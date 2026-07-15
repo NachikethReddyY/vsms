@@ -1,0 +1,289 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="dark">
+  <title>VSMS — Project 2 Field Guide</title>
+  <style>
+    :root {
+      --ink: #f4f0e8;
+      --muted: #aaa49a;
+      --faint: #6d6a64;
+      --ground: #101112;
+      --panel: #191a1a;
+      --panel-2: #20211f;
+      --line: rgba(244,240,232,.14);
+      --acid: #d8ff5a;
+      --coral: #ff8f72;
+      --blue: #8dd5ff;
+      --serif: Georgia, 'Times New Roman', serif;
+      --sans: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    }
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body { margin: 0; background: var(--ground); color: var(--ink); font-family: var(--sans); line-height: 1.5; }
+    a { color: inherit; text-underline-offset: .18em; }
+    .topline { height: 5px; background: var(--acid); }
+    .shell { width: min(1180px, calc(100% - 40px)); margin: 0 auto; }
+    header { padding: 22px 0 0; }
+    .meta { display: flex; justify-content: space-between; gap: 18px; color: var(--muted); font-size: .78rem; letter-spacing: .12em; text-transform: uppercase; }
+    .brand { color: var(--acid); font-weight: 800; }
+    .hero { display: grid; grid-template-columns: minmax(0, 1.5fr) minmax(260px, .75fr); gap: 40px; padding: 72px 0 56px; border-bottom: 1px solid var(--line); }
+    h1, h2, h3, p { margin-top: 0; }
+    h1 { max-width: 830px; margin-bottom: 22px; font-family: var(--serif); font-size: clamp(3.2rem, 8vw, 7.4rem); font-weight: 400; letter-spacing: -.06em; line-height: .84; }
+    h1 em { color: var(--acid); font-style: italic; }
+    .deck { max-width: 650px; color: #cbc6bc; font-size: 1.05rem; }
+    .deadline { align-self: end; border-top: 1px solid var(--acid); padding-top: 16px; }
+    .deadline strong { display: block; font-size: 1.48rem; line-height: 1.13; }
+    .deadline span { color: var(--muted); font-size: .88rem; }
+    .jumpbar { position: sticky; top: 0; z-index: 5; display: flex; gap: 20px; overflow: auto; padding: 13px 0; background: rgba(16,17,18,.94); border-bottom: 1px solid var(--line); backdrop-filter: blur(14px); font-size: .82rem; white-space: nowrap; }
+    .jumpbar a { color: var(--muted); text-decoration: none; }
+    .jumpbar a:hover { color: var(--acid); }
+    main { padding: 54px 0 90px; }
+    section { margin: 0 0 78px; scroll-margin-top: 58px; }
+    .eyebrow { margin-bottom: 10px; color: var(--acid); font-size: .74rem; font-weight: 800; letter-spacing: .14em; text-transform: uppercase; }
+    h2 { max-width: 780px; margin-bottom: 25px; font-family: var(--serif); font-size: clamp(2rem, 4vw, 3.6rem); font-weight: 400; letter-spacing: -.04em; line-height: .96; }
+    h3 { margin-bottom: 7px; font-size: 1rem; letter-spacing: -.01em; }
+    .lead { max-width: 760px; color: #d0cbc1; font-size: 1.05rem; }
+    .callout { display: grid; grid-template-columns: auto 1fr; gap: 16px; margin: 28px 0; padding: 20px 22px; border-left: 3px solid var(--acid); background: var(--panel); }
+    .callout .label { color: var(--acid); font-size: .74rem; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; }
+    .callout p { margin: 0; }
+    .grid { display: grid; gap: 14px; }
+    .grid.two { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .grid.three { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+    .card { min-height: 100%; padding: 20px; border: 1px solid var(--line); background: var(--panel); }
+    .card p { margin-bottom: 0; color: var(--muted); font-size: .92rem; }
+    .card .kicker { display: block; margin-bottom: 14px; color: var(--faint); font-size: .72rem; font-weight: 800; letter-spacing: .11em; text-transform: uppercase; }
+    .priority { border-color: rgba(216,255,90,.35); background: linear-gradient(135deg, rgba(216,255,90,.10), transparent 55%), var(--panel); }
+    .priority h3 { color: var(--acid); }
+    .two-col { display: grid; grid-template-columns: minmax(0, 1.12fr) minmax(280px, .88fr); gap: 42px; align-items: start; }
+    .checklist { display: grid; gap: 2px; }
+    .task { display: grid; grid-template-columns: 24px 1fr auto; gap: 12px; align-items: start; padding: 13px 4px; border-bottom: 1px solid var(--line); }
+    .task input { width: 18px; height: 18px; margin: 1px 0 0; accent-color: var(--acid); cursor: pointer; }
+    .task label { cursor: pointer; }
+    .task label strong { display: block; font-size: .95rem; }
+    .task label span { display: block; color: var(--muted); font-size: .84rem; }
+    .tag { display: inline-block; padding: 3px 7px; border: 1px solid var(--line); color: var(--muted); font-size: .68rem; font-weight: 800; letter-spacing: .09em; line-height: 1.1; text-transform: uppercase; }
+    .tag.must { border-color: rgba(216,255,90,.45); color: var(--acid); }
+    .tag.optional { border-color: rgba(141,213,255,.4); color: var(--blue); }
+    .tag.risk { border-color: rgba(255,143,114,.5); color: var(--coral); }
+    .readiness { padding: 22px; background: var(--panel-2); }
+    .readiness .number { display: block; color: var(--acid); font-family: var(--serif); font-size: 4.7rem; letter-spacing: -.06em; line-height: .85; }
+    .readiness p { margin: 12px 0 16px; color: var(--muted); font-size: .88rem; }
+    progress { width: 100%; height: 8px; accent-color: var(--acid); }
+    .workflow { display: grid; grid-template-columns: repeat(6, 1fr); gap: 8px; margin-top: 24px; }
+    .stage { position: relative; min-height: 145px; padding: 14px; background: var(--panel); border-top: 2px solid var(--acid); }
+    .stage:not(:last-child)::after { position: absolute; right: -9px; top: 50%; z-index: 1; color: var(--acid); content: '→'; transform: translateY(-50%); }
+    .stage strong { display: block; font-family: var(--serif); font-size: 1.26rem; font-weight: 400; line-height: 1; }
+    .stage span { display: block; margin-top: 12px; color: var(--muted); font-size: .79rem; }
+    .stack { display: grid; gap: 0; border: 1px solid var(--line); }
+    .stack-row { display: grid; grid-template-columns: 190px 1fr; gap: 22px; padding: 15px 18px; border-bottom: 1px solid var(--line); }
+    .stack-row:last-child { border: 0; }
+    .stack-row dt { color: var(--acid); font-weight: 800; }
+    .stack-row dd { margin: 0; color: var(--muted); }
+    .requirements { width: 100%; border-collapse: collapse; font-size: .9rem; }
+    .requirements th { padding: 10px 8px; border-bottom: 1px solid var(--acid); color: var(--acid); font-size: .68rem; letter-spacing: .12em; text-align: left; text-transform: uppercase; }
+    .requirements td { padding: 13px 8px; border-bottom: 1px solid var(--line); vertical-align: top; }
+    .requirements td:first-child { width: 100px; color: var(--faint); font-size: .75rem; font-weight: 800; letter-spacing: .08em; }
+    .requirements td:last-child { color: var(--muted); }
+    .rail { display: grid; gap: 12px; }
+    .rail-item { padding: 15px 17px; border: 1px solid var(--line); }
+    .rail-item strong { color: var(--coral); font-size: .78rem; letter-spacing: .1em; text-transform: uppercase; }
+    .rail-item p { margin: 7px 0 0; color: var(--muted); font-size: .88rem; }
+    .deliverable { padding: 20px 0; border-bottom: 1px solid var(--line); }
+    .deliverable:first-child { border-top: 1px solid var(--line); }
+    .deliverable h3 { display: flex; justify-content: space-between; gap: 14px; margin-bottom: 8px; }
+    .deliverable p { max-width: 700px; margin-bottom: 0; color: var(--muted); }
+    .compact-list { margin: 12px 0 0; padding-left: 18px; color: var(--muted); font-size: .88rem; }
+    .compact-list li { margin: 5px 0; }
+    .bonus { display: grid; grid-template-columns: repeat(2, 1fr); gap: 2px; background: var(--line); border: 1px solid var(--line); }
+    .bonus div { padding: 13px 15px; background: var(--panel); color: #d3cec4; font-size: .9rem; }
+    footer { padding: 25px 0 55px; border-top: 1px solid var(--line); color: var(--faint); font-size: .78rem; }
+    .source-note { max-width: 850px; color: var(--faint); font-size: .82rem; }
+    @media (max-width: 800px) {
+      .shell { width: min(100% - 28px, 1180px); }
+      .hero, .two-col { grid-template-columns: 1fr; gap: 26px; }
+      .grid.two, .grid.three { grid-template-columns: 1fr; }
+      .workflow { grid-template-columns: repeat(2, 1fr); }
+      .stage:not(:last-child)::after { display: none; }
+      .stack-row { grid-template-columns: 1fr; gap: 4px; }
+      .requirements { min-width: 650px; }
+      .table-scroll { overflow-x: auto; }
+    }
+    @media print {
+      body { background: #fff; color: #111; }
+      .topline { background: #111; }
+      .jumpbar { display: none; }
+      .card, .callout, .stage, .rail-item, .bonus div, .readiness { background: #f4f4f0; }
+      .card, .callout, .stage, .rail-item, .stack, .bonus { border-color: #aaa; }
+      .eyebrow, .deadline strong, .priority h3, .stack-row dt, .requirements th { color: #111; }
+      .task, .stack-row, .requirements td, .deliverable { border-color: #ccc; }
+    }
+  </style>
+</head>
+<body>
+  <div class="topline"></div>
+  <header class="shell">
+    <div class="meta"><span><span class="brand">SCP / VSMS</span> — Project 2</span><span>AY 2026/27 · Semester 1</span></div>
+    <div class="hero">
+      <div>
+        <p class="eyebrow">Unified project brief</p>
+        <h1>Build the <em>secure, offline-first</em> visual screening system.</h1>
+        <p class="deck">A practical field guide to what your team must design, implement, document, demonstrate, and submit for ST0527 Secure Coding Project — Assignment 2.</p>
+      </div>
+      <aside class="deadline">
+        <span>Final submission</span>
+        <strong>16 Aug 2026<br>23:59</strong>
+        <span>Submit project report + slides via PoliteMall. Present during the week of 16 August.</span>
+      </aside>
+    </div>
+  </header>
+
+  <nav class="jumpbar"><div class="shell"><a href="#north-star">The brief</a> · <a href="#build">Build checklist</a> · <a href="#experience">Screening flow</a> · <a href="#security">Security</a> · <a href="#api">API & data</a> · <a href="#evidence">Evidence to submit</a> · <a href="#marks">Marks & risks</a></div></nav>
+
+  <main class="shell">
+    <section id="north-star">
+      <p class="eyebrow">01 — North star</p>
+      <h2>Digitise a community vision-screening event without losing the ability to operate when the network does.</h2>
+      <p class="lead">The Visual Screening Management System (VSMS) replaces paper forms, manual tracking, spreadsheet consolidation, and manual reporting. It must protect participant data while keeping registration, screening, review, referrals, dashboards, and reporting operational in real event conditions.</p>
+      <div class="callout"><span class="label">Definition of done</span><p>A secure cloud-enabled application that supports multi-station workflows, local offline capture, controlled synchronization, real-time operational visibility, and auditable handling of participant information.</p></div>
+      <div class="grid three">
+        <article class="card priority"><span class="kicker">Outcome</span><h3>Fast, paper-light operations</h3><p>Target a 50% reduction in registration time, a 90% reduction in paperwork, and 30% greater screening throughput.</p></article>
+        <article class="card"><span class="kicker">Scale</span><h3>One event, many moving parts</h3><p>Design for up to 500 participants per event, multiple stations, and operational tracking from registration to referral.</p></article>
+        <article class="card"><span class="kicker">Trust</span><h3>Security is a feature</h3><p>RBAC, audit trails, encryption, secure APIs, and OWASP Top 10 alignment are assessed requirements—not polish.</p></article>
+      </div>
+    </section>
+
+    <section id="build">
+      <p class="eyebrow">02 — Build checklist</p>
+      <h2>Use this as the team’s working definition of scope.</h2>
+      <div class="two-col">
+        <div class="checklist" id="checklist">
+          <div class="task"><input id="t1" type="checkbox"><label for="t1"><strong>Event administration</strong><span>Create, update and delete events; configure stations; assign staff and schedules.</span></label><span class="tag must">Must</span></div>
+          <div class="task"><input id="t2" type="checkbox"><label for="t2"><strong>User management + RBAC</strong><span>Administrators can create/disable users and assign Administrator, Event Manager, Registration Officer, Screener, and Reviewer roles.</span></label><span class="tag must">Must</span></div>
+          <div class="task"><input id="t3" type="checkbox"><label for="t3"><strong>Participant registration</strong><span>Register and update profiles, generate a participant ID, search participant records. QR codes are optional in the common specification.</span></label><span class="tag must">Must</span></div>
+          <div class="task"><input id="t4" type="checkbox"><label for="t4"><strong>Queue + station workflow</strong><span>Show queue status, transfer participants, and monitor station workload and completion.</span></label><span class="tag must">Must</span></div>
+          <div class="task"><input id="t5" type="checkbox"><label for="t5"><strong>Screening capture and clinical flags</strong><span>Record the required screening outcomes, automatically flag threshold-based results, and require screener acknowledgement.</span></label><span class="tag must">Must</span></div>
+          <div class="task"><input id="t6" type="checkbox"><label for="t6"><strong>Review + referral</strong><span>Reviewers acknowledge results—including flagged tests—and generate referrals.</span></label><span class="tag must">Must</span></div>
+          <div class="task"><input id="t7" type="checkbox"><label for="t7"><strong>Offline-first synchronization</strong><span>All core viewing, navigation and data entry functions work without connectivity, then synchronize reliably later.</span></label><span class="tag must">Must</span></div>
+          <div class="task"><input id="t8" type="checkbox"><label for="t8"><strong>Operations dashboard + reporting</strong><span>Expose active events, queue statistics, screening completion, sync status, reports, outcomes and referral statistics.</span></label><span class="tag must">Must</span></div>
+        </div>
+        <aside class="readiness"><span class="number" id="score">0/8</span><strong>Core scope complete</strong><p>Check off work as your team validates it. Progress is stored only in this browser.</p><progress id="progress" max="8" value="0"></progress></aside>
+      </div>
+    </section>
+
+    <section id="experience">
+      <p class="eyebrow">03 — The participant journey</p>
+      <h2>Your demonstration should make this sequence feel effortless—even offline.</h2>
+      <div class="workflow">
+        <article class="stage"><strong>01<br>Registration</strong><span>Register participant; issue ID; optionally issue QR code.</span></article>
+        <article class="stage"><strong>02<br>Visual acuity</strong><span>Capture results and surface threshold-based flags.</span></article>
+        <article class="stage"><strong>03<br>Refraction</strong><span>Record prescription / refraction outcomes.</span></article>
+        <article class="stage"><strong>04<br>Colour vision</strong><span>Capture colour-vision test outcome.</span></article>
+        <article class="stage"><strong>05<br>Eye health</strong><span>Complete assessment at the next station.</span></article>
+        <article class="stage"><strong>06<br>Review + referral</strong><span>Reviewer acknowledges results, flags and next action.</span></article>
+      </div>
+      <div class="grid two" style="margin-top:14px">
+        <article class="card"><span class="kicker">Show in the demo</span><h3>Operational visibility</h3><p>Demonstrate registration, screening workflow, offline mode, synchronization, dashboard, and security controls in the required 15-minute demonstration.</p></article>
+        <article class="card"><span class="kicker">Build for the role</span><h3>Least privilege, clear hand-offs</h3><p>Different roles should expose only the operations that role needs. Make station transfer, acknowledgement and referral explicit and traceable.</p></article>
+      </div>
+    </section>
+
+    <section id="security">
+      <p class="eyebrow">04 — Security baseline</p>
+      <h2>Security design carries 20% of the marking scheme. Treat it as an architecture track, not a final sprint.</h2>
+      <p class="lead">The deliverables brief calls for OWASP Top 10 alignment plus rate limiting, secure headers, session timeout, password policy, encryption at rest, and encryption in transit.</p>
+      <div class="table-scroll"><table class="requirements">
+        <thead><tr><th>OWASP</th><th>Expected control</th><th>What to make visible in your evidence</th></tr></thead>
+        <tbody>
+          <tr><td>A01</td><td>Role-based access control</td><td>Role/permission matrix; backend enforcement; forbidden-access tests.</td></tr>
+          <tr><td>A02</td><td>TLS 1.3 + AES-256</td><td>Encryption-in-transit and at-rest design; secret/data handling decisions.</td></tr>
+          <tr><td>A03</td><td>Input validation</td><td>Schema validation, sanitisation, safe error responses, and negative tests.</td></tr>
+          <tr><td>A04</td><td>Threat modelling</td><td>Threat model with mitigations linked to architecture and abuse cases.</td></tr>
+          <tr><td>A05</td><td>Secure configuration</td><td>Secure headers, environment configuration, session timeout, safe defaults.</td></tr>
+          <tr><td>A06</td><td>Dependency scanning</td><td>Dependency scan results and remediation / acceptance notes.</td></tr>
+          <tr><td>A07</td><td>MFA</td><td>Authentication design and how MFA is supported where applicable.</td></tr>
+          <tr><td>A08</td><td>Idempotent APIs</td><td>Idempotency key / deduplication design plus retry test evidence.</td></tr>
+          <tr><td>A09</td><td>Audit logging</td><td>Auditable actions, log schema, and evidence that key activities are recorded.</td></tr>
+          <tr><td>A10</td><td>URL allow lists</td><td>Outbound / redirect / URL-handling controls and validation tests.</td></tr>
+        </tbody>
+      </table></div>
+    </section>
+
+    <section id="api">
+      <p class="eyebrow">05 — Architecture, data & API</p>
+      <h2>Build a connected system: responsive PWA → local queue → secure API → durable data.</h2>
+      <div class="two-col">
+        <dl class="stack">
+          <div class="stack-row"><dt>Frontend</dt><dd>React + TypeScript responsive web app, with offline and synchronization capability. IndexedDB is suggested for offline storage.</dd></div>
+          <div class="stack-row"><dt>Backend</dt><dd>Node.js + Express; JWT authentication is specified in the common project specification.</dd></div>
+          <div class="stack-row"><dt>Database</dt><dd>The common specification says choose one: PostgreSQL. The deliverables brief frames a NoSQL / DynamoDB design principle and AWS-serverless option—make your chosen approach explicit and defensible in the report.</dd></div>
+          <div class="stack-row"><dt>Data modelling</dt><dd>If using DynamoDB, model access patterns with partition keys, sort keys, GSIs and item collections—not joins and foreign keys.</dd></div>
+          <div class="stack-row"><dt>Operational targets</dt><dd>API ≤ 1 second; 99.9% availability; offline capable; 500 participants/event; full audit trail.</dd></div>
+        </dl>
+        <aside class="rail">
+          <article class="rail-item"><strong>Offline means fully functional</strong><p>Users can view screens, enter data and navigate without any network connection.</p></article>
+          <article class="rail-item"><strong>Sync is a choice</strong><p>Allow continuous syncing while online or a deliberate end-of-event synchronization mode.</p></article>
+          <article class="rail-item"><strong>Queue lifecycle</strong><p>PENDING → PROCESSING → SUCCESS, or FAILED → RETRY. Retry failed background requests automatically.</p></article>
+          <article class="rail-item"><strong>No duplicate records</strong><p>Repeated sync requests must not create duplicate screening results or other duplicate writes.</p></article>
+        </aside>
+      </div>
+      <div class="callout"><span class="label">Minimum API surface</span><p><strong>Auth</strong> — POST login, logout, refresh. <strong>Events</strong> — POST/GET/PUT/DELETE <code>/api/v1/events</code>. <strong>Participants</strong> — POST/GET/PUT <code>/api/v1/participants</code>. <strong>Screening</strong> — POST visual-acuity, refraction, colour-vision and eye-health endpoints. <strong>Sync</strong> — POST <code>/api/v1/sync/batch</code>.</p></div>
+    </section>
+
+    <section id="evidence">
+      <p class="eyebrow">06 — Evidence to submit</p>
+      <h2>Package the implementation into a report, diagrams, code, deployment material and a tight live story.</h2>
+      <div class="deliverable"><h3>10–12 page documentation <span class="tag must">Required</span></h3><p>Include Executive Summary, Problem Statement, Business Requirements, Functional Requirements, Non-Functional Requirements, Use Case Analysis, Architecture Design, Database Design, API Design, Security Design, Testing Results, Deployment Guide, and Reflection.</p></div>
+      <div class="deliverable"><h3>Diagram pack <span class="tag must">Required</span></h3><p>Submit a Context, Use Case, NoSQL Design, Component, Deployment, Sequence, Security Architecture, Offline Synchronization, and Secure API Design diagram.</p></div>
+      <div class="deliverable"><h3>Source + deployment material <span class="tag must">Required</span></h3><p>Include frontend, backend, database scripts and deployment scripts. Make it possible for an evaluator to follow your configuration and reproduce the running system.</p></div>
+      <div class="deliverable"><h3>15-minute demonstration <span class="tag must">Required</span></h3><p>Cover login, registration, screening workflow, offline mode, synchronization, dashboard and security controls. Plan a clean reset state and a believable failure/retry moment.</p></div>
+      <div class="deliverable"><h3>Sample data volume <span class="tag">Plan for</span></h3><p>10 events, 20 users, 500 participants, 2,500 screening results, 500 queue records and 5,000 audit logs.</p></div>
+    </section>
+
+    <section id="marks">
+      <p class="eyebrow">07 — Marking & submission risks</p>
+      <h2>Protect the marks you have already earned.</h2>
+      <div class="two-col">
+        <div>
+          <div class="table-scroll"><table class="requirements">
+            <thead><tr><th>Component</th><th>Weight</th></tr></thead>
+            <tbody>
+              <tr><td>Requirements analysis</td><td>5%</td></tr><tr><td>Architecture design</td><td>10%</td></tr><tr><td>Database design (NoSQL)</td><td>5%</td></tr><tr><td>API design</td><td>10%</td></tr><tr><td>Security design</td><td>20%</td></tr><tr><td>Implementation</td><td>20%</td></tr><tr><td>Testing</td><td>10%</td></tr><tr><td>Bonus features</td><td>10%</td></tr><tr><td>Presentation + Q&amp;A</td><td>10%</td></tr>
+            </tbody>
+          </table></div>
+        </div>
+        <aside class="rail">
+          <article class="rail-item"><strong>Late submission</strong><p><span class="tag risk">50% deduction</span> Submissions within one calendar day after the deadline lose 50%; no marks thereafter (subject to valid LOA exceptions).</p></article>
+          <article class="rail-item"><strong>Integrity form</strong><p><span class="tag risk">No form, no marking</span> Prepare and submit the SOC Declaration of Academic Integrity form from BrightSpace.</p></article>
+          <article class="rail-item"><strong>Academic integrity</strong><p>Copied work or allowing copying receives no marks; plagiarism carries serious disciplinary consequences.</p></article>
+        </aside>
+      </div>
+      <h3 style="margin-top:36px">Bonus features — implement any 4</h3>
+      <div class="bonus">
+        <div>QR code scanning</div><div>Mobile-responsive design</div><div>Event-driven architecture</div><div>Real-time dashboard</div><div>Advanced analytics</div><div>Multi-event operations centre</div><div>Host frontend on AWS S3</div><div>Host backend in AWS services</div><div>Store secrets in AWS Secrets Manager</div><div>Cloud authentication with AWS Cognito</div>
+      </div>
+    </section>
+
+    <section>
+      <p class="eyebrow">08 — First team meeting</p>
+      <h2>Leave with owners, a target architecture, and a demo path—not just a backlog.</h2>
+      <div class="grid three">
+        <article class="card"><span class="kicker">Decide</span><h3>Architecture</h3><p>Choose database strategy, auth, offline queue design and deployment target. Record the trade-offs for the report.</p></article>
+        <article class="card"><span class="kicker">Divide</span><h3>Vertical slices</h3><p>Assign end-to-end feature ownership: registration, screening, review/referral, dashboard, sync, security/evidence.</p></article>
+        <article class="card"><span class="kicker">Prove</span><h3>Demo-critical flows first</h3><p>Build login → registration → offline screening → sync → dashboard → security evidence before optional extras.</p></article>
+      </div>
+    </section>
+  </main>
+  <footer class="shell"><p class="source-note">Compiled from “DBSP SCP — Project 2 Common Project Specification V1” and “SCP Project2AY2627S1 Deliverables V1”. This guide reorganises the source requirements for execution; consult the original briefs for any clarification or final instructor direction.</p></footer>
+  <script>
+    const tasks = [...document.querySelectorAll('#checklist input')];
+    const score = document.querySelector('#score');
+    const progress = document.querySelector('#progress');
+    tasks.forEach((task, i) => { task.checked = localStorage.getItem(`vsms-task-${i}`) === 'true'; task.addEventListener('change', () => { localStorage.setItem(`vsms-task-${i}`, task.checked); update(); }); });
+    function update() { const complete = tasks.filter(t => t.checked).length; score.textContent = `${complete}/8`; progress.value = complete; }
+    update();
+  </script>
+</body>
+</html>
