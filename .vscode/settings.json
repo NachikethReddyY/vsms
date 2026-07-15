@@ -1,0 +1,9 @@
+{
+  // bun.lock is a JSONC lockfile by design (trailing commas + comments are intentional).
+  // Treat it as JSONC so the JSON linter stops flagging trailing commas (error 519).
+  "files.associations": {
+    "bun.lock": "jsonc",
+    "bun.lockb": "jsonc"
+  },
+  "prisma.pinToPrisma6": true
+}
