@@ -1,1 +1,325 @@
-## This is progress logs to show our project management ## 
+# Secure Coding & Database Systems Project
+
+**Project Name:** Optix
+
+**Updated:** 2026-07-16
+
+**Repository:** ______________________
+
+---
+
+# Team Members
+
+> The responsibilities below represent the team's initial task allocation. As the project progresses, members are encouraged to collaborate across different modules and contribute to additional features, secure coding improvements, database optimisation, testing, cloud deployment, and documentation where required.
+
+| Member | Full Name | GitHub Username | Primary Responsibility | Possible Expansion | GitHub Issue |
+|---------|-----------|-----------------|------------------------|--------------------|--------------|
+| Member 1 | | | Authentication & Authorization | RBAC, MFA, Audit Logging, Session Management | # |
+| Member 2 | | | Database Design & Prisma ORM | ERD, Indexing, Transactions, Query Optimisation | # |
+| Member 3 | | | Backend API Development | REST APIs, Validation, QR Code, Error Handling | # |
+| Member 4 | | | Frontend Development | UI/UX, Cloud Deployment, Testing, Dashboard | # |
+
+---
+
+# Sprint Overview
+
+| Sprint | Focus | Status |
+|---------|-------|--------|
+| Week 0 | Planning & Requirements | ⬜ |
+| Week 1 | Database Design | ⬜ |
+| Week 2 | Backend Development | ⬜ |
+| Week 3 | Frontend Integration | ⬜ |
+| Week 4 | Testing & Deployment | ⬜ |
+
+---
+
+# Week 0 – Planning & Requirements
+
+## Objectives
+
+-
+
+## Tasks Completed
+
+- [ ] Functional Requirements
+- [ ] Non-Functional Requirements
+- [ ] User Stories
+- [ ] Use Case Diagram
+- [ ] ERD
+- [ ] Wireframes
+- [ ] Sprint Planning
+- [ ] GitHub Project Board
+- [ ] Task Allocation
+
+## Individual Progress
+
+| Member | Progress | Issues Faced | Next Week |
+|---------|----------|--------------|-----------|
+| | | | |
+| | | | |
+| | | | |
+| | | | |
+
+## Reflection
+
+### What went well?
+
+-
+
+### Challenges
+
+-
+
+### Improvements
+
+-
+
+---
+
+# Week 1 – Database Design
+
+## Objectives
+
+-
+
+## Database
+
+- [ ] Prisma Schema
+- [ ] PostgreSQL Setup
+- [ ] Migration
+- [ ] Seed Data
+- [ ] Primary Keys
+- [ ] Foreign Keys
+- [ ] Relationships
+- [ ] Constraints
+- [ ] Indexes
+
+## Secure Coding
+
+- [ ] Authentication Design
+- [ ] Role Design
+- [ ] Input Validation
+- [ ] Password Hashing
+- [ ] JWT Planning
+
+## Evidence
+
+- Prisma Migration Screenshot
+- ERD
+- Database Tables
+
+## Individual Progress
+
+| Member | Progress | Issues Faced | Next Week |
+|---------|----------|--------------|-----------|
+| | | | |
+| | | | |
+| | | | |
+| | | | |
+
+---
+
+# Week 2 – Backend Development
+
+## Objectives
+
+-
+
+## APIs
+
+- [ ] Authentication
+- [ ] Participants
+- [ ] Events
+- [ ] Screening
+- [ ] Referrals
+- [ ] QR Registration
+
+## Secure Coding
+
+- [ ] JWT
+- [ ] Authorization
+- [ ] SQL Injection Prevention
+- [ ] Validation
+- [ ] Error Handling
+- [ ] Logging
+
+## Database
+
+- [ ] CRUD
+- [ ] Transactions
+- [ ] Stored Procedures
+- [ ] Query Optimisation
+
+## Testing
+
+- [ ] Postman
+- [ ] Unit Testing
+
+## Individual Progress
+
+| Member | Progress | Issues Faced | Next Week |
+|---------|----------|--------------|-----------|
+| | | | |
+| | | | |
+| | | | |
+| | | | |
+
+---
+
+# Week 3 – Frontend Integration
+
+## Objectives
+
+-
+
+## Frontend
+
+- [ ] Login
+- [ ] Dashboard
+- [ ] Participant Registration
+- [ ] Search
+- [ ] QR Registration
+- [ ] Event Management
+- [ ] Screening
+- [ ] Reports
+
+## Integration
+
+- [ ] API Integration
+- [ ] Error Messages
+- [ ] Loading States
+- [ ] Authentication
+
+## Testing
+
+- [ ] Functional Testing
+- [ ] Integration Testing
+- [ ] Performance Testing
+
+## Individual Progress
+
+| Member | Progress | Issues Faced | Next Week |
+|---------|----------|--------------|-----------|
+| | | | |
+| | | | |
+| | | | |
+| | | | |
+
+---
+
+# Week 4 – Testing & Deployment
+
+## Objectives
+
+-
+
+## Security
+
+- [ ] OWASP Review
+- [ ] Authentication Testing
+- [ ] Authorization Testing
+- [ ] Audit Logs
+- [ ] Logging & Monitoring
+
+## Database
+
+- [ ] Performance Testing
+- [ ] Search Performance
+- [ ] Index Verification
+
+## Cloud
+
+- [ ] Environment Variables
+- [ ] Database Deployment
+- [ ] HTTPS
+- [ ] Production Testing
+
+## Documentation
+
+- [ ] User Guide
+- [ ] Technical Documentation
+- [ ] API Documentation
+- [ ] Presentation
+
+## Individual Progress
+
+| Member | Progress | Issues Faced | Next Week |
+|---------|----------|--------------|-----------|
+| | | | |
+| | | | |
+| | | | |
+| | | | |
+
+---
+
+# GitHub Issues
+
+| Issue | Description | Assignee | Status |
+|---------|-------------|----------|--------|
+| # | | | ⬜ |
+| # | | | 🟨 |
+| # | | | ✅ |
+
+---
+
+# Sprint Retrospective
+
+## What Went Well
+
+-
+
+## Challenges
+
+-
+
+## Lessons Learned
+
+-
+
+## Action Items
+
+-
+
+---
+
+# Technical Skills Learned
+
+- PostgreSQL
+- Prisma ORM
+- Database Design
+- Transactions
+- Indexing
+- Secure Coding
+- JWT
+- RBAC
+- React
+- Express.js
+- REST APIs
+- OWASP Top 10
+- Cloud Deployment
+
+---
+
+# Evidence
+
+## Screenshots
+
+- ERD
+- Prisma Schema
+- Database
+- API Testing
+- UI
+- Deployment
+
+## GitHub Commits
+
+| Commit | Description |
+|----------|-------------|
+| | |
+| | |
+
+## Pull Requests
+
+| PR | Description |
+|------|-------------|
+| | |
