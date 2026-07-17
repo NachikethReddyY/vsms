@@ -96,7 +96,7 @@ model Users {
 
     auditLogs AuditLog[]
 
-    @@map("User")
+    @@map("users")
 }
 
 model Department {
