@@ -1,0 +1,189 @@
+openapi: 3.0.3
+
+info:
+  title: Cryptix API
+  version: 1.0.0
+  description: >
+    REST API for the Cryptix project.
+    Provides authentication and user management endpoints.
+
+servers:
+  - url: http://localhost:5000
+    description: Local Development Server
+
+tags:
+  - name: Authentication
+    description: User authentication endpoints
+  - name: Users
+    description: User management endpoints
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  schemas:
+    LoginRequest:
+      type: object
+      required:
+        - email
+        - password
+      properties:
+        email:
+          type: string
+          example: admin@example.com
+        password:
+          type: string
+          example: admin123
+
+    SignupRequest:
+      type: object
+      required:
+        - email
+        - password
+      properties:
+        email:
+          type: string
+          example: newuser@example.com
+        password:
+          type: string
+          example: password123
+
+    User:
+      type: object
+      properties:
+        id:
+          type: integer
+          example: 1
+        email:
+          type: string
+          example: admin@example.com
+        created_at:
+          type: string
+          format: date-time
+
+    LoginResponse:
+      type: object
+      properties:
+        accessToken:
+          type: string
+          example: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+        refreshToken:
+          type: string
+          example: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: string
+          example: Invalid email or password
+
+paths:
+  /:
+    get:
+      summary: Backend status
+      description: Checks whether the backend server is running.
+      responses:
+        "200":
+          description: Server is running.
+
+  /auth/login:
+    post:
+      tags:
+        - Authentication
+
+      summary: Login user
+
+      description: Authenticate a user using email and password.
+
+      requestBody:
+        required: true
+
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LoginRequest"
+
+      responses:
+        "200":
+          description: Login successful
+
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LoginResponse"
+
+        "400":
+          description: Missing email or password
+
+        "401":
+          description: Invalid credentials
+
+        "500":
+          description: Internal server error
+
+  /auth/signup:
+    post:
+      tags:
+        - Authentication
+
+      summary: Register new user
+
+      requestBody:
+        required: true
+
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SignupRequest"
+
+      responses:
+        "201":
+          description: User successfully created
+
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+
+        "400":
+          description: Missing required fields
+
+        "500":
+          description: Internal server error
+
+  /users:
+    get:
+      tags:
+        - Users
+
+      summary: Get all users
+
+      description: Returns every user in the database.
+
+      security:
+        - bearerAuth: []
+
+      responses:
+        "200":
+          description: List of users
+
+          content:
+            application/json:
+              schema:
+                type: array
+
+                items:
+                  $ref: "#/components/schemas/User"
+
+        "401":
+          description: Unauthorized
+
+        "403":
+          description: Invalid token
+
+        "500":
+          description: Internal server error
