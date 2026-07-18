@@ -14,10 +14,10 @@
 
 | Member | Full Name | GitHub Username | Primary Responsibility | Possible Expansion | GitHub Issue |
 |---------|-----------|-----------------|------------------------|--------------------|--------------|
-| Member 1 | | | Authentication & Authorization | RBAC, MFA, Audit Logging, Session Management | # |
-| Member 2 | | | Database Design & Prisma ORM | ERD, Indexing, Transactions, Query Optimisation | # |
-| Member 3 | | | Backend API Development | REST APIs, Validation, QR Code, Error Handling | # |
-| Member 4 | | | Frontend Development | UI/UX, Cloud Deployment, Testing, Dashboard | # |
+| Member 1 | *(Teammate)* | *(GitHub Username)* | Authentication & Authorization | RBAC, MFA, Audit Logging, Session Management | #1 |
+| Member 2 | **Keefe Chen Lin Li** | **Keefeinfotech** | **Database Design & Prisma ORM** | **ERD, Prisma Schema, Database Optimisation, Query Optimisation** | #2 |
+| Member 3 | *(Teammate)* | *(GitHub Username)* | Backend API Development | REST APIs, Validation, QR Code, Error Handling | #3 |
+| Member 4 | *(Teammate)* | *(GitHub Username)* | Frontend Development | UI/UX, Cloud Deployment, Testing, Dashboard | #4 |
 
 ---
 
@@ -25,7 +25,7 @@
 
 | Sprint | Focus | Status |
 |---------|-------|--------|
-| Week 0 | Planning & Requirements | ⬜ |
+| Week 0 | Planning & Requirements | 🚧 In Progress |
 | Week 1 | Database Design | ⬜ |
 | Week 2 | Backend Development | ⬜ |
 | Week 3 | Frontend Integration | ⬜ |
@@ -37,7 +37,13 @@
 
 ## Objectives
 
--
+- Gather project requirements.
+- Define functional and non-functional requirements.
+- Plan the system architecture.
+- Design the database structure.
+- Allocate team responsibilities.
+
+---
 
 ## Tasks Completed
 
@@ -45,20 +51,22 @@
 - [ ] Non-Functional Requirements
 - [ ] User Stories
 - [ ] Use Case Diagram
-- [ ] ERD
+- [x] ERD
 - [ ] Wireframes
 - [ ] Sprint Planning
 - [ ] GitHub Project Board
 - [ ] Task Allocation
 
+---
+
 ## Individual Progress
 
 | Member | Progress | Issues Faced | Next Week |
 |---------|----------|--------------|-----------|
-| | | | |
-| | | | |
-| | | | |
-| | | | |
+| **Keefe Chen Lin Li** | Completed the initial Entity Relationship Diagram (ERD), including identifying entities, attributes, primary keys, foreign keys, and relationships to support the system requirements. | Refining entity relationships and validating the database design with the team before implementation. | Finalise the ERD based on feedback and begin creating the Prisma schema. |
+| Member 1 | No updates yet. | - | Continue planning authentication module. |
+| Member 3 | No updates yet. | - | Begin planning backend APIs. |
+| Member 4 | No updates yet. | - | Begin planning wireframes and UI. |
 
 ## Reflection
 
