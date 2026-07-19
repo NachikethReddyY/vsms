@@ -3,7 +3,6 @@ import LoginPage from './components/LoginPage';
 import SignUpPage from './components/SignUpPage';
 import ForgotPasswordPage from './components/ForgotPasswordPage';
 import DashboardPage from './components/DashboardPage';
-import './App.css';
 
 function App() {
   return (
