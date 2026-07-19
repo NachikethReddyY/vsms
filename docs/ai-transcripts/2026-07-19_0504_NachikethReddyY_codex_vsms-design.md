@@ -12,7 +12,7 @@ contributor_github: "NachikethReddyY"
 git_user_name: "NachikethReddyY"
 git_user_email: "y.nachiketh.reddy@gmail.com"
 ai_product: "Codex"
-model: "Unavailable — not exposed by the AI interface."
+model: "GPT-5.6 Terra Medium"
 interface: "Codex API workspace session"
 -------------
 
