@@ -359,6 +359,7 @@ typography, spacing, the warm canvas, and one chromatic timeline moment.
 | `designl.html` | Landing page. Light/dark toggle, responsive to tablet/mobile. |
 | `designd.html` | Live-queue dashboard. Light/dark, collapsible sidebar, selectable rows, live filtering + urgent-first sort, inspector with drawer behaviour on tablet, and a tablet bottom tab bar of large icons. |
 | `prototype.html` | Interactive walk-through of the golden demonstration flow (`docs/user-flow.md`): sign-in, event select, register/QR, live queue, the four screening stations, flag acknowledgement, clinical review, outcome/referral, dashboard, and the offline branch. Blue system, big icons, tablet bottom tab bar. |
+| `vsms-participant-flow.html` | Interactive service map of the complete golden flow, role hand-offs, rule and reviewer decisions, offline synchronisation branch, and highlighted product questions. Includes role filters, step-detail drawer, question visibility control, responsive layout, and light/dark themes. |
 
 All pages share tokens, the system-native type stack, and Lucide icons via CDN.
 Open any file directly in a browser; no build step.
