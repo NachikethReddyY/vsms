@@ -1,0 +1,544 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>VSMS: Community vision screening, operated properly</title>
+<meta name="description" content="VSMS is an offline-capable event-operations system for community vision screening. Registration, station queues, rule-based flags, clinical review and referrals, without paper." />
+<script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
+<style>
+  :root {
+    --canvas: #F7F7F4;
+    --canvas-soft: #FAFAF7;
+    --surface: #FFFFFF;
+    --surface-2: #F2F1EC;
+    --ink: #26251E;
+    --ink-2: #5A5852;
+    --ink-3: #807D72;
+    --line: #E6E5E0;
+    --line-soft: #EFEEE8;
+    --line-strong: #CFCDC4;
+    --accent: #2563EB;
+    --accent-strong: #1D4ED8;
+    --accent-tint: rgba(37,99,235,0.09);
+    --accent-ink: #FFFFFF;
+    --green: #1F8A65;
+    --amber: #B45309;
+    --orange: #C2410C;
+    --red: #CF2D56;
+    --tl-registration: #DFA88F;
+    --tl-acuity: #9FBBE0;
+    --tl-refraction: #C0A8DD;
+    --tl-colour: #9FC9A2;
+    --tl-eye: #D9B36A;
+    --footer-ink: #141310;
+    --footer-line: rgba(237,235,228,0.12);
+    --footer-text: #8A867C;
+    --focus: #2563EB;
+  }
+  [data-theme="dark"] {
+    --canvas: #100F0D;
+    --canvas-soft: #141310;
+    --surface: #1A1916;
+    --surface-2: #22211D;
+    --ink: #EDEBE4;
+    --ink-2: #B0ACA2;
+    --ink-3: #8A867C;
+    --line: rgba(237,235,228,0.09);
+    --line-soft: rgba(237,235,228,0.06);
+    --line-strong: rgba(237,235,228,0.18);
+    --accent: #93C5FD;
+    --accent-strong: #BFDBFE;
+    --accent-tint: rgba(147,197,253,0.16);
+    --accent-ink: #0B1220;
+    --green: #3FA37F;
+    --amber: #D9964A;
+    --orange: #E07B4C;
+    --red: #E05C7E;
+    --footer-ink: #0B0A09;
+    --focus: #93C5FD;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", system-ui, sans-serif;
+    background: var(--canvas);
+    color: var(--ink);
+    font-size: 17px;
+    line-height: 1.47;
+    letter-spacing: -0.01em;
+    -webkit-font-smoothing: antialiased;
+    font-variant-numeric: tabular-nums;
+  }
+  ::selection { background: var(--accent); color: #fff; }
+  a { color: inherit; text-decoration: none; }
+  a:focus-visible, button:focus-visible {
+    outline: 2px solid var(--focus); outline-offset: 2px; border-radius: 4px;
+  }
+  .wrap { max-width: 1120px; margin: 0 auto; padding: 0 32px; }
+  .lucide { width: 18px; height: 18px; stroke-width: 1.75; }
+
+  /* ---------- Nav ---------- */
+  header.nav {
+    position: sticky; top: 0; z-index: 50;
+    background: var(--canvas);
+    border-bottom: 1px solid var(--line);
+  }
+  .nav-inner { display: flex; align-items: center; height: 56px; gap: 32px; }
+  .wordmark { display: flex; align-items: center; gap: 9px; font-weight: 600; font-size: 15px; letter-spacing: -0.01em; }
+  .wordmark .mark {
+    width: 22px; height: 22px; border-radius: 6px;
+    background: var(--ink); color: var(--canvas);
+    display: grid; place-items: center;
+  }
+  .wordmark .mark .lucide { width: 13px; height: 13px; stroke-width: 2.25; }
+  .nav-links { display: flex; gap: 26px; margin-left: 12px; }
+  .nav-links a { font-size: 13.5px; font-weight: 400; color: var(--ink-2); transition: color .15s; }
+  .nav-links a:hover { color: var(--ink); }
+  .nav-right { margin-left: auto; display: flex; align-items: center; gap: 10px; }
+  .icon-btn {
+    width: 36px; height: 36px; border-radius: 8px; border: 1px solid transparent;
+    background: transparent; color: var(--ink-2); cursor: pointer;
+    display: grid; place-items: center; transition: all .15s;
+  }
+  .icon-btn:hover { background: var(--surface-2); border-color: var(--line); color: var(--ink); }
+  .btn {
+    display: inline-flex; align-items: center; gap: 8px;
+    font-family: inherit; font-size: 13.5px; font-weight: 600;
+    padding: 0 20px; height: 38px; border-radius: 999px; cursor: pointer;
+    border: 1px solid transparent; transition: all .15s; white-space: nowrap;
+  }
+  .btn:active { transform: scale(0.97); }
+  .btn-primary { background: var(--ink); color: var(--canvas); }
+  .btn-primary:hover { opacity: 0.85; }
+  .btn-ghost { border-color: var(--line-strong); color: var(--ink); background: var(--surface); }
+  .btn-ghost:hover { border-color: var(--ink-3); }
+  .btn .lucide { width: 15px; height: 15px; }
+
+  /* ---------- Hero ---------- */
+  .hero { padding: 104px 0 88px; position: relative; }
+  .hero-inner { position: relative; max-width: 780px; }
+  .eyebrow {
+    display: inline-flex; align-items: center; gap: 8px;
+    font-size: 12px; font-weight: 600; letter-spacing: 0.09em; text-transform: uppercase;
+    color: var(--ink-3); margin-bottom: 22px;
+  }
+  .eyebrow::before { content: ""; width: 22px; height: 1px; background: var(--ink-3); }
+  h1 {
+    font-size: clamp(36px, 5.2vw, 56px);
+    line-height: 1.07; letter-spacing: -0.02em; font-weight: 600;
+    margin-bottom: 22px;
+  }
+  h1 .quiet { color: var(--ink-3); }
+  .lede { font-size: 17px; line-height: 1.47; color: var(--ink-2); max-width: 560px; margin-bottom: 34px; }
+  .hero-actions { display: flex; gap: 12px; flex-wrap: wrap; align-items: center; }
+  .hero-actions .btn { height: 44px; padding: 0 24px; font-size: 14px; }
+
+  /* ---------- Constraint strip ---------- */
+  .strip { border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); background: var(--surface); }
+  .strip-inner { display: flex; flex-wrap: wrap; }
+  .strip-item {
+    display: flex; align-items: center; gap: 10px;
+    padding: 16px 28px 16px 0; margin-right: 28px;
+    font-size: 13.5px; font-weight: 400; color: var(--ink-2);
+  }
+  .strip-item + .strip-item { border-left: 1px solid var(--line); padding-left: 28px; }
+  .strip-item .lucide { width: 15px; height: 15px; color: var(--ink-3); }
+
+  /* ---------- Sections ---------- */
+  section.block { padding: 88px 0; }
+  section.block + section.block { border-top: 1px solid var(--line); }
+  .sec-head { display: flex; align-items: baseline; gap: 18px; margin-bottom: 14px; }
+  .sec-num { font-size: 12px; font-weight: 600; color: var(--accent); letter-spacing: 0.06em; }
+  h2 { font-size: clamp(26px, 3.6vw, 40px); letter-spacing: -0.02em; line-height: 1.1; font-weight: 600; }
+  .sec-sub { color: var(--ink-2); max-width: 620px; margin-bottom: 48px; }
+
+  /* Problem statements */
+  .statements { border-top: 1px solid var(--line); }
+  .statement {
+    display: grid; grid-template-columns: 56px 1fr 1.2fr; gap: 24px; align-items: baseline;
+    padding: 26px 0; border-bottom: 1px solid var(--line);
+  }
+  .statement .idx { font-size: 13px; font-weight: 600; color: var(--ink-3); }
+  .statement .claim { font-size: 17px; font-weight: 600; letter-spacing: -0.01em; }
+  .statement .detail { font-size: 14.5px; color: var(--ink-2); }
+
+  /* Flow */
+  .flow { display: grid; grid-template-columns: repeat(6, 1fr); gap: 0; border: 1px solid var(--line); border-radius: 12px; overflow: hidden; background: var(--surface); }
+  .flow-step { padding: 22px 18px 20px; border-left: 1px solid var(--line-soft); position: relative; }
+  .flow-step:first-child { border-left: none; }
+  .flow-step .n { font-size: 11px; font-weight: 600; letter-spacing: 0.06em; color: var(--ink-3); margin-bottom: 26px; display: flex; justify-content: space-between; align-items: center; }
+  .flow-step .n .tl { width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0; }
+  .flow-step .n .tl-1 { background: var(--tl-registration); }
+  .flow-step .n .tl-2 { background: var(--tl-acuity); }
+  .flow-step .n .tl-3 { background: var(--tl-refraction); }
+  .flow-step .n .tl-4 { background: var(--tl-colour); }
+  .flow-step .n .tl-5 { background: var(--tl-eye); }
+  .flow-step .n .tl-6 { background: transparent; box-shadow: inset 0 0 0 2px var(--accent); }
+  .flow-step .name { font-size: 14px; font-weight: 600; margin-bottom: 4px; }
+  .flow-step .desc { font-size: 12.5px; color: var(--ink-2); line-height: 1.5; }
+
+  /* Field / offline */
+  .field-grid { display: grid; grid-template-columns: 1.1fr 1fr; gap: 56px; align-items: start; }
+  .field-copy p { color: var(--ink-2); font-size: 15px; margin-bottom: 16px; }
+  .field-copy strong { color: var(--ink); font-weight: 600; }
+  .sync-list { border: 1px solid var(--line); border-radius: 12px; background: var(--surface); overflow: hidden; }
+  .sync-list .sl-head { padding: 13px 18px; font-size: 11.5px; font-weight: 600; letter-spacing: 0.07em; text-transform: uppercase; color: var(--ink-3); border-bottom: 1px solid var(--line-soft); background: var(--canvas-soft); }
+  .sync-row { display: flex; align-items: center; gap: 12px; padding: 12px 18px; font-size: 13.5px; font-weight: 400; border-bottom: 1px solid var(--line-soft); }
+  .sync-row:last-child { border-bottom: none; }
+  .sync-row .dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
+  .sync-row .note { margin-left: auto; font-size: 12px; color: var(--ink-3); font-weight: 400; }
+  .qr-note { display: flex; gap: 12px; margin-top: 20px; padding: 14px 16px; border: 1px solid var(--line); border-radius: 12px; background: var(--canvas-soft); font-size: 13.5px; color: var(--ink-2); }
+  .qr-note .lucide { flex-shrink: 0; color: var(--ink-3); margin-top: 2px; }
+
+  /* Roles */
+  .roles { border-top: 1px solid var(--line); }
+  .role { display: grid; grid-template-columns: 220px 1fr; gap: 24px; padding: 20px 0; border-bottom: 1px solid var(--line); align-items: baseline; }
+  .role .r-name { font-size: 14.5px; font-weight: 600; display: flex; align-items: center; gap: 10px; }
+  .role .r-name .lucide { width: 16px; height: 16px; color: var(--ink-3); }
+  .role .r-desc { font-size: 14px; color: var(--ink-2); }
+
+  /* Product preview */
+  .preview-frame { border: 1px solid var(--line-strong); border-radius: 12px; background: var(--surface); overflow: hidden; }
+  .preview-bar { display: flex; align-items: center; gap: 8px; padding: 10px 14px; border-bottom: 1px solid var(--line-soft); background: var(--canvas-soft); }
+  .preview-bar .pdot { width: 9px; height: 9px; border-radius: 50%; background: var(--line-strong); }
+  .preview-bar .purl { margin-left: 10px; font-size: 11.5px; color: var(--ink-3); background: var(--canvas); border: 1px solid var(--line); border-radius: 5px; padding: 3px 10px; }
+  .preview-body { padding: 6px 0 0; }
+  .pv-head { display: flex; align-items: baseline; gap: 14px; padding: 14px 22px 12px; border-bottom: 1px solid var(--line); }
+  .pv-head .t { font-size: 14.5px; font-weight: 600; }
+  .pv-head .s { font-size: 12px; color: var(--ink-3); }
+  .pv-row { display: grid; grid-template-columns: 1.5fr 1fr 70px 110px; gap: 16px; padding: 12px 22px; border-bottom: 1px solid var(--line-soft); align-items: center; }
+  .pv-row.sel { background: var(--accent-tint); box-shadow: inset 2px 0 0 var(--accent); }
+  .pv-name { font-size: 13.5px; font-weight: 600; }
+  .pv-id { font-size: 11.5px; color: var(--ink-3); }
+  .pv-meta { font-size: 12.5px; color: var(--ink-2); }
+  .pv-status { display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; font-weight: 400; }
+  .pv-status .lucide { width: 13px; height: 13px; }
+  .st-review { color: var(--amber); } .st-wait { color: var(--ink-3); }
+  .st-screen { color: var(--accent); } .st-urgent { color: var(--red); }
+  .st-complete { color: var(--green); } .st-referral { color: var(--orange); }
+  .preview-cta { display: flex; justify-content: center; padding: 18px; }
+  .preview-cta a { display: inline-flex; align-items: center; gap: 7px; font-size: 13.5px; font-weight: 600; color: var(--accent); }
+  .preview-cta a:hover { color: var(--accent-strong); }
+  .preview-cta .lucide { width: 15px; height: 15px; }
+
+  /* CTA + footer */
+  .final { background: var(--footer-ink); color: #EDEBE4; }
+  .final .cta-block { padding: 88px 0; text-align: left; border-bottom: 1px solid var(--footer-line); }
+  .final h2 { color: #EDEBE4; margin-bottom: 14px; }
+  .final .cta-sub { color: var(--footer-text); max-width: 520px; margin-bottom: 30px; }
+  .footer-inner { display: flex; align-items: center; gap: 24px; padding: 26px 0; font-size: 13px; color: var(--footer-text); flex-wrap: wrap; }
+  .footer-inner .f-links { margin-left: auto; display: flex; gap: 22px; }
+  .footer-inner a:hover { color: #EDEBE4; }
+
+  /* ---------- Responsive ---------- */
+  @media (max-width: 960px) {
+    .flow { grid-template-columns: repeat(3, 1fr); }
+    .flow-step:nth-child(4) { border-left: none; }
+    .flow-step { border-top: 1px solid var(--line); }
+    .flow-step:nth-child(-n+3) { border-top: none; }
+    .field-grid { grid-template-columns: 1fr; gap: 40px; }
+    .statement { grid-template-columns: 40px 1fr; }
+    .statement .detail { grid-column: 2; }
+    .nav-links { display: none; }
+  }
+  @media (max-width: 640px) {
+    .wrap { padding: 0 20px; }
+    .hero { padding: 64px 0 56px; }
+    section.block { padding: 60px 0; }
+    .flow { grid-template-columns: 1fr 1fr; }
+    .flow-step { border-left: none !important; border-top: 1px solid var(--line) !important; }
+    .flow-step:nth-child(odd) { border-right: 1px solid var(--line); }
+    .flow-step:nth-child(-n+2) { border-top: none !important; }
+    .role { grid-template-columns: 1fr; gap: 6px; }
+    .strip-item + .strip-item { border-left: none; padding-left: 0; }
+    .pv-row { grid-template-columns: 1.4fr 90px; }
+    .pv-meta, .pv-row .hide-s { display: none; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    * { transition: none !important; scroll-behavior: auto !important; }
+    .btn:active { transform: none; }
+  }
+</style>
+</head>
+<body>
+
+<header class="nav">
+  <div class="wrap nav-inner">
+    <a class="wordmark" href="#top">
+      <span class="mark"><i data-lucide="scan-eye"></i></span>
+      VSMS
+    </a>
+    <nav class="nav-links" aria-label="Primary">
+      <a href="#problem">The problem</a>
+      <a href="#flow">Event flow</a>
+      <a href="#field">Built for the field</a>
+      <a href="#roles">Roles</a>
+    </nav>
+    <div class="nav-right">
+      <button class="icon-btn" id="themeToggle" aria-label="Toggle dark mode">
+        <i data-lucide="moon"></i>
+      </button>
+      <a class="btn btn-primary" href="designd.html">Open the prototype</a>
+    </div>
+  </div>
+</header>
+
+<main id="top">
+
+  <!-- Hero -->
+  <section class="hero">
+    <div class="wrap hero-inner">
+      <span class="eyebrow">Visual Screening Management System</span>
+      <h1>Run community vision screening<br />without paper, <span class="quiet">queues, or guesswork.</span></h1>
+      <p class="lede">
+        VSMS is the event-operations system for vision-screening teams. Register participants,
+        move them through stations, surface rule-based flags to a reviewer, and keep every
+        record safe, even when the venue has no connection.
+      </p>
+      <div class="hero-actions">
+        <a class="btn btn-primary" href="designd.html">
+          See the live queue <i data-lucide="arrow-right"></i>
+        </a>
+        <a class="btn btn-ghost" href="design.md">Read the design notes</a>
+      </div>
+    </div>
+  </section>
+
+  <!-- Constraint strip -->
+  <div class="strip">
+    <div class="wrap strip-inner">
+      <span class="strip-item"><i data-lucide="cloud-off"></i>Offline-capable by design</span>
+      <span class="strip-item"><i data-lucide="shield-check"></i>Role-based staff access</span>
+      <span class="strip-item"><i data-lucide="user-x"></i>No participant accounts</span>
+      <span class="strip-item"><i data-lucide="accessibility"></i>WCAG 2.2 AA</span>
+    </div>
+  </div>
+
+  <!-- Problem -->
+  <section class="block" id="problem">
+    <div class="wrap">
+      <div class="sec-head"><h2>The problem with screening day</h2></div>
+      <p class="sec-sub">Community screening events are clinically sound and operationally fragile. The failure is never the test. It is everything around it.</p>
+      <div class="statements">
+        <div class="statement">
+          <span class="idx">a</span>
+          <span class="claim">Paper forms slow every station</span>
+          <span class="detail">Results are handwritten, re-entered later, and occasionally lost. A participant's record exists in three places and agrees with itself in none of them.</span>
+        </div>
+        <div class="statement">
+          <span class="idx">b</span>
+          <span class="claim">Queues are managed by shouting</span>
+          <span class="detail">Staff walk participants between stations from memory. Nobody knows who is waiting where, who has been seen, or why one station has stopped moving.</span>
+        </div>
+        <div class="statement">
+          <span class="idx">c</span>
+          <span class="claim">Reporting arrives weeks late</span>
+          <span class="detail">Outcomes are assembled into spreadsheets after the event. Flags that needed same-day review surface when the reviewer has gone home.</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Flow -->
+  <section class="block" id="flow">
+    <div class="wrap">
+      <div class="sec-head"><h2>One participant, one continuous record</h2></div>
+      <p class="sec-sub">Every participant moves through the same stations. Every station reads and writes the same record. The queue is the interface.</p>
+      <div class="flow">
+        <div class="flow-step">
+          <div class="n"><span class="tl tl-1"></span></div>
+          <div class="name">Registration</div>
+          <div class="desc">Find or register, record consent, check in, assign the first queue.</div>
+        </div>
+        <div class="flow-step">
+          <div class="n"><span class="tl tl-2"></span></div>
+          <div class="name">Visual acuity</div>
+          <div class="desc">Distance and near acuity recorded against configured thresholds.</div>
+        </div>
+        <div class="flow-step">
+          <div class="n"><span class="tl tl-3"></span></div>
+          <div class="name">Refraction</div>
+          <div class="desc">Objective refraction results captured at the station, on the spot.</div>
+        </div>
+        <div class="flow-step">
+          <div class="n"><span class="tl tl-4"></span></div>
+          <div class="name">Colour vision</div>
+          <div class="desc">Screening plates recorded pass / refer, never interpreted in-app.</div>
+        </div>
+        <div class="flow-step">
+          <div class="n"><span class="tl tl-5"></span></div>
+          <div class="name">Eye health</div>
+          <div class="desc">External eye health observations recorded for the reviewer.</div>
+        </div>
+        <div class="flow-step">
+          <div class="n"><span class="tl tl-6"></span></div>
+          <div class="name">Clinical review</div>
+          <div class="desc">A reviewer inspects every flag, makes the final decision, creates the referral.</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Field -->
+  <section class="block" id="field">
+    <div class="wrap">
+      <div class="sec-head"><h2>Built for church halls, not server rooms</h2></div>
+      <p class="sec-sub">Screening events happen in venues with no reliable connection. VSMS treats offline as a normal working condition, not an error state.</p>
+      <div class="field-grid">
+        <div class="field-copy">
+          <p><strong>Every record is saved on the device first.</strong> Staff see one calm message: "Saved safely on this device. Records will synchronise when the connection returns." Work continues; nothing is lost.</p>
+          <p>When the connection returns, synchronisation is explicit and observable. Staff always know which records are where, and conflicts are surfaced to a human. They are never silently resolved.</p>
+          <div class="qr-note">
+            <i data-lucide="qr-code"></i>
+            <span><strong>QR event passes</strong> let staff pull up a participant in one scan. The code carries an event identifier only: never names, results, or clinical data.</span>
+          </div>
+        </div>
+        <div class="sync-list" role="img" aria-label="The six synchronisation states: saved offline, pending sync, syncing, synced, sync failed, conflict requiring review">
+          <div class="sl-head">Sync states, always visible</div>
+          <div class="sync-row"><span class="dot" style="background:#807D72"></span>Saved offline<span class="note">on this device</span></div>
+          <div class="sync-row"><span class="dot" style="background:#B45309"></span>Pending sync<span class="note">waiting for connection</span></div>
+          <div class="sync-row"><span class="dot" style="background:#2563EB"></span>Syncing<span class="note">in progress</span></div>
+          <div class="sync-row"><span class="dot" style="background:#1F8A65"></span>Synced<span class="note">server confirmed</span></div>
+          <div class="sync-row"><span class="dot" style="background:#CF2D56"></span>Sync failed<span class="note">will retry</span></div>
+          <div class="sync-row"><span class="dot" style="background:#C2410C"></span>Conflict requiring review<span class="note">human decides</span></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Roles -->
+  <section class="block" id="roles">
+    <div class="wrap">
+      <div class="sec-head"><h2>Five roles, one workspace</h2></div>
+      <p class="sec-sub">Every staff action is permissioned. Each role sees the same event through the lens of its own work.</p>
+      <div class="roles">
+        <div class="role">
+          <span class="r-name"><i data-lucide="clipboard-list"></i>Registration Officer</span>
+          <span class="r-desc">Finds or registers participants, records consent, creates the event check-in, assigns the first queue.</span>
+        </div>
+        <div class="role">
+          <span class="r-name"><i data-lucide="scan-eye"></i>Screener</span>
+          <span class="r-desc">Scans the next participant, enters station results, acknowledges flags, transfers to the next station.</span>
+        </div>
+        <div class="role">
+          <span class="r-name"><i data-lucide="clipboard-check"></i>Reviewer</span>
+          <span class="r-desc">Inspects flagged results, makes the final decision, records notes, creates referrals and urgent escalations.</span>
+        </div>
+        <div class="role">
+          <span class="r-name"><i data-lucide="activity"></i>Event Manager</span>
+          <span class="r-desc">Watches queues, bottlenecks, event progress, staffing, and sync health across the whole venue.</span>
+        </div>
+        <div class="role">
+          <span class="r-name"><i data-lucide="settings"></i>Administrator</span>
+          <span class="r-desc">Manages users, roles, events, stations, thresholds, and audit access.</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Preview -->
+  <section class="block">
+    <div class="wrap">
+      <div class="sec-head"><h2>The live queue is the product</h2></div>
+      <p class="sec-sub">One continuous workspace: who is waiting, at which station, for how long, and what needs a reviewer. This is a reduced preview; the prototype is fully interactive.</p>
+      <div class="preview-frame">
+        <div class="preview-bar">
+          <span class="pdot"></span><span class="pdot"></span><span class="pdot"></span>
+          <span class="purl">vsms.local / northside-community / live-queue</span>
+        </div>
+        <div class="preview-body">
+          <div class="pv-head">
+            <span class="t">Live queue (18)</span>
+            <span class="s">146 registered · 18 waiting · 72 complete · 12 require review · 3 pending sync</span>
+          </div>
+          <div class="pv-row sel">
+            <div><div class="pv-name">Evelyn Ng</div><div class="pv-id">VSMS-240719-035 · Queue 3</div></div>
+            <div class="pv-meta hide-s">Clinical review</div>
+            <div class="pv-meta hide-s">12m</div>
+            <div><span class="pv-status st-review"><i data-lucide="clipboard-check"></i>Review</span></div>
+          </div>
+          <div class="pv-row">
+            <div><div class="pv-name">Aisha Rahman</div><div class="pv-id">VSMS-240719-041 · Queue 1</div></div>
+            <div class="pv-meta hide-s">Refraction</div>
+            <div class="pv-meta hide-s">22m</div>
+            <div><span class="pv-status st-urgent"><i data-lucide="triangle-alert"></i>Urgent</span></div>
+          </div>
+          <div class="pv-row">
+            <div><div class="pv-name">Marcus Thompson</div><div class="pv-id">VSMS-240719-028 · Queue 2</div></div>
+            <div class="pv-meta hide-s">Visual acuity</div>
+            <div class="pv-meta hide-s">4m</div>
+            <div><span class="pv-status st-screen"><i data-lucide="scan-line"></i>Screening</span></div>
+          </div>
+          <div class="pv-row">
+            <div><div class="pv-name">Daniel Okafor</div><div class="pv-id">VSMS-240719-052 · Queue 5</div></div>
+            <div class="pv-meta hide-s">Registration</div>
+            <div class="pv-meta hide-s">6m</div>
+            <div><span class="pv-status st-wait"><i data-lucide="clock"></i>Waiting</span></div>
+          </div>
+          <div class="pv-row">
+            <div><div class="pv-name">Ingrid Johansson</div><div class="pv-id">VSMS-240719-009 · Queue 4</div></div>
+            <div class="pv-meta hide-s">Complete</div>
+            <div class="pv-meta hide-s">·</div>
+            <div><span class="pv-status st-complete"><i data-lucide="circle-check"></i>Complete</span></div>
+          </div>
+        </div>
+        <div class="preview-cta">
+          <a href="designd.html">Open the interactive prototype <i data-lucide="arrow-up-right"></i></a>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- CTA + footer -->
+  <div class="final">
+    <div class="wrap">
+      <div class="cta-block">
+        <span class="eyebrow" style="color:#8A867C;">Prototype</span>
+        <h2>See screening day, running properly.</h2>
+        <p class="cta-sub">The high-fidelity prototype covers the live queue workspace, the participant inspector, offline and sync states, in light and dark mode.</p>
+        <a class="btn btn-primary" href="designd.html" style="background:#EDEBE4; color:#26251E; height:44px; padding:0 24px; font-size:14px;">
+          Open the dashboard <i data-lucide="arrow-right"></i>
+        </a>
+      </div>
+      <div class="footer-inner">
+        <span class="wordmark" style="color:#EDEBE4;">
+          <span class="mark" style="background:#EDEBE4; color:#26251E;"><i data-lucide="scan-eye"></i></span>
+          VSMS
+        </span>
+        <span>Visual Screening Management System, prototype 2026</span>
+        <nav class="f-links">
+          <a href="design.md">Design notes</a>
+          <a href="designd.html">Dashboard</a>
+        </nav>
+      </div>
+    </div>
+  </div>
+
+</main>
+
+<script>
+  lucide.createIcons();
+
+  const root = document.documentElement;
+  const toggle = document.getElementById('themeToggle');
+  const saved = localStorage.getItem('vsms-theme');
+  if (saved) root.dataset.theme = saved;
+  else if (window.matchMedia('(prefers-color-scheme: dark)').matches) root.dataset.theme = 'dark';
+
+  function setIcon() {
+    toggle.innerHTML = '<i data-lucide="' + (root.dataset.theme === 'dark' ? 'sun' : 'moon') + '"></i>';
+    lucide.createIcons();
+  }
+  setIcon();
+
+  toggle.addEventListener('click', () => {
+    root.dataset.theme = root.dataset.theme === 'dark' ? '' : 'dark';
+    if (!root.dataset.theme) root.removeAttribute('data-theme');
+    localStorage.setItem('vsms-theme', root.dataset.theme || 'light');
+    setIcon();
+  });
+</script>
+</body>
+</html>
