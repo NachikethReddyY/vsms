@@ -1,0 +1,972 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Live queue: Northside Community Screening · VSMS</title>
+<script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
+<style>
+  :root {
+    --canvas: #F7F7F4;
+    --canvas-soft: #FAFAF7;
+    --surface: #FFFFFF;
+    --surface-2: #F2F1EC;
+    --surface-3: #EBEAE5;
+    --ink: #26251E;
+    --ink-2: #5A5852;
+    --ink-3: #807D72;
+    --line: #E6E5E0;
+    --line-soft: #EFEEE8;
+    --line-strong: #CFCDC4;
+    --accent: #2563EB;
+    --accent-strong: #1D4ED8;
+    --accent-tint: rgba(37,99,235,0.09);
+    --accent-tint-2: rgba(37,99,235,0.18);
+    --green: #1F8A65;
+    --amber: #B45309;
+    --amber-tint: rgba(180,83,9,0.07);
+    --orange: #C2410C;
+    --red: #CF2D56;
+    --tl-registration: #DFA88F;
+    --tl-acuity: #9FBBE0;
+    --tl-refraction: #C0A8DD;
+    --tl-colour: #9FC9A2;
+    --tl-eye: #D9B36A;
+    --accent-ink: #FFFFFF;
+    --focus: #2563EB;
+    --shadow-drawer: 0 8px 30px rgba(38,37,30,0.14);
+    --topbar-h: 52px;
+    --sidebar-w: 224px;
+    --rail-w: 64px;
+    --inspector-w: 320px;
+  }
+  [data-theme="dark"] {
+    --canvas: #100F0D;
+    --canvas-soft: #141310;
+    --surface: #1A1916;
+    --surface-2: #22211D;
+    --surface-3: #2A2924;
+    --ink: #EDEBE4;
+    --ink-2: #B0ACA2;
+    --ink-3: #8A867C;
+    --line: rgba(237,235,228,0.09);
+    --line-soft: rgba(237,235,228,0.06);
+    --line-strong: rgba(237,235,228,0.18);
+    --accent: #93C5FD;
+    --accent-strong: #BFDBFE;
+    --accent-tint: rgba(147,197,253,0.16);
+    --accent-tint-2: rgba(147,197,253,0.28);
+    --green: #3FA37F;
+    --amber: #D9964A;
+    --amber-tint: rgba(217,150,74,0.10);
+    --orange: #E07B4C;
+    --red: #E05C7E;
+    --accent-ink: #0B1220;
+    --focus: #93C5FD;
+    --shadow-drawer: 0 8px 30px rgba(0,0,0,0.5);
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { height: 100%; overflow: hidden; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", system-ui, sans-serif;
+    background: var(--canvas);
+    color: var(--ink);
+    font-size: 13px;
+    -webkit-font-smoothing: antialiased;
+    font-variant-numeric: tabular-nums;
+  }
+  button { font-family: inherit; }
+  .lucide { width: 16px; height: 16px; stroke-width: 1.75; flex-shrink: 0; }
+  a:focus-visible, button:focus-visible, [tabindex]:focus-visible, summary:focus-visible, input:focus-visible, select:focus-visible {
+    outline: 2px solid var(--focus); outline-offset: 2px; border-radius: 4px;
+  }
+
+  /* ============ Shell ============ */
+  .app { display: flex; height: 100dvh; }
+
+  /* ============ Sidebar ============ */
+  .sidebar {
+    width: var(--sidebar-w); flex-shrink: 0;
+    background: var(--canvas-soft);
+    border-right: 1px solid var(--line);
+    display: flex; flex-direction: column;
+    transition: grid-template-columns .18s ease-out;
+    overflow: hidden;
+  }
+  .app.rail .sidebar { width: var(--rail-w); }
+
+  .event-switch {
+    display: flex; align-items: center; gap: 10px;
+    margin: 10px; padding: 8px 10px;
+    border: 1px solid var(--line); border-radius: 8px;
+    background: var(--surface);
+    cursor: pointer; text-align: left; width: calc(100% - 20px);
+    transition: border-color .15s;
+  }
+  .event-switch:hover { border-color: var(--line-strong); }
+  .event-switch .ev-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--green); flex-shrink: 0; }
+  .event-switch .ev-text { min-width: 0; flex: 1; }
+  .event-switch .ev-name { font-size: 13px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .event-switch .ev-meta { font-size: 11px; color: var(--ink-3); white-space: nowrap; }
+  .event-switch > .lucide { width: 14px; height: 14px; color: var(--ink-3); }
+  .app.rail .event-switch { justify-content: center; padding: 8px 0; }
+  .app.rail .event-switch .ev-text, .app.rail .event-switch > .lucide { display: none; }
+
+  .nav-scroll { flex: 1; overflow-y: auto; overflow-x: hidden; padding: 2px 10px; }
+  .nav-scroll::-webkit-scrollbar { width: 8px; }
+  .nav-scroll::-webkit-scrollbar-thumb { background: var(--line-strong); border-radius: 4px; }
+
+  .nav-item {
+    display: flex; align-items: center; gap: 10px;
+    width: 100%; padding: 0 10px; height: 34px; margin-bottom: 1px;
+    border: none; border-radius: 8px;
+    background: transparent; color: var(--ink-2);
+    font-size: 13px; font-weight: 400; cursor: pointer;
+    position: relative; text-align: left;
+    transition: background .12s, color .12s;
+    white-space: nowrap;
+  }
+  .nav-item:hover { background: var(--surface-3); color: var(--ink); }
+  .nav-item.active { background: var(--accent-tint); color: var(--ink); font-weight: 600; }
+  .nav-item.active::before {
+    content: ""; position: absolute; left: -10px; top: 7px; bottom: 7px;
+    width: 2px; border-radius: 2px; background: var(--accent);
+  }
+  .nav-item .lucide { width: 16px; height: 16px; color: var(--ink-3); }
+  .nav-item.active .lucide { color: var(--accent); }
+  .nav-item .count { margin-left: auto; font-size: 12px; font-weight: 400; color: var(--ink-3); }
+  .nav-item.active .count { color: var(--ink-2); }
+  .app.rail .nav-item { justify-content: center; padding: 0; }
+  .app.rail .nav-item .label, .app.rail .nav-item .count { display: none; }
+  .app.rail .nav-item.active::before { left: -10px; }
+
+  .sidebar-bottom { border-top: 1px solid var(--line); padding: 10px; flex-shrink: 0; }
+  .conn {
+    display: flex; align-items: center; gap: 9px;
+    padding: 7px 10px; border-radius: 8px;
+    font-size: 12px; color: var(--ink-2); font-weight: 400;
+    white-space: nowrap;
+  }
+  .conn .c-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--green); flex-shrink: 0; }
+  .conn .c-sub { color: var(--ink-3); font-weight: 400; }
+  .profile {
+    display: flex; align-items: center; gap: 10px;
+    margin-top: 4px; padding: 7px 10px; border-radius: 8px;
+    cursor: pointer; border: none; background: transparent; width: 100%;
+    text-align: left; transition: background .12s;
+  }
+  .profile:hover { background: var(--surface-3); }
+  .avatar {
+    width: 26px; height: 26px; border-radius: 50%; flex-shrink: 0;
+    background: var(--ink); color: var(--canvas);
+    display: grid; place-items: center;
+    font-size: 12px; font-weight: 600; letter-spacing: 0.02em;
+  }
+  .profile .p-text { min-width: 0; }
+  .profile .p-name { font-size: 13px; font-weight: 600; white-space: nowrap; }
+  .profile .p-role { font-size: 11px; color: var(--ink-3); white-space: nowrap; }
+  .app.rail .conn .c-text, .app.rail .profile .p-text { display: none; }
+  .app.rail .conn, .app.rail .profile { justify-content: center; padding: 7px 0; }
+
+  /* ============ Main column ============ */
+  .main { flex: 1; display: flex; flex-direction: column; min-width: 0; }
+
+  /* Top bar */
+  .topbar {
+    height: var(--topbar-h); flex-shrink: 0;
+    display: flex; align-items: center; gap: 12px;
+    padding: 0 16px;
+    background: var(--surface);
+    border-bottom: 1px solid var(--line);
+  }
+  .tb-icon {
+    width: 32px; height: 32px; border-radius: 8px; border: none;
+    background: transparent; color: var(--ink-2); cursor: pointer;
+    display: grid; place-items: center; transition: background .12s, color .12s;
+    position: relative;
+  }
+  .tb-icon:hover { background: var(--surface-3); color: var(--ink); }
+  .tb-icon .lucide { width: 16px; height: 16px; }
+  .tb-title { display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 600; white-space: nowrap; }
+  .live-mark { display: inline-flex; align-items: center; gap: 5px; font-size: 11px; font-weight: 600; color: var(--green); }
+  .live-mark::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: var(--green); }
+
+  .tb-search {
+    flex: 1; max-width: 420px; margin: 0 auto;
+    display: flex; align-items: center; gap: 8px;
+    height: 34px; padding: 0 10px;
+    background: var(--canvas);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    transition: border-color .15s;
+  }
+  .tb-search:focus-within { border-color: var(--accent); background: var(--surface); }
+  .tb-search .lucide { width: 14px; height: 14px; color: var(--ink-3); }
+  .tb-search input {
+    flex: 1; border: none; background: transparent; outline: none;
+    font-family: inherit; font-size: 13px; color: var(--ink); min-width: 0;
+  }
+  .tb-search input::placeholder { color: var(--ink-3); }
+  .tb-search kbd {
+    font-family: inherit; font-size: 11px; color: var(--ink-3);
+    border: 1px solid var(--line-strong); border-radius: 4px;
+    padding: 1px 5px; background: var(--surface);
+  }
+
+  .tb-right { display: flex; align-items: center; gap: 4px; margin-left: auto; }
+  .sync-chip {
+    display: flex; align-items: center; gap: 8px;
+    height: 32px; padding: 0 11px; margin-right: 6px;
+    border: 1px solid var(--line); border-radius: 8px;
+    background: var(--canvas);
+    font-size: 12px; font-weight: 400; color: var(--ink-2);
+    cursor: pointer; transition: border-color .15s; white-space: nowrap;
+  }
+  .sync-chip:hover { border-color: var(--line-strong); }
+  .sync-chip .lucide { width: 13px; height: 13px; color: var(--amber); }
+  .sync-chip b { font-weight: 600; color: var(--ink); }
+  .tb-icon .badge {
+    position: absolute; top: 5px; right: 5px;
+    min-width: 14px; height: 14px; padding: 0 3px;
+    border-radius: 7px; background: var(--red);
+    color: #fff; font-size: 11px; font-weight: 600;
+    display: grid; place-items: center; line-height: 1;
+  }
+  .tb-avatar { width: 28px; height: 28px; margin-left: 4px; }
+
+  /* ============ Content ============ */
+  .content { flex: 1; display: flex; min-height: 0; }
+
+  /* Queue workspace */
+  .workspace {
+    flex: 1; min-width: 0; display: flex; flex-direction: column;
+    background: var(--surface);
+    overflow: hidden;
+  }
+  .ws-head { padding: 18px 20px 0; flex-shrink: 0; }
+  .ws-title-row { display: flex; align-items: baseline; gap: 14px; flex-wrap: wrap; }
+  .ws-title { font-size: 22px; font-weight: 600; letter-spacing: -0.01em; }
+  .ws-summary { font-size: 12px; color: var(--ink-3); }
+  .ws-summary b { font-weight: 600; color: var(--ink-2); }
+
+  .ws-toolbar { display: flex; align-items: center; gap: 8px; margin-top: 14px; flex-wrap: wrap; }
+  .q-search {
+    display: flex; align-items: center; gap: 7px;
+    height: 34px; padding: 0 10px; width: 220px;
+    background: var(--surface); border: 1px solid var(--line-strong); border-radius: 8px;
+    transition: border-color .15s;
+  }
+  .q-search:focus-within { border-color: var(--accent); }
+  .q-search .lucide { width: 14px; height: 14px; color: var(--ink-3); }
+  .q-search input { flex: 1; border: none; background: transparent; outline: none; font-family: inherit; font-size: 13px; color: var(--ink); min-width: 0; }
+  .q-search input::placeholder { color: var(--ink-3); }
+
+  .q-select {
+    height: 34px; padding: 0 8px;
+    border: 1px solid var(--line-strong); border-radius: 8px;
+    background: var(--surface); color: var(--ink);
+    font-family: inherit; font-size: 13px; font-weight: 400;
+    cursor: pointer; transition: border-color .15s;
+  }
+  .q-select:hover { border-color: var(--ink-3); }
+
+  .q-toggle {
+    display: inline-flex; align-items: center; gap: 7px;
+    height: 34px; padding: 0 12px;
+    border: 1px solid var(--line-strong); border-radius: 8px;
+    background: var(--surface); color: var(--ink-2);
+    font-size: 13px; font-weight: 400; cursor: pointer;
+    transition: all .15s; white-space: nowrap;
+  }
+  .q-toggle .lucide { width: 14px; height: 14px; }
+  .q-toggle[aria-pressed="true"] {
+    background: var(--accent-tint); border-color: var(--accent); color: var(--accent-strong); font-weight: 600;
+  }
+  .q-spacer { flex: 1; }
+  .q-menu-btn {
+    width: 34px; height: 34px; border-radius: 8px;
+    border: 1px solid var(--line-strong); background: var(--surface);
+    color: var(--ink-2); cursor: pointer; display: grid; place-items: center;
+    transition: border-color .15s;
+  }
+  .q-menu-btn:hover { border-color: var(--ink-3); }
+  .q-menu-btn .lucide { width: 15px; height: 15px; }
+
+  /* Table */
+  .queue-scroll { flex: 1; overflow-y: auto; margin-top: 12px; border-top: 1px solid var(--line); }
+  .queue-scroll::-webkit-scrollbar { width: 10px; }
+  .queue-scroll::-webkit-scrollbar-thumb { background: var(--line-strong); border-radius: 5px; border: 2px solid var(--surface); }
+
+  .q-grid {
+    display: grid;
+    grid-template-columns: minmax(210px, 1.7fr) minmax(110px, 1fr) 76px 128px 132px 40px;
+    align-items: center;
+    gap: 12px; padding: 0 20px;
+  }
+  .q-head {
+    position: sticky; top: 0; z-index: 2;
+    background: var(--surface);
+    height: 34px;
+    font-size: 11px; font-weight: 600; letter-spacing: 0.05em; text-transform: uppercase;
+    color: var(--ink-3);
+    border-bottom: 1px solid var(--line);
+  }
+  .q-row {
+    height: 62px;
+    border-bottom: 1px solid var(--line-soft);
+    cursor: pointer;
+    position: relative;
+    transition: background .1s;
+  }
+  .q-row:hover { background: var(--canvas-soft); }
+  .q-row.selected { background: var(--accent-tint); box-shadow: inset 2px 0 0 var(--accent); }
+  .q-row.hidden { display: none; }
+
+  .q-who { min-width: 0; }
+  .q-name { font-size: 14px; font-weight: 600; color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .q-id { font-size: 12px; color: var(--ink-3); margin-top: 1px; white-space: nowrap; }
+  .q-station { font-size: 13px; color: var(--ink-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .q-wait { font-size: 13px; color: var(--ink-2); }
+  .q-wait.long { color: var(--amber); font-weight: 600; }
+
+  .q-status { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 400; white-space: nowrap; }
+  .q-status .lucide { width: 13px; height: 13px; }
+  .st-waiting { color: var(--ink-3); }
+  .st-screening { color: var(--accent); }
+  .st-review { color: var(--amber); }
+  .st-referral { color: var(--orange); }
+  .st-urgent { color: var(--red); font-weight: 600; }
+  .st-complete { color: var(--green); }
+
+  .row-action {
+    height: 30px; padding: 0 4px;
+    border-radius: 8px; border: none;
+    background: transparent; color: var(--ink);
+    font-size: 13px; font-weight: 600; cursor: pointer;
+    white-space: nowrap; transition: color .12s;
+    display: inline-flex; align-items: center; gap: 3px;
+  }
+  .row-action .lucide { width: 13px; height: 13px; }
+  .row-action:hover { color: var(--accent-strong); }
+  .row-action.primary { color: var(--accent); }
+  .row-action.primary:hover { color: var(--accent-strong); }
+  .row-action.textual { color: var(--ink-3); font-weight: 400; }
+  .row-action.textual:hover { color: var(--accent-strong); }
+
+  .q-more {
+    width: 30px; height: 30px; border-radius: 8px; border: none;
+    background: transparent; color: var(--ink-3); cursor: pointer;
+    display: grid; place-items: center; transition: background .12s;
+  }
+  .q-more:hover { background: var(--surface-3); color: var(--ink); }
+  .q-more .lucide { width: 15px; height: 15px; }
+
+  .q-empty { padding: 48px 20px; text-align: center; color: var(--ink-3); font-size: 13px; display: none; }
+
+  /* ============ Inspector ============ */
+  .inspector {
+    width: var(--inspector-w); flex-shrink: 0;
+    background: var(--surface-2);
+    border-left: 1px solid var(--line);
+    overflow-y: auto;
+    display: flex; flex-direction: column;
+  }
+  .inspector::-webkit-scrollbar { width: 8px; }
+  .inspector::-webkit-scrollbar-thumb { background: var(--line-strong); border-radius: 4px; }
+
+  .insp-head { padding: 20px 20px 0; }
+  .insp-close { display: none; }
+  .insp-name-row { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; }
+  .insp-name { font-size: 17px; font-weight: 600; letter-spacing: -0.015em; }
+  .insp-sub { font-size: 12px; color: var(--ink-3); margin-top: 3px; }
+  .insp-station { display: flex; align-items: center; gap: 7px; margin-top: 12px; font-size: 13px; color: var(--ink-2); }
+  .insp-station .lucide { width: 14px; height: 14px; color: var(--amber); }
+  .insp-station b { font-weight: 600; color: var(--ink); }
+
+  .save-state {
+    display: flex; gap: 10px; align-items: flex-start;
+    margin: 16px 20px 0; padding: 11px 12px;
+    border: 1px solid var(--line); border-radius: 12px;
+    background: var(--surface);
+  }
+  .save-state .lucide { width: 15px; height: 15px; color: var(--green); margin-top: 1px; }
+  .save-state .ss-title { font-size: 13px; font-weight: 600; }
+  .save-state .ss-note { font-size: 12px; color: var(--ink-3); margin-top: 2px; line-height: 1.45; }
+
+  .insp-section-label {
+    padding: 20px 20px 10px;
+    font-size: 11px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase;
+    color: var(--ink-3);
+  }
+
+  .timeline { padding: 0 20px; }
+  .tl-item { display: flex; gap: 12px; position: relative; padding-bottom: 16px; }
+  .tl-item:last-child { padding-bottom: 2px; }
+  .tl-item::before {
+    content: ""; position: absolute; left: 5px; top: 14px; bottom: 0;
+    width: 1px; background: var(--line-strong);
+  }
+  .tl-item:last-child::before { display: none; }
+  .tl-dot {
+    width: 11px; height: 11px; border-radius: 50%; flex-shrink: 0; margin-top: 3px;
+    border: 2px solid var(--line-strong); background: var(--surface-2);
+    position: relative; z-index: 1;
+  }
+  /* Muted pastel stage markers: the screening-timeline signature. Scoped here only. */
+  .tl-item.done .tl-dot { border-color: transparent; }
+  .tl-item.done.tl-registration .tl-dot { background: var(--tl-registration); }
+  .tl-item.done.tl-acuity .tl-dot { background: var(--tl-acuity); }
+  .tl-item.done.tl-refraction .tl-dot { background: var(--tl-refraction); }
+  .tl-item.done.tl-colour .tl-dot { background: var(--tl-colour); }
+  .tl-item.done.tl-eye .tl-dot { background: var(--tl-eye); }
+  .tl-item.now .tl-dot { border-color: var(--accent); background: var(--surface); box-shadow: 0 0 0 3px var(--accent-tint-2); }
+  .tl-name { font-size: 13px; font-weight: 400; }
+  .tl-item.now .tl-name { font-weight: 600; color: var(--ink); }
+  .tl-item.pending .tl-name { color: var(--ink-3); }
+  .tl-state { font-size: 12px; color: var(--ink-3); margin-top: 1px; }
+  .tl-item.now .tl-state { color: var(--accent); font-weight: 400; }
+
+  .flag-box {
+    margin: 4px 20px 0; padding: 12px;
+    border: 1px solid color-mix(in srgb, var(--amber) 28%, transparent);
+    border-radius: 12px; background: var(--amber-tint);
+  }
+  .flag-box .fb-head { display: flex; align-items: center; gap: 7px; font-size: 12px; font-weight: 600; color: var(--amber); margin-bottom: 6px; }
+  .flag-box .fb-head .lucide { width: 14px; height: 14px; }
+  .flag-box p { font-size: 13px; line-height: 1.55; color: var(--ink-2); }
+
+  .insp-cta { padding: 16px 20px 4px; }
+  .btn-review {
+    width: 100%; height: 40px;
+    border: none; border-radius: 999px;
+    background: var(--accent); color: var(--accent-ink);
+    font-size: 14px; font-weight: 600; cursor: pointer;
+    display: flex; align-items: center; justify-content: center; gap: 8px;
+    transition: background .15s, transform .1s;
+  }
+  .btn-review:hover { background: var(--accent-strong); }
+  .btn-review:active { transform: scale(0.97); }
+  .btn-review .lucide { width: 15px; height: 15px; }
+
+  .insp-collapsibles { margin-top: 12px; border-top: 1px solid var(--line); padding-bottom: 24px; }
+  .insp-collapsibles details { border-bottom: 1px solid var(--line-soft); }
+  .insp-collapsibles summary {
+    display: flex; align-items: center; gap: 8px;
+    padding: 13px 20px; cursor: pointer; list-style: none;
+    font-size: 13px; font-weight: 600; color: var(--ink);
+    transition: background .12s;
+  }
+  .insp-collapsibles summary::-webkit-details-marker { display: none; }
+  .insp-collapsibles summary:hover { background: var(--surface-3); }
+  .insp-collapsibles summary .lucide { width: 14px; height: 14px; color: var(--ink-3); transition: transform .15s; margin-left: auto; }
+  .insp-collapsibles details[open] summary .lucide { transform: rotate(90deg); }
+  .coll-body { padding: 2px 20px 16px; font-size: 13px; color: var(--ink-2); line-height: 1.6; }
+  .kv { display: flex; justify-content: space-between; gap: 12px; padding: 4px 0; }
+  .kv .k { color: var(--ink-3); }
+  .kv .v { font-weight: 400; color: var(--ink); text-align: right; }
+  .kv .v.flagged { color: var(--amber); font-weight: 600; }
+  .activity-item { display: flex; gap: 10px; padding: 5px 0; align-items: baseline; }
+  .activity-item .t { font-size: 12px; color: var(--ink-3); flex-shrink: 0; width: 44px; }
+  .activity-item .d { font-size: 13px; color: var(--ink-2); }
+
+  /* Inspector drawer (tablet) */
+  .drawer-backdrop {
+    display: none; position: fixed; inset: 0; z-index: 80;
+    background: rgba(20,19,16,0.4);
+  }
+  @media (max-width: 1100px) {
+    .inspector {
+      position: fixed; top: 0; right: 0; bottom: 0; z-index: 90;
+      width: min(340px, 88vw);
+      box-shadow: var(--shadow-drawer);
+      transform: translateX(105%);
+      transition: transform .2s ease-out;
+    }
+    .inspector.open { transform: translateX(0); }
+    .drawer-backdrop.show { display: block; }
+    .insp-close {
+      display: grid; place-items: center;
+      width: 30px; height: 30px; border-radius: 8px; border: none;
+      background: transparent; color: var(--ink-3); cursor: pointer;
+    }
+    .insp-close:hover { background: var(--surface-3); color: var(--ink); }
+  }
+  @media (min-width: 1101px) {
+    .inspector { transform: none !important; }
+  }
+
+  /* Sidebar auto-rail on small tablet */
+  @media (max-width: 860px) {
+    .sidebar { width: var(--rail-w); }
+    .event-switch { justify-content: center; padding: 8px 0; }
+    .event-switch .ev-text, .event-switch > .lucide { display: none; }
+    .nav-item { justify-content: center; padding: 0; }
+    .nav-item .label, .nav-item .count { display: none; }
+    .conn .c-text, .profile .p-text { display: none; }
+    .conn, .profile { justify-content: center; padding: 7px 0; }
+    #collapseBtn { display: none; }
+    .tb-title .full-title { display: none; }
+    .tb-search kbd { display: none; }
+  }
+  @media (max-width: 700px) {
+    .q-grid { grid-template-columns: minmax(160px, 1.6fr) 100px 110px 36px; }
+    .col-station, .col-wait { display: none; }
+    .sync-chip .sc-text { display: none; }
+    .sync-chip { padding: 0 8px; }
+    .tb-search { max-width: none; }
+  }
+
+  /* ============ Tablet bottom tab bar (big icons) ============ */
+  /* On tablet the sidebar collapses to a 64px rail of big icons; a second,
+     even larger set of primary destinations is pinned to the bottom edge so
+     it stays in thumb reach. Hidden on desktop and on phones (phone uses the
+     rail + drawer). */
+  .tabbar {
+    display: none;
+    position: fixed; left: 0; right: 0; bottom: 0; z-index: 70;
+    height: 64px;
+    background: var(--surface);
+    border-top: 1px solid var(--line);
+    grid-template-columns: repeat(5, 1fr);
+    padding: 0 8px;
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+  .tabbar button {
+    border: none; background: transparent; cursor: pointer;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    gap: 3px; height: 100%; color: var(--ink-3);
+    font-size: 11px; font-weight: 600; letter-spacing: 0;
+    min-width: 44px; position: relative; -webkit-tap-highlight-color: transparent;
+    transition: color .12s;
+  }
+  .tabbar button .lucide { width: 24px; height: 24px; stroke-width: 2; }
+  .tabbar button.active { color: var(--accent); }
+  .tabbar button.active::before {
+    content: ""; position: absolute; top: 0; left: 50%; transform: translateX(-50%);
+    width: 28px; height: 3px; border-radius: 0 0 3px 3px; background: var(--accent);
+  }
+  .tabbar button .tb-count {
+    position: absolute; top: 6px; right: 50%; transform: translateX(20px);
+    min-width: 17px; height: 17px; padding: 0 4px;
+    border-radius: 9px; background: var(--accent); color: #fff;
+    font-size: 10px; font-weight: 700; line-height: 1;
+    display: grid; place-items: center;
+  }
+
+  /* Make the tablet rail icons themselves bigger and the rows taller to match */
+  @media (max-width: 1024px) {
+    .sidebar { width: var(--rail-w); }
+    .nav-item { height: 48px; }
+    .nav-item .lucide { width: 22px; height: 22px; stroke-width: 2; }
+    .app.rail .nav-item, .nav-item { justify-content: center; padding: 0; }
+    .nav-item .label, .nav-item .count { display: none; }
+    .event-switch { justify-content: center; padding: 10px 0; }
+    .event-switch .ev-text, .event-switch > .lucide { display: none; }
+    .conn .c-text, .profile .p-text { display: none; }
+    .conn, .profile { justify-content: center; padding: 10px 0; }
+    #collapseBtn { display: none; }
+    .tb-title .full-title { display: none; }
+    .tb-search kbd { display: none; }
+    .tb-icon { width: 40px; height: 40px; }
+    .tb-icon .lucide { width: 20px; height: 20px; }
+    .sync-chip { height: 40px; }
+  }
+
+  /* Phone: hide the bottom bar (rail + drawer covers it) and keep big rail icons */
+  @media (max-width: 600px) {
+    .tabbar { display: none !important; }
+  }
+  /* On tablet the bottom bar appears and content gets bottom padding so the
+     last queue row is never hidden behind it. */
+  @media (min-width: 601px) and (max-width: 1024px) {
+    .tabbar { display: grid; }
+    .queue-scroll { padding-bottom: 80px; }
+  }
+  /* Below 860px the sidebar rail is already big icons; keep collapse control hidden */
+  @media (max-width: 860px) {
+    .app.rail .sidebar { width: var(--rail-w); }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    * { transition: none !important; }
+    .btn-review:active { transform: none; }
+  }
+</style>
+</head>
+<body>
+
+<div class="app" id="app">
+
+  <!-- ================= Sidebar ================= -->
+  <aside class="sidebar" aria-label="Event navigation">
+    <button class="event-switch" aria-label="Switch event">
+      <span class="ev-dot" aria-hidden="true"></span>
+      <span class="ev-text">
+        <span class="ev-name">Northside Community</span><br />
+        <span class="ev-meta">Sat 19 Jul · 8:30am–4:00pm</span>
+      </span>
+      <i data-lucide="chevrons-up-down"></i>
+    </button>
+
+    <nav class="nav-scroll" aria-label="Primary">
+      <button class="nav-item"><i data-lucide="layout-dashboard"></i><span class="label">Dashboard</span></button>
+      <button class="nav-item"><i data-lucide="users"></i><span class="label">Participants</span><span class="count">146</span></button>
+      <button class="nav-item active" aria-current="page"><i data-lucide="list-checks"></i><span class="label">Live queue</span><span class="count">18</span></button>
+      <button class="nav-item"><i data-lucide="scan-eye"></i><span class="label">Screening</span></button>
+      <button class="nav-item"><i data-lucide="clipboard-check"></i><span class="label">Review &amp; referrals</span><span class="count">12</span></button>
+      <button class="nav-item"><i data-lucide="refresh-cw"></i><span class="label">Sync centre</span><span class="count">3</span></button>
+      <button class="nav-item"><i data-lucide="chart-column"></i><span class="label">Reports</span></button>
+      <button class="nav-item"><i data-lucide="settings"></i><span class="label">Settings</span></button>
+    </nav>
+
+    <div class="sidebar-bottom">
+      <div class="conn" role="status">
+        <span class="c-dot" aria-hidden="true"></span>
+        <span class="c-text">Connected <span class="c-sub">· Synced 2 min ago</span></span>
+      </div>
+      <button class="profile">
+        <span class="avatar">AM</span>
+        <span class="p-text">
+          <span class="p-name">Adwoa Mensah</span><br />
+          <span class="p-role">Event Manager</span>
+        </span>
+      </button>
+    </div>
+  </aside>
+
+  <!-- ================= Main ================= -->
+  <div class="main">
+
+    <header class="topbar">
+      <button class="tb-icon" id="collapseBtn" aria-label="Collapse sidebar">
+        <i data-lucide="panel-left"></i>
+      </button>
+      <div class="tb-title">
+        <span class="full-title">Northside Community Screening</span>
+        <span class="live-mark">Live</span>
+      </div>
+
+      <div class="tb-search">
+        <i data-lucide="search"></i>
+        <input type="text" placeholder="Search participants, IDs, commands…" aria-label="Global search" />
+        <kbd>/</kbd>
+      </div>
+
+      <div class="tb-right">
+        <button class="sync-chip" title="3 records pending sync">
+          <i data-lucide="cloud-upload"></i>
+          <span class="sc-text">Saved locally · <b>3 pending</b></span>
+        </button>
+        <button class="tb-icon" id="themeToggle" aria-label="Toggle dark mode"><i data-lucide="moon"></i></button>
+        <button class="tb-icon" aria-label="Notifications, 2 unread">
+          <i data-lucide="bell"></i>
+          <span class="badge">2</span>
+        </button>
+        <button class="tb-icon" aria-label="Help"><i data-lucide="circle-help"></i></button>
+        <span class="avatar tb-avatar" role="button" tabindex="0" aria-label="Account, Adwoa Mensah">AM</span>
+      </div>
+    </header>
+
+    <div class="content">
+
+      <!-- ================= Queue workspace ================= -->
+      <main class="workspace">
+        <div class="ws-head">
+          <div class="ws-title-row">
+            <h1 class="ws-title">Live queue (18)</h1>
+            <p class="ws-summary">
+              <b>146</b> registered · <b>18</b> waiting · <b>72</b> complete ·
+              <b>12</b> require review · <b>3</b> pending sync
+            </p>
+          </div>
+          <div class="ws-toolbar">
+            <div class="q-search">
+              <i data-lucide="search"></i>
+              <input type="text" id="queueSearch" placeholder="Search name or ID…" aria-label="Search queue" />
+            </div>
+            <select class="q-select" id="stationFilter" aria-label="Filter by station">
+              <option value="">All stations</option>
+              <option>Registration</option>
+              <option>Visual acuity</option>
+              <option>Refraction</option>
+              <option>Colour vision</option>
+              <option>Eye health</option>
+              <option>Clinical review</option>
+            </select>
+            <select class="q-select" id="statusFilter" aria-label="Filter by status">
+              <option value="">All statuses</option>
+              <option>Waiting</option>
+              <option>Screening</option>
+              <option>Review</option>
+              <option>Referral</option>
+              <option>Urgent</option>
+              <option>Complete</option>
+            </select>
+            <button class="q-toggle" id="urgentFirst" aria-pressed="false">
+              <i data-lucide="arrow-up-narrow-wide"></i> Urgent first
+            </button>
+            <span class="q-spacer"></span>
+            <button class="q-menu-btn" aria-label="Queue options"><i data-lucide="ellipsis"></i></button>
+          </div>
+        </div>
+
+        <div class="queue-scroll" id="queueScroll">
+          <div class="q-grid q-head" role="row">
+            <span>Participant</span>
+            <span class="col-station">Station</span>
+            <span class="col-wait">Wait</span>
+            <span>Status</span>
+            <span>Action</span>
+            <span></span>
+          </div>
+          <div id="queueRows" role="listbox" aria-label="Live queue"></div>
+          <div class="q-empty" id="queueEmpty">No participants match these filters.</div>
+        </div>
+      </main>
+
+      <!-- ================= Inspector ================= -->
+      <div class="drawer-backdrop" id="drawerBackdrop"></div>
+      <aside class="inspector" id="inspector" aria-label="Selected participant">
+        <div class="insp-head">
+          <div class="insp-name-row">
+            <div>
+              <div class="insp-name" id="inspName">Evelyn Ng</div>
+              <div class="insp-sub" id="inspSub">68 years · VSMS-240719-035</div>
+            </div>
+            <button class="insp-close" id="inspClose" aria-label="Close panel"><i data-lucide="x"></i></button>
+          </div>
+          <div class="insp-station">
+            <i data-lucide="map-pin"></i>
+            <span>Current station: <b id="inspStation">Clinical review</b></span>
+          </div>
+        </div>
+
+        <div class="save-state">
+          <i data-lucide="hard-drive-download"></i>
+          <div>
+            <div class="ss-title">Saved locally</div>
+            <div class="ss-note">Saved safely on this device. Records will synchronise when the connection returns.</div>
+          </div>
+        </div>
+
+        <div class="insp-section-label">Screening timeline</div>
+        <div class="timeline" id="inspTimeline">
+          <div class="tl-item done tl-registration">
+            <span class="tl-dot"></span>
+            <div><div class="tl-name">Registration</div><div class="tl-state">Complete · 9:41</div></div>
+          </div>
+          <div class="tl-item done tl-acuity">
+            <span class="tl-dot"></span>
+            <div><div class="tl-name">Visual acuity</div><div class="tl-state">Complete · 9:58</div></div>
+          </div>
+          <div class="tl-item now">
+            <span class="tl-dot"></span>
+            <div><div class="tl-name">Clinical review</div><div class="tl-state">Active now</div></div>
+          </div>
+          <div class="tl-item pending">
+            <span class="tl-dot"></span>
+            <div><div class="tl-name">Eye health</div><div class="tl-state">Pending</div></div>
+          </div>
+        </div>
+
+        <div class="insp-section-label">Flag</div>
+        <div class="flag-box">
+          <div class="fb-head"><i data-lucide="flag"></i>Flagged for reviewer assessment</div>
+          <p>Distance acuity crossed the configured review threshold. Final decision made by reviewer.</p>
+        </div>
+
+        <div class="insp-cta">
+          <button class="btn-review"><i data-lucide="clipboard-check"></i>Start review</button>
+        </div>
+
+        <div class="insp-collapsibles">
+          <details open>
+            <summary>Screening summary<i data-lucide="chevron-right"></i></summary>
+            <div class="coll-body">
+              <div class="kv"><span class="k">Distance acuity, right</span><span class="v flagged">6/18 · flagged</span></div>
+              <div class="kv"><span class="k">Distance acuity, left</span><span class="v">6/12</span></div>
+              <div class="kv"><span class="k">Near acuity</span><span class="v">N8</span></div>
+              <div class="kv"><span class="k">Review threshold</span><span class="v">≥ 6/18</span></div>
+              <div class="kv"><span class="k">Recorded by</span><span class="v">K. Osei · Station 2</span></div>
+            </div>
+          </details>
+          <details>
+            <summary>Operational notes<i data-lucide="chevron-right"></i></summary>
+            <div class="coll-body">
+              Participant requested Cantonese interpretation, arranged with volunteer
+              interpreter (M. Cheung). Prefers to be called back for results rather than
+              waiting on site.
+            </div>
+          </details>
+          <details>
+            <summary>Recent activity<i data-lucide="chevron-right"></i></summary>
+            <div class="coll-body">
+              <div class="activity-item"><span class="t">9:58am</span><span class="d">Visual acuity recorded. Flag raised by screening rules.</span></div>
+              <div class="activity-item"><span class="t">10:01am</span><span class="d">Transferred to Clinical review · Queue 3</span></div>
+              <div class="activity-item"><span class="t">10:04am</span><span class="d">Record saved locally on this device</span></div>
+            </div>
+          </details>
+        </div>
+      </aside>
+
+    </div>
+  </div>
+</div>
+
+<!-- Tablet bottom tab bar: big icons, thumb reach -->
+<nav class="tabbar" aria-label="Primary navigation">
+  <button class="active" aria-current="page"><i data-lucide="list-checks"></i><span>Queue</span><span class="tb-count">18</span></button>
+  <button><i data-lucide="users"></i><span>People</span></button>
+  <button><i data-lucide="scan-eye"></i><span>Screening</span></button>
+  <button><i data-lucide="clipboard-check"></i><span>Review</span><span class="tb-count">12</span></button>
+  <button><i data-lucide="refresh-cw"></i><span>Sync</span><span class="tb-count">3</span></button>
+</nav>
+
+<script>
+  /* ---------------- Data ---------------- */
+  const STATUSES = {
+    Waiting:   { icon: 'clock',           cls: 'st-waiting' },
+    Screening: { icon: 'scan-line',       cls: 'st-screening' },
+    Review:    { icon: 'clipboard-check', cls: 'st-review' },
+    Referral:  { icon: 'corner-up-right', cls: 'st-referral' },
+    Urgent:    { icon: 'triangle-alert',  cls: 'st-urgent' },
+    Complete:  { icon: 'circle-check',    cls: 'st-complete' },
+  };
+
+  const QUEUE = [
+    { name: 'Evelyn Ng',        age: 68, id: 'VSMS-240719-035', queue: 'Queue 3', station: 'Clinical review', wait: 12,  status: 'Review',    action: 'Start review', primary: true },
+    { name: 'Aisha Rahman',     age: 61, id: 'VSMS-240719-041', queue: 'Queue 1', station: 'Refraction',      wait: 22,  status: 'Urgent',    action: 'Prioritise' },
+    { name: 'Robert Cairn',     age: 74, id: 'VSMS-240719-019', queue: 'Queue 2', station: 'Refraction',      wait: 27,  status: 'Urgent',    action: 'Prioritise' },
+    { name: 'Grace Adeyemi',    age: 59, id: 'VSMS-240719-023', queue: 'Queue 3', station: 'Clinical review', wait: 15,  status: 'Review',    action: 'Start review', primary: true },
+    { name: 'Mei-Lin Chao',     age: 66, id: 'VSMS-240719-014', queue: 'Queue 3', station: 'Clinical review', wait: 8,   status: 'Referral',  action: 'Referral details' },
+    { name: 'Henry Walsh',      age: 71, id: 'VSMS-240719-011', queue: 'Queue 3', station: 'Eye health',      wait: 31,  status: 'Review',    action: 'Start review', primary: true },
+    { name: 'Marcus Thompson',  age: 63, id: 'VSMS-240719-028', queue: 'Queue 2', station: 'Visual acuity',   wait: 4,   status: 'Screening', action: 'Continue' },
+    { name: 'Kwame Mensah',     age: 58, id: 'VSMS-240719-033', queue: 'Queue 2', station: 'Visual acuity',   wait: 11,  status: 'Screening', action: 'Continue' },
+    { name: 'Priya Nair',       age: 52, id: 'VSMS-240719-031', queue: 'Queue 2', station: 'Refraction',      wait: 3,   status: 'Screening', action: 'Continue' },
+    { name: 'Daniel Okafor',    age: 45, id: 'VSMS-240719-052', queue: 'Queue 5', station: 'Registration',    wait: 6,   status: 'Waiting',   action: 'Check in' },
+    { name: 'Sofia Delgado',    age: 49, id: 'VSMS-240719-047', queue: 'Queue 4', station: 'Colour vision',   wait: 9,   status: 'Waiting',   action: 'Start' },
+    { name: 'George Petrov',    age: 70, id: 'VSMS-240719-038', queue: 'Queue 2', station: 'Visual acuity',   wait: 14,  status: 'Waiting',   action: 'Start' },
+    { name: 'Tomas Berg',       age: 55, id: 'VSMS-240719-044', queue: 'Queue 4', station: 'Colour vision',   wait: 5,   status: 'Waiting',   action: 'Start' },
+    { name: 'Fatima Al-Sayed',  age: 64, id: 'VSMS-240719-026', queue: 'Queue 4', station: 'Eye health',      wait: 18,  status: 'Waiting',   action: 'Start' },
+    { name: 'Hassan Yilmaz',    age: 67, id: 'VSMS-240719-030', queue: 'Queue 4', station: 'Eye health',      wait: 7,   status: 'Waiting',   action: 'Start' },
+    { name: 'Peter Novak',      age: 60, id: 'VSMS-240719-043', queue: 'Queue 2', station: 'Refraction',      wait: 10,  status: 'Waiting',   action: 'Start' },
+    { name: 'Lucy Fern',        age: 38, id: 'VSMS-240719-055', queue: 'Queue 5', station: 'Registration',    wait: 2,   status: 'Waiting',   action: 'Check in' },
+    { name: 'Ingrid Johansson', age: 72, id: 'VSMS-240719-009', queue: 'Queue 4', station: 'Complete',        wait: null, status: 'Complete', action: 'View record', textual: true },
+  ];
+
+  /* ---------------- Render queue ---------------- */
+  const rowsEl = document.getElementById('queueRows');
+  const emptyEl = document.getElementById('queueEmpty');
+  let selectedId = QUEUE[0].id;
+  let urgentFirst = false;
+
+  function fmtWait(w) { return w == null ? '—' : w + 'm'; }
+
+  function render() {
+    const q = document.getElementById('queueSearch').value.trim().toLowerCase();
+    const st = document.getElementById('stationFilter').value;
+    const ss = document.getElementById('statusFilter').value;
+
+    let rows = QUEUE.slice();
+    if (urgentFirst) rows.sort((a, b) => (b.status === 'Urgent') - (a.status === 'Urgent') || b.wait - a.wait);
+
+    let visible = 0;
+    rowsEl.innerHTML = '';
+    rows.forEach(p => {
+      const matchQ = !q || p.name.toLowerCase().includes(q) || p.id.toLowerCase().includes(q);
+      const matchSt = !st || p.station === st;
+      const matchSs = !ss || p.status === ss;
+      if (!(matchQ && matchSt && matchSs)) return;
+      visible++;
+
+      const s = STATUSES[p.status];
+      const row = document.createElement('div');
+      row.className = 'q-grid q-row' + (p.id === selectedId ? ' selected' : '');
+      row.setAttribute('role', 'option');
+      row.setAttribute('tabindex', '0');
+      row.setAttribute('aria-selected', p.id === selectedId);
+      row.dataset.id = p.id;
+      row.innerHTML = `
+        <div class="q-who">
+          <div class="q-name">${p.name}</div>
+          <div class="q-id">${p.id} · ${p.queue}</div>
+        </div>
+        <div class="q-station col-station">${p.station}</div>
+        <div class="q-wait col-wait ${p.wait >= 20 ? 'long' : ''}">${fmtWait(p.wait)}</div>
+        <div><span class="q-status ${s.cls}"><i data-lucide="${s.icon}"></i>${p.status}</span></div>
+        <div><button class="row-action ${p.primary ? 'primary' : ''} ${p.textual ? 'textual' : ''}">${p.action}<i data-lucide="chevron-right"></i></button></div>
+        <div><button class="q-more" aria-label="More actions for ${p.name}"><i data-lucide="ellipsis"></i></button></div>
+      `;
+      row.addEventListener('click', () => select(p.id));
+      row.addEventListener('keydown', e => {
+        if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); select(p.id); }
+        if (e.key === 'ArrowDown' && row.nextElementSibling) { e.preventDefault(); row.nextElementSibling.focus(); }
+        if (e.key === 'ArrowUp' && row.previousElementSibling) { e.preventDefault(); row.previousElementSibling.focus(); }
+      });
+      rowsEl.appendChild(row);
+    });
+    emptyEl.style.display = visible ? 'none' : 'block';
+    lucide.createIcons();
+  }
+
+  /* ---------------- Inspector ---------------- */
+  const inspector = document.getElementById('inspector');
+  const backdrop = document.getElementById('drawerBackdrop');
+  const isDrawer = () => window.matchMedia('(max-width: 1100px)').matches;
+
+  function select(id) {
+    selectedId = id;
+    const p = QUEUE.find(x => x.id === id);
+    document.getElementById('inspName').textContent = p.name;
+    document.getElementById('inspSub').textContent = `${p.age} years · ${p.id}`;
+    document.getElementById('inspStation').textContent = p.station;
+    render();
+    if (isDrawer()) { inspector.classList.add('open'); backdrop.classList.add('show'); }
+  }
+
+  function closeDrawer() {
+    inspector.classList.remove('open');
+    backdrop.classList.remove('show');
+  }
+  document.getElementById('inspClose').addEventListener('click', closeDrawer);
+  backdrop.addEventListener('click', closeDrawer);
+  document.addEventListener('keydown', e => { if (e.key === 'Escape') closeDrawer(); });
+
+  /* ---------------- Toolbar ---------------- */
+  document.getElementById('queueSearch').addEventListener('input', render);
+  document.getElementById('stationFilter').addEventListener('change', render);
+  document.getElementById('statusFilter').addEventListener('change', render);
+  document.getElementById('urgentFirst').addEventListener('click', function () {
+    urgentFirst = !urgentFirst;
+    this.setAttribute('aria-pressed', urgentFirst);
+    render();
+  });
+
+  /* ---------------- Shell ---------------- */
+  const app = document.getElementById('app');
+  document.getElementById('collapseBtn').addEventListener('click', () => app.classList.toggle('rail'));
+
+  const root = document.documentElement;
+  const themeToggle = document.getElementById('themeToggle');
+  const savedTheme = localStorage.getItem('vsms-theme');
+  if (savedTheme && savedTheme !== 'light') root.dataset.theme = savedTheme;
+  else if (!savedTheme && window.matchMedia('(prefers-color-scheme: dark)').matches) root.dataset.theme = 'dark';
+
+  function setThemeIcon() {
+    themeToggle.innerHTML = '<i data-lucide="' + (root.dataset.theme === 'dark' ? 'sun' : 'moon') + '"></i>';
+    lucide.createIcons();
+  }
+  themeToggle.addEventListener('click', () => {
+    if (root.dataset.theme === 'dark') { root.removeAttribute('data-theme'); localStorage.setItem('vsms-theme', 'light'); }
+    else { root.dataset.theme = 'dark'; localStorage.setItem('vsms-theme', 'dark'); }
+    setThemeIcon();
+  });
+
+  /* ---------------- Init ---------------- */
+  render();
+  setThemeIcon();
+  lucide.createIcons();
+</script>
+</body>
+</html>
