@@ -1,0 +1,454 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>VSMS PostgreSQL JSONB Complete Tutorial</title>
+<style>
+:root{--bg:#07111f;--panel:#102038;--panel2:#142945;--line:#2a4262;--text:#edf5ff;--muted:#aebed3;--accent:#41d3c7;--blue:#5c8dff;--green:#42cf7a;--amber:#f5bd42;--red:#ff6b6b;--code:#07101b}
+*{box-sizing:border-box} body{margin:0;font-family:Inter,system-ui,Segoe UI,Arial;background:linear-gradient(180deg,#06101c,#0a1728);color:var(--text)}
+header{position:sticky;top:0;z-index:20;background:rgba(6,16,28,.95);border-bottom:1px solid var(--line);backdrop-filter:blur(10px);padding:22px 18px 12px}
+.wrap{max-width:1240px;margin:auto} h1{margin:0;font-size:clamp(1.6rem,4vw,2.5rem)} .subtitle{color:var(--muted);margin-top:7px}
+nav{display:flex;gap:8px;overflow:auto;margin-top:16px} nav button{white-space:nowrap;border:1px solid var(--line);background:#0e1c30;color:var(--muted);border-radius:999px;padding:10px 14px;cursor:pointer} nav button.active{background:var(--accent);color:#041218;border-color:var(--accent);font-weight:800}
+main{max-width:1240px;margin:auto;padding:22px 18px 60px} section{display:none} section.active{display:block} .grid{display:grid;grid-template-columns:repeat(12,1fr);gap:16px}
+.card{grid-column:span 12;background:linear-gradient(180deg,var(--panel2),var(--panel));border:1px solid var(--line);border-radius:18px;padding:18px;box-shadow:0 18px 45px rgba(0,0,0,.22)} .half{grid-column:span 6} .third{grid-column:span 4} .two{grid-column:span 8}
+@media(max-width:850px){.half,.third,.two{grid-column:span 12}}
+h2,h3{margin-top:0} p,li{line-height:1.55;color:#dce7f6} .flow{display:grid;grid-template-columns:repeat(5,1fr);gap:10px;align-items:center} .step{background:#0b1829;border:1px solid var(--line);border-radius:14px;padding:15px;text-align:center} .arrow{text-align:center;color:var(--accent);font-size:1.4rem}
+@media(max-width:850px){.flow{grid-template-columns:1fr}.arrow{transform:rotate(90deg)}}
+pre{position:relative;background:var(--code);border:1px solid #20324b;border-radius:14px;padding:42px 14px 14px;overflow:auto;max-height:580px;margin:0} code{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:.88rem;line-height:1.5} .copy{position:absolute;right:8px;top:8px;border:1px solid var(--line);background:#182b46;color:white;border-radius:8px;padding:6px 9px;cursor:pointer}
+table{width:100%;border-collapse:collapse;min-width:720px} th,td{padding:10px;border-bottom:1px solid var(--line);text-align:left} .tableWrap{overflow:auto}
+.flag{display:inline-block;padding:5px 9px;border-radius:999px;font-weight:800} .GREEN{background:rgba(66,207,122,.16);color:var(--green)} .AMBER{background:rgba(245,189,66,.16);color:var(--amber)} .RED{background:rgba(255,107,107,.16);color:var(--red)}
+label{display:block;margin:10px 0 6px;font-weight:700} input,select,textarea{width:100%;background:#081523;color:white;border:1px solid var(--line);border-radius:10px;padding:11px} textarea{min-height:220px;font-family:ui-monospace,monospace}
+.btn{border:0;background:var(--accent);color:#041218;font-weight:800;border-radius:11px;padding:11px 15px;cursor:pointer;margin-top:10px} .btn.secondary{background:#1c304d;color:white;border:1px solid var(--line)}
+.erd{display:grid;grid-template-columns:repeat(3,1fr);gap:14px} .entity{background:#0a1728;border:1px solid var(--line);border-radius:14px;overflow:hidden} .entity h3{padding:10px 12px;margin:0;background:#1a3658} .entity table{min-width:0;font-size:.9rem} .pk{color:#ff7b7b;font-weight:800} .fk{color:#83b3ff;font-weight:800} @media(max-width:850px){.erd{grid-template-columns:1fr}}
+.advantages{display:grid;grid-template-columns:repeat(4,1fr);gap:12px} .adv{background:#0b1728;border:1px solid var(--line);border-radius:14px;padding:14px} @media(max-width:850px){.advantages{grid-template-columns:1fr 1fr}} @media(max-width:520px){.advantages{grid-template-columns:1fr}}
+.note{background:#0b1a2d;border-left:4px solid var(--blue);padding:13px;border-radius:10px} .result{margin-top:14px;background:#081523;border:1px solid var(--line);border-radius:12px;padding:14px}
+.stationGrid{display:grid;grid-template-columns:repeat(6,1fr);gap:10px} .station{background:#0b1829;border:1px solid var(--line);border-radius:14px;padding:12px;text-align:center} @media(max-width:900px){.stationGrid{grid-template-columns:repeat(2,1fr)}}
+footer{text-align:center;color:var(--muted);padding:25px}
+</style>
+</head>
+<body>
+<header><div class="wrap"><h1>VSMS PostgreSQL JSONB</h1><div class="subtitle">ERD, multiple stations, sample data, API flow, JSONB queries, audit trail, and advantages</div>
+<nav>
+<button class="active" data-tab="overview">Overview</button>
+<button data-tab="erd">ERD</button>
+<button data-tab="stations">Stations</button>
+<button data-tab="data">Sample Data</button>
+<button data-tab="flow">UI → API → DB</button>
+<button data-tab="entry">Station DB Entry</button>
+<button data-tab="queries">JSONB Queries</button>
+<button data-tab="advantages">Advantages</button>
+</nav></div></header>
+
+<main>
+<section id="overview" class="active"><div class="grid">
+<div class="card"><h2>Recommended storage model</h2><div class="note">Store each station screening as a separate row in <b>screening_results</b>. The same participant can therefore have many rows across stations, events, and dates.</div></div>
+<div class="card"><div class="flow"><div class="step">Participant</div><div class="arrow">→</div><div class="step">Multiple stations</div><div class="arrow">→</div><div class="step">One row per station result</div><div class="arrow">→</div><div class="step">JSONB stores station-specific data</div><div class="arrow">→</div><div class="step">Rules + audit</div></div></div>
+</div></section>
+
+<section id="erd"><div class="grid"><div class="card"><h2>Entity Relationship Diagram</h2>
+<div class="erd">
+<div class="entity"><h3>participants</h3><table><tr><td class="pk">PK</td><td>participant_code</td></tr><tr><td></td><td>full_name</td></tr><tr><td></td><td>date_of_birth</td></tr><tr><td></td><td>created_at</td></tr></table></div>
+<div class="entity"><h3>events</h3><table><tr><td class="pk">PK</td><td>event_id</td></tr><tr><td></td><td>event_name</td></tr><tr><td></td><td>event_date</td></tr><tr><td></td><td>location</td></tr></table></div>
+<div class="entity"><h3>stations</h3><table><tr><td class="pk">PK</td><td>station_id</td></tr><tr><td class="fk">FK</td><td>event_id</td></tr><tr><td></td><td>station_name</td></tr><tr><td></td><td>station_order</td></tr></table></div>
+<div class="entity"><h3>screeners</h3><table><tr><td class="pk">PK</td><td>screener_id</td></tr><tr><td></td><td>full_name</td></tr><tr><td></td><td>role</td></tr><tr><td></td><td>active</td></tr></table></div>
+<div class="entity"><h3>screening_results</h3><table><tr><td class="pk">PK</td><td>screening_id</td></tr><tr><td class="fk">FK</td><td>participant_code</td></tr><tr><td class="fk">FK</td><td>event_id</td></tr><tr><td class="fk">FK</td><td>station_id</td></tr><tr><td class="fk">FK</td><td>screener_id</td></tr><tr><td></td><td>test_results JSONB</td></tr><tr><td></td><td>overall_flag</td></tr><tr><td></td><td>rule_version</td></tr></table></div>
+<div class="entity"><h3>rule_evaluations</h3><table><tr><td class="pk">PK</td><td>evaluation_id</td></tr><tr><td class="fk">FK</td><td>screening_id</td></tr><tr><td></td><td>input_snapshot JSONB</td></tr><tr><td></td><td>evaluation_result JSONB</td></tr><tr><td></td><td>evaluated_at</td></tr></table></div>
+</div></div></div></section>
+
+<section id="stations"><div class="grid"><div class="card"><h2>Different test at each station</h2>
+<div class="stationGrid">
+<div class="station"><h3>ST01</h3><b>Visual Acuity</b><p>Left, right, both eyes, correction</p></div>
+<div class="station"><h3>ST02</h3><b>Colour Vision</b><p>Ishihara plates, correct answers, result</p></div>
+<div class="station"><h3>ST03</h3><b>Near Vision</b><p>Left, right, binocular, N notation</p></div>
+<div class="station"><h3>ST04</h3><b>Contrast Sensitivity</b><p>Pelli-Robson, logCS, result</p></div>
+<div class="station"><h3>ST05</h3><b>Stereo Vision</b><p>Randot, arc seconds, result</p></div>
+<div class="station"><h3>ST06</h3><b>Eye Alignment</b><p>Tropia, phoria, cover test</p></div>
+</div></div></div></section>
+
+<section id="data"><div class="grid">
+<div class="card"><h2>Same participant across multiple stations and events</h2>
+<label>Filter by event</label><select id="eventFilter" onchange="renderRows()"><option value="ALL">All events</option><option value="EVT001">EVT001</option><option value="EVT002">EVT002</option></select>
+<div class="tableWrap"><table><thead><tr><th>Screening ID</th><th>Participant</th><th>Event</th><th>Station</th><th>Test</th><th>Time</th><th>Flag</th><th>Summary</th><th>View</th></tr></thead><tbody id="rows"></tbody></table></div></div>
+<div class="card half"><h3>Selected JSONB</h3><pre><button class="copy">Copy</button><code id="jsonPreview"></code></pre></div>
+<div class="card half"><h3>Generated SQL INSERT</h3><pre><button class="copy">Copy</button><code id="sqlPreview"></code></pre></div>
+</div></section>
+
+<section id="flow"><div class="grid">
+<div class="card"><h2>UI → API → PostgreSQL data flow</h2><div class="flow"><div class="step">UI captures station result</div><div class="arrow">→</div><div class="step">POST /api/v1/screenings</div><div class="arrow">→</div><div class="step">Validate + check duplicate</div><div class="arrow">→</div><div class="step">Load rule + evaluate</div><div class="arrow">→</div><div class="step">Insert result + audit</div></div></div>
+<div class="card half"><h3>Request body</h3><pre><button class="copy">Copy</button><code>{
+  "screeningId": "SCR20260713-0001-ST01",
+  "participantCode": "P10021",
+  "eventId": "EVT001",
+  "stationId": "ST01",
+  "screenerId": "SCR01",
+  "testResults": {
+    "visualAcuity": {
+      "leftEye": {"display":"6/12","rank":3},
+      "rightEye": {"display":"6/6","rank":1},
+      "withCorrection": true
+    }
+  },
+  "ruleVersion": "VSMS-1.0"
+}</code></pre></div>
+<div class="card half"><h3>API response</h3><pre><button class="copy">Copy</button><code>{
+  "screeningId": "SCR20260713-0001-ST01",
+  "participantCode": "P10021",
+  "stationId": "ST01",
+  "overallFlag": "GREEN",
+  "ruleVersion": "VSMS-1.0",
+  "message": "Screening saved successfully"
+}</code></pre></div>
+</div></section>
+
+
+<section id="entry"><div class="grid">
+  <div class="card">
+    <h2>Different stations, same participant: UI → API → database entry</h2>
+    <div class="note">
+      Participant <b>P10021</b> can complete several station tests. Each station submission creates a separate row in
+      <b>screening_results</b>, while the participant code remains the same.
+    </div>
+  </div>
+
+  <div class="card third">
+    <h3>1. UI form</h3>
+    <label>Participant code</label>
+    <input id="entryParticipant" value="P10021" readonly>
+
+    <label>Event</label>
+    <select id="entryEvent">
+      <option value="EVT001">EVT001 — Healthy Eyes 2026</option>
+      <option value="EVT002">EVT002 — Community Care</option>
+    </select>
+
+    <label>Station</label>
+    <select id="entryStation" onchange="renderStationForm()">
+      <option value="ST01">ST01 — Visual Acuity</option>
+      <option value="ST02">ST02 — Colour Vision</option>
+      <option value="ST03">ST03 — Near Vision</option>
+      <option value="ST04">ST04 — Contrast Sensitivity</option>
+      <option value="ST05">ST05 — Stereo Vision</option>
+      <option value="ST06">ST06 — Eye Alignment</option>
+    </select>
+
+    <div id="stationFields"></div>
+    <button class="btn" onclick="submitStationResult()">Submit station result</button>
+  </div>
+
+  <div class="card third">
+    <h3>2. API request</h3>
+    <pre><code id="entryRequestPreview"></code></pre>
+    <div class="result" id="entryApiStatus">No request submitted yet.</div>
+  </div>
+
+  <div class="card third">
+    <h3>3. PostgreSQL INSERT</h3>
+    <pre><code id="entrySqlPreview"></code></pre>
+  </div>
+
+  <div class="card">
+    <h3>4. Database rows created for participant P10021</h3>
+    <div class="tableWrap">
+      <table>
+        <thead>
+          <tr>
+            <th>screening_id (PK)</th>
+            <th>participant_code (FK)</th>
+            <th>event_id</th>
+            <th>station_id</th>
+            <th>test type</th>
+            <th>overall_flag</th>
+            <th>screened_at</th>
+            <th>JSONB preview</th>
+          </tr>
+        </thead>
+        <tbody id="entryDbRows"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="card half">
+    <h3>Why separate rows?</h3>
+    <ul>
+      <li>Each station is a separate screening transaction.</li>
+      <li>Every row has its own primary key, timestamp, rule version, and audit record.</li>
+      <li>The same participant code links all rows together.</li>
+      <li>Queries can combine all station results for one participant.</li>
+    </ul>
+  </div>
+
+  <div class="card half">
+    <h3>Query all station rows</h3>
+    <pre><button class="copy">Copy</button><code>SELECT
+  screening_id,
+  participant_code,
+  event_id,
+  station_id,
+  test_results,
+  overall_flag,
+  screened_at
+FROM vsms.screening_results
+WHERE participant_code = 'P10021'
+  AND event_id = 'EVT001'
+ORDER BY screened_at;</code></pre>
+  </div>
+</div></section>
+
+<section id="queries"><div class="grid">
+<div class="card half"><h2>JSONB Query Playground</h2><label>Query</label><select id="queryType">
+<option value="participant">All station results for participant</option>
+<option value="visual">Extract visual acuity</option>
+<option value="amber">Find AMBER screenings</option>
+<option value="colour">Find colour vision results</option>
+<option value="count">Count screenings by station</option>
+</select><button class="btn" onclick="runQuery()">Run Query</button><pre style="margin-top:12px"><code id="querySql"></code></pre></div>
+<div class="card half"><h2>Result</h2><div class="result"><pre><code id="queryResult"></code></pre></div></div>
+</div></section>
+
+<section id="advantages"><div class="grid"><div class="card"><h2>Advantages of PostgreSQL JSONB</h2>
+<div class="advantages">
+<div class="adv"><h3>Flexible schema</h3><p>Different stations store different test structures without changing the table.</p></div>
+<div class="adv"><h3>Powerful querying</h3><p>Use →, →>, #>>, @>, ?, JSONPath, and standard SQL together.</p></div>
+<div class="adv"><h3>Indexable</h3><p>GIN and expression indexes improve searches on nested data.</p></div>
+<div class="adv"><h3>Auditable</h3><p>Store the original input, rule version, matched conditions, and final result.</p></div>
+<div class="adv"><h3>Future-proof</h3><p>Add new tests and properties without frequent schema migration.</p></div>
+<div class="adv"><h3>Partial updates</h3><p>Update one nested value using jsonb_set without replacing unrelated data.</p></div>
+<div class="adv"><h3>Hybrid model</h3><p>Keep IDs and relationships relational while test details remain flexible.</p></div>
+<div class="adv"><h3>Analytics-ready</h3><p>Aggregate by participant, event, station, flag, and nested test outcomes.</p></div>
+</div></div></div></section>
+</main>
+<footer>VSMS PostgreSQL JSONB Complete Interactive Tutorial</footer>
+
+<script>
+const data=[{"screening_id": "SCR20260713-0001-ST01", "participant_code": "P10021", "event_id": "EVT001", "station_id": "ST01", "station_name": "Visual Acuity", "screener_id": "SCR01", "screened_at": "2026-07-13 09:15", "overall_flag": "GREEN", "rule_version": "VSMS-1.0", "summary": "Left 6/12, Right 6/6", "test_results": {"visualAcuity": {"leftEye": {"display": "6/12", "rank": 3}, "rightEye": {"display": "6/6", "rank": 1}, "withCorrection": true}}}, {"screening_id": "SCR20260713-0001-ST02", "participant_code": "P10021", "event_id": "EVT001", "station_id": "ST02", "station_name": "Colour Vision", "screener_id": "SCR02", "screened_at": "2026-07-13 09:25", "overall_flag": "GREEN", "rule_version": "VSMS-1.0", "summary": "Ishihara 14/14 PASS", "test_results": {"colourVision": {"test": "ISHIHARA", "platesPresented": 14, "correctAnswers": 14, "result": "PASS"}}}, {"screening_id": "SCR20260713-0001-ST03", "participant_code": "P10021", "event_id": "EVT001", "station_id": "ST03", "station_name": "Near Vision", "screener_id": "SCR01", "screened_at": "2026-07-13 09:33", "overall_flag": "GREEN", "rule_version": "VSMS-1.0", "summary": "Near N6 / N6", "test_results": {"nearVision": {"leftEye": "N6", "rightEye": "N6", "binocular": "N6"}}}, {"screening_id": "SCR20260713-0001-ST04", "participant_code": "P10021", "event_id": "EVT001", "station_id": "ST04", "station_name": "Contrast Sensitivity", "screener_id": "SCR02", "screened_at": "2026-07-13 09:45", "overall_flag": "AMBER", "rule_version": "VSMS-1.0", "summary": "Pelli-Robson 1.50", "test_results": {"contrastSensitivity": {"test": "PELLI_ROBSON", "score": 1.5, "unit": "logCS", "result": "BORDERLINE"}}}, {"screening_id": "SCR20260713-0001-ST05", "participant_code": "P10021", "event_id": "EVT001", "station_id": "ST05", "station_name": "Stereo Vision", "screener_id": "SCR03", "screened_at": "2026-07-13 09:55", "overall_flag": "GREEN", "rule_version": "VSMS-1.0", "summary": "Randot 40 arcsec PASS", "test_results": {"stereoVision": {"test": "RANDOT", "arcSeconds": 40, "result": "PASS"}}}, {"screening_id": "SCR20260713-0001-ST06", "participant_code": "P10021", "event_id": "EVT001", "station_id": "ST06", "station_name": "Eye Alignment", "screener_id": "SCR03", "screened_at": "2026-07-13 10:05", "overall_flag": "GREEN", "rule_version": "VSMS-1.0", "summary": "Orthophoria", "test_results": {"eyeAlignment": {"tropia": "ORTHO", "phoria": "ORTHO", "result": "PASS"}}}, {"screening_id": "SCR20260815-0001-ST01", "participant_code": "P10021", "event_id": "EVT002", "station_id": "ST01", "station_name": "Visual Acuity", "screener_id": "SCR01", "screened_at": "2026-08-15 10:10", "overall_flag": "AMBER", "rule_version": "VSMS-1.0", "summary": "Left 6/12, Right 6/12", "test_results": {"visualAcuity": {"leftEye": {"display": "6/12", "rank": 3}, "rightEye": {"display": "6/12", "rank": 3}, "withCorrection": true}}}, {"screening_id": "SCR20260815-0001-ST02", "participant_code": "P10021", "event_id": "EVT002", "station_id": "ST02", "station_name": "Colour Vision", "screener_id": "SCR02", "screened_at": "2026-08-15 10:20", "overall_flag": "AMBER", "rule_version": "VSMS-1.0", "summary": "Ishihara 12/14 REVIEW", "test_results": {"colourVision": {"test": "ISHIHARA", "platesPresented": 14, "correctAnswers": 12, "result": "REVIEW"}}}];
+let selected=data[0];
+
+document.querySelectorAll("nav button").forEach(b=>b.onclick=()=>{document.querySelectorAll("nav button").forEach(x=>x.classList.remove("active"));document.querySelectorAll("section").forEach(x=>x.classList.remove("active"));b.classList.add("active");document.getElementById(b.dataset.tab).classList.add("active");window.scrollTo(0,0);});
+document.querySelectorAll(".copy").forEach(btn=>btn.onclick=async()=>{const t=btn.parentElement.querySelector("code").innerText;await navigator.clipboard.writeText(t);const o=btn.textContent;btn.textContent="Copied";setTimeout(()=>btn.textContent=o,1000);});
+
+function toSql(r){return `INSERT INTO vsms.screening_results
+(screening_id,participant_code,event_id,station_id,screener_id,test_results,overall_flag,rule_version,screened_at)
+VALUES (
+'${r.screening_id}','${r.participant_code}','${r.event_id}','${r.station_id}','${r.screener_id}',
+'${JSON.stringify(r.test_results).replaceAll("'","''")}'::jsonb,
+'${r.overall_flag}','${r.rule_version}','${r.screened_at}'
+);`;}
+function selectRow(id){selected=data.find(x=>x.screening_id===id);document.getElementById("jsonPreview").textContent=JSON.stringify(selected,null,2);document.getElementById("sqlPreview").textContent=toSql(selected);}
+function renderRows(){const e=document.getElementById("eventFilter").value;const rows=data.filter(r=>e==="ALL"||r.event_id===e);document.getElementById("rows").innerHTML=rows.map(r=>`<tr><td>${r.screening_id}</td><td>${r.participant_code}</td><td>${r.event_id}</td><td>${r.station_id}</td><td>${r.station_name}</td><td>${r.screened_at}</td><td><span class="flag ${r.overall_flag}">${r.overall_flag}</span></td><td>${r.summary}</td><td><button class="btn secondary" onclick="selectRow('${r.screening_id}')">View</button></td></tr>`).join("");}
+function runQuery(){const t=document.getElementById("queryType").value;let sql="",res=[];
+if(t==="participant"){sql=`SELECT screening_id, station_id, test_results, overall_flag
+FROM vsms.screening_results
+WHERE participant_code = 'P10021'
+ORDER BY screened_at;`;res=data;}
+if(t==="visual"){sql=`SELECT screening_id,
+test_results #>> '{visualAcuity,leftEye,display}' AS left_eye,
+test_results #>> '{visualAcuity,rightEye,display}' AS right_eye
+FROM vsms.screening_results
+WHERE test_results ? 'visualAcuity';`;res=data.filter(r=>r.test_results.visualAcuity).map(r=>({screening_id:r.screening_id,left_eye:r.test_results.visualAcuity.leftEye.display,right_eye:r.test_results.visualAcuity.rightEye.display}));}
+if(t==="amber"){sql=`SELECT screening_id, station_id, overall_flag
+FROM vsms.screening_results
+WHERE overall_flag = 'AMBER';`;res=data.filter(r=>r.overall_flag==="AMBER");}
+if(t==="colour"){sql=`SELECT screening_id,
+test_results #>> '{colourVision,result}' AS result
+FROM vsms.screening_results
+WHERE test_results ? 'colourVision';`;res=data.filter(r=>r.test_results.colourVision).map(r=>({screening_id:r.screening_id,result:r.test_results.colourVision.result}));}
+if(t==="count"){sql=`SELECT station_id, count(*)
+FROM vsms.screening_results
+WHERE participant_code = 'P10021'
+GROUP BY station_id
+ORDER BY station_id;`;const c={};data.forEach(r=>c[r.station_id]=(c[r.station_id]||0)+1);res=Object.entries(c).map(([station_id,count])=>({station_id,count}));}
+document.getElementById("querySql").textContent=sql;document.getElementById("queryResult").textContent=JSON.stringify(res,null,2);}
+
+const stationDbRows = [];
+
+function renderStationForm(){
+  const station=document.getElementById("entryStation").value;
+  const box=document.getElementById("stationFields");
+  let form="";
+
+  if(station==="ST01"){
+    form=`
+      <label>Left eye</label>
+      <select id="f1"><option>6/6</option><option>6/9</option><option selected>6/12</option><option>6/18</option></select>
+      <label>Right eye</label>
+      <select id="f2"><option selected>6/6</option><option>6/9</option><option>6/12</option><option>6/18</option></select>`;
+  }
+  if(station==="ST02"){
+    form=`
+      <label>Correct Ishihara answers</label>
+      <input id="f1" type="number" min="0" max="14" value="14">
+      <label>Plates presented</label>
+      <input id="f2" type="number" value="14">`;
+  }
+  if(station==="ST03"){
+    form=`
+      <label>Left near vision</label>
+      <select id="f1"><option>N6</option><option>N8</option><option>N12</option></select>
+      <label>Right near vision</label>
+      <select id="f2"><option>N6</option><option>N8</option><option>N12</option></select>`;
+  }
+  if(station==="ST04"){
+    form=`
+      <label>Contrast score (logCS)</label>
+      <input id="f1" type="number" step="0.05" value="1.50">
+      <label>Test</label>
+      <input id="f2" value="PELLI_ROBSON" readonly>`;
+  }
+  if(station==="ST05"){
+    form=`
+      <label>Arc seconds</label>
+      <input id="f1" type="number" value="40">
+      <label>Test</label>
+      <input id="f2" value="RANDOT" readonly>`;
+  }
+  if(station==="ST06"){
+    form=`
+      <label>Tropia</label>
+      <select id="f1"><option value="ORTHO">Orthophoria</option><option value="ESO">Esotropia</option><option value="EXO">Exotropia</option></select>
+      <label>Phoria</label>
+      <select id="f2"><option value="ORTHO">Orthophoria</option><option value="ESO">Esophoria</option><option value="EXO">Exophoria</option></select>`;
+  }
+
+  box.innerHTML=form;
+  previewStationRequest();
+  box.querySelectorAll("input,select").forEach(x=>x.addEventListener("input",previewStationRequest));
+}
+
+function acuityRank(v){
+  return {"6/6":1,"6/9":2,"6/12":3,"6/18":4,"6/24":5,"6/36":6,"6/60":7}[v]||1;
+}
+
+function buildStationPayload(){
+  const station=document.getElementById("entryStation").value;
+  const eventId=document.getElementById("entryEvent").value;
+  const participantCode=document.getElementById("entryParticipant").value;
+  const v1=document.getElementById("f1")?.value;
+  const v2=document.getElementById("f2")?.value;
+  let testResults={}, flag="GREEN", testType="";
+
+  if(station==="ST01"){
+    testType="Visual Acuity";
+    const l=acuityRank(v1), r=acuityRank(v2);
+    testResults={visualAcuity:{leftEye:{display:v1,rank:l},rightEye:{display:v2,rank:r},withCorrection:true}};
+    flag=(l>=4||r>=4)?"RED":(l>=3||r>=3)?"AMBER":"GREEN";
+  }
+  if(station==="ST02"){
+    testType="Colour Vision";
+    const correct=Number(v1), total=Number(v2);
+    const result=correct>=13?"PASS":correct>=11?"REVIEW":"FAIL";
+    testResults={colourVision:{test:"ISHIHARA",platesPresented:total,correctAnswers:correct,result}};
+    flag=result==="FAIL"?"RED":result==="REVIEW"?"AMBER":"GREEN";
+  }
+  if(station==="ST03"){
+    testType="Near Vision";
+    testResults={nearVision:{leftEye:v1,rightEye:v2,binocular:v1===v2?v1:"MIXED"}};
+    flag=(v1==="N12"||v2==="N12")?"AMBER":"GREEN";
+  }
+  if(station==="ST04"){
+    testType="Contrast Sensitivity";
+    const score=Number(v1);
+    const result=score<1.25?"FAIL":score<1.55?"BORDERLINE":"PASS";
+    testResults={contrastSensitivity:{test:v2,score,unit:"logCS",result}};
+    flag=result==="FAIL"?"RED":result==="BORDERLINE"?"AMBER":"GREEN";
+  }
+  if(station==="ST05"){
+    testType="Stereo Vision";
+    const arc=Number(v1);
+    const result=arc>200?"FAIL":arc>80?"REVIEW":"PASS";
+    testResults={stereoVision:{test:v2,arcSeconds:arc,result}};
+    flag=result==="FAIL"?"RED":result==="REVIEW"?"AMBER":"GREEN";
+  }
+  if(station==="ST06"){
+    testType="Eye Alignment";
+    const result=(v1==="ORTHO"&&v2==="ORTHO")?"PASS":"REVIEW";
+    testResults={eyeAlignment:{tropia:v1,phoria:v2,result}};
+    flag=result==="PASS"?"GREEN":"AMBER";
+  }
+
+  const suffix=String(stationDbRows.length+1).padStart(2,"0");
+  const screeningId=`SCR-${eventId}-${participantCode}-${station}-${suffix}`;
+
+  return {
+    screeningId,
+    participantCode,
+    eventId,
+    stationId:station,
+    screenerId:"SCR01",
+    testType,
+    testResults,
+    overallFlag:flag,
+    ruleVersion:"VSMS-1.0",
+    screenedAt:new Date().toISOString()
+  };
+}
+
+function payloadToSql(p){
+  return `INSERT INTO vsms.screening_results (
+  screening_id,
+  participant_code,
+  event_id,
+  station_id,
+  screener_id,
+  test_results,
+  overall_flag,
+  rule_version,
+  screened_at
+)
+VALUES (
+  '${p.screeningId}',
+  '${p.participantCode}',
+  '${p.eventId}',
+  '${p.stationId}',
+  '${p.screenerId}',
+  '${JSON.stringify(p.testResults).replaceAll("'","''")}'::jsonb,
+  '${p.overallFlag}',
+  '${p.ruleVersion}',
+  '${p.screenedAt}'
+);`;
+}
+
+function previewStationRequest(){
+  if(!document.getElementById("entryRequestPreview")) return;
+  const p=buildStationPayload();
+  document.getElementById("entryRequestPreview").textContent=JSON.stringify(p,null,2);
+  document.getElementById("entrySqlPreview").textContent=payloadToSql(p);
+}
+
+function submitStationResult(){
+  const p=buildStationPayload();
+
+  if(stationDbRows.some(r=>r.eventId===p.eventId && r.stationId===p.stationId)){
+    document.getElementById("entryApiStatus").innerHTML=
+      `<span class="flag AMBER">409 DUPLICATE</span><p>This participant already has a result for ${p.stationId} in ${p.eventId}.</p>`;
+    return;
+  }
+
+  stationDbRows.push(p);
+  document.getElementById("entryApiStatus").innerHTML=
+    `<span class="flag ${p.overallFlag}">201 ${p.overallFlag}</span>
+     <p>API inserted one new row for ${p.participantCode} at ${p.stationId}.</p>`;
+  renderEntryRows();
+  previewStationRequest();
+}
+
+function renderEntryRows(){
+  const body=document.getElementById("entryDbRows");
+  if(!body) return;
+  body.innerHTML=stationDbRows.length
+    ? stationDbRows.map(r=>`<tr>
+        <td>${r.screeningId}</td>
+        <td>${r.participantCode}</td>
+        <td>${r.eventId}</td>
+        <td>${r.stationId}</td>
+        <td>${r.testType}</td>
+        <td><span class="flag ${r.overallFlag}">${r.overallFlag}</span></td>
+        <td>${r.screenedAt}</td>
+        <td><code>${escapeHtml(JSON.stringify(r.testResults))}</code></td>
+      </tr>`).join("")
+    : '<tr><td colspan="8">No database rows yet. Submit a station result.</td></tr>';
+}
+
+renderStationForm();renderEntryRows();renderRows();selectRow(data[0].screening_id);runQuery();
+</script>
+</body></html>

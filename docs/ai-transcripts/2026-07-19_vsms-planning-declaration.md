@@ -12,7 +12,7 @@ contributor_name: "NachikethReddyY"
 git_user_name: "NachikethReddyY"
 git_user_email: "y.nachiketh.reddy@gmail.com"
 ai_product: "OpenAI Codex"
-model: "Not exposed in stored session metadata"
+model: "GPT-5.6 Terra Medium"
 source_session_file: "/root/.codex/sessions/2026/07/19/rollout-2026-07-19T02-29-09-019f7834-b9c5-7fb1-8bb4-9e5f103b795c.jsonl"
 ---
 
