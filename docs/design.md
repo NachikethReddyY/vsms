@@ -2,11 +2,14 @@
 
 ## Final direction
 
+**Selected direction: Modern Command Centre.** VSMS uses a dominant live-task workspace, a compact command bar, and a contextual inspector. It borrows Calm Human Operations only for reassuring offline and empty states, and Clinical Precision only for data-grid discipline and status clarity. The queue or active form owns the screen; dashboard information is contextual, never a pile of widgets.
+
 VSMS is a calm, compact healthcare operations workspace. Its visual DNA is **60% Cal.com coss UI** (geometry, controls, density and neutral hierarchy), **20% ChatGPT-style restraint** (quiet canvas and task focus), **10% Claude-style warmth** (human typography and explanatory copy), and **10% NHS/GOV.UK behavioural rules**. It must not resemble Carbon, Fluent, Mantine, a government portal, Bootstrap, or default shadcn.
 
 | Concern | System | Rule |
 | --- | --- | --- |
-| Visual language | [coss UI / Cal.com](https://github.com/calcom/cal.com) | Control geometry, sidebar proportions, compact settings/table patterns, neutral hierarchy, dialogs and owned components. |
+| Visual language | [coss UI / Cal.com](https://github.com/calcom/cal.com) | Control geometry, sidebar proportions, compact settings/table patterns and neutral hierarchy. |
+| Workspace composition | Linear / Stripe patterns | Command launcher, practical data grids, selected-row inspector and high-signal filtering; no copied visual branding. |
 | Behaviour primitives | [Base UI](https://base-ui.com/) | Dialog, drawer, menus, fields, tooltips, number inputs and focus handling. |
 | Styling and charts | Tailwind + semantic variables; Recharts | VSMS owns the visual layer; charts are only for reports and operational data. |
 | Clinical language | [NHS patterns](https://service-manual.nhs.uk/design-system) | Clear clinical wording, warnings, review/referral messages. No NHS visual branding. |
@@ -63,7 +66,7 @@ Use Motion for React only for state continuity (sidebar, queue reorder, drawers,
 
 ## Layout
 
-The desktop shell has a 240px light sidebar, 64px header and full operational dashboard. At 1024px the sidebar becomes a 72px labelled-on-focus icon rail; priority information stays visible.
+The desktop shell has a 248px light sidebar, 64px header and full operational dashboard. At 1024px the sidebar becomes a 72px labelled-on-focus icon rail; priority information stays visible.
 
 ```text
 ┌──────── light sidebar ───────┬──────────────────── event header ───────────────────┐
@@ -93,15 +96,15 @@ The primary progress view is a station pipeline. Every row exposes count, percen
 
 Mantine controls use labels above fields, hint text, native input modes, 48px default controls and 52px fast-entry clinical controls. On invalid submission, focus a GOV.UK-style summary linked to every inline error; preserve valid input. Use NHS-style neutral wording: “Flagged for reviewer assessment” and “Referral recommended by screening rules”. The system never diagnoses.
 
-All statuses render a Tabler icon, visible label and semantic colour: Not started, Waiting, In progress, Complete, Review required, Referral required, Urgent escalation, Saved offline, Pending sync, Syncing, Synced, Sync failed and Unavailable.
+All statuses render a Lucide icon, visible label and semantic colour: Not started, Waiting, In progress, Complete, Review required, Referral required, Urgent escalation, Saved offline, Pending sync, Syncing, Synced, Sync failed and Unavailable.
 
 Offline saving is reassuring: “Saved safely on this device. It will synchronise when the connection returns.” Sync Centre exposes pending, syncing, synced and failed records, last success, retry count/reason, Sync now and Retry failed.
 
 ## Release checklist
 
-- [ ] Light 240px sidebar / 72px tablet rail; no full-height navy wall.
+- [ ] Light 248px sidebar / 72px tablet rail; no full-height navy wall.
 - [ ] A populated dashboard fills a 1440px viewport with queue, pipeline, reviews, activity and sync health.
 - [ ] One overview surface, not identical metric cards.
 - [ ] Queue is visually dominant; actions never hide only in an overflow menu.
-- [ ] Tabler icon + text + colour for every status.
+- [ ] Lucide icon + text + colour for every status.
 - [ ] WCAG 2.2 AA, keyboard path, visible focus, 44px targets, 200% zoom and reduced motion checked.
