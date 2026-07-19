@@ -1,0 +1,1029 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>VSMS prototype: the screening-day flow</title>
+<meta name="description" content="An interactive walk-through of the VSMS golden demonstration flow, from sign-in to referral. Blue design system, big icons, tablet-friendly." />
+<script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
+<style>
+  :root {
+    --canvas: #F7F7F4;
+    --canvas-soft: #FAFAF7;
+    --surface: #FFFFFF;
+    --surface-2: #F2F1EC;
+    --surface-3: #EBEAE5;
+    --ink: #26251E;
+    --ink-2: #5A5852;
+    --ink-3: #807D72;
+    --line: #E6E5E0;
+    --line-soft: #EFEEE8;
+    --line-strong: #CFCDC4;
+    --accent: #2563EB;
+    --accent-strong: #1D4ED8;
+    --accent-tint: rgba(37,99,235,0.09);
+    --accent-ink: #FFFFFF;
+    --green: #1F8A65;
+    --green-tint: rgba(31,138,101,0.10);
+    --amber: #B45309;
+    --amber-tint: rgba(180,83,9,0.08);
+    --orange: #C2410C;
+    --red: #CF2D56;
+    --tl-registration: #DFA88F;
+    --tl-acuity: #9FBBE0;
+    --tl-refraction: #C0A8DD;
+    --tl-colour: #9FC9A2;
+    --tl-eye: #D9B36A;
+    --focus: #2563EB;
+    --shadow-drawer: 0 8px 30px rgba(38,37,30,0.14);
+  }
+  [data-theme="dark"] {
+    --canvas: #100F0D;
+    --canvas-soft: #141310;
+    --surface: #1A1916;
+    --surface-2: #22211D;
+    --surface-3: #2A2924;
+    --ink: #EDEBE4;
+    --ink-2: #B0ACA2;
+    --ink-3: #8A867C;
+    --line: rgba(237,235,228,0.09);
+    --line-soft: rgba(237,235,228,0.06);
+    --line-strong: rgba(237,235,228,0.18);
+    --accent: #93C5FD;
+    --accent-strong: #BFDBFE;
+    --accent-tint: rgba(147,197,253,0.16);
+    --accent-ink: #0B1220;
+    --green: #3FA37F;
+    --green-tint: rgba(63,163,127,0.14);
+    --amber: #D9964A;
+    --amber-tint: rgba(217,150,74,0.12);
+    --orange: #E07B4C;
+    --red: #E05C7E;
+    --focus: #93C5FD;
+    --shadow-drawer: 0 8px 30px rgba(0,0,0,0.5);
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", system-ui, sans-serif;
+    background: var(--canvas);
+    color: var(--ink);
+    font-size: 17px;
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+    font-variant-numeric: tabular-nums;
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+  button { font-family: inherit; }
+  .lucide { stroke-width: 1.75; flex-shrink: 0; }
+  a { color: inherit; text-decoration: none; }
+  a:focus-visible, button:focus-visible, summary:focus-visible, input:focus-visible, select:focus-visible {
+    outline: 2px solid var(--focus); outline-offset: 2px; border-radius: 6px;
+  }
+
+  /* ============ Top rail (persistent) ============ */
+  .toprail {
+    position: sticky; top: 0; z-index: 60;
+    background: var(--surface);
+    border-bottom: 1px solid var(--line);
+  }
+  .toprail-inner {
+    max-width: 980px; margin: 0 auto;
+    display: flex; align-items: center; gap: 14px;
+    padding: 0 20px; height: 60px;
+  }
+  .wordmark { display: flex; align-items: center; gap: 9px; font-weight: 600; font-size: 15px; }
+  .wordmark .mark {
+    width: 28px; height: 28px; border-radius: 8px;
+    background: var(--accent); color: var(--accent-ink);
+    display: grid; place-items: center;
+  }
+  .wordmark .mark .lucide { width: 17px; height: 17px; stroke-width: 2.25; }
+  .toprail .tag { font-size: 13px; color: var(--ink-3); }
+  .toprail .spacer { flex: 1; }
+  .toprail-btn {
+    width: 44px; height: 44px; border-radius: 10px; border: 1px solid var(--line);
+    background: var(--surface); color: var(--ink-2); cursor: pointer;
+    display: grid; place-items: center; transition: border-color .15s, color .15s;
+  }
+  .toprail-btn:hover { border-color: var(--line-strong); color: var(--ink); }
+  .toprail-btn .lucide { width: 22px; height: 22px; }
+  .toprail-link {
+    display: inline-flex; align-items: center; gap: 7px;
+    height: 44px; padding: 0 18px; border-radius: 999px;
+    background: var(--accent); color: var(--accent-ink);
+    font-size: 14px; font-weight: 600; cursor: pointer; border: none;
+    transition: background .15s;
+  }
+  .toprail-link:hover { background: var(--accent-strong); }
+  .toprail-link:active { transform: scale(0.97); }
+  .toprail-link .lucide { width: 17px; height: 17px; }
+
+  /* ============ Step progress bar ============ */
+  .progress-wrap { background: var(--surface); border-bottom: 1px solid var(--line); }
+  .progress-inner {
+    max-width: 980px; margin: 0 auto; padding: 14px 20px;
+    display: flex; align-items: center; gap: 8px; overflow-x: auto; scrollbar-width: none;
+  }
+  .progress-inner::-webkit-scrollbar { display: none; }
+  .pstep {
+    display: inline-flex; align-items: center; gap: 8px;
+    padding: 7px 12px; border-radius: 999px;
+    font-size: 13px; color: var(--ink-3); white-space: nowrap;
+    border: 1px solid transparent; cursor: pointer; background: transparent;
+    transition: color .12s, background .12s;
+  }
+  .pstep .pn {
+    width: 22px; height: 22px; border-radius: 50%;
+    background: var(--surface-2); color: var(--ink-3);
+    display: grid; place-items: center; font-size: 12px; font-weight: 700;
+    flex-shrink: 0;
+  }
+  .pstep.done .pn { background: var(--green); color: #fff; }
+  .pstep.done { color: var(--ink-2); }
+  .pstep.active { color: var(--accent); background: var(--accent-tint); }
+  .pstep.active .pn { background: var(--accent); color: var(--accent-ink); }
+  .psep { color: var(--line-strong); flex-shrink: 0; }
+
+  /* ============ Stage shell ============ */
+  .stage { display: none; max-width: 980px; margin: 0 auto; padding: 32px 20px 140px; }
+  .stage.active { display: block; }
+  .stage.bleed { max-width: none; padding: 0; }
+
+  .crumb { font-size: 13px; color: var(--ink-3); margin-bottom: 14px; display: flex; align-items: center; gap: 8px; }
+  .crumb .lucide { width: 15px; height: 15px; }
+  h1.stage-title { font-size: 30px; line-height: 1.12; letter-spacing: -0.02em; font-weight: 600; margin-bottom: 10px; text-wrap: balance; }
+  p.stage-lede { font-size: 17px; line-height: 1.5; color: var(--ink-2); max-width: 640px; margin-bottom: 28px; }
+
+  /* Card-ish panels (used sparingly, full-border not nested) */
+  .panel { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; overflow: hidden; }
+  .panel + .panel { margin-top: 20px; }
+  .panel-head { padding: 16px 20px; border-bottom: 1px solid var(--line-soft); display: flex; align-items: center; gap: 10px; }
+  .panel-head .lucide { width: 19px; height: 19px; color: var(--accent); }
+  .panel-head h2 { font-size: 16px; font-weight: 600; }
+  .panel-head .ph-sub { font-size: 13px; color: var(--ink-3); margin-left: auto; }
+  .panel-body { padding: 20px; }
+
+  /* Form controls */
+  .field { margin-bottom: 18px; }
+  .field:last-child { margin-bottom: 0; }
+  .field label { display: block; font-size: 13px; font-weight: 600; color: var(--ink-2); margin-bottom: 7px; }
+  .field .hint { font-size: 12px; color: var(--ink-3); font-weight: 400; margin-left: 8px; }
+  .input, .select {
+    width: 100%; height: 48px; padding: 0 14px;
+    border: 1px solid var(--line-strong); border-radius: 10px;
+    background: var(--surface); color: var(--ink);
+    font-family: inherit; font-size: 15px;
+    transition: border-color .15s;
+  }
+  .input:focus, .select:focus { border-color: var(--accent); outline: none; }
+  .input::placeholder { color: var(--ink-3); }
+  .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  .row3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 14px; }
+
+  /* Big primary + secondary actions (tablet-friendly, big icons) */
+  .actions { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 26px; }
+  .btn {
+    display: inline-flex; align-items: center; justify-content: center; gap: 9px;
+    height: 52px; padding: 0 26px; border-radius: 999px;
+    font-family: inherit; font-size: 15px; font-weight: 600; cursor: pointer;
+    border: 1px solid transparent; transition: background .15s, border-color .15s, transform .1s;
+    min-height: 52px;
+  }
+  .btn:active { transform: scale(0.97); }
+  .btn .lucide { width: 20px; height: 20px; }
+  .btn-primary { background: var(--accent); color: var(--accent-ink); }
+  .btn-primary:hover { background: var(--accent-strong); }
+  .btn-ghost { background: var(--surface); color: var(--ink); border-color: var(--line-strong); }
+  .btn-ghost:hover { border-color: var(--ink-3); }
+  .btn-back { background: transparent; color: var(--ink-2); padding: 0 14px; }
+  .btn-back:hover { color: var(--ink); }
+
+  /* Big station cards (tablet-tappable) */
+  .station-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 16px; }
+  .station-card {
+    text-align: left; cursor: pointer; padding: 20px;
+    border: 1px solid var(--line); border-radius: 14px; background: var(--surface);
+    display: flex; flex-direction: column; gap: 12px;
+    transition: border-color .15s, transform .1s; min-height: 150px;
+  }
+  .station-card:hover { border-color: var(--accent); }
+  .station-card:active { transform: scale(0.99); }
+  .station-card .sc-top { display: flex; align-items: center; gap: 12px; }
+  .station-card .sc-icon {
+    width: 52px; height: 52px; border-radius: 12px;
+    display: grid; place-items: center; flex-shrink: 0;
+  }
+  .station-card .sc-icon .lucide { width: 26px; height: 26px; stroke-width: 2; }
+  .sc-icon.c-reg { background: rgba(223,168,143,0.22); color: #9c5a3c; }
+  .sc-icon.c-acu { background: rgba(159,187,224,0.25); color: #3c5e87; }
+  .sc-icon.c-ref { background: rgba(192,168,221,0.25); color: #5a4287; }
+  .sc-icon.c-col { background: rgba(159,201,162,0.25); color: #3c6f43; }
+  .sc-icon.c-eye { background: rgba(217,179,106,0.25); color: #7a5a1e; }
+  .sc-icon.c-rev { background: var(--accent-tint); color: var(--accent); }
+  [data-theme="dark"] .sc-icon.c-reg { color: #E9A98A; }
+  [data-theme="dark"] .sc-icon.c-acu { color: #A9C5E8; }
+  [data-theme="dark"] .sc-icon.c-ref { color: #CFBCEB; }
+  [data-theme="dark"] .sc-icon.c-col { color: #A6D6A9; }
+  [data-theme="dark"] .sc-icon.c-eye { color: #E0BE82; }
+  .station-card .sc-name { font-size: 16px; font-weight: 600; }
+  .station-card .sc-state { font-size: 13px; color: var(--ink-3); }
+  .station-card .sc-foot { margin-top: auto; font-size: 13px; color: var(--accent); font-weight: 600; display: flex; align-items: center; gap: 6px; }
+  .station-card .sc-foot .lucide { width: 15px; height: 15px; }
+  .station-card.done .sc-state { color: var(--green); }
+  .station-card.now { border-color: var(--accent); box-shadow: inset 3px 0 0 var(--accent); }
+
+  /* Acuity chart input */
+  .acuity-row { display: flex; align-items: center; gap: 12px; margin-bottom: 16px; }
+  .acuity-row .eye-label { width: 92px; font-size: 14px; font-weight: 600; color: var(--ink-2); }
+  .acuity-row .frac { display: inline-flex; align-items: center; gap: 8px; font-size: 22px; font-weight: 600; color: var(--ink); }
+  .acuity-row .frac input { width: 76px; height: 52px; text-align: center; font-size: 20px; font-weight: 600; }
+  .acuity-row .sl { flex: 1; color: var(--ink-3); font-size: 13px; }
+  .exc-row { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 6px; }
+  .exc-btn {
+    height: 44px; padding: 0 14px; border-radius: 10px;
+    border: 1px solid var(--line-strong); background: var(--surface);
+    color: var(--ink-2); font-size: 13px; font-weight: 600; cursor: pointer;
+    display: inline-flex; align-items: center; gap: 7px;
+  }
+  .exc-btn:hover { border-color: var(--accent); color: var(--accent); }
+  .exc-btn .lucide { width: 16px; height: 16px; }
+
+  /* Info banner */
+  .info-banner {
+    display: flex; gap: 12px; align-items: flex-start;
+    padding: 14px 16px; border-radius: 12px;
+    border: 1px solid var(--line); background: var(--surface-2);
+    font-size: 14px; color: var(--ink-2); line-height: 1.5;
+    margin-bottom: 22px;
+  }
+  .info-banner .lucide { width: 20px; height: 20px; color: var(--accent); margin-top: 1px; flex-shrink: 0; }
+  .info-banner.amber { border-color: color-mix(in srgb, var(--amber) 28%, transparent); background: var(--amber-tint); }
+  .info-banner.amber .lucide { color: var(--amber); }
+  .info-banner.green { border-color: color-mix(in srgb, var(--green) 28%, transparent); background: var(--green-tint); }
+  .info-banner.green .lucide { color: var(--green); }
+  .info-banner b { color: var(--ink); }
+
+  /* Flag block */
+  .flag-block {
+    margin-top: 20px; padding: 18px;
+    border: 1px solid color-mix(in srgb, var(--amber) 30%, transparent);
+    border-radius: 14px; background: var(--amber-tint);
+  }
+  .flag-block .fb-head { display: flex; align-items: center; gap: 9px; font-size: 15px; font-weight: 600; color: var(--amber); margin-bottom: 8px; }
+  .flag-block .fb-head .lucide { width: 19px; height: 19px; }
+  .flag-block p { font-size: 14px; line-height: 1.55; color: var(--ink-2); }
+  .flag-actions { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 14px; }
+  .flag-actions .btn { height: 48px; font-size: 14px; padding: 0 20px; }
+  .flag-actions .btn .lucide { width: 18px; height: 18px; }
+  .btn-amber { background: var(--amber); color: #fff; }
+  .btn-amber:hover { filter: brightness(1.05); }
+
+  /* Timeline rail */
+  .timeline { position: relative; padding-left: 8px; }
+  .tl-item { display: flex; gap: 16px; position: relative; padding-bottom: 22px; }
+  .tl-item:last-child { padding-bottom: 4px; }
+  .tl-item::before {
+    content: ""; position: absolute; left: 11px; top: 24px; bottom: 0;
+    width: 2px; background: var(--line);
+  }
+  .tl-item:last-child::before { display: none; }
+  .tl-dot {
+    width: 24px; height: 24px; border-radius: 50%; flex-shrink: 0;
+    border: 3px solid var(--line-strong); background: var(--surface);
+    display: grid; place-items: center; position: relative; z-index: 1;
+  }
+  .tl-dot .lucide { width: 13px; height: 13px; }
+  .tl-item.done .tl-dot { border-color: transparent; background: var(--green); color: #fff; }
+  .tl-item.done.tl-registration .tl-dot { background: var(--tl-registration); color: #3a2418; }
+  .tl-item.done.tl-acuity .tl-dot { background: var(--tl-acuity); color: #1d3554; }
+  .tl-item.done.tl-refraction .tl-dot { background: var(--tl-refraction); color: #3a2658; }
+  .tl-item.done.tl-colour .tl-dot { background: var(--tl-colour); color: #1f4a2a; }
+  .tl-item.done.tl-eye .tl-dot { background: var(--tl-eye); color: #4a360f; }
+  .tl-item.now .tl-dot { border-color: var(--accent); background: var(--surface); box-shadow: 0 0 0 4px var(--accent-tint); }
+  .tl-item.now .tl-dot .lucide { color: var(--accent); }
+  .tl-body .tl-name { font-size: 15px; font-weight: 600; }
+  .tl-item.pending .tl-name { color: var(--ink-3); font-weight: 400; }
+  .tl-body .tl-state { font-size: 13px; color: var(--ink-3); margin-top: 2px; }
+  .tl-item.now .tl-state { color: var(--accent); }
+  .tl-item.done .tl-state { color: var(--green); }
+
+  /* Participant identity row */
+  .pid { display: flex; align-items: center; gap: 14px; margin-bottom: 22px; }
+  .pid .avatar {
+    width: 52px; height: 52px; border-radius: 50%;
+    background: var(--accent); color: var(--accent-ink);
+    display: grid; place-items: center;
+    font-size: 18px; font-weight: 700; flex-shrink: 0;
+  }
+  .pid .pid-name { font-size: 19px; font-weight: 600; letter-spacing: -0.01em; }
+  .pid .pid-meta { font-size: 13px; color: var(--ink-3); margin-top: 2px; }
+
+  /* KV list */
+  .kv { display: flex; justify-content: space-between; gap: 16px; padding: 11px 0; border-bottom: 1px solid var(--line-soft); }
+  .kv:last-child { border-bottom: none; }
+  .kv .k { color: var(--ink-3); font-size: 14px; }
+  .kv .v { font-weight: 600; color: var(--ink); font-size: 14px; text-align: right; }
+  .kv .v.flag { color: var(--amber); }
+  .kv .v.ok { color: var(--green); }
+
+  /* Outcome choices */
+  .outcome-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; }
+  .outcome-card {
+    text-align: left; cursor: pointer; padding: 18px;
+    border: 1px solid var(--line-strong); border-radius: 12px; background: var(--surface);
+    color: var(--ink);
+    display: flex; flex-direction: column; gap: 8px; min-height: 110px;
+    transition: border-color .15s;
+  }
+  .outcome-card:hover { border-color: var(--accent); }
+  .outcome-card .oc-head { display: flex; align-items: center; gap: 10px; font-size: 15px; font-weight: 600; }
+  .outcome-card .oc-head .lucide { width: 22px; height: 22px; }
+  .outcome-card .oc-desc { font-size: 13px; color: var(--ink-3); line-height: 1.45; }
+  .oc-green .oc-head .lucide { color: var(--green); }
+  .oc-amber .oc-head .lucide { color: var(--amber); }
+  .oc-orange .oc-head .lucide { color: var(--orange); }
+  .oc-red .oc-head .lucide { color: var(--red); }
+
+  /* Sync states list */
+  .sync-list { display: flex; flex-direction: column; gap: 10px; }
+  .sync-row { display: flex; align-items: center; gap: 12px; padding: 12px 14px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); }
+  .sync-row .dot { width: 12px; height: 12px; border-radius: 50%; flex-shrink: 0; }
+  .sync-row .sr-name { font-size: 14px; font-weight: 600; }
+  .sync-row .sr-note { font-size: 13px; color: var(--ink-3); margin-left: auto; }
+
+  /* Dashboard mini */
+  .dash-strip { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); border: 1px solid var(--line); border-radius: 14px; overflow: hidden; background: var(--surface); }
+  .dash-metric { padding: 18px; border-right: 1px solid var(--line); }
+  .dash-metric:last-child { border-right: none; }
+  .dash-metric b { display: block; font-size: 30px; line-height: 1.05; letter-spacing: -0.02em; }
+  .dash-metric span { display: block; font-size: 13px; font-weight: 600; margin-top: 4px; color: var(--ink-2); }
+  .dash-metric small { color: var(--ink-3); font-size: 12px; }
+  .dash-metric.warn b, .dash-metric.warn span { color: var(--amber); }
+  .dash-metric.info b, .dash-metric.info span { color: var(--accent); }
+
+  /* Step footer (prev / next) */
+  .step-foot {
+    display: flex; align-items: center; justify-content: space-between;
+    margin-top: 30px; gap: 12px; flex-wrap: wrap;
+  }
+  .step-foot .foot-note { font-size: 13px; color: var(--ink-3); }
+
+  /* Sign-in */
+  .signin-wrap { max-width: 440px; margin: 40px auto 0; }
+  .signin-wrap .brand-block { text-align: center; margin-bottom: 28px; }
+  .signin-wrap .brand-block .mark { width: 56px; height: 56px; margin: 0 auto 16px; border-radius: 16px; }
+  .signin-wrap .brand-block .mark .lucide { width: 32px; height: 32px; }
+  .signin-wrap .brand-block h1 { font-size: 26px; letter-spacing: -0.02em; }
+  .signin-wrap .brand-block p { color: var(--ink-3); font-size: 14px; margin-top: 6px; }
+  .role-pick { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 10px; }
+  .role-pick label {
+    cursor: pointer; padding: 12px; border: 1px solid var(--line-strong); border-radius: 12px;
+    display: flex; align-items: center; gap: 10px; font-size: 14px; font-weight: 600;
+    transition: border-color .15s, background .15s;
+  }
+  .role-pick input { accent-color: var(--accent); width: 20px; height: 20px; }
+  .role-pick label:has(input:checked) { border-color: var(--accent); background: var(--accent-tint); }
+
+  /* ============ Bottom tab bar (tablet + phone) ============ */
+  .tabbar {
+    display: none;
+    position: fixed; left: 0; right: 0; bottom: 0; z-index: 70;
+    height: 68px; background: var(--surface); border-top: 1px solid var(--line);
+    padding: 0 8px env(safe-area-inset-bottom, 0px);
+    justify-content: space-around; align-items: stretch;
+  }
+  .tabbar button {
+    border: none; background: transparent; cursor: pointer;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    gap: 4px; color: var(--ink-3); font-size: 11px; font-weight: 600;
+    min-width: 56px; position: relative; -webkit-tap-highlight-color: transparent;
+  }
+  .tabbar button .lucide { width: 26px; height: 26px; stroke-width: 2; }
+  .tabbar button.active { color: var(--accent); }
+  .tabbar button.active::before {
+    content: ""; position: absolute; top: 0; left: 50%; transform: translateX(-50%);
+    width: 34px; height: 3px; border-radius: 0 0 3px 3px; background: var(--accent);
+  }
+  @media (max-width: 820px) {
+    .toprail-link span.lbl, .toprail .tag { display: none; }
+    .progress-inner { padding: 10px 14px; }
+    .pstep span.ptxt { display: none; }
+    .stage { padding: 22px 16px 130px; }
+    h1.stage-title { font-size: 24px; }
+    .row2, .row3 { grid-template-columns: 1fr; }
+    .tabbar { display: flex; }
+    .actions { position: sticky; bottom: 76px; }
+    .btn { flex: 1; min-width: 140px; }
+  }
+  @media (max-width: 480px) {
+    .acuity-row { flex-wrap: wrap; }
+    .acuity-row .eye-label { width: 100%; }
+    .role-pick { grid-template-columns: 1fr; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    * { transition: none !important; scroll-behavior: auto !important; }
+    .btn:active, .station-card:active { transform: none; }
+  }
+</style>
+</head>
+<body>
+
+<!-- ============ Persistent top rail ============ -->
+<header class="toprail">
+  <div class="toprail-inner">
+    <a class="wordmark" href="#" onclick="go(0);return false;">
+      <span class="mark"><i data-lucide="scan-eye"></i></span> VSMS
+    </a>
+    <span class="tag">Interactive prototype · the screening-day flow</span>
+    <span class="spacer"></span>
+    <button class="toprail-btn" id="themeToggle" aria-label="Toggle dark mode"><i data-lucide="moon"></i></button>
+    <a class="toprail-link" href="designl.html"><i data-lucide="layout-dashboard"></i><span class="lbl">Live dashboard</span></a>
+  </div>
+</header>
+
+<!-- Step progress -->
+<div class="progress-wrap">
+  <div class="progress-inner" id="progress"></div>
+</div>
+
+<!-- ============ Stages ============ -->
+
+<!-- 0. Sign in -->
+<section class="stage" id="s0">
+  <div class="signin-wrap">
+    <div class="brand-block">
+      <span class="mark" style="display:grid;place-items:center;background:var(--accent);color:var(--accent-ink);border-radius:16px;"><i data-lucide="scan-eye"></i></span>
+      <h1>Sign in to VSMS</h1>
+      <p>Every action requires a signed-in staff member. The backend enforces role permissions.</p>
+    </div>
+    <div class="panel">
+      <div class="panel-body">
+        <div class="field">
+          <label>Work email</label>
+          <input class="input" type="email" placeholder="you@vsms.health" value="adwoa.mensah@vsms.health" />
+        </div>
+        <div class="field">
+          <label>Password</label>
+          <input class="input" type="password" placeholder="••••••••" value="demo-password" />
+        </div>
+        <div class="field">
+          <label>Sign in as <span class="hint">demo only; RBAC is enforced server-side</span></label>
+          <div class="role-pick">
+            <label><input type="radio" name="role" /> Administrator</label>
+            <label><input type="radio" name="role" checked /> Event Manager</label>
+            <label><input type="radio" name="role" /> Registration Officer</label>
+            <label><input type="radio" name="role" /> Screener</label>
+            <label><input type="radio" name="role" /> Reviewer</label>
+            <label><input type="radio" name="role" /> <span style="color:var(--ink-3)">—</span></label>
+          </div>
+        </div>
+        <div class="actions">
+          <button class="btn btn-primary" onclick="go(1)"><i data-lucide="log-in"></i>Sign in</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- 1. Select event -->
+<section class="stage" id="s1">
+  <div class="crumb"><i data-lucide="calendar-days"></i> Signed in as Adwoa Mensah · Event Manager</div>
+  <h1 class="stage-title">Select today's event</h1>
+  <p class="stage-lede">An Event Manager opens the event for the day. Only one event is active per venue at a time.</p>
+  <div class="station-grid">
+    <button class="station-card now" onclick="go(2)">
+      <div class="sc-top"><span class="sc-icon c-reg"><i data-lucide="calendar-check-2"></i></span>
+        <div><div class="sc-name">Northside Community</div><div class="sc-state">Sat 19 Jul · ongoing</div></div></div>
+      <div class="sc-foot">Continue event <i data-lucide="chevron-right"></i></div>
+    </button>
+    <button class="station-card" onclick="go(2)">
+      <div class="sc-top"><span class="sc-icon c-reg"><i data-lucide="calendar"></i></span>
+        <div><div class="sc-name">Eastvale Seniors Day</div><div class="sc-state">Wed 23 Jul · upcoming</div></div></div>
+      <div class="sc-foot">Open event <i data-lucide="chevron-right"></i></div>
+    </button>
+    <button class="station-card" onclick="go(2)">
+      <div class="sc-top"><span class="sc-icon c-reg"><i data-lucide="calendar-plus"></i></span>
+        <div><div class="sc-name">Create new event</div><div class="sc-state">Configure stations & staff</div></div></div>
+      <div class="sc-foot">New event <i data-lucide="chevron-right"></i></div>
+    </button>
+  </div>
+  <div class="step-foot">
+    <button class="btn btn-back" onclick="go(0)"><i data-lucide="arrow-left"></i>Back</button>
+    <span class="foot-note">Participants never create accounts. All identity is staff-mediated.</span>
+  </div>
+</section>
+
+<!-- 2. Register / find participant -->
+<section class="stage" id="s2">
+  <div class="crumb"><i data-lucide="user-plus"></i> Registration · Northside Community</div>
+  <h1 class="stage-title">Register Marcus Thompson</h1>
+  <p class="stage-lede">A Registration Officer searches first. If the participant exists, confirm and check them in. If not, create the record and record consent, then add them to the first station queue.</p>
+
+  <div class="info-banner">
+    <i data-lucide="search"></i>
+    <div><b>Search returned no match.</b> Creating a new participant record. For a returning participant, search first and create a new event check-in instead of a duplicate.</div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-head"><i data-lucide="user"></i><h2>Participant details</h2><span class="ph-sub">No account, reusable across events</span></div>
+    <div class="panel-body">
+      <div class="row2">
+        <div class="field"><label>Full name</label><input class="input" value="Marcus Thompson" /></div>
+        <div class="field"><label>Date of birth</label><input class="input" value="14 Mar 1963 · 63 years" /></div>
+      </div>
+      <div class="row3">
+        <div class="field"><label>Gender</label>
+          <select class="select"><option>Male</option><option>Female</option><option>Prefer not to say</option></select>
+        </div>
+        <div class="field"><label>Contact number</label><input class="input" value="+65 9123 4567" /></div>
+        <div class="field"><label>Preferred language <span class="hint">optional</span></label><input class="input" value="English" /></div>
+      </div>
+      <div class="field"><label>Consent</label>
+        <label class="role-pick" style="display:block;border:1px solid var(--line-strong);border-radius:12px;padding:12px;font-weight:400;cursor:pointer;">
+          <span style="display:flex;align-items:center;gap:10px;"><input type="checkbox" checked /> Participant has consented to screening and to data being stored for this event.</span>
+        </label>
+      </div>
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-head"><i data-lucide="qr-code"></i><h2>Issue QR event pass</h2><span class="ph-sub">No clinical data in the QR</span></div>
+    <div class="panel-body">
+      <div class="info-banner green">
+        <i data-lucide="check-circle-2"></i>
+        <div>Participant ID created: <b>VSMS-240719-028</b>. QR pass contains an opaque, signed event token only. The participant's name, queue number, and medical data are never in the QR.</div>
+      </div>
+      <div style="display:flex;align-items:center;gap:20px;flex-wrap:wrap;">
+        <div style="width:120px;height:120px;border:1px solid var(--line-strong);border-radius:12px;background:var(--surface-2);display:grid;place-items:center;"><i data-lucide="qr-code" style="width:72px;height:72px;color:var(--ink);"></i></div>
+        <div>
+          <div style="font-size:15px;font-weight:600;">Queue 2 · Visual acuity</div>
+          <div style="font-size:13px;color:var(--ink-3);margin-top:4px;">Hand the slip to the participant. If lost, revoke and reissue.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="actions">
+    <button class="btn btn-ghost btn-back" onclick="go(1)"><i data-lucide="arrow-left"></i>Back</button>
+    <button class="btn btn-primary" onclick="go(3)"><i data-lucide="list-checks"></i>Add to first station queue</button>
+  </div>
+</section>
+
+<!-- 3. Live queue -->
+<section class="stage" id="s3">
+  <div class="crumb"><i data-lucide="list-checks"></i> Live queue · Visual acuity is next</div>
+  <h1 class="stage-title">Marcus is in the queue</h1>
+  <p class="stage-lede">The system placed him in the Visual Acuity queue. The Screener opens their station queue, selects the next participant, and the system marks them in progress.</p>
+
+  <div class="dash-strip" style="margin-bottom:22px;">
+    <div class="dash-metric"><b>146</b><span>Registered</span><small>+12 since noon</small></div>
+    <div class="dash-metric info"><b>18</b><span>Waiting</span><small>14 min avg</small></div>
+    <div class="dash-metric"><b>72</b><span>Completed</span><small>49% of registrations</small></div>
+    <div class="dash-metric warn"><b>12</b><span>Require review</span><small>4 in the last hour</small></div>
+    <div class="dash-metric warn"><b>3</b><span>Pending sync</span><small>Saved locally</small></div>
+  </div>
+
+  <div class="info-banner green">
+    <i data-lucide="check-circle-2"></i>
+    <div>Selected: <b>Marcus Thompson · VSMS-240719-028</b>. The Screener scans the QR pass; VSMS verifies the event check-in and opens the Visual Acuity form.</div>
+  </div>
+
+  <div class="actions">
+    <button class="btn btn-ghost btn-back" onclick="go(2)"><i data-lucide="arrow-left"></i>Back</button>
+    <button class="btn btn-primary" onclick="go(4)"><i data-lucide="scan-line"></i>Open Visual Acuity form</button>
+  </div>
+</section>
+
+<!-- 4. Station A: Visual Acuity -->
+<section class="stage" id="s4">
+  <div class="crumb"><i data-lucide="scan-line"></i> Station A · Visual Acuity · Marcus Thompson</div>
+  <h1 class="stage-title">Record visual acuity</h1>
+  <p class="stage-lede">Controlled numeric fields, not free text. The test distance is fixed by the chart; the Screener enters only the denominator.</p>
+
+  <div class="pid">
+    <span class="avatar">MT</span>
+    <div><div class="pid-name">Marcus Thompson</div><div class="pid-meta">63 years · VSMS-240719-028 · Queue 2</div></div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-head"><i data-lucide="ruler"></i><h2>Distance acuity</h2><span class="ph-sub">Test distance 6 m</span></div>
+    <div class="panel-body">
+      <div class="acuity-row">
+        <span class="eye-label">Right eye (OD)</span>
+        <span class="frac">6 / <input class="input" value="12" /></span>
+        <span class="sl">Smallest line read</span>
+      </div>
+      <div class="acuity-row">
+        <span class="eye-label">Left eye (OS)</span>
+        <span class="frac">6 / <input class="input" value="18" /></span>
+        <span class="sl">Smallest line read</span>
+      </div>
+      <div class="field" style="margin-top:18px;">
+        <label>If the chart cannot be read</label>
+        <div class="exc-row">
+          <button class="exc-btn"><i data-lucide="hand"></i>Count Fingers</button>
+          <button class="exc-btn"><i data-lucide="move"></i>Hand Motion</button>
+          <button class="exc-btn"><i data-lucide="lightbulb"></i>Light Perception</button>
+          <button class="exc-btn"><i data-lucide="eye-off"></i>No Light Perception</button>
+          <button class="exc-btn"><i data-lucide="ban"></i>Not testable</button>
+        </div>
+      </div>
+      <div class="info-banner amber" style="margin-top:18px;margin-bottom:0;">
+        <i data-lucide="triangle-alert"></i>
+        <div><b>Automatic flag raised by screening rules.</b> Left eye 6/18 meets the review threshold (≥ 6/18). The app does not diagnose. This is flagged for reviewer assessment; the final decision is made by a reviewer.</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="actions">
+    <button class="btn btn-ghost btn-back" onclick="go(3)"><i data-lucide="arrow-left"></i>Back</button>
+    <button class="btn btn-primary" onclick="go(5)"><i data-lucide="save"></i>Save &amp; transfer to Refraction</button>
+  </div>
+</section>
+
+<!-- 5. Save + flag acknowledgement -->
+<section class="stage" id="s5">
+  <div class="crumb"><i data-lucide="save"></i> Station A · Saved</div>
+  <h1 class="stage-title">Saved locally. Flag acknowledged.</h1>
+  <p class="stage-lede">The result is saved on the device first, then synchronised when online. The preliminary flag stays attached to the record for the reviewer but does not stop the screening journey.</p>
+
+  <div class="info-banner green">
+    <i data-lucide="hard-drive-download"></i>
+    <div><b>Saved safely on this device.</b> Records will synchronise when the connection returns. Online now: syncing to the server. <b>1 pending sync</b>.</div>
+  </div>
+
+  <div class="flag-block">
+    <div class="fb-head"><i data-lucide="flag"></i>Flagged for reviewer assessment</div>
+    <p>Left-eye distance acuity 6/18 crossed the configured review threshold. Final decision made by reviewer.</p>
+    <div class="flag-actions">
+      <button class="btn btn-amber" onclick="ackFlag(this)"><i data-lucide="check"></i>Acknowledge flag</button>
+      <button class="btn btn-ghost" onclick="go(6)"><i data-lucide="arrow-right"></i>Continue to Refraction</button>
+    </div>
+  </div>
+
+  <div class="actions">
+    <button class="btn btn-ghost btn-back" onclick="go(4)"><i data-lucide="arrow-left"></i>Back</button>
+    <button class="btn btn-primary" onclick="go(6)"><i data-lucide="arrow-right"></i>Transfer to Station B</button>
+  </div>
+</section>
+
+<!-- 6. Station B: Refraction -->
+<section class="stage" id="s6">
+  <div class="crumb"><i data-lucide="glasses"></i> Station B · Refraction · Marcus Thompson</div>
+  <h1 class="stage-title">Record refraction</h1>
+  <p class="stage-lede">The Screener scans the same QR pass, asks about distance glasses, then runs the autorefractor for both eyes. Machine estimates are a screening input, never a prescription.</p>
+
+  <div class="panel">
+    <div class="panel-head"><i data-lucide="glasses"></i><h2>Glasses &amp; autorefractor</h2><span class="ph-sub">Device VSMS-REF-02</span></div>
+    <div class="panel-body">
+      <div class="field"><label>Does the participant normally wear distance glasses?</label>
+        <div class="exc-row">
+          <button class="exc-btn"><i data-lucide="check"></i>Yes</button>
+          <button class="exc-btn" style="border-color:var(--accent);color:var(--accent);"><i data-lucide="x"></i>No</button>
+          <button class="exc-btn"><i data-lucide="help-circle"></i>Unknown</button>
+        </div>
+      </div>
+      <div class="row2">
+        <div class="field"><label>Right eye · Sphere (SPH)</label><input class="input" value="-1.25 D" /></div>
+        <div class="field"><label>Left eye · Sphere (SPH)</label><input class="input" value="-2.00 D" /></div>
+      </div>
+      <div class="row2">
+        <div class="field"><label>Right eye · Cylinder (CYL)</label><input class="input" value="-0.50 D" /></div>
+        <div class="field"><label>Left eye · Cylinder (CYL)</label><input class="input" value="-0.75 D" /></div>
+      </div>
+      <div class="row2">
+        <div class="field"><label>Right eye · Axis</label><input class="input" value="92°" /></div>
+        <div class="field"><label>Left eye · Axis</label><input class="input" value="178°" /></div>
+      </div>
+      <div class="info-banner" style="margin-top:6px;margin-bottom:0;">
+        <i data-lucide="info"></i>
+        <div>The machine estimate is a screening input, not a prescription. VSMS never shows "prescribe glasses".</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="actions">
+    <button class="btn btn-ghost btn-back" onclick="go(5)"><i data-lucide="arrow-left"></i>Back</button>
+    <button class="btn btn-primary" onclick="go(7)"><i data-lucide="save"></i>Save &amp; transfer to Colour vision</button>
+  </div>
+</section>
+
+<!-- 7. Station C: Colour vision -->
+<section class="stage" id="s7">
+  <div class="crumb"><i data-lucide="palette"></i> Station C · Colour vision · Marcus Thompson</div>
+  <h1 class="stage-title">Record colour vision</h1>
+  <p class="stage-lede">Screening plates recorded pass or refer. The app never interprets the result.</p>
+  <div class="panel">
+    <div class="panel-head"><i data-lucide="palette"></i><h2>Ishihara screening plates</h2><span class="ph-sub">Test kit TK-04</span></div>
+    <div class="panel-body">
+      <div class="exc-row">
+        <button class="exc-btn" style="border-color:var(--green);color:var(--green);"><i data-lucide="check"></i>Pass</button>
+        <button class="exc-btn"><i data-lucide="corner-up-right"></i>Refer</button>
+        <button class="exc-btn"><i data-lucide="ban"></i>Not testable</button>
+      </div>
+      <div class="row2" style="margin-top:18px;">
+        <div class="field"><label>Right eye score</label><input class="input" value="17 / 17" /></div>
+        <div class="field"><label>Left eye score</label><input class="input" value="17 / 17" /></div>
+      </div>
+    </div>
+  </div>
+  <div class="actions">
+    <button class="btn btn-ghost btn-back" onclick="go(6)"><i data-lucide="arrow-left"></i>Back</button>
+    <button class="btn btn-primary" onclick="go(8)"><i data-lucide="save"></i>Save &amp; transfer to Eye health</button>
+  </div>
+</section>
+
+<!-- 8. Station D: Eye health -->
+<section class="stage" id="s8">
+  <div class="crumb"><i data-lucide="eye"></i> Station D · Eye health · Marcus Thompson</div>
+  <h1 class="stage-title">Record eye-health observations</h1>
+  <p class="stage-lede">External observations for the reviewer. No retinal imaging in this MVP; the field is reserved for when the client confirms photography at this station.</p>
+  <div class="panel">
+    <div class="panel-head"><i data-lucide="eye"></i><h2>External eye health</h2><span class="ph-sub">Approved observations only</span></div>
+    <div class="panel-body">
+      <div class="row2">
+        <div class="field"><label>Right eye</label><select class="select"><option>Within normal limits</option><option>Cataract suspected</option><option>Refer for review</option></select></div>
+        <div class="field"><label>Left eye</label><select class="select"><option>Within normal limits</option><option>Cataract suspected</option><option>Refer for review</option></select></div>
+      </div>
+      <div class="field"><label>Observation notes</label><input class="input" style="height:80px;" value="Mild conjunctival injection, right eye. No acute findings left eye." /></div>
+      <div class="info-banner amber" style="margin-top:6px;margin-bottom:0;">
+        <i data-lucide="triangle-alert"></i>
+        <div><b>Combined flags routed to Clinical Review.</b> Left-eye acuity flag plus this observation. Marcus enters the Clinical Review queue.</div>
+      </div>
+    </div>
+  </div>
+  <div class="actions">
+    <button class="btn btn-ghost btn-back" onclick="go(7)"><i data-lucide="arrow-left"></i>Back</button>
+    <button class="btn btn-primary" onclick="go(9)"><i data-lucide="arrow-right"></i>Send to Clinical Review</button>
+  </div>
+</section>
+
+<!-- 9. Reviewer review -->
+<section class="stage" id="s9">
+  <div class="crumb"><i data-lucide="clipboard-check"></i> Clinical Review · Reviewer · Marcus Thompson</div>
+  <h1 class="stage-title">Review the flagged record</h1>
+  <p class="stage-lede">A reviewer inspects every flag and the full record, then makes the final decision. The system does not diagnose; it surfaces a referral recommendation from screening rules.</p>
+
+  <div class="pid">
+    <span class="avatar">MT</span>
+    <div><div class="pid-name">Marcus Thompson</div><div class="pid-meta">63 years · VSMS-240719-028 · Clinical review</div></div>
+  </div>
+
+  <div class="row2" style="align-items:start;">
+    <div class="panel">
+      <div class="panel-head"><i data-lucide="list-checks"></i><h2>Screening summary</h2></div>
+      <div class="panel-body">
+        <div class="kv"><span class="k">Distance acuity, right</span><span class="v ok">6/12</span></div>
+        <div class="kv"><span class="k">Distance acuity, left</span><span class="v flag">6/18 · flagged</span></div>
+        <div class="kv"><span class="k">Refraction (left SPH/CYL)</span><span class="v">-2.00 / -0.75</span></div>
+        <div class="kv"><span class="k">Colour vision</span><span class="v ok">Pass</span></div>
+        <div class="kv"><span class="k">Eye health</span><span class="v flag">Mild injection, right</span></div>
+        <div class="kv"><span class="k">Recorded by</span><span class="v">K. Osei · Stations A–D</span></div>
+      </div>
+    </div>
+    <div>
+      <div class="timeline">
+        <div class="tl-item done tl-registration"><span class="tl-dot"><i data-lucide="check"></i></span><div class="tl-body"><div class="tl-name">Registration</div><div class="tl-state">Complete · 9:41am</div></div></div>
+        <div class="tl-item done tl-acuity"><span class="tl-dot"><i data-lucide="check"></i></span><div class="tl-body"><div class="tl-name">Visual acuity</div><div class="tl-state">Complete · 9:58am · flag</div></div></div>
+        <div class="tl-item done tl-refraction"><span class="tl-dot"><i data-lucide="check"></i></span><div class="tl-body"><div class="tl-name">Refraction</div><div class="tl-state">Complete</div></div></div>
+        <div class="tl-item done tl-colour"><span class="tl-dot"><i data-lucide="check"></i></span><div class="tl-body"><div class="tl-name">Colour vision</div><div class="tl-state">Complete</div></div></div>
+        <div class="tl-item done tl-eye"><span class="tl-dot"><i data-lucide="check"></i></span><div class="tl-body"><div class="tl-name">Eye health</div><div class="tl-state">Complete · observation</div></div></div>
+        <div class="tl-item now"><span class="tl-dot"><i data-lucide="clipboard-check"></i></span><div class="tl-body"><div class="tl-name">Clinical review</div><div class="tl-state">Active now</div></div></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="flag-block">
+    <div class="fb-head"><i data-lucide="flag"></i>Referral recommendation generated by screening rules</div>
+    <p>Left-eye acuity 6/18 and right-eye observation meet the referral criteria. This is a recommendation. The final decision and approval are made by the reviewer.</p>
+  </div>
+
+  <div class="actions">
+    <button class="btn btn-ghost btn-back" onclick="go(8)"><i data-lucide="arrow-left"></i>Back</button>
+    <button class="btn btn-primary" onclick="go(10)"><i data-lucide="corner-up-right"></i>Record outcome</button>
+  </div>
+</section>
+
+<!-- 10. Outcome / referral -->
+<section class="stage" id="s10">
+  <div class="crumb"><i data-lucide="corner-up-right"></i> Clinical Review · Outcome</div>
+  <h1 class="stage-title">Record the outcome</h1>
+  <p class="stage-lede">The reviewer records the decision and, where required, the referral destination and follow-up wording. Choose one.</p>
+  <div class="outcome-grid">
+    <button class="outcome-card oc-green" onclick="go(11)">
+      <div class="oc-head"><i data-lucide="circle-check"></i>Complete</div>
+      <div class="oc-desc">No referral. Participant receives a completed-screening summary and may leave.</div>
+    </button>
+    <button class="outcome-card oc-amber" onclick="go(11)">
+      <div class="oc-head"><i data-lucide="activity"></i>Monitor</div>
+      <div class="oc-desc">No referral now. Flagged for review at the participant's next screening event.</div>
+    </button>
+    <button class="outcome-card oc-orange" onclick="go(11)">
+      <div class="oc-head"><i data-lucide="corner-up-right"></i>Refer</div>
+      <div class="oc-desc">Referral generated. Specialist / clinic referral letter produced for the reviewer to approve.</div>
+    </button>
+    <button class="outcome-card oc-red" onclick="go(11)">
+      <div class="oc-head"><i data-lucide="triangle-alert"></i>Urgent escalation</div>
+      <div class="oc-desc">Bypass the queue. Clinician is called now; handover arranged immediately. Referral PDF generated after the safety action.</div>
+    </button>
+  </div>
+  <div class="actions">
+    <button class="btn btn-ghost btn-back" onclick="go(9)"><i data-lucide="arrow-left"></i>Back</button>
+  </div>
+</section>
+
+<!-- 11. Referral generated -->
+<section class="stage" id="s11">
+  <div class="crumb"><i data-lucide="file-text"></i> Referral generated · Marcus Thompson</div>
+  <h1 class="stage-title">Referral letter ready</h1>
+  <p class="stage-lede">The reviewer approves the referral. VSMS generates a PDF clinical screening summary, a handover document, not a diagnosis or prescription.</p>
+
+  <div class="panel">
+    <div class="panel-head"><i data-lucide="file-text"></i><h2>Referral summary</h2><span class="ph-sub">v1 · pending approval</span></div>
+    <div class="panel-body">
+      <div class="kv"><span class="k">Participant</span><span class="v">Marcus Thompson · VSMS-240719-028</span></div>
+      <div class="kv"><span class="k">Destination</span><span class="v">Northside Eye Clinic</span></div>
+      <div class="kv"><span class="k">Urgency</span><span class="v flag">Routine referral</span></div>
+      <div class="kv"><span class="k">Reason</span><span class="v">Distance acuity 6/18 (left), observation (right)</span></div>
+      <div class="kv"><span class="k">Reviewer</span><span class="v">Dr. A. Lim · Clinical Reviewer</span></div>
+      <div class="kv"><span class="k">Delivery</span><span class="v">Printed handover at Station D</span></div>
+    </div>
+  </div>
+
+  <div class="info-banner green">
+    <i data-lucide="check-circle-2"></i>
+    <div><b>Audit record created.</b> Registration, result changes, review, referral, and sync outcomes all create audit records.</div>
+  </div>
+
+  <div class="actions">
+    <button class="btn btn-ghost btn-back" onclick="go(10)"><i data-lucide="arrow-left"></i>Back</button>
+    <button class="btn btn-ghost" onclick="window.print()"><i data-lucide="printer"></i>Print letter</button>
+    <button class="btn btn-primary" onclick="go(12)"><i data-lucide="check"></i>Approve &amp; return to dashboard</button>
+  </div>
+</section>
+
+<!-- 12. Dashboard -->
+<section class="stage" id="s12">
+  <div class="crumb"><i data-lucide="layout-dashboard"></i> Event dashboard · Northside Community</div>
+  <h1 class="stage-title">The event dashboard shows the updated totals</h1>
+  <p class="stage-lede">Queue, completion, referral, and sync totals refresh as the event runs. The Event Manager watches throughput, bottlenecks, and sync health.</p>
+
+  <div class="dash-strip">
+    <div class="dash-metric"><b>147</b><span>Registered</span><small>+1</small></div>
+    <div class="dash-metric info"><b>17</b><span>Waiting</span><small>-1</small></div>
+    <div class="dash-metric"><b>73</b><span>Completed</span><small>+1</small></div>
+    <div class="dash-metric warn"><b>13</b><span>Require review</span><small>+1</small></div>
+    <div class="dash-metric warn"><b>5</b><span>Referred</span><small>+1</small></div>
+    <div class="dash-metric info"><b>2</b><span>Pending sync</span><small>Saved locally</small></div>
+  </div>
+
+  <div class="panel" style="margin-top:22px;">
+    <div class="panel-head"><i data-lucide="refresh-cw"></i><h2>Sync states, always visible</h2></div>
+    <div class="panel-body">
+      <div class="sync-list">
+        <div class="sync-row"><span class="dot" style="background:var(--ink-3)"></span><span class="sr-name">Saved offline</span><span class="sr-note">on this device</span></div>
+        <div class="sync-row"><span class="dot" style="background:var(--amber)"></span><span class="sr-name">Pending sync</span><span class="sr-note">waiting for connection</span></div>
+        <div class="sync-row"><span class="dot" style="background:var(--accent)"></span><span class="sr-name">Syncing</span><span class="sr-note">in progress</span></div>
+        <div class="sync-row"><span class="dot" style="background:var(--green)"></span><span class="sr-name">Synced</span><span class="sr-note">server confirmed</span></div>
+        <div class="sync-row"><span class="dot" style="background:var(--red)"></span><span class="sr-name">Sync failed</span><span class="sr-note">will retry</span></div>
+        <div class="sync-row"><span class="dot" style="background:var(--orange)"></span><span class="sr-name">Conflict requiring review</span><span class="sr-note">human decides</span></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="info-banner amber" style="margin-top:22px;">
+    <i data-lucide="wifi-off"></i>
+    <div><b>Try the offline branch.</b> Toggle offline to see the same forms stay usable, writes saved locally, then synced when the connection returns.</div>
+  </div>
+
+  <div class="actions">
+    <button class="btn btn-ghost btn-back" onclick="go(11)"><i data-lucide="arrow-left"></i>Back</button>
+    <button class="btn btn-ghost" id="offlineToggle"><i data-lucide="wifi-off"></i>Go offline</button>
+    <button class="btn btn-primary" onclick="go(13)"><i data-lucide="rotate-cw"></i>Replay offline branch</button>
+  </div>
+</section>
+
+<!-- 13. Offline branch -->
+<section class="stage" id="s13">
+  <div class="crumb"><i data-lucide="wifi-off"></i> Offline branch · Network unavailable</div>
+  <h1 class="stage-title">Offline is not failure</h1>
+  <p class="stage-lede">The same participant and screening forms stay usable. Writes are saved locally as pending actions. When the network returns, the app syncs and the server accepts each action once using its idempotency key.</p>
+
+  <div class="info-banner amber">
+    <i data-lucide="wifi-off"></i>
+    <div><b>You are offline.</b> Marcus's referral was saved locally. The dashboard shows <b>1 pending sync</b>. Staff see one calm message: "Saved safely on this device. Records will synchronise when the connection returns."</div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-head"><i data-lucide="hard-drive-download"></i><h2>Pending actions on this device</h2><span class="ph-sub">Idempotent: server accepts each once</span></div>
+    <div class="panel-body">
+      <div class="sync-list">
+        <div class="sync-row"><span class="dot" style="background:var(--amber)"></span><span class="sr-name">Referral · Marcus Thompson</span><span class="sr-note">Pending sync</span></div>
+        <div class="sync-row"><span class="dot" style="background:var(--ink-3)"></span><span class="sr-name">Eye-health update · Aisha Rahman</span><span class="sr-note">Saved offline</span></div>
+        <div class="sync-row"><span class="dot" style="background:var(--ink-3)"></span><span class="sr-name">Registration · Lucy Fern</span><span class="sr-note">Saved offline</span></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="actions">
+    <button class="btn btn-ghost btn-back" onclick="go(12)"><i data-lucide="arrow-left"></i>Back</button>
+    <button class="btn btn-primary" id="syncNow" onclick="go(12)"><i data-lucide="refresh-cw"></i>Connection returns: sync now</button>
+  </div>
+</section>
+
+<!-- ============ Bottom tab bar ============ -->
+<nav class="tabbar" aria-label="Prototype navigation">
+  <button onclick="go(0)" id="tb0"><i data-lucide="log-in"></i><span>Sign in</span></button>
+  <button onclick="go(2)" id="tb2"><i data-lucide="user-plus"></i><span>Register</span></button>
+  <button onclick="go(4)" id="tb4"><i data-lucide="scan-line"></i><span>Screening</span></button>
+  <button onclick="go(9)" id="tb9"><i data-lucide="clipboard-check"></i><span>Review</span></button>
+  <button onclick="go(12)" id="tb12"><i data-lucide="layout-dashboard"></i><span>Dashboard</span></button>
+</nav>
+
+<script>
+  const STEPS = [
+    { id: 's0', name: 'Sign in' },
+    { id: 's1', name: 'Select event' },
+    { id: 's2', name: 'Register' },
+    { id: 's3', name: 'Live queue' },
+    { id: 's4', name: 'Visual acuity' },
+    { id: 's5', name: 'Save & flag' },
+    { id: 's6', name: 'Refraction' },
+    { id: 's7', name: 'Colour vision' },
+    { id: 's8', name: 'Eye health' },
+    { id: 's9', name: 'Clinical review' },
+    { id: 's10', name: 'Outcome' },
+    { id: 's11', name: 'Referral' },
+    { id: 's12', name: 'Dashboard' },
+    { id: 's13', name: 'Offline branch' },
+  ];
+
+  let current = 0;
+
+  function renderProgress() {
+    const el = document.getElementById('progress');
+    el.innerHTML = STEPS.map((s, i) => {
+      const cls = i === current ? 'active' : (i < current ? 'done' : '');
+      const pn = i < current ? '<i data-lucide="check" style="width:13px;height:13px;"></i>' : (i + 1);
+      return `<button class="pstep ${cls}" onclick="go(${i})"><span class="pn">${pn}</span><span class="ptxt">${s.name}</span></button>${i < STEPS.length - 1 ? '<span class="psep">·</span>' : ''}`;
+    }).join('');
+    lucide.createIcons();
+    // tabbar active
+    [0,2,4,9,12].forEach(i => { const b=document.getElementById('tb'+i); if(b) b.classList.toggle('active', i===current); });
+  }
+
+  function go(i) {
+    if (i < 0 || i >= STEPS.length) return;
+    current = i;
+    document.querySelectorAll('.stage').forEach(s => s.classList.remove('active'));
+    const tgt = document.getElementById(STEPS[i].id);
+    if (tgt) tgt.classList.add('active');
+    renderProgress();
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+    lucide.createIcons();
+  }
+
+  function ackFlag(btn) {
+    btn.innerHTML = '<i data-lucide="check-check"></i>Flag acknowledged';
+    btn.disabled = true;
+    btn.style.opacity = '0.7';
+    lucide.createIcons();
+  }
+
+  /* Theme */
+  const root = document.documentElement;
+  const themeToggle = document.getElementById('themeToggle');
+  const savedTheme = localStorage.getItem('vsms-theme');
+  if (savedTheme && savedTheme !== 'light') root.dataset.theme = savedTheme;
+  else if (!savedTheme && window.matchMedia('(prefers-color-scheme: dark)').matches) root.dataset.theme = 'dark';
+  function setThemeIcon() {
+    themeToggle.innerHTML = '<i data-lucide="' + (root.dataset.theme === 'dark' ? 'sun' : 'moon') + '"></i>';
+    lucide.createIcons();
+  }
+  themeToggle.addEventListener('click', () => {
+    if (root.dataset.theme === 'dark') { root.removeAttribute('data-theme'); localStorage.setItem('vsms-theme', 'light'); }
+    else { root.dataset.theme = 'dark'; localStorage.setItem('vsms-theme', 'dark'); }
+    setThemeIcon();
+  });
+
+  /* Offline toggle (demo) */
+  const offlineBtn = document.getElementById('offlineToggle');
+  if (offlineBtn) {
+    offlineBtn.addEventListener('click', function () {
+      const off = document.body.classList.toggle('offline');
+      this.innerHTML = off
+        ? '<i data-lucide="wifi"></i>Go online'
+        : '<i data-lucide="wifi-off"></i>Go offline';
+      lucide.createIcons();
+    });
+  }
+
+  /* Init */
+  go(0);
+  setThemeIcon();
+  lucide.createIcons();
+</script>
+</body>
+</html>
