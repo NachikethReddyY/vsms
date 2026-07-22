@@ -7,6 +7,10 @@
     "doc": "docs"
   },
   "scripts": {
+    "index:build": "node tools/repo-index.mjs build",
+    "index:update": "node tools/repo-index.mjs update",
+    "index:query": "node tools/repo-index.mjs query",
+    "index:status": "node tools/repo-index.mjs status",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "repository": {
