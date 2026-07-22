@@ -1,0 +1,30 @@
+{
+  "skill_name": "repository-indexing",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "Where is refresh-token rotation implemented, and which code revokes a reused token? Give me only the evidence needed to explain the flow.",
+      "expected_output": "Uses exact and semantic retrieval, follows relevant call/type edges, and cites a minimal set of symbol-level spans without reading the whole auth subsystem."
+    },
+    {
+      "id": 2,
+      "prompt": "This monorepo has 300,000 files. Design an incremental semantic index with Tree-sitter, embeddings, and a symbol graph, including cache invalidation and branch isolation.",
+      "expected_output": "Reads the persistent-index reference and produces a language-agnostic architecture with stable chunk identities, transactional per-file updates, versioned caches, bounded processing, and measurable performance criteria."
+    },
+    {
+      "id": 3,
+      "prompt": "Users sometimes receive duplicate invoice emails. Trace the likely path from scheduled job to email provider and identify the smallest set of relevant code.",
+      "expected_output": "Combines conceptual retrieval with symbol/call expansion, checks configuration and tests only when relevant, labels uncertain edges, and stops once the duplicate-send path is evidenced."
+    },
+    {
+      "id": 4,
+      "prompt": "I renamed a method and modified three lines in its body. Update the repository index without re-embedding unrelated code.",
+      "expected_output": "Hashes and reparses only the changed file, matches stable chunks, removes stale symbol/edges, embeds only changed chunks, and resolves affected references transactionally."
+    },
+    {
+      "id": 5,
+      "prompt": "Change the button label in src/components/SubmitButton.tsx from Send to Submit.",
+      "expected_output": "Does not invoke broad repository indexing; opens the known small target directly, verifies the occurrence, and makes the scoped edit."
+    }
+  ]
+}
