@@ -7,6 +7,7 @@ const YAML = require("yamljs");
 
 const authRoutes = require("./routes/authRoutes");
 const userRoutes = require("./routes/userRoutes");
+const qrRoutes = require("./routes/qrRoutes"); // ✅ Add this
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -33,6 +34,8 @@ app.get("/", (req, res) => {
 // Register Routes
 app.use("/auth", authRoutes);
 app.use("/users", userRoutes);
+app.use("/qr", qrRoutes); // ✅ Add this
+
 
 // Start Server
 app.listen(PORT, () => {

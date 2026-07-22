@@ -1,9 +1,3 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
-// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
-// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
-
 generator client {
   provider        = "prisma-client-js"
   previewFeatures = ["postgresqlExtensions", "relationJoins"]
@@ -14,6 +8,38 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+// ==========================================
+// ENUMS
+// ==========================================
+
+enum UserStatus {
+  ACTIVE
+  INACTIVE
+  SUSPENDED
+}
+
+enum QueueStatus {
+  WAITING
+  IN_PROGRESS
+  COMPLETED
+  SKIPPED
+}
+
+enum AssignmentStatus {
+  ACTIVE
+  INACTIVE
+}
+
+enum ScanResult {
+  SUCCESS
+  INVALID
+  EXPIRED
+  REVOKED
+}
+
+enum EventStatus {
+  UPCOMING
+  ONGOING
 enum EventStatus {
   DRAFT
   PUBLISHED
@@ -44,6 +70,457 @@ enum StaffAssignmentStatus {
   CANCELLED
 }
 
+enum RegistrationStatus {
+  REGISTERED
+  CHECKED_IN
+  CANCELLED
+}
+
+enum Urgency {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+enum Outcome {
+  PASSED
+  FAILED
+  PENDING
+  REFERRED
+}
+
+enum DocType {
+  PDF
+  IMAGE
+  REPORT
+  SUMMARY
+}
+
+enum Channel {
+  EMAIL
+  SMS
+  IN_APP
+}
+
+// ==========================================
+// AUTHENTICATION & USER MANAGEMENT
+// ==========================================
+
+model User {
+  id                  String     @id @default(uuid()) @map("user_id") @db.Uuid
+  fullName            String     @map("full_name") @db.VarChar(100)
+  email               String     @unique @db.VarChar(255)
+  contactNumber       String?    @map("contact_number") @db.VarChar(20)
+  emergencyContact    String?    @map("emergency_contact") @db.VarChar(20)
+  dateOfBirth         DateTime?  @map("date_of_birth") @db.Date
+  gender              String?    @db.VarChar(1)
+  employeeNumber      String     @unique @map("employee_number") @db.VarChar(20)
+  department          String?    @db.VarChar(100)
+  designation         String?    @db.VarChar(100)
+  status              UserStatus @default(ACTIVE)
+  consentConfirmation Boolean    @default(false) @map("consent_confirmation")
+  createdAt           DateTime   @default(now()) @map("created_at")
+  updatedAt           DateTime   @updatedAt @map("updated_at")
+
+  // Relations
+  credential             UserCredential?
+  userRoles              UserRole[]
+  staffAssignments       StaffAssignment[]      @relation("AssignedUser")
+  assignedStaff          StaffAssignment[]      @relation("AssignedBy")
+  eventRegistrations     EventRegistration[]    @relation("RegisteredBy")
+  revokedQRCodes         QRCodePass[]
+  scanLogs               ScanLog[]
+  auditLogs              AuditLog[]
+  loginHistories         LoginHistory[]
+  securityIncidents      SecurityIncident[]     @relation("IncidentUser")
+  resolvedIncidents      SecurityIncident[]     @relation("ResolvedBy")
+  reviews                Review[]
+  referrals              Referral[]
+  documentArtifacts      DocumentArtifact[]
+  syncActions            SyncAction[]
+  screeningResults       ScreeningResult[]
+  movedQueueEntries      QueueMovement[]        @relation("MovedBy")
+  notificationDeliveries NotificationDelivery[]
+
+  @@map("user")
+}
+
+model UserCredential {
+  id           String   @id @default(uuid()) @map("credential_id") @db.Uuid
+  userId       String   @unique @map("user_id") @db.Uuid
+  passwordHash String   @map("password_hash") @db.VarChar(255)
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("user_credential")
+}
+
+model UserRole {
+  id     String @id @default(uuid()) @map("role_id") @db.Uuid
+  userId String @map("user_id") @db.Uuid
+  role   String @db.VarChar(50)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("user_role")
+}
+
+// ==========================================
+// PARTICIPANT & EVENT MANAGEMENT
+// ==========================================
+
+model Participant {
+  id               String   @id @default(uuid()) @map("participant_id") @db.Uuid
+  firstName        String   @map("first_name") @db.VarChar(100)
+  lastName         String   @map("last_name") @db.VarChar(100)
+  dateOfBirth      DateTime @map("date_of_birth") @db.Date
+  gender           String   @db.VarChar(1)
+  contactNumber    String   @map("contact_number") @db.VarChar(20)
+  emergencyContact String   @map("emergency_contact") @db.VarChar(20)
+  consentGiven     Boolean  @map("consent_given")
+  createdAt        DateTime @default(now()) @map("created_at")
+  updatedAt        DateTime @updatedAt @map("updated_at")
+
+  eventRegistrations EventRegistration[]
+
+  @@map("participant")
+}
+
+model Event {
+  id        String      @id @default(uuid()) @map("event_id") @db.Uuid
+  eventName String      @map("event_name") @db.VarChar(100)
+  location  String      @db.VarChar(255)
+  eventDate DateTime    @map("event_date") @db.Date
+  startTime DateTime    @map("start_time") @db.Time
+  endTime   DateTime    @map("end_time") @db.Time
+  status    EventStatus
+  createdAt DateTime    @default(now()) @map("created_at")
+  updatedAt DateTime    @updatedAt @map("updated_at")
+
+  staffAssignments   StaffAssignment[]
+  eventRegistrations EventRegistration[]
+  stations           Station[]
+
+  @@map("event")
+}
+
+model EventRegistration {
+  id                 String             @id @default(uuid()) @map("registration_id") @db.Uuid
+  participantId      String             @map("participant_id") @db.Uuid
+  eventId            String             @map("event_id") @db.Uuid
+  queueNumber        Int                @map("queue_number")
+  registrationStatus RegistrationStatus @map("registration_status")
+  registeredBy       String             @map("registered_by") @db.Uuid
+  registeredAt       DateTime           @default(now()) @map("registered_at")
+  updatedAt          DateTime           @updatedAt @map("updated_at")
+  checkedIn          Boolean            @default(false) @map("checked_in")
+  checkedInAt        DateTime?          @map("checked_in_at")
+
+  // Relations
+  participant      Participant       @relation(fields: [participantId], references: [id])
+  event            Event             @relation(fields: [eventId], references: [id])
+  registeredByUser User              @relation("RegisteredBy", fields: [registeredBy], references: [id])
+  qrCodePasses     QRCodePass[]
+  queueEntries     QueueEntry[]
+  queueMovements   QueueMovement[]
+  scanLogs         ScanLog[]
+  screeningResults ScreeningResult[]
+
+  @@map("event_registration")
+}
+
+model QRCodePass {
+  id             String    @id @default(uuid()) @map("qr_id") @db.Uuid
+  registrationId String    @map("registration_id") @db.Uuid
+  token          String    @map("token") @db.VarChar(255)
+  issuedAt       DateTime  @default(now()) @map("issue_at")
+  expiresAt      DateTime  @map("expires_at")
+  isActive       Boolean   @default(true) @map("is_active")
+  revokedAt      DateTime? @map("revoked_at")
+  revokedBy      String?   @map("revoked_by") @db.Uuid
+  revokedReason  String?   @map("revoked_reason") @db.VarChar(255)
+
+  registration  EventRegistration @relation(fields: [registrationId], references: [id])
+  revokedByUser User?             @relation(fields: [revokedBy], references: [id])
+  scanLogs      ScanLog[]
+
+  @@index([token])
+  @@index([isActive])
+  @@map("qr_code_pass")
+}
+
+// ==========================================
+// STATIONS & QUEUE OPERATIONS
+// ==========================================
+
+model Station {
+  id           String   @id @default(uuid()) @map("station_id") @db.Uuid
+  eventId      String   @map("event_id") @db.Uuid
+  stationName  String   @map("station_name") @db.VarChar(100)
+  stationType  String   @map("station_type") @db.VarChar(100)
+  stationOrder Int      @map("station_order")
+  isActive     Boolean  @default(true) @map("is_active")
+  timeCreated  DateTime @default(now()) @map("time_created")
+
+  event            Event             @relation(fields: [eventId], references: [id])
+  staffAssignments StaffAssignment[]
+  queueEntries     QueueEntry[]
+  scanLogs         ScanLog[]
+  screeningResults ScreeningResult[]
+  fromMovements    QueueMovement[]   @relation("FromStation")
+  toMovements      QueueMovement[]   @relation("ToStation")
+
+  @@map("station")
+}
+
+model StaffAssignment {
+  id               String           @id @default(uuid()) @map("assignment_id") @db.Uuid
+  eventId          String           @map("event_id") @db.Uuid
+  stationId        String           @map("station_id") @db.Uuid
+  userId           String           @map("user_id") @db.Uuid
+  assignedBy       String           @map("assigned_by") @db.Uuid
+  assignedAt       DateTime         @default(now()) @map("assigned_at")
+  assignmentStatus AssignmentStatus @default(ACTIVE) @map("assignment_status")
+
+  event        Event   @relation(fields: [eventId], references: [id])
+  station      Station @relation(fields: [stationId], references: [id])
+  assignedUser User    @relation("AssignedUser", fields: [userId], references: [id])
+  assigner     User    @relation("AssignedBy", fields: [assignedBy], references: [id])
+
+  @@index([eventId])
+  @@index([stationId])
+  @@index([userId])
+  @@map("staff_assignment")
+}
+
+model QueueEntry {
+  id             String      @id @default(uuid()) @map("queue_id") @db.Uuid
+  registrationId String      @map("registration_id") @db.Uuid
+  stationId      String      @map("station_id") @db.Uuid
+  queueNumber    Int         @map("queue_number")
+  status         QueueStatus
+  enteredAt      DateTime    @default(now()) @map("entered_at")
+  calledAt       DateTime?   @map("called_at")
+  startedAt      DateTime?   @map("started_at")
+  leftQueueAt    DateTime?   @map("left_queue_at")
+  completedAt    DateTime?   @map("completed_at")
+
+  registration     EventRegistration @relation(fields: [registrationId], references: [id])
+  station          Station           @relation(fields: [stationId], references: [id])
+  screeningResults ScreeningResult[]
+
+  @@map("queue_entry")
+}
+
+model QueueMovement {
+  id             String   @id @default(uuid()) @map("movement_id") @db.Uuid
+  registrationId String   @map("registration_id") @db.Uuid
+  fromStationId  String   @map("from_station_id") @db.Uuid
+  toStationId    String   @map("to_station_id") @db.Uuid
+  movedBy        String   @map("moved_by") @db.Uuid
+  movementReason String   @map("movement_reason") @db.VarChar(100)
+  movementTime   DateTime @default(now()) @map("movement_time")
+
+  registration EventRegistration @relation(fields: [registrationId], references: [id])
+  fromStation  Station           @relation("FromStation", fields: [fromStationId], references: [id])
+  toStation    Station           @relation("ToStation", fields: [toStationId], references: [id])
+  movedByUser  User              @relation("MovedBy", fields: [movedBy], references: [id])
+
+  @@map("queue_movement")
+}
+
+model ScanLog {
+  id             String     @id @default(uuid()) @map("scan_id") @db.Uuid
+  qrId           String?    @map("qr_id") @db.Uuid
+  userId         String?    @map("user_id") @db.Uuid
+  stationId      String     @map("station_id") @db.Uuid
+  scanResult     ScanResult @map("scan_result")
+  deviceName     String     @map("device_name") @db.VarChar(100)
+  ipAddress      String     @map("ip_address") @db.VarChar(45)
+  scannedAt      DateTime   @default(now()) @map("scanned_at")
+  registrationId String?    @map("registration_id") @db.Uuid
+
+  qrCode       QRCodePass?        @relation(fields: [qrId], references: [id])
+  user         User?              @relation(fields: [userId], references: [id])
+  station      Station            @relation(fields: [stationId], references: [id])
+  registration EventRegistration? @relation(fields: [registrationId], references: [id])
+
+  @@map("scan_log")
+}
+
+// ==========================================
+// SCREENING, REVIEWS & REFERRALS
+// ==========================================
+
+model ScreeningResult {
+  id             String   @id @default(uuid()) @map("result_id") @db.Uuid
+  registrationId String   @map("registration_id") @db.Uuid
+  stationId      String   @map("station_id") @db.Uuid
+  queueEntryId   String?  @map("queue_entry_id") @db.Uuid
+  recordedBy     String   @map("recorded_by") @db.Uuid
+  screeningType  String   @map("screening_type") @db.VarChar(50)
+  resultData     Json     @map("result_data")
+  overallFlag    String?  @map("overall_flag") @db.VarChar(50)
+  isFlagged      Boolean  @default(false) @map("is_flagged")
+  flagSummary    String?  @map("flag_summary") @db.Text
+  ruleVersion    String   @map("rule_version") @db.VarChar(20)
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  registration EventRegistration @relation(fields: [registrationId], references: [id])
+  station      Station           @relation(fields: [stationId], references: [id])
+  queueEntry   QueueEntry?       @relation(fields: [queueEntryId], references: [id])
+  recorder     User              @relation(fields: [recordedBy], references: [id])
+
+  @@map("screening_result")
+}
+
+model Review {
+  id              String   @id @default(uuid()) @map("review_id") @db.Uuid
+  reviewerId      String   @map("reviewer_id") @db.Uuid
+  outcome         Outcome
+  urgency         Urgency
+  clinicalSummary String   @map("clinical_summary") @db.Text
+  recommendations String   @db.Text
+  reviewDatetime  DateTime @map("review_datetime")
+  version         Int      @default(1)
+  parentReviewId  String?  @map("previous_review_id") @db.Uuid
+  createdAt       DateTime @default(now()) @map("created_at")
+
+  reviewer     User       @relation(fields: [reviewerId], references: [id])
+  parentReview Review?    @relation("ReviewHierarchy", fields: [parentReviewId], references: [id])
+  childReviews Review[]   @relation("ReviewHierarchy")
+  referrals    Referral[]
+
+  @@map("review")
+}
+
+model Referral {
+  id               String   @id @default(uuid()) @map("referral_id") @db.Uuid
+  reviewId         String   @map("review_id") @db.Uuid
+  createdBy        String   @map("created_by") @db.Uuid
+  destination      String   @db.VarChar(255)
+  destinationEmail String   @map("destination_email") @db.VarChar(255)
+  reason           String   @db.Text
+  instructions     String   @db.Text
+  urgency          Urgency
+  status           String   @db.VarChar(50)
+  referralDatetime DateTime @map("referral_datetime")
+  createdAt        DateTime @default(now()) @map("created_at")
+
+  review            Review             @relation(fields: [reviewId], references: [id])
+  creator           User               @relation(fields: [createdBy], references: [id])
+  documentArtifacts DocumentArtifact[]
+
+  @@map("referral")
+}
+
+model DocumentArtifact {
+  id           String   @id @default(uuid()) @map("document_id") @db.Uuid
+  referralId   String?  @map("referral_id") @db.Uuid
+  documentType DocType  @map("document_type")
+  version      Int      @default(1)
+  storageKey   String   @map("storage_key") @db.VarChar(500)
+  fileHash     String   @map("file_hash") @db.Char(64)
+  fileName     String   @map("file_name") @db.VarChar(100)
+  fileSize     BigInt   @map("file_size")
+  generatedBy  String   @map("generated_by") @db.Uuid
+  generatedAt  DateTime @default(now()) @map("generated_at")
+
+  referral               Referral?              @relation(fields: [referralId], references: [id])
+  generator              User                   @relation(fields: [generatedBy], references: [id])
+  notificationDeliveries NotificationDelivery[]
+
+  @@map("document_artifact")
+}
+
+model NotificationDelivery {
+  id         String   @id @default(uuid()) @map("notification_id") @db.Uuid
+  userId     String   @map("user_id") @db.Uuid
+  documentId String?  @map("document_id") @db.Uuid
+  channel    Channel
+  recipient  Bytes
+  templateId String   @map("template_id") @db.Uuid
+  status     String   @db.VarChar(50)
+  attempts   Int      @default(0)
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
+
+  user     User              @relation(fields: [userId], references: [id])
+  document DocumentArtifact? @relation(fields: [documentId], references: [id])
+
+  @@map("notification_delivery")
+}
+
+// ==========================================
+// SYSTEM AUDITING & SYNC
+// ==========================================
+
+model SyncAction {
+  id          String    @id @default(uuid()) @map("sync_action_id") @db.Uuid
+  deviceId    String    @map("device_id") @db.Uuid
+  userId      String    @map("user_id") @db.Uuid
+  entityType  String    @map("entity_type") @db.VarChar(50)
+  entityId    String    @map("entity_id") @db.Uuid
+  operation   String    @db.VarChar(20)
+  baseVersion Int       @map("base_version")
+  payload     Json      @db.JsonB
+  attempts    Int       @default(0)
+  createdAt   DateTime  @default(now()) @map("created_at")
+  processedAt DateTime? @map("processed_at")
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@map("sync_action")
+}
+
+model LoginHistory {
+  id          String    @id @default(uuid()) @map("login_id") @db.Uuid
+  userId      String    @map("user_id") @db.Uuid
+  loginTime   DateTime  @default(now()) @map("login_time")
+  logoutTime  DateTime? @map("logout_time")
+  loginStatus String    @map("login_status")
+  ipAddress   String    @map("ip_address") @db.VarChar(45)
+  deviceName  String    @map("device_name") @db.VarChar(100)
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@map("login_history")
+}
+
+model AuditLog {
+  id         String   @id @default(uuid()) @map("audit_id") @db.Uuid
+  userId     String   @map("user_id") @db.Uuid
+  action     String   @db.VarChar(100)
+  entityName String   @map("entity_name") @db.VarChar(50)
+  entityId   String   @map("entity_id") @db.Uuid
+  oldValue   Json?    @map("old_value")
+  newValue   Json?    @map("new_value")
+  ipAddress  String   @map("ip_address") @db.VarChar(45)
+  deviceName String   @map("device_name") @db.VarChar(100)
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@map("audit_log")
+}
+
+model SecurityIncident {
+  id           String    @id @default(uuid()) @map("incident_id") @db.Uuid
+  userId       String    @map("user_id") @db.Uuid
+  incidentType String    @map("incident_type") @db.VarChar(100)
+  severity     String
+  description  String    @db.Text
+  resolved     Boolean   @default(false)
+  resolvedBy   String?   @map("resolved_by") @db.Uuid
+  resolvedAt   DateTime? @map("resolved_at")
+  createdAt    DateTime  @default(now()) @map("created_at")
+
+  user     User  @relation("IncidentUser", fields: [userId], references: [id])
+  resolver User? @relation("ResolvedBy", fields: [resolvedBy], references: [id])
+
+  @@map("security_incident")
 enum ReviewOutcome {
   COMPLETE
   MONITOR
