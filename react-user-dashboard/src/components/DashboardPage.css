@@ -1,0 +1,399 @@
+/* VSMS Light & Dark Design Tokens (§4 design.md) */
+:root {
+  --canvas: #F7F7F4;
+  --canvas-soft: #FAFAF7;
+  --surface: #FFFFFF;
+  --surface-2: #F2F1EC;
+  --hairline: #E6E5E0;
+  --hairline-soft: #EFEEE8;
+  --hairline-strong: #CFCDC4;
+  --ink: #26251E;
+  --ink-2: #5A5852;
+  --muted: #807D72;
+  --accent: #2563EB;
+  --accent-strong: #1D4ED8;
+  --accent-tint: rgba(37, 99, 235, 0.09);
+  
+  /* Semantics */
+  --green: #1F8A65;
+  --amber: #B45309;
+  --orange: #C2410C;
+  --red: #CF2D56;
+
+  /* Timeline Scoped Pastels (§4.2 design.md) */
+  --tl-registration: #DFA88F;
+  --tl-acuity: #9FBBE0;
+  --tl-refraction: #C0A8DD;
+  --tl-colour: #9FC9A2;
+  --tl-eye-health: #D9B36A;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --canvas: #100F0D;
+    --canvas-soft: #141310;
+    --surface: #1A1916;
+    --surface-2: #22211D;
+    --hairline: rgba(237, 235, 228, 0.09);
+    --hairline-soft: rgba(237, 235, 228, 0.06);
+    --hairline-strong: rgba(237, 235, 228, 0.18);
+    --ink: #EDEBE4;
+    --ink-2: #B0ACA2;
+    --muted: #8A867C;
+    --accent: #93C5FD;
+    --accent-strong: #BFDBFE;
+    --accent-tint: rgba(147, 197, 253, 0.16);
+    --green: #3FA37F;
+    --amber: #D9964A;
+    --orange: #E07B4C;
+    --red: #E05C7E;
+  }
+}
+
+.vsms-num {
+  font-variant-numeric: tabular-nums;
+}
+
+/* App Workspace Structure */
+.vsms-workspace {
+  display: flex;
+  height: calc(100vh - 52px);
+  background-color: var(--canvas);
+  color: var(--ink);
+  font-family: system-ui, -apple-system, "SF Pro Text", Inter, sans-serif;
+  overflow: hidden;
+}
+
+/* Live Queue Central Surface */
+.vsms-queue-surface {
+  flex: 1;
+  background-color: var(--surface);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border-right: 1px solid var(--hairline);
+}
+
+.vsms-title-row {
+  padding: 16px 20px 12px 20px;
+  border-bottom: 1px solid var(--hairline-soft);
+}
+
+.vsms-workspace-title {
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 22px;
+  letter-spacing: -0.01em;
+  margin: 0 0 2px 0;
+}
+
+.vsms-inline-summary {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+/* Toolbar */
+.vsms-toolbar {
+  padding: 10px 20px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid var(--hairline);
+  background-color: var(--surface);
+}
+
+.vsms-toolbar-left {
+  display: flex;
+  gap: 10px;
+}
+
+.vsms-control-input,
+.vsms-control-select,
+.vsms-toggle-btn {
+  height: 34px;
+  border-radius: 8px;
+  border: 1px solid var(--hairline-strong);
+  background-color: var(--surface);
+  color: var(--ink);
+  font-size: 13px;
+  padding: 0 10px;
+  outline: none;
+}
+
+.vsms-toggle-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  background-color: var(--surface);
+}
+
+.vsms-toggle-btn.active {
+  background-color: var(--accent-tint);
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.vsms-btn-icon {
+  width: 14px;
+  height: 14px;
+}
+
+/* Continuous Surface Queue Table */
+.vsms-queue-list {
+  flex: 1;
+  overflow-y: auto;
+}
+
+.vsms-queue-header {
+  display: grid;
+  grid-template-columns: 2fr 1.2fr 80px 1.2fr 120px;
+  padding: 8px 20px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--muted);
+  border-bottom: 1px solid var(--hairline-soft);
+  background-color: var(--canvas-soft);
+}
+
+.vsms-queue-row {
+  display: grid;
+  grid-template-columns: 2fr 1.2fr 80px 1.2fr 120px;
+  align-items: center;
+  height: 62px;
+  padding: 0 20px;
+  border-bottom: 1px solid var(--hairline-soft);
+  cursor: pointer;
+  position: relative;
+  transition: background-color 0.12s ease-out;
+}
+
+.vsms-queue-row:hover {
+  background-color: var(--surface-2);
+}
+
+.vsms-queue-row.selected {
+  background-color: var(--accent-tint);
+}
+
+.vsms-queue-row.selected::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  background-color: var(--accent);
+}
+
+.vsms-participant-name {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.vsms-participant-meta {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+/* Status Treatments (No Badges/Pills) */
+.vsms-status-indicator {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  font-weight: 400;
+}
+
+.status-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background-color: currentColor;
+}
+
+.vsms-status-waiting { color: var(--muted); }
+.vsms-status-screening { color: var(--accent); }
+.vsms-status-review { color: var(--amber); }
+.vsms-status-referral { color: var(--orange); }
+.vsms-status-urgent { color: var(--red); }
+.vsms-status-complete { color: var(--green); }
+
+.vsms-row-action {
+  background: none;
+  border: none;
+  color: var(--ink);
+  font-size: 13px;
+  font-weight: 400;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+/* Inspector Drawer (§5.5 design.md) */
+.vsms-inspector {
+  width: 320px;
+  background-color: var(--surface-2);
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+}
+
+.vsms-inspector-header {
+  padding: 20px;
+  border-bottom: 1px solid var(--hairline);
+}
+
+.vsms-inspector-name {
+  font-size: 15px;
+  font-weight: 600;
+  margin: 0 0 2px 0;
+}
+
+.vsms-inspector-meta {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.vsms-current-station {
+  font-size: 12px;
+  color: var(--ink-2);
+  margin-top: 8px;
+}
+
+.vsms-inspector-body {
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+/* Reassurance Box */
+.vsms-reassurance-box {
+  background-color: var(--surface);
+  border: 1px solid var(--hairline-soft);
+  padding: 12px;
+  border-radius: 8px;
+}
+
+.vsms-reassurance-status {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--green);
+  margin-bottom: 2px;
+}
+
+.vsms-reassurance-text {
+  font-size: 12px;
+  color: var(--muted);
+  margin: 0;
+  line-height: 16px;
+}
+
+/* Timeline Signature */
+.vsms-section-label {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  color: var(--muted);
+  margin-bottom: 10px;
+}
+
+.vsms-timeline {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.vsms-timeline-step {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 13px;
+}
+
+.vsms-tl-marker {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+}
+
+.marker-registration { background-color: var(--tl-registration); }
+.marker-acuity { background-color: var(--tl-acuity); }
+.marker-review { border: 2px solid var(--accent); background: transparent; }
+.marker-health { border: 1px solid var(--muted); background: transparent; }
+
+/* Flag Box */
+.vsms-flag-panel {
+  background-color: rgba(180, 83, 9, 0.08);
+  border: 1px solid var(--amber);
+  border-radius: 8px;
+  padding: 12px;
+}
+
+.vsms-flag-heading {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--amber);
+  margin-bottom: 4px;
+}
+
+.vsms-flag-body {
+  font-size: 12px;
+  color: var(--ink);
+  margin: 0;
+  line-height: 16px;
+}
+
+/* Actions */
+.vsms-btn-pill-primary {
+  width: 100%;
+  height: 40px;
+  border-radius: 9999px;
+  background-color: var(--accent);
+  color: #ffffff;
+  border: none;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: transform 0.12s;
+}
+
+.vsms-btn-pill-primary:active {
+  transform: scale(0.97);
+}
+
+/* Accordion */
+.vsms-accordion-item {
+  border-bottom: 1px solid var(--hairline-soft);
+  padding: 8px 0;
+}
+
+.vsms-accordion-summary {
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  color: var(--ink-2);
+}
+
+.vsms-accordion-content {
+  padding-top: 8px;
+  font-size: 13px;
+}
+
+.vsms-data-row {
+  display: flex;
+  justify-content: space-between;
+  padding: 4px 0;
+  color: var(--ink-2);
+}
+
+.vsms-note-text {
+  font-size: 12px;
+  color: var(--muted);
+  margin: 0;
+}
