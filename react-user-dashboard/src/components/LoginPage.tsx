@@ -1,47 +1,66 @@
 import React, { useState } from 'react';
 import { useForm } from 'react-hook-form';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import {
   ArrowRightOnRectangleIcon,
   EyeIcon,
   EyeSlashIcon,
   LockClosedIcon,
+  ExclamationTriangleIcon,
 } from '@heroicons/react/24/outline';
 import apiClient from '../utils/apiClient';
+import { getSafeRedirectUrl } from '../utils/safeNavigation';
 
 interface LoginFormInputs {
   email: string;
   password: string;
 }
 
+interface LoginResponse {
+  accessToken: string;
+  refreshToken: string;
+}
+
 const LoginPage: React.FC = () => {
   const [showPassword, setShowPassword] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+  const [searchParams] = useSearchParams();
+  const navigate = useNavigate();
+
   const {
     register,
     handleSubmit,
     formState: { errors, isSubmitting },
   } = useForm<LoginFormInputs>();
-  const navigate = useNavigate();
 
   const onSubmit = async (data: LoginFormInputs) => {
+    setErrorMessage(null);
     try {
-      const response = await apiClient.post('/auth/login', data);
-      interface LoginResponse {
-        accessToken: string;
-        refreshToken: string;
-      }
-      const { accessToken, refreshToken } = response.data as LoginResponse;
+      const response = await apiClient.post<LoginResponse>('/auth/login', data);
+      const { accessToken, refreshToken } = response.data;
+
       localStorage.setItem('authToken', accessToken);
       localStorage.setItem('refreshToken', refreshToken);
-      navigate('/dashboard');
-    } catch (error) {
+
+      const rawReturnUrl = searchParams.get('returnUrl') || searchParams.get('redirect');
+      const safeDestination = getSafeRedirectUrl(rawReturnUrl, '/dashboard');
+
+      if (safeDestination.startsWith('/')) {
+        navigate(safeDestination);
+      } else {
+        window.location.href = safeDestination;
+      }
+    } catch (error: any) {
       console.error('Login failed:', error);
-      alert('Invalid email or password');
+      const serverMessage = error.response?.data?.message || 'Invalid email or password. Please try again.';
+      setErrorMessage(serverMessage);
     }
   };
 
   return (
     <main className="relative min-h-dvh overflow-hidden bg-[#111416] px-5 py-5 text-zinc-100 sm:px-8">
+      {/* Background gradients */}
       <div
         aria-hidden="true"
         className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_23%_20%,rgba(95,76,83,0.22),transparent_34%),radial-gradient(circle_at_73%_21%,rgba(64,67,94,0.20),transparent_32%),radial-gradient(circle_at_50%_76%,rgba(124,59,50,0.12),transparent_35%),linear-gradient(120deg,rgba(20,28,27,0.95),rgba(28,25,27,0.98)_52%,rgba(14,24,25,0.95))]"
@@ -50,6 +69,8 @@ const LoginPage: React.FC = () => {
         aria-hidden="true"
         className="pointer-events-none absolute inset-0 opacity-55 [background-image:linear-gradient(rgba(255,255,255,0.018)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.014)_1px,transparent_1px)] [background-size:52px_52px] [mask-image:radial-gradient(circle_at_center,black_0%,transparent_72%)]"
       />
+
+      {/* Header */}
       <header className="relative z-10 flex items-center justify-between text-sm text-zinc-400">
         <Link to="/login" className="text-lg font-bold tracking-tight text-zinc-300 transition hover:text-white">
           optix<span className="text-zinc-500">+</span>
@@ -65,6 +86,7 @@ const LoginPage: React.FC = () => {
         </nav>
       </header>
 
+      {/* Login Card Section */}
       <section className="relative z-10 flex min-h-[calc(100dvh-88px)] items-center justify-center py-12">
         <form
           onSubmit={handleSubmit(onSubmit)}
@@ -74,12 +96,21 @@ const LoginPage: React.FC = () => {
             <ArrowRightOnRectangleIcon className="h-8 w-8" aria-hidden="true" />
           </div>
 
-          <div className="mb-7">
+          <div className="mb-6">
             <h1 className="text-[1.45rem] font-bold leading-tight tracking-normal text-white">Welcome to Optix</h1>
             <p className="mt-2 text-[0.98rem] font-medium text-zinc-400">Sign in with your email and password.</p>
           </div>
 
+          {/* Inline Error Banner */}
+          {errorMessage && (
+            <div className="mb-5 flex items-start gap-2.5 rounded-lg border border-red-500/30 bg-red-500/10 p-3 text-sm text-red-300">
+              <ExclamationTriangleIcon className="mt-0.5 h-5 w-5 shrink-0 text-red-400" />
+              <span>{errorMessage}</span>
+            </div>
+          )}
+
           <div className="space-y-4">
+            {/* Email Input */}
             <div>
               <label htmlFor="email" className="mb-2 block text-sm font-semibold text-zinc-100">
                 Email
@@ -101,6 +132,7 @@ const LoginPage: React.FC = () => {
               {errors.email && <p className="mt-2 text-sm font-medium text-red-300">{errors.email.message}</p>}
             </div>
 
+            {/* Password Input */}
             <div>
               <div className="mb-2 flex items-center justify-between gap-3">
                 <label htmlFor="password" className="block text-sm font-semibold text-zinc-100">
@@ -124,7 +156,7 @@ const LoginPage: React.FC = () => {
                 />
                 <button
                   type="button"
-                  onClick={() => setShowPassword((value) => !value)}
+                  onClick={() => setShowPassword((v) => !v)}
                   className="absolute right-1.5 top-1/2 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-md text-zinc-400 transition hover:bg-white/10 hover:text-white focus:outline-none focus:ring-2 focus:ring-white/30"
                   aria-label={showPassword ? 'Hide password' : 'Show password'}
                 >

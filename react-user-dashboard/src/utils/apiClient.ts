@@ -1,8 +1,11 @@
 import axios from 'axios';
 import type { AxiosError, InternalAxiosRequestConfig } from 'axios';
 
+// Base API URL (pointing to Express backend)
+const BASE_URL = 'http://localhost:5000';
+
 const apiClient = axios.create({
-  baseURL: 'http://localhost:5000', // Updated to local backend URL
+  baseURL: BASE_URL,
   headers: {
     'Content-Type': 'application/json',
   },
@@ -26,12 +29,18 @@ interface RetryableRequestConfig extends InternalAxiosRequestConfig {
 
 const refreshAccessToken = async (): Promise<string> => {
   const refreshToken = localStorage.getItem('refreshToken');
-  const response = await axios.post<RefreshResponse>('https://api.example.com/auth/refresh', { refreshToken });
+  
+  // FIX: Updated endpoint from api.example.com to localhost:5000
+  const response = await axios.post<RefreshResponse>(`${BASE_URL}/auth/refresh`, {
+    refreshToken,
+  });
+
   const { accessToken } = response.data;
   localStorage.setItem('authToken', accessToken);
   return accessToken;
 };
 
+// Request Interceptor: Attach Auth Token
 apiClient.interceptors.request.use((config: InternalAxiosRequestConfig) => {
   const token = localStorage.getItem('authToken');
   if (token) {
@@ -40,6 +49,7 @@ apiClient.interceptors.request.use((config: InternalAxiosRequestConfig) => {
   return config;
 });
 
+// Response Interceptor: Handle 401 & Automatic Token Refresh
 apiClient.interceptors.response.use(
   (response) => response,
   async (error: AxiosError) => {

@@ -4,7 +4,10 @@ import tailwindcss from "@tailwindcss/vite";
 import fs from "fs";
 
 export default defineConfig({
-  plugins: [react()],
+  plugins: [
+    react(),
+    tailwindcss(), // 👈 Added here to compile Tailwind CSS
+  ],
   server: {
     https: {
       key: fs.readFileSync("./certs/localhost-key.pem"),
