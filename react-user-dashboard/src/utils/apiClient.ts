@@ -1,80 +1,42 @@
-import axios from 'axios';
-import type { AxiosError, InternalAxiosRequestConfig } from 'axios';
+import axios, { type InternalAxiosRequestConfig } from 'axios';
 
-const apiClient = axios.create({
-  baseURL: 'http://localhost:5000', // Updated to local backend URL
-  headers: {
-    'Content-Type': 'application/json',
-  },
-});
+const qaMirror = window.location.protocol === 'http:' && window.location.port === '5174';
+const baseURL = import.meta.env.VITE_API_BASE_URL ?? (qaMirror ? '/qa-api' : 'https://localhost:5050');
+let accessToken: string | null = null;
+let csrfToken: string | null = null;
+let refreshPromise: Promise<string> | null = null;
+type RetryableRequest = InternalAxiosRequestConfig & { _retry?: boolean };
+type TokenPayload = { accessToken: string; csrfToken: string };
 
-let isRefreshing = false;
-let refreshSubscribers: ((token: string) => void)[] = [];
-
-const onRefreshed = (token: string) => {
-  refreshSubscribers.forEach((callback) => callback(token));
-  refreshSubscribers = [];
+export const setSessionTokens = (tokens: TokenPayload | null) => {
+  accessToken = tokens?.accessToken || null;
+  csrfToken = tokens?.csrfToken || null;
 };
+export const getCsrfToken = () => csrfToken;
 
-interface RefreshResponse {
-  accessToken: string;
-}
+const apiClient = axios.create({ baseURL, withCredentials: true, headers: { 'Content-Type': 'application/json' }, timeout: 15_000 });
+const refreshClient = axios.create({ baseURL, withCredentials: true, timeout: 15_000 });
 
-interface RetryableRequestConfig extends InternalAxiosRequestConfig {
-  _retry?: boolean;
-}
-
-const refreshAccessToken = async (): Promise<string> => {
-  const refreshToken = localStorage.getItem('refreshToken');
-  const response = await axios.post<RefreshResponse>('https://api.example.com/auth/refresh', { refreshToken });
-  const { accessToken } = response.data;
-  localStorage.setItem('authToken', accessToken);
-  return accessToken;
-};
-
-apiClient.interceptors.request.use((config: InternalAxiosRequestConfig) => {
-  const token = localStorage.getItem('authToken');
-  if (token) {
-    config.headers.Authorization = `Bearer ${token}`;
-  }
+apiClient.interceptors.request.use((config) => {
+  if (accessToken) config.headers.Authorization = `Bearer ${accessToken}`;
   return config;
 });
 
-apiClient.interceptors.response.use(
-  (response) => response,
-  async (error: AxiosError) => {
-    const originalRequest = error.config as RetryableRequestConfig | undefined;
-
-    if (error.response && error.response.status === 401 && originalRequest && !originalRequest._retry) {
-      if (isRefreshing) {
-        return new Promise((resolve) => {
-          refreshSubscribers.push((token) => {
-            originalRequest.headers.Authorization = `Bearer ${token}`;
-            resolve(apiClient(originalRequest));
-          });
-        });
-      }
-
-      originalRequest._retry = true;
-      isRefreshing = true;
-
-      try {
-        const newToken = await refreshAccessToken();
-        isRefreshing = false;
-        onRefreshed(newToken);
-        originalRequest.headers.Authorization = `Bearer ${newToken}`;
-        return apiClient(originalRequest);
-      } catch (refreshError) {
-        isRefreshing = false;
-        localStorage.removeItem('authToken');
-        localStorage.removeItem('refreshToken');
-        window.location.href = '/login';
-        return Promise.reject(refreshError);
-      }
-    }
-
-    return Promise.reject(error);
+apiClient.interceptors.response.use((response) => response, async (error) => {
+  const request = error.config as RetryableRequest | undefined;
+  if (error.response?.status !== 401 || !request || request._retry || request.url?.startsWith('/auth/')) return Promise.reject(error);
+  request._retry = true;
+  try {
+    refreshPromise ??= refreshClient.post<TokenPayload>('/auth/refresh', undefined, { headers: { 'X-CSRF-Token': csrfToken } })
+      .then(({ data }) => { setSessionTokens(data); return data.accessToken; })
+      .finally(() => { refreshPromise = null; });
+    request.headers.Authorization = `Bearer ${await refreshPromise}`;
+    return apiClient(request);
+  } catch (refreshError) {
+    setSessionTokens(null);
+    window.dispatchEvent(new Event('vsms:session-ended'));
+    return Promise.reject(refreshError);
   }
-);
+});
 
 export default apiClient;

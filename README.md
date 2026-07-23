@@ -1,43 +1,104 @@
-# Backend Setup Instructions
+# VSMS Event Operations
 
-## 1. Create a `.env` File
-Create a `.env` file in the `backend` directory with the following content:
-```
-DATABASE_URL=postgres://username:password@host:port/database
-PORT=5000
-```
-- Replace `username`, `password`, `host`, `port`, and `database` with your PostgreSQL credentials.
+VSMS is a secure event-operations application for planning, publishing, running, and auditing community screening events. The repository contains an Express/Prisma API and a React/Vite dashboard.
 
-## 2. Start the Backend
-Run the following commands to start the backend server:
+## What is available
+
+Public routes:
+
+- `/` — product landing page
+- `/login` — staff sign-in
+- `/signup` — staff registration; the API keeps registration disabled unless an administrator opts in
+
+Authenticated routes:
+
+- `/events` — graphical upcoming and past event cards
+- `/events/new` — create an event
+- `/events/:eventId` — event details and lifecycle actions
+- `/events/:eventId/edit` — edit an event, including its banner
+
+The event lifecycle is `DRAFT → PUBLISHED → IN_PROGRESS → COMPLETED`, with cancellation available from non-terminal states. Mutations use role checks, optimistic concurrency, and immutable audit records.
+
+## Prerequisites
+
+- Node.js 20 or newer
+- PostgreSQL 15 or newer
+- npm
+- [`mkcert`](https://github.com/FiloSottile/mkcert) for local HTTPS
+
+## Local setup
+
+1. Install dependencies.
+
+   ```bash
+   npm --prefix backend install
+   npm --prefix react-user-dashboard install
+   ```
+
+2. Create the backend environment file.
+
+   ```bash
+   cp backend/.env.example backend/.env
+   ```
+
+   Update `DATABASE_URL` and replace `JWT_ACCESS_SECRET`. Keep `PUBLIC_SIGNUP_ENABLED=false` unless this is a controlled environment where public staff account creation is intended.
+
+3. Generate local-only HTTPS certificates. They are intentionally ignored by Git.
+
+   ```bash
+   mkdir -p react-user-dashboard/certs
+   mkcert -install
+   mkcert -key-file react-user-dashboard/certs/localhost-key.pem -cert-file react-user-dashboard/certs/localhost.pem localhost 127.0.0.1 ::1
+   ```
+
+4. Apply migrations, generate Prisma Client, and seed development data.
+
+   ```bash
+   npm --prefix backend run prisma:migrate
+   npm --prefix backend exec prisma generate
+   npm --prefix backend run prisma:seed
+   ```
+
+5. Start both applications in separate terminals.
+
+   ```bash
+   npm --prefix backend run dev
+   npm --prefix react-user-dashboard run dev
+   ```
+
+Open `https://localhost:5173`. The API is available at `https://localhost:5050`; non-production API documentation is at `https://localhost:5050/api-docs`.
+
+### Seeded development accounts
+
+The seed creates `admin@vsms.local`, `manager@vsms.local`, and `staff@vsms.local`. Set `VSMS_DEMO_PASSWORD` before seeding to choose their shared development password. If it is omitted outside production, the seed uses `Demo-Only-Change-Me-2026!`. Production seeding refuses to run without an explicit value.
+
+## Verification
+
+The backend test command derives a database name ending in `_test`, applies all migrations there, and refuses to prepare any other database.
+
 ```bash
-cd backend
-npm install
-node server.js or npm start
+npm --prefix backend run prisma:validate
+npm --prefix backend run openapi:lint
+npm --prefix backend run contracts:check
+npm --prefix backend test
+npm --prefix react-user-dashboard run lint
+npm --prefix react-user-dashboard run build
 ```
-The backend will start on `http://localhost:5000`.
 
-## 3. Start the Frontend
-Navigate to the `react-user-dashboard` directory and run:
-```bash
-cd react-user-dashboard
-npm install
-npm run dev
-```
-The frontend will start on `http://localhost:5173`.
+The Bruno collection is in `api-testing/bruno`. Select its `Local` environment after both applications are running. Generated result files are ignored because they may contain short-lived credentials.
 
-## 4. Database Table Creation
-The backend automatically creates the `users` table and populates it with a default user if the table does not exist. The default user is:
-- **Email**: `admin@example.com`
-- **Password**: `admin123`
+## Deployment notes
 
-## 5. Sign-Up and Sign-In Instructions
-### Sign-Up
-1. Navigate to `http://localhost:5173/signup`.
-2. Enter your email and password to create a new account.
+- Run `npm --prefix backend run prisma:migrate` before starting a new API release.
+- Set `NODE_ENV=production`, a 32+ character `JWT_ACCESS_SECRET`, the production `DATABASE_URL`, and exact `CORS_ORIGINS`.
+- Keep `PUBLIC_SIGNUP_ENABLED=false` for internet-facing deployments unless account creation is intentionally open.
+- Terminate TLS at the trusted reverse proxy and set `TRUST_PROXY=true` only when that proxy is controlled.
+- Build the frontend with `npm --prefix react-user-dashboard run build`. Set `VITE_API_BASE_URL` when the API is not served at the frontend's expected origin.
+- Configure the static host to rewrite application routes to `index.html`.
 
-### Sign-In
-1. Navigate to `http://localhost:5173/login`.
-2. Enter your email and password to log in.
+## Reference documentation
 
-If you encounter any issues, please check the backend logs for errors.
+- [Event implementation report](docs/event-details-implementation-report.md)
+- [Event delivery plan](design/event-details-plan.md)
+- [Entity relationship model](erd.md)
+- [OpenAPI contract](backend/docs/openapi.yaml)
