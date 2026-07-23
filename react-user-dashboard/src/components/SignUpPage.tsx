@@ -1,7 +1,9 @@
 import React from 'react';
+import axios from 'axios';
 import { useForm } from 'react-hook-form';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import apiClient from '../utils/apiClient';
+import { Meteors, ThemeToggle } from './MagicEffects';
 
 interface SignUpFormInputs {
   email: string;
@@ -12,68 +14,80 @@ interface SignUpFormInputs {
 const SignUpPage: React.FC = () => {
   const { register, handleSubmit, formState: { errors } } = useForm<SignUpFormInputs>();
   const navigate = useNavigate();
+  const [formError, setFormError] = React.useState('');
 
   const onSubmit = async (data: SignUpFormInputs) => {
     if (data.password !== data.confirmPassword) {
-      alert('Passwords do not match');
+      setFormError('The passwords do not match.');
       return;
     }
 
     try {
       await apiClient.post('/auth/signup', { email: data.email, password: data.password });
-      alert('Sign up successful! Please log in.');
+      sessionStorage.setItem('vsms:celebrate', 'true');
       navigate('/login');
     } catch (error) {
       console.error('Sign up failed:', error);
-      alert('Failed to sign up. Please try again.');
+      if (axios.isAxiosError(error) && error.response?.status === 409) {
+        setFormError('An account already uses those details. Try signing in or contact an administrator.');
+      } else {
+        setFormError('Registration is currently closed. Ask an administrator to enable staff sign-up.');
+      }
     }
   };
 
   return (
-    <div className="flex items-center justify-center min-h-screen bg-gray-100">
-      <form onSubmit={handleSubmit(onSubmit)} className="w-full max-w-md p-8 bg-white rounded shadow">
-        <h2 className="mb-6 text-2xl font-bold text-center">Sign Up</h2>
-        <div className="mb-4">
-          <label htmlFor="email" className="block mb-2 text-sm font-medium text-gray-700">Email</label>
+    <main className="auth-page auth-page-compact">
+      <Meteors count={12} />
+      <header className="auth-topbar"><div className="login-brand"><span aria-hidden="true">V</span><strong>VSMS</strong><small>Event operations</small></div><ThemeToggle /></header>
+      <section className="auth-card-wrap">
+      <form onSubmit={handleSubmit(onSubmit)} className="auth-card signup-form" noValidate>
+        <h1>Create your staff account</h1>
+        <p>Use your work email. Registration must already be enabled by a VSMS administrator.</p>
+        {formError && <div className="alert error" role="alert">{formError}</div>}
+        <div>
+          <label htmlFor="email">Work email</label>
           <input
             id="email"
             type="email"
-            {...register('email', { required: 'Email is required' })}
-            className="w-full px-4 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+            autoComplete="email"
+            placeholder="you@organisation.org"
+            {...register('email', {
+              required: 'Email is required',
+              pattern: { value: /^[^\s@]+@[^\s@]+\.[^\s@]+$/, message: 'Enter a valid email address' },
+            })}
           />
-          {errors.email && <p className="mt-1 text-sm text-red-500">{errors.email.message}</p>}
+          {errors.email && <span className="field-error">{errors.email.message}</span>}
         </div>
-        <div className="mb-4">
-          <label htmlFor="password" className="block mb-2 text-sm font-medium text-gray-700">Password</label>
+        <div>
+          <label htmlFor="password">Password</label>
           <input
             id="password"
             type="password"
-            {...register('password', { required: 'Password is required' })}
-            className="w-full px-4 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+            autoComplete="new-password"
+            minLength={12}
+            {...register('password', {
+              required: 'Password is required',
+              minLength: { value: 12, message: 'Use at least 12 characters' },
+            })}
           />
-          {errors.password && <p className="mt-1 text-sm text-red-500">{errors.password.message}</p>}
+          {errors.password && <span className="field-error">{errors.password.message}</span>}
         </div>
-        <div className="mb-6">
-          <label htmlFor="confirmPassword" className="block mb-2 text-sm font-medium text-gray-700">Confirm Password</label>
+        <div>
+          <label htmlFor="confirmPassword">Confirm password</label>
           <input
             id="confirmPassword"
             type="password"
+            autoComplete="new-password"
             {...register('confirmPassword', { required: 'Please confirm your password' })}
-            className="w-full px-4 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
           />
-          {errors.confirmPassword && <p className="mt-1 text-sm text-red-500">{errors.confirmPassword.message}</p>}
+          {errors.confirmPassword && <span className="field-error">{errors.confirmPassword.message}</span>}
         </div>
-        <button
-          type="submit"
-          className="w-full px-4 py-2 text-white bg-blue-500 rounded hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-500"
-        >
-          Sign Up
-        </button>
-        <div className="mt-4 text-center">
-          <a href="/login" className="text-sm text-blue-500 hover:underline">Already have an account? Log in</a>
-        </div>
+        <button type="submit" className="primary wide interactive-cta"><span>Create account</span><span aria-hidden="true">→</span></button>
+        <p className="form-note">Already provisioned? <Link to="/login">Return to sign in</Link></p>
       </form>
-    </div>
+      </section>
+    </main>
   );
 };
 
