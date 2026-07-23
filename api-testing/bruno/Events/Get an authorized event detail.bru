@@ -1,0 +1,145 @@
+meta {
+  name: Get an authorized event detail
+  type: http
+  seq: 3
+  tags: [
+    Events
+  ]
+}
+
+get {
+  url: {{baseUrl}}/api/events/:eventId
+  body: none
+  auth: inherit
+}
+
+params:path {
+  eventId: {{eventId}}
+}
+
+tests {
+  test("created event detail is visible", function() {
+    expect(res.getStatus()).to.equal(200);
+    expect(res.getBody().eventId).to.equal(bru.getVar("eventId"));
+  });
+}
+
+example {
+  name: 200 Response
+  description: Event detail
+
+  request: {
+    url: {{baseUrl}}/api/events/:eventId
+    method: GET
+    mode: none
+    params:path: {
+      eventId:
+    }
+  }
+
+  response: {
+    headers: {
+      Content-Type: application/json
+    }
+
+    status: {
+      code: 200
+      text: OK
+    }
+
+    body: {
+      type: json
+      content: '''
+
+      '''
+    }
+  }
+}
+
+example {
+  name: 401 Response
+  description: Authentication is absent, invalid, expired, revoked, or reused
+
+  request: {
+    url: {{baseUrl}}/api/events/:eventId
+    method: GET
+    mode: none
+    params:path: {
+      eventId:
+    }
+  }
+
+  response: {
+    headers: {
+      Content-Type: application/json
+    }
+
+    status: {
+      code: 401
+      text: Unauthorized
+    }
+
+    body: {
+      type: json
+      content: '''
+        {
+          "type": "",
+          "title": "",
+          "status": 0,
+          "code": "",
+          "requestId": "",
+          "errors": [
+            {
+              "field": "",
+              "message": ""
+            }
+          ]
+        }
+      '''
+    }
+  }
+}
+
+example {
+  name: 404 Response
+  description: Resource is absent or intentionally concealed from the caller
+
+  request: {
+    url: {{baseUrl}}/api/events/:eventId
+    method: GET
+    mode: none
+    params:path: {
+      eventId:
+    }
+  }
+
+  response: {
+    headers: {
+      Content-Type: application/json
+    }
+
+    status: {
+      code: 404
+      text: Not Found
+    }
+
+    body: {
+      type: json
+      content: '''
+        {
+          "type": "",
+          "title": "",
+          "status": 0,
+          "code": "",
+          "requestId": "",
+          "errors": [
+            {
+              "field": "",
+              "message": ""
+            }
+          ]
+        }
+      '''
+    }
+  }
+}

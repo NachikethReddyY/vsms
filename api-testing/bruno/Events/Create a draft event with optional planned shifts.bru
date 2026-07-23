@@ -1,0 +1,342 @@
+meta {
+  name: Create a draft event with optional planned shifts
+  type: http
+  seq: 2
+  tags: [
+    Events
+  ]
+}
+
+post {
+  url: {{baseUrl}}/api/events
+  body: json
+  auth: inherit
+}
+
+body:json {
+  {
+    "name": "Bruno lifecycle verification",
+    "description": "Created by the saved Bruno API verification collection.",
+    "venue": "Bruno Verification Hall",
+    "timezone": "Asia/Singapore",
+    "startsAt": "2027-03-12T01:00:00.000+00:00",
+    "endsAt": "2027-03-12T07:00:00.000+00:00",
+    "capacity": 120,
+    "shifts": [
+      {
+        "name": "Morning operations",
+        "startsAt": "2027-03-12T01:00:00.000+00:00",
+        "endsAt": "2027-03-12T05:00:00.000+00:00",
+        "requiredStaff": 6
+      }
+    ]
+  }
+}
+
+script:post-response {
+  if (res.getStatus() === 201) {
+    bru.setVar("eventId", res.getBody().eventId);
+    bru.setVar("eventVersion", res.getBody().version);
+  }
+}
+
+tests {
+  test("draft event and shift are created", function() {
+    expect(res.getStatus()).to.equal(201);
+    expect(res.getBody().status).to.equal("DRAFT");
+    expect(res.getBody().shifts).to.have.length(1);
+  });
+}
+
+example {
+  name: 201 Response
+  description: Event created and audited
+
+  request: {
+    url: {{baseUrl}}/api/events
+    method: POST
+    mode: json
+    body:json: {
+      {
+        "name": "",
+        "description": "",
+        "venue": "",
+        "timezone": "Asia/Singapore",
+        "startsAt": "",
+        "endsAt": "",
+        "capacity": 0,
+        "shifts": [
+          {
+            "shiftId": "",
+            "name": "",
+            "startsAt": "",
+            "endsAt": "",
+            "requiredStaff": 0
+          }
+        ]
+      }
+    }
+  }
+
+  response: {
+    headers: {
+      Content-Type: application/json
+    }
+
+    status: {
+      code: 201
+      text: Created
+    }
+
+    body: {
+      type: json
+      content: '''
+
+      '''
+    }
+  }
+}
+
+example {
+  name: 401 Response
+  description: Authentication is absent, invalid, expired, revoked, or reused
+
+  request: {
+    url: {{baseUrl}}/api/events
+    method: POST
+    mode: json
+    body:json: {
+      {
+        "name": "",
+        "description": "",
+        "venue": "",
+        "timezone": "Asia/Singapore",
+        "startsAt": "",
+        "endsAt": "",
+        "capacity": 0,
+        "shifts": [
+          {
+            "shiftId": "",
+            "name": "",
+            "startsAt": "",
+            "endsAt": "",
+            "requiredStaff": 0
+          }
+        ]
+      }
+    }
+  }
+
+  response: {
+    headers: {
+      Content-Type: application/json
+    }
+
+    status: {
+      code: 401
+      text: Unauthorized
+    }
+
+    body: {
+      type: json
+      content: '''
+        {
+          "type": "",
+          "title": "",
+          "status": 0,
+          "code": "",
+          "requestId": "",
+          "errors": [
+            {
+              "field": "",
+              "message": ""
+            }
+          ]
+        }
+      '''
+    }
+  }
+}
+
+example {
+  name: 403 Response
+  description: Request origin, CSRF token, or permission is invalid
+
+  request: {
+    url: {{baseUrl}}/api/events
+    method: POST
+    mode: json
+    body:json: {
+      {
+        "name": "",
+        "description": "",
+        "venue": "",
+        "timezone": "Asia/Singapore",
+        "startsAt": "",
+        "endsAt": "",
+        "capacity": 0,
+        "shifts": [
+          {
+            "shiftId": "",
+            "name": "",
+            "startsAt": "",
+            "endsAt": "",
+            "requiredStaff": 0
+          }
+        ]
+      }
+    }
+  }
+
+  response: {
+    headers: {
+      Content-Type: application/json
+    }
+
+    status: {
+      code: 403
+      text: Forbidden
+    }
+
+    body: {
+      type: json
+      content: '''
+        {
+          "type": "",
+          "title": "",
+          "status": 0,
+          "code": "",
+          "requestId": "",
+          "errors": [
+            {
+              "field": "",
+              "message": ""
+            }
+          ]
+        }
+      '''
+    }
+  }
+}
+
+example {
+  name: 422 Response
+  description: Request validation failed
+
+  request: {
+    url: {{baseUrl}}/api/events
+    method: POST
+    mode: json
+    body:json: {
+      {
+        "name": "",
+        "description": "",
+        "venue": "",
+        "timezone": "Asia/Singapore",
+        "startsAt": "",
+        "endsAt": "",
+        "capacity": 0,
+        "shifts": [
+          {
+            "shiftId": "",
+            "name": "",
+            "startsAt": "",
+            "endsAt": "",
+            "requiredStaff": 0
+          }
+        ]
+      }
+    }
+  }
+
+  response: {
+    headers: {
+      Content-Type: application/json
+    }
+
+    status: {
+      code: 422
+      text: Unprocessable Entity
+    }
+
+    body: {
+      type: json
+      content: '''
+        {
+          "type": "",
+          "title": "",
+          "status": 0,
+          "code": "",
+          "requestId": "",
+          "errors": [
+            {
+              "field": "",
+              "message": ""
+            }
+          ]
+        }
+      '''
+    }
+  }
+}
+
+example {
+  name: 429 Response
+  description: Rate limit exceeded
+
+  request: {
+    url: {{baseUrl}}/api/events
+    method: POST
+    mode: json
+    body:json: {
+      {
+        "name": "",
+        "description": "",
+        "venue": "",
+        "timezone": "Asia/Singapore",
+        "startsAt": "",
+        "endsAt": "",
+        "capacity": 0,
+        "shifts": [
+          {
+            "shiftId": "",
+            "name": "",
+            "startsAt": "",
+            "endsAt": "",
+            "requiredStaff": 0
+          }
+        ]
+      }
+    }
+  }
+
+  response: {
+    headers: {
+      Content-Type: application/json
+    }
+
+    status: {
+      code: 429
+      text: Too Many Requests
+    }
+
+    body: {
+      type: json
+      content: '''
+        {
+          "type": "",
+          "title": "",
+          "status": 0,
+          "code": "",
+          "requestId": "",
+          "errors": [
+            {
+              "field": "",
+              "message": ""
+            }
+          ]
+        }
+      '''
+    }
+  }
+}

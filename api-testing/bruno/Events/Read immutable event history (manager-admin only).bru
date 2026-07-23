@@ -1,0 +1,186 @@
+meta {
+  name: Read immutable event history (manager/admin only)
+  type: http
+  seq: 10
+  tags: [
+    Events
+  ]
+}
+
+get {
+  url: {{baseUrl}}/api/events/:eventId/audit-log
+  body: none
+  auth: inherit
+}
+
+params:query {
+  limit: 50
+  ~cursor:
+}
+
+params:path {
+  eventId: {{eventId}}
+}
+
+tests {
+  test("audit history contains the lifecycle", function() {
+    expect(res.getStatus()).to.equal(200);
+    expect(res.getBody().auditLogs.length).to.be.at.least(5);
+  });
+}
+
+example {
+  name: 200 Response
+  description: Reverse-chronological audit records
+
+  request: {
+    url: {{baseUrl}}/api/events/:eventId/audit-log
+    method: GET
+    mode: none
+    params:query: {
+      ~cursor:
+      limit: 50
+    }
+
+    params:path: {
+      eventId:
+    }
+  }
+
+  response: {
+    headers: {
+      Content-Type: application/json
+    }
+
+    status: {
+      code: 200
+      text: OK
+    }
+
+    body: {
+      type: json
+      content: '''
+        {
+          "auditLogs": [
+            {
+              "eventAuditLogId": "",
+              "eventId": "",
+              "actorUserId": "",
+              "action": "CREATED",
+              "beforeSnapshot": {},
+              "afterSnapshot": {},
+              "correlationId": "",
+              "createdAt": "",
+              "actor": {
+                "userId": "",
+                "email": "",
+                "systemRole": "ADMIN",
+                "status": "ACTIVE",
+                "createdAt": ""
+              }
+            }
+          ],
+          "nextCursor": ""
+        }
+      '''
+    }
+  }
+}
+
+example {
+  name: 401 Response
+  description: Authentication is absent, invalid, expired, revoked, or reused
+
+  request: {
+    url: {{baseUrl}}/api/events/:eventId/audit-log
+    method: GET
+    mode: none
+    params:query: {
+      ~cursor:
+      limit: 50
+    }
+
+    params:path: {
+      eventId:
+    }
+  }
+
+  response: {
+    headers: {
+      Content-Type: application/json
+    }
+
+    status: {
+      code: 401
+      text: Unauthorized
+    }
+
+    body: {
+      type: json
+      content: '''
+        {
+          "type": "",
+          "title": "",
+          "status": 0,
+          "code": "",
+          "requestId": "",
+          "errors": [
+            {
+              "field": "",
+              "message": ""
+            }
+          ]
+        }
+      '''
+    }
+  }
+}
+
+example {
+  name: 404 Response
+  description: Resource is absent or intentionally concealed from the caller
+
+  request: {
+    url: {{baseUrl}}/api/events/:eventId/audit-log
+    method: GET
+    mode: none
+    params:query: {
+      ~cursor:
+      limit: 50
+    }
+
+    params:path: {
+      eventId:
+    }
+  }
+
+  response: {
+    headers: {
+      Content-Type: application/json
+    }
+
+    status: {
+      code: 404
+      text: Not Found
+    }
+
+    body: {
+      type: json
+      content: '''
+        {
+          "type": "",
+          "title": "",
+          "status": 0,
+          "code": "",
+          "requestId": "",
+          "errors": [
+            {
+              "field": "",
+              "message": ""
+            }
+          ]
+        }
+      '''
+    }
+  }
+}
