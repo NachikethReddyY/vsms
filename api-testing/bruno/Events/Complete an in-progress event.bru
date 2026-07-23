@@ -1,0 +1,173 @@
+meta {
+  name: Complete an in-progress event
+  type: http
+  seq: 7
+  tags: [
+    Events
+  ]
+}
+
+post {
+  url: {{baseUrl}}/api/events/:eventId/complete
+  body: json
+  auth: inherit
+}
+
+params:path {
+  eventId: {{eventId}}
+}
+
+body:json {
+  {
+    "version": {{eventVersion}}
+  }
+}
+
+script:post-response {
+  if (res.getStatus() === 200) bru.setVar("eventVersion", res.getBody().version);
+}
+
+tests {
+  test("in-progress event completes", function() {
+    expect(res.getStatus()).to.equal(200);
+    expect(res.getBody().status).to.equal("COMPLETED");
+  });
+}
+
+example {
+  name: 200 Response
+  description: Event transitioned and audited
+
+  request: {
+    url: {{baseUrl}}/api/events/:eventId/complete
+    method: POST
+    mode: json
+    params:path: {
+      eventId:
+    }
+
+    body:json: {
+      {
+        "version": 0
+      }
+    }
+  }
+
+  response: {
+    headers: {
+      Content-Type: application/json
+    }
+
+    status: {
+      code: 200
+      text: OK
+    }
+
+    body: {
+      type: json
+      content: '''
+
+      '''
+    }
+  }
+}
+
+example {
+  name: 404 Response
+  description: Resource is absent or intentionally concealed from the caller
+
+  request: {
+    url: {{baseUrl}}/api/events/:eventId/complete
+    method: POST
+    mode: json
+    params:path: {
+      eventId:
+    }
+
+    body:json: {
+      {
+        "version": 0
+      }
+    }
+  }
+
+  response: {
+    headers: {
+      Content-Type: application/json
+    }
+
+    status: {
+      code: 404
+      text: Not Found
+    }
+
+    body: {
+      type: json
+      content: '''
+        {
+          "type": "",
+          "title": "",
+          "status": 0,
+          "code": "",
+          "requestId": "",
+          "errors": [
+            {
+              "field": "",
+              "message": ""
+            }
+          ]
+        }
+      '''
+    }
+  }
+}
+
+example {
+  name: 409 Response
+  description: Stale version, illegal transition, or immutable state
+
+  request: {
+    url: {{baseUrl}}/api/events/:eventId/complete
+    method: POST
+    mode: json
+    params:path: {
+      eventId:
+    }
+
+    body:json: {
+      {
+        "version": 0
+      }
+    }
+  }
+
+  response: {
+    headers: {
+      Content-Type: application/json
+    }
+
+    status: {
+      code: 409
+      text: Conflict
+    }
+
+    body: {
+      type: json
+      content: '''
+        {
+          "type": "",
+          "title": "",
+          "status": 0,
+          "code": "",
+          "requestId": "",
+          "errors": [
+            {
+              "field": "",
+              "message": ""
+            }
+          ]
+        }
+      '''
+    }
+  }
+}

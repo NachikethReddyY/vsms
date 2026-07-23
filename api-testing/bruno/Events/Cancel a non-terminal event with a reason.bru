@@ -1,0 +1,225 @@
+meta {
+  name: Cancel a non-terminal event with a reason
+  type: http
+  seq: 9
+  tags: [
+    Events
+  ]
+}
+
+post {
+  url: {{baseUrl}}/api/events/:eventId/cancel
+  body: json
+  auth: inherit
+}
+
+params:path {
+  eventId: {{cancelEventId}}
+}
+
+body:json {
+  {
+    "version": {{cancelEventVersion}},
+    "reason": "Cancelled by the Bruno lifecycle verification collection."
+  }
+}
+
+tests {
+  test("draft event cancels with a reason", function() {
+    expect(res.getStatus()).to.equal(200);
+    expect(res.getBody().status).to.equal("CANCELLED");
+    expect(res.getBody().cancellationReason).to.be.a("string");
+  });
+}
+
+example {
+  name: 200 Response
+  description: Event transitioned and audited
+
+  request: {
+    url: {{baseUrl}}/api/events/:eventId/cancel
+    method: POST
+    mode: json
+    params:path: {
+      eventId:
+    }
+
+    body:json: {
+      {
+        "version": 0,
+        "reason": ""
+      }
+    }
+  }
+
+  response: {
+    headers: {
+      Content-Type: application/json
+    }
+
+    status: {
+      code: 200
+      text: OK
+    }
+
+    body: {
+      type: json
+      content: '''
+
+      '''
+    }
+  }
+}
+
+example {
+  name: 404 Response
+  description: Resource is absent or intentionally concealed from the caller
+
+  request: {
+    url: {{baseUrl}}/api/events/:eventId/cancel
+    method: POST
+    mode: json
+    params:path: {
+      eventId:
+    }
+
+    body:json: {
+      {
+        "version": 0,
+        "reason": ""
+      }
+    }
+  }
+
+  response: {
+    headers: {
+      Content-Type: application/json
+    }
+
+    status: {
+      code: 404
+      text: Not Found
+    }
+
+    body: {
+      type: json
+      content: '''
+        {
+          "type": "",
+          "title": "",
+          "status": 0,
+          "code": "",
+          "requestId": "",
+          "errors": [
+            {
+              "field": "",
+              "message": ""
+            }
+          ]
+        }
+      '''
+    }
+  }
+}
+
+example {
+  name: 409 Response
+  description: Stale version, illegal transition, or immutable state
+
+  request: {
+    url: {{baseUrl}}/api/events/:eventId/cancel
+    method: POST
+    mode: json
+    params:path: {
+      eventId:
+    }
+
+    body:json: {
+      {
+        "version": 0,
+        "reason": ""
+      }
+    }
+  }
+
+  response: {
+    headers: {
+      Content-Type: application/json
+    }
+
+    status: {
+      code: 409
+      text: Conflict
+    }
+
+    body: {
+      type: json
+      content: '''
+        {
+          "type": "",
+          "title": "",
+          "status": 0,
+          "code": "",
+          "requestId": "",
+          "errors": [
+            {
+              "field": "",
+              "message": ""
+            }
+          ]
+        }
+      '''
+    }
+  }
+}
+
+example {
+  name: 422 Response
+  description: Request validation failed
+
+  request: {
+    url: {{baseUrl}}/api/events/:eventId/cancel
+    method: POST
+    mode: json
+    params:path: {
+      eventId:
+    }
+
+    body:json: {
+      {
+        "version": 0,
+        "reason": ""
+      }
+    }
+  }
+
+  response: {
+    headers: {
+      Content-Type: application/json
+    }
+
+    status: {
+      code: 422
+      text: Unprocessable Entity
+    }
+
+    body: {
+      type: json
+      content: '''
+        {
+          "type": "",
+          "title": "",
+          "status": 0,
+          "code": "",
+          "requestId": "",
+          "errors": [
+            {
+              "field": "",
+              "message": ""
+            }
+          ]
+        }
+      '''
+    }
+  }
+}
