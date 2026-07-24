@@ -6,6 +6,7 @@ let helpers;
 beforeAll(async () => {
   process.env.NODE_ENV = "test";
   process.env.LOCAL_HTTPS = "false";
+  process.env.PUBLIC_SIGNUP_ENABLED = "false";
   process.env.JWT_ACCESS_SECRET = "test-only-access-secret-with-at-least-thirty-two-characters";
   const url = new URL(process.env.DATABASE_URL);
   if (!url.pathname.endsWith("_test")) url.pathname = `${url.pathname}_test`;
