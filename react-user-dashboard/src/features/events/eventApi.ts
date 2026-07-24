@@ -5,6 +5,9 @@ export type EventRecord = Omit<components['schemas']['Event'], 'shifts'> & {
   shifts: components['schemas']['Shift'][];
 };
 export type EventStatus = components['schemas']['EventStatus'];
+export type StaffAssignment = components['schemas']['StaffAssignment'];
+export type StaffAssignmentRole = components['schemas']['StaffAssignmentRole'];
+export type StaffDirectoryEntry = components['schemas']['StaffDirectoryEntry'];
 export type CreateEvent = components['schemas']['CreateEventRequest'];
 export type UpdateEvent = components['schemas']['UpdateEventRequest'];
 export type AuditRecord = components['schemas']['EventAuditLog'];
@@ -32,6 +35,18 @@ export const eventApi = {
   },
   async cancel(id: string, version: number, reason: string) {
     const { data } = await apiClient.post<EventRecord>(`/api/events/${id}/cancel`, { version, reason });
+    return data;
+  },
+  async staffDirectory() {
+    const { data } = await apiClient.get<StaffDirectoryEntry[]>('/api/events/staff-directory');
+    return data;
+  },
+  async assignStaff(id: string, shiftId: string, input: { userId: string; assignmentRole: StaffAssignmentRole }) {
+    const { data } = await apiClient.post<EventRecord>(`/api/events/${id}/shifts/${shiftId}/assignments`, input);
+    return data;
+  },
+  async removeStaff(id: string, shiftId: string, assignmentId: string) {
+    const { data } = await apiClient.delete<EventRecord>(`/api/events/${id}/shifts/${shiftId}/assignments/${assignmentId}`);
     return data;
   },
   async audit(id: string) {

@@ -2,6 +2,7 @@ import React from 'react';
 import axios from 'axios';
 import { useForm } from 'react-hook-form';
 import { Link, useNavigate } from 'react-router-dom';
+import { getApiMessage, useAuth } from '../auth/authState';
 import apiClient from '../utils/apiClient';
 import { Meteors, ThemeToggle } from './MagicEffects';
 
@@ -12,11 +13,13 @@ interface SignUpFormInputs {
 }
 
 const SignUpPage: React.FC = () => {
-  const { register, handleSubmit, formState: { errors } } = useForm<SignUpFormInputs>();
+  const { login } = useAuth();
+  const { register, handleSubmit, formState: { errors, isSubmitting } } = useForm<SignUpFormInputs>();
   const navigate = useNavigate();
   const [formError, setFormError] = React.useState('');
 
   const onSubmit = async (data: SignUpFormInputs) => {
+    setFormError('');
     if (data.password !== data.confirmPassword) {
       setFormError('The passwords do not match.');
       return;
@@ -24,14 +27,17 @@ const SignUpPage: React.FC = () => {
 
     try {
       await apiClient.post('/auth/signup', { email: data.email, password: data.password });
+      await login(data.email, data.password);
       sessionStorage.setItem('vsms:celebrate', 'true');
-      navigate('/login');
+      navigate('/events', { replace: true });
     } catch (error) {
       console.error('Sign up failed:', error);
       if (axios.isAxiosError(error) && error.response?.status === 409) {
         setFormError('An account already uses those details. Try signing in or contact an administrator.');
-      } else {
+      } else if (axios.isAxiosError(error) && error.response?.status === 404) {
         setFormError('Registration is currently closed. Ask an administrator to enable staff sign-up.');
+      } else {
+        setFormError(getApiMessage(error, 'We could not create your account. Please try again.'));
       }
     }
   };
@@ -83,7 +89,7 @@ const SignUpPage: React.FC = () => {
           />
           {errors.confirmPassword && <span className="field-error">{errors.confirmPassword.message}</span>}
         </div>
-        <button type="submit" className="primary wide interactive-cta"><span>Create account</span><span aria-hidden="true">→</span></button>
+        <button type="submit" className="primary wide interactive-cta" disabled={isSubmitting}><span>{isSubmitting ? 'Creating account...' : 'Create account'}</span><span aria-hidden="true">→</span></button>
         <p className="form-note">Already provisioned? <Link to="/login">Return to sign in</Link></p>
       </form>
       </section>

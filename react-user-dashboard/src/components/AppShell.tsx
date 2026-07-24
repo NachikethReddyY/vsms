@@ -6,6 +6,7 @@ import { SuccessConfetti, ThemeToggle } from './MagicEffects';
 
 export default function AppShell({ children }: { children: ReactNode }) {
   const [collapsed, setCollapsed] = useState(false);
+  const [eventSearch, setEventSearch] = useState('');
   const { user, logout } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
@@ -16,15 +17,22 @@ export default function AppShell({ children }: { children: ReactNode }) {
     : /^\/events\/[^/]+$/.test(location.pathname)
       ? 'Event details'
       : 'Events';
+  const isEventsPage = location.pathname === '/events';
+  const isCreateEventPage = location.pathname === '/events/new';
+
+  const submitEventSearch = (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    window.dispatchEvent(new CustomEvent('vsms:events-search', { detail: eventSearch.trim() }));
+  };
 
   useEffect(() => {
     workspaceRef.current?.scrollTo({ top: 0 });
   }, [location.pathname]);
 
   return (
-    <div className={`app-shell ${collapsed ? 'rail' : ''}`}>
+    <div className={`app-shell ${collapsed ? 'rail' : ''} ${isCreateEventPage ? 'focused-workspace' : ''}`}>
       <SuccessConfetti />
-      <aside className="sidebar" aria-label="Primary navigation">
+      {!isCreateEventPage && <aside className="sidebar" aria-label="Primary navigation">
         <div className="brand"><span aria-hidden="true">V</span><strong>VSMS</strong></div>
         <nav className="nav-list">
           <NavLink to="/events" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}>
@@ -39,16 +47,20 @@ export default function AppShell({ children }: { children: ReactNode }) {
             <span><strong>{user?.email.split('@')[0]}</strong><small>{role}</small></span>
           </button>
         </div>
-      </aside>
+      </aside>}
       <div className="app-main">
-        <header className="command-bar">
+        {isCreateEventPage ? <header className="command-bar focused-command-bar">
+          <button className="icon-button" onClick={() => navigate('/events')} aria-label="Back to events"><ChevronLeftIcon /></button>
+          <div className="workspace-name"><strong>Create event</strong><span>Draft event setup</span></div>
+          <ThemeToggle />
+        </header> : <header className="command-bar">
           <button className="icon-button" onClick={() => setCollapsed((v) => !v)} aria-label={collapsed ? 'Expand navigation' : 'Collapse navigation'}><ChevronLeftIcon /></button>
           <span className="mobile-brand" aria-hidden="true">V</span>
           <div className="workspace-name"><strong><span className="desktop-title">Event operations</span><span className="mobile-title">{mobileTitle}</span></strong><span><i /> Secure workspace</span></div>
-          <label className="global-search"><MagnifyingGlassIcon /><span className="sr-only">Search the workspace</span><input placeholder="Search events and commands…" /></label>
+          {isEventsPage && <form className="global-search" onSubmit={submitEventSearch}><MagnifyingGlassIcon /><label className="sr-only" htmlFor="workspace-event-search">Search events</label><input id="workspace-event-search" value={eventSearch} onChange={(event) => setEventSearch(event.target.value)} placeholder="Search events or venues" /></form>}
           <ThemeToggle />
-          <button className="primary compact" onClick={() => navigate('/events/new')}><PlusIcon />New event</button>
-        </header>
+          <button className="primary compact" onClick={() => navigate('/events/new')} aria-label="Create event"><PlusIcon /><span>New event</span></button>
+        </header>}
         <main className="workspace" id="main-content" ref={workspaceRef}>{children}</main>
       </div>
     </div>
