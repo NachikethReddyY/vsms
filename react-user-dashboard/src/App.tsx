@@ -7,6 +7,9 @@ import EventFormPage from './features/events/EventFormPage';
 import EventDetailPage from './features/events/EventDetailPage';
 import LandingPage from './components/LandingPage';
 import SignUpPage from './components/SignUpPage';
+import ForgotPasswordPage from './components/ForgotPasswordPage';
+import DashboardPage from './components/DashboardPage';
+import QRCodePage from './components/qr/QRCodePage';
 
 function ProtectedRoutes() {
   const { user, isBootstrapping } = useAuth();
@@ -22,11 +25,14 @@ export default function App() {
       <Route path="/" element={<LandingPage />} />
       <Route path="/login" element={<LoginPage />} />
       <Route path="/signup" element={<SignUpPage />} />
+      <Route path="/forgot-password" element={<ForgotPasswordPage />} />
       <Route element={<ProtectedRoutes />}>
+        <Route path="/dashboard" element={<DashboardPage />} />
         <Route path="/events" element={<EventsPage />} />
         <Route path="/events/new" element={<EventFormPage mode="create" />} />
         <Route path="/events/:eventId" element={<EventDetailPage />} />
         <Route path="/events/:eventId/edit" element={<EventFormPage mode="edit" />} />
+        <Route path="/qr-generator" element={<QRCodePage />} />
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
