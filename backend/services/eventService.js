@@ -2,23 +2,48 @@ const prisma = require("../prisma/prismaClient");
 const AppError = require("../errors/AppError");
 const { encodeCursor, decodeCursor } = require("../utils/cursor");
 
-const EVENT_FIELDS = ["name", "description", "bannerKey", "venue", "timezone", "startsAt", "endsAt", "capacity", "status", "version"];
+const EVENT_FIELDS = ["name", "description", "bannerKey", "artworkDataUrl", "venue", "timezone", "startsAt", "endsAt", "capacity", "status", "version"];
 const ACTIONS = {
   publish: { from: "DRAFT", to: "PUBLISHED", audit: "PUBLISHED" },
   start: { from: "PUBLISHED", to: "IN_PROGRESS", audit: "STARTED" },
   complete: { from: "IN_PROGRESS", to: "COMPLETED", audit: "COMPLETED" },
 };
 
-const snapshot = (event) => Object.fromEntries(EVENT_FIELDS.map((field) => [
-  field,
-  event[field] instanceof Date ? event[field].toISOString() : event[field],
-]));
+const snapshot = (event) => Object.fromEntries(EVENT_FIELDS.map((field) => {
+  const value = field === "artworkDataUrl" && event[field] ? "[custom artwork]" : event[field];
+  return [field, value instanceof Date ? value.toISOString() : value];
+}));
 
 const eventInclude = {
-  shifts: { orderBy: { startsAt: "asc" } },
+  shifts: {
+    orderBy: { startsAt: "asc" },
+    include: {
+      staffAssignments: {
+        where: { status: { not: "CANCELLED" } },
+        orderBy: { createdAt: "asc" },
+        select: {
+          staffAssignmentId: true,
+          assignmentRole: true,
+          status: true,
+          user: { select: { userId: true, username: true } },
+        },
+      },
+    },
+  },
   createdBy: { select: { userId: true, username: true, email: true, systemRole: true, status: true } },
   cancelledBy: { select: { userId: true, username: true, email: true, systemRole: true, status: true } },
+  registrations: {
+    where: { status: { in: ["SIGNED_UP", "CHECKED_IN"] } },
+    select: { registrationId: true },
+  },
+  _count: { select: { registrations: true } },
 };
+
+const toEventResponse = ({ _count, registrations, ...event }) => ({
+  ...event,
+  signupCount: _count.registrations,
+  activeCapacityCount: registrations.length,
+});
 
 const visibilityWhere = (user) => {
   if (user.systemRole === "ADMIN") return {};
@@ -30,13 +55,7 @@ const visibilityWhere = (user) => {
 
 const loadEventWithAssignment = (eventId, user) => prisma.event.findFirst({
   where: { eventId, ...visibilityWhere(user) },
-  include: {
-    ...eventInclude,
-    shifts: {
-      orderBy: { startsAt: "asc" },
-      include: { staffAssignments: { where: { userId: user.userId }, select: { assignmentRole: true, status: true } } },
-    },
-  },
+  include: eventInclude,
 });
 
 const canManage = (event, user) => user.systemRole === "ADMIN"
@@ -57,6 +76,7 @@ const normalizeEventData = (body) => ({
   ...(body.name !== undefined ? { name: body.name } : {}),
   ...(body.description !== undefined ? { description: body.description || null } : {}),
   ...(body.bannerKey !== undefined ? { bannerKey: body.bannerKey } : {}),
+  ...(body.artworkDataUrl !== undefined ? { artworkDataUrl: body.artworkDataUrl } : {}),
   ...(body.venue !== undefined ? { venue: body.venue } : {}),
   ...(body.timezone !== undefined ? { timezone: body.timezone } : {}),
   ...(body.startsAt !== undefined ? { startsAt: new Date(body.startsAt) } : {}),
@@ -99,7 +119,7 @@ const createEvent = async (body, user, correlationId) => {
   await tx.eventAuditLog.create({
     data: { eventId: event.eventId, actorUserId: user.userId, action: "CREATED", afterSnapshot: snapshot(event), correlationId },
   });
-    return event;
+    return toEventResponse(event);
   });
 };
 
@@ -123,19 +143,19 @@ const listEvents = async (query, user) => {
   const events = hasMore ? rows.slice(0, query.limit) : rows;
   const last = events.at(-1);
   return {
-    events,
+    events: events.map(toEventResponse),
     nextCursor: hasMore && last ? encodeCursor({ scope, startsAt: last.startsAt.toISOString(), eventId: last.eventId }) : null,
   };
 };
 
-const getEvent = (eventId, user) => requireEvent(eventId, user);
+const getEvent = async (eventId, user) => toEventResponse(await requireEvent(eventId, user));
 
 const allowedUpdateKeys = {
-  DRAFT: new Set(["name", "description", "bannerKey", "venue", "timezone", "startsAt", "endsAt", "capacity", "shifts"]),
-  PUBLISHED: new Set(["name", "description", "bannerKey", "venue", "timezone", "startsAt", "endsAt", "capacity", "shifts"]),
-  IN_PROGRESS: new Set(["description", "bannerKey", "capacity"]),
-  COMPLETED: new Set(["bannerKey"]),
-  CANCELLED: new Set(["bannerKey"]),
+  DRAFT: new Set(["name", "description", "bannerKey", "artworkDataUrl", "venue", "timezone", "startsAt", "endsAt", "capacity", "shifts"]),
+  PUBLISHED: new Set(["name", "description", "bannerKey", "artworkDataUrl", "venue", "timezone", "startsAt", "endsAt", "capacity", "shifts"]),
+  IN_PROGRESS: new Set(["description", "bannerKey", "artworkDataUrl", "capacity"]),
+  COMPLETED: new Set(["bannerKey", "artworkDataUrl"]),
+  CANCELLED: new Set(["bannerKey", "artworkDataUrl"]),
 };
 
 const updateEvent = async (eventId, body, user, correlationId) => {
@@ -180,7 +200,7 @@ const updateEvent = async (eventId, body, user, correlationId) => {
     await tx.eventAuditLog.create({
       data: { eventId, actorUserId: user.userId, action: "UPDATED", beforeSnapshot: snapshot(current), afterSnapshot: snapshot(updated), correlationId },
     });
-    return updated;
+    return toEventResponse(updated);
   });
 };
 
@@ -203,7 +223,7 @@ const transitionEvent = async (eventId, command, body, user, correlationId) => {
     }
     const updated = await tx.event.findUniqueOrThrow({ where: { eventId }, include: eventInclude });
     await tx.eventAuditLog.create({ data: { eventId, actorUserId: user.userId, action: transition.audit, beforeSnapshot: snapshot(current), afterSnapshot: snapshot(updated), correlationId } });
-    return updated;
+    return toEventResponse(updated);
   });
 };
 
@@ -221,8 +241,48 @@ const cancelEvent = async (eventId, body, user, correlationId) => {
     await tx.shift.updateMany({ where: { eventId, status: { in: ["PLANNED", "ACTIVE"] } }, data: { status: "CANCELLED" } });
     const updated = await tx.event.findUniqueOrThrow({ where: { eventId }, include: eventInclude });
     await tx.eventAuditLog.create({ data: { eventId, actorUserId: user.userId, action: "CANCELLED", beforeSnapshot: snapshot(current), afterSnapshot: snapshot(updated), correlationId } });
-    return updated;
+    return toEventResponse(updated);
   });
+};
+
+const listStaffDirectory = async () => prisma.user.findMany({
+  where: { status: "ACTIVE" },
+  select: { userId: true, username: true, systemRole: true },
+  orderBy: { username: "asc" },
+  take: 200,
+});
+
+const addStaffAssignment = async (eventId, shiftId, body, user) => {
+  const event = await requireEvent(eventId, user, true);
+  if (!event.shifts.some((shift) => shift.shiftId === shiftId)) {
+    throw new AppError(404, "SHIFT_NOT_FOUND", "Shift was not found");
+  }
+  const target = await prisma.user.findFirst({ where: { userId: body.userId, status: "ACTIVE" }, select: { userId: true } });
+  if (!target) throw new AppError(422, "STAFF_NOT_AVAILABLE", "The selected staff member is not available");
+
+  const existing = await prisma.staffAssignment.findFirst({ where: { shiftId, userId: body.userId, eventStationId: null } });
+  if (existing) {
+    await prisma.staffAssignment.update({
+      where: { staffAssignmentId: existing.staffAssignmentId },
+      data: { assignmentRole: body.assignmentRole, status: "ASSIGNED", assignedByUserId: user.userId },
+    });
+  } else {
+    await prisma.staffAssignment.create({
+      data: { shiftId, userId: body.userId, assignmentRole: body.assignmentRole, assignedByUserId: user.userId },
+    });
+  }
+  return toEventResponse(await prisma.event.findUniqueOrThrow({ where: { eventId }, include: eventInclude }));
+};
+
+const removeStaffAssignment = async (eventId, shiftId, assignmentId, user) => {
+  await requireEvent(eventId, user, true);
+  const assignment = await prisma.staffAssignment.findFirst({
+    where: { staffAssignmentId: assignmentId, shiftId, shift: { eventId } },
+    select: { staffAssignmentId: true },
+  });
+  if (!assignment) throw new AppError(404, "ASSIGNMENT_NOT_FOUND", "Staff assignment was not found");
+  await prisma.staffAssignment.delete({ where: { staffAssignmentId: assignmentId } });
+  return toEventResponse(await prisma.event.findUniqueOrThrow({ where: { eventId }, include: eventInclude }));
 };
 
 const getAuditLog = async (eventId, query, user) => {
@@ -247,4 +307,15 @@ const getAuditLog = async (eventId, query, user) => {
   return { auditLogs, nextCursor: hasMore && last ? encodeCursor({ scope, createdAt: last.createdAt.toISOString(), eventAuditLogId: last.eventAuditLogId }) : null };
 };
 
-module.exports = { createEvent, listEvents, getEvent, updateEvent, transitionEvent, cancelEvent, getAuditLog };
+module.exports = {
+  createEvent,
+  listEvents,
+  getEvent,
+  updateEvent,
+  transitionEvent,
+  cancelEvent,
+  listStaffDirectory,
+  addStaffAssignment,
+  removeStaffAssignment,
+  getAuditLog,
+};

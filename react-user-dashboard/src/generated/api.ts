@@ -127,6 +127,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/events/staff-directory": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List active users available for event staffing */
+        get: operations["listEventStaffDirectory"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/events/{eventId}": {
         parameters: {
             query?: never;
@@ -145,6 +162,40 @@ export interface paths {
         head?: never;
         /** Update allowed fields using optimistic concurrency */
         patch: operations["updateEvent"];
+        trace?: never;
+    };
+    "/api/events/{eventId}/shifts/{shiftId}/assignments": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Assign an active user to an event shift */
+        post: operations["assignEventStaff"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/events/{eventId}/shifts/{shiftId}/assignments/{assignmentId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Remove a user from an event shift */
+        delete: operations["removeEventStaffAssignment"];
+        options?: never;
+        head?: never;
+        patch?: never;
         trace?: never;
     };
     "/api/events/{eventId}/publish": {
@@ -244,6 +295,32 @@ export interface components {
         EventBannerKey: "COMMUNITY_SCREENING" | "LIBRARY_SCREENING" | "EVENT_OPERATIONS";
         /** @enum {string} */
         ShiftStatus: "PLANNED" | "ACTIVE" | "COMPLETED" | "CANCELLED";
+        /** @enum {string} */
+        StaffAssignmentRole: "EVENT_MANAGER" | "REGISTRATION" | "SCREENER" | "REVIEWER" | "SUPPORT";
+        /** @enum {string} */
+        StaffAssignmentStatus: "ASSIGNED" | "CONFIRMED" | "COMPLETED" | "CANCELLED";
+        StaffDirectoryEntry: {
+            /** Format: uuid */
+            userId: string;
+            username: string;
+            systemRole: components["schemas"]["SystemRole"];
+        };
+        StaffAssignmentRequest: {
+            /** Format: uuid */
+            userId: string;
+            assignmentRole: components["schemas"]["StaffAssignmentRole"];
+        };
+        StaffAssignment: {
+            /** Format: uuid */
+            staffAssignmentId: string;
+            assignmentRole: components["schemas"]["StaffAssignmentRole"];
+            status: components["schemas"]["StaffAssignmentStatus"];
+            user: {
+                /** Format: uuid */
+                userId: string;
+                username: string;
+            };
+        };
         User: {
             /** Format: uuid */
             userId: string;
@@ -293,11 +370,14 @@ export interface components {
             /** Format: uuid */
             shiftId: string;
             status: components["schemas"]["ShiftStatus"];
+            staffAssignments: components["schemas"]["StaffAssignment"][];
         };
         CreateEventRequest: {
             name: string;
             description?: string | null;
             bannerKey?: components["schemas"]["EventBannerKey"];
+            /** @description Cropped square event artwork encoded as a bounded JPEG or WebP data URL */
+            artworkDataUrl?: string | null;
             venue: string;
             /** @example Asia/Singapore */
             timezone: string;
@@ -313,6 +393,7 @@ export interface components {
             name?: string;
             description?: string | null;
             bannerKey?: components["schemas"]["EventBannerKey"];
+            artworkDataUrl?: string | null;
             venue?: string;
             timezone?: string;
             /** Format: date-time */
@@ -343,6 +424,10 @@ export interface components {
             /** Format: date-time */
             updatedAt: string;
             shifts: components["schemas"]["Shift"][];
+            /** @description Number of collected registration entries for this event */
+            signupCount: number;
+            /** @description Number of signed-up or checked-in registrations not marked completed or cancelled */
+            activeCapacityCount: number;
             createdBy?: components["schemas"]["User"];
             cancelledBy?: components["schemas"]["User"] | null;
         };
@@ -456,6 +541,7 @@ export interface components {
     };
     parameters: {
         EventId: string;
+        ShiftId: string;
         Cursor: string;
         EventLimit: number;
         /** @description Must equal the `vsms_csrf` cookie; requests also require an allowed Origin */
@@ -700,6 +786,28 @@ export interface operations {
             429: components["responses"]["RateLimited"];
         };
     };
+    listEventStaffDirectory: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Active staff directory */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StaffDirectoryEntry"][];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+        };
+    };
     getEvent: {
         parameters: {
             query?: never;
@@ -752,6 +860,62 @@ export interface operations {
             404: components["responses"]["NotFound"];
             409: components["responses"]["Conflict"];
             422: components["responses"]["ValidationFailed"];
+        };
+    };
+    assignEventStaff: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                eventId: components["parameters"]["EventId"];
+                shiftId: components["parameters"]["ShiftId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["StaffAssignmentRequest"];
+            };
+        };
+        responses: {
+            /** @description Assignment saved */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Event"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+            422: components["responses"]["ValidationFailed"];
+        };
+    };
+    removeEventStaffAssignment: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                eventId: components["parameters"]["EventId"];
+                shiftId: components["parameters"]["ShiftId"];
+                assignmentId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Assignment removed */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Event"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
         };
     };
     publishEvent: {

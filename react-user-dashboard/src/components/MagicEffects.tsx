@@ -178,13 +178,15 @@ export function ConfettiBurst({ active }: { active: boolean }) {
   })}</div>;
 }
 
-export function AvatarCircles({ count }: { count: number }) {
-  const visible = Math.min(Math.max(count, 0), 4);
-  if (visible === 0) return <span className="crew-empty">Crew not set</span>;
+type AvatarPerson = { userId: string; username: string };
+
+export function AvatarCircles({ people, label }: { people: AvatarPerson[]; label: string }) {
+  const visible = people.slice(0, 4);
+  if (visible.length === 0) return null;
   return (
-    <div className="avatar-circles" aria-label={`${count} staff planned`}>
-      {Array.from({ length: visible }, (_, index) => <span className={`crew-avatar tone-${index + 1}`} key={index}><UserIcon /></span>)}
-      {count > visible && <span className="crew-avatar crew-count">+{count - visible}</span>}
+    <div className="avatar-circles" aria-label={label}>
+      {visible.map((person, index) => <span className={`crew-avatar tone-${index + 1}`} key={person.userId} title={person.username} aria-label={person.username} tabIndex={0}><UserIcon /></span>)}
+      {people.length > visible.length && <span className="crew-avatar crew-count" title={people.slice(visible.length).map((person) => person.username).join(', ')}>+{people.length - visible.length}</span>}
     </div>
   );
 }

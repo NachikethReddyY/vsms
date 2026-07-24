@@ -28,3 +28,7 @@ export type EventBannerKey = (typeof EVENT_BANNERS)[number]['key'];
 export function getEventBanner(key?: string | null) {
   return EVENT_BANNERS.find((banner) => banner.key === key) ?? EVENT_BANNERS[0];
 }
+
+export function getEventArtwork(bannerKey?: string | null, artworkDataUrl?: string | null) {
+  return artworkDataUrl || getEventBanner(bannerKey).src;
+}

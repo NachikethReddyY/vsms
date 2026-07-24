@@ -16,6 +16,7 @@ export default defineConfig(({ command }) => {
         cert: fs.readFileSync("./certs/localhost.pem"),
       } : undefined,
       port: 5173,
+      strictPort: true,
       proxy: localHttps ? undefined : {
         '/qa-api': {
           target: 'https://127.0.0.1:5050',

@@ -8,4 +8,7 @@ exports.publish = async (req, res) => res.json(await eventService.transitionEven
 exports.start = async (req, res) => res.json(await eventService.transitionEvent(req.params.eventId, "start", req.body, req.user, req.requestId));
 exports.complete = async (req, res) => res.json(await eventService.transitionEvent(req.params.eventId, "complete", req.body, req.user, req.requestId));
 exports.cancel = async (req, res) => res.json(await eventService.cancelEvent(req.params.eventId, req.body, req.user, req.requestId));
+exports.staffDirectory = async (_req, res) => res.json(await eventService.listStaffDirectory());
+exports.addAssignment = async (req, res) => res.status(201).json(await eventService.addStaffAssignment(req.params.eventId, req.params.shiftId, req.body, req.user));
+exports.removeAssignment = async (req, res) => res.json(await eventService.removeStaffAssignment(req.params.eventId, req.params.shiftId, req.params.assignmentId, req.user));
 exports.audit = async (req, res) => res.json(await eventService.getAuditLog(req.params.eventId, req.query, req.user));

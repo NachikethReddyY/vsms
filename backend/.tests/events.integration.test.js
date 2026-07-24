@@ -41,19 +41,22 @@ const newEvent = () => ({
 
 describe("event lifecycle", () => {
   test("manager creates, updates and publishes an atomically audited event", async () => {
-    const created = await request(app).post("/api/events").set("Authorization", `Bearer ${managerToken}`).send(newEvent());
+    const artworkDataUrl = `data:image/jpeg;base64,${Buffer.from("custom event artwork").toString("base64")}`;
+    const created = await request(app).post("/api/events").set("Authorization", `Bearer ${managerToken}`).send({ ...newEvent(), artworkDataUrl });
     expect(created.status).toBe(201);
     expect(created.body.status).toBe("DRAFT");
     expect(created.body.bannerKey).toBe("COMMUNITY_SCREENING");
+    expect(created.body.artworkDataUrl).toBe(artworkDataUrl);
     expect(created.body.shifts).toHaveLength(1);
 
     const updated = await request(app)
       .patch(`/api/events/${created.body.eventId}`)
       .set("Authorization", `Bearer ${managerToken}`)
-      .send({ version: created.body.version, capacity: 100, bannerKey: "LIBRARY_SCREENING" });
+      .send({ version: created.body.version, capacity: 100, bannerKey: "LIBRARY_SCREENING", artworkDataUrl: null });
     expect(updated.status).toBe(200);
     expect(updated.body.version).toBe(created.body.version + 1);
     expect(updated.body.bannerKey).toBe("LIBRARY_SCREENING");
+    expect(updated.body.artworkDataUrl).toBeNull();
 
     const stale = await request(app)
       .patch(`/api/events/${created.body.eventId}`)
@@ -77,6 +80,48 @@ describe("event lifecycle", () => {
   test("staff cannot create events", async () => {
     const response = await request(app).post("/api/events").set("Authorization", `Bearer ${staffToken}`).send(newEvent());
     expect(response.status).toBe(403);
+  });
+
+  test("manager sees named staff, collected signups, and active venue capacity", async () => {
+    const created = await request(app).post("/api/events").set("Authorization", `Bearer ${managerToken}`).send(newEvent());
+    const staff = await helpers.prisma.user.findUniqueOrThrow({ where: { email: "staff@tests.vsms.local" } });
+    const shift = created.body.shifts[0];
+
+    const assigned = await request(app)
+      .post(`/api/events/${created.body.eventId}/shifts/${shift.shiftId}/assignments`)
+      .set("Authorization", `Bearer ${managerToken}`)
+      .send({ userId: staff.userId, assignmentRole: "REGISTRATION" });
+
+    expect(assigned.status).toBe(201);
+    expect(assigned.body.signupCount).toBe(0);
+    expect(assigned.body.activeCapacityCount).toBe(0);
+    expect(assigned.body.shifts[0].staffAssignments).toEqual([
+      expect.objectContaining({
+        assignmentRole: "REGISTRATION",
+        user: { userId: staff.userId, username: staff.username },
+      }),
+    ]);
+
+    await helpers.prisma.eventRegistration.createMany({ data: [
+      { eventId: created.body.eventId, status: "SIGNED_UP" },
+      { eventId: created.body.eventId, status: "CHECKED_IN" },
+      { eventId: created.body.eventId, status: "COMPLETED" },
+      { eventId: created.body.eventId, status: "CANCELLED" },
+    ] });
+    const withRegistrations = await request(app)
+      .get(`/api/events/${created.body.eventId}`)
+      .set("Authorization", `Bearer ${managerToken}`);
+
+    expect(withRegistrations.body.signupCount).toBe(4);
+    expect(withRegistrations.body.activeCapacityCount).toBe(2);
+
+    const assignmentId = assigned.body.shifts[0].staffAssignments[0].staffAssignmentId;
+    const removed = await request(app)
+      .delete(`/api/events/${created.body.eventId}/shifts/${shift.shiftId}/assignments/${assignmentId}`)
+      .set("Authorization", `Bearer ${managerToken}`);
+
+    expect(removed.status).toBe(200);
+    expect(removed.body.shifts[0].staffAssignments).toEqual([]);
   });
 
   test("manager can change artwork after an event is complete", async () => {

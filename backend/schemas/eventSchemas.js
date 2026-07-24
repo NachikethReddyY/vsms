@@ -3,6 +3,10 @@ const { z } = require("zod");
 const uuid = z.string().uuid();
 const timestamp = z.string().datetime({ offset: true });
 const bannerKey = z.enum(["COMMUNITY_SCREENING", "LIBRARY_SCREENING", "EVENT_OPERATIONS"]);
+const artworkDataUrl = z.string().max(180000).regex(
+  /^data:image\/(jpeg|webp);base64,[A-Za-z0-9+/]+={0,2}$/,
+  "Artwork must be a JPEG or WebP data URL",
+).nullable();
 const timezone = z.string().trim().min(1).max(100).refine((value) => {
   try {
     new Intl.DateTimeFormat("en", { timeZone: value });
@@ -28,6 +32,7 @@ const eventFields = {
   name: z.string().trim().min(1).max(150),
   description: z.string().trim().max(5000).nullable().optional(),
   bannerKey: bannerKey.default("COMMUNITY_SCREENING"),
+  artworkDataUrl: artworkDataUrl.optional(),
   venue: z.string().trim().min(1).max(255),
   timezone,
   startsAt: timestamp,
@@ -54,6 +59,7 @@ const updateEventBody = z.object({
   name: eventFields.name.optional(),
   description: eventFields.description,
   bannerKey: bannerKey.optional(),
+  artworkDataUrl: artworkDataUrl.optional(),
   venue: eventFields.venue.optional(),
   timezone: timezone.optional(),
   startsAt: timestamp.optional(),
@@ -79,4 +85,22 @@ const listQuery = z.object({
 }).strict();
 const auditQuery = z.object({ cursor: z.string().max(2048).optional(), limit: z.coerce.number().int().min(1).max(100).default(50) }).strict();
 
-module.exports = { createEventBody, updateEventBody, transitionBody, cancelBody, eventParams, listQuery, auditQuery };
+const assignmentParams = z.object({ eventId: uuid, shiftId: uuid }).strict();
+const assignmentDeleteParams = z.object({ eventId: uuid, shiftId: uuid, assignmentId: uuid }).strict();
+const assignmentBody = z.object({
+  userId: uuid,
+  assignmentRole: z.enum(["EVENT_MANAGER", "REGISTRATION", "SCREENER", "REVIEWER", "SUPPORT"]),
+}).strict();
+
+module.exports = {
+  createEventBody,
+  updateEventBody,
+  transitionBody,
+  cancelBody,
+  eventParams,
+  listQuery,
+  auditQuery,
+  assignmentParams,
+  assignmentDeleteParams,
+  assignmentBody,
+};

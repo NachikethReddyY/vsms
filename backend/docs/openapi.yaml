@@ -172,6 +172,21 @@ paths:
         "403": { $ref: "#/components/responses/Forbidden" }
         "422": { $ref: "#/components/responses/ValidationFailed" }
         "429": { $ref: "#/components/responses/RateLimited" }
+  /api/events/staff-directory:
+    get:
+      tags: [Events]
+      operationId: listEventStaffDirectory
+      summary: List active users available for event staffing
+      responses:
+        "200":
+          description: Active staff directory
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/StaffDirectoryEntry" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
   /api/events/{eventId}:
     parameters:
       - $ref: "#/components/parameters/EventId"
@@ -206,6 +221,44 @@ paths:
         "404": { $ref: "#/components/responses/NotFound" }
         "409": { $ref: "#/components/responses/Conflict" }
         "422": { $ref: "#/components/responses/ValidationFailed" }
+  /api/events/{eventId}/shifts/{shiftId}/assignments:
+    post:
+      tags: [Events]
+      operationId: assignEventStaff
+      summary: Assign an active user to an event shift
+      parameters:
+        - $ref: "#/components/parameters/EventId"
+        - $ref: "#/components/parameters/ShiftId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/StaffAssignmentRequest" }
+      responses:
+        "201":
+          description: Assignment saved
+          content: { application/json: { schema: { $ref: "#/components/schemas/Event" } } }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "422": { $ref: "#/components/responses/ValidationFailed" }
+  /api/events/{eventId}/shifts/{shiftId}/assignments/{assignmentId}:
+    delete:
+      tags: [Events]
+      operationId: removeEventStaffAssignment
+      summary: Remove a user from an event shift
+      parameters:
+        - $ref: "#/components/parameters/EventId"
+        - $ref: "#/components/parameters/ShiftId"
+        - name: assignmentId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        "200":
+          description: Assignment removed
+          content: { application/json: { schema: { $ref: "#/components/schemas/Event" } } }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
   /api/events/{eventId}/publish:
     post:
       tags: [Events]
@@ -278,6 +331,11 @@ components:
       in: path
       required: true
       schema: { type: string, format: uuid }
+    ShiftId:
+      name: shiftId
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
     Cursor:
       name: cursor
       in: query
@@ -340,6 +398,42 @@ components:
     ShiftStatus:
       type: string
       enum: [PLANNED, ACTIVE, COMPLETED, CANCELLED]
+    StaffAssignmentRole:
+      type: string
+      enum: [EVENT_MANAGER, REGISTRATION, SCREENER, REVIEWER, SUPPORT]
+    StaffAssignmentStatus:
+      type: string
+      enum: [ASSIGNED, CONFIRMED, COMPLETED, CANCELLED]
+    StaffDirectoryEntry:
+      type: object
+      additionalProperties: false
+      required: [userId, username, systemRole]
+      properties:
+        userId: { type: string, format: uuid }
+        username: { type: string }
+        systemRole: { $ref: "#/components/schemas/SystemRole" }
+    StaffAssignmentRequest:
+      type: object
+      additionalProperties: false
+      required: [userId, assignmentRole]
+      properties:
+        userId: { type: string, format: uuid }
+        assignmentRole: { $ref: "#/components/schemas/StaffAssignmentRole" }
+    StaffAssignment:
+      type: object
+      additionalProperties: false
+      required: [staffAssignmentId, assignmentRole, status, user]
+      properties:
+        staffAssignmentId: { type: string, format: uuid }
+        assignmentRole: { $ref: "#/components/schemas/StaffAssignmentRole" }
+        status: { $ref: "#/components/schemas/StaffAssignmentStatus" }
+        user:
+          type: object
+          additionalProperties: false
+          required: [userId, username]
+          properties:
+            userId: { type: string, format: uuid }
+            username: { type: string }
     User:
       type: object
       additionalProperties: false
@@ -387,10 +481,11 @@ components:
       allOf:
         - $ref: "#/components/schemas/ShiftInput"
         - type: object
-          required: [shiftId, status]
+          required: [shiftId, status, staffAssignments]
           properties:
             shiftId: { type: string, format: uuid }
             status: { $ref: "#/components/schemas/ShiftStatus" }
+            staffAssignments: { type: array, items: { $ref: "#/components/schemas/StaffAssignment" } }
     CreateEventRequest:
       type: object
       additionalProperties: false
@@ -399,6 +494,12 @@ components:
         name: { type: string, minLength: 1, maxLength: 150 }
         description: { type: string, nullable: true, maxLength: 5000 }
         bannerKey: { $ref: "#/components/schemas/EventBannerKey" }
+        artworkDataUrl:
+          type: string
+          nullable: true
+          maxLength: 180000
+          pattern: '^data:image/(jpeg|webp);base64,[A-Za-z0-9+/]+={0,2}$'
+          description: Cropped square event artwork encoded as a bounded JPEG or WebP data URL
         venue: { type: string, minLength: 1, maxLength: 255 }
         timezone: { type: string, minLength: 1, maxLength: 100, example: Asia/Singapore }
         startsAt: { type: string, format: date-time }
@@ -414,6 +515,11 @@ components:
         name: { type: string, minLength: 1, maxLength: 150 }
         description: { type: string, nullable: true, maxLength: 5000 }
         bannerKey: { $ref: "#/components/schemas/EventBannerKey" }
+        artworkDataUrl:
+          type: string
+          nullable: true
+          maxLength: 180000
+          pattern: '^data:image/(jpeg|webp);base64,[A-Za-z0-9+/]+={0,2}$'
         venue: { type: string, minLength: 1, maxLength: 255 }
         timezone: { type: string, minLength: 1, maxLength: 100 }
         startsAt: { type: string, format: date-time }
@@ -431,7 +537,7 @@ components:
       allOf:
         - $ref: "#/components/schemas/CreateEventRequest"
         - type: object
-          required: [eventId, status, version, createdByUserId, shifts, createdAt, updatedAt]
+          required: [eventId, artworkDataUrl, status, version, createdByUserId, shifts, signupCount, activeCapacityCount, createdAt, updatedAt]
           properties:
             eventId: { type: string, format: uuid }
             status: { $ref: "#/components/schemas/EventStatus" }
@@ -443,6 +549,8 @@ components:
             createdAt: { type: string, format: date-time }
             updatedAt: { type: string, format: date-time }
             shifts: { type: array, items: { $ref: "#/components/schemas/Shift" } }
+            signupCount: { type: integer, minimum: 0, description: Number of collected registration entries for this event }
+            activeCapacityCount: { type: integer, minimum: 0, description: Number of signed-up or checked-in registrations not marked completed or cancelled }
             createdBy: { $ref: "#/components/schemas/User" }
             cancelledBy: { type: object, allOf: [{ $ref: "#/components/schemas/User" }], nullable: true }
     EventListResponse:

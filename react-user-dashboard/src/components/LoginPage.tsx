@@ -1,7 +1,7 @@
-import { ArrowRightIcon, CheckBadgeIcon, EyeIcon, EyeSlashIcon, LockClosedIcon } from '@heroicons/react/24/outline';
+import { ArrowRightIcon, EyeIcon, EyeSlashIcon, LockClosedIcon } from '@heroicons/react/24/outline';
 import { useState } from 'react';
 import { useForm } from 'react-hook-form';
-import { Navigate, useLocation, useNavigate } from 'react-router-dom';
+import { Link, Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { getApiMessage, useAuth } from '../auth/authState';
 import { Meteors, ThemeToggle } from './MagicEffects';
 
@@ -33,12 +33,6 @@ export default function LoginPage() {
       <Meteors count={12} />
       <header className="auth-topbar"><div className="login-brand"><span aria-hidden="true">V</span><strong>VSMS</strong><small>Event operations</small></div><ThemeToggle /></header>
       <div className="auth-layout">
-        <section className="auth-story" aria-labelledby="login-title">
-          <span className="auth-context">Staff workspace</span>
-          <h1 id="login-title">Everything your screening team needs before doors open.</h1>
-          <p>Plan venues, staff every shift, and move each event from draft to a trustworthy operational record.</p>
-          <ul><li><CheckBadgeIcon />Clear lifecycle ownership</li><li><CheckBadgeIcon />Immutable event history</li><li><CheckBadgeIcon />Secure staff access</li></ul>
-        </section>
         <section className="auth-card-wrap" aria-label="Sign in">
           <form className="login-form auth-card" onSubmit={handleSubmit(submit)} noValidate>
             <div className="login-icon"><LockClosedIcon /></div>
@@ -49,7 +43,7 @@ export default function LoginPage() {
           <label>Password<span className="password-field"><input type={showPassword ? 'text' : 'password'} autoComplete="current-password" {...register('password', { required: 'Enter your password' })} aria-invalid={!!errors.password}/><button type="button" className="icon-button" onClick={() => setShowPassword((v) => !v)} aria-label={showPassword ? 'Hide password' : 'Show password'}>{showPassword ? <EyeSlashIcon /> : <EyeIcon />}</button></span></label>
           {errors.password && <span className="field-error">{errors.password.message}</span>}
           <button className="primary wide interactive-cta" disabled={isSubmitting}><span>{isSubmitting ? 'Opening workspace…' : 'Enter workspace'}</span><ArrowRightIcon /></button>
-          <p className="form-note">New accounts are provisioned by your VSMS administrator.</p>
+          <p className="form-note">Need an account? <Link to="/signup">Create one</Link></p>
           </form>
         </section>
       </div>

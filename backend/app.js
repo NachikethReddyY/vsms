@@ -39,7 +39,7 @@ app.use(cors({
     if (!origin || env.corsOrigins.includes(origin)) return callback(null, true);
     return callback(new AppError(403, "ORIGIN_NOT_ALLOWED", "Request origin is not allowed"));
   },
-  methods: ["GET", "POST", "PATCH", "OPTIONS"],
+  methods: ["GET", "POST", "PATCH", "DELETE", "OPTIONS"],
   allowedHeaders: ["Authorization", "Content-Type", "X-CSRF-Token", "X-Request-Id"],
 }));
 app.use(cookieParser());

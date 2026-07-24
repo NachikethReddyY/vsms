@@ -21,6 +21,14 @@ const EVENTS = [
   { eventId: "20000000-0000-4000-8000-000000000005", name: "Harbour Family Screening", venue: "Harbour Community Room", startsAt: "2026-08-20T00:00:00.000Z", endsAt: "2026-08-20T06:00:00.000Z", capacity: 100, status: "CANCELLED" },
 ];
 
+const REGISTRATION_COUNTS = [
+  { SIGNED_UP: 12, CHECKED_IN: 0, COMPLETED: 0, CANCELLED: 0 },
+  { SIGNED_UP: 4, CHECKED_IN: 0, COMPLETED: 0, CANCELLED: 0 },
+  { SIGNED_UP: 7, CHECKED_IN: 5, COMPLETED: 9, CANCELLED: 1 },
+  { SIGNED_UP: 0, CHECKED_IN: 0, COMPLETED: 30, CANCELLED: 0 },
+  { SIGNED_UP: 0, CHECKED_IN: 0, COMPLETED: 0, CANCELLED: 5 },
+];
+
 const main = async () => {
   const passwordHash = await bcrypt.hash(DEMO_PASSWORD, 12);
   for (const user of USERS) {
@@ -73,6 +81,16 @@ const main = async () => {
           correlationId: `40000000-0000-4000-8000-${String(index + 1).padStart(12, "0")}`,
           afterSnapshot: { name: stored.name, status: stored.status, capacity: stored.capacity, version: stored.version },
         },
+      });
+    }
+
+    const statuses = Object.entries(REGISTRATION_COUNTS[index]).flatMap(([status, count]) => Array.from({ length: count }, () => status));
+    for (const [registrationIndex, status] of statuses.entries()) {
+      const registrationId = `50000000-0000-4000-8000-${String(index * 1000 + registrationIndex + 1).padStart(12, "0")}`;
+      await prisma.eventRegistration.upsert({
+        where: { registrationId },
+        update: { eventId: stored.eventId, status },
+        create: { registrationId, eventId: stored.eventId, status },
       });
     }
   }
