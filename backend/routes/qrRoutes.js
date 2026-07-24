@@ -2,9 +2,13 @@ const express = require("express");
 const router = express.Router();
 
 const qrController = require("../controllers/qrController");
+const authenticate = require("../middlewares/authenticate");
+const asyncHandler = require("../utils/asyncHandler");
 
-router.post("/generate/:participantId", qrController.generateQR);
+router.use(authenticate);
 
-router.get("/:token", qrController.getParticipantByQR);
+router.post("/generate/:participantId", asyncHandler(qrController.generateQR));
+
+router.get("/:token", asyncHandler(qrController.getParticipantByQR));
 
 module.exports = router;

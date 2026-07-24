@@ -1,0 +1,3803 @@
+{
+  "name": "VSMS Event Operations API",
+  "uid": "oIcSn2LQGwXQx08lIHkEI",
+  "version": "1",
+  "items": [
+    {
+      "uid": "icyuhvVcYrA3qKYiEmq5i",
+      "name": "System",
+      "type": "folder",
+      "root": {
+        "request": {
+          "auth": {
+            "mode": "inherit",
+            "basic": null,
+            "bearer": null,
+            "digest": null,
+            "apikey": null,
+            "oauth2": null
+          }
+        },
+        "meta": {
+          "name": "System"
+        }
+      },
+      "items": [
+        {
+          "uid": "g78Pqb2TSJXjnHuWNQHj2",
+          "name": "Check API readiness",
+          "type": "http-request",
+          "tags": [
+            "System"
+          ],
+          "request": {
+            "url": "{{baseUrl}}/health",
+            "method": "GET",
+            "auth": {
+              "mode": "inherit",
+              "basic": null,
+              "bearer": null,
+              "digest": null,
+              "apikey": null,
+              "oauth2": null
+            },
+            "headers": [],
+            "params": [],
+            "body": {
+              "mode": "none",
+              "json": null,
+              "text": null,
+              "xml": null,
+              "formUrlEncoded": [],
+              "multipartForm": []
+            },
+            "script": {
+              "res": null
+            }
+          },
+          "examples": [
+            {
+              "uid": "A8hmjlxP5m5wx2RJjxaVk",
+              "itemUid": "g78Pqb2TSJXjnHuWNQHj2",
+              "name": "200 Response",
+              "description": "API is ready",
+              "type": "http-request",
+              "request": {
+                "url": "{{baseUrl}}/health",
+                "method": "GET",
+                "headers": [],
+                "params": [],
+                "body": {
+                  "mode": "none",
+                  "json": null,
+                  "text": null,
+                  "xml": null,
+                  "sparql": null,
+                  "formUrlEncoded": [],
+                  "multipartForm": []
+                }
+              },
+              "response": {
+                "status": 200,
+                "statusText": "OK",
+                "headers": [
+                  {
+                    "uid": "56lRd777U2JBWEh3o3Qrf",
+                    "name": "Content-Type",
+                    "value": "application/json",
+                    "description": "",
+                    "enabled": true
+                  }
+                ],
+                "body": {
+                  "type": "json",
+                  "content": "{\n  \"status\": \"ok\"\n}"
+                }
+              }
+            },
+            {
+              "uid": "i7Wd4I0AmgKnO0xU8fnSq",
+              "itemUid": "g78Pqb2TSJXjnHuWNQHj2",
+              "name": "404 Response",
+              "description": "Health endpoint is unavailable",
+              "type": "http-request",
+              "request": {
+                "url": "{{baseUrl}}/health",
+                "method": "GET",
+                "headers": [],
+                "params": [],
+                "body": {
+                  "mode": "none",
+                  "json": null,
+                  "text": null,
+                  "xml": null,
+                  "sparql": null,
+                  "formUrlEncoded": [],
+                  "multipartForm": []
+                }
+              },
+              "response": {
+                "status": 404,
+                "statusText": "Not Found",
+                "headers": [
+                  {
+                    "uid": "ma37iHfHZUpm1ne2Af4gM",
+                    "name": "Content-Type",
+                    "value": "application/json",
+                    "description": "",
+                    "enabled": true
+                  }
+                ],
+                "body": {
+                  "type": "json",
+                  "content": "{\n  \"type\": \"\",\n  \"title\": \"\",\n  \"status\": 0,\n  \"code\": \"\",\n  \"requestId\": \"\",\n  \"errors\": [\n    {\n      \"field\": \"\",\n      \"message\": \"\"\n    }\n  ]\n}"
+                }
+              }
+            },
+            {
+              "uid": "4c5PUEJETsFp7l86m8XQ5",
+              "itemUid": "g78Pqb2TSJXjnHuWNQHj2",
+              "name": "500 Response",
+              "description": "Service is not ready",
+              "type": "http-request",
+              "request": {
+                "url": "{{baseUrl}}/health",
+                "method": "GET",
+                "headers": [],
+                "params": [],
+                "body": {
+                  "mode": "none",
+                  "json": null,
+                  "text": null,
+                  "xml": null,
+                  "sparql": null,
+                  "formUrlEncoded": [],
+                  "multipartForm": []
+                }
+              },
+              "response": {
+                "status": 500,
+                "statusText": "Internal Server Error",
+                "headers": [
+                  {
+                    "uid": "IXvVTHIkF6dexSDj21TvT",
+                    "name": "Content-Type",
+                    "value": "application/json",
+                    "description": "",
+                    "enabled": true
+                  }
+                ],
+                "body": {
+                  "type": "json",
+                  "content": "{\n  \"type\": \"\",\n  \"title\": \"\",\n  \"status\": 0,\n  \"code\": \"\",\n  \"requestId\": \"\",\n  \"errors\": [\n    {\n      \"field\": \"\",\n      \"message\": \"\"\n    }\n  ]\n}"
+                }
+              }
+            }
+          ],
+          "seq": 1
+        }
+      ]
+    },
+    {
+      "uid": "ZfLIt81wUxtQcOKorghDW",
+      "name": "Authentication",
+      "type": "folder",
+      "root": {
+        "request": {
+          "auth": {
+            "mode": "inherit",
+            "basic": null,
+            "bearer": null,
+            "digest": null,
+            "apikey": null,
+            "oauth2": null
+          }
+        },
+        "meta": {
+          "name": "Authentication"
+        }
+      },
+      "items": [
+        {
+          "uid": "h6d3jnkdI9z9gdKdRAFbP",
+          "name": "Authenticate a staff member",
+          "type": "http-request",
+          "tags": [
+            "Authentication"
+          ],
+          "request": {
+            "url": "{{baseUrl}}/auth/login",
+            "method": "POST",
+            "auth": {
+              "mode": "inherit",
+              "basic": null,
+              "bearer": null,
+              "digest": null,
+              "apikey": null,
+              "oauth2": null
+            },
+            "headers": [],
+            "params": [],
+            "body": {
+              "mode": "json",
+              "json": "{\n  \"identifier\": \"\",\n  \"password\": \"\"\n}",
+              "text": null,
+              "xml": null,
+              "formUrlEncoded": [],
+              "multipartForm": []
+            },
+            "script": {
+              "res": null
+            }
+          },
+          "examples": [
+            {
+              "uid": "Neco6Jt2dMIEzwobQtlQG",
+              "itemUid": "h6d3jnkdI9z9gdKdRAFbP",
+              "name": "200 Response",
+              "description": "Login succeeded; refresh and CSRF cookies are also set",
+              "type": "http-request",
+              "request": {
+                "url": "{{baseUrl}}/auth/login",
+                "method": "POST",
+                "headers": [],
+                "params": [],
+                "body": {
+                  "mode": "json",
+                  "json": "{\n  \"identifier\": \"\",\n  \"password\": \"\"\n}",
+                  "text": null,
+                  "xml": null,
+                  "sparql": null,
+                  "formUrlEncoded": [],
+                  "multipartForm": []
+                }
+              },
+              "response": {
+                "status": 200,
+                "statusText": "OK",
+                "headers": [
+                  {
+                    "uid": "YXpJVgRRuhPaHaJTWLF0N",
+                    "name": "Content-Type",
+                    "value": "application/json",
+                    "description": "",
+                    "enabled": true
+                  }
+                ],
+                "body": {
+                  "type": "json",
+                  "content": "{\n  \"accessToken\": \"\",\n  \"csrfToken\": \"\",\n  \"user\": {\n    \"userId\": \"\",\n    \"username\": \"\",\n    \"email\": \"\",\n    \"systemRole\": \"ADMIN\",\n    \"status\": \"ACTIVE\",\n    \"createdAt\": \"\"\n  }\n}"
+                }
+              }
+            },
+            {
+              "uid": "RhZGOAKwmx3T5DDBQemPT",
+              "itemUid": "h6d3jnkdI9z9gdKdRAFbP",
+              "name": "401 Response",
+              "description": "Authentication is absent, invalid, expired, revoked, or reused",
+              "type": "http-request",
+              "request": {
+                "url": "{{baseUrl}}/auth/login",
+                "method": "POST",
+                "headers": [],
+                "params": [],
+                "body": {
+                  "mode": "json",
+                  "json": "{\n  \"identifier\": \"\",\n  \"password\": \"\"\n}",
+                  "text": null,
+                  "xml": null,
+                  "sparql": null,
+                  "formUrlEncoded": [],
+                  "multipartForm": []
+                }
+              },
+              "response": {
+                "status": 401,
+                "statusText": "Unauthorized",
+                "headers": [
+                  {
+                    "uid": "6FW4pIgtCuPzLk7s1ySoA",
+                    "name": "Content-Type",
+                    "value": "application/json",
+                    "description": "",
+                    "enabled": true
+                  }
+                ],
+                "body": {
+                  "type": "json",
+                  "content": "{\n  \"type\": \"\",\n  \"title\": \"\",\n  \"status\": 0,\n  \"code\": \"\",\n  \"requestId\": \"\",\n  \"errors\": [\n    {\n      \"field\": \"\",\n      \"message\": \"\"\n    }\n  ]\n}"
+                }
+              }
+            },
+            {
+              "uid": "OrHBJG5vxFv3BvnceXctQ",
+              "itemUid": "h6d3jnkdI9z9gdKdRAFbP",
+              "name": "422 Response",
+              "description": "Request validation failed",
+              "type": "http-request",
+              "request": {
+                "url": "{{baseUrl}}/auth/login",
+                "method": "POST",
+                "headers": [],
+                "params": [],
+                "body": {
+                  "mode": "json",
+                  "json": "{\n  \"identifier\": \"\",\n  \"password\": \"\"\n}",
+                  "text": null,
+                  "xml": null,
+                  "sparql": null,
+                  "formUrlEncoded": [],
+                  "multipartForm": []
+                }
+              },
+              "response": {
+                "status": 422,
+                "statusText": "Unprocessable Entity",
+                "headers": [
+                  {
+                    "uid": "jqnMR2RjyBPDlmKKrvRfS",
+                    "name": "Content-Type",
+                    "value": "application/json",
+                    "description": "",
+                    "enabled": true
+                  }
+                ],
+                "body": {
+                  "type": "json",
+                  "content": "{\n  \"type\": \"\",\n  \"title\": \"\",\n  \"status\": 0,\n  \"code\": \"\",\n  \"requestId\": \"\",\n  \"errors\": [\n    {\n      \"field\": \"\",\n      \"message\": \"\"\n    }\n  ]\n}"
+                }
+              }
+            },
+            {
+              "uid": "NLnpRdLXD3hHFMtXjTgfQ",
+              "itemUid": "h6d3jnkdI9z9gdKdRAFbP",
+              "name": "429 Response",
+              "description": "Rate limit exceeded",
+              "type": "http-request",
+              "request": {
+                "url": "{{baseUrl}}/auth/login",
+                "method": "POST",
+                "headers": [],
+                "params": [],
+                "body": {
+                  "mode": "json",
+                  "json": "{\n  \"identifier\": \"\",\n  \"password\": \"\"\n}",
+                  "text": null,
+                  "xml": null,
+                  "sparql": null,
+                  "formUrlEncoded": [],
+                  "multipartForm": []
+                }
+              },
+              "response": {
+                "status": 429,
+                "statusText": "Too Many Requests",
+                "headers": [
+                  {
+                    "uid": "DdzpdMKZ9cYupo4Mz1N6j",
+                    "name": "Content-Type",
+                    "value": "application/json",
+                    "description": "",
+                    "enabled": true
+                  }
+                ],
+                "body": {
+                  "type": "json",
+                  "content": "{\n  \"type\": \"\",\n  \"title\": \"\",\n  \"status\": 0,\n  \"code\": \"\",\n  \"requestId\": \"\",\n  \"errors\": [\n    {\n      \"field\": \"\",\n      \"message\": \"\"\n    }\n  ]\n}"
+                }
+              }
+            }
+          ],
+          "seq": 1
+        },
+        {
+          "uid": "eJZ2UUNDRMS9fl8BeQo6v",
+          "name": "Rotate a one-time refresh session",
+          "type": "http-request",
+          "tags": [
+            "Authentication"
+          ],
+          "request": {
+            "url": "{{baseUrl}}/auth/refresh",
+            "method": "POST",
+            "auth": {
+              "mode": "apikey",
+              "basic": null,
+              "bearer": null,
+              "digest": null,
+              "apikey": {
+                "key": "vsms_refresh",
+                "value": "{{apiKey}}",
+                "placement": "header"
+              },
+              "oauth2": null
+            },
+            "headers": [
+              {
+                "uid": "D9IOFoWSzPEEkvTZgipgT",
+                "name": "X-CSRF-Token",
+                "value": "",
+                "description": "Must equal the `vsms_csrf` cookie; requests also require an allowed Origin",
+                "enabled": true
+              },
+              {
+                "uid": "hqwiagjocCKNZ2tPp0zmX",
+                "name": "vsms_refresh",
+                "value": "{{apiKey}}",
+                "description": "",
+                "enabled": true
+              }
+            ],
+            "params": [],
+            "body": {
+              "mode": "none",
+              "json": null,
+              "text": null,
+              "xml": null,
+              "formUrlEncoded": [],
+              "multipartForm": []
+            },
+            "script": {
+              "res": null
+            }
+          },
+          "examples": [
+            {
+              "uid": "UQym23UMjghFyB4znHbgr",
+              "itemUid": "eJZ2UUNDRMS9fl8BeQo6v",
+              "name": "200 Response",
+              "description": "Session rotated",
+              "type": "http-request",
+              "request": {
+                "url": "{{baseUrl}}/auth/refresh",
+                "method": "POST",
+                "headers": [
+                  {
+                    "uid": "D9IOFoWSzPEEkvTZgipgT",
+                    "name": "X-CSRF-Token",
+                    "value": "",
+                    "description": "Must equal the `vsms_csrf` cookie; requests also require an allowed Origin",
+                    "enabled": true
+                  },
+                  {
+                    "uid": "hqwiagjocCKNZ2tPp0zmX",
+                    "name": "vsms_refresh",
+                    "value": "{{apiKey}}",
+                    "description": "",
+                    "enabled": true
+                  }
+                ],
+                "params": [],
+                "body": {
+                  "mode": "none",
+                  "json": null,
+                  "text": null,
+                  "xml": null,
+                  "sparql": null,
+                  "formUrlEncoded": [],
+                  "multipartForm": []
+                }
+              },
+              "response": {
+                "status": 200,
+                "statusText": "OK",
+                "headers": [
+                  {
+                    "uid": "U9WkkBXgyAOPYXwfRTPys",
+                    "name": "Content-Type",
+                    "value": "application/json",
+                    "description": "",
+                    "enabled": true
+                  }
+                ],
+                "body": {
+                  "type": "json",
+                  "content": "{\n  \"accessToken\": \"\",\n  \"csrfToken\": \"\",\n  \"user\": {\n    \"userId\": \"\",\n    \"username\": \"\",\n    \"email\": \"\",\n    \"systemRole\": \"ADMIN\",\n    \"status\": \"ACTIVE\",\n    \"createdAt\": \"\"\n  }\n}"
+                }
+              }
+            },
+            {
+              "uid": "FhwtN4HTRdHWU2ZAhK5M5",
+              "itemUid": "eJZ2UUNDRMS9fl8BeQo6v",
+              "name": "401 Response",
+              "description": "Authentication is absent, invalid, expired, revoked, or reused",
+              "type": "http-request",
+              "request": {
+                "url": "{{baseUrl}}/auth/refresh",
+                "method": "POST",
+                "headers": [
+                  {
+                    "uid": "D9IOFoWSzPEEkvTZgipgT",
+                    "name": "X-CSRF-Token",
+                    "value": "",
+                    "description": "Must equal the `vsms_csrf` cookie; requests also require an allowed Origin",
+                    "enabled": true
+                  },
+                  {
+                    "uid": "hqwiagjocCKNZ2tPp0zmX",
+                    "name": "vsms_refresh",
+                    "value": "{{apiKey}}",
+                    "description": "",
+                    "enabled": true
+                  }
+                ],
+                "params": [],
+                "body": {
+                  "mode": "none",
+                  "json": null,
+                  "text": null,
+                  "xml": null,
+                  "sparql": null,
+                  "formUrlEncoded": [],
+                  "multipartForm": []
+                }
+              },
+              "response": {
+                "status": 401,
+                "statusText": "Unauthorized",
+                "headers": [
+                  {
+                    "uid": "BgupaYrqUDBi3jhllTqba",
+                    "name": "Content-Type",
+                    "value": "application/json",
+                    "description": "",
+                    "enabled": true
+                  }
+                ],
+                "body": {
+                  "type": "json",
+                  "content": "{\n  \"type\": \"\",\n  \"title\": \"\",\n  \"status\": 0,\n  \"code\": \"\",\n  \"requestId\": \"\",\n  \"errors\": [\n    {\n      \"field\": \"\",\n      \"message\": \"\"\n    }\n  ]\n}"
+                }
+              }
+            },
+            {
+              "uid": "lNUAXW3yfBDcRn3UtCuiJ",
+              "itemUid": "eJZ2UUNDRMS9fl8BeQo6v",
+              "name": "403 Response",
+              "description": "Request origin, CSRF token, or permission is invalid",
+              "type": "http-request",
+              "request": {
+                "url": "{{baseUrl}}/auth/refresh",
+                "method": "POST",
+                "headers": [
+                  {
+                    "uid": "D9IOFoWSzPEEkvTZgipgT",
+                    "name": "X-CSRF-Token",
+                    "value": "",
+                    "description": "Must equal the `vsms_csrf` cookie; requests also require an allowed Origin",
+                    "enabled": true
+                  },
+                  {
+                    "uid": "hqwiagjocCKNZ2tPp0zmX",
+                    "name": "vsms_refresh",
+                    "value": "{{apiKey}}",
+                    "description": "",
+                    "enabled": true
+                  }
+                ],
+                "params": [],
+                "body": {
+                  "mode": "none",
+                  "json": null,
+                  "text": null,
+                  "xml": null,
+                  "sparql": null,
+                  "formUrlEncoded": [],
+                  "multipartForm": []
+                }
+              },
+              "response": {
+                "status": 403,
+                "statusText": "Forbidden",
+                "headers": [
+                  {
+                    "uid": "zsFtCnjKFpIvo7Cuc6qoD",
+                    "name": "Content-Type",
+                    "value": "application/json",
+                    "description": "",
+                    "enabled": true
+                  }
+                ],
+                "body": {
+                  "type": "json",
+                  "content": "{\n  \"type\": \"\",\n  \"title\": \"\",\n  \"status\": 0,\n  \"code\": \"\",\n  \"requestId\": \"\",\n  \"errors\": [\n    {\n      \"field\": \"\",\n      \"message\": \"\"\n    }\n  ]\n}"
+                }
+              }
+            },
+            {
+              "uid": "MsH1Y8zs0ljikap9mfdVC",
+              "itemUid": "eJZ2UUNDRMS9fl8BeQo6v",
+              "name": "429 Response",
+              "description": "Rate limit exceeded",
+              "type": "http-request",
+              "request": {
+                "url": "{{baseUrl}}/auth/refresh",
+                "method": "POST",
+                "headers": [
+                  {
+                    "uid": "D9IOFoWSzPEEkvTZgipgT",
+                    "name": "X-CSRF-Token",
+                    "value": "",
+                    "description": "Must equal the `vsms_csrf` cookie; requests also require an allowed Origin",
+                    "enabled": true
+                  },
+                  {
+                    "uid": "hqwiagjocCKNZ2tPp0zmX",
+                    "name": "vsms_refresh",
+                    "value": "{{apiKey}}",
+                    "description": "",
+                    "enabled": true
+                  }
+                ],
+                "params": [],
+                "body": {
+                  "mode": "none",
+                  "json": null,
+                  "text": null,
+                  "xml": null,
+                  "sparql": null,
+                  "formUrlEncoded": [],
+                  "multipartForm": []
+                }
+              },
+              "response": {
+                "status": 429,
+                "statusText": "Too Many Requests",
+                "headers": [
+                  {
+                    "uid": "UTUhy8ot7XxAthbWTXk68",
+                    "name": "Content-Type",
+                    "value": "application/json",
+                    "description": "",
+                    "enabled": true
+                  }
+                ],
+                "body": {
+                  "type": "json",
+                  "content": "{\n  \"type\": \"\",\n  \"title\": \"\",\n  \"status\": 0,\n  \"code\": \"\",\n  \"requestId\": \"\",\n  \"errors\": [\n    {\n      \"field\": \"\",\n      \"message\": \"\"\n    }\n  ]\n}"
+                }
+              }
+            }
+          ],
+          "seq": 2
+        },
+        {
+          "uid": "4iwwx5eB4C4rSj7TjyQc9",
+          "name": "Revoke the refresh family and clear cookies",
+          "type": "http-request",
+          "tags": [
+            "Authentication"
+          ],
+          "request": {
+            "url": "{{baseUrl}}/auth/logout",
+            "method": "POST",
+            "auth": {
+              "mode": "apikey",
+              "basic": null,
+              "bearer": null,
+              "digest": null,
+              "apikey": {
+                "key": "vsms_refresh",
+                "value": "{{apiKey}}",
+                "placement": "header"
+              },
+              "oauth2": null
+            },
+            "headers": [
+              {
+                "uid": "hwdFaXzJQh3VZzpsLd5JL",
+                "name": "X-CSRF-Token",
+                "value": "",
+                "description": "Must equal the `vsms_csrf` cookie; requests also require an allowed Origin",
+                "enabled": true
+              },
+              {
+                "uid": "s3eythQdonaa531ZpM3zN",
+                "name": "vsms_refresh",
+                "value": "{{apiKey}}",
+                "description": "",
+                "enabled": true
+              }
+            ],
+            "params": [],
+            "body": {
+              "mode": "none",
+              "json": null,
+              "text": null,
+              "xml": null,
+              "formUrlEncoded": [],
+              "multipartForm": []
+            },
+            "script": {
+              "res": null
+            }
+          },
+          "examples": [
+            {
+              "uid": "35ZNUf6FONQFpvzPnxWzJ",
+              "itemUid": "4iwwx5eB4C4rSj7TjyQc9",
+              "name": "204 Response",
+              "description": "Session revoked",
+              "type": "http-request",
+              "request": {
+                "url": "{{baseUrl}}/auth/logout",
+                "method": "POST",
+                "headers": [
+                  {
+                    "uid": "hwdFaXzJQh3VZzpsLd5JL",
+                    "name": "X-CSRF-Token",
+                    "value": "",
+                    "description": "Must equal the `vsms_csrf` cookie; requests also require an allowed Origin",
+                    "enabled": true
+                  },
+                  {
+                    "uid": "s3eythQdonaa531ZpM3zN",
+                    "name": "vsms_refresh",
+                    "value": "{{apiKey}}",
+                    "description": "",
+                    "enabled": true
+                  }
+                ],
+                "params": [],
+                "body": {
+                  "mode": "none",
+                  "json": null,
+                  "text": null,
+                  "xml": null,
+                  "sparql": null,
+                  "formUrlEncoded": [],
+                  "multipartForm": []
+                }
+              },
+              "response": {
+                "status": 204,
+                "statusText": "No Content",
+                "headers": [],
+                "body": {
+                  "type": "text",
+                  "content": ""
+                }
+              }
+            },
+            {
+              "uid": "TO2BjkOZ6xUoiaIhRQ6h6",
+              "itemUid": "4iwwx5eB4C4rSj7TjyQc9",
+              "name": "403 Response",
+              "description": "Request origin, CSRF token, or permission is invalid",
+              "type": "http-request",
+              "request": {
+                "url": "{{baseUrl}}/auth/logout",
+                "method": "POST",
+                "headers": [
+                  {
+                    "uid": "hwdFaXzJQh3VZzpsLd5JL",
+                    "name": "X-CSRF-Token",
+                    "value": "",
+                    "description": "Must equal the `vsms_csrf` cookie; requests also require an allowed Origin",
+                    "enabled": true
+                  },
+                  {
+                    "uid": "s3eythQdonaa531ZpM3zN",
+                    "name": "vsms_refresh",
+                    "value": "{{apiKey}}",
+                    "description": "",
+                    "enabled": true
+                  }
+                ],
+                "params": [],
+                "body": {
+                  "mode": "none",
+                  "json": null,
+                  "text": null,
+                  "xml": null,
+                  "sparql": null,
+                  "formUrlEncoded": [],
+                  "multipartForm": []
+                }
+              },
+              "response": {
+                "status": 403,
+                "statusText": "Forbidden",
+                "headers": [
+                  {
+                    "uid": "MpD236YjJPXT7OwgVe9tp",
+                    "name": "Content-Type",
+                    "value": "application/json",
+                    "description": "",
+                    "enabled": true
+                  }
+                ],
+                "body": {
+                  "type": "json",
+                  "content": "{\n  \"type\": \"\",\n  \"title\": \"\",\n  \"status\": 0,\n  \"code\": \"\",\n  \"requestId\": \"\",\n  \"errors\": [\n    {\n      \"field\": \"\",\n      \"message\": \"\"\n    }\n  ]\n}"
+                }
+              }
+            }
+          ],
+          "seq": 3
+        }
+      ]
+    },
+    {
+      "uid": "JRFh1Wa8Ns5CdSngNKaAR",
+      "name": "Users",
+      "type": "folder",
+      "root": {
+        "request": {
+          "auth": {
+            "mode": "inherit",
+            "basic": null,
+            "bearer": null,
+            "digest": null,
+            "apikey": null,
+            "oauth2": null
+          }
+        },
+        "meta": {
+          "name": "Users"
+        }
+      },
+      "items": [
+        {
+          "uid": "5iIcZc39Dw9FjrfRaGuEJ",
+          "name": "List projected user records (ADMIN only)",
+          "type": "http-request",
+          "tags": [
+            "Users"
+          ],
+          "request": {
+            "url": "{{baseUrl}}/users",
+            "method": "GET",
+            "auth": {
+              "mode": "inherit",
+              "basic": null,
+              "bearer": null,
+              "digest": null,
+              "apikey": null,
+              "oauth2": null
+            },
+            "headers": [],
+            "params": [],
+            "body": {
+              "mode": "none",
+              "json": null,
+              "text": null,
+              "xml": null,
+              "formUrlEncoded": [],
+              "multipartForm": []
+            },
+            "script": {
+              "res": null
+            }
+          },
+          "examples": [
+            {
+              "uid": "WrqKvvIUVFm7wUOWwy38X",
+              "itemUid": "5iIcZc39Dw9FjrfRaGuEJ",
+              "name": "200 Response",
+              "description": "Up to 100 users without credential material",
+              "type": "http-request",
+              "request": {
+                "url": "{{baseUrl}}/users",
+                "method": "GET",
+                "headers": [],
+                "params": [],
+                "body": {
+                  "mode": "none",
+                  "json": null,
+                  "text": null,
+                  "xml": null,
+                  "sparql": null,
+                  "formUrlEncoded": [],
+                  "multipartForm": []
+                }
+              },
+              "response": {
+                "status": 200,
+                "statusText": "OK",
+                "headers": [
+                  {
+                    "uid": "3wcgkD8YHL0AqG8oNdqH4",
+                    "name": "Content-Type",
+                    "value": "application/json",
+                    "description": "",
+                    "enabled": true
+                  }
+                ],
+                "body": {
+                  "type": "json",
+                  "content": "[\n  {\n    \"userId\": \"\",\n    \"username\": \"\",\n    \"email\": \"\",\n    \"systemRole\": \"ADMIN\",\n    \"status\": \"ACTIVE\",\n    \"createdAt\": \"\"\n  }\n]"
+                }
+              }
+            },
+            {
+              "uid": "PnY8D1W39xbaDdNqc2zOR",
+              "itemUid": "5iIcZc39Dw9FjrfRaGuEJ",
+              "name": "401 Response",
+              "description": "Authentication is absent, invalid, expired, revoked, or reused",
+              "type": "http-request",
+              "request": {
+                "url": "{{baseUrl}}/users",
+                "method": "GET",
+                "headers": [],
+                "params": [],
+                "body": {
+                  "mode": "none",
+                  "json": null,
+                  "text": null,
+                  "xml": null,
+                  "sparql": null,
+                  "formUrlEncoded": [],
+                  "multipartForm": []
+                }
+              },
+              "response": {
+                "status": 401,
+                "statusText": "Unauthorized",
+                "headers": [
+                  {
+                    "uid": "kzcB294xzJ4GUkWilmhp8",
+                    "name": "Content-Type",
+                    "value": "application/json",
+                    "description": "",
+                    "enabled": true
+                  }
+                ],
+                "body": {
+                  "type": "json",
+                  "content": "{\n  \"type\": \"\",\n  \"title\": \"\",\n  \"status\": 0,\n  \"code\": \"\",\n  \"requestId\": \"\",\n  \"errors\": [\n    {\n      \"field\": \"\",\n      \"message\": \"\"\n    }\n  ]\n}"
+                }
+              }
+            },
+            {
+              "uid": "s2BdGJv3mHbonkKzgDf1p",
+              "itemUid": "5iIcZc39Dw9FjrfRaGuEJ",
+              "name": "403 Response",
+              "description": "Request origin, CSRF token, or permission is invalid",
+              "type": "http-request",
+              "request": {
+                "url": "{{baseUrl}}/users",
+                "method": "GET",
+                "headers": [],
+                "params": [],
+                "body": {
+                  "mode": "none",
+                  "json": null,
+                  "text": null,
+                  "xml": null,
+                  "sparql": null,
+                  "formUrlEncoded": [],
+                  "multipartForm": []
+                }
+              },
+              "response": {
+                "status": 403,
+                "statusText": "Forbidden",
+                "headers": [
+                  {
+                    "uid": "eegAYufY4slpolhmum6on",
+                    "name": "Content-Type",
+                    "value": "application/json",
+                    "description": "",
+                    "enabled": true
+                  }
+                ],
+                "body": {
+                  "type": "json",
+                  "content": "{\n  \"type\": \"\",\n  \"title\": \"\",\n  \"status\": 0,\n  \"code\": \"\",\n  \"requestId\": \"\",\n  \"errors\": [\n    {\n      \"field\": \"\",\n      \"message\": \"\"\n    }\n  ]\n}"
+                }
+              }
+            }
+          ],
+          "seq": 1
+        }
+      ]
+    },
+    {
+      "uid": "4tDdE3UAhJ7e276pn3pMn",
+      "name": "Events",
+      "type": "folder",
+      "root": {
+        "request": {
+          "auth": {
+            "mode": "inherit",
+            "basic": null,
+            "bearer": null,
+            "digest": null,
+            "apikey": null,
+            "oauth2": null
+          }
+        },
+        "meta": {
+          "name": "Events"
+        }
+      },
+      "items": [
+        {
+          "uid": "CZI3olZxJKsIZ5VmsmNaB",
+          "name": "List events visible to the current staff member",
+          "type": "http-request",
+          "tags": [
+            "Events"
+          ],
+          "request": {
+            "url": "{{baseUrl}}/api/events",
+            "method": "GET",
+            "auth": {
+              "mode": "inherit",
+              "basic": null,
+              "bearer": null,
+              "digest": null,
+              "apikey": null,
+              "oauth2": null
+            },
+            "headers": [],
+            "params": [
+              {
+                "uid": "mKlBz6AB3ujDgdci5GxLw",
+                "name": "cursor",
+                "value": "",
+                "description": "",
+                "enabled": false,
+                "type": "query"
+              },
+              {
+                "uid": "rFq9a4Yg3QYFk0UpFkzeU",
+                "name": "limit",
+                "value": "25",
+                "description": "",
+                "enabled": true,
+                "type": "query"
+              },
+              {
+                "uid": "oIMPmEvrVnM2kIX68HmdK",
+                "name": "status",
+                "value": "DRAFT",
+                "description": "",
+                "enabled": false,
+                "type": "query"
+              },
+              {
+                "uid": "vD3M7IxzdM4GuFFv1tjIl",
+                "name": "status",
+                "value": "PUBLISHED",
+                "description": "",
+                "enabled": false,
+                "type": "query"
+              },
+              {
+                "uid": "KS3Kg13M3zq7TK5mRdPey",
+                "name": "status",
+                "value": "IN_PROGRESS",
+                "description": "",
+                "enabled": false,
+                "type": "query"
+              },
+              {
+                "uid": "1u77tdUthrw3CLooeL8Yy",
+                "name": "status",
+                "value": "COMPLETED",
+                "description": "",
+                "enabled": false,
+                "type": "query"
+              },
+              {
+                "uid": "b7i5nqHnfHEL1IwtbvgDM",
+                "name": "status",
+                "value": "CANCELLED",
+                "description": "",
+                "enabled": false,
+                "type": "query"
+              },
+              {
+                "uid": "uR7zYCSij0fP7VH1tSWL5",
+                "name": "search",
+                "value": "",
+                "description": "",
+                "enabled": false,
+                "type": "query"
+              }
+            ],
+            "body": {
+              "mode": "none",
+              "json": null,
+              "text": null,
+              "xml": null,
+              "formUrlEncoded": [],
+              "multipartForm": []
+            },
+            "script": {
+              "res": null
+            }
+          },
+          "examples": [
+            {
+              "uid": "LLHQno55fum0NAI69nLhf",
+              "itemUid": "CZI3olZxJKsIZ5VmsmNaB",
+              "name": "200 Response",
+              "description": "Authorized, cursor-paginated events",
+              "type": "http-request",
+              "request": {
+                "url": "{{baseUrl}}/api/events",
+                "method": "GET",
+                "headers": [],
+                "params": [
+                  {
+                    "uid": "mKlBz6AB3ujDgdci5GxLw",
+                    "name": "cursor",
+                    "value": "",
+                    "description": "",
+                    "enabled": false,
+                    "type": "query"
+                  },
+                  {
+                    "uid": "rFq9a4Yg3QYFk0UpFkzeU",
+                    "name": "limit",
+                    "value": "25",
+                    "description": "",
+                    "enabled": true,
+                    "type": "query"
+                  },
+                  {
+                    "uid": "oIMPmEvrVnM2kIX68HmdK",
+                    "name": "status",
+                    "value": "DRAFT",
+                    "description": "",
+                    "enabled": false,
+                    "type": "query"
+                  },
+                  {
+                    "uid": "vD3M7IxzdM4GuFFv1tjIl",
+                    "name": "status",
+                    "value": "PUBLISHED",
+                    "description": "",
+                    "enabled": false,
+                    "type": "query"
+                  },
+                  {
+                    "uid": "KS3Kg13M3zq7TK5mRdPey",
+                    "name": "status",
+                    "value": "IN_PROGRESS",
+                    "description": "",
+                    "enabled": false,
+                    "type": "query"
+                  },
+                  {
+                    "uid": "1u77tdUthrw3CLooeL8Yy",
+                    "name": "status",
+                    "value": "COMPLETED",
+                    "description": "",
+                    "enabled": false,
+                    "type": "query"
+                  },
+                  {
+                    "uid": "b7i5nqHnfHEL1IwtbvgDM",
+                    "name": "status",
+                    "value": "CANCELLED",
+                    "description": "",
+                    "enabled": false,
+                    "type": "query"
+                  },
+                  {
+                    "uid": "uR7zYCSij0fP7VH1tSWL5",
+                    "name": "search",
+                    "value": "",
+                    "description": "",
+                    "enabled": false,
+                    "type": "query"
+                  }
+                ],
+                "body": {
+                  "mode": "none",
+                  "json": null,
+                  "text": null,
+                  "xml": null,
+                  "sparql": null,
+                  "formUrlEncoded": [],
+                  "multipartForm": []
+                }
+              },
+              "response": {
+                "status": 200,
+                "statusText": "OK",
+                "headers": [
+                  {
+                    "uid": "WSwrTtNyr8krJJBa7duiQ",
+                    "name": "Content-Type",
+                    "value": "application/json",
+                    "description": "",
+                    "enabled": true
+                  }
+                ],
+                "body": {
+                  "type": "json",
+                  "content": "{\n  \"events\": [],\n  \"nextCursor\": \"\"\n}"
+                }
+              }
+            },
+            {
+              "uid": "MggeRddy4waPD3XR0i3kD",
+              "itemUid": "CZI3olZxJKsIZ5VmsmNaB",
+              "name": "401 Response",
+              "description": "Authentication is absent, invalid, expired, revoked, or reused",
+              "type": "http-request",
+              "request": {
+                "url": "{{baseUrl}}/api/events",
+                "method": "GET",
+                "headers": [],
+                "params": [
+                  {
+                    "uid": "mKlBz6AB3ujDgdci5GxLw",
+                    "name": "cursor",
+                    "value": "",
+                    "description": "",
+                    "enabled": false,
+                    "type": "query"
+                  },
+                  {
+                    "uid": "rFq9a4Yg3QYFk0UpFkzeU",
+                    "name": "limit",
+                    "value": "25",
+                    "description": "",
+                    "enabled": true,
+                    "type": "query"
+                  },
+                  {
+                    "uid": "oIMPmEvrVnM2kIX68HmdK",
+                    "name": "status",
+                    "value": "DRAFT",
+                    "description": "",
+                    "enabled": false,
+                    "type": "query"
+                  },
+                  {
+                    "uid": "vD3M7IxzdM4GuFFv1tjIl",
+                    "name": "status",
+                    "value": "PUBLISHED",
+                    "description": "",
+                    "enabled": false,
+                    "type": "query"
+                  },
+                  {
+                    "uid": "KS3Kg13M3zq7TK5mRdPey",
+                    "name": "status",
+                    "value": "IN_PROGRESS",
+                    "description": "",
+                    "enabled": false,
+                    "type": "query"
+                  },
+                  {
+                    "uid": "1u77tdUthrw3CLooeL8Yy",
+                    "name": "status",
+                    "value": "COMPLETED",
+                    "description": "",
+                    "enabled": false,
+                    "type": "query"
+                  },
+                  {
+                    "uid": "b7i5nqHnfHEL1IwtbvgDM",
+                    "name": "status",
+                    "value": "CANCELLED",
+                    "description": "",
+                    "enabled": false,
+                    "type": "query"
+                  },
+                  {
+                    "uid": "uR7zYCSij0fP7VH1tSWL5",
+                    "name": "search",
+                    "value": "",
+                    "description": "",
+                    "enabled": false,
+                    "type": "query"
+                  }
+                ],
+                "body": {
+                  "mode": "none",
+                  "json": null,
+                  "text": null,
+                  "xml": null,
+                  "sparql": null,
+                  "formUrlEncoded": [],
+                  "multipartForm": []
+                }
+              },
+              "response": {
+                "status": 401,
+                "statusText": "Unauthorized",
+                "headers": [
+                  {
+                    "uid": "mfnx4TzJFx0mMjzkciKTV",
+                    "name": "Content-Type",
+                    "value": "application/json",
+                    "description": "",
+                    "enabled": true
+                  }
+                ],
+                "body": {
+                  "type": "json",
+                  "content": "{\n  \"type\": \"\",\n  \"title\": \"\",\n  \"status\": 0,\n  \"code\": \"\",\n  \"requestId\": \"\",\n  \"errors\": [\n    {\n      \"field\": \"\",\n      \"message\": \"\"\n    }\n  ]\n}"
+                }
+              }
+            },
+            {
+              "uid": "tC4WbIRBgdZLd0a0x53pb",
+              "itemUid": "CZI3olZxJKsIZ5VmsmNaB",
+              "name": "422 Response",
+              "description": "Request validation failed",
+              "type": "http-request",
+              "request": {
+                "url": "{{baseUrl}}/api/events",
+                "method": "GET",
+                "headers": [],
+                "params": [
+                  {
+                    "uid": "mKlBz6AB3ujDgdci5GxLw",
+                    "name": "cursor",
+                    "value": "",
+                    "description": "",
+                    "enabled": false,
+                    "type": "query"
+                  },
+                  {
+                    "uid": "rFq9a4Yg3QYFk0UpFkzeU",
+                    "name": "limit",
+                    "value": "25",
+                    "description": "",
+                    "enabled": true,
+                    "type": "query"
+                  },
+                  {
+                    "uid": "oIMPmEvrVnM2kIX68HmdK",
+                    "name": "status",
+                    "value": "DRAFT",
+                    "description": "",
+                    "enabled": false,
+                    "type": "query"
+                  },
+                  {
+                    "uid": "vD3M7IxzdM4GuFFv1tjIl",
+                    "name": "status",
+                    "value": "PUBLISHED",
+                    "description": "",
+                    "enabled": false,
+                    "type": "query"
+                  },
+                  {
+                    "uid": "KS3Kg13M3zq7TK5mRdPey",
+                    "name": "status",
+                    "value": "IN_PROGRESS",
+                    "description": "",
+                    "enabled": false,
+                    "type": "query"
+                  },
+                  {
+                    "uid": "1u77tdUthrw3CLooeL8Yy",
+                    "name": "status",
+                    "value": "COMPLETED",
+                    "description": "",
+                    "enabled": false,
+                    "type": "query"
+                  },
+                  {
+                    "uid": "b7i5nqHnfHEL1IwtbvgDM",
+                    "name": "status",
+                    "value": "CANCELLED",
+                    "description": "",
+                    "enabled": false,
+                    "type": "query"
+                  },
+                  {
+                    "uid": "uR7zYCSij0fP7VH1tSWL5",
+                    "name": "search",
+                    "value": "",
+                    "description": "",
+                    "enabled": false,
+                    "type": "query"
+                  }
+                ],
+                "body": {
+                  "mode": "none",
+                  "json": null,
+                  "text": null,
+                  "xml": null,
+                  "sparql": null,
+                  "formUrlEncoded": [],
+                  "multipartForm": []
+                }
+              },
+              "response": {
+                "status": 422,
+                "statusText": "Unprocessable Entity",
+                "headers": [
+                  {
+                    "uid": "l6IoXKFY2klNSvnOMrFyo",
+                    "name": "Content-Type",
+                    "value": "application/json",
+                    "description": "",
+                    "enabled": true
+                  }
+                ],
+                "body": {
+                  "type": "json",
+                  "content": "{\n  \"type\": \"\",\n  \"title\": \"\",\n  \"status\": 0,\n  \"code\": \"\",\n  \"requestId\": \"\",\n  \"errors\": [\n    {\n      \"field\": \"\",\n      \"message\": \"\"\n    }\n  ]\n}"
+                }
+              }
+            }
+          ],
+          "seq": 1
+        },
+        {
+          "uid": "AERx3od5OgtTSm7DhmO7F",
+          "name": "Create a draft event with optional planned shifts",
+          "type": "http-request",
+          "tags": [
+            "Events"
+          ],
+          "request": {
+            "url": "{{baseUrl}}/api/events",
+            "method": "POST",
+            "auth": {
+              "mode": "inherit",
+              "basic": null,
+              "bearer": null,
+              "digest": null,
+              "apikey": null,
+              "oauth2": null
+            },
+            "headers": [],
+            "params": [],
+            "body": {
+              "mode": "json",
+              "json": "{\n  \"name\": \"\",\n  \"description\": \"\",\n  \"venue\": \"\",\n  \"timezone\": \"Asia/Singapore\",\n  \"startsAt\": \"\",\n  \"endsAt\": \"\",\n  \"capacity\": 0,\n  \"shifts\": [\n    {\n      \"shiftId\": \"\",\n      \"name\": \"\",\n      \"startsAt\": \"\",\n      \"endsAt\": \"\",\n      \"requiredStaff\": 0\n    }\n  ]\n}",
+              "text": null,
+              "xml": null,
+              "formUrlEncoded": [],
+              "multipartForm": []
+            },
+            "script": {
+              "res": null
+            }
+          },
+          "examples": [
+            {
+              "uid": "aDM0dqfEwpYPRpEq2Z0BH",
+              "itemUid": "AERx3od5OgtTSm7DhmO7F",
+              "name": "201 Response",
+              "description": "Event created and audited",
+              "type": "http-request",
+              "request": {
+                "url": "{{baseUrl}}/api/events",
+                "method": "POST",
+                "headers": [],
+                "params": [],
+                "body": {
+                  "mode": "json",
+                  "json": "{\n  \"name\": \"\",\n  \"description\": \"\",\n  \"venue\": \"\",\n  \"timezone\": \"Asia/Singapore\",\n  \"startsAt\": \"\",\n  \"endsAt\": \"\",\n  \"capacity\": 0,\n  \"shifts\": [\n    {\n      \"shiftId\": \"\",\n      \"name\": \"\",\n      \"startsAt\": \"\",\n      \"endsAt\": \"\",\n      \"requiredStaff\": 0\n    }\n  ]\n}",
+                  "text": null,
+                  "xml": null,
+                  "sparql": null,
+                  "formUrlEncoded": [],
+                  "multipartForm": []
+                }
+              },
+              "response": {
+                "status": 201,
+                "statusText": "Created",
+                "headers": [
+                  {
+                    "uid": "wBcy0iGP95fhHUePdysX5",
+                    "name": "Content-Type",
+                    "value": "application/json",
+                    "description": "",
+                    "enabled": true
+                  }
+                ],
+                "body": {
+                  "type": "json",
+                  "content": ""
+                }
+              }
+            },
+            {
+              "uid": "A1fPZzMcmrWYHhYuiLwb0",
+              "itemUid": "AERx3od5OgtTSm7DhmO7F",
+              "name": "401 Response",
+              "description": "Authentication is absent, invalid, expired, revoked, or reused",
+              "type": "http-request",
+              "request": {
+                "url": "{{baseUrl}}/api/events",
+                "method": "POST",
+                "headers": [],
+                "params": [],
+                "body": {
+                  "mode": "json",
+                  "json": "{\n  \"name\": \"\",\n  \"description\": \"\",\n  \"venue\": \"\",\n  \"timezone\": \"Asia/Singapore\",\n  \"startsAt\": \"\",\n  \"endsAt\": \"\",\n  \"capacity\": 0,\n  \"shifts\": [\n    {\n      \"shiftId\": \"\",\n      \"name\": \"\",\n      \"startsAt\": \"\",\n      \"endsAt\": \"\",\n      \"requiredStaff\": 0\n    }\n  ]\n}",
+                  "text": null,
+                  "xml": null,
+                  "sparql": null,
+                  "formUrlEncoded": [],
+                  "multipartForm": []
+                }
+              },
+              "response": {
+                "status": 401,
+                "statusText": "Unauthorized",
+                "headers": [
+                  {
+                    "uid": "4gS0HzLkOUNxfzOnmOpoP",
+                    "name": "Content-Type",
+                    "value": "application/json",
+                    "description": "",
+                    "enabled": true
+                  }
+                ],
+                "body": {
+                  "type": "json",
+                  "content": "{\n  \"type\": \"\",\n  \"title\": \"\",\n  \"status\": 0,\n  \"code\": \"\",\n  \"requestId\": \"\",\n  \"errors\": [\n    {\n      \"field\": \"\",\n      \"message\": \"\"\n    }\n  ]\n}"
+                }
+              }
+            },
+            {
+              "uid": "YmFsuRoQzh8XOrVzCA7BN",
+              "itemUid": "AERx3od5OgtTSm7DhmO7F",
+              "name": "403 Response",
+              "description": "Request origin, CSRF token, or permission is invalid",
+              "type": "http-request",
+              "request": {
+                "url": "{{baseUrl}}/api/events",
+                "method": "POST",
+                "headers": [],
+                "params": [],
+                "body": {
+                  "mode": "json",
+                  "json": "{\n  \"name\": \"\",\n  \"description\": \"\",\n  \"venue\": \"\",\n  \"timezone\": \"Asia/Singapore\",\n  \"startsAt\": \"\",\n  \"endsAt\": \"\",\n  \"capacity\": 0,\n  \"shifts\": [\n    {\n      \"shiftId\": \"\",\n      \"name\": \"\",\n      \"startsAt\": \"\",\n      \"endsAt\": \"\",\n      \"requiredStaff\": 0\n    }\n  ]\n}",
+                  "text": null,
+                  "xml": null,
+                  "sparql": null,
+                  "formUrlEncoded": [],
+                  "multipartForm": []
+                }
+              },
+              "response": {
+                "status": 403,
+                "statusText": "Forbidden",
+                "headers": [
+                  {
+                    "uid": "78iT4sROjlX7msQszvHR0",
+                    "name": "Content-Type",
+                    "value": "application/json",
+                    "description": "",
+                    "enabled": true
+                  }
+                ],
+                "body": {
+                  "type": "json",
+                  "content": "{\n  \"type\": \"\",\n  \"title\": \"\",\n  \"status\": 0,\n  \"code\": \"\",\n  \"requestId\": \"\",\n  \"errors\": [\n    {\n      \"field\": \"\",\n      \"message\": \"\"\n    }\n  ]\n}"
+                }
+              }
+            },
+            {
+              "uid": "scYFDjqsVkk7uIoiIgD6o",
+              "itemUid": "AERx3od5OgtTSm7DhmO7F",
+              "name": "422 Response",
+              "description": "Request validation failed",
+              "type": "http-request",
+              "request": {
+                "url": "{{baseUrl}}/api/events",
+                "method": "POST",
+                "headers": [],
+                "params": [],
+                "body": {
+                  "mode": "json",
+                  "json": "{\n  \"name\": \"\",\n  \"description\": \"\",\n  \"venue\": \"\",\n  \"timezone\": \"Asia/Singapore\",\n  \"startsAt\": \"\",\n  \"endsAt\": \"\",\n  \"capacity\": 0,\n  \"shifts\": [\n    {\n      \"shiftId\": \"\",\n      \"name\": \"\",\n      \"startsAt\": \"\",\n      \"endsAt\": \"\",\n      \"requiredStaff\": 0\n    }\n  ]\n}",
+                  "text": null,
+                  "xml": null,
+                  "sparql": null,
+                  "formUrlEncoded": [],
+                  "multipartForm": []
+                }
+              },
+              "response": {
+                "status": 422,
+                "statusText": "Unprocessable Entity",
+                "headers": [
+                  {
+                    "uid": "Q7hVNm9HOekiQdGMVKZ6X",
+                    "name": "Content-Type",
+                    "value": "application/json",
+                    "description": "",
+                    "enabled": true
+                  }
+                ],
+                "body": {
+                  "type": "json",
+                  "content": "{\n  \"type\": \"\",\n  \"title\": \"\",\n  \"status\": 0,\n  \"code\": \"\",\n  \"requestId\": \"\",\n  \"errors\": [\n    {\n      \"field\": \"\",\n      \"message\": \"\"\n    }\n  ]\n}"
+                }
+              }
+            },
+            {
+              "uid": "UNG8e55sOfoTnv3xiO8pC",
+              "itemUid": "AERx3od5OgtTSm7DhmO7F",
+              "name": "429 Response",
+              "description": "Rate limit exceeded",
+              "type": "http-request",
+              "request": {
+                "url": "{{baseUrl}}/api/events",
+                "method": "POST",
+                "headers": [],
+                "params": [],
+                "body": {
+                  "mode": "json",
+                  "json": "{\n  \"name\": \"\",\n  \"description\": \"\",\n  \"venue\": \"\",\n  \"timezone\": \"Asia/Singapore\",\n  \"startsAt\": \"\",\n  \"endsAt\": \"\",\n  \"capacity\": 0,\n  \"shifts\": [\n    {\n      \"shiftId\": \"\",\n      \"name\": \"\",\n      \"startsAt\": \"\",\n      \"endsAt\": \"\",\n      \"requiredStaff\": 0\n    }\n  ]\n}",
+                  "text": null,
+                  "xml": null,
+                  "sparql": null,
+                  "formUrlEncoded": [],
+                  "multipartForm": []
+                }
+              },
+              "response": {
+                "status": 429,
+                "statusText": "Too Many Requests",
+                "headers": [
+                  {
+                    "uid": "S79AA3yKyS9FVDL1lB2mE",
+                    "name": "Content-Type",
+                    "value": "application/json",
+                    "description": "",
+                    "enabled": true
+                  }
+                ],
+                "body": {
+                  "type": "json",
+                  "content": "{\n  \"type\": \"\",\n  \"title\": \"\",\n  \"status\": 0,\n  \"code\": \"\",\n  \"requestId\": \"\",\n  \"errors\": [\n    {\n      \"field\": \"\",\n      \"message\": \"\"\n    }\n  ]\n}"
+                }
+              }
+            }
+          ],
+          "seq": 2
+        },
+        {
+          "uid": "yw9Z5IN7KinHyoboS9gAI",
+          "name": "Get an authorized event detail",
+          "type": "http-request",
+          "tags": [
+            "Events"
+          ],
+          "request": {
+            "url": "{{baseUrl}}/api/events/:eventId",
+            "method": "GET",
+            "auth": {
+              "mode": "inherit",
+              "basic": null,
+              "bearer": null,
+              "digest": null,
+              "apikey": null,
+              "oauth2": null
+            },
+            "headers": [],
+            "params": [
+              {
+                "uid": "YM4fYjOmvIlsadiDa6RGK",
+                "name": "eventId",
+                "value": "",
+                "description": "",
+                "enabled": true,
+                "type": "path"
+              }
+            ],
+            "body": {
+              "mode": "none",
+              "json": null,
+              "text": null,
+              "xml": null,
+              "formUrlEncoded": [],
+              "multipartForm": []
+            },
+            "script": {
+              "res": null
+            }
+          },
+          "examples": [
+            {
+              "uid": "pYxe0LFnCcbFg13YLW0BX",
+              "itemUid": "yw9Z5IN7KinHyoboS9gAI",
+              "name": "200 Response",
+              "description": "Event detail",
+              "type": "http-request",
+              "request": {
+                "url": "{{baseUrl}}/api/events/:eventId",
+                "method": "GET",
+                "headers": [],
+                "params": [
+                  {
+                    "uid": "YM4fYjOmvIlsadiDa6RGK",
+                    "name": "eventId",
+                    "value": "",
+                    "description": "",
+                    "enabled": true,
+                    "type": "path"
+                  }
+                ],
+                "body": {
+                  "mode": "none",
+                  "json": null,
+                  "text": null,
+                  "xml": null,
+                  "sparql": null,
+                  "formUrlEncoded": [],
+                  "multipartForm": []
+                }
+              },
+              "response": {
+                "status": 200,
+                "statusText": "OK",
+                "headers": [
+                  {
+                    "uid": "r9zfSwkHsNITFZ4I8ASrc",
+                    "name": "Content-Type",
+                    "value": "application/json",
+                    "description": "",
+                    "enabled": true
+                  }
+                ],
+                "body": {
+                  "type": "json",
+                  "content": ""
+                }
+              }
+            },
+            {
+              "uid": "P2RVVcWDibEGVGxqfdrYd",
+              "itemUid": "yw9Z5IN7KinHyoboS9gAI",
+              "name": "401 Response",
+              "description": "Authentication is absent, invalid, expired, revoked, or reused",
+              "type": "http-request",
+              "request": {
+                "url": "{{baseUrl}}/api/events/:eventId",
+                "method": "GET",
+                "headers": [],
+                "params": [
+                  {
+                    "uid": "YM4fYjOmvIlsadiDa6RGK",
+                    "name": "eventId",
+                    "value": "",
+                    "description": "",
+                    "enabled": true,
+                    "type": "path"
+                  }
+                ],
+                "body": {
+                  "mode": "none",
+                  "json": null,
+                  "text": null,
+                  "xml": null,
+                  "sparql": null,
+                  "formUrlEncoded": [],
+                  "multipartForm": []
+                }
+              },
+              "response": {
+                "status": 401,
+                "statusText": "Unauthorized",
+                "headers": [
+                  {
+                    "uid": "grjAfDf0vSBv2qGO18zhM",
+                    "name": "Content-Type",
+                    "value": "application/json",
+                    "description": "",
+                    "enabled": true
+                  }
+                ],
+                "body": {
+                  "type": "json",
+                  "content": "{\n  \"type\": \"\",\n  \"title\": \"\",\n  \"status\": 0,\n  \"code\": \"\",\n  \"requestId\": \"\",\n  \"errors\": [\n    {\n      \"field\": \"\",\n      \"message\": \"\"\n    }\n  ]\n}"
+                }
+              }
+            },
+            {
+              "uid": "Dw4GDg0Wa93Gs5NL15dWY",
+              "itemUid": "yw9Z5IN7KinHyoboS9gAI",
+              "name": "404 Response",
+              "description": "Resource is absent or intentionally concealed from the caller",
+              "type": "http-request",
+              "request": {
+                "url": "{{baseUrl}}/api/events/:eventId",
+                "method": "GET",
+                "headers": [],
+                "params": [
+                  {
+                    "uid": "YM4fYjOmvIlsadiDa6RGK",
+                    "name": "eventId",
+                    "value": "",
+                    "description": "",
+                    "enabled": true,
+                    "type": "path"
+                  }
+                ],
+                "body": {
+                  "mode": "none",
+                  "json": null,
+                  "text": null,
+                  "xml": null,
+                  "sparql": null,
+                  "formUrlEncoded": [],
+                  "multipartForm": []
+                }
+              },
+              "response": {
+                "status": 404,
+                "statusText": "Not Found",
+                "headers": [
+                  {
+                    "uid": "JTCScyTCefbb0IpSvaOG0",
+                    "name": "Content-Type",
+                    "value": "application/json",
+                    "description": "",
+                    "enabled": true
+                  }
+                ],
+                "body": {
+                  "type": "json",
+                  "content": "{\n  \"type\": \"\",\n  \"title\": \"\",\n  \"status\": 0,\n  \"code\": \"\",\n  \"requestId\": \"\",\n  \"errors\": [\n    {\n      \"field\": \"\",\n      \"message\": \"\"\n    }\n  ]\n}"
+                }
+              }
+            }
+          ],
+          "seq": 3
+        },
+        {
+          "uid": "Ex247Hzp6tJU7QUxUNI8U",
+          "name": "Update allowed fields using optimistic concurrency",
+          "type": "http-request",
+          "tags": [
+            "Events"
+          ],
+          "request": {
+            "url": "{{baseUrl}}/api/events/:eventId",
+            "method": "PATCH",
+            "auth": {
+              "mode": "inherit",
+              "basic": null,
+              "bearer": null,
+              "digest": null,
+              "apikey": null,
+              "oauth2": null
+            },
+            "headers": [],
+            "params": [
+              {
+                "uid": "C3SgXaErPuG3iHY6WAUuD",
+                "name": "eventId",
+                "value": "",
+                "description": "",
+                "enabled": true,
+                "type": "path"
+              }
+            ],
+            "body": {
+              "mode": "json",
+              "json": "{\n  \"version\": 0,\n  \"name\": \"\",\n  \"description\": \"\",\n  \"venue\": \"\",\n  \"timezone\": \"\",\n  \"startsAt\": \"\",\n  \"endsAt\": \"\",\n  \"capacity\": 0,\n  \"shifts\": [\n    {\n      \"shiftId\": \"\",\n      \"name\": \"\",\n      \"startsAt\": \"\",\n      \"endsAt\": \"\",\n      \"requiredStaff\": 0\n    }\n  ]\n}",
+              "text": null,
+              "xml": null,
+              "formUrlEncoded": [],
+              "multipartForm": []
+            },
+            "script": {
+              "res": null
+            }
+          },
+          "examples": [
+            {
+              "uid": "dvoej4aX0NXEzQWs6Duqd",
+              "itemUid": "Ex247Hzp6tJU7QUxUNI8U",
+              "name": "200 Response",
+              "description": "Event updated and audited",
+              "type": "http-request",
+              "request": {
+                "url": "{{baseUrl}}/api/events/:eventId",
+                "method": "PATCH",
+                "headers": [],
+                "params": [
+                  {
+                    "uid": "C3SgXaErPuG3iHY6WAUuD",
+                    "name": "eventId",
+                    "value": "",
+                    "description": "",
+                    "enabled": true,
+                    "type": "path"
+                  }
+                ],
+                "body": {
+                  "mode": "json",
+                  "json": "{\n  \"version\": 0,\n  \"name\": \"\",\n  \"description\": \"\",\n  \"venue\": \"\",\n  \"timezone\": \"\",\n  \"startsAt\": \"\",\n  \"endsAt\": \"\",\n  \"capacity\": 0,\n  \"shifts\": [\n    {\n      \"shiftId\": \"\",\n      \"name\": \"\",\n      \"startsAt\": \"\",\n      \"endsAt\": \"\",\n      \"requiredStaff\": 0\n    }\n  ]\n}",
+                  "text": null,
+                  "xml": null,
+                  "sparql": null,
+                  "formUrlEncoded": [],
+                  "multipartForm": []
+                }
+              },
+              "response": {
+                "status": 200,
+                "statusText": "OK",
+                "headers": [
+                  {
+                    "uid": "C4zwotUIrlr6dN1bySRii",
+                    "name": "Content-Type",
+                    "value": "application/json",
+                    "description": "",
+                    "enabled": true
+                  }
+                ],
+                "body": {
+                  "type": "json",
+                  "content": ""
+                }
+              }
+            },
+            {
+              "uid": "OdUuGp5yktLjlqvGmtOQM",
+              "itemUid": "Ex247Hzp6tJU7QUxUNI8U",
+              "name": "401 Response",
+              "description": "Authentication is absent, invalid, expired, revoked, or reused",
+              "type": "http-request",
+              "request": {
+                "url": "{{baseUrl}}/api/events/:eventId",
+                "method": "PATCH",
+                "headers": [],
+                "params": [
+                  {
+                    "uid": "C3SgXaErPuG3iHY6WAUuD",
+                    "name": "eventId",
+                    "value": "",
+                    "description": "",
+                    "enabled": true,
+                    "type": "path"
+                  }
+                ],
+                "body": {
+                  "mode": "json",
+                  "json": "{\n  \"version\": 0,\n  \"name\": \"\",\n  \"description\": \"\",\n  \"venue\": \"\",\n  \"timezone\": \"\",\n  \"startsAt\": \"\",\n  \"endsAt\": \"\",\n  \"capacity\": 0,\n  \"shifts\": [\n    {\n      \"shiftId\": \"\",\n      \"name\": \"\",\n      \"startsAt\": \"\",\n      \"endsAt\": \"\",\n      \"requiredStaff\": 0\n    }\n  ]\n}",
+                  "text": null,
+                  "xml": null,
+                  "sparql": null,
+                  "formUrlEncoded": [],
+                  "multipartForm": []
+                }
+              },
+              "response": {
+                "status": 401,
+                "statusText": "Unauthorized",
+                "headers": [
+                  {
+                    "uid": "glV0VHs4SGbCFTqKvL9MR",
+                    "name": "Content-Type",
+                    "value": "application/json",
+                    "description": "",
+                    "enabled": true
+                  }
+                ],
+                "body": {
+                  "type": "json",
+                  "content": "{\n  \"type\": \"\",\n  \"title\": \"\",\n  \"status\": 0,\n  \"code\": \"\",\n  \"requestId\": \"\",\n  \"errors\": [\n    {\n      \"field\": \"\",\n      \"message\": \"\"\n    }\n  ]\n}"
+                }
+              }
+            },
+            {
+              "uid": "x3oMFeaLCZHBMJnV2u43c",
+              "itemUid": "Ex247Hzp6tJU7QUxUNI8U",
+              "name": "404 Response",
+              "description": "Resource is absent or intentionally concealed from the caller",
+              "type": "http-request",
+              "request": {
+                "url": "{{baseUrl}}/api/events/:eventId",
+                "method": "PATCH",
+                "headers": [],
+                "params": [
+                  {
+                    "uid": "C3SgXaErPuG3iHY6WAUuD",
+                    "name": "eventId",
+                    "value": "",
+                    "description": "",
+                    "enabled": true,
+                    "type": "path"
+                  }
+                ],
+                "body": {
+                  "mode": "json",
+                  "json": "{\n  \"version\": 0,\n  \"name\": \"\",\n  \"description\": \"\",\n  \"venue\": \"\",\n  \"timezone\": \"\",\n  \"startsAt\": \"\",\n  \"endsAt\": \"\",\n  \"capacity\": 0,\n  \"shifts\": [\n    {\n      \"shiftId\": \"\",\n      \"name\": \"\",\n      \"startsAt\": \"\",\n      \"endsAt\": \"\",\n      \"requiredStaff\": 0\n    }\n  ]\n}",
+                  "text": null,
+                  "xml": null,
+                  "sparql": null,
+                  "formUrlEncoded": [],
+                  "multipartForm": []
+                }
+              },
+              "response": {
+                "status": 404,
+                "statusText": "Not Found",
+                "headers": [
+                  {
+                    "uid": "ySQiOtUv9ofphWL4nOpVy",
+                    "name": "Content-Type",
+                    "value": "application/json",
+                    "description": "",
+                    "enabled": true
+                  }
+                ],
+                "body": {
+                  "type": "json",
+                  "content": "{\n  \"type\": \"\",\n  \"title\": \"\",\n  \"status\": 0,\n  \"code\": \"\",\n  \"requestId\": \"\",\n  \"errors\": [\n    {\n      \"field\": \"\",\n      \"message\": \"\"\n    }\n  ]\n}"
+                }
+              }
+            },
+            {
+              "uid": "sJ6fz3cNXqkRrsmk3wLfq",
+              "itemUid": "Ex247Hzp6tJU7QUxUNI8U",
+              "name": "409 Response",
+              "description": "Stale version, illegal transition, or immutable state",
+              "type": "http-request",
+              "request": {
+                "url": "{{baseUrl}}/api/events/:eventId",
+                "method": "PATCH",
+                "headers": [],
+                "params": [
+                  {
+                    "uid": "C3SgXaErPuG3iHY6WAUuD",
+                    "name": "eventId",
+                    "value": "",
+                    "description": "",
+                    "enabled": true,
+                    "type": "path"
+                  }
+                ],
+                "body": {
+                  "mode": "json",
+                  "json": "{\n  \"version\": 0,\n  \"name\": \"\",\n  \"description\": \"\",\n  \"venue\": \"\",\n  \"timezone\": \"\",\n  \"startsAt\": \"\",\n  \"endsAt\": \"\",\n  \"capacity\": 0,\n  \"shifts\": [\n    {\n      \"shiftId\": \"\",\n      \"name\": \"\",\n      \"startsAt\": \"\",\n      \"endsAt\": \"\",\n      \"requiredStaff\": 0\n    }\n  ]\n}",
+                  "text": null,
+                  "xml": null,
+                  "sparql": null,
+                  "formUrlEncoded": [],
+                  "multipartForm": []
+                }
+              },
+              "response": {
+                "status": 409,
+                "statusText": "Conflict",
+                "headers": [
+                  {
+                    "uid": "MfrtONGsZYmZmf4fWcOdH",
+                    "name": "Content-Type",
+                    "value": "application/json",
+                    "description": "",
+                    "enabled": true
+                  }
+                ],
+                "body": {
+                  "type": "json",
+                  "content": "{\n  \"type\": \"\",\n  \"title\": \"\",\n  \"status\": 0,\n  \"code\": \"\",\n  \"requestId\": \"\",\n  \"errors\": [\n    {\n      \"field\": \"\",\n      \"message\": \"\"\n    }\n  ]\n}"
+                }
+              }
+            },
+            {
+              "uid": "5bPs6Y94Yrp7mpcCDHZ4S",
+              "itemUid": "Ex247Hzp6tJU7QUxUNI8U",
+              "name": "422 Response",
+              "description": "Request validation failed",
+              "type": "http-request",
+              "request": {
+                "url": "{{baseUrl}}/api/events/:eventId",
+                "method": "PATCH",
+                "headers": [],
+                "params": [
+                  {
+                    "uid": "C3SgXaErPuG3iHY6WAUuD",
+                    "name": "eventId",
+                    "value": "",
+                    "description": "",
+                    "enabled": true,
+                    "type": "path"
+                  }
+                ],
+                "body": {
+                  "mode": "json",
+                  "json": "{\n  \"version\": 0,\n  \"name\": \"\",\n  \"description\": \"\",\n  \"venue\": \"\",\n  \"timezone\": \"\",\n  \"startsAt\": \"\",\n  \"endsAt\": \"\",\n  \"capacity\": 0,\n  \"shifts\": [\n    {\n      \"shiftId\": \"\",\n      \"name\": \"\",\n      \"startsAt\": \"\",\n      \"endsAt\": \"\",\n      \"requiredStaff\": 0\n    }\n  ]\n}",
+                  "text": null,
+                  "xml": null,
+                  "sparql": null,
+                  "formUrlEncoded": [],
+                  "multipartForm": []
+                }
+              },
+              "response": {
+                "status": 422,
+                "statusText": "Unprocessable Entity",
+                "headers": [
+                  {
+                    "uid": "tnyyzddUDIP64vXTkdXGj",
+                    "name": "Content-Type",
+                    "value": "application/json",
+                    "description": "",
+                    "enabled": true
+                  }
+                ],
+                "body": {
+                  "type": "json",
+                  "content": "{\n  \"type\": \"\",\n  \"title\": \"\",\n  \"status\": 0,\n  \"code\": \"\",\n  \"requestId\": \"\",\n  \"errors\": [\n    {\n      \"field\": \"\",\n      \"message\": \"\"\n    }\n  ]\n}"
+                }
+              }
+            }
+          ],
+          "seq": 4
+        },
+        {
+          "uid": "h7fFEtwj2mzvmSpYGieA7",
+          "name": "Move a draft event to published",
+          "type": "http-request",
+          "tags": [
+            "Events"
+          ],
+          "request": {
+            "url": "{{baseUrl}}/api/events/:eventId/publish",
+            "method": "POST",
+            "auth": {
+              "mode": "inherit",
+              "basic": null,
+              "bearer": null,
+              "digest": null,
+              "apikey": null,
+              "oauth2": null
+            },
+            "headers": [],
+            "params": [
+              {
+                "uid": "aVPyjDyBew6Og8QUxTXXO",
+                "name": "eventId",
+                "value": "",
+                "description": "",
+                "enabled": true,
+                "type": "path"
+              }
+            ],
+            "body": {
+              "mode": "json",
+              "json": "{\n  \"version\": 0\n}",
+              "text": null,
+              "xml": null,
+              "formUrlEncoded": [],
+              "multipartForm": []
+            },
+            "script": {
+              "res": null
+            }
+          },
+          "examples": [
+            {
+              "uid": "Jf6uF8ruIhiVRxOinTxz9",
+              "itemUid": "h7fFEtwj2mzvmSpYGieA7",
+              "name": "200 Response",
+              "description": "Event transitioned and audited",
+              "type": "http-request",
+              "request": {
+                "url": "{{baseUrl}}/api/events/:eventId/publish",
+                "method": "POST",
+                "headers": [],
+                "params": [
+                  {
+                    "uid": "aVPyjDyBew6Og8QUxTXXO",
+                    "name": "eventId",
+                    "value": "",
+                    "description": "",
+                    "enabled": true,
+                    "type": "path"
+                  }
+                ],
+                "body": {
+                  "mode": "json",
+                  "json": "{\n  \"version\": 0\n}",
+                  "text": null,
+                  "xml": null,
+                  "sparql": null,
+                  "formUrlEncoded": [],
+                  "multipartForm": []
+                }
+              },
+              "response": {
+                "status": 200,
+                "statusText": "OK",
+                "headers": [
+                  {
+                    "uid": "1uAYI5K2ematqNGIpkQ1N",
+                    "name": "Content-Type",
+                    "value": "application/json",
+                    "description": "",
+                    "enabled": true
+                  }
+                ],
+                "body": {
+                  "type": "json",
+                  "content": ""
+                }
+              }
+            },
+            {
+              "uid": "bdPpmtAIJGUPyfbxt401j",
+              "itemUid": "h7fFEtwj2mzvmSpYGieA7",
+              "name": "401 Response",
+              "description": "Authentication is absent, invalid, expired, revoked, or reused",
+              "type": "http-request",
+              "request": {
+                "url": "{{baseUrl}}/api/events/:eventId/publish",
+                "method": "POST",
+                "headers": [],
+                "params": [
+                  {
+                    "uid": "aVPyjDyBew6Og8QUxTXXO",
+                    "name": "eventId",
+                    "value": "",
+                    "description": "",
+                    "enabled": true,
+                    "type": "path"
+                  }
+                ],
+                "body": {
+                  "mode": "json",
+                  "json": "{\n  \"version\": 0\n}",
+                  "text": null,
+                  "xml": null,
+                  "sparql": null,
+                  "formUrlEncoded": [],
+                  "multipartForm": []
+                }
+              },
+              "response": {
+                "status": 401,
+                "statusText": "Unauthorized",
+                "headers": [
+                  {
+                    "uid": "JNKabwn2F3dZ0vwtN4w6j",
+                    "name": "Content-Type",
+                    "value": "application/json",
+                    "description": "",
+                    "enabled": true
+                  }
+                ],
+                "body": {
+                  "type": "json",
+                  "content": "{\n  \"type\": \"\",\n  \"title\": \"\",\n  \"status\": 0,\n  \"code\": \"\",\n  \"requestId\": \"\",\n  \"errors\": [\n    {\n      \"field\": \"\",\n      \"message\": \"\"\n    }\n  ]\n}"
+                }
+              }
+            },
+            {
+              "uid": "anCvwaU6Q24dRiLuX4XGN",
+              "itemUid": "h7fFEtwj2mzvmSpYGieA7",
+              "name": "404 Response",
+              "description": "Resource is absent or intentionally concealed from the caller",
+              "type": "http-request",
+              "request": {
+                "url": "{{baseUrl}}/api/events/:eventId/publish",
+                "method": "POST",
+                "headers": [],
+                "params": [
+                  {
+                    "uid": "aVPyjDyBew6Og8QUxTXXO",
+                    "name": "eventId",
+                    "value": "",
+                    "description": "",
+                    "enabled": true,
+                    "type": "path"
+                  }
+                ],
+                "body": {
+                  "mode": "json",
+                  "json": "{\n  \"version\": 0\n}",
+                  "text": null,
+                  "xml": null,
+                  "sparql": null,
+                  "formUrlEncoded": [],
+                  "multipartForm": []
+                }
+              },
+              "response": {
+                "status": 404,
+                "statusText": "Not Found",
+                "headers": [
+                  {
+                    "uid": "iZUkHb7sNzFrqjheBmdrX",
+                    "name": "Content-Type",
+                    "value": "application/json",
+                    "description": "",
+                    "enabled": true
+                  }
+                ],
+                "body": {
+                  "type": "json",
+                  "content": "{\n  \"type\": \"\",\n  \"title\": \"\",\n  \"status\": 0,\n  \"code\": \"\",\n  \"requestId\": \"\",\n  \"errors\": [\n    {\n      \"field\": \"\",\n      \"message\": \"\"\n    }\n  ]\n}"
+                }
+              }
+            },
+            {
+              "uid": "N0n7k11anlTLGpO2mJeRQ",
+              "itemUid": "h7fFEtwj2mzvmSpYGieA7",
+              "name": "409 Response",
+              "description": "Stale version, illegal transition, or immutable state",
+              "type": "http-request",
+              "request": {
+                "url": "{{baseUrl}}/api/events/:eventId/publish",
+                "method": "POST",
+                "headers": [],
+                "params": [
+                  {
+                    "uid": "aVPyjDyBew6Og8QUxTXXO",
+                    "name": "eventId",
+                    "value": "",
+                    "description": "",
+                    "enabled": true,
+                    "type": "path"
+                  }
+                ],
+                "body": {
+                  "mode": "json",
+                  "json": "{\n  \"version\": 0\n}",
+                  "text": null,
+                  "xml": null,
+                  "sparql": null,
+                  "formUrlEncoded": [],
+                  "multipartForm": []
+                }
+              },
+              "response": {
+                "status": 409,
+                "statusText": "Conflict",
+                "headers": [
+                  {
+                    "uid": "Ko4PeYUuc78KoXHu2Vbj1",
+                    "name": "Content-Type",
+                    "value": "application/json",
+                    "description": "",
+                    "enabled": true
+                  }
+                ],
+                "body": {
+                  "type": "json",
+                  "content": "{\n  \"type\": \"\",\n  \"title\": \"\",\n  \"status\": 0,\n  \"code\": \"\",\n  \"requestId\": \"\",\n  \"errors\": [\n    {\n      \"field\": \"\",\n      \"message\": \"\"\n    }\n  ]\n}"
+                }
+              }
+            },
+            {
+              "uid": "yVWtLakTpQBh1ILTyFinx",
+              "itemUid": "h7fFEtwj2mzvmSpYGieA7",
+              "name": "422 Response",
+              "description": "Request validation failed",
+              "type": "http-request",
+              "request": {
+                "url": "{{baseUrl}}/api/events/:eventId/publish",
+                "method": "POST",
+                "headers": [],
+                "params": [
+                  {
+                    "uid": "aVPyjDyBew6Og8QUxTXXO",
+                    "name": "eventId",
+                    "value": "",
+                    "description": "",
+                    "enabled": true,
+                    "type": "path"
+                  }
+                ],
+                "body": {
+                  "mode": "json",
+                  "json": "{\n  \"version\": 0\n}",
+                  "text": null,
+                  "xml": null,
+                  "sparql": null,
+                  "formUrlEncoded": [],
+                  "multipartForm": []
+                }
+              },
+              "response": {
+                "status": 422,
+                "statusText": "Unprocessable Entity",
+                "headers": [
+                  {
+                    "uid": "f4RCGimoU1h95iNOrm6sl",
+                    "name": "Content-Type",
+                    "value": "application/json",
+                    "description": "",
+                    "enabled": true
+                  }
+                ],
+                "body": {
+                  "type": "json",
+                  "content": "{\n  \"type\": \"\",\n  \"title\": \"\",\n  \"status\": 0,\n  \"code\": \"\",\n  \"requestId\": \"\",\n  \"errors\": [\n    {\n      \"field\": \"\",\n      \"message\": \"\"\n    }\n  ]\n}"
+                }
+              }
+            },
+            {
+              "uid": "SSewTqOUIiNMXLShAqS94",
+              "itemUid": "h7fFEtwj2mzvmSpYGieA7",
+              "name": "429 Response",
+              "description": "Rate limit exceeded",
+              "type": "http-request",
+              "request": {
+                "url": "{{baseUrl}}/api/events/:eventId/publish",
+                "method": "POST",
+                "headers": [],
+                "params": [
+                  {
+                    "uid": "aVPyjDyBew6Og8QUxTXXO",
+                    "name": "eventId",
+                    "value": "",
+                    "description": "",
+                    "enabled": true,
+                    "type": "path"
+                  }
+                ],
+                "body": {
+                  "mode": "json",
+                  "json": "{\n  \"version\": 0\n}",
+                  "text": null,
+                  "xml": null,
+                  "sparql": null,
+                  "formUrlEncoded": [],
+                  "multipartForm": []
+                }
+              },
+              "response": {
+                "status": 429,
+                "statusText": "Too Many Requests",
+                "headers": [
+                  {
+                    "uid": "TuBzSoUyLCD7yIsKB5G1J",
+                    "name": "Content-Type",
+                    "value": "application/json",
+                    "description": "",
+                    "enabled": true
+                  }
+                ],
+                "body": {
+                  "type": "json",
+                  "content": "{\n  \"type\": \"\",\n  \"title\": \"\",\n  \"status\": 0,\n  \"code\": \"\",\n  \"requestId\": \"\",\n  \"errors\": [\n    {\n      \"field\": \"\",\n      \"message\": \"\"\n    }\n  ]\n}"
+                }
+              }
+            }
+          ],
+          "seq": 5
+        },
+        {
+          "uid": "7jyjmjPaTxeRwknoyneG2",
+          "name": "Start a published event",
+          "type": "http-request",
+          "tags": [
+            "Events"
+          ],
+          "request": {
+            "url": "{{baseUrl}}/api/events/:eventId/start",
+            "method": "POST",
+            "auth": {
+              "mode": "inherit",
+              "basic": null,
+              "bearer": null,
+              "digest": null,
+              "apikey": null,
+              "oauth2": null
+            },
+            "headers": [],
+            "params": [
+              {
+                "uid": "Y6y0HtWYWVQLXFw3dkziY",
+                "name": "eventId",
+                "value": "",
+                "description": "",
+                "enabled": true,
+                "type": "path"
+              }
+            ],
+            "body": {
+              "mode": "json",
+              "json": "{\n  \"version\": 0\n}",
+              "text": null,
+              "xml": null,
+              "formUrlEncoded": [],
+              "multipartForm": []
+            },
+            "script": {
+              "res": null
+            }
+          },
+          "examples": [
+            {
+              "uid": "c5QHiu5dWTKQSM4rp80n0",
+              "itemUid": "7jyjmjPaTxeRwknoyneG2",
+              "name": "200 Response",
+              "description": "Event transitioned and audited",
+              "type": "http-request",
+              "request": {
+                "url": "{{baseUrl}}/api/events/:eventId/start",
+                "method": "POST",
+                "headers": [],
+                "params": [
+                  {
+                    "uid": "Y6y0HtWYWVQLXFw3dkziY",
+                    "name": "eventId",
+                    "value": "",
+                    "description": "",
+                    "enabled": true,
+                    "type": "path"
+                  }
+                ],
+                "body": {
+                  "mode": "json",
+                  "json": "{\n  \"version\": 0\n}",
+                  "text": null,
+                  "xml": null,
+                  "sparql": null,
+                  "formUrlEncoded": [],
+                  "multipartForm": []
+                }
+              },
+              "response": {
+                "status": 200,
+                "statusText": "OK",
+                "headers": [
+                  {
+                    "uid": "hGC9HUGV8O5Z3GNUzCGtp",
+                    "name": "Content-Type",
+                    "value": "application/json",
+                    "description": "",
+                    "enabled": true
+                  }
+                ],
+                "body": {
+                  "type": "json",
+                  "content": ""
+                }
+              }
+            },
+            {
+              "uid": "XJ7fHAWzNF86UOD8L9t0y",
+              "itemUid": "7jyjmjPaTxeRwknoyneG2",
+              "name": "401 Response",
+              "description": "Authentication is absent, invalid, expired, revoked, or reused",
+              "type": "http-request",
+              "request": {
+                "url": "{{baseUrl}}/api/events/:eventId/start",
+                "method": "POST",
+                "headers": [],
+                "params": [
+                  {
+                    "uid": "Y6y0HtWYWVQLXFw3dkziY",
+                    "name": "eventId",
+                    "value": "",
+                    "description": "",
+                    "enabled": true,
+                    "type": "path"
+                  }
+                ],
+                "body": {
+                  "mode": "json",
+                  "json": "{\n  \"version\": 0\n}",
+                  "text": null,
+                  "xml": null,
+                  "sparql": null,
+                  "formUrlEncoded": [],
+                  "multipartForm": []
+                }
+              },
+              "response": {
+                "status": 401,
+                "statusText": "Unauthorized",
+                "headers": [
+                  {
+                    "uid": "hk0lykXoIhcS6ytqRwiQC",
+                    "name": "Content-Type",
+                    "value": "application/json",
+                    "description": "",
+                    "enabled": true
+                  }
+                ],
+                "body": {
+                  "type": "json",
+                  "content": "{\n  \"type\": \"\",\n  \"title\": \"\",\n  \"status\": 0,\n  \"code\": \"\",\n  \"requestId\": \"\",\n  \"errors\": [\n    {\n      \"field\": \"\",\n      \"message\": \"\"\n    }\n  ]\n}"
+                }
+              }
+            },
+            {
+              "uid": "80zyr9yoSknVEzIqavdqL",
+              "itemUid": "7jyjmjPaTxeRwknoyneG2",
+              "name": "404 Response",
+              "description": "Resource is absent or intentionally concealed from the caller",
+              "type": "http-request",
+              "request": {
+                "url": "{{baseUrl}}/api/events/:eventId/start",
+                "method": "POST",
+                "headers": [],
+                "params": [
+                  {
+                    "uid": "Y6y0HtWYWVQLXFw3dkziY",
+                    "name": "eventId",
+                    "value": "",
+                    "description": "",
+                    "enabled": true,
+                    "type": "path"
+                  }
+                ],
+                "body": {
+                  "mode": "json",
+                  "json": "{\n  \"version\": 0\n}",
+                  "text": null,
+                  "xml": null,
+                  "sparql": null,
+                  "formUrlEncoded": [],
+                  "multipartForm": []
+                }
+              },
+              "response": {
+                "status": 404,
+                "statusText": "Not Found",
+                "headers": [
+                  {
+                    "uid": "FIN1Mfizp157BwoUOZfPu",
+                    "name": "Content-Type",
+                    "value": "application/json",
+                    "description": "",
+                    "enabled": true
+                  }
+                ],
+                "body": {
+                  "type": "json",
+                  "content": "{\n  \"type\": \"\",\n  \"title\": \"\",\n  \"status\": 0,\n  \"code\": \"\",\n  \"requestId\": \"\",\n  \"errors\": [\n    {\n      \"field\": \"\",\n      \"message\": \"\"\n    }\n  ]\n}"
+                }
+              }
+            },
+            {
+              "uid": "5dCYULFO0tKoNNp7mrjIB",
+              "itemUid": "7jyjmjPaTxeRwknoyneG2",
+              "name": "409 Response",
+              "description": "Stale version, illegal transition, or immutable state",
+              "type": "http-request",
+              "request": {
+                "url": "{{baseUrl}}/api/events/:eventId/start",
+                "method": "POST",
+                "headers": [],
+                "params": [
+                  {
+                    "uid": "Y6y0HtWYWVQLXFw3dkziY",
+                    "name": "eventId",
+                    "value": "",
+                    "description": "",
+                    "enabled": true,
+                    "type": "path"
+                  }
+                ],
+                "body": {
+                  "mode": "json",
+                  "json": "{\n  \"version\": 0\n}",
+                  "text": null,
+                  "xml": null,
+                  "sparql": null,
+                  "formUrlEncoded": [],
+                  "multipartForm": []
+                }
+              },
+              "response": {
+                "status": 409,
+                "statusText": "Conflict",
+                "headers": [
+                  {
+                    "uid": "t8qmdTFDOo79YPOtPTmym",
+                    "name": "Content-Type",
+                    "value": "application/json",
+                    "description": "",
+                    "enabled": true
+                  }
+                ],
+                "body": {
+                  "type": "json",
+                  "content": "{\n  \"type\": \"\",\n  \"title\": \"\",\n  \"status\": 0,\n  \"code\": \"\",\n  \"requestId\": \"\",\n  \"errors\": [\n    {\n      \"field\": \"\",\n      \"message\": \"\"\n    }\n  ]\n}"
+                }
+              }
+            },
+            {
+              "uid": "GHkB0OPRrnr5JSkCFopxr",
+              "itemUid": "7jyjmjPaTxeRwknoyneG2",
+              "name": "422 Response",
+              "description": "Request validation failed",
+              "type": "http-request",
+              "request": {
+                "url": "{{baseUrl}}/api/events/:eventId/start",
+                "method": "POST",
+                "headers": [],
+                "params": [
+                  {
+                    "uid": "Y6y0HtWYWVQLXFw3dkziY",
+                    "name": "eventId",
+                    "value": "",
+                    "description": "",
+                    "enabled": true,
+                    "type": "path"
+                  }
+                ],
+                "body": {
+                  "mode": "json",
+                  "json": "{\n  \"version\": 0\n}",
+                  "text": null,
+                  "xml": null,
+                  "sparql": null,
+                  "formUrlEncoded": [],
+                  "multipartForm": []
+                }
+              },
+              "response": {
+                "status": 422,
+                "statusText": "Unprocessable Entity",
+                "headers": [
+                  {
+                    "uid": "ohcPJQ8lFy1wwfWLHBO3S",
+                    "name": "Content-Type",
+                    "value": "application/json",
+                    "description": "",
+                    "enabled": true
+                  }
+                ],
+                "body": {
+                  "type": "json",
+                  "content": "{\n  \"type\": \"\",\n  \"title\": \"\",\n  \"status\": 0,\n  \"code\": \"\",\n  \"requestId\": \"\",\n  \"errors\": [\n    {\n      \"field\": \"\",\n      \"message\": \"\"\n    }\n  ]\n}"
+                }
+              }
+            },
+            {
+              "uid": "aHXoN2jEagzbZkP9k95OE",
+              "itemUid": "7jyjmjPaTxeRwknoyneG2",
+              "name": "429 Response",
+              "description": "Rate limit exceeded",
+              "type": "http-request",
+              "request": {
+                "url": "{{baseUrl}}/api/events/:eventId/start",
+                "method": "POST",
+                "headers": [],
+                "params": [
+                  {
+                    "uid": "Y6y0HtWYWVQLXFw3dkziY",
+                    "name": "eventId",
+                    "value": "",
+                    "description": "",
+                    "enabled": true,
+                    "type": "path"
+                  }
+                ],
+                "body": {
+                  "mode": "json",
+                  "json": "{\n  \"version\": 0\n}",
+                  "text": null,
+                  "xml": null,
+                  "sparql": null,
+                  "formUrlEncoded": [],
+                  "multipartForm": []
+                }
+              },
+              "response": {
+                "status": 429,
+                "statusText": "Too Many Requests",
+                "headers": [
+                  {
+                    "uid": "jM1u2pZYDqXrYEYhtoGZe",
+                    "name": "Content-Type",
+                    "value": "application/json",
+                    "description": "",
+                    "enabled": true
+                  }
+                ],
+                "body": {
+                  "type": "json",
+                  "content": "{\n  \"type\": \"\",\n  \"title\": \"\",\n  \"status\": 0,\n  \"code\": \"\",\n  \"requestId\": \"\",\n  \"errors\": [\n    {\n      \"field\": \"\",\n      \"message\": \"\"\n    }\n  ]\n}"
+                }
+              }
+            }
+          ],
+          "seq": 6
+        },
+        {
+          "uid": "dkE6p7DAHjwv1V60wxk9i",
+          "name": "Complete an in-progress event",
+          "type": "http-request",
+          "tags": [
+            "Events"
+          ],
+          "request": {
+            "url": "{{baseUrl}}/api/events/:eventId/complete",
+            "method": "POST",
+            "auth": {
+              "mode": "inherit",
+              "basic": null,
+              "bearer": null,
+              "digest": null,
+              "apikey": null,
+              "oauth2": null
+            },
+            "headers": [],
+            "params": [
+              {
+                "uid": "MQjuBOq32Mc7QvMXLEOsI",
+                "name": "eventId",
+                "value": "",
+                "description": "",
+                "enabled": true,
+                "type": "path"
+              }
+            ],
+            "body": {
+              "mode": "json",
+              "json": "{\n  \"version\": 0\n}",
+              "text": null,
+              "xml": null,
+              "formUrlEncoded": [],
+              "multipartForm": []
+            },
+            "script": {
+              "res": null
+            }
+          },
+          "examples": [
+            {
+              "uid": "EFcaVOFCJW1bDN4WtNsvb",
+              "itemUid": "dkE6p7DAHjwv1V60wxk9i",
+              "name": "200 Response",
+              "description": "Event transitioned and audited",
+              "type": "http-request",
+              "request": {
+                "url": "{{baseUrl}}/api/events/:eventId/complete",
+                "method": "POST",
+                "headers": [],
+                "params": [
+                  {
+                    "uid": "MQjuBOq32Mc7QvMXLEOsI",
+                    "name": "eventId",
+                    "value": "",
+                    "description": "",
+                    "enabled": true,
+                    "type": "path"
+                  }
+                ],
+                "body": {
+                  "mode": "json",
+                  "json": "{\n  \"version\": 0\n}",
+                  "text": null,
+                  "xml": null,
+                  "sparql": null,
+                  "formUrlEncoded": [],
+                  "multipartForm": []
+                }
+              },
+              "response": {
+                "status": 200,
+                "statusText": "OK",
+                "headers": [
+                  {
+                    "uid": "lEi9cpXRWmNK5FciEr4Jj",
+                    "name": "Content-Type",
+                    "value": "application/json",
+                    "description": "",
+                    "enabled": true
+                  }
+                ],
+                "body": {
+                  "type": "json",
+                  "content": ""
+                }
+              }
+            },
+            {
+              "uid": "21UL5n1WHpquoKCMZdsmq",
+              "itemUid": "dkE6p7DAHjwv1V60wxk9i",
+              "name": "401 Response",
+              "description": "Authentication is absent, invalid, expired, revoked, or reused",
+              "type": "http-request",
+              "request": {
+                "url": "{{baseUrl}}/api/events/:eventId/complete",
+                "method": "POST",
+                "headers": [],
+                "params": [
+                  {
+                    "uid": "MQjuBOq32Mc7QvMXLEOsI",
+                    "name": "eventId",
+                    "value": "",
+                    "description": "",
+                    "enabled": true,
+                    "type": "path"
+                  }
+                ],
+                "body": {
+                  "mode": "json",
+                  "json": "{\n  \"version\": 0\n}",
+                  "text": null,
+                  "xml": null,
+                  "sparql": null,
+                  "formUrlEncoded": [],
+                  "multipartForm": []
+                }
+              },
+              "response": {
+                "status": 401,
+                "statusText": "Unauthorized",
+                "headers": [
+                  {
+                    "uid": "LW5g4QPeX86jWCKo6jti3",
+                    "name": "Content-Type",
+                    "value": "application/json",
+                    "description": "",
+                    "enabled": true
+                  }
+                ],
+                "body": {
+                  "type": "json",
+                  "content": "{\n  \"type\": \"\",\n  \"title\": \"\",\n  \"status\": 0,\n  \"code\": \"\",\n  \"requestId\": \"\",\n  \"errors\": [\n    {\n      \"field\": \"\",\n      \"message\": \"\"\n    }\n  ]\n}"
+                }
+              }
+            },
+            {
+              "uid": "I3bAaNiQWrIn5rCOibVEU",
+              "itemUid": "dkE6p7DAHjwv1V60wxk9i",
+              "name": "404 Response",
+              "description": "Resource is absent or intentionally concealed from the caller",
+              "type": "http-request",
+              "request": {
+                "url": "{{baseUrl}}/api/events/:eventId/complete",
+                "method": "POST",
+                "headers": [],
+                "params": [
+                  {
+                    "uid": "MQjuBOq32Mc7QvMXLEOsI",
+                    "name": "eventId",
+                    "value": "",
+                    "description": "",
+                    "enabled": true,
+                    "type": "path"
+                  }
+                ],
+                "body": {
+                  "mode": "json",
+                  "json": "{\n  \"version\": 0\n}",
+                  "text": null,
+                  "xml": null,
+                  "sparql": null,
+                  "formUrlEncoded": [],
+                  "multipartForm": []
+                }
+              },
+              "response": {
+                "status": 404,
+                "statusText": "Not Found",
+                "headers": [
+                  {
+                    "uid": "lzJa1gFiFLvy1NOW3Lsl1",
+                    "name": "Content-Type",
+                    "value": "application/json",
+                    "description": "",
+                    "enabled": true
+                  }
+                ],
+                "body": {
+                  "type": "json",
+                  "content": "{\n  \"type\": \"\",\n  \"title\": \"\",\n  \"status\": 0,\n  \"code\": \"\",\n  \"requestId\": \"\",\n  \"errors\": [\n    {\n      \"field\": \"\",\n      \"message\": \"\"\n    }\n  ]\n}"
+                }
+              }
+            },
+            {
+              "uid": "IP6xDMprrfNNGWVzHXPYX",
+              "itemUid": "dkE6p7DAHjwv1V60wxk9i",
+              "name": "409 Response",
+              "description": "Stale version, illegal transition, or immutable state",
+              "type": "http-request",
+              "request": {
+                "url": "{{baseUrl}}/api/events/:eventId/complete",
+                "method": "POST",
+                "headers": [],
+                "params": [
+                  {
+                    "uid": "MQjuBOq32Mc7QvMXLEOsI",
+                    "name": "eventId",
+                    "value": "",
+                    "description": "",
+                    "enabled": true,
+                    "type": "path"
+                  }
+                ],
+                "body": {
+                  "mode": "json",
+                  "json": "{\n  \"version\": 0\n}",
+                  "text": null,
+                  "xml": null,
+                  "sparql": null,
+                  "formUrlEncoded": [],
+                  "multipartForm": []
+                }
+              },
+              "response": {
+                "status": 409,
+                "statusText": "Conflict",
+                "headers": [
+                  {
+                    "uid": "w66bqmDAMQUAbn1p6G49f",
+                    "name": "Content-Type",
+                    "value": "application/json",
+                    "description": "",
+                    "enabled": true
+                  }
+                ],
+                "body": {
+                  "type": "json",
+                  "content": "{\n  \"type\": \"\",\n  \"title\": \"\",\n  \"status\": 0,\n  \"code\": \"\",\n  \"requestId\": \"\",\n  \"errors\": [\n    {\n      \"field\": \"\",\n      \"message\": \"\"\n    }\n  ]\n}"
+                }
+              }
+            },
+            {
+              "uid": "jj8TXqzZIDbUn4MOFvOFU",
+              "itemUid": "dkE6p7DAHjwv1V60wxk9i",
+              "name": "422 Response",
+              "description": "Request validation failed",
+              "type": "http-request",
+              "request": {
+                "url": "{{baseUrl}}/api/events/:eventId/complete",
+                "method": "POST",
+                "headers": [],
+                "params": [
+                  {
+                    "uid": "MQjuBOq32Mc7QvMXLEOsI",
+                    "name": "eventId",
+                    "value": "",
+                    "description": "",
+                    "enabled": true,
+                    "type": "path"
+                  }
+                ],
+                "body": {
+                  "mode": "json",
+                  "json": "{\n  \"version\": 0\n}",
+                  "text": null,
+                  "xml": null,
+                  "sparql": null,
+                  "formUrlEncoded": [],
+                  "multipartForm": []
+                }
+              },
+              "response": {
+                "status": 422,
+                "statusText": "Unprocessable Entity",
+                "headers": [
+                  {
+                    "uid": "1ZgxABOqRPa5ib0B9cv8O",
+                    "name": "Content-Type",
+                    "value": "application/json",
+                    "description": "",
+                    "enabled": true
+                  }
+                ],
+                "body": {
+                  "type": "json",
+                  "content": "{\n  \"type\": \"\",\n  \"title\": \"\",\n  \"status\": 0,\n  \"code\": \"\",\n  \"requestId\": \"\",\n  \"errors\": [\n    {\n      \"field\": \"\",\n      \"message\": \"\"\n    }\n  ]\n}"
+                }
+              }
+            },
+            {
+              "uid": "NMacuSOd61OgtW5T9EHxl",
+              "itemUid": "dkE6p7DAHjwv1V60wxk9i",
+              "name": "429 Response",
+              "description": "Rate limit exceeded",
+              "type": "http-request",
+              "request": {
+                "url": "{{baseUrl}}/api/events/:eventId/complete",
+                "method": "POST",
+                "headers": [],
+                "params": [
+                  {
+                    "uid": "MQjuBOq32Mc7QvMXLEOsI",
+                    "name": "eventId",
+                    "value": "",
+                    "description": "",
+                    "enabled": true,
+                    "type": "path"
+                  }
+                ],
+                "body": {
+                  "mode": "json",
+                  "json": "{\n  \"version\": 0\n}",
+                  "text": null,
+                  "xml": null,
+                  "sparql": null,
+                  "formUrlEncoded": [],
+                  "multipartForm": []
+                }
+              },
+              "response": {
+                "status": 429,
+                "statusText": "Too Many Requests",
+                "headers": [
+                  {
+                    "uid": "2Z1sGvl3jvQZgzqB33bcN",
+                    "name": "Content-Type",
+                    "value": "application/json",
+                    "description": "",
+                    "enabled": true
+                  }
+                ],
+                "body": {
+                  "type": "json",
+                  "content": "{\n  \"type\": \"\",\n  \"title\": \"\",\n  \"status\": 0,\n  \"code\": \"\",\n  \"requestId\": \"\",\n  \"errors\": [\n    {\n      \"field\": \"\",\n      \"message\": \"\"\n    }\n  ]\n}"
+                }
+              }
+            }
+          ],
+          "seq": 7
+        },
+        {
+          "uid": "wcQvWnv0yzjOVxkjosIhr",
+          "name": "Cancel a non-terminal event with a reason",
+          "type": "http-request",
+          "tags": [
+            "Events"
+          ],
+          "request": {
+            "url": "{{baseUrl}}/api/events/:eventId/cancel",
+            "method": "POST",
+            "auth": {
+              "mode": "inherit",
+              "basic": null,
+              "bearer": null,
+              "digest": null,
+              "apikey": null,
+              "oauth2": null
+            },
+            "headers": [],
+            "params": [
+              {
+                "uid": "FnZ9FVwDsrsJmZ7tKD5Pi",
+                "name": "eventId",
+                "value": "",
+                "description": "",
+                "enabled": true,
+                "type": "path"
+              }
+            ],
+            "body": {
+              "mode": "json",
+              "json": "{\n  \"version\": 0,\n  \"reason\": \"\"\n}",
+              "text": null,
+              "xml": null,
+              "formUrlEncoded": [],
+              "multipartForm": []
+            },
+            "script": {
+              "res": null
+            }
+          },
+          "examples": [
+            {
+              "uid": "ydfSMMNcakizinMoklhJg",
+              "itemUid": "wcQvWnv0yzjOVxkjosIhr",
+              "name": "200 Response",
+              "description": "Event transitioned and audited",
+              "type": "http-request",
+              "request": {
+                "url": "{{baseUrl}}/api/events/:eventId/cancel",
+                "method": "POST",
+                "headers": [],
+                "params": [
+                  {
+                    "uid": "FnZ9FVwDsrsJmZ7tKD5Pi",
+                    "name": "eventId",
+                    "value": "",
+                    "description": "",
+                    "enabled": true,
+                    "type": "path"
+                  }
+                ],
+                "body": {
+                  "mode": "json",
+                  "json": "{\n  \"version\": 0,\n  \"reason\": \"\"\n}",
+                  "text": null,
+                  "xml": null,
+                  "sparql": null,
+                  "formUrlEncoded": [],
+                  "multipartForm": []
+                }
+              },
+              "response": {
+                "status": 200,
+                "statusText": "OK",
+                "headers": [
+                  {
+                    "uid": "HNk6zdd4x9NVcG6mR3rsW",
+                    "name": "Content-Type",
+                    "value": "application/json",
+                    "description": "",
+                    "enabled": true
+                  }
+                ],
+                "body": {
+                  "type": "json",
+                  "content": ""
+                }
+              }
+            },
+            {
+              "uid": "7KGM8zBbSA6j3sFjw8K76",
+              "itemUid": "wcQvWnv0yzjOVxkjosIhr",
+              "name": "401 Response",
+              "description": "Authentication is absent, invalid, expired, revoked, or reused",
+              "type": "http-request",
+              "request": {
+                "url": "{{baseUrl}}/api/events/:eventId/cancel",
+                "method": "POST",
+                "headers": [],
+                "params": [
+                  {
+                    "uid": "FnZ9FVwDsrsJmZ7tKD5Pi",
+                    "name": "eventId",
+                    "value": "",
+                    "description": "",
+                    "enabled": true,
+                    "type": "path"
+                  }
+                ],
+                "body": {
+                  "mode": "json",
+                  "json": "{\n  \"version\": 0,\n  \"reason\": \"\"\n}",
+                  "text": null,
+                  "xml": null,
+                  "sparql": null,
+                  "formUrlEncoded": [],
+                  "multipartForm": []
+                }
+              },
+              "response": {
+                "status": 401,
+                "statusText": "Unauthorized",
+                "headers": [
+                  {
+                    "uid": "jBQcqC8IRutzxj129JSwe",
+                    "name": "Content-Type",
+                    "value": "application/json",
+                    "description": "",
+                    "enabled": true
+                  }
+                ],
+                "body": {
+                  "type": "json",
+                  "content": "{\n  \"type\": \"\",\n  \"title\": \"\",\n  \"status\": 0,\n  \"code\": \"\",\n  \"requestId\": \"\",\n  \"errors\": [\n    {\n      \"field\": \"\",\n      \"message\": \"\"\n    }\n  ]\n}"
+                }
+              }
+            },
+            {
+              "uid": "Un8jfxVWqtDOcpt8ollCU",
+              "itemUid": "wcQvWnv0yzjOVxkjosIhr",
+              "name": "403 Response",
+              "description": "Request origin, CSRF token, or permission is invalid",
+              "type": "http-request",
+              "request": {
+                "url": "{{baseUrl}}/api/events/:eventId/cancel",
+                "method": "POST",
+                "headers": [],
+                "params": [
+                  {
+                    "uid": "FnZ9FVwDsrsJmZ7tKD5Pi",
+                    "name": "eventId",
+                    "value": "",
+                    "description": "",
+                    "enabled": true,
+                    "type": "path"
+                  }
+                ],
+                "body": {
+                  "mode": "json",
+                  "json": "{\n  \"version\": 0,\n  \"reason\": \"\"\n}",
+                  "text": null,
+                  "xml": null,
+                  "sparql": null,
+                  "formUrlEncoded": [],
+                  "multipartForm": []
+                }
+              },
+              "response": {
+                "status": 403,
+                "statusText": "Forbidden",
+                "headers": [
+                  {
+                    "uid": "jD4hj5xMyPWdYdRPvMtKO",
+                    "name": "Content-Type",
+                    "value": "application/json",
+                    "description": "",
+                    "enabled": true
+                  }
+                ],
+                "body": {
+                  "type": "json",
+                  "content": "{\n  \"type\": \"\",\n  \"title\": \"\",\n  \"status\": 0,\n  \"code\": \"\",\n  \"requestId\": \"\",\n  \"errors\": [\n    {\n      \"field\": \"\",\n      \"message\": \"\"\n    }\n  ]\n}"
+                }
+              }
+            },
+            {
+              "uid": "Hu7FhSYf1O5uMRJgOH1MU",
+              "itemUid": "wcQvWnv0yzjOVxkjosIhr",
+              "name": "404 Response",
+              "description": "Resource is absent or intentionally concealed from the caller",
+              "type": "http-request",
+              "request": {
+                "url": "{{baseUrl}}/api/events/:eventId/cancel",
+                "method": "POST",
+                "headers": [],
+                "params": [
+                  {
+                    "uid": "FnZ9FVwDsrsJmZ7tKD5Pi",
+                    "name": "eventId",
+                    "value": "",
+                    "description": "",
+                    "enabled": true,
+                    "type": "path"
+                  }
+                ],
+                "body": {
+                  "mode": "json",
+                  "json": "{\n  \"version\": 0,\n  \"reason\": \"\"\n}",
+                  "text": null,
+                  "xml": null,
+                  "sparql": null,
+                  "formUrlEncoded": [],
+                  "multipartForm": []
+                }
+              },
+              "response": {
+                "status": 404,
+                "statusText": "Not Found",
+                "headers": [
+                  {
+                    "uid": "tY1tl083wvqBcaikszwuX",
+                    "name": "Content-Type",
+                    "value": "application/json",
+                    "description": "",
+                    "enabled": true
+                  }
+                ],
+                "body": {
+                  "type": "json",
+                  "content": "{\n  \"type\": \"\",\n  \"title\": \"\",\n  \"status\": 0,\n  \"code\": \"\",\n  \"requestId\": \"\",\n  \"errors\": [\n    {\n      \"field\": \"\",\n      \"message\": \"\"\n    }\n  ]\n}"
+                }
+              }
+            },
+            {
+              "uid": "3RIVg9LNYlreVn1ekqtWC",
+              "itemUid": "wcQvWnv0yzjOVxkjosIhr",
+              "name": "409 Response",
+              "description": "Stale version, illegal transition, or immutable state",
+              "type": "http-request",
+              "request": {
+                "url": "{{baseUrl}}/api/events/:eventId/cancel",
+                "method": "POST",
+                "headers": [],
+                "params": [
+                  {
+                    "uid": "FnZ9FVwDsrsJmZ7tKD5Pi",
+                    "name": "eventId",
+                    "value": "",
+                    "description": "",
+                    "enabled": true,
+                    "type": "path"
+                  }
+                ],
+                "body": {
+                  "mode": "json",
+                  "json": "{\n  \"version\": 0,\n  \"reason\": \"\"\n}",
+                  "text": null,
+                  "xml": null,
+                  "sparql": null,
+                  "formUrlEncoded": [],
+                  "multipartForm": []
+                }
+              },
+              "response": {
+                "status": 409,
+                "statusText": "Conflict",
+                "headers": [
+                  {
+                    "uid": "MBp5bbEL4TH05Nqg45if2",
+                    "name": "Content-Type",
+                    "value": "application/json",
+                    "description": "",
+                    "enabled": true
+                  }
+                ],
+                "body": {
+                  "type": "json",
+                  "content": "{\n  \"type\": \"\",\n  \"title\": \"\",\n  \"status\": 0,\n  \"code\": \"\",\n  \"requestId\": \"\",\n  \"errors\": [\n    {\n      \"field\": \"\",\n      \"message\": \"\"\n    }\n  ]\n}"
+                }
+              }
+            },
+            {
+              "uid": "Y0YaJIkpHyq75rGuGh82U",
+              "itemUid": "wcQvWnv0yzjOVxkjosIhr",
+              "name": "422 Response",
+              "description": "Request validation failed",
+              "type": "http-request",
+              "request": {
+                "url": "{{baseUrl}}/api/events/:eventId/cancel",
+                "method": "POST",
+                "headers": [],
+                "params": [
+                  {
+                    "uid": "FnZ9FVwDsrsJmZ7tKD5Pi",
+                    "name": "eventId",
+                    "value": "",
+                    "description": "",
+                    "enabled": true,
+                    "type": "path"
+                  }
+                ],
+                "body": {
+                  "mode": "json",
+                  "json": "{\n  \"version\": 0,\n  \"reason\": \"\"\n}",
+                  "text": null,
+                  "xml": null,
+                  "sparql": null,
+                  "formUrlEncoded": [],
+                  "multipartForm": []
+                }
+              },
+              "response": {
+                "status": 422,
+                "statusText": "Unprocessable Entity",
+                "headers": [
+                  {
+                    "uid": "eV3nS1oSMt2MkFoLsrBGW",
+                    "name": "Content-Type",
+                    "value": "application/json",
+                    "description": "",
+                    "enabled": true
+                  }
+                ],
+                "body": {
+                  "type": "json",
+                  "content": "{\n  \"type\": \"\",\n  \"title\": \"\",\n  \"status\": 0,\n  \"code\": \"\",\n  \"requestId\": \"\",\n  \"errors\": [\n    {\n      \"field\": \"\",\n      \"message\": \"\"\n    }\n  ]\n}"
+                }
+              }
+            },
+            {
+              "uid": "XSDbMZUAxQCtihjBGNndg",
+              "itemUid": "wcQvWnv0yzjOVxkjosIhr",
+              "name": "429 Response",
+              "description": "Rate limit exceeded",
+              "type": "http-request",
+              "request": {
+                "url": "{{baseUrl}}/api/events/:eventId/cancel",
+                "method": "POST",
+                "headers": [],
+                "params": [
+                  {
+                    "uid": "FnZ9FVwDsrsJmZ7tKD5Pi",
+                    "name": "eventId",
+                    "value": "",
+                    "description": "",
+                    "enabled": true,
+                    "type": "path"
+                  }
+                ],
+                "body": {
+                  "mode": "json",
+                  "json": "{\n  \"version\": 0,\n  \"reason\": \"\"\n}",
+                  "text": null,
+                  "xml": null,
+                  "sparql": null,
+                  "formUrlEncoded": [],
+                  "multipartForm": []
+                }
+              },
+              "response": {
+                "status": 429,
+                "statusText": "Too Many Requests",
+                "headers": [
+                  {
+                    "uid": "9mPZXqfkKV5urI2SeOcmv",
+                    "name": "Content-Type",
+                    "value": "application/json",
+                    "description": "",
+                    "enabled": true
+                  }
+                ],
+                "body": {
+                  "type": "json",
+                  "content": "{\n  \"type\": \"\",\n  \"title\": \"\",\n  \"status\": 0,\n  \"code\": \"\",\n  \"requestId\": \"\",\n  \"errors\": [\n    {\n      \"field\": \"\",\n      \"message\": \"\"\n    }\n  ]\n}"
+                }
+              }
+            }
+          ],
+          "seq": 8
+        },
+        {
+          "uid": "iRXApNMOwz80SYOBixvyD",
+          "name": "Read immutable event history (manager/admin only)",
+          "type": "http-request",
+          "tags": [
+            "Events"
+          ],
+          "request": {
+            "url": "{{baseUrl}}/api/events/:eventId/audit-log",
+            "method": "GET",
+            "auth": {
+              "mode": "inherit",
+              "basic": null,
+              "bearer": null,
+              "digest": null,
+              "apikey": null,
+              "oauth2": null
+            },
+            "headers": [],
+            "params": [
+              {
+                "uid": "BtKk7Eb0nOwfzmDnaK5hK",
+                "name": "eventId",
+                "value": "",
+                "description": "",
+                "enabled": true,
+                "type": "path"
+              },
+              {
+                "uid": "9MpUCQEvBeeFwZLByqrLt",
+                "name": "cursor",
+                "value": "",
+                "description": "",
+                "enabled": false,
+                "type": "query"
+              },
+              {
+                "uid": "uqxYLUEl6zLC1TNCBBvGz",
+                "name": "limit",
+                "value": "50",
+                "description": "",
+                "enabled": true,
+                "type": "query"
+              }
+            ],
+            "body": {
+              "mode": "none",
+              "json": null,
+              "text": null,
+              "xml": null,
+              "formUrlEncoded": [],
+              "multipartForm": []
+            },
+            "script": {
+              "res": null
+            }
+          },
+          "examples": [
+            {
+              "uid": "lrTuUoN9IrmYC6DxqSLs9",
+              "itemUid": "iRXApNMOwz80SYOBixvyD",
+              "name": "200 Response",
+              "description": "Reverse-chronological audit records",
+              "type": "http-request",
+              "request": {
+                "url": "{{baseUrl}}/api/events/:eventId/audit-log",
+                "method": "GET",
+                "headers": [],
+                "params": [
+                  {
+                    "uid": "BtKk7Eb0nOwfzmDnaK5hK",
+                    "name": "eventId",
+                    "value": "",
+                    "description": "",
+                    "enabled": true,
+                    "type": "path"
+                  },
+                  {
+                    "uid": "9MpUCQEvBeeFwZLByqrLt",
+                    "name": "cursor",
+                    "value": "",
+                    "description": "",
+                    "enabled": false,
+                    "type": "query"
+                  },
+                  {
+                    "uid": "uqxYLUEl6zLC1TNCBBvGz",
+                    "name": "limit",
+                    "value": "50",
+                    "description": "",
+                    "enabled": true,
+                    "type": "query"
+                  }
+                ],
+                "body": {
+                  "mode": "none",
+                  "json": null,
+                  "text": null,
+                  "xml": null,
+                  "sparql": null,
+                  "formUrlEncoded": [],
+                  "multipartForm": []
+                }
+              },
+              "response": {
+                "status": 200,
+                "statusText": "OK",
+                "headers": [
+                  {
+                    "uid": "e5tlum3skzBZQ0CRoGJIM",
+                    "name": "Content-Type",
+                    "value": "application/json",
+                    "description": "",
+                    "enabled": true
+                  }
+                ],
+                "body": {
+                  "type": "json",
+                  "content": "{\n  \"auditLogs\": [\n    {\n      \"eventAuditLogId\": \"\",\n      \"eventId\": \"\",\n      \"actorUserId\": \"\",\n      \"action\": \"CREATED\",\n      \"beforeSnapshot\": {},\n      \"afterSnapshot\": {},\n      \"correlationId\": \"\",\n      \"createdAt\": \"\",\n      \"actor\": {\n        \"userId\": \"\",\n        \"username\": \"\",\n        \"email\": \"\",\n        \"systemRole\": \"ADMIN\",\n        \"status\": \"ACTIVE\",\n        \"createdAt\": \"\"\n      }\n    }\n  ],\n  \"nextCursor\": \"\"\n}"
+                }
+              }
+            },
+            {
+              "uid": "2tOrsArl4eNWKLoCkt82b",
+              "itemUid": "iRXApNMOwz80SYOBixvyD",
+              "name": "401 Response",
+              "description": "Authentication is absent, invalid, expired, revoked, or reused",
+              "type": "http-request",
+              "request": {
+                "url": "{{baseUrl}}/api/events/:eventId/audit-log",
+                "method": "GET",
+                "headers": [],
+                "params": [
+                  {
+                    "uid": "BtKk7Eb0nOwfzmDnaK5hK",
+                    "name": "eventId",
+                    "value": "",
+                    "description": "",
+                    "enabled": true,
+                    "type": "path"
+                  },
+                  {
+                    "uid": "9MpUCQEvBeeFwZLByqrLt",
+                    "name": "cursor",
+                    "value": "",
+                    "description": "",
+                    "enabled": false,
+                    "type": "query"
+                  },
+                  {
+                    "uid": "uqxYLUEl6zLC1TNCBBvGz",
+                    "name": "limit",
+                    "value": "50",
+                    "description": "",
+                    "enabled": true,
+                    "type": "query"
+                  }
+                ],
+                "body": {
+                  "mode": "none",
+                  "json": null,
+                  "text": null,
+                  "xml": null,
+                  "sparql": null,
+                  "formUrlEncoded": [],
+                  "multipartForm": []
+                }
+              },
+              "response": {
+                "status": 401,
+                "statusText": "Unauthorized",
+                "headers": [
+                  {
+                    "uid": "Mi46M5pymkmDopxZrGgf7",
+                    "name": "Content-Type",
+                    "value": "application/json",
+                    "description": "",
+                    "enabled": true
+                  }
+                ],
+                "body": {
+                  "type": "json",
+                  "content": "{\n  \"type\": \"\",\n  \"title\": \"\",\n  \"status\": 0,\n  \"code\": \"\",\n  \"requestId\": \"\",\n  \"errors\": [\n    {\n      \"field\": \"\",\n      \"message\": \"\"\n    }\n  ]\n}"
+                }
+              }
+            },
+            {
+              "uid": "OJWijD4pz3yPDlXNhJWgT",
+              "itemUid": "iRXApNMOwz80SYOBixvyD",
+              "name": "404 Response",
+              "description": "Resource is absent or intentionally concealed from the caller",
+              "type": "http-request",
+              "request": {
+                "url": "{{baseUrl}}/api/events/:eventId/audit-log",
+                "method": "GET",
+                "headers": [],
+                "params": [
+                  {
+                    "uid": "BtKk7Eb0nOwfzmDnaK5hK",
+                    "name": "eventId",
+                    "value": "",
+                    "description": "",
+                    "enabled": true,
+                    "type": "path"
+                  },
+                  {
+                    "uid": "9MpUCQEvBeeFwZLByqrLt",
+                    "name": "cursor",
+                    "value": "",
+                    "description": "",
+                    "enabled": false,
+                    "type": "query"
+                  },
+                  {
+                    "uid": "uqxYLUEl6zLC1TNCBBvGz",
+                    "name": "limit",
+                    "value": "50",
+                    "description": "",
+                    "enabled": true,
+                    "type": "query"
+                  }
+                ],
+                "body": {
+                  "mode": "none",
+                  "json": null,
+                  "text": null,
+                  "xml": null,
+                  "sparql": null,
+                  "formUrlEncoded": [],
+                  "multipartForm": []
+                }
+              },
+              "response": {
+                "status": 404,
+                "statusText": "Not Found",
+                "headers": [
+                  {
+                    "uid": "uVMcbsHFs5ilEnEg6WX5G",
+                    "name": "Content-Type",
+                    "value": "application/json",
+                    "description": "",
+                    "enabled": true
+                  }
+                ],
+                "body": {
+                  "type": "json",
+                  "content": "{\n  \"type\": \"\",\n  \"title\": \"\",\n  \"status\": 0,\n  \"code\": \"\",\n  \"requestId\": \"\",\n  \"errors\": [\n    {\n      \"field\": \"\",\n      \"message\": \"\"\n    }\n  ]\n}"
+                }
+              }
+            }
+          ],
+          "seq": 9
+        }
+      ]
+    }
+  ],
+  "environments": [
+    {
+      "uid": "XspUJP06CHvRSqA6Ay87X",
+      "name": "Same-origin API server; local development uses https://localhost:5050",
+      "variables": [
+        {
+          "uid": "yKIggdbGLTThjELsMGxph",
+          "name": "baseUrl",
+          "value": "",
+          "type": "text",
+          "enabled": true,
+          "secret": false
+        }
+      ]
+    }
+  ],
+  "root": {
+    "request": {
+      "auth": {
+        "mode": "bearer",
+        "basic": null,
+        "bearer": {
+          "token": "{{token}}"
+        },
+        "digest": null,
+        "apikey": null,
+        "oauth2": null
+      }
+    },
+    "meta": {
+      "name": "VSMS Event Operations API"
+    }
+  }
+}

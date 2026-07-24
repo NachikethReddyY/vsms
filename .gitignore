@@ -14,3 +14,21 @@ yarn-error.log*
 # OS generated files
 .DS_Store
 Thumbs.db
+
+# Local generated plan viewer
+.local-plan-preview/
+
+# Generated test artifacts
+coverage/
+**/coverage/
+playwright-report/
+test-results/
+
+# Local semantic repository indexes
+.repo-index/
+
+# Local TLS certificates and private keys (generate these per developer machine)
+react-user-dashboard/certs/*.pem
+
+# Bruno reports can contain short-lived bearer tokens and response headers
+api-testing/results/

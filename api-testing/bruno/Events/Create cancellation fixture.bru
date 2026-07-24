@@ -1,0 +1,41 @@
+meta {
+  name: Create cancellation fixture
+  type: http
+  seq: 8
+  tags: [
+    Events
+  ]
+}
+
+post {
+  url: {{baseUrl}}/api/events
+  body: json
+  auth: inherit
+}
+
+body:json {
+  {
+    "name": "Bruno cancellation verification",
+    "description": "A separate draft verifies cancellation without corrupting the main lifecycle.",
+    "venue": "Bruno Verification Hall",
+    "timezone": "Asia/Singapore",
+    "startsAt": "2027-03-13T01:00:00.000+00:00",
+    "endsAt": "2027-03-13T05:00:00.000+00:00",
+    "capacity": 60,
+    "shifts": []
+  }
+}
+
+script:post-response {
+  if (res.getStatus() === 201) {
+    bru.setVar("cancelEventId", res.getBody().eventId);
+    bru.setVar("cancelEventVersion", res.getBody().version);
+  }
+}
+
+tests {
+  test("cancellation fixture is created", function() {
+    expect(res.getStatus()).to.equal(201);
+    expect(res.getBody().status).to.equal("DRAFT");
+  });
+}

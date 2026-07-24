@@ -1,0 +1,176 @@
+meta {
+  name: List events visible to the current staff member
+  type: http
+  seq: 1
+  tags: [
+    Events
+  ]
+}
+
+tests {
+  test("visible event list is returned", function() {
+    expect(res.getStatus()).to.equal(200);
+    expect(res.getBody().events).to.be.an("array");
+  });
+}
+
+get {
+  url: {{baseUrl}}/api/events
+  body: none
+  auth: inherit
+}
+
+params:query {
+  limit: 25
+  ~cursor:
+  ~status: DRAFT
+  ~status: PUBLISHED
+  ~status: IN_PROGRESS
+  ~status: COMPLETED
+  ~status: CANCELLED
+  ~search:
+}
+
+example {
+  name: 200 Response
+  description: Authorized, cursor-paginated events
+
+  request: {
+    url: {{baseUrl}}/api/events
+    method: GET
+    mode: none
+    params:query: {
+      ~cursor:
+      limit: 25
+      ~status: DRAFT
+      ~status: PUBLISHED
+      ~status: IN_PROGRESS
+      ~status: COMPLETED
+      ~status: CANCELLED
+      ~search:
+    }
+  }
+
+  response: {
+    headers: {
+      Content-Type: application/json
+    }
+
+    status: {
+      code: 200
+      text: OK
+    }
+
+    body: {
+      type: json
+      content: '''
+        {
+          "events": [],
+          "nextCursor": ""
+        }
+      '''
+    }
+  }
+}
+
+example {
+  name: 401 Response
+  description: Authentication is absent, invalid, expired, revoked, or reused
+
+  request: {
+    url: {{baseUrl}}/api/events
+    method: GET
+    mode: none
+    params:query: {
+      ~cursor:
+      limit: 25
+      ~status: DRAFT
+      ~status: PUBLISHED
+      ~status: IN_PROGRESS
+      ~status: COMPLETED
+      ~status: CANCELLED
+      ~search:
+    }
+  }
+
+  response: {
+    headers: {
+      Content-Type: application/json
+    }
+
+    status: {
+      code: 401
+      text: Unauthorized
+    }
+
+    body: {
+      type: json
+      content: '''
+        {
+          "type": "",
+          "title": "",
+          "status": 0,
+          "code": "",
+          "requestId": "",
+          "errors": [
+            {
+              "field": "",
+              "message": ""
+            }
+          ]
+        }
+      '''
+    }
+  }
+}
+
+example {
+  name: 422 Response
+  description: Request validation failed
+
+  request: {
+    url: {{baseUrl}}/api/events
+    method: GET
+    mode: none
+    params:query: {
+      ~cursor:
+      limit: 25
+      ~status: DRAFT
+      ~status: PUBLISHED
+      ~status: IN_PROGRESS
+      ~status: COMPLETED
+      ~status: CANCELLED
+      ~search:
+    }
+  }
+
+  response: {
+    headers: {
+      Content-Type: application/json
+    }
+
+    status: {
+      code: 422
+      text: Unprocessable Entity
+    }
+
+    body: {
+      type: json
+      content: '''
+        {
+          "type": "",
+          "title": "",
+          "status": 0,
+          "code": "",
+          "requestId": "",
+          "errors": [
+            {
+              "field": "",
+              "message": ""
+            }
+          ]
+        }
+      '''
+    }
+  }
+}
