@@ -1,21 +1,20 @@
 const express = require("express");
-
 const router = express.Router();
-
 const eventRegistrationController = require("../controllers/eventRegistrationController");
 
 // ==========================================
 // Register participant for an event
-// POST /event-registration/create
+// POST /event-registrations
 // ==========================================
+// ✅ Change "/create" to "/"
 router.post(
-    "/create",
+    "/",
     eventRegistrationController.createRegistration
 );
 
 // ==========================================
 // Get registration by ID
-// GET /event-registration/:id
+// GET /event-registrations/:id
 // ==========================================
 router.get(
     "/:id",
@@ -24,7 +23,7 @@ router.get(
 
 // ==========================================
 // Get registrations for a participant
-// GET /event-registration/participant/:participantId
+// GET /event-registrations/participant/:participantId
 // ==========================================
 router.get(
     "/participant/:participantId",
