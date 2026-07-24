@@ -419,3 +419,44 @@ model SyncAction {
   @@index([actorUserId])
   @@map("sync_actions")
 }
+
+// These isolated mappings keep the participant QR prototype compatible with
+// the singular legacy tables without coupling them to the events API schema.
+model LegacyParticipant {
+  participantId String   @id @default(uuid()) @map("participant_id") @db.Uuid
+  firstName     String   @map("first_name") @db.VarChar(100)
+  lastName      String   @map("last_name") @db.VarChar(100)
+  createdAt     DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt     DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  @@map("participants")
+}
+
+model LegacyEventRegistration {
+  registrationId String   @id @default(uuid()) @map("registration_id") @db.Uuid
+  participantId  String   @map("participant_id") @db.Uuid
+  eventId        String   @map("event_id") @db.Uuid
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt      DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  @@index([participantId, createdAt])
+  @@index([eventId, createdAt])
+  @@map("participant_event_registrations")
+}
+
+model LegacyQrCodePass {
+  qrId           String    @id @default(uuid()) @map("qr_id") @db.Uuid
+  registrationId String    @map("registration_id") @db.Uuid
+  token          String    @map("token") @db.VarChar(255)
+  issuedAt       DateTime  @default(now()) @map("issued_at") @db.Timestamptz(3)
+  expiresAt      DateTime  @map("expires_at") @db.Timestamptz(3)
+  isActive       Boolean   @default(true) @map("is_active")
+  revokedAt      DateTime? @map("revoked_at") @db.Timestamptz(3)
+  revokedBy      String?   @map("revoked_by_user_id") @db.Uuid
+  revokedReason  String?   @map("revoked_reason") @db.VarChar(255)
+
+  @@unique([token])
+  @@index([registrationId, isActive])
+  @@index([expiresAt, isActive])
+  @@map("qr_code_passes")
+}
