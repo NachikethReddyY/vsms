@@ -65,7 +65,20 @@ export default function EventsPage() {
       </section>
       {error && <div className="alert error" role="alert"><span>{error}</span><button onClick={() => void load()}>Try again</button></div>}
       {loading && events.length === 0 ? <section className="event-card-grid event-card-loading" aria-label="Loading events" aria-live="polite">{Array.from({ length: 4 }, (_, index) => <div className="event-card skeleton-card" key={index}><span /><span /><span /><span /></div>)}</section> : events.length === 0 ? (
-        <section className="empty-state"><CalendarDaysIcon /><h2>{query || status ? 'No matching events' : 'Create the first event'}</h2><p>{query || status ? 'Clear or change the filters to broaden this view.' : 'Start with the date, venue, and expected capacity. You can publish when details are ready.'}</p>{user?.systemRole !== 'STAFF' && <Link className="primary" to="/events/new">Create event</Link>}</section>
+        <section className="empty-state">
+          <CalendarDaysIcon />
+          <h2>{query || status ? 'No matching events' : user?.systemRole === 'STAFF' ? 'No assigned events yet' : 'Create the first event'}</h2>
+          <p>
+            {query || status
+              ? 'Clear or change the filters to broaden this view.'
+              : user?.systemRole === 'STAFF'
+                ? 'Ask an event manager to assign you to a shift. Staff cannot create events.'
+                : 'Start with the date, venue, and expected capacity. You can publish when details are ready.'}
+          </p>
+          {(user?.systemRole === 'ADMIN' || user?.systemRole === 'EVENT_MANAGER') && (
+            <Link className="primary" to="/events/new">Create event</Link>
+          )}
+        </section>
       ) : (
         <section className="event-card-grid event-timeline" aria-label="Events timeline">
           {events.map((event, index) => {
