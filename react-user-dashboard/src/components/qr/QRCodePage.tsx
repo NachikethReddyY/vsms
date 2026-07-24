@@ -1,6 +1,7 @@
 import { useState } from "react";
 import QRCode from "./QRCode";
 import "./QRCodePage.css";
+import apiClient from "../../utils/apiClient";
 
 
 function QRCodePage() {
@@ -22,23 +23,7 @@ function QRCodePage() {
             setLoading(true);
             setError("");
 
-            const response = await fetch(
-                `http://localhost:5000/qr/generate/${participantId}`,
-                {
-                    method: "POST",
-                    headers: {
-                        "Content-Type": "application/json"
-                    }
-                }
-            );
-
-
-            if (!response.ok) {
-                throw new Error("Unable to generate event pass");
-            }
-
-
-            const data = await response.json();
+            const { data } = await apiClient.post(`/api/qr/generate/${participantId}`);
 
             setQrImage(data.qrImage);
             setToken(data.token);

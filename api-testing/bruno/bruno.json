@@ -1,0 +1,9 @@
+{
+  "version": "1",
+  "name": "VSMS Event API",
+  "type": "collection",
+  "ignore": [
+    "node_modules",
+    ".git"
+  ]
+}
