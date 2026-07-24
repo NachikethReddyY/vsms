@@ -1,0 +1,214 @@
+meta {
+  name: Rotate a one-time refresh session
+  type: http
+  seq: 2
+  tags: [
+    Authentication
+    session
+  ]
+}
+
+headers {
+  Origin: https://localhost:5173
+  Sec-Fetch-Site: same-origin
+  X-CSRF-Token: {{csrfToken}}
+}
+
+script:post-response {
+  if (res.getStatus() === 200) {
+    bru.setVar("token", res.getBody().accessToken);
+    bru.setVar("csrfToken", res.getBody().csrfToken);
+  }
+}
+
+tests {
+  test("refresh rotates the session", function() {
+    expect(res.getStatus()).to.equal(200);
+    expect(res.getBody().accessToken).to.be.a("string");
+    expect(res.getBody().refreshToken).to.equal(undefined);
+  });
+}
+
+post {
+  url: {{baseUrl}}/auth/refresh
+  body: none
+  auth: none
+}
+
+example {
+  name: 200 Response
+  description: Session rotated and replacement cookies issued
+
+  request: {
+    url: {{baseUrl}}/auth/refresh
+    method: POST
+    mode: none
+    headers: {
+      X-CSRF-Token:
+      vsms_refresh: {{apiKey}}
+    }
+  }
+
+  response: {
+    headers: {
+      Content-Type: application/json
+    }
+
+    status: {
+      code: 200
+      text: OK
+    }
+
+    body: {
+      type: json
+      content: '''
+        {
+          "accessToken": "",
+          "csrfToken": "",
+          "user": {
+            "userId": "",
+            "email": "",
+            "systemRole": "ADMIN",
+            "status": "ACTIVE",
+            "createdAt": ""
+          }
+        }
+      '''
+    }
+  }
+}
+
+example {
+  name: 401 Response
+  description: Authentication is absent, invalid, expired, revoked, or reused
+
+  request: {
+    url: {{baseUrl}}/auth/refresh
+    method: POST
+    mode: none
+    headers: {
+      X-CSRF-Token:
+      vsms_refresh: {{apiKey}}
+    }
+  }
+
+  response: {
+    headers: {
+      Content-Type: application/json
+    }
+
+    status: {
+      code: 401
+      text: Unauthorized
+    }
+
+    body: {
+      type: json
+      content: '''
+        {
+          "type": "",
+          "title": "",
+          "status": 0,
+          "code": "",
+          "requestId": "",
+          "errors": [
+            {
+              "field": "",
+              "message": ""
+            }
+          ]
+        }
+      '''
+    }
+  }
+}
+
+example {
+  name: 403 Response
+  description: Request origin, CSRF token, or permission is invalid
+
+  request: {
+    url: {{baseUrl}}/auth/refresh
+    method: POST
+    mode: none
+    headers: {
+      X-CSRF-Token:
+      vsms_refresh: {{apiKey}}
+    }
+  }
+
+  response: {
+    headers: {
+      Content-Type: application/json
+    }
+
+    status: {
+      code: 403
+      text: Forbidden
+    }
+
+    body: {
+      type: json
+      content: '''
+        {
+          "type": "",
+          "title": "",
+          "status": 0,
+          "code": "",
+          "requestId": "",
+          "errors": [
+            {
+              "field": "",
+              "message": ""
+            }
+          ]
+        }
+      '''
+    }
+  }
+}
+
+example {
+  name: 429 Response
+  description: Rate limit exceeded
+
+  request: {
+    url: {{baseUrl}}/auth/refresh
+    method: POST
+    mode: none
+    headers: {
+      X-CSRF-Token:
+      vsms_refresh: {{apiKey}}
+    }
+  }
+
+  response: {
+    headers: {
+      Content-Type: application/json
+    }
+
+    status: {
+      code: 429
+      text: Too Many Requests
+    }
+
+    body: {
+      type: json
+      content: '''
+        {
+          "type": "",
+          "title": "",
+          "status": 0,
+          "code": "",
+          "requestId": "",
+          "errors": [
+            {
+              "field": "",
+              "message": ""
+            }
+          ]
+        }
+      '''
+    }
+  }
+}

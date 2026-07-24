@@ -1,79 +1,174 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useForm } from 'react-hook-form';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import apiClient from '../utils/apiClient';
+import './SignUpPage.css';
 
 interface SignUpFormInputs {
+  fullName: string;
   email: string;
   password: string;
   confirmPassword: string;
 }
 
 const SignUpPage: React.FC = () => {
-  const { register, handleSubmit, formState: { errors } } = useForm<SignUpFormInputs>();
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+  const {
+    register,
+    handleSubmit,
+    watch,
+    formState: { errors, isSubmitting },
+  } = useForm<SignUpFormInputs>();
+
   const navigate = useNavigate();
+  const password = watch('password');
 
   const onSubmit = async (data: SignUpFormInputs) => {
-    if (data.password !== data.confirmPassword) {
-      alert('Passwords do not match');
-      return;
-    }
+    setErrorMessage(null);
 
     try {
-      await apiClient.post('/auth/signup', { email: data.email, password: data.password });
+      await apiClient.post('/auth/signup', {
+        fullName: data.fullName,
+        email: data.email,
+        password: data.password,
+      });
+
       alert('Sign up successful! Please log in.');
       navigate('/login');
-    } catch (error) {
+    } catch (error: any) {
       console.error('Sign up failed:', error);
-      alert('Failed to sign up. Please try again.');
+      const serverMessage =
+        error.response?.data?.message || 'Failed to create account. Please try again.';
+      setErrorMessage(serverMessage);
     }
   };
 
   return (
-    <div className="flex items-center justify-center min-h-screen bg-gray-100">
-      <form onSubmit={handleSubmit(onSubmit)} className="w-full max-w-md p-8 bg-white rounded shadow">
-        <h2 className="mb-6 text-2xl font-bold text-center">Sign Up</h2>
-        <div className="mb-4">
-          <label htmlFor="email" className="block mb-2 text-sm font-medium text-gray-700">Email</label>
-          <input
-            id="email"
-            type="email"
-            {...register('email', { required: 'Email is required' })}
-            className="w-full px-4 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
-          />
-          {errors.email && <p className="mt-1 text-sm text-red-500">{errors.email.message}</p>}
-        </div>
-        <div className="mb-4">
-          <label htmlFor="password" className="block mb-2 text-sm font-medium text-gray-700">Password</label>
-          <input
-            id="password"
-            type="password"
-            {...register('password', { required: 'Password is required' })}
-            className="w-full px-4 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
-          />
-          {errors.password && <p className="mt-1 text-sm text-red-500">{errors.password.message}</p>}
-        </div>
+    <main className="vsms-auth-container">
+      <div className="vsms-auth-card">
+        {/* Header */}
         <div className="mb-6">
-          <label htmlFor="confirmPassword" className="block mb-2 text-sm font-medium text-gray-700">Confirm Password</label>
-          <input
-            id="confirmPassword"
-            type="password"
-            {...register('confirmPassword', { required: 'Please confirm your password' })}
-            className="w-full px-4 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
-          />
-          {errors.confirmPassword && <p className="mt-1 text-sm text-red-500">{errors.confirmPassword.message}</p>}
+          <h1 className="vsms-auth-title">Create Staff Account</h1>
+          <p className="vsms-auth-subtitle">
+            Register your credentials for VSMS screening access.
+          </p>
         </div>
-        <button
-          type="submit"
-          className="w-full px-4 py-2 text-white bg-blue-500 rounded hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-500"
-        >
-          Sign Up
-        </button>
-        <div className="mt-4 text-center">
-          <a href="/login" className="text-sm text-blue-500 hover:underline">Already have an account? Log in</a>
+
+        {/* Error Alert */}
+        {errorMessage && (
+          : { userId: any; username: any; email: any; systemRole: any; status: any; createdAt: any; }: { userId: any; username: any; email: any; systemRole: any; status: any; createdAt: any; }<div className="vsms-alert-banner" role="alert">
+            {errorMessage}
+          </div>
+        )}
+
+        {/* Form */}
+        <form onSubmit={handleSubmit(onSubmit)} noValidate className="space-y-4">
+          {/* Full Name */}
+          <div className="vsms-field-group">
+            <label htmlFor="fullName" className="vsms-label">
+              Full Name
+            </label>
+            <input
+              id="fullName"
+              type="text"
+              placeholder="Dr. Alex Rivera"
+              {...register('fullName', {
+                required: 'Full name is required',
+              })}
+              className="vsms-input"
+            />
+            {errors.fullName && (
+              <p className="vsms-error-text">{errors.fullName.message}</p>
+            )}
+          </div>
+
+          {/* Email */}
+          <div className="vsms-field-group">
+            <label htmlFor="email" className="vsms-label">
+              Staff Email Address
+            </label>
+            <input
+              id="email"
+              type="email"
+              placeholder="staff@vsms.org"
+              {...register('email', {
+                required: 'Email is required',
+                pattern: {
+                  value: /^[^\s@]+@[^\s@]+\.[^\s@]+$/,
+                  message: 'Use a valid email format',
+                },
+              })}
+              className="vsms-input"
+            />
+            {errors.email && (
+              <p className="vsms-error-text">{errors.email.message}</p>
+            )}
+          </div>
+
+          {/* Password */}
+          <div className="vsms-field-group">
+            <label htmlFor="password" className="vsms-label">
+              Password
+            </label>
+            <input
+              id="password"
+              type="password"
+              placeholder="••••••••"
+              {...register('password', {
+                required: 'Password is required',
+                minLength: {
+                  value: 8,
+                  message: 'Password must be at least 8 characters',
+                },
+              })}
+              className="vsms-input"
+            />
+            {errors.password && (
+              <p className="vsms-error-text">{errors.password.message}</p>
+            )}
+          </div>
+
+          {/* Confirm Password */}
+          <div className="vsms-field-group">
+            <label htmlFor="confirmPassword" className="vsms-label">
+              Confirm Password
+            </label>
+            <input
+              id="confirmPassword"
+              type="password"
+              placeholder="••••••••"
+              {...register('confirmPassword', {
+                required: 'Please confirm your password',
+                validate: (value) =>
+                  value === password || 'Passwords do not match',
+              })}
+              className="vsms-input"
+            />
+            {errors.confirmPassword && (
+              <p className="vsms-error-text">{errors.confirmPassword.message}</p>
+            )}
+          </div>
+
+          {/* Submit CTA */}
+          <button
+            type="submit"
+            disabled={isSubmitting}
+            className="vsms-btn-primary"
+          >
+            {isSubmitting ? 'Creating Account...' : 'Register Account'}
+          </button>
+        </form>
+
+        {/* Footer */}
+        <div className="vsms-footer-link">
+          Already registered?{' '}
+          <Link to="/login" className="vsms-link">
+            Log in here
+          </Link>
         </div>
-      </form>
-    </div>
+      </div>
+    </main>
   );
 };
 

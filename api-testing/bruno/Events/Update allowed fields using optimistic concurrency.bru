@@ -1,0 +1,354 @@
+meta {
+  name: Update allowed fields using optimistic concurrency
+  type: http
+  seq: 4
+  tags: [
+    Events
+  ]
+}
+
+patch {
+  url: {{baseUrl}}/api/events/:eventId
+  body: json
+  auth: inherit
+}
+
+params:path {
+  eventId: {{eventId}}
+}
+
+body:json {
+  {
+    "version": {{eventVersion}},
+    "capacity": 140
+  }
+}
+
+script:post-response {
+  if (res.getStatus() === 200) bru.setVar("eventVersion", res.getBody().version);
+}
+
+tests {
+  test("versioned update succeeds", function() {
+    expect(res.getStatus()).to.equal(200);
+    expect(res.getBody().capacity).to.equal(140);
+  });
+}
+
+example {
+  name: 200 Response
+  description: Event updated and audited
+
+  request: {
+    url: {{baseUrl}}/api/events/:eventId
+    method: PATCH
+    mode: json
+    params:path: {
+      eventId:
+    }
+
+    body:json: {
+      {
+        "version": 0,
+        "name": "",
+        "description": "",
+        "venue": "",
+        "timezone": "",
+        "startsAt": "",
+        "endsAt": "",
+        "capacity": 0,
+        "shifts": [
+          {
+            "shiftId": "",
+            "name": "",
+            "startsAt": "",
+            "endsAt": "",
+            "requiredStaff": 0
+          }
+        ]
+      }
+    }
+  }
+
+  response: {
+    headers: {
+      Content-Type: application/json
+    }
+
+    status: {
+      code: 200
+      text: OK
+    }
+
+    body: {
+      type: json
+      content: '''
+
+      '''
+    }
+  }
+}
+
+example {
+  name: 401 Response
+  description: Authentication is absent, invalid, expired, revoked, or reused
+
+  request: {
+    url: {{baseUrl}}/api/events/:eventId
+    method: PATCH
+    mode: json
+    params:path: {
+      eventId:
+    }
+
+    body:json: {
+      {
+        "version": 0,
+        "name": "",
+        "description": "",
+        "venue": "",
+        "timezone": "",
+        "startsAt": "",
+        "endsAt": "",
+        "capacity": 0,
+        "shifts": [
+          {
+            "shiftId": "",
+            "name": "",
+            "startsAt": "",
+            "endsAt": "",
+            "requiredStaff": 0
+          }
+        ]
+      }
+    }
+  }
+
+  response: {
+    headers: {
+      Content-Type: application/json
+    }
+
+    status: {
+      code: 401
+      text: Unauthorized
+    }
+
+    body: {
+      type: json
+      content: '''
+        {
+          "type": "",
+          "title": "",
+          "status": 0,
+          "code": "",
+          "requestId": "",
+          "errors": [
+            {
+              "field": "",
+              "message": ""
+            }
+          ]
+        }
+      '''
+    }
+  }
+}
+
+example {
+  name: 404 Response
+  description: Resource is absent or intentionally concealed from the caller
+
+  request: {
+    url: {{baseUrl}}/api/events/:eventId
+    method: PATCH
+    mode: json
+    params:path: {
+      eventId:
+    }
+
+    body:json: {
+      {
+        "version": 0,
+        "name": "",
+        "description": "",
+        "venue": "",
+        "timezone": "",
+        "startsAt": "",
+        "endsAt": "",
+        "capacity": 0,
+        "shifts": [
+          {
+            "shiftId": "",
+            "name": "",
+            "startsAt": "",
+            "endsAt": "",
+            "requiredStaff": 0
+          }
+        ]
+      }
+    }
+  }
+
+  response: {
+    headers: {
+      Content-Type: application/json
+    }
+
+    status: {
+      code: 404
+      text: Not Found
+    }
+
+    body: {
+      type: json
+      content: '''
+        {
+          "type": "",
+          "title": "",
+          "status": 0,
+          "code": "",
+          "requestId": "",
+          "errors": [
+            {
+              "field": "",
+              "message": ""
+            }
+          ]
+        }
+      '''
+    }
+  }
+}
+
+example {
+  name: 409 Response
+  description: Stale version, illegal transition, or immutable state
+
+  request: {
+    url: {{baseUrl}}/api/events/:eventId
+    method: PATCH
+    mode: json
+    params:path: {
+      eventId:
+    }
+
+    body:json: {
+      {
+        "version": 0,
+        "name": "",
+        "description": "",
+        "venue": "",
+        "timezone": "",
+        "startsAt": "",
+        "endsAt": "",
+        "capacity": 0,
+        "shifts": [
+          {
+            "shiftId": "",
+            "name": "",
+            "startsAt": "",
+            "endsAt": "",
+            "requiredStaff": 0
+          }
+        ]
+      }
+    }
+  }
+
+  response: {
+    headers: {
+      Content-Type: application/json
+    }
+
+    status: {
+      code: 409
+      text: Conflict
+    }
+
+    body: {
+      type: json
+      content: '''
+        {
+          "type": "",
+          "title": "",
+          "status": 0,
+          "code": "",
+          "requestId": "",
+          "errors": [
+            {
+              "field": "",
+              "message": ""
+            }
+          ]
+        }
+      '''
+    }
+  }
+}
+
+example {
+  name: 422 Response
+  description: Request validation failed
+
+  request: {
+    url: {{baseUrl}}/api/events/:eventId
+    method: PATCH
+    mode: json
+    params:path: {
+      eventId:
+    }
+
+    body:json: {
+      {
+        "version": 0,
+        "name": "",
+        "description": "",
+        "venue": "",
+        "timezone": "",
+        "startsAt": "",
+        "endsAt": "",
+        "capacity": 0,
+        "shifts": [
+          {
+            "shiftId": "",
+            "name": "",
+            "startsAt": "",
+            "endsAt": "",
+            "requiredStaff": 0
+          }
+        ]
+      }
+    }
+  }
+
+  response: {
+    headers: {
+      Content-Type: application/json
+    }
+
+    status: {
+      code: 422
+      text: Unprocessable Entity
+    }
+
+    body: {
+      type: json
+      content: '''
+        {
+          "type": "",
+          "title": "",
+          "status": 0,
+          "code": "",
+          "requestId": "",
+          "errors": [
+            {
+              "field": "",
+              "message": ""
+            }
+          ]
+        }
+      '''
+    }
+  }
+}
