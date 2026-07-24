@@ -13,6 +13,7 @@ const authRoutes = require("./routes/authRoutes");
 const userRoutes = require("./routes/userRoutes");
 const eventRoutes = require("./routes/eventRoutes");
 const qrRoutes = require("./routes/qrRoutes");
+const screeningRoutes = require("./routes/screeningRoutes");
 const { notFound, errorHandler } = require("./middlewares/errorHandler");
 
 const app = express();
@@ -57,6 +58,7 @@ if (!env.isProduction) {
 app.use("/auth", authLimiter, authRoutes);
 app.use("/users", userRoutes);
 app.use("/api/events", (req, res, next) => ["POST", "PATCH", "PUT", "DELETE"].includes(req.method) ? mutationLimiter(req, res, next) : next(), eventRoutes);
+app.use("/api/events", (req, res, next) => ["POST", "PATCH", "PUT", "DELETE"].includes(req.method) ? mutationLimiter(req, res, next) : next(), screeningRoutes);
 app.use("/api/qr", mutationLimiter, qrRoutes);
 app.use(notFound);
 app.use(errorHandler);
