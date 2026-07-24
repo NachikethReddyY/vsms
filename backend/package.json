@@ -2,10 +2,18 @@
   "name": "backend",
   "version": "1.0.0",
   "description": "",
-  "main": "index.js",
+  "main": "server.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
-    "seed": "psql -U postgres -d vsms -f db/seed.sql"
+    "dev": "node server.js",
+    "start": "NODE_ENV=production node server.js",
+    "test": "node .tests/prepare.js",
+    "test:watch": "vitest .tests",
+    "prisma:validate": "prisma validate",
+    "prisma:migrate": "prisma migrate deploy",
+    "prisma:seed": "node prisma/seed.js",
+    "openapi:lint": "redocly lint docs/openapi.yaml",
+    "contracts:generate": "openapi-typescript docs/openapi.yaml -o ../react-user-dashboard/src/generated/api.ts",
+    "contracts:check": "node scripts/check-contract.js"
   },
   "keywords": [],
   "author": "",
@@ -15,9 +23,12 @@
     "@prisma/client": "^6.19.3",
     "bcrypt": "^6.0.0",
     "body-parser": "^2.2.0",
+    "cookie-parser": "^1.4.7",
     "cors": "^2.8.5",
     "dotenv": "^16.5.0",
     "express": "^5.1.0",
+    "express-rate-limit": "^8.6.0",
+    "helmet": "^8.3.0",
     "html5-qrcode": "^2.3.8",
     "jsonwebtoken": "^9.0.3",
     "pg": "^8.16.0",
@@ -26,6 +37,13 @@
     "qrcode.react": "^4.2.0",
     "swagger-ui-express": "^5.0.1",
     "uuid": "^14.0.1",
-    "yamljs": "^0.3.0"
+    "yamljs": "^0.3.0",
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "@redocly/cli": "^2.40.0",
+    "openapi-typescript": "^7.13.0",
+    "supertest": "^7.2.2",
+    "vitest": "^4.1.10"
   }
 }

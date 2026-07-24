@@ -1,8 +1,7 @@
 const QRCode = require("qrcode");
 const crypto = require("crypto");
-const { PrismaClient } = require("@prisma/client");
-
-const prisma = new PrismaClient();
+const prisma = require("../prisma/prismaClient");
+const AppError = require("../errors/AppError");
 
 /**
  * Generate a secure QR Code for a participant.
@@ -15,17 +14,14 @@ const prisma = new PrismaClient();
  */
 
 async function generateQR(participantId) {
+    const participant = await prisma.legacyParticipant.findUnique({ where: { participantId } });
+    if (!participant) throw new AppError(404, "PARTICIPANT_NOT_FOUND", "Participant was not found");
 
-    // Ensure participant exists
-    const participant = await prisma.participant.findUnique({
-        where: {
-            id: participantId
-        }
+    const registration = await prisma.legacyEventRegistration.findFirst({
+        where: { participantId },
+        orderBy: { registrationId: "desc" },
     });
-
-    if (!participant) {
-        throw new Error("Participant not found.");
-    }
+    if (!registration) throw new AppError(422, "REGISTRATION_REQUIRED", "Participant has no event registration");
 
     // Generate 256-bit random token
     const token = crypto.randomBytes(32).toString("hex");
@@ -35,13 +31,12 @@ async function generateQR(participantId) {
         Date.now() + 24 * 60 * 60 * 1000
     );
 
-    // Save token in database
-    await prisma.qRToken.create({
+    await prisma.legacyQrCodePass.create({
         data: {
+            registrationId: registration.registrationId,
             token,
-            participantId,
             expiresAt,
-            used: false
+            isActive: true,
         }
     });
 
@@ -70,6 +65,25 @@ async function generateQR(participantId) {
     };
 }
 
+async function getParticipant(token) {
+    const pass = await prisma.legacyQrCodePass.findFirst({
+        where: { token, isActive: true, revokedAt: null, expiresAt: { gt: new Date() } },
+    });
+    if (!pass) throw new AppError(404, "QR_PASS_NOT_FOUND", "QR pass is invalid or expired");
+
+    const registration = await prisma.legacyEventRegistration.findUnique({
+        where: { registrationId: pass.registrationId },
+    });
+    if (!registration) throw new AppError(404, "REGISTRATION_NOT_FOUND", "Registration was not found");
+
+    const participant = await prisma.legacyParticipant.findUnique({
+        where: { participantId: registration.participantId },
+    });
+    if (!participant) throw new AppError(404, "PARTICIPANT_NOT_FOUND", "Participant was not found");
+    return participant;
+}
+
 module.exports = {
-    generateQR
+    generateQR,
+    getParticipant,
 };

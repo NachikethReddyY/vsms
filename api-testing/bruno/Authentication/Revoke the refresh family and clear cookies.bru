@@ -1,0 +1,101 @@
+meta {
+  name: Revoke the refresh family and clear cookies
+  type: http
+  seq: 3
+  tags: [
+    Authentication
+    session
+  ]
+}
+
+headers {
+  Origin: https://localhost:5173
+  Sec-Fetch-Site: same-origin
+  X-CSRF-Token: {{csrfToken}}
+}
+
+tests {
+  test("logout revokes the session", function() {
+    expect(res.getStatus()).to.equal(204);
+  });
+}
+
+post {
+  url: {{baseUrl}}/auth/logout
+  body: none
+  auth: none
+}
+
+example {
+  name: 204 Response
+  description: Session revoked
+
+  request: {
+    url: {{baseUrl}}/auth/logout
+    method: POST
+    mode: none
+    headers: {
+      X-CSRF-Token:
+      vsms_refresh: {{apiKey}}
+    }
+  }
+
+  response: {
+    status: {
+      code: 204
+      text: No Content
+    }
+
+    body: {
+      type: text
+      content: '''
+
+      '''
+    }
+  }
+}
+
+example {
+  name: 403 Response
+  description: Request origin, CSRF token, or permission is invalid
+
+  request: {
+    url: {{baseUrl}}/auth/logout
+    method: POST
+    mode: none
+    headers: {
+      X-CSRF-Token:
+      vsms_refresh: {{apiKey}}
+    }
+  }
+
+  response: {
+    headers: {
+      Content-Type: application/json
+    }
+
+    status: {
+      code: 403
+      text: Forbidden
+    }
+
+    body: {
+      type: json
+      content: '''
+        {
+          "type": "",
+          "title": "",
+          "status": 0,
+          "code": "",
+          "requestId": "",
+          "errors": [
+            {
+              "field": "",
+              "message": ""
+            }
+          ]
+        }
+      '''
+    }
+  }
+}

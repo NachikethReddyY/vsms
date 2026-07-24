@@ -1,0 +1,139 @@
+meta {
+  name: List projected user records (ADMIN only)
+  type: http
+  seq: 1
+  tags: [
+    Users
+  ]
+}
+
+tests {
+  test("event manager cannot enumerate all users", function() {
+    expect(res.getStatus()).to.equal(403);
+  });
+}
+
+get {
+  url: {{baseUrl}}/users
+  body: none
+  auth: inherit
+}
+
+example {
+  name: 200 Response
+  description: Up to 100 users without credential material
+
+  request: {
+    url: {{baseUrl}}/users
+    method: GET
+    mode: none
+  }
+
+  response: {
+    headers: {
+      Content-Type: application/json
+    }
+
+    status: {
+      code: 200
+      text: OK
+    }
+
+    body: {
+      type: json
+      content: '''
+        [
+          {
+            "userId": "",
+            "email": "",
+            "systemRole": "ADMIN",
+            "status": "ACTIVE",
+            "createdAt": ""
+          }
+        ]
+      '''
+    }
+  }
+}
+
+example {
+  name: 401 Response
+  description: Authentication is absent, invalid, expired, revoked, or reused
+
+  request: {
+    url: {{baseUrl}}/users
+    method: GET
+    mode: none
+  }
+
+  response: {
+    headers: {
+      Content-Type: application/json
+    }
+
+    status: {
+      code: 401
+      text: Unauthorized
+    }
+
+    body: {
+      type: json
+      content: '''
+        {
+          "type": "",
+          "title": "",
+          "status": 0,
+          "code": "",
+          "requestId": "",
+          "errors": [
+            {
+              "field": "",
+              "message": ""
+            }
+          ]
+        }
+      '''
+    }
+  }
+}
+
+example {
+  name: 403 Response
+  description: Request origin, CSRF token, or permission is invalid
+
+  request: {
+    url: {{baseUrl}}/users
+    method: GET
+    mode: none
+  }
+
+  response: {
+    headers: {
+      Content-Type: application/json
+    }
+
+    status: {
+      code: 403
+      text: Forbidden
+    }
+
+    body: {
+      type: json
+      content: '''
+        {
+          "type": "",
+          "title": "",
+          "status": 0,
+          "code": "",
+          "requestId": "",
+          "errors": [
+            {
+              "field": "",
+              "message": ""
+            }
+          ]
+        }
+      '''
+    }
+  }
+}

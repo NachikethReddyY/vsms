@@ -1,32 +1,25 @@
-const validate = (schema) => {
-    return (req, res, next) => {
-        try {
+const AppError = require("../errors/AppError");
 
-            // Validate request body using Zod schema
-            schema.parse(req.body);
-
-            // Continue to controller if validation passes
-            next();
-
-        } catch (error) {
-
-            // Handle Zod validation errors
-            if (error.name === "ZodError") {
-                return res.status(400).json({
-                    success: false,
-                    message: "Validation failed",
-                    errors: error.errors.map((err) => ({
-                        field: err.path.join("."),
-                        message: err.message
-                    }))
-                });
-            }
-
-            // Handle unexpected errors
-            next(error);
-        }
-    };
+const validate = (schemas) => (req, _res, next) => {
+  try {
+    for (const [location, schema] of Object.entries(schemas)) {
+      const parsed = schema.parse(req[location]);
+      if (location === "query") {
+        Object.defineProperty(req, "query", { value: parsed, writable: false, configurable: true });
+      } else {
+        req[location] = parsed;
+      }
+    }
+    next();
+  } catch (error) {
+    if (error.name === "ZodError") {
+      return next(new AppError(422, "VALIDATION_FAILED", "Request validation failed", error.issues.map((issue) => ({
+        field: issue.path.join("."),
+        message: issue.message,
+      }))));
+    }
+    return next(error);
+  }
 };
-
 
 module.exports = validate;

@@ -1,11 +1,15 @@
 const prisma = require("../prisma/prismaClient");
 
 exports.getAll = async () => {
-    return await prisma.users.findMany();
+    return prisma.user.findMany({
+        select: { userId: true, username: true, email: true, systemRole: true, status: true, createdAt: true },
+        take: 100,
+        orderBy: { createdAt: "desc" }
+    });
 };
 
 exports.findByEmail = async (email) => {
-    return await prisma.users.findUnique({
+    return prisma.user.findUnique({
         where: {
             email: email
         }
@@ -13,13 +17,13 @@ exports.findByEmail = async (email) => {
 };
 
 exports.create = async (userData) => {
-    return await prisma.users.create({
+    return prisma.user.create({
         data: userData
     });
 };
 
 exports.findById = async (userId) => {
-    return await prisma.users.findUnique({
+    return prisma.user.findUnique({
         where: {
             userId: userId
         }
@@ -27,7 +31,7 @@ exports.findById = async (userId) => {
 };
 
 exports.update = async (userId, userData) => {
-    return await prisma.users.update({
+    return prisma.user.update({
         where: {
             userId: userId
         },
@@ -36,7 +40,7 @@ exports.update = async (userId, userData) => {
 };
 
 exports.delete = async (userId) => {
-    return await prisma.users.delete({
+    return prisma.user.delete({
         where: {
             userId: userId
         }
