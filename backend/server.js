@@ -1,10 +1,13 @@
 const express = require("express");
 const cors = require("cors");
 const helmet = require("helmet"); // Added security middleware
+const morgan = require("morgan"); // HTTP Logger Middleware
 require("dotenv").config();
 
 const swaggerUi = require("swagger-ui-express");
 const YAML = require("yamljs");
+
+const logger = require("./utils/logger/logger.js"); // Winston Logger
 
 const authRoutes = require("./routes/authRoutes");
 const userRoutes = require("./routes/userRoutes");
@@ -26,53 +29,85 @@ app.use(
       useDefaults: true,
       directives: {
         "default-src": ["'self'"],
-        // Connect-src defines the allowlist for API endpoints / WebSockets
         "connect-src": [
           "'self'",
           "http://localhost:5000",
           "https://api.vsms-screening.org"
         ],
-        // Allow scripts required by Swagger UI & application
         "script-src": ["'self'", "'unsafe-inline'", "https://cdn.jsdelivr.net"],
-        // Allow inline styles required by Swagger UI
         "style-src": ["'self'", "'unsafe-inline'", "https://cdn.jsdelivr.net"],
-        // Allow image sources (including data URIs for QR code generation)
         "img-src": ["'self'", "data:", "blob:"],
-        // Prevent clickjacking by denying iframe embedding
         "frame-ancestors": ["'none'"],
       },
     },
-    // Cross-Origin Resource Policy
     crossOriginResourcePolicy: { policy: "cross-origin" },
   })
 );
 
-// 2. CORS Middleware Configuration
-app.use(cors());
-app.use(express.json());
+// 2. HTTP Request Logging Middleware (Streams HTTP logs directly to Winston)
+const morganFormat = ":remote-addr - :method :url :status :response-time ms";
+app.use(
+  morgan(morganFormat, {
+    stream: {
+      write: (message) => logger.info(message.trim())
+    }
+  })
+);
 
-// 3. Swagger Documentation Route
+// 3. CORS Middleware Configuration
+app.use(cors());
+
+// 4. Payload Size Limits (Prevents Arbitrary Large Input DoS Attacks)
+app.use(express.json({ limit: "100kb" }));
+app.use(express.urlencoded({ limit: "100kb", extended: true }));
+
+// 5. Catch Payload Too Large (HTTP 413) Errors
+app.use((err, req, res, next) => {
+  if (err.type === "entity.too.large" || err.status === 413) {
+    logger.warn(`Payload Limit Exceeded from IP: ${req.ip}`);
+    return res.status(413).json({
+      success: false,
+      message: "Payload size too large. Requests are strictly limited to 100KB."
+    });
+  }
+  next(err);
+});
+
+// 6. Swagger Documentation Route
 app.use(
   "/api-docs",
   swaggerUi.serve,
   swaggerUi.setup(swaggerDocument)
 );
 
-// 4. Base Check Route
+// 7. Base Check Route
 app.get("/", (req, res) => {
   res.send("Backend is running!");
 });
 
-// 5. API Route Mounts
+// 8. API Route Mounts
 app.use("/auth", authRoutes);
 app.use("/users", userRoutes);
 app.use("/qr", qrRoutes);
 app.use("/participants", participantRoutes);
-app.use("/event-registration", eventRegistrationRoutes);
+app.use("/event-registrations", eventRegistrationRoutes);
 app.use("/events", eventRoutes);
+
+// 9. Global Unhandled Error Handler
+app.use((err, req, res, next) => {
+  // Log error stack trace to rotating error log
+  logger.error(`${err.status || 500} - ${err.message} - ${req.originalUrl} - ${req.method} - ${req.ip}`, {
+    stack: err.stack
+  });
+
+  return res.status(err.status || 500).json({
+    success: false,
+    message: err.message || "An unexpected internal server error occurred."
+  });
+});
 
 // Start server
 app.listen(PORT, () => {
-  console.log(`🚀 Server running on http://localhost:${PORT}`);
-  console.log(`📄 Swagger Docs: http://localhost:${PORT}/api-docs`);
+  logger.info(`🚀 Server running on http://localhost:${PORT}`);
+  logger.info(`📄 Swagger Docs: http://localhost:${PORT}/api-docs`);
 });

@@ -6,8 +6,8 @@ const qrModel = require("../models/qrModel");
 // ==========================================
 exports.generateQR = async (req, res) => {
     try {
-
         const { registrationId } = req.params;
+        const userId = req.user?.id; // Grab authenticated user ID for audit log
 
         if (!registrationId) {
             return res.status(400).json({
@@ -16,7 +16,7 @@ exports.generateQR = async (req, res) => {
             });
         }
 
-        const qr = await qrModel.generateQR(registrationId);
+        const qr = await qrModel.generateQR(registrationId, userId);
 
         return res.status(201).json({
             success: true,
@@ -25,14 +25,12 @@ exports.generateQR = async (req, res) => {
         });
 
     } catch (err) {
-
         console.error("Generate QR Error:", err);
 
         return res.status(500).json({
             success: false,
             message: err.message
         });
-
     }
 };
 
@@ -42,8 +40,8 @@ exports.generateQR = async (req, res) => {
 // ==========================================
 exports.verifyQR = async (req, res) => {
     try {
-
-        const { token } = req.body;
+        const { token, eventId } = req.body;
+        const userId = req.user?.id;
 
         if (!token) {
             return res.status(400).json({
@@ -52,19 +50,28 @@ exports.verifyQR = async (req, res) => {
             });
         }
 
-        const result = await qrModel.verifyQR(token);
+        const result = await qrModel.verifyQR(token, eventId, userId);
 
-        return res.status(200).json(result);
+        return res.status(200).json({
+            success: true,
+            data: result
+        });
 
     } catch (err) {
-
         console.error("Verify QR Error:", err);
+
+        // Client errors (expired, revoked, invalid)
+        if (err.message.includes("invalid") || err.message.includes("expired") || err.message.includes("revoked")) {
+            return res.status(400).json({
+                success: false,
+                message: err.message
+            });
+        }
 
         return res.status(500).json({
             success: false,
             message: err.message
         });
-
     }
 };
 
@@ -74,7 +81,6 @@ exports.verifyQR = async (req, res) => {
 // ==========================================
 exports.getParticipantByQR = async (req, res) => {
     try {
-
         const { token } = req.params;
 
         if (!token) {
@@ -92,14 +98,19 @@ exports.getParticipantByQR = async (req, res) => {
         });
 
     } catch (err) {
-
         console.error("Get Participant Error:", err);
+
+        if (err.message.includes("not found")) {
+            return res.status(404).json({
+                success: false,
+                message: err.message
+            });
+        }
 
         return res.status(500).json({
             success: false,
             message: err.message
         });
-
     }
 };
 
@@ -109,9 +120,10 @@ exports.getParticipantByQR = async (req, res) => {
 // ==========================================
 exports.revokeQR = async (req, res) => {
     try {
-
         const { qrId } = req.params;
-        const { revokedReason, revokedBy } = req.body;
+        const { revokedReason } = req.body;
+        // Fallback to authenticated user ID if revokedBy is not in body
+        const revokedBy = req.body.revokedBy || req.user?.id;
 
         if (!qrId) {
             return res.status(400).json({
@@ -133,14 +145,12 @@ exports.revokeQR = async (req, res) => {
         });
 
     } catch (err) {
-
         console.error("Revoke QR Error:", err);
 
         return res.status(500).json({
             success: false,
             message: err.message
         });
-
     }
 };
 
@@ -150,8 +160,8 @@ exports.revokeQR = async (req, res) => {
 // ==========================================
 exports.reissueQR = async (req, res) => {
     try {
-
         const { registrationId } = req.params;
+        const userId = req.user?.id;
 
         if (!registrationId) {
             return res.status(400).json({
@@ -160,7 +170,7 @@ exports.reissueQR = async (req, res) => {
             });
         }
 
-        const qr = await qrModel.reissueQR(registrationId);
+        const qr = await qrModel.reissueQR(registrationId, userId);
 
         return res.status(201).json({
             success: true,
@@ -169,14 +179,12 @@ exports.reissueQR = async (req, res) => {
         });
 
     } catch (err) {
-
         console.error("Reissue QR Error:", err);
 
         return res.status(500).json({
             success: false,
             message: err.message
         });
-
     }
 };
 
@@ -186,7 +194,6 @@ exports.reissueQR = async (req, res) => {
 // ==========================================
 exports.downloadQR = async (req, res) => {
     try {
-
         const { qrId } = req.params;
 
         if (!qrId) {
@@ -204,14 +211,12 @@ exports.downloadQR = async (req, res) => {
         });
 
     } catch (err) {
-
         console.error("Download QR Error:", err);
 
         return res.status(500).json({
             success: false,
             message: err.message
         });
-
     }
 };
 
@@ -221,7 +226,6 @@ exports.downloadQR = async (req, res) => {
 // ==========================================
 exports.printQR = async (req, res) => {
     try {
-
         const { qrId } = req.params;
 
         if (!qrId) {
@@ -239,14 +243,12 @@ exports.printQR = async (req, res) => {
         });
 
     } catch (err) {
-
         console.error("Print QR Error:", err);
 
         return res.status(500).json({
             success: false,
             message: err.message
         });
-
     }
 };
 
@@ -256,7 +258,6 @@ exports.printQR = async (req, res) => {
 // ==========================================
 exports.getParticipantQRCodes = async (req, res) => {
     try {
-
         const { participantId } = req.params;
 
         if (!participantId) {
@@ -274,34 +275,38 @@ exports.getParticipantQRCodes = async (req, res) => {
         });
 
     } catch (err) {
-
         console.error("QR History Error:", err);
 
         return res.status(500).json({
             success: false,
             message: err.message
         });
-
     }
 };
 
 // ==========================================
-// Manual Check-In
+// Manual Check-In (Fallback when QR cannot be scanned)
 // POST /qr/manual-checkin
 // ==========================================
 exports.manualCheckIn = async (req, res) => {
     try {
+        const { registrationId, identifier, eventId } = req.body;
+        const userId = req.user?.id;
 
-        const { registrationId } = req.body;
-
-        if (!registrationId) {
+        // Ensure at least one form of identification is provided
+        if (!registrationId && !identifier) {
             return res.status(400).json({
                 success: false,
-                message: "Registration ID is required."
+                message: "Registration ID or Identifier (NRIC/Token) is required."
             });
         }
 
-        const result = await qrModel.manualCheckIn(registrationId);
+        const result = await qrModel.manualCheckIn({
+            registrationId,
+            identifier,
+            eventId,
+            userId
+        });
 
         return res.status(200).json({
             success: true,
@@ -310,13 +315,18 @@ exports.manualCheckIn = async (req, res) => {
         });
 
     } catch (err) {
-
         console.error("Manual Check-In Error:", err);
+
+        if (err.message.includes("not found")) {
+            return res.status(404).json({
+                success: false,
+                message: err.message
+            });
+        }
 
         return res.status(500).json({
             success: false,
             message: err.message
         });
-
     }
 };

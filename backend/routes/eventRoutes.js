@@ -9,7 +9,7 @@ const eventController = require("../controllers/eventController");
 // POST /events/create
 // ==========================================
 router.post(
-    "/create",
+    "/",
     eventController.createEvent
 );
 
