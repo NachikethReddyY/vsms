@@ -18,6 +18,14 @@ enum UserStatus {
   SUSPENDED
 }
 
+enum SystemRole {
+  SUPER_ADMIN
+  EVENT_MANAGER
+  SCREENER
+  REVIEWER
+  REGISTRATION_STAFF
+}
+
 enum QueueStatus {
   WAITING
   IN_PROGRESS
@@ -164,6 +172,13 @@ enum SyncActionStatus {
   FAILED
 }
 
+enum IncidentSeverity {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
 // ==========================================
 // AUTHENTICATION & USER MANAGEMENT
 // ==========================================
@@ -185,7 +200,6 @@ model User {
   createdAt           DateTime   @default(now()) @map("created_at")
   updatedAt           DateTime   @updatedAt @map("updated_at")
 
-  // Relations
   credential             UserCredential?
   userRoles              UserRole[]
   staffAssignments       StaffAssignment[]      @relation("AssignedUser")
@@ -224,12 +238,13 @@ model UserCredential {
 }
 
 model UserRole {
-  id     String @id @default(uuid()) @map("role_id") @db.Uuid
-  userId String @map("user_id") @db.Uuid
-  role   String @db.VarChar(50)
+  id     String     @id @default(uuid()) @map("role_id") @db.Uuid
+  userId String     @map("user_id") @db.Uuid
+  role   SystemRole
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
+  @@unique([userId, role])
   @@index([userId, role])
   @@map("user_role")
 }
@@ -248,7 +263,9 @@ model Participant {
   gender               String   @db.VarChar(1)
   race                 String?  @db.VarChar(50)
   nationality          String?  @default("Singaporean") @db.VarChar(50)
-  address              String?  @db.Text
+  addressStreet        String?  @map("address_street") @db.VarChar(255)
+  addressUnit          String?  @map("address_unit") @db.VarChar(20)
+  addressPostalCode    String?  @map("address_postal_code") @db.VarChar(10)
   contactNumber        String   @map("contact_number") @db.VarChar(20)
   emergencyContact     String   @map("emergency_contact") @db.VarChar(20)
   emergencyContactName String?  @map("emergency_contact_name") @db.VarChar(100)
@@ -334,13 +351,12 @@ model EventRegistration {
   participant      Participant       @relation(fields: [participantId], references: [id], onDelete: Restrict)
   event            Event             @relation(fields: [eventId], references: [id], onDelete: Cascade)
   registeredByUser User              @relation("RegisteredBy", fields: [registeredBy], references: [id], onDelete: Restrict)
-  qrCodePasses     QRCodePass[]
+  qrCodePass       QRCodePass?
   queueEntries     QueueEntry[]
   queueMovements   QueueMovement[]
   scanLogs         ScanLog[]
   screeningResults ScreeningResult[]
   reviews          Review[]
-  referrals        Referral[]
 
   @@unique([eventId, participantId])
   @@index([eventId, registrationStatus, checkedIn])
@@ -351,7 +367,7 @@ model EventRegistration {
 
 model QRCodePass {
   id             String    @id @default(uuid()) @map("qr_id") @db.Uuid
-  registrationId String    @map("registration_id") @db.Uuid
+  registrationId String    @unique @map("registration_id") @db.Uuid
   token          String    @unique @map("token") @db.VarChar(255)
   issuedAt       DateTime  @default(now()) @map("issue_at")
   expiresAt      DateTime  @map("expires_at")
@@ -416,6 +432,7 @@ model StaffAssignment {
   assignedUser User     @relation("AssignedUser", fields: [userId], references: [id], onDelete: Cascade)
   assigner     User     @relation("AssignedBy", fields: [assignedBy], references: [id], onDelete: Restrict)
 
+  @@unique([eventId, userId, shiftId, stationId])
   @@index([eventId, assignmentStatus])
   @@index([userId, assignmentStatus])
   @@index([stationId])
@@ -551,7 +568,6 @@ model Review {
 model Referral {
   id               String           @id @default(uuid()) @map("referral_id") @db.Uuid
   reviewId         String           @map("review_id") @db.Uuid
-  registrationId   String?          @map("registration_id") @db.Uuid
   createdBy        String           @map("created_by") @db.Uuid
   destination      String           @db.VarChar(255)
   destinationEmail String?          @map("destination_email") @db.VarChar(255)
@@ -565,7 +581,6 @@ model Referral {
   updatedAt        DateTime         @updatedAt @map("updated_at")
 
   review                 Review                 @relation(fields: [reviewId], references: [id], onDelete: Cascade)
-  registration           EventRegistration?     @relation(fields: [registrationId], references: [id], onDelete: SetNull)
   creator                User                   @relation("ReferralCreator", fields: [createdBy], references: [id], onDelete: Restrict)
   documentArtifacts      DocumentArtifact[]
   notificationDeliveries NotificationDelivery[]
@@ -668,17 +683,17 @@ model LoginHistory {
 
 model AuditLog {
   id         String   @id @default(uuid()) @map("audit_id") @db.Uuid
-  userId     String   @map("user_id") @db.Uuid
+  userId     String?  @map("user_id") @db.Uuid
   action     String   @db.VarChar(100)
   entityName String   @map("entity_name") @db.VarChar(50)
-  entityId   String   @map("entity_id") @db.Uuid
+  entityId   String?  @map("entity_id") @db.Uuid
   oldValue   Json?    @map("old_value")
   newValue   Json?    @map("new_value")
   ipAddress  String   @map("ip_address") @db.VarChar(45)
   deviceName String   @map("device_name") @db.VarChar(100)
   createdAt  DateTime @default(now()) @map("created_at")
 
-  user User @relation(fields: [userId], references: [id], onDelete: Restrict)
+  user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
 
   @@index([entityName, entityId])
   @@index([userId, createdAt])
@@ -686,15 +701,15 @@ model AuditLog {
 }
 
 model SecurityIncident {
-  id           String    @id @default(uuid()) @map("incident_id") @db.Uuid
-  userId       String    @map("user_id") @db.Uuid
-  incidentType String    @map("incident_type") @db.VarChar(100)
-  severity     String
-  description  String    @db.Text
-  resolved     Boolean   @default(false)
-  resolvedBy   String?   @map("resolved_by") @db.Uuid
-  resolvedAt   DateTime? @map("resolved_at")
-  createdAt    DateTime  @default(now()) @map("created_at")
+  id           String           @id @default(uuid()) @map("incident_id") @db.Uuid
+  userId       String           @map("user_id") @db.Uuid
+  incidentType String           @map("incident_type") @db.VarChar(100)
+  severity     IncidentSeverity
+  description  String           @db.Text
+  resolved     Boolean          @default(false)
+  resolvedBy   String?          @map("resolved_by") @db.Uuid
+  resolvedAt   DateTime?        @map("resolved_at")
+  createdAt    DateTime         @default(now()) @map("created_at")
 
   user     User  @relation("IncidentUser", fields: [userId], references: [id], onDelete: Restrict)
   resolver User? @relation("ResolvedBy", fields: [resolvedBy], references: [id], onDelete: SetNull)
