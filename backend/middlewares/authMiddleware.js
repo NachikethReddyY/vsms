@@ -1,49 +1,53 @@
 const jwt = require("jsonwebtoken");
+const AppError = require("../errors/AppError");
 
 /**
- * Verify JWT token attached in Bearer Authorization header
+ * Authentication Middleware
  */
 const authenticateToken = (req, res, next) => {
-  const authHeader = req.headers["authorization"];
+  const authHeader = req.get("authorization") || req.headers["authorization"];
   const token = authHeader && authHeader.split(" ")[1];
 
   if (!token) {
-    return res.status(401).json({
-      success: false,
-      message: "Access token required.",
-    });
+    return next(new AppError(401, "UNAUTHORIZED", "Access token required."));
   }
 
-  jwt.verify(token, process.env.JWT_SECRET || "fallback_secret", (err, user) => {
-    if (err) {
-      return res.status(403).json({
-        success: false,
-        message: "Invalid or expired token.",
-      });
-    }
+  jwt.verify(
+    token,
+    process.env.JWT_SECRET || "fallback_secret",
+    (err, decodedUser) => {
+      if (err) {
+        return next(
+          new AppError(403, "INVALID_SESSION", "Invalid or expired token.")
+        );
+      }
 
-    req.user = user; // Attach payload { id, role, email } to req
-    next();
-  });
+      req.user = decodedUser;
+      next();
+    }
+  );
 };
 
 /**
- * Restrict endpoint access by role
+ * Role Authorization Middleware
  */
 const authorizeRoles = (...allowedRoles) => {
-  return (req, res, next) => {
-    if (!req.user || !req.user.role) {
-      return res.status(401).json({
-        success: false,
-        message: "Unauthorized: User identity not found.",
-      });
+  return (req, _res, next) => {
+    if (!req.user) {
+      return next(new AppError(401, "UNAUTHORIZED", "Authentication required."));
     }
 
-    if (!allowedRoles.includes(req.user.role)) {
-      return res.status(403).json({
-        success: false,
-        message: "Forbidden: You do not have permission to perform this action.",
-      });
+    // Supports both systemRole and role property names
+    const userRole = req.user.systemRole || req.user.role;
+
+    if (!userRole || !allowedRoles.includes(userRole)) {
+      return next(
+        new AppError(
+          403,
+          "FORBIDDEN",
+          "You do not have permission to perform this action."
+        )
+      );
     }
 
     next();
@@ -51,6 +55,11 @@ const authorizeRoles = (...allowedRoles) => {
 };
 
 module.exports = {
+  // Primary exports
   authenticateToken,
   authorizeRoles,
+
+  // Export aliases for alternative import syntaxes across routes
+  authenticate: authenticateToken,
+  requireSystemRole: authorizeRoles,
 };

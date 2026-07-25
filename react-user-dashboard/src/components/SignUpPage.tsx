@@ -57,9 +57,9 @@ const SignUpPage: React.FC = () => {
 
         {/* Error Alert */}
         {errorMessage && (
-          : { userId: any; username: any; email: any; systemRole: any; status: any; createdAt: any; }: { userId: any; username: any; email: any; systemRole: any; status: any; createdAt: any; }<div className="vsms-alert-banner" role="alert">
-            {errorMessage}
-          </div>
+         <div className="vsms-alert-banner" role="alert">
+      {errorMessage}
+  </div>
         )}
 
         {/* Form */}

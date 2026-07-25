@@ -1,33 +1,38 @@
 const express = require("express");
 const router = express.Router();
-const eventRegistrationController = require("../controllers/eventRegistrationController");
+
+const eventController = require("../controllers/eventController");
+const { authenticate, requireSystemRole } = require("../middlewares/authMiddleware");
+
+// Apply authentication middleware to all event routes
+router.use(authenticate);
 
 // ==========================================
-// Register participant for an event
-// POST /event-registrations
+// Event CRUD & Core Actions
 // ==========================================
-// ✅ Change "/create" to "/"
-router.post(
-    "/",
-    eventRegistrationController.createRegistration
-);
+router.get("/", eventController.list);
+router.post("/", requireSystemRole("ADMIN", "EVENT_MANAGER"), eventController.create);
+router.get("/staff-directory", eventController.staffDirectory);
+router.get("/:eventId", eventController.get);
+router.put("/:eventId", requireSystemRole("ADMIN", "EVENT_MANAGER"), eventController.update);
 
 // ==========================================
-// Get registration by ID
-// GET /event-registrations/:id
+// Lifecycle / Transitions
 // ==========================================
-router.get(
-    "/:id",
-    eventRegistrationController.getRegistration
-);
+router.post("/:eventId/publish", requireSystemRole("ADMIN", "EVENT_MANAGER"), eventController.publish);
+router.post("/:eventId/start", requireSystemRole("ADMIN", "EVENT_MANAGER"), eventController.start);
+router.post("/:eventId/complete", requireSystemRole("ADMIN", "EVENT_MANAGER"), eventController.complete);
+router.post("/:eventId/cancel", requireSystemRole("ADMIN", "EVENT_MANAGER"), eventController.cancel);
 
 // ==========================================
-// Get registrations for a participant
-// GET /event-registrations/participant/:participantId
+// Staffing & Assignments
 // ==========================================
-router.get(
-    "/participant/:participantId",
-    eventRegistrationController.getParticipantRegistrations
-);
+router.post("/:eventId/shifts/:shiftId/assignments", requireSystemRole("ADMIN", "EVENT_MANAGER"), eventController.addAssignment);
+router.delete("/:eventId/shifts/:shiftId/assignments/:assignmentId", requireSystemRole("ADMIN", "EVENT_MANAGER"), eventController.removeAssignment);
+
+// ==========================================
+// Audit Logs
+// ==========================================
+router.get("/:eventId/audit", requireSystemRole("ADMIN"), eventController.audit);
 
 module.exports = router;

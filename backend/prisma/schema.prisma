@@ -70,6 +70,7 @@ enum StaffAssignmentStatus {
 }
 
 enum RegistrationStatus {
+  SIGNED_UP
   REGISTERED
   CHECKED_IN
   CANCELLED
@@ -102,6 +103,20 @@ enum Channel {
   EMAIL
   SMS
   IN_APP
+}
+
+enum StationType {
+  VISUAL_ACUITY
+  REFRACTION
+  COLOUR_VISION
+  EYE_HEALTH
+}
+
+enum OverallFlag {
+  NORMAL
+  REVIEW
+  REFER
+  URGENT
 }
 
 enum ReviewOutcome {
@@ -166,6 +181,7 @@ model User {
   designation         String?    @db.VarChar(100)
   status              UserStatus @default(ACTIVE)
   consentConfirmation Boolean    @default(false) @map("consent_confirmation")
+  version             Int        @default(1)
   createdAt           DateTime   @default(now()) @map("created_at")
   updatedAt           DateTime   @updatedAt @map("updated_at")
 
@@ -181,14 +197,18 @@ model User {
   loginHistories         LoginHistory[]
   securityIncidents      SecurityIncident[]     @relation("IncidentUser")
   resolvedIncidents      SecurityIncident[]     @relation("ResolvedBy")
-  reviews                Review[]
-  referrals              Referral[]
-  documentArtifacts      DocumentArtifact[]
-  syncActions            SyncAction[]
-  screeningResults       ScreeningResult[]
+  reviews                Review[]               @relation("ReviewReviewer")
+  referrals              Referral[]             @relation("ReferralCreator")
+  documentArtifacts      DocumentArtifact[]     @relation("DocumentGenerator")
+  syncActions            SyncAction[]           @relation("SyncActor")
+  screeningResults       ScreeningResult[]      @relation("ScreeningRecorder")
   movedQueueEntries      QueueMovement[]        @relation("MovedBy")
   notificationDeliveries NotificationDelivery[]
+  eventsCreated          Event[]                @relation("EventCreatedBy")
+  eventsCancelled        Event[]                @relation("EventCancelledBy")
 
+  @@index([status, department])
+  @@index([email])
   @@map("user")
 }
 
@@ -210,6 +230,7 @@ model UserRole {
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
+  @@index([userId, role])
   @@map("user_role")
 }
 
@@ -218,13 +239,9 @@ model UserRole {
 // ==========================================
 
 model Participant {
-  id   String @id @default(uuid()) @map("participant_id") @db.Uuid
-  // 1. CHANGE THIS FIELD TYPE TO FIT THE ENCRYPTED STRING
-  nric String @unique @db.Text
-
-  // 2. Keep VarChar(9) here since nricMasked stores plain text like "S****123A"
-  nricMasked String @map("nric_masked") @db.VarChar(9)
-
+  id                   String   @id @default(uuid()) @map("participant_id") @db.Uuid
+  nric                 String   @unique @db.Text
+  nricMasked           String   @map("nric_masked") @db.VarChar(9)
   firstName            String   @map("first_name") @db.VarChar(100)
   lastName             String   @map("last_name") @db.VarChar(100)
   dateOfBirth          DateTime @map("date_of_birth") @db.Date
@@ -236,34 +253,47 @@ model Participant {
   emergencyContact     String   @map("emergency_contact") @db.VarChar(20)
   emergencyContactName String?  @map("emergency_contact_name") @db.VarChar(100)
   consentGiven         Boolean  @map("consent_given")
+  version              Int      @default(1)
   createdAt            DateTime @default(now()) @map("created_at")
   updatedAt            DateTime @updatedAt @map("updated_at")
 
   eventRegistrations EventRegistration[]
 
-  @@index([nric])
+  @@index([lastName, firstName])
+  @@index([contactNumber])
   @@map("participant")
 }
 
 model Event {
   id                 String      @id @default(uuid()) @map("event_id") @db.Uuid
-  eventName          String      @map("event_name") @db.VarChar(100)
-  location           String      @db.VarChar(255)
-  eventDate          DateTime    @map("event_date") @db.Date
-  startTime          DateTime    @map("start_time") @db.Time
-  endTime            DateTime    @map("end_time") @db.Time
-  status             EventStatus
-  cancellationReason String?     @map("cancellation_reason")
+  name               String      @map("event_name") @db.VarChar(150)
+  description        String?
+  bannerKey          String      @default("COMMUNITY_SCREENING") @map("banner_key") @db.VarChar(50)
+  artworkDataUrl     String?     @map("artwork_data_url")
+  venue              String      @db.VarChar(255)
+  timezone           String      @default("UTC") @db.VarChar(100)
+  startsAt           DateTime    @map("starts_at") @db.Timestamptz(3)
+  endsAt             DateTime    @map("ends_at") @db.Timestamptz(3)
+  capacity           Int         @default(100)
+  status             EventStatus @default(DRAFT)
+  createdByUserId    String      @map("created_by_user_id") @db.Uuid
+  cancelledByUserId  String?     @map("cancelled_by_user_id") @db.Uuid
   cancelledAt        DateTime?   @map("cancelled_at") @db.Timestamptz(3)
-  createdAt          DateTime    @default(now()) @map("created_at")
-  updatedAt          DateTime    @updatedAt @map("updated_at")
+  cancellationReason String?     @map("cancellation_reason")
+  version            Int         @default(1)
+  createdAt          DateTime    @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt          DateTime    @updatedAt @map("updated_at") @db.Timestamptz(3)
 
-  shifts             Shift[]
-  staffAssignments   StaffAssignment[]
-  eventRegistrations EventRegistration[]
-  stations           Station[]
+  createdBy        User                @relation("EventCreatedBy", fields: [createdByUserId], references: [id], onDelete: Restrict)
+  cancelledBy      User?               @relation("EventCancelledBy", fields: [cancelledByUserId], references: [id], onDelete: Restrict)
+  shifts           Shift[]
+  stations         Station[]
+  registrations    EventRegistration[]
+  staffAssignments StaffAssignment[]
 
-  @@map("event")
+  @@index([status, startsAt, endsAt])
+  @@index([createdByUserId])
+  @@map("events")
 }
 
 model Shift {
@@ -281,26 +311,29 @@ model Shift {
   staffAssignments StaffAssignment[]
 
   @@unique([eventId, name, startsAt])
-  @@index([eventId, startsAt])
+  @@index([eventId, status, startsAt])
   @@map("shift")
 }
 
 model EventRegistration {
-  id                 String             @id @default(uuid()) @map("registration_id") @db.Uuid
-  participantId      String             @map("participant_id") @db.Uuid
-  eventId            String             @map("event_id") @db.Uuid
-  queueNumber        Int                @map("queue_number")
-  registrationStatus RegistrationStatus @map("registration_status")
-  registeredBy       String             @map("registered_by") @db.Uuid
-  registeredAt       DateTime           @default(now()) @map("registered_at")
-  updatedAt          DateTime           @updatedAt @map("updated_at")
-  checkedIn          Boolean            @default(false) @map("checked_in")
-  checkedInAt        DateTime?          @map("checked_in_at")
+  id                     String             @id @default(uuid()) @map("registration_id") @db.Uuid
+  participantId          String             @map("participant_id") @db.Uuid
+  eventId                String             @map("event_id") @db.Uuid
+  queueNumber            Int?               @map("queue_number")
+  registrationStatus     RegistrationStatus @default(SIGNED_UP) @map("registration_status")
+  participantDisplayName String?            @map("participant_display_name") @db.VarChar(150)
+  passToken              String?            @unique @map("pass_token") @db.VarChar(255)
+  registeredBy           String             @map("registered_by") @db.Uuid
+  registeredAt           DateTime           @default(now()) @map("registered_at")
+  checkedIn              Boolean            @default(false) @map("checked_in")
+  checkedInAt            DateTime?          @map("checked_in_at")
+  version                Int                @default(1)
+  createdAt              DateTime           @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt              DateTime           @updatedAt @map("updated_at") @db.Timestamptz(3)
 
-  // Relations
-  participant      Participant       @relation(fields: [participantId], references: [id])
-  event            Event             @relation(fields: [eventId], references: [id])
-  registeredByUser User              @relation("RegisteredBy", fields: [registeredBy], references: [id])
+  participant      Participant       @relation(fields: [participantId], references: [id], onDelete: Restrict)
+  event            Event             @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  registeredByUser User              @relation("RegisteredBy", fields: [registeredBy], references: [id], onDelete: Restrict)
   qrCodePasses     QRCodePass[]
   queueEntries     QueueEntry[]
   queueMovements   QueueMovement[]
@@ -309,13 +342,17 @@ model EventRegistration {
   reviews          Review[]
   referrals        Referral[]
 
-  @@map("event_registration")
+  @@unique([eventId, participantId])
+  @@index([eventId, registrationStatus, checkedIn])
+  @@index([participantId])
+  @@index([registeredBy])
+  @@map("event_registrations")
 }
 
 model QRCodePass {
   id             String    @id @default(uuid()) @map("qr_id") @db.Uuid
   registrationId String    @map("registration_id") @db.Uuid
-  token          String    @map("token") @db.VarChar(255)
+  token          String    @unique @map("token") @db.VarChar(255)
   issuedAt       DateTime  @default(now()) @map("issue_at")
   expiresAt      DateTime  @map("expires_at")
   isActive       Boolean   @default(true) @map("is_active")
@@ -323,12 +360,12 @@ model QRCodePass {
   revokedBy      String?   @map("revoked_by") @db.Uuid
   revokedReason  String?   @map("revoked_reason") @db.VarChar(255)
 
-  registration  EventRegistration @relation(fields: [registrationId], references: [id])
-  revokedByUser User?             @relation(fields: [revokedBy], references: [id])
+  registration  EventRegistration @relation(fields: [registrationId], references: [id], onDelete: Cascade)
+  revokedByUser User?             @relation(fields: [revokedBy], references: [id], onDelete: SetNull)
   scanLogs      ScanLog[]
 
-  @@index([token])
-  @@index([isActive])
+  @@index([registrationId, isActive])
+  @@index([expiresAt])
   @@map("qr_code_pass")
 }
 
@@ -337,15 +374,16 @@ model QRCodePass {
 // ==========================================
 
 model Station {
-  id           String   @id @default(uuid()) @map("station_id") @db.Uuid
-  eventId      String   @map("event_id") @db.Uuid
-  stationName  String   @map("station_name") @db.VarChar(100)
-  stationType  String   @map("station_type") @db.VarChar(100)
-  stationOrder Int      @map("station_order")
-  isActive     Boolean  @default(true) @map("is_active")
-  timeCreated  DateTime @default(now()) @map("time_created")
+  id           String      @id @default(uuid()) @map("station_id") @db.Uuid
+  eventId      String      @map("event_id") @db.Uuid
+  stationName  String      @map("station_name") @db.VarChar(100)
+  stationType  StationType @map("station_type")
+  stationOrder Int         @map("station_order")
+  isActive     Boolean     @default(true) @map("is_active")
+  createdAt    DateTime    @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt    DateTime    @updatedAt @map("updated_at") @db.Timestamptz(3)
 
-  event            Event             @relation(fields: [eventId], references: [id])
+  event            Event             @relation(fields: [eventId], references: [id], onDelete: Cascade)
   staffAssignments StaffAssignment[]
   queueEntries     QueueEntry[]
   scanLogs         ScanLog[]
@@ -353,6 +391,9 @@ model Station {
   fromMovements    QueueMovement[]   @relation("FromStation")
   toMovements      QueueMovement[]   @relation("ToStation")
 
+  @@unique([eventId, stationType])
+  @@unique([eventId, stationOrder])
+  @@index([eventId, isActive, stationOrder])
   @@map("station")
 }
 
@@ -369,15 +410,16 @@ model StaffAssignment {
   status           StaffAssignmentStatus? @default(ASSIGNED)
   notes            String?
 
-  event        Event    @relation(fields: [eventId], references: [id])
-  station      Station? @relation(fields: [stationId], references: [id])
+  event        Event    @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  station      Station? @relation(fields: [stationId], references: [id], onDelete: SetNull)
   shift        Shift?   @relation(fields: [shiftId], references: [id], onDelete: Cascade)
-  assignedUser User     @relation("AssignedUser", fields: [userId], references: [id])
-  assigner     User     @relation("AssignedBy", fields: [assignedBy], references: [id])
+  assignedUser User     @relation("AssignedUser", fields: [userId], references: [id], onDelete: Cascade)
+  assigner     User     @relation("AssignedBy", fields: [assignedBy], references: [id], onDelete: Restrict)
 
-  @@index([eventId])
+  @@index([eventId, assignmentStatus])
+  @@index([userId, assignmentStatus])
   @@index([stationId])
-  @@index([userId])
+  @@index([shiftId])
   @@map("staff_assignment")
 }
 
@@ -386,17 +428,19 @@ model QueueEntry {
   registrationId String      @map("registration_id") @db.Uuid
   stationId      String      @map("station_id") @db.Uuid
   queueNumber    Int         @map("queue_number")
-  status         QueueStatus
+  status         QueueStatus @default(WAITING)
   enteredAt      DateTime    @default(now()) @map("entered_at")
   calledAt       DateTime?   @map("called_at")
   startedAt      DateTime?   @map("started_at")
   leftQueueAt    DateTime?   @map("left_queue_at")
   completedAt    DateTime?   @map("completed_at")
 
-  registration     EventRegistration @relation(fields: [registrationId], references: [id])
-  station          Station           @relation(fields: [stationId], references: [id])
+  registration     EventRegistration @relation(fields: [registrationId], references: [id], onDelete: Cascade)
+  station          Station           @relation(fields: [stationId], references: [id], onDelete: Cascade)
   screeningResults ScreeningResult[]
 
+  @@index([stationId, status, queueNumber])
+  @@index([registrationId, status])
   @@map("queue_entry")
 }
 
@@ -409,11 +453,13 @@ model QueueMovement {
   movementReason String   @map("movement_reason") @db.VarChar(100)
   movementTime   DateTime @default(now()) @map("movement_time")
 
-  registration EventRegistration @relation(fields: [registrationId], references: [id])
-  fromStation  Station           @relation("FromStation", fields: [fromStationId], references: [id])
-  toStation    Station           @relation("ToStation", fields: [toStationId], references: [id])
-  movedByUser  User              @relation("MovedBy", fields: [movedBy], references: [id])
+  registration EventRegistration @relation(fields: [registrationId], references: [id], onDelete: Cascade)
+  fromStation  Station           @relation("FromStation", fields: [fromStationId], references: [id], onDelete: Restrict)
+  toStation    Station           @relation("ToStation", fields: [toStationId], references: [id], onDelete: Restrict)
+  movedByUser  User              @relation("MovedBy", fields: [movedBy], references: [id], onDelete: Restrict)
 
+  @@index([registrationId])
+  @@index([movedBy])
   @@map("queue_movement")
 }
 
@@ -428,11 +474,14 @@ model ScanLog {
   scannedAt      DateTime   @default(now()) @map("scanned_at")
   registrationId String?    @map("registration_id") @db.Uuid
 
-  qrCode       QRCodePass?        @relation(fields: [qrId], references: [id])
-  user         User?              @relation(fields: [userId], references: [id])
-  station      Station            @relation(fields: [stationId], references: [id])
-  registration EventRegistration? @relation(fields: [registrationId], references: [id])
+  qrCode       QRCodePass?        @relation(fields: [qrId], references: [id], onDelete: SetNull)
+  user         User?              @relation(fields: [userId], references: [id], onDelete: SetNull)
+  station      Station            @relation(fields: [stationId], references: [id], onDelete: Cascade)
+  registration EventRegistration? @relation(fields: [registrationId], references: [id], onDelete: Cascade)
 
+  @@index([stationId, scannedAt])
+  @@index([qrId])
+  @@index([registrationId])
   @@map("scan_log")
 }
 
@@ -441,25 +490,33 @@ model ScanLog {
 // ==========================================
 
 model ScreeningResult {
-  id             String   @id @default(uuid()) @map("result_id") @db.Uuid
-  registrationId String   @map("registration_id") @db.Uuid
-  stationId      String   @map("station_id") @db.Uuid
-  queueEntryId   String?  @map("queue_entry_id") @db.Uuid
-  recordedBy     String   @map("recorded_by") @db.Uuid
-  screeningType  String   @map("screening_type") @db.VarChar(50)
-  resultData     Json     @map("result_data")
-  overallFlag    String?  @map("overall_flag") @db.VarChar(50)
-  isFlagged      Boolean  @default(false) @map("is_flagged")
-  flagSummary    String?  @map("flag_summary") @db.Text
-  ruleVersion    String   @map("rule_version") @db.VarChar(20)
-  createdAt      DateTime @default(now()) @map("created_at")
+  id               String      @id @default(uuid()) @map("result_id") @db.Uuid
+  registrationId   String      @map("registration_id") @db.Uuid
+  stationId        String      @map("station_id") @db.Uuid
+  queueEntryId     String?     @map("queue_entry_id") @db.Uuid
+  recordedByUserId String      @map("recorded_by_user_id") @db.Uuid
+  screeningType    StationType @map("screening_type")
+  resultData       Json        @map("result_data")
+  overallFlag      OverallFlag @default(NORMAL) @map("overall_flag")
+  isFlagged        Boolean     @default(false) @map("is_flagged")
+  flagSummary      String?     @map("flag_summary")
+  ruleVersion      String      @default("VSMS-VA-1.0") @map("rule_version") @db.VarChar(20)
+  acknowledgedAt   DateTime?   @map("acknowledged_at") @db.Timestamptz(3)
+  idempotencyKey   String?     @unique @map("idempotency_key") @db.VarChar(64)
+  version          Int         @default(1)
+  createdAt        DateTime    @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt        DateTime    @updatedAt @map("updated_at") @db.Timestamptz(3)
 
-  registration EventRegistration @relation(fields: [registrationId], references: [id])
-  station      Station           @relation(fields: [stationId], references: [id])
-  queueEntry   QueueEntry?       @relation(fields: [queueEntryId], references: [id])
-  recorder     User              @relation(fields: [recordedBy], references: [id])
+  registration EventRegistration @relation(fields: [registrationId], references: [id], onDelete: Cascade)
+  station      Station           @relation(fields: [stationId], references: [id], onDelete: Restrict)
+  queueEntry   QueueEntry?       @relation(fields: [queueEntryId], references: [id], onDelete: SetNull)
+  recordedBy   User              @relation("ScreeningRecorder", fields: [recordedByUserId], references: [id], onDelete: Restrict)
 
-  @@map("screening_result")
+  @@unique([registrationId, stationId])
+  @@index([stationId, isFlagged])
+  @@index([overallFlag, isFlagged])
+  @@index([recordedByUserId])
+  @@map("screening_results")
 }
 
 model Review {
@@ -478,13 +535,16 @@ model Review {
   createdAt       DateTime         @default(now()) @map("created_at")
   updatedAt       DateTime         @updatedAt @map("updated_at")
 
-  registration EventRegistration? @relation(fields: [registrationId], references: [id])
-  reviewer     User               @relation(fields: [reviewerId], references: [id])
-  parentReview Review?            @relation("ReviewHierarchy", fields: [parentReviewId], references: [id])
+  registration EventRegistration? @relation(fields: [registrationId], references: [id], onDelete: Cascade)
+  reviewer     User               @relation("ReviewReviewer", fields: [reviewerId], references: [id], onDelete: Restrict)
+  parentReview Review?            @relation("ReviewHierarchy", fields: [parentReviewId], references: [id], onDelete: Restrict)
   childReviews Review[]           @relation("ReviewHierarchy")
   referrals    Referral[]
   documents    DocumentArtifact[]
 
+  @@index([registrationId])
+  @@index([reviewerId])
+  @@index([clinicalUrgency])
   @@map("review")
 }
 
@@ -504,12 +564,15 @@ model Referral {
   createdAt        DateTime         @default(now()) @map("created_at")
   updatedAt        DateTime         @updatedAt @map("updated_at")
 
-  review                 Review                 @relation(fields: [reviewId], references: [id])
-  registration           EventRegistration?     @relation(fields: [registrationId], references: [id])
-  creator                User                   @relation(fields: [createdBy], references: [id])
+  review                 Review                 @relation(fields: [reviewId], references: [id], onDelete: Cascade)
+  registration           EventRegistration?     @relation(fields: [registrationId], references: [id], onDelete: SetNull)
+  creator                User                   @relation("ReferralCreator", fields: [createdBy], references: [id], onDelete: Restrict)
   documentArtifacts      DocumentArtifact[]
   notificationDeliveries NotificationDelivery[]
 
+  @@index([reviewId])
+  @@index([status, clinicalUrgency])
+  @@index([createdBy])
   @@map("referral")
 }
 
@@ -527,11 +590,14 @@ model DocumentArtifact {
   generatedAt  DateTime  @default(now()) @map("generated_at")
   expiresAt    DateTime? @map("expires_at") @db.Timestamptz(3)
 
-  review                 Review?                @relation(fields: [reviewId], references: [id])
-  referral               Referral?              @relation(fields: [referralId], references: [id])
-  generator              User                   @relation(fields: [generatedBy], references: [id])
+  review                 Review?                @relation(fields: [reviewId], references: [id], onDelete: SetNull)
+  referral               Referral?              @relation(fields: [referralId], references: [id], onDelete: SetNull)
+  generator              User                   @relation("DocumentGenerator", fields: [generatedBy], references: [id], onDelete: Restrict)
   notificationDeliveries NotificationDelivery[]
 
+  @@index([reviewId])
+  @@index([referralId])
+  @@index([generatedBy])
   @@map("document_artifact")
 }
 
@@ -550,10 +616,12 @@ model NotificationDelivery {
   createdAt                 DateTime                   @default(now()) @map("created_at")
   updatedAt                 DateTime                   @updatedAt @map("updated_at")
 
-  user     User              @relation(fields: [userId], references: [id])
-  referral Referral?         @relation(fields: [referralId], references: [id])
-  document DocumentArtifact? @relation(fields: [documentId], references: [id])
+  user     User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  referral Referral?         @relation(fields: [referralId], references: [id], onDelete: SetNull)
+  document DocumentArtifact? @relation(fields: [documentId], references: [id], onDelete: SetNull)
 
+  @@index([status, channel])
+  @@index([userId])
   @@map("notification_delivery")
 }
 
@@ -576,8 +644,10 @@ model SyncAction {
   createdAt      DateTime         @default(now()) @map("created_at")
   processedAt    DateTime?        @map("processed_at")
 
-  user User @relation(fields: [userId], references: [id])
+  user User @relation("SyncActor", fields: [userId], references: [id], onDelete: Restrict)
 
+  @@index([status, createdAt])
+  @@index([deviceId, userId])
   @@map("sync_action")
 }
 
@@ -590,8 +660,9 @@ model LoginHistory {
   ipAddress   String    @map("ip_address") @db.VarChar(45)
   deviceName  String    @map("device_name") @db.VarChar(100)
 
-  user User @relation(fields: [userId], references: [id])
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
+  @@index([userId, loginTime])
   @@map("login_history")
 }
 
@@ -607,8 +678,10 @@ model AuditLog {
   deviceName String   @map("device_name") @db.VarChar(100)
   createdAt  DateTime @default(now()) @map("created_at")
 
-  user User @relation(fields: [userId], references: [id])
+  user User @relation(fields: [userId], references: [id], onDelete: Restrict)
 
+  @@index([entityName, entityId])
+  @@index([userId, createdAt])
   @@map("audit_log")
 }
 
@@ -623,8 +696,10 @@ model SecurityIncident {
   resolvedAt   DateTime? @map("resolved_at")
   createdAt    DateTime  @default(now()) @map("created_at")
 
-  user     User  @relation("IncidentUser", fields: [userId], references: [id])
-  resolver User? @relation("ResolvedBy", fields: [resolvedBy], references: [id])
+  user     User  @relation("IncidentUser", fields: [userId], references: [id], onDelete: Restrict)
+  resolver User? @relation("ResolvedBy", fields: [resolvedBy], references: [id], onDelete: SetNull)
 
+  @@index([resolved, severity])
+  @@index([userId])
   @@map("security_incident")
 }

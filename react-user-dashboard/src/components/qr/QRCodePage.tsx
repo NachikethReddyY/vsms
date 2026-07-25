@@ -1,6 +1,6 @@
 import { useState } from "react";
 import QRCode from "./QRCode";
-import "./QRCodePage.css";
+import "./qrCodePage.css";
 import apiClient from "../../utils/apiClient";
 
 

@@ -95,7 +95,83 @@ const main = async () => {
     }
   }
 
-  console.log(JSON.stringify({ users: USERS.map(({ username, email, systemRole }) => ({ username, email, systemRole })), events: EVENTS.length, demoPasswordSource: process.env.VSMS_DEMO_PASSWORD ? "environment" : "development-only default" }, null, 2));
+  // Visual acuity demo: stations + named checked-in participants + staff screener assignment
+  const liveEventId = "20000000-0000-4000-8000-000000000003";
+  const stationDefs = [
+    { stationId: "60000000-0000-4000-8000-000000000001", stationName: "Visual Acuity", stationType: "VISUAL_ACUITY", stationOrder: 1 },
+    { stationId: "60000000-0000-4000-8000-000000000002", stationName: "Refraction", stationType: "REFRACTION", stationOrder: 2 },
+    { stationId: "60000000-0000-4000-8000-000000000003", stationName: "Colour Vision", stationType: "COLOUR_VISION", stationOrder: 3 },
+  ];
+  for (const station of stationDefs) {
+    await prisma.station.upsert({
+      where: { stationId: station.stationId },
+      update: { ...station, eventId: liveEventId, isActive: true },
+      create: { ...station, eventId: liveEventId, isActive: true },
+    });
+  }
+
+  const demoParticipants = [
+    { registrationId: "70000000-0000-4000-8000-000000000001", name: "John Tan", queueNumber: 1, passToken: "VSMS-DEMO-QR-001" },
+    { registrationId: "70000000-0000-4000-8000-000000000002", name: "Mary Lim", queueNumber: 2, passToken: "VSMS-DEMO-QR-002" },
+    { registrationId: "70000000-0000-4000-8000-000000000003", name: "Aisha Rahman", queueNumber: 3, passToken: "VSMS-DEMO-QR-003" },
+  ];
+  for (const person of demoParticipants) {
+    await prisma.eventRegistration.upsert({
+      where: { registrationId: person.registrationId },
+      update: {
+        eventId: liveEventId,
+        status: "CHECKED_IN",
+        participantDisplayName: person.name,
+        queueNumber: person.queueNumber,
+        passToken: person.passToken,
+      },
+      create: {
+        registrationId: person.registrationId,
+        eventId: liveEventId,
+        status: "CHECKED_IN",
+        participantDisplayName: person.name,
+        queueNumber: person.queueNumber,
+        passToken: person.passToken,
+      },
+    });
+  }
+
+  const liveShift = await prisma.shift.findFirst({ where: { eventId: liveEventId } });
+  if (liveShift) {
+    const existing = await prisma.staffAssignment.findFirst({
+      where: {
+        shiftId: liveShift.shiftId,
+        userId: USERS[2].userId,
+        assignmentRole: "SCREENER",
+      },
+    });
+    if (!existing) {
+      await prisma.staffAssignment.create({
+        data: {
+          shiftId: liveShift.shiftId,
+          userId: USERS[2].userId,
+          eventStationId: stationDefs[0].stationId,
+          assignmentRole: "SCREENER",
+          status: "CONFIRMED",
+          assignedByUserId: USERS[1].userId,
+          notes: "Seeded VA screener assignment",
+        },
+      });
+    }
+  }
+
+  console.log(JSON.stringify({
+    users: USERS.map(({ username, email, systemRole }) => ({ username, email, systemRole })),
+    events: EVENTS.length,
+    visualAcuityDemo: {
+      eventId: liveEventId,
+      eventName: "Central Library Screening",
+      stationPath: `/events/${liveEventId}/stations/visual-acuity`,
+      passTokens: demoParticipants.map((p) => p.passToken),
+      screener: "staff",
+    },
+    demoPasswordSource: process.env.VSMS_DEMO_PASSWORD ? "environment" : "development-only default",
+  }, null, 2));
 };
 
 main().finally(() => prisma.$disconnect());

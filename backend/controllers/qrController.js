@@ -1,9 +1,5 @@
 const qrModel = require("../models/qrModel");
 
-// ==========================================
-// Generate QR Code
-// POST /qr/generate/:registrationId
-// ==========================================
 exports.generateQR = async (req, res) => {
     try {
         const { registrationId } = req.params;
@@ -329,4 +325,10 @@ exports.manualCheckIn = async (req, res) => {
             message: err.message
         });
     }
+    const qr = await qrModel.generateQR(req.params.participantId);
+    res.status(201).json(qr);
+};
+
+exports.getParticipantByQR = async (req, res) => {
+    res.json(await qrModel.getParticipant(req.params.token));
 };

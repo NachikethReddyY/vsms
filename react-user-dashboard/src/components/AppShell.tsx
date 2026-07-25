@@ -12,6 +12,7 @@ export default function AppShell({ children }: { children: ReactNode }) {
   const location = useLocation();
   const workspaceRef = useRef<HTMLElement>(null);
   const role = user?.systemRole.replace('_', ' ').toLowerCase();
+  const canCreateEvent = user?.systemRole === 'ADMIN' || user?.systemRole === 'EVENT_MANAGER';
   const mobileTitle = location.pathname === '/events/new'
     ? 'Create event'
     : /^\/events\/[^/]+$/.test(location.pathname)
@@ -59,7 +60,7 @@ export default function AppShell({ children }: { children: ReactNode }) {
           <div className="workspace-name"><strong><span className="desktop-title">Event operations</span><span className="mobile-title">{mobileTitle}</span></strong><span><i /> Secure workspace</span></div>
           {isEventsPage && <form className="global-search" onSubmit={submitEventSearch}><MagnifyingGlassIcon /><label className="sr-only" htmlFor="workspace-event-search">Search events</label><input id="workspace-event-search" value={eventSearch} onChange={(event) => setEventSearch(event.target.value)} placeholder="Search events or venues" /></form>}
           <ThemeToggle />
-          <button className="primary compact" onClick={() => navigate('/events/new')} aria-label="Create event"><PlusIcon /><span>New event</span></button>
+          {canCreateEvent && <button className="primary compact" onClick={() => navigate('/events/new')} aria-label="Create event"><PlusIcon /><span>New event</span></button>}
         </header>}
         <main className="workspace" id="main-content" ref={workspaceRef}>{children}</main>
       </div>
