@@ -51,6 +51,38 @@ submission: 29 June 2026
 ## 8. Testing Results
 ### 8.1 Automated Security Scanning (SAST/SCA/Secret Detection)
 ### 8.2 Functional Validation & Exception Handling Reports
+#### 8.2.1 Core Registration Endpoint Validation (`POST /participants`)
+The participant registration process was tested to ensure proper request parsing, multi-table database transaction processing, and strict HTTP response security header enforcement.
+
+* **Test Objective:** Verify successful creation of a new participant record along with its associated event registration entry in an ACID-compliant database transaction.
+* **Input Payload:** Standard registration payload containing sensitive demographic data (NRIC, contact information) alongside structural foreign keys (`eventId`, `userId`).
+* **Observed Result:** `HTTP/1.1 201 Created` returned in 165ms.
+<img width="701" height="567" alt="image" src="https://github.com/user-attachments/assets/113cf5e9-91d1-4ccb-8b21-c6382238fb04" />
+
+```json
+POST http://localhost:5000/participants
+Content-Type: application/json
+
+{
+  "nric": "S1234567A",
+  "firstName": "John",
+  "lastName": "Doe",
+  "dateOfBirth": "1990-01-01",
+  "gender": "M",
+  "contactNumber": "91234567",
+  "emergencyContact": "98765432",
+  "consentGiven": true,
+  "eventId": "01f6b64b-d80d-427e-9d43-...",
+  "userId": "5464da13-1d47-45ba-8e10-..."
+}
+```
+### 8.2.2 Security Control & Header Verification
+As demonstrated in the response headers of Figure 8.1, the application layer successfully enforces strict defensive headers via HTTP middleware to prevent common web vulnerabilities:
+
+- Strict Content Security Policy (CSP): Restricts script execution and limits connections exclusively to trusted endpoints ('self' and https://api.vsms-screening.org).
+- Clickjacking Protection: Configured with X-Frame-Options: SAMEORIGIN and frame-ancestors 'none'.
+- Transport & MIME Hardening: Enforces Strict-Transport-Security (HSTS max-age 1 year) and X-Content-Type-Options: nosniff to eliminate protocol downgrade and MIME-sniffing vectors.
+
 ### 8.3 Rate Limiting & Concurrency Testing Verification
 
 ## 9. Bonus Features

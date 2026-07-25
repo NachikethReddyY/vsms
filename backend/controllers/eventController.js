@@ -1,133 +1,124 @@
-const eventModel = require("../models/eventModel");
+const eventService = require("../services/eventService");
 
-// ==========================================
-// Create Event
-// ==========================================
-exports.createEvent = async (req, res) => {
-
-    try {
-
-        const event = await eventModel.createEvent(req.body);
-
-        return res.status(201).json({
-            success: true,
-            message: "Event created successfully.",
-            data: event
-        });
-
-    } catch (err) {
-
-        console.error(err);
-
-        return res.status(500).json({
-            success: false,
-            message: err.message
-        });
-
-    }
-
+// Helper to wrap async controller handlers so unhandled promise rejections are passed to Next.js / Express error middleware
+const asyncHandler = (fn) => (req, res, next) => {
+  Promise.resolve(fn(req, res, next)).catch(next);
 };
 
 // ==========================================
-// Get All Events
+// Event CRUD & Core Actions
 // ==========================================
-exports.getAllEvents = async (req, res) => {
 
-    try {
+exports.list = asyncHandler(async (req, res) => {
+  const data = await eventService.listEvents(req.query, req.user);
+  res.status(200).json(data);
+});
 
-        const events = await eventModel.getAllEvents();
+exports.create = asyncHandler(async (req, res) => {
+  const data = await eventService.createEvent(req.body, req.user, req.requestId);
+  res.status(201).json(data);
+});
 
-        return res.status(200).json({
-            success: true,
-            data: events
-        });
+exports.get = asyncHandler(async (req, res) => {
+  const data = await eventService.getEvent(req.params.eventId, req.user);
+  res.status(200).json(data);
+});
 
-    } catch (err) {
-
-        return res.status(500).json({
-            success: false,
-            message: err.message
-        });
-
-    }
-
-};
-
-// ==========================================
-// Get Event By ID
-// ==========================================
-exports.getEventById = async (req, res) => {
-
-    try {
-
-        const event = await eventModel.getEventById(req.params.id);
-
-        return res.status(200).json({
-            success: true,
-            data: event
-        });
-
-    } catch (err) {
-
-        return res.status(500).json({
-            success: false,
-            message: err.message
-        });
-
-    }
-
-};
+exports.update = asyncHandler(async (req, res) => {
+  const data = await eventService.updateEvent(
+    req.params.eventId,
+    req.body,
+    req.user,
+    req.requestId
+  );
+  res.status(200).json(data);
+});
 
 // ==========================================
-// Update Event
+// Lifecycle / Transitions
 // ==========================================
-exports.updateEvent = async (req, res) => {
 
-    try {
+exports.publish = asyncHandler(async (req, res) => {
+  const data = await eventService.transitionEvent(
+    req.params.eventId,
+    "publish",
+    req.body,
+    req.user,
+    req.requestId
+  );
+  res.status(200).json(data);
+});
 
-        const event = await eventModel.updateEvent(
-            req.params.id,
-            req.body
-        );
+exports.start = asyncHandler(async (req, res) => {
+  const data = await eventService.transitionEvent(
+    req.params.eventId,
+    "start",
+    req.body,
+    req.user,
+    req.requestId
+  );
+  res.status(200).json(data);
+});
 
-        return res.status(200).json({
-            success: true,
-            message: "Event updated successfully.",
-            data: event
-        });
+exports.complete = asyncHandler(async (req, res) => {
+  const data = await eventService.transitionEvent(
+    req.params.eventId,
+    "complete",
+    req.body,
+    req.user,
+    req.requestId
+  );
+  res.status(200).json(data);
+});
 
-    } catch (err) {
-
-        return res.status(500).json({
-            success: false,
-            message: err.message
-        });
-
-    }
-
-};
+exports.cancel = asyncHandler(async (req, res) => {
+  const data = await eventService.cancelEvent(
+    req.params.eventId,
+    req.body,
+    req.user,
+    req.requestId
+  );
+  res.status(200).json(data);
+});
 
 // ==========================================
-// Delete Event
+// Staffing & Assignments
 // ==========================================
-exports.deleteEvent = async (req, res) => {
 
-    try {
+exports.staffDirectory = asyncHandler(async (_req, res) => {
+  const data = await eventService.listStaffDirectory();
+  res.status(200).json(data);
+});
 
-        await eventModel.deleteEvent(req.params.id);
+exports.addAssignment = asyncHandler(async (req, res) => {
+  const data = await eventService.addStaffAssignment(
+    req.params.eventId,
+    req.params.shiftId,
+    req.body,
+    req.user
+  );
+  res.status(201).json(data);
+});
 
-        return res.status(200).json({
-            success: true,
-            message: "Event deleted successfully."
-        });
+exports.removeAssignment = asyncHandler(async (req, res) => {
+  const data = await eventService.removeStaffAssignment(
+    req.params.eventId,
+    req.params.shiftId,
+    req.params.assignmentId,
+    req.user
+  );
+  res.status(200).json(data);
+});
 
-    } catch (err) {
+// ==========================================
+// Audit Logs
+// ==========================================
 
-        return res.status(500).json({
-            success: false,
-            message: err.message
-        });
-
-    }
-
-};
+exports.audit = asyncHandler(async (req, res) => {
+  const data = await eventService.getAuditLog(
+    req.params.eventId,
+    req.query,
+    req.user
+  );
+  res.status(200).json(data);
+});

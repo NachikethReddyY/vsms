@@ -1,47 +1,52 @@
-import { Routes, Route, Navigate } from "react-router-dom";
+import { Navigate, Outlet, Route, Routes, useLocation } from 'react-router-dom';
+import LoginPage from './components/LoginPage';
+import { useAuth } from './auth/authState';
+import AppShell from './components/AppShell';
+import EventsPage from './features/events/EventsPage';
+import EventFormPage from './features/events/EventFormPage';
+import EventDetailPage from './features/events/EventDetailPage';
+import LandingPage from './components/LandingPage';
+import SignUpPage from './components/SignUpPage';
+import ForgotPasswordPage from './components/ForgotPasswordPage';
+import DashboardPage from './components/DashboardPage';
+import QRCodePage from './components/qr/QRCodePage';
+import VisualAcuityStationPage from './features/screening/VisualAcuityStationPage';
 
-// Layout Wrapper
-import { AppLayout } from "./components/layouts/AppLayout";
+function ProtectedRoutes() {
+  const { user, isBootstrapping } = useAuth();
+  const location = useLocation();
+  if (isBootstrapping) return <main className="center-state" aria-live="polite"><span className="spinner" />Restoring your secure session…</main>;
+  if (!user) return <Navigate to="/login" replace state={{ from: location }} />;
+  return <AppShell><Outlet /></AppShell>;
+}
 
-// Unauthenticated / Auth Pages
-import LoginPage from "./components/LoginPage";
-import SignUpPage from "./components/SignUpPage";
-import ForgotPasswordPage from "./components/ForgotPasswordPage";
+function ManagerOnlyRoutes() {
+  const { user } = useAuth();
+  const canManageEvents = user?.systemRole === 'ADMIN' || user?.systemRole === 'EVENT_MANAGER';
+  if (!canManageEvents) return <Navigate to="/events" replace />;
+  return <Outlet />;
+}
 
-// Authenticated Application Modules
-import DashboardPage from "./components/DashboardPage";
-import RegisterParticipantPage from "./components/registration/RegisterParticipantPage";
-import RegistrationSuccess from "./components/registration/RegistrationSuccess";
-import QRCodePage from "./components/qr/QRCodePage";
-
-function App() {
+export default function App() {
   return (
     <Routes>
-      {/* 1. Default Route - Redirect to Login */}
-      <Route path="/" element={<Navigate to="/login" replace />} />
-
-      {/* 2. Authentication Routes (Standalone / No App Shell Sidebar) */}
+      <Route path="/" element={<LandingPage />} />
       <Route path="/login" element={<LoginPage />} />
       <Route path="/signup" element={<SignUpPage />} />
       <Route path="/forgot-password" element={<ForgotPasswordPage />} />
-
-      {/* 3. Operational Application Shell (Includes Enterprise Top Bar + Sidebar) */}
-      <Route element={<AppLayout />}>
+      <Route element={<ProtectedRoutes />}>
         <Route path="/dashboard" element={<DashboardPage />} />
-        <Route path="/live-queue" element={<DashboardPage />} />
-        
-        {/* Registration Workflow */}
-        <Route path="/register-participant" element={<RegisterParticipantPage />} />
-        <Route path="/registration-success" element={<RegistrationSuccess />} />
-
-        {/* QR & System Tools */}
+        <Route path="/events" element={<EventsPage />} />
+        <Route element={<ManagerOnlyRoutes />}>
+          <Route path="/events/new" element={<EventFormPage mode="create" />} />
+          <Route path="/events/:eventId/edit" element={<EventFormPage mode="edit" />} />
+        </Route>
+        <Route path="/events/:eventId" element={<EventDetailPage />} />
+        <Route path="/events/:eventId/stations/visual-acuity" element={<VisualAcuityStationPage />} />
         <Route path="/qr-generator" element={<QRCodePage />} />
       </Route>
-
-      {/* 4. Catch-all Fallback */}
-      <Route path="*" element={<Navigate to="/login" replace />} />
+      <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   );
 }
 
-export default App;
