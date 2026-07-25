@@ -1,5 +1,6 @@
 const { PrismaClient } = require("@prisma/client");
 const { encrypt } = require("../utils/cryptoUtils");
+const { logAuditEvent } = require("../utils/auditLogger"); // Audit Helper
 
 const prisma = new PrismaClient();
 
@@ -14,8 +15,9 @@ function maskNric(nric) {
  * @param {string} eventId - UUID of the event
  * @param {string} [userId] - UUID of the staff/user performing registration
  * @param {string} [initialStationId] - Optional initial station UUID for queue entry
+ * @param {Object} [req] - Express Request object for logging IP/UA
  */
-async function createParticipant(data, eventId, userId, initialStationId) {
+async function createParticipant(data, eventId, userId, initialStationId, req = null) {
   // STEP A: Guard Against Undefined Inputs
   if (!eventId) {
     throw new Error(
@@ -32,8 +34,8 @@ async function createParticipant(data, eventId, userId, initialStationId) {
   const maskedNric = maskNric(data.nric);
 
   // Interactive ACID Transaction
-  return await prisma.$transaction(async (tx) => {
-    // 1. Create the Participant record
+  const result = await prisma.$transaction(async (tx) => {
+    // 1. Create the Participant record using normalized address fields
     const participant = await tx.participant.create({
       data: {
         nric: encryptedNric,
@@ -45,15 +47,18 @@ async function createParticipant(data, eventId, userId, initialStationId) {
         contactNumber: data.contactNumber,
         emergencyContact: data.emergencyContact,
         consentGiven: Boolean(data.consentGiven),
-        // Optional fields if provided:
+        // Normalized address split
+        addressStreet: data.addressStreet || null,
+        addressUnit: data.addressUnit || null,
+        addressPostalCode: data.addressPostalCode || null,
+        // Optional fields
         race: data.race || null,
         nationality: data.nationality || "Singaporean",
-        address: data.address || null,
         emergencyContactName: data.emergencyContactName || null,
       },
     });
 
-    // 2. Resolve a valid User ID (handles local development without auth)
+    // 2. Resolve a valid User ID
     let validUserId = userId;
     let existingUser = null;
 
@@ -63,12 +68,11 @@ async function createParticipant(data, eventId, userId, initialStationId) {
       });
     }
 
-    // If userId was missing or invalid, grab the first available user in DB
     if (!existingUser) {
       const fallbackUser = await tx.user.findFirst();
       if (!fallbackUser) {
         throw new Error(
-          "Foreign key constraint error: No user records exist in the database. Please seed or create at least one user record."
+          "Foreign key constraint error: No user records exist in the database."
         );
       }
       validUserId = fallbackUser.id;
@@ -80,14 +84,14 @@ async function createParticipant(data, eventId, userId, initialStationId) {
     });
     const nextQueueNumber = registrationCount + 1;
 
-    // 4. Create Event Registration entry (using guaranteed valid user ID)
+    // 4. Create Event Registration entry
     const registration = await tx.eventRegistration.create({
       data: {
         participantId: participant.id,
         eventId: eventId,
         queueNumber: nextQueueNumber,
         registrationStatus: "REGISTERED",
-        registeredBy: validUserId, // Passes foreign key validation!
+        registeredBy: validUserId,
       },
     });
 
@@ -98,22 +102,43 @@ async function createParticipant(data, eventId, userId, initialStationId) {
         data: {
           registrationId: registration.id,
           stationId: initialStationId,
+          queueNumber: nextQueueNumber,
           status: "WAITING",
-          joinedAt: new Date(),
+          enteredAt: new Date(), // Corrected field name from joinedAt -> enteredAt
         },
       });
     }
 
-    // Return response object with plaintext NRIC for immediate UI feedback
     return {
       participant: {
         ...participant,
-        nric: data.nric,
+        nric: data.nric, // Return plaintext NRIC to caller for immediate UI response
       },
       registration,
       queueEntry,
+      validUserId,
     };
   });
+
+  // Write Audit Log (Post-transaction execution to keep transaction lean)
+  await logAuditEvent({
+    userId: result.validUserId,
+    action: "PARTICIPANT_REGISTERED",
+    entityName: "Participant",
+    entityId: result.participant.id,
+    newValue: {
+      participantId: result.participant.id,
+      eventId: eventId,
+      maskedNric: maskedNric,
+    },
+    req,
+  });
+
+  return {
+    participant: result.participant,
+    registration: result.registration,
+    queueEntry: result.queueEntry,
+  };
 }
 
 module.exports = {
