@@ -1,42 +1,112 @@
-import axios, { type InternalAxiosRequestConfig } from 'axios';
+import axios from 'axios';
+import type { AxiosError, InternalAxiosRequestConfig } from 'axios';
 
-const qaMirror = window.location.protocol === 'http:' && window.location.port === '5174';
-const baseURL = import.meta.env.VITE_API_BASE_URL ?? (qaMirror ? '/qa-api' : 'https://localhost:5050');
+const BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000';
+
+export interface SessionTokens {
+  accessToken: string;
+  csrfToken?: string;
+}
+
+interface RefreshResponse {
+  accessToken: string;
+}
+
+interface RetryableRequestConfig extends InternalAxiosRequestConfig {
+  _retry?: boolean;
+}
+
 let accessToken: string | null = null;
 let csrfToken: string | null = null;
-let refreshPromise: Promise<string> | null = null;
-type RetryableRequest = InternalAxiosRequestConfig & { _retry?: boolean };
-type TokenPayload = { accessToken: string; csrfToken: string };
+let isRefreshing = false;
+let refreshSubscribers: ((token: string) => void)[] = [];
 
-export const setSessionTokens = (tokens: TokenPayload | null) => {
-  accessToken = tokens?.accessToken || null;
-  csrfToken = tokens?.csrfToken || null;
+export const setCsrfToken = (token: string | null) => { csrfToken = token; };
+export const getCsrfToken = (): string | null => csrfToken;
+
+export const setAccessToken = (token: string | null) => {
+  accessToken = token;
+  if (token) localStorage.setItem('authToken', token);
+  else localStorage.removeItem('authToken');
 };
-export const getCsrfToken = () => csrfToken;
+export const getAccessToken = (): string | null => accessToken || localStorage.getItem('authToken');
 
-const apiClient = axios.create({ baseURL, withCredentials: true, headers: { 'Content-Type': 'application/json' }, timeout: 15_000 });
-const refreshClient = axios.create({ baseURL, withCredentials: true, timeout: 15_000 });
+export const setSessionTokens = (tokens: SessionTokens | null) => {
+  if (!tokens) {
+    setAccessToken(null);
+    setCsrfToken(null);
+    localStorage.removeItem('refreshToken');
+    return;
+  }
+  if (tokens.accessToken) setAccessToken(tokens.accessToken);
+  if (tokens.csrfToken !== undefined) setCsrfToken(tokens.csrfToken);
+};
 
-apiClient.interceptors.request.use((config) => {
-  if (accessToken) config.headers.Authorization = `Bearer ${accessToken}`;
+const apiClient = axios.create({
+  baseURL: BASE_URL,
+  headers: { 'Content-Type': 'application/json' },
+});
+
+const onRefreshed = (token: string) => {
+  refreshSubscribers.forEach((cb) => cb(token));
+  refreshSubscribers = [];
+};
+
+const refreshAccessToken = async (): Promise<string> => {
+  const refreshToken = localStorage.getItem('refreshToken');
+  const response = await axios.post<RefreshResponse>(
+    `${BASE_URL}/auth/refresh`,
+    { refreshToken },
+    { headers: csrfToken ? { 'X-CSRF-Token': csrfToken } : {} }
+  );
+  const newAccessToken = response.data.accessToken;
+  setAccessToken(newAccessToken);
+  return newAccessToken;
+};
+
+apiClient.interceptors.request.use((config: InternalAxiosRequestConfig) => {
+  const token = getAccessToken();
+  if (token) config.headers.Authorization = `Bearer ${token}`;
+  if (csrfToken) config.headers['X-CSRF-Token'] = csrfToken;
   return config;
 });
 
-apiClient.interceptors.response.use((response) => response, async (error) => {
-  const request = error.config as RetryableRequest | undefined;
-  if (error.response?.status !== 401 || !request || request._retry || request.url?.startsWith('/auth/')) return Promise.reject(error);
-  request._retry = true;
-  try {
-    refreshPromise ??= refreshClient.post<TokenPayload>('/auth/refresh', undefined, { headers: { 'X-CSRF-Token': csrfToken } })
-      .then(({ data }) => { setSessionTokens(data); return data.accessToken; })
-      .finally(() => { refreshPromise = null; });
-    request.headers.Authorization = `Bearer ${await refreshPromise}`;
-    return apiClient(request);
-  } catch (refreshError) {
-    setSessionTokens(null);
-    window.dispatchEvent(new Event('vsms:session-ended'));
-    return Promise.reject(refreshError);
+apiClient.interceptors.response.use(
+  (response) => response,
+  async (error: AxiosError) => {
+    const originalRequest = error.config as RetryableRequestConfig | undefined;
+
+    if (error.response?.status === 401 && originalRequest && !originalRequest._retry) {
+      if (originalRequest.url?.includes('/auth/refresh')) return Promise.reject(error);
+
+      if (isRefreshing) {
+        return new Promise((resolve) => {
+          refreshSubscribers.push((token) => {
+            originalRequest.headers.Authorization = `Bearer ${token}`;
+            resolve(apiClient(originalRequest));
+          });
+        });
+      }
+
+      originalRequest._retry = true;
+      isRefreshing = true;
+
+      try {
+        const newToken = await refreshAccessToken();
+        isRefreshing = false;
+        onRefreshed(newToken);
+        originalRequest.headers.Authorization = `Bearer ${newToken}`;
+        return apiClient(originalRequest);
+      } catch (refreshError) {
+        isRefreshing = false;
+        refreshSubscribers = [];
+        setSessionTokens(null);
+        window.location.href = '/login';
+        return Promise.reject(refreshError);
+      }
+    }
+    return Promise.reject(error);
   }
-});
+);
 
 export default apiClient;
