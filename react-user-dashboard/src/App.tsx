@@ -11,6 +11,7 @@ import ForgotPasswordPage from './components/ForgotPasswordPage';
 import DashboardPage from './components/DashboardPage';
 import QRCodePage from './components/qr/QRCodePage';
 import VisualAcuityStationPage from './features/screening/VisualAcuityStationPage';
+import AuditLogsPage from './features/audit-logs/AuditLogsPage';
 
 function ProtectedRoutes() {
   const { user, isBootstrapping } = useAuth();
@@ -24,6 +25,13 @@ function ManagerOnlyRoutes() {
   const { user } = useAuth();
   const canManageEvents = user?.systemRole === 'ADMIN' || user?.systemRole === 'EVENT_MANAGER';
   if (!canManageEvents) return <Navigate to="/events" replace />;
+  return <Outlet />;
+}
+
+function AdminOnlyRoutes() {
+  const { user } = useAuth();
+  const isAdmin = user?.systemRole === 'ADMIN';
+  if (!isAdmin) return <Navigate to="/dashboard" replace />;
   return <Outlet />;
 }
 
@@ -44,9 +52,11 @@ export default function App() {
         <Route path="/events/:eventId" element={<EventDetailPage />} />
         <Route path="/events/:eventId/stations/visual-acuity" element={<VisualAcuityStationPage />} />
         <Route path="/qr-generator" element={<QRCodePage />} />
+        <Route element={<AdminOnlyRoutes />}>
+          <Route path="/audit-logs" element={<AuditLogsPage />} />
+        </Route>
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   );
 }
-
