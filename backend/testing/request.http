@@ -1,0 +1,16 @@
+### Test Register Participant Transaction
+POST http://localhost:5000/participants
+Content-Type: application/json
+
+{
+  "nric": "S1234567A",
+  "firstName": "John",
+  "lastName": "Doe",
+  "dateOfBirth": "1990-01-01",
+  "gender": "M",
+  "contactNumber": "91234567",
+  "emergencyContact": "98765432",
+  "consentGiven": true,
+  "eventId": "01f6b64b-d80d-427e-9d43-a62cf816e2df",
+  "userId": "5464da13-1d47-45ba-8e10-5d31fec8bf19"
+}
