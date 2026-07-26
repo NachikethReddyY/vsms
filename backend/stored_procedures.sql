@@ -1,7 +1,7 @@
 -- =============================================================================
 -- ST0528 Database Systems (Project 2) - VSMS Stored Procedures & Triggers
 -- File: stored_procedures.sql
--- Description: Consolidated enterprise-grade database objects for the Visual 
+-- Description: Consolidated enterprise-grade database objects for the Visual
 --              Screening Management System (VSMS).
 -- =============================================================================
 
@@ -12,13 +12,13 @@
 -- 1.1 Automatic Timestamp Update Trigger Function
 -- Ensures 'updated_at' is always current whenever a row is modified.
 CREATE OR REPLACE FUNCTION fn_update_timestamp()
-RETURNS TRIGGER 
+RETURNS TRIGGER
 LANGUAGE plpgsql
-AS $$ 
-BEGIN 
-    NEW.updated_at = NOW(); 
-    RETURN NEW; 
-END; 
+AS $$
+BEGIN
+    NEW.updated_at = NOW();
+    RETURN NEW;
+END;
 $$;
 
 -- Attach trigger to participants table
@@ -32,27 +32,27 @@ EXECUTE FUNCTION fn_update_timestamp();
 -- 1.2 Clinical Auto-Flagging Trigger Function (FR-05)
 -- Automatically evaluates visual acuity thresholds and sets flags upon insertion/update.
 CREATE OR REPLACE FUNCTION fn_auto_flag_visual_acuity()
-RETURNS TRIGGER 
+RETURNS TRIGGER
 LANGUAGE plpgsql
-AS $$ 
-BEGIN 
-    NEW.is_flagged := FALSE; 
-    NEW.flag_reason := ''; 
-    
-    -- Check Driving Standard Flag: Uncorrected or corrected VA worse than 20/40 
-    IF NEW.left_eye_va IN ('20/50', '20/100', '20/200') OR NEW.right_eye_va IN ('20/50', '20/100', '20/200') THEN 
-        NEW.is_flagged := TRUE; 
-        NEW.flag_reason := NEW.flag_reason || '[Driving Standard: VA worse than 20/40] '; 
-    END IF; 
-    
-    -- Check Pathology & Pinhole Flag: Corrected VA <= 20/30 and pinhole does not improve 
-    IF NEW.pinhole_left IN ('20/40', '20/50', '20/100', '20/200') THEN 
-        NEW.is_flagged := TRUE; 
-        NEW.flag_reason := NEW.flag_reason || '[Pathology: Pinhole fails to improve vision] '; 
-    END IF; 
+AS $$
+BEGIN
+    NEW.is_flagged := FALSE;
+    NEW.flag_reason := '';
 
-    RETURN NEW; 
-END; 
+    -- Check Driving Standard Flag: Uncorrected or corrected VA worse than 20/40
+    IF NEW.left_eye_va IN ('20/50', '20/100', '20/200') OR NEW.right_eye_va IN ('20/50', '20/100', '20/200') THEN
+        NEW.is_flagged := TRUE;
+        NEW.flag_reason := NEW.flag_reason || '[Driving Standard: VA worse than 20/40] ';
+    END IF;
+
+    -- Check Pathology & Pinhole Flag: Corrected VA <= 20/30 and pinhole does not improve
+    IF NEW.pinhole_left IN ('20/40', '20/50', '20/100', '20/200') THEN
+        NEW.is_flagged := TRUE;
+        NEW.flag_reason := NEW.flag_reason || '[Pathology: Pinhole fails to improve vision] ';
+    END IF;
+
+    RETURN NEW;
+END;
 $$;
 
 -- Attach auto-flagging trigger to visual_acuity_results table
@@ -66,16 +66,16 @@ EXECUTE FUNCTION fn_auto_flag_visual_acuity();
 -- 1.3 Audit Logger Trigger Function (BR-06 Compliance)
 -- Automatically records audit entries when queue statuses change.
 CREATE OR REPLACE FUNCTION fn_audit_queue_transition()
-RETURNS TRIGGER 
+RETURNS TRIGGER
 LANGUAGE plpgsql
-AS $$ 
-BEGIN 
-    IF NEW.status = 'COMPLETED' AND (OLD.status IS NULL OR OLD.status != 'COMPLETED') THEN 
-        INSERT INTO audit_logs (participant_id, action, station_name, performed_by, created_at) 
-        VALUES (NEW.participant_id, 'STATION_COMPLETED', NEW.station_name, NEW.updated_by, NOW()); 
-    END IF; 
-    RETURN NEW; 
-END; 
+AS $$
+BEGIN
+    IF NEW.status = 'COMPLETED' AND (OLD.status IS NULL OR OLD.status != 'COMPLETED') THEN
+        INSERT INTO audit_logs (participant_id, action, station_name, performed_by, created_at)
+        VALUES (NEW.participant_id, 'STATION_COMPLETED', NEW.station_name, NEW.updated_by, NOW());
+    END IF;
+    RETURN NEW;
+END;
 $$;
 
 -- Attach audit trigger to station_queues table
@@ -133,24 +133,24 @@ LANGUAGE plpgsql
 AS $$
 BEGIN
     INSERT INTO visual_acuity_results (
-        participant_id, 
-        left_eye_va, 
-        right_eye_va, 
-        pinhole_left, 
-        pinhole_right, 
-        recorded_by, 
+        participant_id,
+        left_eye_va,
+        right_eye_va,
+        pinhole_left,
+        pinhole_right,
+        recorded_by,
         created_at
     )
     VALUES (
-        p_participant_id, 
-        p_left_eye_va, 
-        p_right_eye_va, 
-        p_pinhole_left, 
-        p_pinhole_right, 
-        p_recorded_by, 
+        p_participant_id,
+        p_left_eye_va,
+        p_right_eye_va,
+        p_pinhole_left,
+        p_pinhole_right,
+        p_recorded_by,
         NOW()
     )
-    ON CONFLICT (participant_id) DO UPDATE 
+    ON CONFLICT (participant_id) DO UPDATE
     SET left_eye_va = EXCLUDED.left_eye_va,
         right_eye_va = EXCLUDED.right_eye_va,
         pinhole_left = EXCLUDED.pinhole_left,
@@ -204,17 +204,17 @@ DECLARE
     v_completed_mandatory_stations INT;
 BEGIN
     -- Count mandatory stations configured in the system
-    SELECT COUNT(DISTINCT station_name) 
-    INTO v_total_mandatory_stations 
-    FROM screening_stations 
+    SELECT COUNT(DISTINCT station_name)
+    INTO v_total_mandatory_stations
+    FROM screening_stations
     WHERE is_mandatory = TRUE;
 
     -- Count completed mandatory stations for the participant
-    SELECT COUNT(DISTINCT sq.station_name) 
-    INTO v_completed_mandatory_stations 
+    SELECT COUNT(DISTINCT sq.station_name)
+    INTO v_completed_mandatory_stations
     FROM station_queues sq
     JOIN screening_stations ss ON sq.station_name = ss.station_name
-    WHERE sq.participant_id = p_participant_id 
+    WHERE sq.participant_id = p_participant_id
       AND sq.status = 'COMPLETED'
       AND ss.is_mandatory = TRUE;
 
@@ -232,7 +232,7 @@ RETURNS VARCHAR
 LANGUAGE plpgsql
 AS $$
 BEGIN
-    RETURN CASE 
+    RETURN CASE
         WHEN p_va IN ('20/20', '20/25') THEN 'NORMAL'
         WHEN p_va IN ('20/30', '20/40') THEN 'MILD_IMPAIRMENT'
         WHEN p_va IN ('20/50', '20/100') THEN 'MODERATE_IMPAIRMENT'
@@ -252,7 +252,7 @@ $$;
 DROP MATERIALIZED VIEW IF EXISTS mv_daily_screening_summary;
 
 CREATE MATERIALIZED VIEW mv_daily_screening_summary AS
-SELECT 
+SELECT
     DATE(sq.joined_at) AS screening_date,
     sq.station_name,
     COUNT(DISTINCT sq.participant_id) AS total_participants,

@@ -7,13 +7,15 @@ const helmet = require("helmet");
 const cookieParser = require("cookie-parser");
 const { rateLimit } = require("express-rate-limit");
 const swaggerUi = require("swagger-ui-express");
-const YAML = require("yamljs");
+const YAML = require("yaml");
 const env = require("./config/env");
 const AppError = require("./errors/AppError");
 const requestContext = require("./middlewares/requestContext");
+const requestLogger = require("./middlewares/morgan");
 const authRoutes = require("./routes/authRoutes");
 const userRoutes = require("./routes/userRoutes");
 const eventRoutes = require("./routes/eventRoutes");
+const locationRoutes = require("./routes/locationRoutes");
 const qrRoutes = require("./routes/qrRoutes");
 const screeningRoutes = require("./routes/screeningRoutes");
 const { notFound, errorHandler } = require("./middlewares/errorHandler");
@@ -53,6 +55,7 @@ if (env.trustProxy) app.set("trust proxy", 1);
 app.disable("x-powered-by");
 
 app.use(requestContext);
+app.use(requestLogger);
 app.use((req, _res, next) => {
   if (env.isProduction && !req.secure) return next(new AppError(426, "HTTPS_REQUIRED", "HTTPS is required"));
   return next();
@@ -76,7 +79,7 @@ app.use(cors({
     return callback(new AppError(403, "ORIGIN_NOT_ALLOWED", "Request origin is not allowed"));
   },
   methods: ["GET", "POST", "PATCH", "DELETE", "OPTIONS"],
-  allowedHeaders: ["Authorization", "Content-Type", "X-CSRF-Token", "X-Request-Id"],
+  allowedHeaders: ["Authorization", "Content-Type", "X-CSRF-Token", "X-Request-Id", "Idempotency-Key"],
 }));
 
 app.use(cookieParser());
@@ -88,13 +91,24 @@ const mutationLimiter = rateLimit({ windowMs: 60000, limit: 60, standardHeaders:
 app.get("/health", (_req, res) => res.json({ status: "ok" }));
 
 if (!env.isProduction) {
-  const swaggerDocument = YAML.load(path.join(__dirname, "docs/openapi.yaml"));
-  app.use("/api-docs", swaggerUi.serve, swaggerUi.setup(swaggerDocument));
+  const swaggerDocument = YAML.parse(fs.readFileSync(path.join(__dirname, "docs/openapi.yaml"), "utf8"));
+  app.get("/api-docs/openapi.json", (_req, res) => res.set("Cache-Control", "no-store").json(swaggerDocument));
+  app.use("/api-docs", swaggerUi.serve, swaggerUi.setup(swaggerDocument, {
+    customCss: "",
+    customSiteTitle: "VSMS API documentation",
+    swaggerOptions: {
+      displayRequestDuration: true,
+      filter: true,
+      persistAuthorization: true,
+      tryItOutEnabled: true,
+    },
+  }));
 }
 
 app.use("/auth", authLimiter, authRoutes);
 app.use("/users", userRoutes);
 app.use("/api/events", (req, res, next) => ["POST", "PATCH", "PUT", "DELETE"].includes(req.method) ? mutationLimiter(req, res, next) : next(), eventRoutes);
+app.use("/api/locations", locationRoutes);
 app.use("/api/events", (req, res, next) => ["POST", "PATCH", "PUT", "DELETE"].includes(req.method) ? mutationLimiter(req, res, next) : next(), screeningRoutes);
 app.use("/api/qr", mutationLimiter, qrRoutes);
 

@@ -1,66 +1,36 @@
-import { defineConfig } from "vite";
-import react from "@vitejs/plugin-react";
-import tailwindcss from "@tailwindcss/vite";
-import fs from "fs";
+import { defineConfig } from 'vite'
+import react from '@vitejs/plugin-react'
+import tailwindcss from '@tailwindcss/vite'
+import fs from 'node:fs'
 
 export default defineConfig(({ command }) => {
-  // Check if certs exist before attempting to read them
-  const certsExist =
-    fs.existsSync("./certs/localhost-key.pem") &&
-    fs.existsSync("./certs/localhost.pem");
-
-  const localHttps =
-    command === "serve" &&
-    process.env.DEV_HTTPS !== "false" &&
-    certsExist;
+  // Certificates are local-only. Production builds must never depend on files
+  // that are intentionally excluded from source control.
+  const localHttps = command === 'serve' && process.env.DEV_HTTPS !== 'false'
 
   return {
     plugins: [react(), tailwindcss()],
-
     server: {
-      https: localHttps
-        ? {
-            key: fs.readFileSync("./certs/localhost-key.pem"),
-            cert: fs.readFileSync("./certs/localhost.pem"),
-          }
-        : false,
-
+      host: '0.0.0.0',
+      allowedHosts: ['vwsl.tailaf0363.ts.net'],
+      https: localHttps ? {
+        key: fs.readFileSync("./certs/localhost-key.pem"),
+        cert: fs.readFileSync("./certs/localhost.pem"),
+      } : undefined,
       port: 5173,
       strictPort: true,
-
-      // Enable proxying regardless of localHttps status
       proxy: {
-        "/auth": {
-          target: "http://localhost:5000",
-          changeOrigin: true,
+        '/qa-api': {
+          target: 'https://127.0.0.1:5050',
           secure: false,
-        },
-        "/users": {
-          target: "http://localhost:5000",
           changeOrigin: true,
-          secure: false,
-        },
-        "/events": {
-          target: "http://localhost:5000",
-          changeOrigin: true,
-          secure: false,
-        },
-        "/participants": {
-          target: "http://localhost:5000",
-          changeOrigin: true,
-          secure: false,
-        },
-        "/qr": {
-          target: "http://localhost:5000",
-          changeOrigin: true,
-          secure: false,
-        },
-        "/event-registrations": {
-          target: "http://localhost:5000",
-          changeOrigin: true,
-          secure: false,
+          cookiePathRewrite: { '/auth': '/qa-api/auth' },
+          rewrite: (path) => path.replace(/^\/qa-api/, ''),
+          configure(proxy) {
+            proxy.on('proxyReq', (proxyRequest) => proxyRequest.setHeader('Origin', 'https://localhost:5173'))
+          },
         },
       },
     },
-  };
-});
+  }
+})

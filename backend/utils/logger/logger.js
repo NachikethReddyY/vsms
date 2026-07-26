@@ -1,28 +1,31 @@
-// utils/logger.js
+const fs = require("fs");
+const path = require("path");
+const env = require("../../config/env");
 
-const winston = require("winston");
+const levels = { debug: 10, info: 20, warn: 30, error: 40, silent: Infinity };
+const minimumLevel = env.LOG_LEVEL || (env.NODE_ENV === "test" ? "silent" : "info");
+const logDirectory = path.resolve(__dirname, "../../logs");
 
-// Define a unified format that includes timestamp
-const consoleFormat = winston.format.combine(
-  winston.format.timestamp({ format: "YYYY-MM-DD HH:mm:ss" }),
-  winston.format.colorize(),
-  winston.format.printf(({ level, message, timestamp }) => {
-    // Falls back gracefully if timestamp isn't provided so it never prints 'undefined'
-    const time = timestamp || new Date().toISOString();
-    return `[${time}] ${level}: ${message}`;
-  })
-);
+const append = (file, line) => {
+  fs.mkdirSync(logDirectory, { recursive: true });
+  fs.appendFileSync(path.join(logDirectory, file), `${line}\n`);
+};
 
-const logger = winston.createLogger({
-  level: process.env.LOG_LEVEL || "info",
-  transports: [
-    // Your File transports here...
-    
-    // Fixed Console Transport:
-    new winston.transports.Console({
-      format: consoleFormat,
-    }),
-  ],
-});
+const write = (level, message, context = {}) => {
+  if (levels[level] < levels[minimumLevel]) return;
+  const line = JSON.stringify({
+    ...context,
+    timestamp: new Date().toISOString(),
+    level,
+    message,
+  });
+  append("combined.log", line);
+  if (level === "error") append("error.log", line);
+};
 
-module.exports = logger;
+module.exports = {
+  debug: (message, context) => write("debug", message, context),
+  info: (message, context) => write("info", message, context),
+  warn: (message, context) => write("warn", message, context),
+  error: (message, context) => write("error", message, context),
+};
