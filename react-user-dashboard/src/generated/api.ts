@@ -144,6 +144,43 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/events/station-templates": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List active reusable station templates */
+        get: operations["listStationTemplates"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/locations/search": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Search Singapore addresses with OneMap
+         * @description Uses a server-cached OneMap token that is renewed automatically; requests are rate limited below OneMap's 300 calls/minute quota.
+         */
+        get: operations["searchSingaporeLocations"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/events/{eventId}": {
         parameters: {
             query?: never;
@@ -196,6 +233,40 @@ export interface paths {
         options?: never;
         head?: never;
         patch?: never;
+        trace?: never;
+    };
+    "/api/events/{eventId}/stations/import": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Import active templates as event-owned station snapshots */
+        post: operations["importEventStations"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/events/{eventId}/stations/{eventStationId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Configure an imported station's order, capacity, or availability */
+        patch: operations["updateEventStation"];
         trace?: never;
     };
     "/api/events/{eventId}/publish": {
@@ -305,21 +376,142 @@ export interface components {
             username: string;
             systemRole: components["schemas"]["SystemRole"];
         };
-        StaffAssignmentRequest: {
+        StationTemplate: {
+            /** Format: uuid */
+            stationTemplateId: string;
+            templateKey: string;
+            version: number;
+            name: string;
+            description?: string | null;
+            defaultCapacity: number;
+        };
+        EventStation: {
+            /** Format: uuid */
+            eventStationId: string;
+            /** Format: uuid */
+            stationTemplateId: string;
+            templateVersion: number;
+            name: string;
+            description?: string | null;
+            stationOrder: number;
+            capacity: number;
+            isAvailable: boolean;
+            availabilities: components["schemas"]["EventStationAvailability"][];
+        };
+        EventStationAvailability: {
+            /** Format: uuid */
+            eventStationAvailabilityId: string;
+            isAvailable: boolean;
+            /** Format: date-time */
+            startsAt?: string | null;
+            /** Format: date-time */
+            endsAt?: string | null;
+            capacity: number;
+            eventDay: {
+                /** Format: uuid */
+                eventDayId: string;
+                /** Format: date */
+                date: string;
+            };
+        };
+        EventDayInput: {
+            /** Format: uuid */
+            eventDayId?: string;
+            /** Format: date */
+            date: string;
+            /** Format: date-time */
+            startsAt: string;
+            /** Format: date-time */
+            endsAt: string;
+        };
+        EventDay: components["schemas"]["EventDayInput"] & {
+            /** Format: uuid */
+            eventDayId: string;
+        };
+        StationAvailabilityInput: {
+            /** Format: date */
+            date: string;
+            isAvailable: boolean;
+            /** Format: date-time */
+            startsAt?: string | null;
+            /** Format: date-time */
+            endsAt?: string | null;
+            capacity: number;
+        };
+        EventStationInput: {
+            /** Format: uuid */
+            eventStationId?: string;
+            /** Format: uuid */
+            stationTemplateId: string;
+            stationOrder: number;
+            capacity: number;
+            isAvailable: boolean;
+            availabilities: components["schemas"]["StationAvailabilityInput"][];
+        };
+        StationImportRequest: {
+            version: number;
+            stationTemplateIds: string[];
+        };
+        EventStationUpdateRequest: {
+            version: number;
+            stationOrder?: number;
+            capacity?: number;
+            isAvailable?: boolean;
+        };
+        StaffAssignmentRequest: components["schemas"]["ScreenerStaffAssignmentRequest"] | components["schemas"]["GeneralStaffAssignmentRequest"];
+        ScreenerStaffAssignmentRequest: {
+            version: number;
             /** Format: uuid */
             userId: string;
-            assignmentRole: components["schemas"]["StaffAssignmentRole"];
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            assignmentRole: "SCREENER";
+            /** Format: uuid */
+            eventStationId: string;
+        };
+        GeneralStaffAssignmentRequest: {
+            version: number;
+            /** Format: uuid */
+            userId: string;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            assignmentRole: "EVENT_MANAGER" | "REGISTRATION" | "REVIEWER" | "SUPPORT";
+            /** Format: uuid */
+            eventStationId?: string | null;
         };
         StaffAssignment: {
             /** Format: uuid */
             staffAssignmentId: string;
             assignmentRole: components["schemas"]["StaffAssignmentRole"];
             status: components["schemas"]["StaffAssignmentStatus"];
+            notes?: string | null;
+            eventStation?: {
+                /** Format: uuid */
+                eventStationId: string;
+                /** Format: uuid */
+                stationTemplateId: string;
+                name: string;
+                stationOrder: number;
+            } | null;
             user: {
                 /** Format: uuid */
                 userId: string;
                 username: string;
             };
+        };
+        ShiftAssignmentInput: {
+            /** Format: uuid */
+            staffAssignmentId?: string;
+            /** Format: uuid */
+            userId: string;
+            assignmentRole: components["schemas"]["StaffAssignmentRole"];
+            /** Format: uuid */
+            stationTemplateId?: string | null;
+            notes?: string | null;
         };
         User: {
             /** Format: uuid */
@@ -365,6 +557,7 @@ export interface components {
             endsAt: string;
             /** @default 1 */
             requiredStaff: number;
+            assignments?: components["schemas"]["ShiftAssignmentInput"][];
         };
         Shift: components["schemas"]["ShiftInput"] & {
             /** Format: uuid */
@@ -379,6 +572,15 @@ export interface components {
             /** @description Cropped square event artwork encoded as a bounded JPEG or WebP data URL */
             artworkDataUrl?: string | null;
             venue: string;
+            address?: string | null;
+            postalCode?: string | null;
+            /** Format: double */
+            latitude?: number | null;
+            /** Format: double */
+            longitude?: number | null;
+            /** @enum {string|null} */
+            locationProvider?: "ONEMAP" | "MANUAL" | null;
+            locationReference?: string | null;
             /** @example Asia/Singapore */
             timezone: string;
             /** Format: date-time */
@@ -386,6 +588,9 @@ export interface components {
             /** Format: date-time */
             endsAt: string;
             capacity: number;
+            expectedAttendance?: number | null;
+            eventDays?: components["schemas"]["EventDayInput"][];
+            stations?: components["schemas"]["EventStationInput"][];
             shifts?: components["schemas"]["ShiftInput"][];
         };
         UpdateEventRequest: {
@@ -395,12 +600,24 @@ export interface components {
             bannerKey?: components["schemas"]["EventBannerKey"];
             artworkDataUrl?: string | null;
             venue?: string;
+            address?: string | null;
+            postalCode?: string | null;
+            /** Format: double */
+            latitude?: number | null;
+            /** Format: double */
+            longitude?: number | null;
+            /** @enum {string|null} */
+            locationProvider?: "ONEMAP" | "MANUAL" | null;
+            locationReference?: string | null;
             timezone?: string;
             /** Format: date-time */
             startsAt?: string;
             /** Format: date-time */
             endsAt?: string;
             capacity?: number;
+            expectedAttendance?: number | null;
+            eventDays?: components["schemas"]["EventDayInput"][];
+            stations?: components["schemas"]["EventStationInput"][];
             shifts?: components["schemas"]["ShiftInput"][];
         };
         CancelEventRequest: {
@@ -424,12 +641,33 @@ export interface components {
             /** Format: date-time */
             updatedAt: string;
             shifts: components["schemas"]["Shift"][];
+            eventDays: components["schemas"]["EventDay"][];
+            eventStations: components["schemas"]["EventStation"][];
             /** @description Number of collected registration entries for this event */
             signupCount: number;
             /** @description Number of signed-up or checked-in registrations not marked completed or cancelled */
             activeCapacityCount: number;
+            /** @description Whether the current caller may change this event */
+            canManage: boolean;
             createdBy?: components["schemas"]["User"];
             cancelledBy?: components["schemas"]["User"] | null;
+        };
+        LocationResult: {
+            id: string;
+            label: string;
+            address: string;
+            postalCode?: string | null;
+            /** Format: double */
+            latitude: number;
+            /** Format: double */
+            longitude: number;
+            /** @enum {string} */
+            provider: "ONEMAP";
+            /** @enum {string} */
+            timezone: "Asia/Singapore";
+        };
+        LocationSearchResponse: {
+            locations: components["schemas"]["LocationResult"][];
         };
         EventListResponse: {
             events: components["schemas"]["Event"][];
@@ -761,7 +999,10 @@ export interface operations {
     createEvent: {
         parameters: {
             query?: never;
-            header?: never;
+            header?: {
+                /** @description Stable retry key for this create attempt */
+                "Idempotency-Key"?: string;
+            };
             path?: never;
             cookie?: never;
         };
@@ -806,6 +1047,63 @@ export interface operations {
             };
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
+        };
+    };
+    listStationTemplates: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Active station templates available for import */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StationTemplate"][];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+        };
+    };
+    searchSingaporeLocations: {
+        parameters: {
+            query: {
+                q: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Normalized Singapore locations */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LocationSearchResponse"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            422: components["responses"]["ValidationFailed"];
+            429: components["responses"]["RateLimited"];
+            /** @description OneMap is unavailable or not configured */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
         };
     };
     getEvent: {
@@ -889,12 +1187,15 @@ export interface operations {
             };
             401: components["responses"]["Unauthorized"];
             404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
             422: components["responses"]["ValidationFailed"];
         };
     };
     removeEventStaffAssignment: {
         parameters: {
-            query?: never;
+            query: {
+                version: number;
+            };
             header?: never;
             path: {
                 eventId: components["parameters"]["EventId"];
@@ -916,6 +1217,69 @@ export interface operations {
             };
             401: components["responses"]["Unauthorized"];
             404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            422: components["responses"]["ValidationFailed"];
+        };
+    };
+    importEventStations: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                eventId: components["parameters"]["EventId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["StationImportRequest"];
+            };
+        };
+        responses: {
+            /** @description Stations imported and audited */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Event"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            422: components["responses"]["ValidationFailed"];
+        };
+    };
+    updateEventStation: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                eventId: components["parameters"]["EventId"];
+                eventStationId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["EventStationUpdateRequest"];
+            };
+        };
+        responses: {
+            /** @description Event station updated and audited */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Event"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            422: components["responses"]["ValidationFailed"];
         };
     };
     publishEvent: {

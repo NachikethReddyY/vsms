@@ -3,8 +3,11 @@ import {
   ArrowUpTrayIcon,
   CalendarDaysIcon,
   CheckIcon,
+  ChevronDownIcon,
+  ChevronUpIcon,
   ClipboardDocumentListIcon,
   ClockIcon,
+  DocumentDuplicateIcon,
   MapPinIcon,
   PhotoIcon,
   PencilSquareIcon,
@@ -13,17 +16,24 @@ import {
   UserGroupIcon,
   XMarkIcon,
 } from '@heroicons/react/24/outline';
-import { useEffect, useMemo, useRef, useState, type ChangeEvent } from 'react';
+import { Button } from '@astryxdesign/core/Button';
+import { Selector } from '@astryxdesign/core/Selector';
+import { useEffect, useMemo, useRef, useState, type ChangeEvent, type FormEvent } from 'react';
 import { Link, useLocation, useParams } from 'react-router-dom';
 import { getApiMessage, useAuth } from '../../auth/authState';
-import { eventApi, formatEventDate, STATUS_LABEL, type AuditRecord, type EventRecord, type StaffAssignmentRole, type StaffDirectoryEntry } from './eventApi';
+import { getDisplayName } from '../../utils/identity';
+import { eventApi, formatEventDate, STATUS_LABEL, type AuditRecord, type EventRecord, type EventStatus, type StaffAssignmentRole, type StaffDirectoryEntry, type StationTemplate } from './eventApi';
 import { EVENT_BANNERS, getEventArtwork, type EventBannerKey } from './eventBanners';
-import { AvatarCircles } from '../../components/MagicEffects';
 
-const nextAction: Record<string, { action: 'publish' | 'start' | 'complete'; label: string; prompt: string } | undefined> = {
-  DRAFT: { action: 'publish', label: 'Publish event', prompt: 'Publish this event? Staff with access will see it as ready for operations.' },
-  PUBLISHED: { action: 'start', label: 'Start event', prompt: 'Start operations now? Planned shifts will become active.' },
-  IN_PROGRESS: { action: 'complete', label: 'Complete event', prompt: 'Complete this event? This is a terminal action and cannot be undone.' },
+type AssignmentDraft = { userId: string; assignmentRole: StaffAssignmentRole; eventStationId: string };
+const emptyAssignment: AssignmentDraft = { userId: '', assignmentRole: 'SUPPORT', eventStationId: '' };
+const assignmentRoles: StaffAssignmentRole[] = ['EVENT_MANAGER', 'REGISTRATION', 'SCREENER', 'REVIEWER', 'SUPPORT'];
+const roleLabel = (role: string) => role.toLowerCase().replace(/_/g, ' ').replace(/^\w/, (letter: string) => letter.toUpperCase());
+
+const nextAction: Record<string, { action: 'publish' | 'start' | 'complete'; status: EventStatus; label: string; prompt: string } | undefined> = {
+  DRAFT: { action: 'publish', status: 'PUBLISHED', label: 'Save as published', prompt: 'Publish this event? Staff with access will see it as ready for operations.' },
+  PUBLISHED: { action: 'start', status: 'IN_PROGRESS', label: 'Save as in progress', prompt: 'Start operations now? Planned shifts will become active.' },
+  IN_PROGRESS: { action: 'complete', status: 'COMPLETED', label: 'Save as completed', prompt: 'Complete this event? This is a terminal action and cannot be undone.' },
 };
 
 const lifecycleStages = [
@@ -60,6 +70,7 @@ export default function EventDetailPage() {
   const { user } = useAuth();
   const location = useLocation();
   const [event, setEvent] = useState<EventRecord | null>(null);
+  const [statusChoice, setStatusChoice] = useState<EventStatus>('DRAFT');
   const [audit, setAudit] = useState<AuditRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [pending, setPending] = useState(false);
@@ -70,15 +81,35 @@ export default function EventDetailPage() {
   const [staffDirectory, setStaffDirectory] = useState<StaffDirectoryEntry[]>([]);
   const [staffingOpen, setStaffingOpen] = useState<string | null>(null);
   const [staffingPending, setStaffingPending] = useState(false);
+  const [directoryLoading, setDirectoryLoading] = useState(false);
+  const [directoryLoaded, setDirectoryLoaded] = useState(false);
+  const [directoryError, setDirectoryError] = useState('');
+  const [assignmentDrafts, setAssignmentDrafts] = useState<Record<string, AssignmentDraft>>({});
+  const [stationTemplates, setStationTemplates] = useState<StationTemplate[]>([]);
+  const [stationPanelOpen, setStationPanelOpen] = useState(false);
+  const [stationLoading, setStationLoading] = useState(false);
+  const [stationTemplatesLoaded, setStationTemplatesLoaded] = useState(false);
+  const [stationTemplatesError, setStationTemplatesError] = useState('');
+  const [stationPending, setStationPending] = useState('');
+  const [capacityErrors, setCapacityErrors] = useState<Record<string, string>>({});
+  const [auditLoading, setAuditLoading] = useState(false);
+  const [auditError, setAuditError] = useState('');
   const fileInput = useRef<HTMLInputElement>(null);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState((location.state as { notice?: string } | null)?.notice ?? '');
 
+  const refreshAudit = async (id = eventId) => {
+    setAuditLoading(true); setAuditError('');
+    try { setAudit((await eventApi.audit(id)).auditLogs); }
+    catch (cause) { setAuditError(getApiMessage(cause, 'Activity could not be loaded.')); }
+    finally { setAuditLoading(false); }
+  };
+
   const load = async () => {
     setLoading(true); setError('');
     try {
-      const detail = await eventApi.get(eventId); setEvent(detail);
-      if (user?.systemRole !== 'STAFF') eventApi.audit(eventId).then((data) => setAudit(data.auditLogs)).catch(() => setAudit([]));
+      const detail = await eventApi.get(eventId); setEvent(detail); setStatusChoice(detail.status);
+      if (detail.canManage) void refreshAudit(detail.eventId);
     } catch (cause) { setError(getApiMessage(cause, 'Event details could not be loaded.')); }
     finally { setLoading(false); }
   };
@@ -87,7 +118,7 @@ export default function EventDetailPage() {
   const transition = async () => {
     const next = event && nextAction[event.status]; if (!event || !next || !window.confirm(next.prompt)) return;
     setPending(true); setError('');
-    try { const updated = await eventApi.transition(event.eventId, next.action, event.version); setEvent(updated); setNotice(`${STATUS_LABEL[updated.status]} status saved.`); const data = await eventApi.audit(event.eventId); setAudit(data.auditLogs); }
+    try { const updated = await eventApi.transition(event.eventId, next.action, event.version); setEvent(updated); setStatusChoice(updated.status); setNotice(`${STATUS_LABEL[updated.status]} status saved.`); await refreshAudit(event.eventId); }
     catch (cause) { setError(getApiMessage(cause, 'The status could not be changed. Refresh and try again.')); }
     finally { setPending(false); }
   };
@@ -97,7 +128,7 @@ export default function EventDetailPage() {
     const reason = window.prompt('Give a clear cancellation reason (10-500 characters).');
     if (!reason) return;
     setPending(true); setError('');
-    try { const updated = await eventApi.cancel(event.eventId, event.version, reason); setEvent(updated); setNotice('Event cancelled and reason recorded.'); }
+    try { const updated = await eventApi.cancel(event.eventId, event.version, reason); setEvent(updated); setStatusChoice(updated.status); setNotice('Event cancelled and reason recorded.'); void refreshAudit(event.eventId); }
     catch (cause) { setError(getApiMessage(cause, 'The event could not be cancelled.')); }
     finally { setPending(false); }
   };
@@ -107,7 +138,7 @@ export default function EventDetailPage() {
     setBannerPending(true); setError('');
     try {
       const updated = await eventApi.update(event.eventId, { version: event.version, bannerKey: selectedBannerKey, artworkDataUrl: artworkFile || null });
-      setEvent(updated); setBannerOpen(false); setNotice('Event banner updated.');
+      setEvent(updated); setBannerOpen(false); setNotice('Event banner updated.'); void refreshAudit(event.eventId);
     } catch (cause) { setError(getApiMessage(cause, 'The banner could not be updated. Refresh and try again.')); }
     finally { setBannerPending(false); }
   };
@@ -126,17 +157,44 @@ export default function EventDetailPage() {
     reader.readAsDataURL(file);
   };
 
-  const openStaffing = async (shiftId: string) => {
-    setStaffingOpen((current) => current === shiftId ? null : shiftId);
-    if (staffDirectory.length > 0) return;
-    try { setStaffDirectory(await eventApi.staffDirectory()); }
-    catch (cause) { setError(getApiMessage(cause, 'Staff could not be loaded.')); }
+  const loadStaffDirectory = async () => {
+    setDirectoryLoading(true); setDirectoryError('');
+    try { setStaffDirectory(await eventApi.staffDirectory()); setDirectoryLoaded(true); }
+    catch (cause) { setDirectoryError(getApiMessage(cause, 'Staff could not be loaded.')); setDirectoryLoaded(false); }
+    finally { setDirectoryLoading(false); }
   };
 
-  const assignStaff = async (shiftId: string, userId: string, assignmentRole: StaffAssignmentRole) => {
-    if (!event || !userId) return;
+  const openStaffing = async (shiftId: string) => {
+    const opening = staffingOpen !== shiftId;
+    setStaffingOpen(opening ? shiftId : null);
+    setAssignmentDrafts((current) => current[shiftId] ? current : { ...current, [shiftId]: emptyAssignment });
+    if (opening && !directoryLoaded && !directoryLoading) await loadStaffDirectory();
+  };
+
+  const updateAssignmentDraft = (shiftId: string, changes: Partial<AssignmentDraft>) => {
+    setAssignmentDrafts((current) => ({ ...current, [shiftId]: { ...(current[shiftId] ?? emptyAssignment), ...changes } }));
+  };
+
+  const assignStaff = async (shiftId: string) => {
+    const draft = assignmentDrafts[shiftId] ?? emptyAssignment;
+    if (!event || !draft.userId) return;
+    if (draft.assignmentRole === 'SCREENER' && !draft.eventStationId) {
+      setError('Choose an event station for the screener.');
+      return;
+    }
     setStaffingPending(true); setError('');
-    try { setEvent(await eventApi.assignStaff(event.eventId, shiftId, { userId, assignmentRole })); }
+    try {
+      const updated = await eventApi.assignStaff(event.eventId, shiftId, {
+        version: event.version,
+        userId: draft.userId,
+        assignmentRole: draft.assignmentRole,
+        eventStationId: draft.eventStationId || null,
+      });
+      setEvent(updated);
+      setAssignmentDrafts((current) => ({ ...current, [shiftId]: emptyAssignment }));
+      setNotice('Staff schedule updated.');
+      void refreshAudit(event.eventId);
+    }
     catch (cause) { setError(getApiMessage(cause, 'The staff assignment could not be saved.')); }
     finally { setStaffingPending(false); }
   };
@@ -144,21 +202,74 @@ export default function EventDetailPage() {
   const removeStaff = async (shiftId: string, assignmentId: string) => {
     if (!event) return;
     setStaffingPending(true); setError('');
-    try { setEvent(await eventApi.removeStaff(event.eventId, shiftId, assignmentId)); }
+    try { setEvent(await eventApi.removeStaff(event.eventId, shiftId, assignmentId, event.version)); setNotice('Staff assignment removed.'); void refreshAudit(event.eventId); }
     catch (cause) { setError(getApiMessage(cause, 'The staff assignment could not be removed.')); }
     finally { setStaffingPending(false); }
+  };
+
+  const loadStationTemplates = async () => {
+    setStationLoading(true); setStationTemplatesError('');
+    try { setStationTemplates(await eventApi.stationTemplates()); setStationTemplatesLoaded(true); }
+    catch (cause) { setStationTemplatesError(getApiMessage(cause, 'Station templates could not be loaded.')); setStationTemplatesLoaded(false); }
+    finally { setStationLoading(false); }
+  };
+
+  const openStationTemplates = async () => {
+    const opening = !stationPanelOpen;
+    setStationPanelOpen(opening);
+    if (opening && !stationTemplatesLoaded && !stationLoading) await loadStationTemplates();
+  };
+
+  const importStation = async (stationTemplateId: string) => {
+    if (!event) return;
+    setStationPending(stationTemplateId); setError('');
+    try {
+      setEvent(await eventApi.importStations(event.eventId, event.version, [stationTemplateId]));
+      setNotice('Station imported into the event route.');
+      void refreshAudit(event.eventId);
+    } catch (cause) { setError(getApiMessage(cause, 'The station could not be imported.')); }
+    finally { setStationPending(''); }
+  };
+
+  const updateStation = async (eventStationId: string, changes: { stationOrder?: number; capacity?: number; isAvailable?: boolean }) => {
+    if (!event) return;
+    setStationPending(eventStationId); setError('');
+    try {
+      setEvent(await eventApi.updateStation(event.eventId, eventStationId, { version: event.version, ...changes }));
+      setNotice('Station configuration updated.');
+      void refreshAudit(event.eventId);
+    } catch (cause) { setError(getApiMessage(cause, 'The station configuration could not be saved.')); }
+    finally { setStationPending(''); }
+  };
+
+  const saveStationCapacity = (submitEvent: FormEvent<HTMLFormElement>, eventStationId: string) => {
+    submitEvent.preventDefault();
+    const input = submitEvent.currentTarget.elements.namedItem('capacity');
+    if (!(input instanceof HTMLInputElement)) return;
+    const capacity = input.valueAsNumber;
+    if (!Number.isInteger(capacity) || capacity < 1 || capacity > 1000) {
+      setCapacityErrors((current) => ({ ...current, [eventStationId]: 'Enter a whole number from 1 to 1,000.' }));
+      input.focus();
+      return;
+    }
+    setCapacityErrors((current) => ({ ...current, [eventStationId]: '' }));
+    void updateStation(eventStationId, { capacity });
   };
 
   const dateParts = useMemo(() => event ? getDateParts(event.startsAt, event.timezone) : null, [event]);
 
   if (loading) return <div className="detail-loading" aria-live="polite" aria-label="Loading event"><span /><span /><span /></div>;
-  if (!event || !dateParts) return <div className="center-state error-state"><h1>Event unavailable</h1><p>{error}</p><Link className="secondary" to="/events">Return to events</Link></div>;
+  if (!event || !dateParts) return <div className="center-state error-state"><h1>Event unavailable</h1><p>{error}</p><div className="error-state-actions"><button className="primary" type="button" onClick={() => void load()}>Try again</button><Link className="secondary" to="/events">Return to events</Link></div></div>;
 
   const terminal = event.status === 'COMPLETED' || event.status === 'CANCELLED';
-  const canManage = user?.systemRole === 'ADMIN' || user?.systemRole === 'EVENT_MANAGER';
+  const canManage = event.canManage;
+  const canConfigureStations = canManage && ['DRAFT', 'PUBLISHED', 'IN_PROGRESS'].includes(event.status);
+  const canEditStaffing = canManage && ['DRAFT', 'PUBLISHED', 'IN_PROGRESS'].includes(event.status);
+  const availableTemplates = stationTemplates.filter((template) => !event.eventStations.some((station) => station.stationTemplateId === template.stationTemplateId));
   const canCancel = canManage && !terminal && (event.status !== 'IN_PROGRESS' || user?.systemRole === 'ADMIN');
   const activeStage = lifecycleStages.findIndex((stage) => stage.status === event.status);
   const totalRequiredStaff = event.shifts.reduce((total, shift) => total + shift.requiredStaff, 0);
+  const next = nextAction[event.status];
 
   return <div className="page-frame detail-page">
     <div className="detail-topline">
@@ -173,11 +284,11 @@ export default function EventDetailPage() {
       <div className="event-banner-image"><img src={getEventArtwork(event.bannerKey, event.artworkDataUrl)} alt="" /></div>
       <figcaption className="event-banner-toolbar">
         <div><span>Event banner</span><strong>{event.artworkDataUrl ? 'Your uploaded artwork' : 'Default event artwork'}</strong></div>
-        {canManage && <button className="secondary banner-edit-button" type="button" aria-expanded={bannerOpen} aria-controls="banner-picker" onClick={() => { setSelectedBannerKey(event.bannerKey ?? 'COMMUNITY_SCREENING'); setArtworkFile(event.artworkDataUrl ?? ''); setBannerOpen((open) => !open); }}><PhotoIcon />Change banner</button>}
+        {canManage && !terminal && <button className="secondary banner-edit-button" type="button" aria-expanded={bannerOpen} aria-controls="banner-picker" onClick={() => { setSelectedBannerKey(event.bannerKey ?? 'COMMUNITY_SCREENING'); setArtworkFile(event.artworkDataUrl ?? ''); setBannerOpen((open) => !open); }}><PhotoIcon />Change banner</button>}
       </figcaption>
     </figure>
 
-    {bannerOpen && <section className="banner-picker" id="banner-picker" aria-labelledby="banner-picker-title">
+    {bannerOpen && !terminal && <section className="banner-picker" id="banner-picker" aria-labelledby="banner-picker-title">
       <div className="banner-picker-heading"><div><h2 id="banner-picker-title">Choose event artwork</h2><p>Use a built-in image or select your own file.</p></div><button className="icon-button" type="button" onClick={() => setBannerOpen(false)} aria-label="Close banner picker"><XMarkIcon /></button></div>
       <input ref={fileInput} className="visually-hidden" type="file" accept="image/jpeg,image/webp" onChange={chooseArtwork} />
       <div className="banner-options" role="radiogroup" aria-label="Available event artwork">
@@ -205,13 +316,13 @@ export default function EventDetailPage() {
           </div>
           <div className="event-info-row">
             <MapPinIcon />
-            <div><small>Venue</small><strong>{event.venue}</strong><span>{event.timezone}</span></div>
+            <div><small>Venue</small><strong>{event.venue}</strong><span>{event.address || 'Address entered manually'}{event.postalCode ? ` · Singapore ${event.postalCode}` : ''} · {event.timezone}</span></div>
           </div>
           <div className="event-info-row split">
             <UserGroupIcon />
             <div><small>At venue now</small><strong>{event.activeCapacityCount.toLocaleString()} of {event.capacity.toLocaleString()} people</strong><span>Signed up or checked in, not complete</span></div>
             <ClipboardDocumentListIcon />
-            <div><small>Signups collected</small><strong>{event.signupCount.toLocaleString()} {event.signupCount === 1 ? 'entry' : 'entries'}</strong></div>
+            <div><small>Expected across event</small><strong>{event.expectedAttendance?.toLocaleString() || 'Not set'} visitors</strong><span>{event.signupCount.toLocaleString()} signups collected</span></div>
           </div>
           <div className="event-info-row">
             <ClockIcon />
@@ -219,10 +330,37 @@ export default function EventDetailPage() {
           </div>
         </div>
 
+        {canManage && !terminal && next && <section className="status-editor" aria-labelledby="status-editor-title">
+          <div className="status-editor-copy">
+            <strong id="status-editor-title">Event status</strong>
+            <span>Choose the next validated lifecycle stage, then save it.</span>
+          </div>
+          <Selector
+            label="Event status"
+            isLabelHidden
+            options={[
+              { value: event.status, label: STATUS_LABEL[event.status] },
+              { value: next.status, label: STATUS_LABEL[next.status] },
+            ]}
+            value={statusChoice}
+            onChange={(value) => setStatusChoice(value as EventStatus)}
+            width="100%"
+          />
+          <Button
+            label={next.label}
+            variant="primary"
+            width="100%"
+            isDisabled={pending || statusChoice !== next.status}
+            isLoading={pending}
+            onClick={() => void transition()}
+          />
+        </section>}
+
         {canManage && <div className="action-cluster">
-          {nextAction[event.status] && <button className="primary" onClick={() => void transition()} disabled={pending}>{pending ? 'Saving…' : nextAction[event.status]!.label}</button>}
-          {!terminal && <Link className="secondary" to={`/events/${event.eventId}/edit`}><PencilSquareIcon />Edit details</Link>}
-          {canCancel && <button className="danger-button" onClick={() => void cancel()} disabled={pending}>Cancel event</button>}
+          {terminal ? <Link className="secondary" to="/events/new" state={{ duplicateFrom: event }}><DocumentDuplicateIcon />Duplicate event</Link> : <>
+            <Link className="secondary" to={`/events/${event.eventId}/edit`}><PencilSquareIcon />Edit details</Link>
+            {canCancel && <button className="danger-button" onClick={() => void cancel()} disabled={pending}>Cancel event</button>}
+          </>}
         </div>}
       </aside>
     </section>
@@ -238,20 +376,46 @@ export default function EventDetailPage() {
 
     <div className="event-content-grid">
       <section className="shift-section" aria-labelledby="shift-title">
+        <div className="station-section">
+          <div className="section-title">
+            <div><span className="section-kicker">Participant route</span><h2>Event stations</h2></div>
+            {canConfigureStations && <button className="secondary compact" type="button" aria-expanded={stationPanelOpen} aria-controls="station-template-panel" onClick={() => void openStationTemplates()}><PlusIcon />Import station</button>}
+          </div>
+          {stationPanelOpen && <div className="station-template-panel" id="station-template-panel" aria-live="polite">
+            <div><strong>Station templates</strong><span>Importing creates an event-owned copy. Changes here will not alter the reusable template.</span></div>
+            {stationLoading ? <p>Loading station templates…</p> : stationTemplatesError ? <div className="inline-retry" role="alert"><p>{stationTemplatesError}</p><button className="secondary compact" type="button" onClick={() => void loadStationTemplates()}>Retry</button></div> : stationTemplatesLoaded && availableTemplates.length === 0 ? <p>All active station templates are already in this event.</p> : <ul>{availableTemplates.map((template) => <li key={template.stationTemplateId}><span><strong>{template.name}</strong><small>{template.description || 'No template description.'} · Default capacity {template.defaultCapacity}</small></span><button className="secondary compact" type="button" disabled={!!stationPending} onClick={() => void importStation(template.stationTemplateId)}>{stationPending === template.stationTemplateId ? 'Importing…' : 'Import'}</button></li>)}</ul>}
+          </div>}
+          {event.eventStations.length === 0 ? <p className="quiet-empty">{canConfigureStations ? 'No stations imported yet. Import a template to build the participant route.' : 'No stations are configured for this event.'}</p> : <div className="station-table">{event.eventStations.map((station, index) => <article className={`station-record ${station.isAvailable ? '' : 'is-unavailable'}`} key={station.eventStationId}>
+            <div className="station-order"><strong>{station.stationOrder}</strong><span>Route order</span></div>
+            <div className="station-record-copy"><strong>{station.name}</strong><span>{station.description || 'No station instructions.'}</span><small>Template v{station.templateVersion} · {station.isAvailable ? 'Available' : 'Unavailable'}</small></div>
+            {canConfigureStations ? <div className="station-controls">
+              <div className="station-reorder" aria-label={`Change ${station.name} route order`}>
+                <button className="icon-button" type="button" aria-label={`Move ${station.name} earlier`} disabled={index === 0 || !!stationPending} onClick={() => void updateStation(station.eventStationId, { stationOrder: station.stationOrder - 1 })}><ChevronUpIcon /></button>
+                <button className="icon-button" type="button" aria-label={`Move ${station.name} later`} disabled={index === event.eventStations.length - 1 || !!stationPending} onClick={() => void updateStation(station.eventStationId, { stationOrder: station.stationOrder + 1 })}><ChevronDownIcon /></button>
+              </div>
+              <form className="station-capacity" noValidate onSubmit={(submitEvent) => saveStationCapacity(submitEvent, station.eventStationId)}>
+                <label><span>Capacity</span><input key={`${station.eventStationId}-${station.capacity}`} name="capacity" type="number" min="1" max="1000" step="1" required defaultValue={station.capacity} aria-label={`${station.name} capacity`} aria-invalid={!!capacityErrors[station.eventStationId]} aria-describedby={capacityErrors[station.eventStationId] ? `capacity-error-${station.eventStationId}` : undefined} onInput={() => setCapacityErrors((current) => ({ ...current, [station.eventStationId]: '' }))} />{capacityErrors[station.eventStationId] && <span className="field-error" id={`capacity-error-${station.eventStationId}`} role="alert">{capacityErrors[station.eventStationId]}</span>}</label>
+                <button className="secondary compact" type="submit" disabled={!!stationPending}>{stationPending === station.eventStationId ? 'Saving…' : 'Save'}</button>
+              </form>
+              <button className="secondary compact" type="button" disabled={!!stationPending} onClick={() => void updateStation(station.eventStationId, { isAvailable: !station.isAvailable })}>{station.isAvailable ? 'Mark unavailable' : 'Make available'}</button>
+            </div> : <strong className="station-capacity-readonly">{station.capacity} concurrent</strong>}
+          </article>)}</div>}
+        </div>
+
         <div className="section-title"><div><span className="section-kicker">Staffing plan</span><h2 id="shift-title">Shifts</h2></div><span>{event.shifts.length} scheduled</span></div>
         {event.shifts.length === 0 ? <p className="quiet-empty">No shifts have been added. The event can still be saved as a draft.</p> : <div className="shift-table">{event.shifts.map((shift) => {
-          const planning = shift.staffAssignments.filter((assignment) => assignment.assignmentRole === 'EVENT_MANAGER');
-          const operations = shift.staffAssignments.filter((assignment) => assignment.assignmentRole !== 'EVENT_MANAGER');
+          const draft = assignmentDrafts[shift.shiftId] ?? emptyAssignment;
           return <article className="shift-record" key={shift.shiftId}>
-            <div className="shift-record-summary"><span><strong>{shift.name}</strong><small>{STATUS_LABEL[shift.status as keyof typeof STATUS_LABEL] ?? shift.status.toLowerCase()}</small></span><span><small>Starts</small>{formatEventDate(shift.startsAt, event.timezone)}</span><span><small>Coverage</small>{shift.requiredStaff} staff required</span>{canManage && <button className="secondary compact" type="button" onClick={() => void openStaffing(shift.shiftId)}><PlusIcon />People</button>}</div>
-            {(planning.length > 0 || operations.length > 0) && <div className="shift-people">
-              {planning.length > 0 && <div><span>Planning</span><AvatarCircles people={planning.map((assignment) => assignment.user)} label={`${planning.length} planning staff`} />{canManage && planning.map((assignment) => <button className="assignment-remove" type="button" key={assignment.staffAssignmentId} aria-label={`Remove ${assignment.user.username} from planning`} title={`Remove ${assignment.user.username}`} onClick={() => void removeStaff(shift.shiftId, assignment.staffAssignmentId)} disabled={staffingPending}><TrashIcon /></button>)}</div>}
-              {operations.length > 0 && <div><span>Operations</span><AvatarCircles people={operations.map((assignment) => assignment.user)} label={`${operations.length} operations staff`} />{canManage && operations.map((assignment) => <button className="assignment-remove" type="button" key={assignment.staffAssignmentId} aria-label={`Remove ${assignment.user.username} from operations`} title={`Remove ${assignment.user.username}`} onClick={() => void removeStaff(shift.shiftId, assignment.staffAssignmentId)} disabled={staffingPending}><TrashIcon /></button>)}</div>}
-            </div>}
-            {canManage && staffingOpen === shift.shiftId && <div className="staffing-editor">
-              <label><span>Planning</span><select defaultValue="" disabled={staffingPending} onChange={(change) => { void assignStaff(shift.shiftId, change.target.value, 'EVENT_MANAGER'); change.target.value = ''; }}><option value="" disabled>Add planner</option>{staffDirectory.map((person) => <option value={person.userId} key={person.userId}>{person.username}</option>)}</select></label>
-              <label><span>Operations</span><select defaultValue="" disabled={staffingPending} onChange={(change) => { void assignStaff(shift.shiftId, change.target.value, 'SUPPORT'); change.target.value = ''; }}><option value="" disabled>Add operations staff</option>{staffDirectory.map((person) => <option value={person.userId} key={person.userId}>{person.username}</option>)}</select></label>
-            </div>}
+            <div className="shift-record-summary"><span><strong>{shift.name}</strong><small>{STATUS_LABEL[shift.status as keyof typeof STATUS_LABEL] ?? shift.status.toLowerCase()}</small></span><span><small>Schedule</small>{formatTime(shift.startsAt, event.timezone)}–{formatTime(shift.endsAt, event.timezone)}</span><span><small>Coverage</small>{shift.staffAssignments.length} of {shift.requiredStaff} assigned</span>{canEditStaffing && <button className="secondary compact" type="button" aria-expanded={staffingOpen === shift.shiftId} onClick={() => void openStaffing(shift.shiftId)}><PlusIcon />Assign</button>}</div>
+            {shift.staffAssignments.length > 0 ? <ul className="assignment-list">{shift.staffAssignments.map((assignment) => <li key={assignment.staffAssignmentId}><span><strong>{getDisplayName(assignment.user.username)}</strong><small>{roleLabel(assignment.assignmentRole)}{assignment.eventStation ? ` · ${assignment.eventStation.name}` : ''}</small></span>{canEditStaffing && <button className="assignment-remove" type="button" aria-label={`Remove ${getDisplayName(assignment.user.username)} from ${shift.name}`} title={`Remove ${getDisplayName(assignment.user.username)}`} onClick={() => void removeStaff(shift.shiftId, assignment.staffAssignmentId)} disabled={staffingPending}><TrashIcon /></button>}</li>)}</ul> : <p className="shift-empty">No staff assigned to this shift.</p>}
+            {canEditStaffing && staffingOpen === shift.shiftId && <form className="staffing-editor" onSubmit={(submitEvent) => { submitEvent.preventDefault(); void assignStaff(shift.shiftId); }}>
+              {directoryLoading ? <p>Loading available staff…</p> : directoryError ? <div className="inline-retry" role="alert"><p>{directoryError}</p><button className="secondary compact" type="button" onClick={() => void loadStaffDirectory()}>Retry</button></div> : directoryLoaded && staffDirectory.length === 0 ? <p>No active staff members are available.</p> : <>
+                <label><span>Staff member</span><select required value={draft.userId} disabled={staffingPending} onChange={(change) => updateAssignmentDraft(shift.shiftId, { userId: change.target.value })}><option value="">Choose staff</option>{staffDirectory.map((person) => <option value={person.userId} key={person.userId}>{getDisplayName(person.username)} · {roleLabel(person.systemRole === 'STAFF' ? 'SUPPORT' : person.systemRole)}</option>)}</select></label>
+                <label><span>Shift role</span><select value={draft.assignmentRole} disabled={staffingPending} onChange={(change) => updateAssignmentDraft(shift.shiftId, { assignmentRole: change.target.value as StaffAssignmentRole })}>{assignmentRoles.map((role) => <option value={role} key={role}>{roleLabel(role)}</option>)}</select></label>
+                <label><span>Station {draft.assignmentRole === 'SCREENER' ? '(required)' : '(optional)'}</span><select required={draft.assignmentRole === 'SCREENER'} value={draft.eventStationId} disabled={staffingPending} onChange={(change) => updateAssignmentDraft(shift.shiftId, { eventStationId: change.target.value })}><option value="">No station</option>{event.eventStations.filter((station) => station.isAvailable).map((station) => <option value={station.eventStationId} key={station.eventStationId}>{station.stationOrder}. {station.name}</option>)}</select></label>
+                <button className="primary compact" type="submit" disabled={staffingPending || !draft.userId || (draft.assignmentRole === 'SCREENER' && !draft.eventStationId)}>{staffingPending ? 'Saving…' : 'Save assignment'}</button>
+              </>}
+            </form>}
           </article>;
         })}</div>}
       </section>
@@ -259,7 +423,10 @@ export default function EventDetailPage() {
       <aside className="history" aria-labelledby="activity-title">
         <span className="section-kicker">Immutable record</span>
         <h2 id="activity-title">Activity</h2>
-        {user?.systemRole === 'STAFF' ? <p>History is available to event managers and administrators.</p> : audit.length === 0 ? <p>No history is available.</p> : <ol>{audit.map((item) => <li key={item.eventAuditLogId}><i /><div><strong>{item.action.toLowerCase().replace(/_/g, ' ')}</strong><span>{item.actor?.email ?? 'System actor'}</span><time dateTime={item.createdAt}>{formatEventDate(item.createdAt, event.timezone)}</time></div></li>)}</ol>}
+        {!canManage ? <p>History is available to the event’s managers and administrators.</p> : <>
+          {auditError && <div className="inline-retry" role="alert"><p>{auditError}</p><button className="secondary compact" type="button" onClick={() => void refreshAudit(event.eventId)}>Retry</button></div>}
+          {auditLoading && audit.length === 0 ? <p>Loading activity…</p> : !auditError && audit.length === 0 ? <p>No history is available.</p> : audit.length > 0 ? <ol>{audit.map((item) => <li key={item.eventAuditLogId}><i /><div><strong>{item.action.toLowerCase().replace(/_/g, ' ')}</strong><span>{item.actor?.email ?? 'System actor'}</span><time dateTime={item.createdAt}>{formatEventDate(item.createdAt, event.timezone)}</time></div></li>)}</ol> : null}
+        </>}
       </aside>
     </div>
   </div>;

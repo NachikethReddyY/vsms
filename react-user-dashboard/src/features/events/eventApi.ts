@@ -8,9 +8,12 @@ export type EventStatus = components['schemas']['EventStatus'];
 export type StaffAssignment = components['schemas']['StaffAssignment'];
 export type StaffAssignmentRole = components['schemas']['StaffAssignmentRole'];
 export type StaffDirectoryEntry = components['schemas']['StaffDirectoryEntry'];
+export type StationTemplate = components['schemas']['StationTemplate'];
+export type EventStation = components['schemas']['EventStation'];
 export type CreateEvent = components['schemas']['CreateEventRequest'];
 export type UpdateEvent = components['schemas']['UpdateEventRequest'];
 export type AuditRecord = components['schemas']['EventAuditLog'];
+export type LocationResult = components['schemas']['LocationResult'];
 
 export const eventApi = {
   async list(params?: { status?: EventStatus; search?: string; cursor?: string }) {
@@ -21,8 +24,8 @@ export const eventApi = {
     const { data } = await apiClient.get<EventRecord>(`/api/events/${id}`, { signal });
     return data;
   },
-  async create(input: CreateEvent) {
-    const { data } = await apiClient.post<EventRecord>('/api/events', input);
+  async create(input: CreateEvent, idempotencyKey = crypto.randomUUID()) {
+    const { data } = await apiClient.post<EventRecord>('/api/events', input, { headers: { 'Idempotency-Key': idempotencyKey } });
     return data;
   },
   async update(id: string, input: UpdateEvent) {
@@ -41,12 +44,31 @@ export const eventApi = {
     const { data } = await apiClient.get<StaffDirectoryEntry[]>('/api/events/staff-directory');
     return data;
   },
-  async assignStaff(id: string, shiftId: string, input: { userId: string; assignmentRole: StaffAssignmentRole }) {
+  async stationTemplates() {
+    const { data } = await apiClient.get<StationTemplate[]>('/api/events/station-templates');
+    return data;
+  },
+  async searchLocations(query: string, signal?: AbortSignal) {
+    const { data } = await apiClient.get<components['schemas']['LocationSearchResponse']>('/api/locations/search', {
+      params: { q: query },
+      signal,
+    });
+    return data.locations;
+  },
+  async importStations(id: string, version: number, stationTemplateIds: string[]) {
+    const { data } = await apiClient.post<EventRecord>(`/api/events/${id}/stations/import`, { version, stationTemplateIds });
+    return data;
+  },
+  async updateStation(id: string, eventStationId: string, input: { version: number; stationOrder?: number; capacity?: number; isAvailable?: boolean }) {
+    const { data } = await apiClient.patch<EventRecord>(`/api/events/${id}/stations/${eventStationId}`, input);
+    return data;
+  },
+  async assignStaff(id: string, shiftId: string, input: { version: number; userId: string; assignmentRole: StaffAssignmentRole; eventStationId?: string | null; notes?: string | null }) {
     const { data } = await apiClient.post<EventRecord>(`/api/events/${id}/shifts/${shiftId}/assignments`, input);
     return data;
   },
-  async removeStaff(id: string, shiftId: string, assignmentId: string) {
-    const { data } = await apiClient.delete<EventRecord>(`/api/events/${id}/shifts/${shiftId}/assignments/${assignmentId}`);
+  async removeStaff(id: string, shiftId: string, assignmentId: string, version: number) {
+    const { data } = await apiClient.delete<EventRecord>(`/api/events/${id}/shifts/${shiftId}/assignments/${assignmentId}`, { params: { version } });
     return data;
   },
   async audit(id: string) {

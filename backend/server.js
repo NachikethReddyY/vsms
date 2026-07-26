@@ -4,6 +4,7 @@ const https = require("https");
 const path = require("path");
 const env = require("./config/env");
 const app = require("./app");
+const logger = require("./utils/logger/logger");
 
 const server = !env.isProduction && env.localHttps
   ? https.createServer({
@@ -12,8 +13,16 @@ const server = !env.isProduction && env.localHttps
   }, app)
   : app;
 
-server.listen(env.PORT, "127.0.0.1", () => {
+server.listen(env.PORT, env.HOST, () => {
   const scheme = !env.isProduction && env.localHttps ? "https" : "http";
-  const transport = env.isProduction ? " (private upstream; TLS must terminate at the configured proxy)" : "";
-  console.log(`VSMS API listening on ${scheme}://127.0.0.1:${env.PORT}${transport}`);
+  logger.info("server.started", {
+    environment: env.NODE_ENV,
+    url: `${scheme}://${env.HOST}:${env.PORT}`,
+    ...(env.isProduction ? { tls: "terminated by configured proxy" } : { swaggerPath: "/api-docs" }),
+  });
+});
+
+server.on("error", (error) => {
+  logger.error("server.failed", { message: error.message, stack: error.stack });
+  process.exit(1);
 });

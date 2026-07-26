@@ -126,34 +126,63 @@ enum SyncActionStatus {
 }
 
 model Event {
-  eventId            String      @id @default(uuid()) @map("event_id") @db.Uuid
-  name               String      @db.VarChar(150)
-  description        String?
-  bannerKey          String      @default("COMMUNITY_SCREENING") @map("banner_key") @db.VarChar(50)
-  artworkDataUrl     String?     @map("artwork_data_url")
-  venue              String      @db.VarChar(255)
-  timezone           String      @default("UTC") @db.VarChar(100)
-  startsAt           DateTime    @map("starts_at") @db.Timestamptz(3)
-  endsAt             DateTime    @map("ends_at") @db.Timestamptz(3)
-  capacity           Int
-  status             EventStatus @default(DRAFT)
-  createdByUserId    String      @map("created_by_user_id") @db.Uuid
-  cancelledByUserId  String?     @map("cancelled_by_user_id") @db.Uuid
-  cancelledAt        DateTime?   @map("cancelled_at") @db.Timestamptz(3)
-  cancellationReason String?     @map("cancellation_reason")
-  version            Int         @default(1)
-  createdAt          DateTime    @default(now()) @map("created_at") @db.Timestamptz(3)
-  updatedAt          DateTime    @updatedAt @map("updated_at") @db.Timestamptz(3)
+  eventId              String      @id @default(uuid()) @map("event_id") @db.Uuid
+  name                 String      @db.VarChar(150)
+  description          String?
+  bannerKey            String      @default("COMMUNITY_SCREENING") @map("banner_key") @db.VarChar(50)
+  artworkDataUrl       String?     @map("artwork_data_url")
+  venue                String      @db.VarChar(255)
+  address              String?     @db.VarChar(500)
+  postalCode           String?     @map("postal_code") @db.VarChar(6)
+  latitude             Float?      @db.DoublePrecision
+  longitude            Float?      @db.DoublePrecision
+  locationProvider     String?     @map("location_provider") @db.VarChar(20)
+  locationReference    String?     @map("location_reference") @db.VarChar(255)
+  timezone             String      @default("UTC") @db.VarChar(100)
+  startsAt             DateTime    @map("starts_at") @db.Timestamptz(3)
+  endsAt               DateTime    @map("ends_at") @db.Timestamptz(3)
+  capacity             Int
+  expectedAttendance   Int?        @map("expected_attendance")
+  createIdempotencyKey String?     @map("create_idempotency_key") @db.VarChar(100)
+  createPayloadHash    String?     @map("create_payload_hash") @db.Char(64)
+  status               EventStatus @default(DRAFT)
+  createdByUserId      String      @map("created_by_user_id") @db.Uuid
+  cancelledByUserId    String?     @map("cancelled_by_user_id") @db.Uuid
+  cancelledAt          DateTime?   @map("cancelled_at") @db.Timestamptz(3)
+  cancellationReason   String?     @map("cancellation_reason")
+  version              Int         @default(1)
+  createdAt            DateTime    @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt            DateTime    @updatedAt @map("updated_at") @db.Timestamptz(3)
 
-  createdBy   User            @relation("EventCreatedBy", fields: [createdByUserId], references: [userId], onDelete: Restrict)
-  cancelledBy User?           @relation("EventCancelledBy", fields: [cancelledByUserId], references: [userId], onDelete: Restrict)
-  shifts      Shift[]
+  createdBy     User                @relation("EventCreatedBy", fields: [createdByUserId], references: [userId], onDelete: Restrict)
+  cancelledBy   User?               @relation("EventCancelledBy", fields: [cancelledByUserId], references: [userId], onDelete: Restrict)
+  shifts        Shift[]
+  eventDays     EventDay[]
+  eventStations EventStation[]
   registrations EventRegistration[]
-  auditLogs   EventAuditLog[]
+  auditLogs     EventAuditLog[]
 
+  @@unique([createdByUserId, createIdempotencyKey])
   @@index([status, startsAt])
   @@index([createdByUserId])
   @@map("events")
+}
+
+model EventDay {
+  eventDayId String   @id @default(uuid()) @map("event_day_id") @db.Uuid
+  eventId    String   @map("event_id") @db.Uuid
+  date       DateTime @db.Date
+  startsAt   DateTime @map("starts_at") @db.Timestamptz(3)
+  endsAt     DateTime @map("ends_at") @db.Timestamptz(3)
+  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt  DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  event                 Event                      @relation(fields: [eventId], references: [eventId], onDelete: Cascade)
+  stationAvailabilities EventStationAvailability[]
+
+  @@unique([eventId, date])
+  @@index([eventId, startsAt])
+  @@map("event_days")
 }
 
 model EventRegistration {
@@ -262,6 +291,67 @@ model Shift {
   @@map("shifts")
 }
 
+model StationTemplate {
+  stationTemplateId String   @id @default(uuid()) @map("station_template_id") @db.Uuid
+  templateKey       String   @map("template_key") @db.VarChar(80)
+  version           Int      @default(1)
+  name              String   @db.VarChar(120)
+  description       String?
+  defaultCapacity   Int      @default(1) @map("default_capacity")
+  active            Boolean  @default(true)
+  createdAt         DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt         DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  eventStations EventStation[]
+
+  @@unique([templateKey, version])
+  @@index([active, name])
+  @@map("station_templates")
+}
+
+model EventStation {
+  eventStationId    String   @id @default(uuid()) @map("event_station_id") @db.Uuid
+  eventId           String   @map("event_id") @db.Uuid
+  stationTemplateId String   @map("station_template_id") @db.Uuid
+  templateVersion   Int      @map("template_version")
+  name              String   @db.VarChar(120)
+  description       String?
+  stationOrder      Int      @map("station_order")
+  capacity          Int
+  isAvailable       Boolean  @default(true) @map("is_available")
+  createdAt         DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt         DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  event            Event                      @relation(fields: [eventId], references: [eventId], onDelete: Cascade)
+  stationTemplate  StationTemplate            @relation(fields: [stationTemplateId], references: [stationTemplateId], onDelete: Restrict)
+  staffAssignments StaffAssignment[]
+  availabilities   EventStationAvailability[]
+
+  @@unique([eventId, stationTemplateId])
+  @@unique([eventId, stationOrder])
+  @@index([eventId, isAvailable])
+  @@map("event_stations")
+}
+
+model EventStationAvailability {
+  eventStationAvailabilityId String    @id @default(uuid()) @map("event_station_availability_id") @db.Uuid
+  eventStationId             String    @map("event_station_id") @db.Uuid
+  eventDayId                 String    @map("event_day_id") @db.Uuid
+  isAvailable                Boolean   @default(true) @map("is_available")
+  startsAt                   DateTime? @map("starts_at") @db.Timestamptz(3)
+  endsAt                     DateTime? @map("ends_at") @db.Timestamptz(3)
+  capacity                   Int
+  createdAt                  DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt                  DateTime  @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  eventStation EventStation @relation(fields: [eventStationId], references: [eventStationId], onDelete: Cascade)
+  eventDay     EventDay     @relation(fields: [eventDayId], references: [eventDayId], onDelete: Cascade)
+
+  @@unique([eventStationId, eventDayId])
+  @@index([eventDayId, isAvailable])
+  @@map("event_station_availabilities")
+}
+
 model StaffAssignment {
   staffAssignmentId String                @id @default(uuid()) @map("staff_assignment_id") @db.Uuid
   shiftId           String                @map("shift_id") @db.Uuid
@@ -274,11 +364,12 @@ model StaffAssignment {
   createdAt         DateTime              @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt         DateTime              @updatedAt @map("updated_at") @db.Timestamptz(3)
 
-  shift      Shift @relation(fields: [shiftId], references: [shiftId], onDelete: Cascade)
-  user       User  @relation("StaffAssignmentUser", fields: [userId], references: [userId], onDelete: Restrict)
-  assignedBy User  @relation("StaffAssignmentAssigner", fields: [assignedByUserId], references: [userId], onDelete: Restrict)
+  shift        Shift         @relation(fields: [shiftId], references: [shiftId], onDelete: Cascade)
+  user         User          @relation("StaffAssignmentUser", fields: [userId], references: [userId], onDelete: Restrict)
+  eventStation EventStation? @relation(fields: [eventStationId], references: [eventStationId], onDelete: SetNull)
+  assignedBy   User          @relation("StaffAssignmentAssigner", fields: [assignedByUserId], references: [userId], onDelete: Restrict)
 
-  @@unique([shiftId, userId, eventStationId])
+  @@unique([shiftId, userId])
   @@index([userId, status])
   @@index([eventStationId])
   @@index([assignedByUserId])
