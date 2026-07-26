@@ -6,6 +6,8 @@ const loginBody = z.object({
 }).strict();
 
 const signupBody = z.object({
+  fullName: z.string().trim().min(1).max(100),
+  employeeNumber: z.string().trim().min(1).max(50), // Added employeeNumber validation
   email: z.string().trim().toLowerCase().email().max(255),
   password: z.string().min(12).max(128),
 }).strict();
