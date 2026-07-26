@@ -79,10 +79,21 @@ function parseSearch(req) {
         clauses.push({ participantReference: { contains: participantReferenceValue, mode: "insensitive" } });
     }
     if (name) {
+        const parts = name.split(/\s+/).filter(Boolean);
+        const firstPart = parts[0];
+        const remainingParts = parts.slice(1).join(" ");
         clauses.push({
             OR: [
                 { firstName: { contains: name, mode: "insensitive" } },
                 { lastName: { contains: name, mode: "insensitive" } },
+                ...(remainingParts
+                    ? [{
+                        AND: [
+                            { firstName: { contains: firstPart, mode: "insensitive" } },
+                            { lastName: { contains: remainingParts, mode: "insensitive" } },
+                        ],
+                    }]
+                    : []),
             ],
         });
     }
@@ -92,7 +103,10 @@ function parseSearch(req) {
         if (Number.isNaN(parsed.getTime())) throw validationError("dateOfBirth is invalid");
         clauses.push({ dateOfBirth: parsed });
     }
-    return { AND: clauses };
+    // Treat each supplied field as an independent way to locate an existing
+    // participant. This keeps duplicate prevention useful when one entered
+    // field has a typo but another identifier still matches.
+    return { OR: clauses };
 }
 
 exports.searchParticipants = asyncHandler(async (req, res) => {

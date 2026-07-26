@@ -29,6 +29,7 @@ router.use(authenticate);
 // 1. Static routes MUST come first so they are not captured by dynamic parameters like /:eventId
 router.get("/staff-directory", requireSystemRole("ADMIN", "EVENT_MANAGER"), asyncHandler(eventController.staffDirectory));
 router.get("/station-templates", asyncHandler(eventController.stationTemplates));
+router.get("/active", asyncHandler(eventController.listActive));
 
 // 2. Base collection routes
 router.get("/", validate({ query: listQuery }), asyncHandler(eventController.list));
