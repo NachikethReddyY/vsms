@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
 import QRCode from "./QRCode";
 import "./qrCodePage.css";
@@ -12,7 +12,8 @@ function QRCodePage() {
     const [loading, setLoading] = useState<boolean>(true);
     const [error, setError] = useState<string>("");
 
-    const fetchOrGenerateQR = async () => {
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    const fetchOrGenerateQR = useCallback(async () => {
         if (!registrationId) {
             setError("Registration ID is missing from route parameters.");
             setLoading(false);
@@ -41,12 +42,12 @@ function QRCodePage() {
         } finally {
             setLoading(false);
         }
-    };
+    });
 
     // Automatically trigger pass generation as soon as the component loads
     useEffect(() => {
         fetchOrGenerateQR();
-    }, [registrationId]);
+    }, [fetchOrGenerateQR, registrationId]);
 
     return (
         <main className="qr-page">
