@@ -128,6 +128,7 @@ exports.createParticipant = asyncHandler(async (req, res) => {
                         ...data,
                         participantReference: participantReference(),
                         emergencyContact: data.contactNumber,
+                        consentGiven: false,
                         createdById: req.auth.userId,
                         updatedById: req.auth.userId,
                     },
