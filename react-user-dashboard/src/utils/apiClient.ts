@@ -1,7 +1,6 @@
 import axios, { type InternalAxiosRequestConfig } from 'axios';
 
-const qaMirror = window.location.protocol === 'http:' && window.location.port === '5174';
-const baseURL = import.meta.env.VITE_API_BASE_URL ?? (qaMirror ? '/qa-api' : 'https://localhost:5050');
+const baseURL = import.meta.env.VITE_API_BASE_URL ?? (import.meta.env.DEV ? '/qa-api' : `${window.location.protocol}//${window.location.hostname}:5050`);
 let accessToken: string | null = null;
 let csrfToken: string | null = null;
 let refreshPromise: Promise<string> | null = null;

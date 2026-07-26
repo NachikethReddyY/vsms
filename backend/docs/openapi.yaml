@@ -1,7 +1,7 @@
 openapi: 3.0.3
 info:
   title: VSMS Event Operations API
-  version: 2.0.0
+  version: 2.1.0
   description: Secure staff authentication and event lifecycle operations for VSMS.
   license:
     name: ISC
@@ -157,6 +157,12 @@ paths:
       tags: [Events]
       operationId: createEvent
       summary: Create a draft event with optional planned shifts
+      parameters:
+        - name: Idempotency-Key
+          in: header
+          required: false
+          description: Stable retry key for this create attempt
+          schema: { type: string, minLength: 8, maxLength: 100, pattern: '^[A-Za-z0-9_-]+$' }
       requestBody:
         required: true
         content:
@@ -187,6 +193,43 @@ paths:
                 items: { $ref: "#/components/schemas/StaffDirectoryEntry" }
         "401": { $ref: "#/components/responses/Unauthorized" }
         "403": { $ref: "#/components/responses/Forbidden" }
+  /api/events/station-templates:
+    get:
+      tags: [Events]
+      operationId: listStationTemplates
+      summary: List active reusable station templates
+      responses:
+        "200":
+          description: Active station templates available for import
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/StationTemplate" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+  /api/locations/search:
+    get:
+      tags: [Events]
+      operationId: searchSingaporeLocations
+      summary: Search Singapore addresses with OneMap
+      description: Uses a server-cached OneMap token that is renewed automatically; requests are rate limited below OneMap's 300 calls/minute quota.
+      parameters:
+        - name: q
+          in: query
+          required: true
+          schema: { type: string, minLength: 3, maxLength: 120 }
+      responses:
+        "200":
+          description: Normalized Singapore locations
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/LocationSearchResponse" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "422": { $ref: "#/components/responses/ValidationFailed" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+        "503": { description: OneMap is unavailable or not configured, content: { application/json: { schema: { $ref: "#/components/schemas/Problem" } } } }
   /api/events/{eventId}:
     parameters:
       - $ref: "#/components/parameters/EventId"
@@ -240,6 +283,7 @@ paths:
           content: { application/json: { schema: { $ref: "#/components/schemas/Event" } } }
         "401": { $ref: "#/components/responses/Unauthorized" }
         "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
         "422": { $ref: "#/components/responses/ValidationFailed" }
   /api/events/{eventId}/shifts/{shiftId}/assignments/{assignmentId}:
     delete:
@@ -253,12 +297,61 @@ paths:
           in: path
           required: true
           schema: { type: string, format: uuid }
+        - name: version
+          in: query
+          required: true
+          schema: { type: integer, minimum: 1 }
       responses:
         "200":
           description: Assignment removed
           content: { application/json: { schema: { $ref: "#/components/schemas/Event" } } }
         "401": { $ref: "#/components/responses/Unauthorized" }
         "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "422": { $ref: "#/components/responses/ValidationFailed" }
+  /api/events/{eventId}/stations/import:
+    post:
+      tags: [Events]
+      operationId: importEventStations
+      summary: Import active templates as event-owned station snapshots
+      parameters: [{ $ref: "#/components/parameters/EventId" }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/StationImportRequest" }
+      responses:
+        "201":
+          description: Stations imported and audited
+          content: { application/json: { schema: { $ref: "#/components/schemas/Event" } } }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "422": { $ref: "#/components/responses/ValidationFailed" }
+  /api/events/{eventId}/stations/{eventStationId}:
+    patch:
+      tags: [Events]
+      operationId: updateEventStation
+      summary: Configure an imported station's order, capacity, or availability
+      parameters:
+        - $ref: "#/components/parameters/EventId"
+        - name: eventStationId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/EventStationUpdateRequest" }
+      responses:
+        "200":
+          description: Event station updated and audited
+          content: { application/json: { schema: { $ref: "#/components/schemas/Event" } } }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "422": { $ref: "#/components/responses/ValidationFailed" }
   /api/events/{eventId}/publish:
     post:
       tags: [Events]
@@ -412,13 +505,142 @@ components:
         userId: { type: string, format: uuid }
         username: { type: string }
         systemRole: { $ref: "#/components/schemas/SystemRole" }
-    StaffAssignmentRequest:
+    StationTemplate:
       type: object
       additionalProperties: false
-      required: [userId, assignmentRole]
+      required: [stationTemplateId, templateKey, version, name, defaultCapacity]
       properties:
+        stationTemplateId: { type: string, format: uuid }
+        templateKey: { type: string, maxLength: 80 }
+        version: { type: integer, minimum: 1 }
+        name: { type: string, maxLength: 120 }
+        description: { type: string, nullable: true }
+        defaultCapacity: { type: integer, minimum: 1, maximum: 1000 }
+    EventStation:
+      type: object
+      additionalProperties: false
+      required: [eventStationId, stationTemplateId, templateVersion, name, stationOrder, capacity, isAvailable, availabilities]
+      properties:
+        eventStationId: { type: string, format: uuid }
+        stationTemplateId: { type: string, format: uuid }
+        templateVersion: { type: integer, minimum: 1 }
+        name: { type: string, maxLength: 120 }
+        description: { type: string, nullable: true }
+        stationOrder: { type: integer, minimum: 1, maximum: 50 }
+        capacity: { type: integer, minimum: 1, maximum: 1000 }
+        isAvailable: { type: boolean }
+        availabilities:
+          type: array
+          items: { $ref: "#/components/schemas/EventStationAvailability" }
+    EventStationAvailability:
+      type: object
+      additionalProperties: false
+      required: [eventStationAvailabilityId, isAvailable, capacity, eventDay]
+      properties:
+        eventStationAvailabilityId: { type: string, format: uuid }
+        isAvailable: { type: boolean }
+        startsAt: { type: string, format: date-time, nullable: true }
+        endsAt: { type: string, format: date-time, nullable: true }
+        capacity: { type: integer, minimum: 1, maximum: 100000 }
+        eventDay:
+          type: object
+          additionalProperties: false
+          required: [eventDayId, date]
+          properties:
+            eventDayId: { type: string, format: uuid }
+            date: { type: string, format: date }
+    EventDayInput:
+      type: object
+      additionalProperties: false
+      required: [date, startsAt, endsAt]
+      properties:
+        eventDayId: { type: string, format: uuid }
+        date: { type: string, format: date }
+        startsAt: { type: string, format: date-time }
+        endsAt: { type: string, format: date-time }
+    EventDay:
+      allOf:
+        - $ref: "#/components/schemas/EventDayInput"
+        - type: object
+          required: [eventDayId]
+          properties:
+            eventDayId: { type: string, format: uuid }
+    StationAvailabilityInput:
+      type: object
+      additionalProperties: false
+      required: [date, isAvailable, capacity]
+      properties:
+        date: { type: string, format: date }
+        isAvailable: { type: boolean }
+        startsAt: { type: string, format: date-time, nullable: true }
+        endsAt: { type: string, format: date-time, nullable: true }
+        capacity: { type: integer, minimum: 1, maximum: 100000 }
+    EventStationInput:
+      type: object
+      additionalProperties: false
+      required: [stationTemplateId, stationOrder, capacity, isAvailable, availabilities]
+      properties:
+        eventStationId: { type: string, format: uuid }
+        stationTemplateId: { type: string, format: uuid }
+        stationOrder: { type: integer, minimum: 1, maximum: 50 }
+        capacity: { type: integer, minimum: 1, maximum: 100000 }
+        isAvailable: { type: boolean }
+        availabilities:
+          type: array
+          maxItems: 31
+          items: { $ref: "#/components/schemas/StationAvailabilityInput" }
+    StationImportRequest:
+      type: object
+      additionalProperties: false
+      required: [version, stationTemplateIds]
+      properties:
+        version: { type: integer, minimum: 1 }
+        stationTemplateIds:
+          type: array
+          minItems: 1
+          maxItems: 50
+          uniqueItems: true
+          items: { type: string, format: uuid }
+    EventStationUpdateRequest:
+      type: object
+      additionalProperties: false
+      required: [version]
+      minProperties: 2
+      properties:
+        version: { type: integer, minimum: 1 }
+        stationOrder: { type: integer, minimum: 1, maximum: 50 }
+        capacity: { type: integer, minimum: 1, maximum: 1000 }
+        isAvailable: { type: boolean }
+    StaffAssignmentRequest:
+      oneOf:
+        - $ref: "#/components/schemas/ScreenerStaffAssignmentRequest"
+        - $ref: "#/components/schemas/GeneralStaffAssignmentRequest"
+      discriminator:
+        propertyName: assignmentRole
+        mapping:
+          SCREENER: "#/components/schemas/ScreenerStaffAssignmentRequest"
+          EVENT_MANAGER: "#/components/schemas/GeneralStaffAssignmentRequest"
+          REGISTRATION: "#/components/schemas/GeneralStaffAssignmentRequest"
+          REVIEWER: "#/components/schemas/GeneralStaffAssignmentRequest"
+          SUPPORT: "#/components/schemas/GeneralStaffAssignmentRequest"
+    ScreenerStaffAssignmentRequest:
+      type: object
+      additionalProperties: false
+      required: [version, userId, assignmentRole, eventStationId]
+      properties:
+        version: { type: integer, minimum: 1 }
         userId: { type: string, format: uuid }
-        assignmentRole: { $ref: "#/components/schemas/StaffAssignmentRole" }
+        assignmentRole: { type: string, enum: [SCREENER] }
+        eventStationId: { type: string, format: uuid }
+    GeneralStaffAssignmentRequest:
+      type: object
+      additionalProperties: false
+      required: [version, userId, assignmentRole]
+      properties:
+        version: { type: integer, minimum: 1 }
+        userId: { type: string, format: uuid }
+        assignmentRole: { type: string, enum: [EVENT_MANAGER, REGISTRATION, REVIEWER, SUPPORT] }
+        eventStationId: { type: string, format: uuid, nullable: true }
     StaffAssignment:
       type: object
       additionalProperties: false
@@ -427,6 +649,17 @@ components:
         staffAssignmentId: { type: string, format: uuid }
         assignmentRole: { $ref: "#/components/schemas/StaffAssignmentRole" }
         status: { $ref: "#/components/schemas/StaffAssignmentStatus" }
+        notes: { type: string, nullable: true, maxLength: 500 }
+        eventStation:
+          type: object
+          nullable: true
+          additionalProperties: false
+          required: [eventStationId, stationTemplateId, name, stationOrder]
+          properties:
+            eventStationId: { type: string, format: uuid }
+            stationTemplateId: { type: string, format: uuid }
+            name: { type: string }
+            stationOrder: { type: integer, minimum: 1 }
         user:
           type: object
           additionalProperties: false
@@ -434,6 +667,16 @@ components:
           properties:
             userId: { type: string, format: uuid }
             username: { type: string }
+    ShiftAssignmentInput:
+      type: object
+      additionalProperties: false
+      required: [userId, assignmentRole]
+      properties:
+        staffAssignmentId: { type: string, format: uuid }
+        userId: { type: string, format: uuid }
+        assignmentRole: { $ref: "#/components/schemas/StaffAssignmentRole" }
+        stationTemplateId: { type: string, format: uuid, nullable: true }
+        notes: { type: string, nullable: true, maxLength: 500 }
     User:
       type: object
       additionalProperties: false
@@ -477,6 +720,10 @@ components:
         startsAt: { type: string, format: date-time }
         endsAt: { type: string, format: date-time }
         requiredStaff: { type: integer, minimum: 1, maximum: 1000, default: 1 }
+        assignments:
+          type: array
+          maxItems: 100
+          items: { $ref: "#/components/schemas/ShiftAssignmentInput" }
     Shift:
       allOf:
         - $ref: "#/components/schemas/ShiftInput"
@@ -501,10 +748,19 @@ components:
           pattern: '^data:image/(jpeg|webp);base64,[A-Za-z0-9+/]+={0,2}$'
           description: Cropped square event artwork encoded as a bounded JPEG or WebP data URL
         venue: { type: string, minLength: 1, maxLength: 255 }
+        address: { type: string, nullable: true, maxLength: 500 }
+        postalCode: { type: string, nullable: true, pattern: '^\d{6}$' }
+        latitude: { type: number, format: double, nullable: true, minimum: 1.13, maximum: 1.48 }
+        longitude: { type: number, format: double, nullable: true, minimum: 103.59, maximum: 104.1 }
+        locationProvider: { type: string, nullable: true, enum: [ONEMAP, MANUAL] }
+        locationReference: { type: string, nullable: true, maxLength: 255 }
         timezone: { type: string, minLength: 1, maxLength: 100, example: Asia/Singapore }
         startsAt: { type: string, format: date-time }
         endsAt: { type: string, format: date-time }
         capacity: { type: integer, minimum: 1, maximum: 100000 }
+        expectedAttendance: { type: integer, nullable: true, minimum: 1, maximum: 1000000 }
+        eventDays: { type: array, minItems: 1, maxItems: 31, items: { $ref: "#/components/schemas/EventDayInput" } }
+        stations: { type: array, maxItems: 50, items: { $ref: "#/components/schemas/EventStationInput" } }
         shifts: { type: array, maxItems: 50, items: { $ref: "#/components/schemas/ShiftInput" } }
     UpdateEventRequest:
       type: object
@@ -521,10 +777,19 @@ components:
           maxLength: 180000
           pattern: '^data:image/(jpeg|webp);base64,[A-Za-z0-9+/]+={0,2}$'
         venue: { type: string, minLength: 1, maxLength: 255 }
+        address: { type: string, nullable: true, maxLength: 500 }
+        postalCode: { type: string, nullable: true, pattern: '^\d{6}$' }
+        latitude: { type: number, format: double, nullable: true }
+        longitude: { type: number, format: double, nullable: true }
+        locationProvider: { type: string, nullable: true, enum: [ONEMAP, MANUAL] }
+        locationReference: { type: string, nullable: true, maxLength: 255 }
         timezone: { type: string, minLength: 1, maxLength: 100 }
         startsAt: { type: string, format: date-time }
         endsAt: { type: string, format: date-time }
         capacity: { type: integer, minimum: 1, maximum: 100000 }
+        expectedAttendance: { type: integer, nullable: true, minimum: 1, maximum: 1000000 }
+        eventDays: { type: array, minItems: 1, maxItems: 31, items: { $ref: "#/components/schemas/EventDayInput" } }
+        stations: { type: array, maxItems: 50, items: { $ref: "#/components/schemas/EventStationInput" } }
         shifts: { type: array, maxItems: 50, items: { $ref: "#/components/schemas/ShiftInput" } }
     CancelEventRequest:
       type: object
@@ -537,7 +802,7 @@ components:
       allOf:
         - $ref: "#/components/schemas/CreateEventRequest"
         - type: object
-          required: [eventId, artworkDataUrl, status, version, createdByUserId, shifts, signupCount, activeCapacityCount, createdAt, updatedAt]
+          required: [eventId, artworkDataUrl, status, version, createdByUserId, shifts, eventDays, eventStations, signupCount, activeCapacityCount, canManage, createdAt, updatedAt]
           properties:
             eventId: { type: string, format: uuid }
             status: { $ref: "#/components/schemas/EventStatus" }
@@ -549,10 +814,34 @@ components:
             createdAt: { type: string, format: date-time }
             updatedAt: { type: string, format: date-time }
             shifts: { type: array, items: { $ref: "#/components/schemas/Shift" } }
+            eventDays: { type: array, items: { $ref: "#/components/schemas/EventDay" } }
+            eventStations: { type: array, items: { $ref: "#/components/schemas/EventStation" } }
             signupCount: { type: integer, minimum: 0, description: Number of collected registration entries for this event }
             activeCapacityCount: { type: integer, minimum: 0, description: Number of signed-up or checked-in registrations not marked completed or cancelled }
+            canManage: { type: boolean, description: Whether the current caller may change this event }
             createdBy: { $ref: "#/components/schemas/User" }
             cancelledBy: { type: object, allOf: [{ $ref: "#/components/schemas/User" }], nullable: true }
+    LocationResult:
+      type: object
+      additionalProperties: false
+      required: [id, label, address, latitude, longitude, provider, timezone]
+      properties:
+        id: { type: string }
+        label: { type: string }
+        address: { type: string }
+        postalCode: { type: string, nullable: true }
+        latitude: { type: number, format: double }
+        longitude: { type: number, format: double }
+        provider: { type: string, enum: [ONEMAP] }
+        timezone: { type: string, enum: [Asia/Singapore] }
+    LocationSearchResponse:
+      type: object
+      additionalProperties: false
+      required: [locations]
+      properties:
+        locations:
+          type: array
+          items: { $ref: "#/components/schemas/LocationResult" }
     EventListResponse:
       type: object
       required: [events, nextCursor]

@@ -8,9 +8,16 @@ if (process.env.NODE_ENV === "production" && !process.env.VSMS_DEMO_PASSWORD) {
 }
 
 const USERS = [
-  { userId: "10000000-0000-4000-8000-000000000001", username: "admin", email: "admin@vsms.local", systemRole: "ADMIN" },
-  { userId: "10000000-0000-4000-8000-000000000002", username: "manager", email: "manager@vsms.local", systemRole: "EVENT_MANAGER" },
-  { userId: "10000000-0000-4000-8000-000000000003", username: "staff", email: "staff@vsms.local", systemRole: "STAFF" },
+  { userId: "10000000-0000-4000-8000-000000000001", username: "avery.chen", email: "admin@vsms.local", systemRole: "ADMIN" },
+  { userId: "10000000-0000-4000-8000-000000000002", username: "maya.patel", email: "manager@vsms.local", systemRole: "EVENT_MANAGER" },
+  { userId: "10000000-0000-4000-8000-000000000003", username: "jordan.lee", email: "staff@vsms.local", systemRole: "STAFF" },
+];
+
+const STATION_TEMPLATES = [
+  { stationTemplateId: "60000000-0000-4000-8000-000000000001", templateKey: "REGISTRATION", version: 1, name: "Registration", description: "Confirm the participant record, consent, and QR pass.", defaultCapacity: 3 },
+  { stationTemplateId: "60000000-0000-4000-8000-000000000002", templateKey: "VISUAL_ACUITY", version: 1, name: "Visual acuity", description: "Capture controlled distance and near-vision measurements.", defaultCapacity: 4 },
+  { stationTemplateId: "60000000-0000-4000-8000-000000000003", templateKey: "EYE_HEALTH", version: 1, name: "Eye health", description: "Record eye-health observations and screening flags.", defaultCapacity: 2 },
+  { stationTemplateId: "60000000-0000-4000-8000-000000000004", templateKey: "CLINICAL_REVIEW", version: 1, name: "Clinical review", description: "Review screening outcomes and decide the safe next step.", defaultCapacity: 2 },
 ];
 
 const EVENTS = [
@@ -39,12 +46,22 @@ const main = async () => {
     });
   }
 
+  for (const template of STATION_TEMPLATES) {
+    await prisma.stationTemplate.upsert({
+      where: { stationTemplateId: template.stationTemplateId },
+      update: { ...template, active: true },
+      create: template,
+    });
+  }
+
   for (const [index, event] of EVENTS.entries()) {
     const cancelled = event.status === "CANCELLED";
     const data = {
       ...event,
       description: "Seeded demonstration event for the issue #7 lifecycle flow.",
       timezone: "Asia/Singapore",
+      expectedAttendance: event.capacity * 10,
+      locationProvider: "MANUAL",
       startsAt: new Date(event.startsAt),
       endsAt: new Date(event.endsAt),
       createdByUserId: USERS[1].userId,
@@ -68,6 +85,61 @@ const main = async () => {
             },
           ],
         },
+      },
+    });
+    const localDate = new Date(event.startsAt).toLocaleDateString("sv-SE", { timeZone: "Asia/Singapore" });
+    const eventDay = await prisma.eventDay.upsert({
+      where: { eventId_date: { eventId: stored.eventId, date: new Date(`${localDate}T00:00:00.000Z`) } },
+      update: { startsAt: new Date(event.startsAt), endsAt: new Date(event.endsAt) },
+      create: {
+        eventId: stored.eventId,
+        date: new Date(`${localDate}T00:00:00.000Z`),
+        startsAt: new Date(event.startsAt),
+        endsAt: new Date(event.endsAt),
+      },
+    });
+    for (const [stationIndex, template] of STATION_TEMPLATES.entries()) {
+      const station = await prisma.eventStation.upsert({
+        where: { eventId_stationTemplateId: { eventId: stored.eventId, stationTemplateId: template.stationTemplateId } },
+        update: {},
+        create: {
+          eventId: stored.eventId,
+          stationTemplateId: template.stationTemplateId,
+          templateVersion: template.version,
+          name: template.name,
+          description: template.description,
+          stationOrder: stationIndex + 1,
+          capacity: template.defaultCapacity,
+        },
+      });
+      await prisma.eventStationAvailability.upsert({
+        where: { eventStationId_eventDayId: { eventStationId: station.eventStationId, eventDayId: eventDay.eventDayId } },
+        update: { isAvailable: true, startsAt: eventDay.startsAt, endsAt: eventDay.endsAt, capacity: station.capacity },
+        create: {
+          eventStationId: station.eventStationId,
+          eventDayId: eventDay.eventDayId,
+          isAvailable: true,
+          startsAt: eventDay.startsAt,
+          endsAt: eventDay.endsAt,
+          capacity: station.capacity,
+        },
+      });
+    }
+    const shift = await prisma.shift.findFirstOrThrow({ where: { eventId: stored.eventId }, orderBy: { startsAt: "asc" } });
+    const staffStation = await prisma.eventStation.findUniqueOrThrow({
+      where: { eventId_stationTemplateId: { eventId: stored.eventId, stationTemplateId: STATION_TEMPLATES[1].stationTemplateId } },
+    });
+    const assignmentStatus = event.status === "COMPLETED" ? "COMPLETED" : event.status === "CANCELLED" ? "CANCELLED" : event.status === "IN_PROGRESS" ? "CONFIRMED" : "ASSIGNED";
+    await prisma.staffAssignment.upsert({
+      where: { shiftId_userId: { shiftId: shift.shiftId, userId: USERS[2].userId } },
+      update: { assignmentRole: "SCREENER", eventStationId: staffStation.eventStationId, assignedByUserId: USERS[1].userId, status: assignmentStatus },
+      create: {
+        shiftId: shift.shiftId,
+        userId: USERS[2].userId,
+        eventStationId: staffStation.eventStationId,
+        assignmentRole: "SCREENER",
+        assignedByUserId: USERS[1].userId,
+        status: assignmentStatus,
       },
     });
     const auditId = `30000000-0000-4000-8000-${String(index + 1).padStart(12, "0")}`;
@@ -95,7 +167,7 @@ const main = async () => {
     }
   }
 
-  console.log(JSON.stringify({ users: USERS.map(({ username, email, systemRole }) => ({ username, email, systemRole })), events: EVENTS.length, demoPasswordSource: process.env.VSMS_DEMO_PASSWORD ? "environment" : "development-only default" }, null, 2));
+  console.log(JSON.stringify({ users: USERS.map(({ username, email, systemRole }) => ({ username, email, systemRole })), events: EVENTS.length, stationTemplates: STATION_TEMPLATES.length, demoPasswordSource: process.env.VSMS_DEMO_PASSWORD ? "environment" : "development-only default" }, null, 2));
 };
 
 main().finally(() => prisma.$disconnect());
