@@ -1,6 +1,6 @@
 const express = require("express");
 const router = express.Router();
-const asyncHandler = require("express-async-handler");
+const asyncHandler = require("../utils/asyncHandler");
 
 const qrController = require("../controllers/qrController");
 const { authenticate, requireSystemRole } = require("../middlewares/authMiddleware");

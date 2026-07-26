@@ -31,6 +31,7 @@ describe("authentication boundary", () => {
     expect(response.body.csrfToken).toEqual(expect.any(String));
     expect(response.headers["set-cookie"].join(" ")).toContain("Secure");
     expect(response.headers["set-cookie"].join(" ")).toContain("HttpOnly");
+    expect(response.headers["set-cookie"].find((cookie) => cookie.startsWith("vsms_csrf=") && !cookie.split(";", 1)[0].endsWith("="))).toContain("Path=/;");
   });
 
   test("concurrent refresh reuse revokes the winning replacement family", async () => {
@@ -67,5 +68,14 @@ describe("authentication boundary", () => {
 
   test("user listing is not public", async () => {
     expect((await request(app).get("/users")).status).toBe(401);
+  });
+
+  test("development serves the OpenAPI document and Swagger UI", async () => {
+    const document = await request(app).get("/api-docs/openapi.json");
+    const ui = await request(app).get("/api-docs/");
+    expect(document.status).toBe(200);
+    expect(document.body.openapi).toBe("3.0.3");
+    expect(ui.status).toBe(200);
+    expect(ui.text).toContain('id="swagger-ui"');
   });
 });

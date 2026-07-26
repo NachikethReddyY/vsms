@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
-import { useParams } from "react";
+import { useParams } from "react-router-dom";
 import axios from "axios";
+import apiClient from "../../utils/apiClient";
 import "./ParticipantStatus.css"; // optional custom CSS
 
 interface ParticipantData {
@@ -37,13 +38,11 @@ function ParticipantStatusPage() {
     try {
       setLoading(true);
       // Fetch participant details using the token from the backend
-      const res = await axios.get(
-        `http://${window.location.hostname}:5000/qr/participant/${qrToken}`
-      );
-      
+      const res = await apiClient.get(`/api/qr/participant/${qrToken}`);
+
       const payload = res.data?.data || res.data;
       setData(payload);
-    } catch (err: any) {
+    } catch (err: unknown) {
       if (axios.isAxiosError(err)) {
         setError(err.response?.data?.message || "Invalid or expired QR pass.");
       } else {

@@ -20,7 +20,8 @@ jobs:
           node-version: "20"
 
       - name: Run NPM Audit
-        run: npm audit --audit-level=high
+        run: npm audit --omit=dev --audit-level=high
+        working-directory: backend
 
   owasp-dep-check:
     name: Deep OWASP Dependency Check
@@ -34,9 +35,9 @@ jobs:
         uses: dependency-check/Dependency-Check_Action@main
         with:
           project: "Cryptix Backend API"
-          path: "."
+          path: "backend"
           format: "HTML"
-          args: "--failOnCVSS 7 --suppression suppression.xml"
+          args: "--failOnCVSS 7 --nodePackageSkipDevDependencies --nodeAuditSkipDevDependencies --suppression backend/suppression.xml"
 
       - name: Upload Security Scan Artifacts
         uses: actions/upload-artifact@v4

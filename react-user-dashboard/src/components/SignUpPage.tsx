@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import axios from 'axios';
 import { useForm } from 'react-hook-form';
 import { Link, useNavigate } from 'react-router-dom';
 import apiClient from '../utils/apiClient';
@@ -36,10 +37,10 @@ const SignUpPage: React.FC = () => {
 
       alert('Sign up successful! Please log in.');
       navigate('/login');
-    } catch (error: any) {
-      console.error('Sign up failed:', error);
-      const serverMessage =
-        error.response?.data?.message || 'Failed to create account. Please try again.';
+    } catch (error: unknown) {
+      const serverMessage = axios.isAxiosError<{ message?: string }>(error)
+        ? error.response?.data?.message || 'Failed to create account. Please try again.'
+        : 'Failed to create account. Please try again.';
       setErrorMessage(serverMessage);
     }
   };

@@ -2,14 +2,14 @@ const AppError = require("../errors/AppError");
 
 const validateExternalUrl = (req, res, next) => {
   const targetUrl = req.body.targetUrl || req.query.url;
-  
+
   if (!targetUrl) {
     return next(); // Skip if no URL is provided in this request
   }
 
   try {
     const parsedUrl = new URL(targetUrl);
-    
+
     // Enforce protocol security (only allow HTTPS for external links)
     if (parsedUrl.protocol !== "https:") {
       return next(new AppError(400, "INVALID_URL", "Only secure HTTPS URLs are permitted."));

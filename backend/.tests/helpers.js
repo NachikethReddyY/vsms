@@ -14,6 +14,9 @@ const ensureTestUser = async (systemRole = "EVENT_MANAGER") => {
   });
 };
 
-const cookieHeader = (response) => response.headers["set-cookie"].map((cookie) => cookie.split(";")[0]).join("; ");
+const cookieHeader = (response) => response.headers["set-cookie"]
+  .filter((cookie) => !cookie.split(";", 1)[0].endsWith("="))
+  .map((cookie) => cookie.split(";")[0])
+  .join("; ");
 
 module.exports = { PASSWORD, ensureTestUser, cookieHeader, prisma };
