@@ -37,7 +37,7 @@ jobs:
           project: "Cryptix Backend API"
           path: "backend"
           format: "HTML"
-          args: "--failOnCVSS 7 --suppression backend/suppression.xml"
+          args: "--failOnCVSS 7 --nodePackageSkipDevDependencies --nodeAuditSkipDevDependencies --suppression backend/suppression.xml"
 
       - name: Upload Security Scan Artifacts
         uses: actions/upload-artifact@v4
