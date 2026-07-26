@@ -8,11 +8,15 @@ const { authenticate, requireSystemRole } = require("../middlewares/authMiddlewa
 router.use(authenticate);
 
 // ==========================================
-// Event CRUD & Core Actions
+// Event CRUD & Core Actions (Static paths FIRST)
 // ==========================================
 router.get("/", eventController.list);
 router.post("/", requireSystemRole("ADMIN", "EVENT_MANAGER"), eventController.create);
 router.get("/staff-directory", eventController.staffDirectory);
+
+// ==========================================
+// Event CRUD & Core Actions (Dynamic paths AFTER)
+// ==========================================
 router.get("/:eventId", eventController.get);
 router.put("/:eventId", requireSystemRole("ADMIN", "EVENT_MANAGER"), eventController.update);
 

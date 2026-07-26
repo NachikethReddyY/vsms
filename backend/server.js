@@ -1,7 +1,7 @@
 const express = require("express");
 const cors = require("cors");
 const helmet = require("helmet");
-const morgan = require("morgan"); // <--- 1. Import morgan package first
+const morgan = require("morgan");
 const fs = require("fs");
 const https = require("https");
 const path = require("path");
@@ -17,7 +17,8 @@ const app = express();
 const PORT = process.env.PORT || 5000;
 
 // HTTPS Server setup for local development
-const server = !env.isProduction && env.localHttps
+const useHttps = !env.isProduction && env.localHttps;
+const server = useHttps
   ? https.createServer({
       key: fs.readFileSync(path.resolve(__dirname, env.TLS_KEY_PATH)),
       cert: fs.readFileSync(path.resolve(__dirname, env.TLS_CERT_PATH)),
@@ -31,6 +32,7 @@ const qrRoutes = require("./routes/qrRoutes");
 const participantRoutes = require("./routes/participantRoutes");
 const eventRegistrationRoutes = require("./routes/eventRegistrationRoutes");
 const eventRoutes = require("./routes/eventRoutes");
+const queueRoutes = require("./routes/queueRoutes"); // <--- Included queueRoutes safely
 
 // Load Swagger / OpenAPI Document securely using standard file streams
 let swaggerDocument;
@@ -72,7 +74,7 @@ const corsOptions = {
 };
 
 app.use(cors(corsOptions));
-app.options("/*splat", cors(corsOptions));
+app.options(/(.*)/, cors(corsOptions)); // Safe Express 4 wildcard option handler
 
 // -----------------------------------------------------------------------------
 // 2. HELMET SECURITY HEADERS & CLICKJACKING PROTECTION
@@ -87,6 +89,7 @@ app.use(
         "connect-src": [
           "'self'",
           "http://localhost:5000",
+          "https://localhost:5000",
           "https://localhost:5173",
           "http://localhost:5173",
         ],
@@ -148,9 +151,10 @@ app.use("/qr", qrRoutes);
 app.use("/participants", participantRoutes);
 app.use("/event-registrations", eventRegistrationRoutes);
 app.use("/events", eventRoutes);
+app.use("/queue", queueRoutes); // <--- Registered queue routes to prevent blank export issues
 
-// Express 5 catch-all for undefined routes
-app.all("/*splat", (req, res) => {
+// Safe Express 4 fallback catch-all handler (avoids PathError crashes)
+app.use((req, res) => {
   res.status(404).json({
     success: false,
     message: `Cannot ${req.method} ${req.originalUrl}`,
@@ -163,5 +167,6 @@ server.on("error", (error) => {
 });
 
 server.listen(PORT, () => {
-  logger.info(`Server running on port ${PORT}`);
+  const protocol = useHttps ? "https" : "http";
+  logger.info(`Server running securely on ${protocol}://localhost:${PORT}`);
 });
