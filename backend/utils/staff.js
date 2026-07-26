@@ -47,6 +47,9 @@ async function syncLocalUser(profile) {
         status: "ACTIVE",
     };
 
+    if (profile.cognitoSub) {
+        updateData.cognitoSub = profile.cognitoSub;
+    }
     if (profile.fullName) {
         updateData.fullName = profile.fullName;
     }
@@ -66,6 +69,7 @@ async function syncLocalUser(profile) {
         },
         update: updateData,
         create: {
+            cognitoSub: profile.cognitoSub || null,
             fullName: profile.fullName || "Pending Staff Name",
             email: profile.email,
             employeeNumber: profile.employeeNumber || buildPendingEmployeeNumber(profile.email),

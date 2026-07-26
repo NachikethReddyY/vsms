@@ -35,6 +35,7 @@ function ensureCognitoConfigured() {
 
 function extractProfileFromIdToken(idTokenPayload) {
     return {
+        cognitoSub: idTokenPayload.sub,
         email: idTokenPayload.email || idTokenPayload["cognito:username"],
         fullName: idTokenPayload.name || idTokenPayload.given_name || null,
         employeeNumber: idTokenPayload["custom:employee_number"] || null,
