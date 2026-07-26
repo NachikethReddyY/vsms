@@ -14,7 +14,7 @@ import VisualAcuityStationPage from './features/screening/VisualAcuityStationPag
 import AuditLogsPage from './features/audit-logs/AuditLogsPage';
 
 // Import your new participant form component
-import AddParticipantForm from './components/AddParticipantForm';
+import AddParticipantForm from './components/AddParticipantsForm';
 
 function ProtectedRoutes() {
   const { user, isBootstrapping } = useAuth();
