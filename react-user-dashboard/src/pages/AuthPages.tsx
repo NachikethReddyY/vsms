@@ -9,6 +9,8 @@ import {
   AuthPageLayout,
   Field,
   FormErrorSummary,
+  isPasswordValid,
+  PasswordRequirements,
   PrimaryButton,
   SessionExpiredDialog,
   TextInput,
@@ -156,6 +158,11 @@ export function SignUpPage() {
       return;
     }
 
+    if (!isPasswordValid(form.password)) {
+      setError("Password does not meet all of the requirements.");
+      return;
+    }
+
     setError(null);
     setIsSubmitting(true);
 
@@ -230,7 +237,11 @@ export function SignUpPage() {
             required
           />
         </Field>
-        <PrimaryButton disabled={isSubmitting} type="submit">
+        <PasswordRequirements password={form.password} confirmPassword={form.confirmPassword} />
+        <PrimaryButton
+          disabled={isSubmitting || !isPasswordValid(form.password) || form.password !== form.confirmPassword}
+          type="submit"
+        >
           {isSubmitting ? "Creating account..." : "Create account"}
         </PrimaryButton>
       </form>
@@ -371,6 +382,11 @@ export function ResetPasswordPage() {
     setError(null);
     setMessage(null);
 
+    if (!isPasswordValid(newPassword)) {
+      setError("New password does not meet all of the requirements.");
+      return;
+    }
+
     try {
       await apiClient.post("/auth/confirm-forgot-password", {
         email,
@@ -397,7 +413,8 @@ export function ResetPasswordPage() {
         <Field label="New password">
           <TextInput value={newPassword} onChange={(event) => setNewPassword(event.target.value)} type="password" required />
         </Field>
-        <PrimaryButton type="submit">Reset password</PrimaryButton>
+        <PasswordRequirements password={newPassword} />
+        <PrimaryButton disabled={!isPasswordValid(newPassword)} type="submit">Reset password</PrimaryButton>
       </form>
     </AuthPageLayout>
   );
@@ -452,6 +469,11 @@ export function AccountSecurityPage() {
     setError(null);
     setMessage(null);
 
+    if (!isPasswordValid(newPassword)) {
+      setError("New password does not meet all of the requirements.");
+      return;
+    }
+
     try {
       await apiClient.post("/auth/change-password", {
         oldPassword,
@@ -480,7 +502,8 @@ export function AccountSecurityPage() {
           <Field label="New password">
             <TextInput value={newPassword} onChange={(event) => setNewPassword(event.target.value)} type="password" required />
           </Field>
-          <PrimaryButton type="submit">Change password</PrimaryButton>
+          <PasswordRequirements password={newPassword} />
+          <PrimaryButton disabled={!isPasswordValid(newPassword)} type="submit">Change password</PrimaryButton>
         </form>
       </div>
     </AppShell>

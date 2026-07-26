@@ -9,12 +9,19 @@ This project is wired so Cognito configuration stays in local environment files 
 3. Create a new `User Pool`.
 4. Use `Email` as a sign-in option.
 5. Turn on self-service sign-up if you want staff accounts created from the app.
-6. Add the standard attributes you want to collect, then add these custom attributes:
-   - `employee_number`
-   - `department`
-   - `designation`
-   - `role`
-7. Configure password policy and MFA based on your project requirement.
+6. Configure password policy and MFA based on your project requirement.
+
+Staff metadata is stored in Prisma by default, so Cognito custom attributes are
+not required. Keep `COGNITO_USE_CUSTOM_ATTRIBUTES=false`.
+
+If you intentionally want the same metadata in Cognito, create these custom
+attributes as `String` attributes and then set
+`COGNITO_USE_CUSTOM_ATTRIBUTES=true`:
+
+- `employee_number`
+- `department`
+- `designation`
+- `role`
 
 ## 2. Create the app client
 
@@ -35,6 +42,7 @@ This project is wired so Cognito configuration stays in local environment files 
    - `COGNITO_USER_POOL_ID`
    - `COGNITO_APP_CLIENT_ID`
    - `COGNITO_APP_CLIENT_SECRET` if your app client uses one
+   - `COGNITO_USE_CUSTOM_ATTRIBUTES=false` unless all four custom attributes exist
 3. Start the backend on `http://localhost:5000`.
 
 ## 4. Local frontend setup
