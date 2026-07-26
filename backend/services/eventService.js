@@ -234,16 +234,6 @@ const assertRange = (data, shifts) => {
   }
 };
 
-const createEvent = async (body, user, correlationId) => {
-  if (!["SUPER_ADMIN", "ADMIN", "EVENT_MANAGER"].includes(user.systemRole)) {
-    throw new AppError(
-      403,
-      "FORBIDDEN",
-      "You do not have permission to create events"
-    );
-  }
-};
-
 const assertShiftSchedulesAvailable = async (tx, eventId, desiredShifts, currentShifts) => {
   const desiredById = new Map(desiredShifts.filter((shift) => shift.shiftId).map((shift) => [shift.shiftId, shift]));
   const schedules = currentShifts.flatMap((shift) => {

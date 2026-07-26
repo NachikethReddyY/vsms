@@ -15,6 +15,9 @@ yarn-error.log*
 .DS_Store
 Thumbs.db
 
+# Runtime-only consent signature evidence
+backend/secure-data/
+
 # Local generated plan viewer
 .local-plan-preview/
 
