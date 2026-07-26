@@ -4,8 +4,9 @@ import { Kbd } from '@astryxdesign/core/Kbd';
 import { createStaticSource, type SearchableItem } from '@astryxdesign/core/Typeahead';
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { NavLink, useLocation, useNavigate } from 'react-router-dom';
-import { useAuth } from '../auth/authState';
-import { getDisplayName, getMonogram } from '../utils/identity';
+import { useAuth } from '../auth/AuthProvider';
+import apiClient from '../utils/apiClient';
+import { getMonogram } from '../utils/identity';
 import { SuccessConfetti, ThemeToggle } from './MagicEffects';
 
 type CommandMetadata = {
@@ -24,13 +25,22 @@ export default function AppShell({ children }: { children: ReactNode }) {
   const [collapsed, setCollapsed] = useState(false);
   const [commandOpen, setCommandOpen] = useState(false);
   const [eventSearch, setEventSearch] = useState('');
-  const { user, logout } = useAuth();
+  const { session, clearSession } = useAuth();
+  const user = session?.user;
   const navigate = useNavigate();
   const location = useLocation();
   const workspaceRef = useRef<HTMLElement>(null);
-  const identityName = user?.username ? getDisplayName(user.username) : user?.email || 'Account';
-  const role = user?.systemRole.replace(/_/g, ' ').toLowerCase();
-  const canCreateEvent = user?.systemRole === 'ADMIN' || user?.systemRole === 'EVENT_MANAGER';
+  const identityName = user?.fullName || user?.email || 'Account';
+  const role = user?.roles.join(', ').replace(/_/g, ' ').toLowerCase() || 'staff';
+  const canCreateEvent = Boolean(user?.roles.some((item) => item === 'ADMINISTRATOR' || item === 'EVENT_MANAGER'));
+  const logout = useCallback(async () => {
+    try {
+      await apiClient.post('/auth/logout');
+    } finally {
+      clearSession();
+      navigate('/login');
+    }
+  }, [clearSession, navigate]);
   const mobileTitle = location.pathname === '/events/new'
     ? 'Create event'
     : /^\/events\/[^/]+$/.test(location.pathname)
@@ -49,7 +59,7 @@ export default function AppShell({ children }: { children: ReactNode }) {
         group: 'Navigation', description: 'Open the event operations dashboard', aliases: ['home', 'dashboard'], icon: <CalendarDaysIcon />, action: () => navigate('/events'),
       },
     },
-    ...(user?.systemRole !== 'STAFF' ? [{
+    ...(canCreateEvent ? [{
       id: 'event-create', label: 'Create event', auxiliaryData: {
         group: 'Events', description: 'Open a new draft event', aliases: ['new', 'add'], icon: <PlusIcon />, action: () => navigate('/events/new'),
       },
@@ -69,7 +79,7 @@ export default function AppShell({ children }: { children: ReactNode }) {
         group: 'View', description: 'Toggle the primary navigation', aliases: ['collapse', 'expand', 'navigation'], shortcut: 'mod+b', icon: <Bars3BottomLeftIcon />, action: toggleSidebar,
       },
     },
-  ], [collapsed, navigate, setEventsView, toggleSidebar, user?.systemRole]);
+  ], [canCreateEvent, collapsed, navigate, setEventsView, toggleSidebar]);
   const commandSource = useMemo(() => createStaticSource(commands, {
     keywords: (item) => [item.auxiliaryData.description, ...item.auxiliaryData.aliases],
   }), [commands]);
@@ -128,7 +138,9 @@ export default function AppShell({ children }: { children: ReactNode }) {
           <NavLink to="/events" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}>
             <CalendarDaysIcon /><span>Events</span>
           </NavLink>
-          <span className="nav-item disabled" aria-disabled="true"><QueueListIcon /><span>Participants</span></span>
+          <NavLink to="/participants/search" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}>
+            <QueueListIcon /><span>Participants</span>
+          </NavLink>
         </nav>
         <div className="sidebar-foot">
           <div className="connection"><SignalIcon /><span>Connected<br/><small>All changes synced</small></span></div>

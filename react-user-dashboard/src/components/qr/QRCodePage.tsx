@@ -1,8 +1,8 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
 import QRCode from "./QRCode";
 import "./qrCodePage.css";
-import apiClient from "../../utils/apiClient";
+import apiClient, { getApiError } from "../../utils/apiClient";
 import { PrinterIcon, ArrowDownTrayIcon, ArrowPathIcon } from "@heroicons/react/24/outline";
 
 function QRCodePage() {
@@ -12,7 +12,7 @@ function QRCodePage() {
     const [loading, setLoading] = useState<boolean>(true);
     const [error, setError] = useState<string>("");
 
-    const fetchOrGenerateQR = async () => {
+    const fetchOrGenerateQR = useCallback(async () => {
         if (!registrationId) {
             setError("Registration ID is missing from route parameters.");
             setLoading(false);
@@ -33,20 +33,17 @@ function QRCodePage() {
 
             setQrImage(result.data.qrImage);
             setToken(result.data.token);
-        } catch (err: any) {
-            setError(
-                err.response?.data?.message ||
-                (err instanceof Error ? err.message : "Unexpected error occurred")
-            );
+        } catch (err: unknown) {
+            setError(getApiError(err, err instanceof Error ? err.message : "Unexpected error occurred"));
         } finally {
             setLoading(false);
         }
-    };
+    }, [registrationId]);
 
     // Automatically trigger pass generation as soon as the component loads
     useEffect(() => {
         fetchOrGenerateQR();
-    }, [registrationId]);
+    }, [fetchOrGenerateQR]);
 
     return (
         <main className="qr-page">

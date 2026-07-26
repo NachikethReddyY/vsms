@@ -1,5 +1,17 @@
 const qrModel = require("../models/qrModel");
 
+// Registration-module compatibility endpoint. It intentionally delegates to the
+// existing QR model so there is one token format and one QR lifecycle.
+exports.generateRegistrationQR = async (req, res) => {
+    const qr = await qrModel.generateQR(req.params.registrationId, req.user?.id || req.auth?.userId);
+    return res.status(201).json(qr);
+};
+
+exports.getRegistrationByQR = async (req, res) => {
+    const result = await qrModel.getParticipant(req.params.token);
+    return res.json({ registration: result });
+};
+
 // ==========================================
 // Generate QR Code
 // POST /qr/generate/:registrationId

@@ -6,7 +6,12 @@ import fs from 'node:fs'
 export default defineConfig(({ command }) => {
   // Certificates are local-only. Production builds must never depend on files
   // that are intentionally excluded from source control.
-  const localHttps = command === 'serve' && process.env.DEV_HTTPS !== 'false'
+  const keyPath = "./certs/localhost-key.pem"
+  const certPath = "./certs/localhost.pem"
+  const localHttps = command === 'serve'
+    && process.env.DEV_HTTPS === 'true'
+    && fs.existsSync(keyPath)
+    && fs.existsSync(certPath)
 
   return {
     plugins: [react(), tailwindcss()],
@@ -14,21 +19,15 @@ export default defineConfig(({ command }) => {
       host: '0.0.0.0',
       allowedHosts: ['vwsl.tailaf0363.ts.net'],
       https: localHttps ? {
-        key: fs.readFileSync("./certs/localhost-key.pem"),
-        cert: fs.readFileSync("./certs/localhost.pem"),
+        key: fs.readFileSync(keyPath),
+        cert: fs.readFileSync(certPath),
       } : undefined,
       port: 5173,
       strictPort: true,
       proxy: {
-        '/qa-api': {
-          target: 'https://127.0.0.1:5050',
-          secure: false,
+        '/api/v1': {
+          target: 'http://127.0.0.1:5000',
           changeOrigin: true,
-          cookiePathRewrite: { '/auth': '/qa-api/auth' },
-          rewrite: (path) => path.replace(/^\/qa-api/, ''),
-          configure(proxy) {
-            proxy.on('proxyReq', (proxyRequest) => proxyRequest.setHeader('Origin', 'https://localhost:5173'))
-          },
         },
       },
     },
