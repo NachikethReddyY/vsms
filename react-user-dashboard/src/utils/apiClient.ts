@@ -1,4 +1,4 @@
-import axios, { type AxiosError, type InternalAxiosRequestConfig } from "axios";
+import axios, { AxiosError, type InternalAxiosRequestConfig } from "axios";
 import type { AuthSession } from "../types";
 import { clearStoredSession, getStoredSession, setStoredSession } from "./session";
 
@@ -10,93 +10,82 @@ interface RetryableRequestConfig extends InternalAxiosRequestConfig {
 
 const apiClient = axios.create({
   baseURL,
+  withCredentials: true,
   headers: {
     "Content-Type": "application/json",
+    "X-Requested-With": "XMLHttpRequest",
   },
 });
 
 const refreshClient = axios.create({
   baseURL,
+  withCredentials: true,
   headers: {
     "Content-Type": "application/json",
+    "X-Requested-With": "XMLHttpRequest",
   },
 });
 
-let isRefreshing = false;
-let refreshSubscribers: Array<(session: AuthSession) => void> = [];
+let refreshPromise: Promise<AuthSession> | null = null;
 
-function notifyRefreshSubscribers(session: AuthSession) {
-  refreshSubscribers.forEach((callback) => callback(session));
-  refreshSubscribers = [];
-}
-
-async function refreshAccessToken(session: AuthSession): Promise<AuthSession> {
-  const response = await refreshClient.post("/auth/refresh", {
-    email: session.email,
-    refreshToken: session.refreshToken,
-  });
-
-  const updatedSession: AuthSession = {
-    accessToken: response.data.accessToken,
-    idToken: response.data.idToken ?? session.idToken,
-    refreshToken: session.refreshToken,
-    email: response.data.user?.email ?? session.email,
-    user: response.data.user ?? session.user,
-  };
-
-  setStoredSession(updatedSession);
-  return updatedSession;
+function getDeviceId() {
+  const key = "vsms_device_id";
+  let value = window.localStorage.getItem(key);
+  if (!value) {
+    value = crypto.randomUUID();
+    window.localStorage.setItem(key, value);
+  }
+  return value;
 }
 
 apiClient.interceptors.request.use((config) => {
-  const session = getStoredSession();
-  if (session?.accessToken) {
-    config.headers.Authorization = `Bearer ${session.accessToken}`;
-  }
-
+  config.headers["X-Device-Id"] = getDeviceId();
+  config.headers["X-Device-Name"] = "VSMS staff web";
   return config;
 });
+
+async function refreshSession(): Promise<AuthSession> {
+  const response = await refreshClient.post("/auth/refresh", null, {
+    headers: {
+      "X-Device-Id": getDeviceId(),
+      "X-Device-Name": "VSMS staff web",
+    },
+  });
+  const nextSession: AuthSession = {
+    user: response.data.user,
+    expiresAt: Date.now() + Number(response.data.sessionExpiresIn || 2_592_000) * 1000,
+  };
+  setStoredSession(nextSession);
+  return nextSession;
+}
 
 apiClient.interceptors.response.use(
   (response) => response,
   async (error: AxiosError) => {
     const originalRequest = error.config as RetryableRequestConfig | undefined;
-    const session = getStoredSession();
-
-    if (
-      error.response?.status === 401 &&
-      originalRequest &&
-      !originalRequest._retry &&
-      session?.refreshToken
-    ) {
-      if (isRefreshing) {
-        return new Promise((resolve) => {
-          refreshSubscribers.push((nextSession) => {
-            originalRequest.headers.Authorization = `Bearer ${nextSession.accessToken}`;
-            resolve(apiClient(originalRequest));
-          });
-        });
-      }
-
+    if (error.response?.status === 401 && originalRequest && !originalRequest._retry && getStoredSession()) {
       originalRequest._retry = true;
-      isRefreshing = true;
-
       try {
-        const nextSession = await refreshAccessToken(session);
-        notifyRefreshSubscribers(nextSession);
-        originalRequest.headers.Authorization = `Bearer ${nextSession.accessToken}`;
+        refreshPromise ??= refreshSession().finally(() => {
+          refreshPromise = null;
+        });
+        await refreshPromise;
         return apiClient(originalRequest);
       } catch (refreshError) {
         clearStoredSession();
         window.location.assign("/login?reason=session-expired");
         return Promise.reject(refreshError);
-      } finally {
-        isRefreshing = false;
       }
     }
-
     return Promise.reject(error);
   }
 );
+
+export function getApiError(error: unknown, fallback: string) {
+  if (axios.isAxiosError<{ error?: string }>(error)) {
+    return error.response?.data?.error ?? fallback;
+  }
+  return fallback;
+}
 
 export default apiClient;

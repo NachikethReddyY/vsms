@@ -17,7 +17,7 @@ export function AuthProvider({ children }: PropsWithChildren) {
   const value = useMemo<AuthContextValue>(
     () => ({
       session,
-      isAuthenticated: Boolean(session?.accessToken),
+      isAuthenticated: Boolean(session?.user?.id && session.expiresAt > Date.now()),
       setSession(nextSession) {
         setStoredSession(nextSession);
         setSessionState(nextSession);
@@ -33,6 +33,8 @@ export function AuthProvider({ children }: PropsWithChildren) {
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
 
+// This hook intentionally lives beside its provider so the context stays private.
+// eslint-disable-next-line react-refresh/only-export-components
 export function useAuth() {
   const context = useContext(AuthContext);
   if (!context) {

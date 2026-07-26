@@ -1,189 +1,211 @@
 openapi: 3.0.3
-
 info:
-  title: Cryptix API
+  title: VSMS Secure Staff Registration API
   version: 1.0.0
-  description: >
-    REST API for the Cryptix project.
-    Provides authentication and user management endpoints.
-
 servers:
-  - url: http://localhost:5000
-    description: Local Development Server
-
-tags:
-  - name: Authentication
-    description: User authentication endpoints
-  - name: Users
-    description: User management endpoints
-
+  - url: http://localhost:5000/api/v1
 components:
   securitySchemes:
-    bearerAuth:
-      type: http
-      scheme: bearer
-      bearerFormat: JWT
-
-  schemas:
-    LoginRequest:
-      type: object
-      required:
-        - email
-        - password
-      properties:
-        email:
-          type: string
-          example: admin@example.com
-        password:
-          type: string
-          example: admin123
-
-    SignupRequest:
-      type: object
-      required:
-        - email
-        - password
-      properties:
-        email:
-          type: string
-          example: newuser@example.com
-        password:
-          type: string
-          example: password123
-
-    User:
-      type: object
-      properties:
-        id:
-          type: integer
-          example: 1
-        email:
-          type: string
-          example: admin@example.com
-        created_at:
-          type: string
-          format: date-time
-
-    LoginResponse:
-      type: object
-      properties:
-        accessToken:
-          type: string
-          example: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
-        refreshToken:
-          type: string
-          example: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
-
-    ErrorResponse:
-      type: object
-      properties:
-        error:
-          type: string
-          example: Invalid email or password
-
+    staffCookie:
+      type: apiKey
+      in: cookie
+      name: vsms_access
+  parameters:
+    ParticipantId:
+      name: participantId
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+    EventId:
+      name: eventId
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+    RegistrationId:
+      name: registrationId
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+  responses:
+    Unauthorized:
+      description: Missing, invalid, or expired Cognito access token
+    Forbidden:
+      description: Cognito group or active local role does not authorize access
+security:
+  - staffCookie: []
 paths:
-  /:
-    get:
-      summary: Backend status
-      description: Checks whether the backend server is running.
-      responses:
-        "200":
-          description: Server is running.
-
   /auth/login:
     post:
-      tags:
-        - Authentication
-
-      summary: Login user
-
-      description: Authenticate a user using email and password.
-
-      requestBody:
-        required: true
-
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/LoginRequest"
-
+      security: []
+      summary: Start Cognito password authentication and required first-login/MFA challenges
       responses:
-        "200":
-          description: Login successful
-
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/LoginResponse"
-
-        "400":
-          description: Missing email or password
-
-        "401":
-          description: Invalid credentials
-
-        "500":
-          description: Internal server error
-
-  /auth/signup:
+        "200": { description: Authenticated; HttpOnly session cookies set }
+        "202": { description: Permanent-password, MFA enrollment, or MFA verification challenge required }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+  /auth/respond-to-challenge:
     post:
-      tags:
-        - Authentication
-
-      summary: Register new user
-
-      requestBody:
-        required: true
-
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/SignupRequest"
-
+      security: []
+      summary: Complete a Cognito permanent-password or MFA challenge
       responses:
-        "201":
-          description: User successfully created
-
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/User"
-
-        "400":
-          description: Missing required fields
-
-        "500":
-          description: Internal server error
-
-  /users:
+        "200": { description: Authenticated; HttpOnly session cookies set }
+        "202": { description: Another first-login challenge must be completed }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+  /auth/refresh:
+    post:
+      security: []
+      summary: Refresh the HttpOnly Cognito session
+      responses:
+        "200": { description: Session refreshed }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+  /auth/logout:
+    post:
+      summary: Revoke Cognito tokens and clear session cookies
+      responses:
+        "200": { description: Logged out }
+  /auth/me:
     get:
-      tags:
-        - Users
-
-      summary: Get all users
-
-      description: Returns every user in the database.
-
-      security:
-        - bearerAuth: []
-
+      summary: Return verified active staff profile and effective roles
       responses:
-        "200":
-          description: List of users
-
-          content:
-            application/json:
-              schema:
-                type: array
-
-                items:
-                  $ref: "#/components/schemas/User"
-
-        "401":
-          description: Unauthorized
-
-        "403":
-          description: Invalid token
-
-        "500":
-          description: Internal server error
+        "200": { description: Current staff profile }
+  /auth/change-password:
+    post:
+      summary: Change Cognito password
+      responses:
+        "200": { description: Password changed }
+  /auth/forgot-password:
+    post:
+      security: []
+      summary: Request Cognito recovery code
+      responses:
+        "200": { description: Generic recovery response }
+  /auth/confirm-forgot-password:
+    post:
+      security: []
+      summary: Confirm Cognito password recovery
+      responses:
+        "200": { description: Password reset }
+  /events/active:
+    get:
+      summary: List events currently open for registration with counts
+      responses:
+        "200": { description: Active events }
+  /events/{eventId}/registrations:
+    parameters:
+      - $ref: "#/components/parameters/EventId"
+    post:
+      summary: Idempotently register a participant
+      parameters:
+        - name: Idempotency-Key
+          in: header
+          required: true
+          schema: { type: string, minLength: 8, maxLength: 100 }
+      responses:
+        "201": { description: Registration created with registrationId, reference, queue and status }
+        "200": { description: Existing result returned for an idempotent replay }
+        "409": { description: Duplicate registration or conflicting idempotency key }
+    get:
+      summary: List registrations for an event
+      responses:
+        "200": { description: Paginated registrations }
+  /participants:
+    get:
+      summary: Search participants; at least one bounded criterion is required
+      parameters:
+        - { name: participantReference, in: query, schema: { type: string, minLength: 3 } }
+        - { name: name, in: query, schema: { type: string, minLength: 3 } }
+        - { name: contactNumber, in: query, schema: { type: string, minLength: 3 } }
+        - { name: dateOfBirth, in: query, schema: { type: string, format: date } }
+      responses:
+        "200": { description: Paginated masked participant matches }
+        "400": { description: Invalid or unrestricted search }
+    post:
+      summary: Create participant with server-generated reference
+      responses:
+        "201": { description: Participant created }
+  /participants/{participantId}:
+    parameters:
+      - $ref: "#/components/parameters/ParticipantId"
+    get:
+      summary: Get participant
+      responses:
+        "200": { description: Participant }
+    patch:
+      summary: Validate and update participant
+      responses:
+        "200": { description: Participant updated }
+  /participants/{participantId}/emergency-contacts:
+    parameters:
+      - $ref: "#/components/parameters/ParticipantId"
+    get:
+      summary: List emergency contacts including preserved removed records
+      responses:
+        "200": { description: Emergency contacts }
+    post:
+      summary: Add emergency contact
+      responses:
+        "201": { description: Contact created }
+  /emergency-contacts/{contactId}:
+    patch:
+      summary: Update, reprioritize, or mark an emergency contact removed
+      parameters:
+        - name: contactId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        "200": { description: Contact updated }
+  /consent-forms/active:
+    get:
+      summary: Return the current effective consent form
+      responses:
+        "200": { description: Active version and complete content }
+  /participants/{participantId}/consents:
+    parameters:
+      - $ref: "#/components/parameters/ParticipantId"
+    get:
+      summary: List immutable consent evidence and withdrawals
+      responses:
+        "200": { description: Consent history }
+    post:
+      summary: Record accepted or declined consent
+      responses:
+        "201": { description: Consent recorded }
+  /participants/{participantId}/consents/{consentId}/withdraw:
+    post:
+      summary: Append a withdrawal while preserving original consent evidence
+      parameters:
+        - $ref: "#/components/parameters/ParticipantId"
+        - name: consentId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        "201": { description: Withdrawal recorded }
+  /participants/{participantId}/registrations:
+    get:
+      summary: List participant registration history
+      parameters:
+        - $ref: "#/components/parameters/ParticipantId"
+      responses:
+        "200": { description: Registrations and status history }
+  /registrations/{registrationId}:
+    get:
+      summary: Return a registration confirmation result
+      parameters:
+        - $ref: "#/components/parameters/RegistrationId"
+      responses:
+        "200": { description: Registration }
+  /registrations/{registrationId}/history:
+    get:
+      summary: Return append-only registration status history
+      parameters:
+        - $ref: "#/components/parameters/RegistrationId"
+      responses:
+        "200": { description: Status history }
+  /qr/registrations/{registrationId}:
+    post:
+      summary: Create a secure QR pass using only the registration ID handoff
+      parameters:
+        - $ref: "#/components/parameters/RegistrationId"
+      responses:
+        "201": { description: QR image and expiry }

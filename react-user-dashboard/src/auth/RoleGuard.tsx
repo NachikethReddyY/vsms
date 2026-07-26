@@ -11,7 +11,7 @@ export function RoleGuard({ allowedRoles }: RoleGuardProps) {
   const isAllowed = allowedRoles.some((role) => roles.includes(role));
 
   if (!isAllowed) {
-    return <Navigate to="/dashboard" replace />;
+    return <Navigate to="/account/security" replace />;
   }
 
   return <Outlet />;

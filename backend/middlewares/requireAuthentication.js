@@ -1,6 +1,8 @@
 const asyncHandler = require("./asyncHandler");
 const prisma = require("../prisma/prismaClient");
 const { isCognitoConfigured, verifyCognitoToken } = require("../utils/cognitoJwt");
+const { rolesFromCognitoGroups } = require("../utils/staff");
+const { ACCESS_COOKIE, parseCookies } = require("../utils/httpCookies");
 
 const requireAuthentication = asyncHandler(async (req, res, next) => {
     if (!isCognitoConfigured()) {
@@ -10,14 +12,25 @@ const requireAuthentication = asyncHandler(async (req, res, next) => {
     }
 
     const authHeader = req.headers.authorization;
-    if (!authHeader || !authHeader.startsWith("Bearer ")) {
+    const cookies = parseCookies(req.headers.cookie);
+    const token = authHeader?.startsWith("Bearer ")
+        ? authHeader.slice(7)
+        : cookies[ACCESS_COOKIE];
+
+    if (!token) {
         const error = new Error("Access token required");
         error.statusCode = 401;
         throw error;
     }
 
-    const token = authHeader.split(" ")[1];
-    const payload = await verifyCognitoToken(token, "access");
+    let payload;
+    try {
+        payload = await verifyCognitoToken(token, "access");
+    } catch {
+        const error = new Error("Access token is invalid or expired");
+        error.statusCode = 401;
+        throw error;
+    }
     const username = payload.username || payload["cognito:username"] || payload.email;
 
     if (!payload.sub && !username) {
@@ -62,13 +75,41 @@ const requireAuthentication = asyncHandler(async (req, res, next) => {
         throw error;
     }
 
+    const tokenRoles = rolesFromCognitoGroups(payload);
+    const localRoles = user.userRoles.map((entry) => entry.role.roleName);
+    const effectiveRoles = localRoles.filter((role) => tokenRoles.includes(role));
+
+    if (effectiveRoles.length === 0) {
+        const error = new Error("Cognito group membership does not grant an application role");
+        error.statusCode = 403;
+        throw error;
+    }
+
+    if (req.context.deviceId) {
+        await prisma.device.upsert({
+            where: { id: req.context.deviceId },
+            update: {
+                userId: user.id,
+                deviceName: req.context.deviceName,
+                lastSeenAt: new Date(),
+            },
+            create: {
+                id: req.context.deviceId,
+                userId: user.id,
+                deviceName: req.context.deviceName,
+                lastSeenAt: new Date(),
+            },
+        });
+    }
+
     req.auth = {
         token,
         tokenPayload: payload,
         user,
         userId: user.id,
         email: user.email,
-        roles: user.userRoles.map((entry) => entry.role.roleName),
+        roles: effectiveRoles,
+        cognitoGroups: payload["cognito:groups"] || [],
     };
 
     next();

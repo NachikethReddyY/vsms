@@ -1,12 +1,14 @@
 const asyncHandler = require("../middlewares/asyncHandler");
 const {
     isCognitoConfigured,
-    signUp,
-    confirmSignUp,
-    resendConfirmationCode,
+    resolveChallengeUsername,
+    resolveRequiredAttributes,
     login,
     refreshSession,
     respondToAuthChallenge,
+    associateSoftwareToken,
+    verifySoftwareToken,
+    completeMfaSetup,
     forgotPassword,
     confirmForgotPassword,
     changePassword,
@@ -14,10 +16,17 @@ const {
 } = require("../utils/cognitoClient");
 const { verifyCognitoToken } = require("../utils/cognitoJwt");
 const { createAuthAuditLog } = require("../utils/audit");
-const { syncLocalUser, ALLOWED_ROLES } = require("../utils/staff");
+const { syncLocalUser, rolesFromCognitoGroups, ALLOWED_ROLES } = require("../utils/staff");
+const {
+    REFRESH_COOKIE,
+    USERNAME_COOKIE,
+    parseCookies,
+    setAuthCookies,
+    clearAuthCookies,
+} = require("../utils/httpCookies");
 
 function requireFields(payload, fields) {
-    const missing = fields.filter((field) => !payload[field]);
+    const missing = fields.filter((field) => !String(payload?.[field] || "").trim());
     if (missing.length > 0) {
         const error = new Error(`Missing required fields: ${missing.join(", ")}`);
         error.statusCode = 400;
@@ -33,22 +42,53 @@ function ensureCognitoConfigured() {
     }
 }
 
-function extractProfileFromIdToken(idTokenPayload) {
+function extractProfileFromIdToken(payload) {
     return {
-        cognitoSub: idTokenPayload.sub,
-        email: idTokenPayload.email || idTokenPayload["cognito:username"],
-        fullName: idTokenPayload.name || idTokenPayload.given_name || null,
-        employeeNumber: idTokenPayload["custom:employee_number"] || null,
-        department: idTokenPayload["custom:department"] || null,
-        designation: idTokenPayload["custom:designation"] || null,
-        role: idTokenPayload["custom:role"] || null,
+        cognitoSub: payload.sub,
+        email: payload.email || payload["cognito:username"],
+        fullName: payload.name || payload.given_name || null,
+        employeeNumber: payload["custom:employee_number"] || null,
+        department: payload["custom:department"] || null,
+        designation: payload["custom:designation"] || null,
     };
 }
 
-async function finalizeSuccessfulLogin(authResult, context) {
-    const idTokenPayload = await verifyCognitoToken(authResult.IdToken, "id");
+function publicUser(localUser, roles) {
+    return {
+        id: localUser.id,
+        email: localUser.email,
+        fullName: localUser.fullName,
+        employeeNumber: localUser.employeeNumber,
+        department: localUser.department,
+        designation: localUser.designation,
+        status: localUser.status,
+        roles,
+    };
+}
+
+async function finalizeSuccessfulLogin(authResult, username, context, res) {
+    const [idTokenPayload, accessTokenPayload] = await Promise.all([
+        verifyCognitoToken(authResult.IdToken, "id"),
+        verifyCognitoToken(authResult.AccessToken, "access"),
+    ]);
     const localUser = await syncLocalUser(extractProfileFromIdToken(idTokenPayload));
 
+    if (localUser.status !== "ACTIVE") {
+        const error = new Error("Local staff account is not active");
+        error.statusCode = 403;
+        throw error;
+    }
+
+    const localRoles = localUser.userRoles.map((entry) => entry.role.roleName);
+    const cognitoRoles = rolesFromCognitoGroups(accessTokenPayload);
+    const roles = localRoles.filter((role) => cognitoRoles.includes(role));
+    if (roles.length === 0) {
+        const error = new Error("Cognito group membership does not grant an application role");
+        error.statusCode = 403;
+        throw error;
+    }
+
+    setAuthCookies(res, authResult, username);
     await createAuthAuditLog({
         userId: localUser.id,
         eventType: "LOGIN_SUCCESS",
@@ -58,21 +98,38 @@ async function finalizeSuccessfulLogin(authResult, context) {
     });
 
     return {
-        accessToken: authResult.AccessToken,
-        idToken: authResult.IdToken,
-        refreshToken: authResult.RefreshToken || null,
         expiresIn: authResult.ExpiresIn,
-        tokenType: authResult.TokenType,
-        user: {
-            id: localUser.id,
-            email: localUser.email,
-            fullName: localUser.fullName,
-            employeeNumber: localUser.employeeNumber,
-            department: localUser.department,
-            designation: localUser.designation,
-            status: localUser.status,
-            roles: localUser.userRoles.map((entry) => entry.role.roleName),
-        },
+        sessionExpiresIn: Number(process.env.REFRESH_COOKIE_MAX_AGE_SECONDS || 30 * 24 * 60 * 60),
+        user: publicUser(localUser, roles),
+    };
+}
+
+async function pendingChallenge(response, email, previousChallengeUsername = null) {
+    const challengeUsername = resolveChallengeUsername(
+        response,
+        previousChallengeUsername || email
+    );
+    if (response.ChallengeName !== "MFA_SETUP") {
+        return {
+            challengeName: response.ChallengeName,
+            session: response.Session,
+            email,
+            challengeUsername,
+            requiredAttributes: resolveRequiredAttributes(response),
+        };
+    }
+
+    const setup = await associateSoftwareToken(response.Session);
+    const issuer = encodeURIComponent("VSMS");
+    const account = encodeURIComponent(`VSMS:${email}`);
+    return {
+        challengeName: "MFA_SETUP",
+        session: setup.Session,
+        email,
+        challengeUsername,
+        requiredAttributes: resolveRequiredAttributes(response),
+        secretCode: setup.SecretCode,
+        otpAuthUri: `otpauth://totp/${account}?secret=${encodeURIComponent(setup.SecretCode)}&issuer=${issuer}`,
     };
 }
 
@@ -84,204 +141,181 @@ exports.configStatus = asyncHandler(async (req, res) => {
     });
 });
 
-exports.signup = asyncHandler(async (req, res) => {
-    ensureCognitoConfigured();
-    requireFields(req.body, ["fullName", "email", "employeeNumber", "password", "role"]);
-
-    const response = await signUp(req.body);
-
-    await createAuthAuditLog({
-        eventType: "SIGNUP_REQUESTED",
-        outcome: "SUCCESS",
-        identifier: req.body.email,
-        context: req.context,
-    });
-
-    res.status(201).json({
-        message: "Sign-up request submitted. Confirm the verification code next.",
-        userSub: response.UserSub,
-        codeDeliveryDetails: response.CodeDeliveryDetails || null,
-    });
-});
-
-exports.confirmSignup = asyncHandler(async (req, res) => {
-    ensureCognitoConfigured();
-    requireFields(req.body, ["fullName", "email", "employeeNumber", "code", "role"]);
-
-    await confirmSignUp(req.body);
-    const localUser = await syncLocalUser(req.body);
-
-    await createAuthAuditLog({
-        userId: localUser.id,
-        eventType: "SIGNUP_CONFIRMED",
-        outcome: "SUCCESS",
-        identifier: localUser.email,
-        context: req.context,
-    });
-
-    res.json({
-        message: "Account verified. You can sign in now.",
-        user: {
-            id: localUser.id,
-            email: localUser.email,
-            fullName: localUser.fullName,
-            roles: localUser.userRoles.map((entry) => entry.role.roleName),
-        },
-    });
-});
-
-exports.resendCode = asyncHandler(async (req, res) => {
-    ensureCognitoConfigured();
-    requireFields(req.body, ["email"]);
-
-    const response = await resendConfirmationCode(req.body.email);
-
-    res.json({
-        message: "Verification code resent.",
-        codeDeliveryDetails: response.CodeDeliveryDetails || null,
-    });
-});
-
 exports.login = asyncHandler(async (req, res) => {
     ensureCognitoConfigured();
     requireFields(req.body, ["email", "password"]);
 
     try {
         const response = await login(req.body);
-
         if (response.ChallengeName) {
-            return res.status(202).json({
-                challengeName: response.ChallengeName,
-                session: response.Session,
-                email: req.body.email,
-            });
+            return res.status(202).json(await pendingChallenge(response, req.body.email));
         }
 
-        const payload = await finalizeSuccessfulLogin(response.AuthenticationResult, req.context);
+        const payload = await finalizeSuccessfulLogin(
+            response.AuthenticationResult,
+            req.body.email,
+            req.context,
+            res
+        );
         res.json(payload);
     } catch (error) {
         await createAuthAuditLog({
             eventType: "LOGIN_FAILED",
             outcome: "FAILED",
-            failureCategory: error.message,
+            failureCategory: error.name || "AUTHENTICATION_FAILED",
             identifier: req.body.email,
             context: req.context,
-        });
+        }).catch(() => {});
+        if (!error.statusCode) error.statusCode = 401;
         throw error;
     }
 });
 
 exports.respondToChallenge = asyncHandler(async (req, res) => {
     ensureCognitoConfigured();
-    requireFields(req.body, ["email", "challengeName", "session", "code"]);
+    requireFields(req.body, ["email", "challengeName", "session"]);
+    if (req.body.challengeName === "NEW_PASSWORD_REQUIRED") {
+        requireFields(req.body, ["newPassword"]);
+    } else {
+        requireFields(req.body, ["code"]);
+    }
 
-    const response = await respondToAuthChallenge(req.body);
-    const payload = await finalizeSuccessfulLogin(response.AuthenticationResult, req.context);
-    res.json(payload);
+    try {
+        let response;
+        if (req.body.challengeName === "MFA_SETUP") {
+            const verification = await verifySoftwareToken(req.body.session, req.body.code);
+            response = await completeMfaSetup({
+                email: req.body.email,
+                challengeUsername: req.body.challengeUsername,
+                session: verification.Session,
+            });
+        } else {
+            response = await respondToAuthChallenge(req.body);
+        }
+        if (response.ChallengeName) {
+            return res.status(202).json(await pendingChallenge(
+                response,
+                req.body.email,
+                req.body.challengeUsername
+            ));
+        }
+        const payload = await finalizeSuccessfulLogin(
+            response.AuthenticationResult,
+            req.body.email,
+            req.context,
+            res
+        );
+        res.json(payload);
+    } catch (error) {
+        await createAuthAuditLog({
+            eventType: "MFA_CHALLENGE_FAILED",
+            outcome: "FAILED",
+            failureCategory: error.name || "MFA_FAILED",
+            identifier: req.body.email,
+            context: req.context,
+        }).catch(() => {});
+        if (!error.statusCode) error.statusCode = 401;
+        throw error;
+    }
 });
 
 exports.refresh = asyncHandler(async (req, res) => {
     ensureCognitoConfigured();
-    requireFields(req.body, ["email", "refreshToken"]);
+    const cookies = parseCookies(req.headers.cookie);
+    const refreshToken = cookies[REFRESH_COOKIE];
+    const username = cookies[USERNAME_COOKIE];
+    if (!refreshToken || !username) {
+        const error = new Error("Refresh session is unavailable");
+        error.statusCode = 401;
+        throw error;
+    }
 
     try {
-        const response = await refreshSession(req.body);
+        const response = await refreshSession({ email: username, refreshToken });
         const authResult = response.AuthenticationResult;
-        const idTokenPayload = await verifyCognitoToken(authResult.IdToken, "id");
-        const localUser = await syncLocalUser(extractProfileFromIdToken(idTokenPayload));
+        const accessPayload = await verifyCognitoToken(authResult.AccessToken, "access");
+        const localUser = await syncLocalUser({
+            cognitoSub: accessPayload.sub,
+            email: username.includes("@") ? username : null,
+        });
+        if (localUser.status !== "ACTIVE") {
+            const error = new Error("Local staff account is not active");
+            error.statusCode = 403;
+            throw error;
+        }
 
+        const localRoles = localUser.userRoles.map((entry) => entry.role.roleName);
+        const cognitoRoles = rolesFromCognitoGroups(accessPayload);
+        const roles = localRoles.filter((role) => cognitoRoles.includes(role));
+        if (roles.length === 0) {
+            const error = new Error("Cognito group membership does not grant an application role");
+            error.statusCode = 403;
+            throw error;
+        }
+
+        setAuthCookies(res, { ...authResult, RefreshToken: refreshToken }, username);
         res.json({
-            accessToken: authResult.AccessToken,
-            idToken: authResult.IdToken,
             expiresIn: authResult.ExpiresIn,
-            tokenType: authResult.TokenType,
-            user: {
-                id: localUser.id,
-                email: localUser.email,
-                fullName: localUser.fullName,
-                roles: localUser.userRoles.map((entry) => entry.role.roleName),
-            },
+            sessionExpiresIn: Number(process.env.REFRESH_COOKIE_MAX_AGE_SECONDS || 30 * 24 * 60 * 60),
+            user: publicUser(localUser, roles),
         });
     } catch (error) {
+        clearAuthCookies(res);
         await createAuthAuditLog({
             eventType: "TOKEN_REFRESH_FAILED",
             outcome: "FAILED",
-            failureCategory: error.message,
-            identifier: req.body.email,
+            failureCategory: error.name || "TOKEN_REFRESH_FAILED",
+            identifier: username,
             context: req.context,
-        });
+        }).catch(() => {});
+        if (!error.statusCode) error.statusCode = 401;
         throw error;
     }
 });
 
 exports.me = asyncHandler(async (req, res) => {
-    res.json({
-        user: {
-            id: req.auth.user.id,
-            email: req.auth.user.email,
-            fullName: req.auth.user.fullName,
-            employeeNumber: req.auth.user.employeeNumber,
-            department: req.auth.user.department,
-            designation: req.auth.user.designation,
-            roles: req.auth.roles,
-        },
-    });
+    res.json({ user: publicUser(req.auth.user, req.auth.roles) });
 });
 
 exports.logout = asyncHandler(async (req, res) => {
     ensureCognitoConfigured();
-    const accessToken = req.body.accessToken || req.auth?.token;
-    if (!accessToken) {
-        const error = new Error("Access token is required for logout");
-        error.statusCode = 400;
-        throw error;
+    try {
+        await globalSignOut(req.auth.token);
+        await createAuthAuditLog({
+            userId: req.auth.userId,
+            eventType: "LOGOUT_SUCCESS",
+            outcome: "SUCCESS",
+            identifier: req.auth.email,
+            context: req.context,
+        });
+    } finally {
+        clearAuthCookies(res);
     }
-
-    await globalSignOut(accessToken);
-
-    await createAuthAuditLog({
-        userId: req.auth?.userId || null,
-        eventType: "LOGOUT_SUCCESS",
-        outcome: "SUCCESS",
-        identifier: req.auth?.email || null,
-        context: req.context,
-    });
-
-    res.json({
-        message: "Logged out successfully",
-    });
+    res.json({ message: "Logged out successfully" });
 });
 
 exports.forgotPassword = asyncHandler(async (req, res) => {
     ensureCognitoConfigured();
     requireFields(req.body, ["email"]);
-
-    await forgotPassword(req.body.email);
-    res.json({
-        message: "If the account exists, a reset code has been sent.",
-    });
+    await forgotPassword(req.body.email).catch(() => {});
+    res.json({ message: "If the account exists, a reset code has been sent." });
 });
 
 exports.confirmForgotPassword = asyncHandler(async (req, res) => {
     ensureCognitoConfigured();
     requireFields(req.body, ["email", "code", "newPassword"]);
-
     await confirmForgotPassword(req.body);
-    res.json({
-        message: "Password reset completed. You can sign in now.",
-    });
+    res.json({ message: "Password reset completed. You can sign in now." });
 });
 
 exports.changePassword = asyncHandler(async (req, res) => {
     ensureCognitoConfigured();
     requireFields(req.body, ["oldPassword", "newPassword"]);
-
     await changePassword({
         accessToken: req.auth.token,
         oldPassword: req.body.oldPassword,
         newPassword: req.body.newPassword,
     });
-
     await createAuthAuditLog({
         userId: req.auth.userId,
         eventType: "PASSWORD_CHANGE_SUCCESS",
@@ -289,8 +323,5 @@ exports.changePassword = asyncHandler(async (req, res) => {
         identifier: req.auth.email,
         context: req.context,
     });
-
-    res.json({
-        message: "Password changed successfully.",
-    });
+    res.json({ message: "Password changed successfully." });
 });

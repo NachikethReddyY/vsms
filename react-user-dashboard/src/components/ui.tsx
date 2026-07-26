@@ -3,13 +3,15 @@ import { useAuth } from "../auth/AuthProvider";
 import apiClient from "../utils/apiClient";
 
 const passwordRequirements = [
-  { label: "At least 8 characters", test: (password: string) => password.length >= 8 },
+  { label: "At least 12 characters", test: (password: string) => password.length >= 12 },
   { label: "At least 1 uppercase letter", test: (password: string) => /[A-Z]/.test(password) },
   { label: "At least 1 lowercase letter", test: (password: string) => /[a-z]/.test(password) },
   { label: "At least 1 number", test: (password: string) => /\d/.test(password) },
   { label: "At least 1 special character", test: (password: string) => /[^A-Za-z0-9]/.test(password) },
 ];
 
+// Kept with PasswordRequirements so both use one authoritative policy.
+// eslint-disable-next-line react-refresh/only-export-components
 export function isPasswordValid(password: string) {
   return passwordRequirements.every((requirement) => requirement.test(password));
 }
@@ -44,7 +46,7 @@ export function PasswordRequirements({
             className={`flex items-center gap-2 ${requirement.met ? "text-emerald-700" : "text-slate-600"}`}
           >
             <span className="w-4 font-bold" aria-hidden="true">
-              {requirement.met ? "✓" : "○"}
+              {requirement.met ? "Yes" : "No"}
             </span>
             <span>{requirement.label}</span>
           </li>
@@ -83,14 +85,12 @@ export function SessionExpiredDialog() {
 }
 
 export function LogoutButton() {
-  const { session, clearSession } = useAuth();
+  const { clearSession } = useAuth();
   const navigate = useNavigate();
 
   async function handleLogout() {
     try {
-      await apiClient.post("/auth/global-logout", {
-        accessToken: session?.accessToken,
-      });
+      await apiClient.post("/auth/logout");
     } catch (error) {
       console.error("Logout request failed", error);
     } finally {

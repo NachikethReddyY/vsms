@@ -1,102 +1,55 @@
-# Cognito setup
+# Cognito staff setup
 
-This project is wired so Cognito configuration stays in local environment files and does not need to be committed in a pull request.
+The application contains no local password authentication. Cognito verifies passwords, performs mandatory TOTP MFA, issues tokens, and supplies group claims. PostgreSQL stores only the approved local staff profile and application role.
 
-## 1. Create the user pool
+## Deploy the user pool
 
-1. Open AWS Console.
-2. Go to `Amazon Cognito`.
-3. Create a new `User Pool`.
-4. Use `Email` as a sign-in option.
-5. Turn on self-service sign-up if you want staff accounts created from the app.
-6. Configure password policy and MFA based on your project requirement.
+The versioned CloudFormation template is at `infrastructure/cognito.yaml`. It creates:
 
-Staff metadata is stored in Prisma by default, so Cognito custom attributes are
-not required. Keep `COGNITO_USE_CUSTOM_ATTRIBUTES=false`.
+- an email-login staff user pool;
+- a public web app client with refresh flow and token revocation;
+- a 12-character complexity policy;
+- verified-email account recovery;
+- mandatory software-token MFA;
+- advanced threat protection;
+- `Admin` and `RegistrationOfficer` groups;
+- administrator-only account creation.
 
-If you intentionally want the same metadata in Cognito, create these custom
-attributes as `String` attributes and then set
-`COGNITO_USE_CUSTOM_ATTRIBUTES=true`:
+Deploy it from the project root:
 
-- `employee_number`
-- `department`
-- `designation`
-- `role`
+```powershell
+aws cloudformation deploy `
+  --template-file infrastructure/cognito.yaml `
+  --stack-name vsms-staff-development `
+  --parameter-overrides EnvironmentName=development
+```
 
-## 2. Create the app client
+Copy the output values into `backend/.env` as `COGNITO_USER_POOL_ID`, `COGNITO_APP_CLIENT_ID`, and `COGNITO_REGION`.
 
-1. Inside the user pool, create an `App client`.
-2. Enable:
-   - `ALLOW_USER_PASSWORD_AUTH`
-   - `ALLOW_REFRESH_TOKEN_AUTH`
-   - `ALLOW_USER_SRP_AUTH` if you want future hosted UI flexibility
-3. If you use a client secret, copy it into `COGNITO_APP_CLIENT_SECRET`.
-4. Save the `User Pool ID`, `App Client ID`, region, and optional client secret.
+## Create test staff
 
-## 3. Local backend setup
+Create Cognito staff accounts using the AWS Console or an approved administrator workflow. Never commit a temporary password.
 
-1. Copy [backend/.env.example](C:\Users\mikef\OneDrive\Documents\DBS PROJECT 2\backend\.env.example) to `backend/.env`.
-2. Fill in:
-   - `DATABASE_URL`
-   - `COGNITO_REGION`
-   - `COGNITO_USER_POOL_ID`
-   - `COGNITO_APP_CLIENT_ID`
-   - `COGNITO_APP_CLIENT_SECRET` if your app client uses one
-   - `COGNITO_USE_CUSTOM_ATTRIBUTES=false` unless all four custom attributes exist
-3. Start the backend on `http://localhost:5000`.
+```powershell
+aws cognito-idp admin-create-user --user-pool-id YOUR_POOL_ID --username officer@example.com --user-attributes Name=email,Value=officer@example.com Name=email_verified,Value=true
+aws cognito-idp admin-add-user-to-group --user-pool-id YOUR_POOL_ID --username officer@example.com --group-name RegistrationOfficer
+```
 
-## 4. Local frontend setup
+Create the matching local profile without a password:
 
-1. Copy [react-user-dashboard/.env.example](C:\Users\mikef\OneDrive\Documents\DBS PROJECT 2\react-user-dashboard\.env.example) to `react-user-dashboard/.env`.
-2. Keep `VITE_API_BASE_URL` pointed at your local backend unless you intentionally deploy an API somewhere else.
-3. Start the frontend on `http://localhost:5173`.
+```powershell
+npm run provision-staff -- officer@example.com "Registration Officer" RO-001 REGISTRATION_OFFICER
+```
 
-## 5. What teammates need
+Repeat with the `Admin` Cognito group and `ADMINISTRATOR` local role for the administrator test account. Both the verified Cognito group and local role must match; an inactive local account or missing group receives `403`.
 
-Teammates do not need your Cognito values in git.
+At first login, the web app handles Cognito's permanent-password challenge and software-token MFA enrollment. The staff member enters the setup key in an authenticator app and verifies the generated code before a session is issued.
 
-They only need their own local `backend/.env` and `react-user-dashboard/.env`.
+## Production settings
 
-If they do not configure Cognito, the frontend still builds, but the protected auth routes will return `503 Cognito is not configured`.
-
-## 6. Current auth routes
-
-Backend base path: `http://localhost:5000/api/v1/auth`
-
-- `GET /config-status`
-- `POST /signup`
-- `POST /confirm-signup`
-- `POST /resend-code`
-- `POST /login`
-- `POST /respond-to-challenge`
-- `POST /refresh`
-- `GET /me`
-- `POST /logout`
-- `POST /global-logout`
-- `POST /forgot-password`
-- `POST /confirm-forgot-password`
-- `POST /change-password`
-
-## 7. Current frontend routes
-
-Frontend base path: `http://localhost:5173`
-
-- `/login`
-- `/signup`
-- `/verify-signup`
-- `/forgot-password`
-- `/reset-password`
-- `/dashboard`
-- `/cognito-test`
-- `/events/:eventId/register`
-- `/participants/search`
-- `/participants/new`
-- `/participants/:participantId`
-- `/participants/:participantId/edit`
-- `/participants/:participantId/emergency-contacts`
-- `/events/:eventId/participants/:participantId/consent`
-- `/events/:eventId/participants/:participantId/review`
-- `/registrations/:registrationId/confirmation`
-- `/participants/:participantId/history`
-- `/account/security`
-- `/admin/audit-logs`
+- Serve both applications over HTTPS.
+- Set `COOKIE_SECURE=true`.
+- Set `CORS_ORIGIN` to the exact frontend origin. Separate multiple approved origins with commas.
+- Point `SIGNATURE_STORAGE_DIR` to encrypted, access-controlled persistent storage.
+- Keep `.env` out of source control and use the deployment platform’s secret manager.
+- Rotate app-client secrets if a confidential client is selected.
