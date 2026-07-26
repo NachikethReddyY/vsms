@@ -7,7 +7,7 @@ const helmet = require("helmet");
 const cookieParser = require("cookie-parser");
 const { rateLimit } = require("express-rate-limit");
 const swaggerUi = require("swagger-ui-express");
-const YAML = require("yamljs");
+const YAML = require("yaml");
 const env = require("./config/env");
 const AppError = require("./errors/AppError");
 const requestContext = require("./middlewares/requestContext");
@@ -91,7 +91,7 @@ const mutationLimiter = rateLimit({ windowMs: 60000, limit: 60, standardHeaders:
 app.get("/health", (_req, res) => res.json({ status: "ok" }));
 
 if (!env.isProduction) {
-  const swaggerDocument = YAML.load(path.join(__dirname, "docs/openapi.yaml"));
+  const swaggerDocument = YAML.parse(fs.readFileSync(path.join(__dirname, "docs/openapi.yaml"), "utf8"));
   app.get("/api-docs/openapi.json", (_req, res) => res.set("Cache-Control", "no-store").json(swaggerDocument));
   app.use("/api-docs", swaggerUi.serve, swaggerUi.setup(swaggerDocument, {
     customCss: "",
