@@ -20,15 +20,26 @@ const requireAuthentication = asyncHandler(async (req, res, next) => {
     const payload = await verifyCognitoToken(token, "access");
     const username = payload.username || payload["cognito:username"] || payload.email;
 
-    if (!username) {
+    if (!payload.sub && !username) {
         const error = new Error("Unable to resolve user identity from token");
         error.statusCode = 401;
         throw error;
     }
 
-    const user = await prisma.user.findUnique({
+    const identityMatches = [];
+    if (payload.sub) {
+        identityMatches.push({ cognitoSub: payload.sub });
+    }
+    if (payload.email) {
+        identityMatches.push({ email: String(payload.email).toLowerCase() });
+    }
+    if (username && String(username).includes("@")) {
+        identityMatches.push({ email: String(username).toLowerCase() });
+    }
+
+    const user = await prisma.user.findFirst({
         where: {
-            email: username,
+            OR: identityMatches,
         },
         include: {
             userRoles: {
