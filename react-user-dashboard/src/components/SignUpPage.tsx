@@ -7,6 +7,7 @@ import './SignUpPage.css';
 
 interface SignUpFormInputs {
   fullName: string;
+  username: string; // <--- Added username field
   employeeNumber: string;
   email: string;
   password: string;
@@ -32,6 +33,7 @@ const SignUpPage: React.FC = () => {
     try {
       await apiClient.post('/auth/signup', {
         fullName: data.fullName,
+        username: data.username, // <--- Sent to backend
         employeeNumber: data.employeeNumber,
         email: data.email,
         password: data.password,
@@ -83,6 +85,25 @@ const SignUpPage: React.FC = () => {
             />
             {errors.fullName && (
               <p className="vsms-error-text">{errors.fullName.message}</p>
+            )}
+          </div>
+
+          {/* Username */}
+          <div className="vsms-field-group">
+            <label htmlFor="username" className="vsms-label">
+              Username
+            </label>
+            <input
+              id="username"
+              type="text"
+              placeholder="alexrivera"
+              {...register('username', {
+                required: 'Username is required',
+              })}
+              className="vsms-input"
+            />
+            {errors.username && (
+              <p className="vsms-error-text">{errors.username.message}</p>
             )}
           </div>
 

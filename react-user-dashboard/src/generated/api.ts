@@ -484,6 +484,11 @@ export interface components {
             eventStationId?: string | null;
         };
         StaffAssignment: {
+            assignedUser: {
+              id: string; fullName: string;
+              /** Format: uuid */
+              userId: string; username: string;
+            };
             /** Format: uuid */
             staffAssignmentId: string;
             assignmentRole: components["schemas"]["StaffAssignmentRole"];
@@ -498,6 +503,8 @@ export interface components {
                 stationOrder: number;
             } | null;
             user: {
+                id: string;
+                fullName: string;
                 /** Format: uuid */
                 userId: string;
                 username: string;
@@ -514,6 +521,7 @@ export interface components {
             notes?: string | null;
         };
         User: {
+            id: string;
             /** Format: uuid */
             userId: string;
             username: string;
