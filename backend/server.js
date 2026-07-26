@@ -3,21 +3,26 @@ const cors = require("cors");
 const helmet = require("helmet");
 const morgan = require("morgan");
 const fs = require("fs");
-const YAML = require("yaml"); 
-const cookieParser = require("cookie-parser"); // <--- 1. Import cookie-parser
-require("dotenv").config();
-const fs = require("fs");
 const https = require("https");
 const path = require("path");
+const YAML = require("yaml");
+const cookieParser = require("cookie-parser");
+const swaggerUi = require("swagger-ui-express");
+require("dotenv").config();
+
 const env = require("./config/env");
-const app = require("./app");
 const logger = require("./utils/logger/logger");
 
-const server = !env.isProduction && env.localHttps
+const app = express();
+const PORT = process.env.PORT || 5000;
+
+// HTTPS Server setup for local development
+const useHttps = !env.isProduction && env.localHttps;
+const server = useHttps
   ? https.createServer({
-    key: fs.readFileSync(path.resolve(__dirname, env.TLS_KEY_PATH)),
-    cert: fs.readFileSync(path.resolve(__dirname, env.TLS_CERT_PATH)),
-  }, app)
+      key: fs.readFileSync(path.resolve(__dirname, env.TLS_KEY_PATH)),
+      cert: fs.readFileSync(path.resolve(__dirname, env.TLS_CERT_PATH)),
+    }, app)
   : app;
 
 // Import Routes
@@ -27,9 +32,7 @@ const qrRoutes = require("./routes/qrRoutes");
 const participantRoutes = require("./routes/participantRoutes");
 const eventRegistrationRoutes = require("./routes/eventRegistrationRoutes");
 const eventRoutes = require("./routes/eventRoutes");
-
-const app = express();
-const PORT = process.env.PORT || 5000;
+const queueRoutes = require("./routes/queueRoutes"); // <--- Included queueRoutes safely
 
 // Load Swagger / OpenAPI Document securely using standard file streams
 let swaggerDocument;
@@ -71,9 +74,7 @@ const corsOptions = {
 };
 
 app.use(cors(corsOptions));
-
-// Express 5 preflight wildcard handler
-app.options("/*splat", cors(corsOptions));
+app.options(/(.*)/, cors(corsOptions)); // Safe Express 4 wildcard option handler
 
 // -----------------------------------------------------------------------------
 // 2. HELMET SECURITY HEADERS & CLICKJACKING PROTECTION
@@ -88,6 +89,7 @@ app.use(
         "connect-src": [
           "'self'",
           "http://localhost:5000",
+          "https://localhost:5000",
           "https://localhost:5173",
           "http://localhost:5173",
         ],
@@ -117,7 +119,7 @@ app.use(
 // -----------------------------------------------------------------------------
 // 4. BODY PARSING, COOKIES & LIMITS
 // -----------------------------------------------------------------------------
-app.use(cookieParser()); // <--- 2. Initialize cookie-parser middleware here
+app.use(cookieParser());
 app.use(express.json({ limit: "100kb" }));
 app.use(express.urlencoded({ limit: "100kb", extended: true }));
 
@@ -149,9 +151,10 @@ app.use("/qr", qrRoutes);
 app.use("/participants", participantRoutes);
 app.use("/event-registrations", eventRegistrationRoutes);
 app.use("/events", eventRoutes);
+app.use("/queue", queueRoutes); // <--- Registered queue routes to prevent blank export issues
 
-// Express 5 catch-all for undefined routes
-app.all("/*splat", (req, res) => {
+// Safe Express 4 fallback catch-all handler (avoids PathError crashes)
+app.use((req, res) => {
   res.status(404).json({
     success: false,
     message: `Cannot ${req.method} ${req.originalUrl}`,
@@ -161,4 +164,9 @@ app.all("/*splat", (req, res) => {
 server.on("error", (error) => {
   logger.error("server.failed", { message: error.message, stack: error.stack });
   process.exit(1);
+});
+
+server.listen(PORT, () => {
+  const protocol = useHttps ? "https" : "http";
+  logger.info(`Server running securely on ${protocol}://localhost:${PORT}`);
 });

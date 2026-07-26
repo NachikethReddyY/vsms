@@ -15,6 +15,10 @@ const {
     assignmentParams,
     assignmentDeleteParams,
     assignmentBody,
+    stationImportBody,    // <--- Added missing import
+    stationParams,        // <--- Added missing import
+    stationUpdateBody,    // <--- Added missing import
+    versionQuery,         // <--- Added missing import
 } = require("../schemas/eventSchemas");
 
 const router = express.Router();

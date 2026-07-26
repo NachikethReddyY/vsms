@@ -40,9 +40,19 @@ function eventDateParts(event: EventRecord) {
 }
 
 function uniquePeople(event: EventRecord) {
-  const assigned = event.shifts.flatMap((shift) => shift.staffAssignments).map((assignment) => assignment.user);
-  const people = event.createdBy ? [{ userId: event.createdBy.userId, username: event.createdBy.username }, ...assigned] : assigned;
-  return [...new Map(people.map((person) => [person.userId, person])).values()];
+  const assigned = (event.shifts || []).flatMap((shift) => shift?.staffAssignments || []).map((assignment) => {
+    const u = assignment?.user || assignment?.assignedUser;
+    if (!u) return null;
+    return { userId: u.userId || u.id, username: u.username || u.fullName };
+  }).filter(Boolean);
+
+  const creator = event?.createdBy ? [{ 
+    userId: event.createdBy.userId || event.createdBy.id, 
+    username: event.createdBy.username || event.createdBy.email 
+  }] : [];
+
+  const people = [...creator, ...assigned];
+  return [...new Map(people.map((person) => [person?.userId, person])).values()].filter((p) => p?.userId);
 }
 
 export default function EventsPage() {
