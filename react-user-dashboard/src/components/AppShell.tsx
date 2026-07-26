@@ -1,4 +1,4 @@
-import { ArrowLeftIcon, ArrowRightStartOnRectangleIcon, Bars3BottomLeftIcon, CalendarDaysIcon, ListBulletIcon, MagnifyingGlassIcon, PlusIcon, QueueListIcon, SignalIcon, TableCellsIcon } from '@heroicons/react/24/outline';
+import { ArrowLeftIcon, ArrowRightStartOnRectangleIcon, Bars3BottomLeftIcon, CalendarDaysIcon, HomeIcon, ListBulletIcon, MagnifyingGlassIcon, PlusIcon, QueueListIcon, SignalIcon, TableCellsIcon } from '@heroicons/react/24/outline';
 import { CommandPalette, CommandPaletteInput } from '@astryxdesign/core/CommandPalette';
 import { Kbd } from '@astryxdesign/core/Kbd';
 import { createStaticSource, type SearchableItem } from '@astryxdesign/core/Typeahead';
@@ -41,7 +41,11 @@ export default function AppShell({ children }: { children: ReactNode }) {
       navigate('/login');
     }
   }, [clearSession, navigate]);
-  const mobileTitle = location.pathname === '/events/new'
+  const mobileTitle = location.pathname === '/dashboard'
+    ? 'Dashboard'
+    : location.pathname.startsWith('/participants') || location.pathname.includes('/register')
+      ? 'Registration'
+      : location.pathname === '/events/new'
     ? 'Create event'
     : /^\/events\/[^/]+$/.test(location.pathname)
       ? 'Event details'
@@ -135,6 +139,9 @@ export default function AppShell({ children }: { children: ReactNode }) {
       <aside className="sidebar" aria-label="Primary navigation">
         <div className="brand"><span aria-hidden="true">V</span><strong>VSMS</strong></div>
         <nav className="nav-list">
+          <NavLink to="/dashboard" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}>
+            <HomeIcon /><span>Dashboard</span>
+          </NavLink>
           <NavLink to="/events" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}>
             <CalendarDaysIcon /><span>Events</span>
           </NavLink>

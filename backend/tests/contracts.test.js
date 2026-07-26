@@ -37,6 +37,8 @@ test("API routes expose the required versioned contracts", () => {
     assert.match(participants, /"\/:participantId\/registrations"/);
     assert.match(participants, /"\/:participantId\/consents"/);
     assert.match(events, /"\/:eventId\/registrations"/);
+    assert.match(events, /"\/active"/);
+    assert.ok(events.indexOf('"/active"') < events.indexOf('"/:eventId"'), "active events route must precede the dynamic event route");
     assert.match(registrations, /"\/:registrationId\/history"/);
     for (const route of ["/login", "/logout", "/refresh", "/me", "/change-password", "/forgot-password", "/confirm-forgot-password"]) {
         assert.ok(auth.includes(`"${route}"`), `missing auth route ${route}`);
@@ -63,6 +65,17 @@ test("migration preserves history and enforces one active primary contact", () =
     assert.match(migration, /WHERE "is_primary" = true AND "status" = 'ACTIVE'/);
     assert.match(migration, /participant_consents_one_accepted_per_event_key/);
     assert.match(migration, /withdrawal_of_id/);
+});
+
+test("event service exposes list functions after merge resolution", () => {
+    const eventService = require("../services/eventService");
+    assert.equal(typeof eventService.listEvents, "function");
+    assert.equal(typeof eventService.listActiveEvents, "function");
+});
+
+test("participant search matches any supplied identifier", () => {
+    const controller = read("controllers/participantController.js");
+    assert.match(controller, /return\s+\{\s*OR:\s*clauses\s*\}/);
 });
 
 test("Cognito configuration requires administrator-created staff and complete MFA enrollment", () => {

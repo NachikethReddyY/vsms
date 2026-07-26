@@ -1,6 +1,13 @@
-import { Link, NavLink, useNavigate, useSearchParams } from "react-router-dom";
+import {
+  CloudArrowUpIcon,
+  EyeIcon,
+  ShieldCheckIcon,
+  UserGroupIcon,
+} from "@heroicons/react/24/outline";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "../auth/AuthProvider";
 import apiClient from "../utils/apiClient";
+import { ThemeToggle } from "./MagicEffects";
 
 const passwordRequirements = [
   { label: "At least 12 characters", test: (password: string) => password.length >= 12 },
@@ -57,15 +64,15 @@ export function PasswordRequirements({
 }
 
 export function LoadingState({ label = "Loading..." }: { label?: string }) {
-  return <p className="border border-slate-300 bg-white p-4 text-sm text-slate-700">{label}</p>;
+  return <p className="loading-state" role="status">{label}</p>;
 }
 
 export function FormErrorSummary({ error }: { error: string | null }) {
   if (!error) return null;
 
   return (
-    <div className="border border-red-300 bg-red-50 px-4 py-3 text-sm text-red-700">
-      <strong className="mr-2">Error:</strong>
+    <div className="alert error" role="alert">
+      <strong>Error:</strong>
       {error}
     </div>
   );
@@ -111,48 +118,17 @@ export function LogoutButton() {
 }
 
 export function AppShell({ title, children }: { title: string; children: React.ReactNode }) {
-  const { session } = useAuth();
-  const navigationLinks = [
-    ["/dashboard", "Dashboard"],
-    ["/participants/search", "Participant Search"],
-    ["/participants/new", "Create Participant"],
-    ["/cognito-test", "Cognito Test"],
-    ["/account/security", "Account Security"],
-    ...(session?.user.roles.includes("ADMINISTRATOR") ? [["/admin/audit-logs", "Audit Logs"]] : []),
-  ];
-
   return (
-    <main className="min-h-screen bg-slate-50 text-slate-900">
-      <header className="border-b border-slate-300 bg-white">
-        <div className="mx-auto flex max-w-6xl items-start justify-between gap-4 px-4 py-4">
-          <div>
-            <p className="text-xs uppercase tracking-[0.2em] text-slate-500">VSMS simple view</p>
-            <h1 className="text-2xl font-semibold">{title}</h1>
-          </div>
-          <div className="border border-slate-300 bg-slate-50 px-3 py-2 text-right text-sm text-slate-700">
-            <p><strong>User:</strong> {session?.user.fullName}</p>
-            <p><strong>Role:</strong> {session?.user.roles.join(", ")}</p>
-          </div>
+    <section className="page-frame narrow registration-page">
+      <header className="page-heading registration-page-heading">
+        <div>
+          <p className="page-kicker">Registration workspace</p>
+          <h1>{title}</h1>
+          <p>Search first, maintain one reusable participant record, then create an event-specific check-in.</p>
         </div>
-        <nav className="mx-auto flex max-w-6xl flex-wrap gap-2 px-4 pb-4 text-sm">
-          {navigationLinks.map(([to, label]) => (
-            <NavLink
-              key={to}
-              to={to}
-              className={({ isActive }) =>
-                `border px-3 py-2 ${isActive ? "border-slate-900 bg-slate-900 text-white" : "border-slate-300 bg-white text-slate-800"}`
-              }
-            >
-              {label}
-            </NavLink>
-          ))}
-          <div className="ml-auto">
-            <LogoutButton />
-          </div>
-        </nav>
       </header>
-      <section className="mx-auto max-w-6xl px-4 py-6">{children}</section>
-    </main>
+      {children}
+    </section>
   );
 }
 
@@ -168,17 +144,36 @@ export function AuthPageLayout({
   footer?: React.ReactNode;
 }) {
   return (
-    <main className="min-h-screen bg-slate-50 px-4 py-10 text-slate-900">
-      <div className="mx-auto max-w-lg">
-        <Link to="/" className="mb-6 inline-flex text-sm text-slate-700 underline">
-          Back to login
+    <main className="auth-page">
+      <header className="auth-topbar">
+        <Link className="login-brand" to="/">
+          <span aria-hidden="true">V</span>
+          <div><strong>VSMS</strong><small>Secure staff workspace</small></div>
         </Link>
-        <section className="border border-slate-300 bg-white p-6 shadow-sm [&_label>span]:text-slate-700">
-          <h1 className="text-2xl font-semibold">{title}</h1>
-          <p className="mt-2 text-sm text-slate-600">{description}</p>
-          <div className="mt-6 space-y-4">{children}</div>
-          {footer ? <div className="mt-6 border-t border-slate-300 pt-4 text-sm text-slate-700">{footer}</div> : null}
+        <ThemeToggle />
+      </header>
+      <div className="auth-layout">
+        <section className="auth-story" aria-labelledby="auth-title">
+          <span className="auth-context">Visual Screening Management System</span>
+          <h1 id="auth-title">{title}</h1>
+          <p>{description}</p>
+          <ul aria-label="Security and access commitments">
+            <li><ShieldCheckIcon /> Backend-enforced roles</li>
+            <li><UserGroupIcon /> Approved staff accounts only</li>
+            <li><CloudArrowUpIcon /> Secure event workspace</li>
+          </ul>
         </section>
+        <div className="auth-card-wrap">
+          <section className="auth-card">
+            <div className="login-icon" aria-hidden="true"><EyeIcon /></div>
+            <div className="login-form">
+              <h2>Continue securely</h2>
+              <p>Your role comes from your approved Cognito group; it cannot be selected here.</p>
+              <div className="login-form-content">{children}</div>
+              {footer ? <div className="auth-card-footer">{footer}</div> : null}
+            </div>
+          </section>
+        </div>
       </div>
     </main>
   );
@@ -192,8 +187,8 @@ export function Field({
   children: React.ReactNode;
 }) {
   return (
-    <label className="block space-y-2 text-sm">
-      <span className="font-semibold text-slate-800">{label}</span>
+    <label className="field">
+      <span>{label}</span>
       {children}
     </label>
   );
@@ -203,7 +198,7 @@ export function TextInput(props: React.InputHTMLAttributes<HTMLInputElement>) {
   return (
     <input
       {...props}
-      className={`w-full border border-slate-400 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-slate-900 ${
+      className={`form-control ${
         props.className ?? ""
       }`}
     />
@@ -214,7 +209,7 @@ export function PrimaryButton(props: React.ButtonHTMLAttributes<HTMLButtonElemen
   return (
     <button
       {...props}
-      className={`border border-slate-900 bg-slate-900 px-4 py-2 text-sm text-white hover:bg-slate-700 disabled:cursor-not-allowed disabled:opacity-60 ${
+      className={`primary ${
         props.className ?? ""
       }`}
     />

@@ -114,15 +114,15 @@ export function SignaturePad({ onChange }: { onChange: (dataUrl: string | null) 
   }
 
   return (
-    <div className="space-y-2">
-      <p className="text-sm text-slate-600">
+    <div className="signature-pad-shell">
+      <p>
         Sign inside the box using a mouse, stylus, or finger.
       </p>
       <svg
         ref={svgRef}
         viewBox={`0 0 ${PAD_WIDTH} ${PAD_HEIGHT}`}
         preserveAspectRatio="none"
-        className="h-44 w-full touch-none rounded-xl border-2 border-dashed border-slate-400 bg-white"
+        className="signature-pad"
         role="img"
         aria-label="Electronic signature pad"
         onPointerDown={start}
@@ -153,17 +153,19 @@ export function SignaturePad({ onChange }: { onChange: (dataUrl: string | null) 
           ),
         )}
       </svg>
-      <button
-        type="button"
-        className="text-sm text-slate-700 underline disabled:text-slate-400"
-        onClick={clear}
-        disabled={!hasSignature}
-      >
-        Clear signature
-      </button>
-      <span className={`ml-3 text-sm ${hasSignature ? "text-emerald-700" : "text-slate-500"}`} aria-live="polite">
-        {hasSignature ? "Signature captured" : "Signature required"}
-      </span>
+      <div className="signature-pad-actions">
+        <button
+          type="button"
+          className="signature-pad-clear"
+          onClick={clear}
+          disabled={!hasSignature}
+        >
+          Clear signature
+        </button>
+        <span className={hasSignature ? "signature-pad-status captured" : "signature-pad-status"} aria-live="polite">
+          {hasSignature ? "Signature captured" : "Signature required"}
+        </span>
+      </div>
     </div>
   );
 }
