@@ -1,23 +1,27 @@
 const express = require("express");
 const cors = require("cors");
 const helmet = require("helmet");
-const morgan = require("morgan");
-const fs = require("fs");
-const YAML = require("yaml"); 
-const cookieParser = require("cookie-parser"); // <--- 1. Import cookie-parser
-require("dotenv").config();
+const morgan = require("morgan"); // <--- 1. Import morgan package first
 const fs = require("fs");
 const https = require("https");
 const path = require("path");
+const YAML = require("yaml");
+const cookieParser = require("cookie-parser");
+const swaggerUi = require("swagger-ui-express");
+require("dotenv").config();
+
 const env = require("./config/env");
-const app = require("./app");
 const logger = require("./utils/logger/logger");
 
+const app = express();
+const PORT = process.env.PORT || 5000;
+
+// HTTPS Server setup for local development
 const server = !env.isProduction && env.localHttps
   ? https.createServer({
-    key: fs.readFileSync(path.resolve(__dirname, env.TLS_KEY_PATH)),
-    cert: fs.readFileSync(path.resolve(__dirname, env.TLS_CERT_PATH)),
-  }, app)
+      key: fs.readFileSync(path.resolve(__dirname, env.TLS_KEY_PATH)),
+      cert: fs.readFileSync(path.resolve(__dirname, env.TLS_CERT_PATH)),
+    }, app)
   : app;
 
 // Import Routes
@@ -27,9 +31,6 @@ const qrRoutes = require("./routes/qrRoutes");
 const participantRoutes = require("./routes/participantRoutes");
 const eventRegistrationRoutes = require("./routes/eventRegistrationRoutes");
 const eventRoutes = require("./routes/eventRoutes");
-
-const app = express();
-const PORT = process.env.PORT || 5000;
 
 // Load Swagger / OpenAPI Document securely using standard file streams
 let swaggerDocument;
@@ -71,8 +72,6 @@ const corsOptions = {
 };
 
 app.use(cors(corsOptions));
-
-// Express 5 preflight wildcard handler
 app.options("/*splat", cors(corsOptions));
 
 // -----------------------------------------------------------------------------
@@ -117,7 +116,7 @@ app.use(
 // -----------------------------------------------------------------------------
 // 4. BODY PARSING, COOKIES & LIMITS
 // -----------------------------------------------------------------------------
-app.use(cookieParser()); // <--- 2. Initialize cookie-parser middleware here
+app.use(cookieParser());
 app.use(express.json({ limit: "100kb" }));
 app.use(express.urlencoded({ limit: "100kb", extended: true }));
 
@@ -161,4 +160,8 @@ app.all("/*splat", (req, res) => {
 server.on("error", (error) => {
   logger.error("server.failed", { message: error.message, stack: error.stack });
   process.exit(1);
+});
+
+server.listen(PORT, () => {
+  logger.info(`Server running on port ${PORT}`);
 });
