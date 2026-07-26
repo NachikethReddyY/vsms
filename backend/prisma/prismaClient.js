@@ -3,12 +3,10 @@
 const { PrismaClient } = require("@prisma/client");
 
 const prisma = new PrismaClient({
-    log: [
-        "query",
-        "info",
-        "warn",
-        "error"
-    ]
+    // Query logging can include participant data and is therefore opt-in only.
+    log: process.env.PRISMA_LOG_QUERIES === "true"
+        ? ["query", "warn", "error"]
+        : ["warn", "error"],
 });
 
 // Gracefully disconnect Prisma when the application exits

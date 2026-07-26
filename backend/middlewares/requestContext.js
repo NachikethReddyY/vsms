@@ -2,11 +2,17 @@ const { v4: uuidv4, validate: isUuid } = require("uuid");
 
 function getIpAddress(req) {
     const forwarded = req.headers["x-forwarded-for"];
-    if (typeof forwarded === "string" && forwarded.length > 0) {
-        return forwarded.split(",")[0].trim();
+    let address;
+    if (process.env.TRUST_PROXY === "true" && typeof forwarded === "string" && forwarded.length > 0) {
+        address = forwarded.split(",")[0].trim();
+    } else {
+        address = req.socket?.remoteAddress || req.ip || "unknown";
     }
 
-    return req.socket?.remoteAddress || req.ip || "unknown";
+    const ipv4 = /^(\d{1,3}\.\d{1,3}\.\d{1,3})\.\d{1,3}$/.exec(address);
+    if (ipv4) return `${ipv4[1]}.0`;
+    if (address.includes(":")) return `${address.split(":").slice(0, 4).join(":")}::`;
+    return address.slice(0, 45);
 }
 
 function getDeviceName(req) {

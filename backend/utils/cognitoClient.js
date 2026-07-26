@@ -31,6 +31,39 @@ function buildSecretHash(username) {
         .digest("base64");
 }
 
+function resolveChallengeUsername(response, fallbackUsername) {
+    const parameters = response?.ChallengeParameters || {};
+    let userAttributes = parameters.userAttributes;
+    if (typeof userAttributes === "string") {
+        try {
+            userAttributes = JSON.parse(userAttributes);
+        } catch {
+            userAttributes = {};
+        }
+    }
+    return parameters.USER_ID_FOR_SRP
+        || parameters.USERNAME
+        || userAttributes?.sub
+        || fallbackUsername;
+}
+
+function resolveRequiredAttributes(response) {
+    const rawAttributes = response?.ChallengeParameters?.requiredAttributes;
+    let attributes = rawAttributes;
+    if (typeof attributes === "string") {
+        try {
+            attributes = JSON.parse(attributes);
+        } catch {
+            attributes = [];
+        }
+    }
+    if (!Array.isArray(attributes)) return [];
+    return attributes
+        .filter((attribute) => typeof attribute === "string")
+        .map((attribute) => attribute.replace(/^userAttributes\./, ""))
+        .filter(Boolean);
+}
+
 async function sendCognitoRequest(target, body) {
     if (!isCognitoConfigured()) {
         const error = new Error("Cognito is not configured");
@@ -50,87 +83,31 @@ async function sendCognitoRequest(target, body) {
     const data = await response.json();
 
     if (!response.ok) {
-        const error = new Error(data.message || data.__type || "Cognito request failed");
-        error.statusCode = 400;
-        error.details = data;
+        const errorType = String(data.__type || "").split("#").pop();
+        const authenticationFailure = [
+            "NotAuthorizedException",
+            "CodeMismatchException",
+            "ExpiredCodeException",
+            "UserNotFoundException",
+        ].includes(errorType);
+        const providerMessage = String(data.message || data.Message || "").trim();
+        const exposeProviderMessage = process.env.NODE_ENV !== "production"
+            && !authenticationFailure
+            && providerMessage;
+        const error = new Error(
+            authenticationFailure
+                ? "Authentication request was rejected"
+                : exposeProviderMessage
+                    ? `Cognito request failed: ${providerMessage}`
+                    : "Cognito request failed",
+        );
+        error.name = errorType || "CognitoError";
+        error.statusCode = authenticationFailure ? 401 : 400;
+        error.cognitoReasonCode = data.reasonCode || null;
         throw error;
     }
 
     return data;
-}
-
-function buildUserAttributes(payload) {
-    const attributes = [
-        { Name: "email", Value: payload.email },
-        { Name: "name", Value: payload.fullName },
-    ];
-
-    // Staff metadata already lives in Prisma. Only duplicate it in Cognito when
-    // the User Pool has matching String custom attributes configured.
-    if (process.env.COGNITO_USE_CUSTOM_ATTRIBUTES === "true") {
-        if (payload.employeeNumber) {
-            attributes.push({ Name: "custom:employee_number", Value: payload.employeeNumber });
-        }
-        if (payload.department) {
-            attributes.push({ Name: "custom:department", Value: payload.department });
-        }
-        if (payload.designation) {
-            attributes.push({ Name: "custom:designation", Value: payload.designation });
-        }
-        if (payload.role) {
-            attributes.push({ Name: "custom:role", Value: payload.role });
-        }
-    }
-
-    return attributes;
-}
-
-async function signUp(payload) {
-    const { clientId } = getCognitoConfig();
-    const body = {
-        ClientId: clientId,
-        Username: payload.email,
-        Password: payload.password,
-        UserAttributes: buildUserAttributes(payload),
-    };
-
-    const secretHash = buildSecretHash(payload.email);
-    if (secretHash) {
-        body.SecretHash = secretHash;
-    }
-
-    return sendCognitoRequest("SignUp", body);
-}
-
-async function confirmSignUp(payload) {
-    const { clientId } = getCognitoConfig();
-    const body = {
-        ClientId: clientId,
-        Username: payload.email,
-        ConfirmationCode: payload.code,
-    };
-
-    const secretHash = buildSecretHash(payload.email);
-    if (secretHash) {
-        body.SecretHash = secretHash;
-    }
-
-    return sendCognitoRequest("ConfirmSignUp", body);
-}
-
-async function resendConfirmationCode(email) {
-    const { clientId } = getCognitoConfig();
-    const body = {
-        ClientId: clientId,
-        Username: email,
-    };
-
-    const secretHash = buildSecretHash(email);
-    if (secretHash) {
-        body.SecretHash = secretHash;
-    }
-
-    return sendCognitoRequest("ResendConfirmationCode", body);
 }
 
 async function login(payload) {
@@ -172,8 +149,9 @@ async function refreshSession(payload) {
 
 async function respondToAuthChallenge(payload) {
     const { clientId } = getCognitoConfig();
+    const username = payload.challengeUsername || payload.email;
     const challengeResponses = {
-        USERNAME: payload.email,
+        USERNAME: username,
     };
 
     if (payload.challengeName === "SOFTWARE_TOKEN_MFA") {
@@ -184,7 +162,18 @@ async function respondToAuthChallenge(payload) {
         challengeResponses.SMS_MFA_CODE = payload.code;
     }
 
-    const secretHash = buildSecretHash(payload.email);
+    if (payload.challengeName === "NEW_PASSWORD_REQUIRED") {
+        challengeResponses.NEW_PASSWORD = payload.newPassword;
+        const supportedAttributes = new Set(["name"]);
+        for (const [attribute, value] of Object.entries(payload.userAttributes || {})) {
+            const normalizedValue = String(value || "").trim();
+            if (supportedAttributes.has(attribute) && normalizedValue) {
+                challengeResponses[`userAttributes.${attribute}`] = normalizedValue;
+            }
+        }
+    }
+
+    const secretHash = buildSecretHash(username);
     if (secretHash) {
         challengeResponses.SECRET_HASH = secretHash;
     }
@@ -192,6 +181,33 @@ async function respondToAuthChallenge(payload) {
     return sendCognitoRequest("RespondToAuthChallenge", {
         ClientId: clientId,
         ChallengeName: payload.challengeName,
+        Session: payload.session,
+        ChallengeResponses: challengeResponses,
+    });
+}
+
+async function associateSoftwareToken(session) {
+    return sendCognitoRequest("AssociateSoftwareToken", { Session: session });
+}
+
+async function verifySoftwareToken(session, code) {
+    return sendCognitoRequest("VerifySoftwareToken", {
+        Session: session,
+        UserCode: code,
+        FriendlyDeviceName: "VSMS staff portal",
+    });
+}
+
+async function completeMfaSetup(payload) {
+    const { clientId } = getCognitoConfig();
+    const username = payload.challengeUsername || payload.email;
+    const challengeResponses = { USERNAME: username };
+    const secretHash = buildSecretHash(username);
+    if (secretHash) challengeResponses.SECRET_HASH = secretHash;
+
+    return sendCognitoRequest("RespondToAuthChallenge", {
+        ClientId: clientId,
+        ChallengeName: "MFA_SETUP",
         Session: payload.session,
         ChallengeResponses: challengeResponses,
     });
@@ -246,12 +262,14 @@ async function globalSignOut(accessToken) {
 module.exports = {
     getCognitoConfig,
     isCognitoConfigured,
-    signUp,
-    confirmSignUp,
-    resendConfirmationCode,
+    resolveChallengeUsername,
+    resolveRequiredAttributes,
     login,
     refreshSession,
     respondToAuthChallenge,
+    associateSoftwareToken,
+    verifySoftwareToken,
+    completeMfaSetup,
     forgotPassword,
     confirmForgotPassword,
     changePassword,

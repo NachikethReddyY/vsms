@@ -5,11 +5,9 @@
   "main": "index.js",
   "scripts": {
     "start": "node server.js",
-    "test": "echo \"Error: no test specified\" && exit 1",
-    "seed": "node prisma/seed.js"
-  },
-  "prisma": {
-    "seed": "node prisma/seed.js"
+    "test": "node --test tests/*.test.js",
+    "seed": "node prisma/seed.js",
+    "provision-staff": "node prisma/provisionStaff.js"
   },
   "keywords": [],
   "author": "",
@@ -17,8 +15,6 @@
   "type": "commonjs",
   "dependencies": {
     "@prisma/client": "^6.19.3",
-    "bcrypt": "^6.0.0",
-    "body-parser": "^2.2.0",
     "cors": "^2.8.5",
     "dotenv": "^16.5.0",
     "express": "^5.1.0",
@@ -30,6 +26,6 @@
     "qrcode.react": "^4.2.0",
     "swagger-ui-express": "^5.0.1",
     "uuid": "^14.0.1",
-    "yamljs": "^0.3.0"
+    "yaml": "^2.8.1"
   }
 }

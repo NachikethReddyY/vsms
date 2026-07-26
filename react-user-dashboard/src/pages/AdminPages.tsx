@@ -3,8 +3,21 @@ import apiClient from "../utils/apiClient";
 import { AppShell, LoadingState } from "../components/ui";
 
 export function AuditLogsPage() {
-  const [logs, setLogs] = useState<any[] | null>(null);
-  const [authLogs, setAuthLogs] = useState<any[] | null>(null);
+  type AuditEntry = {
+    id: string;
+    action: string;
+    entityName: string;
+    outcome: string;
+    user?: { email?: string } | null;
+  };
+  type AuthAuditEntry = {
+    id: string;
+    eventType: string;
+    outcome: string;
+    user?: { email?: string } | null;
+  };
+  const [logs, setLogs] = useState<AuditEntry[] | null>(null);
+  const [authLogs, setAuthLogs] = useState<AuthAuditEntry[] | null>(null);
 
   useEffect(() => {
     void apiClient.get("/admin/audit-logs").then((response) => {

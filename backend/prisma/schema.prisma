@@ -154,6 +154,12 @@ enum EmergencyContactStatus {
   REMOVED
 }
 
+enum ParticipantStatus {
+  ACTIVE
+  INACTIVE
+  DECEASED
+}
+
 enum ConsentStatus {
   PENDING
   ACCEPTED
@@ -189,7 +195,6 @@ model User {
   updatedAt           DateTime   @updatedAt @map("updated_at")
 
   // Relations
-  credential             UserCredential?
   staffAssignments       StaffAssignment[]      @relation("AssignedUser")
   assignedStaff          StaffAssignment[]      @relation("AssignedBy")
   eventRegistrations     EventRegistration[]    @relation("RegisteredBy")
@@ -215,20 +220,13 @@ model User {
   consentsRecorded         ParticipantConsent[]          @relation("ConsentRecordedBy")
   consentVersionsCreated   ConsentFormVersion[]          @relation("ConsentFormVersionCreatedBy")
   registrationChanges      RegistrationStatusHistory[]   @relation("RegistrationStatusChangedBy")
+  participantsCreated      Participant[]                 @relation("ParticipantCreatedBy")
+  participantsUpdated      Participant[]                 @relation("ParticipantUpdatedBy")
+  permissionsCreated       Permission[]                  @relation("PermissionCreatedBy")
+  devices                  Device[]
 
   @@index([status])
   @@map("user")
-}
-
-model UserCredential {
-  id           String   @id @default(uuid()) @map("credential_id") @db.Uuid
-  userId       String   @unique @map("user_id") @db.Uuid
-  passwordHash String   @map("password_hash") @db.VarChar(255)
-  updatedAt    DateTime @updatedAt @map("updated_at")
-
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@map("user_credential")
 }
 
 model Role {
@@ -238,9 +236,38 @@ model Role {
   precedence  Int?
   createdAt   DateTime @default(now()) @map("created_at")
 
-  userRoles UserRole[]
+  userRoles       UserRole[]
+  rolePermissions RolePermission[]
 
   @@map("role")
+}
+
+model Permission {
+  id          String   @id @default(uuid()) @map("permission_id") @db.Uuid
+  permissionName String @unique @map("permission_name") @db.VarChar(100)
+  description String?  @db.VarChar(255)
+  createdById String?  @map("created_by") @db.Uuid
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  createdBy       User?            @relation("PermissionCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  rolePermissions RolePermission[]
+
+  @@index([createdById])
+  @@map("permission")
+}
+
+model RolePermission {
+  id           String   @id @default(uuid()) @map("role_permission_id") @db.Uuid
+  roleId       String   @map("role_id") @db.Uuid
+  permissionId String   @map("permission_id") @db.Uuid
+  grantedAt    DateTime @default(now()) @map("granted_at") @db.Timestamptz(3)
+
+  role       Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  permission Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+
+  @@unique([roleId, permissionId])
+  @@index([permissionId])
+  @@map("role_permission")
 }
 
 
@@ -268,21 +295,36 @@ model UserRole {
 // ==========================================
 
 model Participant {
-  id               String   @id @default(uuid()) @map("participant_id") @db.Uuid
-  firstName        String   @map("first_name") @db.VarChar(100)
-  lastName         String   @map("last_name") @db.VarChar(100)
-  dateOfBirth      DateTime @map("date_of_birth") @db.Date
-  gender           String   @db.VarChar(1)
-  contactNumber    String   @map("contact_number") @db.VarChar(20)
-  emergencyContact String   @map("emergency_contact") @db.VarChar(20)
-  consentGiven     Boolean  @map("consent_given")
-  createdAt        DateTime @default(now()) @map("created_at")
-  updatedAt        DateTime @updatedAt @map("updated_at")
+  id                 String            @id @default(uuid()) @map("participant_id") @db.Uuid
+  participantReference String          @unique @map("participant_reference") @db.VarChar(30)
+  firstName          String            @map("first_name") @db.VarChar(100)
+  lastName           String            @map("last_name") @db.VarChar(100)
+  dateOfBirth        DateTime          @map("date_of_birth") @db.Date
+  gender             String            @db.VarChar(1)
+  contactNumber      String            @map("contact_number") @db.VarChar(20)
+  email              String?           @db.VarChar(255)
+  preferredLanguage  String?           @map("preferred_language") @db.VarChar(50)
+  accessibilityNotes String?           @map("accessibility_notes") @db.VarChar(1000)
+  status             ParticipantStatus @default(ACTIVE)
+  emergencyContact   String            @map("emergency_contact") @db.VarChar(20)
+  consentGiven       Boolean           @default(false) @map("consent_given")
+  createdById        String            @map("created_by") @db.Uuid
+  updatedById        String            @map("updated_by") @db.Uuid
+  createdAt          DateTime          @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt          DateTime          @updatedAt @map("updated_at") @db.Timestamptz(3)
 
   eventRegistrations EventRegistration[]
   emergencyContacts  ParticipantEmergencyContact[]
   consents           ParticipantConsent[]
+  createdBy           User @relation("ParticipantCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
+  updatedBy           User @relation("ParticipantUpdatedBy", fields: [updatedById], references: [id], onDelete: Restrict)
 
+  @@index([lastName, firstName])
+  @@index([contactNumber])
+  @@index([dateOfBirth])
+  @@index([status])
+  @@index([createdById])
+  @@index([updatedById])
   @@map("participant")
 }
 
@@ -334,6 +376,7 @@ model EventRegistration {
   queueNumber        Int                @map("queue_number")
   registrationStatus RegistrationStatus @map("registration_status")
   registeredBy       String             @map("registered_by") @db.Uuid
+  idempotencyKey     String             @map("idempotency_key") @db.VarChar(100)
   registeredAt       DateTime           @default(now()) @map("registered_at")
   updatedAt          DateTime           @updatedAt @map("updated_at")
   checkedIn          Boolean            @default(false) @map("checked_in")
@@ -353,13 +396,18 @@ model EventRegistration {
   participantConsents ParticipantConsent[]
   statusHistory       RegistrationStatusHistory[]
 
+  @@unique([participantId, eventId])
+  @@unique([eventId, queueNumber])
+  @@unique([registeredBy, idempotencyKey])
+  @@index([eventId, registrationStatus])
+  @@index([participantId, registeredAt])
   @@map("event_registration")
 }
 
 model QRCodePass {
   id             String    @id @default(uuid()) @map("qr_id") @db.Uuid
   registrationId String    @map("registration_id") @db.Uuid
-  token          String    @map("token") @db.VarChar(255)
+  token          String    @unique @map("token") @db.VarChar(255)
   issuedAt       DateTime  @default(now()) @map("issue_at")
   expiresAt      DateTime  @map("expires_at")
   isActive       Boolean   @default(true) @map("is_active")
@@ -371,7 +419,6 @@ model QRCodePass {
   revokedByUser User?             @relation(fields: [revokedBy], references: [id])
   scanLogs      ScanLog[]
 
-  @@index([token])
   @@index([isActive])
   @@map("qr_code_pass")
 }
@@ -642,17 +689,24 @@ model LoginHistory {
 model AuditLog {
   id         String   @id @default(uuid()) @map("audit_id") @db.Uuid
   userId     String   @map("user_id") @db.Uuid
+  deviceId   String?  @map("device_id") @db.Uuid
   action     String   @db.VarChar(100)
   entityName String   @map("entity_name") @db.VarChar(50)
   entityId   String   @map("entity_id") @db.Uuid
+  outcome    AuthOutcome @default(SUCCESS)
+  requestId  String?  @map("request_id") @db.Uuid
   oldValue   Json?    @map("old_value")
   newValue   Json?    @map("new_value")
   ipAddress  String   @map("ip_address") @db.VarChar(45)
   deviceName String   @map("device_name") @db.VarChar(100)
   createdAt  DateTime @default(now()) @map("created_at")
 
-  user User @relation(fields: [userId], references: [id])
+  user   User    @relation(fields: [userId], references: [id])
+  device Device? @relation(fields: [deviceId], references: [id], onDelete: SetNull)
 
+  @@index([requestId])
+  @@index([deviceId, createdAt])
+  @@index([entityName, entityId])
   @@map("audit_log")
 }
 
@@ -693,13 +747,33 @@ model AuthAuditLog {
   requestId       String?     @map("request_id") @db.Uuid
   occurredAt      DateTime    @default(now()) @map("occurred_at") @db.Timestamptz(3)
 
-  user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+  user   User?   @relation(fields: [userId], references: [id], onDelete: SetNull)
+  device Device? @relation(fields: [deviceId], references: [id], onDelete: SetNull)
 
   @@index([userId, occurredAt])
   @@index([eventType, occurredAt])
   @@index([requestId])
   @@index([deviceId, occurredAt])
   @@map("auth_audit_log")
+}
+
+model Device {
+  id           String    @id @default(uuid()) @map("device_id") @db.Uuid
+  userId       String?   @map("user_id") @db.Uuid
+  deviceName   String    @map("device_name") @db.VarChar(100)
+  fingerprintHash String? @map("fingerprint_hash") @db.Char(64)
+  status       String    @default("ACTIVE") @db.VarChar(20)
+  lastSeenAt   DateTime? @map("last_seen_at") @db.Timestamptz(3)
+  createdAt    DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt    DateTime  @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  user       User?                @relation(fields: [userId], references: [id], onDelete: SetNull)
+  authLogs   AuthAuditLog[]
+  auditLogs  AuditLog[]
+  consents   ParticipantConsent[]
+
+  @@index([userId, status])
+  @@map("device")
 }
 
 model ParticipantEmergencyContact {
@@ -734,6 +808,7 @@ model ConsentFormVersion {
   formCode          String    @map("form_code") @db.VarChar(50)
   versionNumber     String    @map("version_number") @db.VarChar(30)
   title             String    @db.VarChar(200)
+  contentText       String?   @map("content_text") @db.Text
   contentHash       String    @map("content_hash") @db.Char(64)
   documentObjectKey String    @map("document_object_key") @db.VarChar(500)
   effectiveFrom     DateTime  @map("effective_from") @db.Timestamptz(3)
@@ -757,10 +832,15 @@ model ParticipantConsent {
   participantId        String        @map("participant_id") @db.Uuid
   eventId              String        @map("event_id") @db.Uuid
   registrationId       String?       @map("registration_id") @db.Uuid
+  withdrawalOfId       String?       @map("withdrawal_of_id") @db.Uuid
   consentFormVersionId String        @map("consent_form_version_id") @db.Uuid
   consentStatus        ConsentStatus @default(PENDING) @map("consent_status")
+  signerType           String?       @map("signer_type") @db.VarChar(40)
   signerName           String?       @map("signer_name") @db.VarChar(150)
   signerRelationship   String?       @map("signer_relationship") @db.VarChar(60)
+  guardianContactName  String?       @map("guardian_contact_name") @db.VarChar(150)
+  guardianContactPhone String?       @map("guardian_contact_phone") @db.VarChar(30)
+  guardianContactEmail String?       @map("guardian_contact_email") @db.VarChar(255)
   signatureObjectKey   String?       @map("signature_object_key") @db.VarChar(500)
   signatureSha256      String?       @map("signature_sha256") @db.Char(64)
   signatureMimeType    String?       @map("signature_mime_type") @db.VarChar(100)
@@ -768,6 +848,7 @@ model ParticipantConsent {
   recordedById         String        @map("recorded_by") @db.Uuid
   signedAt             DateTime?     @map("signed_at") @db.Timestamptz(3)
   withdrawnAt          DateTime?     @map("withdrawn_at") @db.Timestamptz(3)
+  decisionAt           DateTime?     @map("decision_at") @db.Timestamptz(3)
   withdrawalReason     String?       @map("withdrawal_reason") @db.Text
   createdAt            DateTime      @default(now()) @map("created_at") @db.Timestamptz(3)
 
@@ -777,14 +858,21 @@ model ParticipantConsent {
 
   registration EventRegistration? @relation( fields: [registrationId], references: [id], onDelete: SetNull ) 
 
+  withdrawalOf ParticipantConsent? @relation("ConsentWithdrawal", fields: [withdrawalOfId], references: [id], onDelete: Restrict)
+
+  withdrawals ParticipantConsent[] @relation("ConsentWithdrawal")
+
   consentFormVersion ConsentFormVersion @relation( fields: [consentFormVersionId], references: [id], onDelete: Restrict ) 
 
   recordedBy User @relation( "ConsentRecordedBy", fields: [recordedById], references: [id], onDelete: Restrict ) 
+
+  device Device? @relation(fields: [deviceId], references: [id], onDelete: SetNull)
 
 
   @@index([participantId])
   @@index([eventId])
   @@index([registrationId])
+  @@index([withdrawalOfId])
   @@index([consentFormVersionId])
   @@index([recordedById])
   @@index([deviceId])

@@ -10,11 +10,13 @@ function errorHandler(err, req, res, next) {
         return next(err);
     }
 
-    const status = err.statusCode || 500;
+    const status = err.statusCode || (err.code === "P2002" ? 409 : 500);
     const requestId = req.context?.requestId;
 
     if (status >= 500) {
-        console.error(`Request ${requestId || "unknown"} failed`, err);
+        console.error(
+            `Request ${requestId || "unknown"} failed (${err.name || "Error"}${err.code ? `/${err.code}` : ""})`
+        );
     }
 
     res.status(status).json({

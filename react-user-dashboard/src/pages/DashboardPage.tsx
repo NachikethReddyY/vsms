@@ -1,98 +1,52 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import apiClient from "../utils/apiClient";
+import apiClient, { getApiError } from "../utils/apiClient";
 import type { EventSummary } from "../types";
 import { AppShell, LoadingState } from "../components/ui";
+import { useAuth } from "../auth/AuthProvider";
 
 export function DashboardPage() {
+  const { session } = useAuth();
   const [events, setEvents] = useState<EventSummary[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    let active = true;
-
-    async function loadEvents() {
-      try {
-        const response = await apiClient.get("/events/active");
-        if (active) {
-          setEvents(response.data.events ?? []);
-        }
-      } catch (rawError: any) {
-        if (active) {
-          setError(rawError.response?.data?.error ?? "Unable to load events.");
-        }
-      } finally {
-        if (active) {
-          setIsLoading(false);
-        }
-      }
-    }
-
-    void loadEvents();
-    return () => {
-      active = false;
-    };
+    apiClient.get("/events/active")
+      .then((response) => setEvents(response.data.events ?? []))
+      .catch((requestError: unknown) => setError(getApiError(requestError, "Unable to load events.")))
+      .finally(() => setIsLoading(false));
   }, []);
 
   return (
     <AppShell title="Registration dashboard">
-      <div className="grid gap-6 lg:grid-cols-[1.3fr,0.7fr]">
-        <section className="space-y-4">
-          <div className="rounded-2xl border border-slate-200 bg-white p-5">
-            <h2 className="text-lg font-semibold">Active events</h2>
-            <p className="mt-1 text-sm text-slate-600">Choose an event, then continue into participant search or creation.</p>
-          </div>
-          {isLoading ? <LoadingState label="Loading event list..." /> : null}
-          {error ? <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">{error}</div> : null}
-          {!isLoading && events.length === 0 ? (
-            <div className="rounded-2xl border border-slate-200 bg-white p-5 text-sm text-slate-600">
-              No active events are currently available in the database.
-            </div>
-          ) : null}
+      <div className="space-y-6">
+        <section className="rounded-2xl border border-slate-200 bg-white p-5">
+          <p className="text-sm text-slate-500">Welcome</p>
+          <h2 className="text-xl font-semibold">{session?.user.fullName}</h2>
+          <p className="mt-1 text-sm text-slate-600">Select an open event to register, search, or review participants.</p>
+        </section>
+        {isLoading ? <LoadingState label="Loading active events…" /> : null}
+        {error ? <div className="rounded-xl bg-red-50 p-4 text-sm text-red-800">{error}</div> : null}
+        <section className="grid gap-4 lg:grid-cols-2">
           {events.map((event) => (
             <article key={event.id} className="rounded-2xl border border-slate-200 bg-white p-5">
-              <div className="flex flex-wrap items-center justify-between gap-3">
+              <div className="flex items-start justify-between gap-3">
                 <div>
                   <h3 className="text-lg font-semibold">{event.eventName}</h3>
-                  <p className="text-sm text-slate-600">
-                    {event.location} - {new Date(event.eventDate).toLocaleDateString()}
-                  </p>
+                  <p className="text-sm text-slate-600">{event.location} · {new Date(event.eventDate).toLocaleDateString()}</p>
+                  <p className="mt-2 text-sm">{event._count?.eventRegistrations ?? 0} registered</p>
                 </div>
-                <span className="rounded-full bg-slate-900 px-3 py-1 text-xs font-semibold text-white">{event.status}</span>
+                <span className="rounded-full bg-emerald-100 px-3 py-1 text-xs font-semibold text-emerald-900">{event.status}</span>
               </div>
               <div className="mt-4 flex flex-wrap gap-3">
-                <Link className="rounded-xl bg-slate-900 px-4 py-2 text-sm text-white" to={`/events/${event.id}/register`}>
-                  Start registration
-                </Link>
-                <Link className="rounded-xl border border-slate-300 px-4 py-2 text-sm text-slate-700" to={`/participants/search?eventId=${event.id}`}>
-                  Search participant
-                </Link>
+                <Link className="rounded-xl bg-slate-900 px-4 py-2 text-sm text-white" to={`/events/${event.id}/register`}>Register participant</Link>
+                <Link className="rounded-xl border border-slate-300 px-4 py-2 text-sm" to={`/participants/search?eventId=${event.id}`}>Search participant</Link>
+                <Link className="rounded-xl border border-slate-300 px-4 py-2 text-sm" to={`/events/${event.id}/registrations`}>View registrations</Link>
               </div>
             </article>
           ))}
         </section>
-        <aside className="space-y-4">
-          <div className="rounded-2xl border border-slate-200 bg-white p-5">
-            <h2 className="text-lg font-semibold">Implementation notes</h2>
-            <ul className="mt-3 space-y-2 text-sm text-slate-600">
-              <li>Auth is routed through backend Cognito endpoints.</li>
-              <li>Local Prisma users are created after verification and synced on login.</li>
-              <li>Participant, consent, and registration flows are wired with plain pages first.</li>
-            </ul>
-          </div>
-          <div className="rounded-2xl border border-slate-200 bg-white p-5">
-            <h2 className="text-lg font-semibold">Quick links</h2>
-            <div className="mt-3 grid gap-2 text-sm">
-              <Link to="/participants/new" className="rounded-xl border border-slate-300 px-3 py-2">
-                Create participant directly
-              </Link>
-              <Link to="/cognito-test" className="rounded-xl border border-slate-300 px-3 py-2">
-                Cognito test page
-              </Link>
-            </div>
-          </div>
-        </aside>
       </div>
     </AppShell>
   );

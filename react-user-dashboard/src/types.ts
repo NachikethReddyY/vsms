@@ -10,20 +10,8 @@ export interface AppUser {
 }
 
 export interface AuthSession {
-  accessToken: string;
-  idToken: string | null;
-  refreshToken: string | null;
-  email: string;
   user: AppUser;
-}
-
-export interface PendingSignupProfile {
-  fullName: string;
-  email: string;
-  employeeNumber: string;
-  department: string;
-  designation: string;
-  role: string;
+  expiresAt: number;
 }
 
 export interface EventSummary {
@@ -32,4 +20,76 @@ export interface EventSummary {
   location: string;
   status: string;
   eventDate: string;
+  startTime?: string;
+  endTime?: string;
+  _count?: {
+    eventRegistrations: number;
+  };
+}
+
+export interface ParticipantSummary {
+  id: string;
+  participantReference: string;
+  firstName: string;
+  lastName: string;
+  maskedContactNumber: string;
+  maskedDateOfBirth: string;
+  status: string;
+}
+
+export interface Participant {
+  id: string;
+  participantReference: string;
+  firstName: string;
+  lastName: string;
+  dateOfBirth: string;
+  gender: string;
+  contactNumber: string;
+  email: string | null;
+  preferredLanguage: string | null;
+  accessibilityNotes: string | null;
+  status: string;
+}
+
+export interface EmergencyContact {
+  id: string;
+  contactName: string;
+  relationship: string;
+  phoneNumber: string;
+  email: string | null;
+  isPrimary: boolean;
+  status: string;
+}
+
+export interface ConsentFormVersion {
+  id: string;
+  formCode: string;
+  versionNumber: string;
+  title: string;
+  contentText: string | null;
+  documentObjectKey: string;
+}
+
+export interface Registration {
+  id: string;
+  participantId: string;
+  eventId: string;
+  queueNumber: number;
+  registrationStatus: string;
+  registeredAt: string;
+  participant: Pick<Participant, "id" | "participantReference" | "firstName" | "lastName" | "dateOfBirth">;
+  event: EventSummary;
+  statusHistory?: RegistrationHistory[];
+}
+
+export interface RegistrationHistory {
+  id: string;
+  fromStatus: string | null;
+  toStatus: string;
+  reason: string | null;
+  occurredAt: string;
+  changedBy?: {
+    id: string;
+    fullName: string;
+  };
 }

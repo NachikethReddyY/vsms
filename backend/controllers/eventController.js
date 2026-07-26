@@ -12,6 +12,13 @@ exports.getActiveEvents = asyncHandler(async (req, res) => {
             { eventDate: "asc" },
             { startTime: "asc" },
         ],
+        include: {
+            _count: {
+                select: {
+                    eventRegistrations: true,
+                },
+            },
+        },
     });
 
     res.json({

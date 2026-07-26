@@ -51,6 +51,49 @@ async function seedRoles() {
     return roles;
 }
 
+async function seedPermissions(roles, staff) {
+    const names = [
+        "participants:read",
+        "participants:write",
+        "consents:record",
+        "registrations:create",
+        "registrations:read",
+        "audit:read",
+    ];
+    const permissions = new Map();
+    for (const permissionName of names) {
+        const permission = await prisma.permission.upsert({
+            where: { permissionName },
+            update: {},
+            create: {
+                permissionName,
+                description: `Allows ${permissionName}`,
+                createdById: staff.id,
+            },
+        });
+        permissions.set(permissionName, permission);
+    }
+
+    for (const roleName of ["ADMINISTRATOR", "REGISTRATION_OFFICER"]) {
+        const allowed = roleName === "ADMINISTRATOR" ? names : names.filter((name) => name !== "audit:read");
+        for (const permissionName of allowed) {
+            await prisma.rolePermission.upsert({
+                where: {
+                    roleId_permissionId: {
+                        roleId: roles.get(roleName).id,
+                        permissionId: permissions.get(permissionName).id,
+                    },
+                },
+                update: {},
+                create: {
+                    roleId: roles.get(roleName).id,
+                    permissionId: permissions.get(permissionName).id,
+                },
+            });
+        }
+    }
+}
+
 async function seedStaff(roles) {
     const email = (process.env.SEED_STAFF_EMAIL || "seed.admin@cryptix.local").trim().toLowerCase();
     const existingStaff = await prisma.user.findUnique({ where: { email } });
@@ -111,10 +154,11 @@ async function seedEvent() {
     });
 }
 
-async function seedParticipants() {
+async function seedParticipants(staff) {
     const registeredParticipant = await prisma.participant.upsert({
         where: { id: IDS.registeredParticipant },
         update: {
+            participantReference: "VSMS-2026-000001",
             firstName: "John",
             lastName: "Tan",
             dateOfBirth: new Date("1988-04-15T00:00:00.000Z"),
@@ -122,9 +166,11 @@ async function seedParticipants() {
             contactNumber: "+6591234567",
             emergencyContact: "+6598765432",
             consentGiven: true,
+            updatedById: staff.id,
         },
         create: {
             id: IDS.registeredParticipant,
+            participantReference: "VSMS-2026-000001",
             firstName: "John",
             lastName: "Tan",
             dateOfBirth: new Date("1988-04-15T00:00:00.000Z"),
@@ -132,12 +178,15 @@ async function seedParticipants() {
             contactNumber: "+6591234567",
             emergencyContact: "+6598765432",
             consentGiven: true,
+            createdById: staff.id,
+            updatedById: staff.id,
         },
     });
 
     const newParticipant = await prisma.participant.upsert({
         where: { id: IDS.newParticipant },
         update: {
+            participantReference: "VSMS-2026-000002",
             firstName: "Mary",
             lastName: "Lim",
             dateOfBirth: new Date("1994-09-21T00:00:00.000Z"),
@@ -145,9 +194,11 @@ async function seedParticipants() {
             contactNumber: "+6581234567",
             emergencyContact: "+6587654321",
             consentGiven: false,
+            updatedById: staff.id,
         },
         create: {
             id: IDS.newParticipant,
+            participantReference: "VSMS-2026-000002",
             firstName: "Mary",
             lastName: "Lim",
             dateOfBirth: new Date("1994-09-21T00:00:00.000Z"),
@@ -155,6 +206,8 @@ async function seedParticipants() {
             contactNumber: "+6581234567",
             emergencyContact: "+6587654321",
             consentGiven: false,
+            createdById: staff.id,
+            updatedById: staff.id,
         },
     });
 
@@ -228,6 +281,7 @@ async function seedConsentForm(staff) {
         },
         update: {
             title: "Participant Screening Consent",
+            contentText: "I confirm that the screening process, use of my information, potential risks, privacy safeguards, and my right to decline or withdraw have been explained to me. I voluntarily consent to participate in this event screening.",
             contentHash,
             documentObjectKey: "seed/consent/vsms-consent-v1.pdf",
             effectiveFrom: daysFromNow(-30),
@@ -239,6 +293,7 @@ async function seedConsentForm(staff) {
             formCode: "VSMS-CONSENT",
             versionNumber: "1.0",
             title: "Participant Screening Consent",
+            contentText: "I confirm that the screening process, use of my information, potential risks, privacy safeguards, and my right to decline or withdraw have been explained to me. I voluntarily consent to participate in this event screening.",
             contentHash,
             documentObjectKey: "seed/consent/vsms-consent-v1.pdf",
             effectiveFrom: daysFromNow(-30),
@@ -257,6 +312,7 @@ async function seedCompletedRegistration(staff, event, participant, consentForm)
             queueNumber: 1,
             registrationStatus: "REGISTERED",
             registeredBy: staff.id,
+            idempotencyKey: "seed-registration-0001",
             checkedIn: false,
             checkedInAt: null,
         },
@@ -267,6 +323,7 @@ async function seedCompletedRegistration(staff, event, participant, consentForm)
             queueNumber: 1,
             registrationStatus: "REGISTERED",
             registeredBy: staff.id,
+            idempotencyKey: "seed-registration-0001",
         },
     });
 
@@ -278,10 +335,15 @@ async function seedCompletedRegistration(staff, event, participant, consentForm)
             registrationId: registration.id,
             consentFormVersionId: consentForm.id,
             consentStatus: "ACCEPTED",
+            signerType: "PARTICIPANT",
             signerName: "John Tan",
             signerRelationship: "Self",
             recordedById: staff.id,
             signedAt: daysFromNow(-1),
+            decisionAt: daysFromNow(-1),
+            signatureObjectKey: "seed/signatures/john-tan.png",
+            signatureSha256: crypto.createHash("sha256").update("seed-signature").digest("hex"),
+            signatureMimeType: "image/png",
         },
         create: {
             id: IDS.acceptedConsent,
@@ -290,10 +352,15 @@ async function seedCompletedRegistration(staff, event, participant, consentForm)
             registrationId: registration.id,
             consentFormVersionId: consentForm.id,
             consentStatus: "ACCEPTED",
+            signerType: "PARTICIPANT",
             signerName: "John Tan",
             signerRelationship: "Self",
             recordedById: staff.id,
             signedAt: daysFromNow(-1),
+            decisionAt: daysFromNow(-1),
+            signatureObjectKey: "seed/signatures/john-tan.png",
+            signatureSha256: crypto.createHash("sha256").update("seed-signature").digest("hex"),
+            signatureMimeType: "image/png",
         },
     });
 
@@ -320,7 +387,7 @@ async function seedCompletedRegistration(staff, event, participant, consentForm)
         where: { id: IDS.qrCode },
         update: {
             registrationId: registration.id,
-            token: "VSMS-SEED-QR-001",
+            token: crypto.createHash("sha256").update("VSMS-SEED-QR-001").digest("hex"),
             expiresAt: daysFromNow(30),
             isActive: true,
             revokedAt: null,
@@ -330,7 +397,7 @@ async function seedCompletedRegistration(staff, event, participant, consentForm)
         create: {
             id: IDS.qrCode,
             registrationId: registration.id,
-            token: "VSMS-SEED-QR-001",
+            token: crypto.createHash("sha256").update("VSMS-SEED-QR-001").digest("hex"),
             expiresAt: daysFromNow(30),
             isActive: true,
         },
@@ -390,11 +457,31 @@ async function seedAuditData(staff, participant) {
     });
 }
 
+async function seedDevice(staff) {
+    return prisma.device.upsert({
+        where: { id: IDS.authDevice },
+        update: {
+            userId: staff.id,
+            deviceName: "Seed workstation",
+            status: "ACTIVE",
+            lastSeenAt: new Date(),
+        },
+        create: {
+            id: IDS.authDevice,
+            userId: staff.id,
+            deviceName: "Seed workstation",
+            status: "ACTIVE",
+            lastSeenAt: new Date(),
+        },
+    });
+}
+
 async function main() {
     const roles = await seedRoles();
     const { staff, created } = await seedStaff(roles);
+    await seedPermissions(roles, staff);
     const event = await seedEvent();
-    const participants = await seedParticipants();
+    const participants = await seedParticipants(staff);
     await seedEmergencyContacts(staff, participants);
     const consentForm = await seedConsentForm(staff);
     const registration = await seedCompletedRegistration(
@@ -403,6 +490,7 @@ async function main() {
         participants.registeredParticipant,
         consentForm,
     );
+    await seedDevice(staff);
     await seedAuditData(staff, participants.registeredParticipant);
 
     console.log("Seed completed successfully.");

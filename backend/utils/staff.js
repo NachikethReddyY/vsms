@@ -1,5 +1,6 @@
 const crypto = require("crypto");
 const prisma = require("../prisma/prismaClient");
+const { rolesFromCognitoGroups } = require("./roles");
 
 const ALLOWED_ROLES = [
     "ADMINISTRATOR",
@@ -10,23 +11,17 @@ const ALLOWED_ROLES = [
 ];
 
 function normalizeRole(role) {
-    if (!role) {
-        return "REGISTRATION_OFFICER";
-    }
-
-    const normalized = String(role).trim().toUpperCase().replace(/\s+/g, "_");
-    return ALLOWED_ROLES.includes(normalized) ? normalized : "REGISTRATION_OFFICER";
+    const normalized = String(role || "").trim().toUpperCase().replace(/\s+/g, "_");
+    return ALLOWED_ROLES.includes(normalized) ? normalized : null;
 }
 
 async function ensureRole(roleName) {
     return prisma.role.upsert({
-        where: {
-            roleName,
-        },
+        where: { roleName },
         update: {},
         create: {
             roleName,
-            description: `${roleName} provisioned from Cognito sign-up`,
+            description: `${roleName} application role`,
         },
     });
 }
@@ -36,78 +31,63 @@ function buildPendingEmployeeNumber(email) {
     return `PENDING-${suffix}`;
 }
 
-async function syncLocalUser(profile) {
-    const existingUser = await prisma.user.findUnique({
-        where: {
-            email: profile.email,
-        },
-    });
+async function syncLocalUser(profile, { allowCreate = false } = {}) {
+    const normalizedEmail = String(profile.email || "").trim().toLowerCase();
+    const identityMatches = [];
+    if (profile.cognitoSub) identityMatches.push({ cognitoSub: profile.cognitoSub });
+    if (normalizedEmail) identityMatches.push({ email: normalizedEmail });
 
-    const updateData = {
-        status: "ACTIVE",
-    };
+    let user = identityMatches.length
+        ? await prisma.user.findFirst({ where: { OR: identityMatches } })
+        : null;
 
-    if (profile.cognitoSub) {
-        updateData.cognitoSub = profile.cognitoSub;
-    }
-    if (profile.fullName) {
-        updateData.fullName = profile.fullName;
-    }
-    if (profile.employeeNumber) {
-        updateData.employeeNumber = profile.employeeNumber;
-    }
-    if (profile.department) {
-        updateData.department = profile.department;
-    }
-    if (profile.designation) {
-        updateData.designation = profile.designation;
+    if (!user && !allowCreate) {
+        const error = new Error("No approved local staff profile exists for this Cognito account");
+        error.statusCode = 403;
+        throw error;
     }
 
-    const user = await prisma.user.upsert({
-        where: {
-            email: profile.email,
-        },
-        update: updateData,
-        create: {
-            cognitoSub: profile.cognitoSub || null,
-            fullName: profile.fullName || "Pending Staff Name",
-            email: profile.email,
-            employeeNumber: profile.employeeNumber || buildPendingEmployeeNumber(profile.email),
-            department: profile.department || null,
-            designation: profile.designation || null,
-            status: "ACTIVE",
-        },
-    });
-
-    // Confirmation supplies a role. Later token refreshes may not, so preserve
-    // the existing Prisma roles instead of silently adding a default role.
-    if (profile.role || !existingUser) {
-        const role = await ensureRole(normalizeRole(profile.role));
-
-        await prisma.userRole.upsert({
-            where: {
-                userId_roleId: {
-                    userId: user.id,
-                    roleId: role.id,
-                },
+    if (!user) {
+        user = await prisma.user.create({
+            data: {
+                cognitoSub: profile.cognitoSub || null,
+                fullName: profile.fullName || "Pending Staff",
+                email: normalizedEmail,
+                employeeNumber: profile.employeeNumber || buildPendingEmployeeNumber(normalizedEmail),
+                department: profile.department || null,
+                designation: profile.designation || null,
+                status: "INACTIVE",
             },
-            update: {},
-            create: {
+        });
+
+        const role = await ensureRole("REGISTRATION_OFFICER");
+        await prisma.userRole.create({
+            data: {
                 userId: user.id,
                 roleId: role.id,
             },
         });
+    } else {
+        const update = {};
+        if (profile.cognitoSub && !user.cognitoSub) update.cognitoSub = profile.cognitoSub;
+        if (profile.fullName) update.fullName = profile.fullName;
+        if (profile.employeeNumber) update.employeeNumber = profile.employeeNumber;
+        if (profile.department !== undefined) update.department = profile.department || null;
+        if (profile.designation !== undefined) update.designation = profile.designation || null;
+
+        if (Object.keys(update).length > 0) {
+            user = await prisma.user.update({
+                where: { id: user.id },
+                data: update,
+            });
+        }
     }
 
     return prisma.user.findUnique({
-        where: {
-            id: user.id,
-        },
+        where: { id: user.id },
         include: {
             userRoles: {
-                include: {
-                    role: true,
-                },
+                include: { role: true },
             },
         },
     });
@@ -115,6 +95,7 @@ async function syncLocalUser(profile) {
 
 module.exports = {
     normalizeRole,
+    rolesFromCognitoGroups,
     syncLocalUser,
     ALLOWED_ROLES,
 };

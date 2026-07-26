@@ -11,5 +11,7 @@ router.use(requireAnyRole("ADMINISTRATOR", "REGISTRATION_OFFICER"));
 
 router.post("/", registrationController.createRegistration);
 router.get("/:registrationId", registrationController.getRegistrationById);
+router.get("/:registrationId/history", registrationController.getRegistrationHistory);
+router.patch("/:registrationId/status", registrationController.changeRegistrationStatus);
 
 module.exports = router;
