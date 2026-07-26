@@ -1,4 +1,6 @@
 const path = require("path");
+const fs = require("fs");
+const crypto = require("crypto");
 const express = require("express");
 const cors = require("cors");
 const helmet = require("helmet");
@@ -15,7 +17,38 @@ const userRoutes = require("./routes/userRoutes");
 const eventRoutes = require("./routes/eventRoutes");
 const locationRoutes = require("./routes/locationRoutes");
 const qrRoutes = require("./routes/qrRoutes");
+const screeningRoutes = require("./routes/screeningRoutes");
 const { notFound, errorHandler } = require("./middlewares/errorHandler");
+
+// -----------------------------------------------------------------------------
+// OPTIONAL STARTUP CODE SIGNING VERIFICATION (Deployment Integrity Guard)
+// -----------------------------------------------------------------------------
+if (env.isProduction) {
+  try {
+    const codePath = __filename; // Validates the current running application file
+    const sigPath = path.join(__dirname, "../dist/server.js.sig");
+    const pubKeyPath = path.join(__dirname, "../public.pem");
+
+    if (fs.existsSync(sigPath) && fs.existsSync(pubKeyPath)) {
+      const codeBuffer = fs.readFileSync(codePath);
+      const signature = fs.readFileSync(sigPath);
+      const publicKey = fs.readFileSync(pubKeyPath, "utf8");
+
+      const verifier = crypto.createVerify("SHA256");
+      verifier.update(codeBuffer);
+      verifier.end();
+
+      if (!verifier.verify(publicKey, signature)) {
+        console.error("FATAL: Code signature verification failed! Artifact has been modified.");
+        process.exit(1); // Terminate startup immediately to prevent tampered code execution
+      }
+      console.log("🔒 Code signature successfully verified.");
+    }
+  } catch (err) {
+    console.error("Code integrity verification check failed with error:", err.message);
+    process.exit(1);
+  }
+}
 
 const app = express();
 if (env.trustProxy) app.set("trust proxy", 1);
@@ -27,6 +60,7 @@ app.use((req, _res, next) => {
   if (env.isProduction && !req.secure) return next(new AppError(426, "HTTPS_REQUIRED", "HTTPS is required"));
   return next();
 });
+
 app.use(helmet({
   contentSecurityPolicy: {
     directives: {
@@ -37,6 +71,7 @@ app.use(helmet({
     },
   },
 }));
+
 app.use(cors({
   credentials: true,
   origin(origin, callback) {
@@ -46,6 +81,7 @@ app.use(cors({
   methods: ["GET", "POST", "PATCH", "DELETE", "OPTIONS"],
   allowedHeaders: ["Authorization", "Content-Type", "X-CSRF-Token", "X-Request-Id", "Idempotency-Key"],
 }));
+
 app.use(cookieParser());
 app.use(express.json({ limit: "256kb", strict: true, type: "application/json" }));
 
@@ -53,6 +89,7 @@ const authLimiter = rateLimit({ windowMs: 15 * 60000, limit: 20, standardHeaders
 const mutationLimiter = rateLimit({ windowMs: 60000, limit: 60, standardHeaders: "draft-8", legacyHeaders: false });
 
 app.get("/health", (_req, res) => res.json({ status: "ok" }));
+
 if (!env.isProduction) {
   const swaggerDocument = YAML.load(path.join(__dirname, "docs/openapi.yaml"));
   app.get("/api-docs/openapi.json", (_req, res) => res.set("Cache-Control", "no-store").json(swaggerDocument));
@@ -67,11 +104,14 @@ if (!env.isProduction) {
     },
   }));
 }
+
 app.use("/auth", authLimiter, authRoutes);
 app.use("/users", userRoutes);
 app.use("/api/events", (req, res, next) => ["POST", "PATCH", "PUT", "DELETE"].includes(req.method) ? mutationLimiter(req, res, next) : next(), eventRoutes);
 app.use("/api/locations", locationRoutes);
+app.use("/api/events", (req, res, next) => ["POST", "PATCH", "PUT", "DELETE"].includes(req.method) ? mutationLimiter(req, res, next) : next(), screeningRoutes);
 app.use("/api/qr", mutationLimiter, qrRoutes);
+
 app.use(notFound);
 app.use(errorHandler);
 

@@ -10,6 +10,8 @@ import SignUpPage from './components/SignUpPage';
 import ForgotPasswordPage from './components/ForgotPasswordPage';
 import DashboardPage from './components/DashboardPage';
 import QRCodePage from './components/qr/QRCodePage';
+import VisualAcuityStationPage from './features/screening/VisualAcuityStationPage';
+import AuditLogsPage from './features/audit-logs/AuditLogsPage';
 
 function ProtectedRoutes() {
   const { user, isBootstrapping } = useAuth();
@@ -17,6 +19,20 @@ function ProtectedRoutes() {
   if (isBootstrapping) return <main className="center-state" aria-live="polite"><span className="spinner" />Restoring your secure session…</main>;
   if (!user) return <Navigate to="/login" replace state={{ from: location }} />;
   return <AppShell><Outlet /></AppShell>;
+}
+
+function ManagerOnlyRoutes() {
+  const { user } = useAuth();
+  const canManageEvents = user?.systemRole === 'ADMIN' || user?.systemRole === 'EVENT_MANAGER';
+  if (!canManageEvents) return <Navigate to="/events" replace />;
+  return <Outlet />;
+}
+
+function AdminOnlyRoutes() {
+  const { user } = useAuth();
+  const isAdmin = user?.systemRole === 'ADMIN';
+  if (!isAdmin) return <Navigate to="/dashboard" replace />;
+  return <Outlet />;
 }
 
 export default function App() {
@@ -29,10 +45,16 @@ export default function App() {
       <Route element={<ProtectedRoutes />}>
         <Route path="/dashboard" element={<DashboardPage />} />
         <Route path="/events" element={<EventsPage />} />
-        <Route path="/events/new" element={<EventFormPage mode="create" />} />
+        <Route element={<ManagerOnlyRoutes />}>
+          <Route path="/events/new" element={<EventFormPage mode="create" />} />
+          <Route path="/events/:eventId/edit" element={<EventFormPage mode="edit" />} />
+        </Route>
         <Route path="/events/:eventId" element={<EventDetailPage />} />
-        <Route path="/events/:eventId/edit" element={<EventFormPage mode="edit" />} />
+        <Route path="/events/:eventId/stations/visual-acuity" element={<VisualAcuityStationPage />} />
         <Route path="/qr-generator" element={<QRCodePage />} />
+        <Route element={<AdminOnlyRoutes />}>
+          <Route path="/audit-logs" element={<AuditLogsPage />} />
+        </Route>
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
