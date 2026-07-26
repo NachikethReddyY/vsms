@@ -36,11 +36,11 @@ function ensureCognitoConfigured() {
 function extractProfileFromIdToken(idTokenPayload) {
     return {
         email: idTokenPayload.email || idTokenPayload["cognito:username"],
-        fullName: idTokenPayload.name || idTokenPayload.given_name || idTokenPayload.email,
+        fullName: idTokenPayload.name || idTokenPayload.given_name || null,
         employeeNumber: idTokenPayload["custom:employee_number"] || null,
         department: idTokenPayload["custom:department"] || null,
         designation: idTokenPayload["custom:designation"] || null,
-        role: idTokenPayload["custom:role"] || "REGISTRATION_OFFICER",
+        role: idTokenPayload["custom:role"] || null,
     };
 }
 

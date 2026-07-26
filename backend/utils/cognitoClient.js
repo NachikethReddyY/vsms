@@ -65,17 +65,21 @@ function buildUserAttributes(payload) {
         { Name: "name", Value: payload.fullName },
     ];
 
-    if (payload.employeeNumber) {
-        attributes.push({ Name: "custom:employee_number", Value: payload.employeeNumber });
-    }
-    if (payload.department) {
-        attributes.push({ Name: "custom:department", Value: payload.department });
-    }
-    if (payload.designation) {
-        attributes.push({ Name: "custom:designation", Value: payload.designation });
-    }
-    if (payload.role) {
-        attributes.push({ Name: "custom:role", Value: payload.role });
+    // Staff metadata already lives in Prisma. Only duplicate it in Cognito when
+    // the User Pool has matching String custom attributes configured.
+    if (process.env.COGNITO_USE_CUSTOM_ATTRIBUTES === "true") {
+        if (payload.employeeNumber) {
+            attributes.push({ Name: "custom:employee_number", Value: payload.employeeNumber });
+        }
+        if (payload.department) {
+            attributes.push({ Name: "custom:department", Value: payload.department });
+        }
+        if (payload.designation) {
+            attributes.push({ Name: "custom:designation", Value: payload.designation });
+        }
+        if (payload.role) {
+            attributes.push({ Name: "custom:role", Value: payload.role });
+        }
     }
 
     return attributes;

@@ -11,11 +11,16 @@ function errorHandler(err, req, res, next) {
     }
 
     const status = err.statusCode || 500;
+    const requestId = req.context?.requestId;
+
+    if (status >= 500) {
+        console.error(`Request ${requestId || "unknown"} failed`, err);
+    }
 
     res.status(status).json({
-        error: err.message || "Internal Server Error",
-        details: err.details || null,
-        requestId: req.context?.requestId,
+        error: status >= 500 ? "Internal server error" : (err.message || "Request failed"),
+        details: status >= 500 ? null : (err.details || null),
+        requestId,
     });
 }
 
