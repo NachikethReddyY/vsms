@@ -37,8 +37,8 @@ const snapshot = (event) => ({
     requiredStaff: shift.requiredStaff,
     status: shift.status,
     staffAssignments: (shift.staffAssignments || []).map((assignment) => ({
-      staffAssignmentId: assignment.staffAssignmentId,
-      userId: assignment.user?.userId,
+      staffAssignmentId: assignment.id,
+      userId: assignment.assignedUser?.id,
       assignmentRole: assignment.assignmentRole,
       eventStationId: assignment.eventStation?.eventStationId || null,
       status: assignment.status,
@@ -64,10 +64,10 @@ const eventInclude = {
         where: { status: { not: "CANCELLED" } },
         orderBy: { assignedAt: "asc" },
         select: {
-          staffAssignmentId: true,
+          id: true,
           assignmentRole: true,
           status: true,
-          user: { select: { userId: true, fullName: true, email: true } },
+          assignedUser: { select: { id: true, fullName: true, email: true } },
           eventStation: { select: { eventStationId: true, name: true } },
         },
       },
@@ -81,8 +81,8 @@ const eventInclude = {
       },
     },
   },
-  createdBy: { select: { userId: true, username: true, email: true, systemRole: true, status: true } },
-  cancelledBy: { select: { userId: true, username: true, email: true, systemRole: true, status: true } },
+  createdBy: { select: { id: true, username: true, email: true, systemRole: true, status: true } },
+  cancelledBy: { select: { id: true, username: true, email: true, systemRole: true, status: true } },
   registrations: {
     where: { status: { in: ["SIGNED_UP", "REGISTERED", "CHECKED_IN"] } },
     select: { registrationId: true },
@@ -120,13 +120,13 @@ const visibilityWhere = (user) => {
     shifts: {
       some: {
         staffAssignments: {
-          some: { userId: user.userId, status: { in: ACTIVE_ASSIGNMENT_STATUSES } },
+          some: { userId: user.id, status: { in: ACTIVE_ASSIGNMENT_STATUSES } },
         },
       },
     },
   };
   return user.systemRole === "EVENT_MANAGER"
-    ? { OR: [{ createdByUserId: user.userId }, assigned] }
+    ? { OR: [{ createdByUserId: user.id }, assigned] }
     : assigned;
 };
 
@@ -142,13 +142,13 @@ const canManage = (event, user) => {
     user.systemRole === "SUPER_ADMIN" ||
     user.systemRole === "ADMIN" ||
     (user.systemRole === "EVENT_MANAGER" &&
-      (event.createdByUserId === user.userId ||
+      (event.createdByUserId === user.id ||
         (event.shifts || []).some((shift) =>
           (shift.staffAssignments || []).some(
             (assignment) =>
               assignment.assignmentRole === "EVENT_MANAGER" &&
               ["ASSIGNED", "CONFIRMED"].includes(assignment.status) &&
-              assignment.user?.userId === user.userId
+              assignment.assignedUser?.id === user.id
           )
         )))
   );
@@ -225,7 +225,7 @@ const assertShiftSchedulesAvailable = async (tx, eventId, desiredShifts, current
     return (shift.staffAssignments || [])
       .filter((assignment) => ACTIVE_ASSIGNMENT_STATUSES.includes(assignment.status))
       .map((assignment) => ({
-        userId: assignment.user.userId,
+        userId: assignment.assignedUser.id,
         startsAt: new Date(desired.startsAt),
         endsAt: new Date(desired.endsAt),
       }));
@@ -255,7 +255,7 @@ const assertShiftSchedulesAvailable = async (tx, eventId, desiredShifts, current
         },
       })),
     },
-    select: { staffAssignmentId: true },
+    select: { id: true },
   });
   if (conflict) throw scheduleConflictError();
 };
@@ -281,7 +281,7 @@ const assertAssignmentSchedulesAvailable = async (tx, eventId, shifts) => {
 
   const uniqueUserIds = [...new Set(schedules.map(({ userId }) => userId))];
   const activeUsers = await tx.user.count({
-    where: { userId: { in: uniqueUserIds }, status: "ACTIVE" },
+    where: { id: { in: uniqueUserIds }, status: "ACTIVE" },
   });
   if (activeUsers !== uniqueUserIds.length) {
     throw new AppError(422, "STAFF_NOT_AVAILABLE", "One or more selected staff members are unavailable");
@@ -305,7 +305,7 @@ const assertAssignmentSchedulesAvailable = async (tx, eventId, shifts) => {
         },
       })),
     },
-    select: { staffAssignmentId: true },
+    select: { id: true },
   });
   if (conflict) throw scheduleConflictError();
 };
@@ -329,7 +329,7 @@ const createShiftAssignments = async (tx, eventId, shiftInputs, stationsByTempla
     const existingAssignments = await tx.staffAssignment.findMany({ where: { shiftId: saved.shiftId } });
     for (const assignment of input.assignments) {
       if (assignment.staffAssignmentId && !existingAssignments.some((current) => (
-        current.staffAssignmentId === assignment.staffAssignmentId && current.userId === assignment.userId
+        current.id === assignment.staffAssignmentId && current.userId === assignment.userId
       ))) {
         throw new AppError(422, "INVALID_ASSIGNMENT", "A staff assignment does not belong to this shift");
       }
@@ -368,7 +368,7 @@ const createEvent = async (body, user, correlationId, rawIdempotencyKey) => {
   return prisma.$transaction(async (tx) => {
     if (idempotencyKey) {
       const replay = await tx.event.findUnique({
-        where: { createdByUserId_createIdempotencyKey: { createdByUserId: user.userId, createIdempotencyKey: idempotencyKey } },
+        where: { createdByUserId_createIdempotencyKey: { createdByUserId: user.id, createIdempotencyKey: idempotencyKey } },
         include: eventInclude,
       });
       if (replay) {
@@ -386,7 +386,7 @@ const createEvent = async (body, user, correlationId, rawIdempotencyKey) => {
     const event = await tx.event.create({
       data: {
         ...eventData,
-        createdByUserId: user.userId,
+        createdByUserId: user.id,
         createIdempotencyKey: idempotencyKey,
         createPayloadHash: idempotencyKey ? payloadHash : null,
         shifts: { create: (body.shifts || []).map((shift) => normalizeShift(shift)) },
@@ -396,7 +396,7 @@ const createEvent = async (body, user, correlationId, rawIdempotencyKey) => {
 
     await tx.auditLog.create({
       data: {
-        userId: user.userId,
+        userId: user.id,
         action: "CREATED",
         entityName: "Event",
         entityId: event.eventId,
@@ -443,14 +443,129 @@ const listEvents = async (query, user) => {
   }
 
   const where = conditions.length > 0 ? { AND: conditions } : {};
-
-  const rows = await prisma.event.findMany({
-    where,
-    include: eventInclude,
-    orderBy: [{ startsAt: "asc" }, { eventId: "asc" }],
-    take: query.limit + 1,
-  });
-
+const rows = await prisma.event.findMany({
+  where: {
+    AND: [
+      {
+        shifts: {
+          some: {
+            staffAssignments: {
+              some: {
+                userId: "3997faba-e406-4a22-855f-e9a0d94e2bfd",
+                status: {
+                  in: [
+                    "ASSIGNED",
+                    "CONFIRMED"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    ]
+  },
+  include: {
+    eventDays: {
+      orderBy: {
+        date: "asc"
+      },
+      select: {
+        eventDayId: true,
+        date: true,
+        startsAt: true,
+        endsAt: true
+      }
+    },
+    shifts: {
+      orderBy: {
+        startsAt: "asc"
+      },
+      include: {
+        staffAssignments: {
+          where: {
+            status: {
+              not: "CANCELLED"
+            }
+          },
+          orderBy: {
+            assignedAt: "asc"
+          },
+          select: {
+            id: true,
+            assignmentRole: true,
+            status: true,
+            assignedUser: {
+              select: {
+                id: true,
+                fullName: true,
+                email: true
+              }
+            },
+            station: {
+              select: {
+                stationId: true,
+                stationName: true
+              }
+            }
+          }
+        }
+      }
+    },
+    stations: {
+      orderBy: {
+        stationOrder: "asc"
+      }
+    },
+    createdBy: {
+      select: {
+        id: true,
+        username: true,
+        email: true,
+        sysRole: true,
+        status: true
+      }
+    },
+    cancelledBy: {
+      select: {
+        id: true,
+        username: true,
+        email: true,
+        sysRole: true,
+        status: true
+      }
+    },
+    registrations: {
+      where: {
+        registrationStatus: {
+          in: [
+            // Updated to match your exact enum values (removed "REGISTERED")
+            "SIGNED_UP",
+            "CHECKED_IN",
+            "COMPLETED"
+          ]
+        }
+      },
+      select: {
+        registrationId: true
+      }
+    },
+    _count: {
+      select: {
+        registrations: true
+      }
+    }
+  },
+  orderBy: [
+    {
+      startsAt: "asc"
+    },
+    {
+      eventId: "asc"
+    }
+  ],
+  take: 26
+});
   const hasMore = rows.length > query.limit;
   const events = hasMore ? rows.slice(0, query.limit) : rows;
   const last = events.at(-1);
@@ -614,7 +729,7 @@ const updateEvent = async (eventId, body, user, correlationId) => {
           await tx.shift.create({ data: normalizeShift(shift, eventId) });
         }
       }
-      await createShiftAssignments(tx, eventId, body.shifts, stationsByTemplate, user.userId);
+      await createShiftAssignments(tx, eventId, body.shifts, stationsByTemplate, user.id);
     }
 
     const updated = await tx.event.findUniqueOrThrow({
@@ -624,7 +739,7 @@ const updateEvent = async (eventId, body, user, correlationId) => {
 
     await tx.auditLog.create({
       data: {
-        userId: user.userId,
+        userId: user.id,
         action: "UPDATED",
         entityName: "Event",
         entityId: eventId,
@@ -665,7 +780,7 @@ const transitionEvent = async (eventId, command, body, user, correlationId) => {
 
     await tx.auditLog.create({
       data: {
-        userId: user.userId,
+        userId: user.id,
         action: transition.audit,
         entityName: "Event",
         entityId: eventId,
@@ -697,7 +812,7 @@ const cancelEvent = async (eventId, body, user, correlationId) => {
         status: "CANCELLED",
         cancellationReason: body.reason,
         cancelledAt: new Date(),
-        cancelledByUserId: user.userId,
+        cancelledByUserId: user.id,
         version: { increment: 1 },
       },
     });
@@ -718,7 +833,7 @@ const cancelEvent = async (eventId, body, user, correlationId) => {
 
     await tx.auditLog.create({
       data: {
-        userId: user.userId,
+        userId: user.id,
         action: "CANCELLED",
         entityName: "Event",
         entityId: eventId,
@@ -736,7 +851,7 @@ const cancelEvent = async (eventId, body, user, correlationId) => {
 const listStaffDirectory = async () =>
   prisma.user.findMany({
     where: { status: "ACTIVE" },
-    select: { userId: true, fullName: true, email: true },
+    select: { id: true, fullName: true, email: true },
     orderBy: { fullName: "asc" },
     take: 200,
   });

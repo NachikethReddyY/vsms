@@ -1,27 +1,49 @@
-import axios, { type InternalAxiosRequestConfig } from 'axios';
+import axios from 'axios';
 
-const baseURL = import.meta.env.VITE_API_BASE_URL ?? (import.meta.env.DEV ? '/qa-api' : `${window.location.protocol}//${window.location.hostname}:5050`);
+// Fixed: changed fallback port from 5050 to 5000 to match your Express server
+const baseURL = import.meta.env.VITE_API_BASE_URL ?? (import.meta.env.DEV ? '/qa-api' : `${window.location.protocol}//${window.location.hostname}:5000`);
 
-let accessToken: string | null = null;
-let csrfToken: string | null = null;
+// Initialize tokens directly from localStorage
+let accessToken: string | null = localStorage.getItem('authToken');
+let csrfToken: string | null = localStorage.getItem('csrfToken');
 let refreshPromise: Promise<string> | null = null;
 let refreshSubscribers: ((token: string) => void)[] = [];
 
-type RetryableRequest = InternalAxiosRequestConfig & { _retry?: boolean };
+type RetryableRequest = import('axios').InternalAxiosRequestConfig & { _retry?: boolean };
 type TokenPayload = { accessToken: string; csrfToken?: string };
 
 export const setAccessToken = (token: string | null) => {
   accessToken = token;
+  if (token) {
+    localStorage.setItem('authToken', token);
+  } else {
+    localStorage.removeItem('authToken');
+  }
 };
 
 export const setCsrfToken = (token: string | null) => {
   csrfToken = token;
+  if (token) {
+    localStorage.setItem('csrfToken', token);
+  } else {
+    localStorage.removeItem('csrfToken');
+  }
 };
 
-export const getAccessToken = () => accessToken;
-export const getCsrfToken = () => csrfToken;
+export const getAccessToken = () => {
+  if (!accessToken) {
+    accessToken = localStorage.getItem('authToken');
+  }
+  return accessToken;
+};
 
-// Unified single declaration for setSessionTokens
+export const getCsrfToken = () => {
+  if (!csrfToken) {
+    csrfToken = localStorage.getItem('csrfToken');
+  }
+  return csrfToken;
+};
+
 export const setSessionTokens = (tokens: TokenPayload | null) => {
   if (!tokens) {
     setAccessToken(null);
@@ -34,11 +56,10 @@ export const setSessionTokens = (tokens: TokenPayload | null) => {
 
 const apiClient = axios.create({
   baseURL,
-  withCredentials: true, // Crucial for cookie-based session refreshing
+  withCredentials: true,
   headers: { 'Content-Type': 'application/json' },
 });
 
-// Dedicated client for refreshing tokens to prevent infinite interceptor loops
 const refreshClient = axios.create({
   baseURL,
   withCredentials: true,
@@ -50,10 +71,14 @@ const onRefreshed = (token: string) => {
   refreshSubscribers = [];
 };
 
-apiClient.interceptors.request.use((config: InternalAxiosRequestConfig) => {
+// Request interceptor attaches both Auth Bearer token and CSRF token automatically
+apiClient.interceptors.request.use((config) => {
   const token = getAccessToken();
+  const csrf = getCsrfToken();
+  
   if (token) config.headers.Authorization = `Bearer ${token}`;
-  if (csrfToken) config.headers['X-CSRF-Token'] = csrfToken;
+  if (csrf) config.headers['X-CSRF-Token'] = csrf;
+  
   return config;
 });
 
@@ -70,7 +95,7 @@ apiClient.interceptors.response.use(
 
     try {
       refreshPromise ??= refreshClient.post<TokenPayload>('/auth/refresh', undefined, { 
-        headers: { 'X-CSRF-Token': csrfToken || '' } 
+        headers: { 'X-CSRF-Token': getCsrfToken() || '' } 
       })
         .then(({ data }) => { 
           setSessionTokens(data); 
