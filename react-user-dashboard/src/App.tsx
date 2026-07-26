@@ -42,20 +42,27 @@ export default function App() {
       <Route path="/login" element={<LoginPage />} />
       <Route path="/signup" element={<SignUpPage />} />
       <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+      
       <Route element={<ProtectedRoutes />}>
         <Route path="/dashboard" element={<DashboardPage />} />
         <Route path="/events" element={<EventsPage />} />
+        
+        {/* Fixed: Used explicit opening and closing tags */}
         <Route element={<ManagerOnlyRoutes />}>
           <Route path="/events/new" element={<EventFormPage mode="create" />} />
           <Route path="/events/:eventId/edit" element={<EventFormPage mode="edit" />} />
         </Route>
+
         <Route path="/events/:eventId" element={<EventDetailPage />} />
         <Route path="/events/:eventId/stations/visual-acuity" element={<VisualAcuityStationPage />} />
-        <Route path="/qr-generator" element={<QRCodePage />} />
+        <Route path="/events/qr-pass/:registrationId" element={<QRCodePage />} />
+
+        {/* Fixed: Used explicit opening and closing tags */}
         <Route element={<AdminOnlyRoutes />}>
           <Route path="/audit-logs" element={<AuditLogsPage />} />
         </Route>
       </Route>
+
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   );
