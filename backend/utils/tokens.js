@@ -6,7 +6,7 @@ const signAccessToken = (user) => jwt.sign(
   env.jwtAccessSecret,
   {
     algorithm: "HS256",
-    subject: user.userId,
+    subject: user.id, // <-- FIX: Changed from user.userId to user.id
     issuer: env.JWT_ISSUER,
     audience: env.JWT_AUDIENCE,
     expiresIn: env.ACCESS_TOKEN_TTL,
