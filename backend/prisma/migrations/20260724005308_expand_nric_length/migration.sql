@@ -1,2 +1,0 @@
--- AlterTable
-ALTER TABLE IF EXISTS "participant" ALTER COLUMN "nric" SET DATA TYPE TEXT;

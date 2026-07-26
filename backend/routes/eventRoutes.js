@@ -5,29 +5,29 @@ const validate = require("../middlewares/validate");
 const asyncHandler = require("../utils/asyncHandler");
 const { requireSystemRole } = require("../middlewares/authorize");
 const {
-	createEventBody,
-	updateEventBody,
-	transitionBody,
-	cancelBody,
-	eventParams,
-	listQuery,
-	auditQuery,
-	assignmentParams,
-	assignmentDeleteParams,
-	versionQuery,
-	assignmentBody,
-	stationParams,
-	stationImportBody,
-	stationUpdateBody,
+    createEventBody,
+    updateEventBody,
+    transitionBody,
+    cancelBody,
+    eventParams,
+    listQuery,
+    auditQuery,
+    assignmentParams,
+    assignmentDeleteParams,
+    assignmentBody,
 } = require("../schemas/eventSchemas");
 
 const router = express.Router();
 router.use(authenticate);
 
+// 1. Static routes MUST come first so they are not captured by dynamic parameters like /:eventId
+router.get("/staff-directory", requireSystemRole("ADMIN", "EVENT_MANAGER"), asyncHandler(eventController.staffDirectory));
+
+// 2. Base collection routes
 router.get("/", validate({ query: listQuery }), asyncHandler(eventController.list));
 router.post("/", requireSystemRole("ADMIN", "EVENT_MANAGER"), validate({ body: createEventBody }), asyncHandler(eventController.create));
-router.get("/staff-directory", requireSystemRole("ADMIN", "EVENT_MANAGER"), asyncHandler(eventController.staffDirectory));
-router.get("/station-templates", requireSystemRole("ADMIN", "EVENT_MANAGER"), asyncHandler(eventController.stationTemplates));
+
+// 3. Dynamic parameter routes come last
 router.get("/:eventId", validate({ params: eventParams }), asyncHandler(eventController.get));
 router.patch("/:eventId", validate({ params: eventParams, body: updateEventBody }), asyncHandler(eventController.update));
 router.post("/:eventId/stations/import", validate({ params: eventParams, body: stationImportBody }), asyncHandler(eventController.importStations));

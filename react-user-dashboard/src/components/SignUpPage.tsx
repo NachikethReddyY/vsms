@@ -7,6 +7,7 @@ import './SignUpPage.css';
 
 interface SignUpFormInputs {
   fullName: string;
+  employeeNumber: string;
   email: string;
   password: string;
   confirmPassword: string;
@@ -31,6 +32,7 @@ const SignUpPage: React.FC = () => {
     try {
       await apiClient.post('/auth/signup', {
         fullName: data.fullName,
+        employeeNumber: data.employeeNumber,
         email: data.email,
         password: data.password,
       });
@@ -52,15 +54,15 @@ const SignUpPage: React.FC = () => {
         <div className="mb-6">
           <h1 className="vsms-auth-title">Create Staff Account</h1>
           <p className="vsms-auth-subtitle">
-            Register your credentials for VSMS screening access.
+            Register your credentials and employee details for VSMS screening access.
           </p>
         </div>
 
         {/* Error Alert */}
         {errorMessage && (
-         <div className="vsms-alert-banner" role="alert">
-      {errorMessage}
-  </div>
+          <div className="vsms-alert-banner" role="alert">
+            {errorMessage}
+          </div>
         )}
 
         {/* Form */}
@@ -81,6 +83,25 @@ const SignUpPage: React.FC = () => {
             />
             {errors.fullName && (
               <p className="vsms-error-text">{errors.fullName.message}</p>
+            )}
+          </div>
+
+          {/* Employee Number */}
+          <div className="vsms-field-group">
+            <label htmlFor="employeeNumber" className="vsms-label">
+              Employee Number
+            </label>
+            <input
+              id="employeeNumber"
+              type="text"
+              placeholder="EMP-1042"
+              {...register('employeeNumber', {
+                required: 'Employee number is required',
+              })}
+              className="vsms-input"
+            />
+            {errors.employeeNumber && (
+              <p className="vsms-error-text">{errors.employeeNumber.message}</p>
             )}
           </div>
 
