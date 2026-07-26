@@ -167,7 +167,57 @@ const main = async () => {
     }
   }
 
-  console.log(JSON.stringify({ users: USERS.map(({ username, email, systemRole }) => ({ username, email, systemRole })), events: EVENTS.length, stationTemplates: STATION_TEMPLATES.length, demoPasswordSource: process.env.VSMS_DEMO_PASSWORD ? "environment" : "development-only default" }, null, 2));
+  const liveEventId = "20000000-0000-4000-8000-000000000003";
+  const stationDefs = [
+    { stationId: "61000000-0000-4000-8000-000000000001", stationName: "Visual Acuity", stationType: "VISUAL_ACUITY", stationOrder: 1 },
+    { stationId: "61000000-0000-4000-8000-000000000002", stationName: "Refraction", stationType: "REFRACTION", stationOrder: 2 },
+    { stationId: "61000000-0000-4000-8000-000000000003", stationName: "Colour Vision", stationType: "COLOUR_VISION", stationOrder: 3 },
+  ];
+  for (const station of stationDefs) {
+    await prisma.station.upsert({
+      where: { stationId: station.stationId },
+      update: { ...station, eventId: liveEventId, isActive: true },
+      create: { ...station, eventId: liveEventId, isActive: true },
+    });
+  }
+
+  const demoParticipants = [
+    { registrationId: "70000000-0000-4000-8000-000000000001", name: "John Tan", queueNumber: 1, passToken: "VSMS-DEMO-QR-001" },
+    { registrationId: "70000000-0000-4000-8000-000000000002", name: "Mary Lim", queueNumber: 2, passToken: "VSMS-DEMO-QR-002" },
+    { registrationId: "70000000-0000-4000-8000-000000000003", name: "Aisha Rahman", queueNumber: 3, passToken: "VSMS-DEMO-QR-003" },
+  ];
+  for (const person of demoParticipants) {
+    await prisma.eventRegistration.upsert({
+      where: { registrationId: person.registrationId },
+      update: {
+        eventId: liveEventId,
+        status: "CHECKED_IN",
+        participantDisplayName: person.name,
+        queueNumber: person.queueNumber,
+        passToken: person.passToken,
+      },
+      create: {
+        registrationId: person.registrationId,
+        eventId: liveEventId,
+        status: "CHECKED_IN",
+        participantDisplayName: person.name,
+        queueNumber: person.queueNumber,
+        passToken: person.passToken,
+      },
+    });
+  }
+
+  console.log(JSON.stringify({
+    users: USERS.map(({ username, email, systemRole }) => ({ username, email, systemRole })),
+    events: EVENTS.length,
+    stationTemplates: STATION_TEMPLATES.length,
+    visualAcuityDemo: {
+      eventId: liveEventId,
+      stationPath: `/events/${liveEventId}/stations/visual-acuity`,
+      passTokens: demoParticipants.map(({ passToken }) => passToken),
+    },
+    demoPasswordSource: process.env.VSMS_DEMO_PASSWORD ? "environment" : "development-only default",
+  }, null, 2));
 };
 
 main().finally(() => prisma.$disconnect());

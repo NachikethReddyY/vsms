@@ -13,7 +13,9 @@
     "prisma:seed": "node prisma/seed.js",
     "openapi:lint": "redocly lint docs/openapi.yaml",
     "contracts:generate": "openapi-typescript docs/openapi.yaml -o ../react-user-dashboard/src/generated/api.ts",
-    "contracts:check": "node scripts/check-contract.js"
+    "contracts:check": "node scripts/check-contract.js",
+    "audit": "npm audit",
+    "audit:fix": "npm audit fix"
   },
   "keywords": [],
   "author": "",

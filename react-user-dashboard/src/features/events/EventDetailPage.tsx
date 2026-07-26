@@ -362,6 +362,9 @@ export default function EventDetailPage() {
             {canCancel && <button className="danger-button" onClick={() => void cancel()} disabled={pending}>Cancel event</button>}
           </>}
         </div>}
+        <div className="action-cluster">
+          <Link className="primary" to={`/events/${event.eventId}/stations/visual-acuity`}>Open Visual Acuity station</Link>
+        </div>
       </aside>
     </section>
 

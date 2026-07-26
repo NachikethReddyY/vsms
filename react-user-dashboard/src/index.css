@@ -709,3 +709,17 @@ html[data-vsms-theme-vt="active"]::view-transition-new(root) { clip-path:var(--v
 }
 @media (max-width:370px) { .action-cluster { grid-template-columns:1fr; }.action-cluster .primary { grid-column:auto; }.lifecycle li span { font-size:10px; } }
 @media (prefers-reduced-motion:reduce) { *,*:before,*:after { scroll-behavior:auto!important; animation-duration:.01ms!important; animation-iteration-count:1!important; transition-duration:.01ms!important; }.primary:active,.secondary:active,.danger-button:active { transform:none; }.meteors,.confetti-burst { display:none!important; } }
+
+.va-resolve-row { display:flex; gap:12px; align-items:flex-end; flex-wrap:wrap; margin-bottom:16px; }
+.va-resolve-row label { flex:1; min-width:220px; display:grid; gap:6px; font-size:13px; color:var(--ink-2); }
+.va-resolve-row input, .va-form select, .detail-panel select, .detail-panel input { min-height:42px; border:1px solid var(--hairline); border-radius:10px; padding:0 12px; background:var(--surface); color:var(--ink); }
+.va-form { display:grid; gap:18px; }
+.va-eye-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:16px; }
+.va-eye-card { margin:0; padding:16px; border:1px solid var(--hairline); border-radius:14px; display:grid; gap:12px; }
+.va-eye-card legend { padding:0 4px; font-weight:600; }
+.va-fraction { display:flex; align-items:center; gap:10px; font-size:28px; font-weight:600; letter-spacing:-.03em; }
+.va-fraction select { min-width:110px; }
+.va-exceptions { display:flex; flex-wrap:wrap; gap:8px; }
+.va-exceptions .is-selected { border-color:var(--accent); background:var(--accent-tint); color:var(--accent); }
+.banner-success { padding:12px 14px; border-radius:12px; background:color-mix(in srgb,var(--green) 14%,transparent); color:var(--green); }
+@media (max-width:720px) { .va-eye-grid { grid-template-columns:1fr; } }
