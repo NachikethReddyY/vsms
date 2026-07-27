@@ -1,30 +1,28 @@
 const express = require("express");
-const participantController = require("../controllers/participantController");
-const authenticate = require("../middlewares/authenticate");
-const validate = require("../middlewares/validate");
-const asyncHandler = require("../utils/asyncHandler");
-const { 
-  participantParams, 
-  participantBody 
-} = require("../schemas/participantSchemas");
 
 const router = express.Router();
 
-console.log("participantRoutes.js loaded");
+const participantController = require("../controllers/participantController");
+const requireAuthentication = require("../middlewares/requireAuthentication");
+const requireAnyRole = require("../middlewares/requireAnyRole");
+const { rateLimit } = require("../middlewares/security");
 
-// Apply authentication middleware to all participant routes
-router.use(authenticate);
+router.use(requireAuthentication);
+router.use(requireAnyRole("ADMINISTRATOR", "REGISTRATION_OFFICER"));
 
-// ==========================================
-// Participant Routes
-// ==========================================
-router.post(
-  "/:eventId", 
-  validate({ 
-    params: participantParams, 
-    body: participantBody 
-  }), 
-  asyncHandler(participantController.createParticipant)
-);
+router.get("/", rateLimit({ windowMs: 60_000, max: 30 }), participantController.searchParticipants);
+router.post("/", participantController.createParticipant);
+router.get("/active-consent-form", participantController.getActiveConsentForm);
+router.get("/:participantId", participantController.getParticipantById);
+router.patch("/:participantId", participantController.updateParticipant);
+router.get("/:participantId/registrations", participantController.getParticipantRegistrations);
+router.get("/:participantId/consents", participantController.getParticipantConsents);
+router.get("/:participantId/emergency-contacts", participantController.getEmergencyContacts);
+router.post("/:participantId/emergency-contacts", participantController.addEmergencyContact);
+router.patch("/:participantId/emergency-contacts/:contactId", participantController.updateEmergencyContact);
+router.post("/:participantId/events/:eventId/consent", participantController.saveConsent);
+router.post("/:participantId/consents", participantController.saveConsent);
+router.post("/:participantId/consents/:consentId/withdraw", participantController.withdrawConsent);
+router.get("/:participantId/events/:eventId/review", participantController.getRegistrationReview);
 
 module.exports = router;

@@ -19,5 +19,8 @@
   "bugs": {
     "url": "https://github.com/soc-DBSP/react-nodejs-project2-cryptix/issues"
   },
-  "homepage": "https://github.com/soc-DBSP/react-nodejs-project2-cryptix#readme"
+  "homepage": "https://github.com/soc-DBSP/react-nodejs-project2-cryptix#readme",
+  "devDependencies": {
+    "prisma": "^6.19.3"
+  }
 }

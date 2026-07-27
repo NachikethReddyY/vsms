@@ -5,8 +5,9 @@ const notFound = (req, _res, next) => next(new AppError(404, "NOT_FOUND", `Route
 
 const errorHandler = (error, req, res, _next) => {
   const known = error instanceof AppError;
-  const status = known ? error.status : 500;
-  const code = known ? error.code : "INTERNAL_ERROR";
+  const status = known ? error.status : Number(error.statusCode || 500);
+  const code = known ? error.code : error.name || "INTERNAL_ERROR";
+  const publicMessage = status >= 500 ? "An unexpected error occurred" : error.message;
 
   logger[status >= 500 ? "error" : "warn"]("http.request.failed", {
     requestId: req.requestId,
@@ -21,7 +22,8 @@ const errorHandler = (error, req, res, _next) => {
 
   res.status(status).json({
     type: `https://vsms.local/problems/${code.toLowerCase().replaceAll("_", "-")}`,
-    title: known ? error.message : "An unexpected error occurred",
+    title: publicMessage,
+    error: publicMessage,
     status,
     code,
     requestId: req.requestId,
