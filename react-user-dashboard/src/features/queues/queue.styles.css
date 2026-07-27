@@ -1,0 +1,77 @@
+/* react-user-dashboard/src/features/queues/queue.styles.css */
+.queue-container {
+  padding: 2rem;
+  font-family: Arial, sans-serif;
+}
+
+.queue-heading {
+  font-size: 1.75rem;
+  color: #333;
+  margin-bottom: 0.5rem;
+}
+
+.queue-subtext {
+  color: #666;
+  margin-bottom: 1.5rem;
+}
+
+.queue-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 1rem;
+  background: #fff;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.queue-th {
+  background: #f8f9fa;
+  text-align: left;
+  padding: 1rem;
+  font-weight: 600;
+  color: #444;
+  border-bottom: 2px solid #dee2e6;
+}
+
+.queue-td {
+  padding: 1rem;
+  border-bottom: 1px solid #dee2e6;
+  color: #333;
+}
+
+.badge {
+  padding: 0.35rem 0.65rem;
+  border-radius: 50rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.badge.waiting {
+  background: #fef7e0;
+  color: #b06000;
+}
+
+.badge.in_progress {
+  background: #e8f0fe;
+  color: #1a73e8;
+}
+
+.badge.completed {
+  background: #e6f4ea;
+  color: #137333;
+}
+
+.advance-btn {
+  padding: 0.4rem 0.8rem;
+  cursor: pointer;
+  background: #1a73e8;
+  color: #fff;
+  border: none;
+  border-radius: 4px;
+  font-weight: 500;
+}
+
+.advance-btn:hover {
+  background: #1557b0;
+}
