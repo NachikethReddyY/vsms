@@ -19,6 +19,41 @@ const permissionNames = [
   "audit:read",
 ];
 
+const stationTemplates = [
+  {
+    stationTemplateId: "60000000-0000-4000-8000-000000000001",
+    templateKey: "REGISTRATION",
+    version: 1,
+    name: "Registration",
+    description: "Confirm the participant record, consent, and QR pass.",
+    defaultCapacity: 3,
+  },
+  {
+    stationTemplateId: "60000000-0000-4000-8000-000000000002",
+    templateKey: "VISUAL_ACUITY",
+    version: 1,
+    name: "Visual acuity",
+    description: "Capture controlled distance and near-vision measurements.",
+    defaultCapacity: 4,
+  },
+  {
+    stationTemplateId: "60000000-0000-4000-8000-000000000003",
+    templateKey: "EYE_HEALTH",
+    version: 1,
+    name: "Eye health",
+    description: "Record eye-health observations and screening flags.",
+    defaultCapacity: 2,
+  },
+  {
+    stationTemplateId: "60000000-0000-4000-8000-000000000004",
+    templateKey: "CLINICAL_REVIEW",
+    version: 1,
+    name: "Clinical review",
+    description: "Review screening outcomes and decide the safe next step.",
+    defaultCapacity: 2,
+  },
+];
+
 async function seedRoles() {
   const roles = new Map();
   for (const [roleName, description, precedence] of roleDefinitions) {
@@ -93,6 +128,16 @@ async function seedPermissions(roles, staff) {
         },
       });
     }
+  }
+}
+
+async function seedStationTemplates() {
+  for (const template of stationTemplates) {
+    await prisma.stationTemplate.upsert({
+      where: { stationTemplateId: template.stationTemplateId },
+      update: { ...template, active: true },
+      create: template,
+    });
   }
 }
 
@@ -560,9 +605,10 @@ async function main() {
   const roles = await seedRoles();
   const staff = await seedStaff(roles);
   await seedPermissions(roles, staff);
+  await seedStationTemplates();
   const consentForm = await seedConsentForm(staff);
   const demo = await seedDemoData(staff, consentForm);
-  console.log(`Seeded roles, permissions, consent form, staff profile, and demonstration data for ${staff.email}.`);
+  console.log(`Seeded roles, permissions, station templates, consent form, staff profile, and demonstration data for ${staff.email}.`);
   console.log(`Upcoming event: ${demo.events.upcomingEvent.name} (${demo.events.upcomingEvent.eventId})`);
   console.log(`Live event: ${demo.events.liveEvent.name} (${demo.events.liveEvent.eventId})`);
   console.log(`Ready participant: ${demo.participants.aisha.participantReference} - Aisha Rahman`);

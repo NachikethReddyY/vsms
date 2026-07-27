@@ -13,6 +13,7 @@ const LEGACY_CSRF_COOKIE_OPTIONS = { ...CSRF_COOKIE_OPTIONS, path: "/auth" };
 const publicUser = (user) => ({
   userId: user.id,
   email: user.email,
+  username: user.username,
   fullName: user.fullName,
   employeeNumber: user.employeeNumber,
   systemRole: user.systemRole || "STAFF",
@@ -42,13 +43,13 @@ const clearCookies = (res) => {
   res.clearCookie("vsms_csrf", LEGACY_CSRF_COOKIE_OPTIONS);
 };
 
-const signup = async ({ email, password, fullName, employeeNumber }) => {
+const signup = async ({ email, username, password, fullName, employeeNumber }) => {
   if (!env.publicSignupEnabled) {
     throw new AppError(404, "NOT_FOUND", "Resource not found");
   }
 
-  if (!fullName || !employeeNumber) {
-    throw new AppError(400, "BAD_REQUEST", "Full name and employee number are required");
+  if (!username || !fullName || !employeeNumber) {
+    throw new AppError(400, "BAD_REQUEST", "Username, full name, and employee number are required");
   }
 
   const passwordHash = await bcrypt.hash(password, 12);
@@ -58,6 +59,7 @@ const signup = async ({ email, password, fullName, employeeNumber }) => {
       const newUser = await tx.user.create({
         data: { 
           email, 
+          username, 
           fullName, 
           employeeNumber, 
           status: "ACTIVE" 
@@ -98,7 +100,7 @@ const login = async ({ identifier, password }, req, res) => {
   }
 
   const user = await prisma.user.findFirst({
-    where: { OR: [{ employeeNumber: identifier }, { email: identifier }] },
+    where: { OR: [{ employeeNumber: identifier }, { email: identifier }, { username: identifier }] },
     include: { credential: true }
   });
 
