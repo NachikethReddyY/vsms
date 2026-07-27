@@ -660,7 +660,7 @@ return prisma.$transaction(async (tx) => {
     where: { eventId, version: body.version },
     data: { ...normalizeEventData(body), version: { increment: 1 } },
   });
-  
+
   if (changed.count !== 1) {
     throw new AppError(409, "STALE_EVENT_VERSION", "This event was changed by someone else");
   }
@@ -713,7 +713,7 @@ return prisma.$transaction(async (tx) => {
 
       stationsByTemplate.set(input.stationTemplateId, station);
       await tx.eventStationAvailability.deleteMany({ where: { eventStationId: station.eventStationId } });
-      
+
       if (input.availabilities) {
         for (const availability of input.availabilities) {
           const day = daysByDate.get(availability.date);
@@ -756,15 +756,15 @@ return prisma.$transaction(async (tx) => {
     await assertShiftSchedulesAvailable(tx, eventId, body.shifts, current.shifts);
     const existingById = new Map(current.shifts.map((shift) => [shift.shiftId, shift]));
     const desiredIds = body.shifts.flatMap((shift) => shift.shiftId ? [shift.shiftId] : []);
-    
+
     const unknown = desiredIds.find((id) => !existingById.has(id));
     if (unknown) throw new AppError(422, "INVALID_SHIFT", "A shift does not belong to this event");
-    
+
     const protectedRemoval = current.shifts.find((shift) => !desiredIds.includes(shift.shiftId) && shift.status !== "PLANNED");
     if (protectedRemoval) throw new AppError(409, "SHIFT_NOT_REMOVABLE", "Active or completed shifts cannot be removed");
 
     await tx.shift.deleteMany({ where: { eventId, status: "PLANNED", shiftId: { notIn: desiredIds } } });
-    
+
     for (const shift of body.shifts) {
       if (shift.shiftId) {
         await tx.shift.update({ where: { shiftId: shift.shiftId }, data: normalizeShift(shift, eventId) });
@@ -792,7 +792,7 @@ return prisma.$transaction(async (tx) => {
       ipAddress: "::1",
     },
   });
-  
+
   return toEventResponse(updated, user);
 });
 };
