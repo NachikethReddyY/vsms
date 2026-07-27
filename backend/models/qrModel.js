@@ -30,6 +30,10 @@ function buildQRTargetUrl(token) {
   return `http://${hostIp}:${frontendPort}/participant-status/${token}`;
 }
 
+function hashToken(token) {
+  return crypto.createHash("sha256").update(token).digest("hex");
+}
+
 /**
  * Audit Logger Helper conforming to unified schema
  */
@@ -53,7 +57,7 @@ async function writeAudit(tx, { userId, action, entityName, entityId, newValue }
 async function generateQR(registrationId, userId = null, externalTx = null) {
   const execute = async (tx) => {
     const registration = await tx.eventRegistration.findUnique({
-      where: { id: registrationId },
+      where: { registrationId },
       include: { participant: true, event: true },
     });
 
@@ -68,6 +72,7 @@ async function generateQR(registrationId, userId = null, externalTx = null) {
       data: {
         registrationId,
         token,
+        tokenHash: hashToken(token),
         expiresAt,
         isActive: true,
       },
@@ -108,7 +113,12 @@ async function generateQR(registrationId, userId = null, externalTx = null) {
 async function verifyQR(token, eventId = null, userId = null) {
   return await prisma.$transaction(async (tx) => {
     const qr = await tx.qRCodePass.findFirst({
-      where: { token },
+      where: {
+        OR: [
+          { token },
+          { tokenHash: hashToken(token) },
+        ],
+      },
       include: {
         registration: {
           include: { participant: true, event: true },
@@ -128,20 +138,20 @@ async function verifyQR(token, eventId = null, userId = null) {
       action: "QR_VERIFIED",
       entityName: "QRCodePass",
       entityId: qr.id,
-      newValue: { registrationId: qr.registration.id, eventId },
+      newValue: { registrationId: qr.registration.registrationId, eventId },
     });
 
     return {
       valid: true,
       qrId: qr.id,
-      registrationId: qr.registration.id,
+      registrationId: qr.registration.registrationId,
       participant: {
         id: qr.registration.participant.id,
         firstName: qr.registration.participant.firstName,
         lastName: qr.registration.participant.lastName,
       },
       event: {
-        id: qr.registration.event.id,
+        id: qr.registration.event.eventId,
         name: qr.registration.event.name, // Fixed: event.name instead of eventName
       },
       queueNumber: qr.registration.queueNumber,
@@ -242,7 +252,7 @@ async function manualCheckIn(params) {
               ...(eventId ? { eventId } : {}),
             },
           });
-          if (registration) regIdToUpdate = registration.id;
+          if (registration) regIdToUpdate = registration.registrationId;
         }
       }
     }
@@ -252,7 +262,7 @@ async function manualCheckIn(params) {
     }
 
     const updatedRegistration = await tx.eventRegistration.update({
-      where: { id: regIdToUpdate },
+      where: { registrationId: regIdToUpdate },
       data: {
         checkedIn: true,
         checkedInAt: new Date(),
@@ -282,7 +292,10 @@ async function manualCheckIn(params) {
 async function getParticipant(token) {
   const qr = await prisma.qRCodePass.findFirst({
     where: {
-      token,
+      OR: [
+        { token },
+        { tokenHash: hashToken(token) },
+      ],
       isActive: true,
       expiresAt: { gt: new Date() },
     },
@@ -297,7 +310,7 @@ async function getParticipant(token) {
 
   return {
     qrId: qr.id,
-    registrationId: qr.registration.id,
+    registrationId: qr.registration.registrationId,
     participant: qr.registration.participant,
     event: qr.registration.event,
     queueNumber: qr.registration.queueNumber,
