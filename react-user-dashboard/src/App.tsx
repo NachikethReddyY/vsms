@@ -12,6 +12,7 @@ import DashboardPage from './components/DashboardPage';
 import QRCodePage from './components/qr/QRCodePage';
 import VisualAcuityStationPage from './features/screening/VisualAcuityStationPage';
 import AuditLogsPage from './features/audit-logs/AuditLogsPage';
+import ParticipantSearchPage from './features/participants/ParticipantSearchPage';
 
 
 function ProtectedRoutes() {
@@ -43,6 +44,7 @@ export default function App() {
       <Route path="/login" element={<LoginPage />} />
       <Route path="/signup" element={<SignUpPage />} />
       <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+      <Route path="/participant-search" element={<ParticipantSearchPage />} />
       
       <Route element={<ProtectedRoutes />}>
         <Route path="/dashboard" element={<DashboardPage />} />
