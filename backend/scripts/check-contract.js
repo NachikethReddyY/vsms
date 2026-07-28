@@ -6,7 +6,8 @@ const { randomUUID } = require("crypto");
 
 const temporary = join(tmpdir(), `vsms-api-${randomUUID()}.ts`);
 const generated = resolve(__dirname, "../../react-user-dashboard/src/generated/api.ts");
-const result = spawnSync("npx", ["openapi-typescript", "docs/openapi.yaml", "-o", temporary], {
+const generator = resolve(__dirname, "../node_modules/openapi-typescript/bin/cli.js");
+const result = spawnSync(process.execPath, [generator, "docs/openapi.yaml", "-o", temporary], {
   cwd: resolve(__dirname, ".."),
   stdio: "inherit",
 });

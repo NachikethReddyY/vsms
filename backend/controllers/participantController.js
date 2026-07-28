@@ -1,69 +1,39 @@
-const participantModel = require("../models/participantModel");
+const participantService = require("../services/participantService");
 
-exports.createParticipant = async (req, res) => {
-  console.log("========== CREATE PARTICIPANT ==========");
-  console.log("Request Body:", req.body);
-  console.log("Authenticated User:", req.user);
+const actorFrom = (req) => ({
+  ...req.user,
+  ipAddress: req.ip,
+  requestId: req.requestId,
+});
 
-  try {
-    // 1. Extract parameters
-    const {
-      eventId,
-      initialStationId,
-      userId: bodyUserId,
-      ...participantData
-    } = req.body;
+exports.search = async (req, res) => {
+  const result = await participantService.searchParticipants(req.body, actorFrom(req));
+  return res.status(200).json(result);
+};
 
-    // 2. Resolve userId (Auth middleware token > request body)
-    const userId = req.user?.id || bodyUserId;
+exports.profile = async (req, res) => {
+  const participant = await participantService.getParticipantProfile(
+    req.params.participantId,
+    req.query.eventId,
+    actorFrom(req),
+  );
+  return res.status(200).json({ participant });
+};
 
-    // 3. Validation: Catch missing required fields BEFORE calling the model
-    if (!eventId) {
-      return res.status(400).json({
-        success: false,
-        message: "'eventId' is required to register a participant.",
-      });
-    }
+exports.update = async (req, res) => {
+  const participant = await participantService.updateParticipant(
+    req.params.participantId,
+    req.body,
+    actorFrom(req),
+  );
+  return res.status(200).json({ participant });
+};
 
-    if (!userId) {
-      return res.status(400).json({
-        success: false,
-        message: "'userId' is required for the audit log.",
-      });
-    }
-
-    // 4. Fallback for initialStationId (optional station default)
-    const stationId = initialStationId || null;
-
-    // 5. Create participant record via model
-    const participant = await participantModel.createParticipant(
-      participantData,
-      eventId,
-      userId,
-      stationId
-    );
-
-    console.log("Participant created successfully:", participant);
-
-    return res.status(201).json({
-      success: true,
-      message: "Participant created successfully.",
-      data: participant,
-    });
-  } catch (err) {
-    console.error("Create Participant Error:", err);
-
-    // Prisma / Unique constraint violation (e.g. NRIC already exists)
-    if (err.code === "P2002") {
-      return res.status(409).json({
-        success: false,
-        message: "Participant with this NRIC already exists.",
-      });
-    }
-
-    return res.status(500).json({
-      success: false,
-      message: err.message || "Internal server error.",
-    });
-  }
+exports.registrationHistory = async (req, res) => {
+  const result = await participantService.getRegistrationHistory(
+    req.params.participantId,
+    req.query,
+    actorFrom(req),
+  );
+  return res.status(200).json(result);
 };

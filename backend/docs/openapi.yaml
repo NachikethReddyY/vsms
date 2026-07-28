@@ -18,6 +18,8 @@ tags:
     description: Authorized event details and lifecycle commands
   - name: Users
     description: Restricted administrative user projection
+  - name: Participants
+    description: Event-scoped participant lookup, profile maintenance, and registration history
 security:
   - bearerAuth: []
 paths:
@@ -131,6 +133,103 @@ paths:
                 items: { $ref: "#/components/schemas/User" }
         "401": { $ref: "#/components/responses/Unauthorized" }
         "403": { $ref: "#/components/responses/Forbidden" }
+  /api/participants/search:
+    post:
+      tags: [Participants]
+      operationId: searchParticipants
+      summary: Search participants before event registration
+      description: Sensitive exact identifiers are accepted in the request body so they do not appear in URL or proxy logs. Results are masked and show whether the participant is already registered for the selected event.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ParticipantSearchRequest" }
+      responses:
+        "200":
+          description: Masked, paginated participant matches
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ParticipantSearchResponse" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "422": { $ref: "#/components/responses/ValidationFailed" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+  /api/participants/{participantId}:
+    parameters:
+      - $ref: "#/components/parameters/ParticipantId"
+    get:
+      tags: [Participants]
+      operationId: getParticipantProfile
+      summary: Get the selected participant profile
+      parameters:
+        - $ref: "#/components/parameters/ParticipantEventContext"
+      responses:
+        "200":
+          description: Authorized participant profile without plaintext NRIC/FIN
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required: [participant]
+                properties:
+                  participant: { $ref: "#/components/schemas/ParticipantProfile" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "422": { $ref: "#/components/responses/ValidationFailed" }
+    patch:
+      tags: [Participants]
+      operationId: updateParticipantProfile
+      summary: Update participant profile fields using optimistic concurrency
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ParticipantUpdateRequest" }
+      responses:
+        "200":
+          description: Updated and audited participant profile
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required: [participant]
+                properties:
+                  participant: { $ref: "#/components/schemas/ParticipantProfile" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "422": { $ref: "#/components/responses/ValidationFailed" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+  /api/participants/{participantId}/registrations:
+    parameters:
+      - $ref: "#/components/parameters/ParticipantId"
+    get:
+      tags: [Participants]
+      operationId: getParticipantRegistrationHistory
+      summary: List a returning participant's event registration history
+      parameters:
+        - $ref: "#/components/parameters/ParticipantEventContext"
+        - name: page
+          in: query
+          schema: { type: integer, minimum: 1, default: 1 }
+        - name: limit
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 50, default: 20 }
+      responses:
+        "200":
+          description: Reverse-chronological event registration history
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ParticipantRegistrationHistoryResponse" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "422": { $ref: "#/components/responses/ValidationFailed" }
   /api/events:
     get:
       tags: [Events]
@@ -443,6 +542,17 @@ components:
       required: true
       schema: { type: string, minLength: 32 }
       description: Must equal the `vsms_csrf` cookie; requests also require an allowed Origin
+    ParticipantId:
+      name: participantId
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+    ParticipantEventContext:
+      name: eventId
+      in: query
+      required: true
+      description: Selected event used to authorize the staff member's registration assignment
+      schema: { type: string, format: uuid }
   requestBodies:
     TransitionRequest:
       required: true
@@ -479,6 +589,146 @@ components:
       description: Rate limit exceeded
       content: { application/json: { schema: { $ref: "#/components/schemas/Problem" } } }
   schemas:
+    Pagination:
+      type: object
+      additionalProperties: false
+      required: [page, limit, total, totalPages]
+      properties:
+        page: { type: integer, minimum: 1 }
+        limit: { type: integer, minimum: 1, maximum: 50 }
+        total: { type: integer, minimum: 0 }
+        totalPages: { type: integer, minimum: 0 }
+    ParticipantSearchRequest:
+      type: object
+      additionalProperties: false
+      required: [eventId]
+      anyOf:
+        - required: [query]
+        - required: [nric]
+        - required: [dateOfBirth]
+      properties:
+        eventId: { type: string, format: uuid }
+        query: { type: string, minLength: 3, maxLength: 100, description: "Name, contact number, or masked identifier" }
+        nric: { type: string, pattern: "^[STFGMstfgm][0-9]{7}[A-Za-z]$", description: Exact NRIC/FIN used only for keyed duplicate lookup }
+        dateOfBirth: { type: string, format: date }
+        page: { type: integer, minimum: 1, default: 1 }
+        limit: { type: integer, minimum: 1, maximum: 50, default: 20 }
+    ParticipantEventRegistrationSummary:
+      type: object
+      nullable: true
+      additionalProperties: false
+      required: [registrationId, registrationStatus, checkedIn]
+      properties:
+        registrationId: { type: string, format: uuid }
+        registrationStatus: { type: string, enum: [SIGNED_UP, CHECKED_IN, COMPLETED, CANCELLED] }
+        checkedIn: { type: boolean }
+        queueNumber: { type: integer, nullable: true, minimum: 1 }
+    ParticipantSearchResult:
+      type: object
+      additionalProperties: false
+      required: [participantId, displayName, nricMasked, maskedContactNumber, maskedDateOfBirth, version, registrationCount, selectedEventRegistration]
+      properties:
+        participantId: { type: string, format: uuid }
+        displayName: { type: string, maxLength: 201 }
+        nricMasked: { type: string, maxLength: 9 }
+        maskedContactNumber: { type: string, nullable: true }
+        maskedDateOfBirth: { type: string, nullable: true, example: "****-**-19" }
+        version: { type: integer, minimum: 1 }
+        registrationCount: { type: integer, minimum: 0 }
+        selectedEventRegistration: { $ref: "#/components/schemas/ParticipantEventRegistrationSummary" }
+    ParticipantSearchResponse:
+      type: object
+      additionalProperties: false
+      required: [participants, pagination]
+      properties:
+        participants:
+          type: array
+          items: { $ref: "#/components/schemas/ParticipantSearchResult" }
+        pagination: { $ref: "#/components/schemas/Pagination" }
+    ParticipantProfile:
+      type: object
+      additionalProperties: false
+      required: [participantId, nricMasked, firstName, lastName, displayName, dateOfBirth, gender, contactNumber, emergencyContact, consentGiven, version, createdAt, updatedAt, registrationCount]
+      properties:
+        participantId: { type: string, format: uuid }
+        nricMasked: { type: string, maxLength: 9 }
+        firstName: { type: string, maxLength: 100 }
+        lastName: { type: string, maxLength: 100 }
+        displayName: { type: string, maxLength: 201 }
+        dateOfBirth: { type: string, format: date }
+        gender: { type: string, minLength: 1, maxLength: 1 }
+        race: { type: string, nullable: true, maxLength: 50 }
+        nationality: { type: string, nullable: true, maxLength: 50 }
+        addressStreet: { type: string, nullable: true, maxLength: 255 }
+        addressUnit: { type: string, nullable: true, maxLength: 20 }
+        addressPostalCode: { type: string, nullable: true, pattern: "^[0-9]{6}$" }
+        contactNumber: { type: string, maxLength: 20 }
+        emergencyContact: { type: string, maxLength: 20 }
+        emergencyContactName: { type: string, nullable: true, maxLength: 100 }
+        consentGiven: { type: boolean, description: Read-only here; issue 20 owns consent changes }
+        version: { type: integer, minimum: 1 }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+        registrationCount: { type: integer, minimum: 0 }
+    ParticipantUpdateRequest:
+      type: object
+      additionalProperties: false
+      required: [eventId, version]
+      properties:
+        eventId: { type: string, format: uuid }
+        version: { type: integer, minimum: 1 }
+        nric: { type: string, pattern: "^[STFGMstfgm][0-9]{7}[A-Za-z]$" }
+        firstName: { type: string, minLength: 1, maxLength: 100 }
+        lastName: { type: string, minLength: 1, maxLength: 100 }
+        dateOfBirth: { type: string, format: date }
+        gender: { type: string, minLength: 1, maxLength: 1 }
+        race: { type: string, nullable: true, maxLength: 50 }
+        nationality: { type: string, nullable: true, maxLength: 50 }
+        addressStreet: { type: string, nullable: true, maxLength: 255 }
+        addressUnit: { type: string, nullable: true, maxLength: 20 }
+        addressPostalCode: { type: string, nullable: true, pattern: "^[0-9]{6}$" }
+        contactNumber: { type: string, minLength: 7, maxLength: 20 }
+        emergencyContact: { type: string, minLength: 7, maxLength: 20 }
+        emergencyContactName: { type: string, nullable: true, maxLength: 100 }
+    ParticipantRegistrationHistoryItem:
+      type: object
+      additionalProperties: false
+      required: [registrationId, registrationStatus, checkedIn, createdAt, updatedAt, event, registeredBy]
+      properties:
+        registrationId: { type: string, format: uuid }
+        registrationStatus: { type: string, enum: [SIGNED_UP, CHECKED_IN, COMPLETED, CANCELLED] }
+        queueNumber: { type: integer, nullable: true, minimum: 1 }
+        checkedIn: { type: boolean }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+        event:
+          type: object
+          additionalProperties: false
+          required: [eventId, name, venue, startsAt, endsAt, status]
+          properties:
+            eventId: { type: string, format: uuid }
+            name: { type: string }
+            venue: { type: string }
+            startsAt: { type: string, format: date-time }
+            endsAt: { type: string, format: date-time }
+            status: { $ref: "#/components/schemas/EventStatus" }
+        registeredBy:
+          type: object
+          additionalProperties: false
+          required: [userId, fullName]
+          properties:
+            userId: { type: string, format: uuid }
+            fullName: { type: string }
+    ParticipantRegistrationHistoryResponse:
+      type: object
+      additionalProperties: false
+      required: [participantId, registrations, pagination]
+      properties:
+        participantId: { type: string, format: uuid }
+        registrations:
+          type: array
+          items: { $ref: "#/components/schemas/ParticipantRegistrationHistoryItem" }
+        pagination: { $ref: "#/components/schemas/Pagination" }
     SystemRole:
       type: string
       enum: [ADMIN, EVENT_MANAGER, STAFF]

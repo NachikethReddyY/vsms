@@ -109,6 +109,65 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/participants/search": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Search participants before event registration
+         * @description Sensitive exact identifiers are accepted in the request body so they do not appear in URL or proxy logs. Results are masked and show whether the participant is already registered for the selected event.
+         */
+        post: operations["searchParticipants"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/participants/{participantId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                participantId: components["parameters"]["ParticipantId"];
+            };
+            cookie?: never;
+        };
+        /** Get the selected participant profile */
+        get: operations["getParticipantProfile"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Update participant profile fields using optimistic concurrency */
+        patch: operations["updateParticipantProfile"];
+        trace?: never;
+    };
+    "/api/participants/{participantId}/registrations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                participantId: components["parameters"]["ParticipantId"];
+            };
+            cookie?: never;
+        };
+        /** List a returning participant's event registration history */
+        get: operations["getParticipantRegistrationHistory"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/events": {
         parameters: {
             query?: never;
@@ -358,6 +417,130 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        Pagination: {
+            page: number;
+            limit: number;
+            total: number;
+            totalPages: number;
+        };
+        ParticipantSearchRequest: {
+            /** Format: uuid */
+            eventId: string;
+            /** @description Name, contact number, or masked identifier */
+            query?: string;
+            /** @description Exact NRIC/FIN used only for keyed duplicate lookup */
+            nric?: string;
+            /** Format: date */
+            dateOfBirth?: string;
+            /** @default 1 */
+            page: number;
+            /** @default 20 */
+            limit: number;
+        } | unknown | unknown | unknown;
+        ParticipantEventRegistrationSummary: {
+            /** Format: uuid */
+            registrationId: string;
+            /** @enum {string} */
+            registrationStatus: "SIGNED_UP" | "CHECKED_IN" | "COMPLETED" | "CANCELLED";
+            checkedIn: boolean;
+            queueNumber?: number | null;
+        } | null;
+        ParticipantSearchResult: {
+            /** Format: uuid */
+            participantId: string;
+            displayName: string;
+            nricMasked: string;
+            maskedContactNumber: string | null;
+            /** @example ****-**-19 */
+            maskedDateOfBirth: string | null;
+            version: number;
+            registrationCount: number;
+            selectedEventRegistration: components["schemas"]["ParticipantEventRegistrationSummary"];
+        };
+        ParticipantSearchResponse: {
+            participants: components["schemas"]["ParticipantSearchResult"][];
+            pagination: components["schemas"]["Pagination"];
+        };
+        ParticipantProfile: {
+            /** Format: uuid */
+            participantId: string;
+            nricMasked: string;
+            firstName: string;
+            lastName: string;
+            displayName: string;
+            /** Format: date */
+            dateOfBirth: string;
+            gender: string;
+            race?: string | null;
+            nationality?: string | null;
+            addressStreet?: string | null;
+            addressUnit?: string | null;
+            addressPostalCode?: string | null;
+            contactNumber: string;
+            emergencyContact: string;
+            emergencyContactName?: string | null;
+            /** @description Read-only here; issue 20 owns consent changes */
+            consentGiven: boolean;
+            version: number;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt: string;
+            registrationCount: number;
+        };
+        ParticipantUpdateRequest: {
+            /** Format: uuid */
+            eventId: string;
+            version: number;
+            nric?: string;
+            firstName?: string;
+            lastName?: string;
+            /** Format: date */
+            dateOfBirth?: string;
+            gender?: string;
+            race?: string | null;
+            nationality?: string | null;
+            addressStreet?: string | null;
+            addressUnit?: string | null;
+            addressPostalCode?: string | null;
+            contactNumber?: string;
+            emergencyContact?: string;
+            emergencyContactName?: string | null;
+        };
+        ParticipantRegistrationHistoryItem: {
+            /** Format: uuid */
+            registrationId: string;
+            /** @enum {string} */
+            registrationStatus: "SIGNED_UP" | "CHECKED_IN" | "COMPLETED" | "CANCELLED";
+            queueNumber?: number | null;
+            checkedIn: boolean;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt: string;
+            event: {
+                /** Format: uuid */
+                eventId: string;
+                name: string;
+                venue: string;
+                /** Format: date-time */
+                startsAt: string;
+                /** Format: date-time */
+                endsAt: string;
+                status: components["schemas"]["EventStatus"];
+            };
+            registeredBy: {
+                /** Format: uuid */
+                userId: string;
+                fullName: string;
+            };
+        };
+        ParticipantRegistrationHistoryResponse: {
+            /** Format: uuid */
+            participantId: string;
+            registrations: components["schemas"]["ParticipantRegistrationHistoryItem"][];
+            pagination: components["schemas"]["Pagination"];
+        };
         /** @enum {string} */
         SystemRole: "ADMIN" | "EVENT_MANAGER" | "STAFF";
         /** @enum {string} */
@@ -484,11 +667,6 @@ export interface components {
             eventStationId?: string | null;
         };
         StaffAssignment: {
-            assignedUser: {
-              id: string; fullName: string;
-              /** Format: uuid */
-              userId: string; username: string;
-            };
             /** Format: uuid */
             staffAssignmentId: string;
             assignmentRole: components["schemas"]["StaffAssignmentRole"];
@@ -503,8 +681,6 @@ export interface components {
                 stationOrder: number;
             } | null;
             user: {
-                id: string;
-                fullName: string;
                 /** Format: uuid */
                 userId: string;
                 username: string;
@@ -521,7 +697,6 @@ export interface components {
             notes?: string | null;
         };
         User: {
-            id: string;
             /** Format: uuid */
             userId: string;
             username: string;
@@ -792,6 +967,9 @@ export interface components {
         EventLimit: number;
         /** @description Must equal the `vsms_csrf` cookie; requests also require an allowed Origin */
         CsrfToken: string;
+        ParticipantId: string;
+        /** @description Selected event used to authorize the staff member's registration assignment */
+        ParticipantEventContext: string;
     };
     requestBodies: {
         TransitionRequest: {
@@ -975,6 +1153,131 @@ export interface operations {
             };
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
+        };
+    };
+    searchParticipants: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ParticipantSearchRequest"];
+            };
+        };
+        responses: {
+            /** @description Masked, paginated participant matches */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ParticipantSearchResponse"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            422: components["responses"]["ValidationFailed"];
+            429: components["responses"]["RateLimited"];
+        };
+    };
+    getParticipantProfile: {
+        parameters: {
+            query: {
+                /** @description Selected event used to authorize the staff member's registration assignment */
+                eventId: components["parameters"]["ParticipantEventContext"];
+            };
+            header?: never;
+            path: {
+                participantId: components["parameters"]["ParticipantId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Authorized participant profile without plaintext NRIC/FIN */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        participant: components["schemas"]["ParticipantProfile"];
+                    };
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            422: components["responses"]["ValidationFailed"];
+        };
+    };
+    updateParticipantProfile: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                participantId: components["parameters"]["ParticipantId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ParticipantUpdateRequest"];
+            };
+        };
+        responses: {
+            /** @description Updated and audited participant profile */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        participant: components["schemas"]["ParticipantProfile"];
+                    };
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            422: components["responses"]["ValidationFailed"];
+            429: components["responses"]["RateLimited"];
+        };
+    };
+    getParticipantRegistrationHistory: {
+        parameters: {
+            query: {
+                /** @description Selected event used to authorize the staff member's registration assignment */
+                eventId: components["parameters"]["ParticipantEventContext"];
+                page?: number;
+                limit?: number;
+            };
+            header?: never;
+            path: {
+                participantId: components["parameters"]["ParticipantId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Reverse-chronological event registration history */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ParticipantRegistrationHistoryResponse"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            422: components["responses"]["ValidationFailed"];
         };
     };
     listEvents: {

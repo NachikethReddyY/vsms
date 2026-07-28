@@ -17,6 +17,7 @@ const userRoutes = require("./routes/userRoutes");
 const eventRoutes = require("./routes/eventRoutes");
 const locationRoutes = require("./routes/locationRoutes");
 const qrRoutes = require("./routes/qrRoutes");
+const participantRoutes = require("./routes/participantRoutes");
 const screeningRoutes = require("./routes/screeningRoutes");
 const { notFound, errorHandler } = require("./middlewares/errorHandler");
 
@@ -110,6 +111,7 @@ app.use("/api/auth", authLimiter, authRoutes);
 app.use("/api/users", userRoutes);
 app.use("/api/events", (req, res, next) => ["POST", "PATCH", "PUT", "DELETE"].includes(req.method) ? mutationLimiter(req, res, next) : next(), eventRoutes);
 app.use("/api/locations", locationRoutes);
+app.use("/api/participants", (req, res, next) => ["POST", "PATCH", "PUT", "DELETE"].includes(req.method) ? mutationLimiter(req, res, next) : next(), participantRoutes);
 app.use("/api/events", (req, res, next) => ["POST", "PATCH", "PUT", "DELETE"].includes(req.method) ? mutationLimiter(req, res, next) : next(), screeningRoutes);
 app.use("/api/qr", mutationLimiter, qrRoutes);
 

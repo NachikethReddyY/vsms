@@ -272,6 +272,7 @@ model UserRole {
 model Participant {
   id                   String   @id @default(uuid()) @map("participant_id") @db.Uuid
   nric                 String   @unique @db.Text
+  nricLookupHash       String?  @unique @map("nric_lookup_hash") @db.Char(64)
   nricMasked           String   @map("nric_masked") @db.VarChar(9)
   firstName            String   @map("first_name") @db.VarChar(100)
   lastName             String   @map("last_name") @db.VarChar(100)

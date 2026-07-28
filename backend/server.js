@@ -12,6 +12,7 @@ require("dotenv").config();
 
 const env = require("./config/env");
 const logger = require("./utils/logger/logger");
+const { notFound, errorHandler } = require("./middlewares/errorHandler");
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -149,17 +150,13 @@ app.use("/auth", authRoutes);
 app.use("/users", userRoutes);
 app.use("/qr", qrRoutes);
 app.use("/participants", participantRoutes);
+app.use("/api/participants", participantRoutes);
 app.use("/event-registrations", eventRegistrationRoutes);
 app.use("/events", eventRoutes);
 app.use("/queue", queueRoutes); // <--- Registered queue routes to prevent blank export issues
 
-// Safe Express 4 fallback catch-all handler (avoids PathError crashes)
-app.use((req, res) => {
-  res.status(404).json({
-    success: false,
-    message: `Cannot ${req.method} ${req.originalUrl}`,
-  });
-});
+app.use(notFound);
+app.use(errorHandler);
 
 server.on("error", (error) => {
   logger.error("server.failed", { message: error.message, stack: error.stack });

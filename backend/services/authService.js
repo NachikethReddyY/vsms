@@ -16,7 +16,7 @@ const publicUser = (user) => ({
   username: user.username,
   fullName: user.fullName,
   employeeNumber: user.employeeNumber,
-  systemRole: user.systemRole || "STAFF",
+  systemRole: user.sysRole || "STAFF",
   status: user.status,
   createdAt: user.createdAt,
 });

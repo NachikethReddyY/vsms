@@ -19,17 +19,19 @@ module.exports = async (req, _res, next) => {
       throw new AppError(401, "INVALID_SESSION", "Session is invalid or expired");
     }
 
-    // Matches your Prisma User model schema fields (id, email, fullName, status)
     const user = await prisma.user.findUnique({
       where: { id: payload.sub }, 
-      select: { id: true, email: true, fullName: true, status: true },
+      select: { id: true, email: true, fullName: true, sysRole: true, status: true },
     });
 
     if (!user || user.status !== "ACTIVE") {
       throw new AppError(401, "INVALID_SESSION", "Session is invalid or expired");
     }
 
-    req.user = user;
+    req.user = {
+      ...user,
+      systemRole: user.sysRole,
+    };
     next();
   } catch (error) {
     next(error);
