@@ -13,8 +13,6 @@ import QRCodePage from './components/qr/QRCodePage';
 import VisualAcuityStationPage from './features/screening/VisualAcuityStationPage';
 import AuditLogsPage from './features/audit-logs/AuditLogsPage';
 
-// Import your new participant form component
-import AddParticipantForm from './components/AddParticipantsForm';
 
 function ProtectedRoutes() {
   const { user, isBootstrapping } = useAuth();
@@ -57,8 +55,7 @@ export default function App() {
 
         <Route path="/events/:eventId" element={<EventDetailPage />} />
         
-        {/* Added Participant Registration Route matching your backend path */}
-        <Route path="/events/:eventId/participants/new" element={<AddParticipantForm />} />
+        <Route path="/events/:eventId/participants/new" element={<Navigate to="/events" replace />} />
 
         <Route path="/events/:eventId/stations/visual-acuity" element={<VisualAcuityStationPage />} />
         <Route path="/events/qr-pass/:registrationId" element={<QRCodePage />} />
