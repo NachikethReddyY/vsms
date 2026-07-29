@@ -107,12 +107,26 @@ const searchParticipants = async (input, actor) => {
   const filters = [];
   if (input.nric) filters.push({ nricLookupHash: lookupHash(normalizeNric(input.nric)) });
   if (input.query) {
+    const query = input.query.trim();
+    const nameParts = query.split(/\s+/).filter(Boolean);
+    const fullNameFilter = nameParts.length > 1
+      ? {
+        AND: nameParts.map((part) => ({
+          OR: [
+            { firstName: { contains: part, mode: "insensitive" } },
+            { lastName: { contains: part, mode: "insensitive" } },
+          ],
+        })),
+      }
+      : null;
+
     filters.push({
       OR: [
-        { firstName: { contains: input.query, mode: "insensitive" } },
-        { lastName: { contains: input.query, mode: "insensitive" } },
-        { contactNumber: { contains: input.query } },
-        { nricMasked: { contains: input.query.toUpperCase() } },
+        { firstName: { contains: query, mode: "insensitive" } },
+        { lastName: { contains: query, mode: "insensitive" } },
+        { contactNumber: { contains: query } },
+        { nricMasked: { contains: query.toUpperCase() } },
+        ...(fullNameFilter ? [fullNameFilter] : []),
       ],
     });
   }

@@ -44,7 +44,6 @@ export default function App() {
       <Route path="/login" element={<LoginPage />} />
       <Route path="/signup" element={<SignUpPage />} />
       <Route path="/forgot-password" element={<ForgotPasswordPage />} />
-      <Route path="/participant-search" element={<ParticipantSearchPage />} />
       
       <Route element={<ProtectedRoutes />}>
         <Route path="/dashboard" element={<DashboardPage />} />
@@ -58,6 +57,7 @@ export default function App() {
         <Route path="/events/:eventId" element={<EventDetailPage />} />
         
         <Route path="/events/:eventId/participants/new" element={<Navigate to="/events" replace />} />
+        <Route path="/participant-search" element={<ParticipantSearchPage />} />
 
         <Route path="/events/:eventId/stations/visual-acuity" element={<VisualAcuityStationPage />} />
         <Route path="/events/qr-pass/:registrationId" element={<QRCodePage />} />

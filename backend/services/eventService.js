@@ -442,29 +442,9 @@ const listEvents = async (query, user) => {
     });
   }
 
-  const where = conditions.length > 0 ? { AND: conditions } : {};
+const where = conditions.length > 0 ? { AND: conditions } : {};
 const rows = await prisma.event.findMany({
-  where: {
-    AND: [
-      {
-        shifts: {
-          some: {
-            staffAssignments: {
-              some: {
-                userId: "3997faba-e406-4a22-855f-e9a0d94e2bfd",
-                status: {
-                  in: [
-                    "ASSIGNED",
-                    "CONFIRMED"
-                  ]
-                }
-              }
-            }
-          }
-        }
-      }
-    ]
-  },
+  where,
   include: {
     eventDays: {
       orderBy: {
@@ -564,7 +544,7 @@ const rows = await prisma.event.findMany({
       eventId: "asc"
     }
   ],
-  take: 26
+  take: query.limit + 1,
 });
   const hasMore = rows.length > query.limit;
   const events = hasMore ? rows.slice(0, query.limit) : rows;

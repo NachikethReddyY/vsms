@@ -1,6 +1,7 @@
 require("dotenv").config();
 const bcrypt = require("bcrypt");
 const prisma = require("./prismaClient");
+const { encrypt, lookupHash } = require("../utils/cryptoUtils");
 
 const DEMO_PASSWORD = process.env.VSMS_DEMO_PASSWORD || "Demo-Only-Change-Me-2026!";
 if (process.env.NODE_ENV === "production" && !process.env.VSMS_DEMO_PASSWORD) {
@@ -27,6 +28,27 @@ const EVENTS = [
   { eventId: "20000000-0000-4000-8000-000000000004", name: "West End Community Check", venue: "West End Activity Centre", startsAt: "2026-06-18T00:00:00.000Z", endsAt: "2026-06-18T07:00:00.000Z", capacity: 150, status: "COMPLETED" },
   { eventId: "20000000-0000-4000-8000-000000000005", name: "Harbour Family Screening", venue: "Harbour Community Room", startsAt: "2026-08-20T00:00:00.000Z", endsAt: "2026-08-20T06:00:00.000Z", capacity: 100, status: "CANCELLED" },
 ];
+
+// Fictional demo records only. They use non-real identifiers and phone numbers.
+const PARTICIPANTS = [
+  { id: "50000000-0000-4000-8000-000000000001", nric: "T0000001A", firstName: "Aisha", lastName: "Rahman", dateOfBirth: "1985-04-16", gender: "F", race: "Malay", contactNumber: "+6500000001", emergencyContact: "+6500000101", emergencyContactName: "Demo Contact", consentGiven: true },
+  { id: "50000000-0000-4000-8000-000000000002", nric: "T0000002B", firstName: "Daniel", lastName: "Tan", dateOfBirth: "1978-11-03", gender: "M", race: "Chinese", contactNumber: "+6500000002", emergencyContact: "+6500000102", emergencyContactName: "Demo Contact", consentGiven: true },
+  { id: "50000000-0000-4000-8000-000000000003", nric: "T0000003C", firstName: "Mei", lastName: "Ling", dateOfBirth: "1992-07-22", gender: "F", race: "Chinese", contactNumber: "+6500000003", emergencyContact: "+6500000103", emergencyContactName: "Demo Contact", consentGiven: true },
+  { id: "50000000-0000-4000-8000-000000000004", nric: "T0000004D", firstName: "Kumar", lastName: "Nair", dateOfBirth: "1969-02-09", gender: "M", race: "Indian", contactNumber: "+6500000004", emergencyContact: "+6500000104", emergencyContactName: "Demo Contact", consentGiven: false },
+  { id: "50000000-0000-4000-8000-000000000005", nric: "T0000005E", firstName: "Sofia", lastName: "Lim", dateOfBirth: "2001-09-28", gender: "F", race: "Chinese", contactNumber: "+6500000005", emergencyContact: "+6500000105", emergencyContactName: "Demo Contact", consentGiven: true },
+  { id: "50000000-0000-4000-8000-000000000006", nric: "T0000006F", firstName: "Noah", lastName: "Wong", dateOfBirth: "1958-12-14", gender: "M", race: "Chinese", contactNumber: "+6500000006", emergencyContact: "+6500000106", emergencyContactName: "Demo Contact", consentGiven: true },
+];
+
+const PARTICIPANT_REGISTRATIONS = [
+  { eventId: EVENTS[0].eventId, participantId: PARTICIPANTS[0].id, registrationStatus: "SIGNED_UP", checkedIn: false, queueNumber: 12 },
+  { eventId: EVENTS[0].eventId, participantId: PARTICIPANTS[1].id, registrationStatus: "CHECKED_IN", checkedIn: true, queueNumber: 7 },
+  { eventId: EVENTS[0].eventId, participantId: PARTICIPANTS[2].id, registrationStatus: "SIGNED_UP", checkedIn: false, queueNumber: 18 },
+  { eventId: EVENTS[3].eventId, participantId: PARTICIPANTS[0].id, registrationStatus: "COMPLETED", checkedIn: true, queueNumber: 4 },
+  { eventId: EVENTS[3].eventId, participantId: PARTICIPANTS[3].id, registrationStatus: "COMPLETED", checkedIn: true, queueNumber: 16 },
+  { eventId: EVENTS[1].eventId, participantId: PARTICIPANTS[5].id, registrationStatus: "SIGNED_UP", checkedIn: false, queueNumber: 9 },
+];
+
+const maskNric = (nric) => `${nric.slice(0, 1)}XXXX${nric.slice(-3)}`;
 
 const main = async () => {
   const passwordHash = await bcrypt.hash(DEMO_PASSWORD, 12);
@@ -63,6 +85,34 @@ const main = async () => {
       where: { stationTemplateId: template.stationTemplateId },
       update: { ...template, active: true },
       create: template,
+    });
+  }
+
+  for (const participant of PARTICIPANTS) {
+    const normalizedNric = participant.nric.toUpperCase();
+    const data = {
+      nric: encrypt(normalizedNric),
+      nricLookupHash: lookupHash(normalizedNric),
+      nricMasked: maskNric(normalizedNric),
+      firstName: participant.firstName,
+      lastName: participant.lastName,
+      dateOfBirth: new Date(`${participant.dateOfBirth}T00:00:00.000Z`),
+      gender: participant.gender,
+      race: participant.race,
+      nationality: "Singaporean",
+      addressStreet: "Demo Street",
+      addressUnit: "#00-00",
+      addressPostalCode: "000000",
+      contactNumber: participant.contactNumber,
+      emergencyContact: participant.emergencyContact,
+      emergencyContactName: participant.emergencyContactName,
+      consentGiven: participant.consentGiven,
+    };
+
+    await prisma.participant.upsert({
+      where: { id: participant.id },
+      update: data,
+      create: { id: participant.id, ...data },
     });
   }
 
@@ -192,9 +242,28 @@ const main = async () => {
     }
   }
 
+  for (const registration of PARTICIPANT_REGISTRATIONS) {
+    const participant = PARTICIPANTS.find((item) => item.id === registration.participantId);
+    const data = {
+      registeredBy: USERS[1].id,
+      registrationStatus: registration.registrationStatus,
+      participantDisplayName: `${participant.firstName} ${participant.lastName}`,
+      queueNumber: registration.queueNumber,
+      checkedIn: registration.checkedIn,
+    };
+
+    await prisma.eventRegistration.upsert({
+      where: { eventId_participantId: { eventId: registration.eventId, participantId: registration.participantId } },
+      update: data,
+      create: { eventId: registration.eventId, participantId: registration.participantId, ...data },
+    });
+  }
+
   console.log(JSON.stringify({
     success: true,
-    message: "Database successfully seeded!"
+    message: "Database successfully seeded!",
+    participants: PARTICIPANTS.length,
+    registrations: PARTICIPANT_REGISTRATIONS.length,
   }, null, 2));
 };
 
