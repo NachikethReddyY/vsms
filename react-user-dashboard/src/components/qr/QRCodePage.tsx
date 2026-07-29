@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
+import { isAxiosError } from "axios";
 import { useParams } from "react-router-dom";
 import QRCode from "./QRCode";
 import "./qrCodePage.css";
@@ -12,7 +13,6 @@ function QRCodePage() {
     const [loading, setLoading] = useState<boolean>(true);
     const [error, setError] = useState<string>("");
 
-    // eslint-disable-next-line react-hooks/exhaustive-deps
     const fetchOrGenerateQR = useCallback(async () => {
         if (!registrationId) {
             setError("Registration ID is missing from route parameters.");
@@ -34,20 +34,20 @@ function QRCodePage() {
 
             setQrImage(result.data.qrImage);
             setToken(result.data.token);
-        } catch (err: any) {
+        } catch (err: unknown) {
             setError(
-                err.response?.data?.message ||
+                (isAxiosError<{ message?: string }>(err) && err.response?.data?.message) ||
                 (err instanceof Error ? err.message : "Unexpected error occurred")
             );
         } finally {
             setLoading(false);
         }
-    });
+    }, [registrationId]);
 
     // Automatically trigger pass generation as soon as the component loads
     useEffect(() => {
         fetchOrGenerateQR();
-    }, [fetchOrGenerateQR, registrationId]);
+    }, [fetchOrGenerateQR]);
 
     return (
         <main className="qr-page">

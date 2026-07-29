@@ -114,7 +114,7 @@ A legitimate user performs sensitive operations but later denies carrying out th
 ### Mitigation
 
 - Winston audit logging.
-- Morgan HTTP request logging.
+- Structured application and error logging.
 - Timestamped log entries.
 - Server-side logging of significant operations.
 
@@ -202,8 +202,7 @@ The Optix system incorporates multiple security controls to reduce the likelihoo
 | Zod Validation                   | Validates all incoming requests on the server.                                 |
 | Prisma ORM                       | Uses parameterised queries to reduce SQL Injection risks.                      |
 | Helmet                           | Applies secure HTTP response headers.                                          |
-| Winston Logging                  | Records audit and application events.                                          |
-| Morgan Logging                   | Records incoming HTTP requests for monitoring purposes.                        |
+| Winston Logging                  | Records audit, application, and error events for monitoring purposes.           |
 | Environment Variables            | Protects sensitive configuration such as database credentials and JWT secrets. |
 | Request Payload Limits           | Reduces the risk of Denial of Service attacks.                                 |
 
@@ -215,7 +214,7 @@ The Optix system incorporates multiple security controls to reduce the likelihoo
 | ------------------------ | ---------- | --------------------------------------------------------------- |
 | ① Spoofing               | High       | JWT Authentication, bcrypt password hashing                     |
 | ② Tampering              | High       | HTTPS, Zod validation, Prisma ORM, RBAC                         |
-| ③ Repudiation            | Medium     | Winston logging, Morgan logging                                 |
+| ③ Repudiation            | Medium     | Winston logging                                                 |
 | ④ Information Disclosure | High       | Authentication, Password Hashing, Helmet, Environment Variables |
 | ⑤ Denial of Service      | Medium     | Payload size limits, Input validation, Error handling           |
 | ⑥ Elevation of Privilege | High       | RBAC, JWT verification, Server-side permission checks           |
