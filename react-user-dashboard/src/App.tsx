@@ -13,6 +13,8 @@ import QRCodePage from './components/qr/QRCodePage';
 import VisualAcuityStationPage from './features/screening/VisualAcuityStationPage';
 import AuditLogsPage from './features/audit-logs/AuditLogsPage';
 import ParticipantSearchPage from './features/participants/ParticipantSearchPage';
+import ParticipantRegistrationPage from './features/participants/ParticipantRegistrationPage';
+import ParticipantDetailsPage from './features/participants/ParticipantDetailsPage';
 
 
 function ProtectedRoutes() {
@@ -58,6 +60,8 @@ export default function App() {
         
         <Route path="/events/:eventId/participants/new" element={<Navigate to="/events" replace />} />
         <Route path="/participant-search" element={<ParticipantSearchPage />} />
+        <Route path="/participant-search/:participantId/edit" element={<ParticipantDetailsPage />} />
+        <Route path="/participant-search/:participantId/register" element={<ParticipantRegistrationPage />} />
 
         <Route path="/events/:eventId/stations/visual-acuity" element={<VisualAcuityStationPage />} />
         <Route path="/events/qr-pass/:registrationId" element={<QRCodePage />} />

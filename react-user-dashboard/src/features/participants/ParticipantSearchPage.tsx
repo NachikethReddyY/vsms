@@ -1,5 +1,15 @@
-import { CalendarDaysIcon, ExclamationTriangleIcon, IdentificationIcon, MagnifyingGlassIcon, PhoneIcon, UserGroupIcon } from '@heroicons/react/24/outline';
+import {
+  ArrowRightIcon,
+  CalendarDaysIcon,
+  ExclamationTriangleIcon,
+  IdentificationIcon,
+  MagnifyingGlassIcon,
+  PencilSquareIcon,
+  PhoneIcon,
+  UserGroupIcon,
+} from '@heroicons/react/24/outline';
 import { useEffect, useState, type FormEvent } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { getApiMessage } from '../../auth/authState';
 import { eventApi, formatEventDate, type EventRecord } from '../events/eventApi';
 import apiClient from '../../utils/apiClient';
@@ -17,7 +27,6 @@ type ParticipantSearchResult = {
   nricMasked: string;
   maskedContactNumber: string | null;
   maskedDateOfBirth: string | null;
-  version: number;
   registrationCount: number;
   selectedEventRegistration: ParticipantRegistration | null;
 };
@@ -50,6 +59,7 @@ function registrationSummary(registration: ParticipantRegistration | null) {
 }
 
 export default function ParticipantSearchPage() {
+  const navigate = useNavigate();
   const [events, setEvents] = useState<EventRecord[]>([]);
   const [eventsLoading, setEventsLoading] = useState(true);
   const [eventError, setEventError] = useState('');
@@ -144,6 +154,7 @@ export default function ParticipantSearchPage() {
     setHasSearched(false);
   };
 
+  const selectedEvent = events.find((event) => event.eventId === eventId);
   const pagination = results?.pagination;
 
   return (
@@ -202,10 +213,12 @@ export default function ParticipantSearchPage() {
           <div className="participant-results-list">
             {results.participants.map((participant) => {
               const registration = participant.selectedEventRegistration;
+              const locationState = { participantName: participant.displayName, eventName: selectedEvent?.name };
               return <article className="participant-result-card" key={participant.participantId}>
                 <div className="participant-result-avatar" aria-hidden="true">{participant.displayName.split(/\s+/).slice(0, 2).map((part) => part[0]).join('').toUpperCase()}</div>
                 <div className="participant-result-main"><h3>{participant.displayName}</h3><div className="participant-identity"><span><IdentificationIcon />{participant.nricMasked}</span>{participant.maskedDateOfBirth && <span><CalendarDaysIcon />{participant.maskedDateOfBirth}</span>}{participant.maskedContactNumber && <span><PhoneIcon />{participant.maskedContactNumber}</span>}</div><p>{participant.registrationCount} {participant.registrationCount === 1 ? 'previous registration' : 'previous registrations'}</p></div>
                 <div className={`participant-registration-status ${registration ? 'registered' : ''}`}><strong>{registration ? 'Already registered' : 'New for this event'}</strong><span>{registrationSummary(registration)}</span></div>
+                <div className="participant-result-actions"><button type="button" className="secondary" onClick={() => navigate(`/participant-search/${participant.participantId}/edit?eventId=${encodeURIComponent(eventId)}`, { state: locationState })}><PencilSquareIcon />Edit details</button><button type="button" className="primary" onClick={() => navigate(`/participant-search/${participant.participantId}/register?eventId=${encodeURIComponent(eventId)}`, { state: locationState })}><ArrowRightIcon />Register</button></div>
               </article>;
             })}
           </div>
