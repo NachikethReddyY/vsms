@@ -1,7 +1,6 @@
 const express = require("express");
 const cors = require("cors");
 const helmet = require("helmet");
-const morgan = require("morgan");
 const fs = require("fs");
 const https = require("https");
 const path = require("path");
@@ -105,19 +104,7 @@ app.use(
 );
 
 // -----------------------------------------------------------------------------
-// 3. HTTP LOGGING
-// -----------------------------------------------------------------------------
-const morganFormat = ":remote-addr - :method :url :status :response-time ms";
-app.use(
-  morgan(morganFormat, {
-    stream: {
-      write: (message) => logger.info(message.trim()),
-    },
-  })
-);
-
-// -----------------------------------------------------------------------------
-// 4. BODY PARSING, COOKIES & LIMITS
+// 3. BODY PARSING, COOKIES & LIMITS
 // -----------------------------------------------------------------------------
 app.use(cookieParser());
 app.use(express.json({ limit: "100kb" }));
@@ -135,7 +122,7 @@ app.use((err, req, res, next) => {
 });
 
 // -----------------------------------------------------------------------------
-// 5. ROUTES
+// 4. ROUTES
 // -----------------------------------------------------------------------------
 if (swaggerDocument) {
   app.use("/api-docs", swaggerUi.serve, swaggerUi.setup(swaggerDocument));

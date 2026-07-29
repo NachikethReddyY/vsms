@@ -11,7 +11,6 @@ const YAML = require("yaml");
 const env = require("./config/env");
 const AppError = require("./errors/AppError");
 const requestContext = require("./middlewares/requestContext");
-const requestLogger = require("./middlewares/morgan");
 const authRoutes = require("./routes/authRoutes");
 const userRoutes = require("./routes/userRoutes");
 const eventRoutes = require("./routes/eventRoutes");
@@ -55,7 +54,6 @@ if (env.trustProxy) app.set("trust proxy", 1);
 app.disable("x-powered-by");
 
 app.use(requestContext);
-app.use(requestLogger);
 app.use((req, _res, next) => {
   if (env.isProduction && !req.secure) return next(new AppError(426, "HTTPS_REQUIRED", "HTTPS is required"));
   return next();
