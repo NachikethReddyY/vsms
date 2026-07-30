@@ -24,7 +24,7 @@ export default defineConfig(({ command }) => {
           target: 'https://127.0.0.1:5050',
           secure: false,
           changeOrigin: true,
-          cookiePathRewrite: { '/auth': '/qa-api/auth' },
+          cookiePathRewrite: { '/api/auth': '/qa-api/api/auth' },
           rewrite: (path) => path.replace(/^\/qa-api/, ''),
           configure(proxy) {
             proxy.on('proxyReq', (proxyRequest) => proxyRequest.setHeader('Origin', 'https://localhost:5173'))

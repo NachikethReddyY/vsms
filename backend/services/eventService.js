@@ -67,44 +67,59 @@ const eventInclude = {
           id: true,
           assignmentRole: true,
           status: true,
-          assignedUser: { select: { id: true, fullName: true, email: true } },
-          eventStation: { select: { eventStationId: true, name: true } },
+          notes: true,
+          assignedUser: { select: { id: true, username: true } },
+          station: { select: { stationId: true, stationName: true, stationOrder: true } },
         },
       },
     },
   },
-  eventStations: {
+  stations: {
     orderBy: { stationOrder: "asc" },
-    include: {
-      availabilities: {
-        include: { eventDay: true },
-      },
-    },
   },
-  createdBy: { select: { id: true, username: true, email: true, systemRole: true, status: true } },
-  cancelledBy: { select: { id: true, username: true, email: true, systemRole: true, status: true } },
+  createdBy: { select: { id: true, username: true, email: true, sysRole: true, status: true, createdAt: true } },
+  cancelledBy: { select: { id: true, username: true, email: true, sysRole: true, status: true, createdAt: true } },
   registrations: {
-    where: { status: { in: ["SIGNED_UP", "REGISTERED", "CHECKED_IN"] } },
+    where: { registrationStatus: { in: ["SIGNED_UP", "CHECKED_IN"] } },
     select: { registrationId: true },
   },
   _count: { select: { registrations: true } },
 };
 
-const toEventResponse = ({ _count, registrations, ...event }, user) => ({
+const toEventResponse = ({ _count, registrations, stations, ...event }, user) => ({
   ...event,
+  createdBy: event.createdBy && { ...event.createdBy, userId: event.createdBy.id, systemRole: event.createdBy.sysRole },
+  cancelledBy: event.cancelledBy && { ...event.cancelledBy, userId: event.cancelledBy.id, systemRole: event.cancelledBy.sysRole },
   eventDays: (event.eventDays || []).map((day) => ({
     ...day,
     date: day.date instanceof Date ? day.date.toISOString().slice(0, 10) : String(day.date).slice(0, 10),
   })),
-  eventStations: (event.eventStations || []).map((station) => ({
-    ...station,
-    availabilities: (station.availabilities || []).map((availability) => ({
-      ...availability,
-      eventDay: {
-        ...availability.eventDay,
-        date: availability.eventDay.date instanceof Date
-          ? availability.eventDay.date.toISOString().slice(0, 10)
-          : String(availability.eventDay.date).slice(0, 10),
+  eventStations: (stations || []).map((station) => ({
+    eventStationId: station.stationId,
+    stationTemplateId: station.stationId,
+    templateVersion: 1,
+    name: station.stationName,
+    stationOrder: station.stationOrder,
+    capacity: 1,
+    isAvailable: station.isActive,
+    availabilities: [],
+  })),
+  shifts: (event.shifts || []).map((shift) => ({
+    ...shift,
+    staffAssignments: shift.staffAssignments.map((assignment) => ({
+      staffAssignmentId: assignment.id,
+      assignmentRole: assignment.assignmentRole,
+      status: assignment.status,
+      notes: assignment.notes,
+      eventStation: assignment.station && {
+        eventStationId: assignment.station.stationId,
+        stationTemplateId: assignment.station.stationId,
+        name: assignment.station.stationName,
+        stationOrder: assignment.station.stationOrder,
+      },
+      user: {
+        userId: assignment.assignedUser.id,
+        username: assignment.assignedUser.username,
       },
     })),
   })),
@@ -443,129 +458,12 @@ const listEvents = async (query, user) => {
   }
 
   const where = conditions.length > 0 ? { AND: conditions } : {};
-const rows = await prisma.event.findMany({
-  where: {
-    AND: [
-      {
-        shifts: {
-          some: {
-            staffAssignments: {
-              some: {
-                userId: "3997faba-e406-4a22-855f-e9a0d94e2bfd",
-                status: {
-                  in: [
-                    "ASSIGNED",
-                    "CONFIRMED"
-                  ]
-                }
-              }
-            }
-          }
-        }
-      }
-    ]
-  },
-  include: {
-    eventDays: {
-      orderBy: {
-        date: "asc"
-      },
-      select: {
-        eventDayId: true,
-        date: true,
-        startsAt: true,
-        endsAt: true
-      }
-    },
-    shifts: {
-      orderBy: {
-        startsAt: "asc"
-      },
-      include: {
-        staffAssignments: {
-          where: {
-            status: {
-              not: "CANCELLED"
-            }
-          },
-          orderBy: {
-            assignedAt: "asc"
-          },
-          select: {
-            id: true,
-            assignmentRole: true,
-            status: true,
-            assignedUser: {
-              select: {
-                id: true,
-                fullName: true,
-                email: true
-              }
-            },
-            station: {
-              select: {
-                stationId: true,
-                stationName: true
-              }
-            }
-          }
-        }
-      }
-    },
-    stations: {
-      orderBy: {
-        stationOrder: "asc"
-      }
-    },
-    createdBy: {
-      select: {
-        id: true,
-        username: true,
-        email: true,
-        sysRole: true,
-        status: true
-      }
-    },
-    cancelledBy: {
-      select: {
-        id: true,
-        username: true,
-        email: true,
-        sysRole: true,
-        status: true
-      }
-    },
-    registrations: {
-      where: {
-        registrationStatus: {
-          in: [
-            // Updated to match your exact enum values (removed "REGISTERED")
-            "SIGNED_UP",
-            "CHECKED_IN",
-            "COMPLETED"
-          ]
-        }
-      },
-      select: {
-        registrationId: true
-      }
-    },
-    _count: {
-      select: {
-        registrations: true
-      }
-    }
-  },
-  orderBy: [
-    {
-      startsAt: "asc"
-    },
-    {
-      eventId: "asc"
-    }
-  ],
-  take: 26
-});
+  const rows = await prisma.event.findMany({
+    where,
+    include: eventInclude,
+    orderBy: [{ startsAt: "asc" }, { eventId: "asc" }],
+    take: query.limit + 1,
+  });
   const hasMore = rows.length > query.limit;
   const events = hasMore ? rows.slice(0, query.limit) : rows;
   const last = events.at(-1);
