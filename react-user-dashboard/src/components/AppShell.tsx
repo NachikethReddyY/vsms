@@ -174,10 +174,10 @@ export default function AppShell({ children }: { children: ReactNode }) {
 
           {/* Grouped Dashboards Dropdown Section */}
           <div className="nav-group my-1">
-            <button 
+            <button
               type="button"
               title="Dashboards Hub"
-              onClick={() => setDashboardsOpen(!dashboardsOpen)} 
+              onClick={() => setDashboardsOpen(!dashboardsOpen)}
               className="nav-item nav-group-toggle w-full flex items-center justify-between cursor-pointer border-0 bg-transparent text-inherit"
             >
               <span className="nav-item-inner flex items-center gap-2">

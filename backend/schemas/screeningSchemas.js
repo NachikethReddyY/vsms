@@ -19,6 +19,40 @@ const stationParams = eventParams.extend({
   stationId: z.string().uuid(),
 });
 
+const reviewParams = eventParams.extend({
+  registrationId: z.string().uuid(),
+}).strict();
+
+const clinicalSummary = z.string().trim().min(10).max(2000);
+const recommendations = z.string().trim().max(2000).optional();
+const contextVersion = z.string().regex(/^[a-f0-9]{64}$/);
+const referral = z.object({
+  destinationName: z.string().trim().min(2).max(200),
+  reason: z.string().trim().min(10).max(2000),
+  instructions: z.string().trim().max(2000).optional(),
+}).strict();
+const commonDecision = {
+  contextVersion,
+  confirmed: z.literal(true),
+  clinicalSummary,
+  recommendations,
+};
+const reviewDecisionBody = z.discriminatedUnion("outcome", [
+  z.object({ ...commonDecision, outcome: z.literal("COMPLETE") }).strict(),
+  z.object({ ...commonDecision, outcome: z.literal("MONITOR") }).strict(),
+  z.object({
+    ...commonDecision,
+    outcome: z.literal("REFER"),
+    urgency: z.enum(["ROUTINE", "PRIORITY", "URGENT"]),
+    referral,
+  }).strict(),
+  z.object({
+    ...commonDecision,
+    outcome: z.literal("URGENT_ESCALATION"),
+    referral,
+  }).strict(),
+]);
+
 const resolveQuery = z.object({
   passToken: z.string().min(4).max(255).optional(),
   registrationId: z.string().uuid().optional(),
@@ -41,6 +75,8 @@ const saveVisualAcuityBody = z.object({
 module.exports = {
   eventParams,
   stationParams,
+  reviewParams,
+  reviewDecisionBody,
   resolveQuery,
   saveVisualAcuityBody,
 };

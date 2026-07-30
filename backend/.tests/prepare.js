@@ -1,6 +1,18 @@
 require("dotenv").config();
 const { spawnSync } = require("child_process");
 
+const unitTests = spawnSync("node", [
+  "--test",
+  ".tests/contracts.test.js",
+  ".tests/security.test.js",
+  ".tests/validation.test.js",
+], {
+  cwd: process.cwd(),
+  env: { ...process.env, NODE_ENV: "test", LOCAL_HTTPS: "false" },
+  stdio: "inherit",
+});
+if (unitTests.status !== 0) process.exit(unitTests.status || 1);
+
 const url = new URL(process.env.DATABASE_URL);
 if (!url.pathname.endsWith("_test")) url.pathname = `${url.pathname}_test`;
 if (!url.pathname.endsWith("_test")) throw new Error("Refusing to prepare a database without an _test suffix");
@@ -12,7 +24,15 @@ const result = spawnSync("npx", ["prisma", "migrate", "deploy"], {
 });
 if (result.status !== 0) process.exit(result.status || 1);
 
-const tests = spawnSync("npx", ["vitest", "run", ".tests"], {
+const tests = spawnSync("npx", [
+  "vitest",
+  "run",
+  ".tests/auth.integration.test.js",
+  ".tests/events.integration.test.js",
+  ".tests/locationService.test.js",
+  ".tests/reviewService.test.js",
+  ".tests/reviews.integration.test.js",
+], {
   cwd: process.cwd(),
   env: { ...process.env, DATABASE_URL: url.toString(), NODE_ENV: "test", LOCAL_HTTPS: "false" },
   stdio: "inherit",

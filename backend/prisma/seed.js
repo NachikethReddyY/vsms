@@ -94,6 +94,30 @@ async function seedStaff(roles) {
   return user;
 }
 
+async function seedReviewer(roles, staff) {
+  const email = String(process.env.SEED_REVIEWER_EMAIL || "reviewer@vsms.local").trim().toLowerCase();
+  const reviewer = await prisma.user.upsert({
+    where: { email },
+    update: { status: "ACTIVE", sysRole: "STAFF" },
+    create: {
+      username: email,
+      fullName: process.env.SEED_REVIEWER_NAME || "Dr Samira Tan",
+      email,
+      employeeNumber: process.env.SEED_REVIEWER_EMPLOYEE_NUMBER || "SEED-REVIEWER-001",
+      department: "Clinical Operations",
+      designation: "Clinical Reviewer",
+      status: "ACTIVE",
+      sysRole: "STAFF",
+    },
+  });
+  await prisma.userRole.upsert({
+    where: { userId_roleId: { userId: reviewer.id, roleId: roles.get("REVIEWER").id } },
+    update: { assignedById: staff.id },
+    create: { userId: reviewer.id, roleId: roles.get("REVIEWER").id, assignedById: staff.id },
+  });
+  return reviewer;
+}
+
 async function seedPermissions(roles, staff) {
   const permissions = new Map();
   for (const permissionName of permissionNames) {
@@ -231,7 +255,12 @@ async function seedEventStructure(event, staff) {
   const shift = existingShift
     ? await prisma.shift.update({
         where: { shiftId: existingShift.shiftId },
-        data: { startsAt: shiftStartsAt, endsAt: shiftEndsAt, requiredStaff: 3 },
+        data: {
+          startsAt: shiftStartsAt,
+          endsAt: shiftEndsAt,
+          requiredStaff: 3,
+          status: event.status === "IN_PROGRESS" ? "ACTIVE" : event.status === "COMPLETED" ? "COMPLETED" : "PLANNED",
+        },
       })
     : await prisma.shift.create({
         data: {
@@ -240,6 +269,7 @@ async function seedEventStructure(event, staff) {
           startsAt: shiftStartsAt,
           endsAt: shiftEndsAt,
           requiredStaff: 3,
+          status: event.status === "IN_PROGRESS" ? "ACTIVE" : event.status === "COMPLETED" ? "COMPLETED" : "PLANNED",
         },
       });
 
@@ -484,7 +514,7 @@ async function ensureDemoRegistration(staff, participant, event, consent) {
   return { registration, qr };
 }
 
-async function seedDemoData(staff, consentForm) {
+async function seedDemoData(staff, reviewer, consentForm) {
   const upcomingEvent = await upsertDemoEvent(staff, {
     key: "seed-demo-tampines",
     name: "Community Eye Screening - Tampines",
@@ -512,11 +542,39 @@ async function seedDemoData(staff, consentForm) {
     endsAt: demoDate(-14, 9),
     capacity: 100,
   });
-  await Promise.all([
+  const [, liveStructure] = await Promise.all([
     seedEventStructure(upcomingEvent, staff),
     seedEventStructure(liveEvent, staff),
     seedEventStructure(completedEvent, staff),
   ]);
+
+  const reviewerAssignment = await prisma.staffAssignment.findFirst({
+    where: {
+      eventId: liveEvent.eventId,
+      shiftId: liveStructure.shift.shiftId,
+      userId: reviewer.id,
+      assignmentRole: "REVIEWER",
+      stationId: null,
+    },
+  });
+  const reviewerAssignmentData = {
+    assignedBy: staff.id,
+    assignmentStatus: "CONFIRMED",
+    status: "CONFIRMED",
+  };
+  if (reviewerAssignment) {
+    await prisma.staffAssignment.update({ where: { id: reviewerAssignment.id }, data: reviewerAssignmentData });
+  } else {
+    await prisma.staffAssignment.create({
+      data: {
+        ...reviewerAssignmentData,
+        eventId: liveEvent.eventId,
+        shiftId: liveStructure.shift.shiftId,
+        userId: reviewer.id,
+        assignmentRole: "REVIEWER",
+      },
+    });
+  }
 
   const aisha = await upsertDemoParticipant(staff, {
     participantReference: "VSMS-DEMO-000001",
@@ -592,6 +650,27 @@ async function seedDemoData(staff, consentForm) {
     danielConsent
   );
 
+  for (const station of liveStructure.stations) {
+    const visualAcuity = station.stationType === "VISUAL_ACUITY";
+    const result = {
+      recordedByUserId: reviewer.id,
+      screeningType: station.stationType,
+      resultData: visualAcuity
+        ? { od: { kind: "FRACTION", denominator: 18 }, os: { kind: "FRACTION", denominator: 24 }, chartDistanceMetres: 6, withUsualDistanceGlasses: true }
+        : { sphericalEquivalentRight: -1.25, sphericalEquivalentLeft: -1.75, notes: "Review recommended" },
+      overallFlag: visualAcuity ? "REFER" : "REVIEW",
+      isFlagged: true,
+      flagSummary: visualAcuity ? "Reduced visual acuity in both eyes" : "Refractive difference requires review",
+      ruleVersion: "VSMS-SEED-1.0",
+      idempotencyKey: `seed-review-${registration.registrationId.slice(0, 8)}-${station.stationId.slice(0, 8)}`,
+    };
+    await prisma.screeningResult.upsert({
+      where: { registrationId_stationId: { registrationId: registration.registrationId, stationId: station.stationId } },
+      update: result,
+      create: { ...result, registrationId: registration.registrationId, stationId: station.stationId },
+    });
+  }
+
   return {
     events: { upcomingEvent, liveEvent, completedEvent },
     participants: { aisha, daniel, priya, marcus },
@@ -604,10 +683,11 @@ async function seedDemoData(staff, consentForm) {
 async function main() {
   const roles = await seedRoles();
   const staff = await seedStaff(roles);
+  const reviewer = await seedReviewer(roles, staff);
   await seedPermissions(roles, staff);
   await seedStationTemplates();
   const consentForm = await seedConsentForm(staff);
-  const demo = await seedDemoData(staff, consentForm);
+  const demo = await seedDemoData(staff, reviewer, consentForm);
   console.log(`Seeded roles, permissions, station templates, consent form, staff profile, and demonstration data for ${staff.email}.`);
   console.log(`Upcoming event: ${demo.events.upcomingEvent.name} (${demo.events.upcomingEvent.eventId})`);
   console.log(`Live event: ${demo.events.liveEvent.name} (${demo.events.liveEvent.eventId})`);
@@ -615,6 +695,7 @@ async function main() {
   console.log(`Needs consent: ${demo.participants.priya.participantReference} - Priya Nair`);
   console.log(`Needs emergency contact: ${demo.participants.marcus.participantReference} - Marcus Lim`);
   console.log(`Registered participant: ${demo.participants.daniel.participantReference} - Daniel Tan`);
+  console.log(`Reviewer profile: ${reviewer.email} (Cognito group: REVIEWER)`);
   console.log(`Registration ID: ${demo.registration.registrationId}`);
   console.log(`Demo QR token: ${demo.qr.token}`);
 }
