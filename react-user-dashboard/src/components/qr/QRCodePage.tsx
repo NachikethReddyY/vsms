@@ -1,9 +1,10 @@
 // react-user-dashboard/src/components/qr/QRCodePage.tsx
 import { useCallback, useEffect, useState } from "react";
+import { isAxiosError } from "axios";
 import { useParams } from "react-router-dom";
 import QRCode from "./QRCode";
 import "./qrCodePage.css";
-import apiClient, { getApiError } from "../../utils/apiClient";
+import apiClient from "../../utils/apiClient";
 import { PrinterIcon, ArrowDownTrayIcon, ArrowPathIcon, CheckCircleIcon } from "@heroicons/react/24/outline";
 
 export default function QRCodePage() {
@@ -37,16 +38,17 @@ export default function QRCodePage() {
             setQrImage(result.data.qrImage);
             setToken(result.data.token);
         } catch (err: unknown) {
-            setError(getApiError(err, err instanceof Error ? err.message : "Unexpected error occurred"));
+            setError(
+                (isAxiosError<{ message?: string }>(err) && err.response?.data?.message) ||
+                (err instanceof Error ? err.message : "Unexpected error occurred")
+            );
         } finally {
             setLoading(false);
         }
     }, [registrationId]);
 
     useEffect(() => {
-        if (registrationId) {
-            fetchOrGenerateQR();
-        }
+        fetchOrGenerateQR();
     }, [fetchOrGenerateQR]);
 
     const handleStartEvent = () => {
