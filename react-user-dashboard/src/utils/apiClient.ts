@@ -1,7 +1,7 @@
 import axios from 'axios';
 
-// Fixed: changed fallback port from 5050 to 5000 to match your Express server
-const baseURL = import.meta.env.VITE_API_BASE_URL ?? (import.meta.env.DEV ? '/qa-api' : `${window.location.protocol}//${window.location.hostname}:5000`);
+const baseURL = import.meta.env.VITE_API_BASE_URL
+  ?? (import.meta.env.DEV ? '/qa-api/api' : `${window.location.protocol}//${window.location.hostname}:5050/api`);
 
 // Initialize tokens directly from localStorage
 let accessToken: string | null = localStorage.getItem('authToken');

@@ -102,3 +102,7 @@ The Bruno collection is in `api-testing/bruno`. Select its `Local` environment a
 - [Event delivery plan](design/event-details-plan.md)
 - [Entity relationship model](erd.md)
 - [OpenAPI contract](backend/docs/openapi.yaml)
+
+
+
+Manually remove the event

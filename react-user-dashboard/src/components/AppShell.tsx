@@ -31,13 +31,21 @@ export default function AppShell({ children }: { children: ReactNode }) {
   const identityName = user?.username ? getDisplayName(user.username) : user?.email || 'Account';
   const role = user?.systemRole.replace(/_/g, ' ').toLowerCase();
   const canCreateEvent = user?.systemRole === 'ADMIN' || user?.systemRole === 'EVENT_MANAGER';
-  const mobileTitle = location.pathname === '/events/new'
+  const reviewRoute = /^\/events\/([^/]+)\/reviews(?:\/[^/]+)?$/.exec(location.pathname);
+  const mobileTitle = reviewRoute
+    ? 'Clinical review'
+    : location.pathname === '/events/new'
     ? 'Create event'
     : /^\/events\/[^/]+$/.test(location.pathname)
       ? 'Event details'
       : 'Events';
   const isEventsPage = location.pathname === '/events';
   const toggleSidebar = useCallback(() => setCollapsed((value) => !value), []);
+  const navigateBack = () => {
+    const event = new CustomEvent('vsms:before-navigation', { cancelable: true });
+    if (!window.dispatchEvent(event)) return;
+    navigate(reviewRoute ? `/events/${reviewRoute[1]}` : location.pathname.endsWith('/edit') ? location.pathname.replace(/\/edit$/, '') : '/events');
+  };
   const setEventsView = useCallback((view: 'timeline' | 'table') => {
     localStorage.setItem('vsms-events-view', view);
     window.dispatchEvent(new CustomEvent('vsms:events-view', { detail: view }));
@@ -149,7 +157,7 @@ export default function AppShell({ children }: { children: ReactNode }) {
         <header className="command-bar">
           <div className="command-navigation">
             <button className="icon-button sidebar-toggle" onClick={toggleSidebar} aria-label={collapsed ? 'Show sidebar' : 'Hide sidebar'} title={`${collapsed ? 'Show' : 'Hide'} sidebar (Ctrl/⌘ B)`}><Bars3BottomLeftIcon /></button>
-            {!isEventsPage && <button className="icon-button back-button" onClick={() => navigate(location.pathname.endsWith('/edit') ? location.pathname.replace(/\/edit$/, '') : '/events')} aria-label="Go back" title="Back"><ArrowLeftIcon /></button>}
+            {!isEventsPage && <button className="icon-button back-button" onClick={navigateBack} aria-label="Go back" title="Back"><ArrowLeftIcon /></button>}
           </div>
           <span className="mobile-brand" aria-hidden="true">V</span>
           <div className="workspace-name"><strong><span className="desktop-title">Event operations</span><span className="mobile-title">{mobileTitle}</span></strong><span><i /> Secure workspace</span></div>

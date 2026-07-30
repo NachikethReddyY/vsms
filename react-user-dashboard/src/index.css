@@ -179,6 +179,8 @@ h1,h2,p { margin-top:0; }h1 { margin-bottom:8px; font-size:clamp(28px,3vw,40px);
 .reference-event-actions a { width:34px; height:34px; display:grid; place-items:center; border-radius:7px; color:var(--muted); transition:color 150ms ease-out,background 150ms ease-out; }
 .reference-event-actions a:hover { color:var(--accent); background:var(--accent-tint); }
 .reference-event-actions svg { width:17px; height:17px; }
+.reference-event-actions .event-play-action,.event-table-actions .event-play-action { color:var(--accent); background:var(--accent-tint); }
+.reference-event-actions .event-play-action:hover,.event-table-actions .event-play-action:hover { color:var(--accent-strong); background:var(--accent-tint); }
 .reference-load-more { grid-column:3; padding-left:192px; text-align:center; }
 .event-reference-loading .skeleton-block { display:block; border:0; border-radius:12px; background:var(--surface-2); animation:detail-pulse 1.2s ease-in-out infinite alternate; }
 .event-reference-loading .event-reference-date { width:90px; height:46px; }

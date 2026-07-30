@@ -12,13 +12,14 @@ import DashboardPage from './components/DashboardPage';
 import QRCodePage from './components/qr/QRCodePage';
 import VisualAcuityStationPage from './features/screening/VisualAcuityStationPage';
 import AuditLogsPage from './features/audit-logs/AuditLogsPage';
+import ReviewWorkspacePage from './features/reviews/ReviewWorkspacePage';
 
-function ProtectedRoutes() {
+function ProtectedRoutes({ withShell = true }: { withShell?: boolean }) {
   const { user, isBootstrapping } = useAuth();
   const location = useLocation();
   if (isBootstrapping) return <main className="center-state" aria-live="polite"><span className="spinner" />Restoring your secure session…</main>;
   if (!user) return <Navigate to="/login" replace state={{ from: location }} />;
-  return <AppShell><Outlet /></AppShell>;
+  return withShell ? <AppShell><Outlet /></AppShell> : <Outlet />;
 }
 
 function ManagerOnlyRoutes() {
@@ -60,6 +61,11 @@ export default function App() {
         <Route element={<AdminOnlyRoutes />}>
           <Route path="/audit-logs" element={<AuditLogsPage />} />
         </Route>
+      </Route>
+
+      <Route element={<ProtectedRoutes withShell={false} />}>
+        <Route path="/events/:eventId/reviews" element={<ReviewWorkspacePage />} />
+        <Route path="/events/:eventId/reviews/:registrationId" element={<ReviewWorkspacePage />} />
       </Route>
 
       <Route path="*" element={<Navigate to="/" replace />} />
