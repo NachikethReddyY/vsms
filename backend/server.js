@@ -1,28 +1,17 @@
 const express = require("express");
 const cors = require("cors");
 const helmet = require("helmet");
+const cookieParser = require("cookie-parser");
 const fs = require("fs");
 const https = require("https");
 const path = require("path");
 const YAML = require("yaml");
-const cookieParser = require("cookie-parser");
 const swaggerUi = require("swagger-ui-express");
 require("dotenv").config();
 
 const env = require("./config/env");
+const app = require("./app");
 const logger = require("./utils/logger/logger");
-
-const app = express();
-const PORT = process.env.PORT || 5000;
-
-// HTTPS Server setup for local development
-const useHttps = !env.isProduction && env.localHttps;
-const server = useHttps
-  ? https.createServer({
-      key: fs.readFileSync(path.resolve(__dirname, env.TLS_KEY_PATH)),
-      cert: fs.readFileSync(path.resolve(__dirname, env.TLS_CERT_PATH)),
-    }, app)
-  : app;
 
 // Import Routes
 const authRoutes = require("./routes/authRoutes");
@@ -31,7 +20,7 @@ const qrRoutes = require("./routes/qrRoutes");
 const participantRoutes = require("./routes/participantRoutes");
 const eventRegistrationRoutes = require("./routes/eventRegistrationRoutes");
 const eventRoutes = require("./routes/eventRoutes");
-const queueRoutes = require("./routes/queueRoutes"); // <--- Included queueRoutes safely
+const queueRoutes = require("./routes/queueRoutes");
 
 // Load Swagger / OpenAPI Document securely using standard file streams
 let swaggerDocument;
@@ -110,6 +99,7 @@ app.use(cookieParser());
 app.use(express.json({ limit: "100kb" }));
 app.use(express.urlencoded({ limit: "100kb", extended: true }));
 
+// Payload size error handler middleware
 app.use((err, req, res, next) => {
   if (err.type === "entity.too.large" || err.status === 413) {
     logger.warn(`Payload Limit Exceeded from IP: ${req.ip}`);
@@ -122,7 +112,7 @@ app.use((err, req, res, next) => {
 });
 
 // -----------------------------------------------------------------------------
-// 4. ROUTES
+// 4. ROUTES & DOCUMENTATION
 // -----------------------------------------------------------------------------
 if (swaggerDocument) {
   app.use("/api-docs", swaggerUi.serve, swaggerUi.setup(swaggerDocument));
@@ -138,9 +128,9 @@ app.use("/qr", qrRoutes);
 app.use("/participants", participantRoutes);
 app.use("/event-registrations", eventRegistrationRoutes);
 app.use("/events", eventRoutes);
-app.use("/queue", queueRoutes); // <--- Registered queue routes to prevent blank export issues
+app.use("/queue", queueRoutes);
 
-// Safe Express 4 fallback catch-all handler (avoids PathError crashes)
+// Safe Express 4 fallback catch-all handler
 app.use((req, res) => {
   res.status(404).json({
     success: false,
@@ -148,12 +138,27 @@ app.use((req, res) => {
   });
 });
 
+// -----------------------------------------------------------------------------
+// 5. SERVER CREATION & LISTENING
+// -----------------------------------------------------------------------------
+const server = !env.isProduction && env.localHttps
+  ? https.createServer({
+      key: fs.readFileSync(path.resolve(__dirname, env.TLS_KEY_PATH)),
+      cert: fs.readFileSync(path.resolve(__dirname, env.TLS_CERT_PATH)),
+    }, app)
+  : app;
+
 server.on("error", (error) => {
   logger.error("server.failed", { message: error.message, stack: error.stack });
-  process.exit(1);
+  process.exitCode = 1;
 });
 
-server.listen(PORT, () => {
-  const protocol = useHttps ? "https" : "http";
-  logger.info(`Server running securely on ${protocol}://localhost:${PORT}`);
-});
+if (require.main === module) {
+  const port = env.port || Number(process.env.PORT || 5000);
+  server.listen(port, () => {
+    const protocol = !env.isProduction && env.localHttps ? "https" : "http";
+    logger.info(`Server running securely on ${protocol}://localhost:${port}`);
+  });
+}
+
+module.exports = server;

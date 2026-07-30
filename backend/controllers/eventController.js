@@ -1,6 +1,7 @@
 const eventService = require("../services/eventService");
 
 exports.list = async (req, res) => res.json(await eventService.listEvents(req.query, req.user));
+exports.listActive = async (req, res) => res.json(await eventService.listActiveEvents(req.user));
 exports.create = async (req, res) => {
   const idempotencyKey = req.get("Idempotency-Key");
   res.status(201).json(await eventService.createEvent(req.body, req.user, req.requestId, idempotencyKey));
