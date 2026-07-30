@@ -41,6 +41,13 @@ function getDeviceId() {
 apiClient.interceptors.request.use((config) => {
   config.headers["X-Device-Id"] = getDeviceId();
   config.headers["X-Device-Name"] = "VSMS staff web";
+
+  // Check if session contains an authorization token and attach it if available
+  const session = getStoredSession();
+  if (session && "token" in session && typeof session.token === "string" && session.token) {
+    config.headers.Authorization = `Bearer ${session.token}`;
+  }
+
   return config;
 });
 
@@ -54,6 +61,7 @@ async function refreshSession(): Promise<AuthSession> {
   const nextSession: AuthSession = {
     user: response.data.user,
     expiresAt: Date.now() + Number(response.data.sessionExpiresIn || 2_592_000) * 1000,
+    token: response.data.token, // Preserve token if returned by refresh response
   };
   setStoredSession(nextSession);
   return nextSession;
@@ -88,8 +96,6 @@ export function getApiError(error: unknown, fallback: string) {
   return fallback;
 }
 
-// Compatibility helpers for the preserved main-branch AuthContext. Cognito
-// tokens remain in HttpOnly cookies; these helpers never expose or store them.
 export function getCsrfToken() {
   const match = document.cookie.match(/(?:^|; )vsms_csrf=([^;]+)/);
   return match ? decodeURIComponent(match[1]) : null;

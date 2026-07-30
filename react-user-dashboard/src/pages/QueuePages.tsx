@@ -1,179 +1,161 @@
-import { useEffect, useState, useCallback } from "react";
-import { useParams, Link } from "react-router-dom";
-import apiClient, { getApiError } from "../utils/apiClient";
+import { useState, useMemo } from "react";
+import { useParams } from "react-router-dom";
 import { AppShell, LoadingState } from "../components/ui";
+import { QueueHeader } from "../components/queue/QueueHeader";
+import { NowServingCard } from "../components/queue/NowServingCard";
+import { QueueTable } from "../components/queue/QueueTable";
 
 interface QueueItem {
   id: string;
   ticketNumber: string;
-  status: string;
+  status: "WAITING" | "IN_SERVICE" | "COMPLETED" | "NO_SHOW" | "CANCELLED";
+  station: string;
+  waitTime: string;
   position: number;
   participant: {
     fullName: string;
-    email?: string;
+    age: number;
+    idNumber: string;
   };
 }
 
-interface EventQueueData {
-  eventId: string;
-  eventName: string;
-  currentServing: QueueItem | null;
-  queue: QueueItem[];
-}
+const generateMockQueue = (count: number): QueueItem[] => {
+  const stations = ["Visual Acuity", "Refraction", "Colour Vision", "Eye Health", "Clinical Review"];
+  const firstNames = ["Evelyn", "Marcus", "Aaliyah", "David", "Sarah", "Liam", "Sophia", "Noah", "Olivia", "James"];
+  const lastNames = ["Ng", "Vance", "Chen", "Miller", "Jenkins", "Smith", "Patel", "Johnson", "Brown", "Taylor"];
+  
+  const items: QueueItem[] = [];
+  for (let i = 1; i <= count; i++) {
+    const fName = firstNames[(i * 7) % firstNames.length];
+    const lName = lastNames[(i * 13) % lastNames.length];
+    const station = stations[i % stations.length];
+    
+    items.push({
+      id: `q-${100 + i}`,
+      ticketNumber: `VSMS-240719-${String(i).padStart(3, "0")}`,
+      status: i === 1 ? "IN_SERVICE" : i < 15 ? "WAITING" : i % 3 === 0 ? "COMPLETED" : "WAITING",
+      station,
+      waitTime: `${Math.floor((i * 3) % 45) + 2}m`,
+      position: i,
+      participant: {
+        fullName: `${fName} ${lName}`,
+        age: 20 + (i % 60),
+        idNumber: `ID-${883900 + i}`,
+      },
+    });
+  }
+  return items;
+};
 
 export function QueuePage() {
   const { eventId } = useParams<{ eventId: string }>();
-  const [queueData, setQueueData] = useState<EventQueueData | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [actionLoading, setActionLoading] = useState<string | null>(null);
+  const [isLoading] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [selectedStation, setSelectedStation] = useState("ALL");
+  const [statusFilter, setStatusFilter] = useState("ALL");
+  const [currentPage, setCurrentPage] = useState(1);
+  const pageSize = 12;
 
-  const fetchQueue = useCallback(async () => {
-    try {
-      const response = await apiClient.get(`/events/${eventId}/queue`);
-      setQueueData(response.data);
-      setError(null);
-    } catch (requestError: unknown) {
-      setError(getApiError(requestError, "Unable to load queue data."));
-    } finally {
-      setIsLoading(false);
-    }
-  }, [eventId]);
+  const [queueList, setQueueList] = useState<QueueItem[]>(() => generateMockQueue(500));
 
-  useEffect(() => {
-    fetchQueue();
-    // Poll the queue status every 10 seconds to keep it synchronized in real-time
-    const interval = setInterval(fetchQueue, 10000);
-    return () => clearInterval(interval);
-  }, [fetchQueue]);
+  const currentServing = useMemo(() => {
+    return queueList.find((item) => item.status === "IN_SERVICE") || null;
+  }, [queueList]);
 
-  const handleNextInQueue = async () => {
-    if (!eventId) return;
-    try {
-      setActionLoading("next");
-      await apiClient.post(`/events/${eventId}/queue/next`);
-      await fetchQueue();
-    } catch (requestError: unknown) {
-      setError(getApiError(requestError, "Failed to advance queue."));
-    } finally {
-      setActionLoading(null);
-    }
+  const filteredQueue = useMemo(() => {
+    return queueList.filter((item) => {
+      if (item.status === "IN_SERVICE") return false;
+      const matchesSearch = 
+        item.ticketNumber.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        item.participant.fullName.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        item.participant.idNumber.toLowerCase().includes(searchQuery.toLowerCase());
+      
+      const matchesStation = selectedStation === "ALL" || item.station === selectedStation;
+      const matchesStatus = statusFilter === "ALL" || item.status === statusFilter;
+
+      return matchesSearch && matchesStation && matchesStatus;
+    });
+  }, [queueList, searchQuery, selectedStation, statusFilter]);
+
+  const paginatedQueue = useMemo(() => {
+    const start = (currentPage - 1) * pageSize;
+    return filteredQueue.slice(start, start + pageSize);
+  }, [filteredQueue, currentPage]);
+
+  const totalPages = Math.ceil(filteredQueue.length / pageSize) || 1;
+
+  const handleNextInQueue = () => {
+    const nextWaitingIndex = queueList.findIndex((item) => item.status === "WAITING");
+    if (nextWaitingIndex === -1) return;
+
+    setQueueList((prev) =>
+      prev.map((item, idx) => {
+        if (item.status === "IN_SERVICE") return { ...item, status: "COMPLETED" };
+        if (idx === nextWaitingIndex) return { ...item, status: "IN_SERVICE" };
+        return item;
+      })
+    );
   };
 
-  const handleUpdateStatus = async (queueId: string, status: string) => {
-    try {
-      setActionLoading(queueId);
-      await apiClient.patch(`/queue/${queueId}/status`, { status });
-      await fetchQueue();
-    } catch (requestError: unknown) {
-      setError(getApiError(requestError, "Failed to update queue item status."));
-    } finally {
-      setActionLoading(null);
-    }
+  const handleUpdateStatus = (id: string, newStatus: QueueItem["status"]) => {
+    setQueueList((prev) =>
+      prev.map((item) => (item.id === id ? { ...item, status: newStatus } : item))
+    );
   };
 
   if (isLoading) {
     return (
-      <AppShell title="Live Queue">
-        <LoadingState label="Loading queue details..." />
+      <AppShell title="">
+        <LoadingState label="Loading queue records..." />
       </AppShell>
     );
   }
 
+  const waitingCount = queueList.filter((i) => i.status === "WAITING").length;
+  const completedCount = queueList.filter((i) => i.status === "COMPLETED").length;
+
   return (
-    <AppShell title={queueData?.eventName ? `${queueData.eventName} — Live Queue` : "Live Queue"}>
-      <div className="space-y-6">
-        {/* Navigation & Header Actions */}
-        <div className="flex items-center justify-between">
-          <Link
-            to={`/events/${eventId}/registrations`}
-            className="text-sm font-medium text-slate-600 hover:text-slate-900"
-          >
-            ← Back to Registrations
-          </Link>
-          <button
-            onClick={handleNextInQueue}
-            disabled={actionLoading === "next" || !queueData?.queue.length}
-            className="dashboard-primary-action disabled:opacity-50"
-          >
-            {actionLoading === "next" ? "Calling..." : "Call Next Participant"}
-          </button>
-        </div>
+    <AppShell title="">
+      {/* Tightened max-width and reduced top padding/whitespace */}
+      <div className="max-w-7xl mx-auto pb-16 px-6 pt-2 space-y-4">
+        
+        <QueueHeader
+          eventId={eventId}
+          totalCount={queueList.length}
+          waitingCount={waitingCount}
+          completedCount={completedCount}
+          onCallNext={handleNextInQueue}
+          currentServing={currentServing}
+          onSignOff={() => {
+            if (currentServing) {
+              handleUpdateStatus(currentServing.id, "COMPLETED");
+            }
+          }}
+        />
 
-        {error && (
-          <div className="rounded-xl bg-red-50 p-4 text-sm text-red-800">
-            {error}
-          </div>
-        )}
+        <NowServingCard
+          currentServing={currentServing}
+          onComplete={(id) => handleUpdateStatus(id, "COMPLETED")}
+          onNoShow={(id) => handleUpdateStatus(id, "NO_SHOW")}
+        />
 
-        {/* Currently Serving Banner */}
-        <section className="rounded-2xl border border-blue-200 bg-blue-50 p-6 registration-surface">
-          <p className="text-xs font-semibold uppercase tracking-wider text-blue-600">Now Serving</p>
-          {queueData?.currentServing ? (
-            <div className="mt-2 flex items-center justify-between">
-              <div>
-                <h2 className="text-3xl font-bold text-blue-900">
-                  {queueData.currentServing.ticketNumber}
-                </h2>
-                <p className="mt-1 text-lg font-medium text-blue-800">
-                  {queueData.currentServing.participant.fullName}
-                </p>
-              </div>
-              <div className="flex gap-2">
-                <button
-                  onClick={() => handleUpdateStatus(queueData.currentServing!.id, "COMPLETED")}
-                  disabled={actionLoading === queueData.currentServing.id}
-                  className="rounded-xl bg-green-600 px-4 py-2 text-sm font-medium text-white shadow hover:bg-green-700 disabled:opacity-50"
-                >
-                  Complete
-                </button>
-                <button
-                  onClick={() => handleUpdateStatus(queueData.currentServing!.id, "NO_SHOW")}
-                  disabled={actionLoading === queueData.currentServing.id}
-                  className="rounded-xl bg-amber-600 px-4 py-2 text-sm font-medium text-white shadow hover:bg-amber-700 disabled:opacity-50"
-                >
-                  No Show
-                </button>
-              </div>
-            </div>
-          ) : (
-            <p className="mt-2 text-sm text-blue-700">No participant is currently being served.</p>
-          )}
-        </section>
+        <QueueTable
+          paginatedQueue={paginatedQueue}
+          filteredQueueLength={filteredQueue.length}
+          searchQuery={searchQuery}
+          setSearchQuery={setSearchQuery}
+          selectedStation={selectedStation}
+          setSelectedStation={setSelectedStation}
+          statusFilter={statusFilter}
+          setStatusFilter={setStatusFilter}
+          currentPage={currentPage}
+          setCurrentPage={setCurrentPage}
+          totalPages={totalPages}
+          pageSize={pageSize}
+          onCall={(id) => handleUpdateStatus(id, "IN_SERVICE")}
+          onRemove={(id) => handleUpdateStatus(id, "CANCELLED")}
+        />
 
-        {/* Upcoming Queue List */}
-        <section className="rounded-2xl border border-slate-200 bg-white p-5 registration-surface">
-          <h3 className="text-lg font-semibold text-slate-800">Upcoming in Queue</h3>
-          <div className="mt-4 divide-y divide-slate-100">
-            {queueData?.queue && queueData.queue.length > 0 ? (
-              queueData.queue.map((item, index) => (
-                <div key={item.id} className="flex items-center justify-between py-3">
-                  <div className="flex items-center gap-4">
-                    <span className="text-sm font-semibold text-slate-400">#{index + 1}</span>
-                    <div>
-                      <p className="font-semibold text-slate-800">{item.ticketNumber}</p>
-                      <p className="text-sm text-slate-600">{item.participant.fullName}</p>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-600">
-                      {item.status}
-                    </span>
-                    <button
-                      onClick={() => handleUpdateStatus(item.id, "CANCELLED")}
-                      disabled={actionLoading === item.id}
-                      className="text-xs text-red-600 hover:underline disabled:opacity-50"
-                    >
-                      Remove
-                    </button>
-                  </div>
-                </div>
-              ))
-            ) : (
-              <p className="py-4 text-center text-sm text-slate-500">The queue is currently empty.</p>
-            )}
-          </div>
-        </section>
       </div>
     </AppShell>
   );

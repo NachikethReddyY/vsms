@@ -139,14 +139,40 @@ app.use((req, res) => {
 });
 
 // -----------------------------------------------------------------------------
-// 5. SERVER CREATION & LISTENING
+// 5. SERVER CREATION, SOCKET.IO & LISTENING
 // -----------------------------------------------------------------------------
 const server = !env.isProduction && env.localHttps
   ? https.createServer({
       key: fs.readFileSync(path.resolve(__dirname, env.TLS_KEY_PATH)),
       cert: fs.readFileSync(path.resolve(__dirname, env.TLS_CERT_PATH)),
     }, app)
-  : app;
+  : require("http").createServer(app);
+
+// Attach Socket.io with your existing enterprise CORS policies
+const io = new Server(server, {
+  cors: {
+    origin: allowedOrigins,
+    methods: ["GET", "POST"],
+    credentials: true,
+  },
+});
+
+// Make io accessible globally or export it if needed across controllers/routes
+app.set("io", io);
+
+io.on("connection", (socket) => {
+  logger.info(`Client connected via WebSockets: ${socket.id}`);
+
+  // Example event room join for your active event queues
+  socket.on("join-event-queue", (eventId) => {
+    socket.join(`event-${eventId}`);
+    logger.info(`Socket ${socket.id} joined room: event-${eventId}`);
+  });
+
+  socket.on("disconnect", () => {
+    logger.info(`Client disconnected: ${socket.id}`);
+  });
+});
 
 server.on("error", (error) => {
   logger.error("server.failed", { message: error.message, stack: error.stack });
@@ -157,8 +183,8 @@ if (require.main === module) {
   const port = env.port || Number(process.env.PORT || 5000);
   server.listen(port, () => {
     const protocol = !env.isProduction && env.localHttps ? "https" : "http";
-    logger.info(`Server running securely on ${protocol}://localhost:${port}`);
+    logger.info(`Server & WebSocket engine running securely on ${protocol}://localhost:${port}`);
   });
 }
 
-module.exports = server;
+module.exports = { server, io };
