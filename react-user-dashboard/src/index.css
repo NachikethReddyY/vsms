@@ -774,3 +774,79 @@ html[data-vsms-theme-vt="active"]::view-transition-new(root) { clip-path:var(--v
 .va-exceptions .is-selected { border-color:var(--accent); background:var(--accent-tint); color:var(--accent); }
 .banner-success { padding:12px 14px; border-radius:12px; background:color-mix(in srgb,var(--green) 14%,transparent); color:var(--green); }
 @media (max-width:720px) { .va-eye-grid { grid-template-columns:1fr; } }
+/* ==========================================================================
+   App Shell Sidebar & Rail Mode Fixes
+   ========================================================================== */
+
+/* 1. Base Layout */
+.app-shell.rail {
+  grid-template-columns: 64px minmax(0, 1fr) !important;
+}
+
+.app-shell.rail .sidebar {
+  width: 64px !important;
+  transition: width 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* 2. Hide Text, Submenus, and Chevron in Rail Mode */
+.app-shell.rail .sidebar .brand strong,
+.app-shell.rail .sidebar .nav-item span:not(.nav-item-inner),
+.app-shell.rail .sidebar .nav-label,
+.app-shell.rail .sidebar .nav-chevron,
+.app-shell.rail .sidebar .nav-sub-list,
+.app-shell.rail .sidebar .profile-copy,
+.app-shell.rail .sidebar .connection span {
+  display: none !important;
+}
+
+/* 3. Center Navigation Buttons & Preserve Hit Areas */
+.app-shell.rail .sidebar .nav-item {
+  justify-content: center !important;
+  padding: 0 !important;
+  width: 48px !important;
+  height: 48px !important;
+  margin: 0 auto 4px auto !important;
+  border-radius: 8px;
+}
+
+.app-shell.rail .sidebar .nav-group-toggle {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+}
+
+.app-shell.rail .sidebar .nav-item-inner {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 0 !important;
+}
+
+.app-shell.rail .sidebar .nav-item svg {
+  margin: 0 !important;
+  width: 24px !important;
+  height: 24px !important;
+}
+
+/* 4. Sidebar Foot Alignment in Rail Mode */
+.app-shell.rail .sidebar .sidebar-foot {
+  padding: 10px 4px !important;
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: center !important;
+  gap: 12px !important;
+}
+
+.app-shell.rail .sidebar .connection,
+.app-shell.rail .sidebar .profile {
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: center !important;
+  justify-content: center !important;
+  padding: 8px 0 !important;
+  width: 100% !important;
+}
+
+.app-shell.rail .sidebar .profile-action {
+  margin-top: 4px !important;
+}
