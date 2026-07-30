@@ -47,7 +47,7 @@ export const screeningApi = {
     const { data } = await apiClient.get<{
       event: { eventId: string; name: string; status: string; venue: string };
       stations: Station[];
-    }>(`/api/events/${eventId}/stations`);
+    }>(`/events/${eventId}/stations`);
     return data;
   },
 
@@ -55,7 +55,7 @@ export const screeningApi = {
     const { data } = await apiClient.get<{
       station: Station;
       registrations: QueueRegistration[];
-    }>(`/api/events/${eventId}/stations/${stationId}/queue`);
+    }>(`/events/${eventId}/stations/${stationId}/queue`);
     return data;
   },
 
@@ -66,12 +66,12 @@ export const screeningApi = {
       queueNumber: number | null;
       status: string;
       passToken: string | null;
-    }>(`/api/events/${eventId}/registrations/resolve`, { params });
+    }>(`/events/${eventId}/registrations/resolve`, { params });
     return data;
   },
 
   async saveVisualAcuity(eventId: string, stationId: string, body: VisualAcuityPayload) {
-    const { data } = await apiClient.post(`/api/events/${eventId}/stations/${stationId}/visual-acuity`, body);
+    const { data } = await apiClient.post(`/events/${eventId}/stations/${stationId}/visual-acuity`, body);
     return data as {
       resultId: string;
       overallFlag: OverallFlag;

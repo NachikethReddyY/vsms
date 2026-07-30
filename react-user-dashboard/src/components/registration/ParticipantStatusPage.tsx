@@ -38,7 +38,7 @@ function ParticipantStatusPage() {
     try {
       setLoading(true);
       // Fetch participant details using the token from the backend
-      const res = await apiClient.get(`/api/qr/participant/${qrToken}`);
+      const res = await apiClient.get(`/qr/participant/${qrToken}`);
 
       const payload = res.data?.data || res.data;
       setData(payload);

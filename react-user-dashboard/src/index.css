@@ -785,7 +785,6 @@ html[data-vsms-theme-vt="active"]::view-transition-new(root) { clip-path:var(--v
 
 .app-shell.rail .sidebar {
   width: 64px !important;
-  transition: width 0.2s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 /* 2. Hide Text, Submenus, and Chevron in Rail Mode */

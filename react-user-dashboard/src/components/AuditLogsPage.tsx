@@ -21,7 +21,7 @@ export default function AuditLogsPage() {
       try {
         const response = await axios.get("/api/audit-logs", { withCredentials: true });
         setLogs(response.data.data);
-      } catch (err) {
+      } catch {
         setError("Failed to load audit logs or permission denied.");
       } finally {
         setLoading(false);
