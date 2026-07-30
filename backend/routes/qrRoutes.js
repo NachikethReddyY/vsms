@@ -3,7 +3,7 @@ const router = express.Router();
 const asyncHandler = require("../utils/asyncHandler");
 
 const qrController = require("../controllers/qrController");
-const { authenticate, requireSystemRole } = require("../middlewares/authMiddleware");
+const authenticate = require("../middlewares/authenticate");
 
 // ==========================================
 // Apply Auth Middleware Globally for QR Routes
@@ -16,6 +16,7 @@ router.use(authenticate);
 // ==========================================
 
 // Generation & Reissuing
+router.post("/registrations/:registrationId", asyncHandler(qrController.generateRegistrationQR));
 router.post("/generate/:registrationId", asyncHandler(qrController.generateQR));
 router.post("/reissue/:registrationId", asyncHandler(qrController.reissueQR));
 
@@ -31,5 +32,6 @@ router.get("/history/:participantId", asyncHandler(qrController.getParticipantQR
 router.put("/revoke/:qrId", asyncHandler(qrController.revokeQR));
 router.get("/download/:qrId", asyncHandler(qrController.downloadQR));
 router.get("/print/:qrId", asyncHandler(qrController.printQR));
+router.get("/:token", asyncHandler(qrController.getRegistrationByQR));
 
 module.exports = router;
