@@ -1,334 +1,708 @@
+const crypto = require("crypto");
 require("dotenv").config();
-const bcrypt = require("bcrypt");
 const prisma = require("./prismaClient");
 
-const DEMO_PASSWORD = process.env.VSMS_DEMO_PASSWORD || "Demo-Only-Change-Me-2026!";
-if (process.env.NODE_ENV === "production" && !process.env.VSMS_DEMO_PASSWORD) {
-  throw new Error("VSMS_DEMO_PASSWORD is required for production seed execution");
+const roleDefinitions = [
+  ["ADMINISTRATOR", "Full administrative access", 1],
+  ["EVENT_MANAGER", "Creates and manages events", 2],
+  ["REGISTRATION_OFFICER", "Registers participants and records consent", 3],
+  ["SCREENER", "Performs participant screening", 4],
+  ["REVIEWER", "Reviews screening outcomes", 5],
+];
+
+const permissionNames = [
+  "participants:read",
+  "participants:write",
+  "consents:record",
+  "registrations:create",
+  "registrations:read",
+  "audit:read",
+];
+
+const stationTemplates = [
+  {
+    stationTemplateId: "60000000-0000-4000-8000-000000000001",
+    templateKey: "REGISTRATION",
+    version: 1,
+    name: "Registration",
+    description: "Confirm the participant record, consent, and QR pass.",
+    defaultCapacity: 3,
+  },
+  {
+    stationTemplateId: "60000000-0000-4000-8000-000000000002",
+    templateKey: "VISUAL_ACUITY",
+    version: 1,
+    name: "Visual acuity",
+    description: "Capture controlled distance and near-vision measurements.",
+    defaultCapacity: 4,
+  },
+  {
+    stationTemplateId: "60000000-0000-4000-8000-000000000003",
+    templateKey: "EYE_HEALTH",
+    version: 1,
+    name: "Eye health",
+    description: "Record eye-health observations and screening flags.",
+    defaultCapacity: 2,
+  },
+  {
+    stationTemplateId: "60000000-0000-4000-8000-000000000004",
+    templateKey: "CLINICAL_REVIEW",
+    version: 1,
+    name: "Clinical review",
+    description: "Review screening outcomes and decide the safe next step.",
+    defaultCapacity: 2,
+  },
+];
+
+async function seedRoles() {
+  const roles = new Map();
+  for (const [roleName, description, precedence] of roleDefinitions) {
+    const role = await prisma.role.upsert({
+      where: { roleName },
+      update: { description, precedence },
+      create: { roleName, description, precedence },
+    });
+    roles.set(roleName, role);
+  }
+  return roles;
 }
 
-const USERS = [
-  { id: "10000000-0000-4000-8000-000000000001", username: "avery.chen", fullName: "Avery Chen", employeeNumber: "EMP001", email: "admin@vsms.local", sysRole: "ADMIN" },
-  { id: "10000000-0000-4000-8000-000000000002", username: "maya.patel", fullName: "Maya Patel", employeeNumber: "EMP002", email: "manager@vsms.local", sysRole: "EVENT_MANAGER" },
-  { id: "10000000-0000-4000-8000-000000000003", username: "jordan.lee", fullName: "Jordan Lee", employeeNumber: "EMP003", email: "staff@vsms.local", sysRole: "STAFF" },
-  { id: "10000000-0000-4000-8000-000000000004", username: "samira.tan", fullName: "Dr Samira Tan", employeeNumber: "EMP004", email: "reviewer@vsms.local", sysRole: "STAFF" },
-];
+async function seedStaff(roles) {
+  const email = String(process.env.SEED_STAFF_EMAIL || "seed.admin@cryptix.local").trim().toLowerCase();
+  const user = await prisma.user.upsert({
+    where: { email },
+    update: { status: "ACTIVE", sysRole: "ADMIN" },
+    create: {
+      username: email,
+      fullName: process.env.SEED_STAFF_NAME || "Seed Administrator",
+      email,
+      employeeNumber: process.env.SEED_STAFF_EMPLOYEE_NUMBER || "SEED-ADMIN-001",
+      department: "Operations",
+      designation: "Registration Officer",
+      status: "ACTIVE",
+      sysRole: "ADMIN",
+    },
+  });
 
-const STATION_TEMPLATES = [
-  { stationTemplateId: "60000000-0000-4000-8000-000000000001", templateKey: "REGISTRATION", version: 1, name: "Registration", description: "Confirm the participant record, consent, and QR pass.", defaultCapacity: 3 },
-  { stationTemplateId: "60000000-0000-4000-8000-000000000002", templateKey: "VISUAL_ACUITY", version: 1, name: "Visual acuity", description: "Capture controlled distance and near-vision measurements.", defaultCapacity: 4 },
-  { stationTemplateId: "60000000-0000-4000-8000-000000000003", templateKey: "EYE_HEALTH", version: 1, name: "Eye health", description: "Record eye-health observations and screening flags.", defaultCapacity: 2 },
-  { stationTemplateId: "60000000-0000-4000-8000-000000000004", templateKey: "CLINICAL_REVIEW", version: 1, name: "Clinical review", description: "Review screening outcomes and decide the safe next step.", defaultCapacity: 2 },
-  { stationTemplateId: "60000000-0000-4000-8000-000000000005", templateKey: "REFRACTION", version: 1, name: "Refraction", description: "Capture objective refraction screening measurements.", defaultCapacity: 3 },
-  { stationTemplateId: "60000000-0000-4000-8000-000000000006", templateKey: "COLOUR_VISION", version: 1, name: "Colour vision", description: "Record colour-vision screening observations.", defaultCapacity: 3 },
-];
-
-const SCREENING_STATIONS = [
-  { stationName: "Visual Acuity", stationType: "VISUAL_ACUITY", stationOrder: 1, capacity: 4 },
-  { stationName: "Refraction", stationType: "REFRACTION", stationOrder: 2, capacity: 3 },
-  { stationName: "Colour Vision", stationType: "COLOUR_VISION", stationOrder: 3, capacity: 3 },
-  { stationName: "Eye Health", stationType: "EYE_HEALTH", stationOrder: 4, capacity: 2 },
-];
-
-const REVIEW_PARTICIPANTS = [
-  { id: "70000000-0000-4000-8000-000000000001", registrationId: "80000000-0000-4000-8000-000000000001", nric: "S1234567A", nricMasked: "S****567A", firstName: "Priya", lastName: "Nair", dateOfBirth: "1968-04-12", gender: "F", queueNumber: 11 },
-  { id: "70000000-0000-4000-8000-000000000002", registrationId: "80000000-0000-4000-8000-000000000002", nric: "S2345678B", nricMasked: "S****678B", firstName: "Marcus", lastName: "Lim", dateOfBirth: "1959-09-23", gender: "M", queueNumber: 12 },
-  { id: "70000000-0000-4000-8000-000000000003", registrationId: "80000000-0000-4000-8000-000000000003", nric: "S3456789C", nricMasked: "S****789C", firstName: "Aisha", lastName: "Rahman", dateOfBirth: "1974-01-08", gender: "F", queueNumber: 13 },
-  { id: "70000000-0000-4000-8000-000000000004", registrationId: "80000000-0000-4000-8000-000000000004", nric: "S4567890D", nricMasked: "S****890D", firstName: "Daniel", lastName: "Ong", dateOfBirth: "1982-11-17", gender: "M", queueNumber: 14 },
-];
-
-const EVENTS = [
-  { eventId: "20000000-0000-4000-8000-000000000001", name: "Northside Community Screening", venue: "Northside Community Hall", startsAt: "2026-08-12T00:00:00.000Z", endsAt: "2026-08-12T08:00:00.000Z", capacity: 180, status: "PUBLISHED" },
-  { eventId: "20000000-0000-4000-8000-000000000002", name: "Riverside Vision Day", venue: "Riverside Civic Centre", startsAt: "2026-09-05T01:00:00.000Z", endsAt: "2026-09-05T07:00:00.000Z", capacity: 120, status: "DRAFT" },
-  { eventId: "20000000-0000-4000-8000-000000000003", name: "Central Library Screening", venue: "Central Library Atrium", startsAt: "2026-07-22T01:00:00.000Z", endsAt: "2026-07-22T09:00:00.000Z", capacity: 200, status: "IN_PROGRESS" },
-  { eventId: "20000000-0000-4000-8000-000000000004", name: "West End Community Check", venue: "West End Activity Centre", startsAt: "2026-06-18T00:00:00.000Z", endsAt: "2026-06-18T07:00:00.000Z", capacity: 150, status: "COMPLETED" },
-  { eventId: "20000000-0000-4000-8000-000000000005", name: "Harbour Family Screening", venue: "Harbour Community Room", startsAt: "2026-08-20T00:00:00.000Z", endsAt: "2026-08-20T06:00:00.000Z", capacity: 100, status: "CANCELLED" },
-];
-
-const main = async () => {
-  const passwordHash = await bcrypt.hash(DEMO_PASSWORD, 12);
-  for (const user of USERS) {
-    await prisma.user.upsert({
-      where: { email: user.email },
-      update: { 
-        username: user.username, 
-        fullName: user.fullName, 
-        employeeNumber: user.employeeNumber, 
-        sysRole: user.sysRole, 
-        status: "ACTIVE",
-        credential: {
-          update: { passwordHash }
-        }
-      },
-      create: { 
-        id: user.id,
-        username: user.username,
-        fullName: user.fullName,
-        employeeNumber: user.employeeNumber,
-        email: user.email,
-        sysRole: user.sysRole,
-        status: "ACTIVE",
-        credential: {
-          create: { passwordHash }
-        }
-      },
+  for (const roleName of ["ADMINISTRATOR", "REGISTRATION_OFFICER"]) {
+    await prisma.userRole.upsert({
+      where: { userId_roleId: { userId: user.id, roleId: roles.get(roleName).id } },
+      update: {},
+      create: { userId: user.id, roleId: roles.get(roleName).id },
     });
   }
+  return user;
+}
 
-  for (const template of STATION_TEMPLATES) {
+async function seedReviewer(roles, staff) {
+  const email = String(process.env.SEED_REVIEWER_EMAIL || "reviewer@vsms.local").trim().toLowerCase();
+  const reviewer = await prisma.user.upsert({
+    where: { email },
+    update: { status: "ACTIVE", sysRole: "STAFF" },
+    create: {
+      username: email,
+      fullName: process.env.SEED_REVIEWER_NAME || "Dr Samira Tan",
+      email,
+      employeeNumber: process.env.SEED_REVIEWER_EMPLOYEE_NUMBER || "SEED-REVIEWER-001",
+      department: "Clinical Operations",
+      designation: "Clinical Reviewer",
+      status: "ACTIVE",
+      sysRole: "STAFF",
+    },
+  });
+  await prisma.userRole.upsert({
+    where: { userId_roleId: { userId: reviewer.id, roleId: roles.get("REVIEWER").id } },
+    update: { assignedById: staff.id },
+    create: { userId: reviewer.id, roleId: roles.get("REVIEWER").id, assignedById: staff.id },
+  });
+  return reviewer;
+}
+
+async function seedPermissions(roles, staff) {
+  const permissions = new Map();
+  for (const permissionName of permissionNames) {
+    const permission = await prisma.permission.upsert({
+      where: { permissionName },
+      update: {},
+      create: {
+        permissionName,
+        description: `Allows ${permissionName}`,
+        createdById: staff.id,
+      },
+    });
+    permissions.set(permissionName, permission);
+  }
+
+  for (const roleName of ["ADMINISTRATOR", "REGISTRATION_OFFICER"]) {
+    const allowed = roleName === "ADMINISTRATOR"
+      ? permissionNames
+      : permissionNames.filter((name) => name !== "audit:read");
+    for (const permissionName of allowed) {
+      await prisma.rolePermission.upsert({
+        where: {
+          roleId_permissionId: {
+            roleId: roles.get(roleName).id,
+            permissionId: permissions.get(permissionName).id,
+          },
+        },
+        update: {},
+        create: {
+          roleId: roles.get(roleName).id,
+          permissionId: permissions.get(permissionName).id,
+        },
+      });
+    }
+  }
+}
+
+async function seedStationTemplates() {
+  for (const template of stationTemplates) {
     await prisma.stationTemplate.upsert({
       where: { stationTemplateId: template.stationTemplateId },
       update: { ...template, active: true },
       create: template,
     });
   }
+}
 
-  for (const [index, event] of EVENTS.entries()) {
-    const cancelled = event.status === "CANCELLED";
-    const data = {
-      ...event,
-      description: "Seeded demonstration event for the lifecycle flow.",
+async function seedConsentForm(staff) {
+  const contentText = [
+    "I confirm that the screening process, use of my information, potential risks,",
+    "privacy safeguards, and my right to decline or withdraw have been explained to me.",
+    "I voluntarily consent to participate in this event screening.",
+  ].join(" ");
+  return prisma.consentFormVersion.upsert({
+    where: {
+      formCode_versionNumber: {
+        formCode: "VSMS-CONSENT",
+        versionNumber: "1.0",
+      },
+    },
+    update: { isActive: true, contentText },
+    create: {
+      formCode: "VSMS-CONSENT",
+      versionNumber: "1.0",
+      title: "Participant Screening Consent",
+      contentText,
+      contentHash: crypto.createHash("sha256").update(contentText).digest("hex"),
+      documentObjectKey: "consent-forms/VSMS-CONSENT/1.0",
+      effectiveFrom: new Date("2026-01-01T00:00:00.000Z"),
+      isActive: true,
+      createdById: staff.id,
+    },
+  });
+}
+
+function demoDate(dayOffset, hour, minute = 0) {
+  const value = new Date();
+  value.setUTCHours(0, 0, 0, 0);
+  value.setUTCDate(value.getUTCDate() + dayOffset);
+  value.setUTCHours(hour, minute, 0, 0);
+  return value;
+}
+
+async function upsertDemoEvent(staff, {
+  key,
+  name,
+  venue,
+  status,
+  startsAt,
+  endsAt,
+  capacity,
+}) {
+  return prisma.event.upsert({
+    where: {
+      createdByUserId_createIdempotencyKey: {
+        createdByUserId: staff.id,
+        createIdempotencyKey: key,
+      },
+    },
+    update: {
+      name,
+      venue,
+      status,
+      startsAt,
+      endsAt,
+      capacity,
+      expectedAttendance: Math.floor(capacity * 0.75),
+    },
+    create: {
+      name,
+      description: "Demonstration event for testing participant registration, consent, check-in, and QR workflows.",
+      bannerKey: "COMMUNITY_SCREENING",
+      venue,
+      address: venue,
+      postalCode: "529536",
       timezone: "Asia/Singapore",
-      expectedAttendance: event.capacity * 10,
-      locationProvider: "MANUAL",
-      startsAt: new Date(event.startsAt),
-      endsAt: new Date(event.endsAt),
-      createdByUserId: USERS[1].id,
-      cancelledByUserId: cancelled ? USERS[0].id : null,
-      cancelledAt: cancelled ? new Date("2026-07-20T04:00:00.000Z") : null,
-      cancellationReason: cancelled ? "Venue became unavailable and requires rescheduling." : null,
-    };
-    const stored = await prisma.event.upsert({
-      where: { eventId: event.eventId },
-      update: data,
-      create: {
-        ...data,
-        shifts: {
-          create: [
-            {
-              name: "Morning operations",
-              startsAt: new Date(event.startsAt),
-              endsAt: new Date(new Date(event.startsAt).getTime() + 4 * 3600000),
-              requiredStaff: 8,
-              status: event.status === "COMPLETED" ? "COMPLETED" : event.status === "IN_PROGRESS" ? "ACTIVE" : event.status === "CANCELLED" ? "CANCELLED" : "PLANNED",
-            },
-          ],
-        },
-      },
-    });
-    const localDate = new Date(event.startsAt).toLocaleDateString("sv-SE", { timeZone: "Asia/Singapore" });
-    const eventDay = await prisma.eventDay.upsert({
-      where: { eventId_date: { eventId: stored.eventId, date: new Date(`${localDate}T00:00:00.000Z`) } },
-      update: { startsAt: new Date(event.startsAt), endsAt: new Date(event.endsAt) },
-      create: {
-        eventId: stored.eventId,
-        date: new Date(`${localDate}T00:00:00.000Z`),
-        startsAt: new Date(event.startsAt),
-        endsAt: new Date(event.endsAt),
-      },
-    });
+      startsAt,
+      endsAt,
+      capacity,
+      expectedAttendance: Math.floor(capacity * 0.75),
+      status,
+      createdByUserId: staff.id,
+      createIdempotencyKey: key,
+      createPayloadHash: crypto.createHash("sha256").update(key).digest("hex"),
+    },
+  });
+}
 
-    await prisma.station.updateMany({
-      where: { eventId: stored.eventId },
-      data: { stationOrder: { increment: 100 }, isActive: false },
-    });
-    for (const stationInput of SCREENING_STATIONS) {
-      const station = await prisma.station.upsert({
-        where: { eventId_stationType: { eventId: stored.eventId, stationType: stationInput.stationType } },
-        update: {
-          stationName: stationInput.stationName,
-          stationOrder: stationInput.stationOrder,
-          isActive: true
-        },
-        create: {
-          eventId: stored.eventId,
-          stationName: stationInput.stationName,
-          stationType: stationInput.stationType,
-          stationOrder: stationInput.stationOrder,
-          isActive: true,
-        },
-      });
-
-      await prisma.eventStationAvailability.upsert({
-        where: { 
-          eventStationId_eventDayId: { 
-            eventStationId: station.stationId, 
-            eventDayId: eventDay.eventDayId 
-          } 
-        },
-        update: { 
-          isAvailable: true, 
-          startsAt: eventDay.startsAt, 
-          endsAt: eventDay.endsAt, 
-          capacity: stationInput.capacity
-        },
-        create: {
-          eventStationId: station.stationId,
-          eventDayId: eventDay.eventDayId,
-          isAvailable: true,
-          startsAt: eventDay.startsAt,
-          endsAt: eventDay.endsAt,
-          capacity: stationInput.capacity,
-        },
-      });
-    }
-
-    const shift = await prisma.shift.findFirstOrThrow({ where: { eventId: stored.eventId }, orderBy: { startsAt: "asc" } });
-    await prisma.shift.update({
-      where: { shiftId: shift.shiftId },
-      data: { status: event.status === "COMPLETED" ? "COMPLETED" : event.status === "IN_PROGRESS" ? "ACTIVE" : event.status === "CANCELLED" ? "CANCELLED" : "PLANNED" },
-    });
-    const staffStation = await prisma.station.findFirstOrThrow({
-      where: { eventId: stored.eventId, stationType: "VISUAL_ACUITY" },
-    });
-
-    const assignmentStatus = event.status === "COMPLETED" ? "COMPLETED" : event.status === "CANCELLED" ? "CANCELLED" : event.status === "IN_PROGRESS" ? "CONFIRMED" : "ASSIGNED";
-    await prisma.staffAssignment.upsert({
-      where: { eventId_userId_shiftId_stationId: { eventId: stored.eventId, userId: USERS[2].id, shiftId: shift.shiftId, stationId: staffStation.stationId } },
-      update: { assignmentRole: "SCREENER", assignedBy: USERS[1].id, status: assignmentStatus, assignmentStatus },
-      create: {
-        eventId: stored.eventId,
-        shiftId: shift.shiftId,
-        userId: USERS[2].id,
-        stationId: staffStation.stationId,
-        assignmentRole: "SCREENER",
-        assignedBy: USERS[1].id,
-        status: assignmentStatus,
-        assignmentStatus,
-      },
-    });
-
-    if (event.status === "IN_PROGRESS") {
-      const reviewerAssignment = await prisma.staffAssignment.findFirst({
-        where: { eventId: stored.eventId, shiftId: shift.shiftId, userId: USERS[3].id, assignmentRole: "REVIEWER" },
-      });
-      const reviewerData = {
-        eventId: stored.eventId,
-        shiftId: shift.shiftId,
-        stationId: null,
-        userId: USERS[3].id,
-        assignmentRole: "REVIEWER",
-        assignedBy: USERS[1].id,
-        status: "CONFIRMED",
-        assignmentStatus: "CONFIRMED",
-      };
-      if (reviewerAssignment) await prisma.staffAssignment.update({ where: { id: reviewerAssignment.id }, data: reviewerData });
-      else await prisma.staffAssignment.create({ data: reviewerData });
-    }
-
-    const auditId = `30000000-0000-4000-8000-${String(index + 1).padStart(12, "0")}`;
-    if (!await prisma.eventAuditLog.findUnique({ where: { eventAuditLogId: auditId } })) {
-      await prisma.eventAuditLog.create({
+async function seedEventStructure(event, staff) {
+  const shiftStartsAt = event.startsAt;
+  const shiftEndsAt = event.endsAt;
+  const existingShift = await prisma.shift.findFirst({
+    where: { eventId: event.eventId, name: "Registration and screening" },
+  });
+  const shift = existingShift
+    ? await prisma.shift.update({
+        where: { shiftId: existingShift.shiftId },
         data: {
-          eventAuditLogId: auditId,
-          eventId: stored.eventId,
-          actorUserId: USERS[1].id,
-          action: "CREATED",
-          correlationId: `40000000-0000-4000-8000-${String(index + 1).padStart(12, "0")}`,
-          afterSnapshot: { name: stored.name, status: stored.status, capacity: stored.capacity, version: stored.version },
+          startsAt: shiftStartsAt,
+          endsAt: shiftEndsAt,
+          requiredStaff: 3,
+          status: event.status === "IN_PROGRESS" ? "ACTIVE" : event.status === "COMPLETED" ? "COMPLETED" : "PLANNED",
+        },
+      })
+    : await prisma.shift.create({
+        data: {
+          eventId: event.eventId,
+          name: "Registration and screening",
+          startsAt: shiftStartsAt,
+          endsAt: shiftEndsAt,
+          requiredStaff: 3,
+          status: event.status === "IN_PROGRESS" ? "ACTIVE" : event.status === "COMPLETED" ? "COMPLETED" : "PLANNED",
+        },
+      });
+
+  const stationDefinitions = [
+    ["VISUAL_ACUITY", "Visual acuity", 1],
+    ["REFRACTION", "Refraction", 2],
+  ];
+  const stations = [];
+  for (const [stationType, stationName, stationOrder] of stationDefinitions) {
+    stations.push(await prisma.station.upsert({
+      where: { eventId_stationType: { eventId: event.eventId, stationType } },
+      update: { stationName, stationOrder, isActive: true },
+      create: {
+        eventId: event.eventId,
+        stationType,
+        stationName,
+        stationOrder,
+        isActive: true,
+      },
+    }));
+  }
+
+  const registrationOfficers = await prisma.user.findMany({
+    where: {
+      status: "ACTIVE",
+      OR: [
+        { id: staff.id },
+        { userRoles: { some: { role: { roleName: "REGISTRATION_OFFICER" } } } },
+      ],
+    },
+    select: { id: true },
+  });
+  for (const officer of registrationOfficers) {
+    const assignment = await prisma.staffAssignment.findFirst({
+      where: {
+        eventId: event.eventId,
+        userId: officer.id,
+        assignmentRole: "REGISTRATION",
+        shiftId: null,
+        stationId: null,
+      },
+    });
+    if (assignment) {
+      await prisma.staffAssignment.update({
+        where: { id: assignment.id },
+        data: { status: "ASSIGNED", assignmentStatus: "ASSIGNED", assignedBy: staff.id },
+      });
+    } else {
+      await prisma.staffAssignment.create({
+        data: {
+          eventId: event.eventId,
+          userId: officer.id,
+          assignedBy: staff.id,
+          assignmentRole: "REGISTRATION",
+          assignmentStatus: "ASSIGNED",
+          status: "ASSIGNED",
         },
       });
     }
   }
 
-  const reviewEventId = EVENTS.find((event) => event.status === "IN_PROGRESS").eventId;
-  for (const participant of REVIEW_PARTICIPANTS) {
-    await prisma.participant.upsert({
-      where: { id: participant.id },
-      update: {
-        nric: participant.nric,
-        nricMasked: participant.nricMasked,
-        firstName: participant.firstName,
-        lastName: participant.lastName,
-        dateOfBirth: new Date(`${participant.dateOfBirth}T00:00:00.000Z`),
-        gender: participant.gender,
-        contactNumber: "+65 6000 0000",
-        emergencyContact: "+65 6000 0001",
-        consentGiven: true,
+  return { shift, stations };
+}
+
+async function upsertDemoParticipant(staff, {
+  participantReference,
+  firstName,
+  lastName,
+  dateOfBirth,
+  contactNumber,
+  email,
+  accessibilityNotes = null,
+}) {
+  return prisma.participant.upsert({
+    where: { participantReference },
+    update: {
+      firstName,
+      lastName,
+      dateOfBirth: new Date(`${dateOfBirth}T00:00:00.000Z`),
+      contactNumber,
+      email,
+      accessibilityNotes,
+      status: "ACTIVE",
+      updatedById: staff.id,
+    },
+    create: {
+      participantReference,
+      firstName,
+      lastName,
+      dateOfBirth: new Date(`${dateOfBirth}T00:00:00.000Z`),
+      gender: "U",
+      contactNumber,
+      email,
+      preferredLanguage: "English",
+      accessibilityNotes,
+      status: "ACTIVE",
+      emergencyContact: contactNumber,
+      consentGiven: false,
+      createdById: staff.id,
+      updatedById: staff.id,
+    },
+  });
+}
+
+async function ensureDemoContact(staff, participant, {
+  contactName,
+  relationship,
+  phoneNumber,
+  email,
+}) {
+  const existing = await prisma.participantEmergencyContact.findFirst({
+    where: { participantId: participant.id, contactName },
+  });
+  const data = {
+    contactName,
+    relationship,
+    phoneNumber,
+    email,
+    isPrimary: true,
+    status: "ACTIVE",
+    updatedById: staff.id,
+  };
+  if (existing) {
+    return prisma.participantEmergencyContact.update({
+      where: { id: existing.id },
+      data,
+    });
+  }
+  return prisma.participantEmergencyContact.create({
+    data: {
+      ...data,
+      participantId: participant.id,
+      createdById: staff.id,
+    },
+  });
+}
+
+async function ensureAcceptedConsent(staff, participant, event, consentForm, signerName) {
+  const existing = await prisma.participantConsent.findFirst({
+    where: {
+      participantId: participant.id,
+      eventId: event.eventId,
+      consentStatus: "ACCEPTED",
+      withdrawalOfId: null,
+    },
+  });
+  const signatureSha256 = crypto.createHash("sha256")
+    .update(`${participant.participantReference}:${event.eventId}`)
+    .digest("hex");
+  const data = {
+    consentFormVersionId: consentForm.id,
+    consentStatus: "ACCEPTED",
+    signerType: "PARTICIPANT",
+    signerName,
+    signatureObjectKey: `signatures/demo/${participant.participantReference}.png`,
+    signatureSha256,
+    signatureMimeType: "image/png",
+    recordedById: staff.id,
+    signedAt: new Date(),
+    decisionAt: new Date(),
+  };
+  const consent = existing
+    ? await prisma.participantConsent.update({ where: { id: existing.id }, data })
+    : await prisma.participantConsent.create({
+        data: {
+          ...data,
+          participantId: participant.id,
+          eventId: event.eventId,
+        },
+      });
+  await prisma.participant.update({
+    where: { id: participant.id },
+    data: { consentGiven: true, updatedById: staff.id },
+  });
+  return consent;
+}
+
+async function ensureDemoRegistration(staff, participant, event, consent) {
+  const idempotencyKey = `seed-registration-${participant.participantReference}`;
+  const registration = await prisma.eventRegistration.upsert({
+    where: {
+      participantId_eventId: {
+        participantId: participant.id,
+        eventId: event.eventId,
       },
-      create: {
-        id: participant.id,
-        nric: participant.nric,
-        nricMasked: participant.nricMasked,
-        firstName: participant.firstName,
-        lastName: participant.lastName,
-        dateOfBirth: new Date(`${participant.dateOfBirth}T00:00:00.000Z`),
-        gender: participant.gender,
-        contactNumber: "+65 6000 0000",
-        emergencyContact: "+65 6000 0001",
-        consentGiven: true,
+    },
+    update: {
+      registrationStatus: "SIGNED_UP",
+      participantDisplayName: `${participant.firstName} ${participant.lastName}`,
+      passToken: "VSMS-DEMO-QR-001",
+    },
+    create: {
+      participantId: participant.id,
+      eventId: event.eventId,
+      registeredBy: staff.id,
+      registrationStatus: "SIGNED_UP",
+      participantDisplayName: `${participant.firstName} ${participant.lastName}`,
+      queueNumber: 1,
+      idempotencyKey,
+      passToken: "VSMS-DEMO-QR-001",
+    },
+  });
+  const history = await prisma.registrationStatusHistory.findFirst({
+    where: { registrationId: registration.registrationId, toStatus: "SIGNED_UP" },
+  });
+  if (!history) {
+    await prisma.registrationStatusHistory.create({
+      data: {
+        registrationId: registration.registrationId,
+        fromStatus: null,
+        toStatus: "SIGNED_UP",
+        changedById: staff.id,
+        reason: "Seeded demonstration registration",
       },
     });
-    await prisma.eventRegistration.upsert({
-      where: { registrationId: participant.registrationId },
-      update: {
-        eventId: reviewEventId,
-        participantId: participant.id,
-        registeredBy: USERS[1].id,
-        registrationStatus: "CHECKED_IN",
-        participantDisplayName: `${participant.firstName} ${participant.lastName}`,
-        queueNumber: participant.queueNumber,
-        checkedIn: true,
-      },
-      create: {
-        registrationId: participant.registrationId,
-        eventId: reviewEventId,
-        participantId: participant.id,
-        registeredBy: USERS[1].id,
-        registrationStatus: "CHECKED_IN",
-        participantDisplayName: `${participant.firstName} ${participant.lastName}`,
-        queueNumber: participant.queueNumber,
-        checkedIn: true,
+  }
+  await prisma.participantConsent.update({
+    where: { id: consent.id },
+    data: { registrationId: registration.registrationId },
+  });
+
+  const token = "VSMS-DEMO-QR-001";
+  const qr = await prisma.qRCodePass.upsert({
+    where: { token },
+    update: {
+      registrationId: registration.registrationId,
+      tokenHash: crypto.createHash("sha256").update(token).digest("hex"),
+      expiresAt: demoDate(30, 23, 59),
+      isActive: true,
+      revokedAt: null,
+      revokedBy: null,
+      revokedReason: null,
+    },
+    create: {
+      registrationId: registration.registrationId,
+      token,
+      tokenHash: crypto.createHash("sha256").update(token).digest("hex"),
+      expiresAt: demoDate(30, 23, 59),
+      isActive: true,
+    },
+  });
+  return { registration, qr };
+}
+
+async function seedDemoData(staff, reviewer, consentForm) {
+  const upcomingEvent = await upsertDemoEvent(staff, {
+    key: "seed-demo-tampines",
+    name: "Community Eye Screening - Tampines",
+    venue: "Our Tampines Hub",
+    status: "PUBLISHED",
+    startsAt: demoDate(2, 1),
+    endsAt: demoDate(2, 9),
+    capacity: 120,
+  });
+  const liveEvent = await upsertDemoEvent(staff, {
+    key: "seed-demo-jurong-live",
+    name: "Vision Screening - Jurong Live",
+    venue: "Jurong Regional Library",
+    status: "IN_PROGRESS",
+    startsAt: demoDate(0, 0),
+    endsAt: demoDate(0, 23),
+    capacity: 80,
+  });
+  const completedEvent = await upsertDemoEvent(staff, {
+    key: "seed-demo-woodlands-complete",
+    name: "Community Eye Screening - Woodlands",
+    venue: "Woodlands Community Club",
+    status: "COMPLETED",
+    startsAt: demoDate(-14, 1),
+    endsAt: demoDate(-14, 9),
+    capacity: 100,
+  });
+  const [, liveStructure] = await Promise.all([
+    seedEventStructure(upcomingEvent, staff),
+    seedEventStructure(liveEvent, staff),
+    seedEventStructure(completedEvent, staff),
+  ]);
+
+  const reviewerAssignment = await prisma.staffAssignment.findFirst({
+    where: {
+      eventId: liveEvent.eventId,
+      shiftId: liveStructure.shift.shiftId,
+      userId: reviewer.id,
+      assignmentRole: "REVIEWER",
+      stationId: null,
+    },
+  });
+  const reviewerAssignmentData = {
+    assignedBy: staff.id,
+    assignmentStatus: "CONFIRMED",
+    status: "CONFIRMED",
+  };
+  if (reviewerAssignment) {
+    await prisma.staffAssignment.update({ where: { id: reviewerAssignment.id }, data: reviewerAssignmentData });
+  } else {
+    await prisma.staffAssignment.create({
+      data: {
+        ...reviewerAssignmentData,
+        eventId: liveEvent.eventId,
+        shiftId: liveStructure.shift.shiftId,
+        userId: reviewer.id,
+        assignmentRole: "REVIEWER",
       },
     });
   }
 
-  const registrationIds = REVIEW_PARTICIPANTS.map((participant) => participant.registrationId);
-  await prisma.referral.deleteMany({ where: { registrationId: { in: registrationIds } } });
-  await prisma.review.deleteMany({ where: { registrationId: { in: registrationIds } } });
-  await prisma.screeningResult.deleteMany({ where: { registrationId: { in: registrationIds } } });
-  await prisma.auditLog.deleteMany({ where: { action: { in: ["CLINICAL_REVIEW_RECORDED", "REFERRAL_DRAFT_CREATED"] } } });
+  const aisha = await upsertDemoParticipant(staff, {
+    participantReference: "VSMS-DEMO-000001",
+    firstName: "Aisha",
+    lastName: "Rahman",
+    dateOfBirth: "1988-04-12",
+    contactNumber: "+65 8123 4567",
+    email: "aisha.rahman@example.test",
+    accessibilityNotes: "Prefers large-print instructions.",
+  });
+  const daniel = await upsertDemoParticipant(staff, {
+    participantReference: "VSMS-DEMO-000002",
+    firstName: "Daniel",
+    lastName: "Tan",
+    dateOfBirth: "1975-09-23",
+    contactNumber: "+65 8234 5678",
+    email: "daniel.tan@example.test",
+  });
+  const priya = await upsertDemoParticipant(staff, {
+    participantReference: "VSMS-DEMO-000003",
+    firstName: "Priya",
+    lastName: "Nair",
+    dateOfBirth: "1992-02-18",
+    contactNumber: "+65 8345 6789",
+    email: "priya.nair@example.test",
+  });
+  const marcus = await upsertDemoParticipant(staff, {
+    participantReference: "VSMS-DEMO-000004",
+    firstName: "Marcus",
+    lastName: "Lim",
+    dateOfBirth: "1983-11-05",
+    contactNumber: "+65 8456 7890",
+    email: "marcus.lim@example.test",
+  });
 
-  const stations = await prisma.station.findMany({ where: { eventId: reviewEventId, isActive: true } });
-  const stationByType = new Map(stations.map((station) => [station.stationType, station]));
-  const makeResult = (registrationIndex, stationType, overallFlag, resultData, flagSummary = null) => {
-    const station = stationByType.get(stationType);
-    return {
-      resultId: `90000000-0000-4000-8${registrationIndex}00-${String(station.stationOrder).padStart(12, "0")}`,
-      registrationId: REVIEW_PARTICIPANTS[registrationIndex].registrationId,
-      stationId: station.stationId,
-      recordedByUserId: USERS[2].id,
-      screeningType: stationType,
-      resultData,
-      overallFlag,
-      isFlagged: overallFlag !== "NORMAL",
-      flagSummary,
-      ruleVersion: `DEMO-${stationType}-1.0`.slice(0, 20),
-      acknowledgedAt: overallFlag === "NORMAL" ? null : new Date("2026-07-22T05:30:00.000Z"),
-      idempotencyKey: `demo-review-${registrationIndex}-${stationType.toLowerCase()}`,
+  await ensureDemoContact(staff, aisha, {
+    contactName: "Nur Rahman",
+    relationship: "Sister",
+    phoneNumber: "+65 9123 4001",
+    email: "nur.rahman@example.test",
+  });
+  await ensureDemoContact(staff, daniel, {
+    contactName: "Grace Tan",
+    relationship: "Spouse",
+    phoneNumber: "+65 9123 4002",
+    email: "grace.tan@example.test",
+  });
+  await ensureDemoContact(staff, priya, {
+    contactName: "Arun Nair",
+    relationship: "Brother",
+    phoneNumber: "+65 9123 4003",
+    email: "arun.nair@example.test",
+  });
+
+  const aishaConsent = await ensureAcceptedConsent(
+    staff,
+    aisha,
+    upcomingEvent,
+    consentForm,
+    "Aisha Rahman"
+  );
+  const danielConsent = await ensureAcceptedConsent(
+    staff,
+    daniel,
+    liveEvent,
+    consentForm,
+    "Daniel Tan"
+  );
+  const { registration, qr } = await ensureDemoRegistration(
+    staff,
+    daniel,
+    liveEvent,
+    danielConsent
+  );
+
+  for (const station of liveStructure.stations) {
+    const visualAcuity = station.stationType === "VISUAL_ACUITY";
+    const result = {
+      recordedByUserId: reviewer.id,
+      screeningType: station.stationType,
+      resultData: visualAcuity
+        ? { od: { kind: "FRACTION", denominator: 18 }, os: { kind: "FRACTION", denominator: 24 }, chartDistanceMetres: 6, withUsualDistanceGlasses: true }
+        : { sphericalEquivalentRight: -1.25, sphericalEquivalentLeft: -1.75, notes: "Review recommended" },
+      overallFlag: visualAcuity ? "REFER" : "REVIEW",
+      isFlagged: true,
+      flagSummary: visualAcuity ? "Reduced visual acuity in both eyes" : "Refractive difference requires review",
+      ruleVersion: "VSMS-SEED-1.0",
+      idempotencyKey: `seed-review-${registration.registrationId.slice(0, 8)}-${station.stationId.slice(0, 8)}`,
     };
-  };
-  const normalData = {
-    VISUAL_ACUITY: { chartDistanceMetres: 6, od: { kind: "FRACTION", denominator: 6 }, os: { kind: "FRACTION", denominator: 6 }, withUsualDistanceGlasses: false },
-    REFRACTION: { sphericalEquivalentOd: -0.5, sphericalEquivalentOs: -0.25 },
-    COLOUR_VISION: { platesCorrect: 14, platesAttempted: 14 },
-    EYE_HEALTH: { observation: "No abnormality observed" },
-  };
-  const seededResults = SCREENING_STATIONS.map(({ stationType }) => makeResult(0, stationType, "NORMAL", normalData[stationType]));
-  seededResults.push(...SCREENING_STATIONS.map(({ stationType }) => {
-    if (stationType === "EYE_HEALTH") return makeResult(1, stationType, "REFER", { observation: "Possible lens opacity" }, "Possible lens opacity warrants referral");
-    if (stationType === "VISUAL_ACUITY") return makeResult(1, stationType, "REVIEW", { chartDistanceMetres: 6, od: { kind: "FRACTION", denominator: 18 }, os: { kind: "FRACTION", denominator: 12 }, withUsualDistanceGlasses: true }, "Reduced right-eye visual acuity");
-    return makeResult(1, stationType, "NORMAL", normalData[stationType]);
-  }));
-  seededResults.push(makeResult(2, "EYE_HEALTH", "URGENT", { observation: "Sudden painful vision loss reported" }, "Urgent same-day assessment recommended"));
-  seededResults.push(makeResult(3, "VISUAL_ACUITY", "REVIEW", { chartDistanceMetres: 6, od: { kind: "FRACTION", denominator: 18 }, os: { kind: "FRACTION", denominator: 12 }, withUsualDistanceGlasses: false }, "Reduced visual acuity requires review after remaining stations"));
-  await prisma.screeningResult.createMany({ data: seededResults });
+    await prisma.screeningResult.upsert({
+      where: { registrationId_stationId: { registrationId: registration.registrationId, stationId: station.stationId } },
+      update: result,
+      create: { ...result, registrationId: registration.registrationId, stationId: station.stationId },
+    });
+  }
 
-  console.log(JSON.stringify({
-    success: true,
-    message: "Database successfully seeded!",
-    reviewerCredentials: { identifier: "reviewer@vsms.local", password: DEMO_PASSWORD },
-  }, null, 2));
-};
+  return {
+    events: { upcomingEvent, liveEvent, completedEvent },
+    participants: { aisha, daniel, priya, marcus },
+    aishaConsent,
+    registration,
+    qr,
+  };
+}
 
-main().finally(() => prisma.$disconnect());
+async function main() {
+  const roles = await seedRoles();
+  const staff = await seedStaff(roles);
+  const reviewer = await seedReviewer(roles, staff);
+  await seedPermissions(roles, staff);
+  await seedStationTemplates();
+  const consentForm = await seedConsentForm(staff);
+  const demo = await seedDemoData(staff, reviewer, consentForm);
+  console.log(`Seeded roles, permissions, station templates, consent form, staff profile, and demonstration data for ${staff.email}.`);
+  console.log(`Upcoming event: ${demo.events.upcomingEvent.name} (${demo.events.upcomingEvent.eventId})`);
+  console.log(`Live event: ${demo.events.liveEvent.name} (${demo.events.liveEvent.eventId})`);
+  console.log(`Ready participant: ${demo.participants.aisha.participantReference} - Aisha Rahman`);
+  console.log(`Needs consent: ${demo.participants.priya.participantReference} - Priya Nair`);
+  console.log(`Needs emergency contact: ${demo.participants.marcus.participantReference} - Marcus Lim`);
+  console.log(`Registered participant: ${demo.participants.daniel.participantReference} - Daniel Tan`);
+  console.log(`Reviewer profile: ${reviewer.email} (Cognito group: REVIEWER)`);
+  console.log(`Registration ID: ${demo.registration.registrationId}`);
+  console.log(`Demo QR token: ${demo.qr.token}`);
+}
+
+main()
+  .catch((error) => {
+    console.error("Seed failed:", error);
+    process.exitCode = 1;
+  })
+  .finally(() => prisma.$disconnect());

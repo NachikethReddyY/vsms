@@ -3,7 +3,8 @@ import { createRoot } from 'react-dom/client'
 import { BrowserRouter } from 'react-router-dom'
 import './index.css'
 import App from './App.tsx'
-import { AuthProvider } from './auth/AuthContext.tsx'
+import { AuthProvider as EventAuthProvider } from './auth/AuthContext.tsx'
+import { AuthProvider as StaffAuthProvider } from './auth/AuthProvider.tsx'
 
 const savedTheme = localStorage.getItem('vsms-theme')
 const preferredTheme = savedTheme === 'light' || savedTheme === 'dark'
@@ -15,7 +16,11 @@ document.documentElement.style.colorScheme = preferredTheme
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <BrowserRouter>
-      <AuthProvider><App /></AuthProvider>
+      <EventAuthProvider>
+        <StaffAuthProvider>
+          <App />
+        </StaffAuthProvider>
+      </EventAuthProvider>
     </BrowserRouter>
   </StrictMode>,
 )

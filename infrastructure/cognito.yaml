@@ -1,0 +1,86 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: Secure Cognito configuration for the VSMS staff registration module
+
+Parameters:
+  EnvironmentName:
+    Type: String
+    Default: development
+    AllowedPattern: "[a-z0-9-]+"
+
+Resources:
+  StaffUserPool:
+    Type: AWS::Cognito::UserPool
+    Properties:
+      UserPoolName: !Sub "vsms-staff-${EnvironmentName}"
+      UsernameAttributes:
+        - email
+      AutoVerifiedAttributes:
+        - email
+      MfaConfiguration: "ON"
+      EnabledMfas:
+        - SOFTWARE_TOKEN_MFA
+      SoftwareTokenMfaConfiguration:
+        Enabled: true
+      AccountRecoverySetting:
+        RecoveryMechanisms:
+          - Name: verified_email
+            Priority: 1
+      Policies:
+        PasswordPolicy:
+          MinimumLength: 12
+          RequireUppercase: true
+          RequireLowercase: true
+          RequireNumbers: true
+          RequireSymbols: true
+          TemporaryPasswordValidityDays: 2
+      AdminCreateUserConfig:
+        AllowAdminCreateUserOnly: true
+      UserPoolAddOns:
+        AdvancedSecurityMode: ENFORCED
+      UserAttributeUpdateSettings:
+        AttributesRequireVerificationBeforeUpdate:
+          - email
+
+  StaffAppClient:
+    Type: AWS::Cognito::UserPoolClient
+    Properties:
+      ClientName: !Sub "vsms-staff-web-${EnvironmentName}"
+      UserPoolId: !Ref StaffUserPool
+      GenerateSecret: false
+      PreventUserExistenceErrors: ENABLED
+      EnableTokenRevocation: true
+      AccessTokenValidity: 60
+      IdTokenValidity: 60
+      RefreshTokenValidity: 30
+      TokenValidityUnits:
+        AccessToken: minutes
+        IdToken: minutes
+        RefreshToken: days
+      ExplicitAuthFlows:
+        - ALLOW_USER_PASSWORD_AUTH
+        - ALLOW_REFRESH_TOKEN_AUTH
+        - ALLOW_USER_SRP_AUTH
+
+  AdminGroup:
+    Type: AWS::Cognito::UserPoolGroup
+    Properties:
+      GroupName: Admin
+      Description: VSMS administrators
+      Precedence: 1
+      UserPoolId: !Ref StaffUserPool
+
+  RegistrationOfficerGroup:
+    Type: AWS::Cognito::UserPoolGroup
+    Properties:
+      GroupName: RegistrationOfficer
+      Description: Staff permitted to register participants and record consent
+      Precedence: 10
+      UserPoolId: !Ref StaffUserPool
+
+Outputs:
+  UserPoolId:
+    Value: !Ref StaffUserPool
+  AppClientId:
+    Value: !Ref StaffAppClient
+  Region:
+    Value: !Ref AWS::Region
