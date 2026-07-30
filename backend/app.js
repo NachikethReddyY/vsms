@@ -17,6 +17,12 @@ const eventRoutes = require("./routes/eventRoutes");
 const locationRoutes = require("./routes/locationRoutes");
 const qrRoutes = require("./routes/qrRoutes");
 const screeningRoutes = require("./routes/screeningRoutes");
+const participantRoutes = require("./routes/participantRoutes");
+const registrationRoutes = require("./routes/registrationRoutes");
+const adminRoutes = require("./routes/adminRoutes");
+const consentRoutes = require("./routes/consentRoutes");
+const emergencyContactRoutes = require("./routes/emergencyContactRoutes");
+const signatureRoutes = require("./routes/signatureRoutes");
 const { notFound, errorHandler } = require("./middlewares/errorHandler");
 
 // -----------------------------------------------------------------------------
@@ -77,7 +83,16 @@ app.use(cors({
     return callback(new AppError(403, "ORIGIN_NOT_ALLOWED", "Request origin is not allowed"));
   },
   methods: ["GET", "POST", "PATCH", "DELETE", "OPTIONS"],
-  allowedHeaders: ["Authorization", "Content-Type", "X-CSRF-Token", "X-Request-Id", "Idempotency-Key"],
+  allowedHeaders: [
+    "Authorization",
+    "Content-Type",
+    "X-CSRF-Token",
+    "X-Request-Id",
+    "X-Requested-With",
+    "X-Device-Id",
+    "X-Device-Name",
+    "Idempotency-Key",
+  ],
 }));
 
 app.use(cookieParser());
@@ -104,6 +119,21 @@ if (!env.isProduction) {
 }
 
 // FIX: Updated route mapping with consistent /api namespaces and isolated paths
+// Versioned routes are the canonical integration surface. Selected legacy
+// aliases remain available for the existing event UI during the transition.
+app.use("/api/v1/auth", authLimiter, authRoutes);
+app.use("/api/v1/users", userRoutes);
+app.use("/api/v1/events", (req, res, next) => ["POST", "PATCH", "PUT", "DELETE"].includes(req.method) ? mutationLimiter(req, res, next) : next(), eventRoutes);
+app.use("/api/v1/locations", locationRoutes);
+app.use("/api/v1/events", (req, res, next) => ["POST", "PATCH", "PUT", "DELETE"].includes(req.method) ? mutationLimiter(req, res, next) : next(), screeningRoutes);
+app.use("/api/v1/participants", participantRoutes);
+app.use("/api/v1/registrations", registrationRoutes);
+app.use("/api/v1/consent-forms", consentRoutes);
+app.use("/api/v1/emergency-contacts", emergencyContactRoutes);
+app.use("/api/v1/signatures", signatureRoutes);
+app.use("/api/v1/admin", adminRoutes);
+app.use("/api/v1/qr", mutationLimiter, qrRoutes);
+
 app.use("/api/auth", authLimiter, authRoutes);
 app.use("/api/users", userRoutes);
 app.use("/api/events", (req, res, next) => ["POST", "PATCH", "PUT", "DELETE"].includes(req.method) ? mutationLimiter(req, res, next) : next(), eventRoutes);

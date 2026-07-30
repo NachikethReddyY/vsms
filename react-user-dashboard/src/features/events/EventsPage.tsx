@@ -2,7 +2,8 @@ import { ArrowTopRightOnSquareIcon, CalendarDaysIcon, DocumentDuplicateIcon, Lis
 import { Badge, type BadgeVariant } from '@astryxdesign/core/Badge';
 import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { getApiMessage, useAuth } from '../../auth/authState';
+import { useAuth } from '../../auth/AuthProvider';
+import { getApiMessage } from '../../auth/authState';
 import { AvatarCircles } from '../../components/MagicEffects';
 import { getDisplayName, getMonogram } from '../../utils/identity';
 import { eventApi, formatEventDate, STATUS_LABEL, type EventRecord, type EventStatus } from './eventApi';
@@ -55,7 +56,8 @@ function dashboardPath(event: EventRecord, userId?: string) {
 }
 
 export default function EventsPage() {
-  const { user } = useAuth();
+  const { session } = useAuth();
+  const user = session?.user;
   const [events, setEvents] = useState<EventRecord[]>([]);
   const [timeRange, setTimeRange] = useState<TimeRange>('upcoming');
   const [status, setStatus] = useState<'' | EventStatus>('');

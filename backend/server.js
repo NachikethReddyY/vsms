@@ -14,10 +14,14 @@ const server = !env.isProduction && env.localHttps
 
 server.on("error", (error) => {
   logger.error("server.failed", { message: error.message, stack: error.stack });
-  process.exit(1);
+  process.exitCode = 1;
 });
 
-server.listen(env.PORT, env.HOST, () => {
-  const protocol = server instanceof https.Server ? "https" : "http";
-  logger.info(`Server running securely on ${protocol}://${env.HOST}:${env.PORT}`);
-});
+if (require.main === module) {
+  server.listen(env.PORT, env.HOST, () => {
+    const protocol = server instanceof https.Server ? "https" : "http";
+    logger.info(`Server running securely on ${protocol}://${env.HOST}:${env.PORT}`);
+  });
+}
+
+module.exports = server;
