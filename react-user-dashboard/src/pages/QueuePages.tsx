@@ -46,13 +46,16 @@ export function QueuePage() {
         }),
       ]);
       const firstPage = firstPageResponse.data;
-      const remainingPages = await Promise.all(
-        Array.from({ length: Math.max(0, firstPage.pagination.totalPages - 1) }, (_, index) =>
+      const totalPagesCount = firstPage.pagination?.totalPages || 1;
+      
+      const remainingPages = totalPagesCount > 1 ? await Promise.all(
+        Array.from({ length: totalPagesCount - 1 }, (_, index) =>
           apiClient.get<RegistrationPage>(`/events/${eventId}/registrations`, {
             params: { page: index + 2, pageSize: API_PAGE_SIZE },
           }),
         ),
-      );
+      ) : [];
+
       const registrations = [
         ...firstPage.registrations,
         ...remainingPages.flatMap((response) => response.data.registrations),
@@ -64,8 +67,8 @@ export function QueuePage() {
         queueNumber: registration.queueNumber,
         status: registration.registrationStatus,
         participant: {
-          fullName: `${registration.participant.firstName} ${registration.participant.lastName}`.trim(),
-          reference: registration.participant.participantReference,
+          fullName: `${registration.participant?.firstName ?? ""} ${registration.participant?.lastName ?? ""}`.trim(),
+          reference: registration.participant?.participantReference ?? "",
         },
       })));
       setError(null);
@@ -94,9 +97,9 @@ export function QueuePage() {
     }
   };
 
-  const waiting = queue.filter((item) => item.status === "SIGNED_UP");
-  const checkedIn = queue.filter((item) => item.status === "CHECKED_IN");
-  const completed = queue.filter((item) => item.status === "COMPLETED");
+  const waiting = useMemo(() => queue.filter((item) => item.status === "SIGNED_UP"), [queue]);
+  const checkedIn = useMemo(() => queue.filter((item) => item.status === "CHECKED_IN"), [queue]);
+  const completed = useMemo(() => queue.filter((item) => item.status === "COMPLETED"), [queue]);
   const currentServing = checkedIn[0] ?? null;
 
   const filteredQueue = useMemo(() => {
@@ -112,10 +115,14 @@ export function QueuePage() {
   }, [queue, searchQuery, statusFilter]);
 
   const totalPages = Math.max(1, Math.ceil(filteredQueue.length / PAGE_SIZE));
-  const paginatedQueue = filteredQueue.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
+  const paginatedQueue = useMemo(() => {
+    return filteredQueue.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
+  }, [filteredQueue, currentPage]);
 
   useEffect(() => {
-    if (currentPage > totalPages) setCurrentPage(totalPages);
+    if (currentPage > totalPages) {
+      setCurrentPage(totalPages);
+    }
   }, [currentPage, totalPages]);
 
   if (isLoading) {
@@ -140,6 +147,8 @@ export function QueuePage() {
           onCallNext={() => {
             if (waiting[0]) void updateStatus(waiting[0].id, "CHECKED_IN", "Called from queue dashboard");
           }}
+          currentServing={currentServing}
+          onSignOff={() => {}}
         />
 
         {error && <div className="rounded-xl bg-red-50 p-4 text-sm text-red-800" role="alert">{error}</div>}

@@ -1,0 +1,28 @@
+:root {
+  /* Surfaces & Canvas */
+  --canvas: #F7F7F4;
+  --canvas-soft: #FAFAF7;
+  --surface: #FFFFFF;
+  --surface-2: #F2F1EC;
+  
+  /* Hairlines & Dividers */
+  --hairline: #E6E5E0;
+  --hairline-soft: #EFEEE8;
+  --hairline-strong: #CFCDC4;
+
+  /* Text & Ink */
+  --ink: #26251E;
+  --ink-2: #5A5852;
+  --muted: #807D72;
+
+  /* Accent (Single Blue) */
+  --accent: #2563EB;
+  --accent-strong: #1D4ED8;
+  --accent-tint: rgba(37, 99, 235, 0.09);
+
+  /* Semantic */
+  --green: #1F8A65;
+  --amber: #B45309;
+  --orange: #C2410C;
+  --red: #CF2D56;
+}

@@ -1,45 +1,63 @@
-import type { QueueItem } from "./QueueTable";
+interface CurrentServingItem {
+  id: string;
+  ticketNumber: string;
+  station: string;
+  participant: {
+    fullName: string;
+    age: number;
+    idNumber: string;
+  };
+}
 
 interface NowServingCardProps {
-  currentServing: QueueItem | null;
-  actionLoading: string | null;
+  currentServing: CurrentServingItem | null;
   onComplete: (id: string) => void;
   onNoShow: (id: string) => void;
 }
 
-export function NowServingCard({ currentServing, actionLoading, onComplete, onNoShow }: NowServingCardProps) {
+export function NowServingCard({ currentServing, onComplete, onNoShow }: NowServingCardProps) {
   return (
-    <section className="rounded-xl border border-blue-600/25 bg-blue-600/5 p-5">
-      <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-blue-700">Now serving</p>
+    <div className="rounded-xl border border-[#2563EB]/25 bg-[#2563EB]/4 p-5">
+      <div className="flex items-center justify-between mb-2">
+        <span className="text-[11px] font-semibold uppercase tracking-wider text-[#2563EB]">
+          Now Serving (Active Station)
+        </span>
+        <span className="text-xs font-medium text-[#2563EB] bg-white px-2.5 py-0.5 rounded-md border border-[#2563EB]/20 tabular-nums">
+          {currentServing?.station || "General Screening"}
+        </span>
+      </div>
+
       {currentServing ? (
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div>
-            <h2 className="font-mono text-xl font-semibold">Queue #{currentServing.queueNumber ?? "—"}</h2>
-            <p className="mt-1 font-semibold">{currentServing.participant.fullName}</p>
-            <p className="text-xs text-[#807D72]">{currentServing.participant.reference}</p>
+            <h2 className="text-xl font-semibold tracking-tight text-[#26251E] font-mono tabular-nums">
+              {currentServing.ticketNumber}
+            </h2>
+            <p className="text-sm font-semibold text-[#26251E] mt-0.5">
+              {currentServing.participant.fullName}{" "}
+              <span className="text-xs font-normal text-[#807D72]">
+                ({currentServing.participant.age} yrs · {currentServing.participant.idNumber})
+              </span>
+            </p>
           </div>
-          <div className="flex gap-2">
+          <div className="flex items-center gap-2">
             <button
-              type="button"
-              disabled={actionLoading === currentServing.id}
               onClick={() => onComplete(currentServing.id)}
-              className="rounded-lg border border-emerald-700/20 bg-emerald-700/10 px-4 py-2 text-xs font-semibold text-emerald-800 disabled:opacity-50"
+              className="rounded-lg bg-[#1F8A65]/10 text-[#1F8A65] border border-[#1F8A65]/20 px-4 py-1.5 text-xs font-semibold hover:bg-[#1F8A65]/20 cursor-pointer transition-colors"
             >
-              Complete
+              Complete Station
             </button>
             <button
-              type="button"
-              disabled={actionLoading === currentServing.id}
               onClick={() => onNoShow(currentServing.id)}
-              className="rounded-lg border border-amber-700/20 bg-amber-700/10 px-4 py-2 text-xs font-semibold text-amber-800 disabled:opacity-50"
+              className="rounded-lg bg-[#B45309]/10 text-[#B45309] border border-[#B45309]/20 px-4 py-1.5 text-xs font-semibold hover:bg-[#B45309]/20 cursor-pointer transition-colors"
             >
-              No show
+              No Show
             </button>
           </div>
         </div>
       ) : (
-        <p className="text-sm text-[#807D72]">No participant is currently checked in.</p>
+        <p className="text-xs text-[#807D72]">No participant currently active. Click "Call Next Participant" above.</p>
       )}
-    </section>
+    </div>
   );
 }
