@@ -23,6 +23,53 @@ exports.saveVisualAcuity = async (req, res) => {
   res.status(created ? 201 : 200).json(result);
 };
 
+exports.previewVisualAcuity = async (req, res) => {
+  res.json(await screeningService.previewVisualAcuity(
+    req.params.eventId,
+    req.params.stationId,
+    req.body,
+    req.user,
+  ));
+};
+
+exports.saveRefraction = async (req, res) => {
+  const { result, created } = await screeningService.saveRefraction(
+    req.params.eventId,
+    req.params.stationId,
+    req.body,
+    req.user,
+  );
+  res.status(created ? 201 : 200).json(result);
+};
+
+exports.previewRefraction = async (req, res) => {
+  res.json(await screeningService.previewRefraction(
+    req.params.eventId,
+    req.params.stationId,
+    req.body,
+    req.user,
+  ));
+};
+
+exports.saveColourVision = async (req, res) => {
+  const { result, created } = await screeningService.saveColourVision(
+    req.params.eventId,
+    req.params.stationId,
+    req.body,
+    req.user,
+  );
+  res.status(created ? 201 : 200).json(result);
+};
+
+exports.previewColourVision = async (req, res) => {
+  res.json(await screeningService.previewColourVision(
+    req.params.eventId,
+    req.params.stationId,
+    req.body,
+    req.user,
+  ));
+};
+
 exports.listReviews = async (req, res) => {
   res.json(await reviewService.listQueue(req.params.eventId, req.user));
 };

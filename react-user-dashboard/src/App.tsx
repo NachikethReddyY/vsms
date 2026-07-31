@@ -8,6 +8,8 @@ import EventDetailPage from "./features/events/EventDetailPage";
 import EventFormPage from "./features/events/EventFormPage";
 import EventsPage from "./features/events/EventsPage";
 import ReviewWorkspacePage from "./features/reviews/ReviewWorkspacePage";
+import ColourVisionStationPage from "./features/screening/ColourVisionStationPage";
+import RefractionStationPage from "./features/screening/RefractionStationPage";
 import VisualAcuityStationPage from "./features/screening/VisualAcuityStationPage";
 import { AuditLogsPage as RegistrationAuditLogsPage } from "./pages/AdminPages";
 import { LoginPage } from "./pages/AuthPages";
@@ -59,6 +61,8 @@ export default function App() {
         <Route path="/events/:eventId/edit" element={<EventFormPage mode={"create"} />} />
         <Route path="/events/:eventId" element={<EventDetailPage />} />
         <Route path="/events/:eventId/stations/visual-acuity" element={<VisualAcuityStationPage />} />
+        <Route path="/events/:eventId/stations/refraction" element={<RefractionStationPage />} />
+        <Route path="/events/:eventId/stations/colour-vision" element={<ColourVisionStationPage />} />
 
         {/* Live Queue Route Added */}
         <Route path="/events/:eventId/queue" element={<QueuePage />} />

@@ -58,6 +58,22 @@ const stationTemplates = [
     description: "Review screening outcomes and decide the safe next step.",
     defaultCapacity: 2,
   },
+  {
+    stationTemplateId: "60000000-0000-4000-8000-000000000005",
+    templateKey: "REFRACTION",
+    version: 1,
+    name: "Refraction",
+    description: "Capture autorefractor SPH/CYL/Axis readings for both eyes.",
+    defaultCapacity: 3,
+  },
+  {
+    stationTemplateId: "60000000-0000-4000-8000-000000000006",
+    templateKey: "COLOUR_VISION",
+    version: 1,
+    name: "Colour vision",
+    description: "Record Ishihara plate scores for each eye.",
+    defaultCapacity: 3,
+  },
 ];
 
 async function seedRoles() {
@@ -292,6 +308,7 @@ async function seedEventStructure(event, staff) {
   const stationDefinitions = [
     ["VISUAL_ACUITY", "Visual acuity", 1],
     ["REFRACTION", "Refraction", 2],
+    ["COLOUR_VISION", "Colour vision", 3],
   ];
   const stations = [];
   for (const [stationType, stationName, stationOrder] of stationDefinitions) {
@@ -667,17 +684,46 @@ async function seedDemoData(staff, reviewer, consentForm) {
   );
 
   for (const station of liveStructure.stations) {
-    const visualAcuity = station.stationType === "VISUAL_ACUITY";
+    const seedByType = {
+      VISUAL_ACUITY: {
+        resultData: { od: { kind: "FRACTION", denominator: 18 }, os: { kind: "FRACTION", denominator: 24 }, chartDistanceMetres: 6, withUsualDistanceGlasses: true },
+        overallFlag: "REFER",
+        flagSummary: "Reduced visual acuity in both eyes",
+        ruleVersion: "VSMS-VA-1.0",
+      },
+      REFRACTION: {
+        resultData: {
+          measurementStatus: "COMPLETED",
+          wearsDistanceGlasses: true,
+          od: { sphere: -1.25, cylinder: -0.50, axis: 90 },
+          os: { sphere: -3.50, cylinder: -3.50, axis: 175 },
+          notes: "High astigmatism OS",
+        },
+        overallFlag: "REVIEW",
+        flagSummary: "OS high astigmatism CYL -3.50; Anisometropia SPH difference 2.25 D",
+        ruleVersion: "VSMS-REF-1.0",
+      },
+      COLOUR_VISION: {
+        resultData: { testKit: "ISHIHARA", platesPresented: 11, odCorrect: 11, osCorrect: 2 },
+        overallFlag: "URGENT",
+        flagSummary: "Critical colour-vision asymmetry OD 11/11 vs OS 2/11",
+        ruleVersion: "VSMS-CV-1.0",
+      },
+    };
+    const seeded = seedByType[station.stationType] || {
+      resultData: { notes: "Seed placeholder" },
+      overallFlag: "REVIEW",
+      flagSummary: "Seeded review flag",
+      ruleVersion: "VSMS-SEED-1.0",
+    };
     const result = {
       recordedByUserId: reviewer.id,
       screeningType: station.stationType,
-      resultData: visualAcuity
-        ? { od: { kind: "FRACTION", denominator: 18 }, os: { kind: "FRACTION", denominator: 24 }, chartDistanceMetres: 6, withUsualDistanceGlasses: true }
-        : { sphericalEquivalentRight: -1.25, sphericalEquivalentLeft: -1.75, notes: "Review recommended" },
-      overallFlag: visualAcuity ? "REFER" : "REVIEW",
+      resultData: seeded.resultData,
+      overallFlag: seeded.overallFlag,
       isFlagged: true,
-      flagSummary: visualAcuity ? "Reduced visual acuity in both eyes" : "Refractive difference requires review",
-      ruleVersion: "VSMS-SEED-1.0",
+      flagSummary: seeded.flagSummary,
+      ruleVersion: seeded.ruleVersion,
       idempotencyKey: `seed-review-${registration.registrationId.slice(0, 8)}-${station.stationId.slice(0, 8)}`,
     };
     await prisma.screeningResult.upsert({
