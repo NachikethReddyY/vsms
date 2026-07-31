@@ -6,6 +6,7 @@ import {
   ChevronDownIcon,
   ChevronUpIcon,
   ClipboardDocumentListIcon,
+  ClipboardDocumentCheckIcon,
   ClockIcon,
   DocumentDuplicateIcon,
   MapPinIcon,
@@ -267,6 +268,13 @@ export default function EventDetailPage() {
   const canEditStaffing = canManage && ['DRAFT', 'PUBLISHED', 'IN_PROGRESS'].includes(event.status);
   const availableTemplates = stationTemplates.filter((template) => !event.eventStations.some((station) => station.stationTemplateId === template.stationTemplateId));
   const canCancel = canManage && !terminal && (event.status !== 'IN_PROGRESS' || user?.systemRole === 'ADMIN');
+  const canReview = event.status === 'IN_PROGRESS' && event.shifts.some((shift) => (
+    shift.status === 'ACTIVE' && shift.staffAssignments.some((assignment) => (
+      assignment.assignmentRole === 'REVIEWER'
+      && ['ASSIGNED', 'CONFIRMED'].includes(assignment.status)
+      && assignment.user.userId === user?.userId
+    ))
+  ));
   const activeStage = lifecycleStages.findIndex((stage) => stage.status === event.status);
   const totalRequiredStaff = event.shifts.reduce((total, shift) => total + shift.requiredStaff, 0);
   const next = nextAction[event.status];
@@ -364,6 +372,7 @@ export default function EventDetailPage() {
         </div>}
         <div className="action-cluster">
           <Link className="primary" to={`/events/${event.eventId}/stations/visual-acuity`}>Open Visual Acuity station</Link>
+          {canReview && <Link className="secondary" to={`/events/${event.eventId}/reviews`}><ClipboardDocumentCheckIcon />Open clinical review</Link>}
         </div>
       </aside>
     </section>

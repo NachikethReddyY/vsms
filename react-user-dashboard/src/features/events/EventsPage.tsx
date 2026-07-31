@@ -1,8 +1,9 @@
-import { ArrowTopRightOnSquareIcon, CalendarDaysIcon, DocumentDuplicateIcon, ListBulletIcon, MapPinIcon, PencilSquareIcon, TableCellsIcon } from '@heroicons/react/24/outline';
+import { ArrowTopRightOnSquareIcon, CalendarDaysIcon, DocumentDuplicateIcon, ListBulletIcon, MapPinIcon, PencilSquareIcon, PlayIcon, TableCellsIcon } from '@heroicons/react/24/outline';
 import { Badge, type BadgeVariant } from '@astryxdesign/core/Badge';
 import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { getApiMessage, useAuth } from '../../auth/authState';
+import { useAuth } from '../../auth/AuthProvider';
+import { getApiMessage } from '../../auth/authState';
 import { AvatarCircles } from '../../components/MagicEffects';
 import { getDisplayName, getMonogram } from '../../utils/identity';
 import { eventApi, formatEventDate, STATUS_LABEL, type EventRecord, type EventStatus } from './eventApi';
@@ -45,8 +46,18 @@ function uniquePeople(event: EventRecord) {
   return [...new Map(people.map((person) => [person.userId, person])).values()];
 }
 
+function dashboardPath(event: EventRecord, userId?: string) {
+  const isReviewer = event.shifts.some((shift) => shift.status === 'ACTIVE' && shift.staffAssignments.some((assignment) => (
+    assignment.user.userId === userId
+    && assignment.assignmentRole === 'REVIEWER'
+    && ['ASSIGNED', 'CONFIRMED'].includes(assignment.status)
+  )));
+  return isReviewer ? `/events/${event.eventId}/reviews` : `/events/${event.eventId}`;
+}
+
 export default function EventsPage() {
-  const { user } = useAuth();
+  const { session } = useAuth();
+  const user = session?.user;
   const [events, setEvents] = useState<EventRecord[]>([]);
   const [timeRange, setTimeRange] = useState<TimeRange>('upcoming');
   const [status, setStatus] = useState<'' | EventStatus>('');
@@ -96,8 +107,8 @@ export default function EventsPage() {
     if (view === 'table') return filtered.sort((a, b) => new Date(b.startsAt).getTime() - new Date(a.startsAt).getTime());
     return filtered
       .filter((event) => timeRange === 'past'
-        ? event.status === 'CANCELLED' || new Date(event.endsAt).getTime() < now
-        : event.status !== 'CANCELLED' && new Date(event.endsAt).getTime() >= now)
+        ? event.status === 'CANCELLED' || (event.status !== 'IN_PROGRESS' && new Date(event.endsAt).getTime() < now)
+        : event.status === 'IN_PROGRESS' || (event.status !== 'CANCELLED' && new Date(event.endsAt).getTime() >= now))
       .sort((a, b) => (new Date(a.startsAt).getTime() - new Date(b.startsAt).getTime()) * (timeRange === 'past' ? -1 : 1));
   }, [events, status, timeRange, view]);
 
@@ -149,6 +160,7 @@ export default function EventsPage() {
                 <div className="reference-event-aside">
                   <div className="reference-event-artwork" aria-hidden="true"><img src={getEventArtwork(event.bannerKey, event.artworkDataUrl)} alt="" loading="lazy" /></div>
                   <div className="reference-event-actions">
+                    {event.status === 'IN_PROGRESS' && <Link className="event-play-action" to={dashboardPath(event, user?.userId)} target="_blank" rel="noopener noreferrer" aria-label={`Open ${event.name} dashboard in a new tab`} title="Open dashboard in new tab"><PlayIcon /></Link>}
                     {event.canManage && (terminal
                       ? <Link to="/events/new" state={{ duplicateFrom: event }} aria-label={`Duplicate ${event.name}`} title="Duplicate event"><DocumentDuplicateIcon /></Link>
                       : <Link to={`/events/${event.eventId}/edit`} aria-label={`Edit ${event.name}`} title="Edit event"><PencilSquareIcon /></Link>)}
@@ -174,6 +186,7 @@ export default function EventsPage() {
                 <td><Badge variant={statusVariant[event.status]} label={STATUS_LABEL[event.status]} /></td>
                 <td className="event-table-capacity">{event.activeCapacityCount.toLocaleString()} / {event.capacity.toLocaleString()}</td>
                 <td><div className="event-table-actions">
+                  {event.status === 'IN_PROGRESS' && <Link className="event-play-action" to={dashboardPath(event, user?.userId)} target="_blank" rel="noopener noreferrer" aria-label={`Open ${event.name} dashboard in a new tab`} title="Open dashboard in new tab"><PlayIcon /></Link>}
                   {event.canManage && (terminal
                     ? <Link to="/events/new" state={{ duplicateFrom: event }} aria-label={`Duplicate ${event.name}`} title="Duplicate event"><DocumentDuplicateIcon /></Link>
                     : <Link to={`/events/${event.eventId}/edit`} aria-label={`Edit ${event.name}`} title="Edit event"><PencilSquareIcon /></Link>)}

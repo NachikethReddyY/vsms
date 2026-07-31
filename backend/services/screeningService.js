@@ -43,9 +43,9 @@ const assertCanScreen = async (eventId, user) => {
       userId: user.userId,
       status: { in: ["ASSIGNED", "CONFIRMED"] },
       assignmentRole: { in: ["SCREENER", "SUPPORT", "REGISTRATION"] },
-      shift: { eventId },
+      shift: { eventId, status: "ACTIVE" },
     },
-    select: { staffAssignmentId: true },
+    select: { id: true },
   });
   if (!assignment) {
     throw new AppError(403, "FORBIDDEN", "You are not assigned to screen this event");
@@ -76,7 +76,7 @@ const listQueue = async (eventId, stationId, user) => {
   const registrations = await prisma.eventRegistration.findMany({
     where: {
       eventId,
-      status: { in: ["CHECKED_IN", "SIGNED_UP"] },
+      registrationStatus: { in: ["CHECKED_IN", "SIGNED_UP"] },
     },
     orderBy: [{ queueNumber: "asc" }, { createdAt: "asc" }],
     include: {
@@ -98,7 +98,7 @@ const listQueue = async (eventId, stationId, user) => {
       registrationId: row.registrationId,
       participantDisplayName: row.participantDisplayName || "Unnamed participant",
       queueNumber: row.queueNumber,
-      status: row.status,
+      status: row.registrationStatus,
       passToken: row.passToken,
       existingResult: row.screeningResults[0] || null,
     })),
@@ -122,7 +122,7 @@ const resolveParticipant = async (eventId, query, user) => {
     registrationId: registration.registrationId,
     participantDisplayName: registration.participantDisplayName || "Unnamed participant",
     queueNumber: registration.queueNumber,
-    status: registration.status,
+    status: registration.registrationStatus,
     passToken: registration.passToken,
   };
 };
@@ -134,62 +134,71 @@ const saveVisualAcuity = async (eventId, stationId, body, user) => {
   });
   if (!station) throw new AppError(404, "STATION_NOT_FOUND", "Visual acuity station not found");
 
-  const registration = await prisma.eventRegistration.findFirst({
-    where: { registrationId: body.registrationId, eventId },
-  });
-  if (!registration) throw new AppError(404, "REGISTRATION_NOT_FOUND", "Registration not found for this event");
-  if (registration.status === "CANCELLED") {
-    throw new AppError(409, "REGISTRATION_CANCELLED", "Cannot screen a cancelled registration");
-  }
-
   const evaluation = evaluateVisualAcuity(body.resultData);
   if (evaluation.isFlagged && !body.acknowledged) {
     throw new AppError(400, "ACKNOWLEDGEMENT_REQUIRED", "Flagged results must be acknowledged before save");
   }
 
-  const existingByKey = await prisma.screeningResult.findUnique({
-    where: { idempotencyKey: body.idempotencyKey },
-  });
-  if (existingByKey) return { result: existingByKey, created: false };
-
   try {
-    const result = await prisma.screeningResult.upsert({
-      where: {
-        registrationId_stationId: {
+    return await prisma.$transaction(async (tx) => {
+      const registration = await tx.eventRegistration.findFirst({
+        where: { registrationId: body.registrationId, eventId },
+      });
+      if (!registration) throw new AppError(404, "REGISTRATION_NOT_FOUND", "Registration not found for this event");
+      if (["COMPLETED", "CANCELLED"].includes(registration.registrationStatus)) {
+        throw new AppError(409, "REGISTRATION_NOT_SCREENABLE", "Completed or cancelled registrations cannot be changed");
+      }
+
+      const existingByKey = await tx.screeningResult.findUnique({
+        where: { idempotencyKey: body.idempotencyKey },
+      });
+      if (existingByKey) return { result: existingByKey, created: false };
+
+      const result = await tx.screeningResult.upsert({
+        where: {
+          registrationId_stationId: {
+            registrationId: body.registrationId,
+            stationId,
+          },
+        },
+        update: {
+          recordedByUserId: user.userId,
+          screeningType: "VISUAL_ACUITY",
+          resultData: body.resultData,
+          overallFlag: evaluation.overallFlag,
+          isFlagged: evaluation.isFlagged,
+          flagSummary: evaluation.flagSummary,
+          ruleVersion: "VSMS-VA-1.0",
+          acknowledgedAt: evaluation.isFlagged ? new Date() : null,
+          idempotencyKey: body.idempotencyKey,
+        },
+        create: {
           registrationId: body.registrationId,
           stationId,
+          recordedByUserId: user.userId,
+          screeningType: "VISUAL_ACUITY",
+          resultData: body.resultData,
+          overallFlag: evaluation.overallFlag,
+          isFlagged: evaluation.isFlagged,
+          flagSummary: evaluation.flagSummary,
+          ruleVersion: "VSMS-VA-1.0",
+          acknowledgedAt: evaluation.isFlagged ? new Date() : null,
+          idempotencyKey: body.idempotencyKey,
         },
-      },
-      update: {
-        recordedByUserId: user.userId,
-        screeningType: "VISUAL_ACUITY",
-        resultData: body.resultData,
-        overallFlag: evaluation.overallFlag,
-        isFlagged: evaluation.isFlagged,
-        flagSummary: evaluation.flagSummary,
-        ruleVersion: "VSMS-VA-1.0",
-        acknowledgedAt: evaluation.isFlagged ? new Date() : null,
-        idempotencyKey: body.idempotencyKey,
-      },
-      create: {
-        registrationId: body.registrationId,
-        stationId,
-        recordedByUserId: user.userId,
-        screeningType: "VISUAL_ACUITY",
-        resultData: body.resultData,
-        overallFlag: evaluation.overallFlag,
-        isFlagged: evaluation.isFlagged,
-        flagSummary: evaluation.flagSummary,
-        ruleVersion: "VSMS-VA-1.0",
-        acknowledgedAt: evaluation.isFlagged ? new Date() : null,
-        idempotencyKey: body.idempotencyKey,
-      },
-    });
-    return { result, created: true };
+      });
+      return { result, created: true };
+    }, { isolationLevel: "Serializable" });
   } catch (error) {
     if (error.code === "P2002") {
       const raced = await prisma.screeningResult.findUnique({ where: { idempotencyKey: body.idempotencyKey } });
       if (raced) return { result: raced, created: false };
+    }
+    if (error.code === "P2034") {
+      const registration = await prisma.eventRegistration.findUnique({ where: { registrationId: body.registrationId } });
+      if (registration && ["COMPLETED", "CANCELLED"].includes(registration.registrationStatus)) {
+        throw new AppError(409, "REGISTRATION_NOT_SCREENABLE", "Completed or cancelled registrations cannot be changed");
+      }
+      throw new AppError(409, "SCREENING_WRITE_CONFLICT", "Screening results changed concurrently; retry with the latest registration");
     }
     throw error;
   }

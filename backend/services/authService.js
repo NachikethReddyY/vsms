@@ -6,7 +6,8 @@ const AppError = require("../errors/AppError");
 const { signAccessToken } = require("../utils/tokens");
 const { randomToken, sha256, hashUserAgent } = require("../utils/security");
 
-const COOKIE_OPTIONS = { httpOnly: true, secure: true, sameSite: "strict", path: "/auth" };
+const COOKIE_OPTIONS = { httpOnly: true, secure: true, sameSite: "strict", path: "/api/auth" };
+const LEGACY_REFRESH_COOKIE_OPTIONS = { ...COOKIE_OPTIONS, path: "/auth" };
 const CSRF_COOKIE_OPTIONS = { httpOnly: false, secure: true, sameSite: "strict", path: "/" };
 const LEGACY_CSRF_COOKIE_OPTIONS = { ...CSRF_COOKIE_OPTIONS, path: "/auth" };
 
@@ -16,7 +17,7 @@ const publicUser = (user) => ({
   username: user.username,
   fullName: user.fullName,
   employeeNumber: user.employeeNumber,
-  systemRole: user.systemRole || "STAFF",
+  systemRole: user.sysRole,
   status: user.status,
   createdAt: user.createdAt,
 });
@@ -32,6 +33,7 @@ const buildSessionData = (userId, familyId, token, req) => ({
 
 const issueCookies = (res, refreshToken, csrfToken) => {
   const maxAge = env.REFRESH_TOKEN_TTL_DAYS * 86400000;
+  res.clearCookie("vsms_refresh", LEGACY_REFRESH_COOKIE_OPTIONS);
   res.clearCookie("vsms_csrf", LEGACY_CSRF_COOKIE_OPTIONS);
   res.cookie("vsms_refresh", refreshToken, { ...COOKIE_OPTIONS, maxAge });
   res.cookie("vsms_csrf", csrfToken, { ...CSRF_COOKIE_OPTIONS, maxAge });
@@ -39,6 +41,7 @@ const issueCookies = (res, refreshToken, csrfToken) => {
 
 const clearCookies = (res) => {
   res.clearCookie("vsms_refresh", COOKIE_OPTIONS);
+  res.clearCookie("vsms_refresh", LEGACY_REFRESH_COOKIE_OPTIONS);
   res.clearCookie("vsms_csrf", CSRF_COOKIE_OPTIONS);
   res.clearCookie("vsms_csrf", LEGACY_CSRF_COOKIE_OPTIONS);
 };
@@ -106,9 +109,7 @@ const login = async ({ identifier, password }, req, res) => {
 
   const DUMMY_HASH = "$2b$12$EE6ZpTcEn105IV6.OlGeS.KQJx73gDqfJA7NnE7NDZGy75XXOa9hK";
   const passwordMatches = await bcrypt.compare(password, user?.credential?.passwordHash || DUMMY_HASH);
-  const isLocked = user?.status === "SUSPENDED" || user?.status === "INACTIVE";
-
-  if (!user || !passwordMatches || isLocked) {
+  if (!user || !passwordMatches || user.status !== "ACTIVE") {
     throw new AppError(401, "INVALID_CREDENTIALS", "Invalid username or password");
   }
 
