@@ -144,7 +144,7 @@ export function ThemeToggle({ className = '', duration = 400, variant = 'circle'
   }, [duration, fromCenter, theme, variant]);
 
   return (
-    <button {...props} ref={buttonRef} type="button" className={`icon-button theme-toggle ${className}`.trim()} onClick={toggle} aria-label={`Switch to ${theme === 'dark' ? 'light' : 'dark'} theme`}>
+    <button {...props} ref={buttonRef} type="button" className={`icon-button theme-toggle ${className}`.trim()} onClick={toggle} aria-pressed={theme === 'light'} aria-label={`Switch to ${theme === 'dark' ? 'light' : 'dark'} theme`}>
       <SunIcon className="theme-icon sun" aria-hidden="true" />
       <MoonIcon className="theme-icon moon" aria-hidden="true" />
     </button>
