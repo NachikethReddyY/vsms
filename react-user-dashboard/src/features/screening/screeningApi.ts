@@ -30,17 +30,80 @@ export type EyeReading =
   | { kind: 'FRACTION'; denominator: number }
   | { kind: 'EXCEPTION'; code: 'CF' | 'HM' | 'LP' | 'NLP' | 'NOT_TESTABLE' };
 
-export type VisualAcuityPayload = {
+export type VisualAcuityResultData = {
+  chartDistanceMetres: 3 | 6;
+  od: EyeReading;
+  os: EyeReading;
+  withUsualDistanceGlasses: boolean | null;
+};
+
+export type RefractionEye = {
+  sphere: number;
+  cylinder: number;
+  axis: number | null;
+};
+
+export type RefractionResultData =
+  | {
+    measurementStatus: 'COMPLETED';
+    wearsDistanceGlasses: boolean | null;
+    od: RefractionEye;
+    os: RefractionEye;
+    notes?: string;
+  }
+  | {
+    measurementStatus: 'UNABLE_TO_MEASURE' | 'REPEAT_REQUIRED';
+    wearsDistanceGlasses: boolean | null;
+    notes: string;
+  };
+
+export type ColourVisionResultData = {
+  testKit: 'ISHIHARA';
+  platesPresented: number;
+  odCorrect: number;
+  osCorrect: number;
+};
+
+export type FlagEvaluation = {
+  ruleVersion: string;
+  overallFlag: OverallFlag;
+  isFlagged: boolean;
+  flagSummary: string;
+  reasons: Array<{ flag: OverallFlag; reason: string }>;
+};
+
+export type ScreeningSavePayload<T> = {
   registrationId: string;
   idempotencyKey: string;
-  acknowledged: true;
-  resultData: {
-    chartDistanceMetres: 3 | 6;
-    od: EyeReading;
-    os: EyeReading;
-    withUsualDistanceGlasses: boolean | null;
-  };
+  acknowledged: boolean;
+  resultData: T;
 };
+
+export type ScreeningSaveResponse<T> = {
+  resultId: string;
+  overallFlag: OverallFlag;
+  isFlagged: boolean;
+  flagSummary: string | null;
+  ruleVersion?: string;
+  acknowledgedAt?: string | null;
+  resultData: T;
+  evaluation?: FlagEvaluation;
+};
+
+export type VisualAcuityPayload = ScreeningSavePayload<VisualAcuityResultData>;
+
+async function previewStation<T>(eventId: string, stationId: string, path: string, resultData: T) {
+  const { data } = await apiClient.post<FlagEvaluation>(
+    `/events/${eventId}/stations/${stationId}/${path}/preview`,
+    { resultData },
+  );
+  return data;
+}
+
+async function saveStation<T>(eventId: string, stationId: string, path: string, body: ScreeningSavePayload<T>) {
+  const { data } = await apiClient.post(`/events/${eventId}/stations/${stationId}/${path}`, body);
+  return data as ScreeningSaveResponse<T>;
+}
 
 export const screeningApi = {
   async listStations(eventId: string) {
@@ -70,14 +133,32 @@ export const screeningApi = {
     return data;
   },
 
-  async saveVisualAcuity(eventId: string, stationId: string, body: VisualAcuityPayload) {
-    const { data } = await apiClient.post(`/events/${eventId}/stations/${stationId}/visual-acuity`, body);
-    return data as {
-      resultId: string;
-      overallFlag: OverallFlag;
-      isFlagged: boolean;
-      flagSummary: string | null;
-      resultData: VisualAcuityPayload['resultData'];
-    };
+  previewVisualAcuity(eventId: string, stationId: string, resultData: VisualAcuityResultData) {
+    return previewStation(eventId, stationId, 'visual-acuity', resultData);
+  },
+
+  saveVisualAcuity(eventId: string, stationId: string, body: VisualAcuityPayload) {
+    return saveStation(eventId, stationId, 'visual-acuity', body);
+  },
+
+  previewRefraction(eventId: string, stationId: string, resultData: RefractionResultData) {
+    return previewStation(eventId, stationId, 'refraction', resultData);
+  },
+
+  saveRefraction(eventId: string, stationId: string, body: ScreeningSavePayload<RefractionResultData>) {
+    return saveStation(eventId, stationId, 'refraction', body);
+  },
+
+  previewColourVision(eventId: string, stationId: string, resultData: ColourVisionResultData) {
+    return previewStation(eventId, stationId, 'colour-vision', resultData);
+  },
+
+  saveColourVision(eventId: string, stationId: string, body: ScreeningSavePayload<ColourVisionResultData>) {
+    return saveStation(eventId, stationId, 'colour-vision', body);
   },
 };
+
+export function newIdempotencyKey() {
+  if (typeof crypto !== 'undefined' && 'randomUUID' in crypto) return crypto.randomUUID().replace(/-/g, '');
+  return `${Date.now()}${Math.random().toString(16).slice(2)}`;
+}
