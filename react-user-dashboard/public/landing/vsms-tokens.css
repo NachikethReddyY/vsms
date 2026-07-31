@@ -1,0 +1,56 @@
+@font-face {
+  font-family: "Geist"; /* impeccable-disable-line overused-font -- existing landing brand typeface */
+  src: url("https://cdn.jsdelivr.net/npm/geist@1.7.2/dist/fonts/geist-sans/Geist-Variable.woff2") format("woff2");
+  font-weight: 100 900;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Geist Pixel Square"; /* impeccable-disable-line overused-font -- existing landing display face */
+  src: url("https://cdn.jsdelivr.net/npm/geist@1.7.2/dist/fonts/geist-pixel/GeistPixel-Square.woff2") format("woff2");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+.vsms-landing-system[data-theme="dark"] {
+  color-scheme: dark;
+  --canvas: #0b0b0d;
+  --surface: #121317;
+  --surface-2: #181a20;
+  --ink: #f1f2f3;
+  --ink-2: #b3b7bf;
+  --line: rgba(241, 242, 243, 0.14);
+  --line-soft: rgba(241, 242, 243, 0.08);
+  --accent: #426d9f;
+  --accent-strong: #527faf;
+  --muted-blue: #7897ba;
+  --navy: #173451;
+  --navy-strong: #102944;
+  --orange: #c7794b;
+  --green: #72ac87;
+  --amber: #c38c56;
+  --red: #c96873;
+  --radius-control: 7px;
+  --radius-panel: 8px;
+  --page-width: 1320px;
+  --font-sans: "Geist", system-ui, sans-serif;
+  --font-editorial: "Geist Pixel Square", "Geist", sans-serif;
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  font-family: var(--font-sans);
+}
+
+.vsms-landing-system[data-theme="light"] {
+  color-scheme: light;
+  --canvas: #f7f7f4;
+  --surface: #ffffff;
+  --surface-2: #eff1f3;
+  --ink: #17191c;
+  --ink-2: #62666d;
+  --line: rgba(23, 25, 28, 0.16);
+  --line-soft: rgba(23, 25, 28, 0.08);
+  --accent: #315a8c;
+  --accent-strong: #244873;
+  --muted-blue: #315a8c;
+}

@@ -1,0 +1,1316 @@
+<!DOCTYPE html>
+<html lang="en" class="vsms-landing-system" data-theme="dark">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="dark light">
+  <meta name="theme-color" content="#0b0b0d">
+  <base target="_top">
+  <title>VSMS | Community Vision Screening Operations</title>
+  <meta name="description" content="VSMS supports community vision-screening teams from registration and QR check-in through screening, clinical review, and reporting.">
+  <link rel="preload" href="https://cdn.jsdelivr.net/npm/geist@1.7.2/dist/fonts/geist-sans/Geist-Variable.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="./assets/vsms-screening-hero.webp" as="image" type="image/webp">
+  <link rel="stylesheet" href="./vsms-tokens.css">
+  <style>
+    :root {
+      font-family: var(--font-sans);
+      font-synthesis: none;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html {
+      scroll-behavior: smooth;
+      background: var(--canvas);
+    }
+
+    body {
+      min-width: 320px;
+      margin: 0;
+      overflow-x: hidden;
+      background: var(--canvas);
+      color: var(--ink);
+      -webkit-font-smoothing: antialiased;
+      text-rendering: optimizeLegibility;
+      transition: background-color 220ms ease, color 220ms ease;
+    }
+
+    img {
+      display: block;
+      max-width: 100%;
+    }
+
+    a {
+      color: inherit;
+      text-decoration: none;
+    }
+
+    button,
+    a {
+      font: inherit;
+      touch-action: manipulation;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    h1,
+    h2,
+    h3,
+    p {
+      margin-top: 0;
+    }
+
+    h1,
+    h2 {
+      text-wrap: balance;
+    }
+
+    p {
+      text-wrap: pretty;
+    }
+
+    :focus-visible {
+      outline: 2px solid #7fa1c8;
+      outline-offset: 3px;
+    }
+
+    .sr-only {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      padding: 0;
+      margin: -1px;
+      overflow: hidden;
+      clip: rect(0, 0, 0, 0);
+      white-space: nowrap;
+      border: 0;
+    }
+
+    .skip-link {
+      position: fixed;
+      top: 12px;
+      left: 12px;
+      z-index: 30;
+      padding: 12px 16px;
+      transform: translateY(-160%);
+      border-radius: var(--radius-control);
+      background: #ffffff;
+      color: #101216;
+    }
+
+    .skip-link:focus {
+      transform: translateY(0);
+    }
+
+    .page-shell {
+      width: min(var(--page-width), calc(100% - 48px));
+      margin: 0 auto;
+    }
+
+    .site-nav {
+      position: absolute;
+      top: 18px;
+      left: 50%;
+      z-index: 20;
+      display: flex;
+      width: min(900px, calc(100% - 32px));
+      min-height: 62px;
+      align-items: center;
+      padding: 8px 8px 8px 15px;
+      transform: translateX(-50%);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      border-radius: 12px;
+      background: rgba(11, 11, 13, 0.94);
+      color: #f5f5f2;
+    }
+
+    .brand {
+      display: inline-flex;
+      min-height: 44px;
+      align-items: center;
+      gap: 11px;
+    }
+
+    .brand-mark {
+      display: grid;
+      width: 36px;
+      height: 36px;
+      place-items: center;
+      border-radius: 7px;
+      background: #173451;
+      color: #e8f1fb;
+    }
+
+    .brand-mark svg {
+      width: 26px;
+      height: 26px;
+    }
+
+    .brand-copy {
+      display: grid;
+      min-width: 0;
+      gap: 1px;
+    }
+
+    .brand-copy strong {
+      font-size: 15px;
+      font-weight: 600;
+      letter-spacing: -0.01em;
+    }
+
+    .brand-copy small {
+      color: #9ca2ab;
+      font-size: 0.625rem;
+      letter-spacing: 0.035em;
+    }
+
+    .nav-actions {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      margin-left: auto;
+    }
+
+    .theme-toggle,
+    .nav-sign-in {
+      display: inline-flex;
+      min-height: 44px;
+      align-items: center;
+      justify-content: center;
+      border: 0;
+      border-radius: var(--radius-control);
+      cursor: pointer;
+      transition: background-color 180ms ease, color 180ms ease, transform 180ms ease;
+    }
+
+    .theme-toggle {
+      position: relative;
+      width: 44px;
+      padding: 0;
+      background: transparent;
+      color: #d9dde3;
+    }
+
+    .theme-toggle svg {
+      position: absolute;
+      width: 16px;
+      height: 16px;
+      transition: opacity 180ms ease, transform 220ms var(--ease-out);
+    }
+
+    .theme-toggle .icon-sun {
+      opacity: 1;
+      transform: rotate(0) scale(1);
+    }
+
+    .theme-toggle .icon-moon {
+      opacity: 0;
+      transform: rotate(-28deg) scale(0.78);
+    }
+
+    html[data-theme="light"] .theme-toggle .icon-sun {
+      opacity: 0;
+      transform: rotate(28deg) scale(0.78);
+    }
+
+    html[data-theme="light"] .theme-toggle .icon-moon {
+      opacity: 1;
+      transform: rotate(0) scale(1);
+    }
+
+    .nav-sign-in {
+      padding: 0 18px;
+      background: #f5f5f2;
+      color: #111317;
+      font-size: 13px;
+      font-weight: 600;
+    }
+
+    @media (hover: hover) {
+      .theme-toggle:hover {
+        background: rgba(255, 255, 255, 0.08);
+        color: #ffffff;
+      }
+
+      .nav-sign-in:hover {
+        background: #ffffff;
+      }
+    }
+
+    .hero {
+      position: relative;
+      min-height: 100dvh;
+      overflow: hidden;
+      background: #080a0e;
+    }
+
+    .hero > img {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      object-position: 62% center;
+      filter: saturate(0.5) contrast(1.08) brightness(0.8) hue-rotate(4deg);
+      animation: image-in 280ms var(--ease-out) both;
+    }
+
+    .hero::after {
+      position: absolute;
+      inset: 0;
+      z-index: 1;
+      content: "";
+      background:
+        linear-gradient(90deg, rgba(5, 7, 11, 0.94) 0%, rgba(6, 9, 15, 0.58) 49%, rgba(6, 10, 18, 0.16) 78%),
+        linear-gradient(0deg, var(--canvas) 0%, rgba(7, 10, 16, 0.84) 8%, rgba(7, 10, 16, 0.26) 30%, transparent 56%),
+        linear-gradient(180deg, rgba(8, 16, 28, 0.16), transparent 60%);
+    }
+
+    .hero-inner {
+      position: relative;
+      z-index: 2;
+      display: flex;
+      min-height: 100dvh;
+      align-items: flex-end;
+      padding: 140px 0 142px;
+    }
+
+    .hero-copy {
+      max-width: 760px;
+      color: #f6f6f3;
+      animation: copy-in 280ms 50ms var(--ease-out) both;
+    }
+
+    .hero h1 {
+      max-width: 720px;
+      margin-bottom: 22px;
+      font-size: clamp(52px, 6.1vw, 88px);
+      font-weight: 600;
+      line-height: 0.95;
+      letter-spacing: -0.035em;
+    }
+
+    .hero-copy > p {
+      max-width: 570px;
+      margin-bottom: 30px;
+      color: #d1d5da;
+      font-size: 17px;
+      line-height: 1.55;
+    }
+
+    .hero-action {
+      display: inline-flex;
+      max-width: 100%;
+      min-height: 50px;
+      align-items: center;
+      justify-content: center;
+      padding: 0 20px;
+      border-radius: var(--radius-control);
+      background: #ffffff;
+      color: #101216;
+      font-size: 13px;
+      font-weight: 600;
+      transition: background-color 180ms ease, transform 180ms ease;
+    }
+
+    .hero-action span {
+      margin-left: 28px;
+      color: #c7794b;
+      transition: transform 180ms var(--ease-out);
+    }
+
+    .authorised-note {
+      display: block;
+      margin-top: 12px;
+      color: #aeb4bc;
+      font-size: 11px;
+    }
+
+    @media (hover: hover) {
+      .hero-action:hover {
+        background: #eceef0;
+      }
+
+      .hero-action:hover span {
+        transform: translateX(3px);
+      }
+    }
+
+    .theme-toggle:active,
+    .nav-sign-in:active,
+    .hero-action:active,
+    .access-action:active {
+      transform: scale(0.98);
+    }
+
+    @keyframes image-in {
+      from {
+        opacity: 0.76;
+        transform: scale(1.012);
+      }
+
+      to {
+        opacity: 1;
+        transform: scale(1);
+      }
+    }
+
+    @keyframes copy-in {
+      from {
+        opacity: 0.4;
+        transform: translateY(8px);
+      }
+
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    .service-intro {
+      display: grid;
+      grid-template-columns: minmax(0, 0.8fr) minmax(420px, 1.2fr);
+      gap: clamp(52px, 9vw, 132px);
+      align-items: start;
+      padding: 112px 0 98px;
+      border-bottom: 1px solid var(--line);
+    }
+
+    .service-intro h2,
+    .workflow h2,
+    .interfaces-heading h2 {
+      margin-bottom: 0;
+      font-size: clamp(36px, 4vw, 54px);
+      font-weight: 600;
+      line-height: 1.03;
+      letter-spacing: -0.03em;
+    }
+
+    .service-intro p {
+      max-width: 680px;
+      margin: 3px 0 0;
+      color: var(--ink-2);
+      font-size: clamp(18px, 2vw, 22px);
+      line-height: 1.5;
+    }
+
+    .workflow {
+      padding: 96px 0 122px;
+    }
+
+    .workflow > p {
+      max-width: 65ch;
+      margin: 22px 0 50px;
+      color: var(--ink-2);
+      font-size: 1rem;
+      line-height: 1.6;
+    }
+
+    .workflow-list {
+      position: relative;
+      display: grid;
+      grid-template-columns: repeat(6, minmax(0, 1fr));
+      margin: 0;
+      padding: 0;
+      border-top: 1px solid var(--line);
+      border-bottom: 1px solid var(--line);
+      list-style: none;
+    }
+
+    .workflow-list::after {
+      position: absolute;
+      top: -1px;
+      left: 0;
+      width: 100%;
+      height: 2px;
+      transform: scaleX(1);
+      transform-origin: left center;
+      background: linear-gradient(90deg, #d4a087 0 16.66%, #8eacd1 16.66% 33.32%, #b39bce 33.32% 49.98%, #8fb693 49.98% 66.64%, #c5a25f 66.64% 83.3%, #7897ba 83.3% 100%);
+      content: "";
+      pointer-events: none;
+    }
+
+    .motion-ready .workflow-list::after {
+      transform: scaleX(0);
+    }
+
+    .motion-ready .workflow.is-visible .workflow-list::after {
+      animation: handoff-line 760ms var(--ease-out) both;
+    }
+
+    .motion-ready .workflow:not(.is-visible) .workflow-icon {
+      opacity: 0.55;
+      transform: translateY(4px);
+    }
+
+    .motion-ready .workflow.is-visible .workflow-icon {
+      animation: station-ready 420ms var(--ease-out) both;
+      animation-delay: calc(var(--step) * 70ms + 120ms);
+    }
+
+    .workflow-list li {
+      --step: 0;
+      min-height: 210px;
+      padding: 26px 22px 24px;
+      border-right: 1px solid var(--line);
+    }
+
+    .workflow-list li:nth-child(2) {
+      --step: 1;
+    }
+
+    .workflow-list li:nth-child(3) {
+      --step: 2;
+    }
+
+    .workflow-list li:nth-child(4) {
+      --step: 3;
+    }
+
+    .workflow-list li:nth-child(5) {
+      --step: 4;
+    }
+
+    .workflow-list li:nth-child(6) {
+      --step: 5;
+    }
+
+    .workflow-list li:last-child {
+      border-right: 0;
+    }
+
+    .workflow-icon {
+      display: grid;
+      width: 52px;
+      height: 52px;
+      margin-bottom: 32px;
+      place-items: center;
+      color: #7897ba;
+    }
+
+    .workflow-icon svg {
+      width: 44px;
+      height: 44px;
+    }
+
+    .workflow-list li:nth-child(1) .workflow-icon {
+      color: #d4a087;
+    }
+
+    .workflow-list li:nth-child(2) .workflow-icon {
+      color: #8eacd1;
+    }
+
+    .workflow-list li:nth-child(3) .workflow-icon {
+      color: #b39bce;
+    }
+
+    .workflow-list li:nth-child(4) .workflow-icon {
+      color: #8fb693;
+    }
+
+    .workflow-list li:nth-child(5) .workflow-icon {
+      color: #c5a25f;
+    }
+
+    .workflow-list li:nth-child(6) .workflow-icon {
+      color: #7897ba;
+    }
+
+    .workflow-list h3 {
+      margin-bottom: 10px;
+      overflow-wrap: break-word;
+      font-size: 1.0625rem;
+      font-weight: 600;
+      hyphens: auto;
+    }
+
+    .workflow-list p {
+      margin-bottom: 0;
+      overflow-wrap: break-word;
+      color: var(--ink-2);
+      font-size: 1rem;
+      line-height: 1.55;
+      hyphens: auto;
+    }
+
+    @keyframes handoff-line {
+      to {
+        transform: scaleX(1);
+      }
+    }
+
+    @keyframes station-ready {
+      from {
+        opacity: 0.55;
+        transform: translateY(4px);
+      }
+
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    .interfaces {
+      padding: 112px 0 124px;
+      border-top: 1px solid var(--line);
+      border-bottom: 1px solid var(--line);
+      background: #0b0b0d;
+      color: #eef1f4;
+      content-visibility: auto;
+      contain-intrinsic-size: auto 1200px;
+    }
+
+    .interfaces-heading {
+      max-width: 760px;
+      margin-bottom: 42px;
+    }
+
+    .interfaces-heading h2 {
+      font-size: clamp(42px, 5vw, 64px);
+    }
+
+    .dashboard-showcase {
+      margin: 0;
+    }
+
+    .dashboard-frame,
+    .zoom-window {
+      overflow: hidden;
+      border: 1px solid #2c3038;
+      border-radius: var(--radius-panel);
+      background: #15171c;
+    }
+
+    .dashboard-frame img {
+      display: block;
+      width: 100%;
+      height: auto;
+      aspect-ratio: 16 / 9;
+      object-fit: cover;
+    }
+
+    .dashboard-note {
+      display: flex;
+      align-items: center;
+      gap: 9px;
+      margin-top: 12px;
+      color: #8d949e;
+      font-size: 0.8125rem;
+    }
+
+    .dashboard-note::before {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: #7897ba;
+      content: "";
+    }
+
+    .feature-zooms {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 18px;
+      margin-top: 44px;
+    }
+
+    .feature-zoom {
+      min-width: 0;
+      margin: 0;
+    }
+
+    .zoom-window {
+      position: relative;
+      aspect-ratio: 4 / 3;
+    }
+
+    .zoom-window img {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      transform: scale(2.25);
+    }
+
+    .feature-zoom:nth-child(1) .zoom-window img {
+      object-position: 46% 48%;
+      transform-origin: 46% 48%;
+    }
+
+    .feature-zoom:nth-child(2) .zoom-window img {
+      object-position: 88% 10%;
+      transform-origin: 88% 10%;
+    }
+
+    .feature-zoom:nth-child(3) .zoom-window img {
+      object-position: 84% 52%;
+      transform-origin: 84% 52%;
+    }
+
+    .feature-zoom figcaption {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-top: 14px;
+      color: #dfe3e8;
+      font-size: 0.9375rem;
+      font-weight: 600;
+    }
+
+    .feature-zoom figcaption span {
+      display: grid;
+      width: 28px;
+      height: 28px;
+      place-items: center;
+      color: #7897ba;
+    }
+
+    .feature-zoom figcaption svg {
+      width: 24px;
+      height: 24px;
+    }
+
+    .trust {
+      padding: 104px 0 112px;
+      content-visibility: auto;
+      contain-intrinsic-size: auto 700px;
+    }
+
+    .trust h2 {
+      max-width: 760px;
+      margin-bottom: 48px;
+      font-size: clamp(36px, 4vw, 54px);
+      font-weight: 600;
+      line-height: 1.03;
+      letter-spacing: -0.03em;
+    }
+
+    .trust-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      border-top: 1px solid var(--line);
+    }
+
+    .trust-item {
+      min-width: 0;
+      padding: 28px 24px 6px;
+      border-right: 1px solid var(--line);
+    }
+
+    .trust-item:first-child {
+      padding-left: 0;
+    }
+
+    .trust-item:last-child {
+      padding-right: 0;
+      border-right: 0;
+    }
+
+    .trust-icon {
+      display: grid;
+      width: 34px;
+      height: 34px;
+      margin-bottom: 32px;
+      place-items: center;
+      color: #7897ba;
+    }
+
+    .trust-icon svg {
+      width: 30px;
+      height: 30px;
+    }
+
+    .trust-item h3 {
+      margin-bottom: 8px;
+      overflow-wrap: break-word;
+      font-size: 1.0625rem;
+      font-weight: 600;
+      hyphens: auto;
+    }
+
+    .trust-item p {
+      margin-bottom: 0;
+      overflow-wrap: break-word;
+      color: var(--ink-2);
+      font-size: 1rem;
+      line-height: 1.55;
+      hyphens: auto;
+    }
+
+    .access-wrap {
+      padding: 0 0 28px;
+      content-visibility: auto;
+      contain-intrinsic-size: auto 220px;
+    }
+
+    .access-panel {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      gap: 48px;
+      align-items: center;
+      padding: 48px 52px;
+      border: 1px solid rgba(125, 159, 195, 0.22);
+      border-radius: var(--radius-panel);
+      background: #102944;
+      color: #f5f7fa;
+    }
+
+    .access-panel h2 {
+      margin-bottom: 0;
+      font-family: "Geist Pixel Square", "Geist", sans-serif; /* impeccable-disable-line overused-font -- existing landing display face */
+      font-size: clamp(28px, 3.2vw, 40px);
+      font-weight: 400;
+      line-height: 1.08;
+      letter-spacing: -0.025em;
+      overflow-wrap: break-word;
+    }
+
+    .access-actions {
+      display: grid;
+      gap: 10px;
+      justify-items: start;
+    }
+
+    .access-action {
+      display: inline-flex;
+      min-height: 48px;
+      align-items: center;
+      padding: 0 18px;
+      border-radius: var(--radius-control);
+      background: #ffffff;
+      color: #102944;
+      font-size: 13px;
+      font-weight: 600;
+      transition: background-color 180ms ease, transform 180ms ease;
+    }
+
+    @media (hover: hover) {
+      .access-action:hover {
+        background: #e9eef4;
+      }
+    }
+
+    .site-footer {
+      display: flex;
+      min-height: 112px;
+      align-items: center;
+      justify-content: space-between;
+      gap: 28px;
+      color: var(--ink-2);
+      font-size: 0.8125rem;
+    }
+
+    @media (max-width: 900px) {
+      .service-intro {
+        grid-template-columns: 1fr;
+      }
+
+      .service-intro {
+        gap: 28px;
+      }
+
+      .workflow-list {
+        grid-template-columns: repeat(2, 1fr);
+      }
+
+      .workflow-list li {
+        border-bottom: 1px solid var(--line);
+      }
+
+      .workflow-list li:nth-child(even) {
+        border-right: 0;
+      }
+
+      .workflow-list li:last-child {
+        grid-column: span 2;
+        border-bottom: 0;
+      }
+
+      .trust-grid {
+        grid-template-columns: repeat(2, 1fr);
+      }
+
+      .trust-item,
+      .trust-item:first-child {
+        padding: 28px 24px 34px;
+        border-right: 1px solid var(--line);
+        border-bottom: 1px solid var(--line);
+      }
+
+      .trust-item:nth-child(even) {
+        padding-right: 0;
+        border-right: 0;
+      }
+
+      .trust-item:nth-child(odd) {
+        padding-left: 0;
+      }
+
+      .trust-item:nth-child(n + 3) {
+        border-bottom: 0;
+      }
+    }
+
+    @media (max-width: 620px) {
+      .page-shell {
+        width: calc(100% - 32px);
+      }
+
+      .site-nav {
+        top: 12px;
+        width: calc(100% - 24px);
+        padding-left: 10px;
+      }
+
+      .brand-copy small {
+        display: none;
+      }
+
+      .hero-inner {
+        padding-bottom: 102px;
+      }
+
+      .hero h1 {
+        font-size: clamp(44px, 13vw, 60px);
+      }
+
+      .service-intro h2,
+      .workflow h2,
+      .interfaces-heading h2,
+      .trust h2 {
+        font-size: clamp(2rem, 9vw, 2.75rem);
+      }
+
+      .service-intro {
+        grid-template-columns: 1fr;
+        padding: 88px 0 78px;
+      }
+
+      .workflow {
+        padding: 76px 0 94px;
+      }
+
+      .workflow-list {
+        grid-template-columns: 1fr;
+      }
+
+      .workflow-list::after {
+        display: none;
+      }
+
+      .workflow-list li,
+      .workflow-list li:nth-child(even),
+      .workflow-list li:last-child {
+        grid-column: auto;
+        min-height: 0;
+        border-right: 0;
+        border-bottom: 1px solid var(--line);
+      }
+
+      .workflow-list li:last-child {
+        border-bottom: 0;
+      }
+
+      .workflow-icon {
+        width: 46px;
+        height: 46px;
+        margin-bottom: 24px;
+      }
+
+      .workflow-icon svg {
+        width: 40px;
+        height: 40px;
+      }
+
+      .interfaces {
+        padding: 86px 0 96px;
+      }
+
+      .feature-zooms {
+        grid-template-columns: 1fr;
+      }
+
+      .zoom-window {
+        aspect-ratio: 16 / 9;
+      }
+
+      .trust {
+        padding: 88px 0 94px;
+      }
+
+      .trust-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .trust-item,
+      .trust-item:first-child,
+      .trust-item:nth-child(n) {
+        padding: 26px 0;
+        border-right: 0;
+        border-bottom: 1px solid var(--line);
+      }
+
+      .trust-item:last-child {
+        border-bottom: 0;
+      }
+
+      .trust-icon {
+        margin-bottom: 20px;
+      }
+
+      .access-panel {
+        grid-template-columns: 1fr;
+        gap: 30px;
+        padding: 36px 26px;
+      }
+
+      .access-actions,
+      .access-action {
+        width: 100%;
+      }
+
+      .access-action {
+        justify-content: center;
+      }
+
+      .site-footer {
+        min-height: 140px;
+        align-items: flex-start;
+        flex-direction: column;
+        justify-content: center;
+      }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      html {
+        scroll-behavior: auto;
+      }
+
+      body,
+      .theme-toggle,
+      .theme-toggle svg,
+      .nav-sign-in,
+      .hero-action,
+      .hero-action span,
+      .access-action {
+        transition: none;
+      }
+
+      .hero > img,
+      .hero-copy,
+      .workflow-list::after,
+      .workflow-icon {
+        animation: none;
+      }
+
+      .motion-ready .workflow-list::after {
+        transform: scaleX(1);
+      }
+
+      .motion-ready .workflow:not(.is-visible) .workflow-icon {
+        opacity: 1;
+        transform: none;
+      }
+    }
+  </style>
+</head>
+<body>
+  <a class="skip-link" href="#main-content">Skip to content</a>
+
+  <header class="site-nav">
+    <a class="brand" href="/" aria-label="VSMS home">
+      <span class="brand-mark" aria-hidden="true">
+        <svg viewBox="0 0 32 32" fill="none">
+          <path d="M9 7H6v6M23 7h3v6M9 25H6v-6M23 25h3v-6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"></path>
+          <path d="M9 21c3.6 0 3.8-10 7.3-10 2.4 0 2.8 5.3 6.7 5.3" stroke="currentColor" stroke-width="2" stroke-linecap="round"></path>
+          <circle cx="9" cy="21" r="2" fill="currentColor"></circle>
+          <circle cx="16.3" cy="11" r="2" fill="currentColor"></circle>
+          <circle cx="23" cy="16.3" r="2" fill="currentColor"></circle>
+        </svg>
+      </span>
+      <span class="brand-copy">
+        <strong>VSMS</strong>
+        <small>Vision Screening Management System</small>
+      </span>
+    </a>
+    <div class="nav-actions">
+      <button class="theme-toggle" type="button" aria-pressed="false">
+        <svg class="icon-sun" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round">
+          <circle cx="12" cy="12" r="3.5"></circle>
+          <path d="M12 2v2M12 20v2M4.93 4.93l1.42 1.42M17.65 17.65l1.42 1.42M2 12h2M20 12h2M4.93 19.07l1.42-1.42M17.65 6.35l1.42-1.42"></path>
+        </svg>
+        <svg class="icon-moon" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M20.2 15.2A8.5 8.5 0 0 1 8.8 3.8 8.5 8.5 0 1 0 20.2 15.2Z"></path>
+        </svg>
+        <span class="theme-label sr-only">Light mode</span>
+      </button>
+      <a class="nav-sign-in" href="/login">Sign in</a>
+    </div>
+  </header>
+
+  <main id="main-content">
+    <section class="hero" aria-labelledby="hero-title">
+      <img src="./assets/vsms-screening-hero.webp" alt="Staff member using a tablet at a community vision-screening station" width="1800" height="1013" decoding="async" fetchpriority="high">
+      <div class="page-shell hero-inner">
+        <div class="hero-copy">
+          <h1 id="hero-title">Keep the day moving.</h1>
+          <p>One workspace for the participant records, screening stations, and review decisions behind a community vision-screening event.</p>
+          <a class="hero-action" href="/login">Sign in to VSMS <span aria-hidden="true">→</span></a>
+          <small class="authorised-note">For authorised screening personnel</small>
+        </div>
+      </div>
+    </section>
+
+    <section class="page-shell service-intro" aria-labelledby="purpose-title">
+      <h2 id="purpose-title">A service for event-day screening.</h2>
+      <p>VSMS helps staff register participants, scan secure event passes, record results at each station, and send flagged records to a reviewer without losing track of the next action.</p>
+    </section>
+
+    <section class="page-shell workflow" aria-labelledby="workflow-title">
+      <h2 id="workflow-title">One record, from registration to review.</h2>
+      <p>Each completed step updates the same participant record. The QR pass supports the handoff between stations without carrying personal or clinical information in the code.</p>
+      <ol class="workflow-list">
+        <li>
+          <span class="workflow-icon" aria-hidden="true">
+            <svg viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M7 9h18v16H7zM11 6h10v6H11zM11 17h10M11 21h7"></path>
+            </svg>
+          </span>
+          <h3>Registration</h3>
+          <p>Confirm identity and consent, then create the event registration.</p>
+        </li>
+        <li>
+          <span class="workflow-icon" aria-hidden="true">
+            <svg viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M7 6h18v20H7zM11 11h10M12 16h8M14 21h4"></path>
+            </svg>
+          </span>
+          <h3>Visual acuity</h3>
+          <p>Record the smallest chart line read by each eye.</p>
+        </li>
+        <li>
+          <span class="workflow-icon" aria-hidden="true">
+            <svg viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M5 16c2.8-4.5 6.5-6.8 11-6.8S24.2 11.5 27 16c-2.8 4.5-6.5 6.8-11 6.8S7.8 20.5 5 16Z"></path>
+              <circle cx="16" cy="16" r="3.5"></circle>
+            </svg>
+          </span>
+          <h3>Refraction</h3>
+          <p>Capture the configured refraction reading.</p>
+        </li>
+        <li>
+          <span class="workflow-icon" aria-hidden="true">
+            <svg viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="12" cy="14" r="5"></circle>
+              <circle cx="20" cy="14" r="5"></circle>
+              <circle cx="16" cy="21" r="5"></circle>
+            </svg>
+          </span>
+          <h3>Colour vision</h3>
+          <p>Record the configured colour-vision result.</p>
+        </li>
+        <li>
+          <span class="workflow-icon" aria-hidden="true">
+            <svg viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M5 16c2.8-4.5 6.5-6.8 11-6.8S24.2 11.5 27 16c-2.8 4.5-6.5 6.8-11 6.8S7.8 20.5 5 16Z"></path>
+              <path d="M16 11.5v9M11.5 16h9"></path>
+            </svg>
+          </span>
+          <h3>Eye health</h3>
+          <p>Record observations from the eye-health station.</p>
+        </li>
+        <li>
+          <span class="workflow-icon" aria-hidden="true">
+            <svg viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M8 6h16v20H8zM12 11h8M12 15h8M12 19h4"></path>
+              <path d="m18 22 2 2 4-5"></path>
+            </svg>
+          </span>
+          <h3>Clinical review</h3>
+          <p>Reviewer records the final decision and next step.</p>
+        </li>
+      </ol>
+    </section>
+
+    <section class="interfaces" aria-labelledby="interfaces-title">
+      <div class="page-shell">
+        <header class="interfaces-heading">
+          <h2 id="interfaces-title">What staff see during an event.</h2>
+        </header>
+
+        <figure class="dashboard-showcase">
+          <div class="dashboard-frame">
+            <img src="./assets/placeholder-image.png" alt="Dashboard screenshot placeholder" width="1200" height="800" loading="lazy" decoding="async">
+          </div>
+          <figcaption class="dashboard-note">Dashboard image placeholder. Replace with an approved product screenshot.</figcaption>
+        </figure>
+
+        <div class="feature-zooms" role="group" aria-label="Highlighted dashboard features">
+          <figure class="feature-zoom">
+            <div class="zoom-window" aria-hidden="true">
+              <img src="./assets/placeholder-image.png" alt="" width="1200" height="800" loading="lazy" decoding="async">
+            </div>
+            <figcaption>
+              <span aria-hidden="true">
+                <svg viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M5 25h22M8 21v-6M16 21V8M24 21v-9"></path>
+                </svg>
+              </span>
+              Queue and station load
+            </figcaption>
+          </figure>
+
+          <figure class="feature-zoom">
+            <div class="zoom-window" aria-hidden="true">
+              <img src="./assets/placeholder-image.png" alt="" width="1200" height="800" loading="lazy" decoding="async">
+            </div>
+            <figcaption>
+              <span aria-hidden="true">
+                <svg viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M9 23a7 7 0 0 1 1.2-13.9A9 9 0 0 1 27 13.5 5.5 5.5 0 0 1 25 24H9"></path>
+                  <path d="m12 19 3 3 6-7"></path>
+                </svg>
+              </span>
+              Offline save and sync
+            </figcaption>
+          </figure>
+
+          <figure class="feature-zoom">
+            <div class="zoom-window" aria-hidden="true">
+              <img src="./assets/placeholder-image.png" alt="" width="1200" height="800" loading="lazy" decoding="async">
+            </div>
+            <figcaption>
+              <span aria-hidden="true">
+                <svg viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M8 6h16v20H8zM12 11h8M12 15h8"></path>
+                  <path d="m15 21 2 2 4-5"></path>
+                </svg>
+              </span>
+              Clinical review
+            </figcaption>
+          </figure>
+        </div>
+      </div>
+    </section>
+
+    <section class="page-shell trust" aria-labelledby="trust-title">
+      <h2 id="trust-title">Ready for responsible field work.</h2>
+      <div class="trust-grid">
+        <article class="trust-item">
+          <span class="trust-icon" aria-hidden="true">
+            <svg viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M9 23a7 7 0 0 1 1.2-13.9A9 9 0 0 1 27 13.5 5.5 5.5 0 0 1 25 24H9"></path>
+              <path d="m12 19 3 3 6-7"></path>
+            </svg>
+          </span>
+          <h3>Offline-ready</h3>
+          <p>Save locally. Sync when connected.</p>
+        </article>
+        <article class="trust-item">
+          <span class="trust-icon" aria-hidden="true">
+            <svg viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M6 6h7v7H6zM19 6h7v7h-7zM6 19h7v7H6zM19 19h3v3h-3zM23 23h3v3h-3zM23 17h3"></path>
+            </svg>
+          </span>
+          <h3>Secure QR handoff</h3>
+          <p>Identify records without clinical data.</p>
+        </article>
+        <article class="trust-item">
+          <span class="trust-icon" aria-hidden="true">
+            <svg viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="11" cy="11" r="4"></circle>
+              <circle cx="23" cy="12" r="3"></circle>
+              <path d="M4 26c.7-5 3-7 7-7s6.3 2 7 7M19 20c4.8-1.1 7.7.9 8.5 5"></path>
+            </svg>
+          </span>
+          <h3>Role clarity</h3>
+          <p>Each person sees assigned work.</p>
+        </article>
+        <article class="trust-item">
+          <span class="trust-icon" aria-hidden="true">
+            <svg viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M8 5h16v22H8zM12 10h8M12 15h8"></path>
+              <path d="m13 22 2 2 5-6"></path>
+            </svg>
+          </span>
+          <h3>Reviewer decisions</h3>
+          <p>Rules flag. Reviewers decide.</p>
+        </article>
+      </div>
+    </section>
+
+    <section class="page-shell access-wrap" aria-labelledby="access-title">
+      <div class="access-panel">
+        <h2 id="access-title">Ready for today’s event.</h2>
+        <div class="access-actions">
+          <a class="access-action" href="/login">Open VSMS</a>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="page-shell site-footer">
+    <span>&copy; 2026 Team Cryptics</span>
+    <span>Screening support, not diagnosis.</span>
+  </footer>
+
+  <script>
+    (() => {
+      const root = document.documentElement;
+      const toggle = document.querySelector(".theme-toggle");
+      if (!toggle) return;
+
+      const label = toggle.querySelector(".theme-label");
+      const themeMeta = document.querySelector('meta[name="theme-color"]');
+
+      try {
+        const savedTheme = localStorage.getItem("vsms-landing-theme");
+        if (savedTheme === "light" || savedTheme === "dark") {
+          root.dataset.theme = savedTheme;
+        }
+      } catch {
+        // The page remains usable when storage is unavailable.
+      }
+
+      const syncThemeControl = () => {
+        const isLight = root.dataset.theme === "light";
+        toggle.setAttribute("aria-pressed", String(isLight));
+        toggle.setAttribute("aria-label", isLight ? "Switch to dark mode" : "Switch to light mode");
+        label.textContent = isLight ? "Dark mode" : "Light mode";
+        if (themeMeta) {
+          themeMeta.setAttribute("content", isLight ? "#f7f7f4" : "#0b0b0d");
+        }
+      };
+
+      toggle.addEventListener("click", () => {
+        root.dataset.theme = root.dataset.theme === "light" ? "dark" : "light";
+        try {
+          localStorage.setItem("vsms-landing-theme", root.dataset.theme);
+        } catch {
+          // Theme switching still works for the current page.
+        }
+        syncThemeControl();
+      });
+
+      syncThemeControl();
+
+      const workflow = document.querySelector(".workflow");
+      const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+      if (workflow && !reduceMotion && "IntersectionObserver" in window) {
+        root.classList.add("motion-ready");
+        const observer = new IntersectionObserver(([entry]) => {
+          if (!entry.isIntersecting) return;
+          workflow.classList.add("is-visible");
+          observer.disconnect();
+        }, { threshold: 0.24 });
+
+        observer.observe(workflow);
+      }
+    })();
+  </script>
+</body>
+</html>
