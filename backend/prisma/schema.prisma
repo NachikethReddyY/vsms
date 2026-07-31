@@ -218,6 +218,8 @@ model User {
   updatedAt           DateTime   @updatedAt @map("updated_at") @db.Timestamptz(3)
 
   userRoles                UserRole[]
+  credential               UserCredential?
+  refreshSessions          RefreshSession[]
   roleAssignmentsMade      UserRole[]                    @relation("UserRoleAssignedBy")
   staffAssignments         StaffAssignment[]             @relation("AssignedUser")
   assignedStaff            StaffAssignment[]             @relation("AssignedBy")
@@ -252,6 +254,42 @@ model User {
   @@index([status, department])
   @@index([email])
   @@map("users")
+}
+
+model UserCredential {
+  id           String   @id @default(uuid()) @map("credential_id") @db.Uuid
+  userId       String   @unique @map("user_id") @db.Uuid
+  passwordHash String   @map("password_hash") @db.VarChar(255)
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+
+  @@map("user_credentials")
+}
+
+model RefreshSession {
+  refreshSessionId String    @id @default(uuid()) @map("refresh_session_id") @db.Uuid
+  userId           String    @map("user_id") @db.Uuid
+  tokenHash        String    @unique @map("token_hash") @db.Char(64)
+  familyId         String    @map("family_id") @db.Uuid
+  userAgentHash    String?   @map("user_agent_hash") @db.Char(64)
+  networkHint      String?   @map("network_hint") @db.VarChar(64)
+  expiresAt        DateTime  @map("expires_at") @db.Timestamptz(3)
+  createdAt        DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+  lastUsedAt       DateTime? @map("last_used_at") @db.Timestamptz(3)
+  rotatedAt        DateTime? @map("rotated_at") @db.Timestamptz(3)
+  revokedAt        DateTime? @map("revoked_at") @db.Timestamptz(3)
+  reuseDetectedAt  DateTime? @map("reuse_detected_at") @db.Timestamptz(3)
+  replacedById     String?   @unique @map("replaced_by_session_id") @db.Uuid
+
+  user       User            @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  replacedBy RefreshSession? @relation("RefreshRotation", fields: [replacedById], references: [refreshSessionId], onDelete: SetNull)
+  replaces   RefreshSession? @relation("RefreshRotation")
+
+  @@index([userId, expiresAt])
+  @@index([familyId, createdAt])
+  @@index([expiresAt, revokedAt])
+  @@map("refresh_sessions")
 }
 
 model Role {

@@ -21,7 +21,7 @@ afterAll(async () => helpers.prisma.$disconnect());
 describe("authentication boundary", () => {
   test("login issues a short-lived memory-token response without exposing a refresh token", async () => {
     const response = await request(app)
-      .post("/auth/login")
+      .post("/api/auth/login")
       .set("Origin", "https://localhost:5173")
       .send({ identifier: "test-event-manager", password: helpers.PASSWORD });
 
@@ -29,18 +29,17 @@ describe("authentication boundary", () => {
     expect(response.body.accessToken).toEqual(expect.any(String));
     expect(response.body.refreshToken).toBeUndefined();
     expect(response.body.csrfToken).toEqual(expect.any(String));
-    expect(response.headers["set-cookie"].join(" ")).toContain("Secure");
     expect(response.headers["set-cookie"].join(" ")).toContain("HttpOnly");
     expect(response.headers["set-cookie"].find((cookie) => cookie.startsWith("vsms_csrf=") && !cookie.split(";", 1)[0].endsWith("="))).toContain("Path=/;");
   });
 
   test("concurrent refresh reuse revokes the winning replacement family", async () => {
     const login = await request(app)
-      .post("/auth/login")
+      .post("/api/auth/login")
       .set("Origin", "https://localhost:5173")
       .send({ identifier: "test-event-manager", password: helpers.PASSWORD });
     const rotate = () => request(app)
-      .post("/auth/refresh")
+      .post("/api/auth/refresh")
       .set("Origin", "https://localhost:5173")
       .set("Sec-Fetch-Site", "same-origin")
       .set("X-CSRF-Token", login.body.csrfToken)
@@ -50,7 +49,7 @@ describe("authentication boundary", () => {
 
     const winner = responses.find((response) => response.status === 200);
     const afterReuse = await request(app)
-      .post("/auth/refresh")
+      .post("/api/auth/refresh")
       .set("Origin", "https://localhost:5173")
       .set("Sec-Fetch-Site", "same-origin")
       .set("X-CSRF-Token", winner.body.csrfToken)
@@ -59,15 +58,15 @@ describe("authentication boundary", () => {
   });
 
   test("invalid credentials remain generic and signup is unavailable", async () => {
-    const invalid = await request(app).post("/auth/login").send({ identifier: "nobody", password: "Wrong-Password-Value!" });
-    const signup = await request(app).post("/auth/signup").send({ email: "x@y.test", password: helpers.PASSWORD });
+    const invalid = await request(app).post("/api/auth/login").send({ identifier: "nobody", password: "Wrong-Password-Value!" });
+    const signup = await request(app).post("/api/auth/signup").send({ email: "x@y.test", password: helpers.PASSWORD });
     expect(invalid.status).toBe(401);
     expect(invalid.body.code).toBe("INVALID_CREDENTIALS");
     expect(signup.status).toBe(404);
   });
 
   test("user listing is not public", async () => {
-    expect((await request(app).get("/users")).status).toBe(401);
+    expect((await request(app).get("/api/users")).status).toBe(401);
   });
 
   test("development serves the OpenAPI document and Swagger UI", async () => {

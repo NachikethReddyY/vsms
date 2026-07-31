@@ -11,7 +11,8 @@ test("schema enforces duplicate registration and queue uniqueness", () => {
     assert.match(schema, /@@unique\(\[participantId, eventId\]\)/);
     assert.match(schema, /@@unique\(\[eventId, queueNumber\]\)/);
     assert.match(schema, /@@unique\(\[registeredBy, idempotencyKey\]\)/);
-    assert.doesNotMatch(schema, /passwordHash|model UserCredential/);
+    assert.match(schema, /model UserCredential\s*\{/);
+    assert.match(schema, /passwordHash\s+String/);
 });
 
 test("schema contains all required registration module tables", () => {
@@ -40,7 +41,7 @@ test("API routes expose the required versioned contracts", () => {
     assert.match(events, /"\/active"/);
     assert.ok(events.indexOf('"/active"') < events.indexOf('"/:eventId"'), "active events route must precede the dynamic event route");
     assert.match(registrations, /"\/:registrationId\/history"/);
-    for (const route of ["/login", "/logout", "/refresh", "/me", "/change-password", "/forgot-password", "/confirm-forgot-password"]) {
+    for (const route of ["/login", "/logout", "/refresh", "/me"]) {
         assert.ok(auth.includes(`"${route}"`), `missing auth route ${route}`);
     }
 });
@@ -78,16 +79,11 @@ test("participant search matches any supplied identifier", () => {
     assert.match(controller, /return\s+\{\s*OR:\s*clauses\s*\}/);
 });
 
-test("Cognito configuration requires administrator-created staff and complete MFA enrollment", () => {
-    const template = read("../infrastructure/cognito.yaml");
-    const client = read("utils/cognitoClient.js");
+test("development authentication uses the local credential service", () => {
+    const controller = read("controllers/authController.js");
+    const middleware = read("middlewares/requireAuthentication.js");
     const authRoutes = read("routes/authRoutes.js");
-    assert.match(template, /AllowAdminCreateUserOnly:\s+true/);
-    assert.match(template, /MfaConfiguration:\s+"ON"/);
-    assert.match(template, /SOFTWARE_TOKEN_MFA/);
-    assert.match(client, /NEW_PASSWORD_REQUIRED/);
-    assert.match(client, /AssociateSoftwareToken/);
-    assert.match(client, /VerifySoftwareToken/);
-    assert.match(client, /ChallengeName:\s*"MFA_SETUP"/);
-    assert.doesNotMatch(authRoutes, /signup|confirm-signup|resend-code/);
+    assert.match(controller, /services\/authService/);
+    assert.match(middleware, /verifyAccessToken/);
+    assert.doesNotMatch(`${controller}\n${middleware}\n${authRoutes}`, /cognito(Client|Jwt)|rolesFromCognito/i);
 });

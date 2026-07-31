@@ -21,7 +21,8 @@ import { Button } from '@astryxdesign/core/Button';
 import { Selector } from '@astryxdesign/core/Selector';
 import { useEffect, useMemo, useRef, useState, type ChangeEvent, type FormEvent } from 'react';
 import { Link, useLocation, useParams } from 'react-router-dom';
-import { getApiMessage, useAuth } from '../../auth/authState';
+import { useAuth } from '../../auth/AuthProvider';
+import { getApiMessage } from '../../auth/authState';
 import { getDisplayName } from '../../utils/identity';
 import { eventApi, formatEventDate, STATUS_LABEL, type AuditRecord, type EventRecord, type EventStatus, type StaffAssignmentRole, type StaffDirectoryEntry, type StationTemplate } from './eventApi';
 import { EVENT_BANNERS, getEventArtwork, type EventBannerKey } from './eventBanners';
@@ -68,7 +69,8 @@ function eventDuration(startsAt: string, endsAt: string) {
 
 export default function EventDetailPage() {
   const { eventId = '' } = useParams();
-  const { user } = useAuth();
+  const { session } = useAuth();
+  const user = session?.user;
   const location = useLocation();
   const [event, setEvent] = useState<EventRecord | null>(null);
   const [statusChoice, setStatusChoice] = useState<EventStatus>('DRAFT');

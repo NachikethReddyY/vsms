@@ -1,6 +1,12 @@
 const crypto = require("crypto");
+const bcrypt = require("bcrypt");
 require("dotenv").config();
 const prisma = require("./prismaClient");
+
+const DEMO_PASSWORD = process.env.VSMS_DEMO_PASSWORD || "Demo-Only-Change-Me-2026!";
+if (process.env.NODE_ENV === "production" && !process.env.VSMS_DEMO_PASSWORD) {
+  throw new Error("VSMS_DEMO_PASSWORD is required for production seed execution");
+}
 
 const roleDefinitions = [
   ["ADMINISTRATOR", "Full administrative access", 1],
@@ -67,7 +73,7 @@ async function seedRoles() {
   return roles;
 }
 
-async function seedStaff(roles) {
+async function seedStaff(roles, passwordHash) {
   const email = String(process.env.SEED_STAFF_EMAIL || "seed.admin@cryptix.local").trim().toLowerCase();
   const user = await prisma.user.upsert({
     where: { email },
@@ -83,6 +89,11 @@ async function seedStaff(roles) {
       sysRole: "ADMIN",
     },
   });
+  await prisma.userCredential.upsert({
+    where: { userId: user.id },
+    update: { passwordHash },
+    create: { userId: user.id, passwordHash },
+  });
 
   for (const roleName of ["ADMINISTRATOR", "REGISTRATION_OFFICER"]) {
     await prisma.userRole.upsert({
@@ -94,7 +105,7 @@ async function seedStaff(roles) {
   return user;
 }
 
-async function seedReviewer(roles, staff) {
+async function seedReviewer(roles, staff, passwordHash) {
   const email = String(process.env.SEED_REVIEWER_EMAIL || "reviewer@vsms.local").trim().toLowerCase();
   const reviewer = await prisma.user.upsert({
     where: { email },
@@ -109,6 +120,11 @@ async function seedReviewer(roles, staff) {
       status: "ACTIVE",
       sysRole: "STAFF",
     },
+  });
+  await prisma.userCredential.upsert({
+    where: { userId: reviewer.id },
+    update: { passwordHash },
+    create: { userId: reviewer.id, passwordHash },
   });
   await prisma.userRole.upsert({
     where: { userId_roleId: { userId: reviewer.id, roleId: roles.get("REVIEWER").id } },
@@ -681,9 +697,10 @@ async function seedDemoData(staff, reviewer, consentForm) {
 }
 
 async function main() {
+  const passwordHash = await bcrypt.hash(DEMO_PASSWORD, 12);
   const roles = await seedRoles();
-  const staff = await seedStaff(roles);
-  const reviewer = await seedReviewer(roles, staff);
+  const staff = await seedStaff(roles, passwordHash);
+  const reviewer = await seedReviewer(roles, staff, passwordHash);
   await seedPermissions(roles, staff);
   await seedStationTemplates();
   const consentForm = await seedConsentForm(staff);
@@ -695,7 +712,7 @@ async function main() {
   console.log(`Needs consent: ${demo.participants.priya.participantReference} - Priya Nair`);
   console.log(`Needs emergency contact: ${demo.participants.marcus.participantReference} - Marcus Lim`);
   console.log(`Registered participant: ${demo.participants.daniel.participantReference} - Daniel Tan`);
-  console.log(`Reviewer profile: ${reviewer.email} (Cognito group: REVIEWER)`);
+  console.log(`Reviewer profile: ${reviewer.email} (local role: REVIEWER)`);
   console.log(`Registration ID: ${demo.registration.registrationId}`);
   console.log(`Demo QR token: ${demo.qr.token}`);
 }

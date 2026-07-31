@@ -24,7 +24,6 @@ The event lifecycle is `DRAFT → PUBLISHED → IN_PROGRESS → COMPLETED`, with
 - Node.js 20 or newer
 - PostgreSQL 15 or newer
 - npm
-- [`mkcert`](https://github.com/FiloSottile/mkcert) for local HTTPS
 
 ## Local setup
 
@@ -43,15 +42,7 @@ The event lifecycle is `DRAFT → PUBLISHED → IN_PROGRESS → COMPLETED`, with
 
    Update `DATABASE_URL` and replace `JWT_ACCESS_SECRET`. Keep `PUBLIC_SIGNUP_ENABLED=false` unless this is a controlled environment where public staff account creation is intended.
 
-3. Generate local-only HTTPS certificates. They are intentionally ignored by Git.
-
-   ```bash
-   mkdir -p react-user-dashboard/certs
-   mkcert -install
-   mkcert -key-file react-user-dashboard/certs/localhost-key.pem -cert-file react-user-dashboard/certs/localhost.pem localhost 127.0.0.1 ::1
-   ```
-
-4. Apply migrations, generate Prisma Client, and seed development data.
+3. Apply migrations, generate Prisma Client, and seed development data.
 
    ```bash
    npm --prefix backend run prisma:migrate
@@ -59,18 +50,25 @@ The event lifecycle is `DRAFT → PUBLISHED → IN_PROGRESS → COMPLETED`, with
    npm --prefix backend run prisma:seed
    ```
 
-5. Start both applications in separate terminals.
+4. Start both applications in separate terminals.
 
    ```bash
    npm --prefix backend run dev
    npm --prefix react-user-dashboard run dev
    ```
 
-Open `https://localhost:5173`. The API is available at `https://localhost:5050`; non-production API documentation is at `https://localhost:5050/api-docs`.
+Open `http://localhost:5173`. The API is available at `http://localhost:5050`; non-production API documentation is at `http://localhost:5050/api-docs`.
 
 ### Seeded development accounts
 
-The seed creates `admin@vsms.local`, `manager@vsms.local`, and `staff@vsms.local`. Set `VSMS_DEMO_PASSWORD` before seeding to choose their shared development password. If it is omitted outside production, the seed uses `Demo-Only-Change-Me-2026!`. Production seeding refuses to run without an explicit value.
+Cognito is temporarily disabled in development. After running the seed, use either local username/password pair:
+
+| Username | Password | Access |
+| --- | --- | --- |
+| `seed.admin@cryptix.local` | `Demo-Only-Change-Me-2026!` | Administrator |
+| `reviewer@vsms.local` | `Demo-Only-Change-Me-2026!` | Reviewer |
+
+These credentials are development-only. Set `VSMS_DEMO_PASSWORD` before seeding to replace the shared password; production seeding refuses to run without an explicit value.
 
 ## Verification
 

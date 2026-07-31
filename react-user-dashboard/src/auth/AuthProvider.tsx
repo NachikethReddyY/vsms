@@ -1,5 +1,6 @@
-import { createContext, useContext, useMemo, useState, type PropsWithChildren } from "react";
+import { createContext, useContext, useEffect, useMemo, useState, type PropsWithChildren } from "react";
 import type { AuthSession } from "../types";
+import { getCsrfToken, refreshAuthSession, setSessionTokens } from "../utils/apiClient";
 import { clearStoredSession, getStoredSession, setStoredSession } from "../utils/session";
 
 interface AuthContextValue {
@@ -14,6 +15,17 @@ const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 export function AuthProvider({ children }: PropsWithChildren) {
   const [session, setSessionState] = useState<AuthSession | null>(() => getStoredSession());
 
+  useEffect(() => {
+    if (!getCsrfToken()) return;
+    refreshAuthSession()
+      .then(setSessionState)
+      .catch(() => {
+        setSessionTokens(null);
+        clearStoredSession();
+        setSessionState(null);
+      });
+  }, []);
+
   const value = useMemo<AuthContextValue>(
     () => ({
       session,
@@ -23,6 +35,7 @@ export function AuthProvider({ children }: PropsWithChildren) {
         setSessionState(nextSession);
       },
       clearSession() {
+        setSessionTokens(null);
         clearStoredSession();
         setSessionState(null);
       },

@@ -10,14 +10,7 @@ import EventsPage from "./features/events/EventsPage";
 import ReviewWorkspacePage from "./features/reviews/ReviewWorkspacePage";
 import VisualAcuityStationPage from "./features/screening/VisualAcuityStationPage";
 import { AuditLogsPage as RegistrationAuditLogsPage } from "./pages/AdminPages";
-import {
-  AccountSecurityPage,
-  AuthCallbackPage,
-  CognitoTestPage,
-  ForgotPasswordPage,
-  LoginPage,
-  ResetPasswordPage,
-} from "./pages/AuthPages";
+import { LoginPage } from "./pages/AuthPages";
 import { DashboardPage } from "./pages/DashboardPage";
 import { QueuePage } from "./pages/QueuePages"; // Imported the QueuePage component
 import {
@@ -52,10 +45,6 @@ export default function App() {
       {/* Public / Auth Pages */}
       <Route path="/" element={<LandingPage />} />
       <Route path="/login" element={<LoginPage />} />
-      <Route path="/auth/callback" element={<AuthCallbackPage />} />
-      <Route path="/cognito-test" element={<CognitoTestPage />} />
-      <Route path="/forgot-password" element={<ForgotPasswordPage />} />
-      <Route path="/reset-password" element={<ResetPasswordPage />} />
 
       {/* Standalone QR Code Route */}
       <Route path="/events/qr-pass/:registrationId" element={<QRCodePage />} />
@@ -63,7 +52,6 @@ export default function App() {
       {/* Development Mode: All routes temporarily unprotected but wrapped in AppShell */}
       <Route element={<DevLayoutRoutes />}>
         <Route path="/dashboard" element={<DashboardPage />} />
-        <Route path="/account/security" element={<AccountSecurityPage />} />
 
         {/* Events Management */}
         <Route path="/events" element={<EventsPage />} />
