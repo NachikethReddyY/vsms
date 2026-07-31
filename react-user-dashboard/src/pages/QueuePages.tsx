@@ -1,37 +1,73 @@
-import { useEffect, useState, useCallback } from "react";
-import { useParams, Link } from "react-router-dom";
-import apiClient, { getApiError } from "../utils/apiClient";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { useParams } from "react-router-dom";
+import { NowServingCard } from "../components/queue/NowServingCard";
+import { QueueHeader } from "../components/queue/QueueHeader";
+import { QueueTable, type QueueItem, type QueueStatus } from "../components/queue/QueueTable";
 import { AppShell, LoadingState } from "../components/ui";
+import apiClient, { getApiError } from "../utils/apiClient";
 
-interface QueueItem {
+interface RegistrationRecord {
   id: string;
-  ticketNumber: string;
-  status: string;
-  position: number;
+  queueNumber: number | null;
+  registrationStatus: QueueStatus;
   participant: {
-    fullName: string;
-    email?: string;
+    participantReference: string;
+    firstName: string;
+    lastName: string;
   };
 }
 
-interface EventQueueData {
-  eventId: string;
-  eventName: string;
-  currentServing: QueueItem | null;
-  queue: QueueItem[];
+interface RegistrationPage {
+  registrations: RegistrationRecord[];
+  pagination: { totalPages: number };
 }
+
+const PAGE_SIZE = 12;
+const API_PAGE_SIZE = 100;
 
 export function QueuePage() {
   const { eventId } = useParams<{ eventId: string }>();
-  const [queueData, setQueueData] = useState<EventQueueData | null>(null);
+  const [eventName, setEventName] = useState("");
+  const [queue, setQueue] = useState<QueueItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [statusFilter, setStatusFilter] = useState<QueueStatus | "ALL">("ALL");
+  const [currentPage, setCurrentPage] = useState(1);
 
   const fetchQueue = useCallback(async () => {
+    if (!eventId) return;
     try {
-      const response = await apiClient.get(`/events/${eventId}/queue`);
-      setQueueData(response.data);
+      const [eventResponse, firstPageResponse] = await Promise.all([
+        apiClient.get(`/events/${eventId}`),
+        apiClient.get<RegistrationPage>(`/events/${eventId}/registrations`, {
+          params: { page: 1, pageSize: API_PAGE_SIZE },
+        }),
+      ]);
+      const firstPage = firstPageResponse.data;
+      const remainingPages = await Promise.all(
+        Array.from({ length: Math.max(0, firstPage.pagination.totalPages - 1) }, (_, index) =>
+          apiClient.get<RegistrationPage>(`/events/${eventId}/registrations`, {
+            params: { page: index + 2, pageSize: API_PAGE_SIZE },
+          }),
+        ),
+      );
+      const registrations = [
+        ...firstPage.registrations,
+        ...remainingPages.flatMap((response) => response.data.registrations),
+      ];
+
+      setEventName(eventResponse.data.eventName ?? eventResponse.data.name ?? "");
+      setQueue(registrations.map((registration) => ({
+        id: registration.id,
+        queueNumber: registration.queueNumber,
+        status: registration.registrationStatus,
+        participant: {
+          fullName: `${registration.participant.firstName} ${registration.participant.lastName}`.trim(),
+          reference: registration.participant.participantReference,
+        },
+      })));
       setError(null);
     } catch (requestError: unknown) {
       setError(getApiError(requestError, "Unable to load queue data."));
@@ -41,139 +77,93 @@ export function QueuePage() {
   }, [eventId]);
 
   useEffect(() => {
-    fetchQueue();
-    // Poll the queue status every 10 seconds to keep it synchronized in real-time
-    const interval = setInterval(fetchQueue, 10000);
-    return () => clearInterval(interval);
+    void fetchQueue();
+    const interval = window.setInterval(() => void fetchQueue(), 10_000);
+    return () => window.clearInterval(interval);
   }, [fetchQueue]);
 
-  const handleNextInQueue = async () => {
-    if (!eventId) return;
+  const updateStatus = async (registrationId: string, status: QueueStatus, reason?: string) => {
     try {
-      setActionLoading("next");
-      await apiClient.post(`/events/${eventId}/queue/next`);
+      setActionLoading(registrationId);
+      await apiClient.patch(`/registrations/${registrationId}/status`, { toStatus: status, reason });
       await fetchQueue();
     } catch (requestError: unknown) {
-      setError(getApiError(requestError, "Failed to advance queue."));
+      setError(getApiError(requestError, "Failed to update queue status."));
     } finally {
       setActionLoading(null);
     }
   };
 
-  const handleUpdateStatus = async (queueId: string, status: string) => {
-    try {
-      setActionLoading(queueId);
-      await apiClient.patch(`/queue/${queueId}/status`, { status });
-      await fetchQueue();
-    } catch (requestError: unknown) {
-      setError(getApiError(requestError, "Failed to update queue item status."));
-    } finally {
-      setActionLoading(null);
-    }
-  };
+  const waiting = queue.filter((item) => item.status === "SIGNED_UP");
+  const checkedIn = queue.filter((item) => item.status === "CHECKED_IN");
+  const completed = queue.filter((item) => item.status === "COMPLETED");
+  const currentServing = checkedIn[0] ?? null;
+
+  const filteredQueue = useMemo(() => {
+    const search = searchQuery.trim().toLowerCase();
+    return queue.filter((item) => {
+      const matchesStatus = statusFilter === "ALL" || item.status === statusFilter;
+      const matchesSearch = !search
+        || String(item.queueNumber ?? "").includes(search)
+        || item.participant.fullName.toLowerCase().includes(search)
+        || item.participant.reference.toLowerCase().includes(search);
+      return matchesStatus && matchesSearch;
+    });
+  }, [queue, searchQuery, statusFilter]);
+
+  const totalPages = Math.max(1, Math.ceil(filteredQueue.length / PAGE_SIZE));
+  const paginatedQueue = filteredQueue.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
+
+  useEffect(() => {
+    if (currentPage > totalPages) setCurrentPage(totalPages);
+  }, [currentPage, totalPages]);
 
   if (isLoading) {
     return (
-      <AppShell title="Live Queue">
-        <LoadingState label="Loading queue details..." />
+      <AppShell title="Live queue">
+        <LoadingState label="Loading queue records..." />
       </AppShell>
     );
   }
 
   return (
-    <AppShell title={queueData?.eventName ? `${queueData.eventName} — Live Queue` : "Live Queue"}>
-      <div className="space-y-6">
-        {/* Navigation & Header Actions */}
-        <div className="flex items-center justify-between">
-          <Link
-            to={`/events/${eventId}/registrations`}
-            className="text-sm font-medium text-slate-600 hover:text-slate-900"
-          >
-            ← Back to Registrations
-          </Link>
-          <button
-            onClick={handleNextInQueue}
-            disabled={actionLoading === "next" || !queueData?.queue.length}
-            className="dashboard-primary-action disabled:opacity-50"
-          >
-            {actionLoading === "next" ? "Calling..." : "Call Next Participant"}
-          </button>
-        </div>
+    <AppShell title={eventName ? `${eventName} — Live queue` : "Live queue"}>
+      <div className="mx-auto max-w-7xl space-y-4 px-6 pb-16 pt-2">
+        <QueueHeader
+          eventId={eventId}
+          eventName={eventName}
+          totalCount={queue.length}
+          waitingCount={waiting.length}
+          checkedInCount={checkedIn.length}
+          completedCount={completed.length}
+          callNextDisabled={actionLoading !== null || waiting.length === 0}
+          onCallNext={() => {
+            if (waiting[0]) void updateStatus(waiting[0].id, "CHECKED_IN", "Called from queue dashboard");
+          }}
+        />
 
-        {error && (
-          <div className="rounded-xl bg-red-50 p-4 text-sm text-red-800">
-            {error}
-          </div>
-        )}
+        {error && <div className="rounded-xl bg-red-50 p-4 text-sm text-red-800" role="alert">{error}</div>}
 
-        {/* Currently Serving Banner */}
-        <section className="rounded-2xl border border-blue-200 bg-blue-50 p-6 registration-surface">
-          <p className="text-xs font-semibold uppercase tracking-wider text-blue-600">Now Serving</p>
-          {queueData?.currentServing ? (
-            <div className="mt-2 flex items-center justify-between">
-              <div>
-                <h2 className="text-3xl font-bold text-blue-900">
-                  {queueData.currentServing.ticketNumber}
-                </h2>
-                <p className="mt-1 text-lg font-medium text-blue-800">
-                  {queueData.currentServing.participant.fullName}
-                </p>
-              </div>
-              <div className="flex gap-2">
-                <button
-                  onClick={() => handleUpdateStatus(queueData.currentServing!.id, "COMPLETED")}
-                  disabled={actionLoading === queueData.currentServing.id}
-                  className="rounded-xl bg-green-600 px-4 py-2 text-sm font-medium text-white shadow hover:bg-green-700 disabled:opacity-50"
-                >
-                  Complete
-                </button>
-                <button
-                  onClick={() => handleUpdateStatus(queueData.currentServing!.id, "NO_SHOW")}
-                  disabled={actionLoading === queueData.currentServing.id}
-                  className="rounded-xl bg-amber-600 px-4 py-2 text-sm font-medium text-white shadow hover:bg-amber-700 disabled:opacity-50"
-                >
-                  No Show
-                </button>
-              </div>
-            </div>
-          ) : (
-            <p className="mt-2 text-sm text-blue-700">No participant is currently being served.</p>
-          )}
-        </section>
+        <NowServingCard
+          currentServing={currentServing}
+          actionLoading={actionLoading}
+          onComplete={(id) => void updateStatus(id, "COMPLETED", "Completed from queue dashboard")}
+          onNoShow={(id) => void updateStatus(id, "CANCELLED", "No show")}
+        />
 
-        {/* Upcoming Queue List */}
-        <section className="rounded-2xl border border-slate-200 bg-white p-5 registration-surface">
-          <h3 className="text-lg font-semibold text-slate-800">Upcoming in Queue</h3>
-          <div className="mt-4 divide-y divide-slate-100">
-            {queueData?.queue && queueData.queue.length > 0 ? (
-              queueData.queue.map((item, index) => (
-                <div key={item.id} className="flex items-center justify-between py-3">
-                  <div className="flex items-center gap-4">
-                    <span className="text-sm font-semibold text-slate-400">#{index + 1}</span>
-                    <div>
-                      <p className="font-semibold text-slate-800">{item.ticketNumber}</p>
-                      <p className="text-sm text-slate-600">{item.participant.fullName}</p>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-600">
-                      {item.status}
-                    </span>
-                    <button
-                      onClick={() => handleUpdateStatus(item.id, "CANCELLED")}
-                      disabled={actionLoading === item.id}
-                      className="text-xs text-red-600 hover:underline disabled:opacity-50"
-                    >
-                      Remove
-                    </button>
-                  </div>
-                </div>
-              ))
-            ) : (
-              <p className="py-4 text-center text-sm text-slate-500">The queue is currently empty.</p>
-            )}
-          </div>
-        </section>
+        <QueueTable
+          items={paginatedQueue}
+          filteredCount={filteredQueue.length}
+          searchQuery={searchQuery}
+          setSearchQuery={setSearchQuery}
+          statusFilter={statusFilter}
+          setStatusFilter={setStatusFilter}
+          currentPage={currentPage}
+          setCurrentPage={setCurrentPage}
+          totalPages={totalPages}
+          actionLoading={actionLoading}
+          onStatusChange={(id, status, reason) => void updateStatus(id, status, reason)}
+        />
       </div>
     </AppShell>
   );
