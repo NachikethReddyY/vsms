@@ -60,16 +60,87 @@ const resolveQuery = z.object({
   message: "passToken or registrationId is required",
 });
 
+const visualAcuityResultData = z.object({
+  chartDistanceMetres: z.union([z.literal(3), z.literal(6)]),
+  od: eyeReading,
+  os: eyeReading,
+  withUsualDistanceGlasses: z.boolean().nullable(),
+});
+
+const previewVisualAcuityBody = z.object({
+  resultData: visualAcuityResultData,
+});
+
 const saveVisualAcuityBody = z.object({
   registrationId: z.string().uuid(),
   idempotencyKey: z.string().min(8).max(64),
-  acknowledged: z.literal(true),
-  resultData: z.object({
-    chartDistanceMetres: z.union([z.literal(3), z.literal(6)]),
-    od: eyeReading,
-    os: eyeReading,
-    withUsualDistanceGlasses: z.boolean().nullable(),
+  // Required true when server flags the result; ignored for NORMAL.
+  acknowledged: z.boolean(),
+  resultData: visualAcuityResultData,
+});
+
+const isQuarterDiopter = (value) => Number.isFinite(value)
+  && Math.abs((value * 4) - Math.round(value * 4)) < 1e-6;
+
+const refractionEye = z.object({
+  sphere: z.number().min(-20).max(20).refine(isQuarterDiopter, "Sphere must be in 0.25 D steps"),
+  cylinder: z.number().min(-10).max(10).refine(isQuarterDiopter, "Cylinder must be in 0.25 D steps"),
+  axis: z.number().int().min(0).max(180).nullable(),
+}).superRefine((eye, ctx) => {
+  if (Math.abs(eye.cylinder) >= 0.25 && eye.axis == null) {
+    ctx.addIssue({ code: "custom", message: "Axis is required when cylinder is non-zero", path: ["axis"] });
+  }
+});
+
+const refractionResultData = z.discriminatedUnion("measurementStatus", [
+  z.object({
+    measurementStatus: z.literal("COMPLETED"),
+    wearsDistanceGlasses: z.boolean().nullable(),
+    od: refractionEye,
+    os: refractionEye,
+    notes: z.string().trim().max(500).optional(),
   }),
+  z.object({
+    measurementStatus: z.enum(["UNABLE_TO_MEASURE", "REPEAT_REQUIRED"]),
+    wearsDistanceGlasses: z.boolean().nullable(),
+    notes: z.string().trim().min(3).max(500),
+  }),
+]);
+
+const previewRefractionBody = z.object({
+  resultData: refractionResultData,
+});
+
+const saveRefractionBody = z.object({
+  registrationId: z.string().uuid(),
+  idempotencyKey: z.string().min(8).max(64),
+  acknowledged: z.boolean(),
+  resultData: refractionResultData,
+});
+
+const colourVisionResultData = z.object({
+  testKit: z.literal("ISHIHARA"),
+  platesPresented: z.number().int().min(8).max(24),
+  odCorrect: z.number().int().min(0),
+  osCorrect: z.number().int().min(0),
+}).superRefine((data, ctx) => {
+  if (data.odCorrect > data.platesPresented) {
+    ctx.addIssue({ code: "custom", message: "odCorrect cannot exceed platesPresented", path: ["odCorrect"] });
+  }
+  if (data.osCorrect > data.platesPresented) {
+    ctx.addIssue({ code: "custom", message: "osCorrect cannot exceed platesPresented", path: ["osCorrect"] });
+  }
+});
+
+const previewColourVisionBody = z.object({
+  resultData: colourVisionResultData,
+});
+
+const saveColourVisionBody = z.object({
+  registrationId: z.string().uuid(),
+  idempotencyKey: z.string().min(8).max(64),
+  acknowledged: z.boolean(),
+  resultData: colourVisionResultData,
 });
 
 module.exports = {
@@ -78,5 +149,10 @@ module.exports = {
   reviewParams,
   reviewDecisionBody,
   resolveQuery,
+  previewVisualAcuityBody,
   saveVisualAcuityBody,
+  previewRefractionBody,
+  saveRefractionBody,
+  previewColourVisionBody,
+  saveColourVisionBody,
 };

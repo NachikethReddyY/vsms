@@ -374,6 +374,8 @@ export default function EventDetailPage() {
         </div>}
         <div className="action-cluster">
           <Link className="primary" to={`/events/${event.eventId}/stations/visual-acuity`}>Open Visual Acuity station</Link>
+          <Link className="secondary" to={`/events/${event.eventId}/stations/refraction`}>Open Refraction station</Link>
+          <Link className="secondary" to={`/events/${event.eventId}/stations/colour-vision`}>Open Colour Vision station</Link>
           {canReview && <Link className="secondary" to={`/events/${event.eventId}/reviews`}><ClipboardDocumentCheckIcon />Open clinical review</Link>}
         </div>
       </aside>

@@ -7,7 +7,12 @@ const {
   eventParams,
   stationParams,
   resolveQuery,
+  previewVisualAcuityBody,
   saveVisualAcuityBody,
+  previewRefractionBody,
+  saveRefractionBody,
+  previewColourVisionBody,
+  saveColourVisionBody,
   reviewParams,
   reviewDecisionBody,
 } = require("../schemas/screeningSchemas");
@@ -34,9 +39,39 @@ router.get(
 );
 
 router.post(
+  "/:eventId/stations/:stationId/visual-acuity/preview",
+  validate({ params: stationParams, body: previewVisualAcuityBody }),
+  asyncHandler(screeningController.previewVisualAcuity),
+);
+
+router.post(
   "/:eventId/stations/:stationId/visual-acuity",
   validate({ params: stationParams, body: saveVisualAcuityBody }),
   asyncHandler(screeningController.saveVisualAcuity),
+);
+
+router.post(
+  "/:eventId/stations/:stationId/refraction/preview",
+  validate({ params: stationParams, body: previewRefractionBody }),
+  asyncHandler(screeningController.previewRefraction),
+);
+
+router.post(
+  "/:eventId/stations/:stationId/refraction",
+  validate({ params: stationParams, body: saveRefractionBody }),
+  asyncHandler(screeningController.saveRefraction),
+);
+
+router.post(
+  "/:eventId/stations/:stationId/colour-vision/preview",
+  validate({ params: stationParams, body: previewColourVisionBody }),
+  asyncHandler(screeningController.previewColourVision),
+);
+
+router.post(
+  "/:eventId/stations/:stationId/colour-vision",
+  validate({ params: stationParams, body: saveColourVisionBody }),
+  asyncHandler(screeningController.saveColourVision),
 );
 
 router.get(

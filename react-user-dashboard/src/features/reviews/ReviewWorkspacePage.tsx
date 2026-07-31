@@ -105,6 +105,27 @@ function ResultData({ station }: { station: ReviewDetailResponse['stations'][num
       <div><dt>Usual distance glasses</dt><dd>{displayValue(data.withUsualDistanceGlasses)}</dd></div>
     </dl>;
   }
+  if (station.stationType === 'REFRACTION') {
+    const formatEye = (eye?: { sphere?: number; cylinder?: number; axis?: number | null }) => {
+      if (!eye || eye.sphere == null || eye.cylinder == null) return '—';
+      return `${eye.sphere}/${eye.cylinder} x ${eye.axis ?? '—'}`;
+    };
+    return <dl className="visual-acuity-result">
+      <div><dt>Status</dt><dd>{displayValue(data.measurementStatus)}</dd></div>
+      <div><dt>Usual distance glasses</dt><dd>{displayValue(data.wearsDistanceGlasses)}</dd></div>
+      <div><dt>Right eye (OD)</dt><dd>{formatEye(data.od)}</dd></div>
+      <div><dt>Left eye (OS)</dt><dd>{formatEye(data.os)}</dd></div>
+      {data.notes ? <div><dt>Notes</dt><dd>{displayValue(data.notes)}</dd></div> : null}
+    </dl>;
+  }
+  if (station.stationType === 'COLOUR_VISION') {
+    return <dl className="visual-acuity-result">
+      <div><dt>Test kit</dt><dd>{displayValue(data.testKit)}</dd></div>
+      <div><dt>Plates presented</dt><dd>{displayValue(data.platesPresented)}</dd></div>
+      <div><dt>Right eye (OD)</dt><dd>{displayValue(data.odCorrect)} / {displayValue(data.platesPresented)}</dd></div>
+      <div><dt>Left eye (OS)</dt><dd>{displayValue(data.osCorrect)} / {displayValue(data.platesPresented)}</dd></div>
+    </dl>;
+  }
   return <dl className="result-data-fallback">
     {Object.entries(data).map(([key, value]) => <div key={key}><dt>{prettyKey(key)}</dt><dd>{displayValue(value)}</dd></div>)}
   </dl>;
