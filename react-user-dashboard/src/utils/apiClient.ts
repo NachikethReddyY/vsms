@@ -1,32 +1,25 @@
-import axios, { AxiosError, type InternalAxiosRequestConfig } from "axios";
+import axios, { type AxiosError, type InternalAxiosRequestConfig } from "axios";
 import type { AuthSession } from "../types";
 import { clearStoredSession, getStoredSession, setStoredSession } from "./session";
 
 const baseURL = import.meta.env.VITE_API_BASE_URL ?? "/api/v1";
+type TokenPayload = { accessToken: string; csrfToken: string };
+type RetryableRequestConfig = InternalAxiosRequestConfig & { _retry?: boolean };
 
-interface RetryableRequestConfig extends InternalAxiosRequestConfig {
-  _retry?: boolean;
+let accessToken: string | null = null;
+let csrfToken: string | null = null;
+let refreshPromise: Promise<AuthSession> | null = null;
+
+export function setSessionTokens(tokens: TokenPayload | null) {
+  accessToken = tokens?.accessToken || null;
+  csrfToken = tokens?.csrfToken || null;
 }
 
-const apiClient = axios.create({
-  baseURL,
-  withCredentials: true,
-  headers: {
-    "Content-Type": "application/json",
-    "X-Requested-With": "XMLHttpRequest",
-  },
-});
-
-const refreshClient = axios.create({
-  baseURL,
-  withCredentials: true,
-  headers: {
-    "Content-Type": "application/json",
-    "X-Requested-With": "XMLHttpRequest",
-  },
-});
-
-let refreshPromise: Promise<AuthSession> | null = null;
+export function getCsrfToken() {
+  if (csrfToken) return csrfToken;
+  const match = document.cookie.match(/(?:^|; )vsms_csrf=([^;]+)/);
+  return match ? decodeURIComponent(match[1]) : null;
+}
 
 function getDeviceId() {
   const key = "vsms_device_id";
@@ -38,46 +31,64 @@ function getDeviceId() {
   return value;
 }
 
+const commonHeaders = {
+  "Content-Type": "application/json",
+  "X-Requested-With": "XMLHttpRequest",
+};
+const apiClient = axios.create({ baseURL, withCredentials: true, headers: commonHeaders });
+const refreshClient = axios.create({ baseURL, withCredentials: true, headers: commonHeaders });
+
 apiClient.interceptors.request.use((config) => {
   config.headers["X-Device-Id"] = getDeviceId();
   config.headers["X-Device-Name"] = "VSMS staff web";
+  if (accessToken) config.headers.Authorization = `Bearer ${accessToken}`;
+  if (csrfToken && !["get", "head", "options"].includes(config.method || "get")) {
+    config.headers["X-CSRF-Token"] = csrfToken;
+  }
   return config;
 });
 
-async function refreshSession(): Promise<AuthSession> {
+async function rotateSession(): Promise<AuthSession> {
   const response = await refreshClient.post("/auth/refresh", null, {
     headers: {
+      "X-CSRF-Token": getCsrfToken(),
       "X-Device-Id": getDeviceId(),
       "X-Device-Name": "VSMS staff web",
     },
   });
-  const nextSession: AuthSession = {
+  setSessionTokens(response.data);
+  const session = {
     user: response.data.user,
-    expiresAt: Date.now() + Number(response.data.sessionExpiresIn || 2_592_000) * 1000,
+    expiresAt: Date.now() + Number(response.data.sessionExpiresIn || 604_800) * 1000,
   };
-  setStoredSession(nextSession);
-  return nextSession;
+  setStoredSession(session);
+  return session;
+}
+
+export function refreshAuthSession() {
+  refreshPromise ??= rotateSession().finally(() => {
+    refreshPromise = null;
+  });
+  return refreshPromise;
 }
 
 apiClient.interceptors.response.use(
   (response) => response,
   async (error: AxiosError) => {
-    const originalRequest = error.config as RetryableRequestConfig | undefined;
-    if (error.response?.status === 401 && originalRequest && !originalRequest._retry && getStoredSession()) {
-      originalRequest._retry = true;
-      try {
-        refreshPromise ??= refreshSession().finally(() => {
-          refreshPromise = null;
-        });
-        await refreshPromise;
-        return apiClient(originalRequest);
-      } catch (refreshError) {
-        clearStoredSession();
-        window.location.assign("/login?reason=session-expired");
-        return Promise.reject(refreshError);
-      }
+    const request = error.config as RetryableRequestConfig | undefined;
+    if (error.response?.status !== 401 || !request || request._retry || request.url?.startsWith("/auth/") || !getStoredSession()) {
+      return Promise.reject(error);
     }
-    return Promise.reject(error);
+    request._retry = true;
+    try {
+      await refreshAuthSession();
+      return apiClient(request);
+    } catch (refreshError) {
+      setSessionTokens(null);
+      clearStoredSession();
+      window.location.assign("/login?reason=session-expired");
+      return Promise.reject(refreshError);
+    }
   }
 );
 
@@ -86,17 +97,6 @@ export function getApiError(error: unknown, fallback: string) {
     return error.response?.data?.error ?? error.response?.data?.message ?? fallback;
   }
   return fallback;
-}
-
-// Compatibility helpers for the preserved main-branch AuthContext. Cognito
-// tokens remain in HttpOnly cookies; these helpers never expose or store them.
-export function getCsrfToken() {
-  const match = document.cookie.match(/(?:^|; )vsms_csrf=([^;]+)/);
-  return match ? decodeURIComponent(match[1]) : null;
-}
-
-export function setSessionTokens(session: unknown | null) {
-  if (session === null) clearStoredSession();
 }
 
 export default apiClient;

@@ -6,18 +6,20 @@ const AppError = require("../errors/AppError");
 const { signAccessToken } = require("../utils/tokens");
 const { randomToken, sha256, hashUserAgent } = require("../utils/security");
 
-const COOKIE_OPTIONS = { httpOnly: true, secure: true, sameSite: "strict", path: "/api/auth" };
+const COOKIE_OPTIONS = { httpOnly: true, secure: env.isProduction || env.localHttps, sameSite: "strict", path: "/api" };
 const LEGACY_REFRESH_COOKIE_OPTIONS = { ...COOKIE_OPTIONS, path: "/auth" };
-const CSRF_COOKIE_OPTIONS = { httpOnly: false, secure: true, sameSite: "strict", path: "/" };
+const CSRF_COOKIE_OPTIONS = { httpOnly: false, secure: env.isProduction || env.localHttps, sameSite: "strict", path: "/" };
 const LEGACY_CSRF_COOKIE_OPTIONS = { ...CSRF_COOKIE_OPTIONS, path: "/auth" };
 
 const publicUser = (user) => ({
+  id: user.id,
   userId: user.id,
   email: user.email,
   username: user.username,
   fullName: user.fullName,
   employeeNumber: user.employeeNumber,
   systemRole: user.sysRole,
+  roles: user.userRoles?.map(({ role }) => role.roleName) || [],
   status: user.status,
   createdAt: user.createdAt,
 });
@@ -88,14 +90,16 @@ const signup = async ({ email, username, password, fullName, employeeNumber }) =
   }
 };
 
-const recordFailure = async (userId) => {
-  return prisma.$transaction(async (tx) => {
-    await tx.user.update({
-      where: { id: userId },
-      data: { updatedAt: new Date() }
-    });
+const recordFailure = async (userId) => prisma.$transaction(async (tx) => {
+  const failed = await tx.user.update({
+    where: { id: userId },
+    data: { failedLoginAttempts: { increment: 1 } },
+    select: { failedLoginAttempts: true },
   });
-};
+  if (failed.failedLoginAttempts >= 5) {
+    await tx.user.update({ where: { id: userId }, data: { lockedUntil: new Date(Date.now() + 15 * 60_000) } });
+  }
+});
 
 const login = async ({ identifier, password }, req, res) => {
   if (!identifier || !password) {
@@ -104,12 +108,14 @@ const login = async ({ identifier, password }, req, res) => {
 
   const user = await prisma.user.findFirst({
     where: { OR: [{ employeeNumber: identifier }, { email: identifier }, { username: identifier }] },
-    include: { credential: true }
+    include: { credential: true, userRoles: { include: { role: true } } }
   });
 
   const DUMMY_HASH = "$2b$12$EE6ZpTcEn105IV6.OlGeS.KQJx73gDqfJA7NnE7NDZGy75XXOa9hK";
   const passwordMatches = await bcrypt.compare(password, user?.credential?.passwordHash || DUMMY_HASH);
-  if (!user || !passwordMatches || user.status !== "ACTIVE") {
+  const locked = user?.lockedUntil && user.lockedUntil > new Date();
+  if (!user || !passwordMatches || user.status !== "ACTIVE" || locked) {
+    if (user && !passwordMatches && user.status === "ACTIVE") await recordFailure(user.id);
     throw new AppError(401, "INVALID_CREDENTIALS", "Invalid username or password");
   }
 
@@ -120,7 +126,8 @@ const login = async ({ identifier, password }, req, res) => {
   const updatedUser = await prisma.$transaction(async (tx) => {
     const current = await tx.user.update({
       where: { id: user.id },
-      data: { updatedAt: new Date() }
+      data: { failedLoginAttempts: 0, lockedUntil: null, lastLoginAt: new Date() },
+      include: { userRoles: { include: { role: true } } },
     });
     await tx.refreshSession.create({
       data: buildSessionData(user.id, familyId, refreshToken, req)
@@ -129,7 +136,12 @@ const login = async ({ identifier, password }, req, res) => {
   });
 
   issueCookies(res, refreshToken, csrfToken);
-  return { accessToken: signAccessToken(updatedUser), csrfToken, user: publicUser(updatedUser) };
+  return {
+    accessToken: signAccessToken(updatedUser),
+    csrfToken,
+    sessionExpiresIn: env.REFRESH_TOKEN_TTL_DAYS * 86_400,
+    user: publicUser(updatedUser),
+  };
 };
 
 const revokeFamily = async (familyId) => {
@@ -148,7 +160,7 @@ const refresh = async (req, res) => {
 
   const existing = await prisma.refreshSession.findUnique({
     where: { tokenHash: sha256(suppliedToken) },
-    include: { user: true }
+    include: { user: { include: { userRoles: { include: { role: true } } } } }
   });
 
   if (!existing || existing.expiresAt <= new Date() || !existing.user || existing.user.status !== "ACTIVE") {
@@ -187,7 +199,12 @@ const refresh = async (req, res) => {
   }
 
   issueCookies(res, nextToken, nextCsrf);
-  return { accessToken: signAccessToken(existing.user), csrfToken: nextCsrf, user: publicUser(existing.user) };
+  return {
+    accessToken: signAccessToken(existing.user),
+    csrfToken: nextCsrf,
+    sessionExpiresIn: env.REFRESH_TOKEN_TTL_DAYS * 86_400,
+    user: publicUser(existing.user),
+  };
 };
 
 const logout = async (req, res) => {
@@ -206,4 +223,4 @@ const logout = async (req, res) => {
   clearCookies(res);
 };
 
-module.exports = { signup, login, refresh, logout };
+module.exports = { publicUser, signup, login, refresh, logout };

@@ -168,7 +168,7 @@ export function AuthPageLayout({
             <div className="login-icon" aria-hidden="true"><EyeIcon /></div>
             <div className="login-form">
               <h2>Continue securely</h2>
-              <p>Your role comes from your approved Cognito group; it cannot be selected here.</p>
+              <p>Your permissions come from your approved local staff account.</p>
               <div className="login-form-content">{children}</div>
               {footer ? <div className="auth-card-footer">{footer}</div> : null}
             </div>
