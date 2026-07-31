@@ -4,6 +4,8 @@ const authenticate = require("../middlewares/authenticate");
 const validate = require("../middlewares/validate");
 const asyncHandler = require("../utils/asyncHandler");
 const { requireSystemRole } = require("../middlewares/authorize");
+const requireAnyRole = require("../middlewares/requireAnyRole");
+const registrationController = require("../controllers/registrationController");
 const {
     createEventBody,
     updateEventBody,
@@ -15,10 +17,10 @@ const {
     assignmentParams,
     assignmentDeleteParams,
     assignmentBody,
-    stationImportBody,    // <--- Added missing import
-    stationParams,        // <--- Added missing import
-    stationUpdateBody,    // <--- Added missing import
-    versionQuery,         // <--- Added missing import
+    versionQuery,
+    stationParams,
+    stationImportBody,
+    stationUpdateBody,
 } = require("../schemas/eventSchemas");
 
 const router = express.Router();
@@ -26,10 +28,22 @@ router.use(authenticate);
 
 // 1. Static routes MUST come first so they are not captured by dynamic parameters like /:eventId
 router.get("/staff-directory", requireSystemRole("ADMIN", "EVENT_MANAGER"), asyncHandler(eventController.staffDirectory));
+router.get("/station-templates", asyncHandler(eventController.stationTemplates));
+router.get("/active", asyncHandler(eventController.listActive));
 
 // 2. Base collection routes
 router.get("/", validate({ query: listQuery }), asyncHandler(eventController.list));
 router.post("/", requireSystemRole("ADMIN", "EVENT_MANAGER"), validate({ body: createEventBody }), asyncHandler(eventController.create));
+router.post(
+  "/:eventId/registrations",
+  requireAnyRole("ADMINISTRATOR", "REGISTRATION_OFFICER"),
+  registrationController.createRegistration
+);
+router.get(
+  "/:eventId/registrations",
+  requireAnyRole("ADMINISTRATOR", "REGISTRATION_OFFICER"),
+  registrationController.listEventRegistrations
+);
 
 // 3. Dynamic parameter routes come last
 router.get("/:eventId", validate({ params: eventParams }), asyncHandler(eventController.get));

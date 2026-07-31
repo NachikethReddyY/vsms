@@ -4,6 +4,7 @@ import type { components } from '../generated/api';
 import { AuthContext, type User } from './authState';
 
 type AuthResponse = components['schemas']['AuthResponse'];
+let bootstrapSession: Promise<AuthResponse> | null = null;
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   // Pre-load user from sessionStorage so hard refreshes don't flash a blank/null state
@@ -37,8 +38,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     
     setSessionTokens({ accessToken: '', csrfToken: csrf });
     
-    apiClient.post<AuthResponse>('/auth/refresh', undefined, { headers: { 'X-CSRF-Token': csrf } })
-      .then(({ data }) => acceptSession(data))
+    bootstrapSession ??= apiClient.post<AuthResponse>('/auth/refresh', undefined, { headers: { 'X-CSRF-Token': csrf } })
+      .then(({ data }) => data)
+      .finally(() => { bootstrapSession = null; });
+
+    bootstrapSession
+      .then(acceptSession)
       .catch(() => {
         setSessionTokens(null);
         setUser(null);

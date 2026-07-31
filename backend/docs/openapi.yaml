@@ -1,8 +1,8 @@
 openapi: 3.0.3
 info:
   title: VSMS Event Operations API
-  version: 2.1.0
-  description: Secure staff authentication and event lifecycle operations for VSMS.
+  version: 2.2.0
+  description: Secure staff authentication, event operations, and clinical review workflows for VSMS.
   license:
     name: ISC
     url: https://opensource.org/license/isc-license-txt
@@ -18,8 +18,8 @@ tags:
     description: Authorized event details and lifecycle commands
   - name: Users
     description: Restricted administrative user projection
-  - name: Participants
-    description: Event-scoped participant lookup, profile maintenance, and registration history
+  - name: Clinical Reviews
+    description: Event-scoped clinical review queue and immutable decisions
 security:
   - bearerAuth: []
 paths:
@@ -45,7 +45,7 @@ paths:
         "404":
           description: Health endpoint is unavailable
           content: { application/json: { schema: { $ref: "#/components/schemas/Problem" } } }
-  /auth/login:
+  /api/auth/login:
     post:
       tags: [Authentication]
       security: []
@@ -69,7 +69,7 @@ paths:
         "401": { $ref: "#/components/responses/Unauthorized" }
         "422": { $ref: "#/components/responses/ValidationFailed" }
         "429": { $ref: "#/components/responses/RateLimited" }
-  /auth/signup:
+  /api/auth/signup:
     post:
       tags: [Authentication]
       security: []
@@ -96,7 +96,7 @@ paths:
         "409": { $ref: "#/components/responses/Conflict" }
         "422": { $ref: "#/components/responses/ValidationFailed" }
         "429": { $ref: "#/components/responses/RateLimited" }
-  /auth/refresh:
+  /api/auth/refresh:
     post:
       tags: [Authentication]
       security: [{ refreshCookie: [] }]
@@ -108,7 +108,7 @@ paths:
         "401": { $ref: "#/components/responses/Unauthorized" }
         "403": { $ref: "#/components/responses/Forbidden" }
         "429": { $ref: "#/components/responses/RateLimited" }
-  /auth/logout:
+  /api/auth/logout:
     post:
       tags: [Authentication]
       security: [{ refreshCookie: [] }]
@@ -118,7 +118,7 @@ paths:
       responses:
         "204": { description: Session revoked }
         "403": { $ref: "#/components/responses/Forbidden" }
-  /users:
+  /api/users:
     get:
       tags: [Users]
       operationId: listUsers
@@ -133,103 +133,6 @@ paths:
                 items: { $ref: "#/components/schemas/User" }
         "401": { $ref: "#/components/responses/Unauthorized" }
         "403": { $ref: "#/components/responses/Forbidden" }
-  /api/participants/search:
-    post:
-      tags: [Participants]
-      operationId: searchParticipants
-      summary: Search participants before event registration
-      description: Sensitive exact identifiers are accepted in the request body so they do not appear in URL or proxy logs. Results are masked and show whether the participant is already registered for the selected event.
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema: { $ref: "#/components/schemas/ParticipantSearchRequest" }
-      responses:
-        "200":
-          description: Masked, paginated participant matches
-          content:
-            application/json:
-              schema: { $ref: "#/components/schemas/ParticipantSearchResponse" }
-        "401": { $ref: "#/components/responses/Unauthorized" }
-        "403": { $ref: "#/components/responses/Forbidden" }
-        "404": { $ref: "#/components/responses/NotFound" }
-        "422": { $ref: "#/components/responses/ValidationFailed" }
-        "429": { $ref: "#/components/responses/RateLimited" }
-  /api/participants/{participantId}:
-    parameters:
-      - $ref: "#/components/parameters/ParticipantId"
-    get:
-      tags: [Participants]
-      operationId: getParticipantProfile
-      summary: Get the selected participant profile
-      parameters:
-        - $ref: "#/components/parameters/ParticipantEventContext"
-      responses:
-        "200":
-          description: Authorized participant profile without plaintext NRIC/FIN
-          content:
-            application/json:
-              schema:
-                type: object
-                additionalProperties: false
-                required: [participant]
-                properties:
-                  participant: { $ref: "#/components/schemas/ParticipantProfile" }
-        "401": { $ref: "#/components/responses/Unauthorized" }
-        "403": { $ref: "#/components/responses/Forbidden" }
-        "404": { $ref: "#/components/responses/NotFound" }
-        "422": { $ref: "#/components/responses/ValidationFailed" }
-    patch:
-      tags: [Participants]
-      operationId: updateParticipantProfile
-      summary: Update participant profile fields using optimistic concurrency
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema: { $ref: "#/components/schemas/ParticipantUpdateRequest" }
-      responses:
-        "200":
-          description: Updated and audited participant profile
-          content:
-            application/json:
-              schema:
-                type: object
-                additionalProperties: false
-                required: [participant]
-                properties:
-                  participant: { $ref: "#/components/schemas/ParticipantProfile" }
-        "401": { $ref: "#/components/responses/Unauthorized" }
-        "403": { $ref: "#/components/responses/Forbidden" }
-        "404": { $ref: "#/components/responses/NotFound" }
-        "409": { $ref: "#/components/responses/Conflict" }
-        "422": { $ref: "#/components/responses/ValidationFailed" }
-        "429": { $ref: "#/components/responses/RateLimited" }
-  /api/participants/{participantId}/registrations:
-    parameters:
-      - $ref: "#/components/parameters/ParticipantId"
-    get:
-      tags: [Participants]
-      operationId: getParticipantRegistrationHistory
-      summary: List a returning participant's event registration history
-      parameters:
-        - $ref: "#/components/parameters/ParticipantEventContext"
-        - name: page
-          in: query
-          schema: { type: integer, minimum: 1, default: 1 }
-        - name: limit
-          in: query
-          schema: { type: integer, minimum: 1, maximum: 50, default: 20 }
-      responses:
-        "200":
-          description: Reverse-chronological event registration history
-          content:
-            application/json:
-              schema: { $ref: "#/components/schemas/ParticipantRegistrationHistoryResponse" }
-        "401": { $ref: "#/components/responses/Unauthorized" }
-        "403": { $ref: "#/components/responses/Forbidden" }
-        "404": { $ref: "#/components/responses/NotFound" }
-        "422": { $ref: "#/components/responses/ValidationFailed" }
   /api/events:
     get:
       tags: [Events]
@@ -487,6 +390,64 @@ paths:
           application/json:
             schema: { $ref: "#/components/schemas/CancelEventRequest" }
       responses: { "200": { $ref: "#/components/responses/EventSuccess" }, "401": { $ref: "#/components/responses/Unauthorized" }, "403": { $ref: "#/components/responses/Forbidden" }, "404": { $ref: "#/components/responses/NotFound" }, "409": { $ref: "#/components/responses/Conflict" }, "422": { $ref: "#/components/responses/ValidationFailed" }, "429": { $ref: "#/components/responses/RateLimited" } }
+  /api/events/{eventId}/reviews:
+    get:
+      tags: [Clinical Reviews]
+      operationId: listClinicalReviews
+      summary: List registrations currently actionable by an assigned reviewer
+      parameters: [{ $ref: "#/components/parameters/EventId" }]
+      responses:
+        "200":
+          description: Event summary and severity-ordered actionable queue
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ReviewQueueResponse" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+  /api/events/{eventId}/reviews/{registrationId}:
+    get:
+      tags: [Clinical Reviews]
+      operationId: getClinicalReview
+      summary: Inspect the current screening context or immutable decision
+      parameters:
+        - $ref: "#/components/parameters/EventId"
+        - $ref: "#/components/parameters/RegistrationId"
+      responses:
+        "200":
+          description: Redacted participant, screening, readiness, and review detail
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ReviewDetailResponse" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+  /api/events/{eventId}/reviews/{registrationId}/decision:
+    post:
+      tags: [Clinical Reviews]
+      operationId: recordClinicalReviewDecision
+      summary: Atomically record one immutable decision and optional draft referral
+      parameters:
+        - $ref: "#/components/parameters/EventId"
+        - $ref: "#/components/parameters/RegistrationId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ReviewDecisionRequest" }
+      responses:
+        "201":
+          description: Decision recorded and registration completed
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ReviewDecisionResponse" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "422": { $ref: "#/components/responses/ValidationFailed" }
   /api/events/{eventId}/audit-log:
     get:
       tags: [Events]
@@ -528,6 +489,11 @@ components:
       in: path
       required: true
       schema: { type: string, format: uuid }
+    RegistrationId:
+      name: registrationId
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
     Cursor:
       name: cursor
       in: query
@@ -542,17 +508,6 @@ components:
       required: true
       schema: { type: string, minLength: 32 }
       description: Must equal the `vsms_csrf` cookie; requests also require an allowed Origin
-    ParticipantId:
-      name: participantId
-      in: path
-      required: true
-      schema: { type: string, format: uuid }
-    ParticipantEventContext:
-      name: eventId
-      in: query
-      required: true
-      description: Selected event used to authorize the staff member's registration assignment
-      schema: { type: string, format: uuid }
   requestBodies:
     TransitionRequest:
       required: true
@@ -589,146 +544,6 @@ components:
       description: Rate limit exceeded
       content: { application/json: { schema: { $ref: "#/components/schemas/Problem" } } }
   schemas:
-    Pagination:
-      type: object
-      additionalProperties: false
-      required: [page, limit, total, totalPages]
-      properties:
-        page: { type: integer, minimum: 1 }
-        limit: { type: integer, minimum: 1, maximum: 50 }
-        total: { type: integer, minimum: 0 }
-        totalPages: { type: integer, minimum: 0 }
-    ParticipantSearchRequest:
-      type: object
-      additionalProperties: false
-      required: [eventId]
-      anyOf:
-        - required: [query]
-        - required: [nric]
-        - required: [dateOfBirth]
-      properties:
-        eventId: { type: string, format: uuid }
-        query: { type: string, minLength: 3, maxLength: 100, description: "Name, contact number, or masked identifier" }
-        nric: { type: string, pattern: "^[STFGMstfgm][0-9]{7}[A-Za-z]$", description: Exact NRIC/FIN used only for keyed duplicate lookup }
-        dateOfBirth: { type: string, format: date }
-        page: { type: integer, minimum: 1, default: 1 }
-        limit: { type: integer, minimum: 1, maximum: 50, default: 20 }
-    ParticipantEventRegistrationSummary:
-      type: object
-      nullable: true
-      additionalProperties: false
-      required: [registrationId, registrationStatus, checkedIn]
-      properties:
-        registrationId: { type: string, format: uuid }
-        registrationStatus: { type: string, enum: [SIGNED_UP, CHECKED_IN, COMPLETED, CANCELLED] }
-        checkedIn: { type: boolean }
-        queueNumber: { type: integer, nullable: true, minimum: 1 }
-    ParticipantSearchResult:
-      type: object
-      additionalProperties: false
-      required: [participantId, displayName, nricMasked, maskedContactNumber, maskedDateOfBirth, version, registrationCount, selectedEventRegistration]
-      properties:
-        participantId: { type: string, format: uuid }
-        displayName: { type: string, maxLength: 201 }
-        nricMasked: { type: string, maxLength: 9 }
-        maskedContactNumber: { type: string, nullable: true }
-        maskedDateOfBirth: { type: string, nullable: true, example: "****-**-19" }
-        version: { type: integer, minimum: 1 }
-        registrationCount: { type: integer, minimum: 0 }
-        selectedEventRegistration: { $ref: "#/components/schemas/ParticipantEventRegistrationSummary" }
-    ParticipantSearchResponse:
-      type: object
-      additionalProperties: false
-      required: [participants, pagination]
-      properties:
-        participants:
-          type: array
-          items: { $ref: "#/components/schemas/ParticipantSearchResult" }
-        pagination: { $ref: "#/components/schemas/Pagination" }
-    ParticipantProfile:
-      type: object
-      additionalProperties: false
-      required: [participantId, nricMasked, firstName, lastName, displayName, dateOfBirth, gender, contactNumber, emergencyContact, consentGiven, version, createdAt, updatedAt, registrationCount]
-      properties:
-        participantId: { type: string, format: uuid }
-        nricMasked: { type: string, maxLength: 9 }
-        firstName: { type: string, maxLength: 100 }
-        lastName: { type: string, maxLength: 100 }
-        displayName: { type: string, maxLength: 201 }
-        dateOfBirth: { type: string, format: date }
-        gender: { type: string, minLength: 1, maxLength: 1 }
-        race: { type: string, nullable: true, maxLength: 50 }
-        nationality: { type: string, nullable: true, maxLength: 50 }
-        addressStreet: { type: string, nullable: true, maxLength: 255 }
-        addressUnit: { type: string, nullable: true, maxLength: 20 }
-        addressPostalCode: { type: string, nullable: true, pattern: "^[0-9]{6}$" }
-        contactNumber: { type: string, maxLength: 20 }
-        emergencyContact: { type: string, maxLength: 20 }
-        emergencyContactName: { type: string, nullable: true, maxLength: 100 }
-        consentGiven: { type: boolean, description: Read-only here; issue 20 owns consent changes }
-        version: { type: integer, minimum: 1 }
-        createdAt: { type: string, format: date-time }
-        updatedAt: { type: string, format: date-time }
-        registrationCount: { type: integer, minimum: 0 }
-    ParticipantUpdateRequest:
-      type: object
-      additionalProperties: false
-      required: [eventId, version]
-      properties:
-        eventId: { type: string, format: uuid }
-        version: { type: integer, minimum: 1 }
-        nric: { type: string, pattern: "^[STFGMstfgm][0-9]{7}[A-Za-z]$" }
-        firstName: { type: string, minLength: 1, maxLength: 100 }
-        lastName: { type: string, minLength: 1, maxLength: 100 }
-        dateOfBirth: { type: string, format: date }
-        gender: { type: string, minLength: 1, maxLength: 1 }
-        race: { type: string, nullable: true, maxLength: 50 }
-        nationality: { type: string, nullable: true, maxLength: 50 }
-        addressStreet: { type: string, nullable: true, maxLength: 255 }
-        addressUnit: { type: string, nullable: true, maxLength: 20 }
-        addressPostalCode: { type: string, nullable: true, pattern: "^[0-9]{6}$" }
-        contactNumber: { type: string, minLength: 7, maxLength: 20 }
-        emergencyContact: { type: string, minLength: 7, maxLength: 20 }
-        emergencyContactName: { type: string, nullable: true, maxLength: 100 }
-    ParticipantRegistrationHistoryItem:
-      type: object
-      additionalProperties: false
-      required: [registrationId, registrationStatus, checkedIn, createdAt, updatedAt, event, registeredBy]
-      properties:
-        registrationId: { type: string, format: uuid }
-        registrationStatus: { type: string, enum: [SIGNED_UP, CHECKED_IN, COMPLETED, CANCELLED] }
-        queueNumber: { type: integer, nullable: true, minimum: 1 }
-        checkedIn: { type: boolean }
-        createdAt: { type: string, format: date-time }
-        updatedAt: { type: string, format: date-time }
-        event:
-          type: object
-          additionalProperties: false
-          required: [eventId, name, venue, startsAt, endsAt, status]
-          properties:
-            eventId: { type: string, format: uuid }
-            name: { type: string }
-            venue: { type: string }
-            startsAt: { type: string, format: date-time }
-            endsAt: { type: string, format: date-time }
-            status: { $ref: "#/components/schemas/EventStatus" }
-        registeredBy:
-          type: object
-          additionalProperties: false
-          required: [userId, fullName]
-          properties:
-            userId: { type: string, format: uuid }
-            fullName: { type: string }
-    ParticipantRegistrationHistoryResponse:
-      type: object
-      additionalProperties: false
-      required: [participantId, registrations, pagination]
-      properties:
-        participantId: { type: string, format: uuid }
-        registrations:
-          type: array
-          items: { $ref: "#/components/schemas/ParticipantRegistrationHistoryItem" }
-        pagination: { $ref: "#/components/schemas/Pagination" }
     SystemRole:
       type: string
       enum: [ADMIN, EVENT_MANAGER, STAFF]
@@ -747,6 +562,15 @@ components:
     StaffAssignmentStatus:
       type: string
       enum: [ASSIGNED, CONFIRMED, COMPLETED, CANCELLED]
+    OverallFlag:
+      type: string
+      enum: [NORMAL, REVIEW, REFER, URGENT]
+    ReviewOutcome:
+      type: string
+      enum: [COMPLETE, MONITOR, REFER, URGENT_ESCALATION]
+    ClinicalUrgency:
+      type: string
+      enum: [ROUTINE, PRIORITY, URGENT, EMERGENCY]
     StaffDirectoryEntry:
       type: object
       additionalProperties: false
@@ -1117,6 +941,219 @@ components:
       properties:
         auditLogs: { type: array, items: { $ref: "#/components/schemas/EventAuditLog" } }
         nextCursor: { type: string, nullable: true }
+    ReviewEvent:
+      type: object
+      additionalProperties: false
+      required: [eventId, name, venue, timezone, status]
+      properties:
+        eventId: { type: string, format: uuid }
+        name: { type: string }
+        venue: { type: string }
+        timezone: { type: string }
+        status: { type: string, enum: [IN_PROGRESS] }
+    ReviewQueueItem:
+      type: object
+      additionalProperties: false
+      required: [registrationId, participantDisplayName, queueNumber, highestFlag, flaggedResultCount, completedStationCount, totalStationCount, readyReason, lastResultAt]
+      properties:
+        registrationId: { type: string, format: uuid }
+        participantDisplayName: { type: string }
+        queueNumber: { type: integer, nullable: true }
+        highestFlag: { $ref: "#/components/schemas/OverallFlag" }
+        flaggedResultCount: { type: integer, minimum: 0 }
+        completedStationCount: { type: integer, minimum: 0 }
+        totalStationCount: { type: integer, minimum: 1 }
+        readyReason: { type: string, enum: [SCREENING_COMPLETE, URGENT_FLAG] }
+        lastResultAt: { type: string, format: date-time, nullable: true }
+    ReviewQueueResponse:
+      type: object
+      additionalProperties: false
+      required: [event, queue]
+      properties:
+        event: { $ref: "#/components/schemas/ReviewEvent" }
+        queue:
+          type: array
+          maxItems: 500
+          items: { $ref: "#/components/schemas/ReviewQueueItem" }
+    ReviewParticipant:
+      type: object
+      additionalProperties: false
+      required: [registrationId, participantDisplayName, queueNumber, registrationStatus, maskedNric, dateOfBirth, gender]
+      properties:
+        registrationId: { type: string, format: uuid }
+        participantDisplayName: { type: string }
+        queueNumber: { type: integer, nullable: true }
+        registrationStatus: { type: string, enum: [SIGNED_UP, CHECKED_IN, COMPLETED, CANCELLED] }
+        maskedNric: { type: string, pattern: '^••••.{1,4}$' }
+        dateOfBirth: { type: string, format: date }
+        gender: { type: string, maxLength: 1 }
+    ScreeningResultSummary:
+      type: object
+      additionalProperties: false
+      required: [resultId, stationId, screeningType, resultData, overallFlag, isFlagged, flagSummary, ruleVersion, createdAt, updatedAt]
+      properties:
+        resultId: { type: string, format: uuid }
+        stationId: { type: string, format: uuid }
+        screeningType: { type: string, enum: [VISUAL_ACUITY, REFRACTION, COLOUR_VISION, EYE_HEALTH] }
+        resultData: { type: object, additionalProperties: true }
+        overallFlag: { $ref: "#/components/schemas/OverallFlag" }
+        isFlagged: { type: boolean }
+        flagSummary: { type: string, nullable: true }
+        ruleVersion: { type: string }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+    ReviewStationResult:
+      type: object
+      additionalProperties: false
+      required: [stationId, stationName, stationType, stationOrder, result]
+      properties:
+        stationId: { type: string, format: uuid }
+        stationName: { type: string }
+        stationType: { type: string, enum: [VISUAL_ACUITY, REFRACTION, COLOUR_VISION, EYE_HEALTH] }
+        stationOrder: { type: integer, minimum: 1 }
+        result:
+          type: object
+          nullable: true
+          allOf: [{ $ref: "#/components/schemas/ScreeningResultSummary" }]
+    ReviewReadiness:
+      type: object
+      additionalProperties: false
+      required: [ready, readyReason, completedStationCount, totalStationCount, highestFlag]
+      properties:
+        ready: { type: boolean }
+        readyReason: { type: string, enum: [SCREENING_COMPLETE, URGENT_FLAG], nullable: true }
+        completedStationCount: { type: integer, minimum: 0 }
+        totalStationCount: { type: integer, minimum: 0 }
+        highestFlag: { $ref: "#/components/schemas/OverallFlag" }
+    ReferralSummary:
+      type: object
+      additionalProperties: false
+      required: [referralId, destinationName, reason, instructions, urgency, status]
+      properties:
+        referralId: { type: string, format: uuid }
+        destinationName: { type: string }
+        reason: { type: string }
+        instructions: { type: string, nullable: true }
+        urgency: { $ref: "#/components/schemas/ClinicalUrgency" }
+        status: { type: string, enum: [DRAFT, ISSUED, SENT, ACKNOWLEDGED, CANCELLED] }
+    ExistingReview:
+      type: object
+      additionalProperties: false
+      required: [reviewId, version, outcome, urgency, clinicalSummary, recommendations, reviewedAt, reviewedByName, referral]
+      properties:
+        reviewId: { type: string, format: uuid }
+        version: { type: integer, enum: [1] }
+        outcome: { $ref: "#/components/schemas/ReviewOutcome" }
+        urgency: { $ref: "#/components/schemas/ClinicalUrgency" }
+        clinicalSummary: { type: string }
+        recommendations: { type: string, nullable: true }
+        reviewedAt: { type: string, format: date-time }
+        reviewedByName: { type: string }
+        referral:
+          type: object
+          nullable: true
+          allOf: [{ $ref: "#/components/schemas/ReferralSummary" }]
+    ReviewDetailResponse:
+      type: object
+      additionalProperties: false
+      required: [event, participant, stations, readiness, existingReview, contextVersion]
+      properties:
+        event: { $ref: "#/components/schemas/ReviewEvent" }
+        participant: { $ref: "#/components/schemas/ReviewParticipant" }
+        stations: { type: array, items: { $ref: "#/components/schemas/ReviewStationResult" } }
+        readiness: { $ref: "#/components/schemas/ReviewReadiness" }
+        existingReview:
+          type: object
+          nullable: true
+          allOf: [{ $ref: "#/components/schemas/ExistingReview" }]
+        contextVersion: { type: string, pattern: '^[a-f0-9]{64}$' }
+    ReferralDecisionInput:
+      type: object
+      additionalProperties: false
+      required: [destinationName, reason]
+      properties:
+        destinationName: { type: string, minLength: 2, maxLength: 200 }
+        reason: { type: string, minLength: 10, maxLength: 2000 }
+        instructions: { type: string, maxLength: 2000 }
+    CompleteReviewDecision:
+      type: object
+      additionalProperties: false
+      required: [outcome, contextVersion, confirmed, clinicalSummary]
+      properties:
+        outcome: { type: string, enum: [COMPLETE] }
+        contextVersion: { type: string, pattern: '^[a-f0-9]{64}$' }
+        confirmed: { type: boolean, enum: [true] }
+        clinicalSummary: { type: string, minLength: 10, maxLength: 2000 }
+        recommendations: { type: string, maxLength: 2000 }
+    MonitorReviewDecision:
+      type: object
+      additionalProperties: false
+      required: [outcome, contextVersion, confirmed, clinicalSummary]
+      properties:
+        outcome: { type: string, enum: [MONITOR] }
+        contextVersion: { type: string, pattern: '^[a-f0-9]{64}$' }
+        confirmed: { type: boolean, enum: [true] }
+        clinicalSummary: { type: string, minLength: 10, maxLength: 2000 }
+        recommendations: { type: string, maxLength: 2000 }
+    ReferReviewDecision:
+      type: object
+      additionalProperties: false
+      required: [outcome, contextVersion, confirmed, clinicalSummary, urgency, referral]
+      properties:
+        outcome: { type: string, enum: [REFER] }
+        contextVersion: { type: string, pattern: '^[a-f0-9]{64}$' }
+        confirmed: { type: boolean, enum: [true] }
+        clinicalSummary: { type: string, minLength: 10, maxLength: 2000 }
+        recommendations: { type: string, maxLength: 2000 }
+        urgency: { type: string, enum: [ROUTINE, PRIORITY, URGENT] }
+        referral: { $ref: "#/components/schemas/ReferralDecisionInput" }
+    UrgentReviewDecision:
+      type: object
+      additionalProperties: false
+      required: [outcome, contextVersion, confirmed, clinicalSummary, referral]
+      properties:
+        outcome: { type: string, enum: [URGENT_ESCALATION] }
+        contextVersion: { type: string, pattern: '^[a-f0-9]{64}$' }
+        confirmed: { type: boolean, enum: [true] }
+        clinicalSummary: { type: string, minLength: 10, maxLength: 2000 }
+        recommendations: { type: string, maxLength: 2000 }
+        referral: { $ref: "#/components/schemas/ReferralDecisionInput" }
+    ReviewDecisionRequest:
+      oneOf:
+        - $ref: "#/components/schemas/CompleteReviewDecision"
+        - $ref: "#/components/schemas/MonitorReviewDecision"
+        - $ref: "#/components/schemas/ReferReviewDecision"
+        - $ref: "#/components/schemas/UrgentReviewDecision"
+      discriminator:
+        propertyName: outcome
+        mapping:
+          COMPLETE: "#/components/schemas/CompleteReviewDecision"
+          MONITOR: "#/components/schemas/MonitorReviewDecision"
+          REFER: "#/components/schemas/ReferReviewDecision"
+          URGENT_ESCALATION: "#/components/schemas/UrgentReviewDecision"
+    RecordedReview:
+      type: object
+      additionalProperties: false
+      required: [reviewId, version, outcome, urgency, clinicalSummary, recommendations, reviewedAt]
+      properties:
+        reviewId: { type: string, format: uuid }
+        version: { type: integer, enum: [1] }
+        outcome: { $ref: "#/components/schemas/ReviewOutcome" }
+        urgency: { $ref: "#/components/schemas/ClinicalUrgency" }
+        clinicalSummary: { type: string }
+        recommendations: { type: string, nullable: true }
+        reviewedAt: { type: string, format: date-time }
+    ReviewDecisionResponse:
+      type: object
+      additionalProperties: false
+      required: [registrationStatus, review, referral]
+      properties:
+        registrationStatus: { type: string, enum: [COMPLETED] }
+        review: { $ref: "#/components/schemas/RecordedReview" }
+        referral:
+          type: object
+          nullable: true
+          allOf: [{ $ref: "#/components/schemas/ReferralSummary" }]
     Problem:
       type: object
       required: [type, title, status, code, requestId]

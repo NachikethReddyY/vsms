@@ -1,11 +1,12 @@
-import { ArrowLeftIcon, ArrowRightStartOnRectangleIcon, Bars3BottomLeftIcon, CalendarDaysIcon, ListBulletIcon, MagnifyingGlassIcon, PlusIcon, QueueListIcon, SignalIcon, TableCellsIcon } from '@heroicons/react/24/outline';
+import { ArrowLeftIcon, ArrowRightStartOnRectangleIcon, Bars3BottomLeftIcon, CalendarDaysIcon, ChartBarIcon, ChevronDownIcon, HomeIcon, ListBulletIcon, MagnifyingGlassIcon, PlusIcon, QueueListIcon, ShieldCheckIcon, SignalIcon, TableCellsIcon, UserGroupIcon } from '@heroicons/react/24/outline';
 import { CommandPalette, CommandPaletteInput } from '@astryxdesign/core/CommandPalette';
 import { Kbd } from '@astryxdesign/core/Kbd';
 import { createStaticSource, type SearchableItem } from '@astryxdesign/core/Typeahead';
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { NavLink, useLocation, useNavigate } from 'react-router-dom';
-import { useAuth } from '../auth/authState';
-import { getDisplayName, getMonogram } from '../utils/identity';
+import { useAuth } from '../auth/AuthProvider';
+import apiClient from '../utils/apiClient';
+import { getMonogram } from '../utils/identity';
 import { SuccessConfetti, ThemeToggle } from './MagicEffects';
 
 type CommandMetadata = {
@@ -16,6 +17,7 @@ type CommandMetadata = {
   icon: ReactNode;
   action: () => void;
 };
+
 type CommandItem = Omit<SearchableItem<CommandMetadata>, 'auxiliaryData'> & {
   auxiliaryData: CommandMetadata;
 };
@@ -23,33 +25,58 @@ type CommandItem = Omit<SearchableItem<CommandMetadata>, 'auxiliaryData'> & {
 export default function AppShell({ children }: { children: ReactNode }) {
   const [collapsed, setCollapsed] = useState(false);
   const [commandOpen, setCommandOpen] = useState(false);
+  const [dashboardsOpen, setDashboardsOpen] = useState(true);
   const [eventSearch, setEventSearch] = useState('');
-  const { user, logout } = useAuth();
+
+  const { session, clearSession } = useAuth();
+  const user = session?.user;
   const navigate = useNavigate();
   const location = useLocation();
   const workspaceRef = useRef<HTMLElement>(null);
-  const identityName = user?.username ? getDisplayName(user.username) : user?.email || 'Account';
-  const role = user?.systemRole.replace(/_/g, ' ').toLowerCase();
-  const canCreateEvent = user?.systemRole === 'ADMIN' || user?.systemRole === 'EVENT_MANAGER';
-  const mobileTitle = location.pathname === '/events/new'
+
+  const identityName = user?.fullName || user?.email || 'Account';
+  const role = user?.roles?.join(', ').replace(/_/g, ' ').toLowerCase() || 'staff';
+  const canCreateEvent = Boolean(user?.roles?.some((item) => item === 'ADMINISTRATOR' || item === 'EVENT_MANAGER'));
+
+  const logout = useCallback(async () => {
+    try {
+      await apiClient.post('/auth/logout');
+    } finally {
+      clearSession();
+      navigate('/login');
+    }
+  }, [clearSession, navigate]);
+
+  const mobileTitle = location.pathname === '/dashboard'
+    ? 'Dashboard'
+    : location.pathname.startsWith('/participants') || location.pathname.includes('/register')
+      ? 'Registration'
+      : location.pathname === '/events/new'
     ? 'Create event'
+    : location.pathname.includes('/queue')
+    ? 'Queue dashboard'
+    : location.pathname.includes('/audit')
+    ? 'Audit dashboard'
     : /^\/events\/[^/]+$/.test(location.pathname)
       ? 'Event details'
       : 'Events';
+
   const isEventsPage = location.pathname === '/events';
   const toggleSidebar = useCallback(() => setCollapsed((value) => !value), []);
+
   const setEventsView = useCallback((view: 'timeline' | 'table') => {
     localStorage.setItem('vsms-events-view', view);
     window.dispatchEvent(new CustomEvent('vsms:events-view', { detail: view }));
     if (!isEventsPage) navigate('/events');
   }, [isEventsPage, navigate]);
+
   const commands = useMemo<CommandItem[]>(() => [
     {
       id: 'navigation-events', label: 'Go to events', auxiliaryData: {
         group: 'Navigation', description: 'Open the event operations dashboard', aliases: ['home', 'dashboard'], icon: <CalendarDaysIcon />, action: () => navigate('/events'),
       },
     },
-    ...(user?.systemRole !== 'STAFF' ? [{
+    ...(canCreateEvent ? [{
       id: 'event-create', label: 'Create event', auxiliaryData: {
         group: 'Events', description: 'Open a new draft event', aliases: ['new', 'add'], icon: <PlusIcon />, action: () => navigate('/events/new'),
       },
@@ -69,7 +96,8 @@ export default function AppShell({ children }: { children: ReactNode }) {
         group: 'View', description: 'Toggle the primary navigation', aliases: ['collapse', 'expand', 'navigation'], shortcut: 'mod+b', icon: <Bars3BottomLeftIcon />, action: toggleSidebar,
       },
     },
-  ], [collapsed, navigate, setEventsView, toggleSidebar, user?.systemRole]);
+  ], [canCreateEvent, collapsed, navigate, setEventsView, toggleSidebar]);
+
   const commandSource = useMemo(() => createStaticSource(commands, {
     keywords: (item) => [item.auxiliaryData.description, ...item.auxiliaryData.aliases],
   }), [commands]);
@@ -119,21 +147,63 @@ export default function AppShell({ children }: { children: ReactNode }) {
         searchSource={commandSource}
         onValueChange={(commandId) => commands.find((command) => command.id === commandId)?.auxiliaryData.action()}
         input={<CommandPaletteInput placeholder="Type a command or search actions…" endContent={<Kbd keys="mod+shift+p" />} />}
-        renderItem={(command) => <><span className="command-item-icon">{command.auxiliaryData.icon}</span><span className="command-item-copy"><strong>{command.label}</strong><small>{command.auxiliaryData.description}</small></span>{command.auxiliaryData.shortcut && <Kbd keys={command.auxiliaryData.shortcut} />}</>}
+        renderItem={(command) => (
+          <>
+            <span className="command-item-icon">{command.auxiliaryData.icon}</span>
+            <span className="command-item-copy">
+              <strong>{command.label}</strong>
+              <small>{command.auxiliaryData.description}</small>
+            </span>
+            {command.auxiliaryData.shortcut && <Kbd keys={command.auxiliaryData.shortcut} />}
+          </>
+        )}
         emptySearchText="No matching commands"
       />
       <aside className="sidebar" aria-label="Primary navigation">
-        <div className="brand"><span aria-hidden="true">V</span><strong>VSMS</strong></div>
+        <div className="brand" title="VSMS"><span aria-hidden="true">V</span><strong>VSMS</strong></div>
         <nav className="nav-list">
-          <NavLink to="/events" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}>
+          <NavLink to="/dashboard" title="Dashboard" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}>
+            <HomeIcon /><span>Dashboard</span>
+          </NavLink>
+          <NavLink to="/events" title="Events" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}>
             <CalendarDaysIcon /><span>Events</span>
           </NavLink>
-          <span className="nav-item disabled" aria-disabled="true"><QueueListIcon /><span>Participants</span></span>
+          <NavLink to="/participants/search" title="Participants" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}>
+            <QueueListIcon /><span>Participants</span>
+          </NavLink>
+
+          {/* Grouped Dashboards Dropdown Section */}
+          <div className="nav-group my-1">
+            <button
+              type="button"
+              title="Dashboards Hub"
+              onClick={() => setDashboardsOpen(!dashboardsOpen)}
+              className="nav-item nav-group-toggle w-full flex items-center justify-between cursor-pointer border-0 bg-transparent text-inherit"
+            >
+              <span className="nav-item-inner flex items-center gap-2">
+                <ChartBarIcon />
+                <span className="nav-label">Dashboards Hub</span>
+              </span>
+              <ChevronDownIcon className={`nav-chevron w-4 h-4 transition-transform ${dashboardsOpen ? 'rotate-180' : ''}`} />
+            </button>
+
+            {dashboardsOpen && (
+              <div className="nav-sub-list pl-4 space-y-1 mt-1 border-l border-gray-800 ml-3">
+                <NavLink to="/events/active-event-id/queue" title="Queue Dashboard" className={({ isActive }) => `nav-item text-xs py-1.5 ${isActive ? 'active' : ''}`}>
+                  <UserGroupIcon className="w-4 h-4" /><span>Queue Dashboard</span>
+                </NavLink>
+                <NavLink to="/admin/audit-logs" title="Audit Logs Hub" className={({ isActive }) => `nav-item text-xs py-1.5 ${isActive ? 'active' : ''}`}>
+                  <ShieldCheckIcon className="w-4 h-4" /><span>Audit Logs Hub</span>
+                </NavLink>
+              </div>
+            )}
+          </div>
         </nav>
+
         <div className="sidebar-foot">
-          <div className="connection"><SignalIcon /><span>Connected<br/><small>All changes synced</small></span></div>
+          <div className="connection" title="Connected: All changes synced"><SignalIcon /><span>Connected<br/><small>All changes synced</small></span></div>
           <div className="profile">
-            <span className="avatar" aria-hidden="true">{getMonogram(identityName)}</span>
+            <span className="avatar" aria-hidden="true" title={identityName}>{getMonogram(identityName)}</span>
             <span className="profile-copy" title={user?.email}>
               <strong>{identityName}</strong>
               <small>{role}</small>
@@ -145,6 +215,7 @@ export default function AppShell({ children }: { children: ReactNode }) {
           </div>
         </div>
       </aside>
+
       <div className="app-main">
         <header className="command-bar">
           <div className="command-navigation">

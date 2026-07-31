@@ -59,13 +59,4 @@ function decrypt(cipherPayload) {
     return decrypted;
 }
 
-/**
- * Build a deterministic, keyed lookup value without storing searchable plaintext.
- * This is used for exact duplicate checks; it is not returned by the API.
- */
-function lookupHash(text) {
-    if (!text) return text;
-    return crypto.createHmac("sha256", ENCRYPTION_KEY).update(text, "utf8").digest("hex");
-}
-
-module.exports = { encrypt, decrypt, lookupHash };
+module.exports = { encrypt, decrypt };

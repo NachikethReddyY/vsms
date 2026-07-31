@@ -21,7 +21,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/auth/login": {
+    "/api/auth/login": {
         parameters: {
             query?: never;
             header?: never;
@@ -38,7 +38,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/auth/signup": {
+    "/api/auth/signup": {
         parameters: {
             query?: never;
             header?: never;
@@ -58,7 +58,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/auth/refresh": {
+    "/api/auth/refresh": {
         parameters: {
             query?: never;
             header?: never;
@@ -75,7 +75,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/auth/logout": {
+    "/api/auth/logout": {
         parameters: {
             query?: never;
             header?: never;
@@ -92,7 +92,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/users": {
+    "/api/users": {
         parameters: {
             query?: never;
             header?: never;
@@ -101,65 +101,6 @@ export interface paths {
         };
         /** List projected user records (ADMIN only) */
         get: operations["listUsers"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/participants/search": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Search participants before event registration
-         * @description Sensitive exact identifiers are accepted in the request body so they do not appear in URL or proxy logs. Results are masked and show whether the participant is already registered for the selected event.
-         */
-        post: operations["searchParticipants"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/participants/{participantId}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                participantId: components["parameters"]["ParticipantId"];
-            };
-            cookie?: never;
-        };
-        /** Get the selected participant profile */
-        get: operations["getParticipantProfile"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        /** Update participant profile fields using optimistic concurrency */
-        patch: operations["updateParticipantProfile"];
-        trace?: never;
-    };
-    "/api/participants/{participantId}/registrations": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                participantId: components["parameters"]["ParticipantId"];
-            };
-            cookie?: never;
-        };
-        /** List a returning participant's event registration history */
-        get: operations["getParticipantRegistrationHistory"];
         put?: never;
         post?: never;
         delete?: never;
@@ -396,6 +337,57 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/events/{eventId}/reviews": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List registrations currently actionable by an assigned reviewer */
+        get: operations["listClinicalReviews"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/events/{eventId}/reviews/{registrationId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Inspect the current screening context or immutable decision */
+        get: operations["getClinicalReview"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/events/{eventId}/reviews/{registrationId}/decision": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Atomically record one immutable decision and optional draft referral */
+        post: operations["recordClinicalReviewDecision"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/events/{eventId}/audit-log": {
         parameters: {
             query?: never;
@@ -417,130 +409,6 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
-        Pagination: {
-            page: number;
-            limit: number;
-            total: number;
-            totalPages: number;
-        };
-        ParticipantSearchRequest: {
-            /** Format: uuid */
-            eventId: string;
-            /** @description Name, contact number, or masked identifier */
-            query?: string;
-            /** @description Exact NRIC/FIN used only for keyed duplicate lookup */
-            nric?: string;
-            /** Format: date */
-            dateOfBirth?: string;
-            /** @default 1 */
-            page: number;
-            /** @default 20 */
-            limit: number;
-        } | unknown | unknown | unknown;
-        ParticipantEventRegistrationSummary: {
-            /** Format: uuid */
-            registrationId: string;
-            /** @enum {string} */
-            registrationStatus: "SIGNED_UP" | "CHECKED_IN" | "COMPLETED" | "CANCELLED";
-            checkedIn: boolean;
-            queueNumber?: number | null;
-        } | null;
-        ParticipantSearchResult: {
-            /** Format: uuid */
-            participantId: string;
-            displayName: string;
-            nricMasked: string;
-            maskedContactNumber: string | null;
-            /** @example ****-**-19 */
-            maskedDateOfBirth: string | null;
-            version: number;
-            registrationCount: number;
-            selectedEventRegistration: components["schemas"]["ParticipantEventRegistrationSummary"];
-        };
-        ParticipantSearchResponse: {
-            participants: components["schemas"]["ParticipantSearchResult"][];
-            pagination: components["schemas"]["Pagination"];
-        };
-        ParticipantProfile: {
-            /** Format: uuid */
-            participantId: string;
-            nricMasked: string;
-            firstName: string;
-            lastName: string;
-            displayName: string;
-            /** Format: date */
-            dateOfBirth: string;
-            gender: string;
-            race?: string | null;
-            nationality?: string | null;
-            addressStreet?: string | null;
-            addressUnit?: string | null;
-            addressPostalCode?: string | null;
-            contactNumber: string;
-            emergencyContact: string;
-            emergencyContactName?: string | null;
-            /** @description Read-only here; issue 20 owns consent changes */
-            consentGiven: boolean;
-            version: number;
-            /** Format: date-time */
-            createdAt: string;
-            /** Format: date-time */
-            updatedAt: string;
-            registrationCount: number;
-        };
-        ParticipantUpdateRequest: {
-            /** Format: uuid */
-            eventId: string;
-            version: number;
-            nric?: string;
-            firstName?: string;
-            lastName?: string;
-            /** Format: date */
-            dateOfBirth?: string;
-            gender?: string;
-            race?: string | null;
-            nationality?: string | null;
-            addressStreet?: string | null;
-            addressUnit?: string | null;
-            addressPostalCode?: string | null;
-            contactNumber?: string;
-            emergencyContact?: string;
-            emergencyContactName?: string | null;
-        };
-        ParticipantRegistrationHistoryItem: {
-            /** Format: uuid */
-            registrationId: string;
-            /** @enum {string} */
-            registrationStatus: "SIGNED_UP" | "CHECKED_IN" | "COMPLETED" | "CANCELLED";
-            queueNumber?: number | null;
-            checkedIn: boolean;
-            /** Format: date-time */
-            createdAt: string;
-            /** Format: date-time */
-            updatedAt: string;
-            event: {
-                /** Format: uuid */
-                eventId: string;
-                name: string;
-                venue: string;
-                /** Format: date-time */
-                startsAt: string;
-                /** Format: date-time */
-                endsAt: string;
-                status: components["schemas"]["EventStatus"];
-            };
-            registeredBy: {
-                /** Format: uuid */
-                userId: string;
-                fullName: string;
-            };
-        };
-        ParticipantRegistrationHistoryResponse: {
-            /** Format: uuid */
-            participantId: string;
-            registrations: components["schemas"]["ParticipantRegistrationHistoryItem"][];
-            pagination: components["schemas"]["Pagination"];
-        };
         /** @enum {string} */
         SystemRole: "ADMIN" | "EVENT_MANAGER" | "STAFF";
         /** @enum {string} */
@@ -553,6 +421,12 @@ export interface components {
         StaffAssignmentRole: "EVENT_MANAGER" | "REGISTRATION" | "SCREENER" | "REVIEWER" | "SUPPORT";
         /** @enum {string} */
         StaffAssignmentStatus: "ASSIGNED" | "CONFIRMED" | "COMPLETED" | "CANCELLED";
+        /** @enum {string} */
+        OverallFlag: "NORMAL" | "REVIEW" | "REFER" | "URGENT";
+        /** @enum {string} */
+        ReviewOutcome: "COMPLETE" | "MONITOR" | "REFER" | "URGENT_ESCALATION";
+        /** @enum {string} */
+        ClinicalUrgency: "ROUTINE" | "PRIORITY" | "URGENT" | "EMERGENCY";
         StaffDirectoryEntry: {
             /** Format: uuid */
             userId: string;
@@ -881,6 +755,189 @@ export interface components {
             auditLogs: components["schemas"]["EventAuditLog"][];
             nextCursor: string | null;
         };
+        ReviewEvent: {
+            /** Format: uuid */
+            eventId: string;
+            name: string;
+            venue: string;
+            timezone: string;
+            /** @enum {string} */
+            status: "IN_PROGRESS";
+        };
+        ReviewQueueItem: {
+            /** Format: uuid */
+            registrationId: string;
+            participantDisplayName: string;
+            queueNumber: number | null;
+            highestFlag: components["schemas"]["OverallFlag"];
+            flaggedResultCount: number;
+            completedStationCount: number;
+            totalStationCount: number;
+            /** @enum {string} */
+            readyReason: "SCREENING_COMPLETE" | "URGENT_FLAG";
+            /** Format: date-time */
+            lastResultAt: string | null;
+        };
+        ReviewQueueResponse: {
+            event: components["schemas"]["ReviewEvent"];
+            queue: components["schemas"]["ReviewQueueItem"][];
+        };
+        ReviewParticipant: {
+            /** Format: uuid */
+            registrationId: string;
+            participantDisplayName: string;
+            queueNumber: number | null;
+            /** @enum {string} */
+            registrationStatus: "SIGNED_UP" | "CHECKED_IN" | "COMPLETED" | "CANCELLED";
+            maskedNric: string;
+            /** Format: date */
+            dateOfBirth: string;
+            gender: string;
+        };
+        ScreeningResultSummary: {
+            /** Format: uuid */
+            resultId: string;
+            /** Format: uuid */
+            stationId: string;
+            /** @enum {string} */
+            screeningType: "VISUAL_ACUITY" | "REFRACTION" | "COLOUR_VISION" | "EYE_HEALTH";
+            resultData: {
+                [key: string]: unknown;
+            };
+            overallFlag: components["schemas"]["OverallFlag"];
+            isFlagged: boolean;
+            flagSummary: string | null;
+            ruleVersion: string;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt: string;
+        };
+        ReviewStationResult: {
+            /** Format: uuid */
+            stationId: string;
+            stationName: string;
+            /** @enum {string} */
+            stationType: "VISUAL_ACUITY" | "REFRACTION" | "COLOUR_VISION" | "EYE_HEALTH";
+            stationOrder: number;
+            result: components["schemas"]["ScreeningResultSummary"] | null;
+        };
+        ReviewReadiness: {
+            ready: boolean;
+            /** @enum {string|null} */
+            readyReason: "SCREENING_COMPLETE" | "URGENT_FLAG" | null;
+            completedStationCount: number;
+            totalStationCount: number;
+            highestFlag: components["schemas"]["OverallFlag"];
+        };
+        ReferralSummary: {
+            /** Format: uuid */
+            referralId: string;
+            destinationName: string;
+            reason: string;
+            instructions: string | null;
+            urgency: components["schemas"]["ClinicalUrgency"];
+            /** @enum {string} */
+            status: "DRAFT" | "ISSUED" | "SENT" | "ACKNOWLEDGED" | "CANCELLED";
+        };
+        ExistingReview: {
+            /** Format: uuid */
+            reviewId: string;
+            /** @enum {integer} */
+            version: 1;
+            outcome: components["schemas"]["ReviewOutcome"];
+            urgency: components["schemas"]["ClinicalUrgency"];
+            clinicalSummary: string;
+            recommendations: string | null;
+            /** Format: date-time */
+            reviewedAt: string;
+            reviewedByName: string;
+            referral: components["schemas"]["ReferralSummary"] | null;
+        };
+        ReviewDetailResponse: {
+            event: components["schemas"]["ReviewEvent"];
+            participant: components["schemas"]["ReviewParticipant"];
+            stations: components["schemas"]["ReviewStationResult"][];
+            readiness: components["schemas"]["ReviewReadiness"];
+            existingReview: components["schemas"]["ExistingReview"] | null;
+            contextVersion: string;
+        };
+        ReferralDecisionInput: {
+            destinationName: string;
+            reason: string;
+            instructions?: string;
+        };
+        CompleteReviewDecision: {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            outcome: "COMPLETE";
+            contextVersion: string;
+            /** @enum {boolean} */
+            confirmed: true;
+            clinicalSummary: string;
+            recommendations?: string;
+        };
+        MonitorReviewDecision: {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            outcome: "MONITOR";
+            contextVersion: string;
+            /** @enum {boolean} */
+            confirmed: true;
+            clinicalSummary: string;
+            recommendations?: string;
+        };
+        ReferReviewDecision: {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            outcome: "REFER";
+            contextVersion: string;
+            /** @enum {boolean} */
+            confirmed: true;
+            clinicalSummary: string;
+            recommendations?: string;
+            /** @enum {string} */
+            urgency: "ROUTINE" | "PRIORITY" | "URGENT";
+            referral: components["schemas"]["ReferralDecisionInput"];
+        };
+        UrgentReviewDecision: {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            outcome: "URGENT_ESCALATION";
+            contextVersion: string;
+            /** @enum {boolean} */
+            confirmed: true;
+            clinicalSummary: string;
+            recommendations?: string;
+            referral: components["schemas"]["ReferralDecisionInput"];
+        };
+        ReviewDecisionRequest: components["schemas"]["CompleteReviewDecision"] | components["schemas"]["MonitorReviewDecision"] | components["schemas"]["ReferReviewDecision"] | components["schemas"]["UrgentReviewDecision"];
+        RecordedReview: {
+            /** Format: uuid */
+            reviewId: string;
+            /** @enum {integer} */
+            version: 1;
+            outcome: components["schemas"]["ReviewOutcome"];
+            urgency: components["schemas"]["ClinicalUrgency"];
+            clinicalSummary: string;
+            recommendations: string | null;
+            /** Format: date-time */
+            reviewedAt: string;
+        };
+        ReviewDecisionResponse: {
+            /** @enum {string} */
+            registrationStatus: "COMPLETED";
+            review: components["schemas"]["RecordedReview"];
+            referral: components["schemas"]["ReferralSummary"] | null;
+        };
         Problem: {
             /** Format: uri */
             type: string;
@@ -963,13 +1020,11 @@ export interface components {
     parameters: {
         EventId: string;
         ShiftId: string;
+        RegistrationId: string;
         Cursor: string;
         EventLimit: number;
         /** @description Must equal the `vsms_csrf` cookie; requests also require an allowed Origin */
         CsrfToken: string;
-        ParticipantId: string;
-        /** @description Selected event used to authorize the staff member's registration assignment */
-        ParticipantEventContext: string;
     };
     requestBodies: {
         TransitionRequest: {
@@ -1153,131 +1208,6 @@ export interface operations {
             };
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
-        };
-    };
-    searchParticipants: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["ParticipantSearchRequest"];
-            };
-        };
-        responses: {
-            /** @description Masked, paginated participant matches */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ParticipantSearchResponse"];
-                };
-            };
-            401: components["responses"]["Unauthorized"];
-            403: components["responses"]["Forbidden"];
-            404: components["responses"]["NotFound"];
-            422: components["responses"]["ValidationFailed"];
-            429: components["responses"]["RateLimited"];
-        };
-    };
-    getParticipantProfile: {
-        parameters: {
-            query: {
-                /** @description Selected event used to authorize the staff member's registration assignment */
-                eventId: components["parameters"]["ParticipantEventContext"];
-            };
-            header?: never;
-            path: {
-                participantId: components["parameters"]["ParticipantId"];
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Authorized participant profile without plaintext NRIC/FIN */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        participant: components["schemas"]["ParticipantProfile"];
-                    };
-                };
-            };
-            401: components["responses"]["Unauthorized"];
-            403: components["responses"]["Forbidden"];
-            404: components["responses"]["NotFound"];
-            422: components["responses"]["ValidationFailed"];
-        };
-    };
-    updateParticipantProfile: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                participantId: components["parameters"]["ParticipantId"];
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["ParticipantUpdateRequest"];
-            };
-        };
-        responses: {
-            /** @description Updated and audited participant profile */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        participant: components["schemas"]["ParticipantProfile"];
-                    };
-                };
-            };
-            401: components["responses"]["Unauthorized"];
-            403: components["responses"]["Forbidden"];
-            404: components["responses"]["NotFound"];
-            409: components["responses"]["Conflict"];
-            422: components["responses"]["ValidationFailed"];
-            429: components["responses"]["RateLimited"];
-        };
-    };
-    getParticipantRegistrationHistory: {
-        parameters: {
-            query: {
-                /** @description Selected event used to authorize the staff member's registration assignment */
-                eventId: components["parameters"]["ParticipantEventContext"];
-                page?: number;
-                limit?: number;
-            };
-            header?: never;
-            path: {
-                participantId: components["parameters"]["ParticipantId"];
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Reverse-chronological event registration history */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ParticipantRegistrationHistoryResponse"];
-                };
-            };
-            401: components["responses"]["Unauthorized"];
-            403: components["responses"]["Forbidden"];
-            404: components["responses"]["NotFound"];
-            422: components["responses"]["ValidationFailed"];
         };
     };
     listEvents: {
@@ -1672,6 +1602,91 @@ export interface operations {
             409: components["responses"]["Conflict"];
             422: components["responses"]["ValidationFailed"];
             429: components["responses"]["RateLimited"];
+        };
+    };
+    listClinicalReviews: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                eventId: components["parameters"]["EventId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Event summary and severity-ordered actionable queue */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReviewQueueResponse"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+        };
+    };
+    getClinicalReview: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                eventId: components["parameters"]["EventId"];
+                registrationId: components["parameters"]["RegistrationId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Redacted participant, screening, readiness, and review detail */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReviewDetailResponse"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+        };
+    };
+    recordClinicalReviewDecision: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                eventId: components["parameters"]["EventId"];
+                registrationId: components["parameters"]["RegistrationId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReviewDecisionRequest"];
+            };
+        };
+        responses: {
+            /** @description Decision recorded and registration completed */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReviewDecisionResponse"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            422: components["responses"]["ValidationFailed"];
         };
     };
     getEventAuditLog: {
