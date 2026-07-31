@@ -7,7 +7,8 @@ const errorHandler = (error, req, res, _next) => {
   const known = error instanceof AppError;
   const status = known ? error.status : Number(error.statusCode || 500);
   const code = known ? error.code : error.name || "INTERNAL_ERROR";
-  const publicMessage = status >= 500 ? "An unexpected error occurred" : error.message;
+  // Scrub only true internal failures. 503 (e.g. Cognito not configured) must stay actionable.
+  const publicMessage = status === 500 ? "An unexpected error occurred" : error.message;
 
   logger[status >= 500 ? "error" : "warn"]("http.request.failed", {
     requestId: req.requestId,
@@ -17,7 +18,7 @@ const errorHandler = (error, req, res, _next) => {
     code,
     errorMessage: error.message,
     ...(req.user?.userId ? { userId: req.user.userId } : {}),
-    ...(status >= 500 && error.stack ? { stack: error.stack } : {}),
+    ...(status === 500 && error.stack ? { stack: error.stack } : {}),
   });
 
   res.status(status).json({
