@@ -1,4 +1,5 @@
 import { Navigate, Outlet, Route, Routes } from "react-router-dom";
+import { ProtectedRoute } from "./auth/ProtectedRoute";
 import AppShell from "./components/AppShell";
 import LandingPage from "./components/LandingPage";
 import QRCodePage from "./components/qr/QRCodePage";
@@ -6,6 +7,7 @@ import AuditLogsPage from "./features/audit-logs/AuditLogsPage";
 import EventDetailPage from "./features/events/EventDetailPage";
 import EventFormPage from "./features/events/EventFormPage";
 import EventsPage from "./features/events/EventsPage";
+import ReviewWorkspacePage from "./features/reviews/ReviewWorkspacePage";
 import VisualAcuityStationPage from "./features/screening/VisualAcuityStationPage";
 import { AuditLogsPage as RegistrationAuditLogsPage } from "./pages/AdminPages";
 import {
@@ -69,7 +71,7 @@ export default function App() {
         <Route path="/events/:eventId/edit" element={<EventFormPage mode={"create"} />} />
         <Route path="/events/:eventId" element={<EventDetailPage />} />
         <Route path="/events/:eventId/stations/visual-acuity" element={<VisualAcuityStationPage />} />
-        
+
         {/* Live Queue Route Added */}
         <Route path="/events/:eventId/queue" element={<QueuePage />} />
 
@@ -93,6 +95,11 @@ export default function App() {
         {/* Admin Features */}
         <Route path="/admin/audit-logs" element={<AuditLogsPage />} />
         <Route path="/admin/system-audit-logs" element={<RegistrationAuditLogsPage />} />
+      </Route>
+
+      <Route element={<ProtectedRoute />}>
+        <Route path="/events/:eventId/reviews" element={<ReviewWorkspacePage />} />
+        <Route path="/events/:eventId/reviews/:registrationId" element={<ReviewWorkspacePage />} />
       </Route>
 
       {/* Fallback Catch-all Route */}
