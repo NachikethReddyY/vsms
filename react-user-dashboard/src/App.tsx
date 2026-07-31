@@ -77,6 +77,7 @@ export default function App() {
 
         {/* Participant & Registration Workflows */}
         <Route path="/participants" element={<ParticipantSearchPage />} />
+        <Route path="/participants/search" element={<ParticipantSearchPage />} />
         <Route path="/participants/new" element={<ParticipantCreatePage />} />
         <Route path="/participants/:participantId" element={<ParticipantDetailPage />} />
         <Route path="/participants/:participantId/edit" element={<ParticipantEditPage />} />
