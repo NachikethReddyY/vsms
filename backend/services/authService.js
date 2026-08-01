@@ -62,12 +62,12 @@ const signup = async ({ email, username, password, fullName, employeeNumber }) =
   try {
     const user = await prisma.$transaction(async (tx) => {
       const newUser = await tx.user.create({
-        data: { 
-          email, 
-          username, 
-          fullName, 
-          employeeNumber, 
-          status: "ACTIVE" 
+        data: {
+          email,
+          username,
+          fullName,
+          employeeNumber,
+          status: "ACTIVE"
         },
       });
 

@@ -1885,4 +1885,3 @@ ALTER TABLE ONLY public.sync_actions
 --
 
 \unrestrict NccOvwHfteJdxHfKlzxNgcSYNKizs8G9d4obdIQEn5FghhCTRdpfyvJFVvGX7AZ
-
