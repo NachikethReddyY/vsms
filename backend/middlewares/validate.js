@@ -13,7 +13,10 @@ const validate = (schemas) => (req, _res, next) => {
     next();
   } catch (error) {
     if (error.name === "ZodError") {
-      return next(new AppError(422, "VALIDATION_FAILED", "Request validation failed", error.issues.map((issue) => ({
+      // Diagnostic log to reveal the exact invalid field and rule violation
+      console.error("Zod Validation Failed:", JSON.stringify(error.issues, null, 2));
+
+      return next(new AppError(422, "VALIDATION_ERROR", "Request validation failed", error.issues.map((issue) => ({
         field: issue.path.join("."),
         message: issue.message,
       }))));

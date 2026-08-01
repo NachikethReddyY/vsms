@@ -1,19 +1,27 @@
-require("dotenv").config();
 const fs = require("fs");
 const https = require("https");
 const path = require("path");
-const env = require("./config/env");
 const app = require("./app");
+const env = require("./config/env");
+const logger = require("./utils/logger/logger");
 
 const server = !env.isProduction && env.localHttps
   ? https.createServer({
-    key: fs.readFileSync(path.resolve(__dirname, env.TLS_KEY_PATH)),
-    cert: fs.readFileSync(path.resolve(__dirname, env.TLS_CERT_PATH)),
-  }, app)
+      key: fs.readFileSync(path.resolve(__dirname, env.TLS_KEY_PATH)),
+      cert: fs.readFileSync(path.resolve(__dirname, env.TLS_CERT_PATH)),
+    }, app)
   : app;
 
-server.listen(env.PORT, "127.0.0.1", () => {
-  const scheme = !env.isProduction && env.localHttps ? "https" : "http";
-  const transport = env.isProduction ? " (private upstream; TLS must terminate at the configured proxy)" : "";
-  console.log(`VSMS API listening on ${scheme}://127.0.0.1:${env.PORT}${transport}`);
+server.on("error", (error) => {
+  logger.error("server.failed", { message: error.message, stack: error.stack });
+  process.exitCode = 1;
 });
+
+if (require.main === module) {
+  server.listen(env.PORT, env.HOST, () => {
+    const protocol = server instanceof https.Server ? "https" : "http";
+    logger.info(`Server running securely on ${protocol}://${env.HOST}:${env.PORT}`);
+  });
+}
+
+module.exports = server;

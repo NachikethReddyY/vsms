@@ -1,28 +1,41 @@
-import { Link, Navigate, Outlet, Route, Routes, useLocation } from 'react-router-dom';
-import LoginPage from './components/LoginPage';
-import { useAuth } from './auth/authState';
+import { Navigate, Outlet, Route, Routes } from 'react-router-dom';
+import { ProtectedRoute } from './auth/ProtectedRoute';
+import { RoleGuard } from './auth/RoleGuard';
 import AppShell from './components/AppShell';
-import EventFormPage from './features/events/EventFormPage';
-import EventDetailPage from './features/events/EventDetailPage';
 import LandingPage from './components/LandingPage';
-import SignUpPage from './components/SignUpPage';
 import QRCodePage from './components/qr/QRCodePage';
-import TestHomePage from './components/TestHomePage';
 import SettingsPage from './components/SettingsPage';
+import SignUpPage from './components/SignUpPage';
+import TestHomePage from './components/TestHomePage';
+import AuditLogsPage from './features/audit-logs/AuditLogsPage';
+import EventDetailPage from './features/events/EventDetailPage';
+import EventFormPage from './features/events/EventFormPage';
+import ReviewWorkspacePage from './features/reviews/ReviewWorkspacePage';
+import ColourVisionStationPage from './features/screening/ColourVisionStationPage';
+import RefractionStationPage from './features/screening/RefractionStationPage';
+import VisualAcuityStationPage from './features/screening/VisualAcuityStationPage';
+import { AuditLogsPage as RegistrationAuditLogsPage } from './pages/AdminPages';
+import { LoginPage } from './pages/AuthPages';
+import { QueuePage } from './pages/QueuePages';
+import {
+  ConsentPage,
+  EmergencyContactsPage,
+  EventRegistrationStartPage,
+  EventRegistrationsPage,
+  ParticipantConsentsPage,
+  ParticipantCreatePage,
+  ParticipantDetailPage,
+  ParticipantEditPage,
+  ParticipantHistoryPage,
+  ParticipantSearchPage,
+  RegistrationConfirmationPage,
+  RegistrationHistoryPage,
+  RegistrationQrPage,
+  RegistrationReviewPage,
+} from './pages/ParticipantPages';
 
-function ProtectedRoutes() {
-  const { user, isBootstrapping, bootstrapError, retrySession } = useAuth();
-  const location = useLocation();
-  if (isBootstrapping) return <main className="center-state" aria-live="polite"><span className="spinner" />Restoring your secure session…</main>;
-  if (bootstrapError) return <main className="center-state" role="alert"><p>{bootstrapError}</p><button className="primary" onClick={retrySession}>Try again</button></main>;
-  if (!user) return <Navigate to="/login" replace state={{ from: location }} />;
-  return <Outlet />;
-}
-
-function ManagerRoutes() {
-  const { user } = useAuth();
-  if (!user || !['ADMIN', 'EVENT_MANAGER'].includes(user.systemRole)) return <main className="center-state permission-state"><h1>Manager access required</h1><p>Your account can view assigned event work, but it cannot change event setup.</p><Link className="secondary" to="/events">Return to events</Link></main>;
-  return <Outlet />;
+function ShellRoutes() {
+  return <AppShell><Outlet /></AppShell>;
 }
 
 export default function App() {
@@ -31,19 +44,49 @@ export default function App() {
       <Route path="/" element={<LandingPage />} />
       <Route path="/login" element={<LoginPage />} />
       <Route path="/signup" element={<SignUpPage />} />
-      <Route element={<ProtectedRoutes />}>
+
+      <Route element={<ProtectedRoute />}>
         <Route path="/dashboard" element={<Navigate to="/events" replace />} />
         <Route path="/events" element={<TestHomePage />} />
-        <Route element={<AppShell><Outlet /></AppShell>}>
+
+        <Route element={<ShellRoutes />}>
           <Route path="/events/:eventId" element={<EventDetailPage />} />
+          <Route path="/events/:eventId/stations/visual-acuity" element={<VisualAcuityStationPage />} />
+          <Route path="/events/:eventId/stations/refraction" element={<RefractionStationPage />} />
+          <Route path="/events/:eventId/stations/colour-vision" element={<ColourVisionStationPage />} />
+          <Route path="/events/:eventId/queue" element={<QueuePage />} />
+          <Route path="/events/:eventId/reviews" element={<ReviewWorkspacePage />} />
+          <Route path="/events/:eventId/reviews/:registrationId" element={<ReviewWorkspacePage />} />
           <Route path="/qr-generator" element={<QRCodePage />} />
           <Route path="/settings" element={<SettingsPage />} />
-          <Route element={<ManagerRoutes />}>
+
+          <Route path="/participants" element={<ParticipantSearchPage />} />
+          <Route path="/participants/search" element={<ParticipantSearchPage />} />
+          <Route path="/participants/new" element={<ParticipantCreatePage />} />
+          <Route path="/participants/:participantId" element={<ParticipantDetailPage />} />
+          <Route path="/participants/:participantId/edit" element={<ParticipantEditPage />} />
+          <Route path="/participants/:participantId/history" element={<ParticipantHistoryPage />} />
+          <Route path="/participants/:participantId/consents" element={<ParticipantConsentsPage />} />
+          <Route path="/participants/:participantId/emergency-contacts" element={<EmergencyContactsPage />} />
+          <Route path="/events/:eventId/register" element={<EventRegistrationStartPage />} />
+          <Route path="/events/:eventId/registrations" element={<EventRegistrationsPage />} />
+          <Route path="/registrations/:registrationId/review" element={<RegistrationReviewPage />} />
+          <Route path="/registrations/:registrationId/consent" element={<ConsentPage />} />
+          <Route path="/registrations/:registrationId/confirmation" element={<RegistrationConfirmationPage />} />
+          <Route path="/registrations/:registrationId/history" element={<RegistrationHistoryPage />} />
+          <Route path="/registrations/:registrationId/qr" element={<RegistrationQrPage />} />
+
+          <Route element={<RoleGuard allowedRoles={['ADMINISTRATOR', 'EVENT_MANAGER']} />}>
             <Route path="/events/new" element={<EventFormPage mode="create" />} />
             <Route path="/events/:eventId/edit" element={<EventFormPage mode="edit" />} />
           </Route>
+          <Route element={<RoleGuard allowedRoles={['ADMINISTRATOR']} />}>
+            <Route path="/admin/audit-logs" element={<AuditLogsPage />} />
+            <Route path="/admin/system-audit-logs" element={<RegistrationAuditLogsPage />} />
+          </Route>
         </Route>
       </Route>
+
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   );

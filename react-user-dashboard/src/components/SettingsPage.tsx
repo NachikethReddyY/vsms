@@ -14,7 +14,7 @@ export default function SettingsPage() {
           <dl>
             <div><dt>Username</dt><dd>{user?.username}</dd></div>
             <div><dt>Email</dt><dd>{user?.email}</dd></div>
-            <div><dt>Role</dt><dd>{user?.systemRole.replace('_', ' ').toLowerCase()}</dd></div>
+            <div><dt>Role</dt><dd>{(user?.systemRole ?? 'STAFF').replace('_', ' ').toLowerCase()}</dd></div>
           </dl>
         </section>
         <section>

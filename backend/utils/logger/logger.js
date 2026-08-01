@@ -1,51 +1,31 @@
-const winston = require("winston");
-const WinstonCloudWatch = require("winston-cloudwatch");
+const fs = require("fs");
+const path = require("path");
+const env = require("../../config/env");
 
-const transports = [
-    new winston.transports.Console(),
+const levels = { debug: 10, info: 20, warn: 30, error: 40, silent: Infinity };
+const minimumLevel = env.LOG_LEVEL || (env.NODE_ENV === "test" ? "silent" : "info");
+const logDirectory = path.resolve(__dirname, "../../logs");
 
-    new winston.transports.File({
-        filename: "logs/error.log",
-        level: "error",
-    }),
+const append = (file, line) => {
+  fs.mkdirSync(logDirectory, { recursive: true });
+  fs.appendFileSync(path.join(logDirectory, file), `${line}\n`);
+};
 
-    new winston.transports.File({
-        filename: "logs/combined.log",
-    }),
-];
+const write = (level, message, context = {}) => {
+  if (levels[level] < levels[minimumLevel]) return;
+  const line = JSON.stringify({
+    ...context,
+    timestamp: new Date().toISOString(),
+    level,
+    message,
+  });
+  append("combined.log", line);
+  if (level === "error") append("error.log", line);
+};
 
-// Only enable CloudWatch if configured
-if (
-    process.env.AWS_REGION &&
-    process.env.CLOUDWATCH_LOG_GROUP &&
-    process.env.CLOUDWATCH_LOG_STREAM
-) {
-    transports.push(
-        new WinstonCloudWatch({
-            logGroupName: process.env.CLOUDWATCH_LOG_GROUP,
-            logStreamName: process.env.CLOUDWATCH_LOG_STREAM,
-            awsRegion: process.env.AWS_REGION,
-            jsonMessage: true,
-        })
-    );
-}
-
-const logger = winston.createLogger({
-    level: "info",
-
-    format: winston.format.combine(
-        winston.format.timestamp(),
-
-        winston.format.errors({
-            stack: true,
-        }),
-
-        winston.format.printf(({ timestamp, level, message, stack }) => {
-            return `${timestamp} [${level.toUpperCase()}] ${stack || message}`;
-        })
-    ),
-
-    transports,
-});
-
-module.exports = logger;
+module.exports = {
+  debug: (message, context) => write("debug", message, context),
+  info: (message, context) => write("info", message, context),
+  warn: (message, context) => write("warn", message, context),
+  error: (message, context) => write("error", message, context),
+};

@@ -1,48 +1,92 @@
 const prisma = require("../prisma/prismaClient");
 
+// ==========================================
+// Get All Users
+// ==========================================
 exports.getAll = async () => {
-    return prisma.user.findMany({
-        select: { userId: true, username: true, email: true, systemRole: true, status: true, createdAt: true },
-        take: 100,
-        orderBy: { createdAt: "desc" }
-    });
+  return await prisma.user.findMany({
+    select: {
+      id: true,
+      fullName: true,
+      email: true,
+      contactNumber: true,
+      employeeNumber: true,
+      department: true,
+      designation: true,
+      status: true,
+      createdAt: true,
+    },
+    take: 100,
+    orderBy: { createdAt: "desc" },
+  });
 };
 
+// ==========================================
+// Find User By Email
+// ==========================================
 exports.findByEmail = async (email) => {
-    return prisma.user.findUnique({
-        where: {
-            email: email
-        }
-    });
+  return await prisma.user.findUnique({
+    where: {
+      email: email,
+    },
+  });
 };
 
-exports.create = async (userData) => {
-    return prisma.user.create({
-        data: userData
-    });
-};
-
+// ==========================================
+// Find User By ID
+// ==========================================
 exports.findById = async (userId) => {
-    return prisma.user.findUnique({
-        where: {
-            userId: userId
-        }
-    });
+  return await prisma.user.findUnique({
+    where: {
+      id: userId,
+    },
+  });
 };
 
+// ==========================================
+// Create User
+// ==========================================
+exports.create = async (userData) => {
+  return await prisma.user.create({
+    data: {
+      fullName: userData.fullName,
+      email: userData.email,
+      contactNumber: userData.contactNumber,
+      employeeNumber: userData.employeeNumber,
+      department: userData.department,
+      designation: userData.designation,
+      status: userData.status || "ACTIVE",
+    },
+  });
+};
+
+// ==========================================
+// Update User
+// ==========================================
 exports.update = async (userId, userData) => {
-    return prisma.user.update({
-        where: {
-            userId: userId
-        },
-        data: userData
-    });
+  return await prisma.user.update({
+    where: {
+      id: userId,
+    },
+    data: userData,
+    select: {
+      id: true,
+      fullName: true,
+      email: true,
+      department: true,
+      designation: true,
+      status: true,
+    },
+  });
 };
 
+// ==========================================
+// Delete User
+// ==========================================
 exports.delete = async (userId) => {
-    return prisma.user.delete({
-        where: {
-            userId: userId
-        }
-    });
+  return await prisma.user.delete({
+    where: {
+      id: userId,
+    },
+  });
 };

@@ -1,33 +1,63 @@
-import { defineConfig } from 'vite'
+import { defineConfig, loadEnv } from 'vite'
 import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
 import fs from 'node:fs'
 
-export default defineConfig(({ command }) => {
-  // Certificates are local-only. Production builds must never depend on files
-  // that are intentionally excluded from source control.
-  const localHttps = command === 'serve' && process.env.DEV_HTTPS !== 'false'
+export default defineConfig(({ command, mode }) => {
+
+  const env = loadEnv(mode, process.cwd(), '')
+
+  const keyPath = "./certs/localhost-key.pem"
+  const certPath = "./certs/localhost.pem"
+
+
+  const localHttps =
+    command === "serve" &&
+    env.DEV_HTTPS === "true" &&
+    fs.existsSync(keyPath) &&
+    fs.existsSync(certPath)
 
   return {
-    plugins: [react(), tailwindcss()],
+
+    plugins: [
+      react(),
+      tailwindcss()
+    ],
+
+
     server: {
-      https: localHttps ? {
-        key: fs.readFileSync("./certs/localhost-key.pem"),
-        cert: fs.readFileSync("./certs/localhost.pem"),
-      } : undefined,
+
+      host: "0.0.0.0",
+
+      https: localHttps
+        ? {
+            key: fs.readFileSync(keyPath),
+            cert: fs.readFileSync(certPath),
+          }
+        : undefined,
+
+
       port: 5173,
+
       strictPort: true,
-      proxy: localHttps ? undefined : {
-        '/qa-api': {
-          target: 'https://127.0.0.1:5050',
-          secure: false,
+
+
+      proxy: {
+
+        "/api/v1": {
+
+          target: "http://127.0.0.1:5050",
+
           changeOrigin: true,
-          rewrite: (path) => path.replace(/^\/qa-api/, ''),
-          configure(proxy) {
-            proxy.on('proxyReq', (proxyRequest) => proxyRequest.setHeader('Origin', 'https://localhost:5173'))
-          },
-        },
-      },
-    },
+
+          secure: false
+
+        }
+
+      }
+
+    }
+
   }
+
 })

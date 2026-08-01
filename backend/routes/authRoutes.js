@@ -1,15 +1,16 @@
 const express = require("express");
-const router = express.Router();
-
-const authController = require("../controllers/authController.js");
-const asyncHandler = require("../utils/asyncHandler");
+const authController = require("../controllers/authController");
+const requireAuthentication = require("../middlewares/requireAuthentication");
 const validate = require("../middlewares/validate");
 const csrf = require("../middlewares/csrf");
-const { loginBody, signupBody } = require("../schemas/authSchemas");
+const { rateLimit } = require("../middlewares/security");
+const { loginBody } = require("../schemas/authSchemas");
 
-router.post("/signup", validate({ body: signupBody }), asyncHandler(authController.signup));
-router.post("/login", validate({ body: loginBody }), asyncHandler(authController.login));
-router.post("/refresh", csrf, asyncHandler(authController.refresh));
-router.post("/logout", csrf, asyncHandler(authController.logout));
+const router = express.Router();
+
+router.post("/login", rateLimit({ windowMs: 15 * 60_000, max: 10 }), validate({ body: loginBody }), authController.login);
+router.post("/refresh", rateLimit({ windowMs: 60_000, max: 30 }), csrf, authController.refresh);
+router.get("/me", requireAuthentication, authController.me);
+router.post("/logout", csrf, authController.logout);
 
 module.exports = router;

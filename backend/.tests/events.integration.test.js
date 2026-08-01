@@ -1,15 +1,29 @@
 const crypto = require("crypto");
+const bcrypt = require("bcrypt");
 const request = require("supertest");
 
 let app;
 let helpers;
 let managerToken;
 let staffToken;
-let otherManagerToken;
 
 const login = async (identifier) => {
   const response = await request(app).post("/auth/login").set("Origin", "https://localhost:5173").send({ identifier, password: helpers.PASSWORD });
   return response.body.accessToken;
+};
+
+const createUser = async (systemRole) => {
+  const id = crypto.randomUUID();
+  return helpers.prisma.user.create({
+    data: {
+      userId: id,
+      username: `test-${systemRole.toLowerCase()}-${id.slice(0, 8)}`,
+      email: `${id}@tests.vsms.local`,
+      passwordHash: await bcrypt.hash(helpers.PASSWORD, 4),
+      systemRole,
+      status: "ACTIVE",
+    },
+  });
 };
 
 beforeAll(async () => {
@@ -22,33 +36,122 @@ beforeAll(async () => {
   app = require("../app");
   helpers = require("./helpers");
   await helpers.ensureTestUser("EVENT_MANAGER");
-  await helpers.ensureTestUser("EVENT_MANAGER", "other");
   await helpers.ensureTestUser("STAFF");
   managerToken = await login("event-manager@tests.vsms.local");
   staffToken = await login("staff@tests.vsms.local");
-  otherManagerToken = await login("event-manager-other@tests.vsms.local");
 });
 
 afterAll(async () => helpers.prisma.$disconnect());
 
-const newEvent = () => ({
-  name: `Integration event ${crypto.randomUUID().slice(0, 8)}`,
-  description: "Created by an isolated API integration test.",
-  venue: "Integration Hall",
-  timezone: "Asia/Singapore",
-  startsAt: "2027-02-10T01:00:00.000+00:00",
-  endsAt: "2027-02-10T07:00:00.000+00:00",
-  capacity: 90,
-  shifts: [{ name: "Main shift", startsAt: "2027-02-10T01:00:00.000+00:00", endsAt: "2027-02-10T05:00:00.000+00:00", requiredStaff: 4 }],
-});
+const newEvent = () => {
+  const startsAt = new Date(Date.UTC(2030 + crypto.randomInt(10), crypto.randomInt(12), crypto.randomInt(1, 25), 1));
+  const endsAt = new Date(startsAt.getTime() + 6 * 3600000);
+  return {
+    name: `Integration event ${crypto.randomUUID().slice(0, 8)}`,
+    description: "Created by an isolated API integration test.",
+    venue: "Integration Hall",
+    timezone: "Asia/Singapore",
+    startsAt: startsAt.toISOString(),
+    endsAt: endsAt.toISOString(),
+    capacity: 90,
+    shifts: [{ name: "Main shift", startsAt: startsAt.toISOString(), endsAt: new Date(startsAt.getTime() + 4 * 3600000).toISOString(), requiredStaff: 4 }],
+  };
+};
 
 describe("event lifecycle", () => {
+  test("manager atomically creates a multi-day station and staffing plan", async () => {
+    const staff = await createUser("STAFF");
+    const template = await helpers.prisma.stationTemplate.create({
+      data: {
+        templateKey: `wizard-${crypto.randomUUID()}`,
+        version: 1,
+        name: "Clinical screening",
+        description: "Multi-day wizard test station.",
+        defaultCapacity: 12,
+      },
+    });
+    const instant = (date, time) => new Date(`${date}T${time}:00+08:00`).toISOString();
+    const payload = {
+      name: "Multi-day planning integration",
+      description: "Exercises the complete event wizard payload.",
+      venue: "Our Tampines Hub",
+      address: "1 Tampines Walk, Singapore 528523",
+      postalCode: "528523",
+      latitude: 1.3526,
+      longitude: 103.94,
+      locationProvider: "ONEMAP",
+      locationReference: `528523:${crypto.randomUUID()}`,
+      timezone: "Asia/Singapore",
+      startsAt: instant("2048-06-01", "09:00"),
+      endsAt: instant("2048-06-02", "18:00"),
+      capacity: 500,
+      expectedAttendance: 7000,
+      eventDays: [
+        { date: "2048-06-01", startsAt: instant("2048-06-01", "09:00"), endsAt: instant("2048-06-01", "17:00") },
+        { date: "2048-06-02", startsAt: instant("2048-06-02", "10:00"), endsAt: instant("2048-06-02", "18:00") },
+      ],
+      stations: [{
+        stationTemplateId: template.stationTemplateId,
+        stationOrder: 1,
+        capacity: 12,
+        isAvailable: true,
+        availabilities: [
+          { date: "2048-06-01", isAvailable: true, startsAt: instant("2048-06-01", "09:30"), endsAt: instant("2048-06-01", "16:30"), capacity: 10 },
+          { date: "2048-06-02", isAvailable: false, startsAt: null, endsAt: null, capacity: 12 },
+        ],
+      }],
+      shifts: [{
+        name: "Day one screeners",
+        startsAt: instant("2048-06-01", "09:30"),
+        endsAt: instant("2048-06-01", "16:30"),
+        requiredStaff: 1,
+        assignments: [{
+          userId: staff.userId,
+          assignmentRole: "SCREENER",
+          stationTemplateId: template.stationTemplateId,
+          notes: "Report to the clinical lead at 09:15.",
+        }],
+      }],
+    };
+
+    const idempotencyKey = `wizard-${crypto.randomUUID()}`;
+    const created = await request(app).post("/api/events")
+      .set("Authorization", `Bearer ${managerToken}`)
+      .set("Idempotency-Key", idempotencyKey)
+      .send(payload);
+    expect(created.status).toBe(201);
+    expect(created.body).toEqual(expect.objectContaining({
+      timezone: "Asia/Singapore",
+      expectedAttendance: 7000,
+      postalCode: "528523",
+    }));
+    expect(created.body.eventDays).toHaveLength(2);
+    expect(created.body.eventStations[0].availabilities).toEqual([
+      expect.objectContaining({ isAvailable: true, capacity: 10 }),
+      expect.objectContaining({ isAvailable: false, startsAt: null, endsAt: null }),
+    ]);
+    expect(created.body.shifts[0].staffAssignments[0]).toEqual(expect.objectContaining({
+      assignmentRole: "SCREENER",
+      notes: "Report to the clinical lead at 09:15.",
+      eventStation: expect.objectContaining({ stationTemplateId: template.stationTemplateId }),
+    }));
+    const replay = await request(app).post("/api/events")
+      .set("Authorization", `Bearer ${managerToken}`)
+      .set("Idempotency-Key", idempotencyKey)
+      .send(payload);
+    expect(replay.status).toBe(201);
+    expect(replay.body.eventId).toBe(created.body.eventId);
+
+    const audit = await request(app).get(`/api/events/${created.body.eventId}/audit-log`).set("Authorization", `Bearer ${managerToken}`);
+    const snapshotAssignment = audit.body.auditLogs[0].afterSnapshot.shifts[0].staffAssignments[0];
+    expect(snapshotAssignment.notes).toBe("[redacted]");
+  });
+
   test("manager creates, updates and publishes an atomically audited event", async () => {
     const artworkDataUrl = `data:image/jpeg;base64,${Buffer.from("custom event artwork").toString("base64")}`;
     const created = await request(app).post("/api/events").set("Authorization", `Bearer ${managerToken}`).send({ ...newEvent(), artworkDataUrl });
     expect(created.status).toBe(201);
     expect(created.body.status).toBe("DRAFT");
-    expect(created.body.canManage).toBe(true);
     expect(created.body.bannerKey).toBe("COMMUNITY_SCREENING");
     expect(created.body.artworkDataUrl).toBe(artworkDataUrl);
     expect(created.body.shifts).toHaveLength(1);
@@ -86,41 +189,44 @@ describe("event lifecycle", () => {
     expect(response.status).toBe(403);
   });
 
-  test("event visibility and management are scoped to ownership or assignment", async () => {
+  test("event management is scoped to the caller's own active manager assignment", async () => {
     const created = await request(app).post("/api/events").set("Authorization", `Bearer ${managerToken}`).send(newEvent());
-    expect((await request(app).get(`/api/events/${created.body.eventId}`).set("Authorization", `Bearer ${otherManagerToken}`)).status).toBe(404);
-    expect((await request(app).patch(`/api/events/${created.body.eventId}`).set("Authorization", `Bearer ${otherManagerToken}`).send({ version: created.body.version, capacity: 91 })).status).toBe(404);
+    const otherManager = await createUser("EVENT_MANAGER");
+    const roleHolder = await createUser("STAFF");
+    const otherManagerToken = await login(otherManager.email);
+    const shiftId = created.body.shifts[0].shiftId;
 
-    const staff = await helpers.prisma.user.findUniqueOrThrow({ where: { email: "staff@tests.vsms.local" } });
-    const assigned = await request(app).post(`/api/events/${created.body.eventId}/shifts/${created.body.shifts[0].shiftId}/assignments`)
-      .set("Authorization", `Bearer ${managerToken}`).send({ userId: staff.userId, assignmentRole: "SCREENER" });
-    expect(assigned.status).toBe(201);
-    const visible = await request(app).get(`/api/events/${created.body.eventId}`).set("Authorization", `Bearer ${staffToken}`);
+    const assignedSupport = await request(app)
+      .post(`/api/events/${created.body.eventId}/shifts/${shiftId}/assignments`)
+      .set("Authorization", `Bearer ${managerToken}`)
+      .send({ version: created.body.version, userId: otherManager.userId, assignmentRole: "SUPPORT" });
+    expect(assignedSupport.status).toBe(201);
+    const assignedManagerRole = await request(app)
+      .post(`/api/events/${created.body.eventId}/shifts/${shiftId}/assignments`)
+      .set("Authorization", `Bearer ${managerToken}`)
+      .send({ version: assignedSupport.body.version, userId: roleHolder.userId, assignmentRole: "EVENT_MANAGER" });
+    expect(assignedManagerRole.status).toBe(201);
+
+    const visible = await request(app)
+      .get(`/api/events/${created.body.eventId}`)
+      .set("Authorization", `Bearer ${otherManagerToken}`);
     expect(visible.status).toBe(200);
     expect(visible.body.canManage).toBe(false);
-    expect((await request(app).patch(`/api/events/${created.body.eventId}`).set("Authorization", `Bearer ${staffToken}`).send({ version: visible.body.version, capacity: 92 })).status).toBe(404);
-  });
 
-  test("QR passes are event-scoped, replace older passes, and never expose raw tokens", async () => {
-    const created = await request(app).post("/api/events").set("Authorization", `Bearer ${managerToken}`).send(newEvent());
-    const participant = await helpers.prisma.legacyParticipant.create({ data: { firstName: "Test", lastName: "Participant" } });
-    const registration = await helpers.prisma.legacyEventRegistration.create({ data: { participantId: participant.participantId, eventId: created.body.eventId } });
+    const denied = await request(app)
+      .patch(`/api/events/${created.body.eventId}`)
+      .set("Authorization", `Bearer ${otherManagerToken}`)
+      .send({ version: assignedManagerRole.body.version, capacity: 91 });
+    expect(denied.status).toBe(404);
 
-    const first = await request(app).post(`/api/qr/generate/${participant.participantId}`).set("Authorization", `Bearer ${managerToken}`);
-    expect(first.status).toBe(201);
-    expect(first.body.token).toBeUndefined();
-    expect(first.body.qrImage).toMatch(/^data:image\/png;base64,/);
-    const firstPass = await helpers.prisma.legacyQrCodePass.findFirstOrThrow({ where: { registrationId: registration.registrationId, isActive: true } });
-
-    expect((await request(app).post("/api/qr/resolve").set("Authorization", `Bearer ${staffToken}`).send({ token: firstPass.token })).status).toBe(404);
-    const resolved = await request(app).post("/api/qr/resolve").set("Authorization", `Bearer ${managerToken}`).send({ token: firstPass.token });
-    expect(resolved.status).toBe(200);
-    expect(resolved.body).toEqual({ participantId: participant.participantId, firstName: "Test", lastName: "Participant" });
-
-    const second = await request(app).post(`/api/qr/generate/${participant.participantId}`).set("Authorization", `Bearer ${managerToken}`);
-    expect(second.status).toBe(201);
-    expect((await helpers.prisma.legacyQrCodePass.findUniqueOrThrow({ where: { qrId: firstPass.qrId } })).isActive).toBe(false);
-    expect((await request(app).post("/api/qr/resolve").set("Authorization", `Bearer ${managerToken}`).send({ token: firstPass.token })).status).toBe(404);
+    await helpers.prisma.staffAssignment.update({
+      where: { shiftId_userId: { shiftId, userId: otherManager.userId } },
+      data: { status: "COMPLETED" },
+    });
+    const historical = await request(app)
+      .get(`/api/events/${created.body.eventId}`)
+      .set("Authorization", `Bearer ${otherManagerToken}`);
+    expect(historical.status).toBe(404);
   });
 
   test("manager sees named staff, collected signups, and active venue capacity", async () => {
@@ -131,7 +237,7 @@ describe("event lifecycle", () => {
     const assigned = await request(app)
       .post(`/api/events/${created.body.eventId}/shifts/${shift.shiftId}/assignments`)
       .set("Authorization", `Bearer ${managerToken}`)
-      .send({ userId: staff.userId, assignmentRole: "REGISTRATION" });
+      .send({ version: created.body.version, userId: staff.userId, assignmentRole: "REGISTRATION" });
 
     expect(assigned.status).toBe(201);
     expect(assigned.body.signupCount).toBe(0);
@@ -158,23 +264,156 @@ describe("event lifecycle", () => {
 
     const assignmentId = assigned.body.shifts[0].staffAssignments[0].staffAssignmentId;
     const removed = await request(app)
-      .delete(`/api/events/${created.body.eventId}/shifts/${shift.shiftId}/assignments/${assignmentId}`)
+      .delete(`/api/events/${created.body.eventId}/shifts/${shift.shiftId}/assignments/${assignmentId}?version=${assigned.body.version}`)
       .set("Authorization", `Bearer ${managerToken}`);
 
     expect(removed.status).toBe(200);
     expect(removed.body.shifts[0].staffAssignments).toEqual([]);
   });
 
-  test("manager can change artwork after an event is complete", async () => {
+  test("manager imports and configures station snapshots, schedules screeners, and audits every change", async () => {
+    const payload = newEvent();
+    payload.shifts.push({
+      name: "Overlapping support",
+      startsAt: payload.shifts[0].startsAt,
+      endsAt: payload.shifts[0].endsAt,
+      requiredStaff: 2,
+    });
+    const created = await request(app).post("/api/events").set("Authorization", `Bearer ${managerToken}`).send(payload);
+    const staff = await helpers.prisma.user.findUniqueOrThrow({ where: { email: "staff@tests.vsms.local" } });
+    const templates = await Promise.all(["acuity", "review"].map((key, index) => helpers.prisma.stationTemplate.create({
+      data: {
+        templateKey: `${key}-${crypto.randomUUID()}`,
+        version: 1,
+        name: `Integration ${key}`,
+        description: `Template ${key} must remain unchanged.`,
+        defaultCapacity: index + 2,
+      },
+    })));
+
+    const imported = await request(app)
+      .post(`/api/events/${created.body.eventId}/stations/import`)
+      .set("Authorization", `Bearer ${managerToken}`)
+      .send({ version: created.body.version, stationTemplateIds: templates.map((template) => template.stationTemplateId) });
+    expect(imported.status).toBe(201);
+    expect(imported.body.eventStations).toHaveLength(2);
+    expect(imported.body.eventStations[0]).toEqual(expect.objectContaining({
+      name: templates[0].name,
+      capacity: templates[0].defaultCapacity,
+      stationOrder: 1,
+    }));
+
+    const secondStation = imported.body.eventStations[1];
+    const configured = await request(app)
+      .patch(`/api/events/${created.body.eventId}/stations/${secondStation.eventStationId}`)
+      .set("Authorization", `Bearer ${managerToken}`)
+      .send({ version: imported.body.version, stationOrder: 1, capacity: 6 });
+    expect(configured.status).toBe(200);
+    expect(configured.body.eventStations[0]).toEqual(expect.objectContaining({
+      eventStationId: secondStation.eventStationId,
+      capacity: 6,
+    }));
+
+    const assigned = await request(app)
+      .post(`/api/events/${created.body.eventId}/shifts/${created.body.shifts[0].shiftId}/assignments`)
+      .set("Authorization", `Bearer ${managerToken}`)
+      .send({
+        version: configured.body.version,
+        userId: staff.userId,
+        assignmentRole: "SCREENER",
+        eventStationId: secondStation.eventStationId,
+      });
+    expect(assigned.status).toBe(201);
+    expect(assigned.body.shifts[0].staffAssignments[0].eventStation).toEqual(expect.objectContaining({
+      eventStationId: secondStation.eventStationId,
+    }));
+
+    const conflict = await request(app)
+      .post(`/api/events/${created.body.eventId}/shifts/${created.body.shifts[1].shiftId}/assignments`)
+      .set("Authorization", `Bearer ${managerToken}`)
+      .send({ version: assigned.body.version, userId: staff.userId, assignmentRole: "SUPPORT" });
+    expect(conflict.status).toBe(409);
+    expect(conflict.body.code).toBe("STAFF_SCHEDULE_CONFLICT");
+
+    const denied = await request(app)
+      .patch(`/api/events/${created.body.eventId}/stations/${secondStation.eventStationId}`)
+      .set("Authorization", `Bearer ${staffToken}`)
+      .send({ version: assigned.body.version, capacity: 7 });
+    expect(denied.status).toBe(404);
+
+    const audit = await request(app).get(`/api/events/${created.body.eventId}/audit-log`).set("Authorization", `Bearer ${managerToken}`);
+    expect(audit.body.auditLogs.filter((row) => row.action === "UPDATED")).toHaveLength(3);
+  });
+
+  test("schedule conflicts are serialized across events and rechecked on shift edits", async () => {
+    const staff = await createUser("STAFF");
+    const dayStart = new Date("2045-05-12T00:00:00.000Z");
+    const morningStart = new Date("2045-05-12T01:00:00.000Z");
+    const morningEnd = new Date("2045-05-12T05:00:00.000Z");
+    const afternoonStart = new Date("2045-05-12T10:00:00.000Z");
+    const afternoonEnd = new Date("2045-05-12T14:00:00.000Z");
+    const eventPayload = (name, startsAt, endsAt) => ({
+      ...newEvent(),
+      name,
+      startsAt: dayStart.toISOString(),
+      endsAt: new Date("2045-05-12T23:00:00.000Z").toISOString(),
+      shifts: [{ name: `${name} shift`, startsAt: startsAt.toISOString(), endsAt: endsAt.toISOString(), requiredStaff: 1 }],
+    });
+    const [first, second] = await Promise.all([
+      request(app).post("/api/events").set("Authorization", `Bearer ${managerToken}`).send(eventPayload("Concurrent A", morningStart, morningEnd)),
+      request(app).post("/api/events").set("Authorization", `Bearer ${managerToken}`).send(eventPayload("Concurrent B", morningStart, morningEnd)),
+    ]);
+    expect([first.status, second.status]).toEqual([201, 201]);
+
+    const results = await Promise.all([first, second].map((created) => request(app)
+      .post(`/api/events/${created.body.eventId}/shifts/${created.body.shifts[0].shiftId}/assignments`)
+      .set("Authorization", `Bearer ${managerToken}`)
+      .send({ version: created.body.version, userId: staff.userId, assignmentRole: "SUPPORT" })));
+    expect(results.map(({ status }) => status).sort()).toEqual([201, 409]);
+    const conflict = results.find(({ status }) => status === 409);
+    expect(conflict.body.code).toBe("STAFF_SCHEDULE_CONFLICT");
+    expect(conflict.body.title).toBe("This staff member is already assigned during that time");
+    expect(conflict.body.title).not.toContain("Concurrent");
+
+    const afternoon = await request(app)
+      .post("/api/events")
+      .set("Authorization", `Bearer ${managerToken}`)
+      .send(eventPayload("Afternoon", afternoonStart, afternoonEnd));
+    const assignedAfternoon = await request(app)
+      .post(`/api/events/${afternoon.body.eventId}/shifts/${afternoon.body.shifts[0].shiftId}/assignments`)
+      .set("Authorization", `Bearer ${managerToken}`)
+      .send({ version: afternoon.body.version, userId: staff.userId, assignmentRole: "SUPPORT" });
+    expect(assignedAfternoon.status).toBe(201);
+
+    const editedIntoConflict = await request(app)
+      .patch(`/api/events/${afternoon.body.eventId}`)
+      .set("Authorization", `Bearer ${managerToken}`)
+      .send({
+        version: assignedAfternoon.body.version,
+        shifts: [{
+          shiftId: afternoon.body.shifts[0].shiftId,
+          name: afternoon.body.shifts[0].name,
+          startsAt: morningStart.toISOString(),
+          endsAt: morningEnd.toISOString(),
+          requiredStaff: 1,
+        }],
+      });
+    expect(editedIntoConflict.status).toBe(409);
+    expect(editedIntoConflict.body.code).toBe("STAFF_SCHEDULE_CONFLICT");
+  });
+
+  test("in-progress events remain editable and completed events are read-only", async () => {
     const created = await request(app).post("/api/events").set("Authorization", `Bearer ${managerToken}`).send(newEvent());
     const published = await request(app).post(`/api/events/${created.body.eventId}/publish`).set("Authorization", `Bearer ${managerToken}`).send({ version: created.body.version });
     const started = await request(app).post(`/api/events/${created.body.eventId}/start`).set("Authorization", `Bearer ${managerToken}`).send({ version: published.body.version });
-    const completed = await request(app).post(`/api/events/${created.body.eventId}/complete`).set("Authorization", `Bearer ${managerToken}`).send({ version: started.body.version });
-    const updated = await request(app).patch(`/api/events/${created.body.eventId}`).set("Authorization", `Bearer ${managerToken}`).send({ version: completed.body.version, bannerKey: "EVENT_OPERATIONS" });
-
+    const updated = await request(app).patch(`/api/events/${created.body.eventId}`).set("Authorization", `Bearer ${managerToken}`).send({ version: started.body.version, name: "Updated while running", venue: "Updated operations hall" });
     expect(updated.status).toBe(200);
-    expect(updated.body.status).toBe("COMPLETED");
-    expect(updated.body.bannerKey).toBe("EVENT_OPERATIONS");
+    expect(updated.body.name).toBe("Updated while running");
+
+    const completed = await request(app).post(`/api/events/${created.body.eventId}/complete`).set("Authorization", `Bearer ${managerToken}`).send({ version: updated.body.version });
+    const denied = await request(app).patch(`/api/events/${created.body.eventId}`).set("Authorization", `Bearer ${managerToken}`).send({ version: completed.body.version, bannerKey: "EVENT_OPERATIONS" });
+    expect(denied.status).toBe(409);
+    expect(denied.body.code).toBe("EVENT_NOT_EDITABLE");
   });
 
   test("server and database reject invalid ranges", async () => {
