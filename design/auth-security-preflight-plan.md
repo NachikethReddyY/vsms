@@ -12,20 +12,19 @@ Require a validated session for every frontend route except `/`, `/login`, and `
 | `/login` | Public | Sign in | Clear validation, recovery from API errors, full deep-link return. |
 | `/signup` | Public | Staff sign-up | Match server policy and validation without revealing account details. |
 | `/events` | Authenticated | Event register | Real scoped event data, responsive navigation, loading/error/empty states. |
-| `/dashboard` | Authenticated | Workspace home | Replace placeholder styling/content with a truthful operational overview. |
 | `/events/new` | Authenticated; manager/admin action | Create event | Role-aware access, server-validated form, responsive draft workflow. |
 | `/events/:eventId` | Authenticated and event-scoped | Event detail | Ownership-aware data, lifecycle/staff actions, complete states. |
 | `/events/:eventId/edit` | Authenticated and manager-scoped | Edit event | Reuse the event form with scoped fetch/update and safe conflict handling. |
 | `/qr-generator` | Authenticated | QR lookup/generation | Validate identifiers/tokens, avoid participant data leakage, match the app shell. |
+| `/settings` | Authenticated | Account settings | Show account context and workspace appearance without exposing security controls. |
 
 Unrouted prototype components are not application pages. They will not be exposed or expanded as part of this pass.
 
 ## Private navigation and state rules
 
-- Dashboard, Events, and QR passes are the three discoverable private destinations on desktop, tablet, and phone. Event create/edit/detail remain contextual event actions.
+- Events and QR passes are the discoverable private destinations on desktop, tablet, and phone. Settings remains in the account menu; event create/edit/detail remain contextual event actions.
 - The Events register may retain its image-led header, but it must expose the same destinations, account action, focus behavior, and permission rules as `AppShell`.
 - Create and edit routes require `ADMIN` or `EVENT_MANAGER` before rendering. An authenticated `STAFF` user is returned to Events with a clear permission message; the API independently enforces the same boundary.
-- Dashboard uses the existing scoped event-list response only: next live/upcoming event, counts by state, and direct next actions. No invented clinical or sync analytics.
 - QR generation starts from a validated participant UUID entered by staff. It never displays a fabricated identity or the raw token; unknown, expired, and out-of-scope records use the same non-enumerating unavailable state.
 
 ## Route state matrix
@@ -33,7 +32,6 @@ Unrouted prototype components are not application pages. They will not be expose
 | Surface | Loading | Empty | Error/recovery | Permission/conflict |
 |---|---|---|---|---|
 | Auth bootstrap | Secure-session message | Anonymous redirect | Service retry | Expired session returns to login with full deep link. |
-| Dashboard | Event-summary skeleton | No assigned events + safe Events link | Retry | Data remains API-scoped. |
 | Events | Register skeleton | Distinct upcoming, past, and search copy | Retry/clear search | Create action only for manager/admin. |
 | Event detail | Detail skeleton | Not applicable | Blocking unavailable + return | Non-enumerating 404; stale actions reload current version. |
 | Create/edit | Form or blocking edit load | No shifts is valid | Field errors and retry/return | Route role guard; edit fetch failure never renders a blank editable form. |
@@ -65,7 +63,7 @@ All surfaces require visible keyboard focus, semantic labels, 44px operational t
 12. Enforce role gating in both the frontend route tree and the API. Hiding controls is only a UX aid; every sensitive event mutation remains server-authorized and event-scoped.
 13. Audit the mounted API surface for OWASP access control, authentication, CSRF/CORS, injection, file/data-URL handling, error disclosure, security headers, rate limits, secrets, dependency advisories, and audit logging. Do not claim that the application is absolutely secure; document tested controls and remaining operational requirements.
 14. Use `design/design.md` plus the shipped landing page as the visual authority for all routed React pages: warm neutral surfaces, restrained blue interactivity, semantic state colour, hairline structure, 44px operational targets, visible focus, reduced motion, and complete loading/empty/error/permission states.
-15. Replace the `/dashboard` placeholder with a compact real-data workspace summary, keep create/edit/detail/QR flows within the same app shell, and remove or leave unrouted prototypes dormant rather than inventing unsupported workflows.
+15. Retire the redundant `/dashboard` page, redirect old dashboard bookmarks to Events, and keep create/edit/detail/QR/settings flows within the same app shell.
 16. Run the Impeccable detector once after the implementation, inspect the complete path at desktop and phone sizes, fix one bounded batch of findings, and confirm once.
 
 ## Tradeoffs
@@ -73,7 +71,7 @@ All surfaces require visible keyboard focus, semantic labels, 44px operational t
 - Supporting two explicit development origins is a slightly larger local allowlist, but remains exact and matches the certificate SANs.
 - A CSRF cookie readable across the SPA has broader path exposure, but cookie paths are not a security boundary against same-origin script. The sensitive refresh token remains HttpOnly and `/auth`-scoped.
 - No new auth library, UI framework, database table, or frontend test dependency is introduced.
-- The dashboard will summarize already-available event data; no speculative analytics endpoint or card framework is added.
+- Events is the authenticated home; no speculative analytics endpoint or dashboard card framework is added.
 - The public landing page remains an isolated shipped document in an iframe. Shared visual rules are applied to routed React pages without rebuilding the landing page or coupling its CSS to the application bundle.
 
 ## Foundations

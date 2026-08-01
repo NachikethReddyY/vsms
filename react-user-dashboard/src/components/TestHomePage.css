@@ -365,8 +365,8 @@
   padding-bottom:1px;
 }
 
-.reference-events .reference-team span,
-.reference-events .reference-team small {
+.reference-events .reference-team-avatar,
+.reference-events .reference-team-more {
   width:28px;
   height:28px;
   display:grid;
@@ -379,12 +379,23 @@
   font-weight:750;
 }
 
-.reference-events .reference-team span:first-child { margin-left:0; }
+.reference-events .reference-team-avatar:first-child { margin-left:0; }
 .reference-events .reference-team .team-1 { background:#285f9f; }
 .reference-events .reference-team .team-2 { background:#a4563f; }
 .reference-events .reference-team .team-3 { background:#b38a4e; color:#0b0b0d; }
 .reference-events .reference-team .team-4 { background:#4d5661; }
-.reference-events .reference-team small { background:#38393d; }
+.reference-events .reference-team-more { background:#38393d; }
+.reference-events .reference-team.empty { gap:6px; color:var(--ink-2); }
+.reference-events .reference-team-empty-icon {
+  width:28px;
+  height:28px;
+  display:grid;
+  place-items:center;
+  border:1px solid rgba(241,242,243,.18);
+  border-radius:50%;
+}
+.reference-events .reference-team-empty-icon svg { width:14px; height:14px; }
+.reference-events .reference-team em { font-size:10px; font-style:normal; }
 
 .reference-events .test-register-state {
   grid-column:2;
@@ -547,14 +558,17 @@
     margin-top:auto;
     padding-bottom:0;
   }
-  .reference-events .reference-team span,
-  .reference-events .reference-team small {
+  .reference-events .reference-team-avatar,
+  .reference-events .reference-team-more,
+  .reference-events .reference-team-empty-icon {
     width:23px;
     height:23px;
     margin-left:-6px;
     border-width:1.5px;
     font-size:7px;
   }
+  .reference-events .reference-team em { font-size:9px; }
+  .reference-events .reference-team.empty .reference-team-empty-icon { margin-left:0; }
 
   .reference-events .test-register-state {
     position:absolute;

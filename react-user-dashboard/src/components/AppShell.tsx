@@ -1,4 +1,4 @@
-import { CalendarDaysIcon, ChevronLeftIcon, HomeIcon, MagnifyingGlassIcon, PlusIcon, QrCodeIcon, SignalIcon } from '@heroicons/react/24/outline';
+import { CalendarDaysIcon, ChevronLeftIcon, MagnifyingGlassIcon, PlusIcon, QrCodeIcon, SignalIcon } from '@heroicons/react/24/outline';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { NavLink, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../auth/authState';
@@ -15,14 +15,12 @@ export default function AppShell({ children }: { children: ReactNode }) {
   const canCreate = user?.systemRole === 'ADMIN' || user?.systemRole === 'EVENT_MANAGER';
   const mobileTitle = location.pathname === '/events/new'
     ? 'Create event'
-    : location.pathname === '/dashboard'
-      ? 'Dashboard'
-      : location.pathname === '/qr-generator'
-        ? 'QR passes'
-        : location.pathname === '/settings'
-          ? 'Settings'
+    : location.pathname === '/qr-generator'
+      ? 'QR passes'
+      : location.pathname === '/settings'
+        ? 'Settings'
         : /\/events\/[^/]+\/edit$/.test(location.pathname)
-          ? 'Edit event'
+        ? 'Edit event'
     : /^\/events\/[^/]+$/.test(location.pathname)
       ? 'Event details'
       : 'Events';
@@ -44,9 +42,6 @@ export default function AppShell({ children }: { children: ReactNode }) {
       {!isCreateEventPage && <aside className="sidebar" aria-label="Primary navigation">
         <div className="brand"><span aria-hidden="true">V</span><strong>VSMS</strong></div>
         <nav className="nav-list">
-          <NavLink to="/dashboard" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}>
-            <HomeIcon /><span>Dashboard</span>
-          </NavLink>
           <NavLink to="/events" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}>
             <CalendarDaysIcon /><span>Events</span>
           </NavLink>
@@ -75,9 +70,6 @@ export default function AppShell({ children }: { children: ReactNode }) {
         <main className="workspace" id="main-content" ref={workspaceRef}>{children}</main>
       </div>
       {!isCreateEventPage && <nav className="app-mobile-nav" aria-label="Mobile navigation">
-        <NavLink to="/dashboard" className={({ isActive }) => isActive ? 'active' : ''}>
-          <HomeIcon /><span>Dashboard</span>
-        </NavLink>
         <NavLink to="/events" className={({ isActive }) => isActive ? 'active' : ''}>
           <CalendarDaysIcon /><span>Events</span>
         </NavLink>
