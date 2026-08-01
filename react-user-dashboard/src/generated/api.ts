@@ -283,6 +283,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/qr/generate/{participantId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Replace and generate a QR pass for an authorized event participant */
+        post: operations["generateParticipantQrPass"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/qr/resolve": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Resolve an unexpired QR token within the caller's assigned event scope */
+        post: operations["resolveParticipantQrPass"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -428,6 +462,8 @@ export interface components {
             signupCount: number;
             /** @description Number of signed-up or checked-in registrations not marked completed or cancelled */
             activeCapacityCount: number;
+            /** @description Server-derived ownership or event-manager capability for this caller */
+            canManage: boolean;
             createdBy?: components["schemas"]["User"];
             cancelledBy?: components["schemas"]["User"] | null;
         };
@@ -459,6 +495,22 @@ export interface components {
         AuditListResponse: {
             auditLogs: components["schemas"]["EventAuditLog"][];
             nextCursor: string | null;
+        };
+        QrResolveRequest: {
+            token: string;
+        };
+        QrPassResponse: {
+            /** @enum {boolean} */
+            success: true;
+            /** Format: date-time */
+            expiresAt: string;
+            qrImage: string;
+        };
+        QrParticipant: {
+            /** Format: uuid */
+            participantId: string;
+            firstName: string;
+            lastName: string;
         };
         Problem: {
             /** Format: uri */
@@ -1024,6 +1076,60 @@ export interface operations {
             };
             401: components["responses"]["Unauthorized"];
             404: components["responses"]["NotFound"];
+        };
+    };
+    generateParticipantQrPass: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                participantId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The previous active pass was revoked and a new pass was generated */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["QrPassResponse"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+            422: components["responses"]["ValidationFailed"];
+            429: components["responses"]["RateLimited"];
+        };
+    };
+    resolveParticipantQrPass: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["QrResolveRequest"];
+            };
+        };
+        responses: {
+            /** @description Minimal participant identity for the authorized event */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["QrParticipant"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+            422: components["responses"]["ValidationFailed"];
+            429: components["responses"]["RateLimited"];
         };
     };
 }

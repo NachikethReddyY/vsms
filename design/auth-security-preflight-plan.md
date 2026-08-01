@@ -1,14 +1,51 @@
-# Auth and route-protection plan
+# Whole-application security and design plan
 
 ## Goal
 
-Require a validated session for every frontend route except `/`, `/login`, and `/signup`; restore sessions safely after reload; and make local HTTPS login work from both `localhost` and `127.0.0.1` without weakening the production origin boundary.
+Require a validated session for every frontend route except `/`, `/login`, and `/signup`; restore sessions safely after reload; make local HTTPS login work from both `localhost` and `127.0.0.1` without weakening the production origin boundary; and bring every routed page into the operational design system defined by `design/design.md` and the shipped landing page.
+
+## Routed page inventory
+
+| Route | Access | Surface | Required outcome |
+|---|---|---|---|
+| `/` | Public | Landing page | Keep the shipped visual world and working sign-in path. |
+| `/login` | Public | Sign in | Clear validation, recovery from API errors, full deep-link return. |
+| `/signup` | Public | Staff sign-up | Match server policy and validation without revealing account details. |
+| `/events` | Authenticated | Event register | Real scoped event data, responsive navigation, loading/error/empty states. |
+| `/dashboard` | Authenticated | Workspace home | Replace placeholder styling/content with a truthful operational overview. |
+| `/events/new` | Authenticated; manager/admin action | Create event | Role-aware access, server-validated form, responsive draft workflow. |
+| `/events/:eventId` | Authenticated and event-scoped | Event detail | Ownership-aware data, lifecycle/staff actions, complete states. |
+| `/events/:eventId/edit` | Authenticated and manager-scoped | Edit event | Reuse the event form with scoped fetch/update and safe conflict handling. |
+| `/qr-generator` | Authenticated | QR lookup/generation | Validate identifiers/tokens, avoid participant data leakage, match the app shell. |
+
+Unrouted prototype components are not application pages. They will not be exposed or expanded as part of this pass.
+
+## Private navigation and state rules
+
+- Dashboard, Events, and QR passes are the three discoverable private destinations on desktop, tablet, and phone. Event create/edit/detail remain contextual event actions.
+- The Events register may retain its image-led header, but it must expose the same destinations, account action, focus behavior, and permission rules as `AppShell`.
+- Create and edit routes require `ADMIN` or `EVENT_MANAGER` before rendering. An authenticated `STAFF` user is returned to Events with a clear permission message; the API independently enforces the same boundary.
+- Dashboard uses the existing scoped event-list response only: next live/upcoming event, counts by state, and direct next actions. No invented clinical or sync analytics.
+- QR generation starts from a validated participant UUID entered by staff. It never displays a fabricated identity or the raw token; unknown, expired, and out-of-scope records use the same non-enumerating unavailable state.
+
+## Route state matrix
+
+| Surface | Loading | Empty | Error/recovery | Permission/conflict |
+|---|---|---|---|---|
+| Auth bootstrap | Secure-session message | Anonymous redirect | Service retry | Expired session returns to login with full deep link. |
+| Dashboard | Event-summary skeleton | No assigned events + safe Events link | Retry | Data remains API-scoped. |
+| Events | Register skeleton | Distinct upcoming, past, and search copy | Retry/clear search | Create action only for manager/admin. |
+| Event detail | Detail skeleton | Not applicable | Blocking unavailable + return | Non-enumerating 404; stale actions reload current version. |
+| Create/edit | Form or blocking edit load | No shifts is valid | Field errors and retry/return | Route role guard; edit fetch failure never renders a blank editable form. |
+| QR passes | Idle lookup form | No pass generated | Invalid/not found/expired/out-of-scope + retry | API verifies event assignment before generation or lookup. |
+
+All surfaces require visible keyboard focus, semantic labels, 44px operational targets, reduced-motion support, no horizontal overflow, and checks at phone, tablet, and wide desktop sizes. Offline/sync states are not fabricated on routes whose APIs do not yet implement offline storage; those capabilities remain documented product requirements rather than false UI.
 
 ## Confirmed evidence
 
-- `react-user-dashboard/src/App.tsx` exposes `/events` outside `ProtectedRoutes`.
-- A login from `https://127.0.0.1:5173` sends an OPTIONS request to `https://localhost:5050/auth/login`; the API returns 403 because its exact origin allowlist only contains `https://localhost:5173`.
-- `vsms_csrf` is scoped to `/auth`, so `AuthProvider` cannot read it from application routes after a reload.
+- The prior pass moved `/events` behind `ProtectedRoutes`; this pass verifies the complete route matrix and adds explicit role-aware action guards.
+- The prior pass aligned the browser API host and exact development CORS allowlist for both `localhost` and `127.0.0.1`; integration and browser checks must preserve that fix.
+- The prior pass moved only the readable CSRF cookie to `/` and added single-flight refresh; the refresh cookie remains HttpOnly and scoped to `/auth`.
 - API event, user, and QR routes already authenticate on the server. Frontend route protection is an additional navigation/privacy boundary, not a replacement for API authorization.
 - Access JWT verification already pins HS256, issuer, audience, expiry, token type, subject, and current active-user status. Refresh tokens are opaque, hashed in PostgreSQL, rotated once, family-revoked on reuse, Secure, HttpOnly, and SameSite=Strict.
 
@@ -25,12 +62,19 @@ Require a validated session for every frontend route except `/`, `/login`, and `
 9. Apply the existing Zod request-validation middleware to QR route parameters.
 10. Add backend integration assertions for both allowed local origins, rejection of an unlisted origin, independent refresh/CSRF cookie attributes, malformed QR parameters, unauthenticated event reads and writes, and rejected JWT claims.
 11. Verify the complete route matrix in the browser: no private-content flash, full deep-link return, reload restoration, service-unavailable retry, logout/session expiry, and consistent desktop/phone behavior on both local hostnames.
+12. Enforce role gating in both the frontend route tree and the API. Hiding controls is only a UX aid; every sensitive event mutation remains server-authorized and event-scoped.
+13. Audit the mounted API surface for OWASP access control, authentication, CSRF/CORS, injection, file/data-URL handling, error disclosure, security headers, rate limits, secrets, dependency advisories, and audit logging. Do not claim that the application is absolutely secure; document tested controls and remaining operational requirements.
+14. Use `design/design.md` plus the shipped landing page as the visual authority for all routed React pages: warm neutral surfaces, restrained blue interactivity, semantic state colour, hairline structure, 44px operational targets, visible focus, reduced motion, and complete loading/empty/error/permission states.
+15. Replace the `/dashboard` placeholder with a compact real-data workspace summary, keep create/edit/detail/QR flows within the same app shell, and remove or leave unrouted prototypes dormant rather than inventing unsupported workflows.
+16. Run the Impeccable detector once after the implementation, inspect the complete path at desktop and phone sizes, fix one bounded batch of findings, and confirm once.
 
 ## Tradeoffs
 
 - Supporting two explicit development origins is a slightly larger local allowlist, but remains exact and matches the certificate SANs.
 - A CSRF cookie readable across the SPA has broader path exposure, but cookie paths are not a security boundary against same-origin script. The sensitive refresh token remains HttpOnly and `/auth`-scoped.
 - No new auth library, UI framework, database table, or frontend test dependency is introduced.
+- The dashboard will summarize already-available event data; no speculative analytics endpoint or card framework is added.
+- The public landing page remains an isolated shipped document in an iframe. Shared visual rules are applied to routed React pages without rebuilding the landing page or coupling its CSS to the application bundle.
 
 ## Foundations
 

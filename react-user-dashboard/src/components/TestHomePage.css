@@ -28,7 +28,7 @@
 }
 .reference-events .test-brand-mark svg { width:24px; height:24px; }
 
-.reference-events .reference-header-nav { display:flex; align-items:center; margin-left:-20px; }
+.reference-events .reference-header-nav { display:flex; align-items:center; gap:20px; margin-left:-20px; }
 .reference-events .reference-header-nav a {
   min-height:44px;
   display:flex;

@@ -4,9 +4,10 @@ const prisma = require("../prisma/prismaClient");
 
 const PASSWORD = "Test-Only-Secure-Password-2026!";
 
-const ensureTestUser = async (systemRole = "EVENT_MANAGER") => {
-  const email = `${systemRole.toLowerCase().replaceAll("_", "-")}@tests.vsms.local`;
-  const username = `test-${systemRole.toLowerCase().replaceAll("_", "-")}`;
+const ensureTestUser = async (systemRole = "EVENT_MANAGER", suffix = "") => {
+  const key = `${systemRole.toLowerCase().replaceAll("_", "-")}${suffix ? `-${suffix}` : ""}`;
+  const email = `${key}@tests.vsms.local`;
+  const username = `test-${key}`;
   return prisma.user.upsert({
     where: { email },
     update: { username, passwordHash: await bcrypt.hash(PASSWORD, 4), systemRole, status: "ACTIVE", failedLoginAttempts: 0, lockedUntil: null },

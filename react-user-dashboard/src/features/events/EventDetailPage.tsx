@@ -155,7 +155,7 @@ export default function EventDetailPage() {
   if (!event || !dateParts) return <div className="center-state error-state"><h1>Event unavailable</h1><p>{error}</p><Link className="secondary" to="/events">Return to events</Link></div>;
 
   const terminal = event.status === 'COMPLETED' || event.status === 'CANCELLED';
-  const canManage = user?.systemRole === 'ADMIN' || user?.systemRole === 'EVENT_MANAGER';
+  const canManage = event.canManage;
   const canCancel = canManage && !terminal && (event.status !== 'IN_PROGRESS' || user?.systemRole === 'ADMIN');
   const activeStage = lifecycleStages.findIndex((stage) => stage.status === event.status);
   const totalRequiredStaff = event.shifts.reduce((total, shift) => total + shift.requiredStaff, 0);

@@ -5,6 +5,7 @@ let app;
 let helpers;
 let managerToken;
 let staffToken;
+let otherManagerToken;
 
 const login = async (identifier) => {
   const response = await request(app).post("/auth/login").set("Origin", "https://localhost:5173").send({ identifier, password: helpers.PASSWORD });
@@ -21,9 +22,11 @@ beforeAll(async () => {
   app = require("../app");
   helpers = require("./helpers");
   await helpers.ensureTestUser("EVENT_MANAGER");
+  await helpers.ensureTestUser("EVENT_MANAGER", "other");
   await helpers.ensureTestUser("STAFF");
   managerToken = await login("event-manager@tests.vsms.local");
   staffToken = await login("staff@tests.vsms.local");
+  otherManagerToken = await login("event-manager-other@tests.vsms.local");
 });
 
 afterAll(async () => helpers.prisma.$disconnect());
@@ -45,6 +48,7 @@ describe("event lifecycle", () => {
     const created = await request(app).post("/api/events").set("Authorization", `Bearer ${managerToken}`).send({ ...newEvent(), artworkDataUrl });
     expect(created.status).toBe(201);
     expect(created.body.status).toBe("DRAFT");
+    expect(created.body.canManage).toBe(true);
     expect(created.body.bannerKey).toBe("COMMUNITY_SCREENING");
     expect(created.body.artworkDataUrl).toBe(artworkDataUrl);
     expect(created.body.shifts).toHaveLength(1);
@@ -80,6 +84,43 @@ describe("event lifecycle", () => {
   test("staff cannot create events", async () => {
     const response = await request(app).post("/api/events").set("Authorization", `Bearer ${staffToken}`).send(newEvent());
     expect(response.status).toBe(403);
+  });
+
+  test("event visibility and management are scoped to ownership or assignment", async () => {
+    const created = await request(app).post("/api/events").set("Authorization", `Bearer ${managerToken}`).send(newEvent());
+    expect((await request(app).get(`/api/events/${created.body.eventId}`).set("Authorization", `Bearer ${otherManagerToken}`)).status).toBe(404);
+    expect((await request(app).patch(`/api/events/${created.body.eventId}`).set("Authorization", `Bearer ${otherManagerToken}`).send({ version: created.body.version, capacity: 91 })).status).toBe(404);
+
+    const staff = await helpers.prisma.user.findUniqueOrThrow({ where: { email: "staff@tests.vsms.local" } });
+    const assigned = await request(app).post(`/api/events/${created.body.eventId}/shifts/${created.body.shifts[0].shiftId}/assignments`)
+      .set("Authorization", `Bearer ${managerToken}`).send({ userId: staff.userId, assignmentRole: "SCREENER" });
+    expect(assigned.status).toBe(201);
+    const visible = await request(app).get(`/api/events/${created.body.eventId}`).set("Authorization", `Bearer ${staffToken}`);
+    expect(visible.status).toBe(200);
+    expect(visible.body.canManage).toBe(false);
+    expect((await request(app).patch(`/api/events/${created.body.eventId}`).set("Authorization", `Bearer ${staffToken}`).send({ version: visible.body.version, capacity: 92 })).status).toBe(404);
+  });
+
+  test("QR passes are event-scoped, replace older passes, and never expose raw tokens", async () => {
+    const created = await request(app).post("/api/events").set("Authorization", `Bearer ${managerToken}`).send(newEvent());
+    const participant = await helpers.prisma.legacyParticipant.create({ data: { firstName: "Test", lastName: "Participant" } });
+    const registration = await helpers.prisma.legacyEventRegistration.create({ data: { participantId: participant.participantId, eventId: created.body.eventId } });
+
+    const first = await request(app).post(`/api/qr/generate/${participant.participantId}`).set("Authorization", `Bearer ${managerToken}`);
+    expect(first.status).toBe(201);
+    expect(first.body.token).toBeUndefined();
+    expect(first.body.qrImage).toMatch(/^data:image\/png;base64,/);
+    const firstPass = await helpers.prisma.legacyQrCodePass.findFirstOrThrow({ where: { registrationId: registration.registrationId, isActive: true } });
+
+    expect((await request(app).post("/api/qr/resolve").set("Authorization", `Bearer ${staffToken}`).send({ token: firstPass.token })).status).toBe(404);
+    const resolved = await request(app).post("/api/qr/resolve").set("Authorization", `Bearer ${managerToken}`).send({ token: firstPass.token });
+    expect(resolved.status).toBe(200);
+    expect(resolved.body).toEqual({ participantId: participant.participantId, firstName: "Test", lastName: "Participant" });
+
+    const second = await request(app).post(`/api/qr/generate/${participant.participantId}`).set("Authorization", `Bearer ${managerToken}`);
+    expect(second.status).toBe(201);
+    expect((await helpers.prisma.legacyQrCodePass.findUniqueOrThrow({ where: { qrId: firstPass.qrId } })).isActive).toBe(false);
+    expect((await request(app).post("/api/qr/resolve").set("Authorization", `Bearer ${managerToken}`).send({ token: firstPass.token })).status).toBe(404);
   });
 
   test("manager sees named staff, collected signups, and active venue capacity", async () => {

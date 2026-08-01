@@ -32,18 +32,28 @@ const eventInclude = {
   },
   createdBy: { select: { userId: true, username: true, email: true, systemRole: true, status: true } },
   cancelledBy: { select: { userId: true, username: true, email: true, systemRole: true, status: true } },
-  registrations: {
-    where: { status: { in: ["SIGNED_UP", "CHECKED_IN"] } },
-    select: { registrationId: true },
-  },
   _count: { select: { registrations: true } },
 };
 
-const toEventResponse = ({ _count, registrations, ...event }) => ({
+const toEventResponse = ({ _count, ...event }, user, activeCapacityCount = 0) => ({
   ...event,
   signupCount: _count.registrations,
-  activeCapacityCount: registrations.length,
+  activeCapacityCount,
+  canManage: canManage(event, user),
 });
+
+const toEventResponses = async (events, user, client = prisma) => {
+  const eventIds = events.map((event) => event.eventId);
+  const counts = eventIds.length ? await client.eventRegistration.groupBy({
+    by: ["eventId"],
+    where: { eventId: { in: eventIds }, status: { in: ["SIGNED_UP", "CHECKED_IN"] } },
+    _count: { _all: true },
+  }) : [];
+  const activeByEvent = new Map(counts.map((row) => [row.eventId, row._count._all]));
+  return events.map((event) => toEventResponse(event, user, activeByEvent.get(event.eventId) || 0));
+};
+
+const toEventResponseWithCounts = async (event, user, client = prisma) => (await toEventResponses([event], user, client))[0];
 
 const visibilityWhere = (user) => {
   if (user.systemRole === "ADMIN") return {};
@@ -119,7 +129,7 @@ const createEvent = async (body, user, correlationId) => {
   await tx.eventAuditLog.create({
     data: { eventId: event.eventId, actorUserId: user.userId, action: "CREATED", afterSnapshot: snapshot(event), correlationId },
   });
-    return toEventResponse(event);
+    return toEventResponseWithCounts(event, user, tx);
   });
 };
 
@@ -143,12 +153,12 @@ const listEvents = async (query, user) => {
   const events = hasMore ? rows.slice(0, query.limit) : rows;
   const last = events.at(-1);
   return {
-    events: events.map(toEventResponse),
+    events: await toEventResponses(events, user),
     nextCursor: hasMore && last ? encodeCursor({ scope, startsAt: last.startsAt.toISOString(), eventId: last.eventId }) : null,
   };
 };
 
-const getEvent = async (eventId, user) => toEventResponse(await requireEvent(eventId, user));
+const getEvent = async (eventId, user) => toEventResponseWithCounts(await requireEvent(eventId, user), user);
 
 const allowedUpdateKeys = {
   DRAFT: new Set(["name", "description", "bannerKey", "artworkDataUrl", "venue", "timezone", "startsAt", "endsAt", "capacity", "shifts"]),
@@ -200,7 +210,7 @@ const updateEvent = async (eventId, body, user, correlationId) => {
     await tx.eventAuditLog.create({
       data: { eventId, actorUserId: user.userId, action: "UPDATED", beforeSnapshot: snapshot(current), afterSnapshot: snapshot(updated), correlationId },
     });
-    return toEventResponse(updated);
+    return toEventResponseWithCounts(updated, user, tx);
   });
 };
 
@@ -223,7 +233,7 @@ const transitionEvent = async (eventId, command, body, user, correlationId) => {
     }
     const updated = await tx.event.findUniqueOrThrow({ where: { eventId }, include: eventInclude });
     await tx.eventAuditLog.create({ data: { eventId, actorUserId: user.userId, action: transition.audit, beforeSnapshot: snapshot(current), afterSnapshot: snapshot(updated), correlationId } });
-    return toEventResponse(updated);
+    return toEventResponseWithCounts(updated, user, tx);
   });
 };
 
@@ -241,7 +251,7 @@ const cancelEvent = async (eventId, body, user, correlationId) => {
     await tx.shift.updateMany({ where: { eventId, status: { in: ["PLANNED", "ACTIVE"] } }, data: { status: "CANCELLED" } });
     const updated = await tx.event.findUniqueOrThrow({ where: { eventId }, include: eventInclude });
     await tx.eventAuditLog.create({ data: { eventId, actorUserId: user.userId, action: "CANCELLED", beforeSnapshot: snapshot(current), afterSnapshot: snapshot(updated), correlationId } });
-    return toEventResponse(updated);
+    return toEventResponseWithCounts(updated, user, tx);
   });
 };
 
@@ -271,7 +281,7 @@ const addStaffAssignment = async (eventId, shiftId, body, user) => {
       data: { shiftId, userId: body.userId, assignmentRole: body.assignmentRole, assignedByUserId: user.userId },
     });
   }
-  return toEventResponse(await prisma.event.findUniqueOrThrow({ where: { eventId }, include: eventInclude }));
+  return toEventResponseWithCounts(await prisma.event.findUniqueOrThrow({ where: { eventId }, include: eventInclude }), user);
 };
 
 const removeStaffAssignment = async (eventId, shiftId, assignmentId, user) => {
@@ -282,7 +292,7 @@ const removeStaffAssignment = async (eventId, shiftId, assignmentId, user) => {
   });
   if (!assignment) throw new AppError(404, "ASSIGNMENT_NOT_FOUND", "Staff assignment was not found");
   await prisma.staffAssignment.delete({ where: { staffAssignmentId: assignmentId } });
-  return toEventResponse(await prisma.event.findUniqueOrThrow({ where: { eventId }, include: eventInclude }));
+  return toEventResponseWithCounts(await prisma.event.findUniqueOrThrow({ where: { eventId }, include: eventInclude }), user);
 };
 
 const getAuditLog = async (eventId, query, user) => {

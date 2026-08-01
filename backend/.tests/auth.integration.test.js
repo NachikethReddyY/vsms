@@ -99,7 +99,7 @@ describe("authentication boundary", () => {
     expect(rejected.status).toBe(403);
   });
 
-  test("event APIs reject anonymous and incorrectly scoped JWT requests", async () => {
+  test("event APIs reject anonymous and invalid JWT claims", async () => {
     expect((await request(app).get("/api/events")).status).toBe(401);
     expect((await request(app).post("/api/events").send({})).status).toBe(401);
 
@@ -112,6 +112,25 @@ describe("authentication boundary", () => {
       expiresIn: "15m",
     });
     expect((await request(app).get("/api/events").set("Authorization", `Bearer ${wrongAudience}`)).status).toBe(401);
+
+    const invalidTokens = [
+      jwt.sign({ type: "access" }, process.env.JWT_ACCESS_SECRET, { algorithm: "HS256", subject: user.userId, issuer: "wrong", audience: "vsms-dashboard", expiresIn: "15m" }),
+      jwt.sign({ type: "refresh" }, process.env.JWT_ACCESS_SECRET, { algorithm: "HS256", subject: user.userId, issuer: "vsms-api", audience: "vsms-dashboard", expiresIn: "15m" }),
+      jwt.sign({ type: "access" }, process.env.JWT_ACCESS_SECRET, { algorithm: "HS256", subject: user.userId, issuer: "vsms-api", audience: "vsms-dashboard", expiresIn: -1 }),
+      jwt.sign({ type: "access" }, "wrong-signing-secret-with-at-least-thirty-two-characters", { algorithm: "HS256", subject: user.userId, issuer: "vsms-api", audience: "vsms-dashboard", expiresIn: "15m" }),
+    ];
+    for (const token of invalidTokens) {
+      expect((await request(app).get("/api/events").set("Authorization", `Bearer ${token}`)).status).toBe(401);
+    }
+  });
+
+  test("refresh and logout reject missing, mismatched, and cross-site CSRF proof", async () => {
+    const login = await request(app).post("/auth/login").set("Origin", "https://localhost:5173").send({ identifier: "test-event-manager", password: helpers.PASSWORD });
+    const cookies = helpers.cookieHeader(login);
+    expect((await request(app).post("/auth/refresh").set("Cookie", cookies).set("X-CSRF-Token", login.body.csrfToken)).status).toBe(403);
+    expect((await request(app).post("/auth/refresh").set("Origin", "https://localhost:5173").set("Cookie", cookies)).status).toBe(403);
+    expect((await request(app).post("/auth/refresh").set("Origin", "https://localhost:5173").set("Cookie", cookies).set("X-CSRF-Token", "wrong-token")).status).toBe(403);
+    expect((await request(app).post("/auth/logout").set("Origin", "https://localhost:5173").set("Sec-Fetch-Site", "cross-site").set("Cookie", cookies).set("X-CSRF-Token", login.body.csrfToken)).status).toBe(403);
   });
 
   test("QR route parameters are validated after authentication", async () => {
@@ -121,6 +140,6 @@ describe("authentication boundary", () => {
       .send({ identifier: "test-event-manager", password: helpers.PASSWORD });
     const auth = { Authorization: `Bearer ${login.body.accessToken}` };
     expect((await request(app).post("/api/qr/generate/not-a-uuid").set(auth)).status).toBe(422);
-    expect((await request(app).get("/api/qr/not-a-token").set(auth)).status).toBe(422);
+    expect((await request(app).post("/api/qr/resolve").set(auth).send({ token: "not-a-token" })).status).toBe(422);
   });
 });

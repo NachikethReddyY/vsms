@@ -1,4 +1,4 @@
-import { CalendarDaysIcon, ChevronLeftIcon, MagnifyingGlassIcon, PlusIcon, QueueListIcon, SignalIcon } from '@heroicons/react/24/outline';
+import { CalendarDaysIcon, ChevronLeftIcon, HomeIcon, MagnifyingGlassIcon, PlusIcon, QrCodeIcon, SignalIcon } from '@heroicons/react/24/outline';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { NavLink, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../auth/authState';
@@ -12,8 +12,15 @@ export default function AppShell({ children }: { children: ReactNode }) {
   const location = useLocation();
   const workspaceRef = useRef<HTMLElement>(null);
   const role = user?.systemRole.replace('_', ' ').toLowerCase();
+  const canCreate = user?.systemRole === 'ADMIN' || user?.systemRole === 'EVENT_MANAGER';
   const mobileTitle = location.pathname === '/events/new'
     ? 'Create event'
+    : location.pathname === '/dashboard'
+      ? 'Dashboard'
+      : location.pathname === '/qr-generator'
+        ? 'QR passes'
+        : /\/events\/[^/]+\/edit$/.test(location.pathname)
+          ? 'Edit event'
     : /^\/events\/[^/]+$/.test(location.pathname)
       ? 'Event details'
       : 'Events';
@@ -35,10 +42,15 @@ export default function AppShell({ children }: { children: ReactNode }) {
       {!isCreateEventPage && <aside className="sidebar" aria-label="Primary navigation">
         <div className="brand"><span aria-hidden="true">V</span><strong>VSMS</strong></div>
         <nav className="nav-list">
+          <NavLink to="/dashboard" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}>
+            <HomeIcon /><span>Dashboard</span>
+          </NavLink>
           <NavLink to="/events" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}>
             <CalendarDaysIcon /><span>Events</span>
           </NavLink>
-          <span className="nav-item disabled" aria-disabled="true"><QueueListIcon /><span>Participants</span></span>
+          <NavLink to="/qr-generator" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}>
+            <QrCodeIcon /><span>QR passes</span>
+          </NavLink>
         </nav>
         <div className="sidebar-foot">
           <div className="connection"><SignalIcon /><span>Connected<br/><small>All changes synced</small></span></div>
@@ -59,10 +71,21 @@ export default function AppShell({ children }: { children: ReactNode }) {
           <div className="workspace-name"><strong><span className="desktop-title">Event operations</span><span className="mobile-title">{mobileTitle}</span></strong><span><i /> Secure workspace</span></div>
           {isEventsPage && <form className="global-search" onSubmit={submitEventSearch}><MagnifyingGlassIcon /><label className="sr-only" htmlFor="workspace-event-search">Search events</label><input id="workspace-event-search" value={eventSearch} onChange={(event) => setEventSearch(event.target.value)} placeholder="Search events or venues" /></form>}
           <ThemeToggle />
-          <button className="primary compact" onClick={() => navigate('/events/new')} aria-label="Create event"><PlusIcon /><span>New event</span></button>
+          {canCreate && <button className="primary compact" onClick={() => navigate('/events/new')} aria-label="Create event"><PlusIcon /><span>New event</span></button>}
         </header>}
         <main className="workspace" id="main-content" ref={workspaceRef}>{children}</main>
       </div>
+      {!isCreateEventPage && <nav className="app-mobile-nav" aria-label="Mobile navigation">
+        <NavLink to="/dashboard" className={({ isActive }) => isActive ? 'active' : ''}>
+          <HomeIcon /><span>Dashboard</span>
+        </NavLink>
+        <NavLink to="/events" className={({ isActive }) => isActive ? 'active' : ''}>
+          <CalendarDaysIcon /><span>Events</span>
+        </NavLink>
+        <NavLink to="/qr-generator" className={({ isActive }) => isActive ? 'active' : ''}>
+          <QrCodeIcon /><span>QR passes</span>
+        </NavLink>
+      </nav>}
     </div>
   );
 }

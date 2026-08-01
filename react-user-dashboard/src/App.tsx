@@ -1,4 +1,4 @@
-import { Navigate, Outlet, Route, Routes, useLocation } from 'react-router-dom';
+import { Link, Navigate, Outlet, Route, Routes, useLocation } from 'react-router-dom';
 import LoginPage from './components/LoginPage';
 import { useAuth } from './auth/authState';
 import AppShell from './components/AppShell';
@@ -19,6 +19,12 @@ function ProtectedRoutes() {
   return <Outlet />;
 }
 
+function ManagerRoutes() {
+  const { user } = useAuth();
+  if (!user || !['ADMIN', 'EVENT_MANAGER'].includes(user.systemRole)) return <main className="center-state permission-state"><h1>Manager access required</h1><p>Your account can view assigned event work, but it cannot change event setup.</p><Link className="secondary" to="/events">Return to events</Link></main>;
+  return <Outlet />;
+}
+
 export default function App() {
   return (
     <Routes>
@@ -29,10 +35,12 @@ export default function App() {
         <Route path="/events" element={<TestHomePage />} />
         <Route element={<AppShell><Outlet /></AppShell>}>
           <Route path="/dashboard" element={<DashboardPage />} />
-          <Route path="/events/new" element={<EventFormPage mode="create" />} />
           <Route path="/events/:eventId" element={<EventDetailPage />} />
-          <Route path="/events/:eventId/edit" element={<EventFormPage mode="edit" />} />
           <Route path="/qr-generator" element={<QRCodePage />} />
+          <Route element={<ManagerRoutes />}>
+            <Route path="/events/new" element={<EventFormPage mode="create" />} />
+            <Route path="/events/:eventId/edit" element={<EventFormPage mode="edit" />} />
+          </Route>
         </Route>
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />
