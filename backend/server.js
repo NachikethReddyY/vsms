@@ -1,9 +1,16 @@
 const fs = require("fs");
 const https = require("https");
 const path = require("path");
+const express = require("express");
+const cookieParser = require("cookie-parser");
+const YAML = require("js-yaml");
+const swaggerUi = require("swagger-ui-express");
+const { Server } = require("socket.io");
 const app = require("./app");
 const env = require("./config/env");
 const logger = require("./utils/logger/logger");
+const cors = require("cors");
+const helmet = require("helmet");
 
 // Import Routes
 const authRoutes = require("./routes/authRoutes");
@@ -18,7 +25,7 @@ const queueRoutes = require("./routes/queueRoutes");
 let swaggerDocument;
 try {
   const file = fs.readFileSync("./docs/openapi.yaml", "utf8");
-  swaggerDocument = YAML.parse(file);
+  swaggerDocument = YAML.load(file);
 } catch (error) {
   logger.error("Failed to load or parse ./docs/openapi.yaml", { error: error.message });
 }
