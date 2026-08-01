@@ -6,6 +6,7 @@ const baseURL = import.meta.env.VITE_API_BASE_URL ?? (qaMirror ? '/qa-api' : `ht
 let accessToken: string | null = null;
 let csrfToken: string | null = null;
 let refreshPromise: Promise<SessionPayload> | null = null;
+const sessionChannel = 'BroadcastChannel' in window ? new BroadcastChannel('vsms-session') : null;
 type RetryableRequest = InternalAxiosRequestConfig & { _retry?: boolean };
 type SessionPayload = components['schemas']['AuthResponse'];
 export type TokenPayload = Pick<SessionPayload, 'accessToken' | 'csrfToken'>;
@@ -15,14 +16,34 @@ export const setSessionTokens = (tokens: TokenPayload | null) => {
   csrfToken = tokens?.csrfToken || null;
 };
 export const getCsrfToken = () => csrfToken;
+export const readCsrfCookie = () => {
+  const match = document.cookie.match(/(?:^|; )vsms_csrf=([^;]+)/);
+  return match ? decodeURIComponent(match[1]) : null;
+};
+export const withSessionLock = <T,>(task: () => Promise<T>) => navigator.locks?.request
+  ? navigator.locks.request('vsms-session-rotation', task)
+  : task();
+const clearLocalSession = () => {
+  setSessionTokens(null);
+  window.dispatchEvent(new Event('vsms:session-ended'));
+};
+export const announceSessionEnded = () => {
+  clearLocalSession();
+  sessionChannel?.postMessage('ended');
+};
+sessionChannel?.addEventListener('message', ({ data }) => { if (data === 'ended') clearLocalSession(); });
 
 const apiClient = axios.create({ baseURL, withCredentials: true, headers: { 'Content-Type': 'application/json' }, timeout: 15_000 });
 const refreshClient = axios.create({ baseURL, withCredentials: true, timeout: 15_000 });
 
 export const refreshSession = () => {
-  if (!csrfToken) return Promise.reject(new Error('Missing CSRF token'));
-  refreshPromise ??= refreshClient.post<SessionPayload>('/auth/refresh', undefined, { headers: { 'X-CSRF-Token': csrfToken } })
-    .then(({ data }) => { setSessionTokens(data); return data; })
+  refreshPromise ??= withSessionLock(async () => {
+    csrfToken = readCsrfCookie() || csrfToken;
+    if (!csrfToken) throw new Error('Missing CSRF token');
+    const { data } = await refreshClient.post<SessionPayload>('/auth/refresh', undefined, { headers: { 'X-CSRF-Token': csrfToken } });
+    setSessionTokens(data);
+    return data;
+  })
     .finally(() => { refreshPromise = null; });
   return refreshPromise;
 };
@@ -40,8 +61,7 @@ apiClient.interceptors.response.use((response) => response, async (error) => {
     request.headers.Authorization = `Bearer ${(await refreshSession()).accessToken}`;
     return apiClient(request);
   } catch (refreshError) {
-    setSessionTokens(null);
-    window.dispatchEvent(new Event('vsms:session-ended'));
+    announceSessionEnded();
     return Promise.reject(refreshError);
   }
 });

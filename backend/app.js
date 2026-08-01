@@ -4,8 +4,6 @@ const cors = require("cors");
 const helmet = require("helmet");
 const cookieParser = require("cookie-parser");
 const { rateLimit } = require("express-rate-limit");
-const swaggerUi = require("swagger-ui-express");
-const YAML = require("yamljs");
 const env = require("./config/env");
 const AppError = require("./errors/AppError");
 const requestContext = require("./middlewares/requestContext");
@@ -51,6 +49,8 @@ const mutationLimiter = rateLimit({ windowMs: 60000, limit: 60, standardHeaders:
 
 app.get("/health", (_req, res) => res.json({ status: "ok" }));
 if (!env.isProduction) {
+  const swaggerUi = require("swagger-ui-express");
+  const YAML = require("yamljs");
   const swaggerDocument = YAML.load(path.join(__dirname, "docs/openapi.yaml"));
   app.use("/api-docs", swaggerUi.serve, swaggerUi.setup(swaggerDocument));
 }

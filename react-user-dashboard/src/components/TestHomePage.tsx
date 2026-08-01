@@ -1,4 +1,4 @@
-import { Bell, MapPin, Plus, Search, Ticket, Users } from 'lucide-react';
+import { Bell, LayoutDashboard, MapPin, Plus, QrCode, Search, Ticket, Users } from 'lucide-react';
 import { SegmentedControl } from '@astryxdesign/core';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
@@ -102,9 +102,11 @@ export default function TestHomePage() {
     if (!searchOpen && !notificationsOpen) return;
     const closeOverlay = (event: KeyboardEvent) => {
       if (event.key !== 'Escape') return;
+      const returnToSearch = searchOpen;
       setSearchOpen(false);
       setNotificationsOpen(false);
       setQuery('');
+      requestAnimationFrame(() => document.getElementById(returnToSearch ? 'event-search-button' : 'event-notification-button')?.focus());
     };
     window.addEventListener('keydown', closeOverlay);
     return () => window.removeEventListener('keydown', closeOverlay);
@@ -139,7 +141,9 @@ export default function TestHomePage() {
         </Link>
 
         <nav className="reference-header-nav" aria-label="Primary navigation">
+          <Link to="/dashboard"><LayoutDashboard aria-hidden="true" />Dashboard</Link>
           <a href="#events-register" aria-current="page"><Ticket aria-hidden="true" />Events</a>
+          <Link to="/qr-generator"><QrCode aria-hidden="true" />QR passes</Link>
         </nav>
 
         <div className={`test-header-actions ${searchOpen ? 'searching' : ''}`}>
@@ -148,7 +152,7 @@ export default function TestHomePage() {
             <label className="test-header-search">
               <Search aria-hidden="true" />
               <span className="sr-only">Search events</span>
-              <input
+              <input id="desktop-event-search"
                 autoFocus
                 type="search"
                 value={query}
@@ -157,13 +161,14 @@ export default function TestHomePage() {
               />
             </label>
           )}
-          <Button className="test-header-icon" variant="ghost" size="icon" aria-label={searchOpen ? 'Close search' : 'Search events'} onClick={() => {
+          <Button id="event-search-button" className="test-header-icon" variant="ghost" size="icon" aria-label={searchOpen ? 'Close search' : 'Search events'} aria-expanded={searchOpen} aria-controls="desktop-event-search" onClick={() => {
               setSearchOpen((open) => !open);
               if (searchOpen) setQuery('');
             }}>
             <Search aria-hidden="true" />
           </Button>
           <Button
+            id="event-notification-button"
             className="test-header-icon"
             variant="ghost"
             size="icon"
@@ -210,6 +215,7 @@ export default function TestHomePage() {
 
       <nav className="reference-mobile-dock" aria-label="Mobile navigation">
         <Dock iconSize={44} iconMagnification={52} iconDistance={100} disableMagnification direction="middle">
+          <DockIcon><Link className="reference-dock-action" to="/dashboard" aria-label="Dashboard"><LayoutDashboard aria-hidden="true" /></Link></DockIcon>
           <DockIcon>
             <a className="reference-dock-action active" href="#events-register" aria-label="Events" aria-current="page"><Ticket aria-hidden="true" /></a>
           </DockIcon>
@@ -220,6 +226,7 @@ export default function TestHomePage() {
               if (searchOpen) setQuery('');
             }}><Search aria-hidden="true" /></button>
           </DockIcon>
+          <DockIcon><Link className="reference-dock-action" to="/qr-generator" aria-label="QR passes"><QrCode aria-hidden="true" /></Link></DockIcon>
           {canCreate && <DockIcon><Link className="reference-dock-action" to="/events/new" aria-label="Create event"><Plus aria-hidden="true" /></Link></DockIcon>}
         </Dock>
       </nav>
@@ -285,9 +292,10 @@ export default function TestHomePage() {
         ) : (
           <section className="test-empty-state" aria-live="polite">
             <Search aria-hidden="true" />
-            <h2>{query ? 'No events found' : 'No past events'}</h2>
-            <p>{query ? 'Try a different event or venue name.' : 'Completed events will appear here.'}</p>
+            <h2>{query ? 'No events found' : period === 'upcoming' ? 'No upcoming events' : 'No past events'}</h2>
+            <p>{query ? 'Try a different event or venue name.' : period === 'upcoming' ? 'Assigned and newly created events will appear here.' : 'Completed and cancelled events will appear here.'}</p>
             {query && <Button variant="ghost" onClick={() => setQuery('')}>Clear search</Button>}
+            {!query && period === 'upcoming' && canCreate && <Button onClick={() => navigate('/events/new')}><Plus aria-hidden="true" />Create event</Button>}
           </section>
         )}
 

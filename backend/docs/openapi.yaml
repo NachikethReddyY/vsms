@@ -18,6 +18,8 @@ tags:
     description: Authorized event details and lifecycle commands
   - name: Users
     description: Restricted administrative user projection
+  - name: QR passes
+    description: Event-scoped participant pass generation and resolution
 security:
   - bearerAuth: []
 paths:
@@ -314,6 +316,42 @@ paths:
               schema: { $ref: "#/components/schemas/AuditListResponse" }
         "401": { $ref: "#/components/responses/Unauthorized" }
         "404": { $ref: "#/components/responses/NotFound" }
+  /api/qr/generate/{participantId}:
+    post:
+      tags: [QR passes]
+      operationId: generateParticipantQrPass
+      summary: Replace and generate a QR pass for an authorized event participant
+      parameters:
+        - name: participantId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        "201":
+          description: The previous active pass was revoked and a new pass was generated
+          content: { application/json: { schema: { $ref: "#/components/schemas/QrPassResponse" } } }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "422": { $ref: "#/components/responses/ValidationFailed" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+  /api/qr/resolve:
+    post:
+      tags: [QR passes]
+      operationId: resolveParticipantQrPass
+      summary: Resolve an unexpired QR token within the caller's assigned event scope
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/QrResolveRequest" }
+      responses:
+        "200":
+          description: Minimal participant identity for the authorized event
+          content: { application/json: { schema: { $ref: "#/components/schemas/QrParticipant" } } }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "422": { $ref: "#/components/responses/ValidationFailed" }
+        "429": { $ref: "#/components/responses/RateLimited" }
 components:
   securitySchemes:
     bearerAuth:
@@ -537,7 +575,7 @@ components:
       allOf:
         - $ref: "#/components/schemas/CreateEventRequest"
         - type: object
-          required: [eventId, artworkDataUrl, status, version, createdByUserId, shifts, signupCount, activeCapacityCount, createdAt, updatedAt]
+          required: [eventId, artworkDataUrl, status, version, createdByUserId, shifts, signupCount, activeCapacityCount, canManage, createdAt, updatedAt]
           properties:
             eventId: { type: string, format: uuid }
             status: { $ref: "#/components/schemas/EventStatus" }
@@ -551,6 +589,7 @@ components:
             shifts: { type: array, items: { $ref: "#/components/schemas/Shift" } }
             signupCount: { type: integer, minimum: 0, description: Number of collected registration entries for this event }
             activeCapacityCount: { type: integer, minimum: 0, description: Number of signed-up or checked-in registrations not marked completed or cancelled }
+            canManage: { type: boolean, description: Server-derived ownership or event-manager capability for this caller }
             createdBy: { $ref: "#/components/schemas/User" }
             cancelledBy: { type: object, allOf: [{ $ref: "#/components/schemas/User" }], nullable: true }
     EventListResponse:
@@ -578,6 +617,28 @@ components:
       properties:
         auditLogs: { type: array, items: { $ref: "#/components/schemas/EventAuditLog" } }
         nextCursor: { type: string, nullable: true }
+    QrResolveRequest:
+      type: object
+      additionalProperties: false
+      required: [token]
+      properties:
+        token: { type: string, pattern: '^[a-f0-9]{64}$' }
+    QrPassResponse:
+      type: object
+      additionalProperties: false
+      required: [success, expiresAt, qrImage]
+      properties:
+        success: { type: boolean, enum: [true] }
+        expiresAt: { type: string, format: date-time }
+        qrImage: { type: string, pattern: '^data:image/png;base64,' }
+    QrParticipant:
+      type: object
+      additionalProperties: false
+      required: [participantId, firstName, lastName]
+      properties:
+        participantId: { type: string, format: uuid }
+        firstName: { type: string, maxLength: 100 }
+        lastName: { type: string, maxLength: 100 }
     Problem:
       type: object
       required: [type, title, status, code, requestId]

@@ -13,15 +13,29 @@ const AppError = require("../errors/AppError");
  * 4. Return QR image
  */
 
-async function generateQR(participantId) {
-    const participant = await prisma.legacyParticipant.findUnique({ where: { participantId } });
-    if (!participant) throw new AppError(404, "PARTICIPANT_NOT_FOUND", "Participant was not found");
+const eventVisibility = (user) => user.systemRole === "ADMIN" ? {} : user.systemRole === "EVENT_MANAGER" ? {
+    OR: [
+        { createdByUserId: user.userId },
+        { shifts: { some: { staffAssignments: { some: { userId: user.userId, status: { in: ["ASSIGNED", "CONFIRMED"] } } } } } },
+    ],
+} : { shifts: { some: { staffAssignments: { some: { userId: user.userId, status: { in: ["ASSIGNED", "CONFIRMED"] } } } } } };
+
+async function requireEventAccess(eventId, user) {
+    const event = await prisma.event.findFirst({ where: { eventId, ...eventVisibility(user) }, select: { eventId: true } });
+    if (!event) throw new AppError(404, "QR_RECORD_NOT_FOUND", "QR record was not found");
+}
+
+async function generateQR(participantId, user) {
 
     const registration = await prisma.legacyEventRegistration.findFirst({
         where: { participantId },
         orderBy: { registrationId: "desc" },
     });
-    if (!registration) throw new AppError(422, "REGISTRATION_REQUIRED", "Participant has no event registration");
+    if (!registration) throw new AppError(404, "QR_RECORD_NOT_FOUND", "QR record was not found");
+    await requireEventAccess(registration.eventId, user);
+
+    const participant = await prisma.legacyParticipant.findUnique({ where: { participantId } });
+    if (!participant) throw new AppError(404, "QR_RECORD_NOT_FOUND", "QR record was not found");
 
     // Generate 256-bit random token
     const token = crypto.randomBytes(32).toString("hex");
@@ -31,22 +45,8 @@ async function generateQR(participantId) {
         Date.now() + 24 * 60 * 60 * 1000
     );
 
-    await prisma.legacyQrCodePass.create({
-        data: {
-            registrationId: registration.registrationId,
-            token,
-            expiresAt,
-            isActive: true,
-        }
-    });
-
-    // Only token is embedded in QR
-    const qrPayload = {
-        token
-    };
-
     const qrImage = await QRCode.toDataURL(
-        JSON.stringify(qrPayload),
+        JSON.stringify({ token }),
         {
             errorCorrectionLevel: "H",
             margin: 2,
@@ -54,10 +54,16 @@ async function generateQR(participantId) {
         }
     );
 
+    await prisma.$transaction(async (tx) => {
+        await tx.legacyQrCodePass.updateMany({
+            where: { registrationId: registration.registrationId, isActive: true, revokedAt: null },
+            data: { isActive: false, revokedAt: new Date(), revokedBy: user.userId, revokedReason: "Replaced by a new pass" },
+        });
+        await tx.legacyQrCodePass.create({ data: { registrationId: registration.registrationId, token, expiresAt, isActive: true } });
+    });
+
     return {
         success: true,
-
-        token,
 
         expiresAt,
 
@@ -65,7 +71,7 @@ async function generateQR(participantId) {
     };
 }
 
-async function getParticipant(token) {
+async function getParticipant(token, user) {
     const pass = await prisma.legacyQrCodePass.findFirst({
         where: { token, isActive: true, revokedAt: null, expiresAt: { gt: new Date() } },
     });
@@ -75,12 +81,13 @@ async function getParticipant(token) {
         where: { registrationId: pass.registrationId },
     });
     if (!registration) throw new AppError(404, "REGISTRATION_NOT_FOUND", "Registration was not found");
+    await requireEventAccess(registration.eventId, user);
 
     const participant = await prisma.legacyParticipant.findUnique({
         where: { participantId: registration.participantId },
     });
     if (!participant) throw new AppError(404, "PARTICIPANT_NOT_FOUND", "Participant was not found");
-    return participant;
+    return { participantId: participant.participantId, firstName: participant.firstName, lastName: participant.lastName };
 }
 
 module.exports = {

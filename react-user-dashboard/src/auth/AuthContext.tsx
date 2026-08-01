@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
 import axios from 'axios';
-import apiClient, { getCsrfToken, refreshSession, setSessionTokens } from '../utils/apiClient';
+import apiClient, { announceSessionEnded, getCsrfToken, readCsrfCookie, refreshSession, setSessionTokens, withSessionLock } from '../utils/apiClient';
 import type { components } from '../generated/api';
 import { AuthContext, type User } from './authState';
 
@@ -20,8 +20,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const restoreSession = useCallback(() => {
     setIsBootstrapping(true);
     setBootstrapError('');
-    const csrfMatch = document.cookie.match(/(?:^|; )vsms_csrf=([^;]+)/);
-    const csrf = csrfMatch ? decodeURIComponent(csrfMatch[1]) : null;
+    const csrf = readCsrfCookie();
     if (!csrf) { setIsBootstrapping(false); return; }
     setSessionTokens({ accessToken: '', csrfToken: csrf });
     refreshSession()
@@ -50,9 +49,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [acceptSession]);
 
   const logout = useCallback(async () => {
-    const csrf = getCsrfToken();
-    try { if (csrf) await apiClient.post('/auth/logout', undefined, { headers: { 'X-CSRF-Token': csrf } }); }
-    finally { setSessionTokens(null); setUser(null); }
+    try {
+      await withSessionLock(async () => {
+        const csrf = readCsrfCookie() || getCsrfToken();
+        if (csrf) await apiClient.post('/auth/logout', undefined, { headers: { 'X-CSRF-Token': csrf } });
+      });
+    } finally { announceSessionEnded(); setUser(null); }
   }, []);
 
   const value = useMemo(() => ({ user, isBootstrapping, bootstrapError, login, logout, retrySession: restoreSession }), [user, isBootstrapping, bootstrapError, login, logout, restoreSession]);

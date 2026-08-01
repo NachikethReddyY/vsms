@@ -31,7 +31,6 @@ const SignUpPage: React.FC = () => {
       sessionStorage.setItem('vsms:celebrate', 'true');
       navigate('/events', { replace: true });
     } catch (error) {
-      console.error('Sign up failed:', error);
       if (axios.isAxiosError(error) && error.response?.status === 409) {
         setFormError('An account already uses those details. Try signing in or contact an administrator.');
       } else if (axios.isAxiosError(error) && error.response?.status === 404) {

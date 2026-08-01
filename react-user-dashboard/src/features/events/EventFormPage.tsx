@@ -122,6 +122,7 @@ export default function EventFormPage({ mode }: { mode: 'create' | 'edit' }) {
   };
 
   if (loading) return <div className="center-state"><span className="spinner" />Loading event details…</div>;
+  if (mode === 'edit' && (!existing || !existing.canManage)) return <div className="center-state error-state"><h1>Event unavailable</h1><p>{formError || 'You do not have permission to edit this event.'}</p><Link className="secondary" to="/events">Return to events</Link></div>;
   return (
     <div className="page-frame event-form-page">
       {formError && <div className="alert error" role="alert"><span><strong>{conflict ? 'Version conflict. ' : ''}</strong>{formError}</span>{conflict && <button onClick={() => window.location.reload()}>Load latest version</button>}</div>}
