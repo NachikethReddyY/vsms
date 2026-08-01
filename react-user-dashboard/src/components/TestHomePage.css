@@ -48,7 +48,18 @@
   font-variant-numeric:tabular-nums;
   white-space:nowrap;
 }
-.reference-events .reference-header-create { margin-right:4px; }
+.reference-events .reference-header-create {
+  margin-right:4px;
+  padding:0 10px;
+  border-color:transparent;
+  background:transparent;
+  color:var(--ink);
+}
+
+.reference-events .reference-header-create:hover {
+  background:var(--surface-2);
+  color:var(--ink);
+}
 .reference-events .test-header-icon { width:44px; min-height:44px; }
 .reference-events .test-header-icon svg { width:17px; height:17px; }
 .reference-events .test-profile-action {

@@ -144,8 +144,8 @@ export default function TestHomePage() {
         </nav>
 
         <div className={`test-header-actions ${searchOpen ? 'searching' : ''}`}>
-          <time className="reference-local-time" dateTime={now.toISOString()}>{localTime}</time>
           {canCreate && <Button className="test-header-create reference-header-create" onClick={() => navigate('/events/new')}><Plus aria-hidden="true" />New event</Button>}
+          <time className="reference-local-time" dateTime={now.toISOString()}>{localTime}</time>
           {searchOpen && (
             <label className="test-header-search">
               <Search aria-hidden="true" />
