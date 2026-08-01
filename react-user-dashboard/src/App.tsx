@@ -6,33 +6,34 @@ import EventFormPage from './features/events/EventFormPage';
 import EventDetailPage from './features/events/EventDetailPage';
 import LandingPage from './components/LandingPage';
 import SignUpPage from './components/SignUpPage';
-import ForgotPasswordPage from './components/ForgotPasswordPage';
 import DashboardPage from './components/DashboardPage';
 import QRCodePage from './components/qr/QRCodePage';
 import TestHomePage from './components/TestHomePage';
 
 function ProtectedRoutes() {
-  const { user, isBootstrapping } = useAuth();
+  const { user, isBootstrapping, bootstrapError, retrySession } = useAuth();
   const location = useLocation();
   if (isBootstrapping) return <main className="center-state" aria-live="polite"><span className="spinner" />Restoring your secure session…</main>;
+  if (bootstrapError) return <main className="center-state" role="alert"><p>{bootstrapError}</p><button className="primary" onClick={retrySession}>Try again</button></main>;
   if (!user) return <Navigate to="/login" replace state={{ from: location }} />;
-  return <AppShell><Outlet /></AppShell>;
+  return <Outlet />;
 }
 
 export default function App() {
   return (
     <Routes>
       <Route path="/" element={<LandingPage />} />
-      <Route path="/events" element={<TestHomePage />} />
       <Route path="/login" element={<LoginPage />} />
       <Route path="/signup" element={<SignUpPage />} />
-      <Route path="/forgot-password" element={<ForgotPasswordPage />} />
       <Route element={<ProtectedRoutes />}>
-        <Route path="/dashboard" element={<DashboardPage />} />
-        <Route path="/events/new" element={<EventFormPage mode="create" />} />
-        <Route path="/events/:eventId" element={<EventDetailPage />} />
-        <Route path="/events/:eventId/edit" element={<EventFormPage mode="edit" />} />
-        <Route path="/qr-generator" element={<QRCodePage />} />
+        <Route path="/events" element={<TestHomePage />} />
+        <Route element={<AppShell><Outlet /></AppShell>}>
+          <Route path="/dashboard" element={<DashboardPage />} />
+          <Route path="/events/new" element={<EventFormPage mode="create" />} />
+          <Route path="/events/:eventId" element={<EventDetailPage />} />
+          <Route path="/events/:eventId/edit" element={<EventFormPage mode="edit" />} />
+          <Route path="/qr-generator" element={<QRCodePage />} />
+        </Route>
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>

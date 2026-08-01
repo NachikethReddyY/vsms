@@ -14,14 +14,15 @@ export default function LoginPage() {
   const navigate = useNavigate();
   const location = useLocation();
   const { register, handleSubmit, formState: { errors, isSubmitting } } = useForm<LoginFields>();
-  if (user) return <Navigate to="/events" replace />;
+  const from = (location.state as { from?: { pathname?: string; search?: string; hash?: string } } | null)?.from;
+  const destination = from?.pathname ? `${from.pathname}${from.search ?? ''}${from.hash ?? ''}` : '/events';
+  if (user) return <Navigate to={destination} replace />;
 
   const submit = async (values: LoginFields) => {
     setFormError('');
     try {
       await login(values.identifier, values.password);
       sessionStorage.setItem('vsms:celebrate', 'true');
-      const destination = (location.state as { from?: { pathname?: string } } | null)?.from?.pathname ?? '/events';
       navigate(destination, { replace: true });
     } catch (error) {
       setFormError(getApiMessage(error, 'Sign in failed. Check your credentials and try again.'));

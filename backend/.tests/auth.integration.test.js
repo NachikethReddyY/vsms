@@ -1,4 +1,5 @@
 const request = require("supertest");
+const jwt = require("jsonwebtoken");
 
 let app;
 let helpers;
@@ -29,8 +30,19 @@ describe("authentication boundary", () => {
     expect(response.body.accessToken).toEqual(expect.any(String));
     expect(response.body.refreshToken).toBeUndefined();
     expect(response.body.csrfToken).toEqual(expect.any(String));
-    expect(response.headers["set-cookie"].join(" ")).toContain("Secure");
-    expect(response.headers["set-cookie"].join(" ")).toContain("HttpOnly");
+    const cookies = response.headers["set-cookie"];
+    const refreshCookie = cookies.find((cookie) => cookie.startsWith("vsms_refresh=") && !cookie.includes("Max-Age=0"));
+    const csrfCookie = cookies.find((cookie) => cookie.startsWith("vsms_csrf=") && !cookie.includes("Max-Age=0"));
+    const legacyClear = cookies.find((cookie) => cookie.startsWith("vsms_csrf=") && cookie.includes("Expires=Thu, 01 Jan 1970") && cookie.includes("Path=/auth"));
+    expect(refreshCookie).toContain("Path=/auth");
+    expect(refreshCookie).toContain("HttpOnly");
+    expect(refreshCookie).toContain("Secure");
+    expect(refreshCookie).toContain("SameSite=Strict");
+    expect(csrfCookie).toContain("Path=/");
+    expect(csrfCookie).toContain("Secure");
+    expect(csrfCookie).toContain("SameSite=Strict");
+    expect(csrfCookie).not.toContain("HttpOnly");
+    expect(legacyClear).toBeDefined();
   });
 
   test("concurrent refresh reuse revokes the winning replacement family", async () => {
@@ -67,5 +79,48 @@ describe("authentication boundary", () => {
 
   test("user listing is not public", async () => {
     expect((await request(app).get("/users")).status).toBe(401);
+  });
+
+  test("credentialed CORS allows both exact local origins and rejects others", async () => {
+    for (const origin of ["https://localhost:5173", "https://127.0.0.1:5173"]) {
+      const response = await request(app)
+        .options("/auth/login")
+        .set("Origin", origin)
+        .set("Access-Control-Request-Method", "POST");
+      expect(response.status).toBe(204);
+      expect(response.headers["access-control-allow-origin"]).toBe(origin);
+      expect(response.headers["access-control-allow-credentials"]).toBe("true");
+    }
+
+    const rejected = await request(app)
+      .options("/auth/login")
+      .set("Origin", "https://attacker.example")
+      .set("Access-Control-Request-Method", "POST");
+    expect(rejected.status).toBe(403);
+  });
+
+  test("event APIs reject anonymous and incorrectly scoped JWT requests", async () => {
+    expect((await request(app).get("/api/events")).status).toBe(401);
+    expect((await request(app).post("/api/events").send({})).status).toBe(401);
+
+    const user = await helpers.ensureTestUser("EVENT_MANAGER");
+    const wrongAudience = jwt.sign({ type: "access" }, process.env.JWT_ACCESS_SECRET, {
+      algorithm: "HS256",
+      subject: user.userId,
+      issuer: "vsms-api",
+      audience: "wrong-audience",
+      expiresIn: "15m",
+    });
+    expect((await request(app).get("/api/events").set("Authorization", `Bearer ${wrongAudience}`)).status).toBe(401);
+  });
+
+  test("QR route parameters are validated after authentication", async () => {
+    const login = await request(app)
+      .post("/auth/login")
+      .set("Origin", "https://localhost:5173")
+      .send({ identifier: "test-event-manager", password: helpers.PASSWORD });
+    const auth = { Authorization: `Bearer ${login.body.accessToken}` };
+    expect((await request(app).post("/api/qr/generate/not-a-uuid").set(auth)).status).toBe(422);
+    expect((await request(app).get("/api/qr/not-a-token").set(auth)).status).toBe(422);
   });
 });

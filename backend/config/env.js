@@ -12,7 +12,7 @@ const schema = z.object({
   ACCESS_TOKEN_TTL: z.string().default("15m"),
   REFRESH_TOKEN_TTL_DAYS: z.coerce.number().int().min(1).max(90).default(7),
   PUBLIC_SIGNUP_ENABLED: z.enum(["true", "false"]).default("false"),
-  CORS_ORIGINS: z.string().default("https://localhost:5173"),
+  CORS_ORIGINS: z.string().default("https://localhost:5173,https://127.0.0.1:5173"),
   TRUST_PROXY: z.enum(["true", "false"]).default("false"),
   LOCAL_HTTPS: z.enum(["true", "false"]).default("true"),
   TLS_KEY_PATH: z.string().default("../react-user-dashboard/certs/localhost-key.pem"),
