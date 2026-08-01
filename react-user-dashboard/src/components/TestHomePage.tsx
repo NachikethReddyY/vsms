@@ -1,4 +1,4 @@
-import { Bell, LayoutDashboard, MapPin, Plus, QrCode, Search, Ticket, Users } from 'lucide-react';
+import { Bell, MapPin, Plus, QrCode, Search, Ticket, Users } from 'lucide-react';
 import { SegmentedControl } from '@astryxdesign/core';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
@@ -139,7 +139,6 @@ export default function TestHomePage() {
         </Link>
 
         <nav className="reference-header-nav" aria-label="Primary navigation">
-          <Link to="/dashboard"><LayoutDashboard aria-hidden="true" />Dashboard</Link>
           <a href="#events-register" aria-current="page"><Ticket aria-hidden="true" />Events</a>
           <Link to="/qr-generator"><QrCode aria-hidden="true" />QR passes</Link>
         </nav>
@@ -213,7 +212,6 @@ export default function TestHomePage() {
 
       <nav className="reference-mobile-dock" aria-label="Mobile navigation">
         <Dock iconSize={44} iconMagnification={52} iconDistance={100} disableMagnification direction="middle">
-          <DockIcon><Link className="reference-dock-action" to="/dashboard" aria-label="Dashboard"><LayoutDashboard aria-hidden="true" /></Link></DockIcon>
           <DockIcon>
             <a className="reference-dock-action active" href="#events-register" aria-label="Events" aria-current="page"><Ticket aria-hidden="true" /></a>
           </DockIcon>
@@ -275,9 +273,10 @@ export default function TestHomePage() {
                     <p><MapPin aria-hidden="true" />{event.venue}</p>
                     <p className="reference-attendance-desktop"><Users aria-hidden="true" />{event.attendance}</p>
                     <p className="reference-attendance-mobile"><Users aria-hidden="true" />{event.attendance}</p>
-                    <div className="reference-team" aria-label={`Assigned staff: ${event.staff.join(', ')}${event.extraStaff ? `, plus ${event.extraStaff} more` : ''}`}>
-                      {event.staff.map((name, index) => <span className={`team-${index + 1}`} key={name} title={name} aria-label={name}>{name.split(' ').map((part) => part[0]).join('')}</span>)}
-                      {event.extraStaff ? <small>+{event.extraStaff}</small> : null}
+                    <div className={`reference-team ${event.staff.length ? '' : 'empty'}`} aria-label={event.staff.length ? `Assigned staff: ${event.staff.join(', ')}${event.extraStaff ? `, plus ${event.extraStaff} more` : ''}` : 'No staff assigned'}>
+                      {event.staff.map((name, index) => <span className={`reference-team-avatar team-${index + 1}`} key={name} title={name} aria-label={name}>{name.split(' ').map((part) => part[0]).join('').slice(0, 2).toUpperCase()}</span>)}
+                      {event.extraStaff ? <small className="reference-team-more">+{event.extraStaff}</small> : null}
+                      {!event.staff.length && <><span className="reference-team-empty-icon" aria-hidden="true"><Users /></span><em>No staff assigned</em></>}
                     </div>
                   </div>
                   <div className="test-register-state">
