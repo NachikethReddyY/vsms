@@ -5,7 +5,7 @@
   <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self' https://cdn.jsdelivr.net; connect-src 'none'; object-src 'none'; base-uri 'self'; form-action 'self'">
   <meta name="referrer" content="no-referrer">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="color-scheme" content="dark light">
+  <meta name="color-scheme" content="dark">
   <meta name="theme-color" content="#0b0b0d">
   <base target="_top">
   <title>VSMS | Community Vision Screening Operations</title>
@@ -36,7 +36,6 @@
       color: var(--ink);
       -webkit-font-smoothing: antialiased;
       text-rendering: optimizeLegibility;
-      transition: background-color 220ms ease, color 220ms ease;
     }
 
     img {
@@ -174,7 +173,6 @@
       margin-left: auto;
     }
 
-    .theme-toggle,
     .nav-sign-in {
       display: inline-flex;
       min-height: 44px;
@@ -186,41 +184,6 @@
       transition: background-color 180ms ease, color 180ms ease, transform 180ms ease;
     }
 
-    .theme-toggle {
-      position: relative;
-      width: 44px;
-      padding: 0;
-      background: transparent;
-      color: #d9dde3;
-    }
-
-    .theme-toggle svg {
-      position: absolute;
-      width: 16px;
-      height: 16px;
-      transition: opacity 180ms ease, transform 220ms var(--ease-out);
-    }
-
-    .theme-toggle .icon-sun {
-      opacity: 1;
-      transform: rotate(0) scale(1);
-    }
-
-    .theme-toggle .icon-moon {
-      opacity: 0;
-      transform: rotate(-28deg) scale(0.78);
-    }
-
-    html[data-theme="light"] .theme-toggle .icon-sun {
-      opacity: 0;
-      transform: rotate(28deg) scale(0.78);
-    }
-
-    html[data-theme="light"] .theme-toggle .icon-moon {
-      opacity: 1;
-      transform: rotate(0) scale(1);
-    }
-
     .nav-sign-in {
       padding: 0 18px;
       background: #f5f5f2;
@@ -230,11 +193,6 @@
     }
 
     @media (hover: hover) {
-      .theme-toggle:hover {
-        background: rgba(255, 255, 255, 0.08);
-        color: #ffffff;
-      }
-
       .nav-sign-in:hover {
         background: #ffffff;
       }
@@ -339,7 +297,6 @@
       }
     }
 
-    .theme-toggle:active,
     .nav-sign-in:active,
     .hero-action:active,
     .access-action:active {
@@ -992,8 +949,6 @@
       }
 
       body,
-      .theme-toggle,
-      .theme-toggle svg,
       .nav-sign-in,
       .hero-action,
       .hero-action span,
@@ -1039,16 +994,6 @@
       </span>
     </a>
     <div class="nav-actions">
-      <button class="theme-toggle" type="button" aria-pressed="false">
-        <svg class="icon-sun" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round">
-          <circle cx="12" cy="12" r="3.5"></circle>
-          <path d="M12 2v2M12 20v2M4.93 4.93l1.42 1.42M17.65 17.65l1.42 1.42M2 12h2M20 12h2M4.93 19.07l1.42-1.42M17.65 6.35l1.42-1.42"></path>
-        </svg>
-        <svg class="icon-moon" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M20.2 15.2A8.5 8.5 0 0 1 8.8 3.8 8.5 8.5 0 1 0 20.2 15.2Z"></path>
-        </svg>
-        <span class="theme-label sr-only">Light mode</span>
-      </button>
       <a class="nav-sign-in" href="/login">Sign in</a>
     </div>
   </header>
@@ -1262,43 +1207,6 @@
   <script>
     (() => {
       const root = document.documentElement;
-      const toggle = document.querySelector(".theme-toggle");
-      if (!toggle) return;
-
-      const label = toggle.querySelector(".theme-label");
-      const themeMeta = document.querySelector('meta[name="theme-color"]');
-
-      try {
-        const savedTheme = localStorage.getItem("vsms-landing-theme");
-        if (savedTheme === "light" || savedTheme === "dark") {
-          root.dataset.theme = savedTheme;
-        }
-      } catch {
-        // The page remains usable when storage is unavailable.
-      }
-
-      const syncThemeControl = () => {
-        const isLight = root.dataset.theme === "light";
-        toggle.setAttribute("aria-pressed", String(isLight));
-        toggle.setAttribute("aria-label", isLight ? "Switch to dark mode" : "Switch to light mode");
-        label.textContent = isLight ? "Dark mode" : "Light mode";
-        if (themeMeta) {
-          themeMeta.setAttribute("content", isLight ? "#f7f7f4" : "#0b0b0d");
-        }
-      };
-
-      toggle.addEventListener("click", () => {
-        root.dataset.theme = root.dataset.theme === "light" ? "dark" : "light";
-        try {
-          localStorage.setItem("vsms-landing-theme", root.dataset.theme);
-        } catch {
-          // Theme switching still works for the current page.
-        }
-        syncThemeControl();
-      });
-
-      syncThemeControl();
-
       const workflow = document.querySelector(".workflow");
       const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 

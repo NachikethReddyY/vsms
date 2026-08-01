@@ -8,6 +8,7 @@ import { getApiMessage, useAuth } from '../auth/authState';
 import { Button } from './ui/button';
 import { Dock, DockIcon } from './ui/dock';
 import './TestHomePage.css';
+import ProfileMenu from './ProfileMenu';
 
 type EventItem = {
   eventId: string;
@@ -74,12 +75,9 @@ export default function TestHomePage() {
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [period, setPeriod] = useState<'upcoming' | 'past'>('upcoming');
   const [now, setNow] = useState(() => new Date());
-  const { user, logout } = useAuth();
+  const { user } = useAuth();
   const navigate = useNavigate();
   const canCreate = user?.systemRole !== 'STAFF';
-  const profileLabel = user?.username || user?.email || 'Signed-in user';
-  const profileInitials = profileLabel.split(/[@._ -]+/).filter(Boolean).slice(0, 2).map((part) => part[0]).join('').toUpperCase();
-
   const loadEvents = useCallback(async () => {
     setLoading(true);
     setError('');
@@ -180,7 +178,7 @@ export default function TestHomePage() {
             <Bell aria-hidden="true" />
           </Button>
           {notificationsOpen && <div id="desktop-notifications" className="test-notification-popover" role="status"><strong>You’re all caught up</strong><span>No new event alerts.</span></div>}
-          <Button className="test-profile-action" variant="ghost" aria-label={`Sign out ${profileLabel}`} onClick={() => void logout()}><span aria-hidden="true">{profileInitials}</span></Button>
+          <ProfileMenu triggerClassName="test-profile-action" compact />
         </div>
       </header>
 
@@ -200,7 +198,7 @@ export default function TestHomePage() {
             setSearchOpen(false);
             setQuery('');
           }}><Bell aria-hidden="true" /></button>
-          <button className="reference-mobile-profile" type="button" aria-label={`Sign out ${profileLabel}`} onClick={() => void logout()}><span aria-hidden="true">{profileInitials}</span></button>
+          <ProfileMenu triggerClassName="reference-mobile-profile" compact />
         </div>
       </div>
 
