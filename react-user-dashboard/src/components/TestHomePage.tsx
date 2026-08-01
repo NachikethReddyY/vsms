@@ -145,6 +145,7 @@ export default function TestHomePage() {
 
         <div className={`test-header-actions ${searchOpen ? 'searching' : ''}`}>
           <time className="reference-local-time" dateTime={now.toISOString()}>{localTime}</time>
+          {canCreate && <Button className="test-header-create reference-header-create" onClick={() => navigate('/events/new')}><Plus aria-hidden="true" />New event</Button>}
           {searchOpen && (
             <label className="test-header-search">
               <Search aria-hidden="true" />
@@ -234,7 +235,6 @@ export default function TestHomePage() {
             <button type="button" role="radio" data-value="upcoming" aria-checked={period === 'upcoming'} tabIndex={period === 'upcoming' ? 0 : -1} onClick={() => setPeriod('upcoming')}>Upcoming</button>
             <button type="button" role="radio" data-value="past" aria-checked={period === 'past'} tabIndex={period === 'past' ? 0 : -1} onClick={() => setPeriod('past')}>Past</button>
           </SegmentedControl>
-          {canCreate && <Button className="reference-new-event" onClick={() => navigate('/events/new')}><Plus aria-hidden="true" />New event</Button>}
         </section>
 
         {error ? (
