@@ -1,82 +1,101 @@
-import { Bell, ChevronRight, MapPin, Search, Ticket, Users } from 'lucide-react';
+import { Bell, MapPin, Plus, Search, Ticket, Users } from 'lucide-react';
 import { SegmentedControl } from '@astryxdesign/core';
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { getEventArtwork } from '../features/events/eventBanners';
+import { eventApi, type EventRecord, type EventStatus } from '../features/events/eventApi';
+import { getApiMessage, useAuth } from '../auth/authState';
 import { Button } from './ui/button';
 import { Dock, DockIcon } from './ui/dock';
 import './TestHomePage.css';
 
 type EventItem = {
+  eventId: string;
   date: string;
   day: string;
   month: string;
   title: string;
   time: string;
   venue: string;
-  status: 'Live' | 'Ready' | 'Draft' | 'Complete';
-  banner: string;
+  status: 'Live' | 'Ready' | 'Draft' | 'Complete' | 'Cancelled';
+  artwork: string;
   attendance: string;
-  progress?: number;
-  stationState: string;
   staff: string[];
   extraStaff?: number;
 };
 
-const upcoming: EventItem[] = [
-  {
-    date: 'Today',
-    day: 'Friday',
-    month: '31 July',
-    title: 'Queenstown Community Vision Day',
-    time: '8:00 AM – 2:00 PM GMT+8',
-    venue: 'Queenstown Community Centre',
-    status: 'Live',
-    banner: 'COMMUNITY_SCREENING',
-    attendance: '124 / 160',
-    progress: 77.5,
-    stationState: '4 stations active',
-    staff: ['Mei Lin', 'Arun Das', 'Sara Tan'],
-    extraStaff: 20,
-  },
-  {
-    date: 'Tomorrow',
-    day: 'Saturday',
-    month: '1 August',
-    title: 'Tampines Family Eye Screening',
-    time: '9:30 AM – 4:00 PM GMT+8',
-    venue: 'Our Tampines Hub',
-    status: 'Ready',
-    banner: 'LIBRARY_SCREENING',
-    attendance: '186 capacity',
-    stationState: 'Screening stations ready',
-    staff: ['Kavya Nair', 'Daniel Koh', 'Alicia Lim', 'Haziq Rahman'],
-    extraStaff: 1,
-  },
-  {
-    date: '8 Aug',
-    day: 'Saturday',
-    month: '8 August',
-    title: 'Sengkang Health & Vision Fair',
-    time: '10:00 AM – 3:00 PM GMT+8',
-    venue: 'Sengkang Community Club',
-    status: 'Draft',
-    banner: 'EVENT_OPERATIONS',
-    attendance: '240 capacity',
-    stationState: 'Stations pending',
-    staff: ['Jia Wei', 'Noor Aziz', 'Lydia Goh'],
-  },
-];
+const STATUS_LABEL: Record<EventStatus, EventItem['status']> = {
+  DRAFT: 'Draft',
+  PUBLISHED: 'Ready',
+  IN_PROGRESS: 'Live',
+  COMPLETED: 'Complete',
+  CANCELLED: 'Cancelled',
+};
+
+const dateKey = (value: Date, timeZone: string) => new Intl.DateTimeFormat('en-CA', {
+  year: 'numeric', month: '2-digit', day: '2-digit', timeZone,
+}).format(value);
+
+function toEventItem(event: EventRecord): EventItem {
+  const startsAt = new Date(event.startsAt);
+  const endsAt = new Date(event.endsAt);
+  const today = new Date();
+  const tomorrow = new Date(Date.now() + 86400000);
+  const eventDate = dateKey(startsAt, event.timezone);
+  const shortDate = new Intl.DateTimeFormat('en-SG', { day: 'numeric', month: 'short', timeZone: event.timezone }).format(startsAt);
+  const names = [...new Set(event.shifts.flatMap((shift) => shift.staffAssignments.map((assignment) => assignment.user.username)))];
+  const timeFormatter = new Intl.DateTimeFormat('en-SG', { hour: 'numeric', minute: '2-digit', timeZone: event.timezone });
+  const zone = new Intl.DateTimeFormat('en-SG', { timeZone: event.timezone, timeZoneName: 'short' })
+    .formatToParts(startsAt).find((part) => part.type === 'timeZoneName')?.value ?? event.timezone;
+  const time = `${timeFormatter.format(startsAt)} – ${timeFormatter.format(endsAt)} ${zone}`.toUpperCase().replace('SGT', 'GMT+8');
+
+  return {
+    eventId: event.eventId,
+    date: eventDate === dateKey(today, event.timezone) ? 'Today' : eventDate === dateKey(tomorrow, event.timezone) ? 'Tomorrow' : shortDate,
+    day: new Intl.DateTimeFormat('en-SG', { weekday: 'long', timeZone: event.timezone }).format(startsAt),
+    month: new Intl.DateTimeFormat('en-SG', { day: 'numeric', month: 'long', timeZone: event.timezone }).format(startsAt),
+    title: event.name,
+    time,
+    venue: event.venue,
+    status: STATUS_LABEL[event.status],
+    artwork: getEventArtwork(event.bannerKey, event.artworkDataUrl),
+    attendance: `${event.activeCapacityCount.toLocaleString()} / ${event.capacity.toLocaleString()}`,
+    staff: names.slice(0, 4),
+    extraStaff: names.length > 4 ? names.length - 4 : undefined,
+  };
+}
 
 export default function TestHomePage() {
+  const [events, setEvents] = useState<EventRecord[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
   const [query, setQuery] = useState('');
   const [searchOpen, setSearchOpen] = useState(false);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [period, setPeriod] = useState<'upcoming' | 'past'>('upcoming');
   const [now, setNow] = useState(() => new Date());
+  const { user, logout } = useAuth();
   const navigate = useNavigate();
+  const canCreate = user?.systemRole !== 'STAFF';
+  const profileLabel = user?.username || user?.email || 'Signed-in user';
+  const profileInitials = profileLabel.split(/[@._ -]+/).filter(Boolean).slice(0, 2).map((part) => part[0]).join('').toUpperCase();
+
+  const loadEvents = useCallback(async () => {
+    setLoading(true);
+    setError('');
+    try {
+      const data = await eventApi.list();
+      setEvents(data.events);
+    } catch (cause) {
+      setError(getApiMessage(cause, 'Events could not be loaded.'));
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => { void loadEvents(); }, [loadEvents]);
   useEffect(() => {
-    const clock = window.setInterval(() => setNow(new Date()), 1000);
+    const clock = window.setInterval(() => setNow(new Date()), 60000);
     return () => window.clearInterval(clock);
   }, []);
   useEffect(() => {
@@ -98,8 +117,10 @@ export default function TestHomePage() {
     timeZoneName: 'short',
   }).format(now).toUpperCase().replace('SGT', 'GMT+8');
   const visibleEvents = useMemo(
-    () => (period === 'upcoming' ? upcoming : []).filter((event) => `${event.title} ${event.venue}`.toLowerCase().includes(query.toLowerCase())),
-    [period, query],
+    () => events.map(toEventItem)
+      .filter((event) => period === 'past' ? ['Complete', 'Cancelled'].includes(event.status) : !['Complete', 'Cancelled'].includes(event.status))
+      .filter((event) => `${event.title} ${event.venue}`.toLowerCase().includes(query.toLowerCase())),
+    [events, period, query],
   );
 
   return (
@@ -154,7 +175,7 @@ export default function TestHomePage() {
             <Bell aria-hidden="true" />
           </Button>
           {notificationsOpen && <div id="desktop-notifications" className="test-notification-popover" role="status"><strong>You’re all caught up</strong><span>No new event alerts.</span></div>}
-          <Button className="test-profile-action" variant="ghost" aria-label="Nadia Rahman profile" onClick={() => navigate('/login')}><span aria-hidden="true">NR</span></Button>
+          <Button className="test-profile-action" variant="ghost" aria-label={`Sign out ${profileLabel}`} onClick={() => void logout()}><span aria-hidden="true">{profileInitials}</span></Button>
         </div>
       </header>
 
@@ -174,7 +195,7 @@ export default function TestHomePage() {
             setSearchOpen(false);
             setQuery('');
           }}><Bell aria-hidden="true" /></button>
-          <button className="reference-mobile-profile" type="button" aria-label="Nadia Rahman profile" onClick={() => navigate('/login')}><span aria-hidden="true">NR</span></button>
+          <button className="reference-mobile-profile" type="button" aria-label={`Sign out ${profileLabel}`} onClick={() => void logout()}><span aria-hidden="true">{profileInitials}</span></button>
         </div>
       </div>
 
@@ -199,6 +220,7 @@ export default function TestHomePage() {
               if (searchOpen) setQuery('');
             }}><Search aria-hidden="true" /></button>
           </DockIcon>
+          {canCreate && <DockIcon><Link className="reference-dock-action" to="/events/new" aria-label="Create event"><Plus aria-hidden="true" /></Link></DockIcon>}
         </Dock>
       </nav>
 
@@ -209,13 +231,24 @@ export default function TestHomePage() {
             <button type="button" role="radio" data-value="upcoming" aria-checked={period === 'upcoming'} tabIndex={period === 'upcoming' ? 0 : -1} onClick={() => setPeriod('upcoming')}>Upcoming</button>
             <button type="button" role="radio" data-value="past" aria-checked={period === 'past'} tabIndex={period === 'past' ? 0 : -1} onClick={() => setPeriod('past')}>Past</button>
           </SegmentedControl>
-          <Button className="reference-view-all" variant="ghost" onClick={() => navigate('/login')}>View All<ChevronRight aria-hidden="true" /></Button>
+          {canCreate && <Button className="reference-new-event" onClick={() => navigate('/events/new')}><Plus aria-hidden="true" />New event</Button>}
         </section>
 
-        {visibleEvents.length ? (
+        {error ? (
+          <section className="test-empty-state" role="alert">
+            <h2>Events could not be loaded</h2>
+            <p>{error}</p>
+            <Button variant="ghost" onClick={() => void loadEvents()}>Try again</Button>
+          </section>
+        ) : loading ? (
+          <section className="test-empty-state" aria-live="polite">
+            <span className="spinner" />
+            <h2>Loading events</h2>
+          </section>
+        ) : visibleEvents.length ? (
           <section className="test-event-register" id="events-register" aria-label={`${period === 'upcoming' ? 'Upcoming' : 'Past'} events`}>
             {visibleEvents.map((event) => (
-              <article className={`test-register-row ${event.status.toLowerCase()}`} key={event.title} aria-label={`${event.title}, status ${event.status}`}>
+              <article className={`test-register-row ${event.status.toLowerCase()}`} key={event.eventId} aria-label={`${event.title}, status ${event.status}`}>
                 <div className="test-register-row-date">
                   <strong>{event.date}</strong>
                   <span>{event.day}</span>
@@ -223,9 +256,9 @@ export default function TestHomePage() {
                 </div>
                 <span className="reference-timeline" aria-hidden="true"><i /></span>
                 <div className="reference-event-card">
-                  <Link className="test-register-row-link" to="/login" aria-label={`Open ${event.title}`} />
+                  <Link className="test-register-row-link" to={`/events/${event.eventId}`} aria-label={`Open ${event.title}`} />
                   <div className="reference-event-media">
-                    <img src={getEventArtwork(event.banner)} alt="" loading="lazy" />
+                    <img src={event.artwork} alt="" loading="lazy" />
                   </div>
                   <div className="test-register-event">
                     <div className="reference-event-time">
@@ -243,7 +276,7 @@ export default function TestHomePage() {
                     </div>
                   </div>
                   <div className="test-register-state">
-                    <Button className="test-row-action" onClick={() => navigate('/login')}>Open</Button>
+                    <span className="test-row-action" aria-hidden="true">Open</span>
                   </div>
                 </div>
               </article>

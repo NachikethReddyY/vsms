@@ -8,7 +8,8 @@ const { randomToken, sha256, hashUserAgent } = require("../utils/security");
 
 const DUMMY_HASH = "$2b$12$EE6ZpTcEn105IV6.OlGeS.KQJx73gDqfJA7NnE7NDZGy75XXOa9hK";
 const COOKIE_OPTIONS = { httpOnly: true, secure: true, sameSite: "strict", path: "/auth" };
-const CSRF_COOKIE_OPTIONS = { httpOnly: false, secure: true, sameSite: "strict", path: "/auth" };
+const CSRF_COOKIE_OPTIONS = { httpOnly: false, secure: true, sameSite: "strict", path: "/" };
+const LEGACY_CSRF_COOKIE_OPTIONS = { ...CSRF_COOKIE_OPTIONS, path: "/auth" };
 
 const publicUser = (user) => ({
   userId: user.userId,
@@ -30,6 +31,7 @@ const buildSessionData = (userId, familyId, token, req) => ({
 
 const issueCookies = (res, refreshToken, csrfToken) => {
   const maxAge = env.REFRESH_TOKEN_TTL_DAYS * 86400000;
+  res.clearCookie("vsms_csrf", LEGACY_CSRF_COOKIE_OPTIONS);
   res.cookie("vsms_refresh", refreshToken, { ...COOKIE_OPTIONS, maxAge });
   res.cookie("vsms_csrf", csrfToken, { ...CSRF_COOKIE_OPTIONS, maxAge });
 };
@@ -37,6 +39,7 @@ const issueCookies = (res, refreshToken, csrfToken) => {
 const clearCookies = (res) => {
   res.clearCookie("vsms_refresh", COOKIE_OPTIONS);
   res.clearCookie("vsms_csrf", CSRF_COOKIE_OPTIONS);
+  res.clearCookie("vsms_csrf", LEGACY_CSRF_COOKIE_OPTIONS);
 };
 
 const signup = async ({ email, password }) => {
