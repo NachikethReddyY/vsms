@@ -1,13 +1,14 @@
-const qrService = require("../services/qrServices");
+const qrService = require("../services/qrService");
 
 // Registration-module compatibility endpoint
 exports.generateRegistrationQR = async (req, res, next) => {
     try {
         const qr = await qrService.generateRegistrationQR(
-            req.params.registrationId, 
+            req.params.registrationId,
             req.user?.id || req.auth?.userId
         );
-        return res.status(201).json(qr);
+        const { token: _token, ...safeQr } = qr;
+        return res.status(201).json(safeQr);
     } catch (err) {
         next(err);
     }
@@ -32,11 +33,12 @@ exports.generateQR = async (req, res, next) => {
         const userId = req.user?.id;
 
         const qr = await qrService.generateQR(registrationId, userId);
+        const { token: _token, ...safeQr } = qr;
 
         return res.status(201).json({
             success: true,
             message: "QR Code generated successfully.",
-            data: qr
+            data: safeQr
         });
     } catch (err) {
         next(err);
@@ -51,10 +53,8 @@ exports.verifyQR = async (req, res, next) => {
     try {
         const { token, eventId } = req.body;
         const userId = req.user?.id;
-        const deviceName = req.headers["user-agent"] || "API-Client";
-        const ipAddress = req.ip || "::1";
 
-        const result = await qrService.verifyAndScanPass(token, eventId, userId, deviceName, ipAddress);
+        const result = await qrService.verifyQR(token, eventId, userId);
 
         return res.status(200).json({
             success: true,

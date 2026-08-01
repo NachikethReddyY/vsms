@@ -30,7 +30,7 @@ const { notFound, errorHandler } = require("./middlewares/errorHandler");
 // -----------------------------------------------------------------------------
 if (env.isProduction) {
   try {
-    const codePath = __filename; 
+    const codePath = __filename;
     const sigPath = path.join(__dirname, "../dist/server.js.sig");
     const pubKeyPath = path.join(__dirname, "../public.pem");
 
@@ -45,7 +45,7 @@ if (env.isProduction) {
 
       if (!verifier.verify(publicKey, signature)) {
         console.error("FATAL: Code signature verification failed! Artifact has been modified.");
-        process.exit(1); 
+        process.exit(1);
       }
       console.log("🔒 Code signature successfully verified.");
     }

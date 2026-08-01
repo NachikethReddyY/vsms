@@ -15,7 +15,7 @@ const schema = z.object({
   ACCESS_TOKEN_TTL: z.string().default("15m"),
   REFRESH_TOKEN_TTL_DAYS: z.coerce.number().int().min(1).max(90).default(7),
   PUBLIC_SIGNUP_ENABLED: z.enum(["true", "false"]).default("false"),
-  CORS_ORIGINS: z.string().default("http://localhost:5173"),
+  CORS_ORIGINS: z.string().default("https://localhost:5173,https://127.0.0.1:5173,http://localhost:5173,http://127.0.0.1:5173"),
   CORS_ORIGIN: z.string().optional(),
   TRUST_PROXY: z.enum(["true", "false"]).default("false"),
   LOCAL_HTTPS: z.enum(["true", "false"]).default("false"),
@@ -33,6 +33,9 @@ if (!parsed.success) {
 }
 
 const values = parsed.data;
+if (values.NODE_ENV === "production" && !values.JWT_ACCESS_SECRET) {
+  throw new Error("JWT_ACCESS_SECRET is required in production");
+}
 if (new URL(values.ONEMAP_BASE_URL).origin !== "https://www.onemap.gov.sg") {
   throw new Error("ONEMAP_BASE_URL must use the official https://www.onemap.gov.sg origin");
 }

@@ -106,6 +106,10 @@ function ResultData({ station }: { station: ReviewDetailResponse['stations'][num
     </dl>;
   }
   if (station.stationType === 'REFRACTION') {
+    const refraction = data as typeof data & {
+      od?: { sphere?: number; cylinder?: number; axis?: number | null };
+      os?: { sphere?: number; cylinder?: number; axis?: number | null };
+    };
     const formatEye = (eye?: { sphere?: number; cylinder?: number; axis?: number | null }) => {
       if (!eye || eye.sphere == null || eye.cylinder == null) return '—';
       return `${eye.sphere}/${eye.cylinder} x ${eye.axis ?? '—'}`;
@@ -113,8 +117,8 @@ function ResultData({ station }: { station: ReviewDetailResponse['stations'][num
     return <dl className="visual-acuity-result">
       <div><dt>Status</dt><dd>{displayValue(data.measurementStatus)}</dd></div>
       <div><dt>Usual distance glasses</dt><dd>{displayValue(data.wearsDistanceGlasses)}</dd></div>
-      <div><dt>Right eye (OD)</dt><dd>{formatEye(data.od)}</dd></div>
-      <div><dt>Left eye (OS)</dt><dd>{formatEye(data.os)}</dd></div>
+      <div><dt>Right eye (OD)</dt><dd>{formatEye(refraction.od)}</dd></div>
+      <div><dt>Left eye (OS)</dt><dd>{formatEye(refraction.os)}</dd></div>
       {data.notes ? <div><dt>Notes</dt><dd>{displayValue(data.notes)}</dd></div> : null}
     </dl>;
   }
