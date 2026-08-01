@@ -3,7 +3,7 @@ import type { AuthSession } from "../types";
 import { clearStoredSession, getStoredSession, setStoredSession } from "./session";
 
 const baseURL = import.meta.env.VITE_API_BASE_URL ?? "/api/v1";
-type TokenPayload = { accessToken: string; csrfToken: string; token?: string; user?: any; sessionExpiresIn?: number };
+type TokenPayload = { accessToken: string; csrfToken: string };
 type RetryableRequestConfig = InternalAxiosRequestConfig & { _retry?: boolean };
 
 let accessToken: string | null = null;
@@ -11,14 +11,8 @@ let csrfToken: string | null = null;
 let refreshPromise: Promise<AuthSession> | null = null;
 
 export function setSessionTokens(tokens: TokenPayload | null) {
-  if (tokens === null) {
-    accessToken = null;
-    csrfToken = null;
-    clearStoredSession();
-    return;
-  }
-  accessToken = tokens.accessToken || tokens.token || null;
-  csrfToken = tokens.csrfToken || null;
+  accessToken = tokens?.accessToken || null;
+  csrfToken = tokens?.csrfToken || null;
 }
 
 export function getCsrfToken() {
@@ -49,31 +43,25 @@ apiClient.interceptors.request.use((config) => {
   config.headers["X-Device-Id"] = getDeviceId();
   config.headers["X-Device-Name"] = "VSMS staff web";
 
-  // Check if session contains an authorization token and attach it if available
-  const session = getStoredSession();
-  if (session && "token" in session && typeof session.token === "string" && session.token) {
-    config.headers.Authorization = `Bearer ${session.token}`;
-  } else if (accessToken) {
-    config.headers.Authorization = `Bearer ${accessToken}`;
+  if (accessToken) config.headers.Authorization = `Bearer ${accessToken}`;
+  if (csrfToken && !["get", "head", "options"].includes(config.method || "get")) {
+    config.headers["X-CSRF-Token"] = csrfToken;
   }
-
   return config;
 });
 
 async function rotateSession(): Promise<AuthSession> {
   const response = await refreshClient.post("/auth/refresh", null, {
     headers: {
-      "X-CSRF-Token": getCsrfToken() || "",
+      "X-CSRF-Token": getCsrfToken(),
       "X-Device-Id": getDeviceId(),
       "X-Device-Name": "VSMS staff web",
     },
   });
-  
   setSessionTokens(response.data);
-  const session: AuthSession = {
+  const session = {
     user: response.data.user,
-    expiresAt: Date.now() + Number(response.data.sessionExpiresIn || 2_592_000) * 1000,
-    token: response.data.token || response.data.accessToken,
+    expiresAt: Date.now() + Number(response.data.sessionExpiresIn || 604_800) * 1000,
   };
   setStoredSession(session);
   return session;
@@ -99,6 +87,7 @@ apiClient.interceptors.response.use(
       return apiClient(request);
     } catch (refreshError) {
       setSessionTokens(null);
+      clearStoredSession();
       window.location.assign("/login?reason=session-expired");
       return Promise.reject(refreshError);
     }
