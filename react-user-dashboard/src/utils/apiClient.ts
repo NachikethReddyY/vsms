@@ -35,12 +35,14 @@ const commonHeaders = {
   "Content-Type": "application/json",
   "X-Requested-With": "XMLHttpRequest",
 };
+
 const apiClient = axios.create({ baseURL, withCredentials: true, headers: commonHeaders });
 const refreshClient = axios.create({ baseURL, withCredentials: true, headers: commonHeaders });
 
 apiClient.interceptors.request.use((config) => {
   config.headers["X-Device-Id"] = getDeviceId();
   config.headers["X-Device-Name"] = "VSMS staff web";
+
   if (accessToken) config.headers.Authorization = `Bearer ${accessToken}`;
   if (csrfToken && !["get", "head", "options"].includes(config.method || "get")) {
     config.headers["X-CSRF-Token"] = csrfToken;

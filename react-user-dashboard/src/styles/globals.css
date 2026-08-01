@@ -1,0 +1,21 @@
+@import "./tokens.css";
+@import "tailwindcss";
+
+body {
+  background-color: var(--canvas);
+  color: var(--ink);
+  font-family: system-ui, -apple-system, "SF Pro Text", Inter, "Segoe UI", sans-serif;
+  font-size: 13px;
+  line-height: 20px;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Tabular numbers for IDs, wait times, counts */
+.tabular-nums {
+  font-variant-numeric: tabular-nums;
+}
+
+/* Hairline border utilities */
+.border-hairline {
+  border-color: var(--hairline);
+}

@@ -1,4 +1,4 @@
-import type { Dispatch, SetStateAction } from "react";
+import { Dispatch, SetStateAction } from "react";
 
 export type QueueStatus = "SIGNED_UP" | "CHECKED_IN" | "COMPLETED" | "CANCELLED";
 
@@ -145,7 +145,7 @@ export function QueueTable({
           <button
             type="button"
             disabled={currentPage === 1}
-            onClick={() => setCurrentPage((page) => Math.max(1, page - 1))}
+            onClick={() => setCurrentPage((page: number) => Math.max(1, page - 1))}
             className="rounded-lg border px-3 py-1.5 disabled:opacity-40"
           >
             Previous
@@ -154,7 +154,7 @@ export function QueueTable({
           <button
             type="button"
             disabled={currentPage === totalPages}
-            onClick={() => setCurrentPage((page) => Math.min(totalPages, page + 1))}
+            onClick={() => setCurrentPage((page: number) => Math.min(totalPages, page + 1))}
             className="rounded-lg border px-3 py-1.5 disabled:opacity-40"
           >
             Next
