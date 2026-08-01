@@ -3,15 +3,15 @@ import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { NavLink, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../auth/authState';
 import { SuccessConfetti, ThemeToggle } from './MagicEffects';
+import ProfileMenu from './ProfileMenu';
 
 export default function AppShell({ children }: { children: ReactNode }) {
   const [collapsed, setCollapsed] = useState(false);
   const [eventSearch, setEventSearch] = useState('');
-  const { user, logout } = useAuth();
+  const { user } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const workspaceRef = useRef<HTMLElement>(null);
-  const role = user?.systemRole.replace('_', ' ').toLowerCase();
   const canCreate = user?.systemRole === 'ADMIN' || user?.systemRole === 'EVENT_MANAGER';
   const mobileTitle = location.pathname === '/events/new'
     ? 'Create event'
@@ -19,6 +19,8 @@ export default function AppShell({ children }: { children: ReactNode }) {
       ? 'Dashboard'
       : location.pathname === '/qr-generator'
         ? 'QR passes'
+        : location.pathname === '/settings'
+          ? 'Settings'
         : /\/events\/[^/]+\/edit$/.test(location.pathname)
           ? 'Edit event'
     : /^\/events\/[^/]+$/.test(location.pathname)
@@ -54,10 +56,7 @@ export default function AppShell({ children }: { children: ReactNode }) {
         </nav>
         <div className="sidebar-foot">
           <div className="connection"><SignalIcon /><span>Connected<br/><small>All changes synced</small></span></div>
-          <button className="profile" onClick={() => void logout()} aria-label={`Sign out ${user?.email}`}>
-            <span className="avatar">{user?.email.slice(0, 2).toUpperCase()}</span>
-            <span><strong>{user?.email.split('@')[0]}</strong><small>{role}</small></span>
-          </button>
+          <ProfileMenu triggerClassName="profile" />
         </div>
       </aside>}
       <div className="app-main">

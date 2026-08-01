@@ -9,6 +9,7 @@ import SignUpPage from './components/SignUpPage';
 import DashboardPage from './components/DashboardPage';
 import QRCodePage from './components/qr/QRCodePage';
 import TestHomePage from './components/TestHomePage';
+import SettingsPage from './components/SettingsPage';
 
 function ProtectedRoutes() {
   const { user, isBootstrapping, bootstrapError, retrySession } = useAuth();
@@ -37,6 +38,7 @@ export default function App() {
           <Route path="/dashboard" element={<DashboardPage />} />
           <Route path="/events/:eventId" element={<EventDetailPage />} />
           <Route path="/qr-generator" element={<QRCodePage />} />
+          <Route path="/settings" element={<SettingsPage />} />
           <Route element={<ManagerRoutes />}>
             <Route path="/events/new" element={<EventFormPage mode="create" />} />
             <Route path="/events/:eventId/edit" element={<EventFormPage mode="edit" />} />
