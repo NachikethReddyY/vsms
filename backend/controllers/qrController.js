@@ -4,7 +4,8 @@ const qrModel = require("../models/qrModel");
 // existing QR model so there is one token format and one QR lifecycle.
 exports.generateRegistrationQR = async (req, res) => {
     const qr = await qrModel.generateQR(req.params.registrationId, req.user?.id || req.auth?.userId);
-    return res.status(201).json(qr);
+    const { token: _token, ...safeQr } = qr;
+    return res.status(201).json(safeQr);
 };
 
 exports.getRegistrationByQR = async (req, res) => {
@@ -29,11 +30,12 @@ exports.generateQR = async (req, res) => {
         }
 
         const qr = await qrModel.generateQR(registrationId, userId);
+        const { token: _token, ...safeQr } = qr;
 
         return res.status(201).json({
             success: true,
             message: "QR Code generated successfully.",
-            data: qr
+            data: safeQr
         });
 
     } catch (err) {

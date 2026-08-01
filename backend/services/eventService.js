@@ -505,7 +505,7 @@ const listEvents = async (query, user) => {
   const statuses = query.statuses || (query.status ? [query.status] : null);
   const scope = `events:${statuses?.join(",") || "all"}:${query.search || ""}:${query.limit}`;
   const cursor = decodeCursor(query.cursor, scope);
-  
+
   const visibilityCondition = visibilityWhere(user);
   const conditions = [];
 

@@ -67,7 +67,7 @@ const verifyAndScanPass = async (token, stationId, userId, deviceName, ipAddress
     });
 
     let scanResult = "SUCCESS";
-    
+
     if (!qrPass) {
       // Log invalid scan attempt
       await tx.scanLog.create({
