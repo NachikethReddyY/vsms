@@ -1,97 +1,216 @@
-import React from 'react';
+import React, { useState } from 'react';
 import axios from 'axios';
 import { useForm } from 'react-hook-form';
 import { Link, useNavigate } from 'react-router-dom';
-import { getApiMessage, useAuth } from '../auth/authState';
 import apiClient from '../utils/apiClient';
-import { Meteors, ThemeToggle } from './MagicEffects';
+import './SignUpPage.css';
 
 interface SignUpFormInputs {
+  fullName: string;
+  username: string; // <--- Added username field
+  employeeNumber: string;
   email: string;
   password: string;
   confirmPassword: string;
 }
 
 const SignUpPage: React.FC = () => {
-  const { login } = useAuth();
-  const { register, handleSubmit, formState: { errors, isSubmitting } } = useForm<SignUpFormInputs>();
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+  const {
+    register,
+    handleSubmit,
+    watch,
+    formState: { errors, isSubmitting },
+  } = useForm<SignUpFormInputs>();
+
   const navigate = useNavigate();
-  const [formError, setFormError] = React.useState('');
+  const password = watch('password');
 
   const onSubmit = async (data: SignUpFormInputs) => {
-    setFormError('');
-    if (data.password !== data.confirmPassword) {
-      setFormError('The passwords do not match.');
-      return;
-    }
+    setErrorMessage(null);
 
     try {
-      await apiClient.post('/auth/signup', { email: data.email, password: data.password });
-      await login(data.email, data.password);
-      sessionStorage.setItem('vsms:celebrate', 'true');
-      navigate('/events', { replace: true });
-    } catch (error) {
-      if (axios.isAxiosError(error) && error.response?.status === 409) {
-        setFormError('An account already uses those details. Try signing in or contact an administrator.');
-      } else if (axios.isAxiosError(error) && error.response?.status === 404) {
-        setFormError('Registration is currently closed. Ask an administrator to enable staff sign-up.');
-      } else {
-        setFormError(getApiMessage(error, 'We could not create your account. Please try again.'));
-      }
+      await apiClient.post('/auth/signup', {
+        fullName: data.fullName,
+        username: data.username, // <--- Sent to backend
+        employeeNumber: data.employeeNumber,
+        email: data.email,
+        password: data.password,
+      });
+
+      alert('Sign up successful! Please log in.');
+      navigate('/login');
+    } catch (error: unknown) {
+      const serverMessage = axios.isAxiosError<{ message?: string }>(error)
+        ? error.response?.data?.message || 'Failed to create account. Please try again.'
+        : 'Failed to create account. Please try again.';
+      setErrorMessage(serverMessage);
     }
   };
 
   return (
-    <main className="auth-page auth-page-compact">
-      <Meteors count={12} />
-      <header className="auth-topbar"><div className="login-brand"><span aria-hidden="true">V</span><strong>VSMS</strong><small>Event operations</small></div><ThemeToggle /></header>
-      <section className="auth-card-wrap">
-      <form onSubmit={handleSubmit(onSubmit)} className="auth-card signup-form" noValidate>
-        <h1>Create your staff account</h1>
-        <p>Use your work email. Registration must already be enabled by a VSMS administrator.</p>
-        {formError && <div className="alert error" role="alert">{formError}</div>}
-        <div>
-          <label htmlFor="email">Work email</label>
-          <input
-            id="email"
-            type="email"
-            autoComplete="email"
-            placeholder="you@organisation.org"
-            {...register('email', {
-              required: 'Email is required',
-              pattern: { value: /^[^\s@]+@[^\s@]+\.[^\s@]+$/, message: 'Enter a valid email address' },
-            })}
-          />
-          {errors.email && <span className="field-error">{errors.email.message}</span>}
+    <main className="vsms-auth-container">
+      <div className="vsms-auth-card">
+        {/* Header */}
+        <div className="mb-6">
+          <h1 className="vsms-auth-title">Create Staff Account</h1>
+          <p className="vsms-auth-subtitle">
+            Register your credentials and employee details for VSMS screening access.
+          </p>
         </div>
-        <div>
-          <label htmlFor="password">Password</label>
-          <input
-            id="password"
-            type="password"
-            autoComplete="new-password"
-            minLength={12}
-            {...register('password', {
-              required: 'Password is required',
-              minLength: { value: 12, message: 'Use at least 12 characters' },
-            })}
-          />
-          {errors.password && <span className="field-error">{errors.password.message}</span>}
+
+        {/* Error Alert */}
+        {errorMessage && (
+          <div className="vsms-alert-banner" role="alert">
+            {errorMessage}
+          </div>
+        )}
+
+        {/* Form */}
+        <form onSubmit={handleSubmit(onSubmit)} noValidate className="space-y-4">
+          {/* Full Name */}
+          <div className="vsms-field-group">
+            <label htmlFor="fullName" className="vsms-label">
+              Full Name
+            </label>
+            <input
+              id="fullName"
+              type="text"
+              placeholder="Dr. Alex Rivera"
+              {...register('fullName', {
+                required: 'Full name is required',
+              })}
+              className="vsms-input"
+            />
+            {errors.fullName && (
+              <p className="vsms-error-text">{errors.fullName.message}</p>
+            )}
+          </div>
+
+          {/* Username */}
+          <div className="vsms-field-group">
+            <label htmlFor="username" className="vsms-label">
+              Username
+            </label>
+            <input
+              id="username"
+              type="text"
+              placeholder="alexrivera"
+              {...register('username', {
+                required: 'Username is required',
+              })}
+              className="vsms-input"
+            />
+            {errors.username && (
+              <p className="vsms-error-text">{errors.username.message}</p>
+            )}
+          </div>
+
+          {/* Employee Number */}
+          <div className="vsms-field-group">
+            <label htmlFor="employeeNumber" className="vsms-label">
+              Employee Number
+            </label>
+            <input
+              id="employeeNumber"
+              type="text"
+              placeholder="EMP-1042"
+              {...register('employeeNumber', {
+                required: 'Employee number is required',
+              })}
+              className="vsms-input"
+            />
+            {errors.employeeNumber && (
+              <p className="vsms-error-text">{errors.employeeNumber.message}</p>
+            )}
+          </div>
+
+          {/* Email */}
+          <div className="vsms-field-group">
+            <label htmlFor="email" className="vsms-label">
+              Staff Email Address
+            </label>
+            <input
+              id="email"
+              type="email"
+              placeholder="staff@vsms.org"
+              {...register('email', {
+                required: 'Email is required',
+                pattern: {
+                  value: /^[^\s@]+@[^\s@]+\.[^\s@]+$/,
+                  message: 'Use a valid email format',
+                },
+              })}
+              className="vsms-input"
+            />
+            {errors.email && (
+              <p className="vsms-error-text">{errors.email.message}</p>
+            )}
+          </div>
+
+          {/* Password */}
+          <div className="vsms-field-group">
+            <label htmlFor="password" className="vsms-label">
+              Password
+            </label>
+            <input
+              id="password"
+              type="password"
+              placeholder="••••••••"
+              {...register('password', {
+                required: 'Password is required',
+                minLength: {
+                  value: 8,
+                  message: 'Password must be at least 8 characters',
+                },
+              })}
+              className="vsms-input"
+            />
+            {errors.password && (
+              <p className="vsms-error-text">{errors.password.message}</p>
+            )}
+          </div>
+
+          {/* Confirm Password */}
+          <div className="vsms-field-group">
+            <label htmlFor="confirmPassword" className="vsms-label">
+              Confirm Password
+            </label>
+            <input
+              id="confirmPassword"
+              type="password"
+              placeholder="••••••••"
+              {...register('confirmPassword', {
+                required: 'Please confirm your password',
+                validate: (value) =>
+                  value === password || 'Passwords do not match',
+              })}
+              className="vsms-input"
+            />
+            {errors.confirmPassword && (
+              <p className="vsms-error-text">{errors.confirmPassword.message}</p>
+            )}
+          </div>
+
+          {/* Submit CTA */}
+          <button
+            type="submit"
+            disabled={isSubmitting}
+            className="vsms-btn-primary"
+          >
+            {isSubmitting ? 'Creating Account...' : 'Register Account'}
+          </button>
+        </form>
+
+        {/* Footer */}
+        <div className="vsms-footer-link">
+          Already registered?{' '}
+          <Link to="/login" className="vsms-link">
+            Log in here
+          </Link>
         </div>
-        <div>
-          <label htmlFor="confirmPassword">Confirm password</label>
-          <input
-            id="confirmPassword"
-            type="password"
-            autoComplete="new-password"
-            {...register('confirmPassword', { required: 'Please confirm your password' })}
-          />
-          {errors.confirmPassword && <span className="field-error">{errors.confirmPassword.message}</span>}
-        </div>
-        <button type="submit" className="primary wide interactive-cta" disabled={isSubmitting}><span>{isSubmitting ? 'Creating account...' : 'Create account'}</span><span aria-hidden="true">→</span></button>
-        <p className="form-note">Already provisioned? <Link to="/login">Return to sign in</Link></p>
-      </form>
-      </section>
+      </div>
     </main>
   );
 };

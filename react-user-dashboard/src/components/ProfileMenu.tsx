@@ -33,7 +33,7 @@ export default function ProfileMenu({ triggerClassName = '', compact = false }: 
     <div className={`profile-menu ${open ? 'open' : ''}`} ref={menuRef}>
       <button ref={triggerRef} type="button" className={triggerClassName} aria-label={`Open account menu for ${label}`} aria-haspopup="menu" aria-expanded={open} onClick={() => setOpen((value) => !value)}>
         <span className={compact ? '' : 'avatar'} aria-hidden="true">{initials}</span>
-        {!compact && <span><strong>{user?.username || user?.email.split('@')[0]}</strong><small>{user?.systemRole.replace('_', ' ').toLowerCase()}</small></span>}
+        {!compact && <span><strong>{user?.username || user?.email.split('@')[0]}</strong><small>{(user?.systemRole ?? 'STAFF').replace('_', ' ').toLowerCase()}</small></span>}
       </button>
       {open && <div className="profile-menu-panel" role="menu">
         <div className="profile-menu-identity"><strong>{user?.username || 'Account'}</strong><span>{user?.email}</span></div>

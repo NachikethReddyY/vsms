@@ -1,6 +1,7 @@
-import { MoonIcon, SunIcon, UserIcon } from '@heroicons/react/24/outline';
+import { MoonIcon, SunIcon } from '@heroicons/react/24/outline';
 import { useCallback, useEffect, useRef, useState, type ComponentPropsWithoutRef, type CSSProperties } from 'react';
 import { flushSync } from 'react-dom';
+import { getDisplayName, getMonogram } from '../utils/identity';
 
 type Theme = 'light' | 'dark';
 export type TransitionVariant = 'circle' | 'square' | 'triangle' | 'diamond' | 'hexagon' | 'rectangle' | 'star';
@@ -143,7 +144,7 @@ export function ThemeToggle({ className = '', duration = 400, variant = 'circle'
   }, [duration, fromCenter, theme, variant]);
 
   return (
-    <button {...props} ref={buttonRef} type="button" className={`icon-button theme-toggle ${className}`.trim()} onClick={toggle} aria-label={`Switch to ${theme === 'dark' ? 'light' : 'dark'} theme`}>
+    <button {...props} ref={buttonRef} type="button" className={`icon-button theme-toggle ${className}`.trim()} onClick={toggle} aria-pressed={theme === 'light'} aria-label={`Switch to ${theme === 'dark' ? 'light' : 'dark'} theme`}>
       <SunIcon className="theme-icon sun" aria-hidden="true" />
       <MoonIcon className="theme-icon moon" aria-hidden="true" />
     </button>
@@ -185,8 +186,8 @@ export function AvatarCircles({ people, label }: { people: AvatarPerson[]; label
   if (visible.length === 0) return null;
   return (
     <div className="avatar-circles" aria-label={label}>
-      {visible.map((person, index) => <span className={`crew-avatar tone-${index + 1}`} key={person.userId} title={person.username} aria-label={person.username} tabIndex={0}><UserIcon /></span>)}
-      {people.length > visible.length && <span className="crew-avatar crew-count" title={people.slice(visible.length).map((person) => person.username).join(', ')}>+{people.length - visible.length}</span>}
+      {visible.map((person, index) => <span className={`crew-avatar tone-${index + 1}`} key={person.userId} title={getDisplayName(person.username)} aria-label={getDisplayName(person.username)} tabIndex={0}>{getMonogram(person.username)}</span>)}
+      {people.length > visible.length && <span className="crew-avatar crew-count" title={people.slice(visible.length).map((person) => getDisplayName(person.username)).join(', ')}>+{people.length - visible.length}</span>}
     </div>
   );
 }

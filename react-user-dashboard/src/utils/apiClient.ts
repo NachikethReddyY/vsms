@@ -1,69 +1,102 @@
-import axios, { type InternalAxiosRequestConfig } from 'axios';
-import type { components } from '../generated/api';
+import axios, { type AxiosError, type InternalAxiosRequestConfig } from "axios";
+import type { AuthSession } from "../types";
+import { clearStoredSession, getStoredSession, setStoredSession } from "./session";
 
-const qaMirror = window.location.protocol === 'http:' && window.location.port === '5174';
-const baseURL = import.meta.env.VITE_API_BASE_URL ?? (qaMirror ? '/qa-api' : `https://${window.location.hostname}:5050`);
+const baseURL = import.meta.env.VITE_API_BASE_URL ?? "/api/v1";
+type TokenPayload = { accessToken: string; csrfToken: string };
+type RetryableRequestConfig = InternalAxiosRequestConfig & { _retry?: boolean };
+
 let accessToken: string | null = null;
 let csrfToken: string | null = null;
-let refreshPromise: Promise<SessionPayload> | null = null;
-const sessionChannel = 'BroadcastChannel' in window ? new BroadcastChannel('vsms-session') : null;
-type RetryableRequest = InternalAxiosRequestConfig & { _retry?: boolean };
-type SessionPayload = components['schemas']['AuthResponse'];
-export type TokenPayload = Pick<SessionPayload, 'accessToken' | 'csrfToken'>;
+let refreshPromise: Promise<AuthSession> | null = null;
 
-export const setSessionTokens = (tokens: TokenPayload | null) => {
+export function setSessionTokens(tokens: TokenPayload | null) {
   accessToken = tokens?.accessToken || null;
   csrfToken = tokens?.csrfToken || null;
-};
-export const getCsrfToken = () => csrfToken;
-export const readCsrfCookie = () => {
+}
+
+export function getCsrfToken() {
+  if (csrfToken) return csrfToken;
   const match = document.cookie.match(/(?:^|; )vsms_csrf=([^;]+)/);
   return match ? decodeURIComponent(match[1]) : null;
-};
-export const withSessionLock = <T,>(task: () => Promise<T>) => navigator.locks?.request
-  ? navigator.locks.request('vsms-session-rotation', task)
-  : task();
-const clearLocalSession = () => {
-  setSessionTokens(null);
-  window.dispatchEvent(new Event('vsms:session-ended'));
-};
-export const announceSessionEnded = () => {
-  clearLocalSession();
-  sessionChannel?.postMessage('ended');
-};
-sessionChannel?.addEventListener('message', ({ data }) => { if (data === 'ended') clearLocalSession(); });
+}
 
-const apiClient = axios.create({ baseURL, withCredentials: true, headers: { 'Content-Type': 'application/json' }, timeout: 15_000 });
-const refreshClient = axios.create({ baseURL, withCredentials: true, timeout: 15_000 });
+function getDeviceId() {
+  const key = "vsms_device_id";
+  let value = window.localStorage.getItem(key);
+  if (!value) {
+    value = crypto.randomUUID();
+    window.localStorage.setItem(key, value);
+  }
+  return value;
+}
 
-export const refreshSession = () => {
-  refreshPromise ??= withSessionLock(async () => {
-    csrfToken = readCsrfCookie() || csrfToken;
-    if (!csrfToken) throw new Error('Missing CSRF token');
-    const { data } = await refreshClient.post<SessionPayload>('/auth/refresh', undefined, { headers: { 'X-CSRF-Token': csrfToken } });
-    setSessionTokens(data);
-    return data;
-  })
-    .finally(() => { refreshPromise = null; });
-  return refreshPromise;
+const commonHeaders = {
+  "Content-Type": "application/json",
+  "X-Requested-With": "XMLHttpRequest",
 };
+const apiClient = axios.create({ baseURL, withCredentials: true, headers: commonHeaders });
+const refreshClient = axios.create({ baseURL, withCredentials: true, headers: commonHeaders });
 
 apiClient.interceptors.request.use((config) => {
+  config.headers["X-Device-Id"] = getDeviceId();
+  config.headers["X-Device-Name"] = "VSMS staff web";
   if (accessToken) config.headers.Authorization = `Bearer ${accessToken}`;
+  if (csrfToken && !["get", "head", "options"].includes(config.method || "get")) {
+    config.headers["X-CSRF-Token"] = csrfToken;
+  }
   return config;
 });
 
-apiClient.interceptors.response.use((response) => response, async (error) => {
-  const request = error.config as RetryableRequest | undefined;
-  if (error.response?.status !== 401 || !request || request._retry || request.url?.startsWith('/auth/')) return Promise.reject(error);
-  request._retry = true;
-  try {
-    request.headers.Authorization = `Bearer ${(await refreshSession()).accessToken}`;
-    return apiClient(request);
-  } catch (refreshError) {
-    announceSessionEnded();
-    return Promise.reject(refreshError);
+async function rotateSession(): Promise<AuthSession> {
+  const response = await refreshClient.post("/auth/refresh", null, {
+    headers: {
+      "X-CSRF-Token": getCsrfToken(),
+      "X-Device-Id": getDeviceId(),
+      "X-Device-Name": "VSMS staff web",
+    },
+  });
+  setSessionTokens(response.data);
+  const session = {
+    user: response.data.user,
+    expiresAt: Date.now() + Number(response.data.sessionExpiresIn || 604_800) * 1000,
+  };
+  setStoredSession(session);
+  return session;
+}
+
+export function refreshAuthSession() {
+  refreshPromise ??= rotateSession().finally(() => {
+    refreshPromise = null;
+  });
+  return refreshPromise;
+}
+
+apiClient.interceptors.response.use(
+  (response) => response,
+  async (error: AxiosError) => {
+    const request = error.config as RetryableRequestConfig | undefined;
+    if (error.response?.status !== 401 || !request || request._retry || request.url?.startsWith("/auth/") || !getStoredSession()) {
+      return Promise.reject(error);
+    }
+    request._retry = true;
+    try {
+      await refreshAuthSession();
+      return apiClient(request);
+    } catch (refreshError) {
+      setSessionTokens(null);
+      clearStoredSession();
+      window.location.assign("/login?reason=session-expired");
+      return Promise.reject(refreshError);
+    }
   }
-});
+);
+
+export function getApiError(error: unknown, fallback: string) {
+  if (axios.isAxiosError<{ error?: string; message?: string }>(error)) {
+    return error.response?.data?.error ?? error.response?.data?.message ?? fallback;
+  }
+  return fallback;
+}
 
 export default apiClient;

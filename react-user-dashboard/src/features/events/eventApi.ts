@@ -8,49 +8,71 @@ export type EventStatus = components['schemas']['EventStatus'];
 export type StaffAssignment = components['schemas']['StaffAssignment'];
 export type StaffAssignmentRole = components['schemas']['StaffAssignmentRole'];
 export type StaffDirectoryEntry = components['schemas']['StaffDirectoryEntry'];
+export type StationTemplate = components['schemas']['StationTemplate'];
+export type EventStation = components['schemas']['EventStation'];
 export type CreateEvent = components['schemas']['CreateEventRequest'];
 export type UpdateEvent = components['schemas']['UpdateEventRequest'];
 export type AuditRecord = components['schemas']['EventAuditLog'];
+export type LocationResult = components['schemas']['LocationResult'];
 
 export const eventApi = {
   async list(params?: { status?: EventStatus; search?: string; cursor?: string }) {
-    const { data } = await apiClient.get<components['schemas']['EventListResponse']>('/api/events', { params: { ...params, limit: 25 } });
+    const { data } = await apiClient.get<components['schemas']['EventListResponse']>('/events', { params: { ...params, limit: 25 } });
     return data;
   },
   async get(id: string, signal?: AbortSignal) {
-    const { data } = await apiClient.get<EventRecord>(`/api/events/${id}`, { signal });
+    const { data } = await apiClient.get<EventRecord>(`/events/${id}`, { signal });
     return data;
   },
-  async create(input: CreateEvent) {
-    const { data } = await apiClient.post<EventRecord>('/api/events', input);
+  async create(input: CreateEvent, idempotencyKey = crypto.randomUUID()) {
+    const { data } = await apiClient.post<EventRecord>('/events', input, { headers: { 'Idempotency-Key': idempotencyKey } });
     return data;
   },
   async update(id: string, input: UpdateEvent) {
-    const { data } = await apiClient.patch<EventRecord>(`/api/events/${id}`, input);
+    const { data } = await apiClient.patch<EventRecord>(`/events/${id}`, input);
     return data;
   },
   async transition(id: string, action: 'publish' | 'start' | 'complete', version: number) {
-    const { data } = await apiClient.post<EventRecord>(`/api/events/${id}/${action}`, { version });
+    const { data } = await apiClient.post<EventRecord>(`/events/${id}/${action}`, { version });
     return data;
   },
   async cancel(id: string, version: number, reason: string) {
-    const { data } = await apiClient.post<EventRecord>(`/api/events/${id}/cancel`, { version, reason });
+    const { data } = await apiClient.post<EventRecord>(`/events/${id}/cancel`, { version, reason });
     return data;
   },
   async staffDirectory() {
-    const { data } = await apiClient.get<StaffDirectoryEntry[]>('/api/events/staff-directory');
+    const { data } = await apiClient.get<StaffDirectoryEntry[]>('/events/staff-directory');
     return data;
   },
-  async assignStaff(id: string, shiftId: string, input: { userId: string; assignmentRole: StaffAssignmentRole }) {
-    const { data } = await apiClient.post<EventRecord>(`/api/events/${id}/shifts/${shiftId}/assignments`, input);
+  async stationTemplates() {
+    const { data } = await apiClient.get<StationTemplate[]>('/events/station-templates');
     return data;
   },
-  async removeStaff(id: string, shiftId: string, assignmentId: string) {
-    const { data } = await apiClient.delete<EventRecord>(`/api/events/${id}/shifts/${shiftId}/assignments/${assignmentId}`);
+  async searchLocations(query: string, signal?: AbortSignal) {
+    const { data } = await apiClient.get<components['schemas']['LocationSearchResponse']>('/locations/search', {
+      params: { q: query },
+      signal,
+    });
+    return data.locations;
+  },
+  async importStations(id: string, version: number, stationTemplateIds: string[]) {
+    const { data } = await apiClient.post<EventRecord>(`/events/${id}/stations/import`, { version, stationTemplateIds });
+    return data;
+  },
+  async updateStation(id: string, eventStationId: string, input: { version: number; stationOrder?: number; capacity?: number; isAvailable?: boolean }) {
+    const { data } = await apiClient.patch<EventRecord>(`/events/${id}/stations/${eventStationId}`, input);
+    return data;
+  },
+  async assignStaff(id: string, shiftId: string, input: { version: number; userId: string; assignmentRole: StaffAssignmentRole; eventStationId?: string | null; notes?: string | null }) {
+    const { data } = await apiClient.post<EventRecord>(`/events/${id}/shifts/${shiftId}/assignments`, input);
+    return data;
+  },
+  async removeStaff(id: string, shiftId: string, assignmentId: string, version: number) {
+    const { data } = await apiClient.delete<EventRecord>(`/events/${id}/shifts/${shiftId}/assignments/${assignmentId}`, { params: { version } });
     return data;
   },
   async audit(id: string) {
-    const { data } = await apiClient.get<components['schemas']['AuditListResponse']>(`/api/events/${id}/audit-log`, { params: { limit: 50 } });
+    const { data } = await apiClient.get<components['schemas']['AuditListResponse']>(`/events/${id}/audit-log`, { params: { limit: 50 } });
     return data;
   },
 };
