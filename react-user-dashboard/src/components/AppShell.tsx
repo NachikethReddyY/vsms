@@ -1,4 +1,4 @@
-import { ArrowLeftIcon, ArrowRightStartOnRectangleIcon, Bars3BottomLeftIcon, CalendarDaysIcon, ChartBarIcon, ChevronDownIcon, HomeIcon, ListBulletIcon, MagnifyingGlassIcon, PlusIcon, QueueListIcon, ShieldCheckIcon, SignalIcon, TableCellsIcon, UserGroupIcon } from '@heroicons/react/24/outline';
+import { ArrowLeftIcon, ArrowRightStartOnRectangleIcon, Bars3BottomLeftIcon, CalendarDaysIcon, HomeIcon, ListBulletIcon, MagnifyingGlassIcon, PlusIcon, QueueListIcon, ShieldCheckIcon, SignalIcon, TableCellsIcon, UserGroupIcon } from '@heroicons/react/24/outline';
 import { CommandPalette, CommandPaletteInput } from '@astryxdesign/core/CommandPalette';
 import { Kbd } from '@astryxdesign/core/Kbd';
 import { createStaticSource, type SearchableItem } from '@astryxdesign/core/Typeahead';
@@ -25,7 +25,6 @@ type CommandItem = Omit<SearchableItem<CommandMetadata>, 'auxiliaryData'> & {
 export default function AppShell({ children }: { children: ReactNode }) {
   const [collapsed, setCollapsed] = useState(false);
   const [commandOpen, setCommandOpen] = useState(false);
-  const [dashboardsOpen, setDashboardsOpen] = useState(true);
   const [eventSearch, setEventSearch] = useState('');
 
   const { session, clearSession } = useAuth();
@@ -171,33 +170,14 @@ export default function AppShell({ children }: { children: ReactNode }) {
           <NavLink to="/participants/search" title="Participants" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}>
             <QueueListIcon /><span>Participants</span>
           </NavLink>
-
-          {/* Grouped Dashboards Dropdown Section */}
-          <div className="nav-group my-1">
-            <button
-              type="button"
-              title="Dashboards Hub"
-              onClick={() => setDashboardsOpen(!dashboardsOpen)}
-              className="nav-item nav-group-toggle w-full flex items-center justify-between cursor-pointer border-0 bg-transparent text-inherit"
-            >
-              <span className="nav-item-inner flex items-center gap-2">
-                <ChartBarIcon />
-                <span className="nav-label">Dashboards Hub</span>
-              </span>
-              <ChevronDownIcon className={`nav-chevron w-4 h-4 transition-transform ${dashboardsOpen ? 'rotate-180' : ''}`} />
-            </button>
-
-            {dashboardsOpen && (
-              <div className="nav-sub-list pl-4 space-y-1 mt-1 border-l border-gray-800 ml-3">
-                <NavLink to="/events/active-event-id/queue" title="Queue Dashboard" className={({ isActive }) => `nav-item text-xs py-1.5 ${isActive ? 'active' : ''}`}>
-                  <UserGroupIcon className="w-4 h-4" /><span>Queue Dashboard</span>
-                </NavLink>
-                <NavLink to="/admin/audit-logs" title="Audit Logs Hub" className={({ isActive }) => `nav-item text-xs py-1.5 ${isActive ? 'active' : ''}`}>
-                  <ShieldCheckIcon className="w-4 h-4" /><span>Audit Logs Hub</span>
-                </NavLink>
-              </div>
-            )}
-          </div>
+          <NavLink to="/events/active-event-id/queue" title="Queue Dashboard" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}>
+            <UserGroupIcon /><span>Queue Dashboard</span>
+          </NavLink>
+          
+          {/* Extended Navigation Tab for Audit Dashboard */}
+          <NavLink to="/admin/system-audit-dashboard" title="System Audit Dashboard" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}>
+            <ShieldCheckIcon /><span>Audit Dashboard</span>
+          </NavLink>
         </nav>
 
         <div className="sidebar-foot">
