@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
-import { AppShell, LoadingState } from "../components/ui";
-import apiClient, { getApiError } from "../utils/apiClient";
+import { AppShell, LoadingState } from "../../components/ui";
+import apiClient, { getApiError } from "../../utils/apiClient";
 import { 
   ShieldCheckIcon, 
   DocumentTextIcon, 
