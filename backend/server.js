@@ -19,7 +19,6 @@ const qrRoutes = require("./routes/qrRoutes");
 const participantRoutes = require("./routes/participantRoutes");
 const eventRegistrationRoutes = require("./routes/eventRegistrationRoutes");
 const eventRoutes = require("./routes/eventRoutes");
-const queueRoutes = require("./routes/queueRoutes");
 
 // Load Swagger / OpenAPI Document securely using standard file streams
 let swaggerDocument;
@@ -127,7 +126,7 @@ app.use("/qr", qrRoutes);
 app.use("/participants", participantRoutes);
 app.use("/event-registrations", eventRegistrationRoutes);
 app.use("/events", eventRoutes);
-app.use("/queue", queueRoutes);
+// app.use("/queue", queueRoutes);
 
 // Safe Express 4 fallback catch-all handler
 app.use((req, res) => {

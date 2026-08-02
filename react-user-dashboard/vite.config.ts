@@ -46,7 +46,7 @@ export default defineConfig(({ command, mode }) => {
 
         "/api/v1": {
 
-          target: "http://127.0.0.1:5050",
+          target: "http://127.0.0.1:5000",
 
           changeOrigin: true,
 
