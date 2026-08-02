@@ -28,3 +28,24 @@
   border-color:var(--hairline);
   background:var(--canvas-soft);
 }
+
+.participant-v2-profile-summary { grid-template-columns:1fr 1fr; }
+
+.participant-v2-profile-summary article+article {
+  border-left:1px solid var(--hairline);
+  padding-left:20px;
+}
+
+.participant-v2-profile-summary .participant-v2-consent-status { color:var(--muted); }
+.participant-v2-profile-summary .participant-v2-consent-status.accepted { color:var(--green); }
+.participant-v2-profile-summary .participant-v2-consent-status.declined,
+.participant-v2-profile-summary .participant-v2-consent-status.withdrawn { color:var(--orange); }
+
+@media (max-width:640px) {
+  .participant-v2-profile-summary { grid-template-columns:1fr; }
+  .participant-v2-profile-summary article+article {
+    border-top:1px solid var(--hairline);
+    border-left:0;
+    padding-left:0;
+  }
+}

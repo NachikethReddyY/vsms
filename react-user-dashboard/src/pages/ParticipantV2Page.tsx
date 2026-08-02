@@ -36,6 +36,7 @@ type SearchCriteria = {
 };
 
 const PAGE_SIZE = 20;
+const REGISTRATION_EVENT_STATUSES = new Set(["PUBLISHED", "UPCOMING", "ONGOING", "IN_PROGRESS"]);
 
 function initials(participant: ParticipantSummary) {
   return `${participant.firstName[0] ?? ""}${participant.lastName[0] ?? ""}`.toUpperCase() || "P";
@@ -57,8 +58,10 @@ export default function ParticipantV2Page() {
     void eventApi.list()
       .then((response) => {
         if (!active) return;
-        setEvents(response.events);
-        setEventId((current) => current || response.events[0]?.eventId || "");
+        const registrationEvents = response.events.filter((event) => REGISTRATION_EVENT_STATUSES.has(event.status));
+        setEvents(registrationEvents);
+        setEventId((current) => registrationEvents.some((event) => event.eventId === current) ? current : registrationEvents[0]?.eventId || "");
+        setEventError(registrationEvents.length ? null : "No published or in-progress events are available for participant registration.");
       })
       .catch((requestError: unknown) => {
         if (active) setEventError(getApiError(requestError, "Events could not be loaded. Refresh and try again."));
@@ -133,7 +136,7 @@ export default function ParticipantV2Page() {
             <span>Event</span>
             <select value={eventId} onChange={(event) => setEventId(event.target.value)} disabled={eventsLoading || events.length === 0} required>
               {eventsLoading ? <option>Loading events…</option> : null}
-              {!eventsLoading && events.length === 0 ? <option value="">No events available</option> : null}
+              {!eventsLoading && events.length === 0 ? <option value="">No events open for registration</option> : null}
               {events.map((event) => <option key={event.eventId} value={event.eventId}>{event.name} · {formatEventDate(event.startsAt, event.timezone, false)}</option>)}
             </select>
           </label>

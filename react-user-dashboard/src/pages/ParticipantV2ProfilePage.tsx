@@ -2,12 +2,13 @@ import {
   ArrowLeftIcon,
   ArrowRightIcon,
   CalendarDaysIcon,
+  ClipboardDocumentCheckIcon,
   PhoneIcon,
   UserIcon,
 } from "@heroicons/react/24/outline";
 import { useEffect, useMemo, useState } from "react";
 import { Link, useParams, useSearchParams } from "react-router-dom";
-import type { EmergencyContact, Participant, Registration } from "../types";
+import type { ConsentFormVersion, EmergencyContact, EventSummary, Participant, Registration } from "../types";
 import apiClient, { getApiError } from "../utils/apiClient";
 import "./ParticipantV2Page.css";
 import "./ParticipantV2ProfilePage.css";
@@ -20,12 +21,22 @@ function displayDate(value: string) {
   return new Date(value).toLocaleDateString("en-SG", { day: "numeric", month: "short", year: "numeric" });
 }
 
+type ConsentRecord = {
+  id: string;
+  consentStatus: string;
+  createdAt: string;
+  consentFormVersion: ConsentFormVersion;
+  event: EventSummary;
+  withdrawals: Array<{ id: string; consentStatus: string }>;
+};
+
 export default function ParticipantV2ProfilePage() {
   const { participantId = "" } = useParams();
   const [searchParams] = useSearchParams();
   const eventId = searchParams.get("eventId") ?? "";
   const [participant, setParticipant] = useState<Participant | null>(null);
   const [contacts, setContacts] = useState<EmergencyContact[]>([]);
+  const [consents, setConsents] = useState<ConsentRecord[]>([]);
   const [registrations, setRegistrations] = useState<Registration[]>([]);
   const [error, setError] = useState<string | null>(null);
 
@@ -34,12 +45,14 @@ export default function ParticipantV2ProfilePage() {
     void Promise.all([
       apiClient.get(`/participants/${participantId}`),
       apiClient.get(`/participants/${participantId}/emergency-contacts`),
+      apiClient.get(`/participants/${participantId}/consents`),
       apiClient.get(`/participants/${participantId}/registrations`),
     ])
-      .then(([participantResponse, contactsResponse, registrationsResponse]) => {
+      .then(([participantResponse, contactsResponse, consentsResponse, registrationsResponse]) => {
         if (!active) return;
         setParticipant(participantResponse.data.participant);
         setContacts(contactsResponse.data.contacts ?? []);
+        setConsents(consentsResponse.data.consents ?? []);
         setRegistrations(registrationsResponse.data.registrations ?? []);
       })
       .catch((requestError: unknown) => {
@@ -52,6 +65,20 @@ export default function ParticipantV2ProfilePage() {
     () => contacts.find((contact) => contact.status === "ACTIVE" && contact.isPrimary) ?? contacts.find((contact) => contact.status === "ACTIVE"),
     [contacts],
   );
+  const latestEventConsent = useMemo(
+    () => eventId ? consents.find((consent) => consent.event.id === eventId) : undefined,
+    [consents, eventId],
+  );
+  const consentWithdrawn = latestEventConsent?.consentStatus === "ACCEPTED"
+    && latestEventConsent.withdrawals.some((withdrawal) => withdrawal.consentStatus === "WITHDRAWN");
+  const consentStatus = !eventId
+    ? "Choose an event"
+    : consentWithdrawn
+      ? "Withdrawn"
+      : latestEventConsent
+        ? displayStatus(latestEventConsent.consentStatus)
+        : "Not recorded";
+  const consentStatusClass = consentStatus.toLowerCase().replace(/ /g, "-");
   const searchLink = `/participants-v2${eventId ? `?eventId=${encodeURIComponent(eventId)}` : ""}`;
   const secureRegistrationLink = `/participants/${participantId}${eventId ? `?eventId=${encodeURIComponent(eventId)}` : ""}`;
 
@@ -91,6 +118,7 @@ export default function ParticipantV2ProfilePage() {
       <section className="participant-v2-profile-card" aria-label="Participant profile">
         <div className="participant-v2-profile-actions">
           <Link className="secondary" to={`/participants/${participantId}/edit${eventId ? `?eventId=${encodeURIComponent(eventId)}` : ""}`}>Edit participant details</Link>
+          {eventId ? <Link className="secondary" to={`/participants-v2/${participantId}/consent?eventId=${encodeURIComponent(eventId)}`}>Record consent</Link> : null}
           <Link className="primary" to={secureRegistrationLink}>Start registration <ArrowRightIcon /></Link>
         </div>
 
@@ -109,6 +137,19 @@ export default function ParticipantV2ProfilePage() {
               <h2>{primaryContact ? primaryContact.contactName : "Not recorded"}</h2>
               <p>{primaryContact ? `${primaryContact.relationship} · ${primaryContact.phoneNumber}` : "Add a primary emergency contact before completing registration."}</p>
               <Link to={`/participants/${participantId}/emergency-contacts${eventId ? `?eventId=${encodeURIComponent(eventId)}` : ""}`}>{primaryContact ? "Manage contacts" : "Add emergency contact"} <ArrowRightIcon /></Link>
+            </div>
+          </article>
+          <article>
+            <ClipboardDocumentCheckIcon />
+            <div>
+              <span>Consent status</span>
+              <h2 className={`participant-v2-consent-status ${consentStatusClass}`}>{consentStatus}</h2>
+              <p>{!eventId ? "Select an event to see the consent record for that event." : latestEventConsent ? `Version ${latestEventConsent.consentFormVersion.versionNumber} recorded ${displayDate(latestEventConsent.createdAt)}.` : "Consent is required before this participant can be registered for the selected event."}</p>
+              {eventId
+                ? latestEventConsent
+                  ? <Link to={`/participants/${participantId}/consents?eventId=${encodeURIComponent(eventId)}`}>View consent history <ArrowRightIcon /></Link>
+                  : <Link to={`/participants-v2/${participantId}/consent?eventId=${encodeURIComponent(eventId)}`}>Record consent <ArrowRightIcon /></Link>
+                : <Link to={searchLink}>Choose an event <ArrowRightIcon /></Link>}
             </div>
           </article>
         </div>
