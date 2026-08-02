@@ -80,7 +80,7 @@ export default function ParticipantV2ProfilePage() {
         : "Not recorded";
   const consentStatusClass = consentStatus.toLowerCase().replace(/ /g, "-");
   const searchLink = `/participants-v2${eventId ? `?eventId=${encodeURIComponent(eventId)}` : ""}`;
-  const secureRegistrationLink = `/participants/${participantId}${eventId ? `?eventId=${encodeURIComponent(eventId)}` : ""}`;
+  const checkInLink = `/participants-v2/${participantId}/check-in${eventId ? `?eventId=${encodeURIComponent(eventId)}` : ""}`;
 
   if (!participant && !error) {
     return <section className="participant-v2-page participant-v2-profile"><p className="participant-v2-profile-loading">Loading participant profile...</p></section>;
@@ -119,7 +119,7 @@ export default function ParticipantV2ProfilePage() {
         <div className="participant-v2-profile-actions">
           <Link className="secondary" to={`/participants/${participantId}/edit${eventId ? `?eventId=${encodeURIComponent(eventId)}` : ""}`}>Edit participant details</Link>
           {eventId ? <Link className="secondary" to={`/participants-v2/${participantId}/consent?eventId=${encodeURIComponent(eventId)}`}>Record consent</Link> : null}
-          <Link className="primary" to={secureRegistrationLink}>Start registration <ArrowRightIcon /></Link>
+          <Link className="primary" to={eventId ? checkInLink : searchLink}>{eventId ? "Start event check-in" : "Choose an event"} <ArrowRightIcon /></Link>
         </div>
 
         <section className="participant-v2-profile-details" aria-label="Participant details">
