@@ -118,7 +118,7 @@ export default function ParticipantV2ConsentPage() {
         consentFormVersionId: consentForm.id,
       });
       navigate(form.consentStatus === "ACCEPTED"
-        ? `/events/${eventId}/participants/${participantId}/review`
+        ? `/participants-v2/${participantId}/check-in?eventId=${encodeURIComponent(eventId)}`
         : profileLink);
     } catch (requestError: unknown) {
       setError(getApiError(requestError, "Unable to record consent."));
