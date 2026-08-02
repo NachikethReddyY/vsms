@@ -1,0 +1,30 @@
+/* Keep the profile header aligned with the app's plain surface-card design. */
+.participant-v2-profile-hero {
+  position:static;
+  overflow:visible;
+  border:1px solid var(--hairline-strong);
+  border-radius:14px;
+  background:var(--surface);
+  box-shadow:none;
+}
+
+.participant-v2-profile-hero:after { display:none; }
+
+.participant-v2-profile-identity,
+.participant-v2-profile-status,
+.participant-v2-profile-facts {
+  position:static;
+  z-index:auto;
+}
+
+.participant-v2-profile-avatar {
+  border:1px solid color-mix(in srgb,var(--accent) 20%,var(--hairline));
+  background:var(--accent-tint);
+  box-shadow:none;
+  color:var(--accent);
+}
+
+.participant-v2-profile-facts>div {
+  border-color:var(--hairline);
+  background:var(--canvas-soft);
+}

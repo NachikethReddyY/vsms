@@ -18,6 +18,7 @@ import { AuditLogsPage as RegistrationAuditLogsPage } from './pages/AdminPages';
 import { LoginPage } from './pages/AuthPages';
 import { QueuePage } from './pages/QueuePages';
 import ParticipantV2Page from './pages/ParticipantV2Page';
+import ParticipantV2ProfilePage from './pages/ParticipantV2ProfilePage';
 import {
   ConsentPage,
   EmergencyContactsPage,
@@ -64,6 +65,7 @@ export default function App() {
           <Route path="/participants" element={<ParticipantSearchPage />} />
           <Route path="/participants/search" element={<ParticipantSearchPage />} />
           <Route path="/participants-v2" element={<ParticipantV2Page />} />
+          <Route path="/participants-v2/:participantId" element={<ParticipantV2ProfilePage />} />
           <Route path="/participants/new" element={<ParticipantCreatePage />} />
           <Route path="/participants/:participantId" element={<ParticipantDetailPage />} />
           <Route path="/participants/:participantId/edit" element={<ParticipantEditPage />} />
