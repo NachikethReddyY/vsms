@@ -912,15 +912,30 @@ const listStaffDirectory = async () => {
   }));
 };
 
-// The integrated Prisma schema stores concrete event stations and no longer
-// contains the older station-template tables. Keep these legacy endpoints
-// deterministic instead of allowing orphaned merge fragments to crash startup.
-const listStationTemplates = async () => [];
+// Read-only catalog for the events UI / OpenAPI StationTemplate DTO (#23).
+// Import/update remain stubbed until #24; templateKey→StationType mapping is #30
+// (catalog keys include REGISTRATION / CLINICAL_REVIEW which are not StationType).
+const listStationTemplates = async () => {
+  const templates = await prisma.stationTemplate.findMany({
+    where: { active: true },
+    select: {
+      stationTemplateId: true,
+      templateKey: true,
+      version: true,
+      name: true,
+      description: true,
+      defaultCapacity: true,
+    },
+    orderBy: { name: "asc" },
+  });
+  return templates;
+};
+
 const stationTemplatesUnavailable = async () => {
   throw new AppError(
     501,
     "STATION_TEMPLATES_NOT_AVAILABLE",
-    "Station-template management is not available in the integrated event schema"
+    "Station-template import/update is not available yet"
   );
 };
 const importStations = stationTemplatesUnavailable;
