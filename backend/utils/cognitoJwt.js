@@ -17,13 +17,13 @@ function getIssuer() {
     return `https://cognito-idp.${region}.amazonaws.com/${userPoolId}`;
 }
 
-async function loadJwks() {
+async function loadJwks(forceRefresh = false) {
     const now = Date.now();
-    if (jwksCache.keys.length > 0 && jwksCache.expiresAt > now) {
+    if (!forceRefresh && jwksCache.keys.length > 0 && jwksCache.expiresAt > now) {
         return jwksCache.keys;
     }
 
-    const response = await fetch(`${getIssuer()}/.well-known/jwks.json`);
+    const response = await fetch(`${getIssuer()}/.well-known/jwks.json`, { signal: AbortSignal.timeout(5000) });
     if (!response.ok) {
         throw new Error("Unable to fetch Cognito JWKS");
     }
@@ -48,8 +48,12 @@ function decodeHeader(token) {
 
 async function getKeyObjectForToken(token) {
     const header = decodeHeader(token);
-    const keys = await loadJwks();
-    const matchingKey = keys.find((key) => key.kid === header.kid);
+    let keys = await loadJwks();
+    let matchingKey = keys.find((key) => key.kid === header.kid);
+    if (!matchingKey) {
+        keys = await loadJwks(true);
+        matchingKey = keys.find((key) => key.kid === header.kid);
+    }
 
     if (!matchingKey) {
         throw new Error("Unable to match Cognito signing key");

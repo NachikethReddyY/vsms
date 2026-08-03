@@ -46,7 +46,7 @@ async function sendTokenRequest(parameters) {
         body.delete("client_id");
     }
 
-    const response = await fetch(`${domain}/oauth2/token`, { method: "POST", headers, body });
+    const response = await fetch(`${domain}/oauth2/token`, { method: "POST", headers, body, signal: AbortSignal.timeout(10000) });
     const data = await response.json().catch(() => ({}));
     if (!response.ok) {
         const error = new Error("Cognito token exchange failed");
@@ -92,6 +92,7 @@ async function sendCognitoRequest(target, body) {
             "X-Amz-Target": `AWSCognitoIdentityProviderService.${target}`,
         },
         body: JSON.stringify(body),
+        signal: AbortSignal.timeout(10000),
     });
 
     const data = await response.json();

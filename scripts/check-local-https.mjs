@@ -11,7 +11,7 @@ function request(url) {
   return new Promise((resolve, reject) => {
     https.get(url, { ca }, (response) => {
       response.resume()
-      response.on('end', () => resolve(response.statusCode))
+      response.on('end', () => resolve({ status: response.statusCode, headers: response.headers }))
     }).on('error', reject)
   })
 }
@@ -27,12 +27,15 @@ function rejectsPlainHttp(url) {
   })
 }
 
-assert.equal(await request('https://localhost:5173/'), 200)
-assert.equal(await request('https://127.0.0.1:5000/health'), 200)
-assert.equal(await request('https://localhost:5173/api/v1/users'), 401)
+assert.equal((await request('https://localhost:5173/')).status, 200)
+const health = await request('https://127.0.0.1:5050/health')
+assert.equal(health.status, 200)
+assert.match(health.headers['content-security-policy'], /frame-ancestors 'none'/)
+assert.equal(health.headers['permissions-policy'], 'camera=(), microphone=(), geolocation=()')
+assert.equal((await request('https://localhost:5173/api/v1/users')).status, 401)
 await Promise.all([
   rejectsPlainHttp('http://localhost:5173/'),
-  rejectsPlainHttp('http://127.0.0.1:5000/health'),
+  rejectsPlainHttp('http://127.0.0.1:5050/health'),
 ])
 
 console.log('HTTPS-only smoke check passed')

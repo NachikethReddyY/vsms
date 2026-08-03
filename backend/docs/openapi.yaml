@@ -8,7 +8,7 @@ info:
     url: https://opensource.org/license/isc-license-txt
 servers:
   - url: /
-    description: Same-origin API server; local development proxies to https://127.0.0.1:5000
+    description: Same-origin API server; local development proxies to https://127.0.0.1:5050
 tags:
   - name: System
     description: Service readiness
@@ -16,12 +16,15 @@ tags:
     description: Amazon Cognito managed login with a secure cookie session
   - name: Events
     description: Authorized event details and lifecycle commands
+  - name: Public Events
+    description: Read-only event pages without attendee or staff data
   - name: Users
     description: Restricted administrative user projection
   - name: Clinical Reviews
     description: Event-scoped clinical review queue and immutable decisions
 security:
   - bearerAuth: []
+  - accessCookie: []
 paths:
   /health:
     get:
@@ -103,8 +106,439 @@ paths:
       summary: Revoke the refresh family and clear cookies
       parameters: [{ $ref: "#/components/parameters/CsrfToken" }]
       responses:
-        "204": { description: Session revoked }
+        "200":
+          description: Session revoked and managed-login logout URL returned
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required: [message, logoutUrl]
+                properties:
+                  message: { type: string }
+                  logoutUrl:
+                    type: string
+                    description: Absolute Cognito logout URL, or a local path when the identity provider is unavailable
+                    pattern: '^(https://|/).+'
         "403": { $ref: "#/components/responses/Forbidden" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+  /api/v1/events:
+    get:
+      tags: [Events]
+      operationId: listEventsV1
+      summary: List events visible to the current staff member
+      parameters:
+        - $ref: "#/components/parameters/Cursor"
+        - $ref: "#/components/parameters/EventLimit"
+        - name: status
+          in: query
+          schema: { $ref: "#/components/schemas/EventStatus" }
+        - name: search
+          in: query
+          schema: { type: string, maxLength: 150 }
+      responses:
+        "200":
+          description: Authorized, cursor-paginated events
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EventListResponse" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "422": { $ref: "#/components/responses/ValidationFailed" }
+    post:
+      tags: [Events]
+      operationId: createEventV1
+      summary: Create a draft event with optional planned shifts
+      parameters:
+        - name: Idempotency-Key
+          in: header
+          required: false
+          description: Stable retry key for this create attempt
+          schema: { type: string, minLength: 8, maxLength: 100, pattern: '^[A-Za-z0-9_-]+$' }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CreateEventRequest" }
+      responses:
+        "201":
+          description: Event created and audited
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Event" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "422": { $ref: "#/components/responses/ValidationFailed" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+        "501": { description: Station and staff-assignment plan changes are not available yet }
+  /api/v1/events/active:
+    get:
+      tags: [Events]
+      operationId: listActiveEventsV1
+      summary: List visible published and in-progress events
+      responses:
+        "200":
+          description: Authorized active events without pagination
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EventListResponse" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+  /api/v1/events/staff-directory:
+    get:
+      tags: [Events]
+      operationId: listEventStaffDirectoryV1
+      summary: List active staff available for event staffing
+      responses:
+        "200":
+          description: Active staff directory
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/StaffDirectoryEntry" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+  /api/v1/events/station-templates:
+    get:
+      tags: [Events]
+      operationId: listStationTemplatesV1
+      summary: List active reusable station templates
+      responses:
+        "200":
+          description: Active station templates available for import
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/StationTemplate" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+  /api/v1/events/{eventId}/registrations:
+    parameters: [{ $ref: "#/components/parameters/EventId" }]
+    get:
+      tags: [Events]
+      operationId: listEventRegistrationsV1
+      summary: List registrations for an event
+      parameters:
+        - name: page
+          in: query
+          schema: { type: integer, minimum: 1, default: 1 }
+        - name: pageSize
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 100, default: 20 }
+      responses:
+        "200":
+          description: Registration rows and pagination metadata
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EventRegistrationListResponse" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "422": { $ref: "#/components/responses/ValidationFailed" }
+    post:
+      tags: [Events]
+      operationId: createEventRegistrationV1
+      summary: Register a participant for an open event
+      parameters:
+        - name: Idempotency-Key
+          in: header
+          required: true
+          schema: { type: string, minLength: 8, maxLength: 100 }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/EventRegistrationCreateRequest" }
+      responses:
+        "200":
+          description: Idempotent replay of an existing registration
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EventRegistrationCommandResponse" }
+        "201":
+          description: Registration created
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EventRegistrationCommandResponse" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "422": { $ref: "#/components/responses/ValidationFailed" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+  /api/v1/events/{eventId}/shifts/{shiftId}/assignments:
+    post:
+      tags: [Events]
+      operationId: assignEventStaffV1
+      summary: Assign a user to an event shift
+      parameters:
+        - $ref: "#/components/parameters/EventId"
+        - $ref: "#/components/parameters/ShiftId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/StaffAssignmentRequest" }
+      responses:
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "422": { $ref: "#/components/responses/ValidationFailed" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+        "501": { description: Event staffing assignment is not available yet }
+  /api/v1/events/{eventId}/shifts/{shiftId}/assignments/{assignmentId}:
+    delete:
+      tags: [Events]
+      operationId: removeEventStaffAssignmentV1
+      summary: Remove a user from an event shift
+      parameters:
+        - $ref: "#/components/parameters/EventId"
+        - $ref: "#/components/parameters/ShiftId"
+        - name: assignmentId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+        - name: version
+          in: query
+          required: true
+          schema: { type: integer, minimum: 1 }
+      responses:
+        "200":
+          description: Assignment removed
+          content: { application/json: { schema: { $ref: "#/components/schemas/Event" } } }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "422": { $ref: "#/components/responses/ValidationFailed" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+  /api/v1/events/{eventId}/stations/import:
+    post:
+      tags: [Events]
+      operationId: importEventStationsV1
+      summary: Import active templates as event-owned station snapshots
+      parameters: [{ $ref: "#/components/parameters/EventId" }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/StationImportRequest" }
+      responses:
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "422": { $ref: "#/components/responses/ValidationFailed" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+        "501": { description: Station-template import is not available yet }
+  /api/v1/events/{eventId}/stations/{eventStationId}:
+    patch:
+      tags: [Events]
+      operationId: updateEventStationV1
+      summary: Configure an imported station's order, capacity, or availability
+      parameters:
+        - $ref: "#/components/parameters/EventId"
+        - name: eventStationId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/EventStationUpdateRequest" }
+      responses:
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "422": { $ref: "#/components/responses/ValidationFailed" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+        "501": { description: Station-template update is not available yet }
+  /api/v1/events/{eventId}/publish:
+    post:
+      tags: [Events]
+      operationId: publishEventV1
+      summary: Move a draft event to published
+      parameters: [{ $ref: "#/components/parameters/EventId" }]
+      requestBody: { $ref: "#/components/requestBodies/TransitionRequest" }
+      responses: { "200": { $ref: "#/components/responses/EventSuccess" }, "401": { $ref: "#/components/responses/Unauthorized" }, "404": { $ref: "#/components/responses/NotFound" }, "409": { $ref: "#/components/responses/Conflict" }, "422": { $ref: "#/components/responses/ValidationFailed" }, "429": { $ref: "#/components/responses/RateLimited" } }
+  /api/v1/events/{eventId}/start:
+    post:
+      tags: [Events]
+      operationId: startEventV1
+      summary: Start a published event
+      parameters: [{ $ref: "#/components/parameters/EventId" }]
+      requestBody: { $ref: "#/components/requestBodies/TransitionRequest" }
+      responses: { "200": { $ref: "#/components/responses/EventSuccess" }, "401": { $ref: "#/components/responses/Unauthorized" }, "404": { $ref: "#/components/responses/NotFound" }, "409": { $ref: "#/components/responses/Conflict" }, "422": { $ref: "#/components/responses/ValidationFailed" }, "429": { $ref: "#/components/responses/RateLimited" } }
+  /api/v1/events/{eventId}/complete:
+    post:
+      tags: [Events]
+      operationId: completeEventV1
+      summary: Complete an in-progress event
+      parameters: [{ $ref: "#/components/parameters/EventId" }]
+      requestBody: { $ref: "#/components/requestBodies/TransitionRequest" }
+      responses: { "200": { $ref: "#/components/responses/EventSuccess" }, "401": { $ref: "#/components/responses/Unauthorized" }, "404": { $ref: "#/components/responses/NotFound" }, "409": { $ref: "#/components/responses/Conflict" }, "422": { $ref: "#/components/responses/ValidationFailed" }, "429": { $ref: "#/components/responses/RateLimited" } }
+  /api/v1/events/{eventId}/cancel:
+    post:
+      tags: [Events]
+      operationId: cancelEventV1
+      summary: Cancel a non-terminal event with a reason
+      parameters: [{ $ref: "#/components/parameters/EventId" }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CancelEventRequest" }
+      responses: { "200": { $ref: "#/components/responses/EventSuccess" }, "401": { $ref: "#/components/responses/Unauthorized" }, "403": { $ref: "#/components/responses/Forbidden" }, "404": { $ref: "#/components/responses/NotFound" }, "409": { $ref: "#/components/responses/Conflict" }, "422": { $ref: "#/components/responses/ValidationFailed" }, "429": { $ref: "#/components/responses/RateLimited" } }
+  /api/v1/events/{eventId}/audit-log:
+    get:
+      tags: [Events]
+      operationId: getEventAuditLogV1
+      summary: Read immutable event history for a manager-visible event
+      parameters:
+        - $ref: "#/components/parameters/EventId"
+        - $ref: "#/components/parameters/Cursor"
+        - name: limit
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 100, default: 50 }
+      responses:
+        "200":
+          description: Reverse-chronological audit records
+          headers:
+            Cache-Control: { schema: { type: string, example: no-store } }
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AuditListResponse" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+  /api/v1/public/events/{eventId}:
+    parameters: [{ $ref: "#/components/parameters/EventId" }]
+    get:
+      tags: [Public Events]
+      security: []
+      operationId: getPublicEvent
+      summary: Read a published, in-progress, completed, or cancelled event
+      responses:
+        "200":
+          description: Public event projection; cached for at most 60 seconds
+          headers:
+            Cache-Control: { schema: { type: string, example: "public, max-age=60" } }
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/PublicEvent" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "422": { $ref: "#/components/responses/ValidationFailed" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+  /api/v1/events/{eventId}/metrics:
+    parameters: [{ $ref: "#/components/parameters/EventId" }]
+    get:
+      tags: [Events]
+      operationId: getEventMetrics
+      summary: Read truthful event outcome metrics visible to the current staff member
+      responses:
+        "200":
+          description: Aggregate-only metrics; never cached
+          headers:
+            Cache-Control: { schema: { type: string, example: no-store } }
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EventMetrics" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "422": { $ref: "#/components/responses/ValidationFailed" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+  /api/v1/events/{eventId}/attendees:
+    parameters: [{ $ref: "#/components/parameters/EventId" }]
+    get:
+      tags: [Events]
+      operationId: listEventAttendees
+      summary: List manager-visible attendee operational rows with cursor pagination
+      parameters:
+        - name: cursor
+          in: query
+          schema: { type: string, maxLength: 2048 }
+        - name: limit
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 100, default: 50 }
+        - name: status
+          in: query
+          schema: { type: string, enum: [SIGNED_UP, CHECKED_IN, COMPLETED, CANCELLED] }
+        - name: search
+          in: query
+          schema: { type: string, maxLength: 150 }
+      responses:
+        "200":
+          description: Operational attendee rows; never cached
+          headers:
+            Cache-Control: { schema: { type: string, example: no-store } }
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EventAttendeeList" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "422": { $ref: "#/components/responses/ValidationFailed" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+  /api/v1/events/{eventId}/export:
+    parameters: [{ $ref: "#/components/parameters/EventId" }]
+    get:
+      tags: [Events]
+      operationId: exportEvent
+      summary: Export a manager-visible event with a short-lived deletion receipt
+      responses:
+        "200":
+          description: Versioned JSON export; never cached
+          headers:
+            Cache-Control: { schema: { type: string, example: no-store } }
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EventExportResponse" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "422": { $ref: "#/components/responses/ValidationFailed" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+  /api/v1/events/{eventId}:
+    parameters: [{ $ref: "#/components/parameters/EventId" }]
+    get:
+      tags: [Events]
+      operationId: getEventV1
+      summary: Get an authorized event detail
+      responses:
+        "200":
+          description: Event detail
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Event" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    patch:
+      tags: [Events]
+      operationId: updateEventV1
+      summary: Update allowed fields using optimistic concurrency
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/UpdateEventRequest" }
+      responses:
+        "200":
+          description: Event updated and audited
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Event" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "422": { $ref: "#/components/responses/ValidationFailed" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+        "501": { description: Station and staff-assignment plan changes are not available yet }
+    delete:
+      tags: [Events]
+      operationId: deleteEmptyDraftEvent
+      summary: Delete an exported unpopulated draft event
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/EventDeletionRequest" }
+      responses:
+        "204": { description: Unpopulated draft event deleted and tombstoned }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "422": { $ref: "#/components/responses/ValidationFailed" }
+        "429": { $ref: "#/components/responses/RateLimited" }
   /api/users:
     get:
       tags: [Users]
@@ -167,6 +601,7 @@ paths:
         "403": { $ref: "#/components/responses/Forbidden" }
         "422": { $ref: "#/components/responses/ValidationFailed" }
         "429": { $ref: "#/components/responses/RateLimited" }
+        "501": { description: Station and staff-assignment plan changes are not available yet }
   /api/events/staff-directory:
     get:
       tags: [Events]
@@ -253,6 +688,25 @@ paths:
         "404": { $ref: "#/components/responses/NotFound" }
         "409": { $ref: "#/components/responses/Conflict" }
         "422": { $ref: "#/components/responses/ValidationFailed" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+        "501": { description: Station and staff-assignment plan changes are not available yet }
+    delete:
+      tags: [Events]
+      operationId: deleteEmptyDraftEventLegacy
+      summary: Delete an exported unpopulated draft event through the legacy alias
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/EventDeletionRequest" }
+      responses:
+        "204": { description: Unpopulated draft event deleted and tombstoned }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "422": { $ref: "#/components/responses/ValidationFailed" }
+        "429": { $ref: "#/components/responses/RateLimited" }
   /api/events/{eventId}/shifts/{shiftId}/assignments:
     post:
       tags: [Events]
@@ -274,6 +728,7 @@ paths:
         "404": { $ref: "#/components/responses/NotFound" }
         "409": { $ref: "#/components/responses/Conflict" }
         "422": { $ref: "#/components/responses/ValidationFailed" }
+        "429": { $ref: "#/components/responses/RateLimited" }
   /api/events/{eventId}/shifts/{shiftId}/assignments/{assignmentId}:
     delete:
       tags: [Events]
@@ -298,6 +753,7 @@ paths:
         "404": { $ref: "#/components/responses/NotFound" }
         "409": { $ref: "#/components/responses/Conflict" }
         "422": { $ref: "#/components/responses/ValidationFailed" }
+        "429": { $ref: "#/components/responses/RateLimited" }
   /api/events/{eventId}/stations/import:
     post:
       tags: [Events]
@@ -317,6 +773,7 @@ paths:
         "404": { $ref: "#/components/responses/NotFound" }
         "409": { $ref: "#/components/responses/Conflict" }
         "422": { $ref: "#/components/responses/ValidationFailed" }
+        "429": { $ref: "#/components/responses/RateLimited" }
   /api/events/{eventId}/stations/{eventStationId}:
     patch:
       tags: [Events]
@@ -341,6 +798,7 @@ paths:
         "404": { $ref: "#/components/responses/NotFound" }
         "409": { $ref: "#/components/responses/Conflict" }
         "422": { $ref: "#/components/responses/ValidationFailed" }
+        "429": { $ref: "#/components/responses/RateLimited" }
   /api/events/{eventId}/publish:
     post:
       tags: [Events]
@@ -435,6 +893,7 @@ paths:
         "404": { $ref: "#/components/responses/NotFound" }
         "409": { $ref: "#/components/responses/Conflict" }
         "422": { $ref: "#/components/responses/ValidationFailed" }
+        "429": { $ref: "#/components/responses/RateLimited" }
   /api/events/{eventId}/audit-log:
     get:
       tags: [Events]
@@ -449,18 +908,26 @@ paths:
       responses:
         "200":
           description: Reverse-chronological audit records
+          headers:
+            Cache-Control: { schema: { type: string, example: no-store } }
           content:
             application/json:
               schema: { $ref: "#/components/schemas/AuditListResponse" }
         "401": { $ref: "#/components/responses/Unauthorized" }
         "404": { $ref: "#/components/responses/NotFound" }
+        "429": { $ref: "#/components/responses/RateLimited" }
 components:
   securitySchemes:
     bearerAuth:
       type: http
       scheme: bearer
       bearerFormat: JWT
-      description: Short-lived access token kept in browser memory only
+      description: Short-lived local access token for non-browser API clients and compatibility tests
+    accessCookie:
+      type: apiKey
+      in: cookie
+      name: vsms_access
+      description: HttpOnly Cognito access token; state-changing requests also require the CSRF header
     refreshCookie:
       type: apiKey
       in: cookie
@@ -512,6 +979,9 @@ components:
       content:
         application/json:
           schema: { $ref: "#/components/schemas/Event" }
+    BadRequest:
+      description: Request cannot be fulfilled in the resource's current state
+      content: { application/json: { schema: { $ref: "#/components/schemas/Problem" } } }
     Unauthorized:
       description: Authentication is absent, invalid, expired, revoked, or reused
       content: { application/json: { schema: { $ref: "#/components/schemas/Problem" } } }
@@ -752,10 +1222,11 @@ components:
     AuthResponse:
       type: object
       additionalProperties: false
-      required: [user, sessionExpiresIn]
+      required: [user, sessionExpiresIn, csrfToken]
       properties:
         expiresIn: { type: integer, minimum: 0 }
         sessionExpiresIn: { type: integer, minimum: 0 }
+        csrfToken: { type: string, minLength: 32, description: Rotated double-submit token; also set as the readable vsms_csrf cookie }
         returnTo: { type: string }
         user: { $ref: "#/components/schemas/User" }
     ShiftInput:
@@ -864,11 +1335,221 @@ components:
             shifts: { type: array, items: { $ref: "#/components/schemas/Shift" } }
             eventDays: { type: array, items: { $ref: "#/components/schemas/EventDay" } }
             eventStations: { type: array, items: { $ref: "#/components/schemas/EventStation" } }
-            signupCount: { type: integer, minimum: 0, description: Number of collected registration entries for this event }
+            signupCount: { type: integer, minimum: 0, description: Number of registrations excluding cancelled registrations }
             activeCapacityCount: { type: integer, minimum: 0, description: Number of signed-up or checked-in registrations not marked completed or cancelled }
             canManage: { type: boolean, description: Whether the current caller may change this event }
             createdBy: { $ref: "#/components/schemas/User" }
             cancelledBy: { type: object, allOf: [{ $ref: "#/components/schemas/User" }], nullable: true }
+    PublicEvent:
+      type: object
+      additionalProperties: false
+      required: [eventId, name, description, bannerKey, artworkDataUrl, venue, address, postalCode, timezone, startsAt, endsAt, capacity, status, eventDays]
+      properties:
+        eventId: { type: string, format: uuid }
+        name: { type: string, maxLength: 150 }
+        description: { type: string, nullable: true, maxLength: 5000 }
+        bannerKey: { $ref: "#/components/schemas/EventBannerKey" }
+        artworkDataUrl: { type: string, nullable: true }
+        venue: { type: string, maxLength: 255 }
+        address: { type: string, nullable: true, maxLength: 500 }
+        postalCode: { type: string, nullable: true, pattern: '^\\d{6}$' }
+        timezone: { type: string, maxLength: 100 }
+        startsAt: { type: string, format: date-time }
+        endsAt: { type: string, format: date-time }
+        capacity: { type: integer, minimum: 1 }
+        status: { type: string, enum: [PUBLISHED, IN_PROGRESS, COMPLETED, CANCELLED] }
+        eventDays: { type: array, items: { $ref: "#/components/schemas/EventDay" } }
+    EventMetrics:
+      type: object
+      additionalProperties: false
+      required: [signupCount, checkedInCount, completedCount, cancelledCount, activeCount, attendanceRatePercent, screeningResultCount, flaggedResultCount, referralCount, capacity, expectedAttendance]
+      properties:
+        signupCount: { type: integer, minimum: 0 }
+        checkedInCount: { type: integer, minimum: 0 }
+        completedCount: { type: integer, minimum: 0 }
+        cancelledCount: { type: integer, minimum: 0 }
+        activeCount: { type: integer, minimum: 0 }
+        attendanceRatePercent: { type: integer, minimum: 0, maximum: 100 }
+        screeningResultCount: { type: integer, minimum: 0 }
+        flaggedResultCount: { type: integer, minimum: 0 }
+        referralCount: { type: integer, minimum: 0 }
+        capacity: { type: integer, minimum: 1 }
+        expectedAttendance: { type: integer, nullable: true, minimum: 1 }
+    EventAttendee:
+      type: object
+      additionalProperties: false
+      required: [registrationId, participantReference, participantDisplayName, registrationStatus, checkedIn, checkedInAt, queueNumber, createdAt]
+      properties:
+        registrationId: { type: string, format: uuid }
+        participantReference: { type: string, maxLength: 30 }
+        participantDisplayName: { type: string, nullable: true, maxLength: 150 }
+        registrationStatus: { type: string, enum: [SIGNED_UP, CHECKED_IN, COMPLETED, CANCELLED] }
+        checkedIn: { type: boolean }
+        checkedInAt: { type: string, format: date-time, nullable: true }
+        queueNumber: { type: integer, nullable: true }
+        createdAt: { type: string, format: date-time }
+    EventAttendeeList:
+      type: object
+      additionalProperties: false
+      required: [total, attendees, nextCursor]
+      properties:
+        total: { type: integer, minimum: 0 }
+        attendees: { type: array, maxItems: 100, items: { $ref: "#/components/schemas/EventAttendee" } }
+        nextCursor: { type: string, nullable: true }
+    EventRegistrationCreateRequest:
+      type: object
+      additionalProperties: false
+      required: [participantId]
+      properties:
+        participantId: { type: string, format: uuid }
+    EventRegistrationRecord:
+      type: object
+      additionalProperties: true
+      required: [registrationId, eventId, participantId, registrationStatus]
+      properties:
+        registrationId: { type: string, format: uuid }
+        eventId: { type: string, format: uuid }
+        participantId: { type: string, format: uuid }
+        registrationStatus: { type: string, enum: [SIGNED_UP, CHECKED_IN, COMPLETED, CANCELLED] }
+        queueNumber: { type: integer, nullable: true }
+        registeredAt: { type: string, format: date-time }
+    EventRegistrationCommandResponse:
+      type: object
+      additionalProperties: false
+      required: [registrationId, participantReference, queueNumber, status, registration, idempotentReplay]
+      properties:
+        registrationId: { type: string, format: uuid }
+        participantReference: { type: string }
+        queueNumber: { type: integer, nullable: true }
+        status: { type: string, enum: [SIGNED_UP, CHECKED_IN, COMPLETED, CANCELLED] }
+        registration: { $ref: "#/components/schemas/EventRegistrationRecord" }
+        idempotentReplay: { type: boolean }
+    EventRegistrationListResponse:
+      type: object
+      additionalProperties: false
+      required: [registrations, pagination]
+      properties:
+        registrations:
+          type: array
+          items: { $ref: "#/components/schemas/EventRegistrationRecord" }
+        pagination:
+          type: object
+          additionalProperties: false
+          required: [page, pageSize, total, totalPages]
+          properties:
+            page: { type: integer, minimum: 1 }
+            pageSize: { type: integer, minimum: 1, maximum: 100 }
+            total: { type: integer, minimum: 0 }
+            totalPages: { type: integer, minimum: 0 }
+    EventExportEvent:
+      type: object
+      additionalProperties: false
+      required: [eventId, name, description, bannerKey, artworkDataUrl, venue, address, postalCode, timezone, startsAt, endsAt, capacity, expectedAttendance, status, version]
+      properties:
+        eventId: { type: string, format: uuid }
+        name: { type: string }
+        description: { type: string, nullable: true }
+        bannerKey: { $ref: "#/components/schemas/EventBannerKey" }
+        artworkDataUrl: { type: string, nullable: true }
+        venue: { type: string }
+        address: { type: string, nullable: true }
+        postalCode: { type: string, nullable: true }
+        timezone: { type: string }
+        startsAt: { type: string, format: date-time }
+        endsAt: { type: string, format: date-time }
+        capacity: { type: integer }
+        expectedAttendance: { type: integer, nullable: true }
+        status: { $ref: "#/components/schemas/EventStatus" }
+        version: { type: integer, minimum: 1 }
+    EventExportStation:
+      type: object
+      additionalProperties: false
+      required: [stationId, stationName, stationType, stationOrder, isActive]
+      properties:
+        stationId: { type: string, format: uuid }
+        stationName: { type: string }
+        stationType: { type: string, enum: [VISUAL_ACUITY, REFRACTION, COLOUR_VISION, EYE_HEALTH] }
+        stationOrder: { type: integer }
+        isActive: { type: boolean }
+    EventExportShift:
+      type: object
+      additionalProperties: false
+      required: [shiftId, name, startsAt, endsAt, requiredStaff, status]
+      properties:
+        shiftId: { type: string, format: uuid }
+        name: { type: string }
+        startsAt: { type: string, format: date-time }
+        endsAt: { type: string, format: date-time }
+        requiredStaff: { type: integer }
+        status: { $ref: "#/components/schemas/ShiftStatus" }
+    EventExportStationAvailability:
+      type: object
+      additionalProperties: false
+      required: [eventStationAvailabilityId, eventStationId, eventDayId, isAvailable, startsAt, endsAt, capacity]
+      properties:
+        eventStationAvailabilityId: { type: string, format: uuid }
+        eventStationId: { type: string, format: uuid }
+        eventDayId: { type: string, format: uuid }
+        isAvailable: { type: boolean }
+        startsAt: { type: string, format: date-time, nullable: true }
+        endsAt: { type: string, format: date-time, nullable: true }
+        capacity: { type: integer }
+    EventExportEventDay:
+      type: object
+      additionalProperties: false
+      required: [eventDayId, date, startsAt, endsAt, stationAvailabilities]
+      properties:
+        eventDayId: { type: string, format: uuid }
+        date: { type: string, format: date }
+        startsAt: { type: string, format: date-time }
+        endsAt: { type: string, format: date-time }
+        stationAvailabilities:
+          type: array
+          items: { $ref: "#/components/schemas/EventExportStationAvailability" }
+    EventExportStaffAssignment:
+      type: object
+      additionalProperties: false
+      required: [id, eventId, stationId, shiftId, userId, assignedBy, assignedAt, assignmentRole, assignmentStatus, status]
+      properties:
+        id: { type: string, format: uuid }
+        eventId: { type: string, format: uuid }
+        stationId: { type: string, format: uuid, nullable: true }
+        shiftId: { type: string, format: uuid, nullable: true }
+        userId: { type: string, format: uuid }
+        assignedBy: { type: string, format: uuid }
+        assignedAt: { type: string, format: date-time }
+        assignmentRole: { type: string, enum: [EVENT_MANAGER, REGISTRATION, SCREENER, REVIEWER, SUPPORT], nullable: true }
+        assignmentStatus: { $ref: "#/components/schemas/StaffAssignmentStatus" }
+        status: { type: string, enum: [ASSIGNED, CONFIRMED, COMPLETED, CANCELLED], nullable: true }
+    EventExport:
+      type: object
+      additionalProperties: false
+      required: [schemaVersion, generatedAt, event, metrics, eventDays, stations, shifts, staffAssignments, attendees]
+      properties:
+        schemaVersion: { type: integer, enum: [1] }
+        generatedAt: { type: string, format: date-time }
+        event: { $ref: "#/components/schemas/EventExportEvent" }
+        metrics: { $ref: "#/components/schemas/EventMetrics" }
+        eventDays: { type: array, items: { $ref: "#/components/schemas/EventExportEventDay" } }
+        stations: { type: array, items: { $ref: "#/components/schemas/EventExportStation" } }
+        shifts: { type: array, items: { $ref: "#/components/schemas/EventExportShift" } }
+        staffAssignments: { type: array, items: { $ref: "#/components/schemas/EventExportStaffAssignment" } }
+        attendees: { type: array, items: { $ref: "#/components/schemas/EventAttendee" } }
+    EventExportResponse:
+      type: object
+      additionalProperties: false
+      required: [export, exportReceipt]
+      properties:
+        export: { $ref: "#/components/schemas/EventExport" }
+        exportReceipt: { type: string, description: 15-minute HMAC-bound export receipt }
+    EventDeletionRequest:
+      type: object
+      additionalProperties: false
+      required: [version, eventName, exportReceipt]
+      properties:
+        version: { type: integer, minimum: 1 }
+        eventName: { type: string, minLength: 1, maxLength: 150 }
+        exportReceipt: { type: string, minLength: 1, maxLength: 2048, pattern: '^[A-Za-z0-9_-]+\\.[A-Za-z0-9_-]+$' }
     LocationResult:
       type: object
       additionalProperties: false

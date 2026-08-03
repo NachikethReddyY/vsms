@@ -2,6 +2,7 @@ const assert = require("node:assert/strict");
 const test = require("node:test");
 const { buildAuthorizationUrl } = require("../utils/cognitoClient");
 const { setOAuthCookies } = require("../utils/httpCookies");
+const { normalizeReturnTo } = require("../controllers/authController");
 
 test("managed login uses an authorization-code grant with PKCE", () => {
     const previous = { ...process.env };
@@ -35,4 +36,11 @@ test("OAuth cookies are always Secure", () => {
 
     assert.equal(headers.get("Set-Cookie").length, 3);
     assert.ok(headers.get("Set-Cookie").every((cookie) => cookie.includes("; Secure;")));
+});
+
+test("managed login return paths stay on the local application", () => {
+    assert.equal(normalizeReturnTo("/events/123?tab=operations"), "/events/123?tab=operations");
+    for (const unsafe of ["https://evil.example", "//evil.example", "/\\evil.example", "/%2f%2fevil.example", "/%5c%5cevil.example", "/%0aevil.example"]) {
+        assert.equal(normalizeReturnTo(unsafe), "/events");
+    }
 });
