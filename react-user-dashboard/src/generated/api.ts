@@ -21,44 +21,41 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/auth/login": {
+    "/api/v1/auth/authorize": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        get?: never;
+        /** Redirect the browser to Cognito managed login */
+        get: operations["authorizeWithCognito"];
         put?: never;
-        /** Authenticate a staff member */
-        post: operations["login"];
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/api/auth/signup": {
+    "/api/v1/auth/callback": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        get?: never;
+        /** Exchange the Cognito authorization code for a cookie session */
+        get: operations["completeCognitoAuthorization"];
         put?: never;
-        /**
-         * Create a staff account when public registration is enabled
-         * @description Disabled by default. An administrator must explicitly set PUBLIC_SIGNUP_ENABLED=true.
-         */
-        post: operations["signup"];
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/api/auth/refresh": {
+    "/api/v1/auth/refresh": {
         parameters: {
             query?: never;
             header?: never;
@@ -75,7 +72,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/auth/logout": {
+    "/api/v1/auth/logout": {
         parameters: {
             query?: never;
             header?: never;
@@ -582,23 +579,10 @@ export interface components {
             /** Format: date-time */
             createdAt?: string;
         };
-        LoginRequest: {
-            /** @description Normalized username or email */
-            identifier: string;
-            /** Format: password */
-            password: string;
-        };
-        SignupRequest: {
-            /** Format: email */
-            email: string;
-            /** Format: password */
-            password: string;
-        };
         AuthResponse: {
-            /** @description Short-lived JWT; never persist in browser storage */
-            accessToken: string;
-            /** @description Send as X-CSRF-Token for refresh/logout */
-            csrfToken: string;
+            expiresIn?: number;
+            sessionExpiresIn: number;
+            returnTo?: string;
             user: components["schemas"]["User"];
         };
         ShiftInput: {
@@ -1081,62 +1065,63 @@ export interface operations {
             };
         };
     };
-    login: {
+    authorizeWithCognito: {
         parameters: {
-            query?: never;
+            query?: {
+                returnTo?: string;
+            };
             header?: never;
             path?: never;
             cookie?: never;
         };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["LoginRequest"];
+        requestBody?: never;
+        responses: {
+            /** @description Redirect to the Cognito authorization endpoint */
+            302: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            429: components["responses"]["RateLimited"];
+            /** @description Cognito managed login is not configured */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
+    };
+    completeCognitoAuthorization: {
+        parameters: {
+            query: {
+                code: string;
+                state: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
         responses: {
-            /** @description Login succeeded; refresh and CSRF cookies are also set */
+            /** @description Cognito authorization completed */
             200: {
                 headers: {
-                    /** @description Secure HttpOnly refresh cookie and readable CSRF cookie */
-                    "Set-Cookie"?: string;
                     [name: string]: unknown;
                 };
                 content: {
                     "application/json": components["schemas"]["AuthResponse"];
                 };
             };
-            401: components["responses"]["Unauthorized"];
-            422: components["responses"]["ValidationFailed"];
-            429: components["responses"]["RateLimited"];
-        };
-    };
-    signup: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["SignupRequest"];
-            };
-        };
-        responses: {
-            /** @description Staff account created */
-            201: {
+            /** @description Invalid or expired OAuth state */
+            400: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content: {
-                    "application/json": {
-                        user: components["schemas"]["User"];
-                    };
-                };
+                content?: never;
             };
-            404: components["responses"]["NotFound"];
-            409: components["responses"]["Conflict"];
-            422: components["responses"]["ValidationFailed"];
+            401: components["responses"]["Unauthorized"];
             429: components["responses"]["RateLimited"];
         };
     };

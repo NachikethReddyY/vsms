@@ -1,7 +1,6 @@
 import { ArrowPathIcon, CheckCircleIcon, QrCodeIcon, ShieldCheckIcon } from '@heroicons/react/24/outline';
 import { useState, type FormEvent } from 'react';
-import { getApiMessage } from '../../auth/authState';
-import apiClient from '../../utils/apiClient';
+import apiClient, { getApiError as getApiMessage } from '../../utils/apiClient';
 import QRCode from './QRCode';
 import './qrCodePage.css';
 

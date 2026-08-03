@@ -653,7 +653,7 @@ The participant registration process was tested to ensure proper request parsing
 <img width="701" height="567" alt="image" src="https://github.com/user-attachments/assets/113cf5e9-91d1-4ccb-8b21-c6382238fb04" />
 
 ```json
-POST http://localhost:5000/participants
+POST https://localhost:5000/api/v1/participants
 Content-Type: application/json
 
 {

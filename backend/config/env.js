@@ -3,11 +3,19 @@ const { z } = require("zod");
 require("dotenv").config();
 
 const optionalEnv = (schema) => z.preprocess((value) => value === "" ? undefined : value, schema.optional());
+const httpsUrl = z.string().url().refine((value) => new URL(value).protocol === "https:", "must use HTTPS");
+const httpsOrigins = z.string().refine((value) => value.split(",").every((origin) => {
+  try {
+    return new URL(origin.trim()).protocol === "https:";
+  } catch {
+    return false;
+  }
+}), "must contain only HTTPS origins");
 
 const schema = z.object({
   NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
   HOST: z.enum(["127.0.0.1", "0.0.0.0"]).default("127.0.0.1"),
-  PORT: z.coerce.number().int().min(1).max(65535).default(5050),
+  PORT: z.coerce.number().int().min(1).max(65535).default(5000),
   DATABASE_URL: z.string().url(),
   JWT_ACCESS_SECRET: z.string().min(32).optional(),
   JWT_ISSUER: z.string().min(1).default("vsms-api"),
@@ -15,16 +23,18 @@ const schema = z.object({
   ACCESS_TOKEN_TTL: z.string().default("15m"),
   REFRESH_TOKEN_TTL_DAYS: z.coerce.number().int().min(1).max(90).default(7),
   PUBLIC_SIGNUP_ENABLED: z.enum(["true", "false"]).default("false"),
-  CORS_ORIGINS: z.string().default("https://localhost:5173,https://127.0.0.1:5173,http://localhost:5173,http://127.0.0.1:5173"),
-  CORS_ORIGIN: z.string().optional(),
+  CORS_ORIGINS: httpsOrigins.default("https://localhost:5173"),
+  CORS_ORIGIN: optionalEnv(httpsOrigins),
   TRUST_PROXY: z.enum(["true", "false"]).default("false"),
-  LOCAL_HTTPS: z.enum(["true", "false"]).default("false"),
   TLS_KEY_PATH: z.string().default("../react-user-dashboard/certs/localhost-key.pem"),
   TLS_CERT_PATH: z.string().default("../react-user-dashboard/certs/localhost.pem"),
   LOG_LEVEL: z.enum(["debug", "info", "warn", "error", "silent"]).optional(),
   ONEMAP_BASE_URL: z.string().url().default("https://www.onemap.gov.sg"),
   ONEMAP_API_EMAIL: optionalEnv(z.string().email()),
   ONEMAP_API_PASSWORD: optionalEnv(z.string().min(1)),
+  COGNITO_DOMAIN: optionalEnv(httpsUrl),
+  COGNITO_REDIRECT_URI: optionalEnv(httpsUrl),
+  COGNITO_LOGOUT_URI: optionalEnv(httpsUrl),
 });
 
 const parsed = schema.safeParse(process.env);
@@ -50,7 +60,6 @@ module.exports = Object.freeze({
   jwtAccessSecret: values.JWT_ACCESS_SECRET || ephemeralAccessSecret,
   corsOrigins: (values.CORS_ORIGIN || values.CORS_ORIGINS).split(",").map((origin) => origin.trim()).filter(Boolean),
   trustProxy: values.TRUST_PROXY === "true",
-  localHttps: values.LOCAL_HTTPS === "true",
   publicSignupEnabled: values.PUBLIC_SIGNUP_ENABLED === "true",
   isProduction: values.NODE_ENV === "production",
 });
