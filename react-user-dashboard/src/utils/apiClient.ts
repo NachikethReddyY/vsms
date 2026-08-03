@@ -4,12 +4,13 @@ import { clearStoredSession, getStoredSession, setStoredSession } from "./sessio
 import { getCognitoAuthorizeUrl } from "./cognitoAuth";
 
 const baseURL = import.meta.env.VITE_API_BASE_URL ?? "/api/v1";
-type TokenPayload = { accessToken: string; csrfToken: string };
+type TokenPayload = { accessToken?: string; csrfToken: string };
 type RetryableRequestConfig = InternalAxiosRequestConfig & { _retry?: boolean };
 
 let accessToken: string | null = null;
 let csrfToken: string | null = null;
 let refreshPromise: Promise<AuthSession> | null = null;
+let volatileDeviceId: string | null = null;
 
 export function setSessionTokens(tokens: TokenPayload | null) {
   accessToken = tokens?.accessToken || null;
@@ -19,17 +20,23 @@ export function setSessionTokens(tokens: TokenPayload | null) {
 export function getCsrfToken() {
   if (csrfToken) return csrfToken;
   const match = document.cookie.match(/(?:^|; )vsms_csrf=([^;]+)/);
-  return match ? decodeURIComponent(match[1]) : null;
+  if (!match) return null;
+  try { return decodeURIComponent(match[1]); } catch { return null; }
 }
 
 function getDeviceId() {
   const key = "vsms_device_id";
-  let value = window.localStorage.getItem(key);
-  if (!value) {
-    value = crypto.randomUUID();
-    window.localStorage.setItem(key, value);
+  try {
+    let value = window.localStorage.getItem(key);
+    if (!value) {
+      value = crypto.randomUUID();
+      window.localStorage.setItem(key, value);
+    }
+    return value;
+  } catch {
+    volatileDeviceId ??= crypto.randomUUID();
+    return volatileDeviceId;
   }
-  return value;
 }
 
 const commonHeaders = {
@@ -45,14 +52,15 @@ apiClient.interceptors.request.use((config) => {
   config.headers["X-Device-Name"] = "VSMS staff web";
 
   if (accessToken) config.headers.Authorization = `Bearer ${accessToken}`;
-  if (csrfToken && !["get", "head", "options"].includes(config.method || "get")) {
-    config.headers["X-CSRF-Token"] = csrfToken;
+  const requestCsrfToken = csrfToken || getCsrfToken();
+  if (requestCsrfToken && !["get", "head", "options"].includes(config.method || "get")) {
+    config.headers["X-CSRF-Token"] = requestCsrfToken;
   }
   return config;
 });
 
 async function rotateSession(): Promise<AuthSession> {
-  const response = await refreshClient.post("/auth/refresh", null, {
+  const response = await refreshClient.post("/auth/refresh", {}, {
     headers: {
       "X-CSRF-Token": getCsrfToken(),
       "X-Device-Id": getDeviceId(),

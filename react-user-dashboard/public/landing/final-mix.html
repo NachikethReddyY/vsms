@@ -138,7 +138,7 @@
       width: 36px;
       height: 36px;
       place-items: center;
-      border-radius: 7px;
+      border-radius: 8px;
       background: #173451;
       color: #e8f1fb;
     }
@@ -595,18 +595,18 @@
     }
 
     .feature-zoom:nth-child(1) .zoom-window img {
-      object-position: 46% 48%;
-      transform-origin: 46% 48%;
+      object-position: 25% 58%;
+      transform-origin: 25% 58%;
     }
 
     .feature-zoom:nth-child(2) .zoom-window img {
-      object-position: 88% 10%;
-      transform-origin: 88% 10%;
+      object-position: 75% 58%;
+      transform-origin: 75% 58%;
     }
 
     .feature-zoom:nth-child(3) .zoom-window img {
-      object-position: 84% 52%;
-      transform-origin: 84% 52%;
+      object-position: 50% 100%;
+      transform-origin: 50% 100%;
     }
 
     .feature-zoom figcaption {
@@ -994,7 +994,7 @@
       </span>
     </a>
     <div class="nav-actions">
-      <a class="nav-sign-in" href="/login">Sign in</a>
+      <a class="nav-sign-in" href="/api/v1/auth/authorize?returnTo=%2Fevents">Sign in</a>
     </div>
   </header>
 
@@ -1005,7 +1005,7 @@
         <div class="hero-copy">
           <h1 id="hero-title">Keep the day moving.</h1>
           <p>One workspace for the participant records, screening stations, and review decisions behind a community vision-screening event.</p>
-          <a class="hero-action" href="/login">Sign in to VSMS <span aria-hidden="true">→</span></a>
+          <a class="hero-action" href="/api/v1/auth/authorize?returnTo=%2Fevents">Sign in to VSMS <span aria-hidden="true">→</span></a>
           <small class="authorised-note">For authorised screening personnel</small>
         </div>
       </div>
@@ -1090,15 +1090,15 @@
 
         <figure class="dashboard-showcase">
           <div class="dashboard-frame">
-            <img src="./assets/placeholder-image.png" alt="Dashboard screenshot placeholder" width="1200" height="800" loading="lazy" decoding="async">
+            <img src="./event-workspace-preview.jpg" alt="VSMS event workspace showing a published community screening, schedule and operational metrics" width="1440" height="900" loading="lazy" decoding="async">
           </div>
-          <figcaption class="dashboard-note">Dashboard image placeholder. Replace with an approved product screenshot.</figcaption>
+          <figcaption class="dashboard-note">Event workspace overview with schedule, status and operational metrics.</figcaption>
         </figure>
 
         <div class="feature-zooms" role="group" aria-label="Highlighted dashboard features">
           <figure class="feature-zoom">
             <div class="zoom-window" aria-hidden="true">
-              <img src="./assets/placeholder-image.png" alt="" width="1200" height="800" loading="lazy" decoding="async">
+              <img src="./event-workspace-preview.jpg" alt="" width="1440" height="900" loading="lazy" decoding="async">
             </div>
             <figcaption>
               <span aria-hidden="true">
@@ -1106,13 +1106,13 @@
                   <path d="M5 25h22M8 21v-6M16 21V8M24 21v-9"></path>
                 </svg>
               </span>
-              Queue and station load
+              Schedule and location
             </figcaption>
           </figure>
 
           <figure class="feature-zoom">
             <div class="zoom-window" aria-hidden="true">
-              <img src="./assets/placeholder-image.png" alt="" width="1200" height="800" loading="lazy" decoding="async">
+              <img src="./event-workspace-preview.jpg" alt="" width="1440" height="900" loading="lazy" decoding="async">
             </div>
             <figcaption>
               <span aria-hidden="true">
@@ -1121,13 +1121,13 @@
                   <path d="m12 19 3 3 6-7"></path>
                 </svg>
               </span>
-              Offline save and sync
+              Signups and attendance
             </figcaption>
           </figure>
 
           <figure class="feature-zoom">
             <div class="zoom-window" aria-hidden="true">
-              <img src="./assets/placeholder-image.png" alt="" width="1200" height="800" loading="lazy" decoding="async">
+              <img src="./event-workspace-preview.jpg" alt="" width="1440" height="900" loading="lazy" decoding="async">
             </div>
             <figcaption>
               <span aria-hidden="true">
@@ -1136,7 +1136,7 @@
                   <path d="m15 21 2 2 4-5"></path>
                 </svg>
               </span>
-              Clinical review
+              Lifecycle and activity
             </figcaption>
           </figure>
         </div>
@@ -1153,8 +1153,8 @@
               <path d="m12 19 3 3 6-7"></path>
             </svg>
           </span>
-          <h3>Offline-ready</h3>
-          <p>Save locally. Sync when connected.</p>
+          <h3>Connected workflow</h3>
+          <p>One record follows every station.</p>
         </article>
         <article class="trust-item">
           <span class="trust-icon" aria-hidden="true">
@@ -1193,7 +1193,7 @@
       <div class="access-panel">
         <h2 id="access-title">Ready for today’s event.</h2>
         <div class="access-actions">
-          <a class="access-action" href="/login">Open VSMS</a>
+          <a class="access-action" href="/api/v1/auth/authorize?returnTo=%2Fevents">Open VSMS</a>
         </div>
       </div>
     </section>

@@ -1,51 +1,57 @@
+import { lazy, Suspense } from "react";
 import { Navigate, Outlet, Route, Routes } from "react-router-dom";
 import { ProtectedRoute } from "./auth/ProtectedRoute";
 import { RoleGuard } from "./auth/RoleGuard";
 import { CognitoCallback } from "./auth/CognitoRoutes";
-import AppShell from "./components/AppShell";
-import LandingPage from "./components/LandingPage";
-import SettingsPage from "./components/SettingsPage";
-import TestHomePage from "./components/TestHomePage";
-import QRCodePage from "./components/qr/QRCodePage";
-import EventDetailPage from "./features/events/EventDetailPage";
-import EventFormPage from "./features/events/EventFormPage";
-import ReviewWorkspacePage from "./features/reviews/ReviewWorkspacePage";
-import ColourVisionStationPage from "./features/screening/ColourVisionStationPage";
-import RefractionStationPage from "./features/screening/RefractionStationPage";
-import VisualAcuityStationPage from "./features/screening/VisualAcuityStationPage";
-import { AuditLogsPage as RegistrationAuditLogsPage } from "./pages/AdminPages";
-import AccountSecurityPage from "./pages/AccountSecurityPage";
-import { QueuePage } from "./pages/QueuePages"; // Imported the QueuePage component
-import {
-  ConsentPage,
-  EmergencyContactsPage,
-  EventRegistrationStartPage,
-  EventRegistrationsPage,
-  ParticipantConsentsPage,
-  ParticipantCreatePage,
-  ParticipantDetailPage,
-  ParticipantEditPage,
-  ParticipantHistoryPage,
-  ParticipantSearchPage,
-  RegistrationConfirmationPage,
-  RegistrationHistoryPage,
-  RegistrationQrPage,
-  RegistrationReviewPage,
-} from './pages/ParticipantPages';
+
+const AppShell = lazy(() => import("./components/AppShell"));
+const TestHomePage = lazy(() => import("./components/TestHomePage"));
+const LandingPage = lazy(() => import("./components/LandingPage"));
+const SettingsPage = lazy(() => import("./components/SettingsPage"));
+const QRCodePage = lazy(() => import("./components/qr/QRCodePage"));
+const EventDetailPage = lazy(() => import("./features/events/EventDetailPage"));
+const EventFormPage = lazy(() => import("./features/events/EventFormPage"));
+const PublicEventPage = lazy(() => import("./features/events/PublicEventPage"));
+const ReviewWorkspacePage = lazy(() => import("./features/reviews/ReviewWorkspacePage"));
+const ColourVisionStationPage = lazy(() => import("./features/screening/ColourVisionStationPage"));
+const RefractionStationPage = lazy(() => import("./features/screening/RefractionStationPage"));
+const VisualAcuityStationPage = lazy(() => import("./features/screening/VisualAcuityStationPage"));
+const AccountSecurityPage = lazy(() => import("./pages/AccountSecurityPage"));
+const RegistrationAuditLogsPage = lazy(() => import("./pages/AdminPages").then((module) => ({ default: module.AuditLogsPage })));
+const QueuePage = lazy(() => import("./pages/QueuePages").then((module) => ({ default: module.QueuePage })));
+const ConsentPage = lazy(() => import("./pages/ParticipantPages").then((module) => ({ default: module.ConsentPage })));
+const EmergencyContactsPage = lazy(() => import("./pages/ParticipantPages").then((module) => ({ default: module.EmergencyContactsPage })));
+const EventRegistrationStartPage = lazy(() => import("./pages/ParticipantPages").then((module) => ({ default: module.EventRegistrationStartPage })));
+const EventRegistrationsPage = lazy(() => import("./pages/ParticipantPages").then((module) => ({ default: module.EventRegistrationsPage })));
+const ParticipantConsentsPage = lazy(() => import("./pages/ParticipantPages").then((module) => ({ default: module.ParticipantConsentsPage })));
+const ParticipantCreatePage = lazy(() => import("./pages/ParticipantPages").then((module) => ({ default: module.ParticipantCreatePage })));
+const ParticipantDetailPage = lazy(() => import("./pages/ParticipantPages").then((module) => ({ default: module.ParticipantDetailPage })));
+const ParticipantEditPage = lazy(() => import("./pages/ParticipantPages").then((module) => ({ default: module.ParticipantEditPage })));
+const ParticipantHistoryPage = lazy(() => import("./pages/ParticipantPages").then((module) => ({ default: module.ParticipantHistoryPage })));
+const ParticipantSearchPage = lazy(() => import("./pages/ParticipantPages").then((module) => ({ default: module.ParticipantSearchPage })));
+const RegistrationConfirmationPage = lazy(() => import("./pages/ParticipantPages").then((module) => ({ default: module.RegistrationConfirmationPage })));
+const RegistrationHistoryPage = lazy(() => import("./pages/ParticipantPages").then((module) => ({ default: module.RegistrationHistoryPage })));
+const RegistrationQrPage = lazy(() => import("./pages/ParticipantPages").then((module) => ({ default: module.RegistrationQrPage })));
+const RegistrationReviewPage = lazy(() => import("./pages/ParticipantPages").then((module) => ({ default: module.RegistrationReviewPage })));
 
 const adminRoles = ["ADMINISTRATOR"];
 const eventManagerRoles = ["ADMINISTRATOR", "EVENT_MANAGER"];
 const registrationRoles = ["ADMINISTRATOR", "REGISTRATION_OFFICER"];
 
 function EventWorkspace() {
-  return <AppShell><Outlet /></AppShell>;
+  return <AppShell><Suspense fallback={<RouteFallback />}><Outlet /></Suspense></AppShell>;
+}
+
+function RouteFallback() {
+  return <main className="center-state" role="status" aria-live="polite">Loading workspace…</main>;
 }
 
 export default function App() {
   return (
-    <Routes>
+    <Suspense fallback={<RouteFallback />}><Routes>
       <Route path="/" element={<LandingPage />} />
       <Route path="/auth/callback" element={<CognitoCallback />} />
+      <Route path="/e/:eventId" element={<PublicEventPage />} />
 
       <Route element={<ProtectedRoute />}>
         <Route path="/dashboard" element={<Navigate to="/events" replace />} />
@@ -89,15 +95,15 @@ export default function App() {
             <Route path="/registrations/:registrationId/qr" element={<RegistrationQrPage />} />
           </Route>
 
-        </Route>
+          <Route element={<RoleGuard allowedRoles={adminRoles} />}>
+            <Route path="/admin/audit-logs" element={<RegistrationAuditLogsPage />} />
+            <Route path="/admin/system-audit-logs" element={<Navigate to="/admin/audit-logs" replace />} />
+          </Route>
 
-        <Route element={<RoleGuard allowedRoles={adminRoles} />}>
-          <Route path="/admin/audit-logs" element={<RegistrationAuditLogsPage />} />
-          <Route path="/admin/system-audit-logs" element={<Navigate to="/admin/audit-logs" replace />} />
         </Route>
       </Route>
 
       <Route path="*" element={<Navigate to="/" replace />} />
-    </Routes>
+    </Routes></Suspense>
   );
 }
