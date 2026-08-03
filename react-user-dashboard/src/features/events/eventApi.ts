@@ -14,6 +14,11 @@ export type CreateEvent = components['schemas']['CreateEventRequest'];
 export type UpdateEvent = components['schemas']['UpdateEventRequest'];
 export type AuditRecord = components['schemas']['EventAuditLog'];
 export type LocationResult = components['schemas']['LocationResult'];
+export type PublicEvent = components['schemas']['PublicEvent'];
+export type EventMetrics = components['schemas']['EventMetrics'];
+export type EventAttendee = components['schemas']['EventAttendee'];
+export type EventAttendeeList = components['schemas']['EventAttendeeList'];
+export type EventExportResponse = components['schemas']['EventExportResponse'];
 
 export const eventApi = {
   async list(params?: { status?: EventStatus; search?: string; cursor?: string }) {
@@ -22,6 +27,10 @@ export const eventApi = {
   },
   async get(id: string, signal?: AbortSignal) {
     const { data } = await apiClient.get<EventRecord>(`/events/${id}`, { signal });
+    return data;
+  },
+  async publicGet(id: string, signal?: AbortSignal) {
+    const { data } = await apiClient.get<PublicEvent>(`/public/events/${id}`, { signal });
     return data;
   },
   async create(input: CreateEvent, idempotencyKey = crypto.randomUUID()) {
@@ -75,10 +84,25 @@ export const eventApi = {
     const { data } = await apiClient.get<components['schemas']['AuditListResponse']>(`/events/${id}/audit-log`, { params: { limit: 50 } });
     return data;
   },
+  async metrics(id: string) {
+    const { data } = await apiClient.get<EventMetrics>(`/events/${id}/metrics`);
+    return data;
+  },
+  async attendees(id: string, params?: { cursor?: string; limit?: number; status?: EventAttendee['registrationStatus']; search?: string }, signal?: AbortSignal) {
+    const { data } = await apiClient.get<EventAttendeeList>(`/events/${id}/attendees`, { params, signal });
+    return data;
+  },
+  async exportEvent(id: string) {
+    const { data } = await apiClient.get<EventExportResponse>(`/events/${id}/export`);
+    return data;
+  },
+  async deleteEmptyDraft(id: string, input: components['schemas']['EventDeletionRequest']) {
+    await apiClient.delete(`/events/${id}`, { data: input });
+  },
 };
 
 export const STATUS_LABEL: Record<EventStatus, string> = {
-  DRAFT: 'Draft', PUBLISHED: 'Published', IN_PROGRESS: 'In progress', COMPLETED: 'Completed', CANCELLED: 'Cancelled',
+  DRAFT: 'Draft', PUBLISHED: 'Published', IN_PROGRESS: 'Live', COMPLETED: 'Past', CANCELLED: 'Cancelled',
 };
 
 export function formatEventDate(value: string, timezone: string, includeTime = true) {

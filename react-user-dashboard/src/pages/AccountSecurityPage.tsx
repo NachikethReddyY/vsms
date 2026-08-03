@@ -1,13 +1,15 @@
 import { useState } from "react";
 import apiClient, { getApiError } from "../utils/apiClient";
 import { isPasswordValid } from "../utils/passwordPolicy";
-import { AppShell, Field, FormErrorSummary, PasswordRequirements, PrimaryButton, TextInput } from "../components/ui";
+import { Field, FormErrorSummary, PasswordRequirements, PrimaryButton, TextInput } from "../components/ui";
+import "../components/SettingsPage.css";
 
 export default function AccountSecurityPage() {
   const [oldPassword, setOldPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
+  const [pending, setPending] = useState(false);
 
   async function handleSubmit(event: React.FormEvent) {
     event.preventDefault();
@@ -15,6 +17,9 @@ export default function AccountSecurityPage() {
       setError("New password does not meet all requirements.");
       return;
     }
+    setPending(true);
+    setError(null);
+    setMessage(null);
     try {
       await apiClient.post("/auth/change-password", { oldPassword, newPassword });
       setMessage("Password changed successfully.");
@@ -23,19 +28,24 @@ export default function AccountSecurityPage() {
       setNewPassword("");
     } catch (requestError: unknown) {
       setError(getApiError(requestError, "Unable to change password."));
+    } finally {
+      setPending(false);
     }
   }
 
   return (
-    <AppShell title="Account security">
-      <form className="max-w-xl space-y-4 rounded-2xl border border-slate-200 bg-white p-5" onSubmit={handleSubmit}>
+    <section className="page-frame narrow settings-page midnight-settings account-security-page">
+      <header className="page-heading settings-heading">
+        <div><h1>Account security</h1><p>Change the password for your managed staff identity.</p></div>
+      </header>
+      <form className="account-security-form" onSubmit={handleSubmit}>
         <FormErrorSummary error={error} />
-        {message ? <p className="rounded-xl bg-emerald-50 p-3 text-sm text-emerald-800">{message}</p> : null}
-        <Field label="Current password"><TextInput value={oldPassword} onChange={(event) => setOldPassword(event.target.value)} type="password" required /></Field>
-        <Field label="New password"><TextInput value={newPassword} onChange={(event) => setNewPassword(event.target.value)} type="password" required /></Field>
-        <PasswordRequirements password={newPassword} />
-        <PrimaryButton disabled={!isPasswordValid(newPassword)} type="submit">Change password</PrimaryButton>
+        {message ? <p className="account-security-success" role="status">{message}</p> : null}
+        <Field label="Current password"><TextInput value={oldPassword} onChange={(event) => setOldPassword(event.target.value)} type="password" autoComplete="current-password" required /></Field>
+        <Field label="New password"><TextInput value={newPassword} onChange={(event) => setNewPassword(event.target.value)} type="password" autoComplete="new-password" required /></Field>
+        <div className="account-security-requirements"><PasswordRequirements password={newPassword} /></div>
+        <PrimaryButton disabled={pending || !oldPassword || !isPasswordValid(newPassword)} type="submit">{pending ? 'Changing password…' : 'Change password'}</PrimaryButton>
       </form>
-    </AppShell>
+    </section>
   );
 }
