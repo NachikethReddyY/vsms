@@ -315,7 +315,7 @@ paths:
     post:
       tags: [Events]
       operationId: importEventStations
-      summary: Import active templates as event-owned station snapshots
+      summary: Import active screening templates as event Station rows (VA / refraction / colour vision / eye health). REGISTRATION and CLINICAL_REVIEW are rejected.
       parameters: [{ $ref: "#/components/parameters/EventId" }]
       requestBody:
         required: true
