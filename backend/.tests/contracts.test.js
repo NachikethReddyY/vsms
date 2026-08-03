@@ -41,9 +41,18 @@ test("API routes expose the required versioned contracts", () => {
     assert.match(events, /"\/active"/);
     assert.ok(events.indexOf('"/active"') < events.indexOf('"/:eventId"'), "active events route must precede the dynamic event route");
     assert.match(registrations, /"\/:registrationId\/history"/);
-    for (const route of ["/login", "/logout", "/refresh", "/me"]) {
+    for (const route of ["/authorize", "/callback", "/logout", "/refresh", "/me"]) {
         assert.ok(auth.includes(`"${route}"`), `missing auth route ${route}`);
     }
+});
+
+test("event and screening routes share one authentication and mutation-limit pass", () => {
+    const app = read("app.js");
+    const events = read("routes/eventRoutes.js");
+    const screenings = read("routes/screeningRoutes.js");
+    assert.equal((app.match(/authenticate, eventRoutes, screeningRoutes/g) || []).length, 2);
+    assert.doesNotMatch(events, /router\.use\(authenticate\)/);
+    assert.doesNotMatch(screenings, /router\.use\(authenticate\)/);
 });
 
 test("registration transaction creates registration, history and audit together", () => {
@@ -87,15 +96,59 @@ test("listStationTemplates reads active StationTemplate rows", () => {
 });
 
 test("participant search matches any supplied identifier", () => {
-    const controller = read("controllers/participantController.js");
-    assert.match(controller, /return\s+\{\s*OR:\s*clauses\s*\}/);
+    const service = read("services/participantService.js");
+    assert.match(service, /return\s+\{\s*OR:\s*clauses\s*\}/);
 });
 
-test("development authentication uses the local credential service", () => {
+test("managed authentication verifies both Cognito cookie and compatibility bearer tokens", () => {
     const controller = read("controllers/authController.js");
     const middleware = read("middlewares/requireAuthentication.js");
     const authRoutes = read("routes/authRoutes.js");
-    assert.match(controller, /services\/authService/);
+    assert.match(controller, /utils\/cognitoClient/);
     assert.match(middleware, /verifyAccessToken/);
-    assert.doesNotMatch(`${controller}\n${middleware}\n${authRoutes}`, /cognito(Client|Jwt)|rolesFromCognito/i);
+    assert.match(middleware, /verifyCognitoToken/);
+    assert.match(middleware, /ACCESS_COOKIE/);
+    assert.match(authRoutes, /"\/authorize"/);
+});
+
+test("browser mutations recover the CSRF token after a page reload", () => {
+    const client = read("../react-user-dashboard/src/utils/apiClient.ts");
+    assert.match(client, /const requestCsrfToken = csrfToken \|\| getCsrfToken\(\)/);
+    assert.match(client, /config\.headers\["X-CSRF-Token"\] = requestCsrfToken/);
+});
+
+test("browser session restoration rejects stale profile storage without a session cookie", () => {
+    const provider = read("../react-user-dashboard/src/auth/AuthProvider.tsx");
+    const session = read("../react-user-dashboard/src/utils/session.ts");
+    const client = read("../react-user-dashboard/src/utils/apiClient.ts");
+    assert.match(provider, /if \(!getCsrfToken\(\)\) \{[\s\S]*clearStoredSession\(\);[\s\S]*setSessionState\(null\);/);
+    assert.match(session, /sessionStorage\.getItem\(SESSION_KEY\); \} catch \{ return null; \}/);
+    assert.match(client, /volatileDeviceId \?\?= crypto\.randomUUID\(\)/);
+    assert.match(read("../react-user-dashboard/src/main.tsx"), /try \{ savedTheme = localStorage\.getItem/);
+    assert.match(read("../react-user-dashboard/src/components/MagicEffects.tsx"), /try \{ localStorage\.setItem\('vsms-theme'/);
+});
+
+test("theme toggles apply every click without a transient browser transition", () => {
+    const toggle = read("../react-user-dashboard/src/components/MagicEffects.tsx");
+    assert.match(toggle, /applyTheme\(next\);\s+setTheme\(next\);/);
+    assert.doesNotMatch(toggle, /startViewTransition|isTransitioningRef/);
+});
+
+test("managed password changes use autofill semantics and suppress duplicate submits", () => {
+    const page = read("../react-user-dashboard/src/pages/AccountSecurityPage.tsx");
+    assert.match(page, /autoComplete="current-password"/);
+    assert.match(page, /autoComplete="new-password"/);
+    assert.match(page, /disabled=\{pending \|\| !oldPassword \|\| !isPasswordValid\(newPassword\)\}/);
+});
+
+test("event creation controls use the same verified role grants as the API", () => {
+    const page = read("../react-user-dashboard/src/components/TestHomePage.tsx");
+    assert.match(page, /role === 'ADMINISTRATOR' \|\| role === 'EVENT_MANAGER'/);
+    assert.doesNotMatch(page, /systemRole !== 'STAFF'/);
+});
+
+test("event mutations invalidate stale export receipts", () => {
+    const page = read("../react-user-dashboard/src/features/events/EventDetailPage.tsx");
+    assert.match(page, /const applyEventUpdate = \(updated: EventRecord\) => \{ setEvent\(updated\); setExportReceipt\(''\); \}/);
+    assert.match(page, /applyEventUpdate\(updated\)/);
 });

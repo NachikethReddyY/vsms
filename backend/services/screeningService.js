@@ -119,14 +119,37 @@ const evaluateColourVision = (resultData) => {
   };
 };
 
-const assertCanScreen = async (eventId, user) => {
-  if (user.systemRole === "ADMIN" || user.systemRole === "EVENT_MANAGER") return;
+const assertCanScreen = async (eventId, user, stationId = null) => {
+  if (user.systemRole === "ADMIN") return;
+  if (user.systemRole === "EVENT_MANAGER") {
+    const managedEvent = await prisma.event.findFirst({
+      where: {
+        eventId,
+        OR: [
+          { createdByUserId: user.userId },
+          {
+            staffAssignments: {
+              some: {
+                userId: user.userId,
+                status: { in: ["ASSIGNED", "CONFIRMED"] },
+                assignmentRole: "EVENT_MANAGER",
+              },
+            },
+          },
+        ],
+      },
+      select: { eventId: true },
+    });
+    if (managedEvent) return;
+  }
   const assignment = await prisma.staffAssignment.findFirst({
     where: {
+      eventId,
       userId: user.userId,
       status: { in: ["ASSIGNED", "CONFIRMED"] },
-      assignmentRole: { in: ["SCREENER", "SUPPORT", "REGISTRATION"] },
-      shift: { eventId, status: "ACTIVE" },
+      assignmentRole: stationId ? "SCREENER" : { in: ["SCREENER", "SUPPORT", "REGISTRATION"] },
+      ...(stationId ? { stationId } : {}),
+      shift: { status: "ACTIVE" },
     },
     select: { id: true },
   });
@@ -160,7 +183,7 @@ const listStations = async (eventId, user) => {
 };
 
 const listQueue = async (eventId, stationId, user) => {
-  await assertCanScreen(eventId, user);
+  await assertCanScreen(eventId, user, stationId);
   const station = await prisma.station.findFirst({ where: { stationId, eventId, isActive: true } });
   if (!station) throw new AppError(404, "STATION_NOT_FOUND", "Station not found for this event");
 
@@ -219,7 +242,7 @@ const resolveParticipant = async (eventId, query, user) => {
 };
 
 const previewStationResult = async (eventId, stationId, stationType, label, evaluate, body, user) => {
-  await assertCanScreen(eventId, user);
+  await assertCanScreen(eventId, user, stationId);
   await assertStation(eventId, stationId, stationType, label);
   return evaluate(body.resultData);
 };
@@ -234,7 +257,7 @@ const saveStationResult = async ({
   body,
   user,
 }) => {
-  await assertCanScreen(eventId, user);
+  await assertCanScreen(eventId, user, stationId);
   await assertStation(eventId, stationId, stationType, label);
 
   const evaluation = evaluate(body.resultData);

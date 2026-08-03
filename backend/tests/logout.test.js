@@ -16,6 +16,20 @@ test("logout clears browser auth without requiring a valid access token", async 
     const response = await request(app).post("/api/v1/auth/logout");
 
     assert.equal(response.status, 200);
+    assert.equal(response.headers["cache-control"], "no-store");
     assert.equal(response.body.logoutUrl, "https://vsms.auth.us-east-1.amazoncognito.com/logout?client_id=test-client&logout_uri=https%3A%2F%2Flocalhost%3A5173");
     assert.ok(response.headers["set-cookie"].every((value) => value.includes("Max-Age=0")));
+});
+
+test("logout still clears local cookies when Cognito is unavailable", async () => {
+    const domain = process.env.COGNITO_DOMAIN;
+    delete process.env.COGNITO_DOMAIN;
+    try {
+        const response = await request(app).post("/api/v1/auth/logout");
+        assert.equal(response.status, 200);
+        assert.equal(response.body.logoutUrl, "/");
+        assert.ok(response.headers["set-cookie"].every((value) => value.includes("Max-Age=0")));
+    } finally {
+        process.env.COGNITO_DOMAIN = domain;
+    }
 });

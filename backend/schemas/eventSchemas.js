@@ -116,6 +116,11 @@ const validateEventRange = (value, ctx) => {
     ctx.addIssue({ code: "custom", path: ["timezone"], message: "OneMap locations use Asia/Singapore" });
   }
   const days = value.eventDays || [];
+  for (const [index, day] of days.entries()) {
+    if (new Date(day.startsAt) < eventStart || new Date(day.endsAt) > eventEnd) {
+      ctx.addIssue({ code: "custom", path: ["eventDays", index], message: "Event day must be within the event dates" });
+    }
+  }
   if (new Set(days.map((day) => day.date)).size !== days.length) {
     ctx.addIssue({ code: "custom", path: ["eventDays"], message: "Event dates must be unique" });
   }
@@ -185,6 +190,17 @@ const listQuery = z.object({
   search: z.string().trim().max(150).optional(),
 }).strict();
 const auditQuery = z.object({ cursor: z.string().max(2048).optional(), limit: z.coerce.number().int().min(1).max(100).default(50) }).strict();
+const attendeeQuery = z.object({
+  cursor: z.string().max(2048).optional(),
+  limit: z.coerce.number().int().min(1).max(100).default(50),
+  status: z.enum(["SIGNED_UP", "CHECKED_IN", "COMPLETED", "CANCELLED"]).optional(),
+  search: z.string().trim().max(150).optional(),
+}).strict();
+const deleteEventBody = z.object({
+  version: z.number().int().positive(),
+  eventName: z.string().min(1).max(150),
+  exportReceipt: z.string().min(1).max(2048).regex(/^[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$/),
+}).strict();
 
 const assignmentParams = z.object({ eventId: uuid, shiftId: uuid }).strict();
 const assignmentDeleteParams = z.object({ eventId: uuid, shiftId: uuid, assignmentId: uuid }).strict();
@@ -222,6 +238,8 @@ module.exports = {
   eventParams,
   listQuery,
   auditQuery,
+  attendeeQuery,
+  deleteEventBody,
   assignmentParams,
   assignmentDeleteParams,
   versionQuery,

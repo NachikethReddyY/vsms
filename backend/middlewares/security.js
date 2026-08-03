@@ -1,21 +1,5 @@
 const buckets = new Map();
 
-function secureHeaders(req, res, next) {
-    res.setHeader("X-Content-Type-Options", "nosniff");
-    res.setHeader("X-Frame-Options", "DENY");
-    res.setHeader("Referrer-Policy", "no-referrer");
-    res.setHeader("Permissions-Policy", "camera=(), microphone=(), geolocation=()");
-    res.setHeader("Cross-Origin-Resource-Policy", "same-site");
-    const contentSecurityPolicy = req.path.startsWith("/api-docs")
-        ? "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; frame-ancestors 'none'; base-uri 'none'"
-        : "default-src 'none'; frame-ancestors 'none'; base-uri 'none'";
-    res.setHeader("Content-Security-Policy", contentSecurityPolicy);
-    if (process.env.NODE_ENV === "production") {
-        res.setHeader("Strict-Transport-Security", "max-age=31536000; includeSubDomains");
-    }
-    next();
-}
-
 function rateLimit({ windowMs = 60_000, max = 60, key = (req) => req.ip }) {
     return (req, res, next) => {
         const now = Date.now();
@@ -51,7 +35,6 @@ const cleanupTimer = setInterval(cleanupRateLimitBuckets, 5 * 60_000);
 cleanupTimer.unref();
 
 module.exports = {
-    secureHeaders,
     rateLimit,
     cleanupRateLimitBuckets,
 };
