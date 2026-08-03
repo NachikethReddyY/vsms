@@ -1,41 +1,71 @@
 const QRCode = require("qrcode");
 const crypto = require("crypto");
 
+/**
+ * Generates a branded and secure QR code for a participant.
+ * * @param {string} participantId - The unique ID of the participant.
+ * @param {object} [customOptions={}] - Branding and styling options.
+ * @returns {Promise<{token: string, qrImage: string}>}
+ */
+async function generateBrandedQR(participantId, customOptions = {}) {
+    try {
+        // 1. Generate a secure unique token
+        const token = crypto.randomBytes(32).toString("hex");
 
-async function generateQR(participantId) {
+        // 2. Define the payload (kept compact for efficient scanning)
+        const payload = {
+            id: participantId,
+            t: token,
+            generatedAt: new Date().toISOString()
+        };
 
+        const jsonString = JSON.stringify(payload);
 
-    // Generate unique QR token
-    const token = crypto.randomBytes(32).toString("hex");
+        // 3. Define branding and default styling options
+        const defaultOptions = {
+            errorCorrectionLevel: 'M', // Balance between data density and error recovery
+            type: 'image/png',
+            quality: 0.92,
+            margin: 2, // White space border around the QR code
+            color: {
+                dark: customOptions.darkColor || "#1E293B",  // Custom dark modules (Default: Slate dark)
+                light: customOptions.lightColor || "#FFFFFF" // Background color (Default: White)
+            },
+            width: customOptions.width || 300 // Resolution width in pixels
+        };
 
+        // 4. Generate the QR code data URL
+        const qrImage = await QRCode.toDataURL(jsonString, defaultOptions);
 
-    const qrData = {
-
-        participantId,
-
-        token,
-
-        generatedAt: new Date().toISOString()
-
-    };
-
-
-    const qrImage = await QRCode.toDataURL(
-        JSON.stringify(qrData)
-    );
-
-
-    return {
-
-        token,
-
-        qrImage
-
-    };
-
+        return {
+            token,
+            qrImage
+        };
+    } catch (error) {
+        console.error("Failed to generate branded QR code:", error);
+        throw new Error("QR Code generation failed");
+    }
 }
 
+// Example usage implementation block
+async function run() {
+    try {
+        const result = await generateBrandedQR("user_98765", {
+            darkColor: "#4F46E5",  // Indigo brand color
+            lightColor: "#F3F4F6", // Light gray background
+            width: 400             // Output resolution width
+        });
+
+        console.log("Generated Token:", result.token);
+        console.log("Data URL Ready for <img src='...'>:", result.qrImage);
+    } catch (err) {
+        console.error(err);
+    }
+}
+
+// Uncomment the line below if you want to execute it directly via Node.js
+// run();
 
 module.exports = {
-    generateQR
+    generateBrandedQR
 };
