@@ -1,5 +1,5 @@
 const fs = require("fs");
-const https = require("https");
+const https = https = require("https");
 const path = require("path");
 const express = require("express");
 const cookieParser = require("cookie-parser");
@@ -11,6 +11,12 @@ const env = require("./config/env");
 const logger = require("./utils/logger/logger");
 const cors = require("cors");
 const helmet = require("helmet");
+
+// -----------------------------------------------------------------------------
+// 0. BACKGROUND WORKERS (Event-Driven Architecture)
+// -----------------------------------------------------------------------------
+// Initialize the background audit log worker so it listens for emitted events on boot
+require("./workers/auditWorker");
 
 // Import Routes
 const authRoutes = require("./routes/authRoutes");
@@ -182,7 +188,12 @@ if (require.main === module) {
   const port = env.port || Number(process.env.PORT || 5000);
   server.listen(port, () => {
     const protocol = !env.isProduction && env.localHttps ? "https" : "http";
-    logger.info(`Server & WebSocket engine running securely on ${protocol}://localhost:${port}`);
+    const serverUrl = `${protocol}://localhost:${port}`;
+    
+    // Console log to explicitly confirm the server is running in the terminal
+    console.log(`[Server Status] Running successfully on ${serverUrl}`);
+    
+    logger.info(`Server & WebSocket engine running securely on ${serverUrl}`);
   });
 }
 

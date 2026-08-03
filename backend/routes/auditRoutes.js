@@ -1,20 +1,22 @@
-const express = require('express');
+// routes/auditRoutes.js
+const express = require("express");
+const auditController = require("../controllers/auditController");
+const authenticate = require("../middlewares/authenticate");
+const { requireSystemRole } = require("../middlewares/authorize");
+const asyncHandler = require("../utils/asyncHandler");
+
 const router = express.Router();
-const auditController = require('../controllers/auditController');
-const { requireAuth, requireAdmin } = require('../middleware/authMiddleware');
 
-// Secure all audit endpoints to authenticated admins
-// router.use(requireAuth, requireAdmin);
+// Protect all audit routes with authentication and restrict to admins/managers
+// router.use(authenticate);
+// router.use(requireSystemRole("ADMIN", "EVENT_MANAGER"));
 
-// GET /api/v1/audit-logs - Fetch paginated audit logs with optional filters
-router.get('/', auditController.getAuditLogs);
+// Analytics summary route must come BEFORE `/:id`
+router.get("/analytics/summary", asyncHandler(auditController.getAuditAnalytics));
 
-// 1. Place specific static sub-routes FIRST
-// GET /api/v1/audit-logs/entity/:entityName/:entityId - Fetch audit history for a specific record
-router.get('/entity/:entityName/:entityId', auditController.getAuditHistoryByEntity);
-
-// 2. Place generic dynamic parameter routes LAST
-// GET /api/v1/audit-logs/:id - Fetch details of a specific audit entry
-router.get('/:id', auditController.getAuditLogById);
+// Define endpoints matching the controller functions
+router.get("/", asyncHandler(auditController.getAuditLogs));
+router.get("/entity/:entityName/:entityId", asyncHandler(auditController.getAuditHistoryByEntity));
+router.get("/:id", asyncHandler(auditController.getAuditLogById));
 
 module.exports = router;
