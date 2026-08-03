@@ -1,6 +1,9 @@
 const ACCESS_COOKIE = "vsms_access";
 const REFRESH_COOKIE = "vsms_refresh";
 const USERNAME_COOKIE = "vsms_username";
+const OAUTH_STATE_COOKIE = "vsms_oauth_state";
+const OAUTH_VERIFIER_COOKIE = "vsms_oauth_verifier";
+const OAUTH_RETURN_TO_COOKIE = "vsms_oauth_return_to";
 
 function parseCookies(header = "") {
     return String(header)
@@ -16,16 +19,20 @@ function parseCookies(header = "") {
 }
 
 function cookie(name, value, maxAgeSeconds) {
-    const secure = process.env.NODE_ENV === "production" || process.env.COOKIE_SECURE === "true";
     const parts = [
         `${name}=${encodeURIComponent(value)}`,
         "HttpOnly",
         "Path=/",
         "SameSite=Lax",
+        "Secure",
         `Max-Age=${Math.max(0, maxAgeSeconds)}`,
     ];
-    if (secure) parts.push("Secure");
     return parts.join("; ");
+}
+
+function appendCookies(res, cookies) {
+    const current = res.getHeader("Set-Cookie");
+    res.setHeader("Set-Cookie", [...(Array.isArray(current) ? current : current ? [current] : []), ...cookies]);
 }
 
 function setAuthCookies(res, authenticationResult, username) {
@@ -38,14 +45,31 @@ function setAuthCookies(res, authenticationResult, username) {
     if (authenticationResult.RefreshToken) {
         cookies.push(cookie(REFRESH_COOKIE, authenticationResult.RefreshToken, refreshMaxAge));
     }
-    res.setHeader("Set-Cookie", cookies);
+    appendCookies(res, cookies);
 }
 
 function clearAuthCookies(res) {
-    res.setHeader("Set-Cookie", [
+    appendCookies(res, [
         cookie(ACCESS_COOKIE, "", 0),
         cookie(REFRESH_COOKIE, "", 0),
         cookie(USERNAME_COOKIE, "", 0),
+    ]);
+}
+
+function setOAuthCookies(res, { state, verifier, returnTo }) {
+    const maxAge = 10 * 60;
+    appendCookies(res, [
+        cookie(OAUTH_STATE_COOKIE, state, maxAge),
+        cookie(OAUTH_VERIFIER_COOKIE, verifier, maxAge),
+        cookie(OAUTH_RETURN_TO_COOKIE, returnTo, maxAge),
+    ]);
+}
+
+function clearOAuthCookies(res) {
+    appendCookies(res, [
+        cookie(OAUTH_STATE_COOKIE, "", 0),
+        cookie(OAUTH_VERIFIER_COOKIE, "", 0),
+        cookie(OAUTH_RETURN_TO_COOKIE, "", 0),
     ]);
 }
 
@@ -53,7 +77,12 @@ module.exports = {
     ACCESS_COOKIE,
     REFRESH_COOKIE,
     USERNAME_COOKIE,
+    OAUTH_STATE_COOKIE,
+    OAUTH_VERIFIER_COOKIE,
+    OAUTH_RETURN_TO_COOKIE,
     parseCookies,
     setAuthCookies,
     clearAuthCookies,
+    setOAuthCookies,
+    clearOAuthCookies,
 };

@@ -1,6 +1,7 @@
 import axios, { type AxiosError, type InternalAxiosRequestConfig } from "axios";
 import type { AuthSession } from "../types";
 import { clearStoredSession, getStoredSession, setStoredSession } from "./session";
+import { getCognitoAuthorizeUrl } from "./cognitoAuth";
 
 const baseURL = import.meta.env.VITE_API_BASE_URL ?? "/api/v1";
 type TokenPayload = { accessToken: string; csrfToken: string };
@@ -77,20 +78,22 @@ export function refreshAuthSession() {
 apiClient.interceptors.response.use(
   (response) => response,
   async (error: AxiosError) => {
-    const request = error.config as RetryableRequestConfig | undefined;
-    if (error.response?.status !== 401 || !request || request._retry || request.url?.startsWith("/auth/") || !getStoredSession()) {
-      return Promise.reject(error);
+    const originalRequest = error.config as RetryableRequestConfig | undefined;
+    if (error.response?.status === 401 && originalRequest && !originalRequest._retry && getStoredSession()) {
+      originalRequest._retry = true;
+      try {
+        refreshPromise ??= rotateSession().finally(() => {
+          refreshPromise = null;
+        });
+        await refreshPromise;
+        return apiClient(originalRequest);
+      } catch (refreshError) {
+        clearStoredSession();
+        window.location.assign(getCognitoAuthorizeUrl(`${window.location.pathname}${window.location.search}`));
+        return Promise.reject(refreshError);
+      }
     }
-    request._retry = true;
-    try {
-      await refreshAuthSession();
-      return apiClient(request);
-    } catch (refreshError) {
-      setSessionTokens(null);
-      clearStoredSession();
-      window.location.assign("/login?reason=session-expired");
-      return Promise.reject(refreshError);
-    }
+    return Promise.reject(error);
   }
 );
 

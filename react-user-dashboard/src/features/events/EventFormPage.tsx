@@ -20,7 +20,7 @@ import { useEffect, useMemo, useRef, useState, type ChangeEvent, type FormEvent 
 import Cropper, { type Area } from 'react-easy-crop';
 import { Link, useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { z } from 'zod';
-import { getApiMessage } from '../../auth/authState';
+import { getApiError as getApiMessage } from '../../utils/apiClient';
 import { getDisplayName } from '../../utils/identity';
 import {
   eventApi,

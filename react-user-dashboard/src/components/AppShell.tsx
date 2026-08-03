@@ -1,4 +1,4 @@
-import { ArrowLeftIcon, ArrowRightStartOnRectangleIcon, Bars3BottomLeftIcon, CalendarDaysIcon, HomeIcon, ListBulletIcon, MagnifyingGlassIcon, PlusIcon, QueueListIcon, ShieldCheckIcon, SignalIcon, TableCellsIcon, UserGroupIcon } from '@heroicons/react/24/outline';
+import { ArrowLeftIcon, ArrowRightStartOnRectangleIcon, Bars3BottomLeftIcon, CalendarDaysIcon, PlusIcon, QueueListIcon, ShieldCheckIcon, SignalIcon, UserGroupIcon } from '@heroicons/react/24/outline';
 import { CommandPalette, CommandPaletteInput } from '@astryxdesign/core/CommandPalette';
 import { Kbd } from '@astryxdesign/core/Kbd';
 import { createStaticSource, type SearchableItem } from '@astryxdesign/core/Typeahead';
@@ -25,8 +25,6 @@ type CommandItem = Omit<SearchableItem<CommandMetadata>, 'auxiliaryData'> & {
 export default function AppShell({ children }: { children: ReactNode }) {
   const [collapsed, setCollapsed] = useState(false);
   const [commandOpen, setCommandOpen] = useState(false);
-  const [eventSearch, setEventSearch] = useState('');
-
   const { session, clearSession } = useAuth();
   const user = session?.user;
   const navigate = useNavigate();
@@ -39,16 +37,16 @@ export default function AppShell({ children }: { children: ReactNode }) {
 
   const logout = useCallback(async () => {
     try {
-      await apiClient.post('/auth/logout');
-    } finally {
+      const response = await apiClient.post('/auth/logout');
       clearSession();
-      navigate('/login');
+      window.location.replace(response.data.logoutUrl || '/');
+    } catch {
+      clearSession();
+      navigate('/');
     }
   }, [clearSession, navigate]);
 
-  const mobileTitle = location.pathname === '/dashboard'
-    ? 'Dashboard'
-    : location.pathname.startsWith('/participants') || location.pathname.includes('/register')
+  const mobileTitle = location.pathname.startsWith('/participants') || location.pathname.includes('/register')
       ? 'Registration'
       : location.pathname === '/events/new'
     ? 'Create event'
@@ -60,14 +58,7 @@ export default function AppShell({ children }: { children: ReactNode }) {
       ? 'Event details'
       : 'Events';
 
-  const isEventsPage = location.pathname === '/events';
   const toggleSidebar = useCallback(() => setCollapsed((value) => !value), []);
-
-  const setEventsView = useCallback((view: 'timeline' | 'table') => {
-    localStorage.setItem('vsms-events-view', view);
-    window.dispatchEvent(new CustomEvent('vsms:events-view', { detail: view }));
-    if (!isEventsPage) navigate('/events');
-  }, [isEventsPage, navigate]);
 
   const commands = useMemo<CommandItem[]>(() => [
     {
@@ -81,42 +72,19 @@ export default function AppShell({ children }: { children: ReactNode }) {
       },
     }] : []),
     {
-      id: 'view-timeline', label: 'Switch to timeline view', auxiliaryData: {
-        group: 'View', description: 'Show events in chronological order', aliases: ['schedule', 'list', 'chronological'], icon: <ListBulletIcon />, action: () => setEventsView('timeline'),
-      },
-    },
-    {
-      id: 'view-table', label: 'Switch to table view', auxiliaryData: {
-        group: 'View', description: 'Show the compact CMS event table', aliases: ['business', 'cms'], icon: <TableCellsIcon />, action: () => setEventsView('table'),
-      },
-    },
-    {
       id: 'sidebar-toggle', label: collapsed ? 'Show sidebar' : 'Hide sidebar', auxiliaryData: {
         group: 'View', description: 'Toggle the primary navigation', aliases: ['collapse', 'expand', 'navigation'], shortcut: 'mod+b', icon: <Bars3BottomLeftIcon />, action: toggleSidebar,
       },
     },
-  ], [canCreateEvent, collapsed, navigate, setEventsView, toggleSidebar]);
+  ], [canCreateEvent, collapsed, navigate, toggleSidebar]);
 
   const commandSource = useMemo(() => createStaticSource(commands, {
     keywords: (item) => [item.auxiliaryData.description, ...item.auxiliaryData.aliases],
   }), [commands]);
 
-  const submitEventSearch = (event: React.FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    window.dispatchEvent(new CustomEvent('vsms:events-search', { detail: eventSearch.trim() }));
-  };
-
   useEffect(() => {
     workspaceRef.current?.scrollTo({ top: 0 });
   }, [location.pathname]);
-
-  useEffect(() => {
-    if (!isEventsPage) return;
-    const timeout = window.setTimeout(() => {
-      window.dispatchEvent(new CustomEvent('vsms:events-search', { detail: eventSearch.trim() }));
-    }, 250);
-    return () => window.clearTimeout(timeout);
-  }, [eventSearch, isEventsPage]);
 
   useEffect(() => {
     const handleShortcut = (event: KeyboardEvent) => {
@@ -161,9 +129,6 @@ export default function AppShell({ children }: { children: ReactNode }) {
       <aside className="sidebar" aria-label="Primary navigation">
         <div className="brand" title="VSMS"><span aria-hidden="true">V</span><strong>VSMS</strong></div>
         <nav className="nav-list">
-          <NavLink to="/dashboard" title="Dashboard" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}>
-            <HomeIcon /><span>Dashboard</span>
-          </NavLink>
           <NavLink to="/events" title="Events" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}>
             <CalendarDaysIcon /><span>Events</span>
           </NavLink>
@@ -200,11 +165,10 @@ export default function AppShell({ children }: { children: ReactNode }) {
         <header className="command-bar">
           <div className="command-navigation">
             <button className="icon-button sidebar-toggle" onClick={toggleSidebar} aria-label={collapsed ? 'Show sidebar' : 'Hide sidebar'} title={`${collapsed ? 'Show' : 'Hide'} sidebar (Ctrl/⌘ B)`}><Bars3BottomLeftIcon /></button>
-            {!isEventsPage && <button className="icon-button back-button" onClick={() => navigate(location.pathname.endsWith('/edit') ? location.pathname.replace(/\/edit$/, '') : '/events')} aria-label="Go back" title="Back"><ArrowLeftIcon /></button>}
+            <button className="icon-button back-button" onClick={() => navigate(location.pathname.endsWith('/edit') ? location.pathname.replace(/\/edit$/, '') : '/events')} aria-label="Go back" title="Back"><ArrowLeftIcon /></button>
           </div>
           <span className="mobile-brand" aria-hidden="true">V</span>
           <div className="workspace-name"><strong><span className="desktop-title">Event operations</span><span className="mobile-title">{mobileTitle}</span></strong><span><i /> Secure workspace</span></div>
-          {isEventsPage && <form className="global-search" onSubmit={submitEventSearch}><MagnifyingGlassIcon /><label className="sr-only" htmlFor="workspace-event-search">Search events</label><input id="workspace-event-search" value={eventSearch} onChange={(event) => setEventSearch(event.target.value)} placeholder="Search events or venues" /></form>}
           <ThemeToggle />
           {canCreateEvent && location.pathname !== '/events/new' && <button className="primary compact" onClick={() => navigate('/events/new')} aria-label="Create event"><PlusIcon /><span>New event</span></button>}
         </header>

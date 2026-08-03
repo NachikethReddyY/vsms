@@ -334,7 +334,7 @@ export function ParticipantSearchPage() {
   return (
     <AppShell title="Participant search">
       <ParticipantBackLink
-        to={eventId ? `/events/${eventId}/register` : "/dashboard"}
+        to={eventId ? `/events/${eventId}/register` : "/events"}
         label={eventId ? "Back to registration" : "Back to dashboard"}
       />
       <RegistrationJourney active="search" />
@@ -516,7 +516,7 @@ export function ParticipantDetailPage() {
                 ? <Link to={`/events/${eventId}/participants/${participantId}/consent`}>Record consent <ArrowRightIcon /></Link>
                 : eventConsent
                   ? <Link to={`/participants/${participantId}/consents${eventId ? `?eventId=${eventId}` : ""}`}>View consent history <ArrowRightIcon /></Link>
-                  : <Link to="/dashboard">Choose an event to record consent <ArrowRightIcon /></Link>}
+                  : <Link to="/events">Choose an event to record consent <ArrowRightIcon /></Link>}
             </div>
           </section>
         </div>
@@ -1042,7 +1042,7 @@ export function ParticipantConsentsPage() {
             <p className="text-sm text-slate-600">Consent is recorded for a selected event. Choose an open event, search for this participant, and continue the event check-in.</p>
           </div>
           <div className="flex flex-wrap gap-3">
-            <Link className="primary" to="/dashboard">Choose an event</Link>
+            <Link className="primary" to="/events">Choose an event</Link>
             <Link className="secondary" to={`/participants/${participantId}`}>Return to participant details</Link>
           </div>
         </section>
