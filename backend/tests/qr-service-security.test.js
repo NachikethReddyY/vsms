@@ -282,9 +282,9 @@ test("manual QR check-in writes no bearer or participant data and returns a mini
   assert.deepEqual(qrQueries[0].select, {
     id: true,
     registrationId: true,
-    registration: { select: { eventId: true } },
   });
   assert.equal(qrQueries[0].where.tokenHash, tokenHash(token));
+  assert.deepEqual(qrQueries[0].where.registration, { eventId });
   assert.equal(JSON.stringify(qrQueries[0]).includes(token), false);
   assert.deepEqual(qrQueries[1].select, { id: true, registrationId: true });
   assert.equal(qrQueries[1].where.id, qrId);
@@ -346,7 +346,7 @@ test("manual registration-reference check-in does not resolve participant identi
   assert.deepEqual(Object.keys(result).sort(), ["checkedIn", "checkedInAt", "eventId", "queueNumber", "registrationId", "registrationStatus"]);
 });
 
-test("manual check-in rejects NRIC input and QR tokens from another event", async () => {
+test("manual check-in rejects NRIC input", async () => {
   let openedTransaction = false;
   const invalidDb = { $transaction: async () => { openedTransaction = true; } };
   await assert.rejects(
@@ -354,19 +354,54 @@ test("manual check-in rejects NRIC input and QR tokens from another event", asyn
     (error) => error.code === "INVALID_QR" && error.status === 400,
   );
   assert.equal(openedTransaction, false);
+});
 
+test("unknown and cross-event QR tokens have the same concealed error and event-scoped lookup", async () => {
+  const unknownToken = "a".repeat(64);
+  const foreignToken = "f".repeat(64);
+  const foreignEventId = "99999999-9999-4999-8999-999999999999";
+  const queries = [];
   let updated = false;
-  const wrongEventDb = {
+  const db = {
     $transaction: async (work) => work({
-      qRCodePass: { findFirst: async () => ({ registrationId, registration: { eventId: "99999999-9999-4999-8999-999999999999" } }) },
+      qRCodePass: {
+        findFirst: async (query) => {
+          queries.push(query);
+          const isForeignToken = query.where.tokenHash === tokenHash(foreignToken);
+          if (isForeignToken && query.where.registration?.eventId === foreignEventId) {
+            return { id: qrId, registrationId };
+          }
+          return null;
+        },
+      },
       eventRegistration: { updateMany: async () => { updated = true; return { count: 1 }; } },
       auditLog: { create: async () => ({}) },
     }),
   };
-  await assert.rejects(
-    qrService.manualCheckIn({ identifier: "f".repeat(64), eventId, userId: qrId }, wrongEventDb),
-    (error) => error.code === "QR_EVENT_MISMATCH" && error.status === 400,
-  );
+
+  const publicError = async (identifier) => {
+    try {
+      await qrService.manualCheckIn({ identifier, eventId, userId: qrId }, db);
+      assert.fail("manual check-in unexpectedly succeeded");
+    } catch (error) {
+      return { status: error.status, code: error.code, message: error.message };
+    }
+  };
+
+  const unknownError = await publicError(unknownToken);
+  const foreignError = await publicError(foreignToken);
+
+  assert.deepEqual(unknownError, {
+    status: 404,
+    code: "INVALID_QR",
+    message: "QR Code is invalid, expired, or unavailable.",
+  });
+  assert.deepEqual(foreignError, unknownError);
+  assert.equal(queries.length, 2);
+  for (const query of queries) {
+    assert.deepEqual(query.where.registration, { eventId });
+  }
+  assert.equal(queries[1].where.tokenHash, tokenHash(foreignToken));
   assert.equal(updated, false);
 });
 
