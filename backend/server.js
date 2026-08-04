@@ -1,15 +1,9 @@
 const fs = require("fs");
 const https = require("https");
 const path = require("path");
-const express = require("express");
-const cookieParser = require("cookie-parser");
-const YAML = require("js-yaml");
-const swaggerUi = require("swagger-ui-express");
 const app = require("./app");
 const env = require("./config/env");
 const logger = require("./utils/logger/logger");
-const cors = require("cors");
-const helmet = require("helmet");
 
 const server = env.isProduction
   ? app
@@ -24,10 +18,9 @@ server.on("error", (error) => {
 });
 
 if (require.main === module) {
-  const port = env.port || Number(process.env.PORT || 5000);
-  server.listen(port, () => {
+  server.listen(env.PORT, env.HOST, () => {
     const protocol = env.isProduction ? "http" : "https";
-    logger.info(`Server & WebSocket engine running securely on ${protocol}://localhost:${port}`);
+    logger.info(`Server running on ${protocol}://${env.HOST}:${env.PORT}`);
   });
 }
 
