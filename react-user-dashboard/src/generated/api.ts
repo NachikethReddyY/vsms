@@ -3133,6 +3133,8 @@ export interface components {
         IdempotencyKey: string;
         /** @description Must equal the `vsms_csrf` cookie; requests also require an allowed Origin */
         CsrfToken: string;
+        /** @description Required when credential or CSRF cookies are present; must equal the `vsms_csrf` cookie and include an allowed Origin */
+        ConditionalCsrfToken: string;
     };
     requestBodies: {
         TransitionRequest: {
@@ -3330,7 +3332,10 @@ export interface operations {
     logout: {
         parameters: {
             query?: never;
-            header?: never;
+            header?: {
+                /** @description Required when credential or CSRF cookies are present; must equal the `vsms_csrf` cookie and include an allowed Origin */
+                "X-CSRF-Token"?: components["parameters"]["ConditionalCsrfToken"];
+            };
             path?: never;
             cookie?: never;
         };
@@ -3358,7 +3363,10 @@ export interface operations {
     globalLogout: {
         parameters: {
             query?: never;
-            header?: never;
+            header: {
+                /** @description Must equal the `vsms_csrf` cookie; requests also require an allowed Origin */
+                "X-CSRF-Token": components["parameters"]["CsrfToken"];
+            };
             path?: never;
             cookie?: never;
         };

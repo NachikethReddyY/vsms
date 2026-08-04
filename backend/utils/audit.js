@@ -19,12 +19,37 @@ function hashIdentifier(identifier) {
     return crypto.createHash("sha256").update(identifier.toLowerCase()).digest("hex");
 }
 
-async function resolveAuditContext({ userId, context, client = prisma }) {
+async function resolveAuditContext({ userId, context, client = prisma, enrollDevice = false }) {
     const requestedDeviceId = typeof context === "object" ? context?.deviceId : null;
-    const device = requestedDeviceId && isUuid(requestedDeviceId) && userId ? await client.device.findFirst({
-        where: { id: requestedDeviceId, userId, status: "ACTIVE" },
-        select: { id: true },
-    }) : null;
+    let device = null;
+    if (requestedDeviceId && isUuid(requestedDeviceId) && userId) {
+        if (enrollDevice) {
+            const select = { id: true, userId: true, status: true };
+            device = await client.device.findUnique({ where: { id: requestedDeviceId }, select });
+            if (!device) {
+                try {
+                    device = await client.device.create({
+                        data: {
+                            id: requestedDeviceId,
+                            userId,
+                            deviceName: trimValue(context?.deviceName || "VSMS staff web", 100),
+                            lastSeenAt: new Date(),
+                        },
+                        select,
+                    });
+                } catch (error) {
+                    if (error?.code !== "P2002") throw error;
+                    device = await client.device.findUnique({ where: { id: requestedDeviceId }, select });
+                }
+            }
+            if (device?.userId !== userId || device?.status !== "ACTIVE") device = null;
+        } else {
+            device = await client.device.findFirst({
+                where: { id: requestedDeviceId, userId, status: "ACTIVE" },
+                select: { id: true },
+            });
+        }
+    }
     return {
         requestId: typeof context === "string" ? context : context?.requestId || null,
         deviceId: device?.id || null,
@@ -42,7 +67,12 @@ async function createAuthAuditLog({
     context,
     client = prisma,
 }) {
-    const auditContext = await resolveAuditContext({ userId, context, client });
+    const auditContext = await resolveAuditContext({
+        userId,
+        context,
+        client,
+        enrollDevice: eventType === "LOGIN_SUCCESS" && outcome === "SUCCESS",
+    });
     return client.authAuditLog.create({
         data: {
             userId,
