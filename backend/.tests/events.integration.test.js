@@ -221,6 +221,31 @@ describe("event lifecycle", () => {
     expect(audit.body.auditLogs.map((row) => row.action)).toEqual(expect.arrayContaining(["CREATED", "UPDATED", "PUBLISHED"]));
   });
 
+  test("unknown device UUIDs cannot roll back event mutations or enter audit foreign keys", async () => {
+    const requestId = crypto.randomUUID();
+    const unknownDeviceId = crypto.randomUUID();
+    const created = await request(app)
+      .post("/api/v1/events")
+      .set("Authorization", `Bearer ${managerToken}`)
+      .set("X-Request-Id", requestId)
+      .set("X-Device-Id", unknownDeviceId)
+      .set("X-Device-Name", "Unregistered integration tablet")
+      .set("User-Agent", "private-integration-fingerprint")
+      .send(newEvent());
+
+    expect(created.status).toBe(201);
+    const audit = await helpers.prisma.auditLog.findFirstOrThrow({
+      where: { entityName: "Event", entityId: created.body.eventId, action: "CREATED", requestId },
+    });
+    expect(audit).toEqual(expect.objectContaining({
+      deviceId: null,
+      deviceName: "Unregistered integration tablet",
+      requestId,
+    }));
+    expect(await helpers.prisma.device.findUnique({ where: { id: unknownDeviceId } })).toBeNull();
+    expect(JSON.stringify(audit)).not.toContain("private-integration-fingerprint");
+  });
+
   test("staff cannot create events", async () => {
     const response = await request(app).post("/api/events").set("Authorization", `Bearer ${staffToken}`).send(newEvent());
     expect(response.status).toBe(403);
@@ -377,9 +402,16 @@ describe("event lifecycle", () => {
     expect(skipped.status).toBe(422);
     expect(skipped.body.code).toBe("STATION_TEMPLATE_NOT_IMPORTABLE");
 
+    const device = await helpers.prisma.device.create({
+      data: { userId: manager.id, deviceName: "Station planning tablet", status: "ACTIVE" },
+    });
+    const importRequestId = crypto.randomUUID();
     const imported = await request(app)
       .post(`/api/events/${created.body.eventId}/stations/import`)
       .set("Authorization", `Bearer ${managerToken}`)
+      .set("X-Request-Id", importRequestId)
+      .set("X-Device-Id", device.id)
+      .set("X-Device-Name", "Station planning tablet")
       .send({ version: created.body.version, stationTemplateIds: templates.map((template) => template.stationTemplateId) });
     expect(imported.status).toBe(201);
     expect(imported.body.eventStations).toHaveLength(2);
@@ -389,6 +421,15 @@ describe("event lifecycle", () => {
       stationOrder: 1,
       stationTemplateId: templates[0].stationTemplateId,
     }));
+    const importAudit = await helpers.prisma.auditLog.findFirstOrThrow({
+      where: { entityName: "Event", entityId: created.body.eventId, action: "UPDATED", requestId: importRequestId },
+    });
+    expect(importAudit).toEqual(expect.objectContaining({
+      deviceId: device.id,
+      deviceName: "Station planning tablet",
+      requestId: importRequestId,
+    }));
+    expect(importAudit.ipAddress).toBeTruthy();
 
     const reimported = await request(app)
       .post(`/api/events/${created.body.eventId}/stations/import`)
@@ -398,9 +439,13 @@ describe("event lifecycle", () => {
     expect(reimported.body.eventStations).toHaveLength(2);
 
     const secondStation = imported.body.eventStations[1];
+    const stationRequestId = crypto.randomUUID();
     const configured = await request(app)
       .patch(`/api/events/${created.body.eventId}/stations/${secondStation.eventStationId}`)
       .set("Authorization", `Bearer ${managerToken}`)
+      .set("X-Request-Id", stationRequestId)
+      .set("X-Device-Id", device.id)
+      .set("X-Device-Name", "Station planning tablet")
       .send({ version: reimported.body.version, stationOrder: 1, isAvailable: false });
     expect(configured.status).toBe(200);
     expect(configured.body.eventStations[0]).toEqual(expect.objectContaining({
@@ -408,6 +453,15 @@ describe("event lifecycle", () => {
       stationOrder: 1,
       isAvailable: false,
     }));
+    const stationAudit = await helpers.prisma.auditLog.findFirstOrThrow({
+      where: { entityName: "Event", entityId: created.body.eventId, action: "UPDATED", requestId: stationRequestId },
+    });
+    expect(stationAudit).toEqual(expect.objectContaining({
+      deviceId: device.id,
+      deviceName: "Station planning tablet",
+      requestId: stationRequestId,
+    }));
+    expect(stationAudit.ipAddress).toBeTruthy();
 
     const denied = await request(app)
       .patch(`/api/events/${created.body.eventId}/stations/${secondStation.eventStationId}`)

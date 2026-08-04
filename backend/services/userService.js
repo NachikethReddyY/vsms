@@ -1,5 +1,6 @@
 const prisma = require("../prisma/prismaClient");
 const AppError = require("../errors/AppError");
+const { resolveAuditContext } = require("../utils/audit");
 const { synchronizeStaffAccess } = require("./cognitoStaffAccessService");
 
 const userSelect = {
@@ -70,10 +71,7 @@ async function writeAudit(tx, { actorId, action, accountId, before = null, after
       entityId: accountId,
       oldValue: before,
       newValue: after,
-      requestId: context?.requestId,
-      deviceId: context?.deviceId,
-      ipAddress: context?.ipAddress,
-      deviceName: context?.deviceName || "VSMS staff web",
+      ...await resolveAuditContext({ client: tx, userId: actorId, context }),
     },
   });
 }
