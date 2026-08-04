@@ -148,6 +148,7 @@ test("managed authentication verifies both Cognito cookie and compatibility bear
     assert.match(middleware, /verifyAccessToken/);
     assert.match(middleware, /verifyCognitoToken/);
     assert.match(middleware, /ACCESS_COOKIE/);
+    assert.match(middleware, /process\.env\.NODE_ENV !== "test"/);
     assert.match(authRoutes, /"\/authorize"/);
 });
 

@@ -21,6 +21,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/auth/config-status": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Check whether Cognito managed login is configured */
+        get: operations["getAuthenticationConfigStatus"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/auth/authorize": {
         parameters: {
             query?: never;
@@ -81,8 +98,77 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Revoke the refresh family and clear cookies */
+        /** Sign out from Cognito and clear browser cookies */
         post: operations["logout"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/auth/global-logout": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Alias for Cognito sign-out and local cookie clearing */
+        post: operations["globalLogout"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/auth/me": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Return the authenticated staff identity */
+        get: operations["getCurrentUser"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/auth/change-password": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Change the authenticated Cognito user's password */
+        post: operations["changePassword"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/users": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List projected user records (ADMIN only) */
+        get: operations["listUsers"];
+        put?: never;
+        /** Create a staff user (ADMIN or EVENT_MANAGER) */
+        post: operations["createUser"];
         delete?: never;
         options?: never;
         head?: never;
@@ -156,6 +242,47 @@ export interface paths {
         options?: never;
         head?: never;
         patch?: never;
+        trace?: never;
+    };
+    "/api/v1/locations/search": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Search Singapore addresses with OneMap
+         * @description Uses a server-cached OneMap token that is renewed automatically; requests are rate limited below OneMap's 300 calls/minute quota.
+         */
+        get: operations["searchSingaporeLocations"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/events/{eventId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                eventId: components["parameters"]["EventId"];
+            };
+            cookie?: never;
+        };
+        /** Get an authorized event detail */
+        get: operations["getEventV1"];
+        put?: never;
+        post?: never;
+        /** Delete an exported unpopulated draft event */
+        delete: operations["deleteEmptyDraftEvent"];
+        options?: never;
+        head?: never;
+        /** Update allowed fields using optimistic concurrency */
+        patch: operations["updateEventV1"];
         trace?: never;
     };
     "/api/v1/events/{eventId}/registrations": {
@@ -314,6 +441,210 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/events/{eventId}/stations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List active screening stations for an event */
+        get: operations["listScreeningStations"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/events/{eventId}/stations/{stationId}/queue": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List screenable registrations for a station */
+        get: operations["listScreeningQueue"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/events/{eventId}/registrations/resolve": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Resolve an event registration from a pass token or registration ID */
+        get: operations["resolveScreeningParticipant"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/events/{eventId}/stations/{stationId}/visual-acuity/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Evaluate a visual-acuity result without saving it */
+        post: operations["previewVisualAcuity"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/events/{eventId}/stations/{stationId}/visual-acuity": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Save or idempotently replay a visual-acuity result */
+        post: operations["saveVisualAcuity"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/events/{eventId}/stations/{stationId}/refraction/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Evaluate a refraction result without saving it */
+        post: operations["previewRefraction"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/events/{eventId}/stations/{stationId}/refraction": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Save or idempotently replay a refraction result */
+        post: operations["saveRefraction"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/events/{eventId}/stations/{stationId}/colour-vision/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Evaluate a colour-vision result without saving it */
+        post: operations["previewColourVision"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/events/{eventId}/stations/{stationId}/colour-vision": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Save or idempotently replay a colour-vision result */
+        post: operations["saveColourVision"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/events/{eventId}/reviews": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List registrations currently actionable by an assigned reviewer */
+        get: operations["listClinicalReviews"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/events/{eventId}/reviews/{registrationId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Inspect the current screening context or immutable decision */
+        get: operations["getClinicalReview"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/events/{eventId}/reviews/{registrationId}/decision": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Atomically record one immutable decision and optional draft referral */
+        post: operations["recordClinicalReviewDecision"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/events/{eventId}/audit-log": {
         parameters: {
             query?: never;
@@ -323,6 +654,509 @@ export interface paths {
         };
         /** Read immutable event history for a manager-visible event */
         get: operations["getEventAuditLogV1"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/participants": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Search participants by at least one identifying field */
+        get: operations["searchParticipants"];
+        put?: never;
+        /** Create a participant */
+        post: operations["createParticipant"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/participants/active-consent-form": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get the currently effective consent form */
+        get: operations["getParticipantActiveConsentForm"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/participants/{participantId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                participantId: components["parameters"]["ParticipantId"];
+            };
+            cookie?: never;
+        };
+        /** Get a participant and emergency contacts */
+        get: operations["getParticipant"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Update supplied participant fields */
+        patch: operations["updateParticipant"];
+        trace?: never;
+    };
+    "/api/v1/participants/{participantId}/registrations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List a participant's registrations */
+        get: operations["listParticipantRegistrations"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/participants/{participantId}/consents": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                participantId: components["parameters"]["ParticipantId"];
+            };
+            cookie?: never;
+        };
+        /** List a participant's consent records */
+        get: operations["listParticipantConsents"];
+        put?: never;
+        /** Record consent using an event ID in the request body */
+        post: operations["createParticipantConsent"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/participants/{participantId}/consents/{consentId}/withdraw": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Create an immutable withdrawal for accepted consent */
+        post: operations["withdrawParticipantConsent"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/participants/{participantId}/emergency-contacts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                participantId: components["parameters"]["ParticipantId"];
+            };
+            cookie?: never;
+        };
+        /** List a participant's emergency contacts */
+        get: operations["listEmergencyContacts"];
+        put?: never;
+        /** Add an emergency contact */
+        post: operations["createEmergencyContact"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/participants/{participantId}/emergency-contacts/{contactId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Update an emergency contact owned by a participant */
+        patch: operations["updateParticipantEmergencyContact"];
+        trace?: never;
+    };
+    "/api/v1/participants/{participantId}/events/{eventId}/consent": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Record consent for a participant and event */
+        post: operations["createEventConsent"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/participants/{participantId}/events/{eventId}/review": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get participant, event, emergency contact, and latest consent for registration review */
+        get: operations["getParticipantRegistrationReview"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/registrations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Register a participant using event and participant IDs in the body */
+        post: operations["createRegistration"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/registrations/{registrationId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get a registration */
+        get: operations["getRegistration"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/registrations/{registrationId}/history": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List registration status changes */
+        get: operations["getRegistrationHistory"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/registrations/{registrationId}/status": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Change a registration's status */
+        patch: operations["changeRegistrationStatus"];
+        trace?: never;
+    };
+    "/api/v1/consent-forms/active": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get the currently effective consent form */
+        get: operations["getActiveConsentForm"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/emergency-contacts/{contactId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Update an emergency contact by ID */
+        patch: operations["updateEmergencyContact"];
+        trace?: never;
+    };
+    "/api/v1/signatures": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Store a validated PNG or JPEG signature image */
+        post: operations["storeSignature"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/audit-logs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List the latest application and authentication audit records */
+        get: operations["listAdministrativeAuditLogs"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/qr/registrations/{registrationId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Generate a safe QR pass for a registration */
+        post: operations["generateRegistrationQrCode"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/qr/generate/{registrationId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Generate a QR pass using the legacy response envelope */
+        post: operations["generateQrCode"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/qr/reissue/{registrationId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Revoke the active pass and issue a replacement */
+        post: operations["reissueQrCode"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/qr/verify": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Verify a QR token for an event */
+        post: operations["verifyQrCode"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/qr/manual-checkin": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Check in a participant using a registration ID or identifier */
+        post: operations["manualQrCheckIn"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/qr/participant/{token}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Resolve participant data from a QR token */
+        get: operations["getParticipantByQrCode"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/qr/history/{participantId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List QR passes issued to a participant */
+        get: operations["listParticipantQrCodes"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/qr/revoke/{qrId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Revoke a QR pass */
+        put: operations["revokeQrCode"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/qr/download/{qrId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get QR pass download data */
+        get: operations["downloadQrCode"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/qr/print/{qrId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get QR pass print data */
+        get: operations["printQrCode"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/qr/{token}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Resolve a registration from a QR token */
+        get: operations["getRegistrationByQrCode"];
         put?: never;
         post?: never;
         delete?: never;
@@ -407,27 +1241,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/v1/events/{eventId}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                eventId: components["parameters"]["EventId"];
-            };
-            cookie?: never;
-        };
-        /** Get an authorized event detail */
-        get: operations["getEventV1"];
-        put?: never;
-        post?: never;
-        /** Delete an exported unpopulated draft event */
-        delete: operations["deleteEmptyDraftEvent"];
-        options?: never;
-        head?: never;
-        /** Update allowed fields using optimistic concurrency */
-        patch: operations["updateEventV1"];
-        trace?: never;
-    };
     "/api/users": {
         parameters: {
             query?: never;
@@ -436,7 +1249,7 @@ export interface paths {
             cookie?: never;
         };
         /** List projected user records (ADMIN only) */
-        get: operations["listUsers"];
+        get: operations["listUsersLegacy"];
         put?: never;
         post?: never;
         delete?: never;
@@ -508,7 +1321,7 @@ export interface paths {
          * Search Singapore addresses with OneMap
          * @description Uses a server-cached OneMap token that is renewed automatically; requests are rate limited below OneMap's 300 calls/minute quota.
          */
-        get: operations["searchSingaporeLocations"];
+        get: operations["searchSingaporeLocationsLegacy"];
         put?: never;
         post?: never;
         delete?: never;
@@ -682,7 +1495,7 @@ export interface paths {
             cookie?: never;
         };
         /** List registrations currently actionable by an assigned reviewer */
-        get: operations["listClinicalReviews"];
+        get: operations["listClinicalReviewsLegacy"];
         put?: never;
         post?: never;
         delete?: never;
@@ -699,7 +1512,7 @@ export interface paths {
             cookie?: never;
         };
         /** Inspect the current screening context or immutable decision */
-        get: operations["getClinicalReview"];
+        get: operations["getClinicalReviewLegacy"];
         put?: never;
         post?: never;
         delete?: never;
@@ -718,7 +1531,7 @@ export interface paths {
         get?: never;
         put?: never;
         /** Atomically record one immutable decision and optional draft referral */
-        post: operations["recordClinicalReviewDecision"];
+        post: operations["recordClinicalReviewDecisionLegacy"];
         delete?: never;
         options?: never;
         head?: never;
@@ -909,15 +1722,25 @@ export interface components {
         };
         User: {
             /** Format: uuid */
-            userId: string;
-            username: string;
+            id: string;
+            /** Format: uuid */
+            userId?: string;
+            username?: string;
             /** Format: email */
             email: string;
-            systemRole: components["schemas"]["SystemRole"];
+            fullName: string;
+            employeeNumber: string;
+            contactNumber?: string | null;
+            department?: string | null;
+            designation?: string | null;
+            systemRole?: components["schemas"]["SystemRole"];
             /** @enum {string} */
-            status?: "ACTIVE" | "DISABLED";
+            status: "ACTIVE" | "DISABLED";
+            roles?: string[];
             /** Format: date-time */
             createdAt?: string;
+        } & {
+            [key: string]: unknown;
         };
         AuthResponse: {
             expiresIn?: number;
@@ -1034,205 +1857,6 @@ export interface components {
             canManage: boolean;
             createdBy?: components["schemas"]["User"];
             cancelledBy?: components["schemas"]["User"] | null;
-        };
-        PublicEvent: {
-            /** Format: uuid */
-            eventId: string;
-            name: string;
-            description: string | null;
-            bannerKey: components["schemas"]["EventBannerKey"];
-            artworkDataUrl: string | null;
-            venue: string;
-            address: string | null;
-            postalCode: string | null;
-            timezone: string;
-            /** Format: date-time */
-            startsAt: string;
-            /** Format: date-time */
-            endsAt: string;
-            capacity: number;
-            /** @enum {string} */
-            status: "PUBLISHED" | "IN_PROGRESS" | "COMPLETED" | "CANCELLED";
-            eventDays: components["schemas"]["EventDay"][];
-        };
-        EventMetrics: {
-            signupCount: number;
-            checkedInCount: number;
-            completedCount: number;
-            cancelledCount: number;
-            activeCount: number;
-            attendanceRatePercent: number;
-            screeningResultCount: number;
-            flaggedResultCount: number;
-            referralCount: number;
-            capacity: number;
-            expectedAttendance: number | null;
-        };
-        EventAttendee: {
-            /** Format: uuid */
-            registrationId: string;
-            participantReference: string;
-            participantDisplayName: string | null;
-            /** @enum {string} */
-            registrationStatus: "SIGNED_UP" | "CHECKED_IN" | "COMPLETED" | "CANCELLED";
-            checkedIn: boolean;
-            /** Format: date-time */
-            checkedInAt: string | null;
-            queueNumber: number | null;
-            /** Format: date-time */
-            createdAt: string;
-        };
-        EventAttendeeList: {
-            total: number;
-            attendees: components["schemas"]["EventAttendee"][];
-            nextCursor: string | null;
-        };
-        EventRegistrationCreateRequest: {
-            /** Format: uuid */
-            participantId: string;
-        };
-        EventRegistrationRecord: {
-            /** Format: uuid */
-            registrationId: string;
-            /** Format: uuid */
-            eventId: string;
-            /** Format: uuid */
-            participantId: string;
-            /** @enum {string} */
-            registrationStatus: "SIGNED_UP" | "CHECKED_IN" | "COMPLETED" | "CANCELLED";
-            queueNumber?: number | null;
-            /** Format: date-time */
-            registeredAt?: string;
-        } & {
-            [key: string]: unknown;
-        };
-        EventRegistrationCommandResponse: {
-            /** Format: uuid */
-            registrationId: string;
-            participantReference: string;
-            queueNumber: number | null;
-            /** @enum {string} */
-            status: "SIGNED_UP" | "CHECKED_IN" | "COMPLETED" | "CANCELLED";
-            registration: components["schemas"]["EventRegistrationRecord"];
-            idempotentReplay: boolean;
-        };
-        EventRegistrationListResponse: {
-            registrations: components["schemas"]["EventRegistrationRecord"][];
-            pagination: {
-                page: number;
-                pageSize: number;
-                total: number;
-                totalPages: number;
-            };
-        };
-        EventExportEvent: {
-            /** Format: uuid */
-            eventId: string;
-            name: string;
-            description: string | null;
-            bannerKey: components["schemas"]["EventBannerKey"];
-            artworkDataUrl: string | null;
-            venue: string;
-            address: string | null;
-            postalCode: string | null;
-            timezone: string;
-            /** Format: date-time */
-            startsAt: string;
-            /** Format: date-time */
-            endsAt: string;
-            capacity: number;
-            expectedAttendance: number | null;
-            status: components["schemas"]["EventStatus"];
-            version: number;
-        };
-        EventExportStation: {
-            /** Format: uuid */
-            stationId: string;
-            stationName: string;
-            /** @enum {string} */
-            stationType: "VISUAL_ACUITY" | "REFRACTION" | "COLOUR_VISION" | "EYE_HEALTH";
-            stationOrder: number;
-            isActive: boolean;
-        };
-        EventExportShift: {
-            /** Format: uuid */
-            shiftId: string;
-            name: string;
-            /** Format: date-time */
-            startsAt: string;
-            /** Format: date-time */
-            endsAt: string;
-            requiredStaff: number;
-            status: components["schemas"]["ShiftStatus"];
-        };
-        EventExportStationAvailability: {
-            /** Format: uuid */
-            eventStationAvailabilityId: string;
-            /** Format: uuid */
-            eventStationId: string;
-            /** Format: uuid */
-            eventDayId: string;
-            isAvailable: boolean;
-            /** Format: date-time */
-            startsAt: string | null;
-            /** Format: date-time */
-            endsAt: string | null;
-            capacity: number;
-        };
-        EventExportEventDay: {
-            /** Format: uuid */
-            eventDayId: string;
-            /** Format: date */
-            date: string;
-            /** Format: date-time */
-            startsAt: string;
-            /** Format: date-time */
-            endsAt: string;
-            stationAvailabilities: components["schemas"]["EventExportStationAvailability"][];
-        };
-        EventExportStaffAssignment: {
-            /** Format: uuid */
-            id: string;
-            /** Format: uuid */
-            eventId: string;
-            /** Format: uuid */
-            stationId: string | null;
-            /** Format: uuid */
-            shiftId: string | null;
-            /** Format: uuid */
-            userId: string;
-            /** Format: uuid */
-            assignedBy: string;
-            /** Format: date-time */
-            assignedAt: string;
-            /** @enum {string|null} */
-            assignmentRole: "EVENT_MANAGER" | "REGISTRATION" | "SCREENER" | "REVIEWER" | "SUPPORT" | null;
-            assignmentStatus: components["schemas"]["StaffAssignmentStatus"];
-            /** @enum {string|null} */
-            status: "ASSIGNED" | "CONFIRMED" | "COMPLETED" | "CANCELLED" | null;
-        };
-        EventExport: {
-            /** @enum {integer} */
-            schemaVersion: 1;
-            /** Format: date-time */
-            generatedAt: string;
-            event: components["schemas"]["EventExportEvent"];
-            metrics: components["schemas"]["EventMetrics"];
-            eventDays: components["schemas"]["EventExportEventDay"][];
-            stations: components["schemas"]["EventExportStation"][];
-            shifts: components["schemas"]["EventExportShift"][];
-            staffAssignments: components["schemas"]["EventExportStaffAssignment"][];
-            attendees: components["schemas"]["EventAttendee"][];
-        };
-        EventExportResponse: {
-            export: components["schemas"]["EventExport"];
-            /** @description 15-minute HMAC-bound export receipt */
-            exportReceipt: string;
-        };
-        EventDeletionRequest: {
-            version: number;
-            eventName: string;
-            exportReceipt: string;
         };
         LocationResult: {
             id: string;
@@ -1463,6 +2087,526 @@ export interface components {
             review: components["schemas"]["RecordedReview"];
             referral: components["schemas"]["ReferralSummary"] | null;
         };
+        AuthConfigStatus: {
+            configured: boolean;
+            supportedRoles: string[];
+            /** Format: uuid */
+            requestId: string;
+        };
+        LogoutResponse: {
+            message: string;
+            /** Format: uri */
+            logoutUrl: string;
+        };
+        CreateUserRequest: {
+            fullName: string;
+            /** Format: email */
+            email: string;
+            employeeNumber: string;
+            contactNumber?: string;
+            department?: string;
+            designation?: string;
+            /** @enum {string} */
+            status?: "ACTIVE" | "DISABLED";
+        };
+        UserListResponse: {
+            /** @enum {boolean} */
+            success: true;
+            data: components["schemas"]["User"][];
+        };
+        UserMutationResponse: {
+            /** @enum {boolean} */
+            success: true;
+            message: string;
+            data: components["schemas"]["User"];
+        };
+        Pagination: {
+            page: number;
+            pageSize: number;
+            total: number;
+            totalPages: number;
+        };
+        ParticipantRequest: {
+            firstName: string;
+            lastName: string;
+            /** Format: date */
+            dateOfBirth: string;
+            /** @enum {string} */
+            gender: "M" | "F" | "O" | "U";
+            contactNumber: string;
+            /** Format: email */
+            email?: string | null;
+            preferredLanguage?: string | null;
+            accessibilityNotes?: string | null;
+            /** @enum {string} */
+            status?: "ACTIVE" | "INACTIVE" | "DECEASED";
+        };
+        ParticipantUpdateRequest: {
+            firstName?: string;
+            lastName?: string;
+            /** Format: date */
+            dateOfBirth?: string;
+            /** @enum {string} */
+            gender?: "M" | "F" | "O" | "U";
+            contactNumber?: string;
+            /** Format: email */
+            email?: string | null;
+            preferredLanguage?: string | null;
+            accessibilityNotes?: string | null;
+            /** @enum {string} */
+            status?: "ACTIVE" | "INACTIVE" | "DECEASED";
+        };
+        Participant: {
+            /** Format: uuid */
+            id: string;
+            participantReference: string;
+            firstName: string;
+            lastName: string;
+            /** Format: date-time */
+            dateOfBirth: string;
+            /** @enum {string} */
+            gender: "M" | "F" | "O" | "U";
+            contactNumber: string;
+            /** Format: email */
+            email?: string | null;
+            preferredLanguage?: string | null;
+            accessibilityNotes?: string | null;
+            /** @enum {string} */
+            status: "ACTIVE" | "INACTIVE" | "DECEASED";
+            version?: number;
+            /** Format: date-time */
+            createdAt?: string;
+            /** Format: date-time */
+            updatedAt?: string;
+        } & {
+            [key: string]: unknown;
+        };
+        ParticipantSummary: {
+            /** Format: uuid */
+            id: string;
+            participantReference: string;
+            firstName: string;
+            lastName: string;
+            maskedContactNumber: string;
+            maskedDateOfBirth: string;
+            /** @enum {string} */
+            status: "ACTIVE" | "INACTIVE" | "DECEASED";
+        };
+        ParticipantEnvelope: {
+            participant: components["schemas"]["Participant"];
+        };
+        ParticipantSearchResponse: {
+            participants: components["schemas"]["ParticipantSummary"][];
+            pagination: components["schemas"]["Pagination"];
+        };
+        EmergencyContactRequest: {
+            contactName: string;
+            relationship: string;
+            phoneNumber: string;
+            /** Format: email */
+            email?: string | null;
+            /** @default false */
+            isPrimary: boolean;
+            /**
+             * @default ACTIVE
+             * @enum {string}
+             */
+            status: "ACTIVE" | "REMOVED";
+        };
+        EmergencyContactUpdateRequest: {
+            contactName?: string;
+            relationship?: string;
+            phoneNumber?: string;
+            /** Format: email */
+            email?: string | null;
+            isPrimary?: boolean;
+            /** @enum {string} */
+            status?: "ACTIVE" | "REMOVED";
+        };
+        EmergencyContact: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            participantId: string;
+            contactName: string;
+            relationship: string;
+            phoneNumber: string;
+            /** Format: email */
+            email?: string | null;
+            isPrimary: boolean;
+            /** @enum {string} */
+            status: "ACTIVE" | "REMOVED";
+            /** Format: date-time */
+            createdAt?: string;
+            /** Format: date-time */
+            updatedAt?: string;
+        } & {
+            [key: string]: unknown;
+        };
+        EmergencyContactEnvelope: {
+            contact: components["schemas"]["EmergencyContact"];
+        };
+        EmergencyContactsEnvelope: {
+            contacts: components["schemas"]["EmergencyContact"][];
+        };
+        ConsentForm: {
+            /** Format: uuid */
+            id: string;
+            formCode: string;
+            versionNumber: string;
+            title: string;
+            contentText?: string | null;
+            contentHash: string;
+            documentObjectKey: string;
+            /** Format: date-time */
+            effectiveFrom: string;
+            /** Format: date-time */
+            effectiveTo?: string | null;
+            isActive: boolean;
+        } & {
+            [key: string]: unknown;
+        };
+        ConsentFormEnvelope: {
+            consentForm: components["schemas"]["ConsentForm"];
+        };
+        /** @description Accepted consent requires signature metadata; non-participant signers also require guardian contact and relationship fields. */
+        ConsentRequest: {
+            /** Format: uuid */
+            consentFormVersionId: string;
+            /** @enum {string} */
+            consentStatus: "ACCEPTED" | "DECLINED";
+            /** @enum {string} */
+            signerType: "PARTICIPANT" | "PARENT" | "GUARDIAN" | "AUTHORISED_REPRESENTATIVE";
+            signerName: string;
+            signerRelationship?: string | null;
+            guardianContactName?: string | null;
+            guardianContactPhone?: string | null;
+            /** Format: email */
+            guardianContactEmail?: string | null;
+            signatureObjectKey?: string | null;
+            signatureSha256?: string | null;
+            /** @enum {string|null} */
+            signatureMimeType?: "image/png" | "image/jpeg" | null;
+        };
+        ConsentWithEventRequest: components["schemas"]["ConsentRequest"] & {
+            /** Format: uuid */
+            eventId: string;
+        };
+        ConsentWithdrawalRequest: {
+            withdrawalReason: string;
+        };
+        Consent: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            participantId: string;
+            /** Format: uuid */
+            eventId: string;
+            /** Format: uuid */
+            registrationId?: string | null;
+            /** Format: uuid */
+            withdrawalOfId?: string | null;
+            /** Format: uuid */
+            consentFormVersionId: string;
+            /** @enum {string} */
+            consentStatus: "PENDING" | "ACCEPTED" | "DECLINED" | "WITHDRAWN";
+            signerType?: string | null;
+            signerName?: string | null;
+            /** Format: uuid */
+            recordedById: string;
+            /** Format: date-time */
+            signedAt?: string | null;
+            /** Format: date-time */
+            withdrawnAt?: string | null;
+            withdrawalReason?: string | null;
+            /** Format: date-time */
+            createdAt: string;
+        } & {
+            [key: string]: unknown;
+        };
+        ConsentEnvelope: {
+            consent: components["schemas"]["Consent"];
+        };
+        ConsentsEnvelope: {
+            consents: components["schemas"]["Consent"][];
+        };
+        /** @enum {string} */
+        RegistrationStatus: "SIGNED_UP" | "CHECKED_IN" | "COMPLETED" | "CANCELLED";
+        Registration: {
+            /** Format: uuid */
+            id?: string;
+            /** Format: uuid */
+            registrationId: string;
+            /** Format: uuid */
+            eventId: string;
+            /** Format: uuid */
+            participantId: string;
+            registrationStatus: components["schemas"]["RegistrationStatus"];
+            participantDisplayName?: string | null;
+            queueNumber?: number | null;
+            idempotencyKey: string;
+            checkedIn?: boolean;
+            /** Format: date-time */
+            checkedInAt?: string | null;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt: string;
+        } & {
+            [key: string]: unknown;
+        };
+        RegistrationLookup: {
+            /** Format: uuid */
+            registrationId: string;
+            participantDisplayName: string;
+            queueNumber: number | null;
+            status: components["schemas"]["RegistrationStatus"];
+            passToken: string | null;
+        };
+        RegistrationResponse: {
+            /** Format: uuid */
+            registrationId: string;
+            participantReference: string;
+            queueNumber: number | null;
+            status: components["schemas"]["RegistrationStatus"];
+            registration: components["schemas"]["Registration"];
+            idempotentReplay?: boolean;
+        } & {
+            [key: string]: unknown;
+        };
+        RegistrationsEnvelope: {
+            registrations: components["schemas"]["Registration"][];
+        };
+        RegistrationHistoryItem: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            registrationId: string;
+            fromStatus?: string | null;
+            toStatus: components["schemas"]["RegistrationStatus"];
+            /** Format: uuid */
+            changedById: string;
+            reason?: string | null;
+            /** Format: date-time */
+            occurredAt: string;
+        } & {
+            [key: string]: unknown;
+        };
+        RegistrationHistoryResponse: {
+            history: components["schemas"]["RegistrationHistoryItem"][];
+        };
+        RegistrationStatusRequest: {
+            toStatus: components["schemas"]["RegistrationStatus"];
+            reason?: string | null;
+        };
+        ParticipantRegistrationReview: {
+            participant: components["schemas"]["Participant"];
+            event: components["schemas"]["Event"];
+            emergencyContact: components["schemas"]["EmergencyContact"] | null;
+            latestConsent: components["schemas"]["Consent"] | null;
+        };
+        SignatureRequest: {
+            dataUrl: string;
+        };
+        SignatureResponse: {
+            signatureObjectKey: string;
+            signatureSha256: string;
+            /** @enum {string} */
+            signatureMimeType: "image/png" | "image/jpeg";
+        };
+        AdminAuditLogsResponse: {
+            logs: {
+                [key: string]: unknown;
+            }[];
+            authLogs: {
+                [key: string]: unknown;
+            }[];
+        };
+        QrCode: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            registrationId: string;
+            /** Format: date-time */
+            expiresAt?: string | null;
+            /** Format: date-time */
+            issuedAt: string;
+            isActive: boolean;
+            /** Format: date-time */
+            revokedAt?: string | null;
+            /** Format: uuid */
+            revokedBy?: string | null;
+            revokedReason?: string | null;
+        } & {
+            [key: string]: unknown;
+        };
+        QrMutationResponse: {
+            /** @enum {boolean} */
+            success: true;
+            message: string;
+            data: components["schemas"]["QrCode"];
+        };
+        ApiDataResponse: {
+            /** @enum {boolean} */
+            success: true;
+            message?: string;
+            data: {
+                [key: string]: unknown;
+            };
+        };
+        /** @description Supply either registrationId or identifier together with eventId. */
+        ManualCheckInRequest: {
+            /** Format: uuid */
+            registrationId?: string;
+            identifier?: string;
+            /** Format: uuid */
+            eventId: string;
+        };
+        ScreeningStation: {
+            /** Format: uuid */
+            stationId: string;
+            /** Format: uuid */
+            eventId: string;
+            stationType: string;
+            stationOrder: number;
+            isActive: boolean;
+        } & {
+            [key: string]: unknown;
+        };
+        ScreeningStationsResponse: {
+            event: {
+                /** Format: uuid */
+                eventId: string;
+                name: string;
+                status: components["schemas"]["EventStatus"];
+                venue: string;
+            };
+            stations: components["schemas"]["ScreeningStation"][];
+        };
+        ScreeningQueueItem: {
+            /** Format: uuid */
+            registrationId: string;
+            participantDisplayName: string;
+            queueNumber: number | null;
+            status: components["schemas"]["RegistrationStatus"];
+            passToken: string | null;
+            existingResult: {
+                [key: string]: unknown;
+            } | null;
+        };
+        ScreeningQueueResponse: {
+            station: components["schemas"]["ScreeningStation"];
+            registrations: components["schemas"]["ScreeningQueueItem"][];
+        };
+        EyeReading: {
+            /** @enum {string} */
+            kind: "FRACTION";
+            denominator: number;
+        } | {
+            /** @enum {string} */
+            kind: "EXCEPTION";
+            /** @enum {string} */
+            code: "CF" | "HM" | "LP" | "NLP" | "NOT_TESTABLE";
+        };
+        VisualAcuityResultData: {
+            /** @enum {integer} */
+            chartDistanceMetres: 3 | 6;
+            od: components["schemas"]["EyeReading"];
+            os: components["schemas"]["EyeReading"];
+            withUsualDistanceGlasses: boolean | null;
+        };
+        VisualAcuityPreviewRequest: {
+            resultData: components["schemas"]["VisualAcuityResultData"];
+        };
+        VisualAcuitySaveRequest: {
+            /** Format: uuid */
+            registrationId: string;
+            idempotencyKey: string;
+            acknowledged: boolean;
+            resultData: components["schemas"]["VisualAcuityResultData"];
+        };
+        RefractionEye: {
+            sphere: number;
+            cylinder: number;
+            axis: number | null;
+        };
+        RefractionResultData: {
+            /** @enum {string} */
+            measurementStatus: "COMPLETED";
+            wearsDistanceGlasses: boolean | null;
+            od: components["schemas"]["RefractionEye"];
+            os: components["schemas"]["RefractionEye"];
+            notes?: string;
+        } | {
+            /** @enum {string} */
+            measurementStatus: "UNABLE_TO_MEASURE" | "REPEAT_REQUIRED";
+            wearsDistanceGlasses: boolean | null;
+            notes: string;
+        };
+        RefractionPreviewRequest: {
+            resultData: components["schemas"]["RefractionResultData"];
+        };
+        RefractionSaveRequest: {
+            /** Format: uuid */
+            registrationId: string;
+            idempotencyKey: string;
+            acknowledged: boolean;
+            resultData: components["schemas"]["RefractionResultData"];
+        };
+        ColourVisionResultData: {
+            /** @enum {string} */
+            testKit: "ISHIHARA";
+            platesPresented: number;
+            odCorrect: number;
+            osCorrect: number;
+        };
+        ColourVisionPreviewRequest: {
+            resultData: components["schemas"]["ColourVisionResultData"];
+        };
+        ColourVisionSaveRequest: {
+            /** Format: uuid */
+            registrationId: string;
+            idempotencyKey: string;
+            acknowledged: boolean;
+            resultData: components["schemas"]["ColourVisionResultData"];
+        };
+        ScreeningEvaluationReason: {
+            flag: components["schemas"]["OverallFlag"];
+            reason: string;
+        };
+        ScreeningEvaluation: {
+            ruleVersion: string;
+            overallFlag: components["schemas"]["OverallFlag"];
+            isFlagged: boolean;
+            flagSummary: string;
+            reasons: components["schemas"]["ScreeningEvaluationReason"][];
+        };
+        ScreeningResult: {
+            /** Format: uuid */
+            resultId: string;
+            /** Format: uuid */
+            registrationId: string;
+            /** Format: uuid */
+            stationId: string;
+            screeningType: string;
+            resultData: {
+                [key: string]: unknown;
+            };
+            overallFlag: components["schemas"]["OverallFlag"];
+            isFlagged: boolean;
+            flagSummary?: string | null;
+            ruleVersion?: string;
+            /** Format: date-time */
+            acknowledgedAt?: string | null;
+            idempotencyKey: string;
+            evaluation?: components["schemas"]["ScreeningEvaluation"];
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt: string;
+        } & {
+            [key: string]: unknown;
+        };
         Problem: {
             /** Format: uri */
             type: string;
@@ -1476,6 +2620,205 @@ export interface components {
                 message: string;
             }[];
         };
+        PublicEvent: {
+            /** Format: uuid */
+            eventId: string;
+            name: string;
+            description: string | null;
+            bannerKey: components["schemas"]["EventBannerKey"];
+            artworkDataUrl: string | null;
+            venue: string;
+            address: string | null;
+            postalCode: string | null;
+            timezone: string;
+            /** Format: date-time */
+            startsAt: string;
+            /** Format: date-time */
+            endsAt: string;
+            capacity: number;
+            /** @enum {string} */
+            status: "PUBLISHED" | "IN_PROGRESS" | "COMPLETED" | "CANCELLED";
+            eventDays: components["schemas"]["EventDay"][];
+        };
+        EventMetrics: {
+            signupCount: number;
+            checkedInCount: number;
+            completedCount: number;
+            cancelledCount: number;
+            activeCount: number;
+            attendanceRatePercent: number;
+            screeningResultCount: number;
+            flaggedResultCount: number;
+            referralCount: number;
+            capacity: number;
+            expectedAttendance: number | null;
+        };
+        EventAttendee: {
+            /** Format: uuid */
+            registrationId: string;
+            participantReference: string;
+            participantDisplayName: string | null;
+            /** @enum {string} */
+            registrationStatus: "SIGNED_UP" | "CHECKED_IN" | "COMPLETED" | "CANCELLED";
+            checkedIn: boolean;
+            /** Format: date-time */
+            checkedInAt: string | null;
+            queueNumber: number | null;
+            /** Format: date-time */
+            createdAt: string;
+        };
+        EventAttendeeList: {
+            total: number;
+            attendees: components["schemas"]["EventAttendee"][];
+            nextCursor: string | null;
+        };
+        EventRegistrationCreateRequest: {
+            /** Format: uuid */
+            participantId: string;
+        };
+        EventRegistrationRecord: {
+            /** Format: uuid */
+            registrationId: string;
+            /** Format: uuid */
+            eventId: string;
+            /** Format: uuid */
+            participantId: string;
+            /** @enum {string} */
+            registrationStatus: "SIGNED_UP" | "CHECKED_IN" | "COMPLETED" | "CANCELLED";
+            queueNumber?: number | null;
+            /** Format: date-time */
+            registeredAt?: string;
+        } & {
+            [key: string]: unknown;
+        };
+        EventRegistrationCommandResponse: {
+            /** Format: uuid */
+            registrationId: string;
+            participantReference: string;
+            queueNumber: number | null;
+            /** @enum {string} */
+            status: "SIGNED_UP" | "CHECKED_IN" | "COMPLETED" | "CANCELLED";
+            registration: components["schemas"]["EventRegistrationRecord"];
+            idempotentReplay: boolean;
+        };
+        EventRegistrationListResponse: {
+            registrations: components["schemas"]["EventRegistrationRecord"][];
+            pagination: {
+                page: number;
+                pageSize: number;
+                total: number;
+                totalPages: number;
+            };
+        };
+        EventExportEvent: {
+            /** Format: uuid */
+            eventId: string;
+            name: string;
+            description: string | null;
+            bannerKey: components["schemas"]["EventBannerKey"];
+            artworkDataUrl: string | null;
+            venue: string;
+            address: string | null;
+            postalCode: string | null;
+            timezone: string;
+            /** Format: date-time */
+            startsAt: string;
+            /** Format: date-time */
+            endsAt: string;
+            capacity: number;
+            expectedAttendance: number | null;
+            status: components["schemas"]["EventStatus"];
+            version: number;
+        };
+        EventExportStation: {
+            /** Format: uuid */
+            stationId: string;
+            stationName: string;
+            /** @enum {string} */
+            stationType: "VISUAL_ACUITY" | "REFRACTION" | "COLOUR_VISION" | "EYE_HEALTH";
+            stationOrder: number;
+            isActive: boolean;
+        };
+        EventExportShift: {
+            /** Format: uuid */
+            shiftId: string;
+            name: string;
+            /** Format: date-time */
+            startsAt: string;
+            /** Format: date-time */
+            endsAt: string;
+            requiredStaff: number;
+            status: components["schemas"]["ShiftStatus"];
+        };
+        EventExportStationAvailability: {
+            /** Format: uuid */
+            eventStationAvailabilityId: string;
+            /** Format: uuid */
+            eventStationId: string;
+            /** Format: uuid */
+            eventDayId: string;
+            isAvailable: boolean;
+            /** Format: date-time */
+            startsAt: string | null;
+            /** Format: date-time */
+            endsAt: string | null;
+            capacity: number;
+        };
+        EventExportEventDay: {
+            /** Format: uuid */
+            eventDayId: string;
+            /** Format: date */
+            date: string;
+            /** Format: date-time */
+            startsAt: string;
+            /** Format: date-time */
+            endsAt: string;
+            stationAvailabilities: components["schemas"]["EventExportStationAvailability"][];
+        };
+        EventExportStaffAssignment: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            eventId: string;
+            /** Format: uuid */
+            stationId: string | null;
+            /** Format: uuid */
+            shiftId: string | null;
+            /** Format: uuid */
+            userId: string;
+            /** Format: uuid */
+            assignedBy: string;
+            /** Format: date-time */
+            assignedAt: string;
+            /** @enum {string|null} */
+            assignmentRole: "EVENT_MANAGER" | "REGISTRATION" | "SCREENER" | "REVIEWER" | "SUPPORT" | null;
+            assignmentStatus: components["schemas"]["StaffAssignmentStatus"];
+            /** @enum {string|null} */
+            status: "ASSIGNED" | "CONFIRMED" | "COMPLETED" | "CANCELLED" | null;
+        };
+        EventExport: {
+            /** @enum {integer} */
+            schemaVersion: 1;
+            /** Format: date-time */
+            generatedAt: string;
+            event: components["schemas"]["EventExportEvent"];
+            metrics: components["schemas"]["EventMetrics"];
+            eventDays: components["schemas"]["EventExportEventDay"][];
+            stations: components["schemas"]["EventExportStation"][];
+            shifts: components["schemas"]["EventExportShift"][];
+            staffAssignments: components["schemas"]["EventExportStaffAssignment"][];
+            attendees: components["schemas"]["EventAttendee"][];
+        };
+        EventExportResponse: {
+            export: components["schemas"]["EventExport"];
+            /** @description 15-minute HMAC-bound export receipt */
+            exportReceipt: string;
+        };
+        EventDeletionRequest: {
+            version: number;
+            eventName: string;
+            exportReceipt: string;
+        };
     };
     responses: {
         /** @description Event transitioned and audited */
@@ -1485,15 +2828,6 @@ export interface components {
             };
             content: {
                 "application/json": components["schemas"]["Event"];
-            };
-        };
-        /** @description Request cannot be fulfilled in the resource's current state */
-        BadRequest: {
-            headers: {
-                [name: string]: unknown;
-            };
-            content: {
-                "application/json": components["schemas"]["Problem"];
             };
         };
         /** @description Authentication is absent, invalid, expired, revoked, or reused */
@@ -1550,13 +2884,50 @@ export interface components {
                 "application/json": components["schemas"]["Problem"];
             };
         };
+        /** @description Screening evaluation preview */
+        ScreeningPreview: {
+            headers: {
+                [name: string]: unknown;
+            };
+            content: {
+                "application/json": components["schemas"]["ScreeningEvaluation"];
+            };
+        };
+        /** @description Screening result saved or replayed */
+        ScreeningSaved: {
+            headers: {
+                [name: string]: unknown;
+            };
+            content: {
+                "application/json": components["schemas"]["ScreeningResult"];
+            };
+        };
+        /** @description Request cannot be fulfilled in the resource's current state */
+        BadRequest: {
+            headers: {
+                [name: string]: unknown;
+            };
+            content: {
+                "application/json": components["schemas"]["Problem"];
+            };
+        };
     };
     parameters: {
         EventId: string;
         ShiftId: string;
         RegistrationId: string;
+        ParticipantId: string;
+        StationId: string;
+        ContactId: string;
+        ConsentId: string;
+        QrId: string;
+        QrToken: string;
         Cursor: string;
         EventLimit: number;
+        Page: number;
+        PageSize: number;
+        ParticipantPageSize: number;
+        IdempotencyKey: string;
         /** @description Must equal the `vsms_csrf` cookie; requests also require an allowed Origin */
         CsrfToken: string;
     };
@@ -1613,6 +2984,27 @@ export interface operations {
                     "application/json": components["schemas"]["Problem"];
                 };
             };
+        };
+    };
+    getAuthenticationConfigStatus: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Authentication configuration status */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AuthConfigStatus"];
+                };
+            };
+            429: components["responses"]["RateLimited"];
         };
     };
     authorizeWithCognito: {
@@ -1704,30 +3096,166 @@ export interface operations {
     logout: {
         parameters: {
             query?: never;
-            header: {
-                /** @description Must equal the `vsms_csrf` cookie; requests also require an allowed Origin */
-                "X-CSRF-Token": components["parameters"]["CsrfToken"];
-            };
+            header?: never;
             path?: never;
             cookie?: never;
         };
         requestBody?: never;
         responses: {
-            /** @description Session revoked and managed-login logout URL returned */
+            /** @description Browser session cleared */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LogoutResponse"];
+                };
+            };
+            403: components["responses"]["Forbidden"];
+            /** @description Cognito managed login is not configured */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    globalLogout: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Browser session cleared */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LogoutResponse"];
+                };
+            };
+            403: components["responses"]["Forbidden"];
+            /** @description Cognito managed login is not configured */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    getCurrentUser: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Current user */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
                     "application/json": {
-                        message: string;
-                        /** @description Absolute Cognito logout URL, or a local path when the identity provider is unavailable */
-                        logoutUrl: string;
+                        user: components["schemas"]["User"];
                     };
                 };
             };
+            401: components["responses"]["Unauthorized"];
+        };
+    };
+    changePassword: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** Format: password */
+                    oldPassword: string;
+                    /** Format: password */
+                    newPassword: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Password changed */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            400: components["responses"]["ValidationFailed"];
+            401: components["responses"]["Unauthorized"];
+            /** @description Cognito managed login is not configured */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    listUsers: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Up to 100 users without credential material */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UserListResponse"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
-            429: components["responses"]["RateLimited"];
+        };
+    };
+    createUser: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateUserRequest"];
+            };
+        };
+        responses: {
+            /** @description Staff user created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UserMutationResponse"];
+                };
+            };
+            400: components["responses"]["ValidationFailed"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            409: components["responses"]["Conflict"];
         };
     };
     listEventsV1: {
@@ -1859,11 +3387,138 @@ export interface operations {
             401: components["responses"]["Unauthorized"];
         };
     };
+    searchSingaporeLocations: {
+        parameters: {
+            query: {
+                q: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Normalized Singapore locations */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LocationSearchResponse"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            422: components["responses"]["ValidationFailed"];
+            429: components["responses"]["RateLimited"];
+            /** @description OneMap is unavailable or not configured */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    getEventV1: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                eventId: components["parameters"]["EventId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Event detail */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Event"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    deleteEmptyDraftEvent: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                eventId: components["parameters"]["EventId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["EventDeletionRequest"];
+            };
+        };
+        responses: {
+            /** @description Unpopulated draft event deleted and tombstoned */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            422: components["responses"]["ValidationFailed"];
+            429: components["responses"]["RateLimited"];
+        };
+    };
+    updateEventV1: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                eventId: components["parameters"]["EventId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateEventRequest"];
+            };
+        };
+        responses: {
+            /** @description Event updated and audited */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Event"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            422: components["responses"]["ValidationFailed"];
+            429: components["responses"]["RateLimited"];
+            /** @description Station and staff-assignment plan changes are not available yet */
+            501: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
     listEventRegistrationsV1: {
         parameters: {
             query?: {
-                page?: number;
-                pageSize?: number;
+                page?: components["parameters"]["Page"];
+                pageSize?: components["parameters"]["PageSize"];
             };
             header?: never;
             path: {
@@ -2137,6 +3792,315 @@ export interface operations {
             429: components["responses"]["RateLimited"];
         };
     };
+    listScreeningStations: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                eventId: components["parameters"]["EventId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Event and active stations */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ScreeningStationsResponse"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    listScreeningQueue: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                eventId: components["parameters"]["EventId"];
+                stationId: components["parameters"]["StationId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Station queue */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ScreeningQueueResponse"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    resolveScreeningParticipant: {
+        parameters: {
+            query?: {
+                passToken?: string;
+                registrationId?: string;
+            };
+            header?: never;
+            path: {
+                eventId: components["parameters"]["EventId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Resolved registration */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RegistrationLookup"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            422: components["responses"]["ValidationFailed"];
+        };
+    };
+    previewVisualAcuity: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                eventId: components["parameters"]["EventId"];
+                stationId: components["parameters"]["StationId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["VisualAcuityPreviewRequest"];
+            };
+        };
+        responses: {
+            200: components["responses"]["ScreeningPreview"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            422: components["responses"]["ValidationFailed"];
+        };
+    };
+    saveVisualAcuity: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                eventId: components["parameters"]["EventId"];
+                stationId: components["parameters"]["StationId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["VisualAcuitySaveRequest"];
+            };
+        };
+        responses: {
+            200: components["responses"]["ScreeningSaved"];
+            201: components["responses"]["ScreeningSaved"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            422: components["responses"]["ValidationFailed"];
+        };
+    };
+    previewRefraction: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                eventId: components["parameters"]["EventId"];
+                stationId: components["parameters"]["StationId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RefractionPreviewRequest"];
+            };
+        };
+        responses: {
+            200: components["responses"]["ScreeningPreview"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            422: components["responses"]["ValidationFailed"];
+        };
+    };
+    saveRefraction: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                eventId: components["parameters"]["EventId"];
+                stationId: components["parameters"]["StationId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RefractionSaveRequest"];
+            };
+        };
+        responses: {
+            200: components["responses"]["ScreeningSaved"];
+            201: components["responses"]["ScreeningSaved"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            422: components["responses"]["ValidationFailed"];
+        };
+    };
+    previewColourVision: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                eventId: components["parameters"]["EventId"];
+                stationId: components["parameters"]["StationId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ColourVisionPreviewRequest"];
+            };
+        };
+        responses: {
+            200: components["responses"]["ScreeningPreview"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            422: components["responses"]["ValidationFailed"];
+        };
+    };
+    saveColourVision: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                eventId: components["parameters"]["EventId"];
+                stationId: components["parameters"]["StationId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ColourVisionSaveRequest"];
+            };
+        };
+        responses: {
+            200: components["responses"]["ScreeningSaved"];
+            201: components["responses"]["ScreeningSaved"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            422: components["responses"]["ValidationFailed"];
+        };
+    };
+    listClinicalReviews: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                eventId: components["parameters"]["EventId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Event summary and severity-ordered actionable queue */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReviewQueueResponse"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+        };
+    };
+    getClinicalReview: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                eventId: components["parameters"]["EventId"];
+                registrationId: components["parameters"]["RegistrationId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Redacted participant, screening, readiness, and review detail */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReviewDetailResponse"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+        };
+    };
+    recordClinicalReviewDecision: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                eventId: components["parameters"]["EventId"];
+                registrationId: components["parameters"]["RegistrationId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReviewDecisionRequest"];
+            };
+        };
+        responses: {
+            /** @description Decision recorded and registration completed */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReviewDecisionResponse"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            422: components["responses"]["ValidationFailed"];
+        };
+    };
     getEventAuditLogV1: {
         parameters: {
             query?: {
@@ -2164,6 +4128,916 @@ export interface operations {
             401: components["responses"]["Unauthorized"];
             404: components["responses"]["NotFound"];
             429: components["responses"]["RateLimited"];
+        };
+    };
+    searchParticipants: {
+        parameters: {
+            query?: {
+                participantReference?: string;
+                name?: string;
+                contactNumber?: string;
+                dateOfBirth?: string;
+                page?: components["parameters"]["Page"];
+                pageSize?: components["parameters"]["ParticipantPageSize"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Paginated participant summaries */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ParticipantSearchResponse"];
+                };
+            };
+            400: components["responses"]["ValidationFailed"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            429: components["responses"]["RateLimited"];
+        };
+    };
+    createParticipant: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ParticipantRequest"];
+            };
+        };
+        responses: {
+            /** @description Participant created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ParticipantEnvelope"];
+                };
+            };
+            400: components["responses"]["ValidationFailed"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+        };
+    };
+    getParticipantActiveConsentForm: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Active consent form */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConsentFormEnvelope"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    getParticipant: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                participantId: components["parameters"]["ParticipantId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Participant detail */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ParticipantEnvelope"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    updateParticipant: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                participantId: components["parameters"]["ParticipantId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ParticipantUpdateRequest"];
+            };
+        };
+        responses: {
+            /** @description Participant updated */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ParticipantEnvelope"];
+                };
+            };
+            400: components["responses"]["ValidationFailed"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    listParticipantRegistrations: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                participantId: components["parameters"]["ParticipantId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Registrations */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RegistrationsEnvelope"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+        };
+    };
+    listParticipantConsents: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                participantId: components["parameters"]["ParticipantId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Consent records */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConsentsEnvelope"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+        };
+    };
+    createParticipantConsent: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                participantId: components["parameters"]["ParticipantId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ConsentWithEventRequest"];
+            };
+        };
+        responses: {
+            /** @description Consent recorded */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConsentEnvelope"];
+                };
+            };
+            400: components["responses"]["ValidationFailed"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    withdrawParticipantConsent: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                participantId: components["parameters"]["ParticipantId"];
+                consentId: components["parameters"]["ConsentId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ConsentWithdrawalRequest"];
+            };
+        };
+        responses: {
+            /** @description Consent withdrawn */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConsentEnvelope"];
+                };
+            };
+            400: components["responses"]["ValidationFailed"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+        };
+    };
+    listEmergencyContacts: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                participantId: components["parameters"]["ParticipantId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Emergency contacts */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EmergencyContactsEnvelope"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+        };
+    };
+    createEmergencyContact: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                participantId: components["parameters"]["ParticipantId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["EmergencyContactRequest"];
+            };
+        };
+        responses: {
+            /** @description Emergency contact created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EmergencyContactEnvelope"];
+                };
+            };
+            400: components["responses"]["ValidationFailed"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    updateParticipantEmergencyContact: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                participantId: components["parameters"]["ParticipantId"];
+                contactId: components["parameters"]["ContactId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["EmergencyContactUpdateRequest"];
+            };
+        };
+        responses: {
+            /** @description Emergency contact updated */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EmergencyContactEnvelope"];
+                };
+            };
+            400: components["responses"]["ValidationFailed"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    createEventConsent: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                participantId: components["parameters"]["ParticipantId"];
+                eventId: components["parameters"]["EventId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ConsentRequest"];
+            };
+        };
+        responses: {
+            /** @description Consent recorded */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConsentEnvelope"];
+                };
+            };
+            400: components["responses"]["ValidationFailed"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    getParticipantRegistrationReview: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                participantId: components["parameters"]["ParticipantId"];
+                eventId: components["parameters"]["EventId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Registration review context */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ParticipantRegistrationReview"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    createRegistration: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** Format: uuid */
+                    eventId: string;
+                    /** Format: uuid */
+                    participantId: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Idempotent replay */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RegistrationResponse"];
+                };
+            };
+            /** @description Participant registered */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RegistrationResponse"];
+                };
+            };
+            400: components["responses"]["ValidationFailed"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            409: components["responses"]["Conflict"];
+        };
+    };
+    getRegistration: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                registrationId: components["parameters"]["RegistrationId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Registration detail */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RegistrationResponse"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    getRegistrationHistory: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                registrationId: components["parameters"]["RegistrationId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Status history */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RegistrationHistoryResponse"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+        };
+    };
+    changeRegistrationStatus: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                registrationId: components["parameters"]["RegistrationId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RegistrationStatusRequest"];
+            };
+        };
+        responses: {
+            /** @description Registration status changed */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RegistrationResponse"];
+                };
+            };
+            400: components["responses"]["ValidationFailed"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+        };
+    };
+    getActiveConsentForm: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Active consent form */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConsentFormEnvelope"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    updateEmergencyContact: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                contactId: components["parameters"]["ContactId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["EmergencyContactUpdateRequest"];
+            };
+        };
+        responses: {
+            /** @description Emergency contact updated */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EmergencyContactEnvelope"];
+                };
+            };
+            400: components["responses"]["ValidationFailed"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    storeSignature: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SignatureRequest"];
+            };
+        };
+        responses: {
+            /** @description Signature stored */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SignatureResponse"];
+                };
+            };
+            400: components["responses"]["ValidationFailed"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            429: components["responses"]["RateLimited"];
+        };
+    };
+    listAdministrativeAuditLogs: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Latest audit records */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminAuditLogsResponse"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+        };
+    };
+    generateRegistrationQrCode: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                registrationId: components["parameters"]["RegistrationId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description QR pass generated */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["QrCode"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            429: components["responses"]["RateLimited"];
+        };
+    };
+    generateQrCode: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                registrationId: components["parameters"]["RegistrationId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description QR pass generated */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["QrMutationResponse"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            429: components["responses"]["RateLimited"];
+        };
+    };
+    reissueQrCode: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                registrationId: components["parameters"]["RegistrationId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description QR pass reissued */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["QrMutationResponse"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+            429: components["responses"]["RateLimited"];
+        };
+    };
+    verifyQrCode: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    token: string;
+                    /** Format: uuid */
+                    eventId: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Verification result */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiDataResponse"];
+                };
+            };
+            400: components["responses"]["ValidationFailed"];
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+            429: components["responses"]["RateLimited"];
+        };
+    };
+    manualQrCheckIn: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ManualCheckInRequest"];
+            };
+        };
+        responses: {
+            /** @description Participant checked in */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiDataResponse"];
+                };
+            };
+            400: components["responses"]["ValidationFailed"];
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            429: components["responses"]["RateLimited"];
+        };
+    };
+    getParticipantByQrCode: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                token: components["parameters"]["QrToken"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Participant data */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiDataResponse"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    listParticipantQrCodes: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                participantId: components["parameters"]["ParticipantId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description QR pass history */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiDataResponse"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    revokeQrCode: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                qrId: components["parameters"]["QrId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    revokedReason: string;
+                    /** Format: uuid */
+                    revokedBy?: string;
+                };
+            };
+        };
+        responses: {
+            /** @description QR pass revoked */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["QrMutationResponse"];
+                };
+            };
+            400: components["responses"]["ValidationFailed"];
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    downloadQrCode: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                qrId: components["parameters"]["QrId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Download data */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiDataResponse"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    printQrCode: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                qrId: components["parameters"]["QrId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Print data */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiDataResponse"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    getRegistrationByQrCode: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                token: components["parameters"]["QrToken"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Registration resolved */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        registration: {
+                            [key: string]: unknown;
+                        };
+                    };
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
         };
     };
     getPublicEvent: {
@@ -2278,99 +5152,7 @@ export interface operations {
             429: components["responses"]["RateLimited"];
         };
     };
-    getEventV1: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                eventId: components["parameters"]["EventId"];
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Event detail */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Event"];
-                };
-            };
-            401: components["responses"]["Unauthorized"];
-            404: components["responses"]["NotFound"];
-        };
-    };
-    deleteEmptyDraftEvent: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                eventId: components["parameters"]["EventId"];
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["EventDeletionRequest"];
-            };
-        };
-        responses: {
-            /** @description Unpopulated draft event deleted and tombstoned */
-            204: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            401: components["responses"]["Unauthorized"];
-            403: components["responses"]["Forbidden"];
-            404: components["responses"]["NotFound"];
-            409: components["responses"]["Conflict"];
-            422: components["responses"]["ValidationFailed"];
-            429: components["responses"]["RateLimited"];
-        };
-    };
-    updateEventV1: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                eventId: components["parameters"]["EventId"];
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["UpdateEventRequest"];
-            };
-        };
-        responses: {
-            /** @description Event updated and audited */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Event"];
-                };
-            };
-            401: components["responses"]["Unauthorized"];
-            404: components["responses"]["NotFound"];
-            409: components["responses"]["Conflict"];
-            422: components["responses"]["ValidationFailed"];
-            429: components["responses"]["RateLimited"];
-            /** @description Station and staff-assignment plan changes are not available yet */
-            501: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    listUsers: {
+    listUsersLegacy: {
         parameters: {
             query?: never;
             header?: never;
@@ -2501,7 +5283,7 @@ export interface operations {
             403: components["responses"]["Forbidden"];
         };
     };
-    searchSingaporeLocations: {
+    searchSingaporeLocationsLegacy: {
         parameters: {
             query: {
                 q: string;
@@ -2835,7 +5617,7 @@ export interface operations {
             429: components["responses"]["RateLimited"];
         };
     };
-    listClinicalReviews: {
+    listClinicalReviewsLegacy: {
         parameters: {
             query?: never;
             header?: never;
@@ -2861,7 +5643,7 @@ export interface operations {
             409: components["responses"]["Conflict"];
         };
     };
-    getClinicalReview: {
+    getClinicalReviewLegacy: {
         parameters: {
             query?: never;
             header?: never;
@@ -2888,7 +5670,7 @@ export interface operations {
             409: components["responses"]["Conflict"];
         };
     };
-    recordClinicalReviewDecision: {
+    recordClinicalReviewDecisionLegacy: {
         parameters: {
             query?: never;
             header?: never;

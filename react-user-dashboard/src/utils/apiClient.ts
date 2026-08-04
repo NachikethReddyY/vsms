@@ -11,6 +11,7 @@ let accessToken: string | null = null;
 let csrfToken: string | null = null;
 let refreshPromise: Promise<AuthSession> | null = null;
 let volatileDeviceId: string | null = null;
+let loginRedirectStarted = false;
 
 export function setSessionTokens(tokens: TokenPayload | null) {
   accessToken = tokens?.accessToken || null;
@@ -87,7 +88,7 @@ apiClient.interceptors.response.use(
   (response) => response,
   async (error: AxiosError) => {
     const originalRequest = error.config as RetryableRequestConfig | undefined;
-    if (error.response?.status === 401 && originalRequest && !originalRequest._retry && getStoredSession()) {
+    if (error.response?.status === 401 && originalRequest && !originalRequest._retry && !originalRequest.url?.startsWith("/auth/") && getStoredSession()) {
       originalRequest._retry = true;
       try {
         refreshPromise ??= rotateSession().finally(() => {
@@ -96,8 +97,12 @@ apiClient.interceptors.response.use(
         await refreshPromise;
         return apiClient(originalRequest);
       } catch (refreshError) {
+        setSessionTokens(null);
         clearStoredSession();
-        window.location.assign(getCognitoAuthorizeUrl(`${window.location.pathname}${window.location.search}`));
+        if (!loginRedirectStarted) {
+          loginRedirectStarted = true;
+          window.location.replace(getCognitoAuthorizeUrl(`${window.location.pathname}${window.location.search}`));
+        }
         return Promise.reject(refreshError);
       }
     }

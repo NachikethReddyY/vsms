@@ -145,13 +145,13 @@ a deployed system invulnerable.
 
 | Check | Result | Evidence |
 |---|---|---|
-| Prisma validation/migrations | Pass; seven migrations, including guarded identity/event migration, temporary username migration, and persisted event banner selection | `npm run prisma:validate`, `npm run prisma:migrate` |
-| Seed | Pass; `admin`, `manager`, and `staff` usernames and five lifecycle states | `npm run prisma:seed` |
-| Backend integration | Pass, 2 files / 9 tests; includes concurrent refresh reuse revoking the winning family, disabled-by-default signup, and persisted banner updates on active and completed events | `npm test` |
-| OpenAPI | Pass with no lint warnings | `npm run openapi:lint` |
-| Contract drift | Pass | `npm run contracts:check` |
-| Frontend | Production build pass; ESLint pass with zero warnings/errors | `npm run build && npm run lint` |
-| Runtime dependencies | Backend 0; frontend 0 | `npm audit --omit=dev` in both packages |
+| Prisma validation/migrations | Pass; seven migrations, including guarded identity/event migration, temporary username migration, and persisted event banner selection | `pnpm run prisma:validate`, `pnpm run prisma:migrate` |
+| Seed | Pass; `admin`, `manager`, and `staff` usernames and five lifecycle states | `pnpm run prisma:seed` |
+| Backend integration | Pass, 2 files / 9 tests; includes concurrent refresh reuse revoking the winning family, disabled-by-default signup, and persisted banner updates on active and completed events | `pnpm test` |
+| OpenAPI | Pass; redirect-only authorization produces one expected 2xx warning | `pnpm run openapi:lint` |
+| Contract drift | Pass | `pnpm run contracts:check` |
+| Frontend | Production build pass; ESLint pass with zero warnings/errors | `pnpm run build && pnpm run lint` |
+| Runtime dependencies | Backend 0; frontend 0 | `pnpm audit --prod` in both packages |
 | Bruno lifecycle | Pass, 13/13 requests and tests | Local generated Bruno report |
 | Bruno cookie session | Pass, 3/3 login/refresh/logout requests and tests | Local generated Bruno report |
 | HTTPS | Trusted-CA curl 200; HSTS, CSP, frame, referrer, MIME and request-ID headers present; SAN includes localhost and 127.0.0.1 | `curl --cacert ... https://127.0.0.1:5050/health` |

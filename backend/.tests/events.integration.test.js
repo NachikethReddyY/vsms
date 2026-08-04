@@ -253,6 +253,46 @@ describe("event lifecycle", () => {
     expect(audit.body.auditLogs.map((row) => row.action)).toEqual(expect.arrayContaining(["CREATED", "UPDATED", "PUBLISHED"]));
   });
 
+  test("event deletion retains legacy event audit rows and writes a tombstone", async () => {
+    const created = await request(app).post("/api/events").set("Authorization", `Bearer ${managerToken}`).send(newEvent());
+    expect(created.status).toBe(201);
+    const manager = await helpers.prisma.user.findUniqueOrThrow({ where: { email: "event-manager@tests.vsms.local" } });
+    const auditRow = await helpers.prisma.eventAuditLog.create({
+      data: {
+        eventId: created.body.eventId,
+        actorUserId: manager.id,
+        action: "CREATED",
+        afterSnapshot: { eventId: created.body.eventId, name: created.body.name },
+        correlationId: crypto.randomUUID(),
+      },
+    });
+
+    const exported = await request(app)
+      .get(`/api/events/${created.body.eventId}/export`)
+      .set("Authorization", `Bearer ${managerToken}`);
+    expect(exported.status).toBe(200);
+    const deleted = await request(app)
+      .delete(`/api/events/${created.body.eventId}`)
+      .set("Authorization", `Bearer ${managerToken}`)
+      .send({
+        version: created.body.version,
+        eventName: created.body.name,
+        exportReceipt: exported.body.exportReceipt,
+      });
+    expect(deleted.status).toBe(204);
+
+    const retained = await helpers.prisma.eventAuditLog.findUnique({ where: { eventAuditLogId: auditRow.eventAuditLogId } });
+    expect(retained).toEqual(expect.objectContaining({ eventId: created.body.eventId, afterSnapshot: { eventId: created.body.eventId, name: created.body.name } }));
+    const tombstone = await helpers.prisma.auditLog.findFirstOrThrow({
+      where: { action: "DELETED", entityName: "Event", entityId: created.body.eventId },
+      orderBy: { createdAt: "desc" },
+    });
+    expect(tombstone.details).toEqual(expect.objectContaining({
+      version: created.body.version,
+      preservedCounts: { eventAuditLogs: 1 },
+    }));
+  });
+
   test("staff cannot create events", async () => {
     const response = await request(app).post("/api/events").set("Authorization", `Bearer ${staffToken}`).send(newEvent());
     expect(response.status).toBe(403);

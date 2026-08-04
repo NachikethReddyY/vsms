@@ -239,16 +239,11 @@ exports.me = asyncHandler(async (req, res) => {
 });
 
 exports.logout = asyncHandler(async (req, res) => {
-    const configured = isCognitoConfigured();
+    ensureCognitoConfigured();
     const accessToken = parseCookies(req.headers.cookie)[ACCESS_COOKIE];
-    try {
-        if (configured && accessToken) await globalSignOut(accessToken);
-    } catch {
-        // The managed-login logout endpoint still clears the browser session.
-    } finally {
-        clearAuthCookies(res);
-    }
-    res.json({ message: "Logged out successfully", logoutUrl: configured ? getLogoutUrl() : "/" });
+    if (accessToken) void globalSignOut(accessToken).catch(() => {});
+    clearAuthCookies(res);
+    res.json({ message: "Logged out successfully", logoutUrl: getLogoutUrl() });
 });
 
 exports.changePassword = asyncHandler(async (req, res) => {
