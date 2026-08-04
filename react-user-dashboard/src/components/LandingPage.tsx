@@ -253,22 +253,22 @@ export default function LandingPage() {
             <figure className={styles['dashboard-showcase']}>
               <div className={styles['dashboard-frame']}>
                 <img
-                  src="/landing/placeholder-image.png"
-                  alt="Dashboard screenshot placeholder"
-                  width="1200"
-                  height="800"
+                  src="/landing/vsms-events-workspace.jpg"
+                  alt="VSMS Events workspace showing upcoming screening events, schedules, capacity and staff assignment"
+                  width="1224"
+                  height="768"
                   loading="lazy"
                   decoding="async"
                 />
               </div>
-              <figcaption className={styles['dashboard-note']}>Dashboard image placeholder. Replace with an approved product screenshot.</figcaption>
+              <figcaption className={styles['dashboard-note']}>Events stay readable at a glance: status, schedule, capacity and staffing in one operational view.</figcaption>
             </figure>
 
             <div className={styles['feature-zooms']} role="group" aria-label="Highlighted dashboard features">
               {featureZooms.map((feature) => (
                 <figure className={styles['feature-zoom']} key={feature.label}>
                   <div className={styles['zoom-window']} aria-hidden="true">
-                    <img src="/landing/placeholder-image.png" alt="" width="1200" height="800" loading="lazy" decoding="async" />
+                    <img src="/landing/vsms-events-workspace.jpg" alt="" width="1224" height="768" loading="lazy" decoding="async" />
                   </div>
                   <figcaption>
                     <span aria-hidden="true"><OutlineIcon>{feature.icon}</OutlineIcon></span>
