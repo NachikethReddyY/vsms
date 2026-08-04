@@ -1,44 +1,24 @@
 const crypto = require("crypto");
-const bcrypt = require("bcrypt");
 const request = require("supertest");
+const helpers = require("./helpers");
+const app = require("../app");
 
-let app;
-let helpers;
 let managerToken;
 let staffToken;
+let adminToken;
+let manager;
+let staffUser;
 
-const login = async (identifier) => {
-  const response = await request(app).post("/auth/login").set("Origin", "https://localhost:5173").send({ identifier, password: helpers.PASSWORD });
-  return response.body.accessToken;
-};
-
-const createUser = async (systemRole) => {
-  const id = crypto.randomUUID();
-  return helpers.prisma.user.create({
-    data: {
-      userId: id,
-      username: `test-${systemRole.toLowerCase()}-${id.slice(0, 8)}`,
-      email: `${id}@tests.vsms.local`,
-      passwordHash: await bcrypt.hash(helpers.PASSWORD, 4),
-      systemRole,
-      status: "ACTIVE",
-    },
-  });
-};
+const createUser = (applicationRole, label = `${applicationRole}-${crypto.randomUUID().slice(0, 8)}`) =>
+  helpers.ensureTestUser(applicationRole, label);
 
 beforeAll(async () => {
-  process.env.NODE_ENV = "test";
-  process.env.LOCAL_HTTPS = "false";
-  process.env.JWT_ACCESS_SECRET = "test-only-access-secret-with-at-least-thirty-two-characters";
-  const url = new URL(process.env.DATABASE_URL);
-  if (!url.pathname.endsWith("_test")) url.pathname = `${url.pathname}_test`;
-  process.env.DATABASE_URL = url.toString();
-  app = require("../app");
-  helpers = require("./helpers");
-  await helpers.ensureTestUser("EVENT_MANAGER");
-  await helpers.ensureTestUser("STAFF");
-  managerToken = await login("event-manager@tests.vsms.local");
-  staffToken = await login("staff@tests.vsms.local");
+  manager = await helpers.ensureTestUser("EVENT_MANAGER", "event-manager");
+  staffUser = await helpers.ensureTestUser("REGISTRATION_OFFICER", "staff");
+  const administrator = await helpers.ensureTestUser("ADMINISTRATOR", "event-administrator");
+  managerToken = helpers.accessTokenFor(manager);
+  staffToken = helpers.accessTokenFor(staffUser);
+  adminToken = helpers.accessTokenFor(administrator);
 });
 
 afterAll(async () => helpers.prisma.$disconnect());
@@ -60,7 +40,7 @@ const newEvent = () => {
 
 describe("event lifecycle", () => {
   test("manager atomically creates a multi-day station and staffing plan", async () => {
-    const staff = await createUser("STAFF");
+    const staff = await createUser("SCREENER");
     const template = await helpers.prisma.stationTemplate.upsert({
       where: { templateKey: "VISUAL_ACUITY" },
       update: { active: true, name: "Clinical screening", defaultCapacity: 12 },
@@ -128,6 +108,9 @@ describe("event lifecycle", () => {
       expectedAttendance: 7000,
       postalCode: "528523",
     }));
+    for (const key of ["createIdempotencyKey", "createPayloadHash", "createdByUserId", "cancelledByUserId"]) {
+      expect(Object.hasOwn(created.body, key)).toBe(false);
+    }
     expect(created.body.eventDays).toHaveLength(2);
     expect(created.body.eventStations).toHaveLength(1);
     expect(created.body.eventStations[0]).toEqual(expect.objectContaining({
@@ -195,39 +178,41 @@ describe("event lifecycle", () => {
     expect(response.status).toBe(403);
   });
 
-  test("event management is scoped to the caller's own active manager assignment", async () => {
+  test("event management requires the caller's own active manager assignment and matching account role", async () => {
     const created = await request(app).post("/api/events").set("Authorization", `Bearer ${managerToken}`).send(newEvent());
     const otherManager = await createUser("EVENT_MANAGER");
-    const roleHolder = await createUser("STAFF");
-    const otherManagerToken = await login(otherManager.email);
+    const unassignedManager = await createUser("EVENT_MANAGER");
+    const otherManagerToken = helpers.accessTokenFor(otherManager);
+    const unassignedManagerToken = helpers.accessTokenFor(unassignedManager);
     const shiftId = created.body.shifts[0].shiftId;
 
     const assignedSupport = await request(app)
       .post(`/api/events/${created.body.eventId}/shifts/${shiftId}/assignments`)
       .set("Authorization", `Bearer ${managerToken}`)
       .send({ version: created.body.version, userId: otherManager.userId, assignmentRole: "SUPPORT" });
-    expect(assignedSupport.status).toBe(201);
+    expect(assignedSupport.status).toBe(422);
+    expect(assignedSupport.body.code).toBe("STAFF_ROLE_MISMATCH");
     const assignedManagerRole = await request(app)
       .post(`/api/events/${created.body.eventId}/shifts/${shiftId}/assignments`)
       .set("Authorization", `Bearer ${managerToken}`)
-      .send({ version: assignedSupport.body.version, userId: roleHolder.userId, assignmentRole: "EVENT_MANAGER" });
+      .send({ version: created.body.version, userId: otherManager.userId, assignmentRole: "EVENT_MANAGER" });
     expect(assignedManagerRole.status).toBe(201);
 
     const visible = await request(app)
       .get(`/api/events/${created.body.eventId}`)
       .set("Authorization", `Bearer ${otherManagerToken}`);
     expect(visible.status).toBe(200);
-    expect(visible.body.canManage).toBe(false);
+    expect(visible.body.canManage).toBe(true);
 
     const denied = await request(app)
       .patch(`/api/events/${created.body.eventId}`)
-      .set("Authorization", `Bearer ${otherManagerToken}`)
+      .set("Authorization", `Bearer ${unassignedManagerToken}`)
       .send({ version: assignedManagerRole.body.version, capacity: 91 });
     expect(denied.status).toBe(404);
 
-    await helpers.prisma.staffAssignment.update({
-      where: { shiftId_userId: { shiftId, userId: otherManager.userId } },
-      data: { status: "COMPLETED" },
+    await helpers.prisma.staffAssignment.updateMany({
+      where: { shiftId, userId: otherManager.userId },
+      data: { status: "COMPLETED", assignmentStatus: "COMPLETED" },
     });
     const historical = await request(app)
       .get(`/api/events/${created.body.eventId}`)
@@ -243,7 +228,7 @@ describe("event lifecycle", () => {
     const assigned = await request(app)
       .post(`/api/events/${created.body.eventId}/shifts/${shift.shiftId}/assignments`)
       .set("Authorization", `Bearer ${managerToken}`)
-      .send({ version: created.body.version, userId: staff.userId, assignmentRole: "REGISTRATION" });
+      .send({ version: created.body.version, userId: staff.id, assignmentRole: "REGISTRATION" });
 
     expect(assigned.status).toBe(201);
     expect(assigned.body.signupCount).toBe(0);
@@ -251,22 +236,43 @@ describe("event lifecycle", () => {
     expect(assigned.body.shifts[0].staffAssignments).toEqual([
       expect.objectContaining({
         assignmentRole: "REGISTRATION",
-        user: { userId: staff.userId, username: staff.username },
+        user: { userId: staff.id, username: staff.username },
       }),
     ]);
 
-    await helpers.prisma.eventRegistration.createMany({ data: [
-      { eventId: created.body.eventId, status: "SIGNED_UP" },
-      { eventId: created.body.eventId, status: "CHECKED_IN" },
-      { eventId: created.body.eventId, status: "COMPLETED" },
-      { eventId: created.body.eventId, status: "CANCELLED" },
-    ] });
+    for (const [index, registrationStatus] of ["SIGNED_UP", "CHECKED_IN", "COMPLETED", "CANCELLED"].entries()) {
+      const participant = await helpers.prisma.participant.create({
+        data: {
+          participantReference: `EVT-${crypto.randomUUID().replaceAll("-", "").slice(0, 20)}`,
+          firstName: `Capacity${index}`,
+          lastName: "Participant",
+          dateOfBirth: new Date("1980-01-01T00:00:00.000Z"),
+          gender: "U",
+          contactNumber: `+65 6000 10${String(index).padStart(2, "0")}`,
+          emergencyContact: "+65 6000 2000",
+          consentGiven: true,
+          createdById: staff.id,
+          updatedById: staff.id,
+        },
+      });
+      await helpers.prisma.eventRegistration.create({
+        data: {
+          eventId: created.body.eventId,
+          participantId: participant.id,
+          registeredBy: staff.id,
+          registrationStatus,
+          idempotencyKey: `capacity-${crypto.randomUUID()}`,
+          checkedIn: registrationStatus === "CHECKED_IN",
+          checkedInAt: registrationStatus === "CHECKED_IN" ? new Date() : null,
+        },
+      });
+    }
     const withRegistrations = await request(app)
       .get(`/api/events/${created.body.eventId}`)
       .set("Authorization", `Bearer ${managerToken}`);
 
     expect(withRegistrations.body.signupCount).toBe(4);
-    expect(withRegistrations.body.activeCapacityCount).toBe(2);
+    expect(withRegistrations.body.activeCapacityCount).toBe(1);
 
     const assignmentId = assigned.body.shifts[0].staffAssignments[0].staffAssignmentId;
     const removed = await request(app)
@@ -354,7 +360,7 @@ describe("event lifecycle", () => {
   });
 
   test("schedule conflicts are serialized across events and rechecked on shift edits", async () => {
-    const staff = await createUser("STAFF");
+    const staff = await createUser("SUPPORT");
     const dayStart = new Date("2045-05-12T00:00:00.000Z");
     const morningStart = new Date("2045-05-12T01:00:00.000Z");
     const morningEnd = new Date("2045-05-12T05:00:00.000Z");
@@ -410,16 +416,20 @@ describe("event lifecycle", () => {
     expect(editedIntoConflict.body.code).toBe("STAFF_SCHEDULE_CONFLICT");
   });
 
-  test("in-progress events remain editable and completed events are read-only", async () => {
+  test("in-progress events allow operational edits while terminal events reject operational fields", async () => {
     const created = await request(app).post("/api/events").set("Authorization", `Bearer ${managerToken}`).send(newEvent());
     const published = await request(app).post(`/api/events/${created.body.eventId}/publish`).set("Authorization", `Bearer ${managerToken}`).send({ version: created.body.version });
     const started = await request(app).post(`/api/events/${created.body.eventId}/start`).set("Authorization", `Bearer ${managerToken}`).send({ version: published.body.version });
-    const updated = await request(app).patch(`/api/events/${created.body.eventId}`).set("Authorization", `Bearer ${managerToken}`).send({ version: started.body.version, name: "Updated while running", venue: "Updated operations hall" });
+    const updated = await request(app).patch(`/api/events/${created.body.eventId}`).set("Authorization", `Bearer ${managerToken}`).send({ version: started.body.version, capacity: 100 });
     expect(updated.status).toBe(200);
-    expect(updated.body.name).toBe("Updated while running");
+    expect(updated.body.capacity).toBe(100);
+
+    const deniedRunningIdentityChange = await request(app).patch(`/api/events/${created.body.eventId}`).set("Authorization", `Bearer ${managerToken}`).send({ version: updated.body.version, name: "Updated while running" });
+    expect(deniedRunningIdentityChange.status).toBe(409);
+    expect(deniedRunningIdentityChange.body.code).toBe("EVENT_NOT_EDITABLE");
 
     const completed = await request(app).post(`/api/events/${created.body.eventId}/complete`).set("Authorization", `Bearer ${managerToken}`).send({ version: updated.body.version });
-    const denied = await request(app).patch(`/api/events/${created.body.eventId}`).set("Authorization", `Bearer ${managerToken}`).send({ version: completed.body.version, bannerKey: "EVENT_OPERATIONS" });
+    const denied = await request(app).patch(`/api/events/${created.body.eventId}`).set("Authorization", `Bearer ${managerToken}`).send({ version: completed.body.version, capacity: 101 });
     expect(denied.status).toBe(409);
     expect(denied.body.code).toBe("EVENT_NOT_EDITABLE");
   });
@@ -431,8 +441,57 @@ describe("event lifecycle", () => {
     expect(response.status).toBe(422);
   });
 
-  test("event audit rows reject direct mutation", async () => {
+  test("event audit rows reject direct update and delete mutation", async () => {
     const row = await helpers.prisma.eventAuditLog.findFirst();
-    await expect(helpers.prisma.eventAuditLog.update({ where: { eventAuditLogId: row.eventAuditLogId }, data: { correlationId: crypto.randomUUID() } })).rejects.toThrow(/append-only/);
+    expect(row).toBeTruthy();
+    await expect(helpers.prisma.eventAuditLog.update({ where: { eventAuditLogId: row.eventAuditLogId }, data: { correlationId: crypto.randomUUID() } })).rejects.toThrow(/event audit logs are immutable/);
+    await expect(helpers.prisma.eventAuditLog.delete({ where: { eventAuditLogId: row.eventAuditLogId } })).rejects.toThrow(/event audit logs are immutable/);
+  });
+
+  test("validated administrator hard-delete uses the exact event audit deletion scope", async () => {
+    const created = await request(app)
+      .post("/api/v1/events")
+      .set("Authorization", `Bearer ${adminToken}`)
+      .send(newEvent());
+    expect(created.status).toBe(201);
+
+    const updated = await request(app)
+      .patch(`/api/v1/events/${created.body.eventId}`)
+      .set("Authorization", `Bearer ${adminToken}`)
+      .send({ version: created.body.version, capacity: 91 });
+    expect(updated.status).toBe(200);
+    expect(await helpers.prisma.eventAuditLog.count({ where: { eventId: created.body.eventId } })).toBe(2);
+
+    const published = await request(app)
+      .post(`/api/v1/events/${created.body.eventId}/publish`)
+      .set("Authorization", `Bearer ${adminToken}`)
+      .send({ version: updated.body.version });
+    const started = await request(app)
+      .post(`/api/v1/events/${created.body.eventId}/start`)
+      .set("Authorization", `Bearer ${adminToken}`)
+      .send({ version: published.body.version });
+    const completed = await request(app)
+      .post(`/api/v1/events/${created.body.eventId}/complete`)
+      .set("Authorization", `Bearer ${adminToken}`)
+      .send({ version: started.body.version });
+    expect(completed.status).toBe(200);
+
+    const removed = await request(app)
+      .delete(`/api/v1/events/${created.body.eventId}`)
+      .set("Authorization", `Bearer ${adminToken}`)
+      .send({
+        version: completed.body.version,
+        confirmationName: created.body.name,
+        acknowledgePermanentDeletion: true,
+      });
+    expect(removed.status).toBe(200);
+    expect(removed.body).toEqual({ eventId: created.body.eventId, deleted: true });
+    expect(await helpers.prisma.event.findUnique({ where: { eventId: created.body.eventId } })).toBeNull();
+    expect(await helpers.prisma.eventAuditLog.count({ where: { eventId: created.body.eventId } })).toBe(0);
+    expect(await helpers.prisma.auditLog.count({ where: {
+      entityName: "Event",
+      entityId: created.body.eventId,
+      action: "EVENT_DELETED",
+    } })).toBe(1);
   });
 });

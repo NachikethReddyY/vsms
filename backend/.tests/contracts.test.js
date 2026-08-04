@@ -41,9 +41,10 @@ test("API routes expose the required versioned contracts", () => {
     assert.match(events, /"\/active"/);
     assert.ok(events.indexOf('"/active"') < events.indexOf('"/:eventId"'), "active events route must precede the dynamic event route");
     assert.match(registrations, /"\/:registrationId\/history"/);
-    for (const route of ["/login", "/logout", "/refresh", "/me"]) {
+    for (const route of ["/authorize", "/callback", "/logout", "/refresh", "/me"]) {
         assert.ok(auth.includes(`"${route}"`), `missing auth route ${route}`);
     }
+    assert.doesNotMatch(auth, /"\/login"|"\/signup"/);
 });
 
 test("registration transaction creates registration, history and audit together", () => {
@@ -139,11 +140,14 @@ test("participant search matches any supplied identifier", () => {
     assert.match(controller, /searchParticipantsService/);
 });
 
-test("development authentication uses the local credential service", () => {
+test("authentication uses verified Cognito tokens and approved local role intersection", () => {
     const controller = read("controllers/authController.js");
     const middleware = read("middlewares/requireAuthentication.js");
     const authRoutes = read("routes/authRoutes.js");
-    assert.match(controller, /services\/authService/);
-    assert.match(middleware, /verifyAccessToken/);
-    assert.doesNotMatch(`${controller}\n${middleware}\n${authRoutes}`, /cognito(Client|Jwt)|rolesFromCognito/i);
+    assert.match(controller, /verifyCognitoToken/);
+    assert.match(middleware, /verifyCognitoToken/);
+    assert.match(middleware, /rolesFromCognitoGroups/);
+    assert.match(middleware, /filter\(\(role\) => rolesFromCognitoGroups\(payload\)\.includes\(role\)\)/);
+    assert.match(authRoutes, /"\/authorize"/);
+    assert.doesNotMatch(authRoutes, /"\/login"|"\/signup"/);
 });
