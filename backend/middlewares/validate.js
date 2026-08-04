@@ -23,10 +23,9 @@ const validate = (schemas) => (req, _res, next) => {
     }
     return next();
   } catch (error) {
-    if (error.name === "ZodError" || error.issues) {
-      // Check if it's a Zod error structure
-      const formattedErrors = (error.issues || []).map((issue) => ({
-        field: issue.path.join(".") || "body",
+    if (error.name === "ZodError") {
+      const formattedErrors = error.issues.map((issue) => ({
+        field: issue.path.join("."),
         message: issue.message,
       }));
 

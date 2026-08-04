@@ -6,6 +6,14 @@ const {
   classifyTemplates,
   stationTypeForTemplateKey,
 } = require("./stationTemplateMapping");
+const { ASSIGNMENT_APPLICATION_ROLES } = require("../utils/roles");
+const {
+  enqueueEventArtifactCleanup,
+  processArtifactCleanupTasks,
+} = require("./artifactCleanupService");
+const { createExportReceipt } = require("../utils/eventExportReceipt");
+const { resolveAuditContext } = require("../utils/audit");
+const env = require("../config/env");
 
 const EVENT_FIELDS = [
   "name", "description", "bannerKey", "artworkDataUrl", "venue", "address", "postalCode",
@@ -17,6 +25,16 @@ const ACTIONS = {
   publish: { from: "DRAFT", to: "PUBLISHED", audit: "PUBLISHED" },
   start: { from: "PUBLISHED", to: "IN_PROGRESS", audit: "STARTED" },
   complete: { from: "IN_PROGRESS", to: "COMPLETED", audit: "COMPLETED" },
+};
+
+const assertPublishReady = (event) => {
+  const hasStation = (event.stations || []).some((station) => station.isActive !== false);
+  const hasAssignedPerson = (event.shifts || []).some((shift) => (
+    shift.staffAssignments || []
+  ).some((assignment) => ACTIVE_ASSIGNMENT_STATUSES.includes(assignment.status || assignment.assignmentStatus)));
+  if (!hasStation || !hasAssignedPerson) {
+    throw new AppError(422, "EVENT_NOT_READY", "Add at least one station and assign at least one person before publishing");
+  }
 };
 
 const snapshot = (event) => ({
@@ -95,10 +113,11 @@ const eventInclude = {
   createdBy: { select: { id: true, username: true, fullName: true, email: true, sysRole: true, status: true } },
   cancelledBy: { select: { id: true, username: true, fullName: true, email: true, sysRole: true, status: true } },
   registrations: {
-    where: { registrationStatus: { in: ["SIGNED_UP", "CHECKED_IN"] } },
-    select: { registrationId: true },
+    // Venue occupancy must be derived from an actual check-in, never from a signup.
+    where: { registrationStatus: "CHECKED_IN" },
+    select: { registrationId: true, registrationStatus: true },
   },
-  _count: { select: { registrations: true } },
+  _count: { select: { registrations: { where: { registrationStatus: { not: "CANCELLED" } } } } },
 };
 
 const eventListInclude = {
@@ -118,13 +137,13 @@ const eventListInclude = {
       },
     },
   },
-  createdBy: { select: { userId: true, username: true, email: true, systemRole: true, status: true } },
-  cancelledBy: { select: { userId: true, username: true, email: true, systemRole: true, status: true } },
+  createdBy: { select: { id: true, username: true, fullName: true, email: true, sysRole: true, status: true } },
+  cancelledBy: { select: { id: true, username: true, fullName: true, email: true, sysRole: true, status: true } },
   registrations: {
-    where: { status: { in: ["SIGNED_UP", "CHECKED_IN"] } },
+    where: { registrationStatus: "CHECKED_IN" },
     select: { registrationId: true },
   },
-  _count: { select: { registrations: true } },
+  _count: { select: { registrations: { where: { registrationStatus: { not: "CANCELLED" } } } } },
 };
 
 const publicUser = (value) => value ? {
@@ -135,7 +154,18 @@ const publicUser = (value) => value ? {
   status: value.status,
 } : null;
 
+const rosterOwner = (value) => value ? {
+  userId: value.id,
+  username: value.username || value.fullName || null,
+} : null;
+
+const assignmentUser = (value) => value ? {
+  userId: value.id,
+  username: value.username || value.fullName || "Staff member",
+} : null;
+
 const loadTemplatesByStationType = async (db = prisma) => {
+  if (!db.stationTemplate?.findMany) return new Map();
   const templates = await db.stationTemplate.findMany({ where: { active: true } });
   const byType = new Map();
   for (const template of templates) {
@@ -153,6 +183,7 @@ const mapStationDto = (station, event, templatesByType) => {
     stationTemplateId: template?.stationTemplateId || station.stationId,
     templateVersion: template?.version || 1,
     name: station.stationName,
+    stationType: station.stationType,
     description: template?.description || station.stationType,
     stationOrder: station.stationOrder,
     // Capacity is not on Station (#30); expose template default until availability is wired.
@@ -162,16 +193,25 @@ const mapStationDto = (station, event, templatesByType) => {
   };
 };
 
-const toEventResponse = async ({ _count = {}, registrations = [], stations = [], ...event }, user, db = prisma) => {
+const toEventResponse = async (event, user, db = prisma, options = {}) => {
+  const { _count = {}, registrations = [], stations = [] } = event;
   const templatesByType = await loadTemplatesByStationType(db);
-  const shifts = (event.shifts || []).map((shift) => ({
-    ...shift,
+  const managerView = user ? canManage(event, user) : false;
+  const fullShifts = (event.shifts || []).map((shift) => ({
+    shiftId: shift.shiftId,
+    name: shift.name,
+    startsAt: shift.startsAt,
+    endsAt: shift.endsAt,
+    requiredStaff: shift.requiredStaff,
+    status: shift.status,
     staffAssignments: (shift.staffAssignments || []).map(({ assignedUser, station, ...assignment }) => {
       const template = station ? templatesByType.get(station.stationType) : null;
       return {
-        ...assignment,
         staffAssignmentId: assignment.id,
-        user: publicUser(assignedUser),
+        assignmentRole: assignment.assignmentRole,
+        status: assignment.status,
+        notes: assignment.notes,
+        user: assignmentUser(assignedUser),
         eventStation: station ? {
           eventStationId: station.stationId,
           stationTemplateId: template?.stationTemplateId || station.stationId,
@@ -181,31 +221,86 @@ const toEventResponse = async ({ _count = {}, registrations = [], stations = [],
       };
     }),
   }));
-  const eventStations = stations.map((station) => mapStationDto(station, event, templatesByType));
+  const shifts = managerView ? fullShifts : fullShifts.flatMap((shift) => {
+    if (!user || !["PLANNED", "ACTIVE"].includes(shift.status)) return [];
+    const ownAssignments = shift.staffAssignments
+      .filter((assignment) => (
+        assignment.user?.userId === user.userId
+        && ACTIVE_ASSIGNMENT_STATUSES.includes(assignment.status)
+      ))
+      // Roster summaries never expose private assignment notes. A staff
+      // member's event-detail view can still carry their own instructions.
+      .map((assignment) => options.redactStaffNotes
+        ? (({ notes: _notes, ...safeAssignment }) => safeAssignment)(assignment)
+        : assignment);
+    return ownAssignments.length ? [{ ...shift, staffAssignments: ownAssignments }] : [];
+  });
+  const visibleStationIds = managerView ? null : new Set(shifts.flatMap((shift) => (
+    shift.staffAssignments.flatMap((assignment) => assignment.eventStation?.eventStationId || [])
+  )));
+  const eventStations = stations
+    .filter((station) => !visibleStationIds || visibleStationIds.has(station.stationId))
+    .map((station) => mapStationDto(station, event, templatesByType));
   const registrationCount = _count.registrations || 0;
-  const permissionEvent = { ...event, shifts };
 
-  return {
-    ...event,
+  const response = {
+    // This is deliberately an allowlist. Event persistence contains replay
+    // fingerprints and organisation foreign keys which must never become API
+    // fields merely because Prisma adds them to a result.
+    eventId: event.eventId,
     id: event.eventId,
+    name: event.name,
     eventName: event.name,
+    description: event.description,
+    bannerKey: event.bannerKey,
+    artworkDataUrl: event.artworkDataUrl,
+    venue: event.venue,
     location: event.venue,
+    address: event.address,
+    postalCode: event.postalCode,
+    latitude: event.latitude,
+    longitude: event.longitude,
+    locationProvider: event.locationProvider,
+    locationReference: event.locationReference,
+    timezone: event.timezone,
+    startsAt: event.startsAt,
     eventDate: event.startsAt,
     startTime: event.startsAt,
+    endsAt: event.endsAt,
     endTime: event.endsAt,
+    capacity: event.capacity,
+    expectedAttendance: event.expectedAttendance,
+    status: event.status,
+    version: event.version,
+    cancellationReason: event.cancellationReason,
+    cancelledAt: event.cancelledAt,
+    createdAt: event.createdAt,
+    updatedAt: event.updatedAt,
     eventDays: (event.eventDays || []).map((day) => ({
-      ...day,
+      eventDayId: day.eventDayId,
       date: day.date instanceof Date ? day.date.toISOString().slice(0, 10) : String(day.date).slice(0, 10),
+      startsAt: day.startsAt,
+      endsAt: day.endsAt,
     })),
     shifts,
     eventStations,
-    createdBy: publicUser(event.createdBy),
-    cancelledBy: publicUser(event.cancelledBy),
     signupCount: registrationCount,
-    activeCapacityCount: registrations.length,
+    // Detail queries include the status; list queries deliberately select only
+    // already-checked-in registration ids. Treat the latter as that trusted
+    // projection rather than accidentally reporting zero occupancy.
+    activeCapacityCount: registrations.filter(({ registrationStatus }) => (
+      registrationStatus === undefined || registrationStatus === "CHECKED_IN"
+    )).length,
     _count: { eventRegistrations: registrationCount },
-    canManage: user ? canManage(permissionEvent, user) : false,
+    canManage: managerView,
   };
+  if (managerView) {
+    response.createdBy = publicUser(event.createdBy);
+    response.cancelledBy = publicUser(event.cancelledBy);
+  } else if (options.includeRosterOwner) {
+    response.createdBy = rosterOwner(event.createdBy);
+  }
+  return response;
 };
 
 const visibilityWhere = (user) => {
@@ -235,13 +330,14 @@ const canManage = (event, user) =>
       event.shifts.some((shift) =>
         shift.staffAssignments.some(
           (assignment) =>
+            assignment.userId === user.userId &&
             assignment.assignmentRole === "EVENT_MANAGER" &&
             ["ASSIGNED", "CONFIRMED"].includes(assignment.status)
         )
       )));
 
-const requireEvent = async (eventId, user, manage = false) => {
-  const event = await loadEventWithAssignment(eventId, user);
+const requireEvent = async (eventId, user, manage = false, db = prisma) => {
+  const event = await loadEventWithAssignment(eventId, user, db);
   if (!event || (manage && !canManage(event, user))) {
     throw new AppError(404, "EVENT_NOT_FOUND", "Event was not found");
   }
@@ -282,14 +378,24 @@ const normalizeEventDay = (day, eventId) => ({
   endsAt: new Date(day.endsAt),
 });
 
-const assertRange = (data, shifts) => {
+const assertRange = (data, shifts, eventDays = []) => {
   if (data.endsAt <= data.startsAt) throw new AppError(422, "INVALID_EVENT_RANGE", "Event end must be after its start");
   for (const shift of shifts) {
     if (new Date(shift.startsAt) < data.startsAt || new Date(shift.endsAt) > data.endsAt) {
       throw new AppError(422, "INVALID_SHIFT_RANGE", "Every shift must be within the event schedule");
     }
   }
+  for (const day of eventDays || []) {
+    const startsAt = new Date(day.startsAt);
+    const endsAt = new Date(day.endsAt);
+    if (startsAt < data.startsAt || endsAt > data.endsAt || endsAt <= startsAt) {
+      throw new AppError(422, "INVALID_EVENT_DAY_RANGE", "Every event day must be within the event schedule");
+    }
+  }
 };
+
+const requestIdFor = (context) => typeof context === "string" ? context : context?.requestId;
+const auditFields = (tx, user, context) => resolveAuditContext({ client: tx, userId: user.userId, context });
 
 const bumpEventVersion = async (tx, eventId, version) => {
   const changed = await tx.event.updateMany({
@@ -366,7 +472,7 @@ const auditUpdate = (tx, current, updated, user, correlationId) => tx.eventAudit
     action: "UPDATED",
     beforeSnapshot: snapshot(current),
     afterSnapshot: snapshot(updated),
-    correlationId,
+    correlationId: requestIdFor(correlationId),
   },
 });
 
@@ -389,17 +495,26 @@ const requireTemplates = async (tx, stations) => {
 const assertAssignmentSchedulesAvailable = async (tx, eventId, shifts) => {
   const schedules = shifts.flatMap((shift) => (shift.assignments || []).map((assignment) => ({
     userId: assignment.userId,
+    assignmentRole: assignment.assignmentRole,
     startsAt: new Date(shift.startsAt),
     endsAt: new Date(shift.endsAt),
   })));
   if (schedules.length === 0) return;
   await lockStaffSchedules(tx, schedules.map(({ userId }) => userId));
 
-  const activeUsers = await tx.user.count({
+  const activeUsers = await tx.user.findMany({
     where: { id: { in: [...new Set(schedules.map(({ userId }) => userId))] }, status: "ACTIVE" },
+    select: { id: true, userRoles: { select: { role: { select: { roleName: true } } } } },
   });
-  if (activeUsers !== new Set(schedules.map(({ userId }) => userId)).size) {
+  if (activeUsers.length !== new Set(schedules.map(({ userId }) => userId)).size) {
     throw new AppError(422, "STAFF_NOT_AVAILABLE", "One or more selected staff members are unavailable");
+  }
+  const rolesByUser = new Map(activeUsers.map((member) => [member.id, new Set(member.userRoles.map(({ role }) => role.roleName))]));
+  if (schedules.some(({ userId, assignmentRole }) => {
+    const roles = rolesByUser.get(userId);
+    return roles?.has("ADMINISTRATOR") || !roles?.has(ASSIGNMENT_APPLICATION_ROLES[assignmentRole]);
+  })) {
+    throw new AppError(422, "STAFF_ROLE_MISMATCH", "A selected staff member does not hold the required account role");
   }
   const byUser = new Map();
   for (const schedule of schedules) byUser.set(schedule.userId, [...(byUser.get(schedule.userId) || []), schedule]);
@@ -538,7 +653,7 @@ const createShiftAssignments = async (tx, eventId, shiftInputs, stationsByTempla
   }
 };
 
-const createEvent = async (body, user, correlationId, rawIdempotencyKey) => {
+const createEvent = async (body, user, correlationId, rawIdempotencyKey, db = prisma) => {
   if (!["ADMIN", "EVENT_MANAGER"].includes(user.systemRole)) {
     throw new AppError(403, "FORBIDDEN", "You do not have permission to create events");
   }
@@ -547,7 +662,7 @@ const createEvent = async (body, user, correlationId, rawIdempotencyKey) => {
     throw new AppError(422, "INVALID_IDEMPOTENCY_KEY", "Idempotency-Key must contain 8 to 100 letters, numbers, underscores, or hyphens");
   }
   const payloadHash = crypto.createHash("sha256").update(JSON.stringify(body)).digest("hex");
-  return prisma.$transaction(async (tx) => {
+  return db.$transaction(async (tx) => {
     if (idempotencyKey) {
       const replay = await tx.event.findUnique({
         where: { createdByUserId_createIdempotencyKey: { createdByUserId: user.userId, createIdempotencyKey: idempotencyKey } },
@@ -561,7 +676,7 @@ const createEvent = async (body, user, correlationId, rawIdempotencyKey) => {
       }
     }
     const eventData = normalizeEventData(body);
-    assertRange(eventData, body.shifts);
+    assertRange(eventData, body.shifts, body.eventDays);
     const templatesById = await requireTemplates(tx, body.stations);
     const created = await tx.event.create({
       data: {
@@ -589,15 +704,24 @@ const createEvent = async (body, user, correlationId, rawIdempotencyKey) => {
         entityName: "Event",
         entityId: created.eventId,
         newValue: snapshot(full),
-        ipAddress: "::1",
-        deviceName: "Server",
+        ...await auditFields(tx, user, correlationId),
+      },
+    });
+    await tx.eventAuditLog.create({
+      data: {
+        eventId: created.eventId,
+        actorUserId: user.userId,
+        action: "CREATED",
+        beforeSnapshot: null,
+        afterSnapshot: snapshot(full),
+        correlationId: requestIdFor(correlationId),
       },
     });
     return toEventResponse(full, user, tx);
   });
 };
 
-const listEvents = async (query, user) => {
+const listEvents = async (query, user, db = prisma) => {
   const statuses = query.statuses || (query.status ? [query.status] : null);
   const scope = `events:${statuses?.join(",") || "all"}:${query.search || ""}:${query.limit}`;
   const cursor = decodeCursor(query.cursor, scope);
@@ -633,7 +757,7 @@ const listEvents = async (query, user) => {
 
   const where = conditions.length > 0 ? { AND: conditions } : {};
 
-  const rows = await prisma.event.findMany({
+  const rows = await db.event.findMany({
     where,
     include: eventInclude,
     orderBy: [{ startsAt: "asc" }, { eventId: "asc" }],
@@ -644,7 +768,10 @@ const listEvents = async (query, user) => {
   const events = hasMore ? rows.slice(0, query.limit) : rows;
   const last = events.at(-1);
   return {
-    events: await Promise.all(events.map((event) => toEventResponse(event, user))),
+    events: await Promise.all(events.map((event) => toEventResponse(event, user, db, {
+      redactStaffNotes: true,
+      includeRosterOwner: true,
+    }))),
     nextCursor:
       hasMore && last
         ? encodeCursor({
@@ -656,12 +783,12 @@ const listEvents = async (query, user) => {
   };
 };
 
-const listActiveEvents = (user) => listEvents({
+const listActiveEvents = (user, db = prisma) => listEvents({
   statuses: ["PUBLISHED", "IN_PROGRESS"],
   limit: 100,
-}, user);
+}, user, db);
 
-const getEvent = async (eventId, user) => toEventResponse(await requireEvent(eventId, user), user);
+const getEvent = async (eventId, user, db = prisma) => toEventResponse(await requireEvent(eventId, user, false, db), user, db);
 
 const editableEventKeys = new Set([
   "name", "description", "bannerKey", "artworkDataUrl", "venue", "address", "postalCode",
@@ -675,10 +802,19 @@ const allowedUpdateKeys = {
     "bannerKey",
     "artworkDataUrl",
     "venue",
+    "address",
+    "postalCode",
+    "latitude",
+    "longitude",
+    "locationProvider",
+    "locationReference",
     "timezone",
     "startsAt",
     "endsAt",
     "capacity",
+    "expectedAttendance",
+    "eventDays",
+    "stations",
     "shifts",
   ]),
   PUBLISHED: new Set([
@@ -687,10 +823,19 @@ const allowedUpdateKeys = {
     "bannerKey",
     "artworkDataUrl",
     "venue",
+    "address",
+    "postalCode",
+    "latitude",
+    "longitude",
+    "locationProvider",
+    "locationReference",
     "timezone",
     "startsAt",
     "endsAt",
     "capacity",
+    "expectedAttendance",
+    "eventDays",
+    "stations",
     "shifts",
   ]),
   UPCOMING: new Set([
@@ -699,10 +844,19 @@ const allowedUpdateKeys = {
     "bannerKey",
     "artworkDataUrl",
     "venue",
+    "address",
+    "postalCode",
+    "latitude",
+    "longitude",
+    "locationProvider",
+    "locationReference",
     "timezone",
     "startsAt",
     "endsAt",
     "capacity",
+    "expectedAttendance",
+    "eventDays",
+    "stations",
     "shifts",
   ]),
   ONGOING: new Set([
@@ -721,8 +875,8 @@ const allowedUpdateKeys = {
   CANCELLED: new Set(["bannerKey", "artworkDataUrl"]),
 };
 
-const updateEvent = async (eventId, body, user, correlationId) => {
-  const current = await requireEvent(eventId, user, true);
+const updateEvent = async (eventId, body, user, correlationId, db = prisma) => {
+  const current = await requireEvent(eventId, user, true, db);
   const suppliedKeys = Object.keys(body).filter(
     (key) => !["version"].includes(key)
   );
@@ -749,9 +903,9 @@ const updateEvent = async (eventId, body, user, correlationId) => {
 
   const combined = { ...current, ...normalizeEventData(body) };
   const desiredShifts = body.shifts || current.shifts;
-  assertRange(combined, desiredShifts);
+  assertRange(combined, desiredShifts, body.eventDays);
 
-return prisma.$transaction(async (tx) => {
+return db.$transaction(async (tx) => {
   const changed = await tx.event.updateMany({
     where: { eventId, version: body.version },
     data: { ...normalizeEventData(body), version: { increment: 1 } },
@@ -837,23 +991,25 @@ return prisma.$transaction(async (tx) => {
         oldValue: snapshot(current),
         newValue: snapshot(updated),
       },
-      ipAddress: "::1",
+      ...await auditFields(tx, user, correlationId),
     },
   });
+  await auditUpdate(tx, current, updated, user, correlationId);
 
-  return toEventResponse(updated, user);
+  return toEventResponse(updated, user, tx);
 });
 };
 
-const transitionEvent = async (eventId, command, body, user, correlationId) => {
-  const current = await requireEvent(eventId, user, true);
+const transitionEvent = async (eventId, command, body, user, correlationId, db = prisma) => {
+  const current = await requireEvent(eventId, user, true, db);
   const transition = ACTIONS[command];
   if (!transition || current.status !== transition.from) {
     throw new AppError(409, "INVALID_EVENT_TRANSITION", "Event cannot perform that transition from its current state");
   }
-  return prisma.$transaction(async (tx) => {
+  if (command === "publish") assertPublishReady(current);
+  return db.$transaction(async (tx) => {
     const changed = await tx.event.updateMany({
-      where: { id: eventId, version: body.version, status: transition.from },
+      where: { eventId, version: body.version, status: transition.from },
       data: { status: transition.to, version: { increment: 1 } },
     });
     if (changed.count !== 1) throw new AppError(409, "STALE_EVENT_VERSION", "This event was changed by someone else");
@@ -865,7 +1021,7 @@ const transitionEvent = async (eventId, command, body, user, correlationId) => {
     }
 
     const updated = await tx.event.findUniqueOrThrow({
-      where: { id: eventId },
+      where: { eventId },
       include: eventInclude,
     });
 
@@ -877,17 +1033,26 @@ const transitionEvent = async (eventId, command, body, user, correlationId) => {
         entityId: eventId,
         oldValue: snapshot(current),
         newValue: snapshot(updated),
-        ipAddress: "::1",
-        deviceName: "Server",
+        ...await auditFields(tx, user, correlationId),
+      },
+    });
+    await tx.eventAuditLog.create({
+      data: {
+        eventId,
+        actorUserId: user.userId,
+        action: transition.audit,
+        beforeSnapshot: snapshot(current),
+        afterSnapshot: snapshot(updated),
+        correlationId: requestIdFor(correlationId),
       },
     });
 
-    return toEventResponse(updated);
+    return toEventResponse(updated, user, tx);
   });
 };
 
-const cancelEvent = async (eventId, body, user, correlationId) => {
-  const current = await requireEvent(eventId, user, true);
+const cancelEvent = async (eventId, body, user, correlationId, db = prisma) => {
+  const current = await requireEvent(eventId, user, true, db);
 
   if (
     !["DRAFT", "PUBLISHED", "UPCOMING", "IN_PROGRESS", "ONGOING"].includes(current.status) ||
@@ -899,9 +1064,9 @@ const cancelEvent = async (eventId, body, user, correlationId) => {
       "Event cannot be cancelled from its current state"
     );
   }
-  return prisma.$transaction(async (tx) => {
+  return db.$transaction(async (tx) => {
     const changed = await tx.event.updateMany({
-      where: { id: eventId, version: body.version, status: current.status },
+      where: { eventId, version: body.version, status: current.status },
       data: {
         status: "CANCELLED",
         cancellationReason: body.reason,
@@ -925,7 +1090,7 @@ const cancelEvent = async (eventId, body, user, correlationId) => {
     });
 
     const updated = await tx.event.findUniqueOrThrow({
-      where: { id: eventId },
+      where: { eventId },
       include: eventInclude,
     });
 
@@ -937,19 +1102,197 @@ const cancelEvent = async (eventId, body, user, correlationId) => {
         entityId: eventId,
         oldValue: snapshot(current),
         newValue: snapshot(updated),
-        ipAddress: "::1",
-        deviceName: "Server",
+        ...await auditFields(tx, user, correlationId),
+      },
+    });
+    await tx.eventAuditLog.create({
+      data: {
+        eventId,
+        actorUserId: user.userId,
+        action: "CANCELLED",
+        beforeSnapshot: snapshot(current),
+        afterSnapshot: snapshot(updated),
+        correlationId: requestIdFor(correlationId),
       },
     });
 
-    return toEventResponse(updated);
+    return toEventResponse(updated, user, tx);
   });
+};
+
+const assertNoCrossEventReferences = async (tx, eventId) => {
+  const [registrations, stations, reviews, consents] = await Promise.all([
+    tx.eventRegistration.findMany({ where: { eventId }, select: { registrationId: true } }),
+    tx.station.findMany({ where: { eventId }, select: { stationId: true } }),
+    tx.review.findMany({ where: { registration: { eventId } }, select: { reviewId: true } }),
+    tx.participantConsent.findMany({ where: { eventId }, select: { id: true } }),
+  ]);
+  const registrationIds = registrations.map(({ registrationId }) => registrationId);
+  const stationIds = stations.map(({ stationId }) => stationId);
+  const reviewIds = reviews.map(({ reviewId }) => reviewId);
+  const consentIds = consents.map(({ id }) => id);
+
+  const checks = [];
+  if (reviewIds.length) checks.push(tx.review.findFirst({
+    where: { OR: [
+      { reviewId: { in: reviewIds }, parentReviewId: { not: null, notIn: reviewIds } },
+      { reviewId: { notIn: reviewIds }, parentReviewId: { in: reviewIds } },
+    ] },
+    select: { reviewId: true },
+  }));
+  if (consentIds.length) checks.push(tx.participantConsent.findFirst({
+    where: { OR: [
+      { id: { in: consentIds }, withdrawalOfId: { not: null, notIn: consentIds } },
+      { id: { notIn: consentIds }, withdrawalOfId: { in: consentIds } },
+    ] },
+    select: { id: true },
+  }));
+  if (registrationIds.length || stationIds.length) {
+    checks.push(tx.queueEntry.findFirst({
+      where: { OR: [
+        // If one side has no rows, every reference from the existing side is
+        // external. Do not fabricate `not: null` filters for required UUID
+        // columns: Prisma rejects those and the ownership check is clearer
+        // without them.
+        ...(registrationIds.length ? [{
+          registrationId: { in: registrationIds },
+          ...(stationIds.length ? { stationId: { notIn: stationIds } } : {}),
+        }] : []),
+        ...(stationIds.length ? [{
+          stationId: { in: stationIds },
+          ...(registrationIds.length ? { registrationId: { notIn: registrationIds } } : {}),
+        }] : []),
+      ] },
+      select: { id: true },
+    }));
+    checks.push(tx.queueMovement.findFirst({
+      where: { OR: [
+        ...(registrationIds.length ? [{
+          registrationId: { in: registrationIds },
+          ...(stationIds.length ? { OR: [{ fromStationId: { notIn: stationIds } }, { toStationId: { notIn: stationIds } }] } : {}),
+        }] : []),
+        ...(stationIds.length ? [{
+          ...(registrationIds.length ? { registrationId: { notIn: registrationIds } } : {}),
+          OR: [{ fromStationId: { in: stationIds } }, { toStationId: { in: stationIds } }],
+        }] : []),
+      ] },
+      select: { id: true },
+    }));
+    checks.push(tx.screeningResult.findFirst({
+      where: { OR: [
+        ...(registrationIds.length ? [{
+          registrationId: { in: registrationIds },
+          ...(stationIds.length ? { stationId: { notIn: stationIds } } : {}),
+        }] : []),
+        ...(stationIds.length ? [{
+          stationId: { in: stationIds },
+          ...(registrationIds.length ? { registrationId: { notIn: registrationIds } } : {}),
+        }] : []),
+      ] },
+      select: { resultId: true },
+    }));
+  }
+
+  if ((await Promise.all(checks)).some(Boolean)) {
+    throw new AppError(409, "EVENT_DELETE_INTEGRITY_CONFLICT", "This event has cross-event records and cannot be deleted safely");
+  }
+};
+
+const deleteEvent = async (eventId, body, user, correlationId, db = prisma) => {
+  if (user.systemRole !== "ADMIN" || !user.roles?.includes("ADMINISTRATOR")) {
+    throw new AppError(403, "FORBIDDEN", "Only an administrator can permanently delete an event");
+  }
+  const current = await requireEvent(eventId, user, true, db);
+  if (!['COMPLETED', 'CANCELLED'].includes(current.status)) {
+    throw new AppError(409, "EVENT_NOT_TERMINAL", "Only completed or cancelled events can be permanently deleted");
+  }
+  if (body.confirmationName !== current.name) {
+    throw new AppError(422, "EVENT_DELETE_CONFIRMATION_MISMATCH", "Type the event name exactly to confirm permanent deletion");
+  }
+
+  const deletion = await db.$transaction(async (tx) => {
+    // Claim the exact state before removing children so a stale administrator cannot delete a changed event.
+    const claimed = await tx.event.updateMany({
+      where: { eventId, version: body.version, status: current.status },
+      data: { version: { increment: 1 } },
+    });
+    if (claimed.count !== 1) {
+      throw new AppError(409, "STALE_EVENT_VERSION", "This event was changed by someone else");
+    }
+
+    await assertNoCrossEventReferences(tx, eventId);
+
+    // Persist the exact, validated storage targets before deleting their owner
+    // rows. Filesystem work deliberately happens only after this transaction.
+    const cleanupTaskCount = await enqueueEventArtifactCleanup(tx, eventId);
+
+    await tx.notificationDelivery.deleteMany({ where: { OR: [
+      { referral: { review: { registration: { eventId } } } },
+      { document: { review: { registration: { eventId } } } },
+    ] } });
+    await tx.documentArtifact.deleteMany({ where: { review: { registration: { eventId } } } });
+    await tx.referral.deleteMany({ where: { review: { registration: { eventId } } } });
+    await tx.review.updateMany({ where: { registration: { eventId }, parentReviewId: { not: null } }, data: { parentReviewId: null } });
+    await tx.review.deleteMany({ where: { registration: { eventId } } });
+
+    await tx.participantConsent.updateMany({ where: { eventId, withdrawalOfId: { not: null } }, data: { withdrawalOfId: null } });
+    await tx.participantConsent.deleteMany({ where: { eventId } });
+    await tx.signatureArtifact.deleteMany({ where: { eventId } });
+    await tx.registrationStatusHistory.deleteMany({ where: { registration: { eventId } } });
+    await tx.screeningResult.deleteMany({ where: { registration: { eventId } } });
+    await tx.syncAction.deleteMany({ where: { eventId } });
+    await tx.scanLog.deleteMany({ where: { OR: [{ registration: { eventId } }, { station: { eventId } }] } });
+    await tx.qRCodePass.deleteMany({ where: { registration: { eventId } } });
+    await tx.queueMovement.deleteMany({ where: { registration: { eventId } } });
+    await tx.queueEntry.deleteMany({ where: { registration: { eventId } } });
+    await tx.eventRegistration.deleteMany({ where: { eventId } });
+
+    // Participants are shared records. Remove only their temporary onboarding
+    // scope before deleting the event; the FK also uses SET NULL defensively.
+    await tx.participant.updateMany({ where: { onboardingEventId: eventId }, data: { onboardingEventId: null } });
+
+    await tx.staffAssignment.deleteMany({ where: { eventId } });
+    await tx.shift.deleteMany({ where: { eventId } });
+    await tx.eventStationAvailability.deleteMany({ where: { eventDay: { eventId } } });
+    await tx.eventDay.deleteMany({ where: { eventId } });
+    await tx.station.deleteMany({ where: { eventId } });
+
+    // Event audit rows deliberately outlive the event. The migration removes
+    // their event FK, so an immutable evidence trail remains after deletion.
+
+    const deleted = await tx.event.deleteMany({
+      where: { eventId, version: body.version + 1, status: current.status },
+    });
+    if (deleted.count !== 1) {
+      throw new AppError(409, "STALE_EVENT_VERSION", "This event was changed by someone else");
+    }
+    await tx.auditLog.create({
+      data: {
+        userId: user.userId,
+        action: "EVENT_DELETED",
+        resource: "Event",
+        entityName: "Event",
+        entityId: eventId,
+        details: { status: current.status, version: body.version },
+        ...await auditFields(tx, user, correlationId),
+      },
+    });
+    return { result: { eventId, deleted: true }, cleanupTaskCount };
+  });
+
+  if (deletion.cleanupTaskCount > 0) {
+    await processArtifactCleanupTasks({ eventId }).catch((error) => {
+      // Durable tasks remain retryable; never expose a storage path in logs.
+      console.error("Post-delete artifact cleanup deferred", { eventId, code: error?.code || "ARTIFACT_CLEANUP_FAILED" });
+    });
+  }
+  return deletion.result;
 };
 
 const listStaffDirectory = async () => {
   const users = await prisma.user.findMany({
-    where: { status: "ACTIVE" },
-    select: { id: true, username: true, fullName: true, email: true, sysRole: true },
+    where: { status: "ACTIVE", userRoles: { none: { role: { roleName: "ADMINISTRATOR" } } } },
+    select: { id: true, username: true, fullName: true, email: true, sysRole: true, userRoles: { select: { role: { select: { roleName: true } } } } },
     orderBy: { fullName: "asc" },
     take: 200,
   });
@@ -957,6 +1300,7 @@ const listStaffDirectory = async () => {
     userId: user.id,
     username: user.username || user.fullName || user.email,
     systemRole: user.sysRole,
+    roles: user.userRoles.map(({ role }) => role.roleName),
   }));
 };
 
@@ -976,14 +1320,14 @@ const listStationTemplates = async () => {
     },
     orderBy: { name: "asc" },
   });
-  return templates;
+  return templates.filter((template) => stationTypeForTemplateKey(template.templateKey));
 };
 
-const importStations = async (eventId, body, user, correlationId) => {
-  const current = await requireEvent(eventId, user, true);
+const importStations = async (eventId, body, user, correlationId, db = prisma) => {
+  const current = await requireEvent(eventId, user, true, db);
   assertStationPlanningState(current);
 
-  const templates = await prisma.stationTemplate.findMany({
+  const templates = await db.stationTemplate.findMany({
     where: { stationTemplateId: { in: body.stationTemplateIds }, active: true },
   });
   if (templates.length !== body.stationTemplateIds.length) {
@@ -1008,7 +1352,7 @@ const importStations = async (eventId, body, user, correlationId) => {
     throw new AppError(422, "STATION_LIMIT_EXCEEDED", "An event can have at most 50 stations");
   }
 
-  return prisma.$transaction(async (tx) => {
+  return db.$transaction(async (tx) => {
     await bumpEventVersion(tx, eventId, body.version);
 
     let nextOrder = existingStations.reduce((max, station) => Math.max(max, station.stationOrder), 0);
@@ -1038,13 +1382,24 @@ const importStations = async (eventId, body, user, correlationId) => {
     }
 
     const updated = await tx.event.findUniqueOrThrow({ where: { eventId }, include: eventInclude });
+    await tx.auditLog.create({
+      data: {
+        userId: user.userId,
+        action: "UPDATED",
+        resource: "Event",
+        entityName: "Event",
+        entityId: eventId,
+        details: { oldValue: snapshot(current), newValue: snapshot(updated) },
+        ...await auditFields(tx, user, correlationId),
+      },
+    });
     await auditUpdate(tx, current, updated, user, correlationId);
     return toEventResponse(updated, user, tx);
   });
 };
 
-const updateStation = async (eventId, eventStationId, body, user, correlationId) => {
-  const current = await requireEvent(eventId, user, true);
+const updateStation = async (eventId, eventStationId, body, user, correlationId, db = prisma) => {
+  const current = await requireEvent(eventId, user, true, db);
   assertStationPlanningState(current);
   const stations = current.stations || [];
   const station = stations.find((candidate) => candidate.stationId === eventStationId);
@@ -1053,7 +1408,7 @@ const updateStation = async (eventId, eventStationId, body, user, correlationId)
     throw new AppError(422, "INVALID_STATION_ORDER", "Station order must be within the event station list");
   }
 
-  return prisma.$transaction(async (tx) => {
+  return db.$transaction(async (tx) => {
     await bumpEventVersion(tx, eventId, body.version);
 
     if (body.stationOrder !== undefined && body.stationOrder !== station.stationOrder) {
@@ -1083,30 +1438,103 @@ const updateStation = async (eventId, eventStationId, body, user, correlationId)
 
     // body.capacity accepted for OpenAPI/UI compatibility; Station has no capacity column (#30 MVP).
     const updated = await tx.event.findUniqueOrThrow({ where: { eventId }, include: eventInclude });
+    await tx.auditLog.create({
+      data: {
+        userId: user.userId,
+        action: "UPDATED",
+        resource: "Event",
+        entityName: "Event",
+        entityId: eventId,
+        details: { oldValue: snapshot(current), newValue: snapshot(updated) },
+        ...await auditFields(tx, user, correlationId),
+      },
+    });
     await auditUpdate(tx, current, updated, user, correlationId);
     return toEventResponse(updated, user, tx);
   });
 };
 
-const addStaffAssignment = async () => {
-  throw new AppError(
-    501,
-    "STAFF_ASSIGNMENT_NOT_AVAILABLE",
-    "Staff assignment via this endpoint is not available yet",
-  );
+const addStaffAssignment = async (eventId, shiftId, body, user, correlationId, db = prisma) => {
+  const current = await requireEvent(eventId, user, true, db);
+  if (!["DRAFT", "PUBLISHED", "IN_PROGRESS"].includes(current.status)) {
+    throw new AppError(409, "STAFFING_NOT_EDITABLE", "Staffing cannot be changed for a completed or cancelled event");
+  }
+  const shift = current.shifts.find((candidate) => candidate.shiftId === shiftId);
+  if (!shift) throw new AppError(404, "SHIFT_NOT_FOUND", "Shift was not found");
+  const station = body.eventStationId
+    ? current.stations.find((candidate) => candidate.stationId === body.eventStationId && candidate.isActive)
+    : null;
+  if (body.eventStationId && !station) {
+    throw new AppError(422, "STATION_NOT_AVAILABLE", "The selected event station is unavailable");
+  }
+
+  return db.$transaction(async (tx) => {
+    await bumpEventVersion(tx, eventId, body.version);
+    await lockStaffSchedules(tx, [body.userId]);
+
+    const activeUser = await tx.user.findFirst({
+      where: { id: body.userId, status: "ACTIVE" },
+      select: { id: true, userRoles: { select: { role: { select: { roleName: true } } } } },
+    });
+    if (!activeUser) throw new AppError(422, "STAFF_NOT_AVAILABLE", "The selected staff member is unavailable");
+    const applicationRoles = new Set(activeUser.userRoles.map(({ role }) => role.roleName));
+    if (applicationRoles.has("ADMINISTRATOR") || !applicationRoles.has(ASSIGNMENT_APPLICATION_ROLES[body.assignmentRole])) {
+      throw new AppError(422, "STAFF_ROLE_MISMATCH", "The selected staff member does not hold the required account role");
+    }
+
+    const conflict = await tx.staffAssignment.findFirst({
+      where: {
+        userId: body.userId,
+        status: { in: ACTIVE_ASSIGNMENT_STATUSES },
+        shift: { startsAt: { lt: shift.endsAt }, endsAt: { gt: shift.startsAt } },
+      },
+      select: { id: true },
+    });
+    if (conflict) throw scheduleConflictError();
+
+    await tx.staffAssignment.create({
+      data: {
+        eventId,
+        shiftId,
+        userId: body.userId,
+        stationId: station?.stationId || null,
+        assignedBy: user.userId,
+        assignmentRole: body.assignmentRole,
+        notes: body.notes || null,
+        assignmentStatus: "ASSIGNED",
+        status: "ASSIGNED",
+      },
+    });
+
+    const updated = await tx.event.findUniqueOrThrow({ where: { eventId }, include: eventInclude });
+    await auditUpdate(tx, current, updated, user, correlationId);
+    await tx.auditLog.create({
+      data: {
+        userId: user.userId,
+        action: "STAFF_ASSIGNMENT_ADDED",
+        resource: "Event",
+        entityName: "Event",
+        entityId: eventId,
+        details: { shiftId, assignmentRole: body.assignmentRole, assignedUserId: body.userId },
+        ...await auditFields(tx, user, correlationId),
+      },
+    });
+    return toEventResponse(updated, user, tx);
+  });
 };
 
-const removeStaffAssignment = async (eventId, shiftId, assignmentId, version, user, correlationId) => {
-  const current = await requireEvent(eventId, user, true);
+const removeStaffAssignment = async (eventId, shiftId, assignmentId, version, user, correlationId, db = prisma) => {
+  const current = await requireEvent(eventId, user, true, db);
   if (!["DRAFT", "PUBLISHED", "IN_PROGRESS"].includes(current.status)) {
     throw new AppError(409, "STAFFING_NOT_EDITABLE", "Staffing cannot be changed for a completed or cancelled event");
   }
   const assignment = current.shifts
     .find((shift) => shift.shiftId === shiftId)
-    ?.staffAssignments.find((candidate) => candidate.staffAssignmentId === assignmentId);
+    ?.staffAssignments.find((candidate) => candidate.id === assignmentId);
   if (!assignment) throw new AppError(404, "ASSIGNMENT_NOT_FOUND", "Staff assignment was not found");
 
-  return prisma.$transaction(async (tx) => {
+  return db.$transaction(async (tx) => {
+    await bumpEventVersion(tx, eventId, version);
     const assignment = await tx.staffAssignment.findFirst({
       where: { id: assignmentId, shiftId, shift: { eventId } },
       select: { id: true },
@@ -1125,31 +1553,49 @@ const removeStaffAssignment = async (eventId, shiftId, assignmentId, version, us
     });
 
     const updated = await tx.event.findUniqueOrThrow({
-      where: { id: eventId },
+      where: { eventId },
       include: eventInclude,
     });
 
-    return toEventResponse(updated);
+    await auditUpdate(tx, current, updated, user, correlationId);
+    await tx.auditLog.create({
+      data: {
+        userId: user.userId,
+        action: "STAFF_ASSIGNMENT_REMOVED",
+        resource: "Event",
+        entityName: "Event",
+        entityId: eventId,
+        details: { shiftId, assignmentId },
+        ...await auditFields(tx, user, correlationId),
+      },
+    });
+    return toEventResponse(updated, user, tx);
   });
 };
 
-const getAuditLog = async (eventId, query, user) => {
-  await requireEvent(eventId, user, true);
+const getAuditLog = async (eventId, query, user, db = prisma) => {
+  await requireEvent(eventId, user, true, db);
   const scope = `event-audit:${eventId}:${query.limit}`;
   const cursor = decodeCursor(query.cursor, scope);
-
-  const rows = await prisma.auditLog.findMany({
-    where: {
-      entityName: "Event",
-      entityId: eventId,
-      ...(cursor
-        ? {
-            createdAt: { lt: new Date(cursor.createdAt) },
-          }
-        : {}),
-    },
+  const usesEventAuditLog = Boolean(db.eventAuditLog);
+  const recordId = usesEventAuditLog ? "eventAuditLogId" : "id";
+  const filters = usesEventAuditLog
+    ? { eventId }
+    : { entityName: "Event", entityId: eventId };
+  const rows = await (usesEventAuditLog ? db.eventAuditLog : db.auditLog).findMany({
+    where: cursor ? {
+      AND: [
+        filters,
+        {
+          OR: [
+            { createdAt: { lt: new Date(cursor.createdAt) } },
+            { createdAt: new Date(cursor.createdAt), [recordId]: { lt: cursor.id } },
+          ],
+        },
+      ],
+    } : filters,
     include: {
-      user: {
+      [usesEventAuditLog ? "actor" : "user"]: {
         select: {
           id: true,
           fullName: true,
@@ -1158,7 +1604,7 @@ const getAuditLog = async (eventId, query, user) => {
         },
       },
     },
-    orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+    orderBy: [{ createdAt: "desc" }, { [recordId]: "desc" }],
     take: query.limit + 1,
   });
   const hasMore = rows.length > query.limit;
@@ -1172,9 +1618,223 @@ const getAuditLog = async (eventId, query, user) => {
         ? encodeCursor({
             scope,
             createdAt: last.createdAt.toISOString(),
-            id: last.id,
+            id: last[recordId],
           })
         : null,
+  };
+};
+
+const publicEventStatuses = ["PUBLISHED", "IN_PROGRESS", "COMPLETED", "CANCELLED"];
+const dateTime = (value) => value ? value.toISOString() : null;
+const attendeeSelect = {
+  registrationId: true,
+  participantDisplayName: true,
+  registrationStatus: true,
+  checkedIn: true,
+  checkedInAt: true,
+  queueNumber: true,
+  createdAt: true,
+  participant: { select: { participantReference: true } },
+};
+const attendeeProjection = ({ participant, ...registration }) => ({
+  ...registration,
+  participantReference: participant.participantReference,
+  checkedInAt: dateTime(registration.checkedInAt),
+  createdAt: dateTime(registration.createdAt),
+});
+
+const publicEventProjection = (event) => ({
+  eventId: event.eventId,
+  name: event.name,
+  description: event.description,
+  bannerKey: event.bannerKey,
+  artworkDataUrl: event.artworkDataUrl,
+  venue: event.venue,
+  address: event.address,
+  postalCode: event.postalCode,
+  timezone: event.timezone,
+  startsAt: dateTime(event.startsAt),
+  endsAt: dateTime(event.endsAt),
+  capacity: event.capacity,
+  status: event.status,
+  eventDays: (event.eventDays || []).map((day) => ({
+    eventDayId: day.eventDayId,
+    date: day.date.toISOString().slice(0, 10),
+    startsAt: dateTime(day.startsAt),
+    endsAt: dateTime(day.endsAt),
+  })),
+});
+
+const metricsForEvent = async (event, db = prisma) => {
+  const registrationWhere = { eventId: event.eventId };
+  const [signupCount, checkedInCount, completedCount, cancelledCount, activeCount, screeningResultCount, flaggedResultCount, referralCount] = await Promise.all([
+    db.eventRegistration.count({ where: { ...registrationWhere, registrationStatus: { not: "CANCELLED" } } }),
+    db.eventRegistration.count({ where: { ...registrationWhere, registrationStatus: { not: "CANCELLED" }, checkedIn: true } }),
+    db.eventRegistration.count({ where: { ...registrationWhere, registrationStatus: "COMPLETED" } }),
+    db.eventRegistration.count({ where: { ...registrationWhere, registrationStatus: "CANCELLED" } }),
+    db.eventRegistration.count({ where: { ...registrationWhere, registrationStatus: { in: ["SIGNED_UP", "CHECKED_IN"] } } }),
+    db.screeningResult.count({ where: { registration: { eventId: event.eventId } } }),
+    db.screeningResult.count({ where: { registration: { eventId: event.eventId }, isFlagged: true } }),
+    db.referral.count({ where: { review: { registration: { eventId: event.eventId } } } }),
+  ]);
+  return {
+    signupCount,
+    checkedInCount,
+    completedCount,
+    cancelledCount,
+    activeCount,
+    attendanceRatePercent: signupCount ? Math.round((checkedInCount / signupCount) * 100) : 0,
+    screeningResultCount,
+    flaggedResultCount,
+    referralCount,
+    capacity: event.capacity,
+    expectedAttendance: event.expectedAttendance,
+  };
+};
+
+const getPublicEvent = async (eventId, db = prisma) => {
+  const event = await db.event.findFirst({
+    where: { eventId, status: { in: publicEventStatuses } },
+    select: {
+      eventId: true,
+      name: true,
+      description: true,
+      bannerKey: true,
+      artworkDataUrl: true,
+      venue: true,
+      address: true,
+      postalCode: true,
+      timezone: true,
+      startsAt: true,
+      endsAt: true,
+      capacity: true,
+      status: true,
+      eventDays: { orderBy: { date: "asc" }, select: { eventDayId: true, date: true, startsAt: true, endsAt: true } },
+    },
+  });
+  if (!event) throw new AppError(404, "EVENT_NOT_FOUND", "Event was not found");
+  return publicEventProjection(event);
+};
+
+const getEventMetrics = async (eventId, user, db = prisma) => metricsForEvent(await requireEvent(eventId, user, true, db), db);
+
+const listEventAttendees = async (eventId, query, user, db = prisma) => {
+  await requireEvent(eventId, user, true, db);
+  const limit = query.limit ?? 50;
+  const scope = `event-attendees:${eventId}:${query.status || "all"}:${query.search || ""}:${limit}`;
+  const cursor = decodeCursor(query.cursor, scope);
+  const filters = {
+    eventId,
+    ...(query.status ? { registrationStatus: query.status } : {}),
+    ...(query.search ? {
+      OR: [
+        { participantDisplayName: { contains: query.search, mode: "insensitive" } },
+        { participant: { participantReference: { contains: query.search, mode: "insensitive" } } },
+      ],
+    } : {}),
+  };
+  const where = cursor ? {
+    AND: [filters, {
+      OR: [
+        { createdAt: { lt: new Date(cursor.createdAt) } },
+        { createdAt: new Date(cursor.createdAt), registrationId: { lt: cursor.registrationId } },
+      ],
+    }],
+  } : filters;
+  const [total, rows] = await Promise.all([
+    db.eventRegistration.count({ where: filters }),
+    db.eventRegistration.findMany({
+      where,
+      select: attendeeSelect,
+      orderBy: [{ createdAt: "desc" }, { registrationId: "desc" }],
+      take: limit + 1,
+    }),
+  ]);
+  const hasMore = rows.length > limit;
+  const attendees = hasMore ? rows.slice(0, limit) : rows;
+  const last = attendees.at(-1);
+  return {
+    total,
+    attendees: attendees.map(attendeeProjection),
+    nextCursor: hasMore && last ? encodeCursor({ scope, createdAt: last.createdAt.toISOString(), registrationId: last.registrationId }) : null,
+  };
+};
+
+const exportEventSelect = {
+  eventId: true, name: true, description: true, bannerKey: true, artworkDataUrl: true,
+  venue: true, address: true, postalCode: true, timezone: true, startsAt: true, endsAt: true,
+  capacity: true, expectedAttendance: true, status: true, version: true,
+  eventDays: {
+    orderBy: { date: "asc" },
+    select: {
+      eventDayId: true, date: true, startsAt: true, endsAt: true,
+      stationAvailabilities: {
+        orderBy: [{ eventStationId: "asc" }, { eventStationAvailabilityId: "asc" }],
+        select: {
+          eventStationAvailabilityId: true, eventStationId: true, eventDayId: true,
+          isAvailable: true, startsAt: true, endsAt: true, capacity: true,
+        },
+      },
+    },
+  },
+  stations: { orderBy: [{ stationOrder: "asc" }, { stationId: "asc" }], select: { stationId: true, stationName: true, stationType: true, stationOrder: true, isActive: true } },
+  shifts: { orderBy: [{ startsAt: "asc" }, { shiftId: "asc" }], select: { shiftId: true, name: true, startsAt: true, endsAt: true, requiredStaff: true, status: true } },
+  staffAssignments: {
+    orderBy: { id: "asc" },
+    select: { id: true, eventId: true, stationId: true, shiftId: true, userId: true, assignedBy: true, assignedAt: true, assignmentRole: true, assignmentStatus: true, status: true },
+  },
+  registrations: { orderBy: [{ createdAt: "desc" }, { registrationId: "desc" }], select: attendeeSelect },
+};
+
+const exportSnapshot = async (eventId, db = prisma) => {
+  const event = await db.event.findUnique({
+    where: { eventId },
+    select: exportEventSelect,
+  });
+  if (!event) throw new AppError(404, "EVENT_NOT_FOUND", "Event was not found");
+  const { eventDays, stations, shifts, staffAssignments, registrations, ...eventFields } = event;
+  return {
+    event: { ...eventFields, startsAt: dateTime(event.startsAt), endsAt: dateTime(event.endsAt) },
+    metrics: await metricsForEvent(event, db),
+    eventDays: (eventDays || []).map(({ stationAvailabilities = [], ...day }) => ({
+      ...day,
+      date: day.date.toISOString().slice(0, 10),
+      startsAt: dateTime(day.startsAt),
+      endsAt: dateTime(day.endsAt),
+      stationAvailabilities: stationAvailabilities.map((availability) => ({
+        ...availability,
+        startsAt: dateTime(availability.startsAt),
+        endsAt: dateTime(availability.endsAt),
+      })),
+    })),
+    stations: stations || [],
+    shifts: (shifts || []).map((shift) => ({ ...shift, startsAt: dateTime(shift.startsAt), endsAt: dateTime(shift.endsAt) })),
+    staffAssignments: (staffAssignments || []).map(({ assignedAt, notes: _notes, ...assignment }) => ({
+      ...assignment,
+      assignedAt: dateTime(assignedAt),
+    })),
+    attendees: (registrations || []).map(attendeeProjection),
+  };
+};
+
+const exportHashFor = (snapshot) => crypto
+  .createHash("sha256")
+  .update(JSON.stringify({ schemaVersion: 1, ...snapshot }))
+  .digest("hex");
+
+const exportEvent = async (eventId, user, db = prisma) => {
+  await requireEvent(eventId, user, true, db);
+  const snapshot = await exportSnapshot(eventId, db);
+  const exportHash = exportHashFor(snapshot);
+  return {
+    export: { schemaVersion: 1, generatedAt: new Date().toISOString(), ...snapshot },
+    exportReceipt: createExportReceipt({
+      eventId,
+      version: snapshot.event.version,
+      actorUserId: user.userId,
+      exportHash,
+      secret: env.jwtAccessSecret,
+    }),
   };
 };
 
@@ -1186,6 +1846,7 @@ module.exports = {
   updateEvent,
   transitionEvent,
   cancelEvent,
+  deleteEvent,
   listStaffDirectory,
   listStationTemplates,
   importStations,
@@ -1193,4 +1854,11 @@ module.exports = {
   addStaffAssignment,
   removeStaffAssignment,
   getAuditLog,
+  getPublicEvent,
+  getEventMetrics,
+  metricsForEvent,
+  listEventAttendees,
+  exportEvent,
+  exportSnapshot,
+  exportHashFor,
 };

@@ -1,124 +1,194 @@
 const prisma = require("../prisma/prismaClient");
 const AppError = require("../errors/AppError");
+const { resolveAuditContext } = require("../utils/audit");
+const { synchronizeStaffAccess } = require("./cognitoStaffAccessService");
 
-// ==========================================
-// Get All Users
-// ==========================================
+const userSelect = {
+  id: true,
+  cognitoSub: true,
+  fullName: true,
+  email: true,
+  employeeNumber: true,
+  department: true,
+  designation: true,
+  status: true,
+  sysRole: true,
+  createdAt: true,
+  userRoles: { select: { role: { select: { id: true, roleName: true } } } },
+};
+
+const projectUser = ({ userRoles, sysRole, cognitoSub: _cognitoSub, ...user }) => ({
+  ...user,
+  systemRole: sysRole,
+  roles: userRoles.map(({ role }) => role.roleName),
+});
+
+const accountSnapshot = (user) => ({
+  status: user.status,
+  roles: user.userRoles.map(({ role }) => role.roleName).sort(),
+});
+
+const isActiveAdministrator = (user, roles = accountSnapshot(user).roles, status = user.status) =>
+  status === "ACTIVE" && roles.includes("ADMINISTRATOR");
+
+async function rolesFor(tx, roleNames) {
+  const roles = await tx.role.findMany({
+    where: { roleName: { in: roleNames } },
+    select: { id: true, roleName: true },
+  });
+  if (roles.length !== roleNames.length) {
+    throw new AppError(422, "ROLE_NOT_AVAILABLE", "One or more account roles are unavailable");
+  }
+  return roles;
+}
+
+async function assertAdminSafety(tx, current, nextRoles, nextStatus, actorId) {
+  const currentIsActiveAdmin = isActiveAdministrator(current);
+  const nextIsActiveAdmin = isActiveAdministrator(current, nextRoles, nextStatus);
+  if (current.id === actorId && !nextIsActiveAdmin) {
+    throw new AppError(422, "SELF_ADMIN_CHANGE_BLOCKED", "You cannot remove your own administrator access or deactivate your account");
+  }
+  if (!currentIsActiveAdmin || nextIsActiveAdmin) return;
+
+  const activeAdministratorCount = await tx.user.count({
+    where: {
+      status: "ACTIVE",
+      userRoles: { some: { role: { roleName: "ADMINISTRATOR" } } },
+    },
+  });
+  if (activeAdministratorCount <= 1) {
+    throw new AppError(422, "LAST_ADMIN_CHANGE_BLOCKED", "Keep at least one active administrator account");
+  }
+}
+
+async function writeAudit(tx, { actorId, action, accountId, before = null, after, context }) {
+  await tx.auditLog.create({
+    data: {
+      userId: actorId,
+      action,
+      resource: "StaffAccount",
+      entityName: "User",
+      entityId: accountId,
+      oldValue: before,
+      newValue: after,
+      ...await resolveAuditContext({ client: tx, userId: actorId, context }),
+    },
+  });
+}
+
 exports.getAllUsers = async () => {
-    return await prisma.user.findMany({
-        select: {
-            id: true,
-            fullName: true,
-            email: true,
-            contactNumber: true,
-            employeeNumber: true,
-            department: true,
-            designation: true,
-            status: true,
-            createdAt: true,
-        },
-        take: 100,
-        orderBy: { createdAt: "desc" },
-    });
+  const users = await prisma.user.findMany({
+    select: userSelect,
+    orderBy: [{ fullName: "asc" }, { id: "asc" }],
+  });
+  return users.map(projectUser);
 };
 
-// ==========================================
-// Get User By ID
-// ==========================================
-exports.getUserById = async (userId) => {
-    if (!userId) {
-        throw new AppError(400, "USER_ID_REQUIRED", "User ID is required.");
-    }
+async function compensateAndRethrow(synchronization, error) {
+  if (synchronization) await synchronization.compensate();
+  throw error;
+}
 
-    const user = await prisma.user.findUnique({
-        where: { id: userId },
-    });
+exports.createUser = async (userData, actorId, context, accessProvider = synchronizeStaffAccess) => {
+  let synchronization;
+  try {
+    return await prisma.$transaction(async (tx) => {
+      const existing = await tx.user.findUnique({ where: { email: userData.email }, select: { id: true } });
+      if (existing) throw new AppError(409, "EMAIL_EXISTS", "Email already registered");
 
-    if (!user) {
-        throw new AppError(404, "USER_NOT_FOUND", "User not found");
-    }
-
-    return user;
-};
-
-// ==========================================
-// Create Staff User
-// ==========================================
-exports.createUser = async (userData) => {
-    const { fullName, email, employeeNumber } = userData;
-
-    if (!fullName || !email || !employeeNumber) {
-        throw new AppError(400, "MISSING_FIELDS", "Full name, email, and employee number are required");
-    }
-
-    const existingUser = await prisma.user.findUnique({
-        where: { email },
-    });
-
-    if (existingUser) {
-        throw new AppError(409, "EMAIL_EXISTS", "Email already registered");
-    }
-
-    return await prisma.user.create({
+      const roles = await rolesFor(tx, userData.roles);
+      synchronization = await accessProvider({
+        email: userData.email,
+        roles: userData.roles,
+        status: userData.status,
+      });
+      const user = await tx.user.create({
         data: {
-            fullName,
-            email,
-            employeeNumber,
-            contactNumber: userData.contactNumber,
-            department: userData.department,
-            designation: userData.designation,
-            status: userData.status || "ACTIVE",
+          ...(synchronization.cognitoSub ? { cognitoSub: synchronization.cognitoSub } : {}),
+          username: userData.email,
+          fullName: userData.fullName,
+          email: userData.email,
+          employeeNumber: userData.employeeNumber,
+          department: userData.department ?? null,
+          designation: userData.designation ?? null,
+          status: userData.status,
+          sysRole: userData.roles.includes("ADMINISTRATOR") ? "ADMIN" : userData.roles.includes("EVENT_MANAGER") ? "EVENT_MANAGER" : "STAFF",
+          userRoles: { create: roles.map((role) => ({ roleId: role.id, assignedById: actorId })) },
         },
+        select: userSelect,
+      });
+      await writeAudit(tx, {
+        actorId,
+        action: "STAFF_ACCOUNT_CREATED",
+        accountId: user.id,
+        after: accountSnapshot(user),
+        context,
+      });
+      return projectUser(user);
     });
+  } catch (error) {
+    return compensateAndRethrow(synchronization, error);
+  }
 };
 
-// ==========================================
-// Update User
-// ==========================================
-exports.updateUser = async (userId, userData) => {
-    if (!userId) {
-        throw new AppError(400, "USER_ID_REQUIRED", "User ID is required.");
-    }
+exports.updateUser = async (userId, userData, actorId, context, accessProvider = synchronizeStaffAccess) => {
+  let synchronization;
+  try {
+    return await prisma.$transaction(async (tx) => {
+      const current = await tx.user.findUnique({ where: { id: userId }, select: userSelect });
+      if (!current) throw new AppError(404, "USER_NOT_FOUND", "Staff account not found");
 
-    const existingUser = await prisma.user.findUnique({
+      const currentRoles = accountSnapshot(current).roles;
+      const nextRoles = userData.roles || currentRoles;
+      const nextStatus = userData.status || current.status;
+      await assertAdminSafety(tx, current, nextRoles, nextStatus, actorId);
+
+      let requestedRoles = null;
+      if (userData.roles) requestedRoles = await rolesFor(tx, userData.roles);
+      if (userData.roles || userData.status !== undefined) {
+        synchronization = await accessProvider({
+          email: current.email,
+          roles: nextRoles,
+          status: nextStatus,
+        });
+        if (current.cognitoSub && synchronization.cognitoSub && current.cognitoSub !== synchronization.cognitoSub) {
+          throw new AppError(409, "COGNITO_IDENTITY_MISMATCH", "The Cognito identity does not match this staff account");
+        }
+      }
+
+      if (requestedRoles) {
+        const roleIds = requestedRoles.map(({ id }) => id);
+        await tx.userRole.deleteMany({ where: { userId, roleId: { notIn: roleIds } } });
+        await tx.userRole.createMany({
+          data: requestedRoles.map(({ id }) => ({ userId, roleId: id, assignedById: actorId })),
+          skipDuplicates: true,
+        });
+      }
+
+      const updated = await tx.user.update({
         where: { id: userId },
-    });
-
-    if (!existingUser) {
-        throw new AppError(404, "USER_NOT_FOUND", "User not found");
-    }
-
-    return await prisma.user.update({
-        where: { id: userId },
-        data: userData,
-        select: {
-            id: true,
-            fullName: true,
-            email: true,
-            department: true,
-            designation: true,
-            status: true,
+        data: {
+          ...(!current.cognitoSub && synchronization?.cognitoSub ? { cognitoSub: synchronization.cognitoSub } : {}),
+          ...(userData.fullName !== undefined ? { fullName: userData.fullName } : {}),
+          ...(userData.employeeNumber !== undefined ? { employeeNumber: userData.employeeNumber } : {}),
+          ...(userData.department !== undefined ? { department: userData.department } : {}),
+          ...(userData.designation !== undefined ? { designation: userData.designation } : {}),
+          ...(userData.status !== undefined ? { status: userData.status } : {}),
+          ...(userData.roles ? { sysRole: nextRoles.includes("ADMINISTRATOR") ? "ADMIN" : nextRoles.includes("EVENT_MANAGER") ? "EVENT_MANAGER" : "STAFF" } : {}),
         },
+        select: userSelect,
+      });
+      await writeAudit(tx, {
+        actorId,
+        action: "STAFF_ACCOUNT_UPDATED",
+        accountId: userId,
+        before: accountSnapshot(current),
+        after: accountSnapshot(updated),
+        context,
+      });
+      return projectUser(updated);
     });
-};
-
-// ==========================================
-// Delete User
-// ==========================================
-exports.deleteUser = async (userId) => {
-    if (!userId) {
-        throw new AppError(400, "USER_ID_REQUIRED", "User ID is required.");
-    }
-
-    const existingUser = await prisma.user.findUnique({
-        where: { id: userId },
-    });
-
-    if (!existingUser) {
-        throw new AppError(404, "USER_NOT_FOUND", "User not found");
-    }
-
-    return await prisma.user.delete({
-        where: { id: userId },
-    });
+  } catch (error) {
+    return compensateAndRethrow(synchronization, error);
+  }
 };
