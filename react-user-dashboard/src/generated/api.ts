@@ -118,7 +118,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Sign out from Cognito and clear browser cookies */
+        /** Clear the local browser session and finish the hosted Cognito logout */
         post: operations["logout"];
         delete?: never;
         options?: never;
@@ -135,7 +135,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Alias for Cognito sign-out and local cookie clearing */
+        /** Revoke Cognito sessions everywhere and clear local browser cookies */
         post: operations["globalLogout"];
         delete?: never;
         options?: never;
@@ -3156,6 +3156,8 @@ export interface components {
         IdempotencyKey: string;
         /** @description Must equal the `vsms_csrf` cookie; requests also require an allowed Origin */
         CsrfToken: string;
+        /** @description Required when credential or CSRF cookies are present; must equal the `vsms_csrf` cookie and include an allowed Origin */
+        ConditionalCsrfToken: string;
     };
     requestBodies: {
         TransitionRequest: {
@@ -3353,7 +3355,10 @@ export interface operations {
     logout: {
         parameters: {
             query?: never;
-            header?: never;
+            header?: {
+                /** @description Required when credential or CSRF cookies are present; must equal the `vsms_csrf` cookie and include an allowed Origin */
+                "X-CSRF-Token"?: components["parameters"]["ConditionalCsrfToken"];
+            };
             path?: never;
             cookie?: never;
         };
@@ -3381,13 +3386,16 @@ export interface operations {
     globalLogout: {
         parameters: {
             query?: never;
-            header?: never;
+            header: {
+                /** @description Must equal the `vsms_csrf` cookie; requests also require an allowed Origin */
+                "X-CSRF-Token": components["parameters"]["CsrfToken"];
+            };
             path?: never;
             cookie?: never;
         };
         requestBody?: never;
         responses: {
-            /** @description Browser session cleared */
+            /** @description Cognito sessions revoked and browser session cleared */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -3396,7 +3404,15 @@ export interface operations {
                     "application/json": components["schemas"]["LogoutResponse"];
                 };
             };
+            401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
+            /** @description Cognito global sign-out could not be completed */
+            502: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
             /** @description Cognito managed login is not configured */
             503: {
                 headers: {
