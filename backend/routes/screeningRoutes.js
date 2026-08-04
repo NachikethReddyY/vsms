@@ -105,6 +105,12 @@ router.post(
 );
 
 router.post(
+  "/:eventId/referrals/:referralId/revisions",
+  validate({ params: referralParams, body: reviseReferralBody }),
+  asyncHandler(screeningController.reviseReferral),
+);
+
+router.post(
   "/:eventId/referrals/:referralId/issue",
   validate({ params: referralParams, body: issueReferralBody }),
   asyncHandler(screeningController.issueReferral),
