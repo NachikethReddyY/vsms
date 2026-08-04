@@ -156,6 +156,7 @@ paths:
         "200":
           description: Browser session cleared
           content: { application/json: { schema: { $ref: "#/components/schemas/LogoutResponse" } } }
+        "403": { $ref: "#/components/responses/Forbidden" }
         "503": { description: Cognito managed login is not configured }
   /api/v1/auth/global-logout:
     post:
@@ -166,6 +167,7 @@ paths:
         "200":
           description: Browser session cleared
           content: { application/json: { schema: { $ref: "#/components/schemas/LogoutResponse" } } }
+        "403": { $ref: "#/components/responses/Forbidden" }
         "503": { description: Cognito managed login is not configured }
   /api/v1/auth/me:
     get:

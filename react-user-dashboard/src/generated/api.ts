@@ -3179,6 +3179,7 @@ export interface operations {
                     "application/json": components["schemas"]["LogoutResponse"];
                 };
             };
+            403: components["responses"]["Forbidden"];
             /** @description Cognito managed login is not configured */
             503: {
                 headers: {
@@ -3206,6 +3207,7 @@ export interface operations {
                     "application/json": components["schemas"]["LogoutResponse"];
                 };
             };
+            403: components["responses"]["Forbidden"];
             /** @description Cognito managed login is not configured */
             503: {
                 headers: {
