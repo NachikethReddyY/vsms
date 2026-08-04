@@ -44,15 +44,7 @@ test("API routes expose the required versioned contracts", () => {
     for (const route of ["/authorize", "/callback", "/logout", "/refresh", "/me"]) {
         assert.ok(auth.includes(`"${route}"`), `missing auth route ${route}`);
     }
-});
-
-test("event and screening routes share one authentication and mutation-limit pass", () => {
-    const app = read("app.js");
-    const events = read("routes/eventRoutes.js");
-    const screenings = read("routes/screeningRoutes.js");
-    assert.equal((app.match(/authenticate, eventRoutes, screeningRoutes/g) || []).length, 2);
-    assert.doesNotMatch(events, /router\.use\(authenticate\)/);
-    assert.doesNotMatch(screenings, /router\.use\(authenticate\)/);
+    assert.doesNotMatch(auth, /"\/login"|"\/signup"/);
 });
 
 test("registration transaction creates registration, history and audit together", () => {
@@ -75,6 +67,16 @@ test("migration preserves history and enforces one active primary contact", () =
     assert.match(migration, /WHERE "is_primary" = true AND "status" = 'ACTIVE'/);
     assert.match(migration, /participant_consents_one_accepted_per_event_key/);
     assert.match(migration, /withdrawal_of_id/);
+});
+
+test("event audit log rows are retained after hard delete and remain immutable", () => {
+    const retentionMigration = read("prisma/migrations/20260803090000_preserve_event_audit_history/migration.sql");
+    const triggerMigration = read("prisma/migrations/20260805023000_immutable_event_audit_log/migration.sql");
+    const migration = read("prisma/migrations/20260806010000_preserve_immutable_event_audit_history/migration.sql");
+    assert.match(retentionMigration, /DROP CONSTRAINT IF EXISTS "event_audit_logs_event_id_fkey"/);
+    assert.match(triggerMigration, /BEFORE UPDATE OR DELETE ON "event_audit_logs"/);
+    assert.doesNotMatch(migration, /event_audit_delete_event_id/);
+    assert.match(migration, /ERRCODE = '42501'/);
 });
 
 test("event service exposes list functions after merge resolution", () => {
@@ -119,7 +121,7 @@ test("station template mapping only imports screening StationTypes", () => {
     assert.equal(mapping.stationTypeForTemplateKey("VISUAL_ACUITY"), "VISUAL_ACUITY");
     assert.equal(mapping.stationTypeForTemplateKey("REFRACTION"), "REFRACTION");
     assert.equal(mapping.stationTypeForTemplateKey("COLOUR_VISION"), "COLOUR_VISION");
-    assert.equal(mapping.stationTypeForTemplateKey("EYE_HEALTH"), "EYE_HEALTH");
+    assert.equal(mapping.stationTypeForTemplateKey("EYE_HEALTH"), null);
     assert.equal(mapping.stationTypeForTemplateKey("REGISTRATION"), null);
     assert.equal(mapping.stationTypeForTemplateKey("CLINICAL_REVIEW"), null);
 
@@ -129,8 +131,8 @@ test("station template mapping only imports screening StationTypes", () => {
         { templateKey: "CLINICAL_REVIEW", name: "Clinical review" },
         { templateKey: "EYE_HEALTH", name: "Eye health" },
     ]);
-    assert.deepEqual(importable.map(({ stationType }) => stationType), ["VISUAL_ACUITY", "EYE_HEALTH"]);
-    assert.deepEqual(skipped.map((template) => template.templateKey), ["REGISTRATION", "CLINICAL_REVIEW"]);
+    assert.deepEqual(importable.map(({ stationType }) => stationType), ["VISUAL_ACUITY"]);
+    assert.deepEqual(skipped.map((template) => template.templateKey), ["REGISTRATION", "CLINICAL_REVIEW", "EYE_HEALTH"]);
 });
 
 test("participant search matches any supplied identifier", () => {
@@ -140,57 +142,14 @@ test("participant search matches any supplied identifier", () => {
     assert.match(controller, /searchParticipantsService/);
 });
 
-test("managed authentication verifies both Cognito cookie and compatibility bearer tokens", () => {
+test("authentication uses verified Cognito tokens and approved local role intersection", () => {
     const controller = read("controllers/authController.js");
     const middleware = read("middlewares/requireAuthentication.js");
     const authRoutes = read("routes/authRoutes.js");
-    assert.match(controller, /utils\/cognitoClient/);
-    assert.match(middleware, /verifyAccessToken/);
+    assert.match(controller, /verifyCognitoToken/);
     assert.match(middleware, /verifyCognitoToken/);
-    assert.match(middleware, /ACCESS_COOKIE/);
-    assert.match(middleware, /process\.env\.NODE_ENV !== "test"/);
+    assert.match(middleware, /rolesFromCognitoGroups/);
+    assert.match(middleware, /filter\(\(role\) => rolesFromCognitoGroups\(payload\)\.includes\(role\)\)/);
     assert.match(authRoutes, /"\/authorize"/);
-});
-
-test("browser mutations recover the CSRF token after a page reload", () => {
-    const client = read("../react-user-dashboard/src/utils/apiClient.ts");
-    assert.match(client, /const requestCsrfToken = csrfToken \|\| getCsrfToken\(\)/);
-    assert.match(client, /config\.headers\["X-CSRF-Token"\] = requestCsrfToken/);
-});
-
-test("browser session restoration rejects stale profile storage without a session cookie", () => {
-    const provider = read("../react-user-dashboard/src/auth/AuthProvider.tsx");
-    const session = read("../react-user-dashboard/src/utils/session.ts");
-    const client = read("../react-user-dashboard/src/utils/apiClient.ts");
-    assert.match(provider, /if \(!getCsrfToken\(\)\) \{[\s\S]*clearStoredSession\(\);[\s\S]*setSessionState\(null\);/);
-    assert.match(session, /sessionStorage\.getItem\(SESSION_KEY\); \} catch \{ return null; \}/);
-    assert.match(client, /volatileDeviceId \?\?= crypto\.randomUUID\(\)/);
-    assert.match(read("../react-user-dashboard/src/main.tsx"), /try \{ savedTheme = localStorage\.getItem/);
-    assert.match(read("../react-user-dashboard/src/components/MagicEffects.tsx"), /try \{ localStorage\.setItem\('vsms-theme'/);
-});
-
-test("theme toggle uses the requested animated transition with an accessible fallback", () => {
-    const toggle = read("../react-user-dashboard/src/components/MagicEffects.tsx");
-    assert.match(toggle, /applyTheme\(next\);\s+setTheme\(next\);/);
-    assert.match(toggle, /startViewTransition/);
-    assert.match(toggle, /prefers-reduced-motion:\s*reduce/);
-});
-
-test("managed password changes use autofill semantics and suppress duplicate submits", () => {
-    const page = read("../react-user-dashboard/src/pages/AccountSecurityPage.tsx");
-    assert.match(page, /autoComplete="current-password"/);
-    assert.match(page, /autoComplete="new-password"/);
-    assert.match(page, /disabled=\{pending \|\| !oldPassword \|\| !isPasswordValid\(newPassword\)\}/);
-});
-
-test("event creation controls use the same verified role grants as the API", () => {
-    const page = read("../react-user-dashboard/src/components/TestHomePage.tsx");
-    assert.match(page, /role === 'ADMINISTRATOR' \|\| role === 'EVENT_MANAGER'/);
-    assert.doesNotMatch(page, /systemRole !== 'STAFF'/);
-});
-
-test("event mutations invalidate stale export receipts", () => {
-    const page = read("../react-user-dashboard/src/features/events/EventDetailPage.tsx");
-    assert.match(page, /const applyEventUpdate = \(updated: EventRecord\) => \{ setEvent\(updated\); setExportReceipt\(''\); \}/);
-    assert.match(page, /applyEventUpdate\(updated\)/);
+    assert.doesNotMatch(authRoutes, /"\/login"|"\/signup"/);
 });

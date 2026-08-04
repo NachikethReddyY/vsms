@@ -5,6 +5,6 @@
 -- Refuse accidental use instead of silently creating an insecure parallel schema.
 DO $$
 BEGIN
-  RAISE EXCEPTION 'Do not run backend/db/init.sql; use npm run prisma:migrate';
+  RAISE EXCEPTION 'Do not run backend/db/init.sql; use pnpm prisma:migrate';
 END
 $$;

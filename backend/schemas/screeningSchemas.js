@@ -23,6 +23,30 @@ const reviewParams = eventParams.extend({
   registrationId: z.string().uuid(),
 }).strict();
 
+const referralParams = eventParams.extend({ referralId: z.string().uuid() }).strict();
+const referralDocumentParams = referralParams.extend({ documentId: z.string().uuid() }).strict();
+const issueReferralBody = z.object({
+  destinationEmail: z.string().trim().toLowerCase().email().max(255),
+  signatureObjectKey: z.string().regex(/^signatures\/[a-f0-9-]{36}\/referral-[a-f0-9-]{36}-[a-f0-9-]{36}\.(png|jpg)$/),
+  signatureSha256: z.string().regex(/^[a-f0-9]{64}$/i),
+  signatureMimeType: z.enum(["image/png", "image/jpeg"]),
+  idempotencyKey: z.string().uuid(),
+  confirmed: z.literal(true),
+}).strict();
+
+const acknowledgeReferralHandoffBody = z.object({
+  idempotencyKey: z.string().uuid(),
+}).strict();
+
+const reviseReferralBody = z.object({
+  destinationName: z.string().trim().min(2).max(200),
+  reason: z.string().trim().min(10).max(2000),
+  instructions: z.string().trim().max(2000).optional(),
+  urgency: z.enum(["ROUTINE", "PRIORITY", "URGENT", "EMERGENCY"]),
+  idempotencyKey: z.string().uuid(),
+  confirmed: z.literal(true),
+}).strict();
+
 const clinicalSummary = z.string().trim().min(10).max(2000);
 const recommendations = z.string().trim().max(2000).optional();
 const contextVersion = z.string().regex(/^[a-f0-9]{64}$/);
@@ -36,6 +60,9 @@ const commonDecision = {
   confirmed: z.literal(true),
   clinicalSummary,
   recommendations,
+  signatureObjectKey: z.string().regex(/^signatures\/[a-f0-9-]{36}\/review-decision-[a-f0-9-]{36}-[a-f0-9-]{36}\.(png|jpg)$/),
+  signatureSha256: z.string().regex(/^[a-f0-9]{64}$/i),
+  signatureMimeType: z.enum(["image/png", "image/jpeg"]),
 };
 const reviewDecisionBody = z.discriminatedUnion("outcome", [
   z.object({ ...commonDecision, outcome: z.literal("COMPLETE") }).strict(),
@@ -143,11 +170,43 @@ const saveColourVisionBody = z.object({
   resultData: colourVisionResultData,
 });
 
+const screeningSyncAction = z.discriminatedUnion("stationType", [
+  z.object({
+    clientActionId: z.string().uuid(),
+    stationId: z.string().uuid(),
+    stationType: z.literal("VISUAL_ACUITY"),
+    payload: saveVisualAcuityBody.strict(),
+  }).strict(),
+  z.object({
+    clientActionId: z.string().uuid(),
+    stationId: z.string().uuid(),
+    stationType: z.literal("REFRACTION"),
+    payload: saveRefractionBody.strict(),
+  }).strict(),
+  z.object({
+    clientActionId: z.string().uuid(),
+    stationId: z.string().uuid(),
+    stationType: z.literal("COLOUR_VISION"),
+    payload: saveColourVisionBody.strict(),
+  }).strict(),
+]);
+
+const screeningSyncBody = z.object({
+  clientBatchId: z.string().uuid(),
+  cursor: z.string().datetime({ offset: true }).optional(),
+  actions: z.array(screeningSyncAction).max(25),
+}).strict();
+
 module.exports = {
   eventParams,
   stationParams,
   reviewParams,
   reviewDecisionBody,
+  referralParams,
+  referralDocumentParams,
+  issueReferralBody,
+  acknowledgeReferralHandoffBody,
+  reviseReferralBody,
   resolveQuery,
   previewVisualAcuityBody,
   saveVisualAcuityBody,
@@ -155,4 +214,5 @@ module.exports = {
   saveRefractionBody,
   previewColourVisionBody,
   saveColourVisionBody,
+  screeningSyncBody,
 };

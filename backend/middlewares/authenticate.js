@@ -13,6 +13,7 @@ module.exports = (req, res, next) => requireAuthentication(req, res, (error) => 
     userId: req.auth.userId,
     username: req.auth.user.username || req.auth.email,
     systemRole: systemRoleFor(req.auth.roles),
+    roles: req.auth.roles,
   };
   return next();
 });

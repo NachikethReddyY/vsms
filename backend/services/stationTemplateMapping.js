@@ -1,17 +1,15 @@
 /**
  * StationTemplate.templateKey → Station.stationType mapping (#30 / #24).
- * Only screening StationTypes are importable. REGISTRATION and CLINICAL_REVIEW
- * remain catalog-only (workflow / review domains, not StationType).
+ * Only screening flows with implemented capture APIs are importable.
  */
 
 const IMPORTABLE_TEMPLATE_KEYS = Object.freeze({
   VISUAL_ACUITY: "VISUAL_ACUITY",
   REFRACTION: "REFRACTION",
   COLOUR_VISION: "COLOUR_VISION",
-  EYE_HEALTH: "EYE_HEALTH",
 });
 
-const NON_IMPORTABLE_TEMPLATE_KEYS = Object.freeze(["REGISTRATION", "CLINICAL_REVIEW"]);
+const NON_IMPORTABLE_TEMPLATE_KEYS = Object.freeze(["REGISTRATION", "CLINICAL_REVIEW", "EYE_HEALTH"]);
 
 const stationTypeForTemplateKey = (templateKey) => IMPORTABLE_TEMPLATE_KEYS[templateKey] || null;
 

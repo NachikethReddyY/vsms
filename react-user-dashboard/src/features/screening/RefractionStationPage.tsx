@@ -194,11 +194,11 @@ export default function RefractionStationPage() {
         acknowledged: preview.isFlagged ? acknowledged : false,
         resultData,
       });
-      setSuccess(
-        saved.isFlagged
+      setSuccess(saved.queued
+        ? 'Saved offline. It will sync when connected.'
+        : saved.isFlagged
           ? `Saved with ${saved.overallFlag} flag (${saved.ruleVersion ?? preview.ruleVersion}): ${saved.flagSummary}`
-          : `Saved Refraction result (${saved.overallFlag}, ${saved.ruleVersion ?? preview.ruleVersion}).`,
-      );
+          : `Saved Refraction result (${saved.overallFlag}, ${saved.ruleVersion ?? preview.ruleVersion}).`);
       setSavedRegistrationId(selected.registrationId);
       setEvaluation(null);
       setAcknowledged(false);

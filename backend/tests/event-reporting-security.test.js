@@ -306,90 +306,21 @@ test("export preserves essential cascade-deleted assignment fields with a stable
   assert.equal(eventService.exportHashFor(first), eventService.exportHashFor(second));
 });
 
-const deleteDb = ({ failTombstone = false } = {}) => {
-  let persisted = true;
-  const tombstones = [];
-  const transactionEvent = exportEvent();
-  const tx = {
-    event: {
-      findUnique: async ({ select }) => (select.eventDays ? transactionEvent : {
-        eventId,
-        name: transactionEvent.name,
-        status: transactionEvent.status,
-        version: transactionEvent.version,
-        createdByUserId: managerId,
-      }),
-      delete: async () => { persisted = false; },
-    },
-    eventRegistration: { count: async () => 0 },
-    participantConsent: { count: async () => 0 },
-    eventAuditLog: { count: async () => 2 },
-    screeningResult: { count: async () => 0 },
-    referral: { count: async () => 0 },
-    auditLog: {
-      create: async ({ data }) => {
-        if (failTombstone) throw new Error("tombstone write failed");
-        tombstones.push(data);
-      },
-    },
-  };
-  const db = {
-    event: {
-      findFirst: async () => ({ eventId, createdByUserId: managerId, shifts: [] }),
-    },
-    $transaction: async (operation) => {
-      const before = persisted;
-      try {
-        return await operation(tx);
-      } catch (error) {
-        persisted = before;
-        throw error;
-      }
-    },
-  };
-  return { db, tx, tombstones, get persisted() { return persisted; } };
-};
-
-const deletionReceipt = async (tx) => {
-  const snapshot = await eventService.exportSnapshot(eventId, tx);
-  return createExportReceipt({
+test("an export receipt does not bypass terminal deletion authority", async () => {
+  const receipt = createExportReceipt({
     eventId,
-    version: snapshot.event.version,
+    version: 3,
     actorUserId: managerId,
-    exportHash: eventService.exportHashFor(snapshot),
+    exportHash: "b".repeat(64),
     secret: env.jwtAccessSecret,
   });
-};
-
-test("deletion requires a receipt bound to the export and commits a tombstone", async () => {
-  const fixture = deleteDb();
-  const receipt = await deletionReceipt(fixture.tx);
-  await eventService.deleteEvent(eventId, {
-    version: 3,
-    eventName: "Community screening",
-    exportReceipt: receipt,
-  }, { userId: managerId, systemRole: "EVENT_MANAGER" }, "request-1", fixture.db);
-
-  assert.equal(fixture.persisted, false);
-  assert.equal(fixture.tombstones.length, 1);
-  assert.equal(fixture.tombstones[0].action, "DELETED");
-  assert.equal(fixture.tombstones[0].entityName, "Event");
-  assert.equal(fixture.tombstones[0].entityId, eventId);
-  assert.equal(fixture.tombstones[0].details.version, 3);
-  assert.deepEqual(fixture.tombstones[0].details.preservedCounts, { eventAuditLogs: 2 });
-});
-
-test("failed tombstone rolls back an otherwise receipt-bound deletion", async () => {
-  const fixture = deleteDb({ failTombstone: true });
-  const receipt = await deletionReceipt(fixture.tx);
   await assert.rejects(
     () => eventService.deleteEvent(eventId, {
       version: 3,
-      eventName: "Community screening",
+      confirmationName: "Community screening",
+      acknowledgePermanentDeletion: true,
       exportReceipt: receipt,
-    }, { userId: managerId, systemRole: "EVENT_MANAGER" }, "request-2", fixture.db),
-    /tombstone write failed/,
+    }, { userId: managerId, systemRole: "EVENT_MANAGER", roles: ["EVENT_MANAGER"] }, "request-2"),
+    (error) => error.code === "FORBIDDEN",
   );
-  assert.equal(fixture.persisted, true);
-  assert.deepEqual(fixture.tombstones, []);
 });

@@ -18,6 +18,13 @@ Thumbs.db
 # Runtime-only consent signature evidence
 backend/secure-data/
 
+# Database exports can contain credentials, password hashes, bearer tokens, and PHI.
+backend/backups/*.sql
+backend/backups/*.dump
+backend/backups/*.backup
+backend/backups/*.tar
+*.pgdump
+
 # Local generated plan viewer
 .local-plan-preview/
 

@@ -40,6 +40,10 @@ function transactionDb(current, updated, handlers = {}) {
     },
     shift: { updateMany: async () => ({ count: 0 }) },
     staffAssignment: { updateMany: async () => ({ count: 0 }) },
+    station: { findMany: async () => [], deleteMany: async () => ({ count: 0 }) },
+    eventDay: { findMany: async () => [] },
+    stationTemplate: { findMany: async () => [] },
+    eventAuditLog: { create: async () => ({}) },
     auditLog: { create: handlers.audit || (async () => ({})) },
     ...handlers.tx,
   };
@@ -113,6 +117,11 @@ test("event creation persists the selected event days", async () => {
     eventDay: {
       create: async ({ data }) => { createdDays.push(data); return { eventDayId: saved.eventDays[0].eventDayId, ...data }; },
     },
+    station: { findMany: async () => [] },
+    shift: { findMany: async () => [] },
+    staffAssignment: { findMany: async () => [] },
+    stationTemplate: { findMany: async () => [] },
+    eventAuditLog: { create: async () => ({}) },
     auditLog: { create: async () => ({}) },
   };
   const db = { $transaction: async (callback) => callback(tx) };
@@ -276,7 +285,7 @@ test("staff assignment commits with schedule locking and the event version", asy
     audit: async ({ data }) => { audit = data; return {}; },
     tx: {
       $executeRawUnsafe: async () => 1,
-      user: { findFirst: async () => ({ id: assigneeId }) },
+      user: { findFirst: async () => ({ id: assigneeId, userRoles: [{ role: { roleName: "SCREENER" } }] }) },
       staffAssignment: {
         findFirst: async () => null,
         create: async ({ data }) => { createdAssignment = data; return assignment; },

@@ -10,6 +10,7 @@ const YAML = require("yaml");
 const env = require("./config/env");
 const AppError = require("./errors/AppError");
 const requestContext = require("./middlewares/requestContext");
+const csrf = require("./middlewares/csrf");
 const authRoutes = require("./routes/authRoutes");
 const userRoutes = require("./routes/userRoutes");
 const eventRoutes = require("./routes/eventRoutes");
@@ -23,8 +24,8 @@ const adminRoutes = require("./routes/adminRoutes");
 const consentRoutes = require("./routes/consentRoutes");
 const emergencyContactRoutes = require("./routes/emergencyContactRoutes");
 const signatureRoutes = require("./routes/signatureRoutes");
+const providerEventRoutes = require("./routes/providerEventRoutes");
 const { notFound, errorHandler } = require("./middlewares/errorHandler");
-const csrf = require("./middlewares/csrf");
 const authenticate = require("./middlewares/authenticate");
 
 const app = express();
@@ -59,7 +60,7 @@ app.use(cors({
     if (!origin || env.corsOrigins.includes(origin)) return callback(null, true);
     return callback(new AppError(403, "ORIGIN_NOT_ALLOWED", "Request origin is not allowed"));
   },
-  methods: ["GET", "POST", "PATCH", "DELETE", "OPTIONS"],
+  methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
   allowedHeaders: [
     "Authorization",
     "Content-Type",
@@ -68,13 +69,20 @@ app.use(cors({
     "X-Requested-With",
     "X-Device-Id",
     "X-Device-Name",
+    "X-Event-Id",
     "Idempotency-Key",
   ],
 }));
 
+// Provider callbacks are authenticated with the signed SNS envelope rather
+// than a browser cookie/CSRF token. Mount this one route before browser CSRF.
+const providerEventLimiter = rateLimit({ windowMs: 60000, limit: 120, standardHeaders: "draft-8", legacyHeaders: false });
+app.use("/api/v1/webhooks/ses", providerEventLimiter, providerEventRoutes);
+
 app.use(cookieParser());
 app.use(express.json({ limit: "256kb", strict: true, type: "application/json" }));
-app.use((req, res, next) => ["GET", "HEAD", "OPTIONS"].includes(req.method) ? next() : csrf(req, res, next));
+app.use(["/api/v1", "/api"], (req, res, next) =>
+  ["POST", "PUT", "PATCH", "DELETE"].includes(req.method) ? csrf(req, res, next) : next());
 
 const authLimiter = rateLimit({ windowMs: 15 * 60000, limit: 20, standardHeaders: "draft-8", legacyHeaders: false });
 const mutationLimiter = rateLimit({ windowMs: 60000, limit: 60, standardHeaders: "draft-8", legacyHeaders: false });

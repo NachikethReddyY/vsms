@@ -2,7 +2,9 @@
 import { ExclamationTriangleIcon } from '@heroicons/react/24/outline';
 import { FormEvent, ReactNode, useState } from 'react';
 import { Link } from 'react-router-dom';
+import { AppToast } from '../../components/AppToast';
 import { getApiError as getApiMessage } from '../../utils/apiClient';
+import { getStoredSession } from '../../utils/session';
 import {
   FlagEvaluation,
   QueueRegistration,
@@ -10,6 +12,7 @@ import {
   Station,
   StationType,
 } from './screeningApi';
+import { getOfflineStationContext, isNetworkError } from './offlineSync';
 
 /** Slugs for station pages that currently have UI routes. */
 export const STATION_PATH_SLUG: Partial<Record<StationType, string>> = {
@@ -193,7 +196,7 @@ export function ParticipantLookup({
     <section className="detail-panel" style={{ marginBottom: 24 }}>
       <h2>Find participant</h2>
       {error && <p className="form-error" role="alert">{error}</p>}
-      {success && <p className="banner-success" role="status">{success}</p>}
+      <AppToast message={success ?? ''} />
       <div className="va-resolve-row">
         <label>
           Pass token / QR value
@@ -274,7 +277,7 @@ export function StationPageFrame({
       )}
 
       {error && <p className="form-error" role="alert">{error}</p>}
-      {success && <p className="banner-success" role="status">{success}</p>}
+      <AppToast message={success ?? ''} />
       {success && handoff}
       {children}
     </div>
@@ -293,17 +296,28 @@ export async function loadStationContext(
   queue: QueueRegistration[];
   nextSelectedId: string;
 }> {
-  const stationsPayload = await screeningApi.listStations(eventId);
-  const station = stationsPayload.stations.find((item) => item.stationType === stationType);
-  if (!station) throw new Error(`${label} station is not configured for this event.`);
-  const queuePayload = await screeningApi.listQueue(eventId, station.stationId);
-  return {
-    eventName: stationsPayload.event.name,
-    station,
-    stations: stationsPayload.stations,
-    queue: queuePayload.registrations,
-    nextSelectedId: selectedId || queuePayload.registrations[0]?.registrationId || '',
-  };
+  try {
+    const stationsPayload = await screeningApi.listStations(eventId);
+    const station = stationsPayload.stations.find((item) => item.stationType === stationType);
+    if (!station) throw new Error(`${label} station is not configured for this event.`);
+    const queuePayload = await screeningApi.listQueue(eventId, station.stationId);
+    return {
+      eventName: stationsPayload.event.name,
+      station,
+      stations: stationsPayload.stations,
+      queue: queuePayload.registrations,
+      nextSelectedId: selectedId || queuePayload.registrations[0]?.registrationId || '',
+    };
+  } catch (error) {
+    if (!isNetworkError(error)) throw error;
+    const ownerId = getStoredSession()?.user.id;
+    const offline = ownerId ? await getOfflineStationContext(ownerId, eventId, stationType) : null;
+    if (!offline) throw error;
+    return {
+      ...offline,
+      nextSelectedId: selectedId || offline.queue[0]?.registrationId || '',
+    };
+  }
 }
 
 export function preventDefaultSubmit(handler: () => Promise<void>) {

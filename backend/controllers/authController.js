@@ -1,4 +1,5 @@
 const crypto = require("crypto");
+const env = require("../config/env");
 const asyncHandler = require("../middlewares/asyncHandler");
 const {
     isCognitoConfigured,
@@ -45,12 +46,23 @@ function ensureCognitoConfigured() {
 }
 
 function normalizeReturnTo(value) {
-    const returnTo = String(value || "");
+    const returnTo = String(value || "").trim();
+    let decoded;
     try {
-        const decoded = decodeURIComponent(returnTo);
-        if (!decoded.startsWith("/") || decoded.startsWith("//") || decoded.includes("\\") || /[\u0000-\u001f\u007f]/.test(decoded)) return "/events";
-        const url = new URL(returnTo, "https://vsms.local");
-        return url.origin === "https://vsms.local" ? `${url.pathname}${url.search}${url.hash}` : "/events";
+        decoded = decodeURIComponent(returnTo);
+    } catch {
+        return "/events";
+    }
+    const isPath = decoded.startsWith("/") && !decoded.startsWith("//");
+    const isAbsoluteUrl = /^[a-z][a-z\d+.-]*:\/\//i.test(decoded);
+    if (!isPath && !isAbsoluteUrl || decoded.includes("\\") || /[\u0000-\u001f\u007f]/.test(decoded)) return "/events";
+
+    try {
+        const url = new URL(decoded, env.publicAppOrigin);
+        if (url.origin !== env.publicAppOrigin || url.pathname.startsWith("//") || ["/", "/api"].includes(url.pathname) || url.pathname.startsWith("/auth/") || url.pathname.startsWith("/api/")) {
+            return "/events";
+        }
+        return `${url.pathname}${url.search}${url.hash}`;
     } catch {
         return "/events";
     }
@@ -112,7 +124,7 @@ async function finalizeSuccessfulLogin(authResult, username, context, res) {
         throw error;
     }
 
-    const csrfToken = setAuthCookies(res, authResult, idTokenPayload.email || idTokenPayload["cognito:username"] || username);
+    setAuthCookies(res, authResult, idTokenPayload.email || idTokenPayload["cognito:username"] || username);
     await createAuthAuditLog({
         userId: localUser.id,
         eventType: "LOGIN_SUCCESS",
@@ -124,7 +136,6 @@ async function finalizeSuccessfulLogin(authResult, username, context, res) {
     return {
         expiresIn: authResult.ExpiresIn,
         sessionExpiresIn: Number(process.env.REFRESH_COOKIE_MAX_AGE_SECONDS || 30 * 24 * 60 * 60),
-        csrfToken,
         user: publicUser(localUser, roles),
     };
 }
@@ -213,11 +224,10 @@ exports.refresh = asyncHandler(async (req, res) => {
             throw error;
         }
 
-        const csrfToken = setAuthCookies(res, { ...authResult, RefreshToken: refreshToken }, username);
+        setAuthCookies(res, { ...authResult, RefreshToken: refreshToken }, username);
         res.json({
             expiresIn: authResult.ExpiresIn,
             sessionExpiresIn: Number(process.env.REFRESH_COOKIE_MAX_AGE_SECONDS || 30 * 24 * 60 * 60),
-            csrfToken,
             user: publicUser(localUser, roles),
         });
     } catch (error) {

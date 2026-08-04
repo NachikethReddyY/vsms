@@ -4,6 +4,7 @@ import { BrowserRouter } from 'react-router-dom'
 import './index.css'
 import App from './App.tsx'
 import { AuthProvider } from './auth/AuthProvider.tsx'
+import { OfflineSyncProvider } from './features/screening/OfflineSyncProvider.tsx'
 
 let savedTheme: string | null = null
 try { savedTheme = localStorage.getItem('vsms-theme') } catch { /* Use the system preference when storage is unavailable. */ }
@@ -17,7 +18,9 @@ createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <BrowserRouter>
       <AuthProvider>
-        <App />
+        <OfflineSyncProvider>
+          <App />
+        </OfflineSyncProvider>
       </AuthProvider>
     </BrowserRouter>
   </StrictMode>,

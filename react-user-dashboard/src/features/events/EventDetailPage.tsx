@@ -1,12 +1,11 @@
 import {
-  ArrowDownTrayIcon,
   ArrowLeftIcon,
-  ArrowTopRightOnSquareIcon,
   ArrowUpTrayIcon,
   CalendarDaysIcon,
   CheckIcon,
   ChevronDownIcon,
   ChevronUpIcon,
+  ClipboardDocumentListIcon,
   ClipboardDocumentCheckIcon,
   ClockIcon,
   DocumentDuplicateIcon,
@@ -14,70 +13,61 @@ import {
   PhotoIcon,
   PencilSquareIcon,
   PlusIcon,
-  QueueListIcon,
   TrashIcon,
+  UserGroupIcon,
   XMarkIcon,
 } from '@heroicons/react/24/outline';
-import { useCallback, useEffect, useRef, useState, type ChangeEvent, type FormEvent, type KeyboardEvent as ReactKeyboardEvent } from 'react';
-import { Link, useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom';
+import { useEffect, useMemo, useRef, useState, type ChangeEvent, type FormEvent } from 'react';
+import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
 import { useAuth } from '../../auth/AuthProvider';
+import { AppDialog } from '../../components/AppDialog';
+import { AppToast } from '../../components/AppToast';
 import { getApiError as getApiMessage } from '../../utils/apiClient';
 import { getDisplayName } from '../../utils/identity';
-import {
-  eventApi,
-  formatEventDate,
-  STATUS_LABEL,
-  type AuditRecord,
-  type EventAttendee,
-  type EventMetrics,
-  type EventRecord,
-  type StaffAssignmentRole,
-  type StaffDirectoryEntry,
-  type StationTemplate,
-} from './eventApi';
+import { eventApi, formatEventDate, STATUS_LABEL, type AuditRecord, type EventAttendee, type EventMetrics, type EventRecord, type EventStatus, type StaffAssignmentRole, type StaffDirectoryEntry, type StationTemplate } from './eventApi';
 import { EVENT_BANNERS, getEventArtwork, type EventBannerKey } from './eventBanners';
-import './EventWorkspace.css';
 
 type AssignmentDraft = { userId: string; assignmentRole: StaffAssignmentRole; eventStationId: string };
-type WorkspaceTab = 'overview' | 'attendees' | 'operations' | 'settings';
-
 const emptyAssignment: AssignmentDraft = { userId: '', assignmentRole: 'SUPPORT', eventStationId: '' };
 const assignmentRoles: StaffAssignmentRole[] = ['EVENT_MANAGER', 'REGISTRATION', 'SCREENER', 'REVIEWER', 'SUPPORT'];
-const tabs: Array<{ id: WorkspaceTab; label: string }> = [
-  { id: 'overview', label: 'Overview' },
-  { id: 'attendees', label: 'Attendees' },
-  { id: 'operations', label: 'Operations' },
-  { id: 'settings', label: 'Settings' },
-];
+const applicationRoleByAssignment: Record<StaffAssignmentRole, StaffDirectoryEntry['roles'][number]> = {
+  EVENT_MANAGER: 'EVENT_MANAGER', REGISTRATION: 'REGISTRATION_OFFICER', SCREENER: 'SCREENER', REVIEWER: 'REVIEWER', SUPPORT: 'SUPPORT',
+};
+const roleLabel = (role: string) => role.toLowerCase().replace(/_/g, ' ').replace(/^\w/, (letter: string) => letter.toUpperCase());
+
+const nextAction: Record<string, { action: 'publish' | 'start' | 'complete'; status: EventStatus; label: string; prompt: string } | undefined> = {
+  DRAFT: { action: 'publish', status: 'PUBLISHED', label: 'Publish event', prompt: 'Publish this event? Staff with access will see it as ready for operations.' },
+  PUBLISHED: { action: 'start', status: 'IN_PROGRESS', label: 'Start event', prompt: 'Start operations now? Planned shifts will become active.' },
+  IN_PROGRESS: { action: 'complete', status: 'COMPLETED', label: 'Complete event', prompt: 'Complete this event? This is a terminal action and cannot be undone.' },
+};
+
 const lifecycleStages = [
   { status: 'DRAFT', label: 'Draft' },
   { status: 'PUBLISHED', label: 'Published' },
-  { status: 'IN_PROGRESS', label: 'Live' },
-  { status: 'COMPLETED', label: 'Past' },
+  { status: 'IN_PROGRESS', label: 'In progress' },
+  { status: 'COMPLETED', label: 'Completed' },
 ] as const;
-const nextAction: Record<string, { action: 'publish' | 'start' | 'complete'; label: string; prompt: string } | undefined> = {
-  DRAFT: { action: 'publish', label: 'Publish event', prompt: 'Publish this event? Staff with access will see it as ready for operations.' },
-  PUBLISHED: { action: 'start', label: 'Start operations', prompt: 'Start operations now? Planned shifts will become active.' },
-  IN_PROGRESS: { action: 'complete', label: 'Complete event', prompt: 'Complete this event? This is a terminal action and cannot be undone.' },
-};
 
-const roleLabel = (role: string) => role.toLowerCase().replace(/_/g, ' ').replace(/^\w/, (letter) => letter.toUpperCase());
-const formatTime = (value: string, timezone: string) => new Intl.DateTimeFormat(undefined, { hour: 'numeric', minute: '2-digit', timeZone: timezone }).format(new Date(value));
-const formatDay = (value: string) => new Intl.DateTimeFormat(undefined, { weekday: 'short', month: 'short', day: 'numeric', timeZone: 'UTC' }).format(new Date(`${value}T00:00:00Z`));
+function getDateParts(value: string, timezone: string) {
+  const date = new Date(value);
+  const parts = new Intl.DateTimeFormat(undefined, {
+    weekday: 'long', month: 'short', day: 'numeric', year: 'numeric', timeZone: timezone,
+  }).formatToParts(date);
+  return Object.fromEntries(parts.map(({ type, value: part }) => [type, part]));
+}
+
+function formatTime(value: string, timezone: string) {
+  return new Intl.DateTimeFormat(undefined, {
+    hour: 'numeric', minute: '2-digit', timeZone: timezone,
+  }).format(new Date(value));
+}
 
 function eventDuration(startsAt: string, endsAt: string) {
   const minutes = Math.max(0, Math.round((new Date(endsAt).getTime() - new Date(startsAt).getTime()) / 60_000));
   const hours = Math.floor(minutes / 60);
-  return hours ? `${hours} hr${minutes % 60 ? ` ${minutes % 60} min` : ''}` : `${minutes} min`;
-}
-
-function Metric({ label, value, detail }: { label: string; value: string; detail: string }) {
-  return <div className="workspace-metric"><strong>{value}</strong><span>{label}</span><small>{detail}</small></div>;
-}
-
-function MetricsStatus({ loading, error, onRetry }: { loading: boolean; error: string; onRetry: () => void }) {
-  if (loading) return <div className="workspace-inline-error" aria-live="polite"><p>Loading operational metrics…</p></div>;
-  return <div className="workspace-inline-error" role="alert"><p>Operational metrics unavailable. {error}</p><button type="button" onClick={onRetry}>Try again</button></div>;
+  const remainder = minutes % 60;
+  if (!hours) return `${remainder} min`;
+  return remainder ? `${hours} hr ${remainder} min` : `${hours} hr`;
 }
 
 export default function EventDetailPage() {
@@ -86,18 +76,21 @@ export default function EventDetailPage() {
   const user = session?.user;
   const location = useLocation();
   const navigate = useNavigate();
-  const [searchParams, setSearchParams] = useSearchParams();
-  const requestedTab = searchParams.get('tab');
-  const activeTab: WorkspaceTab = tabs.some((tab) => tab.id === requestedTab) ? requestedTab as WorkspaceTab : 'overview';
   const [event, setEvent] = useState<EventRecord | null>(null);
-  const [metrics, setMetrics] = useState<EventMetrics | null>(null);
-  const [metricsLoading, setMetricsLoading] = useState(true);
-  const [metricsError, setMetricsError] = useState('');
   const [audit, setAudit] = useState<AuditRecord[]>([]);
+  const [metrics, setMetrics] = useState<EventMetrics | null>(null);
+  const [metricsLoading, setMetricsLoading] = useState(false);
+  const [metricsError, setMetricsError] = useState('');
+  const [attendees, setAttendees] = useState<EventAttendee[]>([]);
+  const [attendeeTotal, setAttendeeTotal] = useState(0);
+  const [attendeeNextCursor, setAttendeeNextCursor] = useState<string | null>(null);
+  const [attendeeLoading, setAttendeeLoading] = useState(false);
+  const [attendeeError, setAttendeeError] = useState('');
+  const [attendeeSearch, setAttendeeSearch] = useState('');
+  const [attendeeStatus, setAttendeeStatus] = useState<EventAttendee['registrationStatus'] | ''>('');
+  const [exportPending, setExportPending] = useState(false);
   const [loading, setLoading] = useState(true);
   const [pending, setPending] = useState(false);
-  const [error, setError] = useState('');
-  const [notice, setNotice] = useState((location.state as { notice?: string } | null)?.notice ?? '');
   const [bannerPending, setBannerPending] = useState(false);
   const [bannerOpen, setBannerOpen] = useState(false);
   const [artworkFile, setArtworkFile] = useState('');
@@ -118,119 +111,135 @@ export default function EventDetailPage() {
   const [capacityErrors, setCapacityErrors] = useState<Record<string, string>>({});
   const [auditLoading, setAuditLoading] = useState(false);
   const [auditError, setAuditError] = useState('');
-  const [attendees, setAttendees] = useState<EventAttendee[]>([]);
-  const [attendeeTotal, setAttendeeTotal] = useState(0);
-  const [attendeeNextCursor, setAttendeeNextCursor] = useState<string | null>(null);
-  const [attendeeLoading, setAttendeeLoading] = useState(false);
-  const [attendeeError, setAttendeeError] = useState('');
-  const [attendeeSearch, setAttendeeSearch] = useState('');
-  const [appliedAttendeeSearch, setAppliedAttendeeSearch] = useState('');
-  const [attendeeStatus, setAttendeeStatus] = useState<EventAttendee['registrationStatus'] | ''>('');
-  const [exportPending, setExportPending] = useState(false);
-  const [exportReceipt, setExportReceipt] = useState('');
-  const [deletePending, setDeletePending] = useState(false);
-  const [deleteName, setDeleteName] = useState('');
-  const [cancelReason, setCancelReason] = useState('');
-  const [cancelError, setCancelError] = useState('');
   const fileInput = useRef<HTMLInputElement>(null);
   const deleteDialog = useRef<HTMLDialogElement>(null);
-  const cancelDialog = useRef<HTMLDialogElement>(null);
-  const attendeeRequestId = useRef(0);
-  const metricsRequestId = useRef(0);
-  const auditRequestId = useRef(0);
-  const applyEventUpdate = (updated: EventRecord) => { setEvent(updated); setExportReceipt(''); };
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const [deleteConfirmation, setDeleteConfirmation] = useState('');
+  const [deleteAcknowledged, setDeleteAcknowledged] = useState(false);
+  const [deletePending, setDeletePending] = useState(false);
+  const [deleteError, setDeleteError] = useState('');
+  const [statusConfirmOpen, setStatusConfirmOpen] = useState(false);
+  const [cancelOpen, setCancelOpen] = useState(false);
+  const [cancellationReason, setCancellationReason] = useState('');
+  const [cancellationError, setCancellationError] = useState('');
+  const [error, setError] = useState('');
+  const [notice, setNotice] = useState((location.state as { notice?: string } | null)?.notice ?? '');
 
-  const refreshAudit = useCallback(async (id = eventId) => {
-    const requestId = ++auditRequestId.current;
+  const refreshAudit = async (id = eventId) => {
     setAuditLoading(true); setAuditError('');
-    try {
-      const result = await eventApi.audit(id);
-      if (requestId === auditRequestId.current) setAudit(result.auditLogs);
-    } catch (cause) {
-      if (requestId === auditRequestId.current) setAuditError(getApiMessage(cause, 'Activity could not be loaded.'));
-    } finally {
-      if (requestId === auditRequestId.current) setAuditLoading(false);
-    }
-  }, [eventId]);
+    try { setAudit((await eventApi.audit(id)).auditLogs); }
+    catch (cause) { setAuditError(getApiMessage(cause, 'Activity could not be loaded.')); }
+    finally { setAuditLoading(false); }
+  };
 
-  const loadMetrics = useCallback(async (id = eventId) => {
-    const requestId = ++metricsRequestId.current;
-    setMetricsLoading(true); setMetricsError(''); setMetrics(null);
-    try {
-      const result = await eventApi.metrics(id);
-      if (requestId === metricsRequestId.current) setMetrics(result);
-    } catch (cause) {
-      if (requestId === metricsRequestId.current) setMetricsError(getApiMessage(cause, 'Metrics could not be loaded.'));
-    } finally {
-      if (requestId === metricsRequestId.current) setMetricsLoading(false);
-    }
-  }, [eventId]);
+  const loadMetrics = async (id = eventId) => {
+    setMetricsLoading(true); setMetricsError('');
+    try { setMetrics(await eventApi.metrics(id)); }
+    catch (cause) { setMetricsError(getApiMessage(cause, 'Operational metrics could not be loaded.')); }
+    finally { setMetricsLoading(false); }
+  };
 
-  const loadAttendees = useCallback(async (params?: { cursor?: string; status?: EventAttendee['registrationStatus']; search?: string }, append = false) => {
-    const requestId = ++attendeeRequestId.current;
+  const loadAttendees = async (cursor?: string, append = false) => {
+    if (!event) return;
     setAttendeeLoading(true); setAttendeeError('');
     try {
-      const result = await eventApi.attendees(eventId, { ...params, limit: 50 });
-      if (requestId !== attendeeRequestId.current) return;
-      setAttendees((current) => append ? [...current, ...result.attendees] : result.attendees);
-      setAttendeeTotal(result.total); setAttendeeNextCursor(result.nextCursor);
-    } catch (cause) {
-      if (requestId === attendeeRequestId.current) setAttendeeError(getApiMessage(cause, 'Attendees could not be loaded.'));
-    } finally {
-      if (requestId === attendeeRequestId.current) setAttendeeLoading(false);
-    }
-  }, [eventId]);
+      const page = await eventApi.attendees(event.eventId, {
+        cursor,
+        limit: 50,
+        status: attendeeStatus || undefined,
+        search: attendeeSearch.trim() || undefined,
+      });
+      setAttendees((current) => append ? [...current, ...page.attendees] : page.attendees);
+      setAttendeeTotal(page.total);
+      setAttendeeNextCursor(page.nextCursor);
+    } catch (cause) { setAttendeeError(getApiMessage(cause, 'Attendees could not be loaded.')); }
+    finally { setAttendeeLoading(false); }
+  };
 
-  const load = useCallback(async (signal?: AbortSignal) => {
-    setLoading(true); setError(''); setEvent(null); setExportReceipt('');
+  const downloadEventExport = async () => {
+    if (!event) return;
+    setExportPending(true); setError('');
     try {
-      const detail = await eventApi.get(eventId, signal);
-      if (signal?.aborted) return;
-      setEvent(detail);
-      if (detail.canManage) { void loadMetrics(detail.eventId); void refreshAudit(detail.eventId); }
-      else { setMetricsLoading(false); setMetrics(null); setMetricsError(''); }
-    } catch (cause) {
-      if (!signal?.aborted) setError(getApiMessage(cause, 'Event details could not be loaded.'));
-    } finally {
-      if (!signal?.aborted) setLoading(false);
-    }
-  }, [eventId, loadMetrics, refreshAudit]);
+      const payload = await eventApi.exportEvent(event.eventId);
+      const file = new Blob([JSON.stringify(payload.export, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(file);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `${event.name.replace(/[^a-z0-9]+/gi, '-').replace(/^-|-$/g, '').toLowerCase() || 'event'}-export.json`;
+      document.body.append(link); link.click(); link.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 0);
+      setNotice('Event export downloaded.');
+    } catch (cause) { setError(getApiMessage(cause, 'The event export could not be generated.')); }
+    finally { setExportPending(false); }
+  };
 
+  const load = async () => {
+    setLoading(true); setError('');
+    try {
+      const detail = await eventApi.get(eventId); setEvent(detail);
+      if (detail.canManage) { void refreshAudit(detail.eventId); void loadMetrics(detail.eventId); }
+    } catch (cause) { setError(getApiMessage(cause, 'Event details could not be loaded.')); }
+    finally { setLoading(false); }
+  };
+  useEffect(() => { void load(); }, [eventId]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
-    const controller = new AbortController();
-    void load(controller.signal);
-    return () => controller.abort();
-  }, [load]);
+    const dialog = deleteDialog.current;
+    if (!dialog) return;
+    if (deleteOpen && !dialog.open) dialog.showModal();
+    if (!deleteOpen && dialog.open) dialog.close();
+  }, [deleteOpen]);
   useEffect(() => {
-    const previousTitle = document.title;
-    document.title = `${event?.name ?? (error ? 'Event unavailable' : 'Event workspace')} · VSMS`;
-    return () => { document.title = previousTitle; };
-  }, [error, event?.name]);
-  useEffect(() => {
-    if (activeTab === 'attendees' && event?.canManage) void loadAttendees({ status: attendeeStatus || undefined, search: appliedAttendeeSearch || undefined });
-  }, [activeTab, appliedAttendeeSearch, attendeeStatus, event?.canManage, loadAttendees]);
+    if (event?.canManage && location.pathname.endsWith('/attendees')) void loadAttendees();
+  // The attendee query is explicitly initiated by its form or pagination controls.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [event?.eventId, location.pathname]);
 
   const transition = async () => {
-    const next = event && nextAction[event.status];
-    if (!event || !next || !window.confirm(next.prompt)) return;
+    const next = event && nextAction[event.status]; if (!event || !next) return;
     setPending(true); setError('');
-    try {
-      const updated = await eventApi.transition(event.eventId, next.action, event.version);
-      applyEventUpdate(updated); setNotice(`${STATUS_LABEL[updated.status]} status saved.`); void refreshAudit(event.eventId); void loadMetrics(event.eventId);
-    } catch (cause) { setError(getApiMessage(cause, 'The status could not be changed. Refresh and try again.')); }
+    try { const updated = await eventApi.transition(event.eventId, next.action, event.version); setEvent(updated); setStatusConfirmOpen(false); setNotice(`${STATUS_LABEL[updated.status]} status saved.`); await refreshAudit(event.eventId); }
+    catch (cause) { setError(getApiMessage(cause, 'The status could not be changed. Refresh and try again.')); }
     finally { setPending(false); }
   };
 
   const cancel = async () => {
     if (!event) return;
-    const reason = cancelReason.trim();
-    if (reason.length < 10) { setCancelError('Enter at least 10 characters so staff understand why the event was cancelled.'); return; }
-    setPending(true); setCancelError('');
-    try {
-      const updated = await eventApi.cancel(event.eventId, event.version, reason);
-      applyEventUpdate(updated); cancelDialog.current?.close(); setNotice('Event cancelled and reason recorded.'); void refreshAudit(event.eventId);
-    } catch (cause) { setCancelError(getApiMessage(cause, 'The event could not be cancelled.')); }
+    const reason = cancellationReason.trim();
+    if (reason.length < 10 || reason.length > 500) {
+      setCancellationError('Enter a cancellation reason between 10 and 500 characters.');
+      return;
+    }
+    setPending(true); setError('');
+    try { const updated = await eventApi.cancel(event.eventId, event.version, reason); setEvent(updated); setCancelOpen(false); setCancellationReason(''); setCancellationError(''); setNotice('Event cancelled and reason recorded.'); void refreshAudit(event.eventId); }
+    catch (cause) { setError(getApiMessage(cause, 'The event could not be cancelled.')); }
     finally { setPending(false); }
+  };
+
+  const closeDeleteDialog = () => {
+    setDeleteOpen(false);
+    setDeleteConfirmation('');
+    setDeleteAcknowledged(false);
+    setDeleteError('');
+  };
+
+  const deleteEvent = async (submitEvent: FormEvent<HTMLFormElement>) => {
+    submitEvent.preventDefault();
+    if (!event || deleteConfirmation !== event.name || !deleteAcknowledged) return;
+    setDeletePending(true);
+    setDeleteError('');
+    try {
+      await eventApi.delete(event.eventId, {
+        version: event.version,
+        confirmationName: deleteConfirmation,
+        acknowledgePermanentDeletion: true,
+      });
+      window.sessionStorage.removeItem('vsms_event_id');
+      navigate('/events', { replace: true });
+    } catch (cause) {
+      setDeleteError(getApiMessage(cause, 'The event could not be permanently deleted. Refresh and try again.'));
+    } finally {
+      setDeletePending(false);
+    }
   };
 
   const saveBanner = async () => {
@@ -238,15 +247,19 @@ export default function EventDetailPage() {
     setBannerPending(true); setError('');
     try {
       const updated = await eventApi.update(event.eventId, { version: event.version, bannerKey: selectedBannerKey, artworkDataUrl: artworkFile || null });
-      applyEventUpdate(updated); setBannerOpen(false); setNotice('Event banner updated.'); void refreshAudit(event.eventId);
+      setEvent(updated); setBannerOpen(false); setNotice('Event banner updated.'); void refreshAudit(event.eventId);
     } catch (cause) { setError(getApiMessage(cause, 'The banner could not be updated. Refresh and try again.')); }
     finally { setBannerPending(false); }
   };
 
   const chooseArtwork = (change: ChangeEvent<HTMLInputElement>) => {
-    const file = change.target.files?.[0]; change.target.value = '';
+    const file = change.target.files?.[0];
+    change.target.value = '';
     if (!file) return;
-    if (!['image/jpeg', 'image/webp'].includes(file.type) || file.size > 130_000) { setError('Choose a JPEG or WebP image smaller than 130 KB.'); return; }
+    if (!['image/jpeg', 'image/webp'].includes(file.type) || file.size > 130_000) {
+      setError('Choose a JPEG or WebP image smaller than 130 KB. Use Edit details to crop larger files.');
+      return;
+    }
     const reader = new FileReader();
     reader.onload = () => { setArtworkFile(String(reader.result)); setError(''); };
     reader.onerror = () => setError('The selected image could not be read.');
@@ -267,24 +280,38 @@ export default function EventDetailPage() {
     if (opening && !directoryLoaded && !directoryLoading) await loadStaffDirectory();
   };
 
-  const updateAssignmentDraft = (shiftId: string, changes: Partial<AssignmentDraft>) => setAssignmentDrafts((current) => ({ ...current, [shiftId]: { ...(current[shiftId] ?? emptyAssignment), ...changes } }));
+  const updateAssignmentDraft = (shiftId: string, changes: Partial<AssignmentDraft>) => {
+    setAssignmentDrafts((current) => ({ ...current, [shiftId]: { ...(current[shiftId] ?? emptyAssignment), ...changes } }));
+  };
 
   const assignStaff = async (shiftId: string) => {
     const draft = assignmentDrafts[shiftId] ?? emptyAssignment;
     if (!event || !draft.userId) return;
-    if (draft.assignmentRole === 'SCREENER' && !draft.eventStationId) { setError('Choose an event station for the screener.'); return; }
+    if (draft.assignmentRole === 'SCREENER' && !draft.eventStationId) {
+      setError('Choose an event station for the screener.');
+      return;
+    }
     setStaffingPending(true); setError('');
     try {
-      const updated = await eventApi.assignStaff(event.eventId, shiftId, { version: event.version, userId: draft.userId, assignmentRole: draft.assignmentRole, eventStationId: draft.eventStationId || null });
-      applyEventUpdate(updated); setAssignmentDrafts((current) => ({ ...current, [shiftId]: emptyAssignment })); setNotice('Staff schedule updated.'); void refreshAudit(event.eventId);
-    } catch (cause) { setError(getApiMessage(cause, 'The staff assignment could not be saved.')); }
+      const updated = await eventApi.assignStaff(event.eventId, shiftId, {
+        version: event.version,
+        userId: draft.userId,
+        assignmentRole: draft.assignmentRole,
+        eventStationId: draft.eventStationId || null,
+      });
+      setEvent(updated);
+      setAssignmentDrafts((current) => ({ ...current, [shiftId]: emptyAssignment }));
+      setNotice('Staff schedule updated.');
+      void refreshAudit(event.eventId);
+    }
+    catch (cause) { setError(getApiMessage(cause, 'The staff assignment could not be saved.')); }
     finally { setStaffingPending(false); }
   };
 
   const removeStaff = async (shiftId: string, assignmentId: string) => {
     if (!event) return;
     setStaffingPending(true); setError('');
-    try { applyEventUpdate(await eventApi.removeStaff(event.eventId, shiftId, assignmentId, event.version)); setNotice('Staff assignment removed.'); void refreshAudit(event.eventId); }
+    try { setEvent(await eventApi.removeStaff(event.eventId, shiftId, assignmentId, event.version)); setNotice('Staff assignment removed.'); void refreshAudit(event.eventId); }
     catch (cause) { setError(getApiMessage(cause, 'The staff assignment could not be removed.')); }
     finally { setStaffingPending(false); }
   };
@@ -297,23 +324,30 @@ export default function EventDetailPage() {
   };
 
   const openStationTemplates = async () => {
-    const opening = !stationPanelOpen; setStationPanelOpen(opening);
+    const opening = !stationPanelOpen;
+    setStationPanelOpen(opening);
     if (opening && !stationTemplatesLoaded && !stationLoading) await loadStationTemplates();
   };
 
   const importStation = async (stationTemplateId: string) => {
     if (!event) return;
     setStationPending(stationTemplateId); setError('');
-    try { applyEventUpdate(await eventApi.importStations(event.eventId, event.version, [stationTemplateId])); setNotice('Station imported into the participant route.'); void refreshAudit(event.eventId); }
-    catch (cause) { setError(getApiMessage(cause, 'The station could not be imported.')); }
+    try {
+      setEvent(await eventApi.importStations(event.eventId, event.version, [stationTemplateId]));
+      setNotice('Station imported into the event route.');
+      void refreshAudit(event.eventId);
+    } catch (cause) { setError(getApiMessage(cause, 'The station could not be imported.')); }
     finally { setStationPending(''); }
   };
 
   const updateStation = async (eventStationId: string, changes: { stationOrder?: number; capacity?: number; isAvailable?: boolean }) => {
     if (!event) return;
     setStationPending(eventStationId); setError('');
-    try { applyEventUpdate(await eventApi.updateStation(event.eventId, eventStationId, { version: event.version, ...changes })); setNotice('Station configuration updated.'); void refreshAudit(event.eventId); }
-    catch (cause) { setError(getApiMessage(cause, 'The station configuration could not be saved.')); }
+    try {
+      setEvent(await eventApi.updateStation(event.eventId, eventStationId, { version: event.version, ...changes }));
+      setNotice('Station configuration updated.');
+      void refreshAudit(event.eventId);
+    } catch (cause) { setError(getApiMessage(cause, 'The station configuration could not be saved.')); }
     finally { setStationPending(''); }
   };
 
@@ -322,158 +356,240 @@ export default function EventDetailPage() {
     const input = submitEvent.currentTarget.elements.namedItem('capacity');
     if (!(input instanceof HTMLInputElement)) return;
     const capacity = input.valueAsNumber;
-    if (!Number.isInteger(capacity) || capacity < 1 || capacity > 1000) { setCapacityErrors((current) => ({ ...current, [eventStationId]: 'Enter a whole number from 1 to 1,000.' })); input.focus(); return; }
-    setCapacityErrors((current) => ({ ...current, [eventStationId]: '' })); void updateStation(eventStationId, { capacity });
+    if (!Number.isInteger(capacity) || capacity < 1 || capacity > 1000) {
+      setCapacityErrors((current) => ({ ...current, [eventStationId]: 'Enter a whole number from 1 to 1,000.' }));
+      input.focus();
+      return;
+    }
+    setCapacityErrors((current) => ({ ...current, [eventStationId]: '' }));
+    void updateStation(eventStationId, { capacity });
   };
 
-  const exportEvent = async () => {
-    if (!event) return;
-    setExportPending(true); setError('');
-    try {
-      const payload = await eventApi.exportEvent(event.eventId);
-      setExportReceipt(payload.exportReceipt);
-      const file = new Blob([JSON.stringify(payload.export, null, 2)], { type: 'application/json' });
-      const url = URL.createObjectURL(file);
-      const link = document.createElement('a'); link.href = url; link.download = `${event.name.replace(/[^a-z0-9]+/gi, '-').replace(/^-|-$/g, '').toLowerCase() || 'event'}-export.json`; document.body.append(link); link.click(); link.remove(); setTimeout(() => URL.revokeObjectURL(url), 0);
-      setNotice('Event export downloaded. Its receipt is available for 15 minutes while this page remains open.');
-    } catch (cause) { setError(getApiMessage(cause, 'The event export could not be generated.')); }
-    finally { setExportPending(false); }
-  };
+  const dateParts = useMemo(() => event ? getDateParts(event.startsAt, event.timezone) : null, [event]);
 
-  const deleteEvent = async () => {
-    if (!event || deleteName !== event.name || !exportReceipt || event.status !== 'DRAFT' || event.signupCount !== 0) return;
-    setDeletePending(true); setError('');
-    try {
-      await eventApi.deleteEmptyDraft(event.eventId, { version: event.version, eventName: event.name, exportReceipt });
-      deleteDialog.current?.close(); navigate('/events', { replace: true });
-    } catch (cause) { setError(getApiMessage(cause, 'The draft could not be deleted. Generate a fresh export and try again.')); }
-    finally { setDeletePending(false); }
-  };
-
-  if (loading) return <div className="event-workspace"><div className="workspace-loading" aria-live="polite"><p className="visually-hidden">Loading event workspace…</p><span /><span /><span /></div></div>;
-  if (!event) return <div className="event-workspace"><div className="workspace-error"><h1>Event unavailable</h1><p>{error}</p><button type="button" onClick={() => void load()}>Try again</button><Link to="/events">Return to events</Link></div></div>;
+  if (loading) return <div className="detail-loading" aria-live="polite" aria-label="Loading event"><span /><span /><span /></div>;
+  if (!event || !dateParts) return <div className="center-state error-state"><h1>Event unavailable</h1><p>{error}</p><div className="error-state-actions"><button className="primary" type="button" onClick={() => void load()}>Try again</button><Link className="secondary" to="/events">Return to events</Link></div></div>;
 
   const terminal = event.status === 'COMPLETED' || event.status === 'CANCELLED';
   const canManage = event.canManage;
-  const canConfigureStations = canManage && !terminal;
-  const canEditStaffing = canManage && !terminal;
-  const canCancel = canManage && !terminal && (event.status !== 'IN_PROGRESS' || user?.systemRole === 'ADMIN');
-  const canReview = event.status === 'IN_PROGRESS' && event.shifts.some((shift) => shift.status === 'ACTIVE' && shift.staffAssignments.some((assignment) => assignment.assignmentRole === 'REVIEWER' && ['ASSIGNED', 'CONFIRMED'].includes(assignment.status) && assignment.user.userId === user?.userId));
+  const canConfigureStations = canManage && ['DRAFT', 'PUBLISHED', 'IN_PROGRESS'].includes(event.status);
+  const canEditStaffing = canManage && ['DRAFT', 'PUBLISHED', 'IN_PROGRESS'].includes(event.status);
   const availableTemplates = stationTemplates.filter((template) => !event.eventStations.some((station) => station.stationTemplateId === template.stationTemplateId));
-  const next = nextAction[event.status];
-  const totalRequiredStaff = event.shifts.reduce((total, shift) => total + shift.requiredStaff, 0);
-  const totalAssignments = event.shifts.reduce((total, shift) => total + shift.staffAssignments.length, 0);
-  const coveredPositions = event.shifts.reduce((total, shift) => total + Math.min(shift.requiredStaff, shift.staffAssignments.length), 0);
-  const fullyStaffedShifts = event.shifts.filter((shift) => shift.staffAssignments.length >= shift.requiredStaff).length;
-  const publishReady = event.eventStations.some((station) => station.isAvailable) && totalAssignments > 0;
-  const transitionDisabled = pending || (next?.action === 'publish' && !publishReady);
+  const canCancel = canManage && !terminal && (event.status !== 'IN_PROGRESS' || user?.systemRole === 'ADMIN');
+  const isAdministrator = user?.roles.includes('ADMINISTRATOR') ?? false;
+  const canPermanentlyDelete = terminal && user?.systemRole === 'ADMIN' && isAdministrator;
+  const canReview = !isAdministrator && user?.roles.includes('REVIEWER') && event.status === 'IN_PROGRESS' && event.shifts.some((shift) => (
+    shift.status === 'ACTIVE' && shift.staffAssignments.some((assignment) => (
+      assignment.assignmentRole === 'REVIEWER'
+      && ['ASSIGNED', 'CONFIRMED'].includes(assignment.status)
+      && assignment.user.userId === user?.userId
+    ))
+  ));
+  const assignedStationTypes = new Set(!isAdministrator && user?.roles.includes('SCREENER') ? event.shifts.flatMap((shift) => shift.staffAssignments.flatMap((assignment) => {
+    if (shift.status !== 'ACTIVE'
+      || assignment.assignmentRole !== 'SCREENER'
+      || !['ASSIGNED', 'CONFIRMED'].includes(assignment.status)
+      || assignment.user.userId !== user?.userId
+      || !assignment.eventStation) return [];
+    const station = event.eventStations.find((candidate) => candidate.eventStationId === assignment.eventStation?.eventStationId);
+    return station ? [station.stationType] : [];
+  })) : []);
   const activeStage = lifecycleStages.findIndex((stage) => stage.status === event.status);
-  const canDelete = (user?.systemRole === 'ADMIN' || (user?.systemRole === 'EVENT_MANAGER' && event.createdByUserId === user.userId)) && event.status === 'DRAFT' && event.signupCount === 0 && Boolean(exportReceipt);
-  const selectTab = (tab: WorkspaceTab) => setSearchParams(tab === 'overview' ? {} : { tab });
-  const handleTabKeyDown = (keyboardEvent: ReactKeyboardEvent<HTMLElement>) => {
-    const currentIndex = tabs.findIndex((tab) => tab.id === activeTab);
-    const targetIndex = keyboardEvent.key === 'Home' ? 0
-      : keyboardEvent.key === 'End' ? tabs.length - 1
-      : keyboardEvent.key === 'ArrowRight' ? (currentIndex + 1) % tabs.length
-      : keyboardEvent.key === 'ArrowLeft' ? (currentIndex - 1 + tabs.length) % tabs.length
-      : currentIndex;
-    if (targetIndex === currentIndex && !['Home', 'End', 'ArrowRight', 'ArrowLeft'].includes(keyboardEvent.key)) return;
-    keyboardEvent.preventDefault();
-    const target = tabs[targetIndex].id;
-    selectTab(target);
-    requestAnimationFrame(() => document.getElementById(`event-tab-${target}`)?.focus());
-  };
+  const totalRequiredStaff = event.shifts.reduce((total, shift) => total + shift.requiredStaff, 0);
+  const next = nextAction[event.status];
+  const routeSection = location.pathname.split('/').filter(Boolean).pop();
+  const requestedView = routeSection && ['stations', 'staff', 'attendees', 'activity'].includes(routeSection) ? routeSection : 'overview';
+  const view = canManage ? requestedView : 'overview';
+  const eventPath = `/events/${event.eventId}`;
 
-  return <div className="event-workspace">
-    <header className="event-workspace-hero">
-      <Link className="workspace-back" to="/events"><ArrowLeftIcon aria-hidden="true" />Events</Link>
-      <div className="workspace-identity">
+  return <div className="page-frame detail-page">
+    <div className="detail-topline"><Link className="event-detail-back" to="/events"><ArrowLeftIcon />Back to events</Link><span className="event-record-reference">Event record / {event.eventId.slice(0, 8)}</span></div>
+
+    <section className="event-detail-hero" aria-labelledby="event-title">
+      <figure className="event-hero-artwork" aria-label={`Artwork for ${event.name}`}>
         <img src={getEventArtwork(event.bannerKey, event.artworkDataUrl)} alt="" />
-        <div><span className={`workspace-status status-${event.status.toLowerCase()}`}><i aria-hidden="true" />{STATUS_LABEL[event.status]}</span><h1>{event.name}</h1><p>{event.description || 'No event description has been added.'}</p></div>
-      </div>
-      <div className="workspace-quick-actions" aria-label="Event quick actions">
-        {event.status !== 'DRAFT' && <Link to={`/e/${event.eventId}`} target="_blank" rel="noreferrer"><ArrowTopRightOnSquareIcon aria-hidden="true" />Public page</Link>}
-        <Link to={`/events/${event.eventId}/queue`}><QueueListIcon aria-hidden="true" />Queue</Link>
-        <Link to={`/events/${event.eventId}/stations/visual-acuity`}>Visual acuity</Link>
-        {canReview && <Link to={`/events/${event.eventId}/reviews`}><ClipboardDocumentCheckIcon aria-hidden="true" />Review</Link>}
-        {canManage && <Link className="workspace-action-primary" to={`/events/${event.eventId}/edit`}><PencilSquareIcon aria-hidden="true" />Edit full plan</Link>}
-      </div>
-    </header>
+        {canManage && !terminal && <button type="button" aria-expanded={bannerOpen} aria-controls="event-banner-picker" onClick={() => { setSelectedBannerKey(event.bannerKey ?? 'COMMUNITY_SCREENING'); setArtworkFile(event.artworkDataUrl ?? ''); setBannerOpen((open) => !open); }}><PhotoIcon />Edit artwork</button>}
+      </figure>
 
-    {notice && <div className="workspace-notice" role="status"><CheckIcon aria-hidden="true" />{notice}<button type="button" onClick={() => setNotice('')} aria-label="Dismiss message"><XMarkIcon aria-hidden="true" /></button></div>}
-    {error && <div className="workspace-alert" role="alert">{error}</div>}
+      <div className="event-summary">
+        <div className="event-summary-heading">
+          <h1 id="event-title">{event.name}</h1>
+          <p>{event.description || 'No event description has been added.'}</p>
+          <div className="event-summary-actions">
+            {canManage ? <details className="event-status-control">
+              <summary><i className={`status-dot ${event.status.toLowerCase()}`} />{STATUS_LABEL[event.status]}<ChevronDownIcon /></summary>
+              <div>
+                {next ? <><span>Next stage</span><button className="primary compact" type="button" disabled={pending} onClick={() => setStatusConfirmOpen(true)}>{pending ? 'Saving…' : next.label}</button></> : <span>This lifecycle is complete.</span>}
+                {canCancel && <button className="danger-button compact" type="button" disabled={pending} onClick={() => { setCancellationReason(''); setCancellationError(''); setCancelOpen(true); }}>Cancel event</button>}
+              </div>
+            </details> : <span className="event-status-readonly"><i className={`status-dot ${event.status.toLowerCase()}`} />{STATUS_LABEL[event.status]}</span>}
+            {terminal && canManage && <Link className="secondary compact" to="/events/new" state={{ duplicateFrom: event }}><DocumentDuplicateIcon />Duplicate event</Link>}
+          </div>
+        </div>
 
-    <nav className="workspace-tabs" role="tablist" aria-label="Event workspace sections" onKeyDown={handleTabKeyDown}>
-      {tabs.map((tab) => <button key={tab.id} id={`event-tab-${tab.id}`} type="button" role="tab" aria-selected={activeTab === tab.id} aria-controls={`event-panel-${tab.id}`} tabIndex={activeTab === tab.id ? 0 : -1} onClick={() => selectTab(tab.id)}>{tab.label}</button>)}
-    </nav>
-
-    {activeTab === 'overview' && <section id="event-panel-overview" role="tabpanel" aria-labelledby="event-tab-overview" className="workspace-panel workspace-overview" tabIndex={-1}>
-      <div className="workspace-two-column">
-        <section className="workspace-section"><h2>When &amp; where</h2><div className="workspace-facts">
-          <div><CalendarDaysIcon aria-hidden="true" /><span><small>Event time</small><strong>{formatEventDate(event.startsAt, event.timezone, false)}</strong><em>{formatTime(event.startsAt, event.timezone)}–{formatTime(event.endsAt, event.timezone)} · {eventDuration(event.startsAt, event.endsAt)} · {event.timezone}</em></span></div>
-          <div><MapPinIcon aria-hidden="true" /><span><small>Location</small><strong>{event.venue}</strong><em>{event.address || 'Address entered manually'}{event.postalCode ? ` · ${event.postalCode}` : ''}</em></span></div>
-          <div><ClockIcon aria-hidden="true" /><span><small>Event days</small><strong>{event.eventDays.length ? event.eventDays.map((day) => formatDay(day.date)).join(' · ') : 'Single-day event'}</strong><em>Operational dates and station availability follow this schedule.</em></span></div>
-        </div></section>
-        <section className="workspace-section"><h2>Operational metrics</h2>{metrics ? <div className="workspace-metrics">
-          <Metric label="Signups" value={metrics.signupCount.toLocaleString()} detail="Registered for this event" />
-          <Metric label="Checked in" value={metrics.checkedInCount.toLocaleString()} detail="Arrived at venue" />
-          <Metric label="Active" value={metrics.activeCount.toLocaleString()} detail={`of ${event.capacity.toLocaleString()} capacity`} />
-          <Metric label="Attendance" value={`${metrics.attendanceRatePercent}%`} detail="Checked in / non-cancelled signups" />
-        </div> : <MetricsStatus loading={metricsLoading} error={metricsError} onRetry={() => void loadMetrics(event.eventId)} />}</section>
+        <div className="event-role-actions">
+          {assignedStationTypes.has('VISUAL_ACUITY') && <Link className="primary" to={`${eventPath}/stations/visual-acuity`}>Open Visual Acuity station</Link>}
+          {assignedStationTypes.has('REFRACTION') && <Link className="primary" to={`${eventPath}/stations/refraction`}>Open Refraction station</Link>}
+          {assignedStationTypes.has('COLOUR_VISION') && <Link className="primary" to={`${eventPath}/stations/colour-vision`}>Open Colour Vision station</Link>}
+          {canReview && <Link className="secondary" to={`${eventPath}/reviews`}><ClipboardDocumentCheckIcon />Open clinical review</Link>}
+        </div>
       </div>
+    </section>
 
-      <div className="workspace-two-column workspace-overview-lower">
-        <section className="workspace-section"><div className="workspace-section-heading"><h2>Lifecycle</h2>{canManage && !terminal && next && <button className="workspace-action-primary" type="button" disabled={transitionDisabled} onClick={() => void transition()}>{pending ? 'Saving…' : next.label}</button>}</div>
-          <ol className={`workspace-lifecycle ${event.status === 'CANCELLED' ? 'is-cancelled' : ''}`}>{lifecycleStages.map((stage, index) => <li className={index < activeStage ? 'complete' : index === activeStage ? 'current' : ''} aria-current={index === activeStage ? 'step' : undefined} key={stage.status}><i>{index < activeStage ? <CheckIcon aria-hidden="true" /> : null}</i><span>{stage.label}</span></li>)}</ol>
-          {event.status === 'DRAFT' && !publishReady && <p className="workspace-publish-requirement" role="status">Add at least one open station and assign at least one person before publishing.</p>}
-          {event.status === 'CANCELLED' && <p className="workspace-cancellation"><strong>Cancellation reason:</strong> {event.cancellationReason || 'No reason recorded.'}</p>}
-        </section>
-        <section className="workspace-section workspace-activity"><div className="workspace-section-heading"><h2>Activity</h2>{canManage && <button type="button" onClick={() => void refreshAudit(event.eventId)}>Refresh</button>}</div>
-          {!canManage ? <p>History is available to event managers and administrators.</p> : auditError ? <div className="workspace-inline-error" role="alert"><p>{auditError}</p><button type="button" onClick={() => void refreshAudit(event.eventId)}>Try again</button></div> : auditLoading && audit.length === 0 ? <p>Loading activity…</p> : audit.length ? <ol>{audit.map((item) => <li key={item.eventAuditLogId}><i aria-hidden="true" /><span><strong>{roleLabel(item.action)}</strong><small>{item.actor?.email ?? 'System actor'} · {formatEventDate(item.createdAt, event.timezone)}</small></span></li>)}</ol> : <p>No history is available.</p>}
-        </section>
+    {canManage && <nav className="event-detail-tabs" aria-label="Event sections">
+      <Link className={view === 'overview' ? 'active' : undefined} to={eventPath}>Overview</Link>
+      <Link className={view === 'stations' ? 'active' : undefined} to={`${eventPath}/stations`}>Stations</Link>
+      <Link className={view === 'staff' ? 'active' : undefined} to={`${eventPath}/staff`}>Staff</Link>
+      <Link className={view === 'attendees' ? 'active' : undefined} to={`${eventPath}/attendees`}>Attendees</Link>
+      <Link className={view === 'activity' ? 'active' : undefined} to={`${eventPath}/activity`}>Activity</Link>
+    </nav>}
+
+    <AppToast message={notice} onDismiss={() => setNotice('')} />
+    {error && <div className="alert error" role="alert">{error}</div>}
+
+    {bannerOpen && !terminal && <section className="banner-picker event-hero-banner-picker" id="event-banner-picker" aria-labelledby="banner-picker-title">
+      <div className="banner-picker-heading"><div><h2 id="banner-picker-title">Choose event artwork</h2><p>Use a built-in image or select your own file.</p></div><button className="icon-button" type="button" onClick={() => setBannerOpen(false)} aria-label="Close artwork picker"><XMarkIcon /></button></div>
+      <input ref={fileInput} className="visually-hidden" type="file" accept="image/jpeg,image/webp" onChange={chooseArtwork} />
+      <div className="banner-options" role="radiogroup" aria-label="Available event artwork">
+        {EVENT_BANNERS.map((option) => <button className={`banner-option ${!artworkFile && selectedBannerKey === option.key ? 'selected' : ''}`} type="button" role="radio" aria-checked={!artworkFile && selectedBannerKey === option.key} key={option.key} onClick={() => { setSelectedBannerKey(option.key); setArtworkFile(''); }}><span className="banner-option-image"><img src={option.src} alt="" />{!artworkFile && selectedBannerKey === option.key && <i><CheckIcon /></i>}</span><span><strong>{option.label}</strong><small>{option.description}</small></span></button>)}
+        <button className={`banner-option banner-upload-option ${artworkFile ? 'selected' : ''}`} type="button" role="radio" aria-checked={!!artworkFile} onClick={() => fileInput.current?.click()}><span className="banner-option-image"><ArrowUpTrayIcon />{artworkFile && <i><CheckIcon /></i>}</span><span><strong>Upload your image</strong><small>JPEG or WebP, up to 130 KB</small></span></button>
       </div>
-      {metrics && <section className="workspace-section workspace-outcome-summary"><div className="workspace-section-heading"><div><h2>Outcome summary</h2><p>Aggregate operational benefit without exposing participant clinical details.</p></div></div><div className="workspace-metrics attendee-metrics"><Metric label="Screening results" value={metrics.screeningResultCount.toLocaleString()} detail="Measurements recorded" /><Metric label="Completed" value={metrics.completedCount.toLocaleString()} detail="Participant workflows finished" /><Metric label="Flagged results" value={metrics.flaggedResultCount.toLocaleString()} detail="Results needing review" /><Metric label="Referrals" value={metrics.referralCount.toLocaleString()} detail="Follow-up pathways created" /></div></section>}
+      <div className="banner-picker-actions"><button className="secondary" type="button" onClick={() => setBannerOpen(false)}>Cancel</button><button className="primary" type="button" disabled={bannerPending} onClick={() => void saveBanner()}>{bannerPending ? 'Saving…' : 'Use selected artwork'}</button></div>
     </section>}
 
-    {activeTab === 'attendees' && <section id="event-panel-attendees" role="tabpanel" aria-labelledby="event-tab-attendees" className="workspace-panel" tabIndex={-1}>
-      <div className="workspace-section-heading"><div><h2>Attendees</h2><p>Manager-visible operational rows only.</p></div></div>
-      {metrics ? <div className="workspace-metrics attendee-metrics"><Metric label="Signed up" value={metrics.signupCount.toLocaleString()} detail="Excluding cancellations" /><Metric label="Checked in" value={metrics.checkedInCount.toLocaleString()} detail="At venue" /><Metric label="Completed" value={metrics.completedCount.toLocaleString()} detail="Finished workflow" /><Metric label="Referrals" value={metrics.referralCount.toLocaleString()} detail="Follow-up required" /></div> : <MetricsStatus loading={metricsLoading} error={metricsError} onRetry={() => void loadMetrics(event.eventId)} />}
-      {!canManage ? <section className="workspace-empty"><h3>Manager access required</h3><p>Attendee records are visible only to event managers and administrators.</p></section> : <>
-        <form className="attendee-controls" onSubmit={(submitEvent) => { submitEvent.preventDefault(); setAppliedAttendeeSearch(attendeeSearch.trim()); }}>
-          <label><span className="visually-hidden">Search attendees</span><input type="search" value={attendeeSearch} onChange={(change) => setAttendeeSearch(change.target.value)} placeholder="Search name or reference" /></label>
-          <label><span className="visually-hidden">Filter attendee status</span><select value={attendeeStatus} onChange={(change) => setAttendeeStatus(change.target.value as EventAttendee['registrationStatus'] | '')}><option value="">All statuses</option><option value="SIGNED_UP">Signed up</option><option value="CHECKED_IN">Checked in</option><option value="COMPLETED">Completed</option><option value="CANCELLED">Cancelled</option></select></label>
-          <button type="submit">Search</button>
-        </form>
-        {attendeeError ? <section className="workspace-empty" role="alert"><h3>Attendees could not be loaded</h3><p>{attendeeError}</p><button type="button" onClick={() => void loadAttendees({ status: attendeeStatus || undefined, search: appliedAttendeeSearch || undefined })}>Try again</button></section>
-          : attendeeLoading && attendees.length === 0 ? <section className="workspace-empty" aria-live="polite"><h3>Loading attendees</h3></section>
-          : attendees.length ? <>
-            <p className="attendee-total">Showing {attendees.length.toLocaleString()} of {attendeeTotal.toLocaleString()} attendee{attendeeTotal === 1 ? '' : 's'}</p>
-            <div className="attendee-table-wrap"><table className="attendee-table"><caption className="visually-hidden">Attendees registered for {event.name}</caption><thead><tr><th scope="col">Attendee</th><th scope="col">Status</th><th scope="col">Queue</th><th scope="col">Check-in</th><th scope="col">Registered</th></tr></thead><tbody>{attendees.map((attendee) => <tr key={attendee.registrationId}><td><strong>{attendee.participantDisplayName || 'Participant name unavailable'}</strong><small>{attendee.participantReference}</small></td><td><span className={`attendee-status status-${attendee.registrationStatus.toLowerCase()}`}>{roleLabel(attendee.registrationStatus)}</span></td><td>{attendee.queueNumber ?? '—'}</td><td>{attendee.checkedInAt ? formatEventDate(attendee.checkedInAt, event.timezone) : 'Not checked in'}</td><td>{formatEventDate(attendee.createdAt, event.timezone)}</td></tr>)}</tbody></table></div>
-            {attendeeNextCursor && <div className="attendee-pagination"><button type="button" disabled={attendeeLoading} onClick={() => void loadAttendees({ cursor: attendeeNextCursor, status: attendeeStatus || undefined, search: appliedAttendeeSearch || undefined }, true)}>{attendeeLoading ? 'Loading…' : 'Load more attendees'}</button></div>}
-          </> : <section className="workspace-empty"><h3>No attendees found</h3><p>Try another search or status filter.</p></section>}
+    {view === 'overview' && <div className="event-view">
+      <div className="event-view-heading"><h2>Overview</h2><div>{canManage && <button className="secondary compact" type="button" disabled={exportPending} onClick={() => void downloadEventExport()}>{exportPending ? 'Preparing export…' : 'Download export'}</button>}{canManage && !terminal && <Link className="secondary compact" to={`${eventPath}/edit`}><PencilSquareIcon />Edit overview</Link>}</div></div>
+      <section className="event-metric-grid" aria-label="Event overview">
+        <div className="event-info-row"><CalendarDaysIcon /><div><small>Date and time</small><strong>{dateParts.weekday}, {dateParts.month} {dateParts.day}, {dateParts.year}</strong><span>{formatTime(event.startsAt, event.timezone)} to {formatTime(event.endsAt, event.timezone)}, {eventDuration(event.startsAt, event.endsAt)}</span></div></div>
+        <div className="event-info-row"><MapPinIcon /><div><small>Venue</small><strong>{event.venue}</strong><span>{event.address || 'Address entered manually'}{event.postalCode ? ` · Singapore ${event.postalCode}` : ''} · {event.timezone}</span></div></div>
+        {canManage && <div className="event-info-row"><UserGroupIcon /><div><small>At venue now</small><strong>{event.activeCapacityCount.toLocaleString()} of {event.capacity.toLocaleString()} people</strong><span>Signed up or checked in</span></div></div>}
+        {canManage && <div className="event-info-row"><ClipboardDocumentListIcon /><div><small>Expected</small><strong>{event.expectedAttendance?.toLocaleString() || 'Not set'} visitors</strong><span>{event.signupCount.toLocaleString()} signups collected</span></div></div>}
+        <div className="event-info-row"><ClockIcon /><div><small>Staffing plan</small><strong>{event.shifts.length} {event.shifts.length === 1 ? 'shift' : 'shifts'}, {totalRequiredStaff} required</strong><span>Event operations coverage</span></div></div>
+      </section>
+      {canManage && <section className="event-metric-grid" aria-label="Operational metrics">
+        {metricsLoading ? <p>Loading operational metrics…</p> : metricsError ? <div className="inline-retry" role="alert"><p>{metricsError}</p><button className="secondary compact" type="button" onClick={() => void loadMetrics(event.eventId)}>Retry</button></div> : metrics && <>
+          <div className="event-info-row"><ClipboardDocumentListIcon /><div><small>Signups</small><strong>{metrics.signupCount.toLocaleString()}</strong><span>Non-cancelled registrations</span></div></div>
+          <div className="event-info-row"><UserGroupIcon /><div><small>Checked in</small><strong>{metrics.checkedInCount.toLocaleString()}</strong><span>{metrics.attendanceRatePercent}% attendance</span></div></div>
+          <div className="event-info-row"><ClockIcon /><div><small>Active</small><strong>{metrics.activeCount.toLocaleString()}</strong><span>Of {metrics.capacity.toLocaleString()} capacity</span></div></div>
+          <div className="event-info-row"><ClipboardDocumentCheckIcon /><div><small>Clinical results</small><strong>{metrics.screeningResultCount.toLocaleString()}</strong><span>{metrics.flaggedResultCount.toLocaleString()} flagged · {metrics.referralCount.toLocaleString()} referrals</span></div></div>
+        </>}
+      </section>}
+      <section className="lifecycle" aria-labelledby="lifecycle-title">
+        <div className="lifecycle-heading"><h2 id="lifecycle-title">Event lifecycle</h2><span>{event.status === 'CANCELLED' ? 'Cancelled before completion' : `${STATUS_LABEL[event.status]} stage`}</span></div>
+        <ol className={event.status === 'CANCELLED' ? 'is-cancelled' : ''}>{lifecycleStages.map((stage, index) => <li className={index < activeStage ? 'complete' : index === activeStage ? 'current' : ''} key={stage.status}><i>{index < activeStage ? <CheckIcon /> : null}</i><span>{stage.label}</span></li>)}</ol>
+      </section>
+      {event.status === 'CANCELLED' && <section className="cancellation"><strong>Cancellation reason</strong><p>{event.cancellationReason}</p></section>}
+      {canPermanentlyDelete && <section className="event-danger-zone" aria-labelledby="event-danger-zone-title">
+        <div><h2 id="event-danger-zone-title">Danger zone</h2><p>This completed event can be permanently deleted. Its event-owned operational records will be removed; shared accounts and participant profiles will remain.</p></div>
+        <button className="danger-button compact" type="button" onClick={() => setDeleteOpen(true)}><TrashIcon />Delete event</button>
+      </section>}
+    </div>}
+
+    {view === 'stations' && <section className="event-view station-section" aria-labelledby="stations-title">
+          <div className="section-title">
+            <div><h2 id="stations-title">Event stations</h2><p>Availability follows the event’s scheduled days.</p></div>
+            {canConfigureStations && <button className="secondary compact" type="button" aria-expanded={stationPanelOpen} aria-controls="station-template-panel" onClick={() => void openStationTemplates()}><PlusIcon />Import station</button>}
+          </div>
+          {stationPanelOpen && <div className="station-template-panel" id="station-template-panel" aria-live="polite">
+            <div><strong>Station templates</strong><span>Importing creates an event-owned copy. Changes here will not alter the reusable template.</span></div>
+            {stationLoading ? <p>Loading station templates…</p> : stationTemplatesError ? <div className="inline-retry" role="alert"><p>{stationTemplatesError}</p><button className="secondary compact" type="button" onClick={() => void loadStationTemplates()}>Retry</button></div> : stationTemplatesLoaded && availableTemplates.length === 0 ? <p>All active station templates are already in this event.</p> : <ul>{availableTemplates.map((template) => <li key={template.stationTemplateId}><span><strong>{template.name}</strong><small>{template.description || 'No template description.'} · Default capacity {template.defaultCapacity}</small></span><button className="secondary compact" type="button" disabled={!!stationPending} onClick={() => void importStation(template.stationTemplateId)}>{stationPending === template.stationTemplateId ? 'Importing…' : 'Import'}</button></li>)}</ul>}
+          </div>}
+          {event.eventStations.length === 0 ? <p className="quiet-empty">{canConfigureStations ? 'No stations imported yet. Import a template to build the screening route.' : 'No stations are configured for this event.'}</p> : <div className="station-table">{event.eventStations.map((station, index) => <article className={`station-record ${station.isAvailable ? '' : 'is-unavailable'}`} key={station.eventStationId}>
+            <div className="station-order"><strong>{station.stationOrder}</strong><span>Route order</span></div>
+            <div className="station-record-copy"><strong>{station.name}</strong><span>{station.description || 'No station instructions.'}</span><small>Template v{station.templateVersion}</small><div className="station-day-list">{(station.availabilities.length ? station.availabilities : event.eventDays.map((day) => ({ eventStationAvailabilityId: `${station.eventStationId}-${day.eventDayId}`, eventDay: day, isAvailable: station.isAvailable, capacity: station.capacity }))).map((availability) => <span className={availability.isAvailable ? 'is-available' : 'is-unavailable'} key={availability.eventStationAvailabilityId}>{formatEventDate(availability.eventDay.date, event.timezone, false)} · {availability.isAvailable ? `${availability.capacity} places` : 'Unavailable'}</span>)}</div></div>
+            {canConfigureStations ? <div className="station-controls">
+              <div className="station-reorder" aria-label={`Change ${station.name} route order`}>
+                <button className="icon-button" type="button" aria-label={`Move ${station.name} earlier`} disabled={index === 0 || !!stationPending} onClick={() => void updateStation(station.eventStationId, { stationOrder: station.stationOrder - 1 })}><ChevronUpIcon /></button>
+                <button className="icon-button" type="button" aria-label={`Move ${station.name} later`} disabled={index === event.eventStations.length - 1 || !!stationPending} onClick={() => void updateStation(station.eventStationId, { stationOrder: station.stationOrder + 1 })}><ChevronDownIcon /></button>
+              </div>
+              <form className="station-capacity" noValidate onSubmit={(submitEvent) => saveStationCapacity(submitEvent, station.eventStationId)}>
+                <label><span>Capacity</span><input key={`${station.eventStationId}-${station.capacity}`} name="capacity" type="number" min="1" max="1000" step="1" required defaultValue={station.capacity} aria-label={`${station.name} capacity`} aria-invalid={!!capacityErrors[station.eventStationId]} aria-describedby={capacityErrors[station.eventStationId] ? `capacity-error-${station.eventStationId}` : undefined} onInput={() => setCapacityErrors((current) => ({ ...current, [station.eventStationId]: '' }))} />{capacityErrors[station.eventStationId] && <span className="field-error" id={`capacity-error-${station.eventStationId}`} role="alert">{capacityErrors[station.eventStationId]}</span>}</label>
+                <button className="secondary compact" type="submit" disabled={!!stationPending}>{stationPending === station.eventStationId ? 'Saving…' : 'Save'}</button>
+              </form>
+              <button className="secondary compact" type="button" disabled={!!stationPending} onClick={() => void updateStation(station.eventStationId, { isAvailable: !station.isAvailable })}>{station.isAvailable ? 'Mark unavailable' : 'Make available'}</button>
+            </div> : <strong className="station-capacity-readonly">{station.capacity} concurrent</strong>}
+          </article>)}</div>}
+    </section>}
+
+    {view === 'staff' && <section className="event-view shift-section" aria-labelledby="shift-title">
+        <div className="section-title"><h2 id="shift-title">Shifts</h2><span>{event.shifts.length} scheduled</span></div>
+        {event.shifts.length === 0 ? <p className="quiet-empty">No shifts have been added. The event can still be saved as a draft.</p> : <div className="shift-table">{event.shifts.map((shift) => {
+          const draft = assignmentDrafts[shift.shiftId] ?? emptyAssignment;
+          const selectedStaff = staffDirectory.find((person) => person.userId === draft.userId);
+          const compatibleRoles = selectedStaff
+            ? assignmentRoles.filter((role) => selectedStaff.roles.includes(applicationRoleByAssignment[role]))
+            : [];
+          return <article className="shift-record" key={shift.shiftId}>
+            <div className="shift-record-summary"><span><strong>{shift.name}</strong><small>{STATUS_LABEL[shift.status as keyof typeof STATUS_LABEL] ?? shift.status.toLowerCase()}</small></span><span><small>Schedule</small>{formatTime(shift.startsAt, event.timezone)}–{formatTime(shift.endsAt, event.timezone)}</span><span><small>Coverage</small>{shift.staffAssignments.length} of {shift.requiredStaff} assigned</span>{canEditStaffing && <button className="secondary compact" type="button" aria-expanded={staffingOpen === shift.shiftId} onClick={() => void openStaffing(shift.shiftId)}><PlusIcon />Assign</button>}</div>
+            {shift.staffAssignments.length > 0 ? <ul className="assignment-list">{shift.staffAssignments.map((assignment) => <li key={assignment.staffAssignmentId}><span><strong>{getDisplayName(assignment.user.username)}</strong><small>{roleLabel(assignment.assignmentRole)}{assignment.eventStation ? ` · ${assignment.eventStation.name}` : ''}</small></span>{canEditStaffing && <button className="assignment-remove" type="button" aria-label={`Remove ${getDisplayName(assignment.user.username)} from ${shift.name}`} title={`Remove ${getDisplayName(assignment.user.username)}`} onClick={() => void removeStaff(shift.shiftId, assignment.staffAssignmentId)} disabled={staffingPending}><TrashIcon /></button>}</li>)}</ul> : <p className="shift-empty">No staff assigned to this shift.</p>}
+            {canEditStaffing && staffingOpen === shift.shiftId && <form className="staffing-editor" onSubmit={(submitEvent) => { submitEvent.preventDefault(); void assignStaff(shift.shiftId); }}>
+              {directoryLoading ? <p>Loading available staff…</p> : directoryError ? <div className="inline-retry" role="alert"><p>{directoryError}</p><button className="secondary compact" type="button" onClick={() => void loadStaffDirectory()}>Retry</button></div> : directoryLoaded && staffDirectory.length === 0 ? <p>No active staff members are available.</p> : <>
+                <label><span>Staff member</span><select required value={draft.userId} disabled={staffingPending} onChange={(change) => { const person = staffDirectory.find((candidate) => candidate.userId === change.target.value); const role = assignmentRoles.find((candidate) => person?.roles.includes(applicationRoleByAssignment[candidate])) ?? 'SUPPORT'; updateAssignmentDraft(shift.shiftId, { userId: change.target.value, assignmentRole: role, eventStationId: role === 'SCREENER' ? draft.eventStationId : '' }); }}><option value="">Choose staff</option>{staffDirectory.map((person) => <option value={person.userId} key={person.userId}>{getDisplayName(person.username)} · {person.roles.map(roleLabel).join(', ')}</option>)}</select></label>
+                <label><span>Shift role</span><select value={draft.assignmentRole} disabled={staffingPending || !draft.userId} onChange={(change) => updateAssignmentDraft(shift.shiftId, { assignmentRole: change.target.value as StaffAssignmentRole })}>{compatibleRoles.map((role) => <option value={role} key={role}>{roleLabel(role)}</option>)}</select></label>
+                <label><span>Station {draft.assignmentRole === 'SCREENER' ? '(required)' : '(optional)'}</span><select required={draft.assignmentRole === 'SCREENER'} value={draft.eventStationId} disabled={staffingPending} onChange={(change) => updateAssignmentDraft(shift.shiftId, { eventStationId: change.target.value })}><option value="">No station</option>{event.eventStations.filter((station) => station.isAvailable).map((station) => <option value={station.eventStationId} key={station.eventStationId}>{station.stationOrder}. {station.name}</option>)}</select></label>
+                <button className="primary compact" type="submit" disabled={staffingPending || !draft.userId || (draft.assignmentRole === 'SCREENER' && !draft.eventStationId)}>{staffingPending ? 'Saving…' : 'Save assignment'}</button>
+              </>}
+            </form>}
+          </article>;
+        })}</div>}
+    </section>}
+
+    {view === 'attendees' && <section className="event-view" aria-labelledby="attendees-title">
+      <div className="event-view-heading"><div><h2 id="attendees-title">Attendees</h2><p>{attendeeTotal.toLocaleString()} matching registrations</p></div></div>
+      <form className="station-template-panel" onSubmit={(submitEvent) => { submitEvent.preventDefault(); void loadAttendees(); }}>
+        <label><span>Search attendee</span><input value={attendeeSearch} onChange={(change) => setAttendeeSearch(change.target.value)} placeholder="Name or participant reference" /></label>
+        <label><span>Status</span><select value={attendeeStatus} onChange={(change) => setAttendeeStatus(change.target.value as EventAttendee['registrationStatus'] | '')}><option value="">All statuses</option><option value="SIGNED_UP">Signed up</option><option value="CHECKED_IN">Checked in</option><option value="COMPLETED">Completed</option><option value="CANCELLED">Cancelled</option></select></label>
+        <button className="secondary compact" type="submit" disabled={attendeeLoading}>{attendeeLoading ? 'Loading…' : 'Apply filters'}</button>
+      </form>
+      {attendeeError && <div className="inline-retry" role="alert"><p>{attendeeError}</p><button className="secondary compact" type="button" onClick={() => void loadAttendees()}>Retry</button></div>}
+      {!attendeeError && !attendeeLoading && attendees.length === 0 ? <p className="quiet-empty">No attendees match these filters.</p> : <div className="station-table">{attendees.map((attendee) => <article className="station-record" key={attendee.registrationId}><div className="station-record-copy"><strong>{attendee.participantDisplayName || attendee.participantReference}</strong><span>{attendee.participantReference} · {attendee.registrationStatus.toLowerCase().replace('_', ' ')}</span><small>{attendee.checkedInAt ? `Checked in ${formatEventDate(attendee.checkedInAt, event.timezone)}` : `Registered ${formatEventDate(attendee.createdAt, event.timezone)}`}</small></div><strong className="station-capacity-readonly">{attendee.queueNumber ? `#${attendee.queueNumber}` : '—'}</strong></article>)}</div>}
+      {attendeeNextCursor && <button className="secondary compact" type="button" disabled={attendeeLoading} onClick={() => void loadAttendees(attendeeNextCursor, true)}>{attendeeLoading ? 'Loading…' : 'Load more'}</button>}
+    </section>}
+
+    {view === 'activity' && <section className="event-view history event-activity" aria-labelledby="activity-title">
+      <h2 id="activity-title">Activity</h2>
+      <p>Consequential event actions retain the authenticated actor and timestamp.</p>
+      {!canManage ? <p>History is available to the event’s managers and administrators.</p> : <>
+        {auditError && <div className="inline-retry" role="alert"><p>{auditError}</p><button className="secondary compact" type="button" onClick={() => void refreshAudit(event.eventId)}>Retry</button></div>}
+        {auditLoading && audit.length === 0 ? <p>Loading activity…</p> : !auditError && audit.length === 0 ? <p>No history is available.</p> : audit.length > 0 ? <ol>{audit.map((item) => <li key={item.eventAuditLogId}><i /><div><strong>{item.action.toLowerCase().replace(/_/g, ' ')}</strong><span>{item.actor?.email ?? 'System actor'}</span><time dateTime={item.createdAt}>{formatEventDate(item.createdAt, event.timezone)}</time></div></li>)}</ol> : null}
       </>}
     </section>}
-
-    {activeTab === 'operations' && <section id="event-panel-operations" role="tabpanel" aria-labelledby="event-tab-operations" className="workspace-panel workspace-operations" tabIndex={-1}>
-      <section className="workspace-section"><div className="workspace-section-heading"><div><h2>Participant route</h2><p>Station order and daily availability.</p></div><div>{canConfigureStations && <button type="button" onClick={() => void openStationTemplates()} aria-expanded={stationPanelOpen} aria-controls="station-template-panel"><PlusIcon aria-hidden="true" />Import station</button>}{canManage && <Link to={`/events/${event.eventId}/edit`}>Edit full plan</Link>}</div></div>
-        {stationPanelOpen && <div className="station-template-panel" id="station-template-panel" aria-live="polite"><div><strong>Station templates</strong><span>Importing creates an event-owned copy.</span></div>{stationLoading ? <p>Loading station templates…</p> : stationTemplatesError ? <div className="workspace-inline-error" role="alert"><p>{stationTemplatesError}</p><button type="button" onClick={() => void loadStationTemplates()}>Try again</button></div> : stationTemplatesLoaded && availableTemplates.length === 0 ? <p>All active station templates are already imported.</p> : <ul>{availableTemplates.map((template) => <li key={template.stationTemplateId}><span><strong>{template.name}</strong><small>{template.description || 'No template description.'} · Default capacity {template.defaultCapacity}</small></span><button type="button" disabled={!!stationPending} onClick={() => void importStation(template.stationTemplateId)}>{stationPending === template.stationTemplateId ? 'Importing…' : 'Import'}</button></li>)}</ul>}</div>}
-        {event.eventStations.length === 0 ? <p className="workspace-empty-copy">No stations are configured for this event.</p> : <div className="station-list">{event.eventStations.map((station, index) => <article className={`station-record ${station.isAvailable ? '' : 'is-unavailable'}`} key={station.eventStationId}><div className="station-order"><strong>{station.stationOrder}</strong><span>Route</span></div><div className="station-record-copy"><strong>{station.name}</strong><span>{station.description || 'No station instructions.'}</span><small>{station.isAvailable ? 'Open' : 'Closed'} · Base capacity {station.capacity}</small><ul className="station-availability">{station.availabilities.length ? station.availabilities.map((availability) => <li key={availability.eventStationAvailabilityId}><strong>{formatDay(availability.eventDay.date)}</strong><span>{availability.isAvailable ? 'Open' : 'Closed'} · {availability.startsAt && availability.endsAt ? `${formatTime(availability.startsAt, event.timezone)}–${formatTime(availability.endsAt, event.timezone)}` : 'All day'} · Capacity {availability.capacity}</span></li>) : <li><span>No daily availability configured.</span></li>}</ul></div>{canConfigureStations ? <div className="station-controls"><div className="station-reorder" aria-label={`Change ${station.name} route order`}><button type="button" aria-label={`Move ${station.name} earlier`} disabled={index === 0 || !!stationPending} onClick={() => void updateStation(station.eventStationId, { stationOrder: station.stationOrder - 1 })}><ChevronUpIcon /></button><button type="button" aria-label={`Move ${station.name} later`} disabled={index === event.eventStations.length - 1 || !!stationPending} onClick={() => void updateStation(station.eventStationId, { stationOrder: station.stationOrder + 1 })}><ChevronDownIcon /></button></div><form className="station-capacity" noValidate onSubmit={(submitEvent) => saveStationCapacity(submitEvent, station.eventStationId)}><label>Capacity<input key={`${station.eventStationId}-${station.capacity}`} name="capacity" type="number" min="1" max="1000" required defaultValue={station.capacity} aria-label={`${station.name} capacity`} aria-invalid={!!capacityErrors[station.eventStationId]} onInput={() => setCapacityErrors((current) => ({ ...current, [station.eventStationId]: '' }))} /></label>{capacityErrors[station.eventStationId] && <span className="field-error" role="alert">{capacityErrors[station.eventStationId]}</span>}<button type="submit" disabled={!!stationPending}>{stationPending === station.eventStationId ? 'Saving…' : 'Save'}</button></form><button type="button" disabled={!!stationPending} onClick={() => void updateStation(station.eventStationId, { isAvailable: !station.isAvailable })}>{station.isAvailable ? 'Mark closed' : 'Make open'}</button></div> : null}</article>)}</div>}
-      </section>
-
-      <section className="workspace-section"><div className="workspace-section-heading"><div><h2>Shifts &amp; coverage</h2><p>{event.shifts.length} scheduled · {totalRequiredStaff} positions required.</p></div>{canManage && <Link to={`/events/${event.eventId}/edit`}>Edit full plan</Link>}</div>
-        {event.shifts.length === 0 ? <p className="workspace-empty-copy">No shifts have been added.</p> : <><div className="workspace-metrics attendee-metrics"><Metric label="Positions covered" value={`${coveredPositions}/${totalRequiredStaff}`} detail="Required positions with an assignee" /><Metric label="Open positions" value={Math.max(0, totalRequiredStaff - coveredPositions).toLocaleString()} detail="Still need an assignee" /><Metric label="Fully staffed shifts" value={`${fullyStaffedShifts}/${event.shifts.length}`} detail="Meeting required manpower" /><Metric label="Assignments" value={totalAssignments.toLocaleString()} detail="Active staff placements" /></div><div className="shift-list">{event.shifts.map((shift) => { const draft = assignmentDrafts[shift.shiftId] ?? emptyAssignment; return <article className="shift-record" key={shift.shiftId}><div className="shift-record-summary"><span><strong>{shift.name}</strong><small>{shift.status.toLowerCase()}</small></span><span><small>Schedule</small>{formatTime(shift.startsAt, event.timezone)}–{formatTime(shift.endsAt, event.timezone)}</span><span><small>Coverage</small>{shift.staffAssignments.length} of {shift.requiredStaff} assigned</span>{canEditStaffing && <button type="button" aria-expanded={staffingOpen === shift.shiftId} onClick={() => void openStaffing(shift.shiftId)}><PlusIcon aria-hidden="true" />Assign</button>}</div>{shift.staffAssignments.length ? <ul className="assignment-list">{shift.staffAssignments.map((assignment) => <li key={assignment.staffAssignmentId}><span><strong>{getDisplayName(assignment.user.username)}</strong><small>{roleLabel(assignment.assignmentRole)}{assignment.eventStation ? ` · ${assignment.eventStation.name}` : ''}</small></span>{canEditStaffing && <button type="button" aria-label={`Remove ${getDisplayName(assignment.user.username)} from ${shift.name}`} onClick={() => void removeStaff(shift.shiftId, assignment.staffAssignmentId)} disabled={staffingPending}><TrashIcon aria-hidden="true" /></button>}</li>)}</ul> : <p className="workspace-empty-copy">No staff assigned.</p>}{canEditStaffing && staffingOpen === shift.shiftId && <form className="staffing-editor" onSubmit={(submitEvent) => { submitEvent.preventDefault(); void assignStaff(shift.shiftId); }}>{directoryLoading ? <p>Loading available staff…</p> : directoryError ? <div className="workspace-inline-error" role="alert"><p>{directoryError}</p><button type="button" onClick={() => void loadStaffDirectory()}>Try again</button></div> : directoryLoaded && staffDirectory.length === 0 ? <p>No active staff members are available.</p> : <><label>Staff member<select required value={draft.userId} disabled={staffingPending} onChange={(change) => updateAssignmentDraft(shift.shiftId, { userId: change.target.value })}><option value="">Choose staff</option>{staffDirectory.map((person) => <option value={person.userId} key={person.userId}>{getDisplayName(person.username)} · {roleLabel(person.systemRole === 'STAFF' ? 'SUPPORT' : person.systemRole)}</option>)}</select></label><label>Shift role<select value={draft.assignmentRole} disabled={staffingPending} onChange={(change) => updateAssignmentDraft(shift.shiftId, { assignmentRole: change.target.value as StaffAssignmentRole })}>{assignmentRoles.map((role) => <option value={role} key={role}>{roleLabel(role)}</option>)}</select></label><label>Station {draft.assignmentRole === 'SCREENER' ? '(required)' : '(optional)'}<select required={draft.assignmentRole === 'SCREENER'} value={draft.eventStationId} disabled={staffingPending} onChange={(change) => updateAssignmentDraft(shift.shiftId, { eventStationId: change.target.value })}><option value="">No station</option>{event.eventStations.filter((station) => station.isAvailable).map((station) => <option value={station.eventStationId} key={station.eventStationId}>{station.stationOrder}. {station.name}</option>)}</select></label><button type="submit" disabled={staffingPending || !draft.userId || (draft.assignmentRole === 'SCREENER' && !draft.eventStationId)}>{staffingPending ? 'Saving…' : 'Save assignment'}</button></>}</form>}</article>; })}</div></>}
-      </section>
-    </section>}
-
-    {activeTab === 'settings' && <section id="event-panel-settings" role="tabpanel" aria-labelledby="event-tab-settings" className="workspace-panel workspace-settings" tabIndex={-1}>
-      <section className="workspace-section"><div className="workspace-section-heading"><div><h2>Event artwork</h2><p>{event.artworkDataUrl ? 'Your uploaded artwork' : 'Default event artwork'}</p></div>{canManage && !terminal && <button type="button" onClick={() => { setSelectedBannerKey(event.bannerKey ?? 'COMMUNITY_SCREENING'); setArtworkFile(event.artworkDataUrl ?? ''); setBannerOpen((open) => !open); }}><PhotoIcon aria-hidden="true" />Change banner</button>}</div>
-        {bannerOpen && !terminal && <div className="banner-picker" id="banner-picker"><input ref={fileInput} className="visually-hidden" type="file" accept="image/jpeg,image/webp" onChange={chooseArtwork} /><div className="banner-options" role="radiogroup" aria-label="Available event artwork">{EVENT_BANNERS.map((option) => <button className={`banner-option ${!artworkFile && selectedBannerKey === option.key ? 'selected' : ''}`} type="button" role="radio" aria-checked={!artworkFile && selectedBannerKey === option.key} key={option.key} onClick={() => { setSelectedBannerKey(option.key); setArtworkFile(''); }}><img src={option.src} alt="" /><span>{option.label}</span></button>)}<button className={`banner-option ${artworkFile ? 'selected' : ''}`} type="button" role="radio" aria-checked={!!artworkFile} onClick={() => fileInput.current?.click()}><ArrowUpTrayIcon aria-hidden="true" /><span>Upload image</span></button></div><div className="workspace-form-actions"><button type="button" onClick={() => setBannerOpen(false)}>Cancel</button><button className="workspace-action-primary" type="button" disabled={bannerPending} onClick={() => void saveBanner()}>{bannerPending ? 'Saving…' : 'Use selected artwork'}</button></div></div>}
-      </section>
-      <section className="workspace-section"><div className="workspace-section-heading"><div><h2>Event management</h2><p>Edit event days, slots, and full plan in the event editor.</p></div></div><div className="workspace-management-actions">{canManage && <Link className="workspace-action-primary" to={`/events/${event.eventId}/edit`}><PencilSquareIcon aria-hidden="true" />Edit full plan</Link>}{canManage && <button type="button" disabled={exportPending} onClick={() => void exportEvent()}><ArrowDownTrayIcon aria-hidden="true" />{exportPending ? 'Exporting…' : 'Export event'}</button>}{terminal && canManage && <Link to="/events/new" state={{ duplicateFrom: event }}><DocumentDuplicateIcon aria-hidden="true" />Duplicate event</Link>}{canManage && !terminal && next && <button type="button" disabled={transitionDisabled} onClick={() => void transition()}>{pending ? 'Saving…' : next.label}</button>}{canCancel && <button className="workspace-danger-button" type="button" disabled={pending} onClick={() => { setCancelReason(''); setCancelError(''); cancelDialog.current?.showModal(); }}>Cancel event</button>}</div></section>
-      <section className="workspace-section workspace-danger-zone"><div><h2>Delete empty draft</h2><p>Deletion is available only for an unpopulated draft with no signups or consent records after a current export has been generated.</p></div><button type="button" disabled={!canDelete} onClick={() => { setDeleteName(''); setError(''); deleteDialog.current?.showModal(); }}><TrashIcon aria-hidden="true" />Delete draft</button>{!canDelete && <small>{event.status !== 'DRAFT' ? 'Only drafts can be deleted.' : event.signupCount ? 'Draft has signups and cannot be deleted.' : 'Export the event first to enable deletion.'}</small>}</section>
-    </section>}
-
-    <dialog className="delete-event-dialog" ref={cancelDialog} aria-labelledby="cancel-event-title"><form method="dialog" onSubmit={(submitEvent) => { submitEvent.preventDefault(); void cancel(); }}><h2 id="cancel-event-title">Cancel {event.name}?</h2><p>The reason is recorded in event history and helps staff respond consistently.</p><label>Cancellation reason<textarea autoFocus required minLength={10} maxLength={1000} rows={5} value={cancelReason} onChange={(change) => { setCancelReason(change.target.value); setCancelError(''); }} aria-invalid={Boolean(cancelError)} aria-describedby="cancel-event-help" /></label><small id="cancel-event-help">{cancelReason.length.toLocaleString()}/1,000 characters · minimum 10</small>{cancelError && <p className="dialog-error" role="alert">{cancelError}</p>}<div><button type="button" onClick={() => cancelDialog.current?.close()}>Keep event</button><button className="workspace-danger-button" type="submit" disabled={pending || cancelReason.trim().length < 10}>{pending ? 'Cancelling…' : 'Cancel event'}</button></div></form></dialog>
-    <dialog className="delete-event-dialog" ref={deleteDialog} aria-labelledby="delete-event-title"><form method="dialog" onSubmit={(submitEvent) => { submitEvent.preventDefault(); void deleteEvent(); }}><h2 id="delete-event-title">Delete {event.name}?</h2><p>This permanently removes an empty draft. Type the exact event name to confirm.</p><label>Event name<input value={deleteName} onChange={(change) => setDeleteName(change.target.value)} autoComplete="off" /></label>{error && <p className="dialog-error" role="alert">{error}</p>}<div><button type="button" onClick={() => deleteDialog.current?.close()}>Keep draft</button><button className="workspace-danger-button" type="submit" disabled={deletePending || deleteName !== event.name}>{deletePending ? 'Deleting…' : 'Delete draft'}</button></div></form></dialog>
+    <AppDialog
+      open={statusConfirmOpen}
+      onOpenChange={setStatusConfirmOpen}
+      title={next?.label ?? 'Update event status'}
+      description={next?.prompt}
+      dismissible={!pending}
+    >
+      <div className="app-dialog-actions">
+        <button className="secondary" type="button" data-dialog-autofocus disabled={pending} onClick={() => setStatusConfirmOpen(false)}>Keep current status</button>
+        <button className="primary" type="button" disabled={pending} onClick={() => void transition()}>{pending ? 'Saving…' : next?.label ?? 'Save status'}</button>
+      </div>
+    </AppDialog>
+    <AppDialog
+      open={cancelOpen}
+      onOpenChange={(open) => { if (!open && !pending) { setCancelOpen(false); setCancellationReason(''); setCancellationError(''); } }}
+      title="Cancel this event?"
+      description="Record a clear reason before cancelling. This action cannot be reversed."
+      dismissible={!pending}
+    >
+      <form className="app-dialog-form" noValidate onSubmit={(submitEvent) => { submitEvent.preventDefault(); void cancel(); }}>
+        <label className="app-dialog-field"><span>Cancellation reason</span><textarea required minLength={10} maxLength={500} rows={4} value={cancellationReason} data-dialog-autofocus aria-invalid={!!cancellationError} aria-describedby={cancellationError ? 'event-cancellation-help event-cancellation-error' : 'event-cancellation-help'} onChange={(change) => { setCancellationReason(change.target.value); setCancellationError(''); }} /></label>
+        <p className="app-dialog-help" id="event-cancellation-help">{cancellationReason.length}/500 characters</p>
+        {cancellationError && <p className="app-dialog-error" id="event-cancellation-error" role="alert">{cancellationError}</p>}
+        <div className="app-dialog-actions"><button className="secondary" type="button" disabled={pending} onClick={() => { setCancelOpen(false); setCancellationReason(''); setCancellationError(''); }}>Keep event</button><button className="danger-button" type="submit" disabled={pending}>{pending ? 'Cancelling…' : 'Cancel event'}</button></div>
+      </form>
+    </AppDialog>
+    <dialog className="event-delete-dialog" ref={deleteDialog} aria-labelledby="event-delete-title" onClose={() => setDeleteOpen(false)}>
+      <form method="dialog" onSubmit={(submitEvent) => void deleteEvent(submitEvent)}>
+        <div className="event-delete-dialog-heading"><div><span>Permanent deletion</span><h2 id="event-delete-title">Delete {event.name}?</h2></div><button className="icon-button" type="button" onClick={closeDeleteDialog} aria-label="Close delete event confirmation"><XMarkIcon /></button></div>
+        <p>This cannot be undone. Type the event name and acknowledge the deletion to continue.</p>
+        <label><span>Event name</span><input value={deleteConfirmation} autoFocus onChange={(change) => setDeleteConfirmation(change.target.value)} aria-describedby="event-delete-name-help" /></label>
+        <small id="event-delete-name-help">Type <strong>{event.name}</strong> exactly.</small>
+        <label className="event-delete-acknowledgement"><input type="checkbox" checked={deleteAcknowledged} onChange={(change) => setDeleteAcknowledged(change.target.checked)} /><span>I understand that this permanently deletes this event’s operational records.</span></label>
+        {deleteError && <p className="event-delete-error" role="alert">{deleteError}</p>}
+        <div className="event-delete-dialog-actions"><button className="secondary" type="button" onClick={closeDeleteDialog}>Cancel</button><button className="danger-button" type="submit" disabled={deletePending || deleteConfirmation !== event.name || !deleteAcknowledged}>{deletePending ? 'Deleting…' : 'Permanently delete'}</button></div>
+      </form>
+    </dialog>
   </div>;
 }

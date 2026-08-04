@@ -1,84 +1,99 @@
-import { lazy, Suspense } from "react";
 import { Navigate, Outlet, Route, Routes } from "react-router-dom";
 import { ProtectedRoute } from "./auth/ProtectedRoute";
 import { RoleGuard } from "./auth/RoleGuard";
 import { CognitoCallback } from "./auth/CognitoRoutes";
-
-const AppShell = lazy(() => import("./components/AppShell"));
-const TestHomePage = lazy(() => import("./components/TestHomePage"));
-const LandingPage = lazy(() => import("./components/LandingPage"));
-const SettingsPage = lazy(() => import("./components/SettingsPage"));
-const QRCodePage = lazy(() => import("./components/qr/QRCodePage"));
-const EventDetailPage = lazy(() => import("./features/events/EventDetailPage"));
-const EventFormPage = lazy(() => import("./features/events/EventFormPage"));
-const PublicEventPage = lazy(() => import("./features/events/PublicEventPage"));
-const ReviewWorkspacePage = lazy(() => import("./features/reviews/ReviewWorkspacePage"));
-const ColourVisionStationPage = lazy(() => import("./features/screening/ColourVisionStationPage"));
-const RefractionStationPage = lazy(() => import("./features/screening/RefractionStationPage"));
-const VisualAcuityStationPage = lazy(() => import("./features/screening/VisualAcuityStationPage"));
-const AccountSecurityPage = lazy(() => import("./pages/AccountSecurityPage"));
-const RegistrationAuditLogsPage = lazy(() => import("./pages/AdminPages").then((module) => ({ default: module.AuditLogsPage })));
-const QueuePage = lazy(() => import("./pages/QueuePages").then((module) => ({ default: module.QueuePage })));
-const ConsentPage = lazy(() => import("./pages/ParticipantPages").then((module) => ({ default: module.ConsentPage })));
-const EmergencyContactsPage = lazy(() => import("./pages/ParticipantPages").then((module) => ({ default: module.EmergencyContactsPage })));
-const EventRegistrationStartPage = lazy(() => import("./pages/ParticipantPages").then((module) => ({ default: module.EventRegistrationStartPage })));
-const EventRegistrationsPage = lazy(() => import("./pages/ParticipantPages").then((module) => ({ default: module.EventRegistrationsPage })));
-const ParticipantConsentsPage = lazy(() => import("./pages/ParticipantPages").then((module) => ({ default: module.ParticipantConsentsPage })));
-const ParticipantCreatePage = lazy(() => import("./pages/ParticipantPages").then((module) => ({ default: module.ParticipantCreatePage })));
-const ParticipantDetailPage = lazy(() => import("./pages/ParticipantPages").then((module) => ({ default: module.ParticipantDetailPage })));
-const ParticipantEditPage = lazy(() => import("./pages/ParticipantPages").then((module) => ({ default: module.ParticipantEditPage })));
-const ParticipantHistoryPage = lazy(() => import("./pages/ParticipantPages").then((module) => ({ default: module.ParticipantHistoryPage })));
-const ParticipantSearchPage = lazy(() => import("./pages/ParticipantPages").then((module) => ({ default: module.ParticipantSearchPage })));
-const RegistrationConfirmationPage = lazy(() => import("./pages/ParticipantPages").then((module) => ({ default: module.RegistrationConfirmationPage })));
-const RegistrationHistoryPage = lazy(() => import("./pages/ParticipantPages").then((module) => ({ default: module.RegistrationHistoryPage })));
-const RegistrationQrPage = lazy(() => import("./pages/ParticipantPages").then((module) => ({ default: module.RegistrationQrPage })));
-const RegistrationReviewPage = lazy(() => import("./pages/ParticipantPages").then((module) => ({ default: module.RegistrationReviewPage })));
-const ParticipantV2ConsentPage = lazy(() => import("./pages/ParticipantV2ConsentPage"));
-const ParticipantV2Page = lazy(() => import("./pages/ParticipantV2Page"));
-const ParticipantV2ProfilePage = lazy(() => import("./pages/ParticipantV2ProfilePage"));
+import AppShell from "./components/AppShell";
+import LandingPage from "./components/LandingPage";
+import SettingsPage from "./components/SettingsPage";
+import EventsPage from "./components/EventsPage";
+import QRCodePage from "./components/qr/QRCodePage";
+import EventDetailPage from "./features/events/EventDetailPage";
+import EventFormPage from "./features/events/EventFormPage";
+import PublicEventPage from "./features/events/PublicEventPage";
+import ReviewWorkspacePage from "./features/reviews/ReviewWorkspacePage";
+import ReportsPage from "./features/reports/ReportsPage";
+import ColourVisionStationPage from "./features/screening/ColourVisionStationPage";
+import RefractionStationPage from "./features/screening/RefractionStationPage";
+import VisualAcuityStationPage from "./features/screening/VisualAcuityStationPage";
+import { AuditLogsPage as RegistrationAuditLogsPage } from "./pages/AdminPages";
+import AccountSecurityPage from "./pages/AccountSecurityPage";
+import StaffAccountsPage from "./pages/StaffAccountsPage";
+import { QueuePage } from "./pages/QueuePages"; // Imported the QueuePage component
+import ParticipantV2ConsentPage from "./pages/ParticipantV2ConsentPage";
+import ParticipantV2Page from "./pages/ParticipantV2Page";
+import ParticipantV2ProfilePage from "./pages/ParticipantV2ProfilePage";
+import {
+  ConsentPage,
+  EmergencyContactsPage,
+  EventRegistrationStartPage,
+  EventRegistrationsPage,
+  ParticipantConsentsPage,
+  ParticipantCreatePage,
+  ParticipantDetailPage,
+  ParticipantEditPage,
+  ParticipantHistoryPage,
+  ParticipantSearchPage,
+  RegistrationConfirmationPage,
+  RegistrationHistoryPage,
+  RegistrationQrPage,
+  RegistrationReviewPage,
+} from './pages/ParticipantPages';
 
 const adminRoles = ["ADMINISTRATOR"];
 const eventManagerRoles = ["ADMINISTRATOR", "EVENT_MANAGER"];
-const registrationRoles = ["ADMINISTRATOR", "REGISTRATION_OFFICER"];
+const registrationRoles = ["REGISTRATION_OFFICER"];
+const screenerRoles = ["SCREENER"];
+const reviewerRoles = ["REVIEWER"];
 
 function EventWorkspace() {
-  return <AppShell><Suspense fallback={<RouteFallback />}><Outlet /></Suspense></AppShell>;
-}
-
-function RouteFallback() {
-  return <main className="center-state" role="status" aria-live="polite">Loading workspace…</main>;
+  return <AppShell><Outlet /></AppShell>;
 }
 
 export default function App() {
   return (
-    <Suspense fallback={<RouteFallback />}><Routes>
+    <Routes>
       <Route path="/" element={<LandingPage />} />
       <Route path="/auth/callback" element={<CognitoCallback />} />
       <Route path="/e/:eventId" element={<PublicEventPage />} />
 
       <Route element={<ProtectedRoute />}>
         <Route path="/dashboard" element={<Navigate to="/events" replace />} />
-        <Route path="/events" element={<TestHomePage />} />
+        <Route path="/events" element={<EventsPage />} />
 
         <Route element={<EventWorkspace />}>
           <Route path="/account/security" element={<AccountSecurityPage />} />
           <Route path="/events/:eventId" element={<EventDetailPage />} />
-          <Route path="/events/:eventId/queue" element={<QueuePage />} />
-          <Route path="/events/:eventId/reviews" element={<ReviewWorkspacePage />} />
-          <Route path="/events/:eventId/reviews/:registrationId" element={<ReviewWorkspacePage />} />
-          <Route path="/events/:eventId/stations/visual-acuity" element={<VisualAcuityStationPage />} />
-          <Route path="/events/:eventId/stations/refraction" element={<RefractionStationPage />} />
-          <Route path="/events/:eventId/stations/colour-vision" element={<ColourVisionStationPage />} />
-          <Route path="/events/qr-pass/:registrationId" element={<QRCodePage />} />
-          <Route path="/qr-generator" element={<QRCodePage />} />
           <Route path="/settings" element={<SettingsPage />} />
 
           <Route element={<RoleGuard allowedRoles={eventManagerRoles} />}>
+            <Route path="/events/:eventId/overview" element={<EventDetailPage />} />
+            <Route path="/events/:eventId/stations" element={<EventDetailPage />} />
+            <Route path="/events/:eventId/staff" element={<EventDetailPage />} />
+            <Route path="/events/:eventId/attendees" element={<EventDetailPage />} />
+            <Route path="/events/:eventId/activity" element={<EventDetailPage />} />
+          </Route>
+
+          <Route element={<RoleGuard allowedRoles={reviewerRoles} deniedRoles={adminRoles} />}>
+            <Route path="/events/:eventId/reviews" element={<ReviewWorkspacePage />} />
+            <Route path="/events/:eventId/reviews/:registrationId" element={<ReviewWorkspacePage />} />
+          </Route>
+
+          <Route element={<RoleGuard allowedRoles={screenerRoles} deniedRoles={adminRoles} />}>
+            <Route path="/events/:eventId/stations/visual-acuity" element={<VisualAcuityStationPage />} />
+            <Route path="/events/:eventId/stations/refraction" element={<RefractionStationPage />} />
+            <Route path="/events/:eventId/stations/colour-vision" element={<ColourVisionStationPage />} />
+          </Route>
+
+          <Route element={<RoleGuard allowedRoles={eventManagerRoles} />}>
+            <Route path="/reports" element={<ReportsPage />} />
             <Route path="/events/new" element={<EventFormPage mode="create" />} />
             <Route path="/events/:eventId/edit" element={<EventFormPage mode="edit" />} />
           </Route>
 
-          <Route element={<RoleGuard allowedRoles={registrationRoles} />}>
+          <Route element={<RoleGuard allowedRoles={registrationRoles} deniedRoles={adminRoles} />}>
+            <Route path="/events/:eventId/queue" element={<QueuePage />} />
+            <Route path="/events/qr-pass/:registrationId" element={<QRCodePage />} />
+            <Route path="/qr-generator" element={<QRCodePage />} />
             <Route path="/participants" element={<Navigate to="/participants/search" replace />} />
             <Route path="/participants/search" element={<ParticipantSearchPage />} />
             <Route path="/participants-v2" element={<ParticipantV2Page />} />
@@ -102,14 +117,14 @@ export default function App() {
           </Route>
 
           <Route element={<RoleGuard allowedRoles={adminRoles} />}>
+            <Route path="/staff" element={<StaffAccountsPage />} />
             <Route path="/admin/audit-logs" element={<RegistrationAuditLogsPage />} />
             <Route path="/admin/system-audit-logs" element={<Navigate to="/admin/audit-logs" replace />} />
           </Route>
-
         </Route>
       </Route>
 
       <Route path="*" element={<Navigate to="/" replace />} />
-    </Routes></Suspense>
+    </Routes>
   );
 }

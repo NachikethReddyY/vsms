@@ -28,12 +28,12 @@ function parseCookies(header = "") {
 function cookie(name, value, maxAgeSeconds, httpOnly = true) {
     const parts = [
         `${name}=${encodeURIComponent(value)}`,
-        ...(httpOnly ? ["HttpOnly"] : []),
         "Path=/",
         "SameSite=Lax",
         "Secure",
         `Max-Age=${Math.max(0, maxAgeSeconds)}`,
     ];
+    if (httpOnly) parts.splice(1, 0, "HttpOnly");
     return parts.join("; ");
 }
 

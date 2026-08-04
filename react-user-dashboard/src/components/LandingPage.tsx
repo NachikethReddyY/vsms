@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, Navigate } from 'react-router-dom';
+import { useAuth } from '../auth/AuthProvider';
 import { ThemeToggle } from './MagicEffects';
 import { getCognitoAuthorizeUrl } from '../utils/cognitoAuth';
 import styles from './LandingPage.module.css';
@@ -60,11 +61,11 @@ const workflowSteps = [
 
 const featureZooms = [
   {
-    label: 'Schedule and location',
+    label: 'Queue and station load',
     icon: <path d="M5 25h22M8 21v-6M16 21V8M24 21v-9" />,
   },
   {
-    label: 'Signups and attendance',
+    label: 'Offline save and sync',
     icon: (
       <>
         <path d="M9 23a7 7 0 0 1 1.2-13.9A9 9 0 0 1 27 13.5 5.5 5.5 0 0 1 25 24H9" />
@@ -73,7 +74,7 @@ const featureZooms = [
     ),
   },
   {
-    label: 'Lifecycle and activity',
+    label: 'Clinical review',
     icon: (
       <>
         <path d="M8 6h16v20H8zM12 11h8M12 15h8" />
@@ -85,8 +86,8 @@ const featureZooms = [
 
 const trustItems = [
   {
-    title: 'Connected workflow',
-    description: 'One record follows every station.',
+    title: 'Offline-ready',
+    description: 'Save locally. Sync when connected.',
     icon: (
       <>
         <path d="M9 23a7 7 0 0 1 1.2-13.9A9 9 0 0 1 27 13.5 5.5 5.5 0 0 1 25 24H9" />
@@ -131,6 +132,7 @@ function OutlineIcon({ children }: { children: ReactNode }) {
 }
 
 export default function LandingPage() {
+  const { isAuthenticated } = useAuth();
   const workflowRef = useRef<HTMLElement>(null);
   const [motionReady] = useState(
     () => typeof window !== 'undefined'
@@ -166,6 +168,8 @@ export default function LandingPage() {
     syncThemeColor();
     return () => observer.disconnect();
   }, []);
+
+  if (isAuthenticated) return <Navigate to="/events" replace />;
 
   return (
     <div className={`${styles['landing-page']} ${motionReady ? styles['motion-ready'] : ''}`}>
@@ -249,22 +253,22 @@ export default function LandingPage() {
             <figure className={styles['dashboard-showcase']}>
               <div className={styles['dashboard-frame']}>
                 <img
-                  src="/landing/event-workspace-preview.jpg"
-                  alt="VSMS event workspace showing a published community screening, schedule and operational metrics"
-                  width="1440"
-                  height="900"
+                  src="/landing/vsms-events-workspace.jpg"
+                  alt="VSMS Events workspace showing upcoming screening events, schedules, capacity and staff assignment"
+                  width="1224"
+                  height="768"
                   loading="lazy"
                   decoding="async"
                 />
               </div>
-              <figcaption className={styles['dashboard-note']}>Event workspace overview with schedule, status and operational metrics.</figcaption>
+              <figcaption className={styles['dashboard-note']}>Events stay readable at a glance: status, schedule, capacity and staffing in one operational view.</figcaption>
             </figure>
 
             <div className={styles['feature-zooms']} role="group" aria-label="Highlighted dashboard features">
               {featureZooms.map((feature) => (
                 <figure className={styles['feature-zoom']} key={feature.label}>
                   <div className={styles['zoom-window']} aria-hidden="true">
-                    <img src="/landing/event-workspace-preview.jpg" alt="" width="1440" height="900" loading="lazy" decoding="async" />
+                    <img src="/landing/vsms-events-workspace.jpg" alt="" width="1224" height="768" loading="lazy" decoding="async" />
                   </div>
                   <figcaption>
                     <span aria-hidden="true"><OutlineIcon>{feature.icon}</OutlineIcon></span>
