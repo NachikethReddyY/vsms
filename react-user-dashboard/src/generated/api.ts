@@ -2764,12 +2764,22 @@ export interface components {
             registrationId: string;
             /** Format: uuid */
             eventId: string;
+            /**
+             * @description This alternative accepts a registration reference only.
+             * @enum {unknown}
+             */
+            identifier?: never;
         };
         ManualCheckInByQrToken: {
             /** @description Active QR pass token only; NRIC lookup is not supported. */
             identifier: string;
             /** Format: uuid */
             eventId: string;
+            /**
+             * @description This alternative accepts a QR token only.
+             * @enum {unknown}
+             */
+            registrationId?: never;
         };
         ManualCheckInResult: {
             /** Format: uuid */

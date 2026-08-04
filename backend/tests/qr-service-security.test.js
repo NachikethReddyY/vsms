@@ -387,6 +387,46 @@ test("manual check-in requires exactly one registration reference or QR token", 
   assert.equal(openedTransactions, 0);
 });
 
+test("missing and cross-event registration references have the same concealed error", async () => {
+  const foreignRegistrationId = "88888888-8888-4888-8888-888888888888";
+  const lockQueries = [];
+  const publicErrors = [];
+
+  for (const candidate of [registrationId, foreignRegistrationId]) {
+    const db = {
+      $transaction: async (work) => work({
+        $queryRaw: async (strings, ...values) => {
+          const sql = strings.join("?");
+          lockQueries.push({ sql, values });
+          const eventScoped = sql.includes("event_id = CAST(");
+          return candidate === foreignRegistrationId && !eventScoped
+            ? [{ registration_id: candidate }]
+            : [];
+        },
+        eventRegistration: { findFirst: async () => null },
+        auditLog: { create: async () => ({}) },
+      }),
+    };
+
+    try {
+      await qrService.manualCheckIn({ registrationId: candidate, eventId, userId: qrId }, db);
+      assert.fail("Expected concealed registration lookup failure.");
+    } catch (error) {
+      publicErrors.push({ status: error.status, code: error.code, message: error.message });
+    }
+  }
+
+  assert.deepEqual(publicErrors, [
+    { status: 404, code: "REGISTRATION_NOT_FOUND", message: "Registration record was not found for this event." },
+    { status: 404, code: "REGISTRATION_NOT_FOUND", message: "Registration record was not found for this event." },
+  ]);
+  assert.equal(lockQueries.length, 2);
+  for (const lock of lockQueries) {
+    assert.match(lock.sql, /event_id = CAST\(/);
+    assert.ok(lock.values.includes(eventId));
+  }
+});
+
 test("manual check-in cannot reopen terminal registrations or win a stale update race", async () => {
   for (const [registrationStatus, checkedIn] of [["CANCELLED", false], ["COMPLETED", false], ["CHECKED_IN", true]]) {
     let updated = false;

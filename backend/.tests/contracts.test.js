@@ -15,7 +15,11 @@ test("manual check-in contract accepts exactly one reference and always returns 
     const matches = (schema, value) => {
         if (!schema.required.every((key) => Object.hasOwn(value, key))) return false;
         if (schema.additionalProperties === false) {
-            return Object.keys(value).every((key) => Object.hasOwn(schema.properties, key));
+            if (!Object.keys(value).every((key) => Object.hasOwn(schema.properties, key))) return false;
+        }
+        for (const [key, candidate] of Object.entries(value)) {
+            const allowed = schema.properties[key]?.enum;
+            if (allowed && !allowed.includes(candidate)) return false;
         }
         return true;
     };

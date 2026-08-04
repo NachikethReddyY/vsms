@@ -100,15 +100,26 @@ const safeQrRecord = (qr) => ({
     revokedReason: qr.revokedReason,
 });
 
-const lockRegistration = async (tx, registrationId) => {
+const lockRegistration = async (tx, registrationId, eventId = null) => {
     if (typeof tx.$queryRaw !== "function") return;
-    const rows = await tx.$queryRaw`
-        SELECT registration_id
-        FROM event_registrations
-        WHERE registration_id = CAST(${registrationId} AS uuid)
-        FOR UPDATE
-    `;
+    const rows = eventId
+        ? await tx.$queryRaw`
+            SELECT registration_id
+            FROM event_registrations
+            WHERE registration_id = CAST(${registrationId} AS uuid)
+              AND event_id = CAST(${eventId} AS uuid)
+            FOR UPDATE
+        `
+        : await tx.$queryRaw`
+            SELECT registration_id
+            FROM event_registrations
+            WHERE registration_id = CAST(${registrationId} AS uuid)
+            FOR UPDATE
+        `;
     if (Array.isArray(rows) && rows.length === 0) {
+        if (eventId) {
+            throw new AppError(404, "REGISTRATION_NOT_FOUND", "Registration record was not found for this event.");
+        }
         throw new AppError(404, "REGISTRATION_NOT_FOUND", "Event registration not found.");
     }
 };
@@ -524,7 +535,7 @@ exports.manualCheckIn = async (params, db = prisma) => {
             throw new AppError(404, "REGISTRATION_NOT_FOUND", "Registration record not found for manual check-in.");
         }
 
-        await lockRegistration(tx, regIdToUpdate);
+        await lockRegistration(tx, regIdToUpdate, eventId);
         if (qrIdToUse && !await lockActiveQrPass(tx, qrIdToUse, regIdToUpdate)) {
             throw new AppError(404, "INVALID_QR", "QR Code is invalid, expired, or unavailable.");
         }
