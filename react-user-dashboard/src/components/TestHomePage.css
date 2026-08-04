@@ -498,6 +498,7 @@ html[data-theme="light"] .test-events-page {
   position:absolute;
   inset:0;
   z-index:1;
+  pointer-events:auto;
 }
 
 .reference-events .test-register-row-link:focus-visible { outline:0; }

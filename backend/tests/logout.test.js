@@ -19,3 +19,19 @@ test("logout clears browser auth without requiring a valid access token", async 
     assert.equal(response.body.logoutUrl, "https://vsms.auth.us-east-1.amazoncognito.com/logout?client_id=test-client&logout_uri=https%3A%2F%2Flocalhost%3A5173");
     assert.ok(response.headers["set-cookie"].every((value) => value.includes("Max-Age=0")));
 });
+
+test("logout does not wait for Cognito global sign-out", async () => {
+    const originalFetch = global.fetch;
+    global.fetch = async () => new Promise(() => {});
+
+    try {
+        const response = await request(app)
+            .post("/api/v1/auth/logout")
+            .set("Cookie", "vsms_access=test-token");
+
+        assert.equal(response.status, 200);
+        assert.ok(response.headers["set-cookie"].every((value) => value.includes("Max-Age=0")));
+    } finally {
+        global.fetch = originalFetch;
+    }
+});
