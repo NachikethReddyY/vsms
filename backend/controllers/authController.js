@@ -1,4 +1,5 @@
 const crypto = require("crypto");
+const env = require("../config/env");
 const asyncHandler = require("../middlewares/asyncHandler");
 const {
     isCognitoConfigured,
@@ -45,8 +46,20 @@ function ensureCognitoConfigured() {
 }
 
 function normalizeReturnTo(value) {
-    const returnTo = String(value || "");
-    return returnTo.startsWith("/") && !returnTo.startsWith("//") ? returnTo : "/events";
+    const returnTo = String(value || "").trim();
+    const isPath = returnTo.startsWith("/") && !returnTo.startsWith("//");
+    const isAbsoluteUrl = /^[a-z][a-z\d+.-]*:\/\//i.test(returnTo);
+    if (!isPath && !isAbsoluteUrl) return "/events";
+
+    try {
+        const url = new URL(returnTo, env.publicAppOrigin);
+        if (url.origin !== env.publicAppOrigin || url.pathname.startsWith("//") || ["/", "/api"].includes(url.pathname) || url.pathname.startsWith("/auth/") || url.pathname.startsWith("/api/")) {
+            return "/events";
+        }
+        return `${url.pathname}${url.search}${url.hash}`;
+    } catch {
+        return "/events";
+    }
 }
 
 function extractProfileFromIdToken(payload) {
