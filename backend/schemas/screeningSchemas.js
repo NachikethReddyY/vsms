@@ -60,6 +60,9 @@ const commonDecision = {
   confirmed: z.literal(true),
   clinicalSummary,
   recommendations,
+  signatureObjectKey: z.string().regex(/^signatures\/[a-f0-9-]{36}\/review-decision-[a-f0-9-]{36}-[a-f0-9-]{36}\.(png|jpg)$/),
+  signatureSha256: z.string().regex(/^[a-f0-9]{64}$/i),
+  signatureMimeType: z.enum(["image/png", "image/jpeg"]),
 };
 const reviewDecisionBody = z.discriminatedUnion("outcome", [
   z.object({ ...commonDecision, outcome: z.literal("COMPLETE") }).strict(),
