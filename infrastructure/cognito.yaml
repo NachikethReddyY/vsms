@@ -1,11 +1,16 @@
 AWSTemplateFormatVersion: "2010-09-09"
-Description: Secure Cognito configuration for the VSMS staff registration module
+Description: Secure Cognito configuration for the VSMS staff application
 
 Parameters:
   EnvironmentName:
     Type: String
     Default: development
     AllowedPattern: "[a-z0-9-]+"
+    MaxLength: 20
+  FrontendUrl:
+    Type: String
+    Default: https://localhost:5173
+    Description: Public frontend origin used for Cognito callbacks and logout
 
 Resources:
   StaffUserPool:
@@ -19,8 +24,6 @@ Resources:
       MfaConfiguration: "ON"
       EnabledMfas:
         - SOFTWARE_TOKEN_MFA
-      SoftwareTokenMfaConfiguration:
-        Enabled: true
       AccountRecoverySetting:
         RecoveryMechanisms:
           - Name: verified_email
@@ -57,9 +60,126 @@ Resources:
         IdToken: minutes
         RefreshToken: days
       ExplicitAuthFlows:
-        - ALLOW_USER_PASSWORD_AUTH
         - ALLOW_REFRESH_TOKEN_AUTH
-        - ALLOW_USER_SRP_AUTH
+      AllowedOAuthFlowsUserPoolClient: true
+      AllowedOAuthFlows:
+        - code
+      AllowedOAuthScopes:
+        - openid
+        - email
+        - profile
+      SupportedIdentityProviders:
+        - COGNITO
+      CallbackURLs:
+        - !Sub "${FrontendUrl}/auth/callback"
+      LogoutURLs:
+        - !Ref FrontendUrl
+
+  StaffUserPoolDomain:
+    Type: AWS::Cognito::UserPoolDomain
+    Properties:
+      Domain: !Sub "vsms-staff-${EnvironmentName}-${AWS::AccountId}"
+      ManagedLoginVersion: 2
+      UserPoolId: !Ref StaffUserPool
+
+  StaffManagedLoginBranding:
+    Type: AWS::Cognito::ManagedLoginBranding
+    DependsOn: StaffUserPoolDomain
+    Properties:
+      ClientId: !Ref StaffAppClient
+      UseCognitoProvidedValues: false
+      Settings:
+        categories:
+          global:
+            colorSchemeMode: DYNAMIC
+        components:
+          pageBackground:
+            image:
+              enabled: false
+            lightMode:
+              color: f7f7f4ff
+            darkMode:
+              color: 0b0b0dff
+          form:
+            lightMode:
+              backgroundColor: ffffffff
+              borderColor: cfcdc4ff
+            darkMode:
+              backgroundColor: 121317ff
+              borderColor: 30333aff
+          pageText:
+            lightMode:
+              bodyColor: 4f545bff
+              headingColor: 17191cff
+              descriptionColor: 4f545bff
+            darkMode:
+              bodyColor: c7c9cdff
+              headingColor: f1f2f3ff
+              descriptionColor: c7c9cdff
+          primaryButton:
+            lightMode:
+              defaults:
+                backgroundColor: 315a8cff
+                textColor: ffffffff
+              hover:
+                backgroundColor: 244873ff
+                textColor: ffffffff
+              active:
+                backgroundColor: 1c385aff
+                textColor: ffffffff
+            darkMode:
+              defaults:
+                backgroundColor: 426d9fff
+                textColor: ffffffff
+              hover:
+                backgroundColor: 527fafff
+                textColor: ffffffff
+              active:
+                backgroundColor: 315a8cff
+                textColor: ffffffff
+        componentClasses:
+          input:
+            lightMode:
+              defaults:
+                backgroundColor: ffffffff
+                borderColor: 8a8d91ff
+              placeholderColor: 686d73ff
+            darkMode:
+              defaults:
+                backgroundColor: 121317ff
+                borderColor: 696d75ff
+              placeholderColor: 9b9fa6ff
+          inputLabel:
+            lightMode:
+              textColor: 17191cff
+            darkMode:
+              textColor: f1f2f3ff
+          link:
+            lightMode:
+              defaults:
+                textColor: 315a8cff
+              hover:
+                textColor: 244873ff
+            darkMode:
+              defaults:
+                textColor: 7ea6d0ff
+              hover:
+                textColor: a6c3e1ff
+          focusState:
+            lightMode:
+              borderColor: 315a8cff
+            darkMode:
+              borderColor: 7ea6d0ff
+          optionControls:
+            lightMode:
+              selected:
+                backgroundColor: 315a8cff
+                foregroundColor: ffffffff
+            darkMode:
+              selected:
+                backgroundColor: 7ea6d0ff
+                foregroundColor: 0b0b0dff
+      UserPoolId: !Ref StaffUserPool
 
   AdminGroup:
     Type: AWS::Cognito::UserPoolGroup
@@ -77,6 +197,30 @@ Resources:
       Precedence: 10
       UserPoolId: !Ref StaffUserPool
 
+  EventManagerGroup:
+    Type: AWS::Cognito::UserPoolGroup
+    Properties:
+      GroupName: EventManager
+      Description: Staff permitted to create and manage events
+      Precedence: 5
+      UserPoolId: !Ref StaffUserPool
+
+  ScreenerGroup:
+    Type: AWS::Cognito::UserPoolGroup
+    Properties:
+      GroupName: Screener
+      Description: Staff permitted to record screening results
+      Precedence: 20
+      UserPoolId: !Ref StaffUserPool
+
+  ReviewerGroup:
+    Type: AWS::Cognito::UserPoolGroup
+    Properties:
+      GroupName: Reviewer
+      Description: Staff permitted to review screening results
+      Precedence: 30
+      UserPoolId: !Ref StaffUserPool
+
 Outputs:
   UserPoolId:
     Value: !Ref StaffUserPool
@@ -84,3 +228,7 @@ Outputs:
     Value: !Ref StaffAppClient
   Region:
     Value: !Ref AWS::Region
+  ManagedLoginDomain:
+    Value: !Sub "https://${StaffUserPoolDomain}.auth.${AWS::Region}.amazoncognito.com"
+  CallbackUrl:
+    Value: !Sub "${FrontendUrl}/auth/callback"

@@ -154,7 +154,7 @@ a deployed system invulnerable.
 | Runtime dependencies | Backend 0; frontend 0 | `npm audit --omit=dev` in both packages |
 | Bruno lifecycle | Pass, 13/13 requests and tests | Local generated Bruno report |
 | Bruno cookie session | Pass, 3/3 login/refresh/logout requests and tests | Local generated Bruno report |
-| HTTPS | Trusted-CA curl 200; HSTS, CSP, frame, referrer, MIME and request-ID headers present; SAN includes localhost and 127.0.0.1 | `curl --cacert ... https://127.0.0.1:5050/health` |
+| HTTPS | Trusted-CA curl 200; HSTS, CSP, frame, referrer, MIME and request-ID headers present; SAN includes localhost and 127.0.0.1 | `curl --cacert ... https://127.0.0.1:5000/health` |
 | Browser responsive | Public landing page inspected at 390×844 and 1440×900; login, event list, creation flow, and detail/audit view inspected at earlier desktop/tablet breakpoints; no document horizontal overflow observed | T3 collaborative browser snapshots |
 
 ## Highlighted implementation files
@@ -168,7 +168,7 @@ a deployed system invulnerable.
 | API contract | `backend/docs/openapi.yaml`, `backend/scripts/check-contract.js`, `react-user-dashboard/src/generated/api.ts` | Complete REST contract, lint, generated types, deterministic drift gate |
 | Frontend | `src/auth/*`, `src/utils/apiClient.ts`, `src/components/LandingPage.tsx`, `src/components/AppShell.tsx`, `src/features/events/*`, `src/index.css` | Public landing page, login with retained cookie refresh, memory tokens, graphical event list, persisted banner picker, detail/edit flow, shell, and responsive design-system styling |
 | API verification | `api-testing/bruno/`, `api-testing/event-api.collection.json`, `api-testing/event-api.collection.yml` | Executable collection and portable exports; generated result files stay local |
-| TLS | `vite.config.ts`, `backend/.env.example` | HTTPS-by-default local development with developer-generated, untracked certificates; opt-in loopback QA mirror only when `DEV_HTTPS=false` |
+| TLS | `vite.config.ts`, `backend/.env.example` | HTTPS-only local development with developer-generated, untracked certificates and fail-closed startup |
 
 ## Test and artifact storage policy
 
