@@ -35,3 +35,13 @@ test("Bearer-token API mutations do not require browser CSRF cookies", async () 
         .set("Authorization", "Bearer header.payload.signature");
     assert.equal(response.status, 204);
 });
+
+test("a dummy bearer header cannot bypass CSRF while an access cookie is present", async () => {
+    const denied = await request(app)
+        .post("/mutation")
+        .set("Authorization", "Bearer dummy.header.signature")
+        .set("Origin", "https://localhost:5173")
+        .set("Cookie", "vsms_access=real-cookie-session; vsms_csrf=cookie-token");
+    assert.equal(denied.status, 403);
+    assert.equal(denied.body.code, "CSRF_VALIDATION_FAILED");
+});

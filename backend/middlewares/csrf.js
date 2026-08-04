@@ -1,9 +1,12 @@
 const env = require("../config/env");
 const AppError = require("../errors/AppError");
 const { timingSafeEqual } = require("../utils/security");
+const { ACCESS_COOKIE } = require("../utils/httpCookies");
 
 module.exports = (req, _res, next) => {
-  if (/^Bearer [A-Za-z0-9._~-]+$/.test(req.get("authorization") || "")) return next();
+  const bearerMode = /^Bearer [A-Za-z0-9._~-]+$/.test(req.get("authorization") || "")
+    && !req.cookies?.[ACCESS_COOKIE];
+  if (bearerMode) return next();
   const origin = req.get("origin");
   const fetchSite = req.get("sec-fetch-site");
   const cookieToken = req.cookies.vsms_csrf;

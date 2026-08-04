@@ -93,7 +93,7 @@ The Bruno collection is in `api-testing/bruno`. Select its `Local` environment a
 - Set `NODE_ENV=production`, a 32+ character `JWT_ACCESS_SECRET`, the production `DATABASE_URL`, exact `CORS_ORIGINS`, and a bare HTTPS `PUBLIC_APP_ORIGIN` (used in QR payloads).
 - Keep `PUBLIC_SIGNUP_ENABLED=false` for internet-facing deployments unless account creation is intentionally open.
 - Terminate TLS at the trusted reverse proxy and set `TRUST_PROXY=true` only when that proxy is controlled.
-- Build the frontend with `npm --prefix react-user-dashboard run build`. Set `VITE_API_BASE_URL` when the API is not served at the frontend's expected origin.
+- Build the frontend with `pnpm --dir react-user-dashboard build`. Set `VITE_API_BASE_URL` when the API is not served at the frontend's expected origin.
 - Configure the static host to rewrite application routes to `index.html`.
 
 ## Reference documentation
