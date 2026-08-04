@@ -1,7 +1,7 @@
 openapi: 3.0.3
 info:
   title: VSMS Event Operations API
-  version: 2.3.0
+  version: 2.4.0
   description: Secure staff authentication, event operations, and clinical review workflows for VSMS.
   license:
     name: ISC
@@ -32,6 +32,8 @@ tags:
     description: Event-scoped clinical review queue and immutable decisions
   - name: Referrals
     description: Signed, encrypted clinical referral documents and delivery tracking
+  - name: Provider Events
+    description: Signature-authenticated delivery lifecycle callbacks from configured providers
 security:
   - bearerAuth: []
 paths:
@@ -57,6 +59,34 @@ paths:
         "404":
           description: Health endpoint is unavailable
           content: { application/json: { schema: { $ref: "#/components/schemas/Problem" } } }
+  /api/v1/webhooks/ses:
+    post:
+      tags: [Provider Events]
+      security: []
+      operationId: ingestSesProviderEvent
+      summary: Accept a signature-verified Amazon SNS envelope for SES delivery lifecycle events
+      description: The signed TopicArn must be explicitly allowlisted. Recipient addresses, message bodies, and provider diagnostic text are not retained in provider-event receipts or audits.
+      parameters:
+        - name: x-amz-sns-message-type
+          in: header
+          required: false
+          schema: { type: string, enum: [Notification, SubscriptionConfirmation, UnsubscribeConfirmation] }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object, additionalProperties: true }
+          text/plain:
+            schema: { type: string }
+      responses:
+        "202":
+          description: Authenticated provider event accepted or safely replayed
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ProviderEventAccepted" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "429": { $ref: "#/components/responses/RateLimited" }
   /api/v1/auth/config-status:
     get:
       tags: [Authentication]
@@ -190,7 +220,7 @@ paths:
     post:
       tags: [Users]
       operationId: createUser
-      summary: Create a local staff account (administrator only)
+      summary: Create a staff account and synchronize Cognito access (administrator only)
       requestBody:
         required: true
         content:
@@ -205,11 +235,13 @@ paths:
         "403": { $ref: "#/components/responses/Forbidden" }
         "409": { $ref: "#/components/responses/Conflict" }
         "422": { $ref: "#/components/responses/ValidationFailed" }
+        "502": { description: Cognito access synchronization failed and the local account was not committed }
+        "503": { description: Cognito staff synchronization is not configured }
   /api/v1/users/{id}:
     patch:
       tags: [Users]
       operationId: updateUser
-      summary: Update local staff roles or active state (administrator only)
+      summary: Update staff roles or active state across the application and Cognito (administrator only)
       parameters:
         - name: id
           in: path
@@ -228,6 +260,8 @@ paths:
         "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
         "422": { $ref: "#/components/responses/ValidationFailed" }
+        "502": { description: Cognito access synchronization failed and local role changes were rolled back }
+        "503": { description: Cognito staff synchronization is not configured }
   /api/v1/events:
     get:
       tags: [Events]
@@ -599,6 +633,29 @@ paths:
         "401": { $ref: "#/components/responses/Unauthorized" }
         "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
+  /api/v1/events/{eventId}/sync/screening:
+    post:
+      tags: [Screening]
+      operationId: syncScreeningBatch
+      summary: Push an encrypted-client screening outbox batch and pull the caller's current station scope
+      description: Each action is independently idempotent. The durable server sync ledger stores only operational metadata and safe error codes, never clinical bodies, participant profiles, NRIC values, or pass tokens.
+      parameters: [{ $ref: "#/components/parameters/EventId" }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ScreeningSyncRequest" }
+      responses:
+        "200":
+          description: Per-action outcomes and a fully scoped, pass-token-free station pull
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ScreeningSyncResponse" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "422": { $ref: "#/components/responses/ValidationFailed" }
   /api/v1/events/{eventId}/stations/{stationId}/queue:
     get:
       tags: [Screening]
@@ -756,6 +813,30 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/IssueReferralResponse" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "422": { $ref: "#/components/responses/ValidationFailed" }
+  /api/v1/events/{eventId}/referrals/{referralId}/revisions:
+    post:
+      tags: [Referrals]
+      operationId: reviseReferral
+      summary: Create the next immutable draft revision while preserving the issued referral and its artifacts
+      parameters:
+        - $ref: "#/components/parameters/EventId"
+        - $ref: "#/components/parameters/ReferralId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ReviseReferralRequest" }
+      responses:
+        "201":
+          description: Next sequential draft revision created or idempotently replayed
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ReferralRevisionResponse" }
         "401": { $ref: "#/components/responses/Unauthorized" }
         "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
@@ -1421,6 +1502,9 @@ components:
       content:
         application/json:
           schema: { $ref: "#/components/schemas/Event" }
+    BadRequest:
+      description: Request body is malformed or provider envelope fields are inconsistent
+      content: { application/json: { schema: { $ref: "#/components/schemas/Problem" } } }
     Unauthorized:
       description: Authentication is absent, invalid, expired, revoked, or reused
       content: { application/json: { schema: { $ref: "#/components/schemas/Problem" } } }
@@ -1795,25 +1879,32 @@ components:
       allOf:
         - $ref: "#/components/schemas/CreateEventRequest"
         - type: object
-          required: [eventId, artworkDataUrl, status, version, createdByUserId, shifts, eventDays, eventStations, signupCount, activeCapacityCount, canManage, createdAt, updatedAt]
+          required: [eventId, artworkDataUrl, status, version, shifts, eventDays, eventStations, signupCount, activeCapacityCount, canManage, createdAt, updatedAt]
           properties:
             eventId: { type: string, format: uuid }
             status: { $ref: "#/components/schemas/EventStatus" }
             version: { type: integer, minimum: 1 }
-            createdByUserId: { type: string, format: uuid }
-            cancelledByUserId: { type: string, format: uuid, nullable: true }
             cancelledAt: { type: string, format: date-time, nullable: true }
             cancellationReason: { type: string, nullable: true }
             createdAt: { type: string, format: date-time }
             updatedAt: { type: string, format: date-time }
-            shifts: { type: array, items: { $ref: "#/components/schemas/Shift" } }
+            shifts:
+              type: array
+              description: Managers receive the staffing plan; operational staff receive only their own ASSIGNED or CONFIRMED assignments on PLANNED or ACTIVE shifts.
+              items: { $ref: "#/components/schemas/Shift" }
             eventDays: { type: array, items: { $ref: "#/components/schemas/EventDay" } }
             eventStations: { type: array, items: { $ref: "#/components/schemas/EventStation" } }
             signupCount: { type: integer, minimum: 0, description: Number of collected registration entries for this event }
             activeCapacityCount: { type: integer, minimum: 0, description: Number of registrations checked in to the event; this is not a live count of people still at the venue }
             canManage: { type: boolean, description: Whether the current caller may change this event }
-            createdBy: { $ref: "#/components/schemas/User" }
-            cancelledBy: { type: object, allOf: [{ $ref: "#/components/schemas/User" }], nullable: true }
+            createdBy:
+              description: Manager-only organisation identity projection.
+              allOf: [{ $ref: "#/components/schemas/User" }]
+            cancelledBy:
+              description: Manager-only organisation identity projection.
+              type: object
+              allOf: [{ $ref: "#/components/schemas/User" }]
+              nullable: true
     LocationResult:
       type: object
       additionalProperties: false
@@ -2076,9 +2167,11 @@ components:
     ReferralSummary:
       type: object
       additionalProperties: false
-      required: [referralId, destinationName, reason, instructions, urgency, status, signedAt, document, delivery]
+      required: [referralId, revisionNumber, supersedesReferralId, destinationName, reason, instructions, urgency, status, signedAt, document, delivery]
       properties:
         referralId: { type: string, format: uuid }
+        revisionNumber: { type: integer, minimum: 1 }
+        supersedesReferralId: { type: string, format: uuid, nullable: true }
         destinationName: { type: string }
         reason: { type: string }
         instructions: { type: string, nullable: true }
@@ -2104,15 +2197,40 @@ components:
     ReferralDeliverySummary:
       type: object
       additionalProperties: false
-      required: [deliveryId, status, recipient, providerMessageId, attemptCount, failureReason, sentAt]
+      required: [deliveryId, status, recipient, providerMessageId, attemptCount, failureReason, sentAt, deliveredAt]
       properties:
         deliveryId: { type: string, format: uuid }
-        status: { type: string, enum: [QUEUED, SENDING, RECONCILIATION_REQUIRED, SENT, DELIVERED, FAILED, BOUNCED, CANCELLED] }
+        status: { type: string, enum: [QUEUED, SENDING, RECONCILIATION_REQUIRED, SENT, DELIVERED, FAILED, BOUNCED, COMPLAINT, CANCELLED] }
         recipient: { type: string }
         providerMessageId: { type: string, nullable: true }
         attemptCount: { type: integer, minimum: 0 }
         failureReason: { type: string, nullable: true }
         sentAt: { type: string, format: date-time, nullable: true }
+        deliveredAt: { type: string, format: date-time, nullable: true }
+    ReviseReferralRequest:
+      type: object
+      additionalProperties: false
+      required: [destinationName, reason, urgency, idempotencyKey, confirmed]
+      properties:
+        destinationName: { type: string, minLength: 2, maxLength: 200 }
+        reason: { type: string, minLength: 10, maxLength: 2000 }
+        instructions: { type: string, maxLength: 2000 }
+        urgency: { $ref: "#/components/schemas/ClinicalUrgency" }
+        idempotencyKey: { type: string, format: uuid }
+        confirmed: { type: boolean, enum: [true] }
+    ReferralRevisionResponse:
+      type: object
+      additionalProperties: false
+      required: [referralId, revisionNumber, supersedesReferralId, destinationName, reason, instructions, urgency, status]
+      properties:
+        referralId: { type: string, format: uuid }
+        revisionNumber: { type: integer, minimum: 2 }
+        supersedesReferralId: { type: string, format: uuid }
+        destinationName: { type: string }
+        reason: { type: string }
+        instructions: { type: string, nullable: true }
+        urgency: { $ref: "#/components/schemas/ClinicalUrgency" }
+        status: { type: string, enum: [DRAFT] }
     IssueReferralRequest:
       type: object
       additionalProperties: false
@@ -2157,6 +2275,16 @@ components:
       required: [acknowledgedAt]
       properties:
         acknowledgedAt: { type: string, format: date-time }
+    ProviderEventAccepted:
+      type: object
+      additionalProperties: true
+      required: [accepted]
+      properties:
+        accepted: { type: boolean, enum: [true] }
+        duplicate: { type: boolean }
+        matched: { type: boolean, nullable: true }
+        appliedStatus: { type: string, nullable: true, enum: [DELIVERED, FAILED, BOUNCED, COMPLAINT] }
+        subscriptionConfirmed: { type: boolean }
     ReferralDeliveryMaintenanceRequest:
       type: object
       additionalProperties: false
@@ -2209,7 +2337,7 @@ components:
       properties:
         taskId: { type: string, format: uuid }
         eventId: { type: string, format: uuid }
-        artifactType: { type: string, enum: [CONSENT_SIGNATURE, REFERRAL_SIGNATURE, REFERRAL_DOCUMENT] }
+        artifactType: { type: string, enum: [CONSENT_SIGNATURE, REFERRAL_SIGNATURE, REVIEW_DECISION_SIGNATURE, REFERRAL_DOCUMENT] }
         status: { type: string, enum: [PENDING, PROCESSING, FAILED, ESCALATED, COMPLETED, RESOLVED] }
         attemptCount: { type: integer, minimum: 0 }
         lastError: { type: string, nullable: true }
@@ -2234,7 +2362,7 @@ components:
     ExistingReview:
       type: object
       additionalProperties: false
-      required: [reviewId, version, outcome, urgency, clinicalSummary, recommendations, reviewedAt, reviewedByName, referral]
+      required: [reviewId, version, outcome, urgency, clinicalSummary, recommendations, reviewedAt, reviewedByName, signatureSignerName, signatureSha256, signedPayloadHash, signedAt, referral]
       properties:
         reviewId: { type: string, format: uuid }
         version: { type: integer, enum: [1] }
@@ -2244,6 +2372,10 @@ components:
         recommendations: { type: string, nullable: true }
         reviewedAt: { type: string, format: date-time }
         reviewedByName: { type: string }
+        signatureSignerName: { type: string }
+        signatureSha256: { type: string, pattern: '^[a-f0-9]{64}$', nullable: true }
+        signedPayloadHash: { type: string, pattern: '^[a-f0-9]{64}$', nullable: true }
+        signedAt: { type: string, format: date-time, nullable: true }
         referral:
           type: object
           nullable: true
@@ -2273,27 +2405,33 @@ components:
     CompleteReviewDecision:
       type: object
       additionalProperties: false
-      required: [outcome, contextVersion, confirmed, clinicalSummary]
+      required: [outcome, contextVersion, confirmed, clinicalSummary, signatureObjectKey, signatureSha256, signatureMimeType]
       properties:
         outcome: { type: string, enum: [COMPLETE] }
         contextVersion: { type: string, pattern: '^[a-f0-9]{64}$' }
         confirmed: { type: boolean, enum: [true] }
         clinicalSummary: { type: string, minLength: 10, maxLength: 2000 }
         recommendations: { type: string, maxLength: 2000 }
+        signatureObjectKey: { type: string, pattern: '^signatures/[a-f0-9-]{36}/review-decision-[a-f0-9-]{36}-[a-f0-9-]{36}\\.(png|jpg)$' }
+        signatureSha256: { type: string, pattern: '^[a-fA-F0-9]{64}$' }
+        signatureMimeType: { type: string, enum: [image/png, image/jpeg] }
     MonitorReviewDecision:
       type: object
       additionalProperties: false
-      required: [outcome, contextVersion, confirmed, clinicalSummary]
+      required: [outcome, contextVersion, confirmed, clinicalSummary, signatureObjectKey, signatureSha256, signatureMimeType]
       properties:
         outcome: { type: string, enum: [MONITOR] }
         contextVersion: { type: string, pattern: '^[a-f0-9]{64}$' }
         confirmed: { type: boolean, enum: [true] }
         clinicalSummary: { type: string, minLength: 10, maxLength: 2000 }
         recommendations: { type: string, maxLength: 2000 }
+        signatureObjectKey: { type: string, pattern: '^signatures/[a-f0-9-]{36}/review-decision-[a-f0-9-]{36}-[a-f0-9-]{36}\\.(png|jpg)$' }
+        signatureSha256: { type: string, pattern: '^[a-fA-F0-9]{64}$' }
+        signatureMimeType: { type: string, enum: [image/png, image/jpeg] }
     ReferReviewDecision:
       type: object
       additionalProperties: false
-      required: [outcome, contextVersion, confirmed, clinicalSummary, urgency, referral]
+      required: [outcome, contextVersion, confirmed, clinicalSummary, urgency, referral, signatureObjectKey, signatureSha256, signatureMimeType]
       properties:
         outcome: { type: string, enum: [REFER] }
         contextVersion: { type: string, pattern: '^[a-f0-9]{64}$' }
@@ -2302,10 +2440,13 @@ components:
         recommendations: { type: string, maxLength: 2000 }
         urgency: { type: string, enum: [ROUTINE, PRIORITY, URGENT] }
         referral: { $ref: "#/components/schemas/ReferralDecisionInput" }
+        signatureObjectKey: { type: string, pattern: '^signatures/[a-f0-9-]{36}/review-decision-[a-f0-9-]{36}-[a-f0-9-]{36}\\.(png|jpg)$' }
+        signatureSha256: { type: string, pattern: '^[a-fA-F0-9]{64}$' }
+        signatureMimeType: { type: string, enum: [image/png, image/jpeg] }
     UrgentReviewDecision:
       type: object
       additionalProperties: false
-      required: [outcome, contextVersion, confirmed, clinicalSummary, referral]
+      required: [outcome, contextVersion, confirmed, clinicalSummary, referral, signatureObjectKey, signatureSha256, signatureMimeType]
       properties:
         outcome: { type: string, enum: [URGENT_ESCALATION] }
         contextVersion: { type: string, pattern: '^[a-f0-9]{64}$' }
@@ -2313,6 +2454,9 @@ components:
         clinicalSummary: { type: string, minLength: 10, maxLength: 2000 }
         recommendations: { type: string, maxLength: 2000 }
         referral: { $ref: "#/components/schemas/ReferralDecisionInput" }
+        signatureObjectKey: { type: string, pattern: '^signatures/[a-f0-9-]{36}/review-decision-[a-f0-9-]{36}-[a-f0-9-]{36}\\.(png|jpg)$' }
+        signatureSha256: { type: string, pattern: '^[a-fA-F0-9]{64}$' }
+        signatureMimeType: { type: string, enum: [image/png, image/jpeg] }
     ReviewDecisionRequest:
       oneOf:
         - $ref: "#/components/schemas/CompleteReviewDecision"
@@ -2329,7 +2473,7 @@ components:
     RecordedReview:
       type: object
       additionalProperties: false
-      required: [reviewId, version, outcome, urgency, clinicalSummary, recommendations, reviewedAt]
+      required: [reviewId, version, outcome, urgency, clinicalSummary, recommendations, signatureSignerName, signatureSha256, signedPayloadHash, signedAt, reviewedAt]
       properties:
         reviewId: { type: string, format: uuid }
         version: { type: integer, enum: [1] }
@@ -2337,6 +2481,10 @@ components:
         urgency: { $ref: "#/components/schemas/ClinicalUrgency" }
         clinicalSummary: { type: string }
         recommendations: { type: string, nullable: true }
+        signatureSignerName: { type: string, nullable: true }
+        signatureSha256: { type: string, pattern: '^[a-f0-9]{64}$' }
+        signedPayloadHash: { type: string, pattern: '^[a-f0-9]{64}$' }
+        signedAt: { type: string, format: date-time }
         reviewedAt: { type: string, format: date-time }
     ReviewDecisionResponse:
       type: object
@@ -2718,14 +2866,14 @@ components:
           maxLength: 140000
           pattern: '^data:image/(png|jpeg);base64,'
         eventId: { type: string, format: uuid }
-        purpose: { type: string, enum: [CONSENT, REFERRAL] }
-        targetId: { type: string, format: uuid, description: Participant ID for consent or referral ID for referral issuance. }
+        purpose: { type: string, enum: [CONSENT, REFERRAL, REVIEW_DECISION] }
+        targetId: { type: string, format: uuid, description: "Participant ID for consent, referral ID for referral issuance, or registration ID for a review decision." }
     SignatureResponse:
       type: object
       additionalProperties: false
       required: [signatureObjectKey, signatureSha256, signatureMimeType]
       properties:
-        signatureObjectKey: { type: string, pattern: '^signatures/[a-f0-9-]{36}/(consent|referral)-[a-f0-9-]{36}-[a-f0-9-]{36}\\.(png|jpg)$' }
+        signatureObjectKey: { type: string, pattern: '^signatures/[a-f0-9-]{36}/(consent|referral|review-decision)-[a-f0-9-]{36}-[a-f0-9-]{36}\\.(png|jpg)$' }
         signatureSha256: { type: string, pattern: '^[a-f0-9]{64}$' }
         signatureMimeType: { type: string, enum: [image/png, image/jpeg] }
     AdminAuditLogsResponse:
@@ -2951,6 +3099,116 @@ components:
         idempotencyKey: { type: string, minLength: 8, maxLength: 64 }
         acknowledged: { type: boolean }
         resultData: { $ref: "#/components/schemas/ColourVisionResultData" }
+    ScreeningSyncAction:
+      oneOf:
+        - type: object
+          additionalProperties: false
+          required: [clientActionId, stationId, stationType, payload]
+          properties:
+            clientActionId: { type: string, format: uuid }
+            stationId: { type: string, format: uuid }
+            stationType: { type: string, enum: [VISUAL_ACUITY] }
+            payload: { $ref: "#/components/schemas/VisualAcuitySaveRequest" }
+        - type: object
+          additionalProperties: false
+          required: [clientActionId, stationId, stationType, payload]
+          properties:
+            clientActionId: { type: string, format: uuid }
+            stationId: { type: string, format: uuid }
+            stationType: { type: string, enum: [REFRACTION] }
+            payload: { $ref: "#/components/schemas/RefractionSaveRequest" }
+        - type: object
+          additionalProperties: false
+          required: [clientActionId, stationId, stationType, payload]
+          properties:
+            clientActionId: { type: string, format: uuid }
+            stationId: { type: string, format: uuid }
+            stationType: { type: string, enum: [COLOUR_VISION] }
+            payload: { $ref: "#/components/schemas/ColourVisionSaveRequest" }
+      discriminator: { propertyName: stationType }
+    ScreeningSyncRequest:
+      type: object
+      additionalProperties: false
+      required: [clientBatchId, actions]
+      properties:
+        clientBatchId: { type: string, format: uuid }
+        cursor: { type: string, format: date-time }
+        actions:
+          type: array
+          maxItems: 25
+          items: { $ref: "#/components/schemas/ScreeningSyncAction" }
+    ScreeningSyncResultSnapshot:
+      type: object
+      additionalProperties: false
+      properties:
+        resultId: { type: string, format: uuid }
+        overallFlag: { $ref: "#/components/schemas/OverallFlag" }
+        isFlagged: { type: boolean }
+        ruleVersion: { type: string }
+    ScreeningSyncActionResult:
+      type: object
+      additionalProperties: false
+      required: [clientActionId, status, retryCount]
+      properties:
+        clientActionId: { type: string, format: uuid }
+        status: { type: string, enum: [APPLIED, CONFLICT, FAILED] }
+        retryCount: { type: integer, minimum: 0 }
+        errorCode: { type: string, maxLength: 64 }
+        result: { $ref: "#/components/schemas/ScreeningSyncResultSnapshot" }
+    ScreeningSyncQueueItem:
+      type: object
+      additionalProperties: false
+      required: [registrationId, participantDisplayName, queueNumber, status, existingResult]
+      properties:
+        registrationId: { type: string, format: uuid }
+        participantDisplayName: { type: string }
+        queueNumber: { type: integer, nullable: true }
+        status: { $ref: "#/components/schemas/RegistrationStatus" }
+        existingResult:
+          type: object
+          nullable: true
+          additionalProperties: false
+          properties:
+            resultId: { type: string, format: uuid }
+            overallFlag: { $ref: "#/components/schemas/OverallFlag" }
+            isFlagged: { type: boolean }
+            createdAt: { type: string, format: date-time }
+    ScreeningSyncPullStation:
+      type: object
+      additionalProperties: false
+      required: [stationId, eventId, stationName, stationType, stationOrder, isActive, offlineAccessExpiresAt, registrations]
+      properties:
+        stationId: { type: string, format: uuid }
+        eventId: { type: string, format: uuid }
+        stationName: { type: string }
+        stationType: { type: string, enum: [VISUAL_ACUITY, REFRACTION, COLOUR_VISION] }
+        stationOrder: { type: integer }
+        isActive: { type: boolean }
+        offlineAccessExpiresAt: { type: string, format: date-time, nullable: true }
+        registrations: { type: array, items: { $ref: "#/components/schemas/ScreeningSyncQueueItem" } }
+    ScreeningSyncResponse:
+      type: object
+      additionalProperties: false
+      required: [clientBatchId, serverTime, cursor, actions, pull]
+      properties:
+        clientBatchId: { type: string, format: uuid }
+        serverTime: { type: string, format: date-time }
+        cursor: { type: string, format: date-time }
+        actions: { type: array, items: { $ref: "#/components/schemas/ScreeningSyncActionResult" } }
+        pull:
+          type: object
+          additionalProperties: false
+          required: [event, stations]
+          properties:
+            event:
+              type: object
+              additionalProperties: false
+              required: [eventId, name, status]
+              properties:
+                eventId: { type: string, format: uuid }
+                name: { type: string }
+                status: { $ref: "#/components/schemas/EventStatus" }
+            stations: { type: array, items: { $ref: "#/components/schemas/ScreeningSyncPullStation" } }
     ScreeningEvaluationReason:
       type: object
       additionalProperties: false
