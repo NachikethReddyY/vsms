@@ -32,9 +32,32 @@ type OfflineSnapshot = {
 };
 
 type OfflineMutation = {
+  clientActionId: string;
   stationId: string;
   path: ScreeningPath;
   body: ScreeningSavePayload<VisualAcuityResultData | RefractionResultData | ColourVisionResultData>;
+};
+
+type ScreeningSyncActionResult = {
+  clientActionId: string;
+  status: 'APPLIED' | 'CONFLICT' | 'FAILED';
+  retryCount: number;
+  errorCode?: string;
+};
+
+type ScreeningSyncPullStation = OfflineStation & {
+  registrations: OfflineQueueRegistration[];
+};
+
+type ScreeningSyncResponse = {
+  clientBatchId: string;
+  serverTime: string;
+  cursor: string;
+  actions: ScreeningSyncActionResult[];
+  pull: {
+    event: { eventId: string; name: string; status: string };
+    stations: ScreeningSyncPullStation[];
+  };
 };
 
 type EncryptedRecord = {
@@ -206,7 +229,7 @@ function toOfflineStation(station: Station): OfflineStation | null {
   };
 }
 
-function toOfflineQueue(rows: QueueRegistration[]): OfflineQueueRegistration[] {
+function toOfflineQueue(rows: Array<Omit<QueueRegistration, 'passToken'> & Partial<Pick<QueueRegistration, 'passToken'>>>): OfflineQueueRegistration[] {
   return rows.map((row) => ({
     registrationId: row.registrationId,
     participantDisplayName: row.participantDisplayName,
@@ -232,28 +255,35 @@ async function loadSnapshot(ownerId: string, eventId: string): Promise<OfflineSn
   }
 }
 
-async function getOnlineSnapshot(eventId: string): Promise<OfflineSnapshot> {
-  const { data: stationsPayload } = await apiClient.get<{
-    event: { eventId: string; name: string };
-    stations: Station[];
-  }>(`/events/${eventId}/stations`);
-  const stations = stationsPayload.stations.map(toOfflineStation).filter((station): station is OfflineStation => Boolean(station));
+function snapshotFromPull(pull: ScreeningSyncResponse['pull']): OfflineSnapshot {
+  const stations = pull.stations.map(toOfflineStation).filter((station): station is OfflineStation => Boolean(station));
   if (!stations.length) {
     throw new Error('No currently assigned screening stations are available to download for offline use.');
   }
-
-  const queues = Object.fromEntries(await Promise.all(stations.map(async (station) => {
-    const { data } = await apiClient.get<{ registrations: QueueRegistration[] }>(
-      `/events/${eventId}/stations/${station.stationId}/queue`,
-    );
-    return [station.stationId, toOfflineQueue(data.registrations)];
-  })));
-
   return {
-    event: { eventId: stationsPayload.event.eventId, name: stationsPayload.event.name },
+    event: { eventId: pull.event.eventId, name: pull.event.name },
     stations,
-    queues,
+    queues: Object.fromEntries(pull.stations.map((station) => [
+      station.stationId,
+      toOfflineQueue(station.registrations),
+    ])),
   };
+}
+
+async function requestScreeningSync(
+  eventId: string,
+  actions: Array<{
+    clientActionId: string;
+    stationId: string;
+    stationType: StationType;
+    payload: OfflineMutation['body'];
+  }>,
+): Promise<ScreeningSyncResponse> {
+  const { data } = await apiClient.post<ScreeningSyncResponse>(`/events/${eventId}/sync/screening`, {
+    clientBatchId: crypto.randomUUID(),
+    actions,
+  });
+  return data;
 }
 
 function snapshotExpiry(snapshot: OfflineSnapshot) {
@@ -265,7 +295,8 @@ function snapshotExpiry(snapshot: OfflineSnapshot) {
 }
 
 export async function downloadOfflineEvent(ownerId: string, eventId: string): Promise<OfflineSyncStatus> {
-  const snapshot = await getOnlineSnapshot(eventId);
+  const response = await requestScreeningSync(eventId, []);
+  const snapshot = snapshotFromPull(response.pull);
   const expiresAt = snapshotExpiry(snapshot);
   const record = await encryptRecord({
     id: snapshotId(ownerId, eventId),
@@ -411,14 +442,15 @@ export async function queueOfflineStationSave(
     throw new Error(`Flagged result (${evaluation.overallFlag}) must be acknowledged before saving.`);
   }
   const expiresAt = snapshotExpiry(snapshot);
+  const clientActionId = crypto.randomUUID();
   const record = await encryptRecord({
-    id: `${ownerId}:${eventId}:mutation:${crypto.randomUUID()}`,
+    id: `${ownerId}:${eventId}:mutation:${clientActionId}`,
     ownerId,
     eventId,
     kind: 'mutation',
     status: 'pending',
     expiresAt,
-  }, { stationId, path, body } satisfies OfflineMutation);
+  }, { clientActionId, stationId, path, body } satisfies OfflineMutation);
   await putRecord(record);
   notifyOfflineChange();
   return evaluation;
@@ -453,38 +485,61 @@ export async function syncOfflineEvent(ownerId: string, eventId: string): Promis
   if (!initial.downloaded) return { ...initial, synced: 0, expired: false };
 
   let synced = 0;
+  const pending: Array<{ record: EncryptedRecord; mutation: OfflineMutation }> = [];
   for (const record of await recordsForEvent(ownerId, eventId)) {
     if (record.kind !== 'mutation' || record.status !== 'pending') continue;
     if (isExpired(record.expiresAt)) {
       await purgeEvent(ownerId, eventId);
       return { downloaded: false, pending: 0, conflicts: 0, expiresAt: null, synced, expired: true };
     }
-    const mutation = await decryptRecord<OfflineMutation>(record);
+    pending.push({ record, mutation: await decryptRecord<OfflineMutation>(record) });
+  }
+
+  const batches = pending.length
+    ? Array.from({ length: Math.ceil(pending.length / 25) }, (_, index) => pending.slice(index * 25, (index + 1) * 25))
+    : [[]];
+  for (const batch of batches) {
     try {
-      await apiClient.post(`/events/${eventId}/stations/${mutation.stationId}/${mutation.path}`, mutation.body);
-      await deleteRecords([record]);
-      synced += 1;
+      const response = await requestScreeningSync(eventId, batch.map(({ mutation }) => ({
+        clientActionId: mutation.clientActionId,
+        stationId: mutation.stationId,
+        stationType: mutation.path === 'visual-acuity'
+          ? 'VISUAL_ACUITY'
+          : mutation.path === 'refraction' ? 'REFRACTION' : 'COLOUR_VISION',
+        payload: mutation.body,
+      })));
+      const recordByAction = new Map(batch.map((item) => [item.mutation.clientActionId, item.record]));
+      for (const result of response.actions) {
+        const record = recordByAction.get(result.clientActionId);
+        if (!record) continue;
+        if (result.status === 'APPLIED') {
+          await deleteRecords([record]);
+          synced += 1;
+        } else if (result.status === 'CONFLICT') {
+          await markConflict(record);
+        }
+      }
+
+      const snapshot = snapshotFromPull(response.pull);
+      const expiresAt = snapshotExpiry(snapshot);
+      await putRecord(await encryptRecord({
+        id: snapshotId(ownerId, eventId),
+        ownerId,
+        eventId,
+        kind: 'snapshot',
+        status: 'ready',
+        expiresAt,
+      }, snapshot));
     } catch (error) {
       if (isNetworkError(error)) break;
       if (isScopeExpiredError(error)) {
         await purgeEvent(ownerId, eventId);
         return { downloaded: false, pending: 0, conflicts: 0, expiresAt: null, synced, expired: true };
       }
-      const status = (error as { response?: { status?: number } })?.response?.status;
-      if (status && status >= 400 && status < 500) await markConflict(record);
-      // Server failures stay pending for a later retry; a sequential queue should not stampede a failing API.
-      break;
+      throw error;
     }
   }
-
-  try {
-    await downloadOfflineEvent(ownerId, eventId);
-  } catch (error) {
-    if (isScopeExpiredError(error)) {
-      await purgeEvent(ownerId, eventId);
-      return { downloaded: false, pending: 0, conflicts: 0, expiresAt: null, synced, expired: true };
-    }
-  }
+  notifyOfflineChange();
   return { ...(await getOfflineSyncStatus(ownerId, eventId)), synced, expired: false };
 }
 
