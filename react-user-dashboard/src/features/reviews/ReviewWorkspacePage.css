@@ -394,6 +394,23 @@
 .decision-confirm strong, .decision-confirm small { display: block; }
 .decision-confirm strong { font-size: 12px; line-height: 18px; }
 .decision-confirm small { margin-top: 2px; color: var(--muted); font-size: 10px; line-height: 16px; }
+.decision-signature {
+  display: grid;
+  gap: 14px;
+  margin-top: 18px;
+  padding: 16px;
+  border: 1px solid var(--hairline-strong);
+  border-radius: 10px;
+  background: var(--canvas-soft);
+}
+.decision-signature > div:first-child { display: grid; grid-template-columns: 21px minmax(0, 1fr); gap: 10px; align-items: start; }
+.decision-signature > div:first-child svg { width: 20px; color: var(--accent); }
+.decision-signature > div:first-child strong, .decision-signature > div:first-child small { display: block; }
+.decision-signature > div:first-child strong { font-size: 12px; line-height: 18px; }
+.decision-signature > div:first-child small { margin-top: 2px; color: var(--muted); font-size: 10px; line-height: 16px; }
+.decision-signature .signature-pad-shell { max-width: 720px; }
+.decision-signature-secured { display: flex; align-items: center; gap: 8px; margin: 0; color: var(--green); font-size: 11px; line-height: 17px; }
+.decision-signature-secured svg { width: 17px; flex: none; }
 .decision-actions { display: flex; justify-content: flex-end; margin-top: 18px; }
 .decision-actions .primary { min-width: 190px; }
 
