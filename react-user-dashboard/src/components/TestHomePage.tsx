@@ -40,11 +40,11 @@ const dateKey = (value: Date, timeZone: string) => new Intl.DateTimeFormat('en-C
   year: 'numeric', month: '2-digit', day: '2-digit', timeZone,
 }).format(value);
 
-function toEventItem(event: EventRecord): EventItem {
+function toEventItem(event: EventRecord, now: Date): EventItem {
   const startsAt = new Date(event.startsAt);
   const endsAt = new Date(event.endsAt);
-  const today = new Date();
-  const tomorrow = new Date(Date.now() + 86400000);
+  const tomorrow = new Date(now.getTime() + 86400000);
+  const statusKey = event.status === 'IN_PROGRESS' && endsAt <= now ? 'COMPLETED' : event.status;
   const eventDate = dateKey(startsAt, event.timezone);
   const shortDate = new Intl.DateTimeFormat('en-SG', { day: 'numeric', month: 'short', timeZone: event.timezone }).format(startsAt);
   const names = [...new Set(event.shifts.flatMap((shift) => shift.staffAssignments.map((assignment) => assignment.user.username)))];
@@ -53,14 +53,14 @@ function toEventItem(event: EventRecord): EventItem {
 
   return {
     eventId: event.eventId,
-    date: eventDate === dateKey(today, event.timezone) ? 'Today' : eventDate === dateKey(tomorrow, event.timezone) ? 'Tomorrow' : shortDate,
+    date: eventDate === dateKey(now, event.timezone) ? 'Today' : eventDate === dateKey(tomorrow, event.timezone) ? 'Tomorrow' : shortDate,
     day: new Intl.DateTimeFormat('en-SG', { weekday: 'long', timeZone: event.timezone }).format(startsAt),
     month: new Intl.DateTimeFormat('en-SG', { day: 'numeric', month: 'long', timeZone: event.timezone }).format(startsAt),
     title: event.name,
     time,
     venue: event.venue,
-    status: STATUS_LABEL[event.status],
-    statusKey: event.status,
+    status: STATUS_LABEL[statusKey],
+    statusKey,
     artwork: getEventArtwork(event.bannerKey, event.artworkDataUrl),
     attendance: `${event.activeCapacityCount.toLocaleString()} / ${event.capacity.toLocaleString()}`,
     staff: names.slice(0, 4),
@@ -119,10 +119,10 @@ export default function TestHomePage() {
     timeZone: 'Asia/Singapore',
   }).format(now).toUpperCase();
   const visibleEvents = useMemo(
-    () => events.map(toEventItem)
+    () => events.map((event) => toEventItem(event, now))
       .filter((event) => period === 'past' ? ['COMPLETED', 'CANCELLED'].includes(event.statusKey) : !['COMPLETED', 'CANCELLED'].includes(event.statusKey))
       .filter((event) => `${event.title} ${event.venue}`.toLowerCase().includes(query.toLowerCase())),
-    [events, period, query],
+    [events, now, period, query],
   );
 
   return (
