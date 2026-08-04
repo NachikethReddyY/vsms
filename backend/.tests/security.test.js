@@ -3,7 +3,7 @@ const assert = require("node:assert/strict");
 const { rolesFromCognitoGroups } = require("../utils/roles");
 const { sanitizeMetadata } = require("../utils/sanitize");
 const { setAuthCookies, parseCookies } = require("../utils/httpCookies");
-const { resolveChallengeUsername, resolveRequiredAttributes } = require("../utils/cognitoClient");
+const { buildAuthorizationUrl, getLogoutUrl } = require("../utils/cognitoClient");
 
 test("only verified Cognito groups map to application roles", () => {
     assert.deepEqual(
@@ -13,56 +13,52 @@ test("only verified Cognito groups map to application roles", () => {
     assert.deepEqual(rolesFromCognitoGroups({ role: "ADMINISTRATOR" }), []);
 });
 
-test("Cognito challenges preserve the canonical username instead of an email alias", () => {
-    assert.equal(
-        resolveChallengeUsername(
-            { ChallengeParameters: { USER_ID_FOR_SRP: "89ba757c-60c1-7079-d691-688794814834" } },
-            "staff@example.com"
-        ),
-        "89ba757c-60c1-7079-d691-688794814834"
-    );
-    assert.equal(
-        resolveChallengeUsername(
-            {
-                ChallengeParameters: {
-                    userAttributes: JSON.stringify({
-                        sub: "89ba757c-60c1-7079-d691-688794814834",
-                        email: "staff@example.com",
-                    }),
-                },
-            },
-            "staff@example.com"
-        ),
-        "89ba757c-60c1-7079-d691-688794814834"
-    );
-    assert.equal(resolveChallengeUsername({}, "staff@example.com"), "staff@example.com");
+test("Cognito authorization uses code flow with PKCE and exact state binding", () => {
+    process.env.COGNITO_DOMAIN = "https://auth.tests.vsms.local";
+    process.env.COGNITO_APP_CLIENT_ID = "security-test-client";
+    process.env.COGNITO_REDIRECT_URI = "https://localhost:5173/auth/callback";
+    const url = new URL(buildAuthorizationUrl({ state: "exact-state", codeChallenge: "pkce-challenge" }));
+    assert.equal(url.origin, "https://auth.tests.vsms.local");
+    assert.equal(url.pathname, "/oauth2/authorize");
+    assert.equal(url.searchParams.get("response_type"), "code");
+    assert.equal(url.searchParams.get("state"), "exact-state");
+    assert.equal(url.searchParams.get("code_challenge"), "pkce-challenge");
+    assert.equal(url.searchParams.get("code_challenge_method"), "S256");
+    assert.equal(url.searchParams.has("client_secret"), false);
 });
 
-test("Cognito new-password challenges expose required standard attributes", () => {
-    assert.deepEqual(
-        resolveRequiredAttributes({
-            ChallengeParameters: {
-                requiredAttributes: JSON.stringify(["name", "userAttributes.given_name"]),
-            },
-        }),
-        ["name", "given_name"]
-    );
-    assert.deepEqual(resolveRequiredAttributes({}), []);
+test("Cognito logout URL is restricted to the configured application return", () => {
+    process.env.COGNITO_LOGOUT_URI = "https://localhost:5173/login";
+    const url = new URL(getLogoutUrl());
+    assert.equal(url.origin, "https://auth.tests.vsms.local");
+    assert.equal(url.pathname, "/logout");
+    assert.equal(url.searchParams.get("client_id"), "security-test-client");
+    assert.equal(url.searchParams.get("logout_uri"), "https://localhost:5173/login");
 });
 
-test("auth cookies are HttpOnly and never expose tokens in a JavaScript response object", () => {
+test("credential cookies are HttpOnly while the double-submit CSRF cookie is script-readable", () => {
     let values;
-    const response = { setHeader(name, value) { if (name === "Set-Cookie") values = value; } };
+    const response = {
+        getHeader() { return values; },
+        setHeader(name, value) { if (name === "Set-Cookie") values = value; },
+    };
     setAuthCookies(response, {
         AccessToken: "access-secret",
         RefreshToken: "refresh-secret",
         ExpiresIn: 3600,
     }, "staff@example.com");
-    assert.equal(values.length, 3);
-    for (const value of values) {
+    assert.deepEqual(values.map((entry) => entry.split("=", 1)[0]), [
+        "vsms_access", "vsms_username", "vsms_csrf", "vsms_refresh",
+    ]);
+    for (const value of values.filter((entry) => !entry.startsWith("vsms_csrf="))) {
         assert.match(value, /HttpOnly/);
         assert.match(value, /SameSite=Lax/);
+        assert.match(value, /Secure/);
     }
+    const csrf = values.find((entry) => entry.startsWith("vsms_csrf="));
+    assert.doesNotMatch(csrf, /HttpOnly/);
+    assert.match(csrf, /SameSite=Lax/);
+    assert.match(csrf, /Secure/);
 });
 
 test("cookie parser handles encoded values", () => {

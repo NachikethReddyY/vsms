@@ -123,7 +123,7 @@ The system adopts a defence-in-depth security approach by applying preventive, d
 | **A05: Security Misconfiguration** | Secure configuration practices are enforced through environment-based configuration management, restricted CORS policies, Helmet security middleware, secure HTTP headers, disabled Express fingerprinting (`x-powered-by`), and controlled production settings. API documentation exposure is restricted to non-production environments to reduce unnecessary information disclosure. |
 | **A06: Vulnerable and Outdated Components** | VSMS performs dependency security checks to identify vulnerable or outdated third-party libraries and packages. Dependency scanning tools are used to detect known vulnerabilities (CVEs), outdated components, and potential software supply-chain risks. Identified issues are reviewed and mitigated through dependency updates or security fixes. Threat modelling also considers risks introduced through external dependencies and system components. |
 | **A07: Identification and Authentication Failures** | Authentication security is implemented using JWT-based authentication, bcrypt password hashing, password policy enforcement, refresh session management, secure cookie handling, and session timeout controls. Rate limiting is applied to authentication endpoints to reduce brute-force attack risks. MFA is included as an additional security enhancement for stronger account protection. |
-| **A08: Software and Data Integrity Failures** | VSMS protects software and data integrity through multiple mechanisms. Production deployments perform cryptographic code signature verification using SHA-256 digital signatures and public key verification before application startup. This prevents execution of modified or unauthorised application artifacts. API integrity is maintained through idempotent request handling using Idempotency-Key headers, preventing duplicate operations caused by repeated requests. Database transactions maintain consistency during participant registration, queue updates, and screening submissions. |
+| **A08: Software and Data Integrity Failures** | API integrity is supported through bounded idempotency keys and payload binding, reducing duplicate or mismatched event operations. Serializable and atomic database transactions maintain consistency during event deletion, participant registration, queue updates, and screening submissions. The repository's optional code-signature prototype is not a release assurance by itself; production must enforce signed, immutable artifacts and lockfile verification in the deployment pipeline before claiming startup integrity. |
 | **A09: Security Logging and Monitoring Failures** | Security monitoring is supported through request logging, request context tracking, and audit logging mechanisms. Important activities such as authentication events, administrative actions, QR verification attempts, and security-sensitive operations are recorded to support accountability, investigation, and troubleshooting. |
 | **A10: Server-Side Request Forgery (SSRF)** | External resource requests are controlled through allow-list validation where applicable. Restricting permitted external destinations reduces the possibility of attackers forcing backend services to access unauthorised internal resources. |
 
@@ -229,15 +229,15 @@ Security findings are reviewed and addressed through dependency updates, upgrade
 
 ### Software Integrity Verification
 
-VSMS implements cryptographic application integrity verification during production startup.
+VSMS does not currently claim runtime artifact-signature verification. The previous optional startup prototype silently skipped verification when signature files were absent, checked a source file against a differently named build artifact, and had a second unused implementation. It was removed to avoid presenting a non-enforced control as release assurance.
 
-Before execution, the backend verifies application artifacts using:
+Production delivery must enforce integrity in the deployment pipeline before release by using:
 
 - SHA-256 cryptographic hashing.
 - Digital signatures.
 - Public key verification.
 
-If verification fails, application startup is terminated to prevent execution of potentially modified or compromised code.
+The pipeline must reject a missing or invalid signature and deploy only the immutable artifact that was actually verified. This remains a deployment requirement; it was not simulated locally and no cloud environment was changed.
 
 This protects against:
 
@@ -323,6 +323,7 @@ Centralised error handling middleware provides:
 - Consistent API responses.
 - Controlled failure handling.
 - Prevention of sensitive stack trace exposure.
+- Generic messages for unknown exceptions; bounded legacy status hints retain correct HTTP semantics, while unclassified failures become generic 500 responses.
 - Improved troubleshooting capability.
 
 ---
@@ -599,6 +600,8 @@ Authentication is implemented using JSON Web Tokens (JWT). Protected API endpoin
 
 Authorization is enforced through Role-Based Access Control (RBAC), ensuring that administrators, registration officers, and screening staff only access functionality appropriate to their assigned roles.
 
+Event operations also enforce resource scope, not just a global role name. Event managers may screen only events they created or actively manage; screening staff must have an active `SCREENER` assignment for the requested station. Support and registration assignments cannot write station results. Clinical event aggregates, attendee rows, and management controls require event-level management authority, while ordinary assignees receive only the minimum roster display identity needed for coordination.
+
 Passwords are securely hashed using bcrypt before storage. Refresh sessions support secure re-authentication while reducing repeated login requests.
 
 Sensitive configuration values such as JWT secrets and database credentials are stored using environment variables rather than hard-coded within the application.
@@ -653,7 +656,7 @@ The participant registration process was tested to ensure proper request parsing
 <img width="701" height="567" alt="image" src="https://github.com/user-attachments/assets/113cf5e9-91d1-4ccb-8b21-c6382238fb04" />
 
 ```json
-POST http://localhost:5000/participants
+POST https://localhost:5050/api/v1/participants
 Content-Type: application/json
 
 {

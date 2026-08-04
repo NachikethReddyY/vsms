@@ -1,13 +1,15 @@
 import { ArrowRightStartOnRectangleIcon, Cog6ToothIcon } from '@heroicons/react/24/outline';
 import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { useAuth } from '../auth/authState';
+import { useAuth } from '../auth/AuthProvider';
+import { logoutAndReturnHome } from '../utils/logout';
 
 export default function ProfileMenu({ triggerClassName = '', compact = false }: { triggerClassName?: string; compact?: boolean }) {
   const [open, setOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
-  const { user, logout } = useAuth();
+  const { session, clearSession } = useAuth();
+  const user = session?.user;
   const label = user?.username || user?.email || 'Signed-in user';
   const initials = label.split(/[@._ -]+/).filter(Boolean).slice(0, 2).map((part) => part[0]).join('').toUpperCase();
 
@@ -29,6 +31,10 @@ export default function ProfileMenu({ triggerClassName = '', compact = false }: 
     };
   }, [open]);
 
+  async function logout() {
+    await logoutAndReturnHome(clearSession);
+  }
+
   return (
     <div className={`profile-menu ${open ? 'open' : ''}`} ref={menuRef}>
       <button ref={triggerRef} type="button" className={triggerClassName} aria-label={`Open account menu for ${label}`} aria-haspopup="menu" aria-expanded={open} onClick={() => setOpen((value) => !value)}>
@@ -37,7 +43,7 @@ export default function ProfileMenu({ triggerClassName = '', compact = false }: 
       </button>
       {open && <div className="profile-menu-panel" role="menu">
         <div className="profile-menu-identity"><strong>{user?.username || 'Account'}</strong><span>{user?.email}</span></div>
-        <Link to="/settings" role="menuitem" onClick={() => setOpen(false)}><Cog6ToothIcon aria-hidden="true" />Settings</Link>
+        <Link to="/account/security" role="menuitem" onClick={() => setOpen(false)}><Cog6ToothIcon aria-hidden="true" />Account security</Link>
         <button type="button" role="menuitem" onClick={() => { setOpen(false); void logout(); }}><ArrowRightStartOnRectangleIcon aria-hidden="true" />Sign out</button>
       </div>}
     </div>

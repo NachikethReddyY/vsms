@@ -13,14 +13,13 @@ import {
 import { Avatar } from '@astryxdesign/core/Avatar';
 import type { DateRange } from '@astryxdesign/core/DateRangeInput';
 import { MultiSelector } from '@astryxdesign/core/MultiSelector';
-import type { ISOTimeString } from '@astryxdesign/core/TimeInput';
 import { Toolbar } from '@astryxdesign/core/Toolbar';
 import { Typeahead } from '@astryxdesign/core/Typeahead';
 import { useEffect, useMemo, useRef, useState, type ChangeEvent, type FormEvent } from 'react';
 import Cropper, { type Area } from 'react-easy-crop';
 import { Link, useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { z } from 'zod';
-import { getApiMessage } from '../../auth/authState';
+import { getApiError as getApiMessage } from '../../utils/apiClient';
 import { getDisplayName } from '../../utils/identity';
 import {
   eventApi,
@@ -33,8 +32,9 @@ import {
 } from './eventApi';
 import { EVENT_BANNERS, getEventBanner } from './eventBanners';
 import { createCroppedArtwork } from './cropImage';
+import { EventDateRangePicker, EventTimePicker, type EventTimeValue } from './EventSchedulePicker';
 
-type TimeValue = ISOTimeString;
+type TimeValue = EventTimeValue;
 type DayForm = { eventDayId?: string; date: string; startsAt: TimeValue; endsAt: TimeValue };
 type AvailabilityForm = { date: string; isAvailable: boolean; startsAt: TimeValue; endsAt: TimeValue; capacity: number };
 type StationForm = {
@@ -748,16 +748,12 @@ export default function EventFormPage({ mode }: { mode: 'create' | 'edit' }) {
             </fieldset>
 
             <fieldset><legend className="wizard-section-legend"><span>Dates and daily hours<small>Select up to 31 days, then adjust each day independently.</small></span></legend>
-              <div className="native-date-range" role="group" aria-label="Event date range">
-                <Field label="First day"><input type="date" value={dateRange?.start || ''} max={dateRange?.end || undefined} onChange={(event) => setRange(event.target.value ? { start: event.target.value, end: dateRange?.end && dateRange.end >= event.target.value ? dateRange.end : event.target.value } as DateRange : null)} /></Field>
-                <Field label="Last day"><input type="date" value={dateRange?.end || ''} min={dateRange?.start || undefined} onChange={(event) => setRange(event.target.value ? { start: dateRange?.start && dateRange.start <= event.target.value ? dateRange.start : event.target.value, end: event.target.value } as DateRange : null)} /></Field>
-                {fieldErrors.eventDays && <p className="field-error" role="alert">{fieldErrors.eventDays}</p>}
-              </div>
+              <EventDateRangePicker value={dateRange} onChange={setRange} error={fieldErrors.eventDays} />
               {values.eventDays.length > 0 && <div className="day-schedule-list">
                 {values.eventDays.map((day, index) => <article key={day.date}>
                   <div className="day-schedule-date"><span>{new Intl.DateTimeFormat('en-SG', { weekday: 'short' }).format(new Date(`${day.date}T00:00:00+08:00`))}</span><strong>{new Intl.DateTimeFormat('en-SG', { day: '2-digit', month: 'short' }).format(new Date(`${day.date}T00:00:00+08:00`))}</strong></div>
-                  <TimeField label="Opens" value={day.startsAt} onChange={(time) => updateDay(index, { startsAt: time })} />
-                  <TimeField label="Closes" value={day.endsAt} onChange={(time) => updateDay(index, { endsAt: time })} />
+                  <TimeField label="Opens" value={day.startsAt} error={fieldErrors[`eventDays.${index}.startsAt`]} onChange={(time) => updateDay(index, { startsAt: time })} />
+                  <TimeField label="Closes" value={day.endsAt} error={fieldErrors[`eventDays.${index}.endsAt`]} onChange={(time) => updateDay(index, { endsAt: time })} />
                   <button type="button" className="secondary compact" onClick={() => applyDayHoursToAll(index)}>Apply to all</button>
                 </article>)}
               </div>}
@@ -797,8 +793,8 @@ export default function EventFormPage({ mode }: { mode: 'create' | 'edit' }) {
                 return <article key={station.stationTemplateId} className={!availability.isAvailable ? 'unavailable' : ''}>
                   <header><span className="station-plan-order">{stationIndex + 1}</span><div><h2>{template?.name || 'Station'}</h2><p>{template?.description || 'Reusable event station'}</p></div><label className="availability-toggle"><input type="checkbox" checked={availability.isAvailable} onChange={(event) => updateStationAvailability(stationIndex, activeDayIndex, { isAvailable: event.target.checked })} /><span>{availability.isAvailable ? 'Available' : 'Closed'}</span></label></header>
                   <div className="station-plan-controls">
-                    <TimeField label="Opens" value={availability.startsAt} onChange={(time) => updateStationAvailability(stationIndex, activeDayIndex, { startsAt: time })} disabled={!availability.isAvailable} />
-                    <TimeField label="Closes" value={availability.endsAt} onChange={(time) => updateStationAvailability(stationIndex, activeDayIndex, { endsAt: time })} disabled={!availability.isAvailable} />
+                    <TimeField label="Opens" value={availability.startsAt} error={fieldErrors[`stations.${stationIndex}.availabilities.${activeDayIndex}.startsAt`]} onChange={(time) => updateStationAvailability(stationIndex, activeDayIndex, { startsAt: time })} disabled={!availability.isAvailable} />
+                    <TimeField label="Closes" value={availability.endsAt} error={fieldErrors[`stations.${stationIndex}.availabilities.${activeDayIndex}.endsAt`]} onChange={(time) => updateStationAvailability(stationIndex, activeDayIndex, { endsAt: time })} disabled={!availability.isAvailable} />
                     <Field label="Live capacity" hint="People handled at once"><input type="number" min="1" max="100000" disabled={!availability.isAvailable} value={availability.capacity} onChange={(event) => updateStationAvailability(stationIndex, activeDayIndex, { capacity: Math.max(1, Number(event.target.value)) })} /></Field>
                     <button type="button" className="secondary compact" onClick={() => applyStationDayToAll(stationIndex, activeDayIndex)}>Apply this day to all</button>
                   </div>
@@ -817,8 +813,8 @@ export default function EventFormPage({ mode }: { mode: 'create' | 'edit' }) {
               <div className="shift-plan-fields">
                 <Field label="Shift name" error={fieldErrors[`shifts.${shiftIndex}.name`]}><input value={shift.name} onChange={(event) => updateShift(shiftIndex, { name: event.target.value })} placeholder="Day 1 morning screening" /></Field>
                 <Field label="Event day"><select value={shift.date} onChange={(event) => updateShift(shiftIndex, { date: event.target.value })}>{values.eventDays.map((day, index) => <option key={day.date} value={day.date}>Day {index + 1} · {day.date}</option>)}</select></Field>
-                <TimeField label="Starts" value={shift.startsAt} onChange={(time) => updateShift(shiftIndex, { startsAt: time })} />
-                <TimeField label="Ends" value={shift.endsAt} onChange={(time) => updateShift(shiftIndex, { endsAt: time })} />
+                <TimeField label="Starts" value={shift.startsAt} error={fieldErrors[`shifts.${shiftIndex}.startsAt`]} onChange={(time) => updateShift(shiftIndex, { startsAt: time })} />
+                <TimeField label="Ends" value={shift.endsAt} error={fieldErrors[`shifts.${shiftIndex}.endsAt`]} onChange={(time) => updateShift(shiftIndex, { endsAt: time })} />
                 <Field label="Required team size"><input type="number" min="1" max="1000" value={shift.requiredStaff} onChange={(event) => updateShift(shiftIndex, { requiredStaff: Math.max(1, Number(event.target.value)) })} /></Field>
               </div>
               <div className="shift-assignment-heading"><div><h3>Assigned people</h3><p>{shift.assignments.length} of {shift.requiredStaff} positions filled</p></div><label><span className="visually-hidden">Add person</span><select value="" onChange={(event) => addAssignment(shiftIndex, event.target.value)}><option value="">Add a person…</option>{staff.filter((person) => !shift.assignments.some((assignment) => assignment.userId === person.userId)).map((person) => <option key={person.userId} value={person.userId}>{getDisplayName(person.username)} · {roleLabel(person.systemRole as StaffAssignmentRole)}</option>)}</select></label></div>
@@ -853,6 +849,6 @@ function Field({ label, hint, error, wide, children }: { label: string; hint?: s
   return <label className={wide ? 'field wide' : 'field'}><span>{label}{hint && <small>{hint}</small>}</span>{children}{error && <em>{error}</em>}</label>;
 }
 
-function TimeField({ label, value, onChange, disabled }: { label: string; value: TimeValue; onChange: (value: TimeValue) => void; disabled?: boolean }) {
-  return <label className="field native-time-field"><span>{label}</span><input type="time" value={value} disabled={disabled} onChange={(event) => onChange(asTime(event.target.value))} /></label>;
+function TimeField({ label, value, onChange, disabled, error }: { label: string; value: TimeValue; onChange: (value: TimeValue) => void; disabled?: boolean; error?: string }) {
+  return <EventTimePicker label={label} value={value} onChange={onChange} disabled={disabled} error={error} />;
 }

@@ -1,20 +1,41 @@
+const APPLICATION_ROLES = [
+    "ADMINISTRATOR",
+    "EVENT_MANAGER",
+    "REGISTRATION_OFFICER",
+    "SCREENER",
+    "REVIEWER",
+    "SUPPORT",
+];
+
+// Cognito groups pre-date the application role names in some environments.
+// Normalising here keeps the session, route guards, and database-role
+// intersection on the one application vocabulary.
 const COGNITO_GROUP_ROLE_MAP = {
-    Admin: "ADMINISTRATOR",
-    Administrator: "ADMINISTRATOR",
+    ADMIN: "ADMINISTRATOR",
     ADMINISTRATOR: "ADMINISTRATOR",
-    RegistrationOfficer: "REGISTRATION_OFFICER",
-    REGISTRATION_OFFICER: "REGISTRATION_OFFICER",
-    EventManager: "EVENT_MANAGER",
-    EVENT_MANAGER: "EVENT_MANAGER",
-    Screener: "SCREENER",
+    EVENTMANAGER: "EVENT_MANAGER",
+    REGISTRATIONOFFICER: "REGISTRATION_OFFICER",
     SCREENER: "SCREENER",
-    Reviewer: "REVIEWER",
     REVIEWER: "REVIEWER",
+    SUPPORT: "SUPPORT",
 };
+
+const ASSIGNMENT_APPLICATION_ROLES = {
+    EVENT_MANAGER: "EVENT_MANAGER",
+    REGISTRATION: "REGISTRATION_OFFICER",
+    SCREENER: "SCREENER",
+    REVIEWER: "REVIEWER",
+    SUPPORT: "SUPPORT",
+};
+
+function normalizeApplicationRole(value) {
+    const key = String(value || "").trim().toUpperCase().replace(/[^A-Z0-9]/g, "");
+    return COGNITO_GROUP_ROLE_MAP[key] || null;
+}
 
 function rolesFromCognitoGroups(payload) {
     const groups = Array.isArray(payload?.["cognito:groups"]) ? payload["cognito:groups"] : [];
-    return [...new Set(groups.map((group) => COGNITO_GROUP_ROLE_MAP[group]).filter(Boolean))];
+    return [...new Set(groups.map(normalizeApplicationRole).filter(Boolean))];
 }
 
-module.exports = { rolesFromCognitoGroups };
+module.exports = { APPLICATION_ROLES, normalizeApplicationRole, rolesFromCognitoGroups, ASSIGNMENT_APPLICATION_ROLES };

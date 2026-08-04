@@ -2,7 +2,7 @@
 
 ## Goal
 
-Require a validated session for every frontend route except `/`, `/login`, and `/signup`; restore sessions safely after reload; make local HTTPS login work from both `localhost` and `127.0.0.1` without weakening the production origin boundary; and bring every routed page into the operational design system defined by `design/design.md` and the shipped landing page.
+Require a validated session for every frontend route except `/`, `/login`, and `/signup`; restore sessions safely after reload; make local HTTPS login work from both `localhost` and `127.0.0.1` without weakening the production origin boundary; and bring every routed page into the operational design system defined by `docs/design.md` and the shipped landing page.
 
 ## Routed page inventory
 
@@ -62,7 +62,7 @@ All surfaces require visible keyboard focus, semantic labels, 44px operational t
 11. Verify the complete route matrix in the browser: no private-content flash, full deep-link return, reload restoration, service-unavailable retry, logout/session expiry, and consistent desktop/phone behavior on both local hostnames.
 12. Enforce role gating in both the frontend route tree and the API. Hiding controls is only a UX aid; every sensitive event mutation remains server-authorized and event-scoped.
 13. Audit the mounted API surface for OWASP access control, authentication, CSRF/CORS, injection, file/data-URL handling, error disclosure, security headers, rate limits, secrets, dependency advisories, and audit logging. Do not claim that the application is absolutely secure; document tested controls and remaining operational requirements.
-14. Use `design/design.md` plus the shipped landing page as the visual authority for all routed React pages: warm neutral surfaces, restrained blue interactivity, semantic state colour, hairline structure, 44px operational targets, visible focus, reduced motion, and complete loading/empty/error/permission states.
+14. Use `docs/design.md` plus the shipped landing page as the visual authority for all routed React pages: warm neutral surfaces, restrained blue interactivity, semantic state colour, hairline structure, 44px operational targets, visible focus, reduced motion, and complete loading/empty/error/permission states.
 15. Retire the redundant `/dashboard` page, redirect old dashboard bookmarks to Events, and keep create/edit/detail/QR/settings flows within the same app shell.
 16. Run the Impeccable detector once after the implementation, inspect the complete path at desktop and phone sizes, fix one bounded batch of findings, and confirm once.
 

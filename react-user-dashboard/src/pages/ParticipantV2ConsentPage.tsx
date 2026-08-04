@@ -109,7 +109,7 @@ export default function ParticipantV2ConsentPage() {
     setError(null);
     try {
       const signature = form.consentStatus === "ACCEPTED"
-        ? (await apiClient.post("/signatures", { dataUrl: signatureDataUrl })).data
+        ? (await apiClient.post("/signatures", { dataUrl: signatureDataUrl, eventId, purpose: "CONSENT", targetId: participantId })).data
         : {};
       await apiClient.post(`/participants/${participantId}/consents`, {
         ...form,

@@ -6,7 +6,7 @@ const userService = require("../services/userService");
 // ==========================================
 exports.createUser = async (req, res, next) => {
   try {
-    const newUser = await userService.createUser(req.body);
+    const newUser = await userService.createUser(req.body, req.auth.userId, req.context);
 
     return res.status(201).json({
       success: true,
@@ -65,7 +65,7 @@ exports.updateUser = async (req, res, next) => {
     const { id } = req.params;
     const userData = req.body;
 
-    const updatedUser = await userService.updateUser(id, userData);
+    const updatedUser = await userService.updateUser(id, userData, req.auth.userId, req.context);
 
     return res.status(200).json({
       success: true,
@@ -74,26 +74,6 @@ exports.updateUser = async (req, res, next) => {
     });
   } catch (error) {
     console.error("Update user error:", error);
-    next(error);
-  }
-};
-
-// ==========================================
-// Delete User
-// DELETE /users/:id
-// ==========================================
-exports.deleteUser = async (req, res, next) => {
-  try {
-    const { id } = req.params;
-
-    await userService.deleteUser(id);
-
-    return res.status(200).json({
-      success: true,
-      message: "User deleted successfully",
-    });
-  } catch (error) {
-    console.error("Delete user error:", error);
     next(error);
   }
 };

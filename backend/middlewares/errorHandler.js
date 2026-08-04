@@ -1,14 +1,24 @@
 const AppError = require("../errors/AppError");
 const logger = require("../utils/logger/logger");
 
+const fallbackMessage = (status) => ({
+  400: "Request could not be processed",
+  401: "Authentication required",
+  403: "Access denied",
+  404: "Resource not found",
+  409: "Request conflicts with current state",
+  422: "Request validation failed",
+  429: "Too many requests",
+}[status] || (status >= 500 ? "An unexpected error occurred" : "Request failed"));
+
 const notFound = (req, _res, next) => next(new AppError(404, "NOT_FOUND", `Route ${req.method} ${req.path} was not found`));
 
 const errorHandler = (error, req, res, _next) => {
   const known = error instanceof AppError;
-  const status = known ? error.status : Number(error.statusCode || 500);
-  const code = known ? error.code : error.name || "INTERNAL_ERROR";
-  // Scrub only true internal failures. 503 (e.g. Cognito not configured) must stay actionable.
-  const publicMessage = status === 500 ? "An unexpected error occurred" : error.message;
+  const hintedStatus = Number(error?.statusCode);
+  const status = known ? error.status : Number.isInteger(hintedStatus) && hintedStatus >= 400 && hintedStatus <= 599 ? hintedStatus : 500;
+  const code = known ? error.code : status === 500 ? "INTERNAL_ERROR" : "REQUEST_FAILED";
+  const publicMessage = known ? error.message : fallbackMessage(status);
 
   logger[status >= 500 ? "error" : "warn"]("http.request.failed", {
     requestId: req.requestId,
