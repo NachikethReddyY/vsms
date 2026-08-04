@@ -150,6 +150,7 @@ paths:
   /api/v1/auth/logout:
     post:
       tags: [Authentication]
+      security: []
       operationId: logout
       summary: Clear the local browser session and finish the hosted Cognito logout
       parameters: [{ $ref: "#/components/parameters/ConditionalCsrfToken" }]
