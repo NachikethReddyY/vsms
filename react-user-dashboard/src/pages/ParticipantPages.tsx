@@ -9,7 +9,7 @@ import {
   UserPlusIcon,
 } from "@heroicons/react/24/outline";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
+import { Link, useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import apiClient, { getApiError } from "../utils/apiClient";
 import type {
   ConsentFormVersion,
@@ -386,9 +386,14 @@ export function ParticipantSearchPage() {
 
 export function ParticipantCreatePage() {
   const navigate = useNavigate();
+  const location = useLocation();
   const eventId = useEventIdFromRouteOrQuery();
   const [searchParams] = useSearchParams();
   const searchConfirmed = searchParams.get("searchConfirmed") === "1";
+  const returnToParticipantV2 = searchParams.get("flow") === "participant-v2" || location.pathname.startsWith("/participants-v2");
+  const searchLink = returnToParticipantV2
+    ? `/participants-v2${eventId ? `?eventId=${eventId}` : ""}`
+    : `/participants/search${eventId ? `?eventId=${eventId}` : ""}`;
   const [form, setForm] = useState<ParticipantFormState>(() => {
     const searchedName = (searchParams.get("name") ?? "").trim().split(/\s+/).filter(Boolean);
     return {
@@ -418,9 +423,11 @@ export function ParticipantCreatePage() {
     try {
       const response = await apiClient.post("/participants", currentForm);
       const id = response.data.participant.id;
-      navigate(eventId
-        ? `/participants/${id}/emergency-contacts?eventId=${eventId}`
-        : `/participants/${id}`);
+      navigate(returnToParticipantV2 && eventId
+        ? `/participants-v2/${id}/register?eventId=${eventId}`
+        : eventId
+          ? `/participants/${id}/emergency-contacts?eventId=${eventId}`
+          : `/participants/${id}`);
     } catch (requestError: unknown) {
       setError(getApiError(requestError, "Unable to create participant."));
     } finally {
@@ -431,13 +438,13 @@ export function ParticipantCreatePage() {
     return (
       <AppShell title="Create participant">
         <ParticipantBackLink
-          to={`/participants/search${eventId ? `?eventId=${eventId}` : ""}`}
+          to={searchLink}
           label="Back to participant search"
         />
         <RegistrationJourney active="search" />
         <div className="registration-panel no-match-panel">
           <div className="registration-notice warning"><MagnifyingGlassIcon /><p><strong>Search is required first.</strong> This prevents duplicate participant records and keeps returning participants linked to their existing history.</p></div>
-          <Link className="primary" to={`/participants/search${eventId ? `?eventId=${eventId}` : ""}`}><MagnifyingGlassIcon /> Search participants</Link>
+          <Link className="primary" to={searchLink}><MagnifyingGlassIcon /> Search participants</Link>
         </div>
       </AppShell>
     );
@@ -445,7 +452,7 @@ export function ParticipantCreatePage() {
   return (
     <AppShell title="Create participant">
       <ParticipantBackLink
-        to={`/participants/search${eventId ? `?eventId=${eventId}` : ""}`}
+        to={searchLink}
         label="Back to participant search"
       />
       <RegistrationJourney active="details" />
@@ -566,8 +573,11 @@ export function ParticipantDetailPage() {
 
 export function ParticipantEditPage() {
   const navigate = useNavigate();
+  const location = useLocation();
   const { participantId = "" } = useParams();
   const eventId = useEventIdFromRouteOrQuery();
+  const isParticipantV2 = location.pathname.startsWith("/participants-v2");
+  const participantLink = `${isParticipantV2 ? `/participants-v2/${participantId}` : `/participants/${participantId}`}${eventId ? `?eventId=${eventId}` : ""}`;
   const [form, setForm] = useState<ParticipantFormState | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -610,7 +620,7 @@ export function ParticipantEditPage() {
     setSubmitting(true);
     try {
       await apiClient.patch(`/participants/${participantId}`, currentForm);
-      navigate(`/participants/${participantId}${eventId ? `?eventId=${eventId}` : ""}`);
+      navigate(participantLink);
     } catch (requestError: unknown) {
       setError(getApiError(requestError, "Unable to update participant."));
     } finally {
@@ -620,7 +630,7 @@ export function ParticipantEditPage() {
   return (
     <AppShell title="Edit participant">
       <ParticipantBackLink
-        to={`/participants/${participantId}${eventId ? `?eventId=${eventId}` : ""}`}
+        to={participantLink}
         label="Back to participant details"
       />
       <ParticipantForm form={form} setForm={setEditForm} onSubmit={submit} submitLabel="Save changes" submitting={submitting} feedback={error} onFieldChange={() => setError(null)} />
@@ -630,8 +640,11 @@ export function ParticipantEditPage() {
 
 export function EmergencyContactsPage() {
   const navigate = useNavigate();
+  const location = useLocation();
   const { participantId = "" } = useParams();
   const eventId = useEventIdFromRouteOrQuery();
+  const isParticipantV2 = location.pathname.startsWith("/participants-v2");
+  const participantLink = `${isParticipantV2 ? `/participants-v2/${participantId}` : `/participants/${participantId}`}${eventId ? `?eventId=${eventId}` : ""}`;
   const [contacts, setContacts] = useState<EmergencyContact[]>([]);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -685,12 +698,14 @@ export function EmergencyContactsPage() {
   }
   const hasActiveContact = contacts.some((contact) => contact.status === "ACTIVE");
   const completionTarget = eventId
-    ? `/events/${eventId}/participants/${participantId}/consent`
-    : `/participants/${participantId}`;
+    ? isParticipantV2
+      ? `/participants-v2/${participantId}/consent?eventId=${eventId}`
+      : `/events/${eventId}/participants/${participantId}/consent`
+    : participantLink;
   return (
     <AppShell title="Emergency contacts">
       <ParticipantBackLink
-        to={`/participants/${participantId}${eventId ? `?eventId=${eventId}` : ""}`}
+        to={participantLink}
         label="Back to participant details"
       />
       <RegistrationJourney active="details" />
@@ -1008,12 +1023,13 @@ export function EventRegistrationsPage() {
 }
 
 export function RegistrationHistoryPage() {
+  const location = useLocation();
   const { registrationId = "" } = useParams();
   const [history, setHistory] = useState<RegistrationHistory[]>([]);
   useEffect(() => { void apiClient.get(`/registrations/${registrationId}/history`).then((response) => setHistory(response.data.history ?? [])); }, [registrationId]);
   return (
     <AppShell title="Registration history">
-      <ParticipantBackLink to="/participants/search" label="Back to participant search" />
+      <ParticipantBackLink to={location.pathname.startsWith("/participants-v2") ? "/participants-v2" : "/participants/search"} label="Back to participant search" />
       <div className="space-y-3">{history.map((item) => <article key={item.id} className="rounded-xl border bg-white p-4"><p className="font-semibold">{item.fromStatus ? displayStatus(item.fromStatus) : "New"} → {displayStatus(item.toStatus)}</p><p className="text-sm text-slate-600">{new Date(item.occurredAt).toLocaleString()} · {item.changedBy?.fullName ?? "Staff"} · {item.reason ?? "No reason"}</p></article>)}</div>
     </AppShell>
   );
@@ -1032,8 +1048,11 @@ export function ParticipantHistoryPage() {
 }
 
 export function ParticipantConsentsPage() {
+  const location = useLocation();
   const { participantId = "" } = useParams();
   const eventId = useEventIdFromRouteOrQuery();
+  const isParticipantV2 = location.pathname.startsWith("/participants-v2");
+  const participantLink = `${isParticipantV2 ? `/participants-v2/${participantId}` : `/participants/${participantId}`}${eventId ? `?eventId=${eventId}` : ""}`;
   const [consents, setConsents] = useState<ConsentRecord[]>([]);
   const [reason, setReason] = useState<Record<string, string>>({});
   const [error, setError] = useState<string | null>(null);
@@ -1062,7 +1081,7 @@ export function ParticipantConsentsPage() {
   return (
     <AppShell title="Consent history">
       <ParticipantBackLink
-        to={`/participants/${participantId}${eventId ? `?eventId=${eventId}` : ""}`}
+        to={participantLink}
         label="Back to participant details"
       />
       <FormErrorSummary error={error} />
@@ -1076,7 +1095,7 @@ export function ParticipantConsentsPage() {
           </div>
           <div className="flex flex-wrap gap-3">
             <Link className="primary" to="/events">Choose an event</Link>
-            <Link className="secondary" to={`/participants/${participantId}`}>Return to participant details</Link>
+            <Link className="secondary" to={participantLink}>Return to participant details</Link>
           </div>
         </section>
       ) : null}
@@ -1089,6 +1108,7 @@ export function ParticipantConsentsPage() {
 }
 
 export function RegistrationQrPage() {
+  const location = useLocation();
   const { registrationId = "" } = useParams();
   const [qrImage, setQrImage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -1102,7 +1122,7 @@ export function RegistrationQrPage() {
   }
   return (
     <AppShell title="QR / check-in handoff">
-      <ParticipantBackLink to={`/registrations/${registrationId}/history`} label="Back to registration history" />
+      <ParticipantBackLink to={location.pathname.startsWith("/participants-v2") ? `/participants-v2/registrations/${registrationId}/history` : `/registrations/${registrationId}/history`} label="Back to registration history" />
       <RegistrationJourney active="qr" />
       <FormErrorSummary error={error} />
       <div className="space-y-4 rounded-2xl border bg-white p-5">

@@ -118,6 +118,7 @@ export default function ParticipantV2Page() {
   }
 
   const createParams = new URLSearchParams({ searchConfirmed: "1" });
+  createParams.set("flow", "participant-v2");
   if (eventId) createParams.set("eventId", eventId);
   Object.entries(criteria).forEach(([key, value]) => {
     if (value.trim()) createParams.set(key, value.trim());
@@ -166,7 +167,7 @@ export default function ParticipantV2Page() {
       <section className="participant-v2-results" aria-live="polite" aria-busy={searching}>
         {searching ? <div className="participant-v2-empty"><span className="spinner" /><h2>Searching participant records…</h2></div> : null}
         {!searching && !searched ? <div className="participant-v2-empty"><UserGroupIcon /><h2>Search for an existing participant</h2><p>Use a name, contact number, reference, or date of birth to begin.</p></div> : null}
-        {!searching && searched && results?.participants.length === 0 ? <div className="participant-v2-empty"><UserGroupIcon /><h2>No participants found</h2><p>Check the spelling or search with another identifier before creating a new participant.</p><Link className="primary participant-v2-create" to={`/participants/new?${createParams.toString()}`}><UserPlusIcon />Create new participant</Link></div> : null}
+        {!searching && searched && results?.participants.length === 0 ? <div className="participant-v2-empty"><UserGroupIcon /><h2>No participants found</h2><p>Check the spelling or search with another identifier before creating a new participant.</p><Link className="primary participant-v2-create" to={`/participants-v2/new?${createParams.toString()}`}><UserPlusIcon />Create new participant</Link></div> : null}
         {!searching && results && results.participants.length > 0 ? <>
           <header className="participant-v2-results-heading"><div><h2>{results.pagination.total} {results.pagination.total === 1 ? "match" : "matches"}</h2><p>{selectedEvent ? `Results ready for ${selectedEvent.name}.` : "Select an event before continuing."}</p></div><span>Page {results.pagination.page} of {Math.max(results.pagination.totalPages, 1)}</span></header>
           <div className="participant-v2-result-list">
@@ -174,7 +175,7 @@ export default function ParticipantV2Page() {
               <span className="participant-v2-avatar" aria-hidden="true">{initials(participant)}</span>
               <div><h3>{participant.firstName} {participant.lastName}</h3><p><IdentificationIcon />{participant.participantReference}</p><p><CalendarDaysIcon />{participant.maskedDateOfBirth} <PhoneIcon />{participant.maskedContactNumber}</p></div>
               <div className="participant-v2-result-status"><strong>Ready for registration</strong><span>{selectedEvent ? selectedEvent.name : "Choose an event"}</span></div>
-              <div className="participant-v2-result-actions"><Link className="secondary" to={`/participants-v2/${participant.id}${eventId ? `?eventId=${encodeURIComponent(eventId)}` : ""}`}><PencilSquareIcon />View profile</Link>{eventId ? <Link className="primary" to={`/participants-v2/${participant.id}?eventId=${encodeURIComponent(eventId)}`}><ArrowRightIcon />Register</Link> : null}</div>
+              <div className="participant-v2-result-actions"><Link className="secondary" to={`/participants-v2/${participant.id}${eventId ? `?eventId=${encodeURIComponent(eventId)}` : ""}`}><PencilSquareIcon />View profile</Link>{eventId ? <Link className="primary" to={`/participants-v2/${participant.id}/register?eventId=${encodeURIComponent(eventId)}`}><ArrowRightIcon />Register</Link> : null}</div>
             </article>)}
           </div>
           {results.pagination.totalPages > 1 ? <nav className="participant-v2-pagination" aria-label="Participant result pages"><button className="secondary" type="button" disabled={results.pagination.page <= 1 || searching} onClick={() => void search(results.pagination.page - 1)}>Previous</button><span>Page {results.pagination.page} of {results.pagination.totalPages}</span><button className="secondary" type="button" disabled={results.pagination.page >= results.pagination.totalPages || searching} onClick={() => void search(results.pagination.page + 1)}>Next</button></nav> : null}
