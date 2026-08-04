@@ -19,6 +19,20 @@ function hashIdentifier(identifier) {
     return crypto.createHash("sha256").update(identifier.toLowerCase()).digest("hex");
 }
 
+async function resolveAuditContext({ userId, context, client = prisma }) {
+    const requestedDeviceId = typeof context === "object" ? context?.deviceId : null;
+    const device = requestedDeviceId && userId ? await client.device.findFirst({
+        where: { id: requestedDeviceId, userId, status: "ACTIVE" },
+        select: { id: true },
+    }) : null;
+    return {
+        requestId: typeof context === "string" ? context : context?.requestId || null,
+        deviceId: device?.id || null,
+        ipAddress: typeof context === "object" ? trimValue(context?.ipAddress, 45) : null,
+        deviceName: typeof context === "object" ? trimValue(context?.deviceName, 100) : null,
+    };
+}
+
 async function createAuthAuditLog({
     userId = null,
     eventType,
@@ -70,6 +84,7 @@ async function createAuditLog({
     context,
     client = prisma,
 }) {
+    const auditContext = await resolveAuditContext({ userId, context, client });
     return client.auditLog.create({
         data: {
             userId,
@@ -77,12 +92,12 @@ async function createAuditLog({
             entityName: trimValue(entityName, 50),
             entityId: entityId || uuidv4(),
             outcome,
-            requestId: context.requestId,
-            deviceId: context.deviceId,
+            requestId: auditContext.requestId,
+            deviceId: auditContext.deviceId,
             oldValue: sanitizeMetadata(oldValue),
             newValue: sanitizeMetadata(newValue),
-            ipAddress: context.ipAddress,
-            deviceName: trimValue(context.deviceName, 100),
+            ipAddress: auditContext.ipAddress,
+            deviceName: auditContext.deviceName,
         },
     });
 }
@@ -90,5 +105,6 @@ async function createAuditLog({
 module.exports = {
     createAuthAuditLog,
     createAuditLog,
+    resolveAuditContext,
     sanitizeMetadata,
 };

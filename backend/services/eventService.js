@@ -12,6 +12,7 @@ const {
   processArtifactCleanupTasks,
 } = require("./artifactCleanupService");
 const { createExportReceipt } = require("../utils/eventExportReceipt");
+const { resolveAuditContext } = require("../utils/audit");
 const env = require("../config/env");
 
 const EVENT_FIELDS = [
@@ -394,15 +395,7 @@ const assertRange = (data, shifts, eventDays = []) => {
 };
 
 const requestIdFor = (context) => typeof context === "string" ? context : context?.requestId;
-const auditFields = (context) => {
-  const requestId = requestIdFor(context);
-  return {
-    requestId: requestId || null,
-    deviceId: typeof context === "object" ? context?.deviceId || null : null,
-    ipAddress: typeof context === "object" ? context?.ipAddress || null : null,
-    deviceName: typeof context === "object" ? context?.deviceName || null : null,
-  };
-};
+const auditFields = (tx, user, context) => resolveAuditContext({ client: tx, userId: user.userId, context });
 
 const bumpEventVersion = async (tx, eventId, version) => {
   const changed = await tx.event.updateMany({
@@ -711,7 +704,7 @@ const createEvent = async (body, user, correlationId, rawIdempotencyKey, db = pr
         entityName: "Event",
         entityId: created.eventId,
         newValue: snapshot(full),
-        ...auditFields(correlationId),
+        ...await auditFields(tx, user, correlationId),
       },
     });
     await tx.eventAuditLog.create({
@@ -998,7 +991,7 @@ return db.$transaction(async (tx) => {
         oldValue: snapshot(current),
         newValue: snapshot(updated),
       },
-      ...auditFields(correlationId),
+      ...await auditFields(tx, user, correlationId),
     },
   });
   await auditUpdate(tx, current, updated, user, correlationId);
@@ -1040,7 +1033,7 @@ const transitionEvent = async (eventId, command, body, user, correlationId, db =
         entityId: eventId,
         oldValue: snapshot(current),
         newValue: snapshot(updated),
-        ...auditFields(correlationId),
+        ...await auditFields(tx, user, correlationId),
       },
     });
     await tx.eventAuditLog.create({
@@ -1109,7 +1102,7 @@ const cancelEvent = async (eventId, body, user, correlationId, db = prisma) => {
         entityId: eventId,
         oldValue: snapshot(current),
         newValue: snapshot(updated),
-        ...auditFields(correlationId),
+        ...await auditFields(tx, user, correlationId),
       },
     });
     await tx.eventAuditLog.create({
@@ -1281,7 +1274,7 @@ const deleteEvent = async (eventId, body, user, correlationId, db = prisma) => {
         entityName: "Event",
         entityId: eventId,
         details: { status: current.status, version: body.version },
-        ...auditFields(correlationId),
+        ...await auditFields(tx, user, correlationId),
       },
     });
     return { result: { eventId, deleted: true }, cleanupTaskCount };
@@ -1389,6 +1382,17 @@ const importStations = async (eventId, body, user, correlationId, db = prisma) =
     }
 
     const updated = await tx.event.findUniqueOrThrow({ where: { eventId }, include: eventInclude });
+    await tx.auditLog.create({
+      data: {
+        userId: user.userId,
+        action: "UPDATED",
+        resource: "Event",
+        entityName: "Event",
+        entityId: eventId,
+        details: { oldValue: snapshot(current), newValue: snapshot(updated) },
+        ...await auditFields(tx, user, correlationId),
+      },
+    });
     await auditUpdate(tx, current, updated, user, correlationId);
     return toEventResponse(updated, user, tx);
   });
@@ -1434,6 +1438,17 @@ const updateStation = async (eventId, eventStationId, body, user, correlationId,
 
     // body.capacity accepted for OpenAPI/UI compatibility; Station has no capacity column (#30 MVP).
     const updated = await tx.event.findUniqueOrThrow({ where: { eventId }, include: eventInclude });
+    await tx.auditLog.create({
+      data: {
+        userId: user.userId,
+        action: "UPDATED",
+        resource: "Event",
+        entityName: "Event",
+        entityId: eventId,
+        details: { oldValue: snapshot(current), newValue: snapshot(updated) },
+        ...await auditFields(tx, user, correlationId),
+      },
+    });
     await auditUpdate(tx, current, updated, user, correlationId);
     return toEventResponse(updated, user, tx);
   });
@@ -1501,7 +1516,7 @@ const addStaffAssignment = async (eventId, shiftId, body, user, correlationId, d
         entityName: "Event",
         entityId: eventId,
         details: { shiftId, assignmentRole: body.assignmentRole, assignedUserId: body.userId },
-        ...auditFields(correlationId),
+        ...await auditFields(tx, user, correlationId),
       },
     });
     return toEventResponse(updated, user, tx);
@@ -1551,7 +1566,7 @@ const removeStaffAssignment = async (eventId, shiftId, assignmentId, version, us
         entityName: "Event",
         entityId: eventId,
         details: { shiftId, assignmentId },
-        ...auditFields(correlationId),
+        ...await auditFields(tx, user, correlationId),
       },
     });
     return toEventResponse(updated, user, tx);
