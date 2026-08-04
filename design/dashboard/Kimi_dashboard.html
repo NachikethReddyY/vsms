@@ -1,0 +1,1881 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>VSMS · Operations Dashboard</title>
+<!--
+  VSMS — Vision Screening Management System
+  Independent dashboard proposal · DESIGN_ID: Kimi_dashboard
+  Self-contained prototype: inline CSS + inline JS, no dependencies.
+  Architecture: top-tab command shell (no sidebar) · events as operational rows ·
+  live event as a station pipeline board · participant work mode (scan→confirm→record→handoff) ·
+  clinical review split view · sync ledger with working retry · dry-run mode.
+-->
+<style>
+/* ════════════════════════════════════════════════════════════════
+   VSMS operations dashboard · DESIGN_ID: Kimi_dashboard
+   Design language: "operations ledger" — cool sage canvas, ink primary
+   actions, colour reserved for state, monospace data, chevron stage chain.
+   ════════════════════════════════════════════════════════════════ */
+
+:root{
+  --bg:#EDEFEA;          /* soft sage-gray canvas */
+  --surface:#FFFFFF;
+  --surface-2:#F5F6F1;   /* recessed pane */
+  --surface-3:#E8EBE3;   /* fills, chain segments */
+  --line:#DCE0D5;
+  --line-strong:#C0C6B9;
+  --ink:#1A231C;         /* warm green-black */
+  --ink-2:#3D473F;
+  --muted:#67726A;
+  --faint:#99A19A;
+  --pri:#1F2E25;         /* primary action: near-black ink */
+  --pri-hover:#131E17;
+  --go:#0E5C41;          /* inline actions / links: deep green */
+  --live:#175CD3;        /* in-progress blue (state only) */
+  --live-tint:#E9F0FC;
+  --ok:#1C7A4D;          /* complete / synced */
+  --ok-tint:#E3F2E9;
+  --warn:#B45309;        /* review / flag / warning */
+  --warn-tint:#FAEFDB;
+  --bad:#B3261E;         /* failed / urgent / destructive */
+  --bad-tint:#F9E8E6;
+  --dry:#8A6D1A;         /* dry-run amber */
+  --dry-bg:#FCF3D4;
+  --dry-line:#E2CC86;
+  --focus:#175CD3;
+  --mono:ui-monospace,"SF Mono",SFMono-Regular,Menlo,Consolas,monospace;
+  --r:6px;
+  --shadow:0 14px 40px rgba(20,31,23,.22);
+}
+
+*,*::before,*::after{box-sizing:border-box}
+html,body{margin:0;padding:0}
+body{
+  background:var(--bg);color:var(--ink);
+  font:400 14px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  -webkit-font-smoothing:antialiased;
+  min-height:100dvh;display:flex;flex-direction:column;
+}
+h1,h2,h3,h4{margin:0;font-weight:650;letter-spacing:-.01em}
+p{margin:0}
+button{font:inherit;cursor:pointer}
+input,select,textarea{font:inherit;color:var(--ink)}
+[hidden]{display:none!important}
+:focus-visible{outline:2px solid var(--focus);outline-offset:2px;border-radius:4px}
+::selection{background:#CFE3D8}
+
+.skip-link{position:absolute;left:-9999px;top:8px;background:var(--ink);color:#fff;padding:10px 16px;border-radius:var(--r);z-index:200}
+.skip-link:focus{left:8px}
+
+/* ── Top command bar ─────────────────────────────────────────── */
+#topbar{background:var(--surface);border-bottom:1px solid var(--line-strong);position:sticky;top:0;z-index:60}
+.tb-row{display:flex;align-items:center;gap:20px;flex-wrap:wrap;padding:0 20px;min-height:58px}
+.brand{display:flex;align-items:center;gap:10px;min-height:44px}
+.brand-mark{width:30px;height:30px;border-radius:7px;background:var(--pri);color:#fff;display:grid;place-items:center;font-weight:700;font-size:15px}
+.brand-text{display:flex;flex-direction:column;line-height:1.15}
+.brand-name{font-weight:700;font-size:15px;letter-spacing:.02em}
+.brand-sub{font-size:11px;color:var(--muted)}
+.tabs{display:flex;gap:2px;flex-wrap:wrap}
+.tab{border:0;background:none;min-height:44px;padding:0 14px;border-radius:var(--r);color:var(--ink-2);font-weight:600;font-size:13.5px;display:inline-flex;align-items:center;gap:7px;border-bottom:2px solid transparent}
+.tab:hover{background:var(--surface-2)}
+.tab[aria-current="page"]{color:var(--ink);border-bottom-color:var(--pri);border-radius:var(--r) var(--r) 0 0}
+.tab-n{background:var(--warn-tint);color:var(--warn);border-radius:999px;font-size:11px;font-weight:700;padding:1px 7px;font-variant-numeric:tabular-nums}
+.tab-n.attn{background:var(--bad-tint);color:var(--bad)}
+.tb-right{margin-left:auto;display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.conn{display:inline-flex;align-items:center;gap:8px;min-height:44px;padding:0 12px;border:1px solid var(--line-strong);background:var(--surface);border-radius:999px;font-size:12.5px;font-weight:600;color:var(--ink-2)}
+.conn .dot{width:8px;height:8px;border-radius:50%;background:var(--ok)}
+.conn.off .dot{background:var(--warn)}
+.syncpill{display:inline-flex;align-items:center;gap:8px;min-height:44px;padding:0 12px;border:1px solid var(--line-strong);background:var(--surface-2);border-radius:999px;font-size:12.5px;font-weight:600;color:var(--ink-2);font-variant-numeric:tabular-nums}
+.syncpill .dot{width:8px;height:8px;border-radius:50%;background:var(--ok)}
+.syncpill.warn .dot{background:var(--warn)}
+.syncpill.bad{border-color:var(--bad);background:var(--bad-tint);color:var(--bad)}
+.syncpill.bad .dot{background:var(--bad)}
+.rolewrap{display:flex;align-items:center;gap:8px}
+.role-l{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.07em;font-weight:600}
+#role-select{min-height:44px;border:1px solid var(--line-strong);border-radius:var(--r);background:var(--surface);padding:0 8px;font-weight:600;font-size:13px}
+.me{display:flex;align-items:center;gap:9px;min-height:44px}
+.me-av{width:32px;height:32px;border-radius:50%;background:var(--surface-3);border:1px solid var(--line-strong);display:grid;place-items:center;font-size:11.5px;font-weight:700;color:var(--ink-2)}
+.me-name{font-size:13px;font-weight:600}
+
+/* ── Mode banners ────────────────────────────────────────────── */
+.drybar{position:sticky;top:58px;z-index:55;background:var(--dry-bg);border-bottom:1px solid var(--dry-line);color:var(--dry);display:flex;align-items:center;gap:14px;flex-wrap:wrap;padding:8px 20px;font-size:13px;font-weight:600}
+.drybar .dry-tag{background:var(--dry);color:#fff;border-radius:4px;padding:2px 8px;font-size:11px;letter-spacing:.08em;text-transform:uppercase}
+.drybar .sp{flex:1}
+.offlinebar{background:#F3EFE4;border-bottom:1px solid var(--dry-line);color:#6E5A17;display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:7px 20px;font-size:12.5px;font-weight:600}
+
+/* ── Views & page scaffolding ────────────────────────────────── */
+#main{flex:1;width:100%;max-width:1360px;margin:0 auto;padding:22px 20px 40px;outline:none}
+.view{display:flex;flex-direction:column;gap:16px}
+.phead{display:flex;align-items:flex-end;gap:16px;flex-wrap:wrap}
+.phead h1{font-size:21px}
+.phead .sub{color:var(--muted);font-size:13px}
+.phead .sp{flex:1}
+.toolbar{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.search{position:relative}
+.search input{min-height:44px;min-width:min(320px,72vw);border:1px solid var(--line-strong);border-radius:var(--r);background:var(--surface);padding:0 12px 0 36px}
+.search svg{position:absolute;left:11px;top:50%;transform:translateY(-50%);color:var(--muted)}
+.fgroup{display:flex;gap:6px;flex-wrap:wrap}
+.fchip{min-height:44px;padding:0 14px;border-radius:999px;border:1px solid var(--line-strong);background:var(--surface);color:var(--ink-2);font-weight:600;font-size:13px}
+.fchip[aria-pressed="true"]{background:var(--pri);border-color:var(--pri);color:#fff}
+.sel{min-height:44px;border:1px solid var(--line-strong);border-radius:var(--r);background:var(--surface);padding:0 8px;font-weight:600;font-size:13px}
+.sel-lab{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.07em;font-weight:600;align-self:center}
+
+/* ── Buttons ─────────────────────────────────────────────────── */
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:44px;padding:0 18px;border-radius:var(--r);border:1px solid transparent;font-weight:650;font-size:13.5px;text-decoration:none;white-space:nowrap}
+.btn:active{transform:scale(.98)}
+.btn-pri{background:var(--pri);color:#fff}
+.btn-pri:hover{background:var(--pri-hover)}
+.btn-pri:disabled{background:var(--faint);cursor:not-allowed}
+.btn-sec{background:var(--surface);border-color:var(--line-strong);color:var(--ink)}
+.btn-sec:hover{background:var(--surface-2)}
+.btn-go{background:var(--go);color:#fff}
+.btn-go:hover{background:#0A4A34}
+.btn-danger{background:var(--surface);border-color:var(--bad);color:var(--bad)}
+.btn-danger:hover{background:var(--bad-tint)}
+.btn-danger-solid{background:var(--bad);color:#fff}
+.btn-danger-solid:disabled{background:var(--faint);border-color:var(--faint);cursor:not-allowed}
+.btn-text{background:none;border:0;color:var(--go);font-weight:650;min-height:44px;padding:0 10px;border-radius:var(--r);text-decoration:underline;text-underline-offset:3px}
+.btn-text:hover{color:#0A4A34}
+.btn-row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+
+/* ── Status tokens (dot + coloured text, never colour-only) ──── */
+.st{display:inline-flex;align-items:center;gap:7px;font-size:12.5px;font-weight:650;white-space:nowrap}
+.st::before{content:"";width:8px;height:8px;border-radius:50%;background:currentColor;flex:none}
+.st-draft{color:var(--muted)}.st-draft::before{background:none;border:2px solid var(--faint);width:6px;height:6px}
+.st-upcoming{color:var(--ink-2)}
+.st-live{color:var(--live)}
+.st-done{color:var(--ok)}
+.st-warn{color:var(--warn)}.st-warn::before{border-radius:2px}
+.st-bad{color:var(--bad)}.st-bad::before{border-radius:2px}
+.st-ok{color:var(--ok)}
+.st-mut{color:var(--muted)}
+.st-dry{color:var(--dry)}.st-dry::before{border-radius:2px}
+
+/* ── Alert strip ─────────────────────────────────────────────── */
+.alerts{display:flex;flex-direction:column;gap:8px}
+.alert{display:flex;align-items:center;gap:10px;background:var(--warn-tint);border:1px solid #E7D3AC;border-left:4px solid var(--warn);border-radius:var(--r);padding:10px 14px;font-size:13px;color:#6B4A12;flex-wrap:wrap}
+.alert.bad{background:var(--bad-tint);border-color:#E8C0BC;border-left-color:var(--bad);color:#7A201A}
+.alert svg{flex:none}
+.alert b{font-weight:700}
+.alert .sp{flex:1}
+.alert .btn-text{min-height:36px}
+
+/* ── Event rows (operational ledger rows, not cards) ─────────── */
+.evgroup{display:flex;flex-direction:column;gap:8px}
+.evgroup-h{display:flex;align-items:baseline;gap:10px;margin-top:6px}
+.evgroup-h h2{font-size:12px;text-transform:uppercase;letter-spacing:.09em;color:var(--muted)}
+.evgroup-h .ln{flex:1;height:1px;background:var(--line)}
+.evgroup-h .n{font-size:12px;color:var(--muted);font-variant-numeric:tabular-nums}
+.ev{display:grid;grid-template-columns:66px minmax(0,1fr) auto;gap:16px;background:var(--surface);border:1px solid var(--line);border-left:4px solid var(--line-strong);border-radius:var(--r);padding:14px 16px;align-items:center}
+.ev.s-live{border-left-color:var(--live)}
+.ev.s-upcoming{border-left-color:var(--ink-2)}
+.ev.s-draft{border-left-color:var(--faint);border-left-style:dashed}
+.ev.s-completed{border-left-color:var(--ok)}
+.ev-date{text-align:center;border-right:1px solid var(--line);padding-right:14px}
+.ev-date .d{display:block;font-size:24px;font-weight:700;font-variant-numeric:tabular-nums;line-height:1.05}
+.ev-date .m{display:block;font-size:11px;font-weight:700;letter-spacing:.1em;color:var(--muted)}
+.ev-date .none{font-size:11px;color:var(--warn);font-weight:650;line-height:1.3;display:block}
+.ev-main{display:flex;flex-direction:column;gap:5px;min-width:0}
+.ev-title{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.ev-title h3{font-size:15.5px}
+.ev-meta{font-size:12.5px;color:var(--muted);display:flex;gap:6px;flex-wrap:wrap}
+.ev-meta .sep{color:var(--faint)}
+.ev-meta .mono{font-family:var(--mono);font-size:11.5px}
+.ev-read{display:flex;gap:12px;flex-wrap:wrap;font-size:12px;color:var(--ink-2)}
+.ev-read .ok{color:var(--ok);font-weight:600}
+.ev-read .miss{color:var(--warn);font-weight:600}
+.ev-warns{display:flex;flex-direction:column;gap:2px;font-size:12px;color:var(--warn);font-weight:600}
+.ev-next{font-size:12.5px;color:var(--ink-2)}
+.ev-next b{color:var(--ink)}
+.ev-actions{display:flex;flex-direction:column;gap:6px;align-items:stretch;min-width:190px}
+.ev-actions .primary{justify-content:center}
+.ev-sub{display:flex;gap:2px;flex-wrap:wrap;justify-content:flex-end}
+.ev-sub .btn-text{min-height:36px;padding:0 8px;font-size:12.5px;text-decoration:none}
+.ev-sub .btn-text:hover{text-decoration:underline;text-underline-offset:3px}
+.ev-sub .del{color:var(--bad)}
+
+/* ── Stage chain (signature chevron strip) ───────────────────── */
+.chain{display:flex;gap:3px;list-style:none;margin:0;padding:0;flex-wrap:wrap}
+.chain li{position:relative;display:flex;align-items:center;gap:8px;background:var(--surface-3);color:var(--ink-2);padding:9px 16px 9px 22px;font-size:12.5px;font-weight:600;clip-path:polygon(0 0,calc(100% - 12px) 0,100% 50%,calc(100% - 12px) 100%,0 100%,12px 50%);min-height:44px}
+.chain li:first-child{clip-path:polygon(0 0,calc(100% - 12px) 0,100% 50%,calc(100% - 12px) 100%,0 100%);padding-left:14px}
+.chain li b{font-size:15px;font-weight:700;font-variant-numeric:tabular-nums}
+.chain li.hot{background:var(--live-tint);color:var(--live)}
+.chain li.branch{background:var(--warn-tint);color:var(--warn)}
+.chain li.okseg{background:var(--ok-tint);color:var(--ok)}
+.chain.mini li{min-height:30px;padding:4px 12px 4px 18px;font-size:11.5px;gap:6px}
+.chain.mini li b{font-size:12px}
+.chain.mini li:first-child{padding-left:10px}
+
+/* ── Live event header band ──────────────────────────────────── */
+.live-head{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:16px 18px;display:flex;flex-direction:column;gap:12px}
+.live-head .row1{display:flex;align-items:center;gap:14px;flex-wrap:wrap}
+.live-head h1{font-size:19px}
+.live-head .meta{font-size:12.5px;color:var(--muted)}
+.live-head .sp{flex:1}
+.live-ready{display:flex;gap:14px;flex-wrap:wrap;font-size:12.5px;color:var(--ink-2);border-top:1px solid var(--line);padding-top:10px}
+.live-ready b{font-weight:700}
+
+/* ── Station pipeline board ──────────────────────────────────── */
+.board{display:grid;grid-template-columns:repeat(auto-fit,minmax(215px,1fr));gap:10px}
+.col{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);display:flex;flex-direction:column;min-width:0}
+.col-h{display:flex;align-items:center;gap:8px;padding:10px 12px;border-bottom:1px solid var(--line)}
+.col-h h3{font-size:13px}
+.col-h .n{margin-left:auto;font-size:12px;font-weight:700;color:var(--muted);font-variant-numeric:tabular-nums}
+.col-stat{padding:7px 12px;font-size:11.5px;border-bottom:1px solid var(--line);display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.col-stat .ok{color:var(--ok);font-weight:650}
+.col-stat .warn{color:var(--warn);font-weight:650}
+.col-staff{padding:8px 12px;font-size:12px;color:var(--muted);border-bottom:1px solid var(--line)}
+.col-staff b{color:var(--ink-2);font-weight:650}
+.col-chips{list-style:none;margin:0;padding:10px;display:flex;flex-direction:column;gap:6px;min-height:52px}
+.chip{display:flex;align-items:center;gap:9px;width:100%;min-height:44px;border:1px solid var(--line-strong);background:var(--surface-2);border-radius:var(--r);padding:5px 10px;text-align:left}
+.chip:hover{border-color:var(--ink-2)}
+.chip .av{width:28px;height:28px;border-radius:50%;background:var(--surface-3);display:grid;place-items:center;font-size:10.5px;font-weight:700;color:var(--ink-2);flex:none}
+.chip .who{display:flex;flex-direction:column;line-height:1.25;min-width:0}
+.chip .who b{font-size:12.5px;font-weight:650;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.chip .who span{font-size:11px;color:var(--muted);font-family:var(--mono)}
+.chip .tag{margin-left:auto;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em}
+.chip.in .tag{color:var(--live)}
+.chip.flag{border-color:#E2C48F;background:var(--warn-tint)}
+.chip.flag .tag{color:var(--warn)}
+.col-empty{font-size:12px;color:var(--faint);padding:6px 2px}
+
+/* ── Two-column live lower region ────────────────────────────── */
+.live-lower{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:10px}
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:var(--r)}
+.panel-h{display:flex;align-items:center;gap:10px;padding:11px 14px;border-bottom:1px solid var(--line)}
+.panel-h h3{font-size:13px}
+.panel-h .n{font-size:11.5px;color:var(--muted);font-variant-numeric:tabular-nums}
+.panel-b{padding:6px 14px 10px}
+.duty{list-style:none;margin:0;padding:0}
+.duty li{display:flex;align-items:center;gap:10px;min-height:44px;border-bottom:1px solid var(--line);font-size:13px;flex-wrap:wrap}
+.duty li:last-child{border-bottom:0}
+.duty .r{font-size:11.5px;color:var(--muted)}
+.duty .stn{margin-left:auto;font-size:11.5px;font-weight:650;color:var(--ink-2);background:var(--surface-3);border-radius:4px;padding:2px 8px}
+.increc{list-style:none;margin:0;padding:0}
+.increc li{display:flex;align-items:center;gap:10px;min-height:44px;border-bottom:1px solid var(--line);font-size:13px;flex-wrap:wrap}
+.increc li:last-child{border-bottom:0}
+.increc .why{font-size:11.5px;color:var(--warn);font-weight:600}
+.increc .btn-text{min-height:36px;margin-left:auto}
+
+/* ── Work mode (participant workflow) ────────────────────────── */
+.work-top{display:flex;align-items:center;gap:14px;flex-wrap:wrap}
+.stepper{display:flex;gap:3px;list-style:none;margin:0;padding:0;flex-wrap:wrap;flex:1}
+.stepper li{display:flex;align-items:center;gap:8px;background:var(--surface-3);color:var(--muted);padding:8px 16px 8px 20px;font-size:12.5px;font-weight:650;clip-path:polygon(0 0,calc(100% - 12px) 0,100% 50%,calc(100% - 12px) 100%,0 100%,12px 50%);min-height:40px}
+.stepper li:first-child{clip-path:polygon(0 0,calc(100% - 12px) 0,100% 50%,calc(100% - 12px) 100%,0 100%);padding-left:12px}
+.stepper li .sn{width:20px;height:20px;border-radius:50%;border:2px solid currentColor;display:grid;place-items:center;font-size:10.5px;font-weight:700;flex:none}
+.stepper li.cur{background:var(--pri);color:#fff}
+.stepper li.done{background:var(--ok-tint);color:var(--ok)}
+.stepper li.done .sn{border-color:var(--ok);background:var(--ok);color:#fff}
+.work{display:grid;grid-template-columns:300px minmax(0,1fr);gap:12px;align-items:start}
+.wid{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:16px;display:flex;flex-direction:column;gap:9px;position:sticky;top:130px}
+.wid .wl{font-size:10.5px;text-transform:uppercase;letter-spacing:.09em;color:var(--muted);font-weight:700}
+.wid h2{font-size:18px}
+.wid .code{font-family:var(--mono);font-size:12px;color:var(--ink-2)}
+.wid .qbig{font-size:13px;color:var(--ink-2)}
+.wid .qbig b{font-size:22px;font-variant-numeric:tabular-nums;font-weight:700;color:var(--ink)}
+.wid .evline{font-size:12px;color:var(--muted);border-top:1px solid var(--line);padding-top:9px}
+.wid .syncrow{border-top:1px solid var(--line);padding-top:9px}
+.wmain{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:20px;display:flex;flex-direction:column;gap:16px;min-height:420px}
+.wmain h2{font-size:17px}
+.wmain .lead{font-size:13px;color:var(--muted)}
+
+/* QR scan viewport */
+.scanbox{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,240px);gap:16px;align-items:stretch}
+.qrview{position:relative;border:2px dashed var(--line-strong);border-radius:10px;min-height:260px;display:grid;place-items:center;background:repeating-linear-gradient(45deg,var(--surface-2) 0 14px,var(--surface) 14px 28px)}
+.qrview .corner{position:absolute;width:26px;height:26px;border:3px solid var(--ink-2)}
+.qrview .c1{top:12px;left:12px;border-right:0;border-bottom:0}
+.qrview .c2{top:12px;right:12px;border-left:0;border-bottom:0}
+.qrview .c3{bottom:12px;left:12px;border-right:0;border-top:0}
+.qrview .c4{bottom:12px;right:12px;border-left:0;border-top:0}
+.qrview .hint{text-align:center;color:var(--muted);font-size:13px;padding:0 20px}
+.scanside{display:flex;flex-direction:column;gap:10px}
+.scanside .note{font-size:12px;color:var(--muted);background:var(--surface-2);border:1px solid var(--line);border-radius:var(--r);padding:10px 12px}
+.manual{display:flex;gap:8px}
+.manual input{flex:1;min-height:44px;border:1px solid var(--line-strong);border-radius:var(--r);padding:0 12px;font-family:var(--mono);font-size:12.5px;min-width:0}
+
+/* confirm + station trail */
+.confirm-ev{display:flex;align-items:center;gap:10px;background:var(--ok-tint);border:1px solid #BFE0CC;border-radius:var(--r);padding:12px 14px;font-size:13px;color:#14532D;font-weight:600;flex-wrap:wrap}
+.trail{display:flex;gap:6px;list-style:none;margin:0;padding:0;flex-wrap:wrap}
+.trail li{display:flex;align-items:center;gap:7px;border:1px solid var(--line-strong);border-radius:999px;padding:6px 13px;font-size:12px;font-weight:600;color:var(--muted);min-height:36px}
+.trail li.done{color:var(--ok);border-color:#BFE0CC;background:var(--ok-tint)}
+.trail li.cur{color:var(--live);border-color:#B9D2F5;background:var(--live-tint)}
+.trail li .tdot{width:7px;height:7px;border-radius:50%;background:currentColor}
+
+/* forms */
+.form{display:flex;flex-direction:column;gap:14px;max-width:640px}
+.frow{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px}
+.field{display:flex;flex-direction:column;gap:5px}
+.field label{font-size:12px;font-weight:650;color:var(--ink-2)}
+.field input,.field select,.field textarea{min-height:44px;border:1px solid var(--line-strong);border-radius:var(--r);padding:0 11px;background:var(--surface)}
+.field textarea{padding:10px 11px;min-height:84px;resize:vertical}
+.field .hint{font-size:11.5px;color:var(--muted)}
+.check{display:flex;align-items:center;gap:10px;min-height:44px;font-size:13.5px;font-weight:600}
+.check input{width:20px;height:20px;accent-color:var(--go)}
+.flagbox{background:var(--warn-tint);border:1px solid #E7D3AC;border-left:4px solid var(--warn);border-radius:var(--r);padding:12px 14px;font-size:13px;color:#6B4A12}
+.flagbox b{color:#4A3109}
+.syncstate{display:inline-flex;align-items:center;gap:8px;font-size:12.5px;font-weight:650}
+
+/* handoff */
+.handoff-next{background:var(--live-tint);border:1px solid #B9D2F5;border-radius:var(--r);padding:16px;display:flex;flex-direction:column;gap:4px}
+.handoff-next .hl{font-size:11px;text-transform:uppercase;letter-spacing:.09em;font-weight:700;color:var(--live)}
+.handoff-next .hv{font-size:17px;font-weight:700;color:#0B3B8F}
+.handoff-next .hs{font-size:12.5px;color:#3D5A93}
+.savedline{display:flex;align-items:center;gap:10px;flex-wrap:wrap;font-size:13px}
+
+/* ── Review split view ───────────────────────────────────────── */
+.split{display:grid;grid-template-columns:minmax(300px,360px) minmax(0,1fr);gap:12px;align-items:start}
+.qlist{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);overflow:hidden}
+.qlist-h{padding:11px 14px;border-bottom:1px solid var(--line);font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);display:flex;gap:8px}
+.qrow{width:100%;display:flex;flex-direction:column;gap:3px;background:none;border:0;border-bottom:1px solid var(--line);padding:12px 14px;text-align:left;min-height:44px}
+.qrow:hover{background:var(--surface-2)}
+.qrow[aria-current="true"]{background:var(--live-tint);box-shadow:inset 3px 0 0 var(--live)}
+.qrow .t{display:flex;align-items:center;gap:8px;width:100%}
+.qrow .t b{font-size:13.5px}
+.qrow .t .wait{margin-left:auto;font-size:11px;color:var(--muted);font-variant-numeric:tabular-nums}
+.qrow .f{font-size:12px;color:var(--warn);font-weight:600}
+.qrow .c{font-size:11px;color:var(--muted);font-family:var(--mono)}
+.rdetail{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:18px;display:flex;flex-direction:column;gap:16px;min-height:420px}
+.rd-id{display:flex;align-items:center;gap:12px;flex-wrap:wrap;border-bottom:1px solid var(--line);padding-bottom:12px}
+.rd-id h2{font-size:18px}
+.rd-id .mono{font-family:var(--mono);font-size:12px;color:var(--muted)}
+.rd-id .sp{flex:1}
+.rd-sec h3{font-size:12px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin-bottom:8px}
+.completeness{display:flex;gap:6px;flex-wrap:wrap;list-style:none;margin:0;padding:0}
+.completeness li{display:flex;align-items:center;gap:7px;border:1px solid var(--line-strong);border-radius:var(--r);padding:7px 11px;font-size:12px;font-weight:600;min-height:36px}
+.completeness li.y{color:var(--ok);border-color:#BFE0CC;background:var(--ok-tint)}
+.completeness li.n{color:var(--warn);border-color:#E7D3AC;background:var(--warn-tint)}
+.resblock{border:1px solid var(--line);border-radius:var(--r);overflow:hidden}
+.resblock-h{background:var(--surface-2);padding:8px 12px;font-size:12px;font-weight:700;display:flex;gap:8px;align-items:center}
+.resblock-h .when{margin-left:auto;color:var(--muted);font-weight:500;font-variant-numeric:tabular-nums}
+.resgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:0}
+.resgrid div{padding:9px 12px;border-top:1px solid var(--line);font-size:13px}
+.resgrid dt{font-size:11px;color:var(--muted);margin-bottom:1px}
+.resgrid dd{margin:0;font-weight:650;font-variant-numeric:tabular-nums}
+.resgrid dd.fl{color:var(--warn)}
+.decision{border:1px solid var(--line-strong);border-radius:var(--r);padding:14px;display:flex;flex-direction:column;gap:10px}
+.radio{display:flex;align-items:flex-start;gap:10px;min-height:44px;font-size:13.5px;font-weight:600;padding:6px 8px;border-radius:var(--r)}
+.radio:hover{background:var(--surface-2)}
+.radio input{width:20px;height:20px;margin-top:2px;accent-color:var(--pri)}
+.radio small{display:block;font-weight:400;color:var(--muted);font-size:12px}
+.rules{font-size:12px;color:var(--muted);border-top:1px solid var(--line);padding-top:10px}
+
+/* ── Sync ledger ─────────────────────────────────────────────── */
+.syncband{display:flex;gap:0;border:1px solid var(--line);border-radius:var(--r);overflow:hidden;background:var(--surface);flex-wrap:wrap}
+.syncband .sb{flex:1;min-width:150px;padding:12px 16px;border-right:1px solid var(--line);display:flex;flex-direction:column;gap:2px}
+.syncband .sb:last-child{border-right:0}
+.syncband .sb b{font-size:20px;font-variant-numeric:tabular-nums;font-weight:700}
+.syncband .sb span{font-size:11.5px;color:var(--muted);font-weight:600}
+.srows{display:flex;flex-direction:column;background:var(--surface);border:1px solid var(--line);border-radius:var(--r);overflow:hidden}
+.srow{display:grid;grid-template-columns:minmax(0,1.4fr) minmax(0,1fr) auto auto;gap:12px;align-items:center;padding:10px 16px;border-bottom:1px solid var(--line);min-height:52px}
+.srow:last-child{border-bottom:0}
+.srow .who b{font-size:13.5px;font-weight:650}
+.srow .who span{display:block;font-size:11px;color:var(--muted);font-family:var(--mono)}
+.srow .what{font-size:12.5px;color:var(--ink-2)}
+.srow .what span{display:block;font-size:11px;color:var(--muted);font-variant-numeric:tabular-nums}
+.srow .act{display:flex;gap:6px}
+.schips{display:inline-flex;align-items:center;gap:7px;font-size:12px;font-weight:700;padding:5px 11px;border-radius:999px;white-space:nowrap}
+.schips .cdot{width:7px;height:7px;border-radius:50%;background:currentColor}
+.sc-off{background:var(--surface-3);color:var(--ink-2)}
+.sc-pend{background:#F1EFE4;color:#6E5A17}
+.sc-ing{background:var(--live-tint);color:var(--live)}
+.sc-ing .cdot{animation:pulse 1s infinite}
+.sc-ok{background:var(--ok-tint);color:var(--ok)}
+.sc-fail{background:var(--bad-tint);color:var(--bad)}
+.sc-conf{background:var(--warn-tint);color:var(--warn)}
+@keyframes pulse{50%{opacity:.35}}
+.syncnote{font-size:12px;color:var(--muted);background:var(--surface-2);border:1px solid var(--line);border-radius:var(--r);padding:10px 14px}
+
+/* ── People ──────────────────────────────────────────────────── */
+.pgroup-h{font-size:12px;text-transform:uppercase;letter-spacing:.09em;color:var(--muted);font-weight:700;display:flex;gap:10px;align-items:baseline}
+.pgroup-h .ln{flex:1;height:1px;background:var(--line)}
+.prow{display:grid;grid-template-columns:40px minmax(0,1.3fr) minmax(0,1fr) auto;gap:14px;align-items:center;background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:10px 14px;min-height:60px}
+.prow .pav{width:38px;height:38px;border-radius:50%;background:var(--surface-3);border:1px solid var(--line-strong);display:grid;place-items:center;font-size:12px;font-weight:700;color:var(--ink-2)}
+.prow .pn b{font-size:14px;font-weight:650;display:block}
+.prow .pn span{font-size:12px;color:var(--muted)}
+.prow .pa{font-size:12.5px;color:var(--ink-2);display:flex;flex-direction:column;gap:2px}
+.prow .pa span{font-size:11.5px;color:var(--muted)}
+.prow .pact{display:flex;gap:2px;flex-wrap:wrap;justify-content:flex-end;align-items:center}
+.prow.pending{background:var(--warn-tint);border-color:#E7D3AC}
+.prow.deact{opacity:.62}
+.prow .pact .btn-sec{min-height:38px;padding:0 12px;font-size:12.5px}
+.prow .pact .btn-text{min-height:38px;font-size:12.5px;text-decoration:none}
+.rolebadge{font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;background:var(--surface-3);border:1px solid var(--line-strong);border-radius:4px;padding:2px 7px;color:var(--ink-2);white-space:nowrap}
+.canlist{margin:6px 0 0;padding:0;list-style:none;display:flex;flex-direction:column;gap:6px}
+.canlist li{display:flex;gap:9px;font-size:13px;align-items:flex-start}
+.canlist li::before{content:"✓";color:var(--go);font-weight:700;flex:none}
+.canbox{background:var(--surface-2);border:1px solid var(--line);border-radius:var(--r);padding:12px 14px;margin-top:12px}
+.canbox h4{font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin-bottom:4px}
+
+/* ── Overlays: drawer + modal + confirm ──────────────────────── */
+.ovl{position:fixed;inset:0;background:rgba(20,31,23,.45);z-index:100;display:flex;justify-content:flex-end;align-items:stretch}
+.ovl.center{justify-content:center;align-items:center;padding:20px}
+.drawer{background:var(--surface);width:min(600px,96vw);height:100%;overflow-y:auto;box-shadow:var(--shadow);display:flex;flex-direction:column;animation:slidein .16s ease-out}
+@keyframes slidein{from{transform:translateX(30px);opacity:.6}}
+.drawer-h{position:sticky;top:0;background:var(--surface);border-bottom:1px solid var(--line);padding:14px 20px;display:flex;align-items:center;gap:12px;z-index:2}
+.drawer-h h2{font-size:16px}
+.drawer-h .x{margin-left:auto}
+.drawer-b{padding:18px 20px;display:flex;flex-direction:column;gap:16px}
+.drawer-f{position:sticky;bottom:0;background:var(--surface);border-top:1px solid var(--line);padding:12px 20px;display:flex;gap:10px;justify-content:flex-end;flex-wrap:wrap}
+.modal{background:var(--surface);border-radius:10px;width:min(520px,94vw);max-height:88dvh;overflow-y:auto;box-shadow:var(--shadow);animation:pop .14s ease-out}
+@keyframes pop{from{transform:scale(.97);opacity:.5}}
+.modal-h{padding:16px 20px 0}
+.modal-h h2{font-size:16px}
+.modal-b{padding:14px 20px;display:flex;flex-direction:column;gap:12px;font-size:13.5px}
+.modal-f{padding:0 20px 16px;display:flex;gap:10px;justify-content:flex-end;flex-wrap:wrap}
+.del-summary{border:1px solid #E8C0BC;background:var(--bad-tint);border-radius:var(--r);padding:12px 14px}
+.del-summary b{font-size:14px}
+.del-summary span{display:block;font-size:12px;color:#7A201A;margin-top:2px}
+.x{width:44px;height:44px;border:1px solid var(--line-strong);background:var(--surface);border-radius:var(--r);font-size:16px;line-height:1;color:var(--ink-2)}
+.x:hover{background:var(--surface-2)}
+
+/* ── Toasts ──────────────────────────────────────────────────── */
+#toast-root{position:fixed;right:16px;bottom:16px;z-index:120;display:flex;flex-direction:column;gap:8px;max-width:min(380px,90vw)}
+.toast{background:var(--pri);color:#fff;border-radius:var(--r);padding:12px 16px;font-size:13px;font-weight:600;box-shadow:var(--shadow);animation:pop .14s ease-out;display:flex;gap:10px;align-items:flex-start}
+.toast.warn{background:#7A5A10}
+.toast.bad{background:var(--bad)}
+
+/* ── Empty / denied / skeleton states ────────────────────────── */
+.empty{border:1px dashed var(--line-strong);border-radius:var(--r);background:var(--surface);padding:34px 20px;text-align:center;display:flex;flex-direction:column;gap:8px;align-items:center}
+.empty .glyph{width:44px;height:44px;border-radius:50%;border:2px solid var(--line-strong);display:grid;place-items:center;color:var(--faint);font-size:18px;font-weight:700}
+.empty h3{font-size:15px}
+.empty p{font-size:13px;color:var(--muted);max-width:420px}
+.denied{border:1px solid var(--line);border-left:4px solid var(--warn);border-radius:var(--r);background:var(--surface);padding:28px 22px;display:flex;flex-direction:column;gap:8px;max-width:640px}
+.denied h3{font-size:15px;display:flex;align-items:center;gap:9px}
+.denied p{font-size:13px;color:var(--muted)}
+.skel{border-radius:var(--r);background:linear-gradient(100deg,var(--surface-2) 40%,#fff 50%,var(--surface-2) 60%);background-size:200% 100%;animation:sh 1.1s linear infinite;min-height:64px;border:1px solid var(--line)}
+@keyframes sh{to{background-position:-200% 0}}
+
+/* ── Settings ────────────────────────────────────────────────── */
+.setgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:12px;align-items:start}
+.setcard{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:16px 18px;display:flex;flex-direction:column;gap:10px}
+.setcard h3{font-size:14px}
+.setcard p{font-size:12.5px;color:var(--muted)}
+.setcard ul{margin:0;padding-left:18px;font-size:12.5px;color:var(--ink-2);display:flex;flex-direction:column;gap:4px}
+
+/* ── Footer ──────────────────────────────────────────────────── */
+.devfoot{display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;padding:14px 20px;border-top:1px solid var(--line);font-size:11px;color:var(--faint)}
+.devid{font-family:var(--mono);letter-spacing:.03em}
+
+/* ── Section labels ──────────────────────────────────────────── */
+.seclab{font-size:11px;text-transform:uppercase;letter-spacing:.09em;color:var(--muted);font-weight:700}
+
+/* ── Responsive ──────────────────────────────────────────────── */
+@media (max-width:1100px){
+  .split{grid-template-columns:1fr}
+  .work{grid-template-columns:1fr}
+  .wid{position:static}
+  .live-lower{grid-template-columns:1fr}
+  .scanbox{grid-template-columns:1fr}
+}
+@media (max-width:900px){
+  .ev{grid-template-columns:56px minmax(0,1fr)}
+  .ev-actions{grid-column:1/-1;flex-direction:row;align-items:center;flex-wrap:wrap;border-top:1px solid var(--line);padding-top:10px}
+  .ev-sub{justify-content:flex-start;margin-left:auto}
+  .srow{grid-template-columns:minmax(0,1fr) auto;row-gap:6px}
+  .srow .what{grid-column:1/-1}
+  .prow{grid-template-columns:40px minmax(0,1fr);}
+  .prow .pa{grid-column:2}
+  .prow .pact{grid-column:1/-1;justify-content:flex-start}
+  .tb-row{gap:10px;padding:6px 14px}
+  .tb-right{margin-left:0}
+  #main{padding:16px 14px 34px}
+}
+@media (max-width:640px){
+  .chain li,.stepper li{clip-path:none;border-radius:var(--r);padding:8px 12px}
+  .chain,.stepper{gap:6px}
+  .brand-sub{display:none}
+}
+
+/* ── Reduced motion ──────────────────────────────────────────── */
+@media (prefers-reduced-motion:reduce){
+  *,*::before,*::after{animation:none!important;transition:none!important}
+  .btn:active{transform:none}
+}
+</style>
+</head>
+<body>
+
+<a class="skip-link" href="#main">Skip to main content</a>
+
+<!-- ═══════════════ TOP COMMAND BAR ═══════════════ -->
+<header id="topbar">
+  <div class="tb-row">
+    <div class="brand" aria-label="VSMS home">
+      <span class="brand-mark" aria-hidden="true">V</span>
+      <span class="brand-text">
+        <span class="brand-name">VSMS</span>
+        <span class="brand-sub">Vision Screening Management</span>
+      </span>
+    </div>
+
+    <nav class="tabs" aria-label="Dashboard areas">
+      <button type="button" class="tab" data-nav="events" aria-current="page">Events</button>
+      <button type="button" class="tab" data-nav="people">People</button>
+      <button type="button" class="tab" data-nav="review">Clinical review <span class="tab-n" id="tab-review-n" hidden></span></button>
+      <button type="button" class="tab" data-nav="sync">Sync <span class="tab-n" id="tab-sync-n" hidden></span></button>
+      <button type="button" class="tab" data-nav="settings">Settings</button>
+    </nav>
+
+    <div class="tb-right">
+      <button type="button" id="conn-pill" class="conn" data-act="conn-toggle" title="Toggle simulated connection"></button>
+      <button type="button" id="sync-pill" class="syncpill" data-nav="sync" title="Open sync centre"></button>
+      <label class="rolewrap" for="role-select">
+        <span class="role-l">Viewing as</span>
+        <select id="role-select" data-act-change="role"></select>
+      </label>
+      <div class="me" title="Signed-in staff member">
+        <span class="me-av" aria-hidden="true">AO</span>
+        <span class="me-name">Amara Okafor</span>
+      </div>
+    </div>
+  </div>
+</header>
+
+<!-- Persistent mode banners (rendered by JS) -->
+<div id="drybar" class="drybar" hidden></div>
+<div id="offlinebar" class="offlinebar" hidden></div>
+
+<!-- ═══════════════ MAIN VIEWS ═══════════════ -->
+<main id="main" tabindex="-1">
+
+  <!-- 1 · Events overview: search, filters, status-grouped operational rows -->
+  <section id="view-events" class="view" aria-label="Events overview"></section>
+
+  <!-- 2 · People: staff search, approvals, invite/import, assignment & permissions -->
+  <section id="view-people" class="view" aria-label="People and access" hidden></section>
+
+  <!-- 3 · Clinical review: queue + structured record + final decision -->
+  <section id="view-review" class="view" aria-label="Clinical review" hidden></section>
+
+  <!-- 4 · Sync centre: record-level states, retry, conflicts -->
+  <section id="view-sync" class="view" aria-label="Sync centre" hidden></section>
+
+  <!-- 5 · Settings & prototype controls -->
+  <section id="view-settings" class="view" aria-label="Settings" hidden></section>
+
+  <!-- 6 · Live event dashboard: readiness, attention lane, stage chain, station board -->
+  <section id="view-live" class="view" aria-label="Live event dashboard" hidden></section>
+
+  <!-- 7 · Participant work mode: scan → confirm → record → handoff -->
+  <section id="view-work" class="view" aria-label="Participant workflow" hidden></section>
+
+</main>
+
+<footer class="devfoot">
+  <span>VSMS staff prototype · fictional data only · screening support — not diagnosis</span>
+  <span class="devid">DESIGN_ID: Kimi_dashboard</span>
+</footer>
+
+<!-- Overlays (modals & drawers) and toasts are rendered here -->
+<div id="overlay-root"></div>
+<div id="toast-root" aria-live="polite" aria-atomic="false"></div>
+
+<script>
+'use strict';
+/* ════════════════════════════════════════════════════════════════
+   VSMS operations dashboard · DESIGN_ID: Kimi_dashboard
+   Frontend-only state machine. No backend, no dependencies.
+   ════════════════════════════════════════════════════════════════ */
+
+/* ── Inline icons (stroke, currentColor) ─────────────────────── */
+const IC = {
+  search:'<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>',
+  alert:'<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0Z"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg>',
+  check:'<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg>',
+  wifi:'<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M2 9.5a15 15 0 0 1 20 0"/><path d="M5 12.9a10 10 0 0 1 14 0"/><path d="M8.5 16.2a5 5 0 0 1 7 0"/><path d="M12 20h.01"/></svg>',
+  wifioff:'<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="m2 2 20 20"/><path d="M5 12.9a10 10 0 0 1 5-2.7"/><path d="M8.5 16.2a5 5 0 0 1 7 0"/><path d="M12 20h.01"/></svg>',
+  lock:'<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>',
+  sync:'<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a9 9 0 1 1-2.6-6.4"/><path d="M21 3v6h-6"/></svg>'
+};
+const ic = n => IC[n] || '';
+
+/* ── Constants ───────────────────────────────────────────────── */
+const KEY = 'vsms.kimi.v1';
+const TODAY = new Date('2026-07-31T12:00:00');
+const STATIONS = [
+  {id:'registration',   name:'Registration'},
+  {id:'visual-acuity',  name:'Visual acuity'},
+  {id:'refraction',     name:'Refraction'},
+  {id:'colour-vision',  name:'Colour vision'},
+  {id:'eye-health',     name:'Eye health'},
+  {id:'clinical-review',name:'Clinical review'}
+];
+const ST_NAME = id => (STATIONS.find(s=>s.id===id)||{name:id}).name;
+const FLOW = STATIONS.map(s=>s.id).filter(id=>id!=='clinical-review');
+const ROLES = {EVENT_MANAGER:'Event Manager', REGISTRATION:'Registration Officer', SCREENER:'Screener', REVIEWER:'Doctor / Reviewer', ADMINISTRATOR:'Administrator'};
+const ROLE_CAN = {
+  EVENT_MANAGER:['Create, configure, duplicate and delete events','Start events and open live dashboards','Assign staff to events, roles and stations','Monitor queues, readiness and sync health'],
+  REGISTRATION:['Register and check in participants','Verify consent and participant details','Issue and re-issue QR event passes'],
+  SCREENER:['Scan participant QR passes','Record screening results at assigned stations','Hand participants to the next station'],
+  REVIEWER:['Open the clinical review queue','Resolve screening flags','Record follow-up and referral decisions'],
+  ADMINISTRATOR:['Everything an Event Manager can do','Approve, invite and deactivate staff','Resolve sync conflicts']
+};
+const PERMS = [
+  ['manage-events','Create, edit and delete events'],
+  ['manage-staff','Approve, invite and deactivate staff'],
+  ['assign','Assign events, roles and stations'],
+  ['register','Register and check in participants'],
+  ['screen','Record screening results'],
+  ['review','Finalise clinical reviews and referrals'],
+  ['sync-admin','Resolve sync conflicts']
+];
+const ACUITY = ['6/6','6/9','6/12','6/18','6/24','6/36','6/60'];
+
+/* ── Small utilities ─────────────────────────────────────────── */
+const $  = s => document.querySelector(s);
+const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const initials = n => n.split(/\s+/).slice(0,2).map(w=>w[0]).join('').toUpperCase();
+const nowT = () => new Date().toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'});
+const dObj = s => new Date(s+'T00:00:00');
+const fmtD = s => s ? dObj(s).toLocaleDateString('en-GB',{weekday:'short',day:'numeric',month:'short'}) : 'No date set';
+const ddiff = s => Math.round((dObj(s) - new Date('2026-07-31T00:00:00'))/86400000);
+/* ── Seed data (fictional) ───────────────────────────────────── */
+function seed(){
+  return {
+    v:1, role:'EVENT_MANAGER', connected:true, view:'events',
+    liveEventId:'e1', dry:null, work:null, reviewSel:null,
+    seq:{e:100,s:100,p:100,r:100},
+    ui:{evQ:'',evStatus:'all',evScope:'all',evSort:'asc',pplQ:'',pplRole:'all',pplStatus:'all'},
+    events:[
+      {id:'e1',name:'Riverside Community Vision Screening',date:'2026-07-31',start:'09:00',end:'15:00',venue:'Riverside Community Hall, 42 Loddon Rd',capacity:200,registered:146,completedBase:74,followupBase:6,status:'live',
+       stations:FLOW.concat(['clinical-review']),stationStaff:{'registration':'s2','visual-acuity':'s3','refraction':'s4','colour-vision':'s5','eye-health':null,'clinical-review':'s6'},
+       staffIds:['s1','s2','s3','s4','s5','s6'],staffConfirmed:5,reg:{onsite:true,qr:true,consent:'v3'}},
+      {id:'e2',name:'Maple Grove School Screening',date:'2026-08-04',start:'09:30',end:'14:30',venue:'Maple Grove Primary School, Hall B',capacity:120,registered:96,completedBase:0,followupBase:0,status:'upcoming',
+       stations:FLOW.concat(['clinical-review']),stationStaff:{'registration':'s9','visual-acuity':'s9','refraction':null,'colour-vision':null,'eye-health':null,'clinical-review':'s6'},
+       staffIds:['s1','s6','s9'],staffConfirmed:3,reg:{onsite:true,qr:true,consent:'v3'}},
+      {id:'e3',name:'Eastside Seniors Wellness Day',date:'2026-08-09',start:'10:00',end:'14:00',venue:'Eastside Leisure Centre',capacity:80,registered:41,completedBase:0,followupBase:0,status:'upcoming',
+       stations:FLOW,stationStaff:{'registration':'s2','visual-acuity':null,'refraction':null,'colour-vision':null,'eye-health':null},
+       staffIds:['s2','s9'],staffConfirmed:1,reg:{onsite:true,qr:true,consent:'v3'}},
+      {id:'e4',name:'Harbourview Pop-up Clinic',date:'',start:'09:00',end:'13:00',venue:'Harbourview Market Square',capacity:60,registered:0,completedBase:0,followupBase:0,status:'draft',
+       stations:[],stationStaff:{},staffIds:[],staffConfirmed:0,reg:{onsite:true,qr:true,consent:'v3'}},
+      {id:'e5',name:'Westgate Library Outreach',date:'2026-08-22',start:'10:00',end:'13:00',venue:'Westgate Library, Reading Room',capacity:40,registered:0,completedBase:0,followupBase:0,status:'draft',
+       stations:FLOW,stationStaff:{'registration':'s2'},staffIds:['s2'],staffConfirmed:1,reg:{onsite:false,qr:true,consent:'v3'}},
+      {id:'e6',name:'Brookfield Summer Fair Screening',date:'2026-07-19',start:'10:00',end:'16:00',venue:'Brookfield Park Marquee',capacity:150,registered:118,completedBase:112,followupBase:9,status:'completed',
+       stations:FLOW.concat(['clinical-review']),stationStaff:{'registration':'s2','visual-acuity':'s3','refraction':'s4','colour-vision':'s5','eye-health':'s10','clinical-review':'s6'},
+       staffIds:['s1','s2','s3','s4','s5','s6','s10'],staffConfirmed:7,reg:{onsite:true,qr:true,consent:'v3'}}
+    ],
+    staff:[
+      {id:'s1',name:'Amara Okafor',email:'a.okafor@vsms.example',role:'EVENT_MANAGER',status:'active',eventId:'e1',perms:['manage-events','manage-staff','assign','review','sync-admin'],last:'Online now'},
+      {id:'s2',name:'Daniel Reyes',email:'d.reyes@vsms.example',role:'REGISTRATION',status:'active',eventId:'e1',perms:['register'],last:'Online now'},
+      {id:'s3',name:'Priya Nair',email:'p.nair@vsms.example',role:'SCREENER',status:'active',eventId:'e1',perms:['screen'],last:'Online now'},
+      {id:'s4',name:'Tom Beckett',email:'t.beckett@vsms.example',role:'SCREENER',status:'active',eventId:'e1',perms:['screen'],last:'Checked in 08:47'},
+      {id:'s5',name:'Lucy Chen',email:'l.chen@vsms.example',role:'SCREENER',status:'active',eventId:'e1',perms:['screen'],last:'Not yet confirmed'},
+      {id:'s6',name:'Dr. Hannah Miles',email:'h.miles@vsms.example',role:'REVIEWER',status:'active',eventId:'e1',perms:['review'],last:'Online now'},
+      {id:'s7',name:'Grace Adeyemi',email:'g.adeyemi@vsms.example',role:'REGISTRATION',status:'pending',eventId:null,perms:['register'],last:'Invited 29 Jul'},
+      {id:'s8',name:'Marcus Webb',email:'m.webb@vsms.example',role:'SCREENER',status:'pending',eventId:null,perms:['screen'],last:'Invited 30 Jul'},
+      {id:'s9',name:'Sofia Duarte',email:'s.duarte@vsms.example',role:'SCREENER',status:'active',eventId:'e2',perms:['screen','register'],last:'Active yesterday'},
+      {id:'s10',name:'Jonas Petersen',email:'j.petersen@vsms.example',role:'SCREENER',status:'deactivated',eventId:null,perms:['screen'],last:'Deactivated 12 Jul'}
+    ],
+    participants:[
+      {id:'p01',eventId:'e1',name:'Margaret Ellery',age:71,sex:'F',code:'VSMS-260731-001',queue:'Q01',status:'completed',station:null,done:FLOW,results:{},flags:[],missing:[],wait:'—'},
+      {id:'p02',eventId:'e1',name:'Samuel Osei',age:45,sex:'M',code:'VSMS-260731-002',queue:'Q02',status:'completed',station:null,done:FLOW,results:{},flags:[],missing:[],wait:'—'},
+      {id:'p03',eventId:'e1',name:'Evelyn Ng',age:68,sex:'F',code:'VSMS-260731-003',queue:'Q03',status:'review',station:'clinical-review',wait:'24 min',
+        done:['registration','visual-acuity','refraction','colour-vision'],
+        flags:['Distance acuity crossed the review threshold (R 6/18 · L 6/12)'],
+        missing:['Eye health — not recorded (participant routed to review)'],
+        results:{'registration':{vals:[['Consent','Form v3 signed'],['Details','Verified'],['Assistance','None']],at:'09:41'},
+                 'visual-acuity':{vals:[['Right eye','6/18',1],['Left eye','6/12'],['Correction','With glasses or lenses']],at:'10:07',flagged:true},
+                 'refraction':{vals:[['Right','−1.25 / −0.50 × 175'],['Left','−1.00 / −0.25 × 010']],at:'10:19'},
+                 'colour-vision':{vals:[['Plates correct','13 / 14']],at:'10:26'}}},
+      {id:'p04',eventId:'e1',name:'Arthur Bell',age:59,sex:'M',code:'VSMS-260731-004',queue:'Q04',status:'screening',station:'refraction',done:['registration','visual-acuity'],results:{},flags:[],missing:[],wait:'6 min'},
+      {id:'p05',eventId:'e1',name:'Rosa Jimenez',age:34,sex:'F',code:'VSMS-260731-005',queue:'Q05',status:'waiting',station:'visual-acuity',done:['registration'],results:{},flags:[],missing:[],wait:'9 min'},
+      {id:'p06',eventId:'e1',name:'David Kim',age:62,sex:'M',code:'VSMS-260731-006',queue:'Q06',status:'waiting',station:'visual-acuity',done:['registration'],results:{},flags:[],missing:[],wait:'12 min'},
+      {id:'p07',eventId:'e1',name:'Harriet Cole',age:77,sex:'F',code:'VSMS-260731-007',queue:'Q07',status:'screening',station:'eye-health',done:['registration','visual-acuity','refraction'],results:{},flags:[],missing:['Colour vision — plate set incomplete (stopped at plate 2)'],incomplete:true,why:'Colour vision plate set incomplete',wait:'4 min'},
+      {id:'p08',eventId:'e1',name:'Benjamin Ford',age:29,sex:'M',code:'VSMS-260731-008',queue:'Q08',status:'waiting',station:'colour-vision',done:['registration','visual-acuity','refraction'],results:{},flags:[],missing:[],wait:'7 min'},
+      {id:'p09',eventId:'e1',name:'Nadia Hussain',age:52,sex:'F',code:'VSMS-260731-009',queue:'Q09',status:'review',station:'clinical-review',wait:'31 min',
+        done:['registration','visual-acuity','colour-vision'],
+        flags:['Colour vision below the screening threshold (6/14 plates correct)'],
+        missing:['Refraction — not recorded','Eye health — not recorded'],
+        results:{'registration':{vals:[['Consent','Form v3 signed'],['Details','Verified']],at:'09:58'},
+                 'visual-acuity':{vals:[['Right eye','6/9'],['Left eye','6/9'],['Correction','Without correction']],at:'10:14'},
+                 'colour-vision':{vals:[['Plates correct','6 / 14',1]],at:'10:31',flagged:true}}},
+      {id:'p10',eventId:'e1',name:'George Pavlou',age:66,sex:'M',code:'VSMS-260731-010',queue:'Q10',status:'screening',station:'visual-acuity',done:['registration'],results:{},flags:[],missing:[],wait:'2 min'},
+      {id:'p11',eventId:'e1',name:'Irene Marsh',age:73,sex:'F',code:'VSMS-260731-011',queue:'Q11',status:'waiting',station:'eye-health',done:['registration','visual-acuity','refraction','colour-vision'],results:{},flags:[],missing:[],wait:'11 min'},
+      {id:'p12',eventId:'e1',name:'Peter Oduya',age:41,sex:'M',code:'VSMS-260731-012',queue:'Q12',status:'waiting',station:'refraction',done:['registration','visual-acuity'],results:{},flags:[],missing:[],incomplete:true,why:'Stepped away mid-station',wait:'18 min'},
+      {id:'p13',eventId:'e1',name:'Ana Sousa',age:58,sex:'F',code:'VSMS-260731-013',queue:'Q13',status:'followup',station:null,done:FLOW,results:{},flags:[],missing:[],outcome:'Follow-up — optometrist, routine',wait:'—'},
+      {id:'p14',eventId:'e1',name:'William Tse',age:63,sex:'M',code:'VSMS-260731-014',queue:'Q14',status:'waiting',station:'registration',done:[],results:{},flags:[],missing:[],wait:'3 min'}
+    ],
+    dryParticipants:[],
+    records:[
+      {id:'r1',who:'Evelyn Ng',code:'VSMS-260731-003',type:'Screening result',station:'Visual acuity',at:'10:07',state:'synced',detail:'Synced 10:07'},
+      {id:'r2',who:'Arthur Bell',code:'VSMS-260731-004',type:'Check-in',station:'Registration',at:'09:52',state:'synced',detail:'Synced 09:52'},
+      {id:'r3',who:'Nadia Hussain',code:'VSMS-260731-009',type:'Screening result',station:'Colour vision',at:'10:31',state:'failed',detail:'Server rejected the record — retry'},
+      {id:'r4',who:'Peter Oduya',code:'VSMS-260731-012',type:'Screening result',station:'Visual acuity',at:'10:14',state:'saved-offline',detail:'Saved on this device while offline'},
+      {id:'r5',who:'Harriet Cole',code:'VSMS-260731-007',type:'Screening result',station:'Colour vision',at:'10:22',state:'conflict',detail:'Two versions exist — choose which to keep'},
+      {id:'r6',who:'Margaret Ellery',code:'VSMS-260731-001',type:'Review decision',station:'Clinical review',at:'11:02',state:'synced',detail:'Synced 11:02'}
+    ]
+  };
+}
+/* ── State: load / save / reset ──────────────────────────────── */
+function load(){
+  try{
+    const raw = localStorage.getItem(KEY);
+    if(!raw) return null;
+    const s = JSON.parse(raw);
+    if(!s || s.v!==1) return null;
+    s.records.forEach(r=>{ if(r.state==='syncing') r.state = s.connected ? 'pending' : 'saved-offline'; });
+    return s;
+  }catch(e){ return null; }
+}
+function persist(){ try{ localStorage.setItem(KEY, JSON.stringify(S)); }catch(e){} }
+let S = load() || seed();
+
+/* ── Lookups ─────────────────────────────────────────────────── */
+const ev = id => S.events.find(e=>e.id===id);
+const st = id => S.staff.find(s=>s.id===id);
+const pt = id => (S.dry ? S.dryParticipants : S.participants).find(p=>p.id===id) || S.participants.find(p=>p.id===id);
+const canManage = () => ['EVENT_MANAGER','ADMINISTRATOR'].includes(S.role);
+const canReview = () => ['REVIEWER','EVENT_MANAGER','ADMINISTRATOR'].includes(S.role);
+const activeList = () => S.dry ? S.dryParticipants : S.participants.filter(p=>p.eventId===S.liveEventId);
+const ctxEvent = () => S.dry ? ev(S.dry.eventId) : ev(S.liveEventId);
+const reviewQueue = () => S.participants.filter(p=>p.status==='review').concat(S.dry ? S.dryParticipants.filter(p=>p.status==='review') : []);
+
+/* ── Toasts ──────────────────────────────────────────────────── */
+function toast(msg, kind){
+  const t = document.createElement('div');
+  t.className = 'toast' + (kind ? ' '+kind : '');
+  t.textContent = msg;
+  $('#toast-root').appendChild(t);
+  setTimeout(()=>{ t.remove(); }, 4200);
+}
+
+/* ── Overlays ────────────────────────────────────────────────── */
+let lastFocus = null;
+function openDrawer(title, body, foot){
+  lastFocus = document.activeElement;
+  $('#overlay-root').innerHTML =
+    '<div class="ovl" data-ovl><div class="drawer" role="dialog" aria-modal="true" aria-label="'+esc(title)+'">'
+    + '<div class="drawer-h"><h2>'+esc(title)+'</h2><button type="button" class="x" data-act="overlay-close" aria-label="Close">✕</button></div>'
+    + '<div class="drawer-b">'+body+'</div>'+(foot?'<div class="drawer-f">'+foot+'</div>':'')
+    + '</div></div>';
+  const f = $('#overlay-root').querySelector('input,select,textarea,button:not(.x)'); if(f) f.focus();
+}
+function openModal(title, body, foot){
+  lastFocus = document.activeElement;
+  $('#overlay-root').innerHTML =
+    '<div class="ovl center" data-ovl><div class="modal" role="dialog" aria-modal="true" aria-label="'+esc(title)+'">'
+    + '<div class="modal-h"><h2>'+esc(title)+'</h2></div>'
+    + '<div class="modal-b">'+body+'</div>'+(foot?'<div class="modal-f">'+foot+'</div>':'')
+    + '</div></div>';
+  const f = $('#overlay-root').querySelector('input,select,textarea,button'); if(f) f.focus();
+}
+function closeOverlay(){
+  $('#overlay-root').innerHTML = '';
+  if(lastFocus && lastFocus.focus) lastFocus.focus();
+  lastFocus = null;
+}
+
+/* ── Sync engine ─────────────────────────────────────────────── */
+function addRecord(rec){
+  rec.id = 'r' + (++S.seq.r);
+  rec.state = S.connected ? 'pending' : 'saved-offline';
+  rec.detail = S.connected ? 'Waiting to sync' : 'Saved on this device while offline';
+  if(S.dry) rec.dry = true;
+  S.records.unshift(rec);
+  persist();
+  if(S.connected) setTimeout(()=>advanceRecord(rec.id), 800);
+  render();
+}
+function advanceRecord(id){
+  const r = S.records.find(x=>x.id===id);
+  if(!r || !['pending','saved-offline'].includes(r.state)) return;
+  if(!S.connected){ r.state='saved-offline'; r.detail='Saved on this device while offline'; render(); return; }
+  r.state = 'syncing'; r.detail = 'Syncing…'; render();
+  setTimeout(()=>{
+    const rr = S.records.find(x=>x.id===id);
+    if(rr && rr.state==='syncing'){ rr.state='synced'; rr.detail='Synced '+nowT(); persist(); render(); }
+  }, 1400);
+}
+function retryRecord(id){
+  const r = S.records.find(x=>x.id===id); if(!r) return;
+  r.state='syncing'; r.detail='Retrying…'; render();
+  setTimeout(()=>{
+    const rr = S.records.find(x=>x.id===id);
+    if(rr && rr.state==='syncing'){ rr.state='synced'; rr.detail='Synced after retry · '+nowT(); persist(); render(); toast('Record synced after retry'); }
+  }, 1400);
+}
+function resolveConflict(id, keep){
+  const r = S.records.find(x=>x.id===id); if(!r) return;
+  r.state='synced'; r.detail='Conflict resolved — kept the '+keep+' version · '+nowT();
+  persist(); render(); toast('Conflict resolved — record synced');
+}
+function toggleConn(){
+  S.connected = !S.connected;
+  if(!S.connected){
+    S.records.forEach(r=>{ if(r.state==='syncing'){ r.state='pending'; r.detail='Waiting to sync'; } });
+    toast('Offline — results save on this device', 'warn');
+  }else{
+    S.records.forEach(r=>{ if(r.state==='saved-offline'){ r.state='pending'; r.detail='Waiting to sync'; } });
+    let d = 400;
+    S.records.filter(r=>r.state==='pending').forEach(r=>{ setTimeout(()=>advanceRecord(r.id), d); d += 500; });
+    toast('Connected — syncing pending records');
+  }
+  persist(); render();
+}
+function syncNow(){
+  if(!S.connected){ toast('Offline — records will sync when the connection returns','warn'); return; }
+  let d = 200;
+  S.records.filter(r=>['pending','saved-offline'].includes(r.state)).forEach(r=>{ setTimeout(()=>advanceRecord(r.id), d); d += 450; });
+  toast('Syncing pending records…');
+}
+
+/* ── Navigation & loading ────────────────────────────────────── */
+const VIEWS = ['events','people','review','sync','settings','live','work'];
+function skeleton(v){
+  $('#view-'+v).innerHTML = '<div class="skel" style="min-height:44px"></div><div class="skel"></div><div class="skel"></div><div class="skel"></div>';
+}
+function setView(v){ S.view = v; render(); $('#main').focus({preventScroll:true}); }
+function go(v){
+  if(v==='live' && !S.liveEventId && !S.dry) v = 'events';
+  S.view = v;
+  VIEWS.forEach(x=>{ $('#view-'+x).hidden = x!==v; });
+  renderTop();
+  skeleton(v);
+  setTimeout(()=>{ render(); $('#main').focus({preventScroll:true}); }, 230);
+}
+/* ── Top bar & banners ───────────────────────────────────────── */
+function renderTop(){
+  document.querySelectorAll('.tab').forEach(t=>{
+    if(t.dataset.nav===S.view) t.setAttribute('aria-current','page'); else t.removeAttribute('aria-current');
+  });
+  const rq = reviewQueue().length;
+  const rn = $('#tab-review-n'); rn.hidden = !rq; rn.textContent = rq;
+  const attn = S.records.filter(r=>['failed','conflict'].includes(r.state)).length;
+  const pend = S.records.filter(r=>['pending','syncing','saved-offline'].includes(r.state)).length;
+  const sn = $('#tab-sync-n'); sn.hidden = !(attn+pend); sn.textContent = attn+pend;
+  sn.classList.toggle('attn', attn>0);
+
+  const cp = $('#conn-pill');
+  cp.className = 'conn' + (S.connected ? '' : ' off');
+  cp.innerHTML = '<span class="dot"></span>' + (S.connected ? ic('wifi')+' Connected' : ic('wifioff')+' Offline');
+
+  const sp = $('#sync-pill');
+  if(attn>0){ sp.className='syncpill bad'; sp.innerHTML = '<span class="dot"></span>'+attn+' need'+(attn>1?'':'s')+' attention'; }
+  else if(pend>0){ sp.className='syncpill warn'; sp.innerHTML = '<span class="dot"></span>'+pend+' pending'; }
+  else { sp.className='syncpill'; sp.innerHTML = '<span class="dot"></span>All synced'; }
+
+  const rs = $('#role-select'); if(rs.value!==S.role) rs.value = S.role;
+}
+function renderBars(){
+  const db = $('#drybar');
+  if(S.dry){
+    const e = ev(S.dry.eventId);
+    db.hidden = false;
+    db.innerHTML = '<span class="dry-tag">Dry run</span>'
+      + '<span>'+esc(e?e.name:'')+' — test mode. Nothing here changes live event data.</span>'
+      + '<span class="sp"></span>'
+      + '<button type="button" class="btn btn-sec" style="min-height:36px;padding:0 14px" data-act="dry-exit">Exit dry run</button>';
+  } else db.hidden = true;
+  const ob = $('#offlinebar');
+  if(!S.connected){
+    ob.hidden = false;
+    ob.innerHTML = ic('wifioff') + ' <span>Offline — results are saved on this device and will synchronise when the connection returns.</span>'
+      + '<button type="button" class="btn-text" style="min-height:32px" data-nav="sync">Open sync centre</button>';
+  } else ob.hidden = true;
+}
+
+/* ── Status chips ────────────────────────────────────────────── */
+function syncChip(state){
+  const m = {'saved-offline':['sc-off','Saved offline'],'pending':['sc-pend','Pending sync'],'syncing':['sc-ing','Syncing…'],
+             'synced':['sc-ok','Synced'],'failed':['sc-fail','Sync failed'],'conflict':['sc-conf','Conflict — review']};
+  const x = m[state] || m['pending'];
+  return '<span class="schips '+x[0]+'"><span class="cdot"></span>'+x[1]+'</span>';
+}
+function evStatusChip(status){
+  const m = {draft:['st-draft','Draft'], upcoming:['st-upcoming','Upcoming'], live:['st-live','Live now'], completed:['st-done','Completed']};
+  const x = m[status];
+  return '<span class="st '+x[0]+'">'+x[1]+'</span>';
+}
+
+/* ── VIEW 1 · Events ─────────────────────────────────────────── */
+function evWarnings(e){
+  const w = [];
+  if(e.status==='draft'){
+    if(!e.date) w.push('No date set');
+    if(!e.stations.length) w.push('No screening stations configured');
+    if(!e.staffIds.length) w.push('No staff assigned');
+  }
+  if(e.status==='upcoming'){
+    const hasRev = e.staffIds.some(id=>{ const s=st(id); return s && s.role==='REVIEWER'; }) || !!e.stationStaff['clinical-review'];
+    if(!hasRev) w.push('No clinical reviewer assigned');
+    if(e.staffConfirmed < e.staffIds.length) w.push((e.staffIds.length-e.staffConfirmed)+' staff not yet confirmed');
+  }
+  if(e.status==='live'){
+    const unstaffed = e.stations.filter(x=>!e.stationStaff[x]);
+    if(unstaffed.length) w.push(unstaffed.map(ST_NAME).join(', ') + ' — no staff assigned');
+    const fails = S.records.filter(r=>r.state==='failed').length;
+    if(fails) w.push(fails+' record'+(fails>1?'s':'')+' failed to sync');
+    const rv = S.participants.filter(p=>p.eventId===e.id && p.status==='review').length;
+    if(rv) w.push(rv+' records awaiting clinical review');
+  }
+  return w;
+}
+function evNext(e){
+  if(e.status==='draft'){
+    if(!e.date) return '<b>Next:</b> Set an event date — a draft cannot be scheduled without one.';
+    if(!e.stations.length) return '<b>Next:</b> Finish setup — add screening stations and assign staff.';
+    return '<b>Next:</b> Run a dry test with your team, then schedule the event.';
+  }
+  if(e.status==='upcoming'){
+    const d = ddiff(e.date);
+    if(d<=1) return '<b>Next:</b> Start the event when doors open — or run one last dry test.';
+    return '<b>Next:</b> Run a dry test before '+fmtD(e.date)+' so staff can rehearse every station.';
+  }
+  if(e.status==='live'){
+    const w = S.participants.filter(p=>p.eventId===e.id && p.status==='waiting').length;
+    return '<b>Next:</b> Open the live dashboard — '+w+' participants are waiting in station queues.';
+  }
+  return '<b>Next:</b> Open the summary — '+e.followupBase+' follow-up letters still need to be sent.';
+}
+function evRow(e){
+  const d = e.date ? dObj(e.date) : null;
+  const dblock = d ? '<span class="d">'+String(d.getDate()).padStart(2,'0')+'</span><span class="m">'+d.toLocaleDateString('en-GB',{month:'short'}).toUpperCase()+'</span>'
+                   : '<span class="none">NO<br>DATE</span>';
+  const warns = evWarnings(e);
+  const read = (e.status==='draft' || e.status==='upcoming')
+    ? '<div class="ev-read">'
+      + '<span class="'+(e.stations.length?'ok':'miss')+'">'+(e.stations.length?e.stations.length+' stations configured':'No stations')+'</span>'
+      + '<span class="'+(e.staffIds.length?'ok':'miss')+'">'+(e.staffIds.length?e.staffConfirmed+'/'+e.staffIds.length+' staff confirmed':'No staff')+'</span>'
+      + '<span class="'+(e.date?'ok':'miss')+'">'+(e.date?fmtD(e.date):'Date required')+'</span>'
+      + '</div>' : '';
+  let chain = '';
+  if(e.status==='live'){
+    const ps = S.participants.filter(p=>p.eventId===e.id);
+    const c = s => ps.filter(p=>p.status===s).length;
+    chain = '<ol class="chain mini" aria-label="Participant stages">'
+      + '<li><b>'+e.registered+'</b><span>Registered</span></li>'
+      + '<li><b>'+c('waiting')+'</b><span>Waiting</span></li>'
+      + '<li class="hot"><b>'+c('screening')+'</b><span>Screening</span></li>'
+      + '<li class="branch"><b>'+c('review')+'</b><span>Review</span></li>'
+      + '<li class="okseg"><b>'+e.completedBase+'</b><span>Completed</span></li>'
+      + '<li class="branch"><b>'+e.followupBase+'</b><span>Follow-up</span></li></ol>';
+  }
+  if(e.status==='completed'){
+    chain = '<ol class="chain mini" aria-label="Event outcome">'
+      + '<li><b>'+e.registered+'</b><span>Registered</span></li>'
+      + '<li class="okseg"><b>'+e.completedBase+'</b><span>Completed</span></li>'
+      + '<li class="branch"><b>'+e.followupBase+'</b><span>Follow-up</span></li></ol>';
+  }
+  let primary = '', subs = [];
+  if(e.status==='draft'){
+    if(canManage()) primary = '<button type="button" class="btn btn-pri primary" data-act="ev-edit" data-id="'+e.id+'">Continue setup</button>';
+    subs.push('<button type="button" class="btn-text" data-act="ev-dry" data-id="'+e.id+'">Dry run</button>');
+  }
+  if(e.status==='upcoming'){
+    primary = canManage()
+      ? '<button type="button" class="btn btn-pri primary" data-act="ev-start" data-id="'+e.id+'">Start event</button>'
+      : '<button type="button" class="btn btn-sec primary" data-act="ev-summary" data-id="'+e.id+'">Open event</button>';
+    subs.push('<button type="button" class="btn-text" data-act="ev-dry" data-id="'+e.id+'">Dry run</button>');
+  }
+  if(e.status==='live'){
+    primary = '<button type="button" class="btn btn-go primary" data-act="ev-open" data-id="'+e.id+'">Open live dashboard</button>';
+  }
+  if(e.status==='completed'){
+    primary = '<button type="button" class="btn btn-sec primary" data-act="ev-summary" data-id="'+e.id+'">Open summary</button>';
+  }
+  if(e.status!=='draft' && e.status!=='completed' && canManage()) subs.push('<button type="button" class="btn-text" data-act="ev-edit" data-id="'+e.id+'">Edit</button>');
+  if(canManage()){
+    subs.push('<button type="button" class="btn-text" data-act="ev-dup" data-id="'+e.id+'">Duplicate</button>');
+    subs.push('<button type="button" class="btn-text del" data-act="ev-del" data-id="'+e.id+'">Delete</button>');
+  }
+  return '<article class="ev s-'+e.status+'" aria-label="'+esc(e.name)+'">'
+    + '<div class="ev-date" aria-hidden="true">'+dblock+'</div>'
+    + '<div class="ev-main">'
+    +   '<div class="ev-title"><h3><button type="button" class="btn-text" style="min-height:0;padding:0;font-size:15.5px;color:var(--ink);text-decoration:none" data-act="'+(e.status==='live'?'ev-open':'ev-summary')+'" data-id="'+e.id+'">'+esc(e.name)+'</button></h3>'
+    +   evStatusChip(e.status)+'</div>'
+    +   '<div class="ev-meta"><span>'+esc(e.venue)+'</span><span class="sep">·</span>'
+    +   '<span>'+(e.date?fmtD(e.date):'Date to be confirmed')+'</span><span class="sep">·</span>'
+    +   '<span>'+e.start+'–'+e.end+'</span><span class="sep">·</span>'
+    +   '<span class="mono">'+e.registered+' registered / cap '+e.capacity+'</span></div>'
+    +   chain + read
+    +   (warns.length?'<div class="ev-warns">'+warns.map(w=>'<span>▲ '+esc(w)+'</span>').join('')+'</div>':'')
+    +   '<div class="ev-next">'+evNext(e)+'</div>'
+    + '</div>'
+    + '<div class="ev-actions">'+primary+'<div class="ev-sub">'+subs.join('')+'</div></div>'
+    + '</article>';
+}
+function renderEvents(){
+  const c = $('#view-events');
+  const q = S.ui.evQ.trim().toLowerCase();
+  let list = S.events.filter(e=>{
+    if(S.ui.evStatus!=='all' && e.status!==S.ui.evStatus) return false;
+    if(q && !(e.name+' '+e.venue).toLowerCase().includes(q)) return false;
+    if(S.ui.evScope==='week'  && !(e.date && ddiff(e.date)>=0 && ddiff(e.date)<=7))  return false;
+    if(S.ui.evScope==='month' && !(e.date && ddiff(e.date)>=0 && ddiff(e.date)<=30)) return false;
+    if(S.ui.evScope==='past'  && !(e.date && ddiff(e.date)<0)) return false;
+    return true;
+  });
+  list.sort((a,b)=>{
+    if(!a.date) return 1; if(!b.date) return -1;
+    return S.ui.evSort==='asc' ? a.date.localeCompare(b.date) : b.date.localeCompare(a.date);
+  });
+
+  const alerts = [];
+  const fails = S.records.filter(r=>r.state==='failed').length;
+  if(fails) alerts.push({kind:'bad', html:'<b>'+fails+' record'+(fails>1?'s':'')+' failed to sync.</b> Screening data is safe on this device.', act:'sync', lab:'Open sync centre'});
+  const e1 = ev('e1');
+  if(e1 && e1.status==='live'){
+    const un = e1.stations.filter(x=>!e1.stationStaff[x]);
+    if(un.length) alerts.push({kind:'warn', html:'<b>Riverside is live:</b> '+un.map(ST_NAME).join(', ')+' has no staff assigned.', act:'people', lab:'Assign staff'});
+  }
+  S.events.filter(e=>e.status==='upcoming').forEach(e=>{
+    const hasRev = e.staffIds.some(id=>{ const s=st(id); return s && s.role==='REVIEWER'; }) || !!e.stationStaff['clinical-review'];
+    if(!hasRev) alerts.push({kind:'warn', html:'<b>'+esc(e.name)+':</b> no clinical reviewer assigned yet.', act:'people', lab:'Assign reviewer'});
+  });
+
+  const groups = [['live','In progress'],['upcoming','Upcoming'],['draft','Drafts'],['completed','Completed']];
+  let body = '', any = false;
+  groups.forEach(([g,label])=>{
+    const rows = list.filter(e=>e.status===g);
+    if(!rows.length) return;
+    any = true;
+    body += '<div class="evgroup" role="group" aria-label="'+label+'">'
+      + '<div class="evgroup-h"><h2>'+label+'</h2><span class="ln"></span><span class="n">'+rows.length+'</span></div>'
+      + rows.map(evRow).join('')+'</div>';
+  });
+  if(!any){
+    body = '<div class="empty"><div class="glyph">◇</div><h3>No events match</h3>'
+      + '<p>Try a different search, or clear the status and date filters.</p>'
+      + '<button type="button" class="btn btn-sec" data-act="ev-clear">Clear filters</button></div>';
+  }
+
+  const chips = [['all','All'],['draft','Draft'],['upcoming','Upcoming'],['live','In progress'],['completed','Completed']]
+    .map(([v,l])=>'<button type="button" class="fchip" data-act="ev-fstatus" data-v="'+v+'" aria-pressed="'+(S.ui.evStatus===v)+'">'+l+'</button>').join('');
+
+  c.innerHTML =
+      '<div class="phead"><div><h1>Events</h1><p class="sub">'+S.events.length+' events · '+S.events.filter(e=>e.status==='live').length+' in progress · Today is Fri 31 Jul 2026</p></div>'
+    + '<div class="sp"></div>'
+    + (canManage()?'<button type="button" class="btn btn-pri" data-act="ev-create">+ Create event</button>':'')
+    + '</div>'
+    + (alerts.length?'<div class="alerts">'+alerts.slice(0,3).map(a=>'<div class="alert '+a.kind+'">'+ic('alert')+'<span>'+a.html+'</span><span class="sp"></span><button type="button" class="btn-text" data-nav="'+a.act+'">'+a.lab+'</button></div>').join('')+'</div>':'')
+    + '<div class="toolbar" role="search">'
+    +   '<div class="search">'+ic('search')+'<input type="search" placeholder="Search events or venues…" value="'+esc(S.ui.evQ)+'" data-act-input="evQ" aria-label="Search events"></div>'
+    +   '<div class="fgroup" aria-label="Status filter">'+chips+'</div>'
+    +   '<label class="sel-lab" for="ev-scope">Dates</label>'
+    +   '<select id="ev-scope" class="sel" data-act-change="evScope">'
+    +     '<option value="all"'+(S.ui.evScope==='all'?' selected':'')+'>All dates</option>'
+    +     '<option value="week"'+(S.ui.evScope==='week'?' selected':'')+'>Next 7 days</option>'
+    +     '<option value="month"'+(S.ui.evScope==='month'?' selected':'')+'>Next 30 days</option>'
+    +     '<option value="past"'+(S.ui.evScope==='past'?' selected':'')+'>Past</option>'
+    +   '</select>'
+    +   '<label class="sel-lab" for="ev-sort">Sort</label>'
+    +   '<select id="ev-sort" class="sel" data-act-change="evSort">'
+    +     '<option value="asc"'+(S.ui.evSort==='asc'?' selected':'')+'>Soonest first</option>'
+    +     '<option value="desc"'+(S.ui.evSort==='desc'?' selected':'')+'>Latest first</option>'
+    +   '</select>'
+    + '</div>'
+    + body;
+}
+/* ── Event editor / summary / delete ─────────────────────────── */
+function openEditor(opts){
+  const editing = opts.id ? ev(opts.id) : null;
+  const dup = opts.dupFrom ? ev(opts.dupFrom) : null;
+  const base = editing || (dup ? Object.assign({}, dup, {name:dup.name+' (Copy)', date:'', status:'draft'}) : null);
+  const b = base || {name:'',date:'',start:'09:00',end:'15:00',venue:'',capacity:80,status:'draft',stations:FLOW.slice(),staffIds:[],reg:{onsite:true,qr:true,consent:'v3'}};
+  const locked = editing && ['live','completed'].includes(editing.status);
+  const stationBoxes = STATIONS.map(s=>
+    '<label class="check"><input type="checkbox" name="stations" value="'+s.id+'"'+(b.stations.includes(s.id)?' checked':'')+'> '+s.name+'</label>').join('');
+  const staffBoxes = S.staff.filter(s=>s.status==='active').map(s=>
+    '<label class="check"><input type="checkbox" name="staff" value="'+s.id+'"'+(b.staffIds.includes(s.id)?' checked':'')+'> '+esc(s.name)+' <span style="color:var(--muted);font-weight:400">· '+ROLES[s.role]+'</span></label>').join('');
+  const statusField = locked
+    ? '<div class="field"><label>Status</label><p style="min-height:44px;display:flex;align-items:center;gap:8px">'+evStatusChip(b.status)+'<span style="color:var(--muted);font-size:12px">Status changes from the event list</span></p></div>'
+    : '<div class="field"><label for="ef-status">Event status</label>'
+      + '<select id="ef-status" name="status" class="sel" style="width:100%">'
+      + '<option value="draft"'+(b.status==='draft'?' selected':'')+'>Draft — not visible to staff</option>'
+      + '<option value="upcoming"'+(b.status==='upcoming'?' selected':'')+'>Upcoming — scheduled and visible to staff</option>'
+      + '</select><span class="hint">A date is required before an event can be scheduled.</span></div>';
+  openDrawer(editing?'Edit event':(dup?'Duplicate event':'Create event'),
+      (dup?'<div class="flagbox"><b>Configuration copied.</b> “'+esc(dup.name)+'” was duplicated. The copy stays a draft until you set a new date.</div>':'')
+    + '<form id="ev-form" class="form" data-id="'+(editing?editing.id:'')+'" data-dup="'+(dup?dup.id:'')+'" novalidate>'
+    +   '<div id="ef-err" class="flagbox" hidden role="alert"></div>'
+    +   '<div class="field"><label for="ef-name">Event name</label><input id="ef-name" name="name" required value="'+esc(b.name)+'" placeholder="e.g. Northgate Community Vision Screening"></div>'
+    +   '<div class="frow">'
+    +     '<div class="field"><label for="ef-date">Date</label><input id="ef-date" name="date" type="date" value="'+esc(b.date)+'"></div>'
+    +     '<div class="field"><label for="ef-start">Start</label><input id="ef-start" name="start" type="time" value="'+esc(b.start)+'"></div>'
+    +     '<div class="field"><label for="ef-end">End</label><input id="ef-end" name="end" type="time" value="'+esc(b.end)+'"></div>'
+    +   '</div>'
+    +   '<div class="field"><label for="ef-venue">Venue</label><input id="ef-venue" name="venue" required value="'+esc(b.venue)+'" placeholder="Venue name and address"></div>'
+    +   '<div class="frow">'
+    +     '<div class="field"><label for="ef-cap">Capacity</label><input id="ef-cap" name="capacity" type="number" min="1" max="2000" value="'+b.capacity+'"></div>'
+    +     statusField
+    +   '</div>'
+    +   '<div class="field"><label>Screening stations</label><span class="hint">Participants move through these in order.</span>'+stationBoxes+'</div>'
+    +   '<div class="field"><label>Assigned staff</label>'+(staffBoxes||'<p class="hint">No active staff yet — invite staff from People.</p>')+'</div>'
+    +   '<div class="field"><label>Registration settings</label>'
+    +     '<label class="check"><input type="checkbox" name="onsite"'+(b.reg.onsite?' checked':'')+'> Allow on-site registration</label>'
+    +     '<label class="check"><input type="checkbox" name="qr"'+(b.reg.qr?' checked':'')+'> Issue QR event passes <span style="color:var(--muted);font-weight:400">(a pass carries a check-in token only — never clinical data)</span></label>'
+    +     '<label for="ef-consent" style="margin-top:6px">Consent form version</label>'
+    +     '<select id="ef-consent" name="consent" class="sel" style="width:100%">'
+    +       '<option value="v3"'+(b.reg.consent==='v3'?' selected':'')+'>Consent form v3 · Community screening 2026</option>'
+    +       '<option value="v2"'+(b.reg.consent==='v2'?' selected':'')+'>Consent form v2 · Legacy</option>'
+    +     '</select></div>'
+    + '</form>',
+    '<button type="button" class="btn btn-sec" data-act="overlay-close">Cancel</button>'
+    + '<button type="submit" form="ev-form" class="btn btn-pri">'+(editing?'Save changes':(dup?'Create draft copy':'Create event'))+'</button>');
+}
+function saveEventForm(f){
+  const fd = new FormData(f);
+  const name = (fd.get('name')||'').toString().trim();
+  const venue = (fd.get('venue')||'').toString().trim();
+  const date = (fd.get('date')||'').toString();
+  const status = (fd.get('status')||'draft').toString();
+  const err = $('#ef-err');
+  const fail = m => { err.hidden=false; err.innerHTML = '<b>Check the form:</b> '+m; };
+  if(!name) return fail('the event needs a name.');
+  if(!venue) return fail('the event needs a venue.');
+  if(status==='upcoming' && !date) return fail('set a date before the event can be scheduled as upcoming.');
+  const stations = fd.getAll('stations').map(String);
+  const staffIds = fd.getAll('staff').map(String);
+  const id = f.dataset.id, dupFrom = f.dataset.dup;
+  if(id){
+    const e = ev(id);
+    Object.assign(e,{name:name,venue:venue,date:date,start:fd.get('start'),end:fd.get('end'),capacity:+fd.get('capacity')||e.capacity,stations:stations,staffIds:staffIds});
+    if(!['live','completed'].includes(e.status)) e.status = status;
+    Object.keys(e.stationStaff).forEach(k=>{ if(!stations.includes(k)) delete e.stationStaff[k]; });
+    stations.forEach(s=>{ if(!(s in e.stationStaff)) e.stationStaff[s]=null; });
+    e.reg = {onsite:!!fd.get('onsite'), qr:!!fd.get('qr'), consent:fd.get('consent')};
+    toast('Event saved — the list is up to date');
+  }else{
+    const from = dupFrom ? ev(dupFrom) : null;
+    const ne = {
+      id:'e'+(++S.seq.e), name:name, venue:venue, date:date, start:fd.get('start'), end:fd.get('end'),
+      capacity:+fd.get('capacity')||80, status: date? status : 'draft',
+      registered:0, completedBase:0, followupBase:0, stations:stations,
+      stationStaff:Object.fromEntries(stations.map(s=>[s, (from && from.stationStaff[s] && staffIds.includes(from.stationStaff[s])) ? from.stationStaff[s] : null])),
+      staffIds:staffIds, staffConfirmed:0,
+      reg:{onsite:!!fd.get('onsite'), qr:!!fd.get('qr'), consent:fd.get('consent')}
+    };
+    S.events.unshift(ne);
+    toast(dupFrom ? 'Duplicate created as a draft — set a date to schedule it' : 'Event created as a draft');
+  }
+  closeOverlay(); persist(); render();
+}
+function deleteEvent(id){
+  const e = ev(id); if(!e) return;
+  openModal('Delete this event?',
+      '<div class="del-summary"><b>'+esc(e.name)+'</b><span>'+esc(e.venue)+' · '+(e.date?fmtD(e.date):'No date set')+' · '+e.registered+' registered participants</span></div>'
+    + '<p>Deleting removes this event and its configuration from this device. This cannot be undone.</p>'
+    + '<p style="color:var(--muted);font-size:12.5px">Unsynced screening records are never deleted by this action — they stay in the sync centre.</p>'
+    + '<label class="check"><input type="checkbox" id="del-check" data-act-change="del-check"> I understand — permanently delete <b>&nbsp;'+esc(e.name)+'</b></label>',
+    '<button type="button" class="btn btn-sec" data-act="overlay-close">Keep event</button>'
+    + '<button type="button" class="btn btn-danger-solid" id="del-do" data-act="del-do" data-id="'+e.id+'" disabled>Delete event</button>');
+}
+function openSummary(id){
+  const e = ev(id); if(!e) return;
+  const ps = S.participants.filter(p=>p.eventId===e.id);
+  const c = s => ps.filter(p=>p.status===s).length;
+  const lines = e.status==='live'
+    ? '<div class="resgrid" style="border:1px solid var(--line);border-radius:6px">'
+      + '<div><dt>Registered</dt><dd>'+e.registered+'</dd></div><div><dt>Waiting</dt><dd>'+c('waiting')+'</dd></div>'
+      + '<div><dt>Screening</dt><dd>'+c('screening')+'</dd></div><div><dt>In review</dt><dd>'+c('review')+'</dd></div>'
+      + '<div><dt>Completed</dt><dd>'+e.completedBase+'</dd></div><div><dt>Follow-up</dt><dd>'+e.followupBase+'</dd></div></div>'
+    : '<div class="resgrid" style="border:1px solid var(--line);border-radius:6px">'
+      + '<div><dt>Registered</dt><dd>'+e.registered+'</dd></div><div><dt>Completed</dt><dd>'+e.completedBase+'</dd></div>'
+      + '<div><dt>Follow-up required</dt><dd>'+e.followupBase+'</dd></div>'
+      + '<div><dt>Completion rate</dt><dd>'+(e.registered?Math.round(e.completedBase/e.registered*100):0)+'%</dd></div></div>';
+  openDrawer('Event summary',
+      '<div><h3 style="font-size:17px">'+esc(e.name)+'</h3>'
+    + '<p style="color:var(--muted);font-size:12.5px;margin-top:3px">'+esc(e.venue)+' · '+(e.date?fmtD(e.date):'No date')+' · '+e.start+'–'+e.end+' · '+evStatusChip(e.status)+'</p></div>'
+    + lines
+    + '<div class="rd-sec"><h3>Stations &amp; staffing</h3><ul class="duty">'
+    + (e.stations.map(sid=>{ const sf = st(e.stationStaff[sid]);
+        return '<li><span>'+ST_NAME(sid)+'</span><span class="stn">'+(sf?esc(sf.name):'Unassigned')+'</span></li>'; }).join('') || '<li>No stations configured.</li>')
+    + '</ul></div>'
+    + '<p class="rules">Report export runs in the connected system. VSMS supports screening — it does not diagnose; every follow-up decision was made by a reviewer.</p>',
+    e.status==='live'
+      ? '<button type="button" class="btn btn-sec" data-act="overlay-close">Close</button><button type="button" class="btn btn-go" data-act="ev-open" data-id="'+e.id+'">Open live dashboard</button>'
+      : '<button type="button" class="btn btn-sec" data-act="overlay-close">Close</button>');
+}
+/* ── VIEW 2 · People ─────────────────────────────────────────── */
+function denied(title, body){
+  return '<div class="denied"><h3>'+ic('lock')+' '+esc(title)+'</h3><p>'+body+'</p>'
+    + '<p>You are viewing as <b>'+ROLES[S.role]+'</b>. Switch roles from the top bar to see what a manager sees.</p></div>';
+}
+function renderPeople(){
+  const c = $('#view-people');
+  if(!canManage()){
+    c.innerHTML = '<div class="phead"><div><h1>People</h1><p class="sub">Staff access and assignments</p></div></div>'
+      + denied('You don’t have permission to manage staff','People administration — inviting, approving, assigning and deactivating staff — is available to Event Managers and Administrators.')
+      + '<p class="rules" style="max-width:640px">Participants are managed as event records. They never receive accounts and can never sign in.</p>';
+    return;
+  }
+  const q = S.ui.pplQ.trim().toLowerCase();
+  const match = s =>
+    (!q || (s.name+' '+s.email).toLowerCase().includes(q)) &&
+    (S.ui.pplRole==='all' || s.role===S.ui.pplRole) &&
+    (S.ui.pplStatus==='all' || s.status===S.ui.pplStatus);
+  const pending = S.staff.filter(s=>s.status==='pending' && match(s));
+  const active  = S.staff.filter(s=>s.status==='active' && match(s));
+  const deact   = S.staff.filter(s=>s.status==='deactivated' && match(s));
+
+  const row = s => {
+    const e = s.eventId ? ev(s.eventId) : null;
+    const stn = e ? Object.keys(e.stationStaff).find(k=>e.stationStaff[k]===s.id) : null;
+    return '<div class="prow'+(s.status==='deactivated'?' deact':'')+'">'
+      + '<span class="pav" aria-hidden="true">'+initials(s.name)+'</span>'
+      + '<div class="pn"><b>'+esc(s.name)+'</b><span>'+esc(s.email)+' · '+esc(s.last)+'</span></div>'
+      + '<div class="pa"><span class="rolebadge">'+ROLES[s.role]+'</span>'
+      + '<span>'+(e?esc(e.name):'No event assigned')+(stn?' · '+ST_NAME(stn):'')+'</span></div>'
+      + '<div class="pact">'
+      + '<button type="button" class="btn btn-sec" data-act="ppl-assign" data-id="'+s.id+'">Assign</button>'
+      + '<button type="button" class="btn-text" data-act="ppl-perms" data-id="'+s.id+'">Permissions</button>'
+      + (s.status==='active'
+          ? '<button type="button" class="btn-text" style="color:var(--bad)" data-act="ppl-deact" data-id="'+s.id+'">Deactivate</button>'
+          : '<button type="button" class="btn-text" data-act="ppl-react" data-id="'+s.id+'">Reactivate</button>')
+      + '</div></div>';
+  };
+  const prow = s => '<div class="prow pending">'
+    + '<span class="pav" aria-hidden="true">'+initials(s.name)+'</span>'
+    + '<div class="pn"><b>'+esc(s.name)+'</b><span>'+esc(s.email)+' · '+esc(s.last)+'</span></div>'
+    + '<div class="pa"><span class="rolebadge">'+ROLES[s.role]+'</span><span>Awaiting approval</span></div>'
+    + '<div class="pact">'
+    + '<button type="button" class="btn btn-go" data-act="ppl-approve" data-id="'+s.id+'">Approve</button>'
+    + '<button type="button" class="btn btn-sec" data-act="ppl-reject" data-id="'+s.id+'">Reject</button>'
+    + '</div></div>';
+
+  c.innerHTML =
+      '<div class="phead"><div><h1>People</h1><p class="sub">'+S.staff.filter(s=>s.status==='active').length+' active · '+pending.length+' pending approval · staff only — participants never receive sign-in access</p></div>'
+    + '<div class="sp"></div>'
+    + '<button type="button" class="btn btn-sec" data-act="ppl-import">Import staff</button>'
+    + '<button type="button" class="btn btn-pri" data-act="ppl-invite">+ Invite staff</button></div>'
+    + '<div class="toolbar" role="search">'
+    +   '<div class="search">'+ic('search')+'<input type="search" placeholder="Search staff by name or email…" value="'+esc(S.ui.pplQ)+'" data-act-input="pplQ" aria-label="Search staff"></div>'
+    +   '<select class="sel" data-act-change="pplRole" aria-label="Filter by role"><option value="all">All roles</option>'
+    +   Object.entries(ROLES).map(([k,v])=>'<option value="'+k+'"'+(S.ui.pplRole===k?' selected':'')+'>'+v+'</option>').join('')+'</select>'
+    +   '<select class="sel" data-act-change="pplStatus" aria-label="Filter by status">'
+    +     '<option value="all">All statuses</option>'
+    +     '<option value="active"'+(S.ui.pplStatus==='active'?' selected':'')+'>Active</option>'
+    +     '<option value="pending"'+(S.ui.pplStatus==='pending'?' selected':'')+'>Pending</option>'
+    +     '<option value="deactivated"'+(S.ui.pplStatus==='deactivated'?' selected':'')+'>Deactivated</option>'
+    +   '</select></div>'
+    + (pending.length?'<div class="evgroup"><div class="evgroup-h"><h2>Pending approval</h2><span class="ln"></span><span class="n">'+pending.length+'</span></div>'+pending.map(prow).join('')+'</div>':'')
+    + '<div class="evgroup"><div class="evgroup-h"><h2>Active staff</h2><span class="ln"></span><span class="n">'+active.length+'</span></div>'
+    + (active.length?active.map(row).join(''):'<div class="empty"><div class="glyph">◇</div><h3>No staff match</h3><p>Adjust the search or filters.</p></div>')+'</div>'
+    + (deact.length?'<div class="evgroup"><div class="evgroup-h"><h2>Deactivated</h2><span class="ln"></span><span class="n">'+deact.length+'</span></div>'+deact.map(row).join('')+'</div>':'');
+}
+function openAssign(id){
+  const s = st(id); if(!s) return;
+  const evOpts = S.events.filter(e=>e.status!=='completed').map(e=>'<option value="'+e.id+'"'+(s.eventId===e.id?' selected':'')+'>'+esc(e.name)+'</option>').join('');
+  const roleOpts = Object.entries(ROLES).map(([k,v])=>'<option value="'+k+'"'+(s.role===k?' selected':'')+'>'+v+'</option>').join('');
+  const cur = s.eventId ? ev(s.eventId) : S.events[0];
+  const stnOpts = cur ? cur.stations.map(x=>'<option value="'+x+'">'+ST_NAME(x)+'</option>').join('') : '';
+  openDrawer('Assign '+s.name,
+      '<div class="form">'
+    + '<div class="field"><label for="as-ev">Event</label><select id="as-ev" class="sel" style="width:100%" data-act-change="assign-ev">'+evOpts+'</select></div>'
+    + '<div class="field"><label for="as-role">Role</label><select id="as-role" class="sel" style="width:100%" data-act-change="assign-role">'+roleOpts+'</select>'
+    + '<span class="hint">The role decides what this person can do.</span></div>'
+    + '<div class="field"><label for="as-stn">Station</label><select id="as-stn" class="sel" style="width:100%">'+(stnOpts||'<option value="">No stations on this event</option>')+'</select></div>'
+    + '<div class="canbox"><h4>This assignment allows</h4><ul class="canlist" id="as-can">'+ROLE_CAN[s.role].map(x=>'<li>'+x+'</li>').join('')+'</ul></div>'
+    + '</div>',
+    '<button type="button" class="btn btn-sec" data-act="overlay-close">Cancel</button>'
+    + '<button type="button" class="btn btn-pri" data-act="assign-save" data-id="'+s.id+'">Confirm assignment</button>');
+}
+function openPerms(id){
+  const s = st(id); if(!s) return;
+  const boxes = PERMS.map(([k,lab])=>'<label class="check"><input type="checkbox" name="perm" value="'+k+'"'+(s.perms.includes(k)?' checked':'')+' data-act-change="perm-prev"> '+lab+'</label>').join('');
+  openDrawer('Permissions — '+s.name,
+      '<p style="font-size:12.5px;color:var(--muted)">Base role: <b>'+ROLES[s.role]+'</b>. Permissions take effect the next time this person signs in.</p>'
+    + '<div class="form">'+boxes+'</div>'
+    + '<div class="canbox"><h4>This allows</h4><ul class="canlist" id="perm-can">'+s.perms.map(k=>{const p=PERMS.find(x=>x[0]===k);return p?'<li>'+p[1]+'</li>':''}).join('')+'</ul></div>',
+    '<button type="button" class="btn btn-sec" data-act="overlay-close">Cancel</button>'
+    + '<button type="button" class="btn btn-pri" data-act="perms-save" data-id="'+s.id+'">Save permissions</button>');
+}
+/* ── VIEW 3 · Clinical review ────────────────────────────────── */
+function renderReview(){
+  const c = $('#view-review');
+  if(!canReview()){
+    c.innerHTML = '<div class="phead"><div><h1>Clinical review</h1><p class="sub">Flagged records waiting for a reviewer decision</p></div></div>'
+      + denied('Clinical review is restricted','Only Doctors / Reviewers, Event Managers and Administrators can open flagged screening records. Screening flags are routed to the review queue automatically.');
+    return;
+  }
+  const q = reviewQueue();
+  if(!q.length){
+    S.reviewSel = null;
+    c.innerHTML = '<div class="phead"><div><h1>Clinical review</h1><p class="sub">Flagged records waiting for a reviewer decision</p></div></div>'
+      + '<div class="empty"><div class="glyph" style="color:var(--ok);border-color:#BFE0CC">✓</div><h3>Review queue is clear</h3>'
+      + '<p>Every flagged record has a reviewer decision. New flags appear here as soon as a screening result crosses a configured threshold.</p></div>';
+    return;
+  }
+  if(!S.reviewSel || !q.find(p=>p.id===S.reviewSel)) S.reviewSel = q[0].id;
+  const p = pt(S.reviewSel);
+  const e = ev(p.eventId);
+  const rows = q.map(x=>'<button type="button" class="qrow" data-act="rev-select" data-id="'+x.id+'" aria-current="'+(x.id===S.reviewSel)+'">'
+    + '<span class="t"><b>'+esc(x.name)+'</b>'+(x.dry?'<span class="tab-n">DRY</span>':'')+'<span class="wait">'+esc(x.wait||'18 min')+'</span></span>'
+    + '<span class="f">▲ '+esc(x.flags[0]||'Flagged for review')+'</span>'
+    + '<span class="c">'+esc(x.code)+' · '+esc(x.queue)+'</span></button>').join('');
+  const done = new Set(p.done);
+  const completeness = STATIONS.map(s=>{
+    if(s.id==='clinical-review') return '';
+    return done.has(s.id) ? '<li class="y">'+ic('check')+' '+s.name+'</li>' : '<li class="n">— '+s.name+'</li>';
+  }).join('');
+  const resblocks = Object.keys(p.results).map(sid=>{
+    const r = p.results[sid];
+    return '<div class="resblock"><div class="resblock-h">'+ST_NAME(sid)+(r.flagged?' <span class="st st-warn">Flagged</span>':'')+'<span class="when">'+r.at+'</span></div>'
+      + '<dl class="resgrid">'+r.vals.map(v=>'<div><dt>'+esc(v[0])+'</dt><dd class="'+(v[2]?'fl':'')+'">'+esc(v[1])+'</dd></div>').join('')+'</dl></div>';
+  }).join('');
+  c.innerHTML =
+      '<div class="phead"><div><h1>Clinical review</h1><p class="sub">'+q.length+' record'+(q.length>1?'s':'')+' waiting · VSMS supports screening — a flag is not a diagnosis. The reviewer’s decision is final.</p></div></div>'
+    + '<div class="split">'
+    +   '<div class="qlist" role="listbox" aria-label="Review queue"><div class="qlist-h">Review queue <span style="margin-left:auto">'+q.length+'</span></div>'+rows+'</div>'
+    +   '<div class="rdetail">'
+    +     '<div class="rd-id"><div><h2>'+esc(p.name)+'</h2><span class="mono">'+p.age+' yrs · '+p.sex+' · '+esc(p.code)+' · Queue '+esc(p.queue)+'</span></div>'
+    +     '<div class="sp"></div><span class="st st-warn">Awaiting review</span></div>'
+    +     '<p style="font-size:12.5px;color:var(--muted)">Event: <b style="color:var(--ink-2)">'+esc(e?e.name:'—')+'</b></p>'
+    +     '<div class="rd-sec"><h3>Station completeness</h3><ul class="completeness">'+completeness+'</ul></div>'
+    +     (p.missing.length?'<div class="flagbox"><b>Incomplete results</b><ul style="margin:6px 0 0;padding-left:18px">'+p.missing.map(m=>'<li>'+esc(m)+'</li>').join('')+'</ul></div>':'')
+    +     '<div class="rd-sec"><h3>Screening results</h3>'+(resblocks||'<p style="font-size:13px;color:var(--muted)">No structured results recorded.</p>')+'</div>'
+    +     '<div class="flagbox"><b>Screening flags</b><ul style="margin:6px 0 0;padding-left:18px">'+p.flags.map(f=>'<li>'+esc(f)+'</li>').join('')+'</ul>'
+    +       '<p style="margin-top:6px;font-size:12px">Flags come from configured screening rules. They are prompts for review — not diagnoses.</p></div>'
+    +     '<form id="rev-form" class="form" style="max-width:none">'
+    +       '<div class="field"><label for="rev-notes">Reviewer notes</label><textarea id="rev-notes" name="notes" placeholder="Observations and reasoning for the record…"></textarea></div>'
+    +       '<div class="decision" role="radiogroup" aria-label="Review decision"><span class="seclab">Decision</span>'
+    +         '<label class="radio"><input type="radio" name="decision" value="none" data-act-change="rev-dec"> <span>No follow-up required<small>Screening results within thresholds. Participant completes the event.</small></span></label>'
+    +         '<label class="radio"><input type="radio" name="decision" value="followup" data-act-change="rev-dec"> <span>Follow-up required<small>Participant advised to book a routine check. A follow-up letter is prepared.</small></span></label>'
+    +         '<label class="radio"><input type="radio" name="decision" value="referral" data-act-change="rev-dec"> <span>Referral recommended<small>Referred for further assessment. This is a screening referral — not a diagnosis.</small></span></label>'
+    +         '<div class="frow" id="rev-ref" hidden>'
+    +           '<div class="field"><label for="rev-dest">Refer to</label><select id="rev-dest" name="dest" class="sel" style="width:100%"><option>Optometrist</option><option>GP</option><option>Hospital eye service</option></select></div>'
+    +           '<div class="field"><label for="rev-urg">Urgency</label><select id="rev-urg" name="urgency" class="sel" style="width:100%"><option>Routine</option><option>Priority</option></select></div>'
+    +         '</div></div>'
+    +       '<div class="btn-row"><button type="button" class="btn btn-pri" id="rev-fin" data-act="rev-finalise" data-id="'+p.id+'" disabled>Finalise review</button>'
+    +       '<span class="hint" style="align-self:center;color:var(--muted);font-size:12px">Choose a decision to finalise. The record leaves the queue and syncs.</span></div>'
+    +     '</form>'
+    +   '</div></div>';
+}
+function finaliseReview(id){
+  const f = $('#rev-form'); if(!f) return;
+  const fd = new FormData(f);
+  const dec = fd.get('decision');
+  if(!dec) return;
+  const p = pt(id); if(!p) return;
+  const notes = (fd.get('notes')||'').toString().trim();
+  let outcome = 'No follow-up required';
+  if(dec==='followup') outcome = 'Follow-up — routine check advised';
+  if(dec==='referral') outcome = 'Referral — '+fd.get('dest')+' ('+String(fd.get('urgency')).toLowerCase()+')';
+  p.status = dec==='none' ? 'completed' : 'followup';
+  p.station = null; p.outcome = outcome; p.reviewNotes = notes;
+  addRecord({who:p.name, code:p.code, type:'Review decision', station:'Clinical review', at:nowT()});
+  S.reviewSel = null;
+  toast('Review finalised — '+outcome);
+  render();
+}
+
+/* ── VIEW 4 · Sync centre ────────────────────────────────────── */
+function renderSync(){
+  const c = $('#view-sync');
+  const R = S.records;
+  const n = s => R.filter(r=>r.state===s).length;
+  const pend = n('pending')+n('syncing');
+  const rows = R.map(r=>'<div class="srow">'
+    + '<div class="who"><b>'+esc(r.who)+'</b><span>'+esc(r.code)+(r.dry?' · DRY RUN':'')+'</span></div>'
+    + '<div class="what">'+esc(r.type)+' · '+esc(r.station)+'<span>Saved '+esc(r.at)+' · '+esc(r.detail)+'</span></div>'
+    + syncChip(r.state)
+    + '<div class="act">'
+    + (r.state==='failed'?'<button type="button" class="btn btn-sec" data-act="sync-retry" data-id="'+r.id+'">'+ic('sync')+' Retry</button>':'')
+    + (r.state==='conflict'?'<button type="button" class="btn btn-sec" data-act="sync-keep" data-id="'+r.id+'" data-keep="device">Keep device</button>'
+        +'<button type="button" class="btn btn-sec" data-act="sync-keep" data-id="'+r.id+'" data-keep="server">Keep server</button>':'')
+    + '</div></div>').join('');
+  c.innerHTML =
+      '<div class="phead"><div><h1>Sync centre</h1><p class="sub">'+(S.connected?'Connected — records sync automatically':'Offline — records save on this device first')+'</p></div>'
+    + '<div class="sp"></div>'
+    + '<button type="button" class="btn btn-sec" data-act="conn-toggle">'+(S.connected?'Go offline (simulate)':'Reconnect')+'</button>'
+    + '<button type="button" class="btn btn-pri" data-act="sync-now"'+((!S.connected||!pend)?' disabled':'')+'>'+ic('sync')+' Sync now'+(pend?' ('+pend+')':'')+'</button></div>'
+    + '<div class="syncband" aria-label="Sync health">'
+    +   '<div class="sb"><b style="color:var(--ok)">'+n('synced')+'</b><span>Synced</span></div>'
+    +   '<div class="sb"><b style="color:var(--live)">'+pend+'</b><span>Pending / syncing</span></div>'
+    +   '<div class="sb"><b>'+n('saved-offline')+'</b><span>Saved offline</span></div>'
+    +   '<div class="sb"><b style="color:var(--bad)">'+n('failed')+'</b><span>Failed</span></div>'
+    +   '<div class="sb"><b style="color:var(--warn)">'+n('conflict')+'</b><span>Conflicts</span></div>'
+    + '</div>'
+    + (n('failed')?'<div class="alert bad">'+ic('alert')+'<span><b>'+n('failed')+' record'+(n('failed')>1?'s':'')+' failed to sync.</b> Data is safe on this device — retry when ready.</span></div>':'')
+    + '<div class="srows">'+(rows||'<div class="empty" style="border:0"><div class="glyph">◇</div><h3>No records yet</h3><p>Screening results, check-ins and review decisions appear here as they are saved.</p></div>')+'</div>'
+    + '<div class="syncnote"><b>States:</b> Saved offline → Pending sync → Syncing → Synced. Failures retry safely; conflicts are resolved by a person, never automatically. '
+    + 'Discarding unsynced results is deliberately not possible from this screen — unsynced screening data is protected.</div>';
+}
+
+/* ── VIEW 5 · Settings ───────────────────────────────────────── */
+function renderSettings(){
+  $('#view-settings').innerHTML =
+      '<div class="phead"><div><h1>Settings</h1><p class="sub">Prototype controls and product rules</p></div></div>'
+    + '<div class="setgrid">'
+    +   '<div class="setcard"><h3>Prototype controls</h3>'
+    +     '<p>Reset returns every event, participant, staff member and sync record to the original fictional seed data.</p>'
+    +     '<div class="btn-row"><button type="button" class="btn btn-danger" data-act="reset">Reset prototype</button>'
+    +     '<button type="button" class="btn btn-sec" data-act="conn-toggle">'+(S.connected?'Go offline (simulate)':'Reconnect')+'</button></div></div>'
+    +   '<div class="setcard"><h3>Product rules this design protects</h3>'
+    +     '<ul><li>VSMS supports screening — it does not diagnose. A flag is not a diagnosis.</li>'
+    +     '<li>A reviewer makes every final decision.</li><li>QR passes carry a check-in token only — never clinical data.</li>'
+    +     '<li>Offline is a normal operating state, not an error.</li><li>Losing unsynced screening data is never the easy action.</li></ul></div>'
+    +   '<div class="setcard"><h3>About this prototype</h3>'
+    +     '<p>Self-contained HTML/CSS/JS proposal for the VSMS staff dashboard. All events, staff and participants are fictional. State persists in localStorage only.</p>'
+    +     '<p style="font-family:var(--mono)">DESIGN_ID: Kimi_dashboard</p></div>'
+    + '</div>';
+}
+/* ── VIEW 6 · Live event dashboard ───────────────────────────── */
+function renderLive(){
+  const c = $('#view-live');
+  const e = ctxEvent();
+  if(!e){ c.innerHTML = '<div class="empty"><h3>No event selected</h3></div>'; return; }
+  const ps = activeList();
+  const cnt = s => ps.filter(p=>p.status===s).length;
+  const staffed = e.stations.filter(x=>e.stationStaff[x]).length;
+  const alerts = [];
+  e.stations.filter(x=>!e.stationStaff[x]).forEach(x=>alerts.push({h:'<b>'+ST_NAME(x)+'</b> has no staff assigned — participants will queue without cover.', a:'people', l:'Assign staff'}));
+  const rv = cnt('review');
+  if(rv) alerts.push({h:'<b>'+rv+' record'+(rv>1?'s':'')+'</b> waiting for clinical review.', a:'review', l:'Open review queue'});
+  const fails = S.records.filter(r=>r.state==='failed' && (!r.dry || S.dry)).length;
+  if(fails) alerts.push({h:'<b>'+fails+' sync failure'+(fails>1?'s':'')+'</b> — records are safe on this device.', a:'sync', l:'Retry in sync centre'});
+  const refWait = ps.filter(p=>p.station==='refraction' && p.status==='waiting').length;
+  if(refWait>=1) alerts.push({h:'<b>Queue building at Refraction</b> — longest wait 14 min. Consider a second screener.', a:null, l:null});
+
+  const cols = e.stations.map(sid=>{
+    const sf = st(e.stationStaff[sid]);
+    const here = ps.filter(p=>p.station===sid);
+    const chips = here.map(p=>{
+      const cls = (sid==='clinical-review' || p.flags.length) ? 'flag' : (p.status==='screening' ? 'in' : '');
+      const tag = sid==='clinical-review' ? 'Flagged' : (p.status==='screening' ? 'In station' : 'Waiting');
+      return '<li><button type="button" class="chip '+cls+'" data-act="work-resume" data-id="'+p.id+'">'
+        + '<span class="av" aria-hidden="true">'+initials(p.name)+'</span>'
+        + '<span class="who"><b>'+esc(p.name)+'</b><span>'+esc(p.queue)+' · '+esc(p.code)+'</span></span>'
+        + '<span class="tag">'+tag+'</span></button></li>';
+    }).join('');
+    return '<section class="col" aria-label="'+ST_NAME(sid)+'">'
+      + '<div class="col-h"><h3>'+ST_NAME(sid)+'</h3><span class="n">'+here.length+'</span></div>'
+      + '<div class="col-stat">'+(sf?'<span class="ok">● Open</span>':'<span class="warn">▲ No staff assigned</span>')
+      + '<span style="color:var(--muted)">· longest wait '+(here.length?(6+here.length*2)+' min':'—')+'</span></div>'
+      + '<div class="col-staff">'+(sf?'<b>'+esc(sf.name)+'</b> · '+ROLES[sf.role]:'Assign a worker from People')+'</div>'
+      + '<ul class="col-chips">'+(chips||'<li class="col-empty">Queue clear</li>')+'</ul>'
+      + '</section>';
+  }).join('');
+
+  const duty = e.staffIds.map(id=>{ const s=st(id); if(!s) return '';
+    const stn = Object.keys(e.stationStaff).find(k=>e.stationStaff[k]===id);
+    return '<li><span><b>'+esc(s.name)+'</b> <span class="r">· '+ROLES[s.role]+'</span></span><span class="stn">'+(stn?ST_NAME(stn):'Floating')+'</span></li>';
+  }).join('');
+  const inc = ps.filter(p=>p.incomplete);
+  const incRows = inc.map(p=>'<li><span><b>'+esc(p.name)+'</b> <span class="r">· '+esc(p.queue)+'</span><br><span class="why">▲ '+esc(p.why||'Incomplete record')+'</span></span>'
+    + '<button type="button" class="btn-text" data-act="work-resume" data-id="'+p.id+'" data-step="record">Resume</button></li>').join('');
+
+  c.innerHTML =
+      '<div class="work-top"><button type="button" class="btn-text" data-act="live-back">← All events</button>'
+    + '<div style="flex:1"></div>'+(S.dry?'<span class="st st-dry">Dry run — simulated participants</span>':'')+'</div>'
+    + '<div class="live-head"><div class="row1">'
+    +   '<h1>'+esc(e.name)+'</h1>'
+    +   (S.dry?'<span class="st st-dry">Dry run</span>':evStatusChip(e.status))
+    +   '<span class="meta">'+esc(e.venue)+' · '+fmtD(e.date)+' · '+e.start+'–'+e.end+'</span>'
+    +   '<div class="sp"></div>'
+    +   '<button type="button" class="btn btn-sec" data-act="ev-summary" data-id="'+e.id+'">Event summary</button>'
+    +   '<button type="button" class="btn btn-sec" data-nav="review">Clinical review ('+rv+')</button>'
+    +   '<button type="button" class="btn btn-pri" data-act="live-scan">Scan participant QR</button>'
+    + '</div>'
+    + '<div class="live-ready">'
+    +   '<span>Stations staffed <b>'+staffed+'/'+e.stations.length+'</b></span>'
+    +   '<span>Staff confirmed <b>'+e.staffConfirmed+'/'+e.staffIds.length+'</b></span>'
+    +   '<span>Registration <b>'+(e.reg.onsite?'open':'pre-registered only')+'</b></span>'
+    +   '<span>Sync <b>'+(S.connected?'connected':'offline — saving locally')+'</b></span>'
+    + '</div></div>'
+    + (alerts.length?'<div class="alerts">'+alerts.slice(0,3).map(a=>'<div class="alert">'+ic('alert')+'<span>'+a.h+'</span><span class="sp"></span>'+(a.a?'<button type="button" class="btn-text" data-nav="'+a.a+'">'+a.l+'</button>':'')+'</div>').join('')+'</div>':'')
+    + '<ol class="chain" aria-label="Participant stages">'
+    +   '<li><b>'+e.registered+'</b><span>Registered</span></li>'
+    +   '<li><b>'+cnt('waiting')+'</b><span>Waiting</span></li>'
+    +   '<li class="hot"><b>'+cnt('screening')+'</b><span>Screening</span></li>'
+    +   '<li class="branch"><b>'+cnt('review')+'</b><span>Clinical review</span></li>'
+    +   '<li class="okseg"><b>'+(e.completedBase + cnt('completed'))+'</b><span>Completed</span></li>'
+    +   '<li class="branch"><b>'+(e.followupBase + cnt('followup'))+'</b><span>Follow-up</span></li>'
+    + '</ol>'
+    + '<div class="board">'+cols+'</div>'
+    + '<div class="live-lower">'
+    +   '<div class="panel"><div class="panel-h"><h3>Staff on duty</h3><span class="n">'+e.staffIds.length+'</span></div><div class="panel-b"><ul class="duty">'+duty+'</ul></div></div>'
+    +   '<div class="panel"><div class="panel-h"><h3>Incomplete records</h3><span class="n">'+inc.length+'</span></div><div class="panel-b">'
+    +   (inc.length?'<ul class="increc">'+incRows+'</ul>':'<p style="font-size:12.5px;color:var(--muted);padding:8px 0">No incomplete records — every participant is moving through stations.</p>')
+    +   '</div></div>'
+    + '</div>';
+}
+/* ── VIEW 7 · Participant work mode ──────────────────────────── */
+const FORMS = {
+  'registration':{title:'Registration & consent', fields:[
+    {k:'consent',t:'check',label:'Consent form v3 confirmed and signed'},
+    {k:'verified',t:'check',label:'Identity and details verified'},
+    {k:'assist',t:'select',label:'Mobility assistance',opts:['None','Wheelchair access','Guide required']}]},
+  'visual-acuity':{title:'Visual acuity — distance', fields:[
+    {k:'right',t:'select',label:'Right eye',opts:ACUITY},
+    {k:'left',t:'select',label:'Left eye',opts:ACUITY},
+    {k:'corr',t:'select',label:'Correction',opts:['Without correction','With glasses or lenses']},
+    {k:'notes',t:'textarea',label:'Notes (optional)'}],
+    flag:v=> (ACUITY.indexOf(v.right)>=3 || ACUITY.indexOf(v.left)>=3) ? 'Distance acuity crossed the review threshold (R '+v.right+' · L '+v.left+')' : null},
+  'refraction':{title:'Refraction — autorefractor', fields:[
+    {k:'rs',t:'number',label:'R sphere (D)',step:'0.25',ph:'−1.25'},{k:'rc',t:'number',label:'R cyl (D)',step:'0.25',ph:'−0.50'},{k:'ra',t:'number',label:'R axis (°)',step:'1',ph:'175'},
+    {k:'ls',t:'number',label:'L sphere (D)',step:'0.25',ph:'−1.00'},{k:'lc',t:'number',label:'L cyl (D)',step:'0.25',ph:'−0.25'},{k:'la',t:'number',label:'L axis (°)',step:'1',ph:'010'}],
+    flag:v=> (Math.abs(+v.rs)>=4 || Math.abs(+v.ls)>=4) ? 'High refractive error — reviewer assessment advised' : null},
+  'colour-vision':{title:'Colour vision — Ishihara plates', fields:[
+    {k:'plates',t:'number',label:'Plates correct (0–14)',step:'1',ph:'13'}],
+    flag:v=> (+v.plates<10) ? 'Colour vision below the screening threshold ('+v.plates+'/14)' : null},
+  'eye-health':{title:'Eye health — anterior check', fields:[
+    {k:'lids',t:'select',label:'Lids and lashes',opts:['Normal','Abnormal','Not assessed']},
+    {k:'conj',t:'select',label:'Conjunctiva',opts:['Normal','Abnormal','Not assessed']},
+    {k:'cornea',t:'select',label:'Cornea',opts:['Normal','Abnormal','Not assessed']},
+    {k:'iris',t:'select',label:'Iris and pupil',opts:['Normal','Abnormal','Not assessed']},
+    {k:'notes',t:'textarea',label:'Notes (optional)'}],
+    flag:v=> ['lids','conj','cornea','iris'].some(k=>v[k]==='Abnormal') ? 'Anterior eye health observation — reviewer assessment advised' : null}
+};
+function renderWork(){
+  const c = $('#view-work');
+  const e = ctxEvent();
+  const w = S.work || {pid:null, step:'scan'};
+  const p = w.pid ? pt(w.pid) : null;
+  const steps = [['scan','Scan'],['confirm','Confirm'],['record','Record results'],['handoff','Handoff']];
+  const si = steps.findIndex(s=>s[0]===w.step);
+  const stepper = steps.map((s,i)=>'<li class="'+(i<si?'done':(i===si?'cur':''))+'"><span class="sn">'+(i<si?'✓':i+1)+'</span>'+s[1]+'</li>').join('');
+
+  const lastRec = w.lastRecordId ? S.records.find(r=>r.id===w.lastRecordId) : null;
+  const aside = p
+    ? '<div class="wl">Participant</div><h2>'+esc(p.name)+'</h2>'
+      + '<span class="code">'+esc(p.code)+(p.dry?' · TEST':'')+'</span>'
+      + '<span class="qbig"><b>'+esc(p.queue)+'</b> · '+p.age+' yrs · '+p.sex+'</span>'
+      + '<div class="evline">'+esc(e?e.name:'')+'<br>'+(p.station?'Current station: <b>'+ST_NAME(p.station)+'</b>':'All stations complete')+'</div>'
+      + (lastRec?'<div class="syncrow">'+syncChip(lastRec.state)+'</div>':'')
+    : '<div class="wl">Participant</div><h2 style="color:var(--faint)">No one selected</h2>'
+      + '<p style="font-size:12.5px;color:var(--muted)">Scan a QR pass to pull up the next participant. '+activeList().filter(x=>x.status==='waiting').length+' people are waiting.</p>';
+
+  let main = '';
+  if(w.step==='scan'){
+    main = '<h2>Scan participant QR pass</h2>'
+      + '<p class="lead">The pass contains a check-in token only — it never holds clinical information.</p>'
+      + '<div class="scanbox"><div class="qrview" aria-label="Scanner viewport">'
+      +   '<span class="corner c1"></span><span class="corner c2"></span><span class="corner c3"></span><span class="corner c4"></span>'
+      +   '<div class="hint">Point the device camera at the participant’s QR event pass</div></div>'
+      + '<div class="scanside">'
+      +   '<button type="button" class="btn btn-pri" data-act="work-sim">Simulate scan</button>'
+      +   '<form id="manual-form" class="manual"><input id="manual-code" placeholder="VSMS-260731-005 or Q05" aria-label="Enter code manually">'
+      +   '<button type="submit" class="btn btn-sec">Look up</button></form>'
+      +   '<div class="note">Camera unavailable? Enter the code printed under the QR pass, or the participant’s queue number.</div>'
+      + '</div></div>';
+  }
+  if(w.step==='confirm' && p){
+    const done = new Set(p.done);
+    const trail = FLOW.map(sid=>'<li class="'+(done.has(sid)?'done':(p.station===sid?'cur':''))+'"><span class="tdot"></span>'+ST_NAME(sid)+'</li>').join('')
+      + (p.flags.length?'<li class="cur" style="color:var(--warn);border-color:#E7D3AC;background:var(--warn-tint)"><span class="tdot"></span>Clinical review</li>':'');
+    main = '<h2>Confirm participant and event</h2>'
+      + '<div class="confirm-ev">'+ic('check')+' Correct event — <b>'+esc(e?e.name:'')+'</b> · '+fmtD(e?e.date:'')+' · this pass is valid for today</div>'
+      + '<div class="rd-sec"><h3>Station progress — completed · current · next</h3><ul class="trail">'+trail+'</ul></div>'
+      + '<p class="lead">Check the name, age and queue number with the participant before recording anything.</p>'
+      + '<div class="btn-row"><button type="button" class="btn btn-pri" data-act="work-confirm">Confirm — this is '+esc(p.name.split(' ')[0])+'</button>'
+      + '<button type="button" class="btn btn-sec" data-act="work-rescan">Wrong person — scan again</button></div>';
+  }
+  if(w.step==='record' && p){
+    const def = FORMS[p.station] || FORMS['registration'];
+    const fields = def.fields.map(f=>{
+      if(f.t==='check') return '<label class="check" style="grid-column:1/-1"><input type="checkbox" name="'+f.k+'" value="yes"> '+f.label+'</label>';
+      if(f.t==='select') return '<div class="field"><label for="wf-'+f.k+'">'+f.label+'</label><select id="wf-'+f.k+'" name="'+f.k+'" class="sel" style="width:100%">'+f.opts.map(o=>'<option>'+o+'</option>').join('')+'</select></div>';
+      if(f.t==='number') return '<div class="field"><label for="wf-'+f.k+'">'+f.label+'</label><input id="wf-'+f.k+'" name="'+f.k+'" type="number" step="'+(f.step||'1')+'" placeholder="'+(f.ph||'')+'" required></div>';
+      return '<div class="field" style="grid-column:1/-1"><label for="wf-'+f.k+'">'+f.label+'</label><textarea id="wf-'+f.k+'" name="'+f.k+'"></textarea></div>';
+    }).join('');
+    main = '<h2>'+def.title+'</h2>'
+      + '<p class="lead">Station: <b>'+ST_NAME(p.station)+'</b> · results save on this device first, then sync. Screening thresholds route exceptions to clinical review automatically.</p>'
+      + '<form id="work-form" class="form" style="max-width:none"><div id="wf-err" class="flagbox" hidden role="alert"></div>'
+      + '<div class="frow">'+fields+'</div>'
+      + '<div class="savedline">'+syncChip(S.connected?'pending':'saved-offline')+'<span style="color:var(--muted);font-size:12px">'+(S.connected?'Connected — will sync after save':'Offline — saves stay on this device until you reconnect')+'</span></div>'
+      + '<div class="btn-row"><button type="submit" class="btn btn-pri">Save result</button>'
+      + '<button type="button" class="btn btn-sec" data-act="work-rescan">Cancel — back to scan</button></div></form>';
+  }
+  if(w.step==='handoff' && p){
+    const res = p.lastResult;
+    const flagged = !!p.lastFlag;
+    const next = p.station ? ST_NAME(p.station) : null;
+    const nextTxt = flagged
+      ? ['Clinical review','Flagged for reviewer assessment — the record is now in the review queue. A screening flag is not a diagnosis.']
+      : next ? [next,'Send the participant to the '+next+' station. The next worker scans the same QR pass to continue.']
+             : ['Screening complete','All stations are done. Thank the participant — any letters follow after review.'];
+    main = '<h2>Result saved</h2>'
+      + '<div class="savedline">'+(lastRec?syncChip(lastRec.state):'')+'<span style="color:var(--muted);font-size:12px">'+(lastRec?esc(lastRec.detail):'')+'</span></div>'
+      + (flagged?'<div class="flagbox"><b>Flagged for reviewer assessment.</b> '+esc(p.lastFlag)+' The final decision is always made by a reviewer.</div>':'')
+      + (res?'<div class="resblock"><div class="resblock-h">'+ST_NAME(res.station)+'<span class="when">'+res.at+'</span></div><dl class="resgrid">'+res.vals.map(v=>'<div><dt>'+esc(v[0])+'</dt><dd class="'+(v[2]?'fl':'')+'">'+esc(v[1])+'</dd></div>').join('')+'</dl></div>':'')
+      + '<div class="handoff-next"><span class="hl">Next</span><span class="hv">'+nextTxt[0]+'</span><span class="hs">'+nextTxt[1]+'</span></div>'
+      + '<div class="btn-row"><button type="button" class="btn btn-pri" data-act="work-next">Scan next participant</button>'
+      + '<button type="button" class="btn btn-sec" data-act="work-board">Back to event board</button></div>';
+  }
+
+  c.innerHTML =
+      '<div class="work-top"><button type="button" class="btn-text" data-act="work-board">← Event board</button>'
+    + '<ol class="stepper" aria-label="Participant workflow steps">'+stepper+'</ol></div>'
+    + '<div class="work"><aside class="wid" aria-label="Participant identity">'+aside+'</aside>'
+    + '<section class="wmain">'+main+'</section></div>';
+}
+function workScanPick(){
+  const list = activeList().filter(p=>p.status==='waiting').sort((a,b)=>a.queue.localeCompare(b.queue));
+  if(!list.length){ toast('Queue is clear — no one is waiting to be scanned'); return; }
+  S.work = {pid:list[0].id, step:'confirm'};
+  render();
+}
+function workLookup(code){
+  const q = code.trim().toUpperCase();
+  if(!q) return;
+  const p = activeList().find(x=>x.code.toUpperCase()===q || x.queue.toUpperCase()===q);
+  if(!p){ toast('No participant matches “'+code+'” at this event','bad'); return; }
+  if(['completed','followup'].includes(p.status)){ toast(p.name+' has already completed this event','warn'); return; }
+  S.work = {pid:p.id, step:'confirm'};
+  render();
+}
+function saveWorkResult(f){
+  const p = pt(S.work.pid); if(!p) return;
+  const station = p.station || 'registration';
+  const def = FORMS[station] || FORMS['registration'];
+  const fd = new FormData(f);
+  const v = {};
+  def.fields.forEach(fl=>{ v[fl.k] = fl.t==='check' ? (fd.get(fl.k)?'yes':'') : (fd.get(fl.k)||'').toString(); });
+  const err = $('#wf-err');
+  const missingNum = def.fields.filter(fl=>fl.t==='number' && v[fl.k]==='').map(fl=>fl.label);
+  if(missingNum.length){ err.hidden=false; err.innerHTML='<b>Check the form:</b> missing '+missingNum.join(', ')+'.'; return; }
+  if(station==='registration' && (!v.consent || !v.verified)){ err.hidden=false; err.innerHTML='<b>Check the form:</b> consent and identity must be confirmed before check-in.'; return; }
+  const flagText = def.flag ? def.flag(v) : null;
+  const labelOf = k => (def.fields.find(x=>x.k===k)||{}).label || k;
+  let vals = [];
+  if(station==='visual-acuity') vals = [['Right eye',v.right,ACUITY.indexOf(v.right)>=3],['Left eye',v.left,ACUITY.indexOf(v.left)>=3],['Correction',v.corr]];
+  else if(station==='refraction') vals = [['Right',(v.rs||'0')+' / '+(v.rc||'0')+' × '+(v.ra||'0'),Math.abs(+v.rs)>=4],['Left',(v.ls||'0')+' / '+(v.lc||'0')+' × '+(v.la||'0'),Math.abs(+v.ls)>=4]];
+  else if(station==='colour-vision') vals = [['Plates correct',v.plates+' / 14',+v.plates<10]];
+  else if(station==='eye-health') vals = [['Lids and lashes',v.lids,v.lids==='Abnormal'],['Conjunctiva',v.conj,v.conj==='Abnormal'],['Cornea',v.cornea,v.cornea==='Abnormal'],['Iris and pupil',v.iris,v.iris==='Abnormal']];
+  else vals = [['Consent',v.consent?'Form v3 signed':'Not confirmed'],['Details',v.verified?'Verified':'Not verified'],['Assistance',v.assist||'None']];
+  if(v.notes) vals.push(['Notes', v.notes]);
+
+  p.results[station] = {vals:vals, at:nowT(), flagged:!!flagText};
+  if(!p.done.includes(station)) p.done.push(station);
+  p.lastResult = {station:station, vals:vals, at:nowT()};
+  p.lastFlag = flagText || null;
+  p.incomplete = false; delete p.why;
+  const idx = FLOW.indexOf(station);
+  const nextSt = FLOW[idx+1] || null;
+  if(flagText){ p.flags.push(flagText); p.status='review'; p.station='clinical-review'; p.wait='0 min'; }
+  else if(nextSt){ p.station=nextSt; p.status='waiting'; }
+  else { p.station=null; p.status='completed'; }
+
+  const rec = {who:p.name, code:p.code, type:'Screening result', station:ST_NAME(station), at:nowT()};
+  addRecord(rec);
+  S.work.step = 'handoff';
+  S.work.lastRecordId = rec.id;
+  toast(flagText ? 'Result saved — flagged for reviewer assessment' : 'Result saved on this device');
+  render();
+}
+/* ── Dry run ─────────────────────────────────────────────────── */
+function drySeed(evId){
+  const mk = (id,name,age,sex,q,status,station,done)=>({id:id,eventId:evId,name:name,age:age,sex:sex,code:'DRY-'+q,queue:q,status:status,station:station,done:done,results:{},flags:[],missing:[],wait:'2 min',dry:true});
+  return [
+    mk('tp1','Test Participant A',45,'F','T01','waiting','visual-acuity',['registration']),
+    mk('tp2','Test Participant B',61,'M','T02','waiting','registration',[]),
+    mk('tp3','Test Participant C',38,'F','T03','waiting','refraction',['registration','visual-acuity']),
+    mk('tp4','Test Participant D',55,'M','T04','waiting','eye-health',['registration','visual-acuity','refraction','colour-vision'])
+  ];
+}
+function startDryRun(id){
+  const e = ev(id); if(!e) return;
+  S.dry = {eventId:id};
+  S.dryParticipants = drySeed(id);
+  S.work = null;
+  toast('Dry run started — rehearse freely, live data is untouched');
+  setView('live');
+}
+function exitDryRun(){
+  openModal('Exit dry run?',
+      '<p>Everything recorded in this dry run is <b>test data</b> and will be discarded. Live event data is unchanged.</p>',
+    '<button type="button" class="btn btn-sec" data-act="overlay-close">Stay in dry run</button>'
+    + '<button type="button" class="btn btn-pri" data-act="dry-exit-do">Exit and discard test data</button>');
+}
+function doExitDry(){
+  S.dry = null;
+  S.dryParticipants = [];
+  S.records = S.records.filter(r=>!r.dry);
+  S.work = null;
+  closeOverlay();
+  toast('Dry run ended — test data discarded');
+  setView('events');
+}
+
+/* ── Master render ───────────────────────────────────────────── */
+function render(){
+  renderTop(); renderBars();
+  VIEWS.forEach(v=>{ $('#view-'+v).hidden = v!==S.view; });
+  ({events:renderEvents, people:renderPeople, review:renderReview, sync:renderSync,
+    settings:renderSettings, live:renderLive, work:renderWork})[S.view]();
+  persist();
+}
+
+/* ── Action delegation ───────────────────────────────────────── */
+document.addEventListener('click', e=>{
+  const ovl = e.target.classList && e.target.classList.contains('ovl');
+  if(ovl){ closeOverlay(); return; }
+  const nav = e.target.closest('[data-nav]');
+  if(nav){ closeOverlay(); go(nav.dataset.nav); return; }
+  const t = e.target.closest('[data-act]');
+  if(!t) return;
+  const act = t.dataset.act, id = t.dataset.id;
+  switch(act){
+    /* shell */
+    case 'conn-toggle': toggleConn(); break;
+    case 'role': break; /* handled on change */
+    case 'overlay-close': closeOverlay(); break;
+    case 'reset':
+      openModal('Reset the prototype?',
+        '<p>All events, staff, participants and sync records return to the original fictional seed data. Anything you changed is discarded.</p>',
+        '<button type="button" class="btn btn-sec" data-act="overlay-close">Cancel</button>'
+        + '<button type="button" class="btn btn-danger-solid" data-act="reset-do">Reset everything</button>');
+      break;
+    case 'reset-do': localStorage.removeItem(KEY); location.reload(); break;
+    /* events */
+    case 'ev-create': if(canManage()) openEditor({}); break;
+    case 'ev-edit': if(canManage()) openEditor({id:id}); break;
+    case 'ev-dup': if(canManage()) openEditor({dupFrom:id}); break;
+    case 'ev-del': if(canManage()) deleteEvent(id); break;
+    case 'del-do': {
+      const e2 = ev(id);
+      S.events = S.events.filter(x=>x.id!==id);
+      if(S.liveEventId===id) S.liveEventId = S.events.length?S.events[0].id:null;
+      closeOverlay(); toast('Deleted “'+(e2?e2.name:'event')+'”'); render(); break;
+    }
+    case 'ev-start': {
+      const e2 = ev(id); if(!e2) break;
+      e2.status = 'live'; S.liveEventId = id;
+      toast('Event is live — the dashboard is open'); setView('live'); break;
+    }
+    case 'ev-open': S.liveEventId = id; go('live'); break;
+    case 'ev-summary': openSummary(id); break;
+    case 'ev-dry': startDryRun(id); break;
+    case 'ev-clear': S.ui.evQ=''; S.ui.evStatus='all'; S.ui.evScope='all'; render(); break;
+    case 'ev-fstatus': S.ui.evStatus = t.dataset.v; render(); break;
+    /* people */
+    case 'ppl-approve': { const s=st(id); if(s){ s.status='active'; s.last='Approved just now'; toast(s.name+' approved — they can sign in'); render(); } break; }
+    case 'ppl-reject': { const s=st(id); if(s){ S.staff = S.staff.filter(x=>x.id!==id); toast(s.name+' rejected — invitation withdrawn'); render(); } break; }
+    case 'ppl-invite':
+      openModal('Invite staff member',
+        '<form id="invite-form" class="form">'
+        + '<div class="field"><label for="iv-name">Full name</label><input id="iv-name" name="name" required placeholder="e.g. Rita Kapoor"></div>'
+        + '<div class="field"><label for="iv-email">Email</label><input id="iv-email" name="email" type="email" required placeholder="name@vsms.example"></div>'
+        + '<div class="field"><label for="iv-role">Role</label><select id="iv-role" name="role" class="sel" style="width:100%">'
+        + Object.entries(ROLES).map(([k,v])=>'<option value="'+k+'">'+v+'</option>').join('')+'</select></div></form>',
+        '<button type="button" class="btn btn-sec" data-act="overlay-close">Cancel</button>'
+        + '<button type="button" class="btn btn-pri" data-act="invite-do">Send invitation</button>');
+      break;
+    case 'invite-do': {
+      const f = $('#invite-form'); if(!f) break;
+      const fd = new FormData(f);
+      const nm = (fd.get('name')||'').toString().trim(), em = (fd.get('email')||'').toString().trim();
+      if(!nm || !em){ toast('Name and email are required','warn'); break; }
+      S.staff.unshift({id:'s'+(++S.seq.s), name:nm, email:em, role:fd.get('role'), status:'pending', eventId:null, perms:['screen'], last:'Invited just now'});
+      closeOverlay(); toast('Invitation sent — '+nm+' is pending approval'); render(); break;
+    }
+    case 'ppl-import':
+      openModal('Import staff',
+        '<p style="font-size:12.5px;color:var(--muted)">One per line: name, email, role. Imported staff arrive as <b>pending</b> and still need approval.</p>'
+        + '<form id="import-form" class="form"><div class="field"><label for="im-text">Staff list</label>'
+        + '<textarea id="im-text" name="list">Jo Carter, j.carter@vsms.example, Screener\nRuth Osei, r.osei@vsms.example, Registration Officer</textarea></div></form>',
+        '<button type="button" class="btn btn-sec" data-act="overlay-close">Cancel</button>'
+        + '<button type="button" class="btn btn-pri" data-act="import-do">Import as pending</button>');
+      break;
+    case 'import-do': {
+      const f = $('#import-form'); if(!f) break;
+      const lines = (new FormData(f).get('list')||'').toString().split('\n').map(x=>x.trim()).filter(Boolean);
+      const roleKey = r => { const k = Object.keys(ROLES).find(k=>ROLES[k].toLowerCase()===r.toLowerCase()); return k || 'SCREENER'; };
+      lines.forEach(L=>{ const [nm,em,rl] = L.split(',').map(x=>x.trim());
+        if(nm && em) S.staff.unshift({id:'s'+(++S.seq.s), name:nm, email:em, role:roleKey(rl||''), status:'pending', eventId:null, perms:['screen'], last:'Imported just now'}); });
+      closeOverlay(); toast(lines.length+' staff imported as pending approval'); render(); break;
+    }
+    case 'ppl-assign': openAssign(id); break;
+    case 'assign-save': {
+      const s = st(id); if(!s) break;
+      const eId = $('#as-ev').value, role = $('#as-role').value, stn = $('#as-stn').value;
+      S.events.forEach(x=>{ Object.keys(x.stationStaff).forEach(k=>{ if(x.stationStaff[k]===s.id) x.stationStaff[k]=null; }); });
+      s.eventId = eId; s.role = role;
+      const ee = ev(eId);
+      if(ee && stn && ee.stations.includes(stn)) ee.stationStaff[stn] = s.id;
+      closeOverlay(); toast(s.name+' assigned — '+ROLES[role]+(stn?' at '+ST_NAME(stn):'')); render(); break;
+    }
+    case 'ppl-perms': openPerms(id); break;
+    case 'perms-save': {
+      const s = st(id); if(!s) break;
+      s.perms = Array.from(document.querySelectorAll('#overlay-root input[name="perm"]:checked')).map(x=>x.value);
+      closeOverlay(); toast('Permissions saved for '+s.name); render(); break;
+    }
+    case 'ppl-deact': {
+      const s = st(id); if(!s) break;
+      openModal('Deactivate access?',
+        '<div class="del-summary"><b>'+esc(s.name)+'</b><span>'+esc(s.email)+' · '+ROLES[s.role]+'</span></div>'
+        + '<p>They will no longer be able to sign in or be assigned to events. Their recorded work is kept.</p>',
+        '<button type="button" class="btn btn-sec" data-act="overlay-close">Keep active</button>'
+        + '<button type="button" class="btn btn-danger-solid" data-act="deact-do" data-id="'+s.id+'">Deactivate</button>');
+      break;
+    }
+    case 'deact-do': { const s=st(id); if(s){ s.status='deactivated'; s.last='Deactivated just now'; closeOverlay(); toast(s.name+' deactivated'); render(); } break; }
+    case 'ppl-react': { const s=st(id); if(s){ s.status='active'; s.last='Reactivated just now'; toast(s.name+' reactivated'); render(); } break; }
+    /* review */
+    case 'rev-select': S.reviewSel = id; render(); break;
+    case 'rev-finalise': finaliseReview(id); break;
+    /* sync */
+    case 'sync-retry': retryRecord(id); break;
+    case 'sync-keep': resolveConflict(id, t.dataset.keep); break;
+    case 'sync-now': syncNow(); break;
+    /* live + work */
+    case 'live-back': setView('events'); break;
+    case 'live-scan': S.work = {pid:null, step:'scan'}; setView('work'); break;
+    case 'work-resume': S.work = {pid:id, step:(t.dataset.step==='record'?'record':'confirm')}; setView('work'); break;
+    case 'work-sim': workScanPick(); break;
+    case 'work-confirm': if(S.work){ S.work.step='record'; render(); } break;
+    case 'work-rescan': S.work = {pid:null, step:'scan'}; render(); break;
+    case 'work-next': S.work = {pid:null, step:'scan'}; render(); break;
+    case 'work-board': S.work = null; setView('live'); break;
+    /* dry run */
+    case 'dry-exit': exitDryRun(); break;
+    case 'dry-exit-do': doExitDry(); break;
+  }
+});
+document.addEventListener('input', e=>{
+  const t = e.target.closest('[data-act-input]'); if(!t) return;
+  S.ui[t.dataset.actInput] = t.value;
+  render();
+  const el = document.querySelector('[data-act-input="'+t.dataset.actInput+'"]');
+  if(el){ el.focus(); el.setSelectionRange(el.value.length, el.value.length); }
+});
+document.addEventListener('change', e=>{
+  const t = e.target.closest('[data-act-change]'); if(!t) return;
+  switch(t.dataset.actChange){
+    case 'role': S.role = t.value; toast('Viewing as '+ROLES[S.role]); render(); break;
+    case 'evScope': case 'evSort': case 'pplRole': case 'pplStatus':
+      S.ui[t.dataset.actChange] = t.value; render(); break;
+    case 'del-check': { const b = $('#del-do'); if(b) b.disabled = !t.checked; break; }
+    case 'assign-role': { const ul = $('#as-can'); if(ul) ul.innerHTML = ROLE_CAN[t.value].map(x=>'<li>'+x+'</li>').join(''); break; }
+    case 'assign-ev': {
+      const ee = ev(t.value); const sel = $('#as-stn');
+      if(sel && ee) sel.innerHTML = ee.stations.map(x=>'<option value="'+x+'">'+ST_NAME(x)+'</option>').join('') || '<option value="">No stations on this event</option>';
+      break; }
+    case 'perm-prev': {
+      const ul = $('#perm-can'); if(!ul) break;
+      const on = Array.from(document.querySelectorAll('#overlay-root input[name="perm"]:checked')).map(x=>x.value);
+      ul.innerHTML = on.map(k=>{ const p=PERMS.find(x=>x[0]===k); return p?'<li>'+p[1]+'</li>':''; }).join('') || '<li>No permissions selected</li>';
+      break; }
+    case 'rev-dec': {
+      const fin = $('#rev-fin'); if(fin) fin.disabled = false;
+      const ref = $('#rev-ref'); if(ref) ref.hidden = t.value!=='referral';
+      break; }
+  }
+});
+document.addEventListener('submit', e=>{
+  e.preventDefault();
+  if(e.target.id==='ev-form') saveEventForm(e.target);
+  if(e.target.id==='work-form') saveWorkResult(e.target);
+  if(e.target.id==='manual-form') workLookup($('#manual-code').value);
+});
+document.addEventListener('keydown', e=>{ if(e.key==='Escape') closeOverlay(); });
+
+/* ── Boot ────────────────────────────────────────────────────── */
+(function boot(){
+  const rs = $('#role-select');
+  rs.innerHTML = Object.entries(ROLES).map(([k,v])=>'<option value="'+k+'">'+v+'</option>').join('');
+  rs.value = S.role;
+  render();
+  if(S.connected){
+    let d = 600;
+    S.records.filter(r=>r.state==='pending').forEach(r=>{ setTimeout(()=>advanceRecord(r.id), d); d += 500; });
+  }
+})();
+</script>
+
+</body>
+</html>
