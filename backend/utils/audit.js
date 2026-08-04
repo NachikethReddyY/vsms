@@ -1,5 +1,5 @@
 const crypto = require("crypto");
-const { v4: uuidv4 } = require("uuid");
+const { v4: uuidv4, validate: isUuid } = require("uuid");
 const prisma = require("../prisma/prismaClient");
 const { sanitizeMetadata } = require("./sanitize");
 
@@ -19,12 +19,37 @@ function hashIdentifier(identifier) {
     return crypto.createHash("sha256").update(identifier.toLowerCase()).digest("hex");
 }
 
-async function resolveAuditContext({ userId, context, client = prisma }) {
+async function resolveAuditContext({ userId, context, client = prisma, enrollDevice = false }) {
     const requestedDeviceId = typeof context === "object" ? context?.deviceId : null;
-    const device = requestedDeviceId && userId ? await client.device.findFirst({
-        where: { id: requestedDeviceId, userId, status: "ACTIVE" },
-        select: { id: true },
-    }) : null;
+    let device = null;
+    if (requestedDeviceId && isUuid(requestedDeviceId) && userId) {
+        if (enrollDevice) {
+            const select = { id: true, userId: true, status: true };
+            device = await client.device.findUnique({ where: { id: requestedDeviceId }, select });
+            if (!device) {
+                try {
+                    device = await client.device.create({
+                        data: {
+                            id: requestedDeviceId,
+                            userId,
+                            deviceName: trimValue(context?.deviceName || "VSMS staff web", 100),
+                            lastSeenAt: new Date(),
+                        },
+                        select,
+                    });
+                } catch (error) {
+                    if (error?.code !== "P2002") throw error;
+                    device = await client.device.findUnique({ where: { id: requestedDeviceId }, select });
+                }
+            }
+            if (device?.userId !== userId || device?.status !== "ACTIVE") device = null;
+        } else {
+            device = await client.device.findFirst({
+                where: { id: requestedDeviceId, userId, status: "ACTIVE" },
+                select: { id: true },
+            });
+        }
+    }
     return {
         requestId: typeof context === "string" ? context : context?.requestId || null,
         deviceId: device?.id || null,
@@ -42,22 +67,12 @@ async function createAuthAuditLog({
     context,
     client = prisma,
 }) {
-    if (context.deviceId) {
-        await client.device.upsert({
-            where: { id: context.deviceId },
-            update: {
-                ...(userId ? { userId } : {}),
-                deviceName: trimValue(context.deviceName || "VSMS staff web", 100),
-                lastSeenAt: new Date(),
-            },
-            create: {
-                id: context.deviceId,
-                userId,
-                deviceName: trimValue(context.deviceName || "VSMS staff web", 100),
-                lastSeenAt: new Date(),
-            },
-        });
-    }
+    const auditContext = await resolveAuditContext({
+        userId,
+        context,
+        client,
+        enrollDevice: eventType === "LOGIN_SUCCESS" && outcome === "SUCCESS",
+    });
     return client.authAuditLog.create({
         data: {
             userId,
@@ -65,10 +80,10 @@ async function createAuthAuditLog({
             outcome,
             failureCategory: trimValue(failureCategory, 50),
             identifierHash: hashIdentifier(identifier),
-            ipAddress: context.ipAddress,
-            userAgent: trimValue(context.userAgent, 500),
-            requestId: context.requestId,
-            deviceId: context.deviceId,
+            ipAddress: auditContext.ipAddress,
+            userAgent: trimValue(context?.userAgent, 500),
+            requestId: auditContext.requestId,
+            deviceId: auditContext.deviceId,
         },
     });
 }

@@ -12,20 +12,30 @@ process.env.COGNITO_LOGOUT_URI = "https://localhost:5173";
 
 const app = require("../app");
 
-for (const route of ["logout", "global-logout"]) {
-    test(`${route} clears browser auth without requiring a valid access token`, async () => {
-        const response = await request(app)
-            .post(`/api/v1/auth/${route}`)
-            .set("Origin", "https://localhost:5173")
-            .set("Cookie", "vsms_csrf=test-token")
-            .set("X-CSRF-Token", "test-token")
-            .send({});
+test("logout clears browser auth without requiring a valid access token", async () => {
+    const response = await request(app)
+        .post("/api/v1/auth/logout")
+        .set("Origin", "https://localhost:5173")
+        .set("Cookie", "vsms_csrf=test-token")
+        .set("X-CSRF-Token", "test-token")
+        .send({});
 
-        assert.equal(response.status, 200);
-        assert.equal(response.body.logoutUrl, "https://vsms.auth.us-east-1.amazoncognito.com/logout?client_id=test-client&logout_uri=https%3A%2F%2Flocalhost%3A5173");
-        assert.ok(response.headers["set-cookie"].every((value) => value.includes("Max-Age=0")));
-    });
-}
+    assert.equal(response.status, 200);
+    assert.equal(response.body.logoutUrl, "https://vsms.auth.us-east-1.amazoncognito.com/logout?client_id=test-client&logout_uri=https%3A%2F%2Flocalhost%3A5173");
+    assert.ok(response.headers["set-cookie"].every((value) => value.includes("Max-Age=0")));
+});
+
+test("global logout requires an access session and still clears browser auth", async () => {
+    const response = await request(app)
+        .post("/api/v1/auth/global-logout")
+        .set("Origin", "https://localhost:5173")
+        .set("Cookie", "vsms_csrf=test-token")
+        .set("X-CSRF-Token", "test-token")
+        .send({});
+
+    assert.equal(response.status, 401);
+    assert.ok(response.headers["set-cookie"].every((value) => value.includes("Max-Age=0")));
+});
 
 test("logout does not clear cookies when CSRF validation rejects the request", async () => {
     const response = await request(app)
@@ -52,6 +62,50 @@ test("logout does not wait for Cognito global sign-out", async () => {
             .set("X-CSRF-Token", "test-token");
 
         assert.equal(response.status, 200);
+        assert.ok(response.headers["set-cookie"].every((value) => value.includes("Max-Age=0")));
+    } finally {
+        global.fetch = originalFetch;
+    }
+});
+
+test("global logout waits for Cognito revocation before confirming success", async () => {
+    const originalFetch = global.fetch;
+    let target;
+    global.fetch = async (_url, options) => {
+        target = options.headers["X-Amz-Target"];
+        return { ok: true, json: async () => ({}) };
+    };
+
+    try {
+        const response = await request(app)
+            .post("/api/v1/auth/global-logout")
+            .set("Origin", "https://localhost:5173")
+            .set("Cookie", "vsms_access=test-token; vsms_csrf=test-token")
+            .set("X-CSRF-Token", "test-token");
+
+        assert.equal(response.status, 200);
+        assert.equal(target, "AWSCognitoIdentityProviderService.GlobalSignOut");
+        assert.ok(response.headers["set-cookie"].every((value) => value.includes("Max-Age=0")));
+    } finally {
+        global.fetch = originalFetch;
+    }
+});
+
+test("global logout surfaces Cognito revocation failure after clearing browser auth", async () => {
+    const originalFetch = global.fetch;
+    global.fetch = async () => ({
+        ok: false,
+        json: async () => ({ __type: "InternalErrorException", message: "Unavailable" }),
+    });
+
+    try {
+        const response = await request(app)
+            .post("/api/v1/auth/global-logout")
+            .set("Origin", "https://localhost:5173")
+            .set("Cookie", "vsms_access=test-token; vsms_csrf=test-token")
+            .set("X-CSRF-Token", "test-token");
+
+        assert.equal(response.status, 502);
         assert.ok(response.headers["set-cookie"].every((value) => value.includes("Max-Age=0")));
     } finally {
         global.fetch = originalFetch;
