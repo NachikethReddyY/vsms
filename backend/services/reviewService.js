@@ -54,7 +54,10 @@ const compareQueueItems = (left, right) => {
   return left.participantDisplayName.localeCompare(right.participantDisplayName, undefined, { sensitivity: "base" });
 };
 
-const requireReviewerAccess = async (db, eventId, userId) => {
+const requireReviewerAccess = async (db, eventId, user) => {
+  if (user.roles?.includes("ADMINISTRATOR") || !user.roles?.includes("REVIEWER")) {
+    throw new AppError(403, "REVIEWER_ROLE_REQUIRED", "A reviewer account role is required");
+  }
   const event = await db.event.findUnique({
     where: { eventId },
     select: { eventId: true, name: true, venue: true, timezone: true, status: true },
@@ -64,13 +67,14 @@ const requireReviewerAccess = async (db, eventId, userId) => {
     throw new AppError(409, "EVENT_NOT_IN_PROGRESS", "Clinical review is available only while the event is in progress");
   }
 
+  const now = new Date();
   const assignment = await db.staffAssignment.findFirst({
     where: {
       eventId,
-      userId,
+      userId: user.userId,
       assignmentRole: "REVIEWER",
       status: { in: ACTIVE_ASSIGNMENT_STATUSES },
-      shift: { eventId, status: "ACTIVE" },
+      shift: { eventId, status: "ACTIVE", startsAt: { lte: now }, endsAt: { gt: now } },
     },
     select: { id: true },
   });
@@ -110,7 +114,7 @@ const displayName = (registration) => registration.participantDisplayName
   || "Unnamed participant";
 
 const listQueue = async (eventId, user) => {
-  const event = await requireReviewerAccess(prisma, eventId, user.userId);
+  const event = await requireReviewerAccess(prisma, eventId, user);
   const stations = await activeStations(prisma, eventId);
   if (stations.length === 0) return { event, queue: [] };
   const stationIds = stations.map((station) => station.stationId);
@@ -161,6 +165,7 @@ const loadRegistration = async (db, eventId, registrationId, stations) => {
       participant: {
         select: {
           nric: true,
+          nricMasked: true,
           firstName: true,
           lastName: true,
           dateOfBirth: true,
@@ -189,6 +194,17 @@ const loadRegistration = async (db, eventId, registrationId, stations) => {
               instructions: true,
               urgency: true,
               status: true,
+              signedAt: true,
+              documentArtifacts: {
+                orderBy: { generatedAt: "desc" },
+                take: 1,
+                select: { documentId: true, version: true, generatedAt: true },
+              },
+              notificationDeliveries: {
+                orderBy: { createdAt: "desc" },
+                take: 1,
+                select: { id: true, status: true, recipient: true, providerMessageId: true, failureReason: true, sentAt: true, attemptCount: true },
+              },
             },
           },
         },
@@ -206,7 +222,7 @@ const serializeReview = (review) => review ? {
   recommendations: review.recommendations,
   reviewedAt: review.reviewedAt,
   reviewedByName: review.reviewer.fullName,
-  referral: review.referrals[0] || null,
+  referral: serializeReferral(review.referrals[0]),
 } : null;
 
 const serializeReferral = (referral) => referral ? {
@@ -216,6 +232,17 @@ const serializeReferral = (referral) => referral ? {
   instructions: referral.instructions,
   urgency: referral.urgency,
   status: referral.status,
+  signedAt: referral.signedAt,
+  document: referral.documentArtifacts?.[0] || null,
+  delivery: referral.notificationDeliveries?.[0] ? {
+    deliveryId: referral.notificationDeliveries[0].id,
+    status: referral.notificationDeliveries[0].status,
+    recipient: referral.notificationDeliveries[0].recipient,
+    providerMessageId: referral.notificationDeliveries[0].providerMessageId,
+    failureReason: referral.notificationDeliveries[0].failureReason,
+    sentAt: referral.notificationDeliveries[0].sentAt,
+    attemptCount: referral.notificationDeliveries[0].attemptCount,
+  } : null,
 } : null;
 
 const buildDetail = (event, stations, registration) => {
@@ -228,7 +255,7 @@ const buildDetail = (event, stations, registration) => {
       participantDisplayName: displayName(registration),
       queueNumber: registration.queueNumber,
       registrationStatus: registration.registrationStatus,
-      maskedNric: `••••${String(registration.participant.nric).slice(-4)}`,
+      maskedNric: registration.participant.nricMasked || `••••${String(registration.participant.nric || "").slice(-4)}`,
       dateOfBirth: registration.participant.dateOfBirth.toISOString().slice(0, 10),
       gender: registration.participant.gender,
     },
@@ -252,7 +279,7 @@ const buildDetail = (event, stations, registration) => {
 };
 
 const getDetail = async (eventId, registrationId, user) => {
-  const event = await requireReviewerAccess(prisma, eventId, user.userId);
+  const event = await requireReviewerAccess(prisma, eventId, user);
   const stations = await activeStations(prisma, eventId);
   const registration = await loadRegistration(prisma, eventId, registrationId, stations);
   if (!registration) throw new AppError(404, "REGISTRATION_NOT_FOUND", "Registration not found");
@@ -269,7 +296,7 @@ const recordDecision = async (eventId, registrationId, decision, user, ipAddress
   const userId = user.userId;
   try {
     return await prisma.$transaction(async (tx) => {
-      await requireReviewerAccess(tx, eventId, userId);
+      await requireReviewerAccess(tx, eventId, user);
       const stations = await activeStations(tx, eventId);
       const registration = await loadRegistration(tx, eventId, registrationId, stations);
       if (!registration) throw new AppError(404, "REGISTRATION_NOT_FOUND", "Registration not found");
@@ -379,4 +406,5 @@ module.exports = {
   reviewReadiness,
   compareQueueItems,
   contextVersion,
+  requireReviewerAccess,
 };

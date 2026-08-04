@@ -12,6 +12,7 @@ const {
     updateEventBody,
     transitionBody,
     cancelBody,
+    deleteEventBody,
     eventParams,
     listQuery,
     auditQuery,
@@ -62,6 +63,7 @@ router.post("/:eventId/publish", validate({ params: eventParams, body: transitio
 router.post("/:eventId/start", validate({ params: eventParams, body: transitionBody }), asyncHandler(eventController.start));
 router.post("/:eventId/complete", validate({ params: eventParams, body: transitionBody }), asyncHandler(eventController.complete));
 router.post("/:eventId/cancel", validate({ params: eventParams, body: cancelBody }), asyncHandler(eventController.cancel));
+router.delete("/:eventId", requireSystemRole("ADMIN"), validate({ params: eventParams, body: deleteEventBody }), asyncHandler(eventController.remove));
 router.post("/:eventId/shifts/:shiftId/assignments", validate({ params: assignmentParams, body: assignmentBody }), asyncHandler(eventController.addAssignment));
 router.delete("/:eventId/shifts/:shiftId/assignments/:assignmentId", validate({ params: assignmentDeleteParams, query: versionQuery }), asyncHandler(eventController.removeAssignment));
 router.get("/:eventId/audit-log", validate({ params: eventParams, query: auditQuery }), asyncHandler(eventController.audit));

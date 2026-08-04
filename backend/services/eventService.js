@@ -6,6 +6,11 @@ const {
   classifyTemplates,
   stationTypeForTemplateKey,
 } = require("./stationTemplateMapping");
+const { ASSIGNMENT_APPLICATION_ROLES } = require("../utils/roles");
+const {
+  enqueueEventArtifactCleanup,
+  processArtifactCleanupTasks,
+} = require("./artifactCleanupService");
 
 const EVENT_FIELDS = [
   "name", "description", "bannerKey", "artworkDataUrl", "venue", "address", "postalCode",
@@ -95,8 +100,9 @@ const eventInclude = {
   createdBy: { select: { id: true, username: true, fullName: true, email: true, sysRole: true, status: true } },
   cancelledBy: { select: { id: true, username: true, fullName: true, email: true, sysRole: true, status: true } },
   registrations: {
-    where: { registrationStatus: { in: ["SIGNED_UP", "CHECKED_IN"] } },
-    select: { registrationId: true },
+    // Venue occupancy must be derived from an actual check-in, never from a signup.
+    where: { registrationStatus: "CHECKED_IN" },
+    select: { registrationId: true, registrationStatus: true },
   },
   _count: { select: { registrations: true } },
 };
@@ -203,7 +209,7 @@ const toEventResponse = async ({ _count = {}, registrations = [], stations = [],
     createdBy: publicUser(event.createdBy),
     cancelledBy: publicUser(event.cancelledBy),
     signupCount: registrationCount,
-    activeCapacityCount: registrations.length,
+    activeCapacityCount: registrations.filter(({ registrationStatus }) => registrationStatus === "CHECKED_IN").length,
     _count: { eventRegistrations: registrationCount },
     canManage: user ? canManage(permissionEvent, user) : false,
   };
@@ -236,6 +242,7 @@ const canManage = (event, user) =>
       event.shifts.some((shift) =>
         shift.staffAssignments.some(
           (assignment) =>
+            assignment.userId === user.userId &&
             assignment.assignmentRole === "EVENT_MANAGER" &&
             ["ASSIGNED", "CONFIRMED"].includes(assignment.status)
         )
@@ -390,17 +397,26 @@ const requireTemplates = async (tx, stations) => {
 const assertAssignmentSchedulesAvailable = async (tx, eventId, shifts) => {
   const schedules = shifts.flatMap((shift) => (shift.assignments || []).map((assignment) => ({
     userId: assignment.userId,
+    assignmentRole: assignment.assignmentRole,
     startsAt: new Date(shift.startsAt),
     endsAt: new Date(shift.endsAt),
   })));
   if (schedules.length === 0) return;
   await lockStaffSchedules(tx, schedules.map(({ userId }) => userId));
 
-  const activeUsers = await tx.user.count({
+  const activeUsers = await tx.user.findMany({
     where: { id: { in: [...new Set(schedules.map(({ userId }) => userId))] }, status: "ACTIVE" },
+    select: { id: true, userRoles: { select: { role: { select: { roleName: true } } } } },
   });
-  if (activeUsers !== new Set(schedules.map(({ userId }) => userId)).size) {
+  if (activeUsers.length !== new Set(schedules.map(({ userId }) => userId)).size) {
     throw new AppError(422, "STAFF_NOT_AVAILABLE", "One or more selected staff members are unavailable");
+  }
+  const rolesByUser = new Map(activeUsers.map((member) => [member.id, new Set(member.userRoles.map(({ role }) => role.roleName))]));
+  if (schedules.some(({ userId, assignmentRole }) => {
+    const roles = rolesByUser.get(userId);
+    return roles?.has("ADMINISTRATOR") || !roles?.has(ASSIGNMENT_APPLICATION_ROLES[assignmentRole]);
+  })) {
+    throw new AppError(422, "STAFF_ROLE_MISMATCH", "A selected staff member does not hold the required account role");
   }
   const byUser = new Map();
   for (const schedule of schedules) byUser.set(schedule.userId, [...(byUser.get(schedule.userId) || []), schedule]);
@@ -947,10 +963,158 @@ const cancelEvent = async (eventId, body, user, correlationId) => {
   });
 };
 
+const assertNoCrossEventReferences = async (tx, eventId) => {
+  const [registrations, stations, reviews, consents] = await Promise.all([
+    tx.eventRegistration.findMany({ where: { eventId }, select: { registrationId: true } }),
+    tx.station.findMany({ where: { eventId }, select: { stationId: true } }),
+    tx.review.findMany({ where: { registration: { eventId } }, select: { reviewId: true } }),
+    tx.participantConsent.findMany({ where: { eventId }, select: { id: true } }),
+  ]);
+  const registrationIds = registrations.map(({ registrationId }) => registrationId);
+  const stationIds = stations.map(({ stationId }) => stationId);
+  const reviewIds = reviews.map(({ reviewId }) => reviewId);
+  const consentIds = consents.map(({ id }) => id);
+
+  const checks = [];
+  if (reviewIds.length) checks.push(tx.review.findFirst({
+    where: { OR: [
+      { reviewId: { in: reviewIds }, parentReviewId: { not: null, notIn: reviewIds } },
+      { reviewId: { notIn: reviewIds }, parentReviewId: { in: reviewIds } },
+    ] },
+    select: { reviewId: true },
+  }));
+  if (consentIds.length) checks.push(tx.participantConsent.findFirst({
+    where: { OR: [
+      { id: { in: consentIds }, withdrawalOfId: { not: null, notIn: consentIds } },
+      { id: { notIn: consentIds }, withdrawalOfId: { in: consentIds } },
+    ] },
+    select: { id: true },
+  }));
+  if (registrationIds.length || stationIds.length) {
+    const outsideRegistrations = registrationIds.length ? { notIn: registrationIds } : { not: null };
+    const outsideStations = stationIds.length ? { notIn: stationIds } : { not: null };
+    checks.push(tx.queueEntry.findFirst({
+      where: { OR: [
+        ...(registrationIds.length ? [{ registrationId: { in: registrationIds }, stationId: outsideStations }] : []),
+        ...(stationIds.length ? [{ stationId: { in: stationIds }, registrationId: outsideRegistrations }] : []),
+      ] },
+      select: { id: true },
+    }));
+    checks.push(tx.queueMovement.findFirst({
+      where: { OR: [
+        ...(registrationIds.length ? [{ registrationId: { in: registrationIds }, OR: [{ fromStationId: outsideStations }, { toStationId: outsideStations }] }] : []),
+        ...(stationIds.length ? [{ registrationId: outsideRegistrations, OR: [{ fromStationId: { in: stationIds } }, { toStationId: { in: stationIds } }] }] : []),
+      ] },
+      select: { id: true },
+    }));
+    checks.push(tx.screeningResult.findFirst({
+      where: { OR: [
+        ...(registrationIds.length ? [{ registrationId: { in: registrationIds }, stationId: outsideStations }] : []),
+        ...(stationIds.length ? [{ stationId: { in: stationIds }, registrationId: outsideRegistrations }] : []),
+      ] },
+      select: { resultId: true },
+    }));
+  }
+
+  if ((await Promise.all(checks)).some(Boolean)) {
+    throw new AppError(409, "EVENT_DELETE_INTEGRITY_CONFLICT", "This event has cross-event records and cannot be deleted safely");
+  }
+};
+
+const deleteEvent = async (eventId, body, user, correlationId) => {
+  if (user.systemRole !== "ADMIN" || !user.roles?.includes("ADMINISTRATOR")) {
+    throw new AppError(403, "FORBIDDEN", "Only an administrator can permanently delete an event");
+  }
+  const current = await requireEvent(eventId, user, true);
+  if (!['COMPLETED', 'CANCELLED'].includes(current.status)) {
+    throw new AppError(409, "EVENT_NOT_TERMINAL", "Only completed or cancelled events can be permanently deleted");
+  }
+  if (body.confirmationName !== current.name) {
+    throw new AppError(422, "EVENT_DELETE_CONFIRMATION_MISMATCH", "Type the event name exactly to confirm permanent deletion");
+  }
+
+  const deletion = await prisma.$transaction(async (tx) => {
+    // Claim the exact state before removing children so a stale administrator cannot delete a changed event.
+    const claimed = await tx.event.updateMany({
+      where: { eventId, version: body.version, status: current.status },
+      data: { version: { increment: 1 } },
+    });
+    if (claimed.count !== 1) {
+      throw new AppError(409, "STALE_EVENT_VERSION", "This event was changed by someone else");
+    }
+
+    await assertNoCrossEventReferences(tx, eventId);
+
+    // Persist the exact, validated storage targets before deleting their owner
+    // rows. Filesystem work deliberately happens only after this transaction.
+    const cleanupTaskCount = await enqueueEventArtifactCleanup(tx, eventId);
+
+    await tx.notificationDelivery.deleteMany({ where: { OR: [
+      { referral: { review: { registration: { eventId } } } },
+      { document: { review: { registration: { eventId } } } },
+    ] } });
+    await tx.documentArtifact.deleteMany({ where: { review: { registration: { eventId } } } });
+    await tx.referral.deleteMany({ where: { review: { registration: { eventId } } } });
+    await tx.review.updateMany({ where: { registration: { eventId }, parentReviewId: { not: null } }, data: { parentReviewId: null } });
+    await tx.review.deleteMany({ where: { registration: { eventId } } });
+
+    await tx.participantConsent.updateMany({ where: { eventId, withdrawalOfId: { not: null } }, data: { withdrawalOfId: null } });
+    await tx.participantConsent.deleteMany({ where: { eventId } });
+    await tx.signatureArtifact.deleteMany({ where: { eventId } });
+    await tx.registrationStatusHistory.deleteMany({ where: { registration: { eventId } } });
+    await tx.screeningResult.deleteMany({ where: { registration: { eventId } } });
+    await tx.scanLog.deleteMany({ where: { OR: [{ registration: { eventId } }, { station: { eventId } }] } });
+    await tx.qRCodePass.deleteMany({ where: { registration: { eventId } } });
+    await tx.queueMovement.deleteMany({ where: { registration: { eventId } } });
+    await tx.queueEntry.deleteMany({ where: { registration: { eventId } } });
+    await tx.eventRegistration.deleteMany({ where: { eventId } });
+
+    // Participants are shared records. Remove only their temporary onboarding
+    // scope before deleting the event; the FK also uses SET NULL defensively.
+    await tx.participant.updateMany({ where: { onboardingEventId: eventId }, data: { onboardingEventId: null } });
+
+    await tx.staffAssignment.deleteMany({ where: { eventId } });
+    await tx.shift.deleteMany({ where: { eventId } });
+    await tx.eventStationAvailability.deleteMany({ where: { eventDay: { eventId } } });
+    await tx.eventDay.deleteMany({ where: { eventId } });
+    await tx.station.deleteMany({ where: { eventId } });
+    await tx.eventAuditLog.deleteMany({ where: { eventId } });
+
+    const deleted = await tx.event.deleteMany({
+      where: { eventId, version: body.version + 1, status: current.status },
+    });
+    if (deleted.count !== 1) {
+      throw new AppError(409, "STALE_EVENT_VERSION", "This event was changed by someone else");
+    }
+    await tx.auditLog.create({
+      data: {
+        userId: user.userId,
+        action: "EVENT_DELETED",
+        resource: "Event",
+        entityName: "Event",
+        entityId: eventId,
+        requestId: correlationId,
+        details: { status: current.status, version: body.version },
+        ipAddress: "::1",
+        deviceName: "Server",
+      },
+    });
+    return { result: { eventId, deleted: true }, cleanupTaskCount };
+  });
+
+  if (deletion.cleanupTaskCount > 0) {
+    await processArtifactCleanupTasks({ eventId }).catch((error) => {
+      // Durable tasks remain retryable; never expose a storage path in logs.
+      console.error("Post-delete artifact cleanup deferred", { eventId, code: error?.code || "ARTIFACT_CLEANUP_FAILED" });
+    });
+  }
+  return deletion.result;
+};
+
 const listStaffDirectory = async () => {
   const users = await prisma.user.findMany({
-    where: { status: "ACTIVE" },
-    select: { id: true, username: true, fullName: true, email: true, sysRole: true },
+    where: { status: "ACTIVE", userRoles: { none: { role: { roleName: "ADMINISTRATOR" } } } },
+    select: { id: true, username: true, fullName: true, email: true, sysRole: true, userRoles: { select: { role: { select: { roleName: true } } } } },
     orderBy: { fullName: "asc" },
     take: 200,
   });
@@ -958,6 +1122,7 @@ const listStaffDirectory = async () => {
     userId: user.id,
     username: user.username || user.fullName || user.email,
     systemRole: user.sysRole,
+    roles: user.userRoles.map(({ role }) => role.roleName),
   }));
 };
 
@@ -1109,9 +1274,13 @@ const addStaffAssignment = async (eventId, shiftId, body, user, correlationId) =
 
     const activeUser = await tx.user.findFirst({
       where: { id: body.userId, status: "ACTIVE" },
-      select: { id: true },
+      select: { id: true, userRoles: { select: { role: { select: { roleName: true } } } } },
     });
     if (!activeUser) throw new AppError(422, "STAFF_NOT_AVAILABLE", "The selected staff member is unavailable");
+    const applicationRoles = new Set(activeUser.userRoles.map(({ role }) => role.roleName));
+    if (applicationRoles.has("ADMINISTRATOR") || !applicationRoles.has(ASSIGNMENT_APPLICATION_ROLES[body.assignmentRole])) {
+      throw new AppError(422, "STAFF_ROLE_MISMATCH", "The selected staff member does not hold the required account role");
+    }
 
     const conflict = await tx.staffAssignment.findFirst({
       where: {
@@ -1235,6 +1404,7 @@ module.exports = {
   updateEvent,
   transitionEvent,
   cancelEvent,
+  deleteEvent,
   listStaffDirectory,
   listStationTemplates,
   importStations,
