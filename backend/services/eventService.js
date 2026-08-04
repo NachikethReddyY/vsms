@@ -397,9 +397,10 @@ const requestIdFor = (context) => typeof context === "string" ? context : contex
 const auditFields = (context) => {
   const requestId = requestIdFor(context);
   return {
-    ...(requestId ? { requestId } : {}),
-    ...(typeof context === "object" && context?.ipAddress ? { ipAddress: context.ipAddress } : {}),
-    ...(typeof context === "object" && context?.deviceName ? { deviceName: context.deviceName } : {}),
+    requestId: requestId || null,
+    deviceId: typeof context === "object" ? context?.deviceId || null : null,
+    ipAddress: typeof context === "object" ? context?.ipAddress || null : null,
+    deviceName: typeof context === "object" ? context?.deviceName || null : null,
   };
 };
 
@@ -710,8 +711,6 @@ const createEvent = async (body, user, correlationId, rawIdempotencyKey, db = pr
         entityName: "Event",
         entityId: created.eventId,
         newValue: snapshot(full),
-        ipAddress: "::1",
-        deviceName: "Server",
         ...auditFields(correlationId),
       },
     });
@@ -999,8 +998,6 @@ return db.$transaction(async (tx) => {
         oldValue: snapshot(current),
         newValue: snapshot(updated),
       },
-      ipAddress: "::1",
-      deviceName: "Server",
       ...auditFields(correlationId),
     },
   });
@@ -1043,8 +1040,6 @@ const transitionEvent = async (eventId, command, body, user, correlationId, db =
         entityId: eventId,
         oldValue: snapshot(current),
         newValue: snapshot(updated),
-        ipAddress: "::1",
-        deviceName: "Server",
         ...auditFields(correlationId),
       },
     });
@@ -1114,8 +1109,6 @@ const cancelEvent = async (eventId, body, user, correlationId, db = prisma) => {
         entityId: eventId,
         oldValue: snapshot(current),
         newValue: snapshot(updated),
-        ipAddress: "::1",
-        deviceName: "Server",
         ...auditFields(correlationId),
       },
     });
@@ -1287,10 +1280,7 @@ const deleteEvent = async (eventId, body, user, correlationId, db = prisma) => {
         resource: "Event",
         entityName: "Event",
         entityId: eventId,
-        requestId: requestIdFor(correlationId),
         details: { status: current.status, version: body.version },
-        ipAddress: "::1",
-        deviceName: "Server",
         ...auditFields(correlationId),
       },
     });
@@ -1511,8 +1501,6 @@ const addStaffAssignment = async (eventId, shiftId, body, user, correlationId, d
         entityName: "Event",
         entityId: eventId,
         details: { shiftId, assignmentRole: body.assignmentRole, assignedUserId: body.userId },
-        ipAddress: "::1",
-        deviceName: "Server",
         ...auditFields(correlationId),
       },
     });
@@ -1563,8 +1551,6 @@ const removeStaffAssignment = async (eventId, shiftId, assignmentId, version, us
         entityName: "Event",
         entityId: eventId,
         details: { shiftId, assignmentId },
-        ipAddress: "::1",
-        deviceName: "Server",
         ...auditFields(correlationId),
       },
     });
