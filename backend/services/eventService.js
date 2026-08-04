@@ -153,6 +153,7 @@ const mapStationDto = (station, event, templatesByType) => {
     stationTemplateId: template?.stationTemplateId || station.stationId,
     templateVersion: template?.version || 1,
     name: station.stationName,
+    stationType: station.stationType,
     description: template?.description || station.stationType,
     stationOrder: station.stationOrder,
     // Capacity is not on Station (#30); expose template default until availability is wired.
@@ -976,7 +977,7 @@ const listStationTemplates = async () => {
     },
     orderBy: { name: "asc" },
   });
-  return templates;
+  return templates.filter((template) => stationTypeForTemplateKey(template.templateKey));
 };
 
 const importStations = async (eventId, body, user, correlationId) => {

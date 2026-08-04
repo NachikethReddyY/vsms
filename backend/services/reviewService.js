@@ -1,9 +1,11 @@
 const crypto = require("crypto");
 const prisma = require("../prisma/prismaClient");
 const AppError = require("../errors/AppError");
+const { IMPORTABLE_TEMPLATE_KEYS } = require("./stationTemplateMapping");
 
 const FLAG_RANK = { NORMAL: 0, REVIEW: 1, REFER: 2, URGENT: 3 };
 const ACTIVE_ASSIGNMENT_STATUSES = ["ASSIGNED", "CONFIRMED"];
+const SUPPORTED_SCREENING_TYPES = Object.values(IMPORTABLE_TEMPLATE_KEYS);
 
 const highestFlag = (results) => results.reduce(
   (highest, result) => FLAG_RANK[result.overallFlag] > FLAG_RANK[highest] ? result.overallFlag : highest,
@@ -79,7 +81,7 @@ const requireReviewerAccess = async (db, eventId, userId) => {
 };
 
 const activeStations = (db, eventId) => db.station.findMany({
-  where: { eventId, isActive: true },
+  where: { eventId, isActive: true, stationType: { in: SUPPORTED_SCREENING_TYPES } },
   orderBy: [{ stationOrder: "asc" }, { stationId: "asc" }],
   select: {
     stationId: true,

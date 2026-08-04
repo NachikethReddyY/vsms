@@ -347,7 +347,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Import active templates as event-owned station snapshots */
+        /** Import active screening templates as event Station rows (VA / refraction / colour vision / eye health). REGISTRATION and CLINICAL_REVIEW are rejected. */
         post: operations["importEventStations"];
         delete?: never;
         options?: never;
@@ -1208,6 +1208,8 @@ export interface components {
             stationTemplateId: string;
             templateVersion: number;
             name: string;
+            /** @enum {string} */
+            stationType: "VISUAL_ACUITY" | "REFRACTION" | "COLOUR_VISION";
             description?: string | null;
             stationOrder: number;
             capacity: number;
