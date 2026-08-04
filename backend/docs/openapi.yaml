@@ -3157,6 +3157,7 @@ components:
       properties:
         registrationId: { type: string, format: uuid }
         eventId: { type: string, format: uuid }
+        identifier: { enum: [], description: This alternative accepts a registration reference only. }
     ManualCheckInByQrToken:
       type: object
       additionalProperties: false
@@ -3164,6 +3165,7 @@ components:
       properties:
         identifier: { type: string, pattern: "^[a-fA-F0-9]{64}$", description: Active QR pass token only; NRIC lookup is not supported. }
         eventId: { type: string, format: uuid }
+        registrationId: { enum: [], description: This alternative accepts a QR token only. }
     ManualCheckInResult:
       type: object
       additionalProperties: false
