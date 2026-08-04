@@ -21,6 +21,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/webhooks/ses": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Accept a signature-verified Amazon SNS envelope for SES delivery lifecycle events
+         * @description The signed TopicArn must be explicitly allowlisted. Recipient addresses, message bodies, and provider diagnostic text are not retained in provider-event receipts or audits.
+         */
+        post: operations["ingestSesProviderEvent"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/auth/config-status": {
         parameters: {
             query?: never;
@@ -167,7 +187,7 @@ export interface paths {
         /** List organisation staff accounts (administrator only) */
         get: operations["listUsers"];
         put?: never;
-        /** Create a local staff account (administrator only) */
+        /** Create a staff account and synchronize Cognito access (administrator only) */
         post: operations["createUser"];
         delete?: never;
         options?: never;
@@ -188,7 +208,7 @@ export interface paths {
         delete?: never;
         options?: never;
         head?: never;
-        /** Update local staff roles or active state (administrator only) */
+        /** Update staff roles or active state across the application and Cognito (administrator only) */
         patch: operations["updateUser"];
         trace?: never;
     };
@@ -498,6 +518,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/events/{eventId}/sync/screening": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Push an encrypted-client screening outbox batch and pull the caller's current station scope
+         * @description Each action is independently idempotent. The durable server sync ledger stores only operational metadata and safe error codes, never clinical bodies, participant profiles, NRIC values, or pass tokens.
+         */
+        post: operations["syncScreeningBatch"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/events/{eventId}/stations/{stationId}/queue": {
         parameters: {
             query?: never;
@@ -696,6 +736,23 @@ export interface paths {
         put?: never;
         /** Sign a draft referral, generate an encrypted PDF, and attempt secure email delivery */
         post: operations["issueReferral"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/events/{eventId}/referrals/{referralId}/revisions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Create the next immutable draft revision while preserving the issued referral and its artifacts */
+        post: operations["reviseReferral"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1587,10 +1644,6 @@ export interface components {
             eventId: string;
             status: components["schemas"]["EventStatus"];
             version: number;
-            /** Format: uuid */
-            createdByUserId: string;
-            /** Format: uuid */
-            cancelledByUserId?: string | null;
             /** Format: date-time */
             cancelledAt?: string | null;
             cancellationReason?: string | null;
@@ -1598,6 +1651,7 @@ export interface components {
             createdAt: string;
             /** Format: date-time */
             updatedAt: string;
+            /** @description Managers receive the staffing plan; operational staff receive only their own ASSIGNED or CONFIRMED assignments on PLANNED or ACTIVE shifts. */
             shifts: components["schemas"]["Shift"][];
             eventDays: components["schemas"]["EventDay"][];
             eventStations: components["schemas"]["EventStation"][];
@@ -1607,7 +1661,9 @@ export interface components {
             activeCapacityCount: number;
             /** @description Whether the current caller may change this event */
             canManage: boolean;
+            /** @description Manager-only organisation identity projection. */
             createdBy?: components["schemas"]["User"];
+            /** @description Manager-only organisation identity projection. */
             cancelledBy?: components["schemas"]["User"] | null;
         };
         LocationResult: {
@@ -1826,6 +1882,9 @@ export interface components {
         ReferralSummary: {
             /** Format: uuid */
             referralId: string;
+            revisionNumber: number;
+            /** Format: uuid */
+            supersedesReferralId: string | null;
             destinationName: string;
             reason: string;
             instructions: string | null;
@@ -1848,13 +1907,38 @@ export interface components {
             /** Format: uuid */
             deliveryId: string;
             /** @enum {string} */
-            status: "QUEUED" | "SENDING" | "RECONCILIATION_REQUIRED" | "SENT" | "DELIVERED" | "FAILED" | "BOUNCED" | "CANCELLED";
+            status: "QUEUED" | "SENDING" | "RECONCILIATION_REQUIRED" | "SENT" | "DELIVERED" | "FAILED" | "BOUNCED" | "COMPLAINT" | "CANCELLED";
             recipient: string;
             providerMessageId: string | null;
             attemptCount: number;
             failureReason: string | null;
             /** Format: date-time */
             sentAt: string | null;
+            /** Format: date-time */
+            deliveredAt: string | null;
+        };
+        ReviseReferralRequest: {
+            destinationName: string;
+            reason: string;
+            instructions?: string;
+            urgency: components["schemas"]["ClinicalUrgency"];
+            /** Format: uuid */
+            idempotencyKey: string;
+            /** @enum {boolean} */
+            confirmed: true;
+        };
+        ReferralRevisionResponse: {
+            /** Format: uuid */
+            referralId: string;
+            revisionNumber: number;
+            /** Format: uuid */
+            supersedesReferralId: string;
+            destinationName: string;
+            reason: string;
+            instructions: string | null;
+            urgency: components["schemas"]["ClinicalUrgency"];
+            /** @enum {string} */
+            status: "DRAFT";
         };
         IssueReferralRequest: {
             /** Format: email */
@@ -1893,6 +1977,17 @@ export interface components {
             /** Format: date-time */
             acknowledgedAt: string;
         };
+        ProviderEventAccepted: {
+            /** @enum {boolean} */
+            accepted: true;
+            duplicate?: boolean;
+            matched?: boolean | null;
+            /** @enum {string|null} */
+            appliedStatus?: "DELIVERED" | "FAILED" | "BOUNCED" | "COMPLAINT" | null;
+            subscriptionConfirmed?: boolean;
+        } & {
+            [key: string]: unknown;
+        };
         ReferralDeliveryMaintenanceRequest: {
             /** @default 30 */
             staleAfterMinutes: number;
@@ -1927,7 +2022,7 @@ export interface components {
             /** Format: uuid */
             eventId: string;
             /** @enum {string} */
-            artifactType: "CONSENT_SIGNATURE" | "REFERRAL_SIGNATURE" | "REFERRAL_DOCUMENT";
+            artifactType: "CONSENT_SIGNATURE" | "REFERRAL_SIGNATURE" | "REVIEW_DECISION_SIGNATURE" | "REFERRAL_DOCUMENT";
             /** @enum {string} */
             status: "PENDING" | "PROCESSING" | "FAILED" | "ESCALATED" | "COMPLETED" | "RESOLVED";
             attemptCount: number;
@@ -1963,6 +2058,11 @@ export interface components {
             /** Format: date-time */
             reviewedAt: string;
             reviewedByName: string;
+            signatureSignerName: string;
+            signatureSha256: string | null;
+            signedPayloadHash: string | null;
+            /** Format: date-time */
+            signedAt: string | null;
             referral: components["schemas"]["ReferralSummary"] | null;
         };
         ReviewDetailResponse: {
@@ -1989,6 +2089,10 @@ export interface components {
             confirmed: true;
             clinicalSummary: string;
             recommendations?: string;
+            signatureObjectKey: string;
+            signatureSha256: string;
+            /** @enum {string} */
+            signatureMimeType: "image/png" | "image/jpeg";
         };
         MonitorReviewDecision: {
             /**
@@ -2001,6 +2105,10 @@ export interface components {
             confirmed: true;
             clinicalSummary: string;
             recommendations?: string;
+            signatureObjectKey: string;
+            signatureSha256: string;
+            /** @enum {string} */
+            signatureMimeType: "image/png" | "image/jpeg";
         };
         ReferReviewDecision: {
             /**
@@ -2016,6 +2124,10 @@ export interface components {
             /** @enum {string} */
             urgency: "ROUTINE" | "PRIORITY" | "URGENT";
             referral: components["schemas"]["ReferralDecisionInput"];
+            signatureObjectKey: string;
+            signatureSha256: string;
+            /** @enum {string} */
+            signatureMimeType: "image/png" | "image/jpeg";
         };
         UrgentReviewDecision: {
             /**
@@ -2029,6 +2141,10 @@ export interface components {
             clinicalSummary: string;
             recommendations?: string;
             referral: components["schemas"]["ReferralDecisionInput"];
+            signatureObjectKey: string;
+            signatureSha256: string;
+            /** @enum {string} */
+            signatureMimeType: "image/png" | "image/jpeg";
         };
         ReviewDecisionRequest: components["schemas"]["CompleteReviewDecision"] | components["schemas"]["MonitorReviewDecision"] | components["schemas"]["ReferReviewDecision"] | components["schemas"]["UrgentReviewDecision"];
         RecordedReview: {
@@ -2040,6 +2156,11 @@ export interface components {
             urgency: components["schemas"]["ClinicalUrgency"];
             clinicalSummary: string;
             recommendations: string | null;
+            signatureSignerName: string | null;
+            signatureSha256: string;
+            signedPayloadHash: string;
+            /** Format: date-time */
+            signedAt: string;
             /** Format: date-time */
             reviewedAt: string;
         };
@@ -2388,10 +2509,10 @@ export interface components {
             /** Format: uuid */
             eventId: string;
             /** @enum {string} */
-            purpose: "CONSENT" | "REFERRAL";
+            purpose: "CONSENT" | "REFERRAL" | "REVIEW_DECISION";
             /**
              * Format: uuid
-             * @description Participant ID for consent or referral ID for referral issuance.
+             * @description Participant ID for consent, referral ID for referral issuance, or registration ID for a review decision.
              */
             targetId: string;
         };
@@ -2587,6 +2708,101 @@ export interface components {
             acknowledged: boolean;
             resultData: components["schemas"]["ColourVisionResultData"];
         };
+        ScreeningSyncAction: {
+            /** Format: uuid */
+            clientActionId: string;
+            /** Format: uuid */
+            stationId: string;
+            /** @enum {string} */
+            stationType: "VISUAL_ACUITY";
+            payload: components["schemas"]["VisualAcuitySaveRequest"];
+        } | {
+            /** Format: uuid */
+            clientActionId: string;
+            /** Format: uuid */
+            stationId: string;
+            /** @enum {string} */
+            stationType: "REFRACTION";
+            payload: components["schemas"]["RefractionSaveRequest"];
+        } | {
+            /** Format: uuid */
+            clientActionId: string;
+            /** Format: uuid */
+            stationId: string;
+            /** @enum {string} */
+            stationType: "COLOUR_VISION";
+            payload: components["schemas"]["ColourVisionSaveRequest"];
+        };
+        ScreeningSyncRequest: {
+            /** Format: uuid */
+            clientBatchId: string;
+            /** Format: date-time */
+            cursor?: string;
+            actions: components["schemas"]["ScreeningSyncAction"][];
+        };
+        ScreeningSyncResultSnapshot: {
+            /** Format: uuid */
+            resultId?: string;
+            overallFlag?: components["schemas"]["OverallFlag"];
+            isFlagged?: boolean;
+            ruleVersion?: string;
+        };
+        ScreeningSyncActionResult: {
+            /** Format: uuid */
+            clientActionId: string;
+            /** @enum {string} */
+            status: "APPLIED" | "CONFLICT" | "FAILED";
+            retryCount: number;
+            errorCode?: string;
+            result?: components["schemas"]["ScreeningSyncResultSnapshot"];
+        };
+        ScreeningSyncQueueItem: {
+            /** Format: uuid */
+            registrationId: string;
+            participantDisplayName: string;
+            queueNumber: number | null;
+            status: components["schemas"]["RegistrationStatus"];
+            existingResult: {
+                /** Format: uuid */
+                resultId?: string;
+                overallFlag?: components["schemas"]["OverallFlag"];
+                isFlagged?: boolean;
+                /** Format: date-time */
+                createdAt?: string;
+            } | null;
+        };
+        ScreeningSyncPullStation: {
+            /** Format: uuid */
+            stationId: string;
+            /** Format: uuid */
+            eventId: string;
+            stationName: string;
+            /** @enum {string} */
+            stationType: "VISUAL_ACUITY" | "REFRACTION" | "COLOUR_VISION";
+            stationOrder: number;
+            isActive: boolean;
+            /** Format: date-time */
+            offlineAccessExpiresAt: string | null;
+            registrations: components["schemas"]["ScreeningSyncQueueItem"][];
+        };
+        ScreeningSyncResponse: {
+            /** Format: uuid */
+            clientBatchId: string;
+            /** Format: date-time */
+            serverTime: string;
+            /** Format: date-time */
+            cursor: string;
+            actions: components["schemas"]["ScreeningSyncActionResult"][];
+            pull: {
+                event: {
+                    /** Format: uuid */
+                    eventId: string;
+                    name: string;
+                    status: components["schemas"]["EventStatus"];
+                };
+                stations: components["schemas"]["ScreeningSyncPullStation"][];
+            };
+        };
         ScreeningEvaluationReason: {
             flag: components["schemas"]["OverallFlag"];
             reason: string;
@@ -2647,6 +2863,15 @@ export interface components {
             };
             content: {
                 "application/json": components["schemas"]["Event"];
+            };
+        };
+        /** @description Request body is malformed or provider envelope fields are inconsistent */
+        BadRequest: {
+            headers: {
+                [name: string]: unknown;
+            };
+            content: {
+                "application/json": components["schemas"]["Problem"];
             };
         };
         /** @description Authentication is absent, invalid, expired, revoked, or reused */
@@ -2796,6 +3021,38 @@ export interface operations {
                     "application/json": components["schemas"]["Problem"];
                 };
             };
+        };
+    };
+    ingestSesProviderEvent: {
+        parameters: {
+            query?: never;
+            header?: {
+                "x-amz-sns-message-type"?: "Notification" | "SubscriptionConfirmation" | "UnsubscribeConfirmation";
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    [key: string]: unknown;
+                };
+                "text/plain": string;
+            };
+        };
+        responses: {
+            /** @description Authenticated provider event accepted or safely replayed */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProviderEventAccepted"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            403: components["responses"]["Forbidden"];
+            429: components["responses"]["RateLimited"];
         };
     };
     getAuthenticationConfigStatus: {
@@ -3066,6 +3323,20 @@ export interface operations {
             403: components["responses"]["Forbidden"];
             409: components["responses"]["Conflict"];
             422: components["responses"]["ValidationFailed"];
+            /** @description Cognito access synchronization failed and the local account was not committed */
+            502: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Cognito staff synchronization is not configured */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
         };
     };
     updateUser: {
@@ -3096,6 +3367,20 @@ export interface operations {
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
             422: components["responses"]["ValidationFailed"];
+            /** @description Cognito access synchronization failed and local role changes were rolled back */
+            502: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Cognito staff synchronization is not configured */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
         };
     };
     listEvents: {
@@ -3671,6 +3956,37 @@ export interface operations {
             404: components["responses"]["NotFound"];
         };
     };
+    syncScreeningBatch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                eventId: components["parameters"]["EventId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ScreeningSyncRequest"];
+            };
+        };
+        responses: {
+            /** @description Per-action outcomes and a fully scoped, pass-token-free station pull */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ScreeningSyncResponse"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            422: components["responses"]["ValidationFailed"];
+        };
+    };
     listScreeningQueue: {
         parameters: {
             query?: never;
@@ -3978,6 +4294,38 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["IssueReferralResponse"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            422: components["responses"]["ValidationFailed"];
+        };
+    };
+    reviseReferral: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                eventId: components["parameters"]["EventId"];
+                referralId: components["parameters"]["ReferralId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReviseReferralRequest"];
+            };
+        };
+        responses: {
+            /** @description Next sequential draft revision created or idempotently replayed */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReferralRevisionResponse"];
                 };
             };
             401: components["responses"]["Unauthorized"];
