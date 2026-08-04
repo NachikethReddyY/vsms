@@ -15,6 +15,10 @@ const {
   saveColourVisionBody,
   reviewParams,
   reviewDecisionBody,
+  referralParams,
+  referralDocumentParams,
+  issueReferralBody,
+  acknowledgeReferralHandoffBody,
 } = require("../schemas/screeningSchemas");
 
 const router = express.Router({ mergeParams: true });
@@ -90,6 +94,24 @@ router.post(
   "/:eventId/reviews/:registrationId/decision",
   validate({ params: reviewParams, body: reviewDecisionBody }),
   asyncHandler(screeningController.recordReviewDecision),
+);
+
+router.post(
+  "/:eventId/referrals/:referralId/issue",
+  validate({ params: referralParams, body: issueReferralBody }),
+  asyncHandler(screeningController.issueReferral),
+);
+
+router.post(
+  "/:eventId/referrals/:referralId/issue/acknowledge",
+  validate({ params: referralParams, body: acknowledgeReferralHandoffBody }),
+  asyncHandler(screeningController.acknowledgeReferralHandoff),
+);
+
+router.get(
+  "/:eventId/referrals/:referralId/documents/:documentId",
+  validate({ params: referralDocumentParams }),
+  asyncHandler(screeningController.downloadReferralDocument),
 );
 
 module.exports = router;

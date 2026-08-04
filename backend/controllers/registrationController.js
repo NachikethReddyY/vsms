@@ -7,6 +7,7 @@ const {
     parsePositiveInt,
     validateIdempotencyKey,
 } = require("../utils/validation");
+const { assertRegistrationAssignment } = require("../utils/staff");
 
 const OPEN_EVENT_STATUSES = ["PUBLISHED", "UPCOMING", "ONGOING", "IN_PROGRESS"];
 const REGISTRATION_STATUSES = new Set([
@@ -76,6 +77,7 @@ exports.createRegistration = asyncHandler(async (req, res) => {
     const participantId = assertUuid(req.body.participantId, "participantId");
     const eventId = assertUuid(req.params.eventId || req.body.eventId, "eventId");
     const idempotencyKey = validateIdempotencyKey(req.headers["idempotency-key"]);
+    await assertRegistrationAssignment(prisma, eventId, req.auth);
 
     const priorRequest = await prisma.eventRegistration.findUnique({
         where: {
@@ -244,11 +246,13 @@ exports.getRegistrationById = asyncHandler(async (req, res) => {
         error.statusCode = 404;
         throw error;
     }
+    await assertRegistrationAssignment(prisma, registration.eventId, req.auth);
     res.json({ ...handoff(registration), registration: publicRegistration(registration) });
 });
 
 exports.listEventRegistrations = asyncHandler(async (req, res) => {
     const eventId = assertUuid(req.params.eventId, "eventId");
+    await assertRegistrationAssignment(prisma, eventId, req.auth);
     const page = parsePositiveInt(req.query.page, 1, 10_000);
     const pageSize = parsePositiveInt(req.query.pageSize, 20, 100);
     const where = { eventId };
@@ -270,6 +274,13 @@ exports.listEventRegistrations = asyncHandler(async (req, res) => {
 
 exports.getRegistrationHistory = asyncHandler(async (req, res) => {
     const registrationId = assertUuid(req.params.registrationId, "registrationId");
+    const registration = await prisma.eventRegistration.findUnique({ where: { registrationId }, select: { eventId: true } });
+    if (!registration) {
+        const error = new Error("Registration not found");
+        error.statusCode = 404;
+        throw error;
+    }
+    await assertRegistrationAssignment(prisma, registration.eventId, req.auth);
     const history = await prisma.registrationStatusHistory.findMany({
         where: { registrationId },
         orderBy: { occurredAt: "asc" },
@@ -297,6 +308,7 @@ exports.changeRegistrationStatus = asyncHandler(async (req, res) => {
             error.statusCode = 404;
             throw error;
         }
+        await assertRegistrationAssignment(tx, existing.eventId, req.auth);
         if (existing.registrationStatus === toStatus) {
             const error = new Error("Registration already has that status");
             error.statusCode = 409;

@@ -1,5 +1,6 @@
 const express = require("express");
 const eventController = require("../controllers/eventController");
+const reportingController = require("../controllers/reportingController");
 const authenticate = require("../middlewares/authenticate");
 const validate = require("../middlewares/validate");
 const asyncHandler = require("../utils/asyncHandler");
@@ -21,6 +22,7 @@ const {
     stationParams,
     stationImportBody,
     stationUpdateBody,
+    reportQuery,
 } = require("../schemas/eventSchemas");
 
 const router = express.Router();
@@ -30,18 +32,24 @@ router.use(authenticate);
 router.get("/staff-directory", requireSystemRole("ADMIN", "EVENT_MANAGER"), asyncHandler(eventController.staffDirectory));
 router.get("/station-templates", asyncHandler(eventController.stationTemplates));
 router.get("/active", asyncHandler(eventController.listActive));
+router.get(
+  "/reports/operations",
+  requireSystemRole("ADMIN", "EVENT_MANAGER"),
+  validate({ query: reportQuery }),
+  asyncHandler(reportingController.operations),
+);
 
 // 2. Base collection routes
 router.get("/", validate({ query: listQuery }), asyncHandler(eventController.list));
 router.post("/", requireSystemRole("ADMIN", "EVENT_MANAGER"), validate({ body: createEventBody }), asyncHandler(eventController.create));
 router.post(
   "/:eventId/registrations",
-  requireAnyRole("ADMINISTRATOR", "REGISTRATION_OFFICER"),
+  requireAnyRole.operational("REGISTRATION_OFFICER"),
   registrationController.createRegistration
 );
 router.get(
   "/:eventId/registrations",
-  requireAnyRole("ADMINISTRATOR", "REGISTRATION_OFFICER"),
+  requireAnyRole.operational("REGISTRATION_OFFICER"),
   registrationController.listEventRegistrations
 );
 

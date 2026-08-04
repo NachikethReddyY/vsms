@@ -6,9 +6,11 @@ const participantController = require("../controllers/participantController");
 const requireAuthentication = require("../middlewares/requireAuthentication");
 const requireAnyRole = require("../middlewares/requireAnyRole");
 const { rateLimit } = require("../middlewares/security");
+const requireRegistrationAssignment = require("../middlewares/requireRegistrationAssignment");
 
 router.use(requireAuthentication);
-router.use(requireAnyRole("ADMINISTRATOR", "REGISTRATION_OFFICER"));
+router.use(requireAnyRole.operational("REGISTRATION_OFFICER"));
+router.use(requireRegistrationAssignment);
 
 router.get("/", rateLimit({ windowMs: 60_000, max: 30 }), participantController.searchParticipants);
 router.post("/", participantController.createParticipant);

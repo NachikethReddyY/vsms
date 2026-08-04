@@ -23,6 +23,21 @@ const reviewParams = eventParams.extend({
   registrationId: z.string().uuid(),
 }).strict();
 
+const referralParams = eventParams.extend({ referralId: z.string().uuid() }).strict();
+const referralDocumentParams = referralParams.extend({ documentId: z.string().uuid() }).strict();
+const issueReferralBody = z.object({
+  destinationEmail: z.string().trim().toLowerCase().email().max(255),
+  signatureObjectKey: z.string().regex(/^signatures\/[a-f0-9-]{36}\/referral-[a-f0-9-]{36}-[a-f0-9-]{36}\.(png|jpg)$/),
+  signatureSha256: z.string().regex(/^[a-f0-9]{64}$/i),
+  signatureMimeType: z.enum(["image/png", "image/jpeg"]),
+  idempotencyKey: z.string().uuid(),
+  confirmed: z.literal(true),
+}).strict();
+
+const acknowledgeReferralHandoffBody = z.object({
+  idempotencyKey: z.string().uuid(),
+}).strict();
+
 const clinicalSummary = z.string().trim().min(10).max(2000);
 const recommendations = z.string().trim().max(2000).optional();
 const contextVersion = z.string().regex(/^[a-f0-9]{64}$/);
@@ -148,6 +163,10 @@ module.exports = {
   stationParams,
   reviewParams,
   reviewDecisionBody,
+  referralParams,
+  referralDocumentParams,
+  issueReferralBody,
+  acknowledgeReferralHandoffBody,
   resolveQuery,
   previewVisualAcuityBody,
   saveVisualAcuityBody,

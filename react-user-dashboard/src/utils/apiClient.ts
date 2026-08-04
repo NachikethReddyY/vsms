@@ -33,6 +33,13 @@ function getDeviceId() {
   return value;
 }
 
+function getEventContext() {
+  const match = window.location.pathname.match(/\/events\/([a-f0-9-]{36})(?:\/|$)/i);
+  const value = new URLSearchParams(window.location.search).get("eventId") || match?.[1] || null;
+  if (value && /^[a-f0-9-]{36}$/i.test(value)) window.sessionStorage.setItem("vsms_event_id", value);
+  return value || window.sessionStorage.getItem("vsms_event_id");
+}
+
 const commonHeaders = {
   "Content-Type": "application/json",
   "X-Requested-With": "XMLHttpRequest",
@@ -44,6 +51,8 @@ const refreshClient = axios.create({ baseURL, withCredentials: true, headers: co
 apiClient.interceptors.request.use((config) => {
   config.headers["X-Device-Id"] = getDeviceId();
   config.headers["X-Device-Name"] = "VSMS staff web";
+  const eventId = getEventContext();
+  if (eventId) config.headers["X-Event-Id"] = eventId;
 
   if (accessToken) config.headers.Authorization = `Bearer ${accessToken}`;
   const requestCsrfToken = getCsrfToken();

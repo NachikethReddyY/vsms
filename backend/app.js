@@ -83,7 +83,7 @@ app.use(cors({
     if (!origin || env.corsOrigins.includes(origin)) return callback(null, true);
     return callback(new AppError(403, "ORIGIN_NOT_ALLOWED", "Request origin is not allowed"));
   },
-  methods: ["GET", "POST", "PATCH", "DELETE", "OPTIONS"],
+  methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
   allowedHeaders: [
     "Authorization",
     "Content-Type",
@@ -92,6 +92,7 @@ app.use(cors({
     "X-Requested-With",
     "X-Device-Id",
     "X-Device-Name",
+    "X-Event-Id",
     "Idempotency-Key",
   ],
 }));

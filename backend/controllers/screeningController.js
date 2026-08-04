@@ -1,5 +1,6 @@
 const screeningService = require("../services/screeningService");
 const reviewService = require("../services/reviewService");
+const referralService = require("../services/referralService");
 
 exports.listStations = async (req, res) => {
   res.json(await screeningService.listStations(req.params.eventId, req.user));
@@ -86,4 +87,39 @@ exports.recordReviewDecision = async (req, res) => {
     req.user,
     req.ip,
   ));
+};
+
+exports.issueReferral = async (req, res) => {
+  res.status(201).json(await referralService.issueReferral(
+    req.params.eventId,
+    req.params.referralId,
+    req.body,
+    req.user,
+    req.ip,
+  ));
+};
+
+exports.acknowledgeReferralHandoff = async (req, res) => {
+  res.json(await referralService.acknowledgeReferralHandoff(
+    req.params.eventId,
+    req.params.referralId,
+    req.body,
+    req.user,
+    req.ip,
+  ));
+};
+
+exports.downloadReferralDocument = async (req, res) => {
+  const document = await referralService.getDocument(
+    req.params.eventId,
+    req.params.referralId,
+    req.params.documentId,
+    req.user,
+  );
+  res.set({
+    "Content-Type": "application/pdf",
+    "Content-Disposition": `attachment; filename="${document.filename}"`,
+    "Cache-Control": "private, no-store",
+    "X-Content-Type-Options": "nosniff",
+  }).send(document.buffer);
 };
