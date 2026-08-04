@@ -250,10 +250,27 @@ exports.me = asyncHandler(async (req, res) => {
 
 exports.logout = asyncHandler(async (req, res) => {
     ensureCognitoConfigured();
-    const accessToken = parseCookies(req.headers.cookie)[ACCESS_COOKIE];
-    if (accessToken) void globalSignOut(accessToken).catch(() => {});
     clearAuthCookies(res);
     res.json({ message: "Logged out successfully", logoutUrl: getLogoutUrl() });
+});
+
+exports.globalLogout = asyncHandler(async (req, res) => {
+    const accessToken = parseCookies(req.headers.cookie)[ACCESS_COOKIE];
+    try {
+        ensureCognitoConfigured();
+        if (!accessToken) {
+            const error = new Error("An active access session is required to sign out everywhere");
+            error.statusCode = 401;
+            throw error;
+        }
+        await globalSignOut(accessToken);
+    } catch (error) {
+        if (error.statusCode !== 401 && error.statusCode !== 503) error.statusCode = 502;
+        throw error;
+    } finally {
+        clearAuthCookies(res);
+    }
+    res.json({ message: "Signed out everywhere successfully", logoutUrl: getLogoutUrl() });
 });
 
 exports.changePassword = asyncHandler(async (req, res) => {
