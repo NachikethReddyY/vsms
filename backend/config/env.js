@@ -12,6 +12,7 @@ const httpsOrigins = z.string().refine((value) => value.split(",").every((origin
   }
 }), "must contain only HTTPS origins");
 const localHostnames = new Set(["localhost", "127.0.0.1", "::1"]);
+const snsTopicArn = /^arn:(aws|aws-us-gov|aws-cn):sns:[a-z0-9-]+:\d{12}:[A-Za-z0-9_.-]{1,256}$/;
 
 const resolvePublicAppOrigin = (value, nodeEnv) => {
   if (!value && nodeEnv === "production") {
@@ -70,6 +71,10 @@ const schema = z.object({
   ENCRYPTION_ACTIVE_KEY_ID: optionalEnv(z.string().regex(/^[A-Za-z0-9_-]{1,32}$/)),
   ENCRYPTION_KEYRING_JSON: optionalEnv(z.string().min(1)),
   SES_FROM_EMAIL: optionalEnv(z.string().email()),
+  SES_SNS_TOPIC_ARNS: optionalEnv(z.string().refine(
+    (value) => value.split(",").every((topic) => snsTopicArn.test(topic.trim())),
+    "must contain only Amazon SNS topic ARNs",
+  )),
   AWS_REGION: z.string().min(1).default("us-east-1"),
 });
 
@@ -129,4 +134,5 @@ module.exports = Object.freeze({
   publicAppOrigin,
   encryptionActiveKeyId: values.ENCRYPTION_ACTIVE_KEY_ID || null,
   encryptionKeyring,
+  sesSnsTopicArns: (values.SES_SNS_TOPIC_ARNS || "").split(",").map((topic) => topic.trim()).filter(Boolean),
 });

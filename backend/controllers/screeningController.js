@@ -99,6 +99,16 @@ exports.issueReferral = async (req, res) => {
   ));
 };
 
+exports.reviseReferral = async (req, res) => {
+  res.status(201).json(await referralService.createReferralRevision(
+    req.params.eventId,
+    req.params.referralId,
+    req.body,
+    req.user,
+    req.ip,
+  ));
+};
+
 exports.acknowledgeReferralHandoff = async (req, res) => {
   res.json(await referralService.acknowledgeReferralHandoff(
     req.params.eventId,

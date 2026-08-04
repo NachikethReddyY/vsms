@@ -38,6 +38,15 @@ const acknowledgeReferralHandoffBody = z.object({
   idempotencyKey: z.string().uuid(),
 }).strict();
 
+const reviseReferralBody = z.object({
+  destinationName: z.string().trim().min(2).max(200),
+  reason: z.string().trim().min(10).max(2000),
+  instructions: z.string().trim().max(2000).optional(),
+  urgency: z.enum(["ROUTINE", "PRIORITY", "URGENT", "EMERGENCY"]),
+  idempotencyKey: z.string().uuid(),
+  confirmed: z.literal(true),
+}).strict();
+
 const clinicalSummary = z.string().trim().min(10).max(2000);
 const recommendations = z.string().trim().max(2000).optional();
 const contextVersion = z.string().regex(/^[a-f0-9]{64}$/);
@@ -167,6 +176,7 @@ module.exports = {
   referralDocumentParams,
   issueReferralBody,
   acknowledgeReferralHandoffBody,
+  reviseReferralBody,
   resolveQuery,
   previewVisualAcuityBody,
   saveVisualAcuityBody,
