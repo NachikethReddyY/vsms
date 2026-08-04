@@ -4,7 +4,12 @@ const path = require("path");
 const AppError = require("../errors/AppError");
 
 const MIME_EXTENSIONS = { "image/png": "png", "image/jpeg": "jpg" };
-const SIGNATURE_KEY = /^signatures\/([a-f0-9-]{36})\/(consent|referral)-([a-f0-9-]{36})-([a-f0-9-]{36})\.(png|jpg)$/;
+const PURPOSE_SLUGS = Object.freeze({
+  CONSENT: "consent",
+  REFERRAL: "referral",
+  REVIEW_DECISION: "review-decision",
+});
+const SIGNATURE_KEY = /^signatures\/([a-f0-9-]{36})\/(consent|referral|review-decision)-([a-f0-9-]{36})-([a-f0-9-]{36})\.(png|jpg)$/;
 const storageRoot = () => path.resolve(
   process.env.SIGNATURE_STORAGE_DIR || path.join(__dirname, "..", "secure-data", "signatures"),
 );
@@ -29,7 +34,9 @@ const hasExpectedImageSignature = (buffer, mimeType) => mimeType === "image/png"
     && buffer.subarray(-2).equals(Buffer.from([0xff, 0xd9]));
 
 const storeSignature = async (buffer, mimeType, userId, eventId, purpose) => {
-  const filename = `${purpose.toLowerCase()}-${eventId}-${crypto.randomUUID()}.${MIME_EXTENSIONS[mimeType]}`;
+  const purposeSlug = PURPOSE_SLUGS[purpose];
+  if (!purposeSlug) throw new AppError(422, "INVALID_SIGNATURE", "Signature purpose is invalid");
+  const filename = `${purposeSlug}-${eventId}-${crypto.randomUUID()}.${MIME_EXTENSIONS[mimeType]}`;
   const userRoot = path.join(storageRoot(), userId);
   await fs.mkdir(userRoot, { recursive: true });
   await fs.writeFile(path.join(userRoot, filename), buffer, { flag: "wx", mode: 0o600 });
@@ -42,8 +49,9 @@ const storeSignature = async (buffer, mimeType, userId, eventId, purpose) => {
 
 const loadVerifiedSignature = async ({ signatureObjectKey, signatureSha256, signatureMimeType }, userId, eventId, purpose) => {
   const extension = MIME_EXTENSIONS[signatureMimeType];
+  const purposeSlug = PURPOSE_SLUGS[purpose];
   const match = SIGNATURE_KEY.exec(signatureObjectKey || "");
-  if (!extension || !match || match[1] !== userId || match[2] !== purpose.toLowerCase() || match[3] !== eventId || match[5] !== extension) {
+  if (!extension || !purposeSlug || !match || match[1] !== userId || match[2] !== purposeSlug || match[3] !== eventId || match[5] !== extension) {
     throw new AppError(422, "INVALID_SIGNATURE", "Signature metadata is invalid");
   }
   let buffer;
@@ -108,6 +116,7 @@ const deleteEventSignature = async (signatureObjectKey, eventId) => {
 
 module.exports = {
   MIME_EXTENSIONS,
+  PURPOSE_SLUGS,
   hasExpectedImageSignature,
   storeSignature,
   loadVerifiedSignature,

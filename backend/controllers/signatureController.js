@@ -20,7 +20,19 @@ exports.storeSignature = asyncHandler(async (req, res) => {
             select: { referralId: true },
         });
         if (!referral) throw validationError("Referral signature target is not available");
-    } else throw validationError("purpose must be CONSENT or REFERRAL");
+    } else if (purpose === "REVIEW_DECISION") {
+        await requireReviewerAccess(prisma, eventId, req.auth);
+        const registration = await prisma.eventRegistration.findFirst({
+            where: {
+                registrationId: targetId,
+                eventId,
+                registrationStatus: { in: ["SIGNED_UP", "CHECKED_IN"] },
+                reviews: { none: {} },
+            },
+            select: { registrationId: true },
+        });
+        if (!registration) throw validationError("Review decision signature target is not available");
+    } else throw validationError("purpose must be CONSENT, REFERRAL, or REVIEW_DECISION");
 
     const dataUrl = String(req.body?.dataUrl || "");
     const match = /^data:(image\/(?:png|jpeg));base64,([A-Za-z0-9+/=]+)$/.exec(dataUrl);

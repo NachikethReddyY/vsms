@@ -2,6 +2,7 @@ const crypto = require("crypto");
 const prisma = require("../prisma/prismaClient");
 const AppError = require("../errors/AppError");
 const { IMPORTABLE_TEMPLATE_KEYS } = require("./stationTemplateMapping");
+const { loadVerifiedSignature, consumeSignatureArtifact } = require("../utils/signatureStorage");
 
 const FLAG_RANK = { NORMAL: 0, REVIEW: 1, REFER: 2, URGENT: 3 };
 const ACTIVE_ASSIGNMENT_STATUSES = ["ASSIGNED", "CONFIRMED"];
@@ -183,12 +184,19 @@ const loadRegistration = async (db, eventId, registrationId, stations) => {
           urgency: true,
           clinicalSummary: true,
           recommendations: true,
+          signatureSha256: true,
+          signedPayloadHash: true,
+          signedAt: true,
           reviewedAt: true,
           reviewer: { select: { fullName: true } },
+          signatureSigner: { select: { fullName: true } },
           referrals: {
+            orderBy: { revisionNumber: "desc" },
             take: 1,
             select: {
               referralId: true,
+              revisionNumber: true,
+              supersedesReferralId: true,
               destinationName: true,
               reason: true,
               instructions: true,
@@ -203,7 +211,7 @@ const loadRegistration = async (db, eventId, registrationId, stations) => {
               notificationDeliveries: {
                 orderBy: { createdAt: "desc" },
                 take: 1,
-                select: { id: true, status: true, recipient: true, providerMessageId: true, failureReason: true, sentAt: true, attemptCount: true },
+                select: { id: true, status: true, recipient: true, providerMessageId: true, failureReason: true, sentAt: true, deliveredAt: true, attemptCount: true },
               },
             },
           },
@@ -222,11 +230,17 @@ const serializeReview = (review) => review ? {
   recommendations: review.recommendations,
   reviewedAt: review.reviewedAt,
   reviewedByName: review.reviewer.fullName,
+  signatureSignerName: review.signatureSigner?.fullName || review.reviewer.fullName,
+  signatureSha256: review.signatureSha256,
+  signedPayloadHash: review.signedPayloadHash,
+  signedAt: review.signedAt,
   referral: serializeReferral(review.referrals[0]),
 } : null;
 
 const serializeReferral = (referral) => referral ? {
   referralId: referral.referralId,
+  revisionNumber: referral.revisionNumber || 1,
+  supersedesReferralId: referral.supersedesReferralId || null,
   destinationName: referral.destinationName,
   reason: referral.reason,
   instructions: referral.instructions,
@@ -241,6 +255,7 @@ const serializeReferral = (referral) => referral ? {
     providerMessageId: referral.notificationDeliveries[0].providerMessageId,
     failureReason: referral.notificationDeliveries[0].failureReason,
     sentAt: referral.notificationDeliveries[0].sentAt,
+    deliveredAt: referral.notificationDeliveries[0].deliveredAt,
     attemptCount: referral.notificationDeliveries[0].attemptCount,
   } : null,
 } : null;
@@ -292,8 +307,45 @@ const decisionUrgency = (decision) => {
   return "ROUTINE";
 };
 
+const reviewSignedPayloadHash = ({ eventId, registrationId, reviewId, userId, decision, urgency, signedAt }) => crypto
+  .createHash("sha256")
+  .update(JSON.stringify({
+    eventId,
+    registrationId,
+    reviewId,
+    version: 1,
+    reviewedByUserId: userId,
+    outcome: decision.outcome,
+    urgency,
+    contextVersion: decision.contextVersion,
+    clinicalSummary: decision.clinicalSummary,
+    recommendations: decision.recommendations || null,
+    referral: decision.referral || null,
+    signatureSha256: decision.signatureSha256.toLowerCase(),
+    signedAt: signedAt.toISOString(),
+  }))
+  .digest("hex");
+
 const recordDecision = async (eventId, registrationId, decision, user, ipAddress) => {
   const userId = user.userId;
+  const signature = {
+    signatureObjectKey: decision.signatureObjectKey,
+    signatureSha256: decision.signatureSha256,
+    signatureMimeType: decision.signatureMimeType,
+  };
+  await loadVerifiedSignature(signature, userId, eventId, "REVIEW_DECISION");
+  const reviewId = crypto.randomUUID();
+  const signedAt = new Date();
+  const urgency = decisionUrgency(decision);
+  const signedPayloadHash = reviewSignedPayloadHash({
+    eventId,
+    registrationId,
+    reviewId,
+    userId,
+    decision,
+    urgency,
+    signedAt,
+  });
   try {
     return await prisma.$transaction(async (tx) => {
       await requireReviewerAccess(tx, eventId, user);
@@ -312,9 +364,18 @@ const recordDecision = async (eventId, registrationId, decision, user, ipAddress
         throw new AppError(409, "SCREENING_RESULTS_CHANGED", "Screening results changed; reassess before deciding");
       }
 
-      const urgency = decisionUrgency(decision);
+      await consumeSignatureArtifact(
+        tx,
+        signature,
+        userId,
+        eventId,
+        "REVIEW_DECISION",
+        registrationId,
+        signedAt,
+      );
       const review = await tx.review.create({
         data: {
+          reviewId,
           registrationId,
           version: 1,
           reviewedByUserId: userId,
@@ -323,6 +384,12 @@ const recordDecision = async (eventId, registrationId, decision, user, ipAddress
           urgency,
           clinicalSummary: decision.clinicalSummary,
           recommendations: decision.recommendations || null,
+          signatureObjectKey: signature.signatureObjectKey,
+          signatureSha256: signature.signatureSha256.toLowerCase(),
+          signatureMimeType: signature.signatureMimeType,
+          signatureSignerUserId: userId,
+          signedPayloadHash,
+          signedAt,
         },
       });
 
@@ -353,6 +420,10 @@ const recordDecision = async (eventId, registrationId, decision, user, ipAddress
         reviewId: review.reviewId,
         outcome: review.outcome,
         urgency: review.urgency,
+        signaturePurpose: "REVIEW_DECISION",
+        signatureSha256: review.signatureSha256,
+        signedPayloadHash: review.signedPayloadHash,
+        signedAt: review.signedAt,
       };
       await tx.auditLog.create({
         data: {
@@ -384,6 +455,10 @@ const recordDecision = async (eventId, registrationId, decision, user, ipAddress
           urgency: review.urgency,
           clinicalSummary: review.clinicalSummary,
           recommendations: review.recommendations,
+          signatureSignerName: user.fullName || null,
+          signatureSha256: review.signatureSha256,
+          signedPayloadHash: review.signedPayloadHash,
+          signedAt: review.signedAt,
           reviewedAt: review.reviewedAt,
         },
         referral: serializeReferral(referral),
@@ -407,4 +482,5 @@ module.exports = {
   compareQueueItems,
   contextVersion,
   requireReviewerAccess,
+  reviewSignedPayloadHash,
 };
