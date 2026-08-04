@@ -127,6 +127,9 @@ const validateEventRange = (value, ctx) => {
   if (new Set((value.stations || []).map((station) => station.stationTemplateId)).size !== (value.stations || []).length) {
     ctx.addIssue({ code: "custom", path: ["stations"], message: "Station templates must be unique" });
   }
+  if (new Set((value.stations || []).map((station) => station.stationOrder)).size !== (value.stations || []).length) {
+    ctx.addIssue({ code: "custom", path: ["stations"], message: "Station order must be unique" });
+  }
   for (const [stationIndex, station] of (value.stations || []).entries()) {
     if (new Set(station.availabilities.map((entry) => entry.date)).size !== station.availabilities.length) {
       ctx.addIssue({ code: "custom", path: ["stations", stationIndex, "availabilities"], message: "Station dates must be unique" });

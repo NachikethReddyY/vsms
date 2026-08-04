@@ -581,7 +581,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Import active templates as event-owned station snapshots */
+        /** Import active screening templates as event Station rows (VA / refraction / colour vision / eye health). REGISTRATION and CLINICAL_REVIEW are rejected. */
         post: operations["importEventStations"];
         delete?: never;
         options?: never;
@@ -1946,16 +1946,20 @@ export interface operations {
             };
         };
         responses: {
-            401: components["responses"]["Unauthorized"];
-            422: components["responses"]["ValidationFailed"];
-            429: components["responses"]["RateLimited"];
-            /** @description Event staffing assignment is not available yet */
-            501: {
+            /** @description Staff assignment created */
+            201: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["Event"];
+                };
             };
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            422: components["responses"]["ValidationFailed"];
+            429: components["responses"]["RateLimited"];
         };
     };
     removeEventStaffAssignmentV1: {
@@ -2004,16 +2008,20 @@ export interface operations {
             };
         };
         responses: {
-            401: components["responses"]["Unauthorized"];
-            422: components["responses"]["ValidationFailed"];
-            429: components["responses"]["RateLimited"];
-            /** @description Station-template import is not available yet */
-            501: {
+            /** @description Stations imported */
+            201: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["Event"];
+                };
             };
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            422: components["responses"]["ValidationFailed"];
+            429: components["responses"]["RateLimited"];
         };
     };
     updateEventStationV1: {
@@ -2032,16 +2040,20 @@ export interface operations {
             };
         };
         responses: {
-            401: components["responses"]["Unauthorized"];
-            422: components["responses"]["ValidationFailed"];
-            429: components["responses"]["RateLimited"];
-            /** @description Station-template update is not available yet */
-            501: {
+            /** @description Station updated */
+            200: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["Event"];
+                };
             };
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            422: components["responses"]["ValidationFailed"];
+            429: components["responses"]["RateLimited"];
         };
     };
     publishEventV1: {

@@ -1,0 +1,106 @@
+name: Code Quality
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: code-quality-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  backend:
+    name: Backend tests and contracts
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: vsms_test
+          POSTGRES_USER: vsms
+          POSTGRES_PASSWORD: vsms-ci-password
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U vsms -d vsms_test"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      DATABASE_URL: postgresql://vsms:vsms-ci-password@127.0.0.1:5432/vsms_test
+      NODE_ENV: test
+      LOCAL_HTTPS: "false"
+      JWT_ACCESS_SECRET: ci-only-access-secret-with-at-least-thirty-two-characters
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+
+      - name: Install backend dependencies
+        run: npm ci
+        working-directory: backend
+
+      - name: Generate Prisma client
+        run: npx prisma generate
+        working-directory: backend
+
+      - name: Run backend unit tests
+        run: npm test
+        working-directory: backend
+
+      - name: Validate Prisma schema
+        run: npm run prisma:validate
+        working-directory: backend
+
+      - name: Lint OpenAPI contract
+        run: npm run openapi:lint
+        working-directory: backend
+
+      - name: Verify generated API client
+        run: npm run contracts:check
+        working-directory: backend
+
+      - name: Run database integration tests
+        run: npm run test:integration
+        working-directory: backend
+
+  frontend:
+    name: Frontend lint, tests and build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: react-user-dashboard/package-lock.json
+
+      - name: Install frontend dependencies
+        run: npm ci
+        working-directory: react-user-dashboard
+
+      - name: Lint frontend
+        run: npm run lint
+        working-directory: react-user-dashboard
+
+      - name: Run frontend tests
+        run: npm run test:queue
+        working-directory: react-user-dashboard
+
+      - name: Build frontend
+        run: npm run build
+        working-directory: react-user-dashboard

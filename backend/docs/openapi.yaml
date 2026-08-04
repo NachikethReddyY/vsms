@@ -278,10 +278,14 @@ paths:
           application/json:
             schema: { $ref: "#/components/schemas/StaffAssignmentRequest" }
       responses:
+        "201":
+          description: Staff assignment created
+          content: { application/json: { schema: { $ref: "#/components/schemas/Event" } } }
         "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
         "422": { $ref: "#/components/responses/ValidationFailed" }
         "429": { $ref: "#/components/responses/RateLimited" }
-        "501": { description: Event staffing assignment is not available yet }
   /api/v1/events/{eventId}/shifts/{shiftId}/assignments/{assignmentId}:
     delete:
       tags: [Events]
@@ -319,10 +323,14 @@ paths:
           application/json:
             schema: { $ref: "#/components/schemas/StationImportRequest" }
       responses:
+        "201":
+          description: Stations imported
+          content: { application/json: { schema: { $ref: "#/components/schemas/Event" } } }
         "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
         "422": { $ref: "#/components/responses/ValidationFailed" }
         "429": { $ref: "#/components/responses/RateLimited" }
-        "501": { description: Station-template import is not available yet }
   /api/v1/events/{eventId}/stations/{eventStationId}:
     patch:
       tags: [Events]
@@ -340,10 +348,14 @@ paths:
           application/json:
             schema: { $ref: "#/components/schemas/EventStationUpdateRequest" }
       responses:
+        "200":
+          description: Station updated
+          content: { application/json: { schema: { $ref: "#/components/schemas/Event" } } }
         "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
         "422": { $ref: "#/components/responses/ValidationFailed" }
         "429": { $ref: "#/components/responses/RateLimited" }
-        "501": { description: Station-template update is not available yet }
   /api/v1/events/{eventId}/publish:
     post:
       tags: [Events]
@@ -758,7 +770,7 @@ paths:
     post:
       tags: [Events]
       operationId: importEventStations
-      summary: Import active templates as event-owned station snapshots
+      summary: Import active screening templates as event Station rows (VA / refraction / colour vision / eye health). REGISTRATION and CLINICAL_REVIEW are rejected.
       parameters: [{ $ref: "#/components/parameters/EventId" }]
       requestBody:
         required: true
