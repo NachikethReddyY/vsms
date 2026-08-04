@@ -38,7 +38,7 @@ export default function ParticipantV2CreatePage() {
   });
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
-  const searchLink = `/participants-v2${eventId ? `?eventId=${encodeURIComponent(eventId)}` : ""}`;
+  const searchLink = `/participants${eventId ? `?eventId=${encodeURIComponent(eventId)}` : ""}`;
 
   function update<K extends keyof ParticipantForm>(field: K, value: ParticipantForm[K]) {
     setForm((current) => ({ ...current, [field]: value }));
@@ -69,7 +69,7 @@ export default function ParticipantV2CreatePage() {
       const response = await apiClient.post("/participants", { ...form, status: "ACTIVE" }, {
         headers: { "X-Event-Id": eventId },
       });
-      navigate(`/participants-v2/${response.data.participant.id}?eventId=${encodeURIComponent(eventId)}`);
+      navigate(`/participants/${response.data.participant.id}?eventId=${encodeURIComponent(eventId)}`);
     } catch (requestError: unknown) {
       setError(getApiError(requestError, "Unable to create participant."));
     } finally {
@@ -80,7 +80,7 @@ export default function ParticipantV2CreatePage() {
   if (!searchConfirmed) {
     return (
       <section className="participant-v2-page participant-v2-create">
-        <Link className="participant-v2-back" to={searchLink}><ArrowLeftIcon /> Back to Participants V2</Link>
+        <Link className="participant-v2-back" to={searchLink}><ArrowLeftIcon /> Back to participants</Link>
         <section className="participant-v2-create-guard">
           <ExclamationTriangleIcon />
           <h1>Search before creating</h1>

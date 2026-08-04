@@ -48,7 +48,7 @@ export default function ParticipantV2ConsentPage() {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const profileLink = `/participants-v2/${participantId}${eventId ? `?eventId=${encodeURIComponent(eventId)}` : ""}`;
+  const profileLink = `/participants/${participantId}${eventId ? `?eventId=${encodeURIComponent(eventId)}` : ""}`;
   const activeSigner = signerLabels[form.signerType];
   const requiresRepresentativeDetails = form.signerType !== "PARTICIPANT";
 
@@ -74,7 +74,7 @@ export default function ParticipantV2ConsentPage() {
   useEffect(() => { void loadConsentPage(); }, [loadConsentPage]);
 
   const missingRequirement = useMemo(() => {
-    if (!eventId) return "Choose an event in Participants V2 before recording consent.";
+    if (!eventId) return "Choose an event in Participants before recording consent.";
     if (!form.signerName.trim()) return `${activeSigner.name} is required.`;
     if (requiresRepresentativeDetails && !form.signerRelationship.trim()) return "Relationship to participant is required.";
     if (requiresRepresentativeDetails && !form.guardianContactName.trim()) return `${activeSigner.person} contact name is required.`;
@@ -118,7 +118,7 @@ export default function ParticipantV2ConsentPage() {
         consentFormVersionId: consentForm.id,
       });
       navigate(form.consentStatus === "ACCEPTED"
-        ? `/participants-v2/${participantId}/check-in?eventId=${encodeURIComponent(eventId)}`
+        ? `/participants/${participantId}/check-in?eventId=${encodeURIComponent(eventId)}`
         : profileLink);
     } catch (requestError: unknown) {
       setError(getApiError(requestError, "Unable to record consent."));
@@ -133,14 +133,14 @@ export default function ParticipantV2ConsentPage() {
       <header className="participant-v2-consent-heading">
         <span className="participant-v2-consent-icon"><DocumentTextIcon /></span>
         <div>
-          <p>Registration workspace · V2</p>
+          <p>Registration workspace</p>
           <h1 id="participant-v2-consent-title">Consent and signature</h1>
           <span>{participant ? `Record consent for ${participant.firstName} ${participant.lastName}.` : "Review the approved form and record the signer’s decision."}</span>
         </div>
         <span className="participant-v2-consent-security">Secure record</span>
       </header>
 
-      {!eventId ? <div className="participant-v2-consent-notice" role="alert"><ExclamationTriangleIcon /><div><strong>Event required</strong><p>Return to Participants V2, select an event, and open this participant again before recording consent.</p></div></div> : null}
+      {!eventId ? <div className="participant-v2-consent-notice" role="alert"><ExclamationTriangleIcon /><div><strong>Event required</strong><p>Return to Participants, select an event, and open this participant again before recording consent.</p></div></div> : null}
       {error ? <p className="participant-v2-alert participant-v2-consent-alert" role="alert">{error}</p> : null}
       {isLoading ? <div className="participant-v2-consent-loading">Loading the approved consent form...</div> : null}
       {!isLoading && !consentForm ? (

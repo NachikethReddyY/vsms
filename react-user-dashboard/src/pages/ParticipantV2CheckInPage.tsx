@@ -34,7 +34,7 @@ export default function ParticipantV2CheckInPage() {
   const { participantId = "" } = useParams();
   const [searchParams] = useSearchParams();
   const eventId = searchParams.get("eventId") ?? "";
-  const profileLink = `/participants-v2/${participantId}${eventId ? `?eventId=${encodeURIComponent(eventId)}` : ""}`;
+  const profileLink = `/participants/${participantId}${eventId ? `?eventId=${encodeURIComponent(eventId)}` : ""}`;
   const [review, setReview] = useState<CheckInReview | null>(null);
   const [existingRegistration, setExistingRegistration] = useState<Registration | null>(null);
   const [createdRegistration, setCreatedRegistration] = useState<Registration | null>(null);
@@ -117,8 +117,8 @@ export default function ParticipantV2CheckInPage() {
   if (!eventId) {
     return (
       <section className="participant-v2-page participant-v2-checkin">
-        <Link className="participant-v2-back" to={`/participants-v2/${participantId}`}><ArrowLeftIcon /> Back to participant profile</Link>
-        <section className="participant-v2-checkin-empty"><ExclamationTriangleIcon /><h1>Choose an event first</h1><p>Return to Participants V2, choose an open event, then open this participant to start an event check-in.</p><Link className="primary" to="/participants-v2">Choose an event</Link></section>
+        <Link className="participant-v2-back" to={`/participants/${participantId}`}><ArrowLeftIcon /> Back to participant profile</Link>
+        <section className="participant-v2-checkin-empty"><ExclamationTriangleIcon /><h1>Choose an event first</h1><p>Return to Participants, choose an open event, then open this participant to start an event check-in.</p><Link className="primary" to="/participants">Choose an event</Link></section>
       </section>
     );
   }
@@ -151,8 +151,8 @@ export default function ParticipantV2CheckInPage() {
           <p className="participant-v2-checkin-success-note">{isCheckedIn ? "Attendance was recorded securely. The QR pass remains available for the participant's event record." : "A duplicate registration was not created. Confirm their arrival below, or continue to the QR handoff."}</p>
           <div>
             {!isCheckedIn ? <button className="primary" type="button" disabled={isCheckingIn} onClick={() => void markAsCheckedIn(registration)}>{isCheckingIn ? "Checking in..." : "Mark participant as checked in"}</button> : null}
-            <Link className={isCheckedIn ? "primary" : "secondary"} to={`/participants-v2/registrations/${registration.id}/qr`}>View QR pass <ArrowRightIcon /></Link>
-            <Link className="secondary" to={`/participants-v2/registrations/${registration.id}/history`}>View registration history</Link>
+            <Link className={isCheckedIn ? "primary" : "secondary"} to={`/participants/registrations/${registration.id}/qr`}>View QR pass <ArrowRightIcon /></Link>
+            <Link className="secondary" to={`/participants/registrations/${registration.id}/history`}>View registration history</Link>
           </div>
           {error ? <p className="participant-v2-alert participant-v2-checkin-alert" role="alert">{error}</p> : null}
         </section>
@@ -165,7 +165,7 @@ export default function ParticipantV2CheckInPage() {
       <Link className="participant-v2-back" to={profileLink}><ArrowLeftIcon /> Back to participant profile</Link>
       <header className="participant-v2-checkin-heading">
         <span><TicketIcon /></span>
-        <div><p>Registration workspace · V2</p><h1 id="participant-v2-checkin-title">Event check-in</h1><small>Confirm this returning participant’s event registration.</small></div>
+        <div><p>Registration workspace</p><h1 id="participant-v2-checkin-title">Event check-in</h1><small>Confirm this returning participant’s event registration.</small></div>
       </header>
 
       {error ? <p className="participant-v2-alert participant-v2-checkin-alert" role="alert">{error}</p> : null}
