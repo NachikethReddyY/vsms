@@ -13,7 +13,12 @@ process.env.COGNITO_LOGOUT_URI ||= "https://localhost:5173";
 const app = require("../app");
 
 test("logout clears browser auth without requiring a valid access token", async () => {
-    const response = await request(app).post("/api/v1/auth/logout");
+    const response = await request(app)
+        .post("/api/v1/auth/logout")
+        .set("Origin", "https://localhost:5173")
+        .set("Cookie", "vsms_csrf=test-token")
+        .set("X-CSRF-Token", "test-token")
+        .send({});
 
     assert.equal(response.status, 200);
     assert.equal(response.body.logoutUrl, "https://vsms.auth.us-east-1.amazoncognito.com/logout?client_id=test-client&logout_uri=https%3A%2F%2Flocalhost%3A5173");

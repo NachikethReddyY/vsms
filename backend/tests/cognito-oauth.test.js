@@ -1,7 +1,7 @@
 const assert = require("node:assert/strict");
 const test = require("node:test");
 const { buildAuthorizationUrl } = require("../utils/cognitoClient");
-const { setOAuthCookies } = require("../utils/httpCookies");
+const { setAuthCookies, setOAuthCookies } = require("../utils/httpCookies");
 
 test("managed login uses an authorization-code grant with PKCE", () => {
     const previous = { ...process.env };
@@ -35,4 +35,20 @@ test("OAuth cookies are always Secure", () => {
 
     assert.equal(headers.get("Set-Cookie").length, 3);
     assert.ok(headers.get("Set-Cookie").every((cookie) => cookie.includes("; Secure;")));
+});
+
+test("auth cookies include a script-readable CSRF token without exposing credentials", () => {
+    const headers = new Map();
+    const response = {
+        getHeader: (name) => headers.get(name),
+        setHeader: (name, value) => headers.set(name, value),
+    };
+
+    setAuthCookies(response, { AccessToken: "access", RefreshToken: "refresh", ExpiresIn: 60 }, "staff@example.com");
+
+    const cookies = headers.get("Set-Cookie");
+    const csrf = cookies.find((value) => value.startsWith("vsms_csrf="));
+    assert.ok(csrf);
+    assert.ok(!csrf.includes("HttpOnly"));
+    assert.ok(cookies.filter((value) => !value.startsWith("vsms_csrf=")).every((value) => value.includes("HttpOnly")));
 });
