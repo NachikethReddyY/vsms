@@ -77,6 +77,10 @@ export default function ParticipantV2Page() {
   const selectedEvent = useMemo(() => events.find((event) => event.eventId === eventId), [eventId, events]);
 
   const search = useCallback(async (page = 1) => {
+    if (!eventId) {
+      setError("Select an event before searching for participants.");
+      return;
+    }
     const hasTextSearch = [criteria.name, criteria.participantReference, criteria.contactNumber]
       .some((value) => value.trim().length >= 3);
     if (!hasTextSearch && !criteria.dateOfBirth) {
@@ -88,6 +92,7 @@ export default function ParticipantV2Page() {
     try {
       const { data } = await apiClient.get<SearchResponse>("/participants", {
         params: { ...criteria, page, pageSize: PAGE_SIZE },
+        headers: { "X-Event-Id": eventId },
       });
       setResults(data);
       setSearched(true);
@@ -98,7 +103,7 @@ export default function ParticipantV2Page() {
     } finally {
       setSearching(false);
     }
-  }, [criteria]);
+  }, [criteria, eventId]);
 
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
