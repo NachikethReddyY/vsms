@@ -287,6 +287,30 @@ test("reporting controllers set their public and private cache boundaries", asyn
   }
 });
 
+test("event mutation controllers pass the sanitized request context", async () => {
+  const context = {
+    requestId: "66666666-6666-4666-8666-666666666666",
+    deviceId: "77777777-7777-4777-8777-777777777777",
+    ipAddress: "203.0.113.12",
+    deviceName: "Planning tablet",
+    userAgent: "sanitized-agent",
+  };
+  const originalTransition = eventService.transitionEvent;
+  let receivedContext;
+  eventService.transitionEvent = async (_eventId, _command, _body, _user, received) => {
+    receivedContext = received;
+    return { eventId };
+  };
+  const res = { json(value) { this.body = value; return this; } };
+
+  try {
+    await eventController.publish({ params: { eventId }, body: { version: 1 }, user: { userId: managerId }, context }, res);
+    assert.equal(receivedContext, context);
+  } finally {
+    eventService.transitionEvent = originalTransition;
+  }
+});
+
 test("export preserves essential cascade-deleted assignment fields with a stable hash", async () => {
   const db = reportingDb();
   const first = await eventService.exportSnapshot(eventId, db);
