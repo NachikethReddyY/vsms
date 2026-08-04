@@ -20,6 +20,7 @@ const run = (command, args, env = testEnvironment()) => {
 
 // Keep the integration command as the single CI gate: all maintained unit
 // suites plus the filesystem/API security contracts run before touching a DB.
+run(pnpm, ["exec", "prisma", "generate"]);
 run(pnpm, ["test"]);
 run("node", [
   "--test",
