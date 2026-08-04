@@ -37,6 +37,9 @@ const eventRecord = (status = "DRAFT", version = 1, assignments = [], registrati
   version,
   capacity: 10,
   createdByUserId: manager.userId,
+  cancelledByUserId: crypto.randomUUID(),
+  createIdempotencyKey: "internal-replay-key",
+  createPayloadHash: "a".repeat(64),
   shifts: [{ shiftId, eventId, name: "Main", startsAt, endsAt, requiredStaff: 1, status: "PLANNED", staffAssignments: assignments }],
   stations: [],
   eventDays: [],
@@ -209,6 +212,89 @@ test("event responses count only checked-in registrations toward venue capacity"
   assert.equal(result.signupCount, 2);
 });
 
+test("event responses project operational staff to only their own planned or active shift instructions", async (t) => {
+  const otherStaffId = crypto.randomUUID();
+  const ownStationId = crypto.randomUUID();
+  const otherStationId = crypto.randomUUID();
+  const templateId = crypto.randomUUID();
+  const ownAssignment = {
+    id: crypto.randomUUID(),
+    userId: staffId,
+    assignmentRole: "SUPPORT",
+    status: "ASSIGNED",
+    notes: "Report to the north entrance",
+    assignedUser: { id: staffId, username: "support", fullName: "Support Person", email: "support@example.com" },
+    station: { stationId: ownStationId, stationName: "Welcome", stationOrder: 1, stationType: "VISUAL_ACUITY" },
+  };
+  const otherAssignment = {
+    id: crypto.randomUUID(),
+    userId: otherStaffId,
+    assignmentRole: "EVENT_MANAGER",
+    status: "CONFIRMED",
+    notes: "Private instructions for another employee",
+    assignedUser: { id: otherStaffId, username: "other", fullName: "Other Person", email: "other@example.com" },
+    station: { stationId: otherStationId, stationName: "Other station", stationOrder: 2, stationType: "REFRACTION" },
+  };
+  const current = {
+    ...eventRecord("PUBLISHED", 1, [ownAssignment, otherAssignment]),
+    createdBy: { id: manager.userId, username: "admin", fullName: "Admin", email: "admin@example.com", sysRole: "ADMIN", status: "ACTIVE" },
+    shifts: [
+      eventRecord().shifts[0],
+      { ...eventRecord().shifts[0], shiftId: crypto.randomUUID(), status: "ACTIVE", staffAssignments: [ownAssignment, otherAssignment] },
+      { ...eventRecord().shifts[0], shiftId: crypto.randomUUID(), status: "COMPLETED", staffAssignments: [ownAssignment] },
+    ],
+    stations: [ownAssignment.station, otherAssignment.station],
+  };
+  current.shifts[0].staffAssignments = [otherAssignment];
+
+  const originalFindFirst = prisma.event.findFirst;
+  const originalTemplates = prisma.stationTemplate.findMany;
+  prisma.event.findFirst = async () => current;
+  prisma.stationTemplate.findMany = async () => [{
+    stationTemplateId: templateId,
+    templateKey: "VISUAL_ACUITY",
+    version: 1,
+    name: "Visual acuity",
+    description: null,
+    defaultCapacity: 3,
+  }];
+  t.after(() => {
+    prisma.event.findFirst = originalFindFirst;
+    prisma.stationTemplate.findMany = originalTemplates;
+  });
+
+  const supportResult = await eventService.getEvent(eventId, {
+    userId: staffId,
+    systemRole: "STAFF",
+    roles: ["SUPPORT"],
+  });
+  assert.equal(supportResult.canManage, false);
+  assert.equal(supportResult.shifts.length, 1);
+  assert.deepEqual(supportResult.shifts[0].staffAssignments.map(({ user }) => user.userId), [staffId]);
+  assert.equal(supportResult.shifts[0].staffAssignments[0].notes, "Report to the north entrance");
+  assert.deepEqual(supportResult.eventStations.map(({ eventStationId }) => eventStationId), [ownStationId]);
+  assert.equal(supportResult.createdBy, undefined);
+  assert.equal(Object.hasOwn(supportResult, "createdBy"), false);
+  assert.equal(Object.hasOwn(supportResult, "cancelledBy"), false);
+  assertForbiddenEventKeysAbsent(supportResult);
+  assert.doesNotMatch(JSON.stringify(supportResult), /other@example\.com|Private instructions|admin@example\.com/);
+
+  const managerResult = await eventService.getEvent(eventId, { ...manager, roles: ["ADMINISTRATOR"] });
+  assert.equal(managerResult.canManage, true);
+  assert.equal(managerResult.shifts.length, 3);
+  assert.equal(managerResult.shifts[1].staffAssignments.length, 2);
+  assert.equal(managerResult.createdBy.email, "admin@example.com");
+  assertForbiddenEventKeysAbsent(managerResult);
+
+  const assignedManagerResult = await eventService.getEvent(eventId, {
+    userId: otherStaffId,
+    systemRole: "EVENT_MANAGER",
+    roles: ["EVENT_MANAGER"],
+  });
+  assert.equal(assignedManagerResult.canManage, true);
+  assert.equal(assignedManagerResult.shifts[1].staffAssignments.length, 2);
+});
+
 function installDeletionTransaction(t, { claimCount = 1, crossEventReview = false } = {}) {
   const originalFindFirst = prisma.event.findFirst;
   const originalTransaction = prisma.$transaction;
@@ -247,6 +333,7 @@ function installDeletionTransaction(t, { claimCount = 1, crossEventReview = fals
     eventDay: remove("eventDays"),
     eventAuditLog: remove("eventAudit"),
     auditLog: { create: async (input) => { calls.push(["ledger", input]); return {}; } },
+    $queryRawUnsafe: async (...input) => { calls.push(["audit.deleteScope", input]); return [{ set_config: eventId }]; },
   });
   t.after(() => {
     prisma.event.findFirst = originalFindFirst;
@@ -285,6 +372,10 @@ test("terminal event deletion removes only event-owned records and leaves a non-
   assert.deepEqual(ledger.details, { status: "COMPLETED", version: 1 });
   assert.ok(calls.some(([name]) => name === "registrations"));
   assert.ok(calls.some(([name]) => name === "stations"));
+  assert.deepEqual(calls.filter(([name]) => name === "audit.deleteScope").map(([, input]) => input), [
+    ["SELECT set_config('vsms.event_audit_delete_event_id', $1, true)", eventId],
+    ["SELECT set_config('vsms.event_audit_delete_event_id', '', true)"],
+  ]);
 });
 
 test("terminal event deletion denies non-administrators and stale versions", async (t) => {
