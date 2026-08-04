@@ -525,7 +525,7 @@ async function ensureDemoRegistration(staff, participant, event, consent) {
   });
 
   const token = "VSMS-DEMO-QR-001";
-  const qr = await prisma.qRCodePass.upsert({
+  await prisma.qRCodePass.upsert({
     where: { token },
     update: {
       registrationId: registration.registrationId,
@@ -544,7 +544,7 @@ async function ensureDemoRegistration(staff, participant, event, consent) {
       isActive: true,
     },
   });
-  return { registration, qr };
+  return registration;
 }
 
 async function seedDemoData(staff, reviewer, consentForm) {
@@ -676,7 +676,7 @@ async function seedDemoData(staff, reviewer, consentForm) {
     consentForm,
     "Daniel Tan"
   );
-  const { registration, qr } = await ensureDemoRegistration(
+  const registration = await ensureDemoRegistration(
     staff,
     daniel,
     liveEvent,
@@ -738,11 +738,11 @@ async function seedDemoData(staff, reviewer, consentForm) {
     participants: { aisha, daniel, priya, marcus },
     aishaConsent,
     registration,
-    qr,
   };
 }
 
 async function main() {
+  if (process.env.NODE_ENV === "production") throw new Error("Demonstration seed data is disabled in production");
   const passwordHash = await bcrypt.hash(DEMO_PASSWORD, 12);
   const roles = await seedRoles();
   const staff = await seedStaff(roles, passwordHash);
@@ -760,7 +760,6 @@ async function main() {
   console.log(`Registered participant: ${demo.participants.daniel.participantReference} - Daniel Tan`);
   console.log(`Reviewer profile: ${reviewer.email} (local role: REVIEWER)`);
   console.log(`Registration ID: ${demo.registration.registrationId}`);
-  console.log(`Demo QR token: ${demo.qr.token}`);
 }
 
 main()

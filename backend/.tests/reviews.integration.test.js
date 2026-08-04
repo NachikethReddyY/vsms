@@ -27,6 +27,7 @@ const auth = (token) => ({ Authorization: `Bearer ${token}` });
 const createRegistration = async (label, queueNumber, resultFlags) => {
   const participant = await prisma.participant.create({
     data: {
+      participantReference: `REVIEW-${crypto.randomUUID().slice(0, 20)}`,
       nric: `TEST-${crypto.randomUUID()}`,
       nricMasked: "T****123A",
       firstName: label,
@@ -36,6 +37,8 @@ const createRegistration = async (label, queueNumber, resultFlags) => {
       contactNumber: "+65 6000 1000",
       emergencyContact: "+65 6000 1001",
       consentGiven: true,
+      createdById: testUsers.manager.id,
+      updatedById: testUsers.manager.id,
     },
   });
   const registration = await prisma.eventRegistration.create({
@@ -47,6 +50,7 @@ const createRegistration = async (label, queueNumber, resultFlags) => {
       participantDisplayName: `${label} Participant`,
       queueNumber,
       checkedIn: true,
+      idempotencyKey: crypto.randomUUID(),
     },
   });
   for (const [stationType, overallFlag] of Object.entries(resultFlags)) {
@@ -89,6 +93,9 @@ beforeAll(async () => {
 
   for (const [label, role] of Object.entries({ reviewer: "STAFF", admin: "ADMIN", manager: "EVENT_MANAGER", screener: "STAFF", inactive: "STAFF", inactiveShift: "STAFF" })) {
     testUsers[label] = await prisma.user.create({ data: userInput(label, role) });
+    const roleName = role === "ADMIN" ? "ADMINISTRATOR" : role === "EVENT_MANAGER" ? "EVENT_MANAGER" : "SCREENER";
+    const applicationRole = await prisma.role.upsert({ where: { roleName }, update: {}, create: { roleName } });
+    await prisma.userRole.create({ data: { userId: testUsers[label].id, roleId: applicationRole.id } });
   }
   reviewerToken = signAccessToken(testUsers.reviewer);
   adminToken = signAccessToken(testUsers.admin);

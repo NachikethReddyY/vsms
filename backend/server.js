@@ -5,12 +5,13 @@ const app = require("./app");
 const env = require("./config/env");
 const logger = require("./utils/logger/logger");
 
-const server = env.isProduction
-  ? app
-  : https.createServer({
+const useHttps = !env.isProduction && env.localHttps;
+const server = useHttps
+  ? https.createServer({
       key: fs.readFileSync(path.resolve(__dirname, env.TLS_KEY_PATH)),
       cert: fs.readFileSync(path.resolve(__dirname, env.TLS_CERT_PATH)),
-    }, app);
+    }, app)
+  : app;
 
 server.on("error", (error) => {
   logger.error("server.failed", { message: error.message, stack: error.stack });
@@ -19,7 +20,7 @@ server.on("error", (error) => {
 
 if (require.main === module) {
   server.listen(env.PORT, env.HOST, () => {
-    const protocol = env.isProduction ? "http" : "https";
+    const protocol = useHttps ? "https" : "http";
     logger.info(`Server running on ${protocol}://${env.HOST}:${env.PORT}`);
   });
 }

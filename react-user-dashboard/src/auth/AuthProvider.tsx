@@ -16,7 +16,12 @@ export function AuthProvider({ children }: PropsWithChildren) {
   const [session, setSessionState] = useState<AuthSession | null>(() => getStoredSession());
 
   useEffect(() => {
-    if (!getCsrfToken()) return;
+    if (!getCsrfToken()) {
+      setSessionTokens(null);
+      clearStoredSession();
+      setSessionState(null);
+      return;
+    }
     refreshAuthSession()
       .then(setSessionState)
       .catch(() => {

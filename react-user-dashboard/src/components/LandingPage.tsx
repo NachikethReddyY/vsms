@@ -60,11 +60,11 @@ const workflowSteps = [
 
 const featureZooms = [
   {
-    label: 'Queue and station load',
+    label: 'Schedule and location',
     icon: <path d="M5 25h22M8 21v-6M16 21V8M24 21v-9" />,
   },
   {
-    label: 'Offline save and sync',
+    label: 'Signups and attendance',
     icon: (
       <>
         <path d="M9 23a7 7 0 0 1 1.2-13.9A9 9 0 0 1 27 13.5 5.5 5.5 0 0 1 25 24H9" />
@@ -73,7 +73,7 @@ const featureZooms = [
     ),
   },
   {
-    label: 'Clinical review',
+    label: 'Lifecycle and activity',
     icon: (
       <>
         <path d="M8 6h16v20H8zM12 11h8M12 15h8" />
@@ -85,8 +85,8 @@ const featureZooms = [
 
 const trustItems = [
   {
-    title: 'Offline-ready',
-    description: 'Save locally. Sync when connected.',
+    title: 'Connected workflow',
+    description: 'One record follows every station.',
     icon: (
       <>
         <path d="M9 23a7 7 0 0 1 1.2-13.9A9 9 0 0 1 27 13.5 5.5 5.5 0 0 1 25 24H9" />
@@ -249,22 +249,22 @@ export default function LandingPage() {
             <figure className={styles['dashboard-showcase']}>
               <div className={styles['dashboard-frame']}>
                 <img
-                  src="/landing/placeholder-image.png"
-                  alt="Dashboard screenshot placeholder"
-                  width="1200"
-                  height="800"
+                  src="/landing/event-workspace-preview.jpg"
+                  alt="VSMS event workspace showing a published community screening, schedule and operational metrics"
+                  width="1440"
+                  height="900"
                   loading="lazy"
                   decoding="async"
                 />
               </div>
-              <figcaption className={styles['dashboard-note']}>Dashboard image placeholder. Replace with an approved product screenshot.</figcaption>
+              <figcaption className={styles['dashboard-note']}>Event workspace overview with schedule, status and operational metrics.</figcaption>
             </figure>
 
             <div className={styles['feature-zooms']} role="group" aria-label="Highlighted dashboard features">
               {featureZooms.map((feature) => (
                 <figure className={styles['feature-zoom']} key={feature.label}>
                   <div className={styles['zoom-window']} aria-hidden="true">
-                    <img src="/landing/placeholder-image.png" alt="" width="1200" height="800" loading="lazy" decoding="async" />
+                    <img src="/landing/event-workspace-preview.jpg" alt="" width="1440" height="900" loading="lazy" decoding="async" />
                   </div>
                   <figcaption>
                     <span aria-hidden="true"><OutlineIcon>{feature.icon}</OutlineIcon></span>

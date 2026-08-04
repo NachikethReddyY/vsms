@@ -1,22 +1,6 @@
-    @font-face {
-      font-family: "Geist";
-      src: url("/landing/Geist-Variable.woff2") format("woff2");
-      font-weight: 100 900;
-      font-style: normal;
-      font-display: swap;
-    }
-
-    @font-face {
-      font-family: "Geist Pixel Square";
-      src: url("/landing/GeistPixel-Square.woff2") format("woff2");
-      font-weight: 400;
-      font-style: normal;
-      font-display: swap;
-    }
-
     .landing-page {
       color-scheme: dark;
-      font-family: "Geist", system-ui, sans-serif;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
       font-synthesis: none;
       min-width: 320px;
       min-height: 100dvh;
@@ -165,7 +149,7 @@
       width: 36px;
       height: 36px;
       place-items: center;
-      border-radius: 7px;
+      border-radius: 8px;
       background: #173451;
       color: #e8f1fb;
     }
@@ -638,7 +622,7 @@
       display: block;
       width: 100%;
       height: auto;
-      aspect-ratio: 16 / 9;
+      aspect-ratio: 8 / 5;
       object-fit: cover;
     }
 
@@ -686,18 +670,18 @@
     }
 
     .feature-zoom:nth-child(1) .zoom-window img {
-      object-position: 46% 48%;
-      transform-origin: 46% 48%;
+      object-position: 25% 58%;
+      transform-origin: 25% 58%;
     }
 
     .feature-zoom:nth-child(2) .zoom-window img {
-      object-position: 88% 10%;
-      transform-origin: 88% 10%;
+      object-position: 75% 58%;
+      transform-origin: 75% 58%;
     }
 
     .feature-zoom:nth-child(3) .zoom-window img {
-      object-position: 84% 52%;
-      transform-origin: 84% 52%;
+      object-position: 50% 100%;
+      transform-origin: 50% 100%;
     }
 
     .feature-zoom figcaption {
@@ -810,9 +794,8 @@
 
     .access-panel h2 {
       margin-bottom: 0;
-      font-family: "Geist Pixel Square", "Geist", sans-serif;
       font-size: clamp(28px, 3.2vw, 40px);
-      font-weight: 400;
+      font-weight: 750;
       line-height: 1.08;
       letter-spacing: -0.025em;
       overflow-wrap: break-word;

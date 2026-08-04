@@ -27,7 +27,9 @@ test("logout does not wait for Cognito global sign-out", async () => {
     try {
         const response = await request(app)
             .post("/api/v1/auth/logout")
-            .set("Cookie", "vsms_access=test-token");
+            .set("Origin", "https://localhost:5173")
+            .set("Cookie", ["vsms_access=test-token", "vsms_csrf=test-csrf-token"])
+            .set("X-CSRF-Token", "test-csrf-token");
 
         assert.equal(response.status, 200);
         assert.ok(response.headers["set-cookie"].every((value) => value.includes("Max-Age=0")));

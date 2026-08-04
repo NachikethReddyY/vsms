@@ -183,10 +183,10 @@ export interface paths {
             cookie?: never;
         };
         /** List events visible to the current staff member */
-        get: operations["listEvents"];
+        get: operations["listEventsV1"];
         put?: never;
         /** Create a draft event with optional planned shifts */
-        post: operations["createEvent"];
+        post: operations["createEventV1"];
         delete?: never;
         options?: never;
         head?: never;
@@ -200,8 +200,8 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** List published or in-progress events */
-        get: operations["listActiveEvents"];
+        /** List visible published and in-progress events */
+        get: operations["listActiveEventsV1"];
         put?: never;
         post?: never;
         delete?: never;
@@ -217,8 +217,8 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** List active users available for event staffing */
-        get: operations["listEventStaffDirectory"];
+        /** List active staff available for event staffing */
+        get: operations["listEventStaffDirectoryV1"];
         put?: never;
         post?: never;
         delete?: never;
@@ -235,7 +235,7 @@ export interface paths {
             cookie?: never;
         };
         /** List active reusable station templates */
-        get: operations["listStationTemplates"];
+        get: operations["listStationTemplatesV1"];
         put?: never;
         post?: never;
         delete?: never;
@@ -274,14 +274,15 @@ export interface paths {
             cookie?: never;
         };
         /** Get an authorized event detail */
-        get: operations["getEvent"];
+        get: operations["getEventV1"];
         put?: never;
         post?: never;
-        delete?: never;
+        /** Delete an exported unpopulated draft event */
+        delete: operations["deleteEmptyDraftEvent"];
         options?: never;
         head?: never;
         /** Update allowed fields using optimistic concurrency */
-        patch: operations["updateEvent"];
+        patch: operations["updateEventV1"];
         trace?: never;
     };
     "/api/v1/events/{eventId}/registrations": {
@@ -294,10 +295,10 @@ export interface paths {
             cookie?: never;
         };
         /** List registrations for an event */
-        get: operations["listEventRegistrations"];
+        get: operations["listEventRegistrationsV1"];
         put?: never;
-        /** Register a participant for an event */
-        post: operations["createEventRegistration"];
+        /** Register a participant for an open event */
+        post: operations["createEventRegistrationV1"];
         delete?: never;
         options?: never;
         head?: never;
@@ -313,8 +314,8 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Assign an active user to an event shift */
-        post: operations["assignEventStaff"];
+        /** Assign a user to an event shift */
+        post: operations["assignEventStaffV1"];
         delete?: never;
         options?: never;
         head?: never;
@@ -332,7 +333,7 @@ export interface paths {
         put?: never;
         post?: never;
         /** Remove a user from an event shift */
-        delete: operations["removeEventStaffAssignment"];
+        delete: operations["removeEventStaffAssignmentV1"];
         options?: never;
         head?: never;
         patch?: never;
@@ -348,7 +349,7 @@ export interface paths {
         get?: never;
         put?: never;
         /** Import active templates as event-owned station snapshots */
-        post: operations["importEventStations"];
+        post: operations["importEventStationsV1"];
         delete?: never;
         options?: never;
         head?: never;
@@ -369,7 +370,7 @@ export interface paths {
         options?: never;
         head?: never;
         /** Configure an imported station's order, capacity, or availability */
-        patch: operations["updateEventStation"];
+        patch: operations["updateEventStationV1"];
         trace?: never;
     };
     "/api/v1/events/{eventId}/publish": {
@@ -382,7 +383,7 @@ export interface paths {
         get?: never;
         put?: never;
         /** Move a draft event to published */
-        post: operations["publishEvent"];
+        post: operations["publishEventV1"];
         delete?: never;
         options?: never;
         head?: never;
@@ -399,7 +400,7 @@ export interface paths {
         get?: never;
         put?: never;
         /** Start a published event */
-        post: operations["startEvent"];
+        post: operations["startEventV1"];
         delete?: never;
         options?: never;
         head?: never;
@@ -416,7 +417,7 @@ export interface paths {
         get?: never;
         put?: never;
         /** Complete an in-progress event */
-        post: operations["completeEvent"];
+        post: operations["completeEventV1"];
         delete?: never;
         options?: never;
         head?: never;
@@ -433,7 +434,7 @@ export interface paths {
         get?: never;
         put?: never;
         /** Cancel a non-terminal event with a reason */
-        post: operations["cancelEvent"];
+        post: operations["cancelEventV1"];
         delete?: never;
         options?: never;
         head?: never;
@@ -651,8 +652,8 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Read immutable event history (manager/admin only) */
-        get: operations["getEventAuditLog"];
+        /** Read immutable event history for a manager-visible event */
+        get: operations["getEventAuditLogV1"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1164,6 +1165,396 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/public/events/{eventId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                eventId: components["parameters"]["EventId"];
+            };
+            cookie?: never;
+        };
+        /** Read a published, in-progress, completed, or cancelled event */
+        get: operations["getPublicEvent"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/events/{eventId}/metrics": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                eventId: components["parameters"]["EventId"];
+            };
+            cookie?: never;
+        };
+        /** Read truthful event outcome metrics visible to the current staff member */
+        get: operations["getEventMetrics"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/events/{eventId}/attendees": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                eventId: components["parameters"]["EventId"];
+            };
+            cookie?: never;
+        };
+        /** List manager-visible attendee operational rows with cursor pagination */
+        get: operations["listEventAttendees"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/events/{eventId}/export": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                eventId: components["parameters"]["EventId"];
+            };
+            cookie?: never;
+        };
+        /** Export a manager-visible event with a short-lived deletion receipt */
+        get: operations["exportEvent"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/users": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List projected user records (ADMIN only) */
+        get: operations["listUsersLegacy"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/events": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List events visible to the current staff member */
+        get: operations["listEvents"];
+        put?: never;
+        /** Create a draft event with optional planned shifts */
+        post: operations["createEvent"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/events/staff-directory": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List active users available for event staffing */
+        get: operations["listEventStaffDirectory"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/events/station-templates": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List active reusable station templates */
+        get: operations["listStationTemplates"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/locations/search": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Search Singapore addresses with OneMap
+         * @description Uses a server-cached OneMap token that is renewed automatically; requests are rate limited below OneMap's 300 calls/minute quota.
+         */
+        get: operations["searchSingaporeLocationsLegacy"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/events/{eventId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                eventId: components["parameters"]["EventId"];
+            };
+            cookie?: never;
+        };
+        /** Get an authorized event detail */
+        get: operations["getEvent"];
+        put?: never;
+        post?: never;
+        /** Delete an exported unpopulated draft event through the legacy alias */
+        delete: operations["deleteEmptyDraftEventLegacy"];
+        options?: never;
+        head?: never;
+        /** Update allowed fields using optimistic concurrency */
+        patch: operations["updateEvent"];
+        trace?: never;
+    };
+    "/api/events/{eventId}/shifts/{shiftId}/assignments": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Assign an active user to an event shift */
+        post: operations["assignEventStaff"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/events/{eventId}/shifts/{shiftId}/assignments/{assignmentId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Remove a user from an event shift */
+        delete: operations["removeEventStaffAssignment"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/events/{eventId}/stations/import": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Import active screening templates as event Station rows (VA / refraction / colour vision / eye health). REGISTRATION and CLINICAL_REVIEW are rejected. */
+        post: operations["importEventStations"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/events/{eventId}/stations/{eventStationId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Configure an imported station's order, capacity, or availability */
+        patch: operations["updateEventStation"];
+        trace?: never;
+    };
+    "/api/events/{eventId}/publish": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Move a draft event to published */
+        post: operations["publishEvent"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/events/{eventId}/start": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Start a published event */
+        post: operations["startEvent"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/events/{eventId}/complete": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Complete an in-progress event */
+        post: operations["completeEvent"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/events/{eventId}/cancel": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Cancel a non-terminal event with a reason */
+        post: operations["cancelEvent"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/events/{eventId}/reviews": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List registrations currently actionable by an assigned reviewer */
+        get: operations["listClinicalReviewsLegacy"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/events/{eventId}/reviews/{registrationId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Inspect the current screening context or immutable decision */
+        get: operations["getClinicalReviewLegacy"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/events/{eventId}/reviews/{registrationId}/decision": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Atomically record one immutable decision and optional draft referral */
+        post: operations["recordClinicalReviewDecisionLegacy"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/events/{eventId}/audit-log": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Read immutable event history (manager/admin only) */
+        get: operations["getEventAuditLog"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -1354,6 +1745,8 @@ export interface components {
         AuthResponse: {
             expiresIn?: number;
             sessionExpiresIn: number;
+            /** @description Rotated double-submit token; also set as the readable vsms_csrf cookie */
+            csrfToken: string;
             returnTo?: string;
             user: components["schemas"]["User"];
         };
@@ -1456,7 +1849,7 @@ export interface components {
             shifts: components["schemas"]["Shift"][];
             eventDays: components["schemas"]["EventDay"][];
             eventStations: components["schemas"]["EventStation"][];
-            /** @description Number of collected registration entries for this event */
+            /** @description Number of registrations excluding cancelled registrations */
             signupCount: number;
             /** @description Number of signed-up or checked-in registrations not marked completed or cancelled */
             activeCapacityCount: number;
@@ -1981,10 +2374,6 @@ export interface components {
         } & {
             [key: string]: unknown;
         };
-        RegistrationListResponse: {
-            registrations: components["schemas"]["Registration"][];
-            pagination: components["schemas"]["Pagination"];
-        };
         RegistrationsEnvelope: {
             registrations: components["schemas"]["Registration"][];
         };
@@ -2231,6 +2620,205 @@ export interface components {
                 message: string;
             }[];
         };
+        PublicEvent: {
+            /** Format: uuid */
+            eventId: string;
+            name: string;
+            description: string | null;
+            bannerKey: components["schemas"]["EventBannerKey"];
+            artworkDataUrl: string | null;
+            venue: string;
+            address: string | null;
+            postalCode: string | null;
+            timezone: string;
+            /** Format: date-time */
+            startsAt: string;
+            /** Format: date-time */
+            endsAt: string;
+            capacity: number;
+            /** @enum {string} */
+            status: "PUBLISHED" | "IN_PROGRESS" | "COMPLETED" | "CANCELLED";
+            eventDays: components["schemas"]["EventDay"][];
+        };
+        EventMetrics: {
+            signupCount: number;
+            checkedInCount: number;
+            completedCount: number;
+            cancelledCount: number;
+            activeCount: number;
+            attendanceRatePercent: number;
+            screeningResultCount: number;
+            flaggedResultCount: number;
+            referralCount: number;
+            capacity: number;
+            expectedAttendance: number | null;
+        };
+        EventAttendee: {
+            /** Format: uuid */
+            registrationId: string;
+            participantReference: string;
+            participantDisplayName: string | null;
+            /** @enum {string} */
+            registrationStatus: "SIGNED_UP" | "CHECKED_IN" | "COMPLETED" | "CANCELLED";
+            checkedIn: boolean;
+            /** Format: date-time */
+            checkedInAt: string | null;
+            queueNumber: number | null;
+            /** Format: date-time */
+            createdAt: string;
+        };
+        EventAttendeeList: {
+            total: number;
+            attendees: components["schemas"]["EventAttendee"][];
+            nextCursor: string | null;
+        };
+        EventRegistrationCreateRequest: {
+            /** Format: uuid */
+            participantId: string;
+        };
+        EventRegistrationRecord: {
+            /** Format: uuid */
+            registrationId: string;
+            /** Format: uuid */
+            eventId: string;
+            /** Format: uuid */
+            participantId: string;
+            /** @enum {string} */
+            registrationStatus: "SIGNED_UP" | "CHECKED_IN" | "COMPLETED" | "CANCELLED";
+            queueNumber?: number | null;
+            /** Format: date-time */
+            registeredAt?: string;
+        } & {
+            [key: string]: unknown;
+        };
+        EventRegistrationCommandResponse: {
+            /** Format: uuid */
+            registrationId: string;
+            participantReference: string;
+            queueNumber: number | null;
+            /** @enum {string} */
+            status: "SIGNED_UP" | "CHECKED_IN" | "COMPLETED" | "CANCELLED";
+            registration: components["schemas"]["EventRegistrationRecord"];
+            idempotentReplay: boolean;
+        };
+        EventRegistrationListResponse: {
+            registrations: components["schemas"]["EventRegistrationRecord"][];
+            pagination: {
+                page: number;
+                pageSize: number;
+                total: number;
+                totalPages: number;
+            };
+        };
+        EventExportEvent: {
+            /** Format: uuid */
+            eventId: string;
+            name: string;
+            description: string | null;
+            bannerKey: components["schemas"]["EventBannerKey"];
+            artworkDataUrl: string | null;
+            venue: string;
+            address: string | null;
+            postalCode: string | null;
+            timezone: string;
+            /** Format: date-time */
+            startsAt: string;
+            /** Format: date-time */
+            endsAt: string;
+            capacity: number;
+            expectedAttendance: number | null;
+            status: components["schemas"]["EventStatus"];
+            version: number;
+        };
+        EventExportStation: {
+            /** Format: uuid */
+            stationId: string;
+            stationName: string;
+            /** @enum {string} */
+            stationType: "VISUAL_ACUITY" | "REFRACTION" | "COLOUR_VISION" | "EYE_HEALTH";
+            stationOrder: number;
+            isActive: boolean;
+        };
+        EventExportShift: {
+            /** Format: uuid */
+            shiftId: string;
+            name: string;
+            /** Format: date-time */
+            startsAt: string;
+            /** Format: date-time */
+            endsAt: string;
+            requiredStaff: number;
+            status: components["schemas"]["ShiftStatus"];
+        };
+        EventExportStationAvailability: {
+            /** Format: uuid */
+            eventStationAvailabilityId: string;
+            /** Format: uuid */
+            eventStationId: string;
+            /** Format: uuid */
+            eventDayId: string;
+            isAvailable: boolean;
+            /** Format: date-time */
+            startsAt: string | null;
+            /** Format: date-time */
+            endsAt: string | null;
+            capacity: number;
+        };
+        EventExportEventDay: {
+            /** Format: uuid */
+            eventDayId: string;
+            /** Format: date */
+            date: string;
+            /** Format: date-time */
+            startsAt: string;
+            /** Format: date-time */
+            endsAt: string;
+            stationAvailabilities: components["schemas"]["EventExportStationAvailability"][];
+        };
+        EventExportStaffAssignment: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            eventId: string;
+            /** Format: uuid */
+            stationId: string | null;
+            /** Format: uuid */
+            shiftId: string | null;
+            /** Format: uuid */
+            userId: string;
+            /** Format: uuid */
+            assignedBy: string;
+            /** Format: date-time */
+            assignedAt: string;
+            /** @enum {string|null} */
+            assignmentRole: "EVENT_MANAGER" | "REGISTRATION" | "SCREENER" | "REVIEWER" | "SUPPORT" | null;
+            assignmentStatus: components["schemas"]["StaffAssignmentStatus"];
+            /** @enum {string|null} */
+            status: "ASSIGNED" | "CONFIRMED" | "COMPLETED" | "CANCELLED" | null;
+        };
+        EventExport: {
+            /** @enum {integer} */
+            schemaVersion: 1;
+            /** Format: date-time */
+            generatedAt: string;
+            event: components["schemas"]["EventExportEvent"];
+            metrics: components["schemas"]["EventMetrics"];
+            eventDays: components["schemas"]["EventExportEventDay"][];
+            stations: components["schemas"]["EventExportStation"][];
+            shifts: components["schemas"]["EventExportShift"][];
+            staffAssignments: components["schemas"]["EventExportStaffAssignment"][];
+            attendees: components["schemas"]["EventAttendee"][];
+        };
+        EventExportResponse: {
+            export: components["schemas"]["EventExport"];
+            /** @description 15-minute HMAC-bound export receipt */
+            exportReceipt: string;
+        };
+        EventDeletionRequest: {
+            version: number;
+            eventName: string;
+            exportReceipt: string;
+        };
     };
     responses: {
         /** @description Event transitioned and audited */
@@ -2312,6 +2900,15 @@ export interface components {
             };
             content: {
                 "application/json": components["schemas"]["ScreeningResult"];
+            };
+        };
+        /** @description Request cannot be fulfilled in the resource's current state */
+        BadRequest: {
+            headers: {
+                [name: string]: unknown;
+            };
+            content: {
+                "application/json": components["schemas"]["Problem"];
             };
         };
     };
@@ -2407,6 +3004,7 @@ export interface operations {
                     "application/json": components["schemas"]["AuthConfigStatus"];
                 };
             };
+            429: components["responses"]["RateLimited"];
         };
     };
     authorizeWithCognito: {
@@ -2513,6 +3111,7 @@ export interface operations {
                     "application/json": components["schemas"]["LogoutResponse"];
                 };
             };
+            403: components["responses"]["Forbidden"];
             /** @description Cognito managed login is not configured */
             503: {
                 headers: {
@@ -2540,6 +3139,7 @@ export interface operations {
                     "application/json": components["schemas"]["LogoutResponse"];
                 };
             };
+            403: components["responses"]["Forbidden"];
             /** @description Cognito managed login is not configured */
             503: {
                 headers: {
@@ -2658,7 +3258,7 @@ export interface operations {
             409: components["responses"]["Conflict"];
         };
     };
-    listEvents: {
+    listEventsV1: {
         parameters: {
             query?: {
                 cursor?: components["parameters"]["Cursor"];
@@ -2685,7 +3285,7 @@ export interface operations {
             422: components["responses"]["ValidationFailed"];
         };
     };
-    createEvent: {
+    createEventV1: {
         parameters: {
             query?: never;
             header?: {
@@ -2714,9 +3314,16 @@ export interface operations {
             403: components["responses"]["Forbidden"];
             422: components["responses"]["ValidationFailed"];
             429: components["responses"]["RateLimited"];
+            /** @description Station and staff-assignment plan changes are not available yet */
+            501: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
         };
     };
-    listActiveEvents: {
+    listActiveEventsV1: {
         parameters: {
             query?: never;
             header?: never;
@@ -2725,19 +3332,19 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description Active events */
+            /** @description Authorized active events without pagination */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["Event"][];
+                    "application/json": components["schemas"]["EventListResponse"];
                 };
             };
             401: components["responses"]["Unauthorized"];
         };
     };
-    listEventStaffDirectory: {
+    listEventStaffDirectoryV1: {
         parameters: {
             query?: never;
             header?: never;
@@ -2759,7 +3366,7 @@ export interface operations {
             403: components["responses"]["Forbidden"];
         };
     };
-    listStationTemplates: {
+    listStationTemplatesV1: {
         parameters: {
             query?: never;
             header?: never;
@@ -2778,7 +3385,6 @@ export interface operations {
                 };
             };
             401: components["responses"]["Unauthorized"];
-            403: components["responses"]["Forbidden"];
         };
     };
     searchSingaporeLocations: {
@@ -2816,7 +3422,7 @@ export interface operations {
             };
         };
     };
-    getEvent: {
+    getEventV1: {
         parameters: {
             query?: never;
             header?: never;
@@ -2840,7 +3446,37 @@ export interface operations {
             404: components["responses"]["NotFound"];
         };
     };
-    updateEvent: {
+    deleteEmptyDraftEvent: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                eventId: components["parameters"]["EventId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["EventDeletionRequest"];
+            };
+        };
+        responses: {
+            /** @description Unpopulated draft event deleted and tombstoned */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            422: components["responses"]["ValidationFailed"];
+            429: components["responses"]["RateLimited"];
+        };
+    };
+    updateEventV1: {
         parameters: {
             query?: never;
             header?: never;
@@ -2868,9 +3504,17 @@ export interface operations {
             404: components["responses"]["NotFound"];
             409: components["responses"]["Conflict"];
             422: components["responses"]["ValidationFailed"];
+            429: components["responses"]["RateLimited"];
+            /** @description Station and staff-assignment plan changes are not available yet */
+            501: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
         };
     };
-    listEventRegistrations: {
+    listEventRegistrationsV1: {
         parameters: {
             query?: {
                 page?: components["parameters"]["Page"];
@@ -2884,25 +3528,25 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description Paginated event registrations */
+            /** @description Registration rows and pagination metadata */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["RegistrationListResponse"];
+                    "application/json": components["schemas"]["EventRegistrationListResponse"];
                 };
             };
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
-            404: components["responses"]["NotFound"];
+            422: components["responses"]["ValidationFailed"];
         };
     };
-    createEventRegistration: {
+    createEventRegistrationV1: {
         parameters: {
             query?: never;
             header: {
-                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+                "Idempotency-Key": string;
             };
             path: {
                 eventId: components["parameters"]["EventId"];
@@ -2911,38 +3555,37 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": {
-                    /** Format: uuid */
-                    participantId: string;
-                };
+                "application/json": components["schemas"]["EventRegistrationCreateRequest"];
             };
         };
         responses: {
-            /** @description Idempotent replay */
+            /** @description Idempotent replay of an existing registration */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["RegistrationResponse"];
+                    "application/json": components["schemas"]["EventRegistrationCommandResponse"];
                 };
             };
-            /** @description Participant registered */
+            /** @description Registration created */
             201: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["RegistrationResponse"];
+                    "application/json": components["schemas"]["EventRegistrationCommandResponse"];
                 };
             };
-            400: components["responses"]["ValidationFailed"];
+            400: components["responses"]["BadRequest"];
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
             409: components["responses"]["Conflict"];
+            422: components["responses"]["ValidationFailed"];
+            429: components["responses"]["RateLimited"];
         };
     };
-    assignEventStaff: {
+    assignEventStaffV1: {
         parameters: {
             query?: never;
             header?: never;
@@ -2958,7 +3601,7 @@ export interface operations {
             };
         };
         responses: {
-            /** @description Assignment saved */
+            /** @description Staff assignment created */
             201: {
                 headers: {
                     [name: string]: unknown;
@@ -2971,9 +3614,10 @@ export interface operations {
             404: components["responses"]["NotFound"];
             409: components["responses"]["Conflict"];
             422: components["responses"]["ValidationFailed"];
+            429: components["responses"]["RateLimited"];
         };
     };
-    removeEventStaffAssignment: {
+    removeEventStaffAssignmentV1: {
         parameters: {
             query: {
                 version: number;
@@ -3001,9 +3645,10 @@ export interface operations {
             404: components["responses"]["NotFound"];
             409: components["responses"]["Conflict"];
             422: components["responses"]["ValidationFailed"];
+            429: components["responses"]["RateLimited"];
         };
     };
-    importEventStations: {
+    importEventStationsV1: {
         parameters: {
             query?: never;
             header?: never;
@@ -3018,7 +3663,7 @@ export interface operations {
             };
         };
         responses: {
-            /** @description Stations imported and audited */
+            /** @description Stations imported */
             201: {
                 headers: {
                     [name: string]: unknown;
@@ -3031,9 +3676,10 @@ export interface operations {
             404: components["responses"]["NotFound"];
             409: components["responses"]["Conflict"];
             422: components["responses"]["ValidationFailed"];
+            429: components["responses"]["RateLimited"];
         };
     };
-    updateEventStation: {
+    updateEventStationV1: {
         parameters: {
             query?: never;
             header?: never;
@@ -3049,7 +3695,7 @@ export interface operations {
             };
         };
         responses: {
-            /** @description Event station updated and audited */
+            /** @description Station updated */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -3062,9 +3708,10 @@ export interface operations {
             404: components["responses"]["NotFound"];
             409: components["responses"]["Conflict"];
             422: components["responses"]["ValidationFailed"];
+            429: components["responses"]["RateLimited"];
         };
     };
-    publishEvent: {
+    publishEventV1: {
         parameters: {
             query?: never;
             header?: never;
@@ -3083,7 +3730,7 @@ export interface operations {
             429: components["responses"]["RateLimited"];
         };
     };
-    startEvent: {
+    startEventV1: {
         parameters: {
             query?: never;
             header?: never;
@@ -3102,7 +3749,7 @@ export interface operations {
             429: components["responses"]["RateLimited"];
         };
     };
-    completeEvent: {
+    completeEventV1: {
         parameters: {
             query?: never;
             header?: never;
@@ -3121,7 +3768,7 @@ export interface operations {
             429: components["responses"]["RateLimited"];
         };
     };
-    cancelEvent: {
+    cancelEventV1: {
         parameters: {
             query?: never;
             header?: never;
@@ -3454,7 +4101,7 @@ export interface operations {
             422: components["responses"]["ValidationFailed"];
         };
     };
-    getEventAuditLog: {
+    getEventAuditLogV1: {
         parameters: {
             query?: {
                 cursor?: components["parameters"]["Cursor"];
@@ -3471,6 +4118,7 @@ export interface operations {
             /** @description Reverse-chronological audit records */
             200: {
                 headers: {
+                    "Cache-Control"?: string;
                     [name: string]: unknown;
                 };
                 content: {
@@ -3479,6 +4127,7 @@ export interface operations {
             };
             401: components["responses"]["Unauthorized"];
             404: components["responses"]["NotFound"];
+            429: components["responses"]["RateLimited"];
         };
     };
     searchParticipants: {
@@ -4389,6 +5038,698 @@ export interface operations {
             };
             401: components["responses"]["Unauthorized"];
             404: components["responses"]["NotFound"];
+        };
+    };
+    getPublicEvent: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                eventId: components["parameters"]["EventId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Public event projection; cached for at most 60 seconds */
+            200: {
+                headers: {
+                    "Cache-Control"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PublicEvent"];
+                };
+            };
+            404: components["responses"]["NotFound"];
+            422: components["responses"]["ValidationFailed"];
+            429: components["responses"]["RateLimited"];
+        };
+    };
+    getEventMetrics: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                eventId: components["parameters"]["EventId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Aggregate-only metrics; never cached */
+            200: {
+                headers: {
+                    "Cache-Control"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EventMetrics"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+            422: components["responses"]["ValidationFailed"];
+            429: components["responses"]["RateLimited"];
+        };
+    };
+    listEventAttendees: {
+        parameters: {
+            query?: {
+                cursor?: string;
+                limit?: number;
+                status?: "SIGNED_UP" | "CHECKED_IN" | "COMPLETED" | "CANCELLED";
+                search?: string;
+            };
+            header?: never;
+            path: {
+                eventId: components["parameters"]["EventId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Operational attendee rows; never cached */
+            200: {
+                headers: {
+                    "Cache-Control"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EventAttendeeList"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+            422: components["responses"]["ValidationFailed"];
+            429: components["responses"]["RateLimited"];
+        };
+    };
+    exportEvent: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                eventId: components["parameters"]["EventId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Versioned JSON export; never cached */
+            200: {
+                headers: {
+                    "Cache-Control"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EventExportResponse"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+            422: components["responses"]["ValidationFailed"];
+            429: components["responses"]["RateLimited"];
+        };
+    };
+    listUsersLegacy: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Up to 100 users without credential material */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["User"][];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+        };
+    };
+    listEvents: {
+        parameters: {
+            query?: {
+                cursor?: components["parameters"]["Cursor"];
+                limit?: components["parameters"]["EventLimit"];
+                status?: components["schemas"]["EventStatus"];
+                search?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Authorized, cursor-paginated events */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EventListResponse"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            422: components["responses"]["ValidationFailed"];
+        };
+    };
+    createEvent: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description Stable retry key for this create attempt */
+                "Idempotency-Key"?: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateEventRequest"];
+            };
+        };
+        responses: {
+            /** @description Event created and audited */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Event"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            422: components["responses"]["ValidationFailed"];
+            429: components["responses"]["RateLimited"];
+            /** @description Station and staff-assignment plan changes are not available yet */
+            501: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    listEventStaffDirectory: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Active staff directory */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StaffDirectoryEntry"][];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+        };
+    };
+    listStationTemplates: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Active station templates available for import */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StationTemplate"][];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+        };
+    };
+    searchSingaporeLocationsLegacy: {
+        parameters: {
+            query: {
+                q: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Normalized Singapore locations */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LocationSearchResponse"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            422: components["responses"]["ValidationFailed"];
+            429: components["responses"]["RateLimited"];
+            /** @description OneMap is unavailable or not configured */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    getEvent: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                eventId: components["parameters"]["EventId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Event detail */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Event"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    deleteEmptyDraftEventLegacy: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                eventId: components["parameters"]["EventId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["EventDeletionRequest"];
+            };
+        };
+        responses: {
+            /** @description Unpopulated draft event deleted and tombstoned */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            422: components["responses"]["ValidationFailed"];
+            429: components["responses"]["RateLimited"];
+        };
+    };
+    updateEvent: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                eventId: components["parameters"]["EventId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateEventRequest"];
+            };
+        };
+        responses: {
+            /** @description Event updated and audited */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Event"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            422: components["responses"]["ValidationFailed"];
+            429: components["responses"]["RateLimited"];
+            /** @description Station and staff-assignment plan changes are not available yet */
+            501: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    assignEventStaff: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                eventId: components["parameters"]["EventId"];
+                shiftId: components["parameters"]["ShiftId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["StaffAssignmentRequest"];
+            };
+        };
+        responses: {
+            /** @description Assignment saved */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Event"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            422: components["responses"]["ValidationFailed"];
+            429: components["responses"]["RateLimited"];
+        };
+    };
+    removeEventStaffAssignment: {
+        parameters: {
+            query: {
+                version: number;
+            };
+            header?: never;
+            path: {
+                eventId: components["parameters"]["EventId"];
+                shiftId: components["parameters"]["ShiftId"];
+                assignmentId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Assignment removed */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Event"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            422: components["responses"]["ValidationFailed"];
+            429: components["responses"]["RateLimited"];
+        };
+    };
+    importEventStations: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                eventId: components["parameters"]["EventId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["StationImportRequest"];
+            };
+        };
+        responses: {
+            /** @description Stations imported and audited */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Event"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            422: components["responses"]["ValidationFailed"];
+            429: components["responses"]["RateLimited"];
+        };
+    };
+    updateEventStation: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                eventId: components["parameters"]["EventId"];
+                eventStationId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["EventStationUpdateRequest"];
+            };
+        };
+        responses: {
+            /** @description Event station updated and audited */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Event"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            422: components["responses"]["ValidationFailed"];
+            429: components["responses"]["RateLimited"];
+        };
+    };
+    publishEvent: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                eventId: components["parameters"]["EventId"];
+            };
+            cookie?: never;
+        };
+        requestBody: components["requestBodies"]["TransitionRequest"];
+        responses: {
+            200: components["responses"]["EventSuccess"];
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            422: components["responses"]["ValidationFailed"];
+            429: components["responses"]["RateLimited"];
+        };
+    };
+    startEvent: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                eventId: components["parameters"]["EventId"];
+            };
+            cookie?: never;
+        };
+        requestBody: components["requestBodies"]["TransitionRequest"];
+        responses: {
+            200: components["responses"]["EventSuccess"];
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            422: components["responses"]["ValidationFailed"];
+            429: components["responses"]["RateLimited"];
+        };
+    };
+    completeEvent: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                eventId: components["parameters"]["EventId"];
+            };
+            cookie?: never;
+        };
+        requestBody: components["requestBodies"]["TransitionRequest"];
+        responses: {
+            200: components["responses"]["EventSuccess"];
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            422: components["responses"]["ValidationFailed"];
+            429: components["responses"]["RateLimited"];
+        };
+    };
+    cancelEvent: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                eventId: components["parameters"]["EventId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CancelEventRequest"];
+            };
+        };
+        responses: {
+            200: components["responses"]["EventSuccess"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            422: components["responses"]["ValidationFailed"];
+            429: components["responses"]["RateLimited"];
+        };
+    };
+    listClinicalReviewsLegacy: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                eventId: components["parameters"]["EventId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Event summary and severity-ordered actionable queue */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReviewQueueResponse"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+        };
+    };
+    getClinicalReviewLegacy: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                eventId: components["parameters"]["EventId"];
+                registrationId: components["parameters"]["RegistrationId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Redacted participant, screening, readiness, and review detail */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReviewDetailResponse"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+        };
+    };
+    recordClinicalReviewDecisionLegacy: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                eventId: components["parameters"]["EventId"];
+                registrationId: components["parameters"]["RegistrationId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReviewDecisionRequest"];
+            };
+        };
+        responses: {
+            /** @description Decision recorded and registration completed */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReviewDecisionResponse"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            422: components["responses"]["ValidationFailed"];
+            429: components["responses"]["RateLimited"];
+        };
+    };
+    getEventAuditLog: {
+        parameters: {
+            query?: {
+                cursor?: components["parameters"]["Cursor"];
+                limit?: number;
+            };
+            header?: never;
+            path: {
+                eventId: components["parameters"]["EventId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Reverse-chronological audit records */
+            200: {
+                headers: {
+                    "Cache-Control"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AuditListResponse"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+            429: components["responses"]["RateLimited"];
         };
     };
 }

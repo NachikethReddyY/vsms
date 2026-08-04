@@ -2,6 +2,8 @@ const prisma = require("../prisma/prismaClient");
 const crypto = require("crypto");
 const AppError = require("../errors/AppError");
 const { encodeCursor, decodeCursor } = require("../utils/cursor");
+const env = require("../config/env");
+const { createExportReceipt, verifyExportReceipt } = require("../utils/eventExportReceipt");
 const {
   classifyTemplates,
   stationTypeForTemplateKey,
@@ -18,6 +20,23 @@ const ACTIONS = {
   start: { from: "PUBLISHED", to: "IN_PROGRESS", audit: "STARTED" },
   complete: { from: "IN_PROGRESS", to: "COMPLETED", audit: "COMPLETED" },
 };
+const assertPublishReady = (event) => {
+  const hasStation = (event.stations || []).some((station) => station.isActive !== false);
+  const hasAssignedPerson = (event.shifts || []).some((shift) =>
+    (shift.staffAssignments || []).some((assignment) => ACTIVE_ASSIGNMENT_STATUSES.includes(assignment.status || assignment.assignmentStatus))
+  );
+  if (!hasStation || !hasAssignedPerson) {
+    throw new AppError(422, "EVENT_NOT_READY", "Add at least one station and assign at least one person before publishing");
+  }
+};
+const auditFields = (context) => {
+  const value = typeof context === "string" ? { requestId: context } : context || {};
+  return {
+    requestId: value.requestId || null,
+    ipAddress: value.ipAddress || null,
+    deviceName: value.deviceName || null,
+  };
+};
 
 const snapshot = (event) => ({
   ...Object.fromEntries(EVENT_FIELDS.map((field) => {
@@ -30,7 +49,7 @@ const snapshot = (event) => ({
     templateVersion: station.templateVersion || 1,
     name: station.name || station.stationName,
     stationOrder: station.stationOrder,
-    capacity: station.capacity,
+    capacity: station.capacity ?? event.capacity,
     isAvailable: station.isAvailable ?? station.isActive,
   })),
   shifts: (event.shifts || []).map((shift) => ({
@@ -48,7 +67,7 @@ const snapshot = (event) => ({
         || assignment.station?.stationId
         || assignment.stationId
         || null,
-      status: assignment.status,
+      status: assignment.status || assignment.assignmentStatus,
       notes: assignment.notes ? "[redacted]" : null,
     })),
   })),
@@ -98,44 +117,21 @@ const eventInclude = {
     where: { registrationStatus: { in: ["SIGNED_UP", "CHECKED_IN"] } },
     select: { registrationId: true },
   },
-  _count: { select: { registrations: true } },
-};
-
-const eventListInclude = {
-  shifts: {
-    orderBy: { startsAt: "asc" },
-    include: {
-      staffAssignments: {
-        orderBy: { createdAt: "asc" },
-        select: {
-          staffAssignmentId: true,
-          assignmentRole: true,
-          status: true,
-          notes: true,
-          user: { select: { userId: true, username: true } },
-          eventStation: { select: { eventStationId: true, stationTemplateId: true, name: true, stationOrder: true } },
-        },
-      },
+  _count: {
+    select: {
+      registrations: { where: { registrationStatus: { not: "CANCELLED" } } },
     },
   },
-  createdBy: { select: { userId: true, username: true, email: true, systemRole: true, status: true } },
-  cancelledBy: { select: { userId: true, username: true, email: true, systemRole: true, status: true } },
-  registrations: {
-    where: { status: { in: ["SIGNED_UP", "CHECKED_IN"] } },
-    select: { registrationId: true },
-  },
-  _count: { select: { registrations: true } },
 };
 
-const publicUser = (value) => value ? {
+const publicUser = (value, detailed = false) => value ? {
   userId: value.id,
   username: value.username || value.fullName || value.email,
-  email: value.email,
-  systemRole: value.sysRole,
-  status: value.status,
+  ...(detailed ? { email: value.email, systemRole: value.sysRole, status: value.status } : {}),
 } : null;
 
 const loadTemplatesByStationType = async (db = prisma) => {
+  if (!db.stationTemplate?.findMany) return new Map();
   const templates = await db.stationTemplate.findMany({ where: { active: true } });
   const byType = new Map();
   for (const template of templates) {
@@ -145,8 +141,36 @@ const loadTemplatesByStationType = async (db = prisma) => {
   return byType;
 };
 
-const mapStationDto = (station, event, templatesByType) => {
+const loadAvailabilitiesByStationId = async (stations, db = prisma) => {
+  const byStationId = new Map();
+  if (stations.length === 0 || !db.eventStationAvailability?.findMany) return byStationId;
+  const rows = await db.eventStationAvailability.findMany({
+    where: { eventStationId: { in: stations.map((station) => station.stationId) } },
+    include: { eventDay: { select: { eventDayId: true, date: true } } },
+    orderBy: { eventDay: { date: "asc" } },
+  });
+  for (const row of rows) {
+    const availability = {
+      eventStationAvailabilityId: row.eventStationAvailabilityId,
+      isAvailable: row.isAvailable,
+      startsAt: row.startsAt,
+      endsAt: row.endsAt,
+      capacity: row.capacity,
+      eventDay: {
+        eventDayId: row.eventDay.eventDayId,
+        date: row.eventDay.date instanceof Date
+          ? row.eventDay.date.toISOString().slice(0, 10)
+          : String(row.eventDay.date).slice(0, 10),
+      },
+    };
+    byStationId.set(row.eventStationId, [...(byStationId.get(row.eventStationId) || []), availability]);
+  }
+  return byStationId;
+};
+
+const mapStationDto = (station, event, templatesByType, availabilitiesByStationId) => {
   const template = templatesByType.get(station.stationType);
+  const availabilities = availabilitiesByStationId.get(station.stationId) || [];
   return {
     eventStationId: station.stationId,
     // OpenAPI EventStation DTO: id is Station.stationId; template id resolved via #30 mapping.
@@ -155,21 +179,25 @@ const mapStationDto = (station, event, templatesByType) => {
     name: station.stationName,
     description: template?.description || station.stationType,
     stationOrder: station.stationOrder,
-    // Capacity is not on Station (#30); expose template default until availability is wired.
-    capacity: template?.defaultCapacity || event.capacity,
+    capacity: availabilities[0]?.capacity || template?.defaultCapacity || event.capacity,
     isAvailable: station.isActive,
-    availabilities: [],
+    availabilities,
   };
 };
 
 const toEventResponse = async ({ _count = {}, registrations = [], stations = [], ...event }, user, db = prisma) => {
-  const templatesByType = await loadTemplatesByStationType(db);
+  const manageable = user ? canManage(event, user) : false;
+  const [templatesByType, availabilitiesByStationId] = await Promise.all([
+    loadTemplatesByStationType(db),
+    loadAvailabilitiesByStationId(stations, db),
+  ]);
   const shifts = (event.shifts || []).map((shift) => ({
     ...shift,
-    staffAssignments: (shift.staffAssignments || []).map(({ assignedUser, station, ...assignment }) => {
+    staffAssignments: (shift.staffAssignments || []).map(({ assignedUser, station, notes, ...assignment }) => {
       const template = station ? templatesByType.get(station.stationType) : null;
       return {
         ...assignment,
+        ...(manageable ? { notes } : {}),
         staffAssignmentId: assignment.id,
         user: publicUser(assignedUser),
         eventStation: station ? {
@@ -181,10 +209,13 @@ const toEventResponse = async ({ _count = {}, registrations = [], stations = [],
       };
     }),
   }));
-  const eventStations = stations.map((station) => mapStationDto(station, event, templatesByType));
+  const eventStations = stations.map((station) => mapStationDto(
+    station,
+    event,
+    templatesByType,
+    availabilitiesByStationId,
+  ));
   const registrationCount = _count.registrations || 0;
-  const permissionEvent = { ...event, shifts };
-
   return {
     ...event,
     id: event.eventId,
@@ -199,12 +230,12 @@ const toEventResponse = async ({ _count = {}, registrations = [], stations = [],
     })),
     shifts,
     eventStations,
-    createdBy: publicUser(event.createdBy),
-    cancelledBy: publicUser(event.cancelledBy),
+    createdBy: publicUser(event.createdBy, manageable),
+    cancelledBy: publicUser(event.cancelledBy, manageable),
     signupCount: registrationCount,
     activeCapacityCount: registrations.length,
     _count: { eventRegistrations: registrationCount },
-    canManage: user ? canManage(permissionEvent, user) : false,
+    canManage: manageable,
   };
 };
 
@@ -235,13 +266,14 @@ const canManage = (event, user) =>
       event.shifts.some((shift) =>
         shift.staffAssignments.some(
           (assignment) =>
+            assignment.userId === user.userId &&
             assignment.assignmentRole === "EVENT_MANAGER" &&
             ["ASSIGNED", "CONFIRMED"].includes(assignment.status)
         )
       )));
 
-const requireEvent = async (eventId, user, manage = false) => {
-  const event = await loadEventWithAssignment(eventId, user);
+const requireEvent = async (eventId, user, manage = false, db = prisma) => {
+  const event = await loadEventWithAssignment(eventId, user, db);
   if (!event || (manage && !canManage(event, user))) {
     throw new AppError(404, "EVENT_NOT_FOUND", "Event was not found");
   }
@@ -282,8 +314,13 @@ const normalizeEventDay = (day, eventId) => ({
   endsAt: new Date(day.endsAt),
 });
 
-const assertRange = (data, shifts) => {
+const assertRange = (data, shifts, days = []) => {
   if (data.endsAt <= data.startsAt) throw new AppError(422, "INVALID_EVENT_RANGE", "Event end must be after its start");
+  for (const day of days) {
+    if (new Date(day.startsAt) < data.startsAt || new Date(day.endsAt) > data.endsAt) {
+      throw new AppError(422, "INVALID_EVENT_DAY_RANGE", "Every event day must be within the event schedule");
+    }
+  }
   for (const shift of shifts) {
     if (new Date(shift.startsAt) < data.startsAt || new Date(shift.endsAt) > data.endsAt) {
       throw new AppError(422, "INVALID_SHIFT_RANGE", "Every shift must be within the event schedule");
@@ -321,7 +358,7 @@ const assertShiftSchedulesAvailable = async (tx, eventId, desiredShifts, current
   const schedules = currentShifts.flatMap((shift) => {
     const desired = desiredById.get(shift.shiftId);
     if (!desired) return [];
-    return shift.staffAssignments
+      return shift.staffAssignments
       .filter((assignment) => ACTIVE_ASSIGNMENT_STATUSES.includes(assignment.status))
       .map((assignment) => ({
         userId: assignment.assignedUser?.id || assignment.user?.userId || assignment.userId,
@@ -359,14 +396,15 @@ const assertShiftSchedulesAvailable = async (tx, eventId, desiredShifts, current
   if (conflict) throw scheduleConflictError();
 };
 
-const auditUpdate = (tx, current, updated, user, correlationId) => tx.eventAuditLog.create({
+const auditUpdate = (tx, current, updated, user, context) => tx.auditLog.create({
   data: {
-    eventId: current.eventId,
-    actorUserId: user.userId,
+    userId: user.userId,
     action: "UPDATED",
-    beforeSnapshot: snapshot(current),
-    afterSnapshot: snapshot(updated),
-    correlationId,
+    entityName: "Event",
+    entityId: current.eventId,
+    ...auditFields(context),
+    oldValue: snapshot(current),
+    newValue: snapshot(updated),
   },
 });
 
@@ -433,10 +471,9 @@ const createEventDays = async (tx, eventId, days) => {
 
 const createEventStations = async (tx, eventId, stations, daysByDate, templatesById) => {
   const stationsByTemplate = new Map();
+  if (!stations?.length) return stationsByTemplate;
   const existing = await tx.station.findMany({ where: { eventId }, orderBy: { stationOrder: "asc" } });
-  let nextOrder = existing.reduce((max, station) => Math.max(max, station.stationOrder), 0);
-
-  for (const input of stations || []) {
+  const planned = stations.map((input) => {
     const template = templatesById.get(input.stationTemplateId);
     const stationType = stationTypeForTemplateKey(template.templateKey);
     if (!stationType) {
@@ -446,7 +483,23 @@ const createEventStations = async (tx, eventId, stations, daysByDate, templatesB
         `${template.templateKey} cannot be imported as a Station (not a screening StationType)`,
       );
     }
+    return { input, template, stationType };
+  });
+  const plannedTypes = new Set(planned.map(({ stationType }) => stationType));
+  const untouchedOrders = new Set(existing
+    .filter((station) => !plannedTypes.has(station.stationType))
+    .map((station) => station.stationOrder));
+  if (planned.some(({ input }) => untouchedOrders.has(input.stationOrder))) {
+    throw new AppError(422, "INVALID_STATION_ORDER", "Station order conflicts with an existing event station");
+  }
+  let temporaryOrder = existing.reduce((max, station) => Math.max(max, station.stationOrder), 0);
+  for (const station of existing.filter((row) => plannedTypes.has(row.stationType))) {
+    temporaryOrder += 1;
+    await tx.station.update({ where: { stationId: station.stationId }, data: { stationOrder: temporaryOrder } });
+    station.stationOrder = temporaryOrder;
+  }
 
+  for (const { input, template, stationType } of planned) {
     let station = existing.find((row) => row.stationType === stationType);
     if (station) {
       station = await tx.station.update({
@@ -458,18 +511,12 @@ const createEventStations = async (tx, eventId, stations, daysByDate, templatesB
         },
       });
     } else {
-      nextOrder = Math.max(nextOrder + 1, input.stationOrder || nextOrder + 1);
-      // Prefer requested order when free; otherwise append.
-      const orderTaken = existing.some((row) => row.stationOrder === input.stationOrder)
-        || [...stationsByTemplate.values()].some((row) => row.stationOrder === input.stationOrder);
-      const stationOrder = orderTaken ? nextOrder : (input.stationOrder || nextOrder);
-      nextOrder = Math.max(nextOrder, stationOrder);
       station = await tx.station.create({
         data: {
           eventId,
           stationType,
           stationName: template.name,
-          stationOrder,
+          stationOrder: input.stationOrder,
           isActive: input.isAvailable !== false,
         },
       });
@@ -500,10 +547,11 @@ const createEventStations = async (tx, eventId, stations, daysByDate, templatesB
 };
 
 const createShiftAssignments = async (tx, eventId, shiftInputs, stationsByTemplate, assignedByUserId) => {
-  await assertAssignmentSchedulesAvailable(tx, eventId, shiftInputs);
+  const inputsWithAssignments = (shiftInputs || []).filter((shift) => shift.assignments !== undefined);
+  if (inputsWithAssignments.length === 0) return;
+  await assertAssignmentSchedulesAvailable(tx, eventId, inputsWithAssignments);
   const savedShifts = await tx.shift.findMany({ where: { eventId } });
-  for (const input of shiftInputs || []) {
-    if (input.assignments === undefined) continue;
+  for (const input of inputsWithAssignments) {
     const saved = input.shiftId
       ? savedShifts.find((shift) => shift.shiftId === input.shiftId)
       : savedShifts.find((shift) => shift.name === input.name && shift.startsAt.getTime() === new Date(input.startsAt).getTime());
@@ -538,7 +586,7 @@ const createShiftAssignments = async (tx, eventId, shiftInputs, stationsByTempla
   }
 };
 
-const createEvent = async (body, user, correlationId, rawIdempotencyKey) => {
+const createEvent = async (body, user, context, rawIdempotencyKey, db = prisma) => {
   if (!["ADMIN", "EVENT_MANAGER"].includes(user.systemRole)) {
     throw new AppError(403, "FORBIDDEN", "You do not have permission to create events");
   }
@@ -547,7 +595,7 @@ const createEvent = async (body, user, correlationId, rawIdempotencyKey) => {
     throw new AppError(422, "INVALID_IDEMPOTENCY_KEY", "Idempotency-Key must contain 8 to 100 letters, numbers, underscores, or hyphens");
   }
   const payloadHash = crypto.createHash("sha256").update(JSON.stringify(body)).digest("hex");
-  return prisma.$transaction(async (tx) => {
+  return db.$transaction(async (tx) => {
     if (idempotencyKey) {
       const replay = await tx.event.findUnique({
         where: { createdByUserId_createIdempotencyKey: { createdByUserId: user.userId, createIdempotencyKey: idempotencyKey } },
@@ -557,11 +605,11 @@ const createEvent = async (body, user, correlationId, rawIdempotencyKey) => {
         if (replay.createPayloadHash !== payloadHash) {
           throw new AppError(409, "IDEMPOTENCY_KEY_REUSED", "This idempotency key was already used for a different event");
         }
-        return toEventResponse(replay, user);
+        return toEventResponse(replay, user, tx);
       }
     }
     const eventData = normalizeEventData(body);
-    assertRange(eventData, body.shifts);
+    assertRange(eventData, body.shifts || [], body.eventDays || []);
     const templatesById = await requireTemplates(tx, body.stations);
     const created = await tx.event.create({
       data: {
@@ -572,7 +620,6 @@ const createEvent = async (body, user, correlationId, rawIdempotencyKey) => {
         shifts: { create: (body.shifts || []).map((shift) => ({ ...normalizeShift(shift), eventId: undefined })) },
       },
     });
-
     const daysByDate = await createEventDays(tx, created.eventId, body.eventDays);
     const stationsByTemplate = await createEventStations(tx, created.eventId, body.stations, daysByDate, templatesById);
     await createShiftAssignments(tx, created.eventId, body.shifts, stationsByTemplate, user.userId);
@@ -588,16 +635,15 @@ const createEvent = async (body, user, correlationId, rawIdempotencyKey) => {
         action: "CREATED",
         entityName: "Event",
         entityId: created.eventId,
+        ...auditFields(context),
         newValue: snapshot(full),
-        ipAddress: "::1",
-        deviceName: "Server",
       },
     });
     return toEventResponse(full, user, tx);
   });
 };
 
-const listEvents = async (query, user) => {
+const listEvents = async (query, user, db = prisma) => {
   const statuses = query.statuses || (query.status ? [query.status] : null);
   const scope = `events:${statuses?.join(",") || "all"}:${query.search || ""}:${query.limit}`;
   const cursor = decodeCursor(query.cursor, scope);
@@ -633,7 +679,7 @@ const listEvents = async (query, user) => {
 
   const where = conditions.length > 0 ? { AND: conditions } : {};
 
-  const rows = await prisma.event.findMany({
+  const rows = await db.event.findMany({
     where,
     include: eventInclude,
     orderBy: [{ startsAt: "asc" }, { eventId: "asc" }],
@@ -644,7 +690,7 @@ const listEvents = async (query, user) => {
   const events = hasMore ? rows.slice(0, query.limit) : rows;
   const last = events.at(-1);
   return {
-    events: await Promise.all(events.map((event) => toEventResponse(event, user))),
+    events: await Promise.all(events.map((event) => toEventResponse(event, user, db))),
     nextCursor:
       hasMore && last
         ? encodeCursor({
@@ -656,12 +702,12 @@ const listEvents = async (query, user) => {
   };
 };
 
-const listActiveEvents = (user) => listEvents({
+const listActiveEvents = (user, db = prisma) => listEvents({
   statuses: ["PUBLISHED", "IN_PROGRESS"],
   limit: 100,
-}, user);
+}, user, db);
 
-const getEvent = async (eventId, user) => toEventResponse(await requireEvent(eventId, user), user);
+const getEvent = async (eventId, user, db = prisma) => toEventResponse(await requireEvent(eventId, user, false, db), user, db);
 
 const editableEventKeys = new Set([
   "name", "description", "bannerKey", "artworkDataUrl", "venue", "address", "postalCode",
@@ -669,62 +715,22 @@ const editableEventKeys = new Set([
   "endsAt", "capacity", "expectedAttendance", "eventDays", "stations", "shifts",
 ]);
 const allowedUpdateKeys = {
-  DRAFT: new Set([
-    "name",
-    "description",
-    "bannerKey",
-    "artworkDataUrl",
-    "venue",
-    "timezone",
-    "startsAt",
-    "endsAt",
-    "capacity",
-    "shifts",
-  ]),
-  PUBLISHED: new Set([
-    "name",
-    "description",
-    "bannerKey",
-    "artworkDataUrl",
-    "venue",
-    "timezone",
-    "startsAt",
-    "endsAt",
-    "capacity",
-    "shifts",
-  ]),
-  UPCOMING: new Set([
-    "name",
-    "description",
-    "bannerKey",
-    "artworkDataUrl",
-    "venue",
-    "timezone",
-    "startsAt",
-    "endsAt",
-    "capacity",
-    "shifts",
-  ]),
-  ONGOING: new Set([
-    "description",
-    "bannerKey",
-    "artworkDataUrl",
-    "capacity",
-  ]),
+  DRAFT: editableEventKeys,
+  PUBLISHED: editableEventKeys,
   IN_PROGRESS: new Set([
     "description",
     "bannerKey",
     "artworkDataUrl",
     "capacity",
   ]),
-  COMPLETED: new Set(["bannerKey", "artworkDataUrl"]),
-  CANCELLED: new Set(["bannerKey", "artworkDataUrl"]),
+  COMPLETED: new Set(),
+  CANCELLED: new Set(),
 };
 
-const updateEvent = async (eventId, body, user, correlationId) => {
-  const current = await requireEvent(eventId, user, true);
+const updateEvent = async (eventId, body, user, context, db = prisma) => {
+  const current = await requireEvent(eventId, user, true, db);
   const suppliedKeys = Object.keys(body).filter(
-    (key) => !["version"].includes(key)
+    (key) => key !== "version" && !(key === "stations" && body.stations.length === 0)
   );
 
   if (suppliedKeys.some((key) => !allowedUpdateKeys[current.status]?.has(key))) {
@@ -736,7 +742,7 @@ const updateEvent = async (eventId, body, user, correlationId) => {
   }
 
   if (
-    ["IN_PROGRESS", "ONGOING"].includes(current.status) &&
+    current.status === "IN_PROGRESS" &&
     body.capacity !== undefined &&
     body.capacity < current.capacity
   ) {
@@ -749,9 +755,9 @@ const updateEvent = async (eventId, body, user, correlationId) => {
 
   const combined = { ...current, ...normalizeEventData(body) };
   const desiredShifts = body.shifts || current.shifts;
-  assertRange(combined, desiredShifts);
+  assertRange(combined, desiredShifts, body.eventDays || current.eventDays);
 
-return prisma.$transaction(async (tx) => {
+return db.$transaction(async (tx) => {
   const changed = await tx.event.updateMany({
     where: { eventId, version: body.version },
     data: { ...normalizeEventData(body), version: { increment: 1 } },
@@ -761,41 +767,45 @@ return prisma.$transaction(async (tx) => {
     throw new AppError(409, "STALE_EVENT_VERSION", "This event was changed by someone else");
   }
 
-  let daysByDate;
+  const stationInputs = body.stations?.length ? body.stations : null;
+  const hasAssignmentChanges = (body.shifts || []).some((shift) => shift.assignments !== undefined);
+  const needsStationPlanning = Boolean(body.eventDays || stationInputs || hasAssignmentChanges);
+  let daysByDate = new Map();
   if (body.eventDays) {
     await tx.eventStationAvailability.deleteMany({ where: { eventDay: { eventId } } });
     await tx.eventDay.deleteMany({ where: { eventId } });
     daysByDate = await createEventDays(tx, eventId, body.eventDays);
-  } else {
+  } else if (needsStationPlanning) {
     const days = await tx.eventDay.findMany({ where: { eventId } });
     daysByDate = new Map(days.map((day) => [day.date.toISOString().slice(0, 10), day]));
   }
 
   let stationsByTemplate = new Map();
-  const templatesByType = await loadTemplatesByStationType(tx);
-  const existingStations = await tx.station.findMany({ where: { eventId } });
-  for (const station of existingStations) {
-    const template = templatesByType.get(station.stationType);
-    if (template) stationsByTemplate.set(template.stationTemplateId, station);
-  }
-
-  if (body.stations) {
-    const templatesById = await requireTemplates(tx, body.stations);
-    stationsByTemplate = await createEventStations(tx, eventId, body.stations, daysByDate, templatesById);
-  } else if (body.eventDays) {
-    // Recreate day-level availability rows against Station ids (column still named event_station_id).
+  if (needsStationPlanning) {
+    const templatesByType = await loadTemplatesByStationType(tx);
+    const existingStations = await tx.station.findMany({ where: { eventId } });
     for (const station of existingStations) {
-      for (const day of daysByDate.values()) {
-        await tx.eventStationAvailability.create({
-          data: {
-            eventStationId: station.stationId,
-            eventDayId: day.eventDayId,
-            isAvailable: station.isActive,
-            startsAt: station.isActive ? day.startsAt : null,
-            endsAt: station.isActive ? day.endsAt : null,
-            capacity: templatesByType.get(station.stationType)?.defaultCapacity || current.capacity,
-          },
-        });
+      const template = templatesByType.get(station.stationType);
+      if (template) stationsByTemplate.set(template.stationTemplateId, station);
+    }
+
+    if (stationInputs) {
+      const templatesById = await requireTemplates(tx, stationInputs);
+      stationsByTemplate = await createEventStations(tx, eventId, stationInputs, daysByDate, templatesById);
+    } else if (body.eventDays) {
+      for (const station of existingStations) {
+        for (const day of daysByDate.values()) {
+          await tx.eventStationAvailability.create({
+            data: {
+              eventStationId: station.stationId,
+              eventDayId: day.eventDayId,
+              isAvailable: station.isActive,
+              startsAt: station.isActive ? day.startsAt : null,
+              endsAt: station.isActive ? day.endsAt : null,
+              capacity: templatesByType.get(station.stationType)?.defaultCapacity || current.capacity,
+            },
+          });
+        }
       }
     }
   }
@@ -832,28 +842,28 @@ return prisma.$transaction(async (tx) => {
     data: {
       userId: user.userId,
       action: "UPDATED",
-      resource: "Event",
-      details: {
-        oldValue: snapshot(current),
-        newValue: snapshot(updated),
-      },
-      ipAddress: "::1",
+      entityName: "Event",
+      entityId: eventId,
+      ...auditFields(context),
+      oldValue: snapshot(current),
+      newValue: snapshot(updated),
     },
   });
 
-  return toEventResponse(updated, user);
+  return toEventResponse(updated, user, tx);
 });
 };
 
-const transitionEvent = async (eventId, command, body, user, correlationId) => {
-  const current = await requireEvent(eventId, user, true);
+const transitionEvent = async (eventId, command, body, user, context, db = prisma) => {
+  const current = await requireEvent(eventId, user, true, db);
   const transition = ACTIONS[command];
   if (!transition || current.status !== transition.from) {
     throw new AppError(409, "INVALID_EVENT_TRANSITION", "Event cannot perform that transition from its current state");
   }
-  return prisma.$transaction(async (tx) => {
+  if (command === "publish") assertPublishReady(current);
+  return db.$transaction(async (tx) => {
     const changed = await tx.event.updateMany({
-      where: { id: eventId, version: body.version, status: transition.from },
+      where: { eventId, version: body.version, status: transition.from },
       data: { status: transition.to, version: { increment: 1 } },
     });
     if (changed.count !== 1) throw new AppError(409, "STALE_EVENT_VERSION", "This event was changed by someone else");
@@ -865,7 +875,7 @@ const transitionEvent = async (eventId, command, body, user, correlationId) => {
     }
 
     const updated = await tx.event.findUniqueOrThrow({
-      where: { id: eventId },
+      where: { eventId },
       include: eventInclude,
     });
 
@@ -875,23 +885,22 @@ const transitionEvent = async (eventId, command, body, user, correlationId) => {
         action: transition.audit,
         entityName: "Event",
         entityId: eventId,
+        ...auditFields(context),
         oldValue: snapshot(current),
         newValue: snapshot(updated),
-        ipAddress: "::1",
-        deviceName: "Server",
       },
     });
 
-    return toEventResponse(updated);
+    return toEventResponse(updated, user, tx);
   });
 };
 
-const cancelEvent = async (eventId, body, user, correlationId) => {
-  const current = await requireEvent(eventId, user, true);
+const cancelEvent = async (eventId, body, user, context, db = prisma) => {
+  const current = await requireEvent(eventId, user, true, db);
 
   if (
-    !["DRAFT", "PUBLISHED", "UPCOMING", "IN_PROGRESS", "ONGOING"].includes(current.status) ||
-    (["IN_PROGRESS", "ONGOING"].includes(current.status) && !["SUPER_ADMIN", "ADMIN"].includes(user.systemRole))
+    !["DRAFT", "PUBLISHED", "IN_PROGRESS"].includes(current.status) ||
+    (current.status === "IN_PROGRESS" && !["SUPER_ADMIN", "ADMIN"].includes(user.systemRole))
   ) {
     throw new AppError(
       409,
@@ -899,9 +908,9 @@ const cancelEvent = async (eventId, body, user, correlationId) => {
       "Event cannot be cancelled from its current state"
     );
   }
-  return prisma.$transaction(async (tx) => {
+  return db.$transaction(async (tx) => {
     const changed = await tx.event.updateMany({
-      where: { id: eventId, version: body.version, status: current.status },
+      where: { eventId, version: body.version, status: current.status },
       data: {
         status: "CANCELLED",
         cancellationReason: body.reason,
@@ -925,7 +934,7 @@ const cancelEvent = async (eventId, body, user, correlationId) => {
     });
 
     const updated = await tx.event.findUniqueOrThrow({
-      where: { id: eventId },
+      where: { eventId },
       include: eventInclude,
     });
 
@@ -935,19 +944,18 @@ const cancelEvent = async (eventId, body, user, correlationId) => {
         action: "CANCELLED",
         entityName: "Event",
         entityId: eventId,
+        ...auditFields(context),
         oldValue: snapshot(current),
         newValue: snapshot(updated),
-        ipAddress: "::1",
-        deviceName: "Server",
       },
     });
 
-    return toEventResponse(updated);
+    return toEventResponse(updated, user, tx);
   });
 };
 
-const listStaffDirectory = async () => {
-  const users = await prisma.user.findMany({
+const listStaffDirectory = async (db = prisma) => {
+  const users = await db.user.findMany({
     where: { status: "ACTIVE" },
     select: { id: true, username: true, fullName: true, email: true, sysRole: true },
     orderBy: { fullName: "asc" },
@@ -963,8 +971,8 @@ const listStaffDirectory = async () => {
 // Read-only catalog for the events UI / OpenAPI StationTemplate DTO (#23).
 // Import/update map templateKey → StationType per #30 (catalog keys include
 // REGISTRATION / CLINICAL_REVIEW which are not StationType and are rejected on import).
-const listStationTemplates = async () => {
-  const templates = await prisma.stationTemplate.findMany({
+const listStationTemplates = async (db = prisma) => {
+  const templates = await db.stationTemplate.findMany({
     where: { active: true },
     select: {
       stationTemplateId: true,
@@ -979,11 +987,11 @@ const listStationTemplates = async () => {
   return templates;
 };
 
-const importStations = async (eventId, body, user, correlationId) => {
-  const current = await requireEvent(eventId, user, true);
+const importStations = async (eventId, body, user, context, db = prisma) => {
+  const current = await requireEvent(eventId, user, true, db);
   assertStationPlanningState(current);
 
-  const templates = await prisma.stationTemplate.findMany({
+  const templates = await db.stationTemplate.findMany({
     where: { stationTemplateId: { in: body.stationTemplateIds }, active: true },
   });
   if (templates.length !== body.stationTemplateIds.length) {
@@ -1008,14 +1016,15 @@ const importStations = async (eventId, body, user, correlationId) => {
     throw new AppError(422, "STATION_LIMIT_EXCEEDED", "An event can have at most 50 stations");
   }
 
-  return prisma.$transaction(async (tx) => {
+  return db.$transaction(async (tx) => {
     await bumpEventVersion(tx, eventId, body.version);
 
     let nextOrder = existingStations.reduce((max, station) => Math.max(max, station.stationOrder), 0);
     for (const { template, stationType } of importable) {
       const existing = existingStations.find((station) => station.stationType === stationType);
+      let station;
       if (existing) {
-        await tx.station.update({
+        station = await tx.station.update({
           where: { stationId: existing.stationId },
           data: {
             stationName: template.name,
@@ -1024,7 +1033,7 @@ const importStations = async (eventId, body, user, correlationId) => {
         });
       } else {
         nextOrder += 1;
-        const created = await tx.station.create({
+        station = await tx.station.create({
           data: {
             eventId,
             stationType,
@@ -1033,18 +1042,34 @@ const importStations = async (eventId, body, user, correlationId) => {
             isActive: true,
           },
         });
-        existingStations.push(created);
+        existingStations.push(station);
+      }
+
+      const availabilityCount = await tx.eventStationAvailability.count({
+        where: { eventStationId: station.stationId },
+      });
+      if (availabilityCount === 0 && current.eventDays.length > 0) {
+        await tx.eventStationAvailability.createMany({
+          data: current.eventDays.map((day) => ({
+            eventStationId: station.stationId,
+            eventDayId: day.eventDayId,
+            isAvailable: true,
+            startsAt: day.startsAt,
+            endsAt: day.endsAt,
+            capacity: template.defaultCapacity,
+          })),
+        });
       }
     }
 
     const updated = await tx.event.findUniqueOrThrow({ where: { eventId }, include: eventInclude });
-    await auditUpdate(tx, current, updated, user, correlationId);
+    await auditUpdate(tx, current, updated, user, context);
     return toEventResponse(updated, user, tx);
   });
 };
 
-const updateStation = async (eventId, eventStationId, body, user, correlationId) => {
-  const current = await requireEvent(eventId, user, true);
+const updateStation = async (eventId, eventStationId, body, user, context, db = prisma) => {
+  const current = await requireEvent(eventId, user, true, db);
   assertStationPlanningState(current);
   const stations = current.stations || [];
   const station = stations.find((candidate) => candidate.stationId === eventStationId);
@@ -1052,14 +1077,17 @@ const updateStation = async (eventId, eventStationId, body, user, correlationId)
   if (body.stationOrder !== undefined && body.stationOrder > stations.length) {
     throw new AppError(422, "INVALID_STATION_ORDER", "Station order must be within the event station list");
   }
+  if (body.capacity !== undefined && current.eventDays.length === 0) {
+    throw new AppError(422, "STATION_CAPACITY_REQUIRES_EVENT_DAY", "Add an event day before setting station capacity");
+  }
 
-  return prisma.$transaction(async (tx) => {
+  return db.$transaction(async (tx) => {
     await bumpEventVersion(tx, eventId, body.version);
 
     if (body.stationOrder !== undefined && body.stationOrder !== station.stationOrder) {
       const displaced = stations.find((candidate) => candidate.stationOrder === body.stationOrder);
       if (!displaced) throw new AppError(422, "INVALID_STATION_ORDER", "Station order must be within the event station list");
-      const tempOrder = stations.length + 1;
+      const tempOrder = Math.max(...stations.map((candidate) => candidate.stationOrder)) + 1;
       await tx.station.update({
         where: { stationId: displaced.stationId },
         data: { stationOrder: tempOrder },
@@ -1081,32 +1109,114 @@ const updateStation = async (eventId, eventStationId, body, user, correlationId)
       });
     }
 
-    // body.capacity accepted for OpenAPI/UI compatibility; Station has no capacity column (#30 MVP).
+    if (body.capacity !== undefined) {
+      const changed = await tx.eventStationAvailability.updateMany({
+        where: { eventStationId },
+        data: { capacity: body.capacity },
+      });
+      if (changed.count === 0 && current.eventDays.length > 0) {
+        await tx.eventStationAvailability.createMany({
+          data: current.eventDays.map((day) => ({
+            eventStationId,
+            eventDayId: day.eventDayId,
+            isAvailable: body.isAvailable ?? station.isActive,
+            startsAt: (body.isAvailable ?? station.isActive) ? day.startsAt : null,
+            endsAt: (body.isAvailable ?? station.isActive) ? day.endsAt : null,
+            capacity: body.capacity,
+          })),
+        });
+      }
+    }
+
     const updated = await tx.event.findUniqueOrThrow({ where: { eventId }, include: eventInclude });
-    await auditUpdate(tx, current, updated, user, correlationId);
+    await auditUpdate(tx, current, updated, user, context);
     return toEventResponse(updated, user, tx);
   });
 };
 
-const addStaffAssignment = async () => {
-  throw new AppError(
-    501,
-    "STAFF_ASSIGNMENT_NOT_AVAILABLE",
-    "Staff assignment via this endpoint is not available yet",
-  );
+const addStaffAssignment = async (eventId, shiftId, body, user, context, db = prisma) => {
+  const current = await requireEvent(eventId, user, true, db);
+  if (!["DRAFT", "PUBLISHED", "IN_PROGRESS"].includes(current.status)) {
+    throw new AppError(409, "STAFFING_NOT_EDITABLE", "Staffing cannot be changed for a completed or cancelled event");
+  }
+
+  const shift = current.shifts.find((candidate) => candidate.shiftId === shiftId);
+  if (!shift) throw new AppError(404, "SHIFT_NOT_FOUND", "Event shift was not found");
+
+  const station = body.eventStationId
+    ? current.stations.find((candidate) => candidate.stationId === body.eventStationId && candidate.isActive)
+    : null;
+  if (body.eventStationId && !station) {
+    throw new AppError(422, "STATION_NOT_AVAILABLE", "The selected event station is unavailable");
+  }
+  if (body.assignmentRole === "SCREENER" && !station) {
+    throw new AppError(422, "STATION_REQUIRED", "Screeners must be assigned to an event station");
+  }
+
+  return db.$transaction(async (tx) => {
+    await lockStaffSchedules(tx, [body.userId]);
+
+    const activeUser = await tx.user.findFirst({
+      where: { id: body.userId, status: "ACTIVE" },
+      select: { id: true },
+    });
+    if (!activeUser) throw new AppError(422, "STAFF_NOT_AVAILABLE", "The selected staff member is unavailable");
+
+    const conflict = await tx.staffAssignment.findFirst({
+      where: {
+        userId: body.userId,
+        status: { in: ACTIVE_ASSIGNMENT_STATUSES },
+        shift: {
+          startsAt: { lt: shift.endsAt },
+          endsAt: { gt: shift.startsAt },
+        },
+      },
+      select: { id: true },
+    });
+    if (conflict) throw scheduleConflictError();
+
+    await bumpEventVersion(tx, eventId, body.version);
+    await tx.staffAssignment.create({
+      data: {
+        eventId,
+        shiftId,
+        userId: body.userId,
+        stationId: station?.stationId || null,
+        assignedBy: user.userId,
+        assignmentRole: body.assignmentRole,
+        assignmentStatus: "ASSIGNED",
+        status: "ASSIGNED",
+        notes: body.notes || null,
+      },
+    });
+
+    const updated = await tx.event.findUniqueOrThrow({ where: { eventId }, include: eventInclude });
+    await tx.auditLog.create({
+      data: {
+        userId: user.userId,
+        action: "STAFF_ASSIGNMENT_ADDED",
+        entityName: "Event",
+        entityId: eventId,
+        ...auditFields(context),
+        oldValue: snapshot(current),
+        newValue: snapshot(updated),
+      },
+    });
+    return toEventResponse(updated, user, tx);
+  });
 };
 
-const removeStaffAssignment = async (eventId, shiftId, assignmentId, version, user, correlationId) => {
-  const current = await requireEvent(eventId, user, true);
+const removeStaffAssignment = async (eventId, shiftId, assignmentId, version, user, context, db = prisma) => {
+  const current = await requireEvent(eventId, user, true, db);
   if (!["DRAFT", "PUBLISHED", "IN_PROGRESS"].includes(current.status)) {
     throw new AppError(409, "STAFFING_NOT_EDITABLE", "Staffing cannot be changed for a completed or cancelled event");
   }
   const assignment = current.shifts
     .find((shift) => shift.shiftId === shiftId)
-    ?.staffAssignments.find((candidate) => candidate.staffAssignmentId === assignmentId);
+    ?.staffAssignments.find((candidate) => candidate.id === assignmentId);
   if (!assignment) throw new AppError(404, "ASSIGNMENT_NOT_FOUND", "Staff assignment was not found");
 
-  return prisma.$transaction(async (tx) => {
+  return db.$transaction(async (tx) => {
     const assignment = await tx.staffAssignment.findFirst({
       where: { id: assignmentId, shiftId, shift: { eventId } },
       select: { id: true },
@@ -1120,34 +1230,55 @@ const removeStaffAssignment = async (eventId, shiftId, assignmentId, version, us
       );
     }
 
+    const changed = await tx.event.updateMany({
+      where: { eventId, version },
+      data: { version: { increment: 1 } },
+    });
+    if (changed.count !== 1) throw new AppError(409, "STALE_EVENT_VERSION", "This event was changed by someone else");
+
     await tx.staffAssignment.delete({
       where: { id: assignmentId },
     });
 
     const updated = await tx.event.findUniqueOrThrow({
-      where: { id: eventId },
+      where: { eventId },
       include: eventInclude,
     });
 
-    return toEventResponse(updated);
+    await tx.auditLog.create({
+      data: {
+        userId: user.userId,
+        action: "STAFF_ASSIGNMENT_REMOVED",
+        entityName: "Event",
+        entityId: eventId,
+        ...auditFields(context),
+        oldValue: snapshot(current),
+        newValue: snapshot(updated),
+      },
+    });
+
+    return toEventResponse(updated, user, tx);
   });
 };
 
-const getAuditLog = async (eventId, query, user) => {
-  await requireEvent(eventId, user, true);
+const getAuditLog = async (eventId, query, user, db = prisma) => {
+  await requireEvent(eventId, user, true, db);
   const scope = `event-audit:${eventId}:${query.limit}`;
   const cursor = decodeCursor(query.cursor, scope);
 
-  const rows = await prisma.auditLog.findMany({
-    where: {
-      entityName: "Event",
-      entityId: eventId,
-      ...(cursor
-        ? {
-            createdAt: { lt: new Date(cursor.createdAt) },
-          }
-        : {}),
-    },
+  const filters = { entityName: "Event", entityId: eventId };
+  const rows = await db.auditLog.findMany({
+    where: cursor ? {
+      AND: [
+        filters,
+        {
+          OR: [
+            { createdAt: { lt: new Date(cursor.createdAt) } },
+            { createdAt: new Date(cursor.createdAt), id: { lt: cursor.id } },
+          ],
+        },
+      ],
+    } : filters,
     include: {
       user: {
         select: {
@@ -1178,6 +1309,336 @@ const getAuditLog = async (eventId, query, user) => {
   };
 };
 
+const publicEventStatuses = ["PUBLISHED", "IN_PROGRESS", "COMPLETED", "CANCELLED"];
+const attendeeSelect = {
+  registrationId: true,
+  participantDisplayName: true,
+  registrationStatus: true,
+  checkedIn: true,
+  checkedInAt: true,
+  queueNumber: true,
+  createdAt: true,
+  participant: { select: { participantReference: true } },
+};
+const dateTime = (value) => value ? value.toISOString() : null;
+const attendeeProjection = ({ participant, ...registration }) => ({
+  ...registration,
+  participantReference: participant.participantReference,
+  checkedInAt: dateTime(registration.checkedInAt),
+  createdAt: dateTime(registration.createdAt),
+});
+
+const metricsForEvent = async (event, db = prisma) => {
+  const registrationWhere = { eventId: event.eventId };
+  const [signupCount, checkedInCount, completedCount, cancelledCount, activeCount, screeningResultCount, flaggedResultCount, referralCount] = await Promise.all([
+    db.eventRegistration.count({ where: { ...registrationWhere, registrationStatus: { not: "CANCELLED" } } }),
+    db.eventRegistration.count({ where: { ...registrationWhere, registrationStatus: { not: "CANCELLED" }, checkedIn: true } }),
+    db.eventRegistration.count({ where: { ...registrationWhere, registrationStatus: "COMPLETED" } }),
+    db.eventRegistration.count({ where: { ...registrationWhere, registrationStatus: "CANCELLED" } }),
+    db.eventRegistration.count({ where: { ...registrationWhere, registrationStatus: { in: ["SIGNED_UP", "CHECKED_IN"] } } }),
+    db.screeningResult.count({ where: { registration: { eventId: event.eventId } } }),
+    db.screeningResult.count({ where: { registration: { eventId: event.eventId }, isFlagged: true } }),
+    db.referral.count({ where: { review: { registration: { eventId: event.eventId } } } }),
+  ]);
+  return {
+    signupCount,
+    checkedInCount,
+    completedCount,
+    cancelledCount,
+    activeCount,
+    attendanceRatePercent: signupCount ? Math.round((checkedInCount / signupCount) * 100) : 0,
+    screeningResultCount,
+    flaggedResultCount,
+    referralCount,
+    capacity: event.capacity,
+    expectedAttendance: event.expectedAttendance,
+  };
+};
+
+const publicEventProjection = (event) => ({
+  eventId: event.eventId,
+  name: event.name,
+  description: event.description,
+  bannerKey: event.bannerKey,
+  artworkDataUrl: event.artworkDataUrl,
+  venue: event.venue,
+  address: event.address,
+  postalCode: event.postalCode,
+  timezone: event.timezone,
+  startsAt: dateTime(event.startsAt),
+  endsAt: dateTime(event.endsAt),
+  capacity: event.capacity,
+  status: event.status,
+  eventDays: event.eventDays.map((day) => ({
+    eventDayId: day.eventDayId,
+    date: day.date.toISOString().slice(0, 10),
+    startsAt: dateTime(day.startsAt),
+    endsAt: dateTime(day.endsAt),
+  })),
+});
+
+const getPublicEvent = async (eventId, db = prisma) => {
+  const event = await db.event.findFirst({
+    where: { eventId, status: { in: publicEventStatuses } },
+    select: {
+      eventId: true,
+      name: true,
+      description: true,
+      bannerKey: true,
+      artworkDataUrl: true,
+      venue: true,
+      address: true,
+      postalCode: true,
+      timezone: true,
+      startsAt: true,
+      endsAt: true,
+      capacity: true,
+      status: true,
+      eventDays: {
+        orderBy: { date: "asc" },
+        select: { eventDayId: true, date: true, startsAt: true, endsAt: true },
+      },
+    },
+  });
+  if (!event) throw new AppError(404, "EVENT_NOT_FOUND", "Event was not found");
+  return publicEventProjection(event);
+};
+
+const getEventMetrics = async (eventId, user, db = prisma) => metricsForEvent(await requireEvent(eventId, user, true, db), db);
+
+const listEventAttendees = async (eventId, query, user, db = prisma) => {
+  await requireEvent(eventId, user, true, db);
+  const limit = query.limit ?? 50;
+  const scope = `event-attendees:${eventId}:${query.status || "all"}:${query.search || ""}:${limit}`;
+  const cursor = decodeCursor(query.cursor, scope);
+  const filters = {
+    eventId,
+    ...(query.status ? { registrationStatus: query.status } : {}),
+    ...(query.search ? {
+      OR: [
+        { participantDisplayName: { contains: query.search, mode: "insensitive" } },
+        { participant: { participantReference: { contains: query.search, mode: "insensitive" } } },
+      ],
+    } : {}),
+  };
+  const where = cursor ? {
+    AND: [
+      filters,
+      {
+        OR: [
+          { createdAt: { lt: new Date(cursor.createdAt) } },
+          { createdAt: new Date(cursor.createdAt), registrationId: { lt: cursor.registrationId } },
+        ],
+      },
+    ],
+  } : filters;
+  const [total, rows] = await Promise.all([
+    db.eventRegistration.count({ where: filters }),
+    db.eventRegistration.findMany({
+      where,
+      select: attendeeSelect,
+      orderBy: [{ createdAt: "desc" }, { registrationId: "desc" }],
+      take: limit + 1,
+    }),
+  ]);
+  const hasMore = rows.length > limit;
+  const page = hasMore ? rows.slice(0, limit) : rows;
+  const last = page.at(-1);
+  return {
+    total,
+    attendees: page.map(attendeeProjection),
+    nextCursor: hasMore && last ? encodeCursor({
+      scope,
+      createdAt: last.createdAt.toISOString(),
+      registrationId: last.registrationId,
+    }) : null,
+  };
+};
+
+const exportEventSelect = {
+  eventId: true,
+  name: true,
+  description: true,
+  bannerKey: true,
+  artworkDataUrl: true,
+  venue: true,
+  address: true,
+  postalCode: true,
+  timezone: true,
+  startsAt: true,
+  endsAt: true,
+  capacity: true,
+  expectedAttendance: true,
+  status: true,
+  version: true,
+  eventDays: {
+    orderBy: { date: "asc" },
+    select: {
+      eventDayId: true,
+      date: true,
+      startsAt: true,
+      endsAt: true,
+      stationAvailabilities: {
+        orderBy: [{ eventStationId: "asc" }, { eventStationAvailabilityId: "asc" }],
+        select: {
+          eventStationAvailabilityId: true,
+          eventStationId: true,
+          eventDayId: true,
+          isAvailable: true,
+          startsAt: true,
+          endsAt: true,
+          capacity: true,
+        },
+      },
+    },
+  },
+  stations: {
+    orderBy: [{ stationOrder: "asc" }, { stationId: "asc" }],
+    select: { stationId: true, stationName: true, stationType: true, stationOrder: true, isActive: true },
+  },
+  shifts: {
+    orderBy: [{ startsAt: "asc" }, { shiftId: "asc" }],
+    select: { shiftId: true, name: true, startsAt: true, endsAt: true, requiredStaff: true, status: true },
+  },
+  staffAssignments: {
+    orderBy: { id: "asc" },
+    select: {
+      id: true,
+      eventId: true,
+      stationId: true,
+      shiftId: true,
+      userId: true,
+      assignedBy: true,
+      assignedAt: true,
+      assignmentRole: true,
+      assignmentStatus: true,
+      status: true,
+    },
+  },
+  registrations: {
+    orderBy: [{ createdAt: "desc" }, { registrationId: "desc" }],
+    select: attendeeSelect,
+  },
+};
+
+const exportSnapshot = async (eventId, db = prisma) => {
+  const event = await db.event.findUnique({ where: { eventId }, select: exportEventSelect });
+  if (!event) throw new AppError(404, "EVENT_NOT_FOUND", "Event was not found");
+  const { eventDays, stations, shifts, staffAssignments, registrations, ...eventFields } = event;
+  return {
+    event: {
+      ...eventFields,
+      startsAt: dateTime(event.startsAt),
+      endsAt: dateTime(event.endsAt),
+    },
+    metrics: await metricsForEvent(event, db),
+    eventDays: eventDays.map(({ stationAvailabilities, ...day }) => ({
+      ...day,
+      date: day.date.toISOString().slice(0, 10),
+      startsAt: dateTime(day.startsAt),
+      endsAt: dateTime(day.endsAt),
+      stationAvailabilities: stationAvailabilities.map((availability) => ({
+        ...availability,
+        startsAt: dateTime(availability.startsAt),
+        endsAt: dateTime(availability.endsAt),
+      })),
+    })),
+    stations,
+    shifts: shifts.map((shift) => ({ ...shift, startsAt: dateTime(shift.startsAt), endsAt: dateTime(shift.endsAt) })),
+    staffAssignments: staffAssignments.map(({ assignedAt, notes: _notes, ...assignment }) => ({
+      ...assignment,
+      assignedAt: dateTime(assignedAt),
+    })),
+    attendees: registrations.map(attendeeProjection),
+  };
+};
+
+const exportHashFor = (snapshot) => crypto.createHash("sha256").update(JSON.stringify({ schemaVersion: 1, ...snapshot })).digest("hex");
+
+const exportEvent = async (eventId, user) => {
+  await requireEvent(eventId, user, true);
+  const snapshot = await exportSnapshot(eventId);
+  const exportHash = exportHashFor(snapshot);
+  return {
+    export: { schemaVersion: 1, generatedAt: new Date().toISOString(), ...snapshot },
+    exportReceipt: createExportReceipt({
+      eventId,
+      version: snapshot.event.version,
+      actorUserId: user.userId,
+      exportHash,
+      secret: env.jwtAccessSecret,
+    }),
+  };
+};
+
+const invalidReceipt = () => new AppError(409, "INVALID_EXPORT_RECEIPT", "Export receipt is invalid or expired");
+const assertDeleteAuthority = (event, user) => {
+  if (user.systemRole === "ADMIN") return;
+  if (user.systemRole === "EVENT_MANAGER" && event.createdByUserId === user.userId) return;
+  throw new AppError(403, "FORBIDDEN", "You do not have permission to delete this event");
+};
+
+const deleteEvent = async (eventId, body, user, context, db = prisma) => {
+  const audit = auditFields(context);
+  const visibleEvent = await requireEvent(eventId, user, true, db);
+  assertDeleteAuthority(visibleEvent, user);
+  if (!verifyExportReceipt(body.exportReceipt, {
+    secret: env.jwtAccessSecret,
+    eventId,
+    version: body.version,
+    actorUserId: user.userId,
+  })) throw invalidReceipt();
+
+  await db.$transaction(async (tx) => {
+    const current = await tx.event.findUnique({
+      where: { eventId },
+      select: { eventId: true, name: true, status: true, version: true, createdByUserId: true },
+    });
+    if (!current) throw new AppError(404, "EVENT_NOT_FOUND", "Event was not found");
+    assertDeleteAuthority(current, user);
+    if (current.status !== "DRAFT") throw new AppError(409, "EVENT_NOT_DELETABLE", "Only unpopulated draft events can be deleted");
+    if (current.name !== body.eventName || current.version !== body.version) {
+      throw new AppError(409, "STALE_EVENT_VERSION", "This event was changed by someone else");
+    }
+
+    const [registrationCount, consentCount, preservedEventAuditLogs, snapshot] = await Promise.all([
+      tx.eventRegistration.count({ where: { eventId } }),
+      tx.participantConsent.count({ where: { eventId } }),
+      tx.eventAuditLog.count({ where: { eventId } }),
+      exportSnapshot(eventId, tx),
+    ]);
+    if (registrationCount || consentCount) {
+      throw new AppError(409, "EVENT_NOT_DELETABLE", "Only unpopulated draft events can be deleted");
+    }
+    const exportHash = exportHashFor(snapshot);
+    if (!verifyExportReceipt(body.exportReceipt, {
+      secret: env.jwtAccessSecret,
+      eventId,
+      version: current.version,
+      actorUserId: user.userId,
+      exportHash,
+    })) throw invalidReceipt();
+
+    await tx.event.delete({ where: { eventId } });
+    await tx.auditLog.create({
+      data: {
+        userId: user.userId,
+        action: "DELETED",
+        entityName: "Event",
+        entityId: eventId,
+        ...audit,
+        details: {
+          exportHash,
+          version: current.version,
+          deletedCounts: { events: 1 },
+          preservedCounts: { eventAuditLogs: preservedEventAuditLogs },
+          requestId: audit.requestId,
+        },
+      },
+    });
+  }, { isolationLevel: "Serializable" });
+};
+
 module.exports = {
   createEvent,
   listEvents,
@@ -1193,4 +1654,12 @@ module.exports = {
   addStaffAssignment,
   removeStaffAssignment,
   getAuditLog,
+  getPublicEvent,
+  getEventMetrics,
+  metricsForEvent,
+  listEventAttendees,
+  exportEvent,
+  deleteEvent,
+  exportSnapshot,
+  exportHashFor,
 };

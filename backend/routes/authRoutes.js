@@ -6,6 +6,11 @@ const authController = require("../controllers/authController");
 const requireAuthentication = require("../middlewares/requireAuthentication");
 const { rateLimit } = require("../middlewares/security");
 
+router.use((_req, res, next) => {
+    res.set("Cache-Control", "no-store");
+    next();
+});
+
 router.get("/config-status", authController.configStatus);
 router.get("/authorize", rateLimit({ windowMs: 15 * 60_000, max: 30 }), authController.authorize);
 router.get("/callback", rateLimit({ windowMs: 15 * 60_000, max: 30 }), authController.callback);

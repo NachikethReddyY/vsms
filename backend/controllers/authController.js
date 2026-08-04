@@ -46,8 +46,17 @@ function ensureCognitoConfigured() {
 
 function normalizeReturnTo(value) {
     const returnTo = String(value || "");
-    return returnTo.startsWith("/") && !returnTo.startsWith("//") ? returnTo : "/events";
+    try {
+        const decoded = decodeURIComponent(returnTo);
+        if (!decoded.startsWith("/") || decoded.startsWith("//") || decoded.includes("\\") || /[\u0000-\u001f\u007f]/.test(decoded)) return "/events";
+        const url = new URL(returnTo, "https://vsms.local");
+        return url.origin === "https://vsms.local" ? `${url.pathname}${url.search}${url.hash}` : "/events";
+    } catch {
+        return "/events";
+    }
 }
+
+exports.normalizeReturnTo = normalizeReturnTo;
 
 function extractProfileFromIdToken(payload) {
     return {
@@ -103,7 +112,7 @@ async function finalizeSuccessfulLogin(authResult, username, context, res) {
         throw error;
     }
 
-    setAuthCookies(res, authResult, idTokenPayload.email || idTokenPayload["cognito:username"] || username);
+    const csrfToken = setAuthCookies(res, authResult, idTokenPayload.email || idTokenPayload["cognito:username"] || username);
     await createAuthAuditLog({
         userId: localUser.id,
         eventType: "LOGIN_SUCCESS",
@@ -115,6 +124,7 @@ async function finalizeSuccessfulLogin(authResult, username, context, res) {
     return {
         expiresIn: authResult.ExpiresIn,
         sessionExpiresIn: Number(process.env.REFRESH_COOKIE_MAX_AGE_SECONDS || 30 * 24 * 60 * 60),
+        csrfToken,
         user: publicUser(localUser, roles),
     };
 }
@@ -203,10 +213,11 @@ exports.refresh = asyncHandler(async (req, res) => {
             throw error;
         }
 
-        setAuthCookies(res, { ...authResult, RefreshToken: refreshToken }, username);
+        const csrfToken = setAuthCookies(res, { ...authResult, RefreshToken: refreshToken }, username);
         res.json({
             expiresIn: authResult.ExpiresIn,
             sessionExpiresIn: Number(process.env.REFRESH_COOKIE_MAX_AGE_SECONDS || 30 * 24 * 60 * 60),
+            csrfToken,
             user: publicUser(localUser, roles),
         });
     } catch (error) {

@@ -3,7 +3,8 @@ import { SegmentedControl } from '@astryxdesign/core';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { getEventArtwork } from '../features/events/eventBanners';
-import { eventApi, type EventRecord, type EventStatus } from '../features/events/eventApi';
+import { eventApi, type EventRecord } from '../features/events/eventApi';
+import { formatEventTimeRange, getEventDisplayStatus, type EventDisplayStatus } from '../features/events/eventDisplayStatus';
 import { useAuth } from '../auth/AuthProvider';
 import { getApiError as getApiMessage } from '../utils/apiClient';
 import { Button } from './ui/button';
@@ -20,19 +21,20 @@ type EventItem = {
   title: string;
   time: string;
   venue: string;
-  status: 'To plan' | 'Assigned' | 'Ongoing' | 'Completed' | 'Cancelled';
-  statusKey: EventStatus;
+  status: 'Draft' | 'Published' | 'Live' | 'Past' | 'Cancelled';
+  statusKey: EventDisplayStatus;
   artwork: string;
   attendance: string;
   staff: string[];
   extraStaff?: number;
 };
 
-const STATUS_LABEL: Record<EventStatus, EventItem['status']> = {
-  DRAFT: 'To plan',
-  PUBLISHED: 'Assigned',
-  IN_PROGRESS: 'Ongoing',
-  COMPLETED: 'Completed',
+const STATUS_LABEL: Record<EventDisplayStatus, EventItem['status']> = {
+  DRAFT: 'Draft',
+  PUBLISHED: 'Published',
+  IN_PROGRESS: 'Live',
+  ENDED: 'Past',
+  COMPLETED: 'Past',
   CANCELLED: 'Cancelled',
 };
 
@@ -40,29 +42,27 @@ const dateKey = (value: Date, timeZone: string) => new Intl.DateTimeFormat('en-C
   year: 'numeric', month: '2-digit', day: '2-digit', timeZone,
 }).format(value);
 
-function toEventItem(event: EventRecord): EventItem {
+function toEventItem(event: EventRecord, now: Date): EventItem {
   const startsAt = new Date(event.startsAt);
-  const endsAt = new Date(event.endsAt);
-  const today = new Date();
-  const tomorrow = new Date(Date.now() + 86400000);
+  const tomorrow = new Date(now.getTime() + 86400000);
+  const displayStatus = getEventDisplayStatus(event.status, event.endsAt, now);
   const eventDate = dateKey(startsAt, event.timezone);
   const shortDate = new Intl.DateTimeFormat('en-SG', { day: 'numeric', month: 'short', timeZone: event.timezone }).format(startsAt);
   const names = [...new Set(event.shifts.flatMap((shift) => shift.staffAssignments.map((assignment) => assignment.user.username)))];
-  const timeFormatter = new Intl.DateTimeFormat('en-SG', { hour: 'numeric', minute: '2-digit', timeZone: event.timezone });
-  const time = `${timeFormatter.format(startsAt)} – ${timeFormatter.format(endsAt)}`.toUpperCase();
+  const time = formatEventTimeRange(event.startsAt, event.endsAt, event.timezone);
 
   return {
     eventId: event.eventId,
-    date: eventDate === dateKey(today, event.timezone) ? 'Today' : eventDate === dateKey(tomorrow, event.timezone) ? 'Tomorrow' : shortDate,
+    date: eventDate === dateKey(now, event.timezone) ? 'Today' : eventDate === dateKey(tomorrow, event.timezone) ? 'Tomorrow' : shortDate,
     day: new Intl.DateTimeFormat('en-SG', { weekday: 'long', timeZone: event.timezone }).format(startsAt),
     month: new Intl.DateTimeFormat('en-SG', { day: 'numeric', month: 'long', timeZone: event.timezone }).format(startsAt),
     title: event.name,
     time,
     venue: event.venue,
-    status: STATUS_LABEL[event.status],
-    statusKey: event.status,
+    status: STATUS_LABEL[displayStatus],
+    statusKey: displayStatus,
     artwork: getEventArtwork(event.bannerKey, event.artworkDataUrl),
-    attendance: `${event.activeCapacityCount.toLocaleString()} / ${event.capacity.toLocaleString()}`,
+    attendance: `${event.signupCount.toLocaleString()} / ${event.capacity.toLocaleString()}`,
     staff: names.slice(0, 4),
     extraStaff: names.length > 4 ? names.length - 4 : undefined,
   };
@@ -80,13 +80,23 @@ export default function TestHomePage() {
   const { session } = useAuth();
   const user = session?.user;
   const navigate = useNavigate();
-  const canCreate = user?.systemRole !== 'STAFF';
+  const canCreate = Boolean(user?.roles?.some((role) => role === 'ADMINISTRATOR' || role === 'EVENT_MANAGER'));
   const loadEvents = useCallback(async () => {
     setLoading(true);
     setError('');
     try {
-      const data = await eventApi.list();
-      setEvents(data.events);
+      const allEvents: EventRecord[] = [];
+      const seenCursors = new Set<string>();
+      let cursor: string | undefined;
+      while (true) {
+        if (cursor && seenCursors.has(cursor)) break;
+        if (cursor) seenCursors.add(cursor);
+        const page = await eventApi.list(cursor ? { cursor } : undefined);
+        allEvents.push(...page.events);
+        if (!page.nextCursor) break;
+        cursor = page.nextCursor;
+      }
+      setEvents(allEvents);
     } catch (cause) {
       setError(getApiMessage(cause, 'Events could not be loaded.'));
     } finally {
@@ -95,6 +105,11 @@ export default function TestHomePage() {
   }, []);
 
   useEffect(() => { void loadEvents(); }, [loadEvents]);
+  useEffect(() => {
+    const previousTitle = document.title;
+    document.title = 'Events · VSMS';
+    return () => { document.title = previousTitle; };
+  }, []);
   useEffect(() => {
     const clock = window.setInterval(() => setNow(new Date()), 60000);
     return () => window.clearInterval(clock);
@@ -119,10 +134,10 @@ export default function TestHomePage() {
     timeZone: 'Asia/Singapore',
   }).format(now).toUpperCase();
   const visibleEvents = useMemo(
-    () => events.map(toEventItem)
-      .filter((event) => period === 'past' ? ['COMPLETED', 'CANCELLED'].includes(event.statusKey) : !['COMPLETED', 'CANCELLED'].includes(event.statusKey))
+    () => events.map((event) => toEventItem(event, now))
+      .filter((event) => period === 'past' ? ['ENDED', 'COMPLETED', 'CANCELLED'].includes(event.statusKey) : !['ENDED', 'COMPLETED', 'CANCELLED'].includes(event.statusKey))
       .filter((event) => `${event.title} ${event.venue}`.toLowerCase().includes(query.toLowerCase())),
-    [events, period, query],
+    [events, now, period, query],
   );
 
   return (
@@ -260,8 +275,7 @@ export default function TestHomePage() {
                   <small>{event.month}</small>
                 </div>
                 <span className="reference-timeline" aria-hidden="true"><i /></span>
-                <div className="reference-event-card">
-                  <Link className="test-register-row-link" to={`/events/${event.eventId}`} aria-label={`Open ${event.title}`} />
+                <Link className="reference-event-card test-register-row-link" to={`/events/${event.eventId}`} aria-label={`Open ${event.title}`}>
                   <div className="reference-event-media">
                     <img src={event.artwork} alt="" loading="lazy" />
                   </div>
@@ -284,7 +298,7 @@ export default function TestHomePage() {
                   <div className="test-register-state">
                     <span className="test-row-action" aria-hidden="true">Open</span>
                   </div>
-                </div>
+                </Link>
               </article>
             ))}
           </section>
@@ -292,7 +306,7 @@ export default function TestHomePage() {
           <section className="test-empty-state" aria-live="polite">
             <MagnifyingGlassIcon aria-hidden="true" />
             <h2>{query ? 'No events found' : period === 'upcoming' ? 'No upcoming events' : 'No past events'}</h2>
-            <p>{query ? 'Try a different event or venue name.' : period === 'upcoming' ? 'Assigned and newly created events will appear here.' : 'Completed and cancelled events will appear here.'}</p>
+            <p>{query ? 'Try a different event or venue name.' : period === 'upcoming' ? 'Assigned and newly created events will appear here.' : 'Past and cancelled events will appear here.'}</p>
             {query && <Button variant="ghost" onClick={() => setQuery('')}>Clear search</Button>}
             {!query && period === 'upcoming' && canCreate && <Button onClick={() => navigate('/events/new')}><PlusIcon aria-hidden="true" />Create event</Button>}
           </section>
