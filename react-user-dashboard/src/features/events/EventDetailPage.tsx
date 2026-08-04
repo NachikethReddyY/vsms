@@ -1,5 +1,4 @@
 import {
-  ArrowLeftIcon,
   ArrowUpTrayIcon,
   CalendarDaysIcon,
   CheckIcon,
@@ -30,6 +29,9 @@ import { EVENT_BANNERS, getEventArtwork, type EventBannerKey } from './eventBann
 type AssignmentDraft = { userId: string; assignmentRole: StaffAssignmentRole; eventStationId: string };
 const emptyAssignment: AssignmentDraft = { userId: '', assignmentRole: 'SUPPORT', eventStationId: '' };
 const assignmentRoles: StaffAssignmentRole[] = ['EVENT_MANAGER', 'REGISTRATION', 'SCREENER', 'REVIEWER', 'SUPPORT'];
+const applicationRoleByAssignment: Record<StaffAssignmentRole, StaffDirectoryEntry['roles'][number]> = {
+  EVENT_MANAGER: 'EVENT_MANAGER', REGISTRATION: 'REGISTRATION_OFFICER', SCREENER: 'SCREENER', REVIEWER: 'REVIEWER', SUPPORT: 'SUPPORT',
+};
 const roleLabel = (role: string) => role.toLowerCase().replace(/_/g, ' ').replace(/^\w/, (letter: string) => letter.toUpperCase());
 
 const nextAction: Record<string, { action: 'publish' | 'start' | 'complete'; status: EventStatus; label: string; prompt: string } | undefined> = {
@@ -270,14 +272,15 @@ export default function EventDetailPage() {
   const canEditStaffing = canManage && ['DRAFT', 'PUBLISHED', 'IN_PROGRESS'].includes(event.status);
   const availableTemplates = stationTemplates.filter((template) => !event.eventStations.some((station) => station.stationTemplateId === template.stationTemplateId));
   const canCancel = canManage && !terminal && (event.status !== 'IN_PROGRESS' || user?.systemRole === 'ADMIN');
-  const canReview = event.status === 'IN_PROGRESS' && event.shifts.some((shift) => (
+  const isAdministrator = user?.roles.includes('ADMINISTRATOR') ?? false;
+  const canReview = !isAdministrator && user?.roles.includes('REVIEWER') && event.status === 'IN_PROGRESS' && event.shifts.some((shift) => (
     shift.status === 'ACTIVE' && shift.staffAssignments.some((assignment) => (
       assignment.assignmentRole === 'REVIEWER'
       && ['ASSIGNED', 'CONFIRMED'].includes(assignment.status)
       && assignment.user.userId === user?.userId
     ))
   ));
-  const assignedStationTypes = new Set(event.shifts.flatMap((shift) => shift.staffAssignments.flatMap((assignment) => {
+  const assignedStationTypes = new Set(!isAdministrator && user?.roles.includes('SCREENER') ? event.shifts.flatMap((shift) => shift.staffAssignments.flatMap((assignment) => {
     if (shift.status !== 'ACTIVE'
       || assignment.assignmentRole !== 'SCREENER'
       || !['ASSIGNED', 'CONFIRMED'].includes(assignment.status)
@@ -285,70 +288,29 @@ export default function EventDetailPage() {
       || !assignment.eventStation) return [];
     const station = event.eventStations.find((candidate) => candidate.eventStationId === assignment.eventStation?.eventStationId);
     return station ? [station.stationType] : [];
-  })));
+  })) : []);
   const activeStage = lifecycleStages.findIndex((stage) => stage.status === event.status);
   const totalRequiredStaff = event.shifts.reduce((total, shift) => total + shift.requiredStaff, 0);
   const next = nextAction[event.status];
 
   return <div className="page-frame detail-page">
-    <div className="detail-topline">
-      <Link className="back-link" to="/events"><ArrowLeftIcon />Events</Link>
-      <span className="event-record-reference">Event record / {event.eventId.slice(0, 8)}</span>
-    </div>
-
-    {notice && <div className="alert success" role="status"><CheckIcon />{notice}<button className="icon-button" onClick={() => setNotice('')} aria-label="Dismiss message"><XMarkIcon /></button></div>}
-    {error && <div className="alert error" role="alert">{error}</div>}
-
-    <figure className="event-banner" aria-label={`Banner for ${event.name}`}>
-      <div className="event-banner-image"><img src={getEventArtwork(event.bannerKey, event.artworkDataUrl)} alt="" /></div>
-      <figcaption className="event-banner-toolbar">
-        <div><span>Event banner</span><strong>{event.artworkDataUrl ? 'Your uploaded artwork' : 'Default event artwork'}</strong></div>
-        {canManage && !terminal && <button className="secondary banner-edit-button" type="button" aria-expanded={bannerOpen} aria-controls="banner-picker" onClick={() => { setSelectedBannerKey(event.bannerKey ?? 'COMMUNITY_SCREENING'); setArtworkFile(event.artworkDataUrl ?? ''); setBannerOpen((open) => !open); }}><PhotoIcon />Change banner</button>}
-      </figcaption>
-    </figure>
-
-    {bannerOpen && !terminal && <section className="banner-picker" id="banner-picker" aria-labelledby="banner-picker-title">
-      <div className="banner-picker-heading"><div><h2 id="banner-picker-title">Choose event artwork</h2><p>Use a built-in image or select your own file.</p></div><button className="icon-button" type="button" onClick={() => setBannerOpen(false)} aria-label="Close banner picker"><XMarkIcon /></button></div>
-      <input ref={fileInput} className="visually-hidden" type="file" accept="image/jpeg,image/webp" onChange={chooseArtwork} />
-      <div className="banner-options" role="radiogroup" aria-label="Available event artwork">
-        {EVENT_BANNERS.map((option) => <button className={`banner-option ${!artworkFile && selectedBannerKey === option.key ? 'selected' : ''}`} type="button" role="radio" aria-checked={!artworkFile && selectedBannerKey === option.key} key={option.key} onClick={() => { setSelectedBannerKey(option.key); setArtworkFile(''); }}><span className="banner-option-image"><img src={option.src} alt="" />{!artworkFile && selectedBannerKey === option.key && <i><CheckIcon /></i>}</span><span><strong>{option.label}</strong><small>{option.description}</small></span></button>)}
-        <button className={`banner-option banner-upload-option ${artworkFile ? 'selected' : ''}`} type="button" role="radio" aria-checked={!!artworkFile} onClick={() => fileInput.current?.click()}><span className="banner-option-image"><ArrowUpTrayIcon />{artworkFile && <i><CheckIcon /></i>}</span><span><strong>Upload your image</strong><small>JPEG or WebP, up to 130 KB</small></span></button>
-      </div>
-      <div className="banner-picker-actions"><button className="secondary" type="button" onClick={() => setBannerOpen(false)}>Cancel</button><button className="primary" type="button" disabled={bannerPending} onClick={() => void saveBanner()}>{bannerPending ? 'Saving…' : 'Use selected artwork'}</button></div>
-    </section>}
-
-    <section className="event-overview" aria-labelledby="event-title">
+    <section className="event-detail-hero" aria-labelledby="event-title">
       <div className="event-summary">
+        <div className="detail-topline"><Link to="/events">Events</Link><span className="event-record-reference">Event record / {event.eventId.slice(0, 8)}</span></div>
         <div className="event-summary-heading">
           <span className="status-line"><i className={`status-dot ${event.status.toLowerCase()}`} />{STATUS_LABEL[event.status]}</span>
           <h1 id="event-title">{event.name}</h1>
           <p>{event.description || 'No event description has been added.'}</p>
         </div>
-
+        <nav className="event-detail-tabs" aria-label="Event sections">
+          <a className="active" href="#overview">Overview</a>
+          <a href="#stations">Stations</a>
+          <a href="#staff">Staff</a>
+          <a href="#activity">Activity</a>
+        </nav>
       </div>
 
-      <aside className="event-facts" aria-label="Event essentials and actions">
-        <div className="event-info-list">
-          <div className="event-info-row">
-            <CalendarDaysIcon />
-            <div><small>Date and time</small><strong>{dateParts.weekday}, {dateParts.month} {dateParts.day}, {dateParts.year}</strong><span>{formatTime(event.startsAt, event.timezone)} to {formatTime(event.endsAt, event.timezone)}, {eventDuration(event.startsAt, event.endsAt)}</span></div>
-          </div>
-          <div className="event-info-row">
-            <MapPinIcon />
-            <div><small>Venue</small><strong>{event.venue}</strong><span>{event.address || 'Address entered manually'}{event.postalCode ? ` · Singapore ${event.postalCode}` : ''} · {event.timezone}</span></div>
-          </div>
-          <div className="event-info-row split">
-            <UserGroupIcon />
-            <div><small>At venue now</small><strong>{event.activeCapacityCount.toLocaleString()} of {event.capacity.toLocaleString()} people</strong><span>Signed up or checked in, not complete</span></div>
-            <ClipboardDocumentListIcon />
-            <div><small>Expected across event</small><strong>{event.expectedAttendance?.toLocaleString() || 'Not set'} visitors</strong><span>{event.signupCount.toLocaleString()} signups collected</span></div>
-          </div>
-          <div className="event-info-row">
-            <ClockIcon />
-            <div><small>Staffing plan</small><strong>{event.shifts.length} {event.shifts.length === 1 ? 'shift' : 'shifts'}, {totalRequiredStaff} required</strong></div>
-          </div>
-        </div>
-
+      <aside className="event-command-panel" aria-label="Event actions">
         {canManage && !terminal && next && <section className="status-editor" aria-labelledby="status-editor-title">
           <div className="status-editor-copy">
             <strong id="status-editor-title">Event status</strong>
@@ -390,6 +352,17 @@ export default function EventDetailPage() {
       </aside>
     </section>
 
+    {notice && <div className="alert success" role="status"><CheckIcon />{notice}<button className="icon-button" onClick={() => setNotice('')} aria-label="Dismiss message"><XMarkIcon /></button></div>}
+    {error && <div className="alert error" role="alert">{error}</div>}
+
+    <section className="event-metric-grid" id="overview" aria-label="Event overview">
+      <div className="event-info-row"><CalendarDaysIcon /><div><small>Date and time</small><strong>{dateParts.weekday}, {dateParts.month} {dateParts.day}, {dateParts.year}</strong><span>{formatTime(event.startsAt, event.timezone)} to {formatTime(event.endsAt, event.timezone)}, {eventDuration(event.startsAt, event.endsAt)}</span></div></div>
+      <div className="event-info-row"><MapPinIcon /><div><small>Venue</small><strong>{event.venue}</strong><span>{event.address || 'Address entered manually'}{event.postalCode ? ` · Singapore ${event.postalCode}` : ''} · {event.timezone}</span></div></div>
+      <div className="event-info-row"><UserGroupIcon /><div><small>At venue now</small><strong>{event.activeCapacityCount.toLocaleString()} of {event.capacity.toLocaleString()} people</strong><span>Signed up or checked in</span></div></div>
+      <div className="event-info-row"><ClipboardDocumentListIcon /><div><small>Expected</small><strong>{event.expectedAttendance?.toLocaleString() || 'Not set'} visitors</strong><span>{event.signupCount.toLocaleString()} signups collected</span></div></div>
+      <div className="event-info-row"><ClockIcon /><div><small>Staffing plan</small><strong>{event.shifts.length} {event.shifts.length === 1 ? 'shift' : 'shifts'}, {totalRequiredStaff} required</strong><span>Event operations coverage</span></div></div>
+    </section>
+
     <section className="lifecycle" aria-labelledby="lifecycle-title">
       <div className="lifecycle-heading"><h2 id="lifecycle-title">Event lifecycle</h2><span>{event.status === 'CANCELLED' ? 'Cancelled before completion' : `${STATUS_LABEL[event.status]} stage`}</span></div>
       <ol className={event.status === 'CANCELLED' ? 'is-cancelled' : ''}>
@@ -401,9 +374,9 @@ export default function EventDetailPage() {
 
     <div className="event-content-grid">
       <section className="shift-section" aria-labelledby="shift-title">
-        <div className="station-section">
+        <div className="station-section" id="stations">
           <div className="section-title">
-            <div><span className="section-kicker">Participant route</span><h2>Event stations</h2></div>
+            <div><span className="section-kicker">Screening route</span><h2>Event stations</h2></div>
             {canConfigureStations && <button className="secondary compact" type="button" aria-expanded={stationPanelOpen} aria-controls="station-template-panel" onClick={() => void openStationTemplates()}><PlusIcon />Import station</button>}
           </div>
           {stationPanelOpen && <div className="station-template-panel" id="station-template-panel" aria-live="polite">
@@ -427,16 +400,20 @@ export default function EventDetailPage() {
           </article>)}</div>}
         </div>
 
-        <div className="section-title"><div><span className="section-kicker">Staffing plan</span><h2 id="shift-title">Shifts</h2></div><span>{event.shifts.length} scheduled</span></div>
+        <div className="section-title" id="staff"><div><span className="section-kicker">Staffing plan</span><h2 id="shift-title">Shifts</h2></div><span>{event.shifts.length} scheduled</span></div>
         {event.shifts.length === 0 ? <p className="quiet-empty">No shifts have been added. The event can still be saved as a draft.</p> : <div className="shift-table">{event.shifts.map((shift) => {
           const draft = assignmentDrafts[shift.shiftId] ?? emptyAssignment;
+          const selectedStaff = staffDirectory.find((person) => person.userId === draft.userId);
+          const compatibleRoles = selectedStaff
+            ? assignmentRoles.filter((role) => selectedStaff.roles.includes(applicationRoleByAssignment[role]))
+            : [];
           return <article className="shift-record" key={shift.shiftId}>
             <div className="shift-record-summary"><span><strong>{shift.name}</strong><small>{STATUS_LABEL[shift.status as keyof typeof STATUS_LABEL] ?? shift.status.toLowerCase()}</small></span><span><small>Schedule</small>{formatTime(shift.startsAt, event.timezone)}–{formatTime(shift.endsAt, event.timezone)}</span><span><small>Coverage</small>{shift.staffAssignments.length} of {shift.requiredStaff} assigned</span>{canEditStaffing && <button className="secondary compact" type="button" aria-expanded={staffingOpen === shift.shiftId} onClick={() => void openStaffing(shift.shiftId)}><PlusIcon />Assign</button>}</div>
             {shift.staffAssignments.length > 0 ? <ul className="assignment-list">{shift.staffAssignments.map((assignment) => <li key={assignment.staffAssignmentId}><span><strong>{getDisplayName(assignment.user.username)}</strong><small>{roleLabel(assignment.assignmentRole)}{assignment.eventStation ? ` · ${assignment.eventStation.name}` : ''}</small></span>{canEditStaffing && <button className="assignment-remove" type="button" aria-label={`Remove ${getDisplayName(assignment.user.username)} from ${shift.name}`} title={`Remove ${getDisplayName(assignment.user.username)}`} onClick={() => void removeStaff(shift.shiftId, assignment.staffAssignmentId)} disabled={staffingPending}><TrashIcon /></button>}</li>)}</ul> : <p className="shift-empty">No staff assigned to this shift.</p>}
             {canEditStaffing && staffingOpen === shift.shiftId && <form className="staffing-editor" onSubmit={(submitEvent) => { submitEvent.preventDefault(); void assignStaff(shift.shiftId); }}>
               {directoryLoading ? <p>Loading available staff…</p> : directoryError ? <div className="inline-retry" role="alert"><p>{directoryError}</p><button className="secondary compact" type="button" onClick={() => void loadStaffDirectory()}>Retry</button></div> : directoryLoaded && staffDirectory.length === 0 ? <p>No active staff members are available.</p> : <>
-                <label><span>Staff member</span><select required value={draft.userId} disabled={staffingPending} onChange={(change) => updateAssignmentDraft(shift.shiftId, { userId: change.target.value })}><option value="">Choose staff</option>{staffDirectory.map((person) => <option value={person.userId} key={person.userId}>{getDisplayName(person.username)} · {roleLabel(person.systemRole === 'STAFF' ? 'SUPPORT' : person.systemRole)}</option>)}</select></label>
-                <label><span>Shift role</span><select value={draft.assignmentRole} disabled={staffingPending} onChange={(change) => updateAssignmentDraft(shift.shiftId, { assignmentRole: change.target.value as StaffAssignmentRole })}>{assignmentRoles.map((role) => <option value={role} key={role}>{roleLabel(role)}</option>)}</select></label>
+                <label><span>Staff member</span><select required value={draft.userId} disabled={staffingPending} onChange={(change) => { const person = staffDirectory.find((candidate) => candidate.userId === change.target.value); const role = assignmentRoles.find((candidate) => person?.roles.includes(applicationRoleByAssignment[candidate])) ?? 'SUPPORT'; updateAssignmentDraft(shift.shiftId, { userId: change.target.value, assignmentRole: role, eventStationId: role === 'SCREENER' ? draft.eventStationId : '' }); }}><option value="">Choose staff</option>{staffDirectory.map((person) => <option value={person.userId} key={person.userId}>{getDisplayName(person.username)} · {person.roles.map(roleLabel).join(', ')}</option>)}</select></label>
+                <label><span>Shift role</span><select value={draft.assignmentRole} disabled={staffingPending || !draft.userId} onChange={(change) => updateAssignmentDraft(shift.shiftId, { assignmentRole: change.target.value as StaffAssignmentRole })}>{compatibleRoles.map((role) => <option value={role} key={role}>{roleLabel(role)}</option>)}</select></label>
                 <label><span>Station {draft.assignmentRole === 'SCREENER' ? '(required)' : '(optional)'}</span><select required={draft.assignmentRole === 'SCREENER'} value={draft.eventStationId} disabled={staffingPending} onChange={(change) => updateAssignmentDraft(shift.shiftId, { eventStationId: change.target.value })}><option value="">No station</option>{event.eventStations.filter((station) => station.isAvailable).map((station) => <option value={station.eventStationId} key={station.eventStationId}>{station.stationOrder}. {station.name}</option>)}</select></label>
                 <button className="primary compact" type="submit" disabled={staffingPending || !draft.userId || (draft.assignmentRole === 'SCREENER' && !draft.eventStationId)}>{staffingPending ? 'Saving…' : 'Save assignment'}</button>
               </>}
@@ -445,13 +422,33 @@ export default function EventDetailPage() {
         })}</div>}
       </section>
 
-      <aside className="history" aria-labelledby="activity-title">
-        <span className="section-kicker">Immutable record</span>
-        <h2 id="activity-title">Activity</h2>
-        {!canManage ? <p>History is available to the event’s managers and administrators.</p> : <>
-          {auditError && <div className="inline-retry" role="alert"><p>{auditError}</p><button className="secondary compact" type="button" onClick={() => void refreshAudit(event.eventId)}>Retry</button></div>}
-          {auditLoading && audit.length === 0 ? <p>Loading activity…</p> : !auditError && audit.length === 0 ? <p>No history is available.</p> : audit.length > 0 ? <ol>{audit.map((item) => <li key={item.eventAuditLogId}><i /><div><strong>{item.action.toLowerCase().replace(/_/g, ' ')}</strong><span>{item.actor?.email ?? 'System actor'}</span><time dateTime={item.createdAt}>{formatEventDate(item.createdAt, event.timezone)}</time></div></li>)}</ol> : null}
-        </>}
+      <aside className="event-detail-aside">
+        <figure className="event-banner" aria-label={`Banner for ${event.name}`}>
+          <div className="event-banner-image"><img src={getEventArtwork(event.bannerKey, event.artworkDataUrl)} alt="" /></div>
+          <figcaption className="event-banner-toolbar">
+            <strong>{event.artworkDataUrl ? 'Your uploaded artwork' : 'Default event artwork'}</strong>
+            {canManage && !terminal && <button className="secondary banner-edit-button" type="button" aria-expanded={bannerOpen} aria-controls="event-banner-picker" onClick={() => { setSelectedBannerKey(event.bannerKey ?? 'COMMUNITY_SCREENING'); setArtworkFile(event.artworkDataUrl ?? ''); setBannerOpen((open) => !open); }}><PhotoIcon />Change</button>}
+          </figcaption>
+        </figure>
+
+        {bannerOpen && !terminal && <section className="banner-picker" id="event-banner-picker" aria-labelledby="banner-picker-title">
+          <div className="banner-picker-heading"><div><h2 id="banner-picker-title">Choose event artwork</h2><p>Use a built-in image or select your own file.</p></div><button className="icon-button" type="button" onClick={() => setBannerOpen(false)} aria-label="Close banner picker"><XMarkIcon /></button></div>
+          <input ref={fileInput} className="visually-hidden" type="file" accept="image/jpeg,image/webp" onChange={chooseArtwork} />
+          <div className="banner-options" role="radiogroup" aria-label="Available event artwork">
+            {EVENT_BANNERS.map((option) => <button className={`banner-option ${!artworkFile && selectedBannerKey === option.key ? 'selected' : ''}`} type="button" role="radio" aria-checked={!artworkFile && selectedBannerKey === option.key} key={option.key} onClick={() => { setSelectedBannerKey(option.key); setArtworkFile(''); }}><span className="banner-option-image"><img src={option.src} alt="" />{!artworkFile && selectedBannerKey === option.key && <i><CheckIcon /></i>}</span><span><strong>{option.label}</strong><small>{option.description}</small></span></button>)}
+            <button className={`banner-option banner-upload-option ${artworkFile ? 'selected' : ''}`} type="button" role="radio" aria-checked={!!artworkFile} onClick={() => fileInput.current?.click()}><span className="banner-option-image"><ArrowUpTrayIcon />{artworkFile && <i><CheckIcon /></i>}</span><span><strong>Upload your image</strong><small>JPEG or WebP, up to 130 KB</small></span></button>
+          </div>
+          <div className="banner-picker-actions"><button className="secondary" type="button" onClick={() => setBannerOpen(false)}>Cancel</button><button className="primary" type="button" disabled={bannerPending} onClick={() => void saveBanner()}>{bannerPending ? 'Saving…' : 'Use selected artwork'}</button></div>
+        </section>}
+
+        <section className="history" id="activity" aria-labelledby="activity-title">
+          <span className="section-kicker">Immutable record</span>
+          <h2 id="activity-title">Activity</h2>
+          {!canManage ? <p>History is available to the event’s managers and administrators.</p> : <>
+            {auditError && <div className="inline-retry" role="alert"><p>{auditError}</p><button className="secondary compact" type="button" onClick={() => void refreshAudit(event.eventId)}>Retry</button></div>}
+            {auditLoading && audit.length === 0 ? <p>Loading activity…</p> : !auditError && audit.length === 0 ? <p>No history is available.</p> : audit.length > 0 ? <ol>{audit.map((item) => <li key={item.eventAuditLogId}><i /><div><strong>{item.action.toLowerCase().replace(/_/g, ' ')}</strong><span>{item.actor?.email ?? 'System actor'}</span><time dateTime={item.createdAt}>{formatEventDate(item.createdAt, event.timezone)}</time></div></li>)}</ol> : null}
+          </>}
+        </section>
       </aside>
     </div>
   </div>;
