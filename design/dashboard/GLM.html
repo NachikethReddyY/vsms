@@ -1,0 +1,1066 @@
+<!doctype html>
+<html lang="en" data-theme="">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>VSMS — Triage Console</title>
+<style>
+/* VSMS · Triage Console — independent proposal (DESIGN_ID: GLM)
+   Status-first triage console. Cool graphite + teal accent + measured semantics.
+   No frameworks, no CDN, no external assets. Inline SVG icons only. */
+*,*::before,*::after{box-sizing:border-box}
+html,body{margin:0;height:100%}
+:root{
+  --bg:#0E1116;--bg-raised:#151A21;--bg-elev:#1B2230;--bg-input:#0B0E13;
+  --panel:#11151C;--line:#262C38;--line-soft:#1F2530;--line-strong:#364154;
+  --ink:#E6EAF2;--ink-2:#AAB3C4;--muted:#77808F;--muted-soft:#5A6271;
+  --acc:#2DD4BF;--acc-strong:#14B8A6;--acc-tint:rgba(45,212,191,.10);
+  --acc-line:rgba(45,212,191,.32);--acc-ink:#06231F;
+  --ok:#34D399;--warn:#FBBF24;--ref:#FB923C;--crit:#F87171;--info:#60A5FA;
+  --stage-reg:#D8A48F;--stage-va:#9DB4D1;--stage-ref:#C0A8DD;--stage-col:#9FC9A2;--stage-eye:#D9B36A;
+  --shadow:0 14px 40px rgba(0,0,0,.45);
+  --r-sm:6px;--r:8px;--r-lg:12px;--r-xl:16px;
+  --t-fast:120ms;--t:160ms;--ease:cubic-bezier(.2,.6,.2,1);
+  --mono:ui-monospace,"SF Mono",Menlo,Consolas,monospace;
+  --sans:system-ui,-apple-system,"SF Pro Text","Segoe UI",sans-serif;
+}
+[data-theme="light"]{
+  --bg:#F4F5F7;--bg-raised:#FFFFFF;--bg-elev:#FFFFFF;--bg-input:#EEF0F3;
+  --panel:#F9FAFB;--line:#E2E5EA;--line-soft:#EAEDF1;--line-strong:#D0D5DD;
+  --ink:#10131A;--ink-2:#4A5160;--muted:#6B7280;--muted-soft:#9AA0AC;
+  --acc:#0D9488;--acc-strong:#0F766E;--acc-tint:rgba(13,148,136,.10);--acc-line:rgba(13,148,136,.35);--acc-ink:#FFFFFF;
+  --ok:#059669;--warn:#D97706;--ref:#EA580C;--crit:#DC2626;--info:#2563EB;
+  --stage-reg:#C97A5A;--stage-va:#5B7AA8;--stage-ref:#8466B5;--stage-col:#4F8E5A;--stage-eye:#B8893A;
+  --shadow:0 10px 32px rgba(16,19,26,.14);
+}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+body{font-family:var(--sans);background:var(--bg);color:var(--ink);font-size:13px;line-height:1.5;-webkit-font-smoothing:antialiased;font-variant-numeric:tabular-nums;overflow:hidden}
+button{font-family:inherit;font-size:inherit;color:inherit;background:none;border:0;cursor:pointer}
+a{color:inherit;text-decoration:none}
+:focus-visible{outline:2px solid var(--acc);outline-offset:2px;border-radius:4px}
+.mono{font-family:var(--mono)}
+.muted{color:var(--muted)}
+.id{font-family:var(--mono);color:var(--muted);font-size:12px;letter-spacing:.01em}
+.hide{display:none!important}
+.sronly{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;border:0}
+
+.app{display:grid;grid-template-columns:220px 1fr;height:100vh;height:100dvh;overflow:hidden}
+.app.collapsed{grid-template-columns:56px 1fr}
+.app.collapsed .nav-label,.app.collapsed .nav-count,.app.collapsed .rail-pad,.app.collapsed .ev-switch-label,.app.collapsed .rail-group-h{display:none}
+.app.collapsed .nav-item{justify-content:center;padding-left:0;padding-right:0}
+
+.sidebar{background:var(--panel);border-right:1px solid var(--line);display:flex;flex-direction:column;min-height:0}
+.sidebar-top{padding:14px 14px 10px;border-bottom:1px solid var(--line-soft);display:flex;align-items:center;gap:10px;min-height:52px}
+.brand{display:flex;align-items:center;gap:9px;font-weight:600;font-size:15px;letter-spacing:-.01em}
+.brand-mark{width:26px;height:26px;border-radius:7px;background:linear-gradient(135deg,var(--acc),var(--acc-strong));display:grid;place-items:center;color:var(--acc-ink);flex:0 0 auto}
+.brand-mark svg{width:15px;height:15px}
+.ev-switch{margin:8px 8px 0;padding:9px 10px;border:1px solid var(--line);border-radius:var(--r);background:var(--bg-input);display:flex;align-items:center;gap:8px;cursor:pointer;width:calc(100% - 16px)}
+.ev-switch:hover{border-color:var(--line-strong)}
+.ev-switch-label{font-size:12px;line-height:1.3;flex:1;min-width:0}
+.ev-switch-label b{display:block;color:var(--ink);font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ev-switch-label span{color:var(--muted);font-size:11px}
+.nav{flex:1;overflow-y:auto;padding:6px 8px;display:flex;flex-direction:column;gap:1px}
+.nav-group{margin-top:10px;padding-top:8px;border-top:1px solid var(--line-soft)}
+.nav-group:first-child{border-top:0;margin-top:0;padding-top:0}
+.rail-group-h{font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted-soft);padding:6px 10px 4px;font-weight:600}
+.nav-item{display:flex;align-items:center;gap:11px;padding:9px 10px;border-radius:var(--r);color:var(--ink-2);font-size:13px;font-weight:500;cursor:pointer;text-align:left;width:100%;min-height:36px;transition:background var(--t-fast) var(--ease),color var(--t-fast) var(--ease)}
+.nav-item:hover{background:var(--bg-input);color:var(--ink)}
+.nav-item.active{background:var(--acc-tint);color:var(--ink);box-shadow:inset 2px 0 0 var(--acc)}
+.nav-item svg{width:17px;height:17px;flex:0 0 auto;opacity:.85}
+.nav-item.active svg{opacity:1;color:var(--acc)}
+.nav-count{margin-left:auto;font-size:11px;color:var(--muted);background:var(--bg-input);padding:1px 7px;border-radius:999px}
+.nav-item.active .nav-count{background:var(--acc-tint);color:var(--acc)}
+.sidebar-bottom{border-top:1px solid var(--line);padding:8px}
+.connect{padding:7px 10px;border-radius:var(--r);display:flex;align-items:center;gap:8px;font-size:12px;color:var(--ink-2)}
+.dot{width:8px;height:8px;border-radius:50%;flex:0 0 auto;background:var(--muted-soft)}
+.dot.ok{background:var(--ok);box-shadow:0 0 0 3px rgba(52,211,153,.16)}
+.dot.warn{background:var(--warn);box-shadow:0 0 0 3px rgba(251,191,36,.16)}
+.dot.crit{background:var(--crit);box-shadow:0 0 0 3px rgba(248,113,113,.16)}
+.dot.info{background:var(--info);box-shadow:0 0 0 3px rgba(96,165,250,.16)}
+.connect .c-label{flex:1;min-width:0}
+.connect .c-label b{display:block;color:var(--ink);font-weight:600;font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.connect .c-label span{color:var(--muted);font-size:11px}
+.profile{display:flex;align-items:center;gap:9px;padding:7px 10px;border-radius:var(--r);cursor:pointer;margin-top:2px}
+.profile:hover{background:var(--bg-input)}
+.avatar{width:28px;height:28px;border-radius:50%;background:var(--line-strong);display:grid;place-items:center;font-size:11px;font-weight:600;color:var(--ink);flex:0 0 auto}
+.profile-meta{font-size:12px;line-height:1.3;min-width:0}
+.profile-meta b{display:block;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.profile-meta span{color:var(--muted);font-size:11px}
+
+.main{display:flex;flex-direction:column;min-width:0;min-height:0}
+.topbar{height:52px;background:var(--bg-raised);border-bottom:1px solid var(--line);display:flex;align-items:center;gap:12px;padding:0 14px;flex:0 0 auto}
+.icon-btn{width:36px;height:36px;border-radius:var(--r);display:grid;place-items:center;color:var(--ink-2);cursor:pointer;flex:0 0 auto}
+.icon-btn:hover{background:var(--bg-input);color:var(--ink)}
+.icon-btn svg{width:18px;height:18px}
+.crumbs{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--ink-2);min-width:0;flex:1}
+.crumbs b{color:var(--ink);font-weight:600}
+.search{position:relative;flex:1;max-width:380px}
+.search input{width:100%;height:36px;background:var(--bg-input);border:1px solid var(--line);border-radius:var(--r);color:var(--ink);padding:0 12px 0 34px;font-size:13px}
+.search input::placeholder{color:var(--muted-soft)}
+.search input:focus{outline:none;border-color:var(--acc);box-shadow:0 0 0 3px var(--acc-tint)}
+.search svg{position:absolute;left:10px;top:9px;width:16px;height:16px;color:var(--muted)}
+.kbd{position:absolute;right:8px;top:7px;font-family:var(--mono);font-size:11px;color:var(--muted);border:1px solid var(--line);border-radius:4px;padding:1px 6px;background:var(--bg-raised)}
+.topbar-right{display:flex;align-items:center;gap:4px}
+.pill-sync{display:inline-flex;align-items:center;gap:7px;height:30px;padding:0 11px;border:1px solid var(--line);border-radius:999px;font-size:12px;color:var(--ink-2);background:var(--bg-input)}
+.pill-sync.warn{border-color:rgba(251,191,36,.4);color:var(--warn)}
+
+.content{flex:1;overflow-y:auto;padding:18px 22px 80px;min-width:0}
+.page{display:none;animation:fade .2s var(--ease)}
+.page.active{display:block}
+@keyframes fade{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
+.page-head{display:flex;align-items:flex-end;justify-content:space-between;gap:16px;margin-bottom:18px;flex-wrap:wrap}
+.page-title{font-size:22px;font-weight:600;letter-spacing:-.02em;margin:0}
+.page-sub{color:var(--muted);font-size:13px;margin-top:3px}
+.page-actions{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:7px;height:36px;padding:0 14px;border-radius:var(--r);font-size:13px;font-weight:600;cursor:pointer;border:1px solid transparent;transition:background var(--t-fast) var(--ease),border-color var(--t-fast) var(--ease),transform var(--t-fast) var(--ease);min-height:36px;white-space:nowrap}
+.btn:active{transform:scale(.97)}
+.btn svg{width:15px;height:15px}
+.btn-primary{background:var(--acc);color:var(--acc-ink)}
+.btn-primary:hover{background:var(--acc-strong)}
+.btn-ghost{background:var(--bg-input);color:var(--ink);border-color:var(--line)}
+.btn-ghost:hover{border-color:var(--line-strong)}
+.btn-outline{background:transparent;color:var(--ink);border-color:var(--line-strong)}
+.btn-outline:hover{border-color:var(--acc);color:var(--acc)}
+.btn-danger{background:transparent;color:var(--crit);border-color:rgba(248,113,113,.4)}
+.btn-danger:hover{background:rgba(248,113,113,.12)}
+.btn-sm{height:30px;min-height:30px;padding:0 11px;font-size:12px}
+.btn-lg{height:44px;min-height:44px;padding:0 18px;font-size:14px}
+.btn[disabled]{opacity:.45;cursor:not-allowed;transform:none!important}
+
+.triage-layout{display:grid;grid-template-columns:1fr 300px;gap:18px;align-items:start}
+.rail{position:sticky;top:0;display:flex;flex-direction:column;gap:12px}
+.rail-card{background:var(--bg-raised);border:1px solid var(--line);border-radius:var(--r-lg);overflow:hidden}
+.rail-head{padding:11px 13px;border-bottom:1px solid var(--line-soft);display:flex;align-items:center;gap:8px}
+.rail-head h4{margin:0;font-size:12px;font-weight:600;letter-spacing:.03em;text-transform:uppercase;color:var(--ink-2);flex:1}
+.rail-head .tag{font-size:11px;color:var(--muted)}
+.rail-body{padding:4px}
+.rail-empty{padding:18px 13px;text-align:center;color:var(--muted);font-size:12px;line-height:1.5}
+.rail-empty svg{width:30px;height:30px;color:var(--muted-soft);margin-bottom:6px}
+
+.attention-item{display:flex;gap:10px;padding:10px 12px;border-radius:var(--r);cursor:pointer;align-items:flex-start}
+.attention-item:hover{background:var(--bg-input)}
+.attention-item .ai-dot{margin-top:5px;flex:0 0 auto}
+.ai-meta{flex:1;min-width:0}
+.ai-meta b{display:block;font-size:12px;font-weight:600;color:var(--ink);line-height:1.35}
+.ai-meta span{display:block;font-size:11px;color:var(--muted);line-height:1.4}
+.ai-act{font-size:11px;color:var(--acc);font-weight:600;margin-top:3px;display:inline-flex;align-items:center;gap:3px}
+
+.toolbar{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:14px}
+.tb-search{position:relative;flex:1;min-width:200px;max-width:340px}
+.tb-search input{width:100%;height:32px;background:var(--bg-input);border:1px solid var(--line);border-radius:var(--r);color:var(--ink);padding:0 11px 0 30px;font-size:12px}
+.tb-search input:focus{outline:none;border-color:var(--acc)}
+.tb-search svg{position:absolute;left:8px;top:8px;width:14px;height:14px;color:var(--muted)}
+.seg{display:inline-flex;background:var(--bg-input);border:1px solid var(--line);border-radius:var(--r);padding:2px;gap:2px;flex-wrap:wrap}
+.seg button{height:28px;padding:0 11px;border-radius:6px;font-size:12px;font-weight:500;color:var(--ink-2)}
+.seg button.active{background:var(--bg-raised);color:var(--ink);box-shadow:0 1px 2px rgba(0,0,0,.2)}
+[data-theme="light"] .seg button.active{box-shadow:0 1px 2px rgba(0,0,0,.08)}
+.select{height:32px;background:var(--bg-input);border:1px solid var(--line);border-radius:var(--r);color:var(--ink);padding:0 28px 0 11px;font-size:12px;appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%2377808F' stroke-width='2.5'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 9px center;cursor:pointer}
+
+.tps{margin:10px 0 6px;display:flex;align-items:center;gap:0;height:7px;border-radius:999px;overflow:hidden;background:var(--bg-input)}
+.tps>span{display:block;height:100%;transition:width var(--t) var(--ease)}
+.tps .s-reg{background:var(--stage-reg)}.tps .s-done{background:var(--ok)}.tps .s-rev{background:var(--warn)}.tps .s-fu{background:var(--ref)}.tps .s-wait{background:var(--line-strong)}
+
+.e-list{display:flex;flex-direction:column;gap:10px}
+.e-card{background:var(--bg-raised);border:1px solid var(--line);border-radius:var(--r-lg);padding:14px 16px;transition:border-color var(--t-fast) var(--ease)}
+.e-card:hover{border-color:var(--line-strong)}
+.e-card.warn{border-color:rgba(251,191,36,.35)}
+.e-card.crit{border-color:rgba(248,113,113,.4)}
+.e-row{display:flex;align-items:flex-start;gap:14px;flex-wrap:wrap}
+.e-main{flex:1;min-width:240px}
+.e-name{font-size:15px;font-weight:600;letter-spacing:-.01em;display:flex;align-items:center;gap:9px;flex-wrap:wrap}
+.e-meta{display:flex;gap:14px;flex-wrap:wrap;margin-top:5px;color:var(--muted);font-size:12px;align-items:center}
+.e-meta b{color:var(--ink-2);font-weight:600}
+.e-stats{display:flex;gap:18px;flex-wrap:wrap;margin-top:10px}
+.estat{display:flex;flex-direction:column;gap:1px}
+.estat .n{font-size:15px;font-weight:600;font-variant-numeric:tabular-nums}
+.estat .l{font-size:10px;letter-spacing:.04em;text-transform:uppercase;color:var(--muted-soft)}
+.estat .n.warn{color:var(--warn)}.estat .n.crit{color:var(--crit)}.estat .n.ok{color:var(--ok)}
+.e-actions{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.e-actions .btn{height:32px;min-height:32px;font-size:12px}
+.next-action{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:600;color:var(--acc);background:var(--acc-tint);border:1px solid var(--acc-line);padding:6px 12px;border-radius:var(--r);cursor:pointer;min-height:32px}
+.next-action:hover{background:rgba(45,212,191,.18)}
+[data-theme="light"] .next-action:hover{background:rgba(13,148,136,.16)}
+.menu-wrap{position:relative}
+.menu{position:absolute;right:0;top:calc(100% + 4px);background:var(--bg-raised);border:1px solid var(--line-strong);border-radius:var(--r);box-shadow:var(--shadow);min-width:180px;padding:5px;z-index:50;display:none}
+.menu.open{display:block}
+.menu button{display:flex;align-items:center;gap:9px;width:100%;text-align:left;padding:8px 10px;border-radius:6px;font-size:13px;color:var(--ink);font-weight:400;min-height:34px}
+.menu button:hover{background:var(--bg-input)}
+.menu button svg{width:15px;height:15px;color:var(--muted)}
+.menu button.danger{color:var(--crit)}
+.menu .sep{height:1px;background:var(--line-soft);margin:4px 0}
+
+.badge{display:inline-flex;align-items:center;gap:6px;height:22px;padding:0 9px;border-radius:999px;font-size:11px;font-weight:600;letter-spacing:.01em;white-space:nowrap}
+.badge .dot{width:6px;height:6px;box-shadow:none}
+.badge-draft{background:rgba(119,128,143,.14);color:var(--ink-2)}.badge-draft .dot{background:var(--muted)}
+.badge-up{background:rgba(96,165,250,.14);color:var(--info)}.badge-up .dot{background:var(--info)}
+.badge-live{background:rgba(52,211,153,.14);color:var(--ok)}.badge-live .dot{background:var(--ok)}
+.badge-done{background:rgba(119,128,143,.12);color:var(--muted)}.badge-done .dot{background:var(--muted-soft)}
+.badge-review{background:rgba(251,191,36,.14);color:var(--warn)}.badge-review .dot{background:var(--warn)}
+.badge-referral{background:rgba(251,146,60,.14);color:var(--ref)}.badge-referral .dot{background:var(--ref)}
+.badge-urgent{background:rgba(248,113,113,.14);color:var(--crit)}.badge-urgent .dot{background:var(--crit)}
+.badge-offline{background:rgba(119,128,143,.14);color:var(--ink-2)}
+.badge-synced{background:rgba(52,211,153,.14);color:var(--ok)}
+.badge-pending{background:rgba(251,191,36,.14);color:var(--warn)}
+.badge-failed{background:rgba(248,113,113,.14);color:var(--crit)}
+.badge-conflict{background:rgba(96,165,250,.14);color:var(--info)}
+
+.live-grid{display:grid;grid-template-columns:1fr 320px;gap:16px;align-items:start}
+.live-main{display:flex;flex-direction:column;gap:16px;min-width:0}
+.station-board{background:var(--bg-raised);border:1px solid var(--line);border-radius:var(--r-lg);overflow:hidden}
+.sb-head{display:flex;align-items:center;justify-content:space-between;padding:12px 15px;border-bottom:1px solid var(--line-soft)}
+.sb-head h3{margin:0;font-size:14px;font-weight:600}
+.sb-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr))}
+.sb-cell{padding:13px 15px;border-right:1px solid var(--line-soft);border-bottom:1px solid var(--line-soft);min-width:0}
+.sb-cell .h{display:flex;align-items:center;gap:7px;font-size:11px;text-transform:uppercase;letter-spacing:.04em;color:var(--muted-soft);font-weight:600;margin-bottom:6px}
+.sb-cell .h .stage-dot{width:9px;height:9px;border-radius:50%}
+.sb-cell .v{font-size:22px;font-weight:600;letter-spacing:-.02em;line-height:1.1}
+.sb-cell .sub{font-size:11px;color:var(--muted);margin-top:2px}
+.sb-cell .assign{font-size:11px;color:var(--ink-2);margin-top:5px;display:flex;align-items:center;gap:6px}
+.sb-cell .assign .avatar{width:18px;height:18px;font-size:9px}
+.sb-cell.warn .v{color:var(--warn)}
+.sb-cell.crit .v{color:var(--crit)}
+
+.workspace{display:grid;grid-template-columns:300px 1fr 340px;gap:0;background:var(--bg-raised);border:1px solid var(--line);border-radius:var(--r-lg);overflow:hidden;min-height:560px}
+.ws-queue{border-right:1px solid var(--line);display:flex;flex-direction:column;min-height:0}
+.ws-qhead{padding:11px 14px;border-bottom:1px solid var(--line-soft);display:flex;align-items:center;gap:8px}
+.ws-qhead h3{margin:0;font-size:13px;font-weight:600;flex:1}
+.ws-qlist{flex:1;overflow-y:auto;min-height:200px}
+.qrow{padding:11px 14px;border-bottom:1px solid var(--line-soft);cursor:pointer;display:flex;gap:10px;align-items:flex-start}
+.qrow:hover{background:var(--bg-input)}
+.qrow.sel{background:var(--acc-tint);box-shadow:inset 2px 0 0 var(--acc)}
+.qrow .qi{flex:1;min-width:0}
+.qrow .qn{font-size:13px;font-weight:600;display:flex;align-items:center;gap:7px}
+.qrow .qid{font-family:var(--mono);font-size:11px;color:var(--muted);margin-top:1px}
+.qrow .qs{display:flex;gap:6px;margin-top:4px;flex-wrap:wrap;align-items:center}
+.qrow .wait{font-size:11px;color:var(--muted);display:inline-flex;align-items:center;gap:3px}
+.ws-active{display:flex;flex-direction:column;min-width:0;min-height:0}
+.ws-ahead{padding:14px 16px;border-bottom:1px solid var(--line-soft);display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}
+.ws-ahead h3{margin:0;font-size:15px;font-weight:600;letter-spacing:-.01em}
+.ws-abody{flex:1;overflow-y:auto;padding:16px}
+.ws-ctx{border:1px solid var(--line);border-radius:var(--r);padding:12px 14px;margin-bottom:14px;background:var(--bg-input)}
+.ws-ctx .pid{font-family:var(--mono);font-size:11px;color:var(--muted)}
+.ws-ctx .pname{font-size:15px;font-weight:600;margin-top:2px}
+.ws-inspector{border-left:1px solid var(--line);display:flex;flex-direction:column;min-height:0}
+.ws-ihead{padding:11px 14px;border-bottom:1px solid var(--line-soft)}
+.ws-ihead h3{margin:0;font-size:13px;font-weight:600}
+.ws-ibody{flex:1;overflow-y:auto;padding:14px}
+.timeline{position:relative;padding-left:22px}
+.timeline::before{content:"";position:absolute;left:7px;top:4px;bottom:4px;width:2px;background:var(--line)}
+.tl-step{position:relative;padding:9px 0 13px}
+.tl-step::before{content:"";position:absolute;left:-19px;top:11px;width:12px;height:12px;border-radius:50%;background:var(--bg);border:2px solid var(--line-strong)}
+.tl-step.done::before{background:var(--stage-color,var(--ok));border-color:var(--stage-color,var(--ok))}
+.tl-step.active::before{background:var(--bg);border-color:var(--acc);box-shadow:0 0 0 4px var(--acc-tint)}
+.tl-step .tl-h{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.tl-step .tl-h b{font-size:13px;font-weight:600}
+.tl-step .tl-h span{font-size:11px;color:var(--muted)}
+.tl-step .tl-d{font-size:11px;color:var(--muted);margin-top:2px;line-height:1.4}
+.tl-step.active .tl-h b{color:var(--acc)}
+.field{margin-bottom:13px}
+.field label{display:block;font-size:11px;font-weight:600;letter-spacing:.03em;text-transform:uppercase;color:var(--muted-soft);margin-bottom:5px}
+.field input,.field select,.field textarea{width:100%;background:var(--bg-input);border:1px solid var(--line);border-radius:var(--r);color:var(--ink);padding:0 11px;font-size:13px;font-family:inherit}
+.field input{height:38px}.field select{height:38px;appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%2377808F' stroke-width='2.5'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 10px center;padding-right:30px}
+.field textarea{padding:9px 11px;min-height:72px;resize:vertical;line-height:1.5}
+.field input:focus,.field select:focus,.field textarea:focus{outline:none;border-color:var(--acc);box-shadow:0 0 0 3px var(--acc-tint)}
+.field-row{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.result-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:10px;margin:8px 0 14px}
+.result-cell{border:1px solid var(--line);border-radius:var(--r);padding:10px 11px;background:var(--bg-input)}
+.result-cell label{font-size:10px;text-transform:uppercase;letter-spacing:.04em;color:var(--muted-soft);font-weight:600}
+.result-cell .rv{font-size:16px;font-weight:600;margin-top:3px;letter-spacing:-.01em}
+.result-cell .rv.warn{color:var(--warn)}.result-cell .rv.crit{color:var(--crit)}
+.result-cell input{width:100%;height:30px;background:var(--bg);border:1px solid var(--line);border-radius:5px;color:var(--ink);padding:0 8px;font-size:13px;margin-top:4px}
+
+.overlay{position:fixed;inset:0;background:rgba(6,8,11,.6);backdrop-filter:blur(2px);display:none;align-items:center;justify-content:center;z-index:100;padding:20px}
+.overlay.open{display:flex}
+.modal{background:var(--bg-raised);border:1px solid var(--line-strong);border-radius:var(--r-xl);box-shadow:var(--shadow);width:100%;max-width:520px;max-height:90vh;overflow-y:auto}
+.modal.wide{max-width:680px}
+.modal-head{padding:16px 20px;border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:space-between;gap:12px;position:sticky;top:0;background:var(--bg-raised)}
+.modal-head h3{margin:0;font-size:16px;font-weight:600;letter-spacing:-.01em}
+.modal-body{padding:18px 20px}
+.modal-foot{padding:14px 20px;border-top:1px solid var(--line);display:flex;justify-content:flex-end;gap:8px;flex-wrap:wrap;position:sticky;bottom:0;background:var(--bg-raised)}
+
+.toast-wrap{position:fixed;bottom:20px;right:20px;display:flex;flex-direction:column;gap:8px;z-index:200;max-width:340px}
+.toast{background:var(--bg-raised);border:1px solid var(--line-strong);border-radius:var(--r);box-shadow:var(--shadow);padding:12px 14px;display:flex;gap:10px;align-items:flex-start;animation:slidein .25s var(--ease)}
+.toast.ok{border-left:3px solid var(--ok)}
+.toast.warn{border-left:3px solid var(--warn)}
+.toast.crit{border-left:3px solid var(--crit)}
+.toast.info{border-left:3px solid var(--info)}
+.toast b{font-size:13px;font-weight:600;display:block}
+.toast span{font-size:12px;color:var(--muted)}
+.toast svg{width:17px;height:17px;flex:0 0 auto;margin-top:1px}
+@keyframes slidein{from{opacity:0;transform:translateX(20px)}to{opacity:1;transform:none}}
+
+.dryrun-banner{position:sticky;top:0;background:repeating-linear-gradient(135deg,rgba(251,191,36,.10),rgba(251,191,36,.10) 12px,transparent 12px,transparent 24px);border-bottom:1px solid rgba(251,191,36,.35);padding:9px 22px;display:flex;align-items:center;gap:12px;font-size:12px;color:var(--warn);z-index:5;font-weight:600}
+.dryrun-banner svg{width:16px;height:16px}
+.dryrun-banner .dry-actions{margin-left:auto;display:flex;gap:8px}
+
+.state-box{border:1px dashed var(--line-strong);border-radius:var(--r-lg);padding:48px 24px;text-align:center;color:var(--muted);background:var(--bg-raised)}
+.state-box svg{width:40px;height:40px;color:var(--muted-soft);margin-bottom:10px}
+.state-box h3{margin:0 0 6px;font-size:15px;color:var(--ink);font-weight:600}
+.state-box p{margin:0 auto;font-size:13px;line-height:1.5;max-width:380px}
+.skeleton{background:linear-gradient(90deg,var(--bg-input) 25%,var(--bg-raised) 50%,var(--bg-input) 75%);background-size:200% 100%;animation:shimmer 1.4s infinite;border-radius:var(--r)}
+@keyframes shimmer{0%{background-position:200% 0}100%{background-position:-200% 0}}
+.sk-card{height:120px;border-radius:var(--r-lg);margin-bottom:10px}
+
+.staff-row{display:flex;align-items:center;gap:14px;padding:12px 14px;border-bottom:1px solid var(--line-soft)}
+.staff-row:hover{background:var(--bg-input)}
+.staff-row .avatar{width:34px;height:34px;font-size:12px}
+.staff-main{flex:1;min-width:0}
+.staff-main b{font-size:13px;font-weight:600;display:block}
+.staff-main span{font-size:12px;color:var(--muted)}
+.staff-meta{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.role-tag{font-size:11px;font-weight:600;padding:3px 9px;border-radius:999px;border:1px solid var(--line);color:var(--ink-2)}
+.role-tag.mgr{color:var(--info);border-color:rgba(96,165,250,.35)}
+.role-tag.reg{color:var(--stage-col);border-color:rgba(159,201,162,.35)}
+.role-tag.scr{color:var(--stage-va);border-color:rgba(157,180,209,.35)}
+.role-tag.doc{color:var(--warn);border-color:rgba(251,191,36,.35)}
+.role-tag.admin{color:var(--acc);border-color:var(--acc-line)}
+.role-tag.pending{color:var(--muted);border-style:dashed}
+.staff-actions{display:flex;gap:6px}
+
+.scan-card{background:var(--bg-input);border:1px solid var(--line);border-radius:var(--r-lg);padding:24px;text-align:center;max-width:440px;margin:0 auto}
+.scan-faux{width:180px;height:180px;margin:6px auto 16px;border:1px solid var(--acc-line);border-radius:var(--r-lg);background:var(--bg);display:grid;place-items:center;position:relative;overflow:hidden}
+.scan-faux::before{content:"";position:absolute;inset:0;background:linear-gradient(180deg,transparent,rgba(45,212,191,.12),transparent);animation:scan 2.2s var(--ease) infinite}
+@keyframes scan{0%{transform:translateY(-100%)}100%{transform:translateY(100%)}}
+.scan-faux svg{width:64px;height:64px;color:var(--acc);position:relative;z-index:1}
+
+.sync-row{display:flex;align-items:center;gap:12px;padding:10px 12px;border-bottom:1px solid var(--line-soft)}
+.sync-row .sr-main{flex:1;min-width:0}
+.sync-row .sr-main b{font-size:12px;font-weight:600;display:block;font-family:var(--mono)}
+.sync-row .sr-main span{font-size:11px;color:var(--muted)}
+.progress{height:5px;background:var(--bg-input);border-radius:999px;overflow:hidden;flex:1;min-width:80px}
+.progress>span{display:block;height:100%;background:var(--acc);transition:width var(--t) var(--ease)}
+
+.dev-label{position:fixed;bottom:8px;left:8px;font-family:var(--mono);font-size:10px;color:var(--muted-soft);background:var(--bg);border:1px solid var(--line);border-radius:4px;padding:2px 6px;z-index:90;opacity:.7}
+
+@media(max-width:1200px){.triage-layout{grid-template-columns:1fr}.rail{position:static;flex-direction:row;overflow-x:auto;padding-bottom:4px}.rail-card{min-width:280px;flex:0 0 auto}.live-grid{grid-template-columns:1fr}.workspace{grid-template-columns:260px 1fr}.ws-inspector{display:none}}
+@media(max-width:900px){.app{grid-template-columns:56px 1fr}.nav-label,.nav-count,.rail-pad,.ev-switch-label,.rail-group-h{display:none}.nav-item{justify-content:center;padding-left:0;padding-right:0}.search{display:none}.workspace{grid-template-columns:1fr;min-height:auto}.ws-queue,.ws-inspector{display:none}.content{padding:14px 14px 70px}}
+@media(max-width:640px){.topbar-right .pill-sync{display:none}.e-stats{gap:12px}}
+</style>
+</head>
+<body>
+<div class="app" id="app">
+  <aside class="sidebar">
+    <div class="sidebar-top">
+      <div class="brand"><span class="brand-mark"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg></span><span class="nav-label">VSMS</span></div>
+      <button class="icon-btn" style="margin-left:auto" onclick="toggleSidebar()" title="Collapse sidebar" aria-label="Collapse sidebar"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M9 4v16"/></svg></button>
+    </div>
+    <div class="ev-switch" onclick="nav('events')" title="Switch event context">
+      <span class="dot ok"></span>
+      <span class="ev-switch-label"><b id="ctxEvent">Northside Community</b><span id="ctxDate">31 Jul · Live</span></span>
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+    </div>
+    <nav class="nav" id="nav">
+      <div class="nav-group">
+        <div class="rail-group-h">Operations</div>
+        <button class="nav-item active" data-nav="events" onclick="nav('events')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 10h18M8 4v4M16 4v4"/></svg><span class="nav-label">Events</span><span class="nav-count" id="navCountEvents">7</span></button>
+        <button class="nav-item" data-nav="live" onclick="nav('live')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg><span class="nav-label">Live event</span><span class="nav-count" id="navCountLive">1</span></button>
+        <button class="nav-item" data-nav="screening" onclick="nav('screening')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 7h4v10H3zM10 7h4v10h-4zM17 9l4 6h-8z"/></svg><span class="nav-label">Screening</span></button>
+        <button class="nav-item" data-nav="review" onclick="nav('review')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg><span class="nav-label">Review &amp; referrals</span><span class="nav-count" id="navCountReview">4</span></button>
+      </div>
+      <div class="nav-group">
+        <div class="rail-group-h">Manage</div>
+        <button class="nav-item" data-nav="people" onclick="nav('people')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></svg><span class="nav-label">People</span><span class="nav-count" id="navCountPeople">2</span></button>
+        <button class="nav-item" data-nav="sync" onclick="nav('sync')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12a9 9 0 1 1-9-9c2.5 0 4.8 1 6.5 2.6"/><path d="M21 3v6h-6"/></svg><span class="nav-label">Sync centre</span><span class="nav-count" id="navCountSync">3</span></button>
+        <button class="nav-item" data-nav="reports" onclick="nav('reports')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3v18h18"/><path d="M7 14l4-4 4 4 5-6"/></svg><span class="nav-label">Reports</span></button>
+      </div>
+    </nav>
+    <div class="sidebar-bottom">
+      <div class="connect" id="connectStatus">
+        <span class="dot ok"></span>
+        <span class="c-label"><b>Connected</b><span id="syncLabel">Synced 2 min ago</span></span>
+      </div>
+      <div class="profile" onclick="openProfile()">
+        <span class="avatar">AT</span>
+        <span class="profile-meta"><b>Aisha Thomas</b><span>Event Manager</span></span>
+      </div>
+    </div>
+  </aside>
+
+  <main class="main">
+    <header class="topbar">
+      <button class="icon-btn" onclick="toggleSidebar()" title="Toggle sidebar" aria-label="Toggle sidebar"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12h18M3 6h18M3 18h18"/></svg></button>
+      <div class="crumbs" id="crumbs">Events</div>
+      <div class="search">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
+        <input id="globalSearch" type="text" placeholder="Search participants, IDs, events…" aria-label="Global search">
+        <span class="kbd">/</span>
+      </div>
+      <div class="topbar-right">
+        <button class="icon-btn" onclick="resetPrototype()" title="Reset prototype" aria-label="Reset prototype"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12a9 9 0 1 1 3 6.7"/><path d="M3 4v5h5"/></svg></button>
+        <span class="pill-sync warn" id="topSync"><span class="dot warn" style="width:7px;height:7px;box-shadow:none"></span><span id="topSyncTxt">3 pending</span></span>
+        <button class="icon-btn" onclick="toast('No new notifications','info')" title="Notifications" aria-label="Notifications"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8a6 6 0 1 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/></svg></button>
+        <button class="icon-btn" onclick="toast('Help centre opens in production','info')" title="Help" aria-label="Help"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M9.1 9a3 3 0 0 1 5.8 1c0 2-3 3-3 3"/><path d="M12 17h.01"/></svg></button>
+        <button class="icon-btn" onclick="toggleTheme()" title="Toggle theme" aria-label="Toggle theme" id="themeBtn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8Z"/></svg></button>
+      </div>
+    </header>
+
+    <div id="dryrunBanner" class="dryrun-banner hide">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0Z"/><path d="M12 9v4M12 17h.01"/></svg>
+      <span>Dry run active — simulated data. No live records will be changed.</span>
+      <div class="dry-actions">
+        <button class="btn btn-sm btn-ghost" onclick="exitDryRun()">Exit dry run</button>
+      </div>
+    </div>
+
+    <div class="content" id="content">
+
+      <section class="page active" id="page-events">
+        <div class="page-head">
+          <div>
+            <h1 class="page-title">Events</h1>
+            <p class="page-sub" id="eventsSub">7 events · 1 live · 2 upcoming · 1 draft · 3 completed</p>
+          </div>
+          <div class="page-actions">
+            <button class="btn btn-ghost" onclick="startDryRun()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/></svg>Dry run</button>
+            <button class="btn btn-primary" onclick="openCreate()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>Create event</button>
+          </div>
+        </div>
+        <div class="triage-layout">
+          <div>
+            <div class="toolbar">
+              <div class="tb-search">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
+                <input id="evSearch" type="text" placeholder="Search events, venues…" oninput="renderEvents()">
+              </div>
+              <div class="seg" id="evFilter">
+                <button class="active" data-f="all" onclick="setEvFilter('all')">All</button>
+                <button data-f="draft" onclick="setEvFilter('draft')">Draft</button>
+                <button data-f="upcoming" onclick="setEvFilter('upcoming')">Upcoming</button>
+                <button data-f="live" onclick="setEvFilter('live')">In progress</button>
+                <button data-f="completed" onclick="setEvFilter('completed')">Completed</button>
+              </div>
+              <select class="select" id="evSort" onchange="renderEvents()">
+                <option value="date">Sort: Date</option>
+                <option value="name">Sort: Name</option>
+                <option value="status">Sort: Status</option>
+              </select>
+            </div>
+            <div id="eventList" class="e-list"></div>
+            <div id="evEmpty" class="state-box hide" style="margin-top:14px">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 10h18"/></svg>
+              <h3>No events match</h3>
+              <p>Adjust the filters or search, or create a new event to get started.</p>
+            </div>
+          </div>
+          <aside class="rail" aria-label="Attention">
+            <div class="rail-card">
+              <div class="rail-head"><h4>Needs attention</h4><span class="tag" id="attCount">3 items</span></div>
+              <div class="rail-body" id="attentionList"></div>
+            </div>
+            <div class="rail-card">
+              <div class="rail-head"><h4>My assignments</h4></div>
+              <div class="rail-body">
+                <div class="attention-item" onclick="nav('screening')"><span class="dot info ai-dot"></span><div class="ai-meta"><b>Northside — Registration</b><span>Station 1 · 09:00–13:00</span><span class="ai-act">Open station →</span></div></div>
+                <div class="attention-item" onclick="nav('review')"><span class="dot warn ai-dot"></span><div class="ai-meta"><b>Riverside — Reviewer</b><span>4 records awaiting decision</span><span class="ai-act">Review queue →</span></div></div>
+              </div>
+            </div>
+          </aside>
+        </div>
+      </section>
+
+      <section class="page" id="page-live">
+        <div class="page-head">
+          <div>
+            <h1 class="page-title" id="liveTitle">Northside Community Screening</h1>
+            <p class="page-sub" id="liveSub">Riverside Hall · 31 Jul 2026 · 09:00–15:00 · Capacity 200</p>
+          </div>
+          <div class="page-actions">
+            <button class="btn btn-ghost" onclick="nav('screening')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="6" height="14"/><rect x="15" y="7" width="6" height="10"/><path d="M9 10h6"/></svg>Open screening</button>
+            <button class="btn btn-primary" onclick="confirmComplete()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><path d="M22 4 12 14.01l-3-3"/></svg>Complete event</button>
+          </div>
+        </div>
+        <div class="live-grid">
+          <div class="live-main">
+            <div class="station-board">
+              <div class="sb-head"><h3>Station board</h3><span class="badge badge-live"><span class="dot"></span>Live · 2h 14m</span></div>
+              <div class="sb-grid" id="stationBoard"></div>
+            </div>
+            <div class="workspace">
+              <div class="ws-queue">
+                <div class="ws-qhead"><h3>Queue</h3><span class="badge badge-offline"><span class="dot"></span><span id="qCount">18</span> waiting</span></div>
+                <div class="ws-qlist" id="queueList"></div>
+              </div>
+              <div class="ws-active">
+                <div class="ws-ahead"><h3 id="activeTitle">Select a participant</h3><span id="activeSync" class="badge badge-synced hide"><span class="dot"></span>Saved locally</span></div>
+                <div class="ws-abody" id="activeBody">
+                  <div class="state-box" style="border:0;padding:24px"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M3 7h4v10H3zM10 7h4v10h-4zM17 9l4 6h-8z"/></svg><h3>No participant selected</h3><p>Pick a participant from the queue to confirm identity and run the next station.</p></div>
+                </div>
+              </div>
+              <div class="ws-inspector">
+                <div class="ws-ihead"><h3>Participant context</h3></div>
+                <div class="ws-ibody" id="inspectorBody">
+                  <p class="muted" style="font-size:12px">Select a participant to view their screening timeline and station progress.</p>
+                </div>
+              </div>
+            </div>
+          </div>
+          <aside class="rail">
+            <div class="rail-card">
+              <div class="rail-head"><h4>Event throughput</h4></div>
+              <div class="rail-body" style="padding:12px">
+                <div class="tps" id="liveTps"></div>
+                <div style="display:flex;gap:12px;flex-wrap:wrap;margin-top:8px;font-size:11px;color:var(--muted)">
+                  <span><span class="dot" style="background:var(--stage-reg);width:7px;height:7px;display:inline-block;margin-right:4px"></span>Registered 146</span>
+                  <span><span class="dot" style="background:var(--line-strong);width:7px;height:7px;display:inline-block;margin-right:4px"></span>Waiting 18</span>
+                  <span><span class="dot" style="background:var(--ok);width:7px;height:7px;display:inline-block;margin-right:4px"></span>Complete 72</span>
+                  <span><span class="dot" style="background:var(--warn);width:7px;height:7px;display:inline-block;margin-right:4px"></span>Review 12</span>
+                </div>
+              </div>
+            </div>
+            <div class="rail-card">
+              <div class="rail-head"><h4>Operational alerts</h4><span class="tag">2</span></div>
+              <div class="rail-body">
+                <div class="attention-item" onclick="nav('review')"><span class="dot crit ai-dot"></span><div class="ai-meta"><b>12 records awaiting review</b><span>3 flagged urgent · reviewers on site</span><span class="ai-act">Open review →</span></div></div>
+                <div class="attention-item" onclick="nav('sync')"><span class="dot warn ai-dot"></span><div class="ai-meta"><b>3 records pending sync</b><span>Retry available · saved offline</span><span class="ai-act">Retry sync →</span></div></div>
+              </div>
+            </div>
+            <div class="rail-card">
+              <div class="rail-head"><h4>Readiness</h4></div>
+              <div class="rail-body" style="padding:10px 12px;font-size:12px;color:var(--ink-2);line-height:1.6">
+                <div style="display:flex;justify-content:space-between"><span>Stations ready</span><b style="color:var(--ok)">5 / 5</b></div>
+                <div style="display:flex;justify-content:space-between"><span>Staff checked in</span><b style="color:var(--ok)">8 / 9</b></div>
+                <div style="display:flex;justify-content:space-between"><span>Incomplete records</span><b style="color:var(--warn)">4</b></div>
+              </div>
+            </div>
+          </aside>
+        </div>
+      </section>
+
+      <section class="page" id="page-screening">
+        <div class="page-head">
+          <div>
+            <h1 class="page-title">Screening station</h1>
+            <p class="page-sub" id="screenSub">Visual acuity · Station 2 · Aisha Thomas</p>
+          </div>
+          <div class="page-actions">
+            <button class="btn btn-ghost" onclick="nav('live')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>Back to event</button>
+          </div>
+        </div>
+        <div id="screeningView"></div>
+      </section>
+
+      <section class="page" id="page-review">
+        <div class="page-head">
+          <div>
+            <h1 class="page-title">Review &amp; referrals</h1>
+            <p class="page-sub" id="reviewSub">4 records awaiting decision · 2 flagged urgent</p>
+          </div>
+        </div>
+        <div class="workspace" id="reviewWs">
+          <div class="ws-queue">
+            <div class="ws-qhead"><h3>Review queue</h3><span class="badge badge-review"><span class="dot"></span>4</span></div>
+            <div class="ws-qlist" id="reviewQueue"></div>
+          </div>
+          <div class="ws-active">
+            <div class="ws-ahead"><h3 id="reviewTitle">Select a record</h3></div>
+            <div class="ws-abody" id="reviewBody">
+              <div class="state-box" style="border:0;padding:24px"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg><h3>No record selected</h3><p>Pick a flagged record to review screening results and record a decision.</p></div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="page" id="page-people">
+        <div class="page-head">
+          <div>
+            <h1 class="page-title">People &amp; access</h1>
+            <p class="page-sub" id="peopleSub">9 staff · 2 pending approval · 1 inactive</p>
+          </div>
+          <div class="page-actions">
+            <button class="btn btn-ghost" onclick="toast('CSV import opens in production','info')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M7 10l5 5 5-5M12 15V3"/></svg>Import</button>
+            <button class="btn btn-primary" onclick="openInvite()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M19 8v6M22 11h-6"/></svg>Invite staff</button>
+          </div>
+        </div>
+        <div class="toolbar">
+          <div class="tb-search"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg><input id="staffSearch" type="text" placeholder="Search staff…" oninput="renderPeople()"></div>
+          <div class="seg" id="staffFilter">
+            <button class="active" data-f="all" onclick="setStaffFilter('all')">All</button>
+            <button data-f="pending" onclick="setStaffFilter('pending')">Pending</button>
+            <button data-f="active" onclick="setStaffFilter('active')">Active</button>
+          </div>
+        </div>
+        <div class="rail-card" style="overflow:visible"><div class="rail-body" style="padding:0" id="peopleList"></div></div>
+      </section>
+
+      <section class="page" id="page-sync">
+        <div class="page-head">
+          <div>
+            <h1 class="page-title">Sync centre</h1>
+            <p class="page-sub" id="syncSub">3 records pending · 1 failed · connection healthy</p>
+          </div>
+          <div class="page-actions">
+            <button class="btn btn-primary" onclick="retryAllSync()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12a9 9 0 1 1-9-9c2.5 0 4.8 1 6.5 2.6"/><path d="M21 3v6h-6"/></svg>Retry all failed</button>
+          </div>
+        </div>
+        <div class="rail-card" style="overflow:visible"><div class="rail-body" style="padding:0" id="syncList"></div></div>
+      </section>
+
+      <section class="page" id="page-reports">
+        <div class="page-head"><div><h1 class="page-title">Reports</h1><p class="page-sub">Completed event summaries and exports</p></div></div>
+        <div id="reportsList"></div>
+      </section>
+
+    </div>
+  </main>
+</div>
+
+<div class="dev-label" title="Development prototype label">DESIGN_ID: GLM</div>
+
+<div class="overlay" id="overlay" onclick="if(event.target===this)closeModal()">
+  <div class="modal" id="modal" role="dialog" aria-modal="true" aria-labelledby="modalTitle"></div>
+</div>
+
+<div class="toast-wrap" id="toastWrap" aria-live="polite" aria-atomic="true"></div>
+<script>
+const ROLES = {EVENT_MANAGER:'Event Manager',REGISTRATION_OFFICER:'Registration Officer',SCREENER:'Screener',REVIEWER:'Doctor / Reviewer',ADMINISTRATOR:'Administrator'};
+const STAGES = ['Registration','Visual acuity','Refraction','Colour vision','Eye health','Clinical review'];
+const STAGE_COLORS = ['var(--stage-reg)','var(--stage-va)','var(--stage-ref)','var(--stage-col)','var(--stage-eye)','var(--acc)'];
+
+function freshState(){
+return {
+  dryRun:false, evFilter:'all', staffFilter:'all',
+  selectedParticipant:null, selectedReview:null,
+  events:[
+    {id:'EVS-2401',name:'Northside Community Screening',date:'2026-07-31',time:'09:00-15:00',venue:'Riverside Hall, Northside',capacity:200,status:'live',reg:146,wait:18,screen:32,review:12,done:72,followup:8,stations:5,staffReady:8,staffTotal:9,warnings:['3 pending sync','12 awaiting review']},
+    {id:'EVS-2402',name:'Eastgate Senior Clinic',date:'2026-08-02',time:'10:00-14:00',venue:'Eastgate Community Centre',capacity:120,status:'upcoming',reg:64,wait:0,screen:0,review:0,done:0,followup:0,stations:4,staffReady:5,staffTotal:6,warnings:['2 stations unassigned']},
+    {id:'EVS-2403',name:'Lakeside Children Vision Day',date:'2026-08-05',time:'08:30-13:00',venue:'Lakeside Primary Hall',capacity:150,status:'upcoming',reg:38,wait:0,screen:0,review:0,done:0,followup:0,stations:5,staffReady:3,staffTotal:7,warnings:['4 staff unassigned','Low registration']},
+    {id:'EVS-2404',name:'Hillview Outreach Camp',date:'2026-08-09',time:'09:00-16:00',venue:'Hillview Tent Grounds',capacity:80,status:'draft',reg:0,wait:0,screen:0,review:0,done:0,followup:0,stations:0,staffReady:0,staffTotal:0,warnings:['Not published','No stations configured']},
+    {id:'EVS-2308',name:'Southport Weekend Screening',date:'2026-07-19',time:'09:00-15:00',venue:'Southport Library',capacity:100,status:'completed',reg:88,wait:0,screen:0,review:0,done:84,followup:6,stations:4,staffReady:6,staffTotal:6,warnings:[]},
+    {id:'EVS-2306',name:'Greenfield Mobile Clinic',date:'2026-07-12',time:'10:00-14:00',venue:'Greenfield Plaza',capacity:60,status:'completed',reg:52,wait:0,screen:0,review:0,done:49,followup:3,stations:3,staffReady:4,staffTotal:4,warnings:[]},
+    {id:'EVS-2301',name:'Westend Health Drive',date:'2026-07-05',time:'08:00-13:00',venue:'Westend Civic Hall',capacity:120,status:'completed',reg:104,wait:0,screen:0,review:0,done:99,followup:5,stations:5,staffReady:7,staffTotal:7,warnings:[]}
+  ],
+  participants:[
+    {id:'P-2401',name:'Evelyn Ng',age:68,event:'EVS-2401',queue:3,station:'Clinical review',wait:'4m',status:'review',flag:'Distance acuity crossed review threshold',stagesDone:[0,1,2,3],stageActive:5,sync:'offline',results:{va:'6/18',ref:'+2.25',colour:'Normal',iop:'16 mmHg'}},
+    {id:'P-2402',name:'Marcus Tan',age:54,event:'EVS-2401',queue:1,station:'Visual acuity',wait:'1m',status:'waiting',stagesDone:[0],stageActive:1,sync:'synced',results:{}},
+    {id:'P-2403',name:'Priya Raman',age:41,event:'EVS-2401',queue:2,station:'Registration',wait:'2m',status:'waiting',stagesDone:[],stageActive:0,sync:'synced',results:{}},
+    {id:'P-2404',name:'James Okafor',age:72,event:'EVS-2401',queue:4,station:'Eye health',wait:'6m',status:'screening',stagesDone:[0,1,2,3],stageActive:4,sync:'pending',results:{va:'6/12',ref:'+1.50',colour:'Normal',iop:'14 mmHg'}},
+    {id:'P-2405',name:'Linh Tran',age:35,event:'EVS-2401',queue:5,station:'Visual acuity',wait:'8m',status:'waiting',stagesDone:[0],stageActive:1,sync:'synced',results:{}},
+    {id:'P-2406',name:'Hassan Ali',age:59,event:'EVS-2401',queue:6,station:'Colour vision',wait:'11m',status:'urgent',flag:'Colour vision anomaly detected',stagesDone:[0,1,2],stageActive:3,sync:'synced',results:{va:'6/9',ref:'+1.00',colour:'8/12 plates',iop:'15 mmHg'}},
+    {id:'P-2407',name:'Sofia Marchetti',age:47,event:'EVS-2401',queue:7,station:'Refraction',wait:'14m',status:'screening',stagesDone:[0,1],stageActive:2,sync:'failed',results:{va:'6/12',ref:'Pending',colour:'Normal',iop:'Pending'}},
+    {id:'P-2408',name:'Daniel Brooks',age:63,event:'EVS-2401',queue:8,station:'Clinical review',wait:'19m',status:'review',flag:'Intra-ocular pressure elevated',stagesDone:[0,1,2,3,4],stageActive:5,sync:'conflict',results:{va:'6/12',ref:'+1.75',colour:'Normal',iop:'24 mmHg'}}
+  ],
+  review:[
+    {id:'R-01',pid:'P-2401',name:'Evelyn Ng',age:68,flag:'Distance acuity crossed review threshold',severity:'review',station:'Clinical review',results:{va:'6/18',ref:'+2.25',colour:'Normal',iop:'16 mmHg'},missing:[],sync:'offline'},
+    {id:'R-02',pid:'P-2406',name:'Hassan Ali',age:59,flag:'Colour vision anomaly detected',severity:'urgent',station:'Colour vision',results:{va:'6/9',ref:'+1.00',colour:'8/12 plates',iop:'15 mmHg'},missing:[],sync:'synced'},
+    {id:'R-03',pid:'P-2408',name:'Daniel Brooks',age:63,flag:'Intra-ocular pressure elevated',severity:'urgent',station:'Eye health',results:{va:'6/12',ref:'+1.75',colour:'Normal',iop:'24 mmHg'},missing:['Refraction not finalised'],sync:'conflict'},
+    {id:'R-04',pid:'P-2409',name:'Mei Lin',age:51,flag:'Distance acuity crossed review threshold',severity:'review',station:'Visual acuity',results:{va:'6/24',ref:'Pending',colour:'Normal',iop:'Pending'},missing:['Refraction pending','Eye health pending'],sync:'pending'}
+  ],
+  staff:[
+    {id:'U-01',name:'Aisha Thomas',email:'aisha.t@vsms.health',role:'EVENT_MANAGER',status:'active',event:'EVS-2401',station:'Registration',initials:'AT'},
+    {id:'U-02',name:'Rohan Mehta',email:'rohan.m@vsms.health',role:'REVIEWER',status:'active',event:'EVS-2401',station:'Clinical review',initials:'RM'},
+    {id:'U-03',name:'Carla Mendes',email:'carla.m@vsms.health',role:'SCREENER',status:'active',event:'EVS-2401',station:'Visual acuity',initials:'CM'},
+    {id:'U-04',name:'Jin Park',email:'jin.p@vsms.health',role:'SCREENER',status:'active',event:'EVS-2401',station:'Refraction',initials:'JP'},
+    {id:'U-05',name:'Grace Okolie',email:'grace.o@vsms.health',role:'REGISTRATION_OFFICER',status:'active',event:'EVS-2401',station:'Registration',initials:'GO'},
+    {id:'U-06',name:'Samuel Vetrov',email:'sam.v@vsms.health',role:'SCREENER',status:'active',event:'EVS-2401',station:'Colour vision',initials:'SV'},
+    {id:'U-07',name:'Nadia Farouk',email:'nadia.f@vsms.health',role:'REVIEWER',status:'pending',event:null,station:null,initials:'NF'},
+    {id:'U-08',name:'Leo Andersson',email:'leo.a@vsms.health',role:'SCREENER',status:'pending',event:null,station:null,initials:'LA'},
+    {id:'U-09',name:'Priya Nair',email:'priya.n@vsms.health',role:'REGISTRATION_OFFICER',status:'inactive',event:null,station:null,initials:'PN'}
+  ],
+  syncRecords:[
+    {id:'VSMS-240719-035',who:'Evelyn Ng',state:'failed',ts:'09:42',size:'1 record'},
+    {id:'VSMS-240719-041',who:'Daniel Brooks',state:'conflict',ts:'09:48',size:'1 record'},
+    {id:'VSMS-240719-039',who:'Sofia Marchetti',state:'pending',ts:'09:51',size:'1 record'}
+  ]
+};};
+let state = freshState();
+
+const I = {
+  more:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="1"/><circle cx="12" cy="5" r="1"/><circle cx="12" cy="19" r="1"/></svg>',
+  play:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="6 3 20 12 6 21 6 3"/></svg>',
+  edit:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>',
+  copy:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>',
+  trash:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m3 0v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/></svg>',
+  check:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><path d="M22 4 12 14.01l-3-3"/></svg>',
+  flag:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1Z"/><path d="M4 22v-7"/></svg>',
+  chev:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>',
+  scan:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 7V5a2 2 0 0 1 2-2h2M17 3h2a2 2 0 0 1 2 2v2M21 17v2a2 2 0 0 1-2 2h-2M7 21H5a2 2 0 0 1-2-2v-2"/><path d="M7 12h10"/></svg>',
+  clock:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>',
+  refresh:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12a9 9 0 1 1-9-9c2.5 0 4.8 1 6.5 2.6"/><path d="M21 3v6h-6"/></svg>',
+  ban:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="m4.9 4.9 14.2 14.2"/></svg>'
+};
+
+const CRUMBS = {events:'Events',live:'Live event · Northside',screening:'Screening station',review:'Review & referrals',people:'People & access',sync:'Sync centre',reports:'Reports'};
+</script>
+<script>
+function nav(page){
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+  document.getElementById('page-'+page).classList.add('active');
+  document.querySelectorAll('.nav-item').forEach(n=>n.classList.toggle('active',n.dataset.nav===page));
+  document.getElementById('crumbs').textContent = CRUMBS[page]||'';
+  document.getElementById('content').scrollTop=0;
+  if(page==='events')renderEvents();
+  if(page==='live')renderLive();
+  if(page==='screening')renderScreening();
+  if(page==='review')renderReview();
+  if(page==='people')renderPeople();
+  if(page==='sync')renderSync();
+  if(page==='reports')renderReports();
+}
+function toggleSidebar(){document.getElementById('app').classList.toggle('collapsed')}
+function toggleTheme(){const t=document.documentElement.dataset.theme==='light'?'':'light';document.documentElement.dataset.theme=t;toast(t==='light'?'Light theme':'Dark theme','info')}
+
+function toast(msg,kind,title){
+  kind=kind||'info';
+  const w=document.getElementById('toastWrap');
+  const el=document.createElement('div');el.className='toast '+kind;
+  const icons={ok:I.check,warn:I.flag,crit:I.flag,info:I.clock};
+  el.innerHTML=(icons[kind]||I.clock)+'<div>'+(title?'<b>'+title+'</b>':'')+'<span>'+msg+'</span></div>';
+  w.appendChild(el);
+  setTimeout(function(){el.style.opacity='0';el.style.transition='opacity .2s';setTimeout(function(){el.remove()},220)},3200);
+}
+
+function fmtDate(d){const dt=new Date(d+'T00:00');return dt.toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'})}
+
+const STATUS_META={
+  draft:{badge:'badge-draft',label:'Draft',next:'Edit setup',act:'edit'},
+  upcoming:{badge:'badge-up',label:'Upcoming',next:'Open setup',act:'edit'},
+  live:{badge:'badge-live',label:'In progress',next:'Open event',act:'live'},
+  completed:{badge:'badge-done',label:'Completed',next:'Open summary',act:'report'}
+};
+
+function updateNavCounts(){
+  document.getElementById('navCountEvents').textContent=state.events.length;
+  document.getElementById('navCountLive').textContent=state.events.filter(e=>e.status==='live').length;
+  document.getElementById('navCountReview').textContent=state.review.length;
+  document.getElementById('navCountPeople').textContent=state.staff.filter(s=>s.status==='pending').length;
+  const sp=state.syncRecords.filter(r=>r.state==='failed'||r.state==='pending'||r.state==='conflict').length;
+  document.getElementById('navCountSync').textContent=sp;
+  const t=document.getElementById('topSyncTxt');const pend=state.syncRecords.filter(r=>r.state!=='synced').length;
+  t.textContent=pend>0?pend+' pending':'Synced';
+}
+
+function setEvFilter(f){state.evFilter=f;document.querySelectorAll('#evFilter button').forEach(b=>b.classList.toggle('active',b.dataset.f===f));renderEvents()}
+function evMatches(ev){
+  if(state.evFilter!=='all'&&ev.status!==state.evFilter)return false;
+  const q=(document.getElementById('evSearch').value||'').toLowerCase().trim();
+  if(q&&!(ev.name.toLowerCase().indexOf(q)>=0||ev.venue.toLowerCase().indexOf(q)>=0||ev.id.toLowerCase().indexOf(q)>=0))return false;
+  return true;
+}
+function renderEvents(){
+  const list=document.getElementById('eventList');
+  const sort=document.getElementById('evSort').value;
+  let evs=state.events.filter(evMatches);
+  evs.sort(function(a,b){return sort==='name'?a.name.localeCompare(b.name):sort==='status'?a.status.localeCompare(b.status):a.date.localeCompare(b.date)});
+  list.innerHTML=evs.map(function(ev){
+    const m=STATUS_META[ev.status];
+    const cardClass=ev.warnings.length&&ev.status==='live'?'warn':'';
+    const total=Math.max(ev.reg,1);
+    const pct=function(s){return Math.round((s/total)*100)};
+    const tps='<div class="tps"><span class="s-reg" style="width:'+pct(Math.max(ev.reg-ev.done-ev.review-ev.followup-ev.wait,0))+'%"></span><span class="s-done" style="width:'+pct(ev.done)+'%"></span><span class="s-rev" style="width:'+pct(ev.review)+'%"></span><span class="s-fu" style="width:'+pct(ev.followup)+'%"></span><span class="s-wait" style="width:'+pct(ev.wait)+'%"></span></div>';
+    let stats;
+    if(ev.status==='completed'){stats='<div class="e-stats"><div class="estat"><span class="n ok">'+ev.done+'</span><span class="l">Completed</span></div><div class="estat"><span class="n warn">'+ev.followup+'</span><span class="l">Follow-up</span></div><div class="estat"><span class="n">'+ev.reg+'</span><span class="l">Registered</span></div></div>'}
+    else if(ev.status==='draft'){stats='<div class="e-stats"><div class="estat"><span class="n muted">'+ev.stations+'</span><span class="l">Stations</span></div><div class="estat"><span class="n muted">'+ev.staffReady+'/'+ev.staffTotal+'</span><span class="l">Staff ready</span></div></div>'}
+    else{stats='<div class="e-stats"><div class="estat"><span class="n">'+ev.reg+'</span><span class="l">Registered</span></div><div class="estat"><span class="n">'+ev.wait+'</span><span class="l">Waiting</span></div><div class="estat"><span class="n">'+ev.done+'</span><span class="l">Complete</span></div>'+(ev.review?'<div class="estat"><span class="n warn">'+ev.review+'</span><span class="l">Review</span></div>':'')+(ev.followup?'<div class="estat"><span class="n">'+ev.followup+'</span><span class="l">Follow-up</span></div>':'')+'</div>'}
+    const warns=ev.warnings.length?'<div style="margin-top:8px;display:flex;gap:6px;flex-wrap:wrap">'+ev.warnings.map(function(w){return '<span class="badge '+(ev.status==='live'&&w.indexOf('sync')>=0?'badge-pending':'badge-review')+'"><span class="dot"></span>'+w+'</span>'}).join('')+'</div>':'';
+    let acts='';
+    if(ev.status==='live')acts+='<button class="next-action" onclick="nav(\'live\')">'+I.play+'Open event</button>';
+    if(ev.status==='completed')acts+='<button class="next-action" onclick="openReport(\''+ev.id+'\')">'+I.chev+'Open summary</button>';
+    if(ev.status==='upcoming'||ev.status==='draft')acts+='<button class="next-action" onclick="openEdit(\''+ev.id+'\')">'+I.chev+m.next+'</button>';
+    if(ev.status!=='live')acts+='<button class="btn btn-sm btn-ghost" onclick="startDryRunEvent(\''+ev.id+'\')">Dry run</button>';
+    acts+='<div class="menu-wrap"><button class="icon-btn" onclick="toggleMenu(event,\'menu-'+ev.id+'\')" aria-label="More actions">'+I.more+'</button><div class="menu" id="menu-'+ev.id+'">';
+    if(ev.status==='upcoming'||ev.status==='draft')acts+='<button onclick="openEdit(\''+ev.id+'\');closeMenus()">'+I.edit+'Edit</button>';
+    acts+='<button onclick="duplicateEvent(\''+ev.id+'\');closeMenus()">'+I.copy+'Duplicate</button>';
+    if(ev.status==='live')acts+='<button onclick="nav(\'live\');closeMenus()">'+I.play+'Open event</button>';
+    if(ev.status==='completed')acts+='<button onclick="openReport(\''+ev.id+'\');closeMenus()">'+I.chev+'Open summary</button>';
+    if(ev.status!=='live'&&ev.status!=='completed')acts+='<div class="sep"></div><button onclick="deleteEvent(\''+ev.id+'\');closeMenus()" class="danger">'+I.trash+'Delete</button>';
+    acts+='</div></div>';
+    return '<div class="e-card '+cardClass+'"><div class="e-row"><div class="e-main"><div class="e-name"><span>'+ev.name+'</span><span class="badge '+m.badge+'"><span class="dot"></span>'+m.label+'</span></div><div class="e-meta"><span class="id">'+ev.id+'</span><span>·</span><b>'+fmtDate(ev.date)+'</b><span>·</span><span>'+ev.time+'</span><span>·</span><span>'+ev.venue+'</span><span>·</span><span>Cap '+ev.capacity+'</span></div>'+(ev.status!=='draft'?tps:'')+stats+warns+'</div><div class="e-actions">'+acts+'</div></div></div>';
+  }).join('');
+  document.getElementById('evEmpty').classList.toggle('hide',evs.length>0);
+  const counts={all:state.events.length,draft:0,upcoming:0,live:0,completed:0};
+  state.events.forEach(function(e){counts[e.status]++});
+  document.getElementById('eventsSub').textContent=state.events.length+' events · '+counts.live+' live · '+counts.upcoming+' upcoming · '+counts.draft+' draft · '+counts.completed+' completed';
+  updateNavCounts();
+  renderAttention();
+}
+function renderAttention(){
+  const items=[];
+  state.events.forEach(function(ev){
+    if(ev.status==='live'){
+      if(ev.review>0)items.push({kind:'warn',title:ev.review+' records awaiting review',sub:ev.name,act:'nav(\'review\')'});
+      ev.warnings.forEach(function(w){if(w.indexOf('sync')>=0)items.push({kind:'crit',title:w,sub:ev.name,act:'nav(\'sync\')'})});
+    }
+    if(ev.status==='upcoming'&&ev.warnings.some(function(w){return w.indexOf('unassigned')>=0}))items.push({kind:'warn',title:ev.name+' has unassigned staff',sub:'Configure before start',act:'openEdit(\''+ev.id+'\')'});
+    if(ev.status==='draft')items.push({kind:'info',title:ev.name+' is a draft',sub:'Publish when ready',act:'openEdit(\''+ev.id+'\')'});
+  });
+  state.review.filter(function(r){return r.severity==='urgent'}).forEach(function(r){items.push({kind:'crit',title:r.name+' — urgent flag',sub:r.flag,act:'selectReview(\''+r.id+'\')'})});
+  document.getElementById('attCount').textContent=items.length+' item'+(items.length!==1?'s':'');
+  document.getElementById('attentionList').innerHTML=items.length?items.map(function(i){return '<div class="attention-item" onclick="'+i.act+'"><span class="dot '+(i.kind==='warn'?'warn':i.kind==='crit'?'crit':'info')+' ai-dot"></span><div class="ai-meta"><b>'+i.title+'</b><span>'+i.sub+'</span><span class="ai-act">View →</span></div></div>'}).join(''):'<div class="rail-empty"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><path d="M22 4 12 14.01l-3-3"/></svg>Nothing needs attention right now.</div>';
+}
+function toggleMenu(e,id){e.stopPropagation();const m=document.getElementById(id);const open=m.classList.contains('open');closeMenus();if(!open)m.classList.add('open')}
+function closeMenus(){document.querySelectorAll('.menu.open').forEach(function(m){m.classList.remove('open')})}
+document.addEventListener('click',closeMenus);
+</script>
+<script>
+function eventFormHTML(ev){
+  ev=ev||{id:'',name:'',date:'',time:'09:00-15:00',venue:'',capacity:100,status:'draft',stations:4,staffReady:0,staffTotal:0};
+  return '<div class="field"><label>Event name</label><input id="f_name" value="'+ev.name+'" placeholder="e.g. Northside Community Screening"></div>'+
+  '<div class="field-row"><div class="field"><label>Date</label><input id="f_date" type="date" value="'+ev.date+'"></div><div class="field"><label>Time window</label><input id="f_time" value="'+ev.time+'" placeholder="09:00-15:00"></div></div>'+
+  '<div class="field"><label>Venue</label><input id="f_venue" value="'+ev.venue+'" placeholder="Hall, address"></div>'+
+  '<div class="field-row"><div class="field"><label>Capacity</label><input id="f_cap" type="number" min="1" value="'+ev.capacity+'"></div><div class="field"><label>Screening stations</label><input id="f_stations" type="number" min="0" value="'+ev.stations+'"></div></div>'+
+  '<div class="field"><label>Assigned staff (ready / total)</label><input id="f_staff" value="'+ev.staffReady+'/'+ev.staffTotal+'" placeholder="e.g. 5/6"></div>'+
+  '<div class="field"><label>Registration settings</label><select id="f_reg"><option>Open registration</option><option>Invite-only</option><option>Walk-in only</option></select></div>'+
+  '<div class="field"><label>Event status</label><select id="f_status"><option value="draft" '+(ev.status==='draft'?'selected':'')+'>Draft</option><option value="upcoming" '+(ev.status==='upcoming'?'selected':'')+'>Published / upcoming</option><option value="live" '+(ev.status==='live'?'selected':'')+'>In progress</option><option value="completed" '+(ev.status==='completed'?'selected':'')+'>Completed</option></select></div>'+
+  '<div class="field"><label>Notes</label><textarea id="f_notes" placeholder="Operational notes for staff…"></textarea></div>';
+}
+function openCreate(){
+  modal({title:'Create event',body:eventFormHTML(),ok:'Save draft',okAct:function(){
+    const ev=collectForm();if(!ev.name||!ev.date){toast('Event name and date are required','warn','Cannot save');return false}
+    ev.id='EVS-'+String(2400+state.events.length+1);state.events.unshift(ev);renderEvents();toast('Draft saved — configure stations before publishing','ok','Event created');return true;
+  }});
+}
+function openEdit(id){
+  const ev=state.events.find(function(e){return e.id===id});if(!ev)return;
+  modal({title:'Edit event',body:eventFormHTML(ev),ok:'Save changes',okAct:function(){
+    const u=collectForm();if(!u.name||!u.date){toast('Event name and date are required','warn','Cannot save');return false}
+    Object.assign(ev,u);renderEvents();toast('Event updated — changes visible in the list','ok','Saved');return true;
+  }});
+}
+function collectForm(){
+  const staff=(document.getElementById('f_staff').value||'0/0').split('/').map(function(s){return parseInt(s)||0});
+  return {name:document.getElementById('f_name').value.trim(),date:document.getElementById('f_date').value,time:document.getElementById('f_time').value.trim()||'09:00-15:00',venue:document.getElementById('f_venue').value.trim(),capacity:parseInt(document.getElementById('f_cap').value)||0,stations:parseInt(document.getElementById('f_stations').value)||0,staffReady:staff[0]||0,staffTotal:staff[1]||0,status:document.getElementById('f_status').value,reg:0,wait:0,screen:0,review:0,done:0,followup:0,warnings:document.getElementById('f_status').value==='draft'?['Not published','No stations configured']:[]};
+}
+function duplicateEvent(id){
+  const ev=state.events.find(function(e){return e.id===id});if(!ev)return;
+  const copy=Object.assign({},ev,{id:'EVS-'+String(2400+state.events.length+1),name:ev.name+' (Copy)',status:'draft',date:'',reg:0,wait:0,screen:0,review:0,done:0,followup:0,warnings:['Not published','New date required']});
+  state.events.unshift(copy);renderEvents();
+  modal({title:'Duplicated as draft',body:'<p style="font-size:13px;color:var(--ink-2);line-height:1.6">A copy of <b>'+ev.name+'</b> has been created as a draft with the name <b>'+copy.name+'</b>.</p><p style="font-size:13px;color:var(--muted);margin-top:8px">A <b>new date is required</b> before this event can become active. Edit it now to set the date and stations.</p>',ok:'Edit new draft',okAct:function(){openEdit(copy.id);return true}});
+}
+function deleteEvent(id){
+  const ev=state.events.find(function(e){return e.id===id});if(!ev)return;
+  modal({title:'Delete event',danger:true,body:'<div style="border:1px solid rgba(248,113,113,.35);background:rgba(248,113,113,.06);border-radius:var(--r);padding:13px 14px;margin-bottom:14px"><div style="display:flex;gap:10px;align-items:center"><span class="avatar" style="background:rgba(248,113,113,.18);color:var(--crit);width:36px;height:36px">'+I.trash+'</span><div><b style="font-size:14px">'+ev.name+'</b><div class="id">'+ev.id+' · '+fmtDate(ev.date)+' · '+ev.venue+'</div></div></div><p style="margin:10px 0 0;font-size:12px;color:var(--ink-2);line-height:1.5">This removes the event from this device\'s working list. No live participant data will be lost in the prototype. This action cannot be undone.</p></div><div class="field"><label>Type the event name to confirm</label><input id="confirmName" placeholder="'+ev.name+'" autocomplete="off"></div>',okLabel:'Delete event',okClass:'btn-danger',okAct:function(){
+    const typed=document.getElementById('confirmName').value.trim();
+    if(typed!==ev.name){toast('Name did not match — deletion cancelled','warn','Not deleted');return false}
+    state.events=state.events.filter(function(e){return e.id!==id});renderEvents();toast(ev.name+' removed','ok','Event deleted');return true;
+  }});
+}
+function confirmComplete(){
+  const ev=state.events.find(function(e){return e.id==='EVS-2401'});
+  modal({title:'Complete event',body:'<p style="font-size:13px;color:var(--ink-2);line-height:1.6">Completing <b>'+ev.name+'</b> makes it read-only. Screening, review, and sync remain available until all records are finalised.</p><div class="ws-ctx" style="margin-top:12px"><b style="font-size:13px">Before completing:</b><ul style="margin:6px 0 0;padding-left:18px;font-size:12px;color:var(--ink-2);line-height:1.7"><li>12 records awaiting clinical review</li><li>3 records pending sync</li><li>4 incomplete records</li></ul></div>',ok:'Mark complete',okAct:function(){ev.status='completed';renderEvents();nav('reports');toast('Event completed — summary available in Reports','ok','Completed');return true}});
+}
+function openReport(id){nav('reports')}
+</script>
+<script>
+function renderLive(){
+  const ev=state.events.find(function(e){return e.id==='EVS-2401'});
+  document.getElementById('liveTitle').textContent=ev.name;
+  document.getElementById('liveSub').textContent=ev.venue+' · '+fmtDate(ev.date)+' · '+ev.time+' · Capacity '+ev.capacity;
+  const stations=[
+    {h:'Registration',cur:3,wait:1,who:'Grace O.',col:'var(--stage-reg)'},
+    {h:'Visual acuity',cur:2,wait:4,who:'Carla M.',col:'var(--stage-va)'},
+    {h:'Refraction',cur:1,wait:3,who:'Jin P.',col:'var(--stage-ref)'},
+    {h:'Colour vision',cur:1,wait:2,who:'Samuel V.',col:'var(--stage-col)'},
+    {h:'Eye health',cur:2,wait:5,who:'—',col:'var(--stage-eye)',warn:'Unassigned'},
+    {h:'Clinical review',cur:4,wait:0,who:'Rohan M.',col:'var(--acc)',warn:'12 flagged'}
+  ];
+  document.getElementById('stationBoard').innerHTML=stations.map(function(s){
+    return '<div class="sb-cell '+(s.warn?'warn':'')+'"><div class="h"><span class="stage-dot" style="background:'+s.col+'"></span>'+s.h+'</div><div class="v">'+s.cur+'</div><div class="sub">in station · '+s.wait+' waiting</div><div class="assign"><span class="avatar">'+(s.who==='—'?'—':s.who.split(' ').map(function(p){return p[0]}).join(''))+'</span>'+(s.who==='—'?'Unassigned':s.who)+'</div>'+(s.warn?'<div class="sub" style="color:var(--warn);margin-top:4px">'+s.warn+'</div>':'')+'</div>';
+  }).join('');
+  const ps=state.participants.filter(function(p){return p.event==='EVS-2401'});
+  document.getElementById('qCount').textContent=ps.filter(function(p){return p.status==='waiting'||p.status==='urgent'}).length;
+  document.getElementById('queueList').innerHTML=ps.map(function(p){
+    const dotCls=p.status==='urgent'?'crit':p.status==='review'?'warn':p.status==='screening'?'info':'';
+    const statBadge=p.status==='waiting'?'badge-offline':p.status==='screening'?'badge-up':p.status==='review'?'badge-review':'badge-urgent';
+    const statLabel=p.status==='waiting'?'Waiting':p.status==='screening'?'Screening':p.status==='review'?'In review':'Urgent';
+    const urg=p.status==='urgent'?' <span class="badge badge-urgent" style="height:18px;font-size:10px;padding:0 6px"><span class="dot"></span>Urgent</span>':'';
+    return '<div class="qrow '+(state.selectedParticipant===p.id?'sel':'')+'" onclick="selectParticipant(\''+p.id+'\')"><span class="dot '+dotCls+'" style="margin-top:5px"></span><div class="qi"><div class="qn">'+p.name+urg+'</div><div class="qid">'+p.id+' · Queue '+p.queue+'</div><div class="qs"><span class="badge '+statBadge+'" style="height:18px;font-size:10px;padding:0 6px"><span class="dot"></span>'+statLabel+'</span><span class="wait">'+I.clock+p.wait+' at '+p.station+'</span></div></div></div>';
+  }).join('');
+  const total=Math.max(ev.reg,1);
+  const pct=function(s){return Math.round((s/total)*100)};
+  document.getElementById('liveTps').innerHTML='<span class="s-reg" style="width:'+pct(Math.max(ev.reg-ev.done-ev.review-ev.followup-ev.wait,0))+'%"></span><span class="s-done" style="width:'+pct(ev.done)+'%"></span><span class="s-rev" style="width:'+pct(ev.review)+'%"></span><span class="s-fu" style="width:'+pct(ev.followup)+'%"></span><span class="s-wait" style="width:'+pct(ev.wait)+'%"></span>';
+  renderAttention();
+}
+function selectParticipant(id){
+  state.selectedParticipant=id;
+  const p=state.participants.find(function(x){return x.id===id});if(!p)return;
+  renderLive();state.selectedParticipant=id;
+  const syncMap={offline:'badge-offline',pending:'badge-pending',synced:'badge-synced',failed:'badge-failed',conflict:'badge-conflict'};
+  const syncLabel={offline:'Saved offline',pending:'Pending sync',synced:'Synced',failed:'Sync failed',conflict:'Conflict'}[p.sync];
+  const sb=document.getElementById('activeSync');sb.className='badge '+syncMap[p.sync];sb.innerHTML='<span class="dot"></span>'+syncLabel;sb.classList.remove('hide');
+  document.getElementById('activeTitle').innerHTML=p.name+' <span class="id" style="margin-left:6px">'+p.id+'</span>';
+  const flagBox=p.flag?'<div style="margin-top:10px;padding:10px 12px;border:1px solid rgba(251,191,36,.3);background:rgba(251,191,36,.06);border-radius:var(--r);font-size:12px;color:var(--warn);line-height:1.5"><b>Flagged for reviewer assessment.</b> '+p.flag+'. Final decision made by reviewer.</div>':'';
+  const flagBadge=p.flag?'<span class="badge badge-urgent"><span class="dot"></span>Flagged</span>':'';
+  const retryBtn=(p.sync==='failed'||p.sync==='conflict')?'<button class="btn btn-outline" onclick="retryParticipantSync(\''+p.id+'\')">'+I.refresh+'Retry sync</button>':'';
+  const mainBtn=p.status==='review'?'<button class="btn btn-primary" onclick="selectReviewByPid(\''+p.id+'\');nav(\'review\')">'+I.flag+'Open in review</button>':'<button class="btn btn-primary" onclick="nav(\'screening\')">'+I.scan+'Continue screening</button>';
+  document.getElementById('activeBody').innerHTML='<div class="ws-ctx"><div class="pid">'+p.id+' · Queue '+p.queue+' · '+p.age+' years</div><div class="pname">'+p.name+'</div><div style="margin-top:8px;display:flex;gap:8px;flex-wrap:wrap"><span class="badge '+(p.status==='review'?'badge-review':'badge-up')+'"><span class="dot"></span>'+(p.status==='review'?'In review':'Screening')+'</span><span class="badge '+syncMap[p.sync]+'"><span class="dot"></span>'+syncLabel+'</span>'+flagBadge+'</div>'+flagBox+'<div style="margin-top:10px;font-size:11px;color:var(--muted);line-height:1.5">Current station: <b style="color:var(--ink-2)">'+p.station+'</b> · Next: <b style="color:var(--ink-2)">'+nextStation(p)+'</b></div></div><div style="display:flex;gap:8px;flex-wrap:wrap">'+mainBtn+'<button class="btn btn-ghost" onclick="toast(\'Handoff note recorded\',\'ok\',\'Station handoff\')">'+I.chev+'Hand to next station</button>'+retryBtn+'</div>';
+  document.getElementById('inspectorBody').innerHTML='<div style="margin-bottom:12px"><div class="id">'+p.id+'</div><div style="font-size:14px;font-weight:600;margin-top:2px">'+p.name+'</div><div class="muted" style="font-size:12px">'+p.age+' years · Queue '+p.queue+'</div></div><div style="font-size:11px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;color:var(--muted-soft);margin:8px 0">Screening timeline</div><div class="timeline">'+STAGES.map(function(s,i){const done=p.stagesDone.indexOf(i)>=0;const active=p.stageActive===i;return '<div class="tl-step '+(done?'done':'')+' '+(active?'active':'')+'" style="--stage-color:'+STAGE_COLORS[i]+'"><div class="tl-h"><b>'+s+'</b><span>'+(done?'Complete':active?'Now':'Pending')+'</span></div><div class="tl-d">'+(active?p.station+' station':done?'Recorded':'Awaiting')+'</div></div>'}).join('')+'</div><div style="margin-top:14px;padding:10px 12px;border:1px solid var(--line);border-radius:var(--r);background:var(--bg-input);font-size:12px;color:var(--ink-2);line-height:1.5"><b style="color:var(--ink)">Save state.</b> '+syncLabel+'. Records saved safely on this device will synchronise when the connection returns.</div>';
+}
+function nextStation(p){const i=STAGES.indexOf(p.station);if(i<0||i>=STAGES.length-1)return 'Complete';return STAGES[i+1]}
+function retryParticipantSync(pid){const p=state.participants.find(function(x){return x.id===pid});if(!p)return;p.sync='pending';renderLive();selectParticipant(pid);setTimeout(function(){p.sync='synced';renderLive();if(state.selectedParticipant===pid)selectParticipant(pid);toast(p.name+' synced','ok','Synced')},1400)}
+</script>
+<script>
+function renderScreening(){
+  const p=state.selectedParticipant?state.participants.find(function(x){return x.id===state.selectedParticipant}):state.participants[1];
+  if(!p){document.getElementById('screeningView').innerHTML=emptyState('No participant','Scan a QR to begin');return}
+  document.getElementById('screenSub').textContent=p.station+' · Station 2 · Aisha Thomas';
+  const r=p.results||{};
+  const idx=STAGES.indexOf(p.station);
+  const stageStrip=STAGES.map(function(s,i){const st=i<idx?'done':i===idx?'active':'pending';return '<span class="badge '+(st==='done'?'badge-synced':st==='active'?'badge-up':'badge-offline')+'" style="height:20px;font-size:10px"><span class="dot" style="background:'+(i<idx?STAGE_COLORS[i]:i===idx?'var(--acc)':'var(--muted-soft)')+'"></span>'+s+'</span>'}).join('');
+  const flagBox=p.flag?'<div style="padding:10px 12px;border:1px solid rgba(251,191,36,.3);background:rgba(251,191,36,.06);border-radius:var(--r);font-size:12px;color:var(--warn);margin-bottom:14px"><b>Flagged for reviewer assessment.</b> '+p.flag+'.</div>':'';
+  const resGrid=r.va?'<div class="result-grid"><div class="result-cell"><label>Visual acuity</label><div class="rv '+(r.va&&(r.va.indexOf('18')>=0||r.va.indexOf('24')>=0)?'warn':'')+'">'+r.va+'</div></div><div class="result-cell"><label>Refraction</label><div class="rv">'+r.ref+'</div></div><div class="result-cell"><label>Colour vision</label><div class="rv">'+r.colour+'</div></div><div class="result-cell"><label>IOP</label><div class="rv '+(r.iop&&r.iop.indexOf('24')>=0?'crit':'')+'">'+r.iop+'</div></div></div>':'';
+  document.getElementById('screeningView').innerHTML='<div class="live-grid"><div class="live-main"><div class="rail-card"><div class="rail-body" style="padding:16px"><div style="display:flex;align-items:center;gap:12px;margin-bottom:14px"><span class="avatar" style="width:42px;height:42px;font-size:14px">'+p.name.split(' ').map(function(n){return n[0]}).join('')+'</span><div style="flex:1"><div style="font-size:16px;font-weight:600">'+p.name+'</div><div class="id">'+p.id+' · '+p.age+' years · Queue '+p.queue+'</div></div><span class="badge '+(p.sync==='synced'?'badge-synced':p.sync==='offline'?'badge-offline':'badge-pending')+'"><span class="dot"></span>'+(p.sync==='synced'?'Synced':p.sync==='offline'?'Saved offline':'Pending')+'</span></div><div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px">'+stageStrip+'</div>'+flagBox+resGrid+'<div class="field"><label>'+p.station+' — result entry</label><div class="result-grid"><div class="result-cell"><label>Right eye</label><input id="r_right" placeholder="e.g. 6/9"></div><div class="result-cell"><label>Left eye</label><input id="r_left" placeholder="e.g. 6/12"></div></div></div><div class="field"><label>Notes</label><textarea id="r_notes" placeholder="Operational observations…"></textarea></div><div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn btn-primary btn-lg" onclick="saveResult(\''+p.id+'\')">'+I.check+'Save result</button><button class="btn btn-ghost btn-lg" onclick="handoff(\''+p.id+'\')">'+I.chev+'Hand to '+nextStation(p)+'</button><button class="btn btn-outline" onclick="nav(\'live\')">'+I.clock+'Back to queue</button></div></div></div></div><aside class="rail"><div class="rail-card"><div class="rail-head"><h4>Scan next QR</h4></div><div class="rail-body" style="padding:16px"><div class="scan-faux">'+I.scan+'</div><button class="btn btn-outline btn-lg" style="width:100%" onclick="simulateScan()">'+I.scan+'Simulate scan</button><p class="muted" style="font-size:11px;text-align:center;margin-top:10px;line-height:1.5">QR contains an event pass only. No clinical data is stored in the code.</p></div></div><div class="rail-card"><div class="rail-head"><h4>Station state</h4></div><div class="rail-body" style="padding:10px 12px;font-size:12px;color:var(--ink-2);line-height:1.7"><div style="display:flex;justify-content:space-between"><span>Local saves</span><b style="color:var(--ok)">3</b></div><div style="display:flex;justify-content:space-between"><span>Pending sync</span><b style="color:var(--warn)">1</b></div><div style="display:flex;justify-content:space-between"><span>Connection</span><b style="color:var(--ok)">Online</b></div></div></div></aside></div>';
+}
+function emptyState(t,s){return '<div class="state-box"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="12" r="10"/><path d="M12 8v4M12 16h.01"/></svg><h3>'+t+'</h3><p>'+s+'</p></div>'}
+function simulateScan(){
+  modal({title:'Scan participant QR',body:'<div class="scan-card"><div class="scan-faux">'+I.scan+'</div><div style="font-size:13px;color:var(--ink-2);margin-bottom:8px">Scanning…</div><div class="id">VSMS-240719-035</div></div>',ok:'Confirm participant',okAct:function(){const p=state.participants[2];state.selectedParticipant=p.id;nav('screening');toast(p.name+' confirmed at Registration','ok','Participant confirmed');return true}});
+}
+function saveResult(pid){
+  const p=state.participants.find(function(x){return x.id===pid});if(!p)return;
+  if(p.stagesDone.indexOf(p.stageActive)<0)p.stagesDone.push(p.stageActive);
+  p.sync='offline';
+  const next=nextStation(p);
+  if(next!=='Complete'){p.stageActive=STAGES.indexOf(next);p.station=next}else{p.status='completed'}
+  toast('Saved locally — will sync when connected','ok','Result saved');renderScreening();
+}
+function handoff(pid){saveResult(pid);const p=state.participants.find(function(x){return x.id===pid});toast('Handed to '+nextStation(p)+' station','info','Station handoff');const ps=state.participants.filter(function(x){return x.event==='EVS-2401'&&x.status==='waiting'});if(ps.length)state.selectedParticipant=ps[0].id;nav('live')}
+</script>
+<script>
+function renderReview(){
+  document.getElementById('reviewQueue').innerHTML=state.review.map(function(r){
+    const dotCls=r.severity==='urgent'?'crit':'warn';
+    const syncBadge=r.sync==='offline'?'badge-offline':r.sync==='conflict'?'badge-conflict':'badge-synced';
+    const syncLabel=r.sync==='offline'?'Offline':r.sync==='conflict'?'Conflict':'Synced';
+    const urg=r.severity==='urgent'?' <span class="badge badge-urgent" style="height:18px;font-size:10px;padding:0 6px"><span class="dot"></span>Urgent</span>':'';
+    return '<div class="qrow '+(state.selectedReview===r.id?'sel':'')+'" onclick="selectReview(\''+r.id+'\')"><span class="dot '+dotCls+'" style="margin-top:5px"></span><div class="qi"><div class="qn">'+r.name+urg+'</div><div class="qid">'+r.pid+' · '+r.age+' years</div><div class="qs"><span class="badge '+syncBadge+'" style="height:18px;font-size:10px;padding:0 6px"><span class="dot"></span>'+syncLabel+'</span></div><div class="qs" style="margin-top:3px"><span style="font-size:11px;color:var(--muted)">'+r.flag+'</span></div></div></div>';
+  }).join('');
+  document.getElementById('reviewSub').textContent=state.review.length+' records awaiting decision · '+state.review.filter(function(r){return r.severity==='urgent'}).length+' flagged urgent';
+  if(state.selectedReview)selectReview(state.selectedReview);
+  updateNavCounts();
+}
+function selectReview(id){
+  state.selectedReview=id;const r=state.review.find(function(x){return x.id===id});if(!r)return;
+  renderReview();state.selectedReview=id;
+  document.getElementById('reviewTitle').innerHTML=r.name+' <span class="id" style="margin-left:6px">'+r.pid+'</span>';
+  const syncBadge=r.sync==='offline'?'badge-offline':r.sync==='conflict'?'badge-conflict':'badge-synced';
+  const syncLabel=r.sync==='offline'?'Saved offline':r.sync==='conflict'?'Conflict':'Synced';
+  const missing=r.missing.length?'<div style="padding:10px 12px;border:1px solid rgba(248,113,113,.3);background:rgba(248,113,113,.06);border-radius:var(--r);font-size:12px;color:var(--crit);margin-bottom:14px"><b>Missing or incomplete:</b><ul style="margin:4px 0 0;padding-left:18px;line-height:1.6">'+r.missing.map(function(m){return '<li>'+m+'</li>'}).join('')+'</ul></div>':'';
+  const vaWarn=r.results.va.indexOf('18')>=0||r.results.va.indexOf('24')>=0?'warn':'';
+  const iopWarn=r.results.iop.indexOf('24')>=0?'crit':'';
+  document.getElementById('reviewBody').innerHTML='<div class="ws-ctx"><div class="pid">'+r.pid+' · '+r.age+' years · '+r.station+'</div><div class="pname">'+r.name+'</div><div style="margin-top:8px;display:flex;gap:8px;flex-wrap:wrap"><span class="badge '+(r.severity==='urgent'?'badge-urgent':'badge-review')+'"><span class="dot"></span>'+(r.severity==='urgent'?'Urgent flag':'Review flag')+'</span><span class="badge '+syncBadge+'"><span class="dot"></span>'+syncLabel+'</span></div><div style="margin-top:10px;padding:10px 12px;border:1px solid rgba(251,191,36,.3);background:rgba(251,191,36,.06);border-radius:var(--r);font-size:12px;color:var(--warn);line-height:1.5"><b>Flagged for reviewer assessment.</b> '+r.flag+'. VSMS supports screening — it does not diagnose. Final decision made by reviewer.</div></div><div style="margin:14px 0"><div style="font-size:11px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;color:var(--muted-soft);margin-bottom:8px">Screening results</div><div class="result-grid"><div class="result-cell"><label>Visual acuity</label><div class="rv '+vaWarn+'">'+r.results.va+'</div></div><div class="result-cell"><label>Refraction</label><div class="rv">'+r.results.ref+'</div></div><div class="result-cell"><label>Colour vision</label><div class="rv">'+r.results.colour+'</div></div><div class="result-cell"><label>IOP</label><div class="rv '+iopWarn+'">'+r.results.iop+'</div></div></div></div>'+missing+'<div class="field"><label>Reviewer notes</label><textarea id="rev_notes" placeholder="Record clinical reasoning and next-step rationale…"></textarea></div><div class="field"><label>Final decision</label><select id="rev_decision"><option value="">Select decision…</option><option>Complete — no follow-up</option><option>Follow-up required</option><option>Referral to specialist</option><option>Return for re-screening</option></select></div><div class="field" id="referralDetail" style="display:none"><label>Referral / follow-up action</label><input id="rev_referral" placeholder="e.g. Refer to ophthalmology within 2 weeks"></div><div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:6px"><button class="btn btn-primary btn-lg" onclick="finaliseReview(\''+r.id+'\')">'+I.check+'Finalise review</button><button class="btn btn-ghost" onclick="toast(\'Saved as draft decision\',\'info\',\'Draft saved\')">'+I.clock+'Save draft</button></div>';
+  const dec=document.getElementById('rev_decision');
+  if(dec)dec.addEventListener('change',function(e){document.getElementById('referralDetail').style.display=(e.target.value.indexOf('Referral')>=0||e.target.value.indexOf('Follow-up')>=0)?'block':'none'});
+}
+function selectReviewByPid(pid){const r=state.review.find(function(x){return x.pid===pid});if(r)selectReview(r.id)}
+function finaliseReview(id){
+  const r=state.review.find(function(x){return x.id===id});if(!r)return;
+  const dec=document.getElementById('rev_decision').value;
+  if(!dec){toast('Select a final decision first','warn','Cannot finalise');return}
+  r.decision=dec;r.finalised=true;r.sync='pending';
+  state.review=state.review.filter(function(x){return x.id!==id});
+  state.selectedReview=null;
+  renderReview();
+  document.getElementById('reviewBody').innerHTML='<div class="state-box" style="border:0;padding:24px"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><path d="M22 4 12 14.01l-3-3"/></svg><h3>Review finalised</h3><p>The decision has been recorded and queued for sync. Select the next record from the queue.</p></div>';
+  toast('Review finalised: '+dec,'ok','Decision recorded');
+  updateNavCounts();
+}
+</script>
+<script>
+function setStaffFilter(f){state.staffFilter=f;document.querySelectorAll('#staffFilter button').forEach(function(b){b.classList.toggle('active',b.dataset.f===f)});renderPeople()}
+function renderPeople(){
+  const q=(document.getElementById('staffSearch').value||'').toLowerCase().trim();
+  const list=state.staff.filter(function(s){
+    if(state.staffFilter==='pending'&&s.status!=='pending')return false;
+    if(state.staffFilter==='active'&&s.status!=='active')return false;
+    if(q&&!(s.name.toLowerCase().indexOf(q)>=0||s.email.toLowerCase().indexOf(q)>=0||ROLES[s.role].toLowerCase().indexOf(q)>=0))return false;
+    return true;
+  });
+  document.getElementById('peopleList').innerHTML=list.length?list.map(function(s){
+    let acts='';
+    if(s.status==='pending')acts+='<button class="btn btn-sm btn-primary" onclick="approveStaff(\''+s.id+'\')">Approve</button><button class="btn btn-sm btn-ghost" onclick="rejectStaff(\''+s.id+'\')">Reject</button>';
+    if(s.status==='active')acts+='<button class="btn btn-sm btn-ghost" onclick="assignStaff(\''+s.id+'\')">Assign</button><div class="menu-wrap"><button class="icon-btn" onclick="toggleMenu(event,\'smenu-'+s.id+'\')">'+I.more+'</button><div class="menu" id="smenu-'+s.id+'"><button onclick="changeRole(\''+s.id+'\');closeMenus()">'+I.edit+'Change role</button><button onclick="changePerms(\''+s.id+'\');closeMenus()">'+I.ban+'Change permissions</button><button onclick="deactivateStaff(\''+s.id+'\');closeMenus()" class="danger">'+I.ban+'Deactivate access</button></div></div>';
+    if(s.status==='inactive')acts+='<button class="btn btn-sm btn-ghost" onclick="reactivateStaff(\''+s.id+'\')">Reactivate</button>';
+    const station=s.event?'<span class="badge badge-live" style="height:20px;font-size:10px"><span class="dot"></span>'+s.station+'</span>':'';
+    const pend=s.status==='pending'?'<span class="role-tag pending">Pending</span>':'';
+    const inact=s.status==='inactive'?'<span class="role-tag">Inactive</span>':'';
+    return '<div class="staff-row"><span class="avatar">'+s.initials+'</span><div class="staff-main"><b>'+s.name+'</b><span>'+s.email+'</span></div><div class="staff-meta"><span class="role-tag '+roleClass(s.role)+'">'+ROLES[s.role]+'</span>'+station+pend+inact+'</div><div class="staff-actions">'+acts+'</div></div>';
+  }).join(''):'<div class="state-box" style="border:0"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg><h3>No staff found</h3><p>Adjust the search or invite new staff.</p></div>';
+  const pending=state.staff.filter(function(s){return s.status==='pending'}).length;
+  const inactive=state.staff.filter(function(s){return s.status==='inactive'}).length;
+  document.getElementById('peopleSub').textContent=state.staff.length+' staff · '+pending+' pending approval · '+inactive+' inactive';
+  updateNavCounts();
+}
+function roleClass(r){return {EVENT_MANAGER:'mgr',REGISTRATION_OFFICER:'reg',SCREENER:'scr',REVIEWER:'doc',ADMINISTRATOR:'admin'}[r]||''}
+function approveStaff(id){const s=state.staff.find(function(x){return x.id===id});if(s){s.status='active';renderPeople();toast(s.name+' approved — Event Manager access','ok','Staff approved')}}
+function rejectStaff(id){const s=state.staff.find(function(x){return x.id===id});if(s){state.staff=state.staff.filter(function(x){return x.id!==id});renderPeople();toast(s.name+' access request rejected','warn','Rejected')}}
+function assignStaff(id){
+  const s=state.staff.find(function(x){return x.id===id});if(!s)return;
+  const opts=state.events.filter(function(e){return e.status!=='completed'}).map(function(e){return '<option '+(s.event===e.id?'selected':'')+'>'+e.name+'</option>'}).join('');
+  modal({title:'Assign '+s.name,body:'<div class="field"><label>Event</label><select id="a_event">'+opts+'</select></div><div class="field"><label>Station</label><select id="a_station"><option '+(s.station==='Registration'?'selected':'')+'>Registration</option><option '+(s.station==='Visual acuity'?'selected':'')+'>Visual acuity</option><option>Refraction</option><option>Colour vision</option><option>Eye health</option><option '+(s.station==='Clinical review'?'selected':'')+'>Clinical review</option></select></div><div class="field"><label>Role for this assignment</label><select id="a_role">'+Object.entries(ROLES).map(function(e){return '<option '+(s.role===e[0]?'selected':'')+' value="'+e[0]+'">'+e[1]+'</option>'}).join('')+'</select></div><div style="padding:10px 12px;border:1px solid var(--acc-line);background:var(--acc-tint);border-radius:var(--r);font-size:12px;color:var(--ink-2);line-height:1.5"><b style="color:var(--acc)">What this allows:</b> Record screening results, save offline, hand off participants, and view assigned queue. Cannot delete events or approve staff.</div>',ok:'Confirm assignment',okAct:function(){toast(s.name+' assigned','ok','Assignment confirmed');renderPeople();return true}});
+}
+function changeRole(id){const s=state.staff.find(function(x){return x.id===id});if(!s)return;modal({title:'Change role · '+s.name,body:'<div class="field"><label>System role</label><select id="cr_role">'+Object.entries(ROLES).map(function(e){return '<option value="'+e[0]+'" '+(s.role===e[0]?'selected':'')+'>'+e[1]+'</option>'}).join('')+'</select></div>',ok:'Save role',okAct:function(){s.role=document.getElementById('cr_role').value;renderPeople();toast('Role updated','ok','Saved');return true}})}
+function changePerms(id){const s=state.staff.find(function(x){return x.id===id});if(!s)return;modal({title:'Permissions · '+s.name,body:'<div style="font-size:12px;color:var(--ink-2);line-height:1.7"><label style="display:flex;align-items:center;gap:8px;padding:6px 0"><input type="checkbox" checked> Create and edit events</label><label style="display:flex;align-items:center;gap:8px;padding:6px 0"><input type="checkbox" '+(s.role==='EVENT_MANAGER'||s.role==='ADMINISTRATOR'?'checked':'')+'> Approve staff</label><label style="display:flex;align-items:center;gap:8px;padding:6px 0"><input type="checkbox" '+(s.role==='ADMINISTRATOR'?'checked':'')+'> Delete events</label><label style="display:flex;align-items:center;gap:8px;padding:6px 0"><input type="checkbox" checked> Record screening results</label><label style="display:flex;align-items:center;gap:8px;padding:6px 0"><input type="checkbox" '+(s.role==='REVIEWER'?'checked':'')+'> Finalise clinical review</label></div>',ok:'Save permissions',okAct:function(){toast('Permissions updated','ok','Saved');return true}})}
+function deactivateStaff(id){const s=state.staff.find(function(x){return x.id===id});if(!s)return;modal({title:'Deactivate access',danger:true,body:'<p style="font-size:13px;color:var(--ink-2);line-height:1.6">Deactivating <b>'+s.name+'</b> removes their dashboard access immediately. Their recorded results remain intact.</p>',okLabel:'Deactivate',okClass:'btn-danger',okAct:function(){s.status='inactive';s.event=null;s.station=null;renderPeople();toast(s.name+' deactivated','warn','Access removed');return true}})}
+function reactivateStaff(id){const s=state.staff.find(function(x){return x.id===id});if(s){s.status='active';renderPeople();toast(s.name+' reactivated','ok','Access restored')}}
+function openInvite(){modal({title:'Invite staff',body:'<div class="field"><label>Email address</label><input id="inv_email" type="email" placeholder="colleague@vsms.health"></div><div class="field"><label>Proposed role</label><select id="inv_role">'+Object.entries(ROLES).map(function(e){return '<option value="'+e[0]+'">'+e[1]+'</option>'}).join('')+'</select></div><div class="field"><label>Message (optional)</label><textarea placeholder="You have been invited to join VSMS…"></textarea></div><p class="muted" style="font-size:12px;line-height:1.5">Invitees receive a secure sign-up link. They cannot access the dashboard until an Event Manager or Administrator approves their request.</p>',ok:'Send invite',okAct:function(){const e=document.getElementById('inv_email').value.trim();if(!e||e.indexOf('@')<0){toast('Enter a valid email','warn','Cannot invite');return false}toast('Invite sent to '+e,'ok','Invitation sent');return true}})}
+function openProfile(){modal({title:'Aisha Thomas',body:'<div style="display:flex;gap:14px;align-items:center;margin-bottom:14px"><span class="avatar" style="width:48px;height:48px;font-size:16px">AT</span><div><div style="font-size:15px;font-weight:600">Aisha Thomas</div><div class="id" style="margin-top:2px">U-01 · aisha.t@vsms.health</div><span class="role-tag mgr" style="margin-top:5px;display:inline-block">Event Manager</span></div></div><div style="font-size:12px;color:var(--muted);line-height:1.6">Signed in on this device. Role and permissions are checked live on every action.</div>',ok:'Sign out',okAct:function(){showPermissionDenied();return true}})}
+function showPermissionDenied(){
+  closeModal();
+  document.querySelectorAll('.page').forEach(function(p){p.classList.remove('active')});
+  const c=document.getElementById('content');c.querySelectorAll('.denied-page').forEach(function(n){n.remove()});
+  const d=document.createElement('section');d.className='page active denied-page';
+  d.innerHTML='<div class="state-box" style="margin-top:40px"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="12" r="10"/><path d="m4.9 4.9 14.2 14.2"/></svg><h3>Permission required</h3><p>You do not have access to this area. Sign in with an authorised staff account to continue. Reset the prototype to return to the demo.</p><button class="btn btn-primary" style="margin-top:14px" onclick="resetPrototype()">Reset prototype</button></div>';
+  c.appendChild(d);
+}
+</script>
+<script>
+function renderSync(){
+  document.getElementById('syncList').innerHTML=state.syncRecords.length?state.syncRecords.map(function(r){
+    const cls=r.state==='failed'?'badge-failed':r.state==='conflict'?'badge-conflict':r.state==='pending'?'badge-pending':r.state==='syncing'?'badge-up':'badge-synced';
+    const lbl=r.state==='failed'?'Sync failed':r.state==='conflict'?'Conflict requires review':r.state==='pending'?'Pending sync':r.state==='syncing'?'Syncing…':'Synced';
+    const dotCls=r.state==='failed'?'crit':r.state==='conflict'?'info':r.state==='syncing'?'info':'warn';
+    const prog=r.state==='syncing'?'<div class="progress"><span style="width:60%"></span></div>':'';
+    const retry=(r.state==='failed'||r.state==='conflict')?'<button class="btn btn-sm btn-outline" onclick="retrySync(\''+r.id+'\')">'+I.refresh+'Retry</button>':'';
+    return '<div class="sync-row"><span class="dot '+dotCls+'"></span><div class="sr-main"><b>'+r.id+'</b><span>'+r.who+' · saved '+r.ts+' · '+r.size+'</span></div>'+prog+'<span class="badge '+cls+'" style="height:20px;font-size:10px"><span class="dot"></span>'+lbl+'</span>'+retry+'</div>';
+  }).join(''):'<div class="state-box" style="border:0"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><path d="M22 4 12 14.01l-3-3"/></svg><h3>All records synced</h3><p>No pending or failed sync activity.</p></div>';
+  const failed=state.syncRecords.filter(function(r){return r.state==='failed'}).length;
+  const pending=state.syncRecords.filter(function(r){return r.state==='pending'}).length;
+  const conflict=state.syncRecords.filter(function(r){return r.state==='conflict'}).length;
+  document.getElementById('syncSub').textContent=pending+' pending · '+failed+' failed · '+conflict+' conflict · connection healthy';
+  updateNavCounts();
+}
+function retrySync(id){const r=state.syncRecords.find(function(x){return x.id===id});if(!r)return;r.state='syncing';renderSync();setTimeout(function(){r.state='synced';renderSync();toast(r.id+' synced','ok','Synced')},1400)}
+function retryAllSync(){state.syncRecords.forEach(function(r){if(r.state==='failed'||r.state==='conflict')r.state='syncing'});renderSync();setTimeout(function(){state.syncRecords.forEach(function(r){if(r.state==='syncing')r.state='synced'});renderSync();toast('All failed records synced','ok','Sync complete')},1600)}
+
+function renderReports(){
+  const completed=state.events.filter(function(e){return e.status==='completed'});
+  document.getElementById('reportsList').innerHTML=completed.length?completed.map(function(ev){
+    return '<div class="e-card" style="margin-bottom:10px"><div class="e-row"><div class="e-main"><div class="e-name"><span>'+ev.name+'</span><span class="badge badge-done"><span class="dot"></span>Completed</span></div><div class="e-meta"><span class="id">'+ev.id+'</span><span>·</span><b>'+fmtDate(ev.date)+'</b><span>·</span><span>'+ev.venue+'</span></div><div class="e-stats"><div class="estat"><span class="n ok">'+ev.done+'</span><span class="l">Completed</span></div><div class="estat"><span class="n warn">'+ev.followup+'</span><span class="l">Follow-up</span></div><div class="estat"><span class="n">'+ev.reg+'</span><span class="l">Registered</span></div><div class="estat"><span class="n">'+ev.stations+'</span><span class="l">Stations</span></div></div></div><div class="e-actions"><button class="next-action" onclick="toast(\'Report exported as CSV (demo)\',\'ok\',\'Export ready\')">'+I.chev+'Export summary</button></div></div></div>';
+  }).join(''):'<div class="state-box"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M3 3v18h18"/><path d="M7 14l4-4 4 4 5-6"/></svg><h3>No completed events</h3><p>Completed event summaries will appear here.</p></div>';
+}
+
+function modal(opts){
+  const m=document.getElementById('modal');
+  m.innerHTML='<div class="modal-head"><h3 id="modalTitle">'+opts.title+'</h3><button class="icon-btn" onclick="closeModal()" aria-label="Close"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6 6 18M6 6l12 12"/></svg></button></div><div class="modal-body">'+(opts.body||'')+'</div><div class="modal-foot"><button class="btn btn-ghost" onclick="closeModal()">Cancel</button><button class="btn '+(opts.okClass||'btn-primary')+'" id="modalOk">'+(opts.okLabel||opts.ok||'OK')+'</button></div>';
+  document.getElementById('overlay').classList.add('open');
+  const okBtn=document.getElementById('modalOk');
+  okBtn.onclick=function(){if(opts.okAct){const r=opts.okAct();if(r===true)closeModal()}else closeModal()};
+  setTimeout(function(){const f=m.querySelector('input,textarea,select');if(f)f.focus()},50);
+}
+function closeModal(){document.getElementById('overlay').classList.remove('open')}
+
+function startDryRun(){
+  state.dryRun=true;document.getElementById('dryrunBanner').classList.remove('hide');
+  nav('live');toast('Dry run started — simulate without affecting live data','info','Dry run');
+}
+function startDryRunEvent(id){state.dryRun=true;document.getElementById('dryrunBanner').classList.remove('hide');nav('live');toast('Dry run on '+id+' — simulated event','info','Dry run')}
+function exitDryRun(){state.dryRun=false;document.getElementById('dryrunBanner').classList.add('hide');nav('events');toast('Dry run ended','ok','Exited')}
+
+function resetPrototype(){
+  state=freshState();
+  document.documentElement.dataset.theme='';
+  document.getElementById('dryrunBanner').classList.add('hide');
+  document.querySelectorAll('.denied-page').forEach(function(n){n.remove()});
+  nav('events');
+  toast('Prototype reset to initial state','ok','Reset');
+}
+
+document.addEventListener('keydown',function(e){
+  if(e.key==='/'&&document.activeElement.tagName!=='INPUT'&&document.activeElement.tagName!=='TEXTAREA'){e.preventDefault();document.getElementById('globalSearch').focus()}
+  if(e.key==='Escape'){closeModal();closeMenus()}
+});
+
+window.addEventListener('DOMContentLoaded',function(){renderEvents();updateNavCounts()});
+</script>
+</body>
+</html>
