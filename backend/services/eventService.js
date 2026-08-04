@@ -1177,6 +1177,7 @@ const deleteEvent = async (eventId, body, user, correlationId) => {
     await tx.signatureArtifact.deleteMany({ where: { eventId } });
     await tx.registrationStatusHistory.deleteMany({ where: { registration: { eventId } } });
     await tx.screeningResult.deleteMany({ where: { registration: { eventId } } });
+    await tx.syncAction.deleteMany({ where: { eventId } });
     await tx.scanLog.deleteMany({ where: { OR: [{ registration: { eventId } }, { station: { eventId } }] } });
     await tx.qRCodePass.deleteMany({ where: { registration: { eventId } } });
     await tx.queueMovement.deleteMany({ where: { registration: { eventId } } });

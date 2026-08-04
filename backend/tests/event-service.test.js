@@ -323,6 +323,7 @@ function installDeletionTransaction(t, { claimCount = 1, crossEventReview = fals
     artifactCleanupTask: { createMany: async () => ({ count: 0 }) },
     registrationStatusHistory: remove("registrationHistory"),
     screeningResult: remove("screeningResults"),
+    syncAction: remove("syncActions"),
     scanLog: remove("scanLogs"),
     qRCodePass: remove("qrPasses"),
     queueMovement: remove("queueMovements"),
@@ -342,7 +343,7 @@ function installDeletionTransaction(t, { claimCount = 1, crossEventReview = fals
   return calls;
 }
 
-test("terminal event deletion removes only event-owned records and leaves a non-PHI ledger", async (t) => {
+test("terminal event deletion removes event-owned records and preserves the admin audit ledger", async (t) => {
   const calls = installDeletionTransaction(t);
   const administrator = { ...manager, roles: ["ADMINISTRATOR"] };
 
@@ -372,6 +373,8 @@ test("terminal event deletion removes only event-owned records and leaves a non-
   assert.deepEqual(ledger.details, { status: "COMPLETED", version: 1 });
   assert.ok(calls.some(([name]) => name === "registrations"));
   assert.ok(calls.some(([name]) => name === "stations"));
+  assert.deepEqual(calls.find(([name]) => name === "syncActions")[1], { where: { eventId } });
+  assert.ok(calls.findIndex(([name]) => name === "syncActions") < calls.findIndex(([name]) => name === "event.delete"));
   assert.deepEqual(calls.filter(([name]) => name === "audit.deleteScope").map(([, input]) => input), [
     ["SELECT set_config('vsms.event_audit_delete_event_id', $1, true)", eventId],
     ["SELECT set_config('vsms.event_audit_delete_event_id', '', true)"],
