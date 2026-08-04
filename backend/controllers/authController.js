@@ -230,13 +230,8 @@ exports.me = asyncHandler(async (req, res) => {
 exports.logout = asyncHandler(async (req, res) => {
     ensureCognitoConfigured();
     const accessToken = parseCookies(req.headers.cookie)[ACCESS_COOKIE];
-    try {
-        if (accessToken) await globalSignOut(accessToken);
-    } catch {
-        // The managed-login logout endpoint still clears the browser session.
-    } finally {
-        clearAuthCookies(res);
-    }
+    if (accessToken) void globalSignOut(accessToken).catch(() => {});
+    clearAuthCookies(res);
     res.json({ message: "Logged out successfully", logoutUrl: getLogoutUrl() });
 });
 
