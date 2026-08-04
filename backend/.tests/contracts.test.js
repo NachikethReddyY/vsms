@@ -2,9 +2,45 @@ const test = require("node:test");
 const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const path = require("node:path");
+const YAML = require("yaml");
 
 const backendRoot = path.resolve(__dirname, "..");
 const read = (relativePath) => fs.readFileSync(path.join(backendRoot, relativePath), "utf8");
+
+test("manual check-in contract accepts exactly one reference and always returns a message", () => {
+    const document = YAML.parse(read("docs/openapi.yaml"));
+    const schemas = document.components.schemas;
+    const request = schemas.ManualCheckInRequest;
+    const referenced = request.oneOf.map(({ $ref }) => schemas[$ref.split("/").at(-1)]);
+    const matches = (schema, value) => {
+        if (!schema.required.every((key) => Object.hasOwn(value, key))) return false;
+        if (schema.additionalProperties === false) {
+            if (!Object.keys(value).every((key) => Object.hasOwn(schema.properties, key))) return false;
+        }
+        for (const [key, candidate] of Object.entries(value)) {
+            const allowed = schema.properties[key]?.enum;
+            if (allowed && !allowed.includes(candidate)) return false;
+        }
+        return true;
+    };
+    const matchCount = (value) => referenced.filter((schema) => matches(schema, value)).length;
+
+    assert.equal(matchCount({ eventId: "11111111-1111-4111-8111-111111111111" }), 0);
+    assert.equal(matchCount({
+        eventId: "11111111-1111-4111-8111-111111111111",
+        registrationId: "22222222-2222-4222-8222-222222222222",
+        identifier: "a".repeat(64),
+    }), 0);
+    assert.equal(matchCount({
+        eventId: "11111111-1111-4111-8111-111111111111",
+        registrationId: "22222222-2222-4222-8222-222222222222",
+    }), 1);
+    assert.equal(matchCount({
+        eventId: "11111111-1111-4111-8111-111111111111",
+        identifier: "a".repeat(64),
+    }), 1);
+    assert.ok(schemas.ManualCheckInResponse.required.includes("message"));
+});
 
 test("schema enforces duplicate registration and queue uniqueness", () => {
     const schema = read("prisma/schema.prisma");

@@ -188,9 +188,8 @@ exports.manualCheckIn = async (req, res, next) => {
     try {
         const { registrationId, identifier, eventId } = req.body;
         const userId = req.auth.userId;
-        // Manual identifiers may be either a QR token or an encrypted participant identifier.
-        // Authorize the claimed event first; qrService then applies the same active/expiry
-        // predicate to QR tokens and verifies that they belong to this event.
+        // Manual check-in accepts a registration reference or an active QR token. NRIC is
+        // deliberately not searchable. Authorize the claimed event before resolving either.
         await assertQrAccess(req, { eventId });
 
         const result = await qrService.manualCheckIn({

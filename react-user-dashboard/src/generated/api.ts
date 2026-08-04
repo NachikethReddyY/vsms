@@ -1271,7 +1271,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Check in a participant using a registration ID or identifier */
+        /** Check in a participant using a registration reference or QR token */
         post: operations["manualQrCheckIn"];
         delete?: never;
         options?: never;
@@ -2758,13 +2758,46 @@ export interface components {
                 [key: string]: unknown;
             };
         };
-        /** @description Supply either registrationId or identifier together with eventId. */
-        ManualCheckInRequest: {
+        ManualCheckInRequest: components["schemas"]["ManualCheckInByRegistration"] | components["schemas"]["ManualCheckInByQrToken"];
+        ManualCheckInByRegistration: {
             /** Format: uuid */
-            registrationId?: string;
-            identifier?: string;
+            registrationId: string;
             /** Format: uuid */
             eventId: string;
+            /**
+             * @description This alternative accepts a registration reference only.
+             * @enum {unknown}
+             */
+            identifier?: never;
+        };
+        ManualCheckInByQrToken: {
+            /** @description Active QR pass token only; NRIC lookup is not supported. */
+            identifier: string;
+            /** Format: uuid */
+            eventId: string;
+            /**
+             * @description This alternative accepts a QR token only.
+             * @enum {unknown}
+             */
+            registrationId?: never;
+        };
+        ManualCheckInResult: {
+            /** Format: uuid */
+            registrationId: string;
+            /** Format: uuid */
+            eventId: string;
+            registrationStatus: components["schemas"]["RegistrationStatus"];
+            /** @enum {boolean} */
+            checkedIn: true;
+            /** Format: date-time */
+            checkedInAt: string;
+            queueNumber: number | null;
+        };
+        ManualCheckInResponse: {
+            /** @enum {boolean} */
+            success: true;
+            message: string;
+            data: components["schemas"]["ManualCheckInResult"];
         };
         ScreeningStation: {
             /** Format: uuid */
@@ -5461,7 +5494,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["ApiDataResponse"];
+                    "application/json": components["schemas"]["ManualCheckInResponse"];
                 };
             };
             400: components["responses"]["ValidationFailed"];
