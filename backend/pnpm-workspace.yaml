@@ -17,3 +17,4 @@ minimumReleaseAgeExclude:
   - '@aws-sdk/credential-provider-web-identity@3.972.72'
   - '@aws-sdk/nested-clients@3.997.40'
   - '@aws-sdk/token-providers@3.1102.0'
+  - '@aws-sdk/client-sns@3.1102.0'

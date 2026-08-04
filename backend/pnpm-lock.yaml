@@ -8,7 +8,13 @@ importers:
 
   .:
     dependencies:
+      '@aws-sdk/client-cognito-identity-provider':
+        specifier: ^3.1101.0
+        version: 3.1101.0
       '@aws-sdk/client-sesv2':
+        specifier: ^3.1102.0
+        version: 3.1102.0
+      '@aws-sdk/client-sns':
         specifier: ^3.1102.0
         version: 3.1102.0
       '@prisma/client':
@@ -84,8 +90,16 @@ importers:
 
 packages:
 
+  '@aws-sdk/client-cognito-identity-provider@3.1101.0':
+    resolution: {integrity: sha512-iINP4bJzVeCN1UDDQ5aRIEaGOCUUf8esOkHp7P7q/mBB+X8icJUitDsCcf4F1poymUO5YK4ArARGF45dH74rSg==}
+    engines: {node: '>=20.0.0'}
+
   '@aws-sdk/client-sesv2@3.1102.0':
     resolution: {integrity: sha512-xkTVCxv/vDcUJfnoDxyeQktioSS/zBIPI/GZbTXOFjhwLhli3mLuN/d5xI3b1y3cDjx7i4wAdnRuO04qUwhBBQ==}
+    engines: {node: '>=20.0.0'}
+
+  '@aws-sdk/client-sns@3.1102.0':
+    resolution: {integrity: sha512-IpKqKPGx4MiwLx5jD5LtFkD/hR1qNJ+nRKMczY/qGBh6ocCS519aVhg9Y0A4PREjVXItdOwkjBj4wQCbGwhOdQ==}
     engines: {node: '>=20.0.0'}
 
   '@aws-sdk/core@3.977.5':
@@ -1529,11 +1543,33 @@ packages:
 
 snapshots:
 
+  '@aws-sdk/client-cognito-identity-provider@3.1101.0':
+    dependencies:
+      '@aws-sdk/core': 3.977.5
+      '@aws-sdk/credential-provider-node': 3.972.77
+      '@aws-sdk/types': 3.974.2
+      '@smithy/core': 3.31.1
+      '@smithy/fetch-http-handler': 5.6.13
+      '@smithy/node-http-handler': 4.9.13
+      '@smithy/types': 4.16.1
+      tslib: 2.8.1
+
   '@aws-sdk/client-sesv2@3.1102.0':
     dependencies:
       '@aws-sdk/core': 3.977.5
       '@aws-sdk/credential-provider-node': 3.972.77
       '@aws-sdk/signature-v4-multi-region': 3.996.43
+      '@aws-sdk/types': 3.974.2
+      '@smithy/core': 3.31.1
+      '@smithy/fetch-http-handler': 5.6.13
+      '@smithy/node-http-handler': 4.9.13
+      '@smithy/types': 4.16.1
+      tslib: 2.8.1
+
+  '@aws-sdk/client-sns@3.1102.0':
+    dependencies:
+      '@aws-sdk/core': 3.977.5
+      '@aws-sdk/credential-provider-node': 3.972.77
       '@aws-sdk/types': 3.974.2
       '@smithy/core': 3.31.1
       '@smithy/fetch-http-handler': 5.6.13
