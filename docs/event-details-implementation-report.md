@@ -154,7 +154,7 @@ a deployed system invulnerable.
 | Runtime dependencies | Backend 0; frontend 0 | `npm audit --omit=dev` in both packages |
 | Bruno lifecycle | Pass, 13/13 requests and tests | Local generated Bruno report |
 | Bruno cookie session | Pass, 3/3 login/refresh/logout requests and tests | Local generated Bruno report |
-| HTTPS | Trusted-CA curl 200; HSTS, CSP, frame, referrer, MIME and request-ID headers present; SAN includes localhost and 127.0.0.1 | `curl --cacert ... https://127.0.0.1:5000/health` |
+| HTTPS | Trusted-CA curl 200; HSTS, CSP, frame, referrer, MIME and request-ID headers present; SAN includes localhost and 127.0.0.1 | `curl --cacert ... https://127.0.0.1:5050/health` |
 | Browser responsive | Public landing page inspected at 390×844 and 1440×900; login, event list, creation flow, and detail/audit view inspected at earlier desktop/tablet breakpoints; no document horizontal overflow observed | T3 collaborative browser snapshots |
 
 ## Highlighted implementation files
