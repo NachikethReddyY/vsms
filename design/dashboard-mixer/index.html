@@ -1,0 +1,827 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Dashboard mixer</title>
+    <style>
+      :root {
+        --bg: #f7f9fc;
+        --panel: #ffffff;
+        --line: #d2d7df;
+        --text: #101828;
+        --muted: #667085;
+        --accent: #1f6feb;
+        --accent-text: #ffffff;
+        --shadow: 0 8px 24px rgba(15, 23, 42, 0.08);
+      }
+
+      [data-theme="dark"] {
+        --bg: #0f172a;
+        --panel: #1b2436;
+        --line: #2f3f57;
+        --text: #ecedff;
+        --muted: #a5b0c3;
+        --accent: #6da7ff;
+        --accent-text: #07142a;
+        --shadow: 0 8px 24px rgba(3, 10, 22, 0.35);
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
+        background: var(--bg);
+        color: var(--text);
+      }
+
+      .app {
+        max-width: 1080px;
+        margin: 0 auto;
+        padding: 1.5rem;
+        display: grid;
+        gap: 1rem;
+      }
+
+      .top {
+        display: flex;
+        justify-content: space-between;
+        align-items: start;
+        gap: 1rem;
+        flex-wrap: wrap;
+      }
+
+      h1,
+      h2,
+      h3,
+      p {
+        margin: 0;
+      }
+
+      .toolbar {
+        display: flex;
+        gap: 0.5rem;
+        flex-wrap: wrap;
+      }
+
+      button,
+      input,
+      select {
+        border: 1px solid var(--line);
+        border-radius: 0.65rem;
+        font: inherit;
+      }
+
+      button {
+        background: var(--panel);
+        color: var(--text);
+        cursor: pointer;
+        padding: 0.55rem 0.8rem;
+      }
+
+      button[data-active="true"] {
+        border-color: var(--accent);
+        box-shadow: inset 0 0 0 1px var(--accent);
+      }
+
+      .panel {
+        background: var(--panel);
+        border: 1px solid var(--line);
+        border-radius: 0.9rem;
+        padding: 1rem;
+        box-shadow: var(--shadow);
+      }
+
+      .concept-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+        gap: 0.65rem;
+        margin: 0.7rem 0 0.4rem;
+      }
+
+      .concept {
+        border: 1px dashed var(--line);
+        border-radius: 0.6rem;
+        padding: 0.45rem 0.6rem;
+        text-align: center;
+      }
+
+      .controls-row {
+        display: flex;
+        gap: 0.5rem;
+        align-items: center;
+        flex-wrap: wrap;
+        margin: 0.5rem 0;
+      }
+
+      #dashboardFilter {
+        width: min(18rem, 100%);
+        min-height: 2.2rem;
+        padding: 0.4rem 0.55rem;
+      }
+
+      #dashboardTabs {
+        display: grid;
+        gap: 0.5rem;
+        grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+        margin-top: 0.6rem;
+      }
+
+      .dashboard-btn {
+        text-align: left;
+      }
+
+      .grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+        gap: 0.75rem;
+      }
+
+      .region-card {
+        border: 1px solid var(--line);
+        border-radius: 0.8rem;
+        padding: 0.75rem;
+        background: color-mix(in srgb, var(--panel) 96%, var(--accent) 4%);
+        display: grid;
+        gap: 0.45rem;
+      }
+
+      .region-name {
+        font-weight: 600;
+      }
+
+      .region-key {
+        font-size: 0.8rem;
+        color: var(--muted);
+      }
+
+      .region-selector {
+        min-height: 2.1rem;
+        width: 100%;
+      }
+
+      .output {
+        display: grid;
+        gap: 0.8rem;
+      }
+
+      .status {
+        color: #b42318;
+        min-height: 1.25rem;
+      }
+
+      .bars {
+        display: grid;
+        gap: 0.45rem;
+      }
+
+      .bar {
+        display: grid;
+        gap: 0.25rem;
+      }
+
+      .bar-label {
+        display: flex;
+        justify-content: space-between;
+        font-size: 0.9rem;
+      }
+
+      .bar-fill {
+        background: #dbe5ff;
+        border-radius: 999px;
+        overflow: hidden;
+        height: 0.7rem;
+      }
+
+      .bar-fill::after {
+        content: "";
+        display: block;
+        height: 100%;
+        width: var(--w);
+        background: var(--accent);
+      }
+
+      .summary-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+        gap: 0.5rem;
+      }
+
+      .summary-stat {
+        border: 1px solid var(--line);
+        border-radius: 0.7rem;
+        padding: 0.55rem;
+        background: var(--bg);
+      }
+
+      .summary-value {
+        font-size: 1.15rem;
+        font-weight: 700;
+        margin-top: 0.25rem;
+      }
+
+      .drawer {
+        position: fixed;
+        right: 0;
+        top: 0;
+        width: min(90vw, 360px);
+        height: 100vh;
+        background: var(--panel);
+        border-left: 1px solid var(--line);
+        padding: 1rem;
+        box-shadow: -20px 0 30px rgba(15, 23, 42, 0.12);
+        transform: translateX(105%);
+        transition: transform 0.2s ease;
+        overflow: auto;
+        z-index: 20;
+      }
+
+      .drawer.open {
+        transform: translateX(0);
+      }
+
+      pre {
+        margin: 0;
+        white-space: pre-wrap;
+        word-break: break-word;
+        background: var(--bg);
+        padding: 0.6rem;
+        border-radius: 0.6rem;
+        border: 1px solid var(--line);
+        max-height: 32vh;
+        overflow: auto;
+      }
+
+      .sr-only {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        padding: 0;
+        margin: -1px;
+        overflow: hidden;
+        clip: rect(0, 0, 0, 0);
+        border: 0;
+      }
+
+      table {
+        width: 100%;
+        border-collapse: collapse;
+      }
+
+      th,
+      td {
+        padding: 0.45rem;
+        border-bottom: 1px solid var(--line);
+        text-align: left;
+      }
+    </style>
+  </head>
+  <body>
+    <main class="app" aria-live="polite">
+      <header class="top panel">
+        <div>
+          <p class="label">Design artifact</p>
+          <h1>Dashboard mixer</h1>
+          <p>Five concept names and Final mix output with six-region mixer controls.</p>
+        </div>
+        <div class="toolbar" role="group" aria-label="Global tools">
+          <button id="themeToggle" type="button" aria-label="Toggle color theme">
+            Theme: light
+          </button>
+          <button id="modeToggle" type="button" aria-label="Toggle mix output mode">
+            Show table view
+          </button>
+          <button id="drawerToggle" type="button" aria-controls="stateDrawer" aria-expanded="false">
+            Open state drawer
+          </button>
+        </div>
+      </header>
+
+      <section class="panel" aria-labelledby="conceptTitle">
+        <h2 id="conceptTitle">Concept set</h2>
+        <div class="concept-grid" id="conceptList" aria-label="Concept names"></div>
+      </section>
+
+      <section class="panel" aria-labelledby="dashboardLabel">
+        <h2 id="dashboardLabel">Switch dashboard path</h2>
+        <div class="controls-row">
+          <label for="dashboardFilter">Filter dashboards</label>
+          <input id="dashboardFilter" type="search" aria-label="Filter dashboard names" placeholder="Type to filter..." />
+        </div>
+        <div id="dashboardTabs" role="tablist" aria-label="Dashboard paths"></div>
+        <p id="activeDashboardLabel" class="status" role="status" aria-live="polite"></p>
+      </section>
+
+      <section class="panel" aria-labelledby="mixerLabel">
+        <h2 id="mixerLabel">Six-region mixer</h2>
+        <div class="grid" id="regionGrid">
+          <article class="region-card" data-region-key="intake">
+            <div class="region-name"></div>
+            <div class="region-key"></div>
+            <p class="region-description"></p>
+            <label class="sr-only" for="region-intake">Choose concept for Intake zone</label>
+            <select id="region-intake" class="region-selector" data-region="intake"></select>
+          </article>
+          <article class="region-card" data-region-key="triage">
+            <div class="region-name"></div>
+            <div class="region-key"></div>
+            <p class="region-description"></p>
+            <label class="sr-only" for="region-triage">Choose concept for Triage zone</label>
+            <select id="region-triage" class="region-selector" data-region="triage"></select>
+          </article>
+          <article class="region-card" data-region-key="screening">
+            <div class="region-name"></div>
+            <div class="region-key"></div>
+            <p class="region-description"></p>
+            <label class="sr-only" for="region-screening">Choose concept for Screening zone</label>
+            <select id="region-screening" class="region-selector" data-region="screening"></select>
+          </article>
+          <article class="region-card" data-region-key="consult">
+            <div class="region-name"></div>
+            <div class="region-key"></div>
+            <p class="region-description"></p>
+            <label class="sr-only" for="region-consult">Choose concept for Consultation zone</label>
+            <select id="region-consult" class="region-selector" data-region="consult"></select>
+          </article>
+          <article class="region-card" data-region-key="audit">
+            <div class="region-name"></div>
+            <div class="region-key"></div>
+            <p class="region-description"></p>
+            <label class="sr-only" for="region-audit">Choose concept for Audit zone</label>
+            <select id="region-audit" class="region-selector" data-region="audit"></select>
+          </article>
+          <article class="region-card" data-region-key="escalation">
+            <div class="region-name"></div>
+            <div class="region-key"></div>
+            <p class="region-description"></p>
+            <label class="sr-only" for="region-escalation">Choose concept for Escalation zone</label>
+            <select id="region-escalation" class="region-selector" data-region="escalation"></select>
+          </article>
+        </div>
+      </section>
+
+      <section class="panel output" aria-labelledby="mixLabel">
+        <h2 id="mixLabel">Final mix</h2>
+        <p id="finalMixText" class="status"></p>
+        <div id="finalMixBars" class="bars" aria-live="polite"></div>
+        <div id="mixTable" class="summary-grid" aria-live="polite"></div>
+      </section>
+    </main>
+
+    <aside id="stateDrawer" class="drawer" aria-label="Debug state drawer" aria-hidden="true">
+      <h2>State preview</h2>
+      <p id="drawerStatus" class="status" role="status"></p>
+      <pre id="statePreview" aria-live="polite"></pre>
+      <button id="closeDrawer" type="button">Close state drawer</button>
+    </aside>
+
+    <script>
+      (() => {
+        const STORAGE_KEY = 'dashboard-mixer-state';
+
+        const CONCEPTS = [
+          'Clarity',
+          'Speed',
+          'Safety',
+          'Compliance',
+          'Care continuity',
+        ];
+
+        const DASHBOARDS = [
+          {
+            id: 'clinical',
+            name: 'Clinical review',
+            blurb: 'Prioritize safety checks and escalation paths.',
+          },
+          {
+            id: 'registration',
+            name: 'Registration',
+            blurb: 'Keep onboarding fast while staying complete.',
+          },
+          {
+            id: 'screening',
+            name: 'Screening station',
+            blurb: 'Route patients by immediate needs.',
+          },
+          {
+            id: 'operations',
+            name: 'Operations control',
+            blurb: 'Hold line balance across all teams.',
+          },
+          {
+            id: 'quality',
+            name: 'Quality and audit',
+            blurb: 'Track drift and enforce consistency.',
+          },
+        ];
+
+        const REGIONS = [
+          { key: 'intake', label: 'Intake zone', details: 'Data capture and eligibility checks.' },
+          { key: 'triage', label: 'Triage zone', details: 'Initial risk and priority flags.' },
+          { key: 'screening', label: 'Screening zone', details: 'Decision support during assessment.' },
+          { key: 'consult', label: 'Consultation zone', details: 'Clinical guidance and notes.' },
+          { key: 'audit', label: 'Audit zone', details: 'Controls, logs, and integrity checks.' },
+          { key: 'escalation', label: 'Escalation zone', details: 'Alerts and cross-team handoff.' },
+        ];
+
+        const regionKeys = REGIONS.map((entry) => entry.key);
+
+        const state = {
+          activeDashboard: DASHBOARDS[0].id,
+          chartMode: 'chart',
+          theme: 'light',
+          regionSelections: Object.fromEntries(REGIONS.map((region) => [region.key, CONCEPTS[0]])),
+        };
+
+        const conceptList = document.getElementById('conceptList');
+        const dashboardFilter = document.getElementById('dashboardFilter');
+        const dashboardTabs = document.getElementById('dashboardTabs');
+        const activeDashboardLabel = document.getElementById('activeDashboardLabel');
+        const regionGrid = document.getElementById('regionGrid');
+        const finalMixText = document.getElementById('finalMixText');
+        const finalMixBars = document.getElementById('finalMixBars');
+        const mixTable = document.getElementById('mixTable');
+        const statePreview = document.getElementById('statePreview');
+        const drawerStatus = document.getElementById('drawerStatus');
+        const drawer = document.getElementById('stateDrawer');
+        const themeToggle = document.getElementById('themeToggle');
+        const modeToggle = document.getElementById('modeToggle');
+        const drawerToggle = document.getElementById('drawerToggle');
+        const closeDrawerButton = document.getElementById('closeDrawer');
+
+        const safe = (fn, fallback = () => {}) => {
+          try {
+            return fn();
+          } catch (error) {
+            console.error('dashboard-mixer runtime error', error);
+            drawerStatus.textContent = error?.message || 'Unexpected runtime error';
+            fallback();
+            return undefined;
+          }
+        };
+
+        const renderConcepts = () => {
+          conceptList.textContent = '';
+          CONCEPTS.forEach((concept) => {
+            const pill = document.createElement('div');
+            pill.className = 'concept';
+            pill.textContent = concept;
+            conceptList.appendChild(pill);
+          });
+        };
+
+        const renderDashboardButtons = () => {
+          dashboardTabs.textContent = '';
+          DASHBOARDS.forEach((dashboard) => {
+            const button = document.createElement('button');
+            button.type = 'button';
+            button.className = 'dashboard-btn';
+            button.dataset.dashboardId = dashboard.id;
+            button.setAttribute('role', 'tab');
+            button.setAttribute('aria-selected', String(dashboard.id === state.activeDashboard));
+            button.dataset.active = String(dashboard.id === state.activeDashboard);
+            button.textContent = `${dashboard.name} - ${dashboard.blurb}`;
+
+            button.addEventListener('click', () => {
+              state.activeDashboard = dashboard.id;
+              render();
+              persist();
+            });
+
+            dashboardTabs.appendChild(button);
+          });
+        };
+
+        const updateDashboardActive = () => {
+          Array.from(dashboardTabs.querySelectorAll('button')).forEach((btn) => {
+            const isActive = btn.dataset.dashboardId === state.activeDashboard;
+            btn.dataset.active = String(isActive);
+            btn.setAttribute('aria-selected', String(isActive));
+          });
+
+          const activeName =
+            DASHBOARDS.find((entry) => entry.id === state.activeDashboard)?.name || DASHBOARDS[0].name;
+          activeDashboardLabel.textContent = `Active dashboard path: ${activeName}`;
+        };
+
+        const filterDashboards = () => {
+          const query = dashboardFilter.value.trim().toLowerCase();
+          Array.from(dashboardTabs.querySelectorAll('button')).forEach((button) => {
+            const title = button.textContent.toLowerCase();
+            const visible = title.includes(query);
+            button.hidden = query !== '' && !visible;
+          });
+        };
+
+        const renderRegions = () => {
+          REGIONS.forEach((region) => {
+            const card = regionGrid.querySelector(`[data-region-key="${region.key}"]`);
+            if (!card) {
+              return;
+            }
+
+            card.querySelector('.region-name').textContent = region.label;
+            card.querySelector('.region-key').textContent = `region key: ${region.key}`;
+            card.querySelector('.region-description').textContent = region.details;
+
+            const select = card.querySelector(`.region-selector[data-region="${region.key}"]`);
+            if (!select) {
+              return;
+            }
+
+            select.textContent = '';
+            CONCEPTS.forEach((concept, index) => {
+              const option = document.createElement('option');
+              option.value = concept;
+              option.textContent = `${index + 1}. ${concept}`;
+              select.appendChild(option);
+            });
+
+            select.value = state.regionSelections[region.key] || CONCEPTS[0];
+            select.setAttribute('aria-label', `Choose concept for ${region.label}`);
+          });
+        };
+
+        const computeMix = () => {
+          const totals = Object.fromEntries(CONCEPTS.map((concept) => [concept, 0]));
+          REGIONS.forEach((region) => {
+            const selected = state.regionSelections[region.key];
+            if (!totals[selected]) {
+              totals[selected] = 1;
+            } else {
+              totals[selected] = totals[selected] + 1;
+            }
+          });
+
+          const totalSelections = REGIONS.length;
+          return CONCEPTS.map((concept) => {
+            const count = totals[concept] || 0;
+            return {
+              name: concept,
+              count,
+              pct: Math.round((count / totalSelections) * 100),
+            };
+          }).sort((a, b) => b.count - a.count);
+        };
+
+        const renderBars = (mix) => {
+          const total = REGIONS.length;
+          finalMixBars.textContent = '';
+          mix.forEach((entry) => {
+            const row = document.createElement('div');
+            row.className = 'bar';
+
+            const label = document.createElement('div');
+            label.className = 'bar-label';
+
+            const left = document.createElement('span');
+            left.textContent = entry.name;
+            const right = document.createElement('span');
+            right.textContent = `${entry.count}/${total} (${entry.pct}%)`;
+
+            label.appendChild(left);
+            label.appendChild(right);
+
+            const fill = document.createElement('div');
+            fill.className = 'bar-fill';
+            fill.style.setProperty('--w', `${entry.pct}%`);
+
+            row.appendChild(label);
+            row.appendChild(fill);
+            finalMixBars.appendChild(row);
+          });
+        };
+
+        const renderTable = (mix) => {
+          const rows = mix.map((entry, index) =>
+            `<tr><td>${index + 1}</td><td>${entry.name}</td><td>${entry.count}</td><td>${entry.pct}%</td></tr>`
+          ).join('');
+          mixTable.innerHTML = `
+            <table>
+              <thead>
+                <tr>
+                  <th>#</th>
+                  <th>Concept</th>
+                  <th>Regions</th>
+                  <th>Share</th>
+                </tr>
+              </thead>
+              <tbody>${rows}</tbody>
+            </table>
+          `;
+        };
+
+        const renderSummaryTiles = (mix) => {
+          const top = mix[0];
+          finalMixText.textContent = `Final mix balances to ${top.name} as the leading concept.`;
+
+          const cards = mix.slice(0, 3).map((entry) => {
+            const card = document.createElement('div');
+            card.className = 'summary-stat';
+            const label = document.createElement('div');
+            label.textContent = entry.name;
+            const value = document.createElement('div');
+            value.className = 'summary-value';
+            value.textContent = `${entry.pct}%`;
+            card.appendChild(label);
+            card.appendChild(value);
+            return card;
+          });
+
+          mixTable.prepend(...cards);
+        };
+
+        const renderMode = (mix) => {
+          if (state.chartMode === 'table') {
+            mixTable.textContent = '';
+            renderTable(mix);
+            modeToggle.textContent = 'Show chart view';
+            modeToggle.setAttribute('aria-pressed', 'true');
+            finalMixBars.hidden = true;
+          } else {
+            finalMixBars.hidden = false;
+            renderBars(mix);
+            renderSummaryTiles(mix);
+            modeToggle.textContent = 'Show table view';
+            modeToggle.setAttribute('aria-pressed', 'false');
+          }
+        };
+
+        const renderDrawer = () => {
+          const orderedKeys = regionKeys.sort();
+          const summary = {
+            activeDashboard: state.activeDashboard,
+            theme: state.theme,
+            mode: state.chartMode,
+            regionKeys: orderedKeys,
+            regionSelections: state.regionSelections,
+            conceptWeights: computeMix().map((item) => ({ concept: item.name, count: item.count, pct: item.pct })),
+          };
+          statePreview.textContent = JSON.stringify(summary, null, 2);
+          drawerStatus.textContent = `Region keys: ${orderedKeys.join(', ')}`;
+        };
+
+        const render = () => {
+          const mix = computeMix();
+          updateDashboardActive();
+          renderMode(mix);
+          renderDrawer();
+          document.body.dataset.theme = state.theme;
+          themeToggle.textContent = `Theme: ${state.theme}`;
+          modeToggle.setAttribute('aria-label', 'Switch between chart and table mix output');
+          filterDashboards();
+        };
+
+        const persist = () => {
+          localStorage.setItem(
+            STORAGE_KEY,
+            JSON.stringify({
+              activeDashboard: state.activeDashboard,
+              theme: state.theme,
+              chartMode: state.chartMode,
+              regionSelections: state.regionSelections,
+            })
+          );
+        };
+
+        const hydrate = () => {
+          const stored = localStorage.getItem(STORAGE_KEY);
+          if (!stored) {
+            return;
+          }
+          const parsed = safe(() => JSON.parse(stored), () => ({}));
+          if (!parsed || typeof parsed !== 'object') {
+            return;
+          }
+
+          if (DASHBOARDS.some((entry) => entry.id === parsed.activeDashboard)) {
+            state.activeDashboard = parsed.activeDashboard;
+          }
+
+          if (['light', 'dark'].includes(parsed.theme)) {
+            state.theme = parsed.theme;
+          }
+
+          if (parsed.chartMode === 'chart' || parsed.chartMode === 'table') {
+            state.chartMode = parsed.chartMode;
+          }
+
+          if (parsed.regionSelections && typeof parsed.regionSelections === 'object') {
+            state.regionSelections = {
+              ...state.regionSelections,
+              ...parsed.regionSelections,
+            };
+          }
+        };
+
+        const toggleTheme = () => {
+          state.theme = state.theme === 'light' ? 'dark' : 'light';
+          persist();
+          render();
+        };
+
+        const toggleMode = () => {
+          state.chartMode = state.chartMode === 'chart' ? 'table' : 'chart';
+          persist();
+          render();
+        };
+
+        const renderMix = () => {
+          render();
+        };
+
+        const openDrawer = () => {
+          drawer.classList.add('open');
+          drawer.setAttribute('aria-hidden', 'false');
+          drawerToggle.setAttribute('aria-expanded', 'true');
+          drawerToggle.textContent = 'Close state drawer';
+        };
+
+        const closeDrawer = () => {
+          drawer.classList.remove('open');
+          drawer.setAttribute('aria-hidden', 'true');
+          drawerToggle.setAttribute('aria-expanded', 'false');
+          drawerToggle.textContent = 'Open state drawer';
+        };
+
+        const init = () => {
+          hydrate();
+          renderConcepts();
+          renderDashboardButtons();
+          renderRegions();
+          render();
+
+          if (state.theme === 'dark') {
+            document.body.dataset.theme = 'dark';
+          }
+
+          themeToggle.addEventListener('click', () => safe(toggleTheme));
+          modeToggle.addEventListener('click', () => safe(toggleMode));
+          drawerToggle.addEventListener('click', () => safe(() => {
+            if (drawer.classList.contains('open')) {
+              closeDrawer();
+            } else {
+              openDrawer();
+            }
+          }));
+
+          closeDrawerButton.addEventListener('click', () => safe(closeDrawer));
+
+          dashboardFilter.addEventListener('input', filterDashboards);
+
+          regionGrid.addEventListener('change', (event) => {
+            const target = event.target;
+            if (!(target instanceof HTMLSelectElement)) {
+              return;
+            }
+            const regionKey = target.dataset.region;
+            if (!regionKey) {
+              return;
+            }
+            state.regionSelections[regionKey] = target.value;
+            renderMix();
+            persist();
+          });
+
+          dashboardTabs.addEventListener('keydown', (event) => {
+            const buttons = Array.from(dashboardTabs.querySelectorAll('button:not([hidden])'));
+            if (!buttons.length) {
+              return;
+            }
+            const current = document.activeElement;
+            const index = buttons.indexOf(current);
+            if (index === -1) {
+              return;
+            }
+            if (event.key === 'ArrowRight') {
+              const next = buttons[(index + 1) % buttons.length];
+              next.focus();
+              next.click();
+              event.preventDefault();
+            }
+            if (event.key === 'ArrowLeft') {
+              const previous = buttons[(index - 1 + buttons.length) % buttons.length];
+              previous.focus();
+              previous.click();
+              event.preventDefault();
+            }
+          });
+
+          document.addEventListener('keydown', (event) => {
+            if (event.key === '?') {
+              openDrawer();
+            }
+            if (event.key === 'Escape') {
+              closeDrawer();
+            }
+          });
+        };
+
+        init();
+      })();
+    </script>
+  </body>
+</html>
