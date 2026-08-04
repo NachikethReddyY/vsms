@@ -514,25 +514,24 @@ exports.manualCheckIn = async (params, db = prisma) => {
 
         if (!regIdToUpdate && identifier) {
             const qr = await tx.qRCodePass.findFirst({
-                where: activeQrWhere(tokenSelector(identifier)),
+                where: activeQrWhere({
+                    ...tokenSelector(identifier),
+                    registration: { eventId },
+                }),
                 select: {
                     id: true,
                     registrationId: true,
-                    registration: { select: { eventId: true } },
                 },
             });
 
             if (qr) {
-                if (eventId && qr.registration.eventId !== eventId) {
-                    throw new AppError(400, "QR_EVENT_MISMATCH", "QR Code is not valid for this specific event.");
-                }
                 regIdToUpdate = qr.registrationId;
                 qrIdToUse = qr.id;
             }
         }
 
         if (!regIdToUpdate) {
-            throw new AppError(404, "REGISTRATION_NOT_FOUND", "Registration record not found for manual check-in.");
+            throw new AppError(404, "INVALID_QR", "QR Code is invalid, expired, or unavailable.");
         }
 
         await lockRegistration(tx, regIdToUpdate, eventId);
