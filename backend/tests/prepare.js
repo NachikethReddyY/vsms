@@ -6,6 +6,7 @@ const unitTests = spawnSync("node", [
   ".tests/contracts.test.js",
   ".tests/security.test.js",
   ".tests/validation.test.js",
+  ".tests/stationTemplateMapping.test.js",
 ], {
   cwd: process.cwd(),
   env: { ...process.env, NODE_ENV: "test", LOCAL_HTTPS: "false" },

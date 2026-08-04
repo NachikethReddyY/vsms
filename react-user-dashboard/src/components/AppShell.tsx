@@ -135,6 +135,9 @@ export default function AppShell({ children }: { children: ReactNode }) {
           <NavLink to="/participants/search" title="Participants" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}>
             <QueueListIcon /><span>Participants</span>
           </NavLink>
+          <NavLink to="/participants-v2" title="Participants V2" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}>
+            <QueueListIcon /><span>Participants V2</span>
+          </NavLink>
           <NavLink to="/events/active-event-id/queue" title="Queue Dashboard" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}>
             <UserGroupIcon /><span>Queue Dashboard</span>
           </NavLink>

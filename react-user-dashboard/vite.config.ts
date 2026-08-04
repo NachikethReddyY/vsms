@@ -9,7 +9,7 @@ import { defineConfig, loadEnv } from 'vite'
 export default defineConfig(({ command, mode }) => {
   const env = loadEnv(mode, process.cwd(), '')
   const serving = command === 'serve'
-  const proxyTarget = env.VITE_API_PROXY_TARGET || 'https://127.0.0.1:5000'
+  const proxyTarget = env.VITE_API_PROXY_TARGET || 'https://127.0.0.1:5050'
 
   if (serving && new URL(proxyTarget).protocol !== 'https:') {
     throw new Error('VITE_API_PROXY_TARGET must use HTTPS')
