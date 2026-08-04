@@ -1,14 +1,13 @@
 import { ArrowRightStartOnRectangleIcon, Cog6ToothIcon } from '@heroicons/react/24/outline';
 import { useEffect, useRef, useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import { useAuth } from '../auth/AuthProvider';
-import apiClient from '../utils/apiClient';
+import { logoutAndReturnHome } from '../utils/logout';
 
 export default function ProfileMenu({ triggerClassName = '', compact = false }: { triggerClassName?: string; compact?: boolean }) {
   const [open, setOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
-  const navigate = useNavigate();
   const { session, clearSession } = useAuth();
   const user = session?.user;
   const label = user?.username || user?.email || 'Signed-in user';
@@ -33,14 +32,7 @@ export default function ProfileMenu({ triggerClassName = '', compact = false }: 
   }, [open]);
 
   async function logout() {
-    try {
-      const response = await apiClient.post('/auth/logout');
-      clearSession();
-      window.location.replace(response.data.logoutUrl || '/');
-    } catch {
-      clearSession();
-      navigate('/');
-    }
+    await logoutAndReturnHome(clearSession);
   }
 
   return (

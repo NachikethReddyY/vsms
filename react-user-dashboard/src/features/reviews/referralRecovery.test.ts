@@ -76,7 +76,7 @@ describe('referral recovery storage privacy', () => {
     expect(window.sessionStorage.getItem(key)).toBeNull();
   });
 
-  it('clears every referral issue on session invalidation while preserving unrelated state', () => {
+  it('clears every referral and event context artifact on session invalidation', () => {
     setStoredSession({
       user: { id: '44444444-4444-4444-8444-444444444444' },
       expiresAt: now + 60_000,
@@ -90,6 +90,6 @@ describe('referral recovery storage privacy', () => {
     expect(window.sessionStorage.getItem('vsms_staff_session')).toBeNull();
     expect(window.sessionStorage.getItem(referralIssueStorageKey(eventId, referralId))).toBeNull();
     expect(window.sessionStorage.getItem('vsms.referral-issue:another:event')).toBeNull();
-    expect(window.sessionStorage.getItem('vsms_event_id')).toBe(eventId);
+    expect(window.sessionStorage.getItem('vsms_event_id')).toBeNull();
   });
 });
