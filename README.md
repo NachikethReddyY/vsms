@@ -23,7 +23,7 @@ The event lifecycle is `DRAFT → PUBLISHED → IN_PROGRESS → COMPLETED`, with
 
 ## Prerequisites
 
-- Node.js 20 or newer
+- Node.js 24 or newer
 - PostgreSQL 15 or newer
 - pnpm 11
 
