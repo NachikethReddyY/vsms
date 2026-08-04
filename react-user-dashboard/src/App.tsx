@@ -33,6 +33,9 @@ const RegistrationConfirmationPage = lazy(() => import("./pages/ParticipantPages
 const RegistrationHistoryPage = lazy(() => import("./pages/ParticipantPages").then((module) => ({ default: module.RegistrationHistoryPage })));
 const RegistrationQrPage = lazy(() => import("./pages/ParticipantPages").then((module) => ({ default: module.RegistrationQrPage })));
 const RegistrationReviewPage = lazy(() => import("./pages/ParticipantPages").then((module) => ({ default: module.RegistrationReviewPage })));
+const ParticipantV2ConsentPage = lazy(() => import("./pages/ParticipantV2ConsentPage"));
+const ParticipantV2Page = lazy(() => import("./pages/ParticipantV2Page"));
+const ParticipantV2ProfilePage = lazy(() => import("./pages/ParticipantV2ProfilePage"));
 
 const adminRoles = ["ADMINISTRATOR"];
 const eventManagerRoles = ["ADMINISTRATOR", "EVENT_MANAGER"];
@@ -78,6 +81,9 @@ export default function App() {
           <Route element={<RoleGuard allowedRoles={registrationRoles} />}>
             <Route path="/participants" element={<Navigate to="/participants/search" replace />} />
             <Route path="/participants/search" element={<ParticipantSearchPage />} />
+            <Route path="/participants-v2" element={<ParticipantV2Page />} />
+            <Route path="/participants-v2/:participantId" element={<ParticipantV2ProfilePage />} />
+            <Route path="/participants-v2/:participantId/consent" element={<ParticipantV2ConsentPage />} />
             <Route path="/participants/new" element={<ParticipantCreatePage />} />
             <Route path="/participants/:participantId" element={<ParticipantDetailPage />} />
             <Route path="/participants/:participantId/edit" element={<ParticipantEditPage />} />

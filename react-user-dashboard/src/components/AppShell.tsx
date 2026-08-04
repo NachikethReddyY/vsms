@@ -120,6 +120,7 @@ export default function AppShell({ children }: { children: ReactNode }) {
           <nav className="shell-nav" aria-label="Workspace navigation">
             <NavLink to="/events"><TicketIcon aria-hidden="true" />Events</NavLink>
             {canAccessParticipants && <NavLink to="/participants/search"><UserGroupIcon aria-hidden="true" />Participants</NavLink>}
+            {canAccessParticipants && <NavLink to="/participants-v2"><UserGroupIcon aria-hidden="true" />Participants V2</NavLink>}
             <NavLink to="/settings"><Cog6ToothIcon aria-hidden="true" />Settings</NavLink>
           </nav>
           <div className="shell-actions">
@@ -139,7 +140,7 @@ export default function AppShell({ children }: { children: ReactNode }) {
         </header>
         <nav className="events-shell-mobile-dock" aria-label="Mobile navigation">
           <NavLink to="/events" aria-label="Events"><TicketIcon /></NavLink>
-          {canAccessParticipants && <NavLink to="/participants/search" aria-label="Participants"><UserGroupIcon /></NavLink>}
+          {canAccessParticipants && <NavLink to="/participants-v2" aria-label="Participants V2"><UserGroupIcon /></NavLink>}
           <button type="button" onClick={() => setCommandOpen(true)} aria-label="Search commands"><MagnifyingGlassIcon /></button>
           <ThemeToggle />
           <NavLink to="/settings" aria-label="Settings"><Cog6ToothIcon /></NavLink>
