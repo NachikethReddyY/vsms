@@ -284,7 +284,7 @@ export default function EventDetailPage() {
   return <div className="page-frame detail-page">
     <div className="detail-topline">
       <Link className="back-link" to="/events"><ArrowLeftIcon />Events</Link>
-      <span className="event-reference">Event record / {event.eventId.slice(0, 8)}</span>
+      <span className="event-record-reference">Event record / {event.eventId.slice(0, 8)}</span>
     </div>
 
     {notice && <div className="alert success" role="status"><CheckIcon />{notice}<button className="icon-button" onClick={() => setNotice('')} aria-label="Dismiss message"><XMarkIcon /></button></div>}
