@@ -12,6 +12,7 @@ import type { ConsentFormVersion, EmergencyContact, EventSummary, Participant, R
 import apiClient, { getApiError } from "../utils/apiClient";
 import "./ParticipantV2Page.css";
 import "./ParticipantV2ProfilePage.css";
+import "./ParticipantV2ProfileMarkers.css";
 
 function displayStatus(value: string) {
   return value.toLowerCase().split("_").map((word) => word.charAt(0).toUpperCase() + word.slice(1)).join(" ");
@@ -79,7 +80,10 @@ export default function ParticipantV2ProfilePage() {
         ? displayStatus(latestEventConsent.consentStatus)
         : "Not recorded";
   const consentStatusClass = consentStatus.toLowerCase().replace(/ /g, "-");
+  const consentMissing = Boolean(eventId) && !latestEventConsent;
   const searchLink = `/participants-v2${eventId ? `?eventId=${encodeURIComponent(eventId)}` : ""}`;
+  const registrationForEvent = registrations.find((registration) => registration.eventId === eventId);
+  const registrationLink = `/participants-v2/${participantId}/register${eventId ? `?eventId=${encodeURIComponent(eventId)}` : ""}`;
   const checkInLink = `/participants-v2/${participantId}/check-in${eventId ? `?eventId=${encodeURIComponent(eventId)}` : ""}`;
 
   if (!participant && !error) {
@@ -117,9 +121,9 @@ export default function ParticipantV2ProfilePage() {
 
       <section className="participant-v2-profile-card" aria-label="Participant profile">
         <div className="participant-v2-profile-actions">
-          <Link className="secondary" to={`/participants/${participantId}/edit${eventId ? `?eventId=${encodeURIComponent(eventId)}` : ""}`}>Edit participant details</Link>
+          <Link className="secondary" to={`/participants-v2/${participantId}/edit${eventId ? `?eventId=${encodeURIComponent(eventId)}` : ""}`}>Edit participant details</Link>
           {eventId ? <Link className="secondary" to={`/participants-v2/${participantId}/consent?eventId=${encodeURIComponent(eventId)}`}>Record consent</Link> : null}
-          <Link className="primary" to={eventId ? checkInLink : searchLink}>{eventId ? "Start event check-in" : "Choose an event"} <ArrowRightIcon /></Link>
+          <Link className="primary" to={eventId ? (registrationForEvent ? checkInLink : registrationLink) : searchLink}>{eventId ? (registrationForEvent ? "Start event check-in" : "Register for event") : "Choose an event"} <ArrowRightIcon /></Link>
         </div>
 
         <section className="participant-v2-profile-details" aria-label="Participant details">
@@ -130,24 +134,26 @@ export default function ParticipantV2ProfilePage() {
         </section>
 
         <div className="participant-v2-profile-summary">
-          <article>
+          <article className={primaryContact ? "complete" : "missing"}>
             <PhoneIcon />
             <div>
               <span>Emergency contact</span>
+              {!primaryContact ? <em className="participant-v2-profile-required">Required</em> : null}
               <h2>{primaryContact ? primaryContact.contactName : "Not recorded"}</h2>
               <p>{primaryContact ? `${primaryContact.relationship} · ${primaryContact.phoneNumber}` : "Add a primary emergency contact before completing registration."}</p>
-              <Link to={`/participants/${participantId}/emergency-contacts${eventId ? `?eventId=${encodeURIComponent(eventId)}` : ""}`}>{primaryContact ? "Manage contacts" : "Add emergency contact"} <ArrowRightIcon /></Link>
+              <Link to={`/participants-v2/${participantId}/emergency-contacts${eventId ? `?eventId=${encodeURIComponent(eventId)}` : ""}`}>{primaryContact ? "Manage contacts" : "Add emergency contact"} <ArrowRightIcon /></Link>
             </div>
           </article>
-          <article>
+          <article className={consentMissing ? "missing" : "complete"}>
             <ClipboardDocumentCheckIcon />
             <div>
               <span>Consent status</span>
+              {consentMissing ? <em className="participant-v2-profile-required">Required</em> : null}
               <h2 className={`participant-v2-consent-status ${consentStatusClass}`}>{consentStatus}</h2>
               <p>{!eventId ? "Select an event to see the consent record for that event." : latestEventConsent ? `Version ${latestEventConsent.consentFormVersion.versionNumber} recorded ${displayDate(latestEventConsent.createdAt)}.` : "Consent is required before this participant can be registered for the selected event."}</p>
               {eventId
                 ? latestEventConsent
-                  ? <Link to={`/participants/${participantId}/consents?eventId=${encodeURIComponent(eventId)}`}>View consent history <ArrowRightIcon /></Link>
+                  ? <Link to={`/participants-v2/${participantId}/consents?eventId=${encodeURIComponent(eventId)}`}>View consent history <ArrowRightIcon /></Link>
                   : <Link to={`/participants-v2/${participantId}/consent?eventId=${encodeURIComponent(eventId)}`}>Record consent <ArrowRightIcon /></Link>
                 : <Link to={searchLink}>Choose an event <ArrowRightIcon /></Link>}
             </div>
@@ -173,7 +179,7 @@ export default function ParticipantV2ProfilePage() {
                 </div>
                 <div className="participant-v2-history-meta">
                   <strong>{displayStatus(registration.registrationStatus)}</strong>
-                  <Link to={`/registrations/${registration.id}/history`}>View history <ArrowRightIcon /></Link>
+                  <Link to={`/participants-v2/registrations/${registration.id}/history`}>View history <ArrowRightIcon /></Link>
                 </div>
               </article>)}
             </div>

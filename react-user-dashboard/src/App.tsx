@@ -21,8 +21,10 @@ import StaffAccountsPage from "./pages/StaffAccountsPage";
 import { QueuePage } from "./pages/QueuePages"; // Imported the QueuePage component
 import ParticipantV2CheckInPage from "./pages/ParticipantV2CheckInPage";
 import ParticipantV2ConsentPage from "./pages/ParticipantV2ConsentPage";
+import ParticipantV2CreatePage from "./pages/ParticipantV2CreatePage";
 import ParticipantV2Page from "./pages/ParticipantV2Page";
 import ParticipantV2ProfilePage from "./pages/ParticipantV2ProfilePage";
+import ParticipantV2RegistrationPage from "./pages/ParticipantV2RegistrationPage";
 import {
   ConsentPage,
   EmergencyContactsPage,
@@ -98,9 +100,16 @@ export default function App() {
             <Route path="/participants" element={<Navigate to="/participants/search" replace />} />
             <Route path="/participants/search" element={<ParticipantSearchPage />} />
             <Route path="/participants-v2" element={<ParticipantV2Page />} />
+            <Route path="/participants-v2/new" element={<ParticipantV2CreatePage />} />
             <Route path="/participants-v2/:participantId" element={<ParticipantV2ProfilePage />} />
+            <Route path="/participants-v2/:participantId/edit" element={<ParticipantEditPage />} />
+            <Route path="/participants-v2/:participantId/emergency-contacts" element={<EmergencyContactsPage />} />
+            <Route path="/participants-v2/:participantId/consents" element={<ParticipantConsentsPage />} />
+            <Route path="/participants-v2/:participantId/register" element={<ParticipantV2RegistrationPage />} />
             <Route path="/participants-v2/:participantId/consent" element={<ParticipantV2ConsentPage />} />
             <Route path="/participants-v2/:participantId/check-in" element={<ParticipantV2CheckInPage />} />
+            <Route path="/participants-v2/registrations/:registrationId/history" element={<RegistrationHistoryPage />} />
+            <Route path="/participants-v2/registrations/:registrationId/qr" element={<RegistrationQrPage />} />
             <Route path="/participants/new" element={<ParticipantCreatePage />} />
             <Route path="/participants/:participantId" element={<ParticipantDetailPage />} />
             <Route path="/participants/:participantId/edit" element={<ParticipantEditPage />} />

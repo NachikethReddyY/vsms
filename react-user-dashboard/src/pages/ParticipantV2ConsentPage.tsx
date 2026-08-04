@@ -142,7 +142,6 @@ export default function ParticipantV2ConsentPage() {
 
       {!eventId ? <div className="participant-v2-consent-notice" role="alert"><ExclamationTriangleIcon /><div><strong>Event required</strong><p>Return to Participants V2, select an event, and open this participant again before recording consent.</p></div></div> : null}
       {error ? <p className="participant-v2-alert participant-v2-consent-alert" role="alert">{error}</p> : null}
-
       {isLoading ? <div className="participant-v2-consent-loading">Loading the approved consent form...</div> : null}
       {!isLoading && !consentForm ? (
         <section className="participant-v2-consent-unavailable">
