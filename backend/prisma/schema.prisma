@@ -441,17 +441,17 @@ model Event {
   createdAt            DateTime    @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt            DateTime    @updatedAt @map("updated_at") @db.Timestamptz(3)
 
-  createdBy           User                 @relation("EventCreatedBy", fields: [createdByUserId], references: [id], onDelete: Restrict, onUpdate: Cascade)
-  cancelledBy         User?                @relation("EventCancelledBy", fields: [cancelledByUserId], references: [id], onDelete: Restrict, onUpdate: Cascade)
-  shifts              Shift[]
-  stations            Station[]
-  eventDays           EventDay[]
-  registrations       EventRegistration[]
-  staffAssignments    StaffAssignment[]
-  auditLogs           EventAuditLog[]
-  participantConsents ParticipantConsent[]
-  onboardingParticipants Participant[]             @relation("ParticipantOnboardingEvent")
-  signatureArtifacts  SignatureArtifact[]
+  createdBy               User                     @relation("EventCreatedBy", fields: [createdByUserId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  cancelledBy             User?                    @relation("EventCancelledBy", fields: [cancelledByUserId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  shifts                  Shift[]
+  stations                Station[]
+  eventDays               EventDay[]
+  registrations           EventRegistration[]
+  staffAssignments        StaffAssignment[]
+  auditLogs               EventAuditLog[]
+  participantConsents     ParticipantConsent[]
+  onboardingParticipants  Participant[]            @relation("ParticipantOnboardingEvent")
+  signatureArtifacts      SignatureArtifact[]
   screeningRequestLedgers ScreeningRequestLedger[]
 
   @@unique([createdByUserId, createIdempotencyKey])
@@ -510,18 +510,18 @@ model EventRegistration {
   createdAt              DateTime                @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt              DateTime                @updatedAt @map("updated_at") @db.Timestamptz(3)
 
-  participant      Participant                 @relation(fields: [participantId], references: [id], onDelete: Restrict, onUpdate: Cascade)
-  event            Event                       @relation(fields: [eventId], references: [eventId], onDelete: Cascade)
-  registeredByUser User                        @relation("RegisteredBy", fields: [registeredBy], references: [id], onDelete: Restrict, onUpdate: Cascade)
-  qrCodePasses     QRCodePass[]
-  queueEntries     QueueEntry[]
-  queueMovements   QueueMovement[]
-  scanLogs         ScanLog[]
-  screeningResults ScreeningResult[]
+  participant             Participant                 @relation(fields: [participantId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  event                   Event                       @relation(fields: [eventId], references: [eventId], onDelete: Cascade)
+  registeredByUser        User                        @relation("RegisteredBy", fields: [registeredBy], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  qrCodePasses            QRCodePass[]
+  queueEntries            QueueEntry[]
+  queueMovements          QueueMovement[]
+  scanLogs                ScanLog[]
+  screeningResults        ScreeningResult[]
   screeningRequestLedgers ScreeningRequestLedger[]
-  reviews          Review[]
-  statusHistory    RegistrationStatusHistory[]
-  consents         ParticipantConsent[]
+  reviews                 Review[]
+  statusHistory           RegistrationStatusHistory[]
+  consents                ParticipantConsent[]
 
   @@unique([participantId, eventId])
   @@unique([eventId, queueNumber])
@@ -580,14 +580,14 @@ model Station {
   createdAt    DateTime    @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt    DateTime    @updatedAt @map("updated_at") @db.Timestamptz(3)
 
-  event            Event             @relation(fields: [eventId], references: [eventId], onDelete: Cascade, onUpdate: Cascade)
-  staffAssignments StaffAssignment[]
-  queueEntries     QueueEntry[]
-  scanLogs         ScanLog[]
-  screeningResults ScreeningResult[]
+  event                   Event                    @relation(fields: [eventId], references: [eventId], onDelete: Cascade, onUpdate: Cascade)
+  staffAssignments        StaffAssignment[]
+  queueEntries            QueueEntry[]
+  scanLogs                ScanLog[]
+  screeningResults        ScreeningResult[]
   screeningRequestLedgers ScreeningRequestLedger[]
-  fromMovements    QueueMovement[]   @relation("FromStation")
-  toMovements      QueueMovement[]   @relation("ToStation")
+  fromMovements           QueueMovement[]          @relation("FromStation")
+  toMovements             QueueMovement[]          @relation("ToStation")
 
   @@unique([eventId, stationType])
   @@unique([eventId, stationOrder])
@@ -723,28 +723,28 @@ model QRCodePass {
 // ==========================================
 
 model ScreeningResult {
-  resultId         String      @id @default(uuid()) @map("result_id") @db.Uuid
-  registrationId   String      @map("registration_id") @db.Uuid
-  stationId        String      @map("station_id") @db.Uuid
-  recordedByUserId String      @map("recorded_by_user_id") @db.Uuid
-  queueEntryId     String?     @map("queue_entry_id") @db.Uuid
-  screeningType    StationType @map("screening_type")
-  resultData       Json        @map("result_data")
-  overallFlag      OverallFlag @default(NORMAL) @map("overall_flag")
-  isFlagged        Boolean     @default(false) @map("is_flagged")
-  flagSummary      String?     @map("flag_summary")
-  ruleVersion      String      @default("VSMS-VA-1.0") @map("rule_version") @db.VarChar(20)
-  acknowledgedAt   DateTime?   @map("acknowledged_at") @db.Timestamptz(3)
+  resultId           String      @id @default(uuid()) @map("result_id") @db.Uuid
+  registrationId     String      @map("registration_id") @db.Uuid
+  stationId          String      @map("station_id") @db.Uuid
+  recordedByUserId   String      @map("recorded_by_user_id") @db.Uuid
+  queueEntryId       String?     @map("queue_entry_id") @db.Uuid
+  screeningType      StationType @map("screening_type")
+  resultData         Json        @map("result_data")
+  overallFlag        OverallFlag @default(NORMAL) @map("overall_flag")
+  isFlagged          Boolean     @default(false) @map("is_flagged")
+  flagSummary        String?     @map("flag_summary")
+  ruleVersion        String      @default("VSMS-VA-1.0") @map("rule_version") @db.VarChar(20)
+  acknowledgedAt     DateTime?   @map("acknowledged_at") @db.Timestamptz(3)
   idempotencyKey     String      @unique @map("idempotency_key") @db.VarChar(64)
   requestFingerprint String?     @map("request_fingerprint") @db.Char(64)
   version            Int         @default(1)
   createdAt          DateTime    @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt          DateTime    @updatedAt @map("updated_at") @db.Timestamptz(3)
 
-  registration EventRegistration @relation(fields: [registrationId], references: [registrationId], onDelete: Restrict, onUpdate: Cascade)
-  station      Station           @relation(fields: [stationId], references: [stationId], onDelete: Restrict, onUpdate: Cascade)
-  queueEntry   QueueEntry?       @relation(fields: [queueEntryId], references: [id], onDelete: SetNull, onUpdate: Cascade)
-  recordedBy   User              @relation("ScreeningRecorder", fields: [recordedByUserId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  registration    EventRegistration        @relation(fields: [registrationId], references: [registrationId], onDelete: Restrict, onUpdate: Cascade)
+  station         Station                  @relation(fields: [stationId], references: [stationId], onDelete: Restrict, onUpdate: Cascade)
+  queueEntry      QueueEntry?              @relation(fields: [queueEntryId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+  recordedBy      User                     @relation("ScreeningRecorder", fields: [recordedByUserId], references: [id], onDelete: Restrict, onUpdate: Cascade)
   requestReceipts ScreeningRequestLedger[]
 
   @@unique([registrationId, stationId])
@@ -941,29 +941,29 @@ model SecurityIncident {
 }
 
 model NotificationDelivery {
-  id                  String                     @id @default(uuid()) @map("notification_id") @db.Uuid
-  userId              String?                    @map("user_id") @db.Uuid
-  referralId          String?                    @map("referral_id") @db.Uuid
-  documentId          String?                    @map("document_id") @db.Uuid
-  channel             NotificationChannel        @default(EMAIL)
-  status              NotificationDeliveryStatus @default(QUEUED)
-  recipient           String                     @db.VarChar(255)
-  recipientCiphertext String?                    @map("recipient_ciphertext")
-  subject             String                     @db.VarChar(255)
-  body                String
-  providerMessageId   String?                    @map("provider_message_id") @db.VarChar(255)
-  attemptCount        Int                        @default(0) @map("attempt_count")
-  lastAttemptAt       DateTime?                  @map("last_attempt_at") @db.Timestamptz(3)
-  idempotencyKey      String?                    @unique @map("idempotency_key") @db.VarChar(100)
-  requestFingerprint  String?                    @map("request_fingerprint") @db.Char(64)
-  handoffSecretCiphertext String?                @map("handoff_secret_ciphertext")
-  handoffSecretExpiresAt  DateTime?              @map("handoff_secret_expires_at") @db.Timestamptz(3)
-  handoffSecretAcknowledgedAt DateTime?          @map("handoff_secret_acknowledged_at") @db.Timestamptz(3)
-  failureReason       String?                    @map("failure_reason")
-  sentAt              DateTime?                  @map("sent_at") @db.Timestamptz(3)
-  deliveredAt         DateTime?                  @map("delivered_at") @db.Timestamptz(3)
-  createdAt           DateTime                   @default(now()) @map("created_at") @db.Timestamptz(3)
-  updatedAt           DateTime                   @updatedAt @map("updated_at") @db.Timestamptz(3)
+  id                          String                     @id @default(uuid()) @map("notification_id") @db.Uuid
+  userId                      String?                    @map("user_id") @db.Uuid
+  referralId                  String?                    @map("referral_id") @db.Uuid
+  documentId                  String?                    @map("document_id") @db.Uuid
+  channel                     NotificationChannel        @default(EMAIL)
+  status                      NotificationDeliveryStatus @default(QUEUED)
+  recipient                   String                     @db.VarChar(255)
+  recipientCiphertext         String?                    @map("recipient_ciphertext")
+  subject                     String                     @db.VarChar(255)
+  body                        String
+  providerMessageId           String?                    @map("provider_message_id") @db.VarChar(255)
+  attemptCount                Int                        @default(0) @map("attempt_count")
+  lastAttemptAt               DateTime?                  @map("last_attempt_at") @db.Timestamptz(3)
+  idempotencyKey              String?                    @unique @map("idempotency_key") @db.VarChar(100)
+  requestFingerprint          String?                    @map("request_fingerprint") @db.Char(64)
+  handoffSecretCiphertext     String?                    @map("handoff_secret_ciphertext")
+  handoffSecretExpiresAt      DateTime?                  @map("handoff_secret_expires_at") @db.Timestamptz(3)
+  handoffSecretAcknowledgedAt DateTime?                  @map("handoff_secret_acknowledged_at") @db.Timestamptz(3)
+  failureReason               String?                    @map("failure_reason")
+  sentAt                      DateTime?                  @map("sent_at") @db.Timestamptz(3)
+  deliveredAt                 DateTime?                  @map("delivered_at") @db.Timestamptz(3)
+  createdAt                   DateTime                   @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt                   DateTime                   @updatedAt @map("updated_at") @db.Timestamptz(3)
 
   user     User?             @relation(fields: [userId], references: [id], onDelete: SetNull, onUpdate: Cascade)
   referral Referral?         @relation(fields: [referralId], references: [referralId], onDelete: SetNull, onUpdate: Cascade)
