@@ -8,7 +8,7 @@ info:
     url: https://opensource.org/license/isc-license-txt
 servers:
   - url: /
-    description: Same-origin API server; local development uses https://localhost:5050
+    description: Same-origin API server; local development uses https://localhost:5000
 tags:
   - name: System
     description: Service readiness
