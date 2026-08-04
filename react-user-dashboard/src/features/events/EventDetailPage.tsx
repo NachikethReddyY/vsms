@@ -277,6 +277,15 @@ export default function EventDetailPage() {
       && assignment.user.userId === user?.userId
     ))
   ));
+  const assignedStationTypes = new Set(event.shifts.flatMap((shift) => shift.staffAssignments.flatMap((assignment) => {
+    if (shift.status !== 'ACTIVE'
+      || assignment.assignmentRole !== 'SCREENER'
+      || !['ASSIGNED', 'CONFIRMED'].includes(assignment.status)
+      || assignment.user.userId !== user?.userId
+      || !assignment.eventStation) return [];
+    const station = event.eventStations.find((candidate) => candidate.eventStationId === assignment.eventStation?.eventStationId);
+    return station ? [station.stationType] : [];
+  })));
   const activeStage = lifecycleStages.findIndex((stage) => stage.status === event.status);
   const totalRequiredStaff = event.shifts.reduce((total, shift) => total + shift.requiredStaff, 0);
   const next = nextAction[event.status];
@@ -373,9 +382,9 @@ export default function EventDetailPage() {
           </>}
         </div>}
         <div className="action-cluster">
-          <Link className="primary" to={`/events/${event.eventId}/stations/visual-acuity`}>Open Visual Acuity station</Link>
-          <Link className="secondary" to={`/events/${event.eventId}/stations/refraction`}>Open Refraction station</Link>
-          <Link className="secondary" to={`/events/${event.eventId}/stations/colour-vision`}>Open Colour Vision station</Link>
+          {assignedStationTypes.has('VISUAL_ACUITY') && <Link className="primary" to={`/events/${event.eventId}/stations/visual-acuity`}>Open Visual Acuity station</Link>}
+          {assignedStationTypes.has('REFRACTION') && <Link className="primary" to={`/events/${event.eventId}/stations/refraction`}>Open Refraction station</Link>}
+          {assignedStationTypes.has('COLOUR_VISION') && <Link className="primary" to={`/events/${event.eventId}/stations/colour-vision`}>Open Colour Vision station</Link>}
           {canReview && <Link className="secondary" to={`/events/${event.eventId}/reviews`}><ClipboardDocumentCheckIcon />Open clinical review</Link>}
         </div>
       </aside>

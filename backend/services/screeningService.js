@@ -119,13 +119,22 @@ const evaluateColourVision = (resultData) => {
   };
 };
 
-const assertCanScreen = async (eventId, user) => {
-  if (user.systemRole === "ADMIN" || user.systemRole === "EVENT_MANAGER") return;
+const assertCanScreen = async (eventId, user, stationId) => {
+  const event = await prisma.event.findUnique({
+    where: { eventId },
+    select: { eventId: true, name: true, status: true, venue: true },
+  });
+  if (!event) throw new AppError(404, "EVENT_NOT_FOUND", "Event not found");
+  if (event.status !== "IN_PROGRESS") {
+    throw new AppError(409, "EVENT_NOT_IN_PROGRESS", "Screening is available only while the event is in progress");
+  }
   const assignment = await prisma.staffAssignment.findFirst({
     where: {
+      eventId,
       userId: user.userId,
       status: { in: ["ASSIGNED", "CONFIRMED"] },
-      assignmentRole: { in: ["SCREENER", "SUPPORT", "REGISTRATION"] },
+      assignmentRole: "SCREENER",
+      ...(stationId ? { stationId } : {}),
       shift: { eventId, status: "ACTIVE" },
     },
     select: { id: true },
@@ -133,6 +142,7 @@ const assertCanScreen = async (eventId, user) => {
   if (!assignment) {
     throw new AppError(403, "FORBIDDEN", "You are not assigned to screen this event");
   }
+  return event;
 };
 
 const assertStation = async (eventId, stationId, stationType, label) => {
@@ -144,12 +154,7 @@ const assertStation = async (eventId, stationId, stationType, label) => {
 };
 
 const listStations = async (eventId, user) => {
-  await assertCanScreen(eventId, user);
-  const event = await prisma.event.findUnique({
-    where: { eventId },
-    select: { eventId: true, name: true, status: true, venue: true },
-  });
-  if (!event) throw new AppError(404, "EVENT_NOT_FOUND", "Event not found");
+  const event = await assertCanScreen(eventId, user);
 
   const stations = await prisma.station.findMany({
     where: { eventId, isActive: true },
@@ -160,7 +165,7 @@ const listStations = async (eventId, user) => {
 };
 
 const listQueue = async (eventId, stationId, user) => {
-  await assertCanScreen(eventId, user);
+  await assertCanScreen(eventId, user, stationId);
   const station = await prisma.station.findFirst({ where: { stationId, eventId, isActive: true } });
   if (!station) throw new AppError(404, "STATION_NOT_FOUND", "Station not found for this event");
 
@@ -219,7 +224,7 @@ const resolveParticipant = async (eventId, query, user) => {
 };
 
 const previewStationResult = async (eventId, stationId, stationType, label, evaluate, body, user) => {
-  await assertCanScreen(eventId, user);
+  await assertCanScreen(eventId, user, stationId);
   await assertStation(eventId, stationId, stationType, label);
   return evaluate(body.resultData);
 };
@@ -234,7 +239,7 @@ const saveStationResult = async ({
   body,
   user,
 }) => {
-  await assertCanScreen(eventId, user);
+  await assertCanScreen(eventId, user, stationId);
   await assertStation(eventId, stationId, stationType, label);
 
   const evaluation = evaluate(body.resultData);
