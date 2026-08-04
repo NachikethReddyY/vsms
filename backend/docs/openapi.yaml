@@ -1,14 +1,14 @@
 openapi: 3.0.3
 info:
   title: VSMS Event Operations API
-  version: 2.2.0
+  version: 2.3.0
   description: Secure staff authentication, event operations, and clinical review workflows for VSMS.
   license:
     name: ISC
     url: https://opensource.org/license/isc-license-txt
 servers:
   - url: /
-    description: Same-origin API server; local development proxies to https://127.0.0.1:5000
+    description: Same-origin API server; local development proxies to https://127.0.0.1:5050
 tags:
   - name: System
     description: Service readiness
@@ -18,6 +18,16 @@ tags:
     description: Authorized event details and lifecycle commands
   - name: Users
     description: Restricted administrative user projection
+  - name: Participants
+    description: Participant onboarding, lookup, consent, and emergency contacts
+  - name: Registrations
+    description: Event registration and status history
+  - name: Screening
+    description: Event station queues and screening result capture
+  - name: QR Codes
+    description: Registration pass generation, verification, and check-in
+  - name: Administration
+    description: Restricted operational audit data
   - name: Clinical Reviews
     description: Event-scoped clinical review queue and immutable decisions
 security:
@@ -45,6 +55,16 @@ paths:
         "404":
           description: Health endpoint is unavailable
           content: { application/json: { schema: { $ref: "#/components/schemas/Problem" } } }
+  /api/v1/auth/config-status:
+    get:
+      tags: [Authentication]
+      security: []
+      operationId: getAuthenticationConfigStatus
+      summary: Check whether Cognito managed login is configured
+      responses:
+        "200":
+          description: Authentication configuration status
+          content: { application/json: { schema: { $ref: "#/components/schemas/AuthConfigStatus" } } }
   /api/v1/auth/authorize:
     get:
       tags: [Authentication]
@@ -98,14 +118,60 @@ paths:
   /api/v1/auth/logout:
     post:
       tags: [Authentication]
-      security: [{ refreshCookie: [] }]
       operationId: logout
-      summary: Revoke the refresh family and clear cookies
-      parameters: [{ $ref: "#/components/parameters/CsrfToken" }]
+      summary: Sign out from Cognito and clear browser cookies
       responses:
-        "204": { description: Session revoked }
-        "403": { $ref: "#/components/responses/Forbidden" }
-  /api/users:
+        "200":
+          description: Browser session cleared
+          content: { application/json: { schema: { $ref: "#/components/schemas/LogoutResponse" } } }
+        "503": { description: Cognito managed login is not configured }
+  /api/v1/auth/global-logout:
+    post:
+      tags: [Authentication]
+      operationId: globalLogout
+      summary: Alias for Cognito sign-out and local cookie clearing
+      responses:
+        "200":
+          description: Browser session cleared
+          content: { application/json: { schema: { $ref: "#/components/schemas/LogoutResponse" } } }
+        "503": { description: Cognito managed login is not configured }
+  /api/v1/auth/me:
+    get:
+      tags: [Authentication]
+      operationId: getCurrentUser
+      summary: Return the authenticated staff identity
+      responses:
+        "200":
+          description: Current user
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [user]
+                properties: { user: { $ref: "#/components/schemas/User" } }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+  /api/v1/auth/change-password:
+    post:
+      tags: [Authentication]
+      operationId: changePassword
+      summary: Change the authenticated Cognito user's password
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [oldPassword, newPassword]
+              properties:
+                oldPassword: { type: string, format: password }
+                newPassword: { type: string, format: password }
+      responses:
+        "200": { description: Password changed }
+        "400": { $ref: "#/components/responses/ValidationFailed" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "503": { description: Cognito managed login is not configured }
+  /api/v1/users:
     get:
       tags: [Users]
       operationId: listUsers
@@ -116,11 +182,27 @@ paths:
           content:
             application/json:
               schema:
-                type: array
-                items: { $ref: "#/components/schemas/User" }
+                $ref: "#/components/schemas/UserListResponse"
         "401": { $ref: "#/components/responses/Unauthorized" }
         "403": { $ref: "#/components/responses/Forbidden" }
-  /api/events:
+    post:
+      tags: [Users]
+      operationId: createUser
+      summary: Create a staff user (ADMIN or EVENT_MANAGER)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CreateUserRequest" }
+      responses:
+        "201":
+          description: Staff user created
+          content: { application/json: { schema: { $ref: "#/components/schemas/UserMutationResponse" } } }
+        "400": { $ref: "#/components/responses/ValidationFailed" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "409": { $ref: "#/components/responses/Conflict" }
+  /api/v1/events:
     get:
       tags: [Events]
       operationId: listEvents
@@ -167,7 +249,21 @@ paths:
         "403": { $ref: "#/components/responses/Forbidden" }
         "422": { $ref: "#/components/responses/ValidationFailed" }
         "429": { $ref: "#/components/responses/RateLimited" }
-  /api/events/staff-directory:
+  /api/v1/events/active:
+    get:
+      tags: [Events]
+      operationId: listActiveEvents
+      summary: List published or in-progress events
+      responses:
+        "200":
+          description: Active events
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/Event" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+  /api/v1/events/staff-directory:
     get:
       tags: [Events]
       operationId: listEventStaffDirectory
@@ -182,7 +278,7 @@ paths:
                 items: { $ref: "#/components/schemas/StaffDirectoryEntry" }
         "401": { $ref: "#/components/responses/Unauthorized" }
         "403": { $ref: "#/components/responses/Forbidden" }
-  /api/events/station-templates:
+  /api/v1/events/station-templates:
     get:
       tags: [Events]
       operationId: listStationTemplates
@@ -197,7 +293,7 @@ paths:
                 items: { $ref: "#/components/schemas/StationTemplate" }
         "401": { $ref: "#/components/responses/Unauthorized" }
         "403": { $ref: "#/components/responses/Forbidden" }
-  /api/locations/search:
+  /api/v1/locations/search:
     get:
       tags: [Events]
       operationId: searchSingaporeLocations
@@ -219,7 +315,7 @@ paths:
         "422": { $ref: "#/components/responses/ValidationFailed" }
         "429": { $ref: "#/components/responses/RateLimited" }
         "503": { description: OneMap is unavailable or not configured, content: { application/json: { schema: { $ref: "#/components/schemas/Problem" } } } }
-  /api/events/{eventId}:
+  /api/v1/events/{eventId}:
     parameters:
       - $ref: "#/components/parameters/EventId"
     get:
@@ -253,7 +349,45 @@ paths:
         "404": { $ref: "#/components/responses/NotFound" }
         "409": { $ref: "#/components/responses/Conflict" }
         "422": { $ref: "#/components/responses/ValidationFailed" }
-  /api/events/{eventId}/shifts/{shiftId}/assignments:
+  /api/v1/events/{eventId}/registrations:
+    parameters: [{ $ref: "#/components/parameters/EventId" }]
+    get:
+      tags: [Registrations]
+      operationId: listEventRegistrations
+      summary: List registrations for an event
+      parameters:
+        - $ref: "#/components/parameters/Page"
+        - $ref: "#/components/parameters/PageSize"
+      responses:
+        "200":
+          description: Paginated event registrations
+          content: { application/json: { schema: { $ref: "#/components/schemas/RegistrationListResponse" } } }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    post:
+      tags: [Registrations]
+      operationId: createEventRegistration
+      summary: Register a participant for an event
+      parameters: [{ $ref: "#/components/parameters/IdempotencyKey" }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [participantId]
+              properties:
+                participantId: { type: string, format: uuid }
+      responses:
+        "200": { description: Idempotent replay, content: { application/json: { schema: { $ref: "#/components/schemas/RegistrationResponse" } } } }
+        "201": { description: Participant registered, content: { application/json: { schema: { $ref: "#/components/schemas/RegistrationResponse" } } } }
+        "400": { $ref: "#/components/responses/ValidationFailed" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "409": { $ref: "#/components/responses/Conflict" }
+  /api/v1/events/{eventId}/shifts/{shiftId}/assignments:
     post:
       tags: [Events]
       operationId: assignEventStaff
@@ -274,7 +408,7 @@ paths:
         "404": { $ref: "#/components/responses/NotFound" }
         "409": { $ref: "#/components/responses/Conflict" }
         "422": { $ref: "#/components/responses/ValidationFailed" }
-  /api/events/{eventId}/shifts/{shiftId}/assignments/{assignmentId}:
+  /api/v1/events/{eventId}/shifts/{shiftId}/assignments/{assignmentId}:
     delete:
       tags: [Events]
       operationId: removeEventStaffAssignment
@@ -298,7 +432,7 @@ paths:
         "404": { $ref: "#/components/responses/NotFound" }
         "409": { $ref: "#/components/responses/Conflict" }
         "422": { $ref: "#/components/responses/ValidationFailed" }
-  /api/events/{eventId}/stations/import:
+  /api/v1/events/{eventId}/stations/import:
     post:
       tags: [Events]
       operationId: importEventStations
@@ -317,7 +451,7 @@ paths:
         "404": { $ref: "#/components/responses/NotFound" }
         "409": { $ref: "#/components/responses/Conflict" }
         "422": { $ref: "#/components/responses/ValidationFailed" }
-  /api/events/{eventId}/stations/{eventStationId}:
+  /api/v1/events/{eventId}/stations/{eventStationId}:
     patch:
       tags: [Events]
       operationId: updateEventStation
@@ -341,7 +475,7 @@ paths:
         "404": { $ref: "#/components/responses/NotFound" }
         "409": { $ref: "#/components/responses/Conflict" }
         "422": { $ref: "#/components/responses/ValidationFailed" }
-  /api/events/{eventId}/publish:
+  /api/v1/events/{eventId}/publish:
     post:
       tags: [Events]
       operationId: publishEvent
@@ -349,7 +483,7 @@ paths:
       parameters: [{ $ref: "#/components/parameters/EventId" }]
       requestBody: { $ref: "#/components/requestBodies/TransitionRequest" }
       responses: { "200": { $ref: "#/components/responses/EventSuccess" }, "401": { $ref: "#/components/responses/Unauthorized" }, "404": { $ref: "#/components/responses/NotFound" }, "409": { $ref: "#/components/responses/Conflict" }, "422": { $ref: "#/components/responses/ValidationFailed" }, "429": { $ref: "#/components/responses/RateLimited" } }
-  /api/events/{eventId}/start:
+  /api/v1/events/{eventId}/start:
     post:
       tags: [Events]
       operationId: startEvent
@@ -357,7 +491,7 @@ paths:
       parameters: [{ $ref: "#/components/parameters/EventId" }]
       requestBody: { $ref: "#/components/requestBodies/TransitionRequest" }
       responses: { "200": { $ref: "#/components/responses/EventSuccess" }, "401": { $ref: "#/components/responses/Unauthorized" }, "404": { $ref: "#/components/responses/NotFound" }, "409": { $ref: "#/components/responses/Conflict" }, "422": { $ref: "#/components/responses/ValidationFailed" }, "429": { $ref: "#/components/responses/RateLimited" } }
-  /api/events/{eventId}/complete:
+  /api/v1/events/{eventId}/complete:
     post:
       tags: [Events]
       operationId: completeEvent
@@ -365,7 +499,7 @@ paths:
       parameters: [{ $ref: "#/components/parameters/EventId" }]
       requestBody: { $ref: "#/components/requestBodies/TransitionRequest" }
       responses: { "200": { $ref: "#/components/responses/EventSuccess" }, "401": { $ref: "#/components/responses/Unauthorized" }, "404": { $ref: "#/components/responses/NotFound" }, "409": { $ref: "#/components/responses/Conflict" }, "422": { $ref: "#/components/responses/ValidationFailed" }, "429": { $ref: "#/components/responses/RateLimited" } }
-  /api/events/{eventId}/cancel:
+  /api/v1/events/{eventId}/cancel:
     post:
       tags: [Events]
       operationId: cancelEvent
@@ -377,7 +511,98 @@ paths:
           application/json:
             schema: { $ref: "#/components/schemas/CancelEventRequest" }
       responses: { "200": { $ref: "#/components/responses/EventSuccess" }, "401": { $ref: "#/components/responses/Unauthorized" }, "403": { $ref: "#/components/responses/Forbidden" }, "404": { $ref: "#/components/responses/NotFound" }, "409": { $ref: "#/components/responses/Conflict" }, "422": { $ref: "#/components/responses/ValidationFailed" }, "429": { $ref: "#/components/responses/RateLimited" } }
-  /api/events/{eventId}/reviews:
+  /api/v1/events/{eventId}/stations:
+    get:
+      tags: [Screening]
+      operationId: listScreeningStations
+      summary: List active screening stations for an event
+      parameters: [{ $ref: "#/components/parameters/EventId" }]
+      responses:
+        "200": { description: Event and active stations, content: { application/json: { schema: { $ref: "#/components/schemas/ScreeningStationsResponse" } } } }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+  /api/v1/events/{eventId}/stations/{stationId}/queue:
+    get:
+      tags: [Screening]
+      operationId: listScreeningQueue
+      summary: List screenable registrations for a station
+      parameters:
+        - $ref: "#/components/parameters/EventId"
+        - $ref: "#/components/parameters/StationId"
+      responses:
+        "200": { description: Station queue, content: { application/json: { schema: { $ref: "#/components/schemas/ScreeningQueueResponse" } } } }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+  /api/v1/events/{eventId}/registrations/resolve:
+    get:
+      tags: [Screening]
+      operationId: resolveScreeningParticipant
+      summary: Resolve an event registration from a pass token or registration ID
+      parameters:
+        - $ref: "#/components/parameters/EventId"
+        - name: passToken
+          in: query
+          schema: { type: string, minLength: 4, maxLength: 255 }
+        - name: registrationId
+          in: query
+          schema: { type: string, format: uuid }
+      responses:
+        "200": { description: Resolved registration, content: { application/json: { schema: { $ref: "#/components/schemas/RegistrationLookup" } } } }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "422": { $ref: "#/components/responses/ValidationFailed" }
+  /api/v1/events/{eventId}/stations/{stationId}/visual-acuity/preview:
+    post:
+      tags: [Screening]
+      operationId: previewVisualAcuity
+      summary: Evaluate a visual-acuity result without saving it
+      parameters: [{ $ref: "#/components/parameters/EventId" }, { $ref: "#/components/parameters/StationId" }]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: "#/components/schemas/VisualAcuityPreviewRequest" } } } }
+      responses: { "200": { $ref: "#/components/responses/ScreeningPreview" }, "401": { $ref: "#/components/responses/Unauthorized" }, "403": { $ref: "#/components/responses/Forbidden" }, "404": { $ref: "#/components/responses/NotFound" }, "422": { $ref: "#/components/responses/ValidationFailed" } }
+  /api/v1/events/{eventId}/stations/{stationId}/visual-acuity:
+    post:
+      tags: [Screening]
+      operationId: saveVisualAcuity
+      summary: Save or idempotently replay a visual-acuity result
+      parameters: [{ $ref: "#/components/parameters/EventId" }, { $ref: "#/components/parameters/StationId" }]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: "#/components/schemas/VisualAcuitySaveRequest" } } } }
+      responses: { "200": { $ref: "#/components/responses/ScreeningSaved" }, "201": { $ref: "#/components/responses/ScreeningSaved" }, "401": { $ref: "#/components/responses/Unauthorized" }, "403": { $ref: "#/components/responses/Forbidden" }, "404": { $ref: "#/components/responses/NotFound" }, "409": { $ref: "#/components/responses/Conflict" }, "422": { $ref: "#/components/responses/ValidationFailed" } }
+  /api/v1/events/{eventId}/stations/{stationId}/refraction/preview:
+    post:
+      tags: [Screening]
+      operationId: previewRefraction
+      summary: Evaluate a refraction result without saving it
+      parameters: [{ $ref: "#/components/parameters/EventId" }, { $ref: "#/components/parameters/StationId" }]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: "#/components/schemas/RefractionPreviewRequest" } } } }
+      responses: { "200": { $ref: "#/components/responses/ScreeningPreview" }, "401": { $ref: "#/components/responses/Unauthorized" }, "403": { $ref: "#/components/responses/Forbidden" }, "404": { $ref: "#/components/responses/NotFound" }, "422": { $ref: "#/components/responses/ValidationFailed" } }
+  /api/v1/events/{eventId}/stations/{stationId}/refraction:
+    post:
+      tags: [Screening]
+      operationId: saveRefraction
+      summary: Save or idempotently replay a refraction result
+      parameters: [{ $ref: "#/components/parameters/EventId" }, { $ref: "#/components/parameters/StationId" }]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: "#/components/schemas/RefractionSaveRequest" } } } }
+      responses: { "200": { $ref: "#/components/responses/ScreeningSaved" }, "201": { $ref: "#/components/responses/ScreeningSaved" }, "401": { $ref: "#/components/responses/Unauthorized" }, "403": { $ref: "#/components/responses/Forbidden" }, "404": { $ref: "#/components/responses/NotFound" }, "409": { $ref: "#/components/responses/Conflict" }, "422": { $ref: "#/components/responses/ValidationFailed" } }
+  /api/v1/events/{eventId}/stations/{stationId}/colour-vision/preview:
+    post:
+      tags: [Screening]
+      operationId: previewColourVision
+      summary: Evaluate a colour-vision result without saving it
+      parameters: [{ $ref: "#/components/parameters/EventId" }, { $ref: "#/components/parameters/StationId" }]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: "#/components/schemas/ColourVisionPreviewRequest" } } } }
+      responses: { "200": { $ref: "#/components/responses/ScreeningPreview" }, "401": { $ref: "#/components/responses/Unauthorized" }, "403": { $ref: "#/components/responses/Forbidden" }, "404": { $ref: "#/components/responses/NotFound" }, "422": { $ref: "#/components/responses/ValidationFailed" } }
+  /api/v1/events/{eventId}/stations/{stationId}/colour-vision:
+    post:
+      tags: [Screening]
+      operationId: saveColourVision
+      summary: Save or idempotently replay a colour-vision result
+      parameters: [{ $ref: "#/components/parameters/EventId" }, { $ref: "#/components/parameters/StationId" }]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: "#/components/schemas/ColourVisionSaveRequest" } } } }
+      responses: { "200": { $ref: "#/components/responses/ScreeningSaved" }, "201": { $ref: "#/components/responses/ScreeningSaved" }, "401": { $ref: "#/components/responses/Unauthorized" }, "403": { $ref: "#/components/responses/Forbidden" }, "404": { $ref: "#/components/responses/NotFound" }, "409": { $ref: "#/components/responses/Conflict" }, "422": { $ref: "#/components/responses/ValidationFailed" } }
+  /api/v1/events/{eventId}/reviews:
     get:
       tags: [Clinical Reviews]
       operationId: listClinicalReviews
@@ -393,7 +618,7 @@ paths:
         "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
         "409": { $ref: "#/components/responses/Conflict" }
-  /api/events/{eventId}/reviews/{registrationId}:
+  /api/v1/events/{eventId}/reviews/{registrationId}:
     get:
       tags: [Clinical Reviews]
       operationId: getClinicalReview
@@ -411,7 +636,7 @@ paths:
         "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
         "409": { $ref: "#/components/responses/Conflict" }
-  /api/events/{eventId}/reviews/{registrationId}/decision:
+  /api/v1/events/{eventId}/reviews/{registrationId}/decision:
     post:
       tags: [Clinical Reviews]
       operationId: recordClinicalReviewDecision
@@ -435,7 +660,7 @@ paths:
         "404": { $ref: "#/components/responses/NotFound" }
         "409": { $ref: "#/components/responses/Conflict" }
         "422": { $ref: "#/components/responses/ValidationFailed" }
-  /api/events/{eventId}/audit-log:
+  /api/v1/events/{eventId}/audit-log:
     get:
       tags: [Events]
       operationId: getEventAuditLog
@@ -452,6 +677,429 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/AuditListResponse" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+  /api/v1/participants:
+    get:
+      tags: [Participants]
+      operationId: searchParticipants
+      summary: Search participants by at least one identifying field
+      parameters:
+        - { name: participantReference, in: query, schema: { type: string, minLength: 3, maxLength: 30 } }
+        - { name: name, in: query, schema: { type: string, minLength: 3, maxLength: 100 } }
+        - { name: contactNumber, in: query, schema: { type: string, minLength: 3, maxLength: 30 } }
+        - { name: dateOfBirth, in: query, schema: { type: string, format: date } }
+        - { $ref: "#/components/parameters/Page" }
+        - { $ref: "#/components/parameters/ParticipantPageSize" }
+      responses:
+        "200": { description: Paginated participant summaries, content: { application/json: { schema: { $ref: "#/components/schemas/ParticipantSearchResponse" } } } }
+        "400": { $ref: "#/components/responses/ValidationFailed" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+    post:
+      tags: [Participants]
+      operationId: createParticipant
+      summary: Create a participant
+      requestBody: { required: true, content: { application/json: { schema: { $ref: "#/components/schemas/ParticipantRequest" } } } }
+      responses:
+        "201": { description: Participant created, content: { application/json: { schema: { $ref: "#/components/schemas/ParticipantEnvelope" } } } }
+        "400": { $ref: "#/components/responses/ValidationFailed" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+  /api/v1/participants/active-consent-form:
+    get:
+      tags: [Participants]
+      operationId: getParticipantActiveConsentForm
+      summary: Get the currently effective consent form
+      responses:
+        "200": { description: Active consent form, content: { application/json: { schema: { $ref: "#/components/schemas/ConsentFormEnvelope" } } } }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+  /api/v1/participants/{participantId}:
+    parameters: [{ $ref: "#/components/parameters/ParticipantId" }]
+    get:
+      tags: [Participants]
+      operationId: getParticipant
+      summary: Get a participant and emergency contacts
+      responses:
+        "200": { description: Participant detail, content: { application/json: { schema: { $ref: "#/components/schemas/ParticipantEnvelope" } } } }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    patch:
+      tags: [Participants]
+      operationId: updateParticipant
+      summary: Update supplied participant fields
+      requestBody: { required: true, content: { application/json: { schema: { $ref: "#/components/schemas/ParticipantUpdateRequest" } } } }
+      responses:
+        "200": { description: Participant updated, content: { application/json: { schema: { $ref: "#/components/schemas/ParticipantEnvelope" } } } }
+        "400": { $ref: "#/components/responses/ValidationFailed" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+  /api/v1/participants/{participantId}/registrations:
+    get:
+      tags: [Registrations]
+      operationId: listParticipantRegistrations
+      summary: List a participant's registrations
+      parameters: [{ $ref: "#/components/parameters/ParticipantId" }]
+      responses:
+        "200": { description: Registrations, content: { application/json: { schema: { $ref: "#/components/schemas/RegistrationsEnvelope" } } } }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+  /api/v1/participants/{participantId}/consents:
+    parameters: [{ $ref: "#/components/parameters/ParticipantId" }]
+    get:
+      tags: [Participants]
+      operationId: listParticipantConsents
+      summary: List a participant's consent records
+      responses:
+        "200": { description: Consent records, content: { application/json: { schema: { $ref: "#/components/schemas/ConsentsEnvelope" } } } }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+    post:
+      tags: [Participants]
+      operationId: createParticipantConsent
+      summary: Record consent using an event ID in the request body
+      requestBody: { required: true, content: { application/json: { schema: { $ref: "#/components/schemas/ConsentWithEventRequest" } } } }
+      responses:
+        "201": { description: Consent recorded, content: { application/json: { schema: { $ref: "#/components/schemas/ConsentEnvelope" } } } }
+        "400": { $ref: "#/components/responses/ValidationFailed" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+  /api/v1/participants/{participantId}/consents/{consentId}/withdraw:
+    post:
+      tags: [Participants]
+      operationId: withdrawParticipantConsent
+      summary: Create an immutable withdrawal for accepted consent
+      parameters:
+        - $ref: "#/components/parameters/ParticipantId"
+        - $ref: "#/components/parameters/ConsentId"
+      requestBody: { required: true, content: { application/json: { schema: { $ref: "#/components/schemas/ConsentWithdrawalRequest" } } } }
+      responses:
+        "201": { description: Consent withdrawn, content: { application/json: { schema: { $ref: "#/components/schemas/ConsentEnvelope" } } } }
+        "400": { $ref: "#/components/responses/ValidationFailed" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+  /api/v1/participants/{participantId}/emergency-contacts:
+    parameters: [{ $ref: "#/components/parameters/ParticipantId" }]
+    get:
+      tags: [Participants]
+      operationId: listEmergencyContacts
+      summary: List a participant's emergency contacts
+      responses:
+        "200": { description: Emergency contacts, content: { application/json: { schema: { $ref: "#/components/schemas/EmergencyContactsEnvelope" } } } }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+    post:
+      tags: [Participants]
+      operationId: createEmergencyContact
+      summary: Add an emergency contact
+      requestBody: { required: true, content: { application/json: { schema: { $ref: "#/components/schemas/EmergencyContactRequest" } } } }
+      responses:
+        "201": { description: Emergency contact created, content: { application/json: { schema: { $ref: "#/components/schemas/EmergencyContactEnvelope" } } } }
+        "400": { $ref: "#/components/responses/ValidationFailed" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+  /api/v1/participants/{participantId}/emergency-contacts/{contactId}:
+    patch:
+      tags: [Participants]
+      operationId: updateParticipantEmergencyContact
+      summary: Update an emergency contact owned by a participant
+      parameters:
+        - $ref: "#/components/parameters/ParticipantId"
+        - $ref: "#/components/parameters/ContactId"
+      requestBody: { required: true, content: { application/json: { schema: { $ref: "#/components/schemas/EmergencyContactUpdateRequest" } } } }
+      responses:
+        "200": { description: Emergency contact updated, content: { application/json: { schema: { $ref: "#/components/schemas/EmergencyContactEnvelope" } } } }
+        "400": { $ref: "#/components/responses/ValidationFailed" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+  /api/v1/participants/{participantId}/events/{eventId}/consent:
+    post:
+      tags: [Participants]
+      operationId: createEventConsent
+      summary: Record consent for a participant and event
+      parameters:
+        - $ref: "#/components/parameters/ParticipantId"
+        - $ref: "#/components/parameters/EventId"
+      requestBody: { required: true, content: { application/json: { schema: { $ref: "#/components/schemas/ConsentRequest" } } } }
+      responses:
+        "201": { description: Consent recorded, content: { application/json: { schema: { $ref: "#/components/schemas/ConsentEnvelope" } } } }
+        "400": { $ref: "#/components/responses/ValidationFailed" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+  /api/v1/participants/{participantId}/events/{eventId}/review:
+    get:
+      tags: [Participants]
+      operationId: getParticipantRegistrationReview
+      summary: Get participant, event, emergency contact, and latest consent for registration review
+      parameters:
+        - $ref: "#/components/parameters/ParticipantId"
+        - $ref: "#/components/parameters/EventId"
+      responses:
+        "200": { description: Registration review context, content: { application/json: { schema: { $ref: "#/components/schemas/ParticipantRegistrationReview" } } } }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+  /api/v1/registrations:
+    post:
+      tags: [Registrations]
+      operationId: createRegistration
+      summary: Register a participant using event and participant IDs in the body
+      parameters: [{ $ref: "#/components/parameters/IdempotencyKey" }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [eventId, participantId]
+              properties:
+                eventId: { type: string, format: uuid }
+                participantId: { type: string, format: uuid }
+      responses:
+        "200": { description: Idempotent replay, content: { application/json: { schema: { $ref: "#/components/schemas/RegistrationResponse" } } } }
+        "201": { description: Participant registered, content: { application/json: { schema: { $ref: "#/components/schemas/RegistrationResponse" } } } }
+        "400": { $ref: "#/components/responses/ValidationFailed" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "409": { $ref: "#/components/responses/Conflict" }
+  /api/v1/registrations/{registrationId}:
+    get:
+      tags: [Registrations]
+      operationId: getRegistration
+      summary: Get a registration
+      parameters: [{ $ref: "#/components/parameters/RegistrationId" }]
+      responses:
+        "200": { description: Registration detail, content: { application/json: { schema: { $ref: "#/components/schemas/RegistrationResponse" } } } }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+  /api/v1/registrations/{registrationId}/history:
+    get:
+      tags: [Registrations]
+      operationId: getRegistrationHistory
+      summary: List registration status changes
+      parameters: [{ $ref: "#/components/parameters/RegistrationId" }]
+      responses:
+        "200": { description: Status history, content: { application/json: { schema: { $ref: "#/components/schemas/RegistrationHistoryResponse" } } } }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+  /api/v1/registrations/{registrationId}/status:
+    patch:
+      tags: [Registrations]
+      operationId: changeRegistrationStatus
+      summary: Change a registration's status
+      parameters: [{ $ref: "#/components/parameters/RegistrationId" }]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: "#/components/schemas/RegistrationStatusRequest" } } } }
+      responses:
+        "200": { description: Registration status changed, content: { application/json: { schema: { $ref: "#/components/schemas/RegistrationResponse" } } } }
+        "400": { $ref: "#/components/responses/ValidationFailed" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+  /api/v1/consent-forms/active:
+    get:
+      tags: [Participants]
+      operationId: getActiveConsentForm
+      summary: Get the currently effective consent form
+      responses:
+        "200": { description: Active consent form, content: { application/json: { schema: { $ref: "#/components/schemas/ConsentFormEnvelope" } } } }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+  /api/v1/emergency-contacts/{contactId}:
+    patch:
+      tags: [Participants]
+      operationId: updateEmergencyContact
+      summary: Update an emergency contact by ID
+      parameters: [{ $ref: "#/components/parameters/ContactId" }]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: "#/components/schemas/EmergencyContactUpdateRequest" } } } }
+      responses:
+        "200": { description: Emergency contact updated, content: { application/json: { schema: { $ref: "#/components/schemas/EmergencyContactEnvelope" } } } }
+        "400": { $ref: "#/components/responses/ValidationFailed" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+  /api/v1/signatures:
+    post:
+      tags: [Participants]
+      operationId: storeSignature
+      summary: Store a validated PNG or JPEG signature image
+      requestBody: { required: true, content: { application/json: { schema: { $ref: "#/components/schemas/SignatureRequest" } } } }
+      responses:
+        "201": { description: Signature stored, content: { application/json: { schema: { $ref: "#/components/schemas/SignatureResponse" } } } }
+        "400": { $ref: "#/components/responses/ValidationFailed" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+  /api/v1/admin/audit-logs:
+    get:
+      tags: [Administration]
+      operationId: listAdministrativeAuditLogs
+      summary: List the latest application and authentication audit records
+      responses:
+        "200": { description: Latest audit records, content: { application/json: { schema: { $ref: "#/components/schemas/AdminAuditLogsResponse" } } } }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+  /api/v1/qr/registrations/{registrationId}:
+    post:
+      tags: [QR Codes]
+      operationId: generateRegistrationQrCode
+      summary: Generate a safe QR pass for a registration
+      parameters: [{ $ref: "#/components/parameters/RegistrationId" }]
+      responses:
+        "201": { description: QR pass generated, content: { application/json: { schema: { $ref: "#/components/schemas/QrCode" } } } }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+  /api/v1/qr/generate/{registrationId}:
+    post:
+      tags: [QR Codes]
+      operationId: generateQrCode
+      summary: Generate a QR pass using the legacy response envelope
+      parameters: [{ $ref: "#/components/parameters/RegistrationId" }]
+      responses:
+        "201": { description: QR pass generated, content: { application/json: { schema: { $ref: "#/components/schemas/QrMutationResponse" } } } }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+  /api/v1/qr/reissue/{registrationId}:
+    post:
+      tags: [QR Codes]
+      operationId: reissueQrCode
+      summary: Revoke the active pass and issue a replacement
+      parameters: [{ $ref: "#/components/parameters/RegistrationId" }]
+      responses:
+        "201": { description: QR pass reissued, content: { application/json: { schema: { $ref: "#/components/schemas/QrMutationResponse" } } } }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+  /api/v1/qr/verify:
+    post:
+      tags: [QR Codes]
+      operationId: verifyQrCode
+      summary: Verify a QR token for an event
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [token, eventId]
+              properties:
+                token: { type: string, minLength: 1 }
+                eventId: { type: string, format: uuid }
+      responses:
+        "200": { description: Verification result, content: { application/json: { schema: { $ref: "#/components/schemas/ApiDataResponse" } } } }
+        "400": { $ref: "#/components/responses/ValidationFailed" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+  /api/v1/qr/manual-checkin:
+    post:
+      tags: [QR Codes]
+      operationId: manualQrCheckIn
+      summary: Check in a participant using a registration ID or identifier
+      requestBody: { required: true, content: { application/json: { schema: { $ref: "#/components/schemas/ManualCheckInRequest" } } } }
+      responses:
+        "200": { description: Participant checked in, content: { application/json: { schema: { $ref: "#/components/schemas/ApiDataResponse" } } } }
+        "400": { $ref: "#/components/responses/ValidationFailed" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+  /api/v1/qr/participant/{token}:
+    get:
+      tags: [QR Codes]
+      operationId: getParticipantByQrCode
+      summary: Resolve participant data from a QR token
+      parameters: [{ $ref: "#/components/parameters/QrToken" }]
+      responses:
+        "200": { description: Participant data, content: { application/json: { schema: { $ref: "#/components/schemas/ApiDataResponse" } } } }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+  /api/v1/qr/history/{participantId}:
+    get:
+      tags: [QR Codes]
+      operationId: listParticipantQrCodes
+      summary: List QR passes issued to a participant
+      parameters: [{ $ref: "#/components/parameters/ParticipantId" }]
+      responses:
+        "200": { description: QR pass history, content: { application/json: { schema: { $ref: "#/components/schemas/ApiDataResponse" } } } }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+  /api/v1/qr/revoke/{qrId}:
+    put:
+      tags: [QR Codes]
+      operationId: revokeQrCode
+      summary: Revoke a QR pass
+      parameters: [{ $ref: "#/components/parameters/QrId" }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [revokedReason]
+              properties:
+                revokedReason: { type: string, minLength: 1, maxLength: 255 }
+                revokedBy: { type: string, format: uuid }
+      responses:
+        "200": { description: QR pass revoked, content: { application/json: { schema: { $ref: "#/components/schemas/QrMutationResponse" } } } }
+        "400": { $ref: "#/components/responses/ValidationFailed" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+  /api/v1/qr/download/{qrId}:
+    get:
+      tags: [QR Codes]
+      operationId: downloadQrCode
+      summary: Get QR pass download data
+      parameters: [{ $ref: "#/components/parameters/QrId" }]
+      responses:
+        "200": { description: Download data, content: { application/json: { schema: { $ref: "#/components/schemas/ApiDataResponse" } } } }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+  /api/v1/qr/print/{qrId}:
+    get:
+      tags: [QR Codes]
+      operationId: printQrCode
+      summary: Get QR pass print data
+      parameters: [{ $ref: "#/components/parameters/QrId" }]
+      responses:
+        "200": { description: Print data, content: { application/json: { schema: { $ref: "#/components/schemas/ApiDataResponse" } } } }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+  /api/v1/qr/{token}:
+    get:
+      tags: [QR Codes]
+      operationId: getRegistrationByQrCode
+      summary: Resolve a registration from a QR token
+      parameters: [{ $ref: "#/components/parameters/QrToken" }]
+      responses:
+        "200":
+          description: Registration resolved
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [registration]
+                properties: { registration: { type: object, additionalProperties: true } }
         "401": { $ref: "#/components/responses/Unauthorized" }
         "404": { $ref: "#/components/responses/NotFound" }
 components:
@@ -481,6 +1129,36 @@ components:
       in: path
       required: true
       schema: { type: string, format: uuid }
+    ParticipantId:
+      name: participantId
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+    StationId:
+      name: stationId
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+    ContactId:
+      name: contactId
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+    ConsentId:
+      name: consentId
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+    QrId:
+      name: qrId
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+    QrToken:
+      name: token
+      in: path
+      required: true
+      schema: { type: string, minLength: 1, maxLength: 255 }
     Cursor:
       name: cursor
       in: query
@@ -489,6 +1167,23 @@ components:
       name: limit
       in: query
       schema: { type: integer, minimum: 1, maximum: 100, default: 25 }
+    Page:
+      name: page
+      in: query
+      schema: { type: integer, minimum: 1, maximum: 10000, default: 1 }
+    PageSize:
+      name: pageSize
+      in: query
+      schema: { type: integer, minimum: 1, maximum: 100, default: 20 }
+    ParticipantPageSize:
+      name: pageSize
+      in: query
+      schema: { type: integer, minimum: 1, maximum: 50, default: 10 }
+    IdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      required: true
+      schema: { type: string, minLength: 8, maxLength: 100, pattern: '^[A-Za-z0-9._:-]+$' }
     CsrfToken:
       name: X-CSRF-Token
       in: header
@@ -530,6 +1225,12 @@ components:
     RateLimited:
       description: Rate limit exceeded
       content: { application/json: { schema: { $ref: "#/components/schemas/Problem" } } }
+    ScreeningPreview:
+      description: Screening evaluation preview
+      content: { application/json: { schema: { $ref: "#/components/schemas/ScreeningEvaluation" } } }
+    ScreeningSaved:
+      description: Screening result saved or replayed
+      content: { application/json: { schema: { $ref: "#/components/schemas/ScreeningResult" } } }
   schemas:
     SystemRole:
       type: string
@@ -740,14 +1441,21 @@ components:
         notes: { type: string, nullable: true, maxLength: 500 }
     User:
       type: object
-      additionalProperties: false
-      required: [userId, username, email, systemRole]
+      additionalProperties: true
+      required: [id, email, fullName, employeeNumber, status]
       properties:
+        id: { type: string, format: uuid }
         userId: { type: string, format: uuid }
         username: { type: string, minLength: 3, maxLength: 100 }
         email: { type: string, format: email }
+        fullName: { type: string }
+        employeeNumber: { type: string }
+        contactNumber: { type: string, nullable: true }
+        department: { type: string, nullable: true }
+        designation: { type: string, nullable: true }
         systemRole: { $ref: "#/components/schemas/SystemRole" }
         status: { type: string, enum: [ACTIVE, DISABLED] }
+        roles: { type: array, items: { type: string } }
         createdAt: { type: string, format: date-time }
     AuthResponse:
       type: object
@@ -1128,6 +1836,588 @@ components:
           type: object
           nullable: true
           allOf: [{ $ref: "#/components/schemas/ReferralSummary" }]
+    AuthConfigStatus:
+      type: object
+      additionalProperties: false
+      required: [configured, supportedRoles, requestId]
+      properties:
+        configured: { type: boolean }
+        supportedRoles: { type: array, items: { type: string } }
+        requestId: { type: string, format: uuid }
+    LogoutResponse:
+      type: object
+      additionalProperties: false
+      required: [message, logoutUrl]
+      properties:
+        message: { type: string }
+        logoutUrl: { type: string, format: uri }
+    CreateUserRequest:
+      type: object
+      additionalProperties: false
+      required: [fullName, email, employeeNumber]
+      properties:
+        fullName: { type: string, minLength: 1, maxLength: 100 }
+        email: { type: string, format: email, maxLength: 255 }
+        employeeNumber: { type: string, minLength: 1, maxLength: 20 }
+        contactNumber: { type: string, maxLength: 20 }
+        department: { type: string, maxLength: 100 }
+        designation: { type: string, maxLength: 100 }
+        status: { type: string, enum: [ACTIVE, DISABLED] }
+    UserListResponse:
+      type: object
+      additionalProperties: false
+      required: [success, data]
+      properties:
+        success: { type: boolean, enum: [true] }
+        data: { type: array, items: { $ref: "#/components/schemas/User" } }
+    UserMutationResponse:
+      type: object
+      additionalProperties: false
+      required: [success, message, data]
+      properties:
+        success: { type: boolean, enum: [true] }
+        message: { type: string }
+        data: { $ref: "#/components/schemas/User" }
+    Pagination:
+      type: object
+      additionalProperties: false
+      required: [page, pageSize, total, totalPages]
+      properties:
+        page: { type: integer, minimum: 1 }
+        pageSize: { type: integer, minimum: 1 }
+        total: { type: integer, minimum: 0 }
+        totalPages: { type: integer, minimum: 0 }
+    ParticipantRequest:
+      type: object
+      additionalProperties: false
+      required: [firstName, lastName, dateOfBirth, gender, contactNumber]
+      properties:
+        firstName: { type: string, minLength: 1, maxLength: 100 }
+        lastName: { type: string, minLength: 1, maxLength: 100 }
+        dateOfBirth: { type: string, format: date }
+        gender: { type: string, enum: [M, F, O, U] }
+        contactNumber: { type: string, minLength: 7, maxLength: 30 }
+        email: { type: string, format: email, nullable: true }
+        preferredLanguage: { type: string, maxLength: 50, nullable: true }
+        accessibilityNotes: { type: string, maxLength: 1000, nullable: true }
+        status: { type: string, enum: [ACTIVE, INACTIVE, DECEASED] }
+    ParticipantUpdateRequest:
+      type: object
+      additionalProperties: false
+      minProperties: 1
+      properties:
+        firstName: { type: string, minLength: 1, maxLength: 100 }
+        lastName: { type: string, minLength: 1, maxLength: 100 }
+        dateOfBirth: { type: string, format: date }
+        gender: { type: string, enum: [M, F, O, U] }
+        contactNumber: { type: string, minLength: 7, maxLength: 30 }
+        email: { type: string, format: email, nullable: true }
+        preferredLanguage: { type: string, maxLength: 50, nullable: true }
+        accessibilityNotes: { type: string, maxLength: 1000, nullable: true }
+        status: { type: string, enum: [ACTIVE, INACTIVE, DECEASED] }
+    Participant:
+      type: object
+      additionalProperties: true
+      required: [id, participantReference, firstName, lastName, dateOfBirth, gender, contactNumber, status]
+      properties:
+        id: { type: string, format: uuid }
+        participantReference: { type: string, maxLength: 30 }
+        firstName: { type: string }
+        lastName: { type: string }
+        dateOfBirth: { type: string, format: date-time }
+        gender: { type: string, enum: [M, F, O, U] }
+        contactNumber: { type: string }
+        email: { type: string, format: email, nullable: true }
+        preferredLanguage: { type: string, nullable: true }
+        accessibilityNotes: { type: string, nullable: true }
+        status: { type: string, enum: [ACTIVE, INACTIVE, DECEASED] }
+        version: { type: integer, minimum: 1 }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+    ParticipantSummary:
+      type: object
+      additionalProperties: false
+      required: [id, participantReference, firstName, lastName, maskedContactNumber, maskedDateOfBirth, status]
+      properties:
+        id: { type: string, format: uuid }
+        participantReference: { type: string }
+        firstName: { type: string }
+        lastName: { type: string }
+        maskedContactNumber: { type: string }
+        maskedDateOfBirth: { type: string }
+        status: { type: string, enum: [ACTIVE, INACTIVE, DECEASED] }
+    ParticipantEnvelope:
+      type: object
+      additionalProperties: false
+      required: [participant]
+      properties: { participant: { $ref: "#/components/schemas/Participant" } }
+    ParticipantSearchResponse:
+      type: object
+      additionalProperties: false
+      required: [participants, pagination]
+      properties:
+        participants: { type: array, items: { $ref: "#/components/schemas/ParticipantSummary" } }
+        pagination: { $ref: "#/components/schemas/Pagination" }
+    EmergencyContactRequest:
+      type: object
+      additionalProperties: false
+      required: [contactName, relationship, phoneNumber]
+      properties:
+        contactName: { type: string, minLength: 1, maxLength: 120 }
+        relationship: { type: string, minLength: 1, maxLength: 60 }
+        phoneNumber: { type: string, minLength: 7, maxLength: 30 }
+        email: { type: string, format: email, nullable: true }
+        isPrimary: { type: boolean, default: false }
+        status: { type: string, enum: [ACTIVE, REMOVED], default: ACTIVE }
+    EmergencyContactUpdateRequest:
+      type: object
+      additionalProperties: false
+      minProperties: 1
+      properties:
+        contactName: { type: string, minLength: 1, maxLength: 120 }
+        relationship: { type: string, minLength: 1, maxLength: 60 }
+        phoneNumber: { type: string, minLength: 7, maxLength: 30 }
+        email: { type: string, format: email, nullable: true }
+        isPrimary: { type: boolean }
+        status: { type: string, enum: [ACTIVE, REMOVED] }
+    EmergencyContact:
+      type: object
+      additionalProperties: true
+      required: [id, participantId, contactName, relationship, phoneNumber, isPrimary, status]
+      properties:
+        id: { type: string, format: uuid }
+        participantId: { type: string, format: uuid }
+        contactName: { type: string }
+        relationship: { type: string }
+        phoneNumber: { type: string }
+        email: { type: string, format: email, nullable: true }
+        isPrimary: { type: boolean }
+        status: { type: string, enum: [ACTIVE, REMOVED] }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+    EmergencyContactEnvelope:
+      type: object
+      additionalProperties: false
+      required: [contact]
+      properties: { contact: { $ref: "#/components/schemas/EmergencyContact" } }
+    EmergencyContactsEnvelope:
+      type: object
+      additionalProperties: false
+      required: [contacts]
+      properties: { contacts: { type: array, items: { $ref: "#/components/schemas/EmergencyContact" } } }
+    ConsentForm:
+      type: object
+      additionalProperties: true
+      required: [id, formCode, versionNumber, title, contentHash, documentObjectKey, effectiveFrom, isActive]
+      properties:
+        id: { type: string, format: uuid }
+        formCode: { type: string }
+        versionNumber: { type: string }
+        title: { type: string }
+        contentText: { type: string, nullable: true }
+        contentHash: { type: string, pattern: '^[a-f0-9]{64}$' }
+        documentObjectKey: { type: string }
+        effectiveFrom: { type: string, format: date-time }
+        effectiveTo: { type: string, format: date-time, nullable: true }
+        isActive: { type: boolean }
+    ConsentFormEnvelope:
+      type: object
+      additionalProperties: false
+      required: [consentForm]
+      properties: { consentForm: { $ref: "#/components/schemas/ConsentForm" } }
+    ConsentRequest:
+      type: object
+      additionalProperties: false
+      required: [consentFormVersionId, consentStatus, signerType, signerName]
+      properties:
+        consentFormVersionId: { type: string, format: uuid }
+        consentStatus: { type: string, enum: [ACCEPTED, DECLINED] }
+        signerType: { type: string, enum: [PARTICIPANT, PARENT, GUARDIAN, AUTHORISED_REPRESENTATIVE] }
+        signerName: { type: string, minLength: 1, maxLength: 150 }
+        signerRelationship: { type: string, maxLength: 60, nullable: true }
+        guardianContactName: { type: string, maxLength: 150, nullable: true }
+        guardianContactPhone: { type: string, maxLength: 30, nullable: true }
+        guardianContactEmail: { type: string, format: email, nullable: true }
+        signatureObjectKey: { type: string, maxLength: 500, nullable: true }
+        signatureSha256: { type: string, pattern: '^[a-fA-F0-9]{64}$', nullable: true }
+        signatureMimeType: { type: string, enum: [image/png, image/jpeg], nullable: true }
+      description: Accepted consent requires signature metadata; non-participant signers also require guardian contact and relationship fields.
+    ConsentWithEventRequest:
+      allOf:
+        - $ref: "#/components/schemas/ConsentRequest"
+        - type: object
+          required: [eventId]
+          properties: { eventId: { type: string, format: uuid } }
+    ConsentWithdrawalRequest:
+      type: object
+      additionalProperties: false
+      required: [withdrawalReason]
+      properties: { withdrawalReason: { type: string, minLength: 1, maxLength: 1000 } }
+    Consent:
+      type: object
+      additionalProperties: true
+      required: [id, participantId, eventId, consentFormVersionId, consentStatus, recordedById, createdAt]
+      properties:
+        id: { type: string, format: uuid }
+        participantId: { type: string, format: uuid }
+        eventId: { type: string, format: uuid }
+        registrationId: { type: string, format: uuid, nullable: true }
+        withdrawalOfId: { type: string, format: uuid, nullable: true }
+        consentFormVersionId: { type: string, format: uuid }
+        consentStatus: { type: string, enum: [PENDING, ACCEPTED, DECLINED, WITHDRAWN] }
+        signerType: { type: string, nullable: true }
+        signerName: { type: string, nullable: true }
+        recordedById: { type: string, format: uuid }
+        signedAt: { type: string, format: date-time, nullable: true }
+        withdrawnAt: { type: string, format: date-time, nullable: true }
+        withdrawalReason: { type: string, nullable: true }
+        createdAt: { type: string, format: date-time }
+    ConsentEnvelope:
+      type: object
+      additionalProperties: false
+      required: [consent]
+      properties: { consent: { $ref: "#/components/schemas/Consent" } }
+    ConsentsEnvelope:
+      type: object
+      additionalProperties: false
+      required: [consents]
+      properties: { consents: { type: array, items: { $ref: "#/components/schemas/Consent" } } }
+    RegistrationStatus:
+      type: string
+      enum: [SIGNED_UP, CHECKED_IN, COMPLETED, CANCELLED]
+    Registration:
+      type: object
+      additionalProperties: true
+      required: [registrationId, eventId, participantId, registrationStatus, idempotencyKey, createdAt, updatedAt]
+      properties:
+        id: { type: string, format: uuid }
+        registrationId: { type: string, format: uuid }
+        eventId: { type: string, format: uuid }
+        participantId: { type: string, format: uuid }
+        registrationStatus: { $ref: "#/components/schemas/RegistrationStatus" }
+        participantDisplayName: { type: string, nullable: true }
+        queueNumber: { type: integer, nullable: true }
+        idempotencyKey: { type: string }
+        checkedIn: { type: boolean }
+        checkedInAt: { type: string, format: date-time, nullable: true }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+    RegistrationLookup:
+      type: object
+      additionalProperties: false
+      required: [registrationId, participantDisplayName, queueNumber, status, passToken]
+      properties:
+        registrationId: { type: string, format: uuid }
+        participantDisplayName: { type: string }
+        queueNumber: { type: integer, nullable: true }
+        status: { $ref: "#/components/schemas/RegistrationStatus" }
+        passToken: { type: string, nullable: true }
+    RegistrationResponse:
+      type: object
+      additionalProperties: true
+      required: [registrationId, participantReference, queueNumber, status, registration]
+      properties:
+        registrationId: { type: string, format: uuid }
+        participantReference: { type: string }
+        queueNumber: { type: integer, nullable: true }
+        status: { $ref: "#/components/schemas/RegistrationStatus" }
+        registration: { $ref: "#/components/schemas/Registration" }
+        idempotentReplay: { type: boolean }
+    RegistrationListResponse:
+      type: object
+      additionalProperties: false
+      required: [registrations, pagination]
+      properties:
+        registrations: { type: array, items: { $ref: "#/components/schemas/Registration" } }
+        pagination: { $ref: "#/components/schemas/Pagination" }
+    RegistrationsEnvelope:
+      type: object
+      additionalProperties: false
+      required: [registrations]
+      properties: { registrations: { type: array, items: { $ref: "#/components/schemas/Registration" } } }
+    RegistrationHistoryItem:
+      type: object
+      additionalProperties: true
+      required: [id, registrationId, toStatus, changedById, occurredAt]
+      properties:
+        id: { type: string, format: uuid }
+        registrationId: { type: string, format: uuid }
+        fromStatus: { type: string, nullable: true }
+        toStatus: { $ref: "#/components/schemas/RegistrationStatus" }
+        changedById: { type: string, format: uuid }
+        reason: { type: string, nullable: true }
+        occurredAt: { type: string, format: date-time }
+    RegistrationHistoryResponse:
+      type: object
+      additionalProperties: false
+      required: [history]
+      properties: { history: { type: array, items: { $ref: "#/components/schemas/RegistrationHistoryItem" } } }
+    RegistrationStatusRequest:
+      type: object
+      additionalProperties: false
+      required: [toStatus]
+      properties:
+        toStatus: { $ref: "#/components/schemas/RegistrationStatus" }
+        reason: { type: string, maxLength: 200, nullable: true }
+    ParticipantRegistrationReview:
+      type: object
+      additionalProperties: false
+      required: [participant, event, emergencyContact, latestConsent]
+      properties:
+        participant: { $ref: "#/components/schemas/Participant" }
+        event: { $ref: "#/components/schemas/Event" }
+        emergencyContact:
+          type: object
+          nullable: true
+          allOf: [{ $ref: "#/components/schemas/EmergencyContact" }]
+        latestConsent:
+          type: object
+          nullable: true
+          allOf: [{ $ref: "#/components/schemas/Consent" }]
+    SignatureRequest:
+      type: object
+      additionalProperties: false
+      required: [dataUrl]
+      properties:
+        dataUrl:
+          type: string
+          maxLength: 140000
+          pattern: '^data:image/(png|jpeg);base64,'
+    SignatureResponse:
+      type: object
+      additionalProperties: false
+      required: [signatureObjectKey, signatureSha256, signatureMimeType]
+      properties:
+        signatureObjectKey: { type: string }
+        signatureSha256: { type: string, pattern: '^[a-f0-9]{64}$' }
+        signatureMimeType: { type: string, enum: [image/png, image/jpeg] }
+    AdminAuditLogsResponse:
+      type: object
+      additionalProperties: false
+      required: [logs, authLogs]
+      properties:
+        logs: { type: array, items: { type: object, additionalProperties: true } }
+        authLogs: { type: array, items: { type: object, additionalProperties: true } }
+    QrCode:
+      type: object
+      additionalProperties: true
+      required: [id, registrationId, issuedAt, isActive]
+      properties:
+        id: { type: string, format: uuid }
+        registrationId: { type: string, format: uuid }
+        expiresAt: { type: string, format: date-time, nullable: true }
+        issuedAt: { type: string, format: date-time }
+        isActive: { type: boolean }
+        revokedAt: { type: string, format: date-time, nullable: true }
+        revokedBy: { type: string, format: uuid, nullable: true }
+        revokedReason: { type: string, nullable: true }
+    QrMutationResponse:
+      type: object
+      additionalProperties: false
+      required: [success, message, data]
+      properties:
+        success: { type: boolean, enum: [true] }
+        message: { type: string }
+        data: { $ref: "#/components/schemas/QrCode" }
+    ApiDataResponse:
+      type: object
+      additionalProperties: false
+      required: [success, data]
+      properties:
+        success: { type: boolean, enum: [true] }
+        message: { type: string }
+        data: { type: object, additionalProperties: true }
+    ManualCheckInRequest:
+      type: object
+      additionalProperties: false
+      required: [eventId]
+      properties:
+        registrationId: { type: string, format: uuid }
+        identifier: { type: string }
+        eventId: { type: string, format: uuid }
+      description: Supply either registrationId or identifier together with eventId.
+    ScreeningStation:
+      type: object
+      additionalProperties: true
+      required: [stationId, eventId, stationType, stationOrder, isActive]
+      properties:
+        stationId: { type: string, format: uuid }
+        eventId: { type: string, format: uuid }
+        stationType: { type: string }
+        stationOrder: { type: integer }
+        isActive: { type: boolean }
+    ScreeningStationsResponse:
+      type: object
+      additionalProperties: false
+      required: [event, stations]
+      properties:
+        event:
+          type: object
+          additionalProperties: false
+          required: [eventId, name, status, venue]
+          properties:
+            eventId: { type: string, format: uuid }
+            name: { type: string }
+            status: { $ref: "#/components/schemas/EventStatus" }
+            venue: { type: string }
+        stations: { type: array, items: { $ref: "#/components/schemas/ScreeningStation" } }
+    ScreeningQueueItem:
+      type: object
+      additionalProperties: false
+      required: [registrationId, participantDisplayName, queueNumber, status, passToken, existingResult]
+      properties:
+        registrationId: { type: string, format: uuid }
+        participantDisplayName: { type: string }
+        queueNumber: { type: integer, nullable: true }
+        status: { $ref: "#/components/schemas/RegistrationStatus" }
+        passToken: { type: string, nullable: true }
+        existingResult:
+          type: object
+          nullable: true
+          additionalProperties: true
+    ScreeningQueueResponse:
+      type: object
+      additionalProperties: false
+      required: [station, registrations]
+      properties:
+        station: { $ref: "#/components/schemas/ScreeningStation" }
+        registrations: { type: array, items: { $ref: "#/components/schemas/ScreeningQueueItem" } }
+    EyeReading:
+      oneOf:
+        - type: object
+          additionalProperties: false
+          required: [kind, denominator]
+          properties:
+            kind: { type: string, enum: [FRACTION] }
+            denominator: { type: integer, minimum: 1, maximum: 240 }
+        - type: object
+          additionalProperties: false
+          required: [kind, code]
+          properties:
+            kind: { type: string, enum: [EXCEPTION] }
+            code: { type: string, enum: [CF, HM, LP, NLP, NOT_TESTABLE] }
+    VisualAcuityResultData:
+      type: object
+      additionalProperties: false
+      required: [chartDistanceMetres, od, os, withUsualDistanceGlasses]
+      properties:
+        chartDistanceMetres: { type: integer, enum: [3, 6] }
+        od: { $ref: "#/components/schemas/EyeReading" }
+        os: { $ref: "#/components/schemas/EyeReading" }
+        withUsualDistanceGlasses: { type: boolean, nullable: true }
+    VisualAcuityPreviewRequest:
+      type: object
+      additionalProperties: false
+      required: [resultData]
+      properties: { resultData: { $ref: "#/components/schemas/VisualAcuityResultData" } }
+    VisualAcuitySaveRequest:
+      type: object
+      additionalProperties: false
+      required: [registrationId, idempotencyKey, acknowledged, resultData]
+      properties:
+        registrationId: { type: string, format: uuid }
+        idempotencyKey: { type: string, minLength: 8, maxLength: 64 }
+        acknowledged: { type: boolean }
+        resultData: { $ref: "#/components/schemas/VisualAcuityResultData" }
+    RefractionEye:
+      type: object
+      additionalProperties: false
+      required: [sphere, cylinder, axis]
+      properties:
+        sphere: { type: number, minimum: -20, maximum: 20, multipleOf: 0.25 }
+        cylinder: { type: number, minimum: -10, maximum: 10, multipleOf: 0.25 }
+        axis: { type: integer, minimum: 0, maximum: 180, nullable: true }
+    RefractionResultData:
+      oneOf:
+        - type: object
+          additionalProperties: false
+          required: [measurementStatus, wearsDistanceGlasses, od, os]
+          properties:
+            measurementStatus: { type: string, enum: [COMPLETED] }
+            wearsDistanceGlasses: { type: boolean, nullable: true }
+            od: { $ref: "#/components/schemas/RefractionEye" }
+            os: { $ref: "#/components/schemas/RefractionEye" }
+            notes: { type: string, maxLength: 500 }
+        - type: object
+          additionalProperties: false
+          required: [measurementStatus, wearsDistanceGlasses, notes]
+          properties:
+            measurementStatus: { type: string, enum: [UNABLE_TO_MEASURE, REPEAT_REQUIRED] }
+            wearsDistanceGlasses: { type: boolean, nullable: true }
+            notes: { type: string, minLength: 3, maxLength: 500 }
+    RefractionPreviewRequest:
+      type: object
+      additionalProperties: false
+      required: [resultData]
+      properties: { resultData: { $ref: "#/components/schemas/RefractionResultData" } }
+    RefractionSaveRequest:
+      type: object
+      additionalProperties: false
+      required: [registrationId, idempotencyKey, acknowledged, resultData]
+      properties:
+        registrationId: { type: string, format: uuid }
+        idempotencyKey: { type: string, minLength: 8, maxLength: 64 }
+        acknowledged: { type: boolean }
+        resultData: { $ref: "#/components/schemas/RefractionResultData" }
+    ColourVisionResultData:
+      type: object
+      additionalProperties: false
+      required: [testKit, platesPresented, odCorrect, osCorrect]
+      properties:
+        testKit: { type: string, enum: [ISHIHARA] }
+        platesPresented: { type: integer, minimum: 8, maximum: 24 }
+        odCorrect: { type: integer, minimum: 0, maximum: 24 }
+        osCorrect: { type: integer, minimum: 0, maximum: 24 }
+    ColourVisionPreviewRequest:
+      type: object
+      additionalProperties: false
+      required: [resultData]
+      properties: { resultData: { $ref: "#/components/schemas/ColourVisionResultData" } }
+    ColourVisionSaveRequest:
+      type: object
+      additionalProperties: false
+      required: [registrationId, idempotencyKey, acknowledged, resultData]
+      properties:
+        registrationId: { type: string, format: uuid }
+        idempotencyKey: { type: string, minLength: 8, maxLength: 64 }
+        acknowledged: { type: boolean }
+        resultData: { $ref: "#/components/schemas/ColourVisionResultData" }
+    ScreeningEvaluationReason:
+      type: object
+      additionalProperties: false
+      required: [flag, reason]
+      properties:
+        flag: { $ref: "#/components/schemas/OverallFlag" }
+        reason: { type: string }
+    ScreeningEvaluation:
+      type: object
+      additionalProperties: false
+      required: [ruleVersion, overallFlag, isFlagged, flagSummary, reasons]
+      properties:
+        ruleVersion: { type: string }
+        overallFlag: { $ref: "#/components/schemas/OverallFlag" }
+        isFlagged: { type: boolean }
+        flagSummary: { type: string }
+        reasons: { type: array, items: { $ref: "#/components/schemas/ScreeningEvaluationReason" } }
+    ScreeningResult:
+      type: object
+      additionalProperties: true
+      required: [resultId, registrationId, stationId, screeningType, resultData, overallFlag, isFlagged, idempotencyKey, createdAt, updatedAt]
+      properties:
+        resultId: { type: string, format: uuid }
+        registrationId: { type: string, format: uuid }
+        stationId: { type: string, format: uuid }
+        screeningType: { type: string }
+        resultData: { type: object, additionalProperties: true }
+        overallFlag: { $ref: "#/components/schemas/OverallFlag" }
+        isFlagged: { type: boolean }
+        flagSummary: { type: string, nullable: true }
+        ruleVersion: { type: string }
+        acknowledgedAt: { type: string, format: date-time, nullable: true }
+        idempotencyKey: { type: string }
+        evaluation: { $ref: "#/components/schemas/ScreeningEvaluation" }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
     Problem:
       type: object
       required: [type, title, status, code, requestId]

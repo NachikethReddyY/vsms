@@ -28,11 +28,11 @@ function rejectsPlainHttp(url) {
 }
 
 assert.equal(await request('https://localhost:5173/'), 200)
-assert.equal(await request('https://127.0.0.1:5000/health'), 200)
+assert.equal(await request('https://127.0.0.1:5050/health'), 200)
 assert.equal(await request('https://localhost:5173/api/v1/users'), 401)
 await Promise.all([
   rejectsPlainHttp('http://localhost:5173/'),
-  rejectsPlainHttp('http://127.0.0.1:5000/health'),
+  rejectsPlainHttp('http://127.0.0.1:5050/health'),
 ])
 
 console.log('HTTPS-only smoke check passed')
