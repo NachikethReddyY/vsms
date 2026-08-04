@@ -19,10 +19,9 @@ server.on("error", (error) => {
 });
 
 if (require.main === module) {
-  const port = env.PORT;
-  server.listen(port, () => {
+  server.listen(env.PORT, env.HOST, () => {
     const protocol = useHttps ? "https" : "http";
-    logger.info(`API server running securely on ${protocol}://localhost:${port}`);
+    logger.info(`Server running on ${protocol}://${env.HOST}:${env.PORT}`);
   });
 }
 

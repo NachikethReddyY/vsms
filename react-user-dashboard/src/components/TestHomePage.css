@@ -489,18 +489,19 @@ html[data-theme="light"] .test-events-page {
   background:var(--card-hover);
 }
 
-.reference-events .test-register-row-link:focus-visible {
+.reference-events .test-register-row:has(.test-register-row-link:focus-visible) .reference-event-card {
   outline:2px solid var(--muted-blue);
   outline-offset:3px;
 }
 
 .reference-events .test-register-row-link {
-  position:relative;
-  inset:auto;
-  z-index:auto;
-  color:inherit;
-  text-decoration:none;
+  position:absolute;
+  inset:0;
+  z-index:1;
+  pointer-events:auto;
 }
+
+.reference-events .test-register-row-link:focus-visible { outline:0; }
 
 .reference-events .reference-event-media,
 .reference-events .test-register-event,
@@ -574,8 +575,7 @@ html[data-theme="light"] .test-events-page {
 
 .reference-events .reference-status-tag.status-published { --status-color:var(--status-assigned); }
 .reference-events .reference-status-tag.status-in_progress { --status-color:var(--live); }
-.reference-events .reference-status-tag.status-ended { --status-color:var(--status-plan); }
-.reference-events .reference-status-tag.status-completed { --status-color:var(--status-plan); }
+.reference-events .reference-status-tag.status-completed { --status-color:var(--status-completed); }
 .reference-events .reference-status-tag.status-cancelled { --status-color:var(--status-cancelled); }
 .reference-events .reference-status-tag.status-in_progress i { animation:reference-live-blink 1.1s ease-in-out infinite; }
 
