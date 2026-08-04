@@ -174,16 +174,25 @@ const mapStationDto = (station, event, templatesByType) => {
   };
 };
 
-const toEventResponse = async ({ _count = {}, registrations = [], stations = [], ...event }, user, db = prisma) => {
+const toEventResponse = async (event, user, db = prisma) => {
+  const { _count = {}, registrations = [], stations = [] } = event;
   const templatesByType = await loadTemplatesByStationType(db);
-  const shifts = (event.shifts || []).map((shift) => ({
-    ...shift,
+  const managerView = user ? canManage(event, user) : false;
+  const fullShifts = (event.shifts || []).map((shift) => ({
+    shiftId: shift.shiftId,
+    name: shift.name,
+    startsAt: shift.startsAt,
+    endsAt: shift.endsAt,
+    requiredStaff: shift.requiredStaff,
+    status: shift.status,
     staffAssignments: (shift.staffAssignments || []).map(({ assignedUser, station, ...assignment }) => {
       const template = station ? templatesByType.get(station.stationType) : null;
       return {
-        ...assignment,
         staffAssignmentId: assignment.id,
-        user: publicUser(assignedUser),
+        assignmentRole: assignment.assignmentRole,
+        status: assignment.status,
+        notes: assignment.notes,
+        user: assignmentUser(assignedUser),
         eventStation: station ? {
           eventStationId: station.stationId,
           stationTemplateId: template?.stationTemplateId || station.stationId,
@@ -872,8 +881,9 @@ return prisma.$transaction(async (tx) => {
       ipAddress: "::1",
     },
   });
+  await auditUpdate(tx, current, updated, user, correlationId);
 
-  return toEventResponse(updated, user);
+  return toEventResponse(updated, user, tx);
 });
 };
 
