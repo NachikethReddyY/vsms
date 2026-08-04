@@ -573,11 +573,9 @@ export function ParticipantDetailPage() {
 
 export function ParticipantEditPage() {
   const navigate = useNavigate();
-  const location = useLocation();
   const { participantId = "" } = useParams();
   const eventId = useEventIdFromRouteOrQuery();
-  const isParticipantV2 = location.pathname.startsWith("/participants-v2");
-  const participantLink = `${isParticipantV2 ? `/participants-v2/${participantId}` : `/participants/${participantId}`}${eventId ? `?eventId=${eventId}` : ""}`;
+  const participantLink = `/participants/${participantId}${eventId ? `?eventId=${eventId}` : ""}`;
   const [form, setForm] = useState<ParticipantFormState | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -640,11 +638,9 @@ export function ParticipantEditPage() {
 
 export function EmergencyContactsPage() {
   const navigate = useNavigate();
-  const location = useLocation();
   const { participantId = "" } = useParams();
   const eventId = useEventIdFromRouteOrQuery();
-  const isParticipantV2 = location.pathname.startsWith("/participants-v2");
-  const participantLink = `${isParticipantV2 ? `/participants-v2/${participantId}` : `/participants/${participantId}`}${eventId ? `?eventId=${eventId}` : ""}`;
+  const participantLink = `/participants/${participantId}${eventId ? `?eventId=${eventId}` : ""}`;
   const [contacts, setContacts] = useState<EmergencyContact[]>([]);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -698,9 +694,7 @@ export function EmergencyContactsPage() {
   }
   const hasActiveContact = contacts.some((contact) => contact.status === "ACTIVE");
   const completionTarget = eventId
-    ? isParticipantV2
-      ? `/participants-v2/${participantId}/consent?eventId=${eventId}`
-      : `/events/${eventId}/participants/${participantId}/consent`
+    ? `/participants/${participantId}/consent?eventId=${eventId}`
     : participantLink;
   return (
     <AppShell title="Emergency contacts">
@@ -1023,13 +1017,12 @@ export function EventRegistrationsPage() {
 }
 
 export function RegistrationHistoryPage() {
-  const location = useLocation();
   const { registrationId = "" } = useParams();
   const [history, setHistory] = useState<RegistrationHistory[]>([]);
   useEffect(() => { void apiClient.get(`/registrations/${registrationId}/history`).then((response) => setHistory(response.data.history ?? [])); }, [registrationId]);
   return (
     <AppShell title="Registration history">
-      <ParticipantBackLink to={location.pathname.startsWith("/participants-v2") ? "/participants-v2" : "/participants/search"} label="Back to participant search" />
+      <ParticipantBackLink to="/participants" label="Back to participant search" />
       <div className="space-y-3">{history.map((item) => <article key={item.id} className="rounded-xl border bg-white p-4"><p className="font-semibold">{item.fromStatus ? displayStatus(item.fromStatus) : "New"} → {displayStatus(item.toStatus)}</p><p className="text-sm text-slate-600">{new Date(item.occurredAt).toLocaleString()} · {item.changedBy?.fullName ?? "Staff"} · {item.reason ?? "No reason"}</p></article>)}</div>
     </AppShell>
   );
@@ -1048,11 +1041,9 @@ export function ParticipantHistoryPage() {
 }
 
 export function ParticipantConsentsPage() {
-  const location = useLocation();
   const { participantId = "" } = useParams();
   const eventId = useEventIdFromRouteOrQuery();
-  const isParticipantV2 = location.pathname.startsWith("/participants-v2");
-  const participantLink = `${isParticipantV2 ? `/participants-v2/${participantId}` : `/participants/${participantId}`}${eventId ? `?eventId=${eventId}` : ""}`;
+  const participantLink = `/participants/${participantId}${eventId ? `?eventId=${eventId}` : ""}`;
   const [consents, setConsents] = useState<ConsentRecord[]>([]);
   const [reason, setReason] = useState<Record<string, string>>({});
   const [error, setError] = useState<string | null>(null);
@@ -1108,7 +1099,6 @@ export function ParticipantConsentsPage() {
 }
 
 export function RegistrationQrPage() {
-  const location = useLocation();
   const { registrationId = "" } = useParams();
   const [qrImage, setQrImage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -1122,7 +1112,7 @@ export function RegistrationQrPage() {
   }
   return (
     <AppShell title="QR / check-in handoff">
-      <ParticipantBackLink to={location.pathname.startsWith("/participants-v2") ? `/participants-v2/registrations/${registrationId}/history` : `/registrations/${registrationId}/history`} label="Back to registration history" />
+      <ParticipantBackLink to={`/participants/registrations/${registrationId}/history`} label="Back to registration history" />
       <RegistrationJourney active="qr" />
       <FormErrorSummary error={error} />
       <div className="space-y-4 rounded-2xl border bg-white p-5">

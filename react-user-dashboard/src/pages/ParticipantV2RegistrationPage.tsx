@@ -44,7 +44,7 @@ export default function ParticipantV2RegistrationPage() {
   const { participantId = "" } = useParams();
   const [searchParams] = useSearchParams();
   const eventId = searchParams.get("eventId") ?? "";
-  const profileLink = `/participants-v2/${participantId}${eventId ? `?eventId=${encodeURIComponent(eventId)}` : ""}`;
+  const profileLink = `/participants/${participantId}${eventId ? `?eventId=${encodeURIComponent(eventId)}` : ""}`;
   const [review, setReview] = useState<RegistrationReview | null>(null);
   const [existingRegistration, setExistingRegistration] = useState<Registration | null>(null);
   const [createdRegistration, setCreatedRegistration] = useState<Registration | null>(null);
@@ -108,8 +108,8 @@ export default function ParticipantV2RegistrationPage() {
   if (!eventId) {
     return (
       <section className="participant-v2-page participant-v2-checkin participant-v2-registration">
-        <Link className="participant-v2-back" to={`/participants-v2/${participantId}`}><ArrowLeftIcon /> Back to participant profile</Link>
-        <section className="participant-v2-checkin-empty"><ExclamationTriangleIcon /><h1>Choose an event first</h1><p>Return to Participants V2, choose an open event, then open this participant to register them.</p><Link className="primary" to="/participants-v2">Choose an event</Link></section>
+        <Link className="participant-v2-back" to={`/participants/${participantId}`}><ArrowLeftIcon /> Back to participant profile</Link>
+        <section className="participant-v2-checkin-empty"><ExclamationTriangleIcon /><h1>Choose an event first</h1><p>Return to Participants, choose an open event, then open this participant to register them.</p><Link className="primary" to="/participants">Choose an event</Link></section>
       </section>
     );
   }
@@ -138,8 +138,8 @@ export default function ParticipantV2RegistrationPage() {
           <div className="participant-v2-checkin-ticket"><TicketIcon /><div><span>Queue number</span><strong>{registration.queueNumber}</strong></div><div><span>Status</span><strong>{displayStatus(registration.registrationStatus)}</strong></div></div>
           <p className="participant-v2-checkin-success-note">The participant is ready for event check-in when they arrive.</p>
           <div>
-            <Link className="primary" to={`/participants-v2/${participantId}/check-in?eventId=${encodeURIComponent(eventId)}`}>Start event check-in <ArrowRightIcon /></Link>
-            <Link className="secondary" to={`/participants-v2/registrations/${registration.id}/history`}>View registration history</Link>
+            <Link className="primary" to={`/participants/${participantId}/check-in?eventId=${encodeURIComponent(eventId)}`}>Start event check-in <ArrowRightIcon /></Link>
+            <Link className="secondary" to={`/participants/registrations/${registration.id}/history`}>View registration history</Link>
           </div>
         </section>
       </section>
@@ -151,7 +151,7 @@ export default function ParticipantV2RegistrationPage() {
       <Link className="participant-v2-back" to={profileLink}><ArrowLeftIcon /> Back to participant profile</Link>
       <header className="participant-v2-checkin-heading">
         <span><TicketIcon /></span>
-        <div><p>Registration workspace Â· V2</p><h1 id="participant-v2-registration-title">Register participant</h1><small>Confirm the participant is ready before creating their event registration.</small></div>
+        <div><p>Registration workspace</p><h1 id="participant-v2-registration-title">Register participant</h1><small>Confirm the participant is ready before creating their event registration.</small></div>
       </header>
       {error ? <p className="participant-v2-alert participant-v2-checkin-alert" role="alert">{error}</p> : null}
       <section className="participant-v2-checkin-card">
