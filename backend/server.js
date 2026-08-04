@@ -1,18 +1,17 @@
 const fs = require("fs");
-const http = require("http");
-const https = require("https"); // Added missing import
+const http = http = require("http");
+const https = require("https");
 const path = require("path");
 const cors = require("cors");
-const express = require("express"); // Added missing import
-const helmet = require("helmet"); // Added missing import
-const cookieParser = require("cookie-parser"); // Added missing import
-const YAML = require("yamljs"); // Added missing import for YAML parser
-const swaggerUi = require("swagger-ui-express"); // Added missing import
-const { Server } = require("socket.io"); // Added missing import
+const express = require("express");
+const helmet = require("helmet");
+const cookieParser = require("cookie-parser");
+const YAML = require("yamljs");
+const swaggerUi = require("swagger-ui-express");
+const { Server } = require("socket.io");
 const app = require("./app");
 const env = require("./config/env");
 const logger = require("./utils/logger/logger");
-
 
 // -----------------------------------------------------------------------------
 // 0. BACKGROUND WORKERS (Event-Driven Architecture)
@@ -133,8 +132,27 @@ app.use("/qr", qrRoutes);
 app.use("/participants", participantRoutes);
 app.use("/event-registrations", eventRegistrationRoutes);
 app.use("/events", eventRoutes);
-app.use("/queue", queueRoutes);
+app.use("/queues", queueRoutes);
 
+// -----------------------------------------------------------------------------
+// 5. GLOBAL ERROR HANDLER (Catches downstream async/sync errors cleanly)
+// -----------------------------------------------------------------------------
+app.use((err, req, res, next) => {
+  const statusCode = err.statusCode || 500;
+  logger.error(`[Global Error] ${err.message}`, { 
+    stack: err.stack, 
+    path: req.originalUrl, 
+    method: req.method 
+  });
+
+  res.status(statusCode).json({
+    success: false,
+    message: err.message || "Internal Server Error",
+    ...(process.env.NODE_ENV === "development" && { stack: err.stack }),
+  });
+});
+
+// 404 Handler for undefined routes
 app.use((req, res) => {
   res.status(404).json({
     success: false,
@@ -143,7 +161,7 @@ app.use((req, res) => {
 });
 
 // -----------------------------------------------------------------------------
-// 5. SERVER CREATION, SOCKET.IO & LISTENING
+// 6. SERVER CREATION, SOCKET.IO & LISTENING
 // -----------------------------------------------------------------------------
 let server;
 
@@ -160,6 +178,17 @@ if (!env.isProduction && env.localHttps) {
 }
 
 const io = new Server(server, { cors: corsOptions });
+
+// Make io accessible globally via Express context for web sockets & controllers
+app.set("io", io);
+
+io.on("connection", (socket) => {
+  logger.info(`Client connected: ${socket.id}`);
+  
+  socket.on("disconnect", () => {
+    logger.info(`Client disconnected: ${socket.id}`);
+  });
+});
 
 server.on("error", (error) => {
   logger.error("server.failed", { message: error.message, stack: error.stack });

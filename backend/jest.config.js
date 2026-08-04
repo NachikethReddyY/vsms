@@ -8,8 +8,13 @@ module.exports = {
   // The test environment that will be used for testing (Node environment for backend)
   testEnvironment: "node",
 
+  // Transform files using babel-jest
+  transform: {
+    "^.+\\.(js|jsx|ts|tsx)$": "babel-jest",
+  },
+
   // Allows Jest to transform modern ES modules inside node_modules like 'uuid'
   transformIgnorePatterns: [
-    "/node_modules/(?!uuid)"
+    "/node_modules/(?!(uuid)/)"
   ],
 };

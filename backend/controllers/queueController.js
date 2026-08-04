@@ -47,13 +47,23 @@ exports.getParticipantQueueStatus = async (req, res) => {
   }
 };
 
-// 3. Register/join a participant into a queue line
+// 3. Register/join a participant into a queue line (Idempotent Handle)
 exports.joinQueue = async (req, res) => {
   try {
     const { eventId, participantId, initialStationId } = req.body;
 
     if (!eventId || !participantId) {
       return res.status(400).json({ success: false, message: "Event ID and Participant ID are required." });
+    }
+
+    // Check if already active in queue to ensure safe idempotency behavior
+    const existingQueue = await queueModel.getQueueByParticipantAndEvent(participantId, eventId);
+    if (existingQueue) {
+      return res.status(200).json({
+        success: true,
+        message: "Participant is already active in this event's queue.",
+        data: existingQueue,
+      });
     }
 
     const newQueueItem = await queueModel.addParticipantToQueue(eventId, participantId, initialStationId);
@@ -66,6 +76,12 @@ exports.joinQueue = async (req, res) => {
       { eventId, participantId },
       req.ip
     );
+
+    // Broadcast real-time update via Socket.IO if configured
+    const io = req.app.get("io");
+    if (io) {
+      io.to(`event-${eventId}`).emit("queue-updated", { eventId, action: "JOIN", data: newQueueItem });
+    }
 
     return res.status(201).json({
       success: true,
@@ -90,6 +106,10 @@ exports.advanceQueue = async (req, res) => {
 
     const updatedItem = await queueModel.updateQueuePosition(queueId, nextStationId, status);
 
+    if (!updatedItem) {
+      return res.status(404).json({ success: false, message: "Queue entry not found." });
+    }
+
     // Emit audit trail log
     await logAudit(
       req.user?.id,
@@ -98,6 +118,12 @@ exports.advanceQueue = async (req, res) => {
       { queueId, participantId: updatedItem.participantId, nextStationId },
       req.ip
     );
+
+    // Broadcast real-time update via Socket.IO
+    const io = req.app.get("io");
+    if (io && updatedItem.eventId) {
+      io.to(`event-${updatedItem.eventId}`).emit("queue-updated", { eventId: updatedItem.eventId, action: "ADVANCE", data: updatedItem });
+    }
 
     return res.status(200).json({
       success: true,
@@ -121,6 +147,10 @@ exports.leaveQueue = async (req, res) => {
 
     const removedItem = await queueModel.removeQueueItem(queueId);
 
+    if (!removedItem) {
+      return res.status(404).json({ success: false, message: "Queue entry not found." });
+    }
+
     // Emit audit trail log
     await logAudit(
       req.user?.id,
@@ -129,6 +159,12 @@ exports.leaveQueue = async (req, res) => {
       { queueId, participantId: removedItem?.participantId },
       req.ip
     );
+
+    // Broadcast real-time update via Socket.IO
+    const io = req.app.get("io");
+    if (io && removedItem.eventId) {
+      io.to(`event-${removedItem.eventId}`).emit("queue-updated", { eventId: removedItem.eventId, action: "LEAVE", queueId });
+    }
 
     return res.status(200).json({
       success: true,
