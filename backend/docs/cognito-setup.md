@@ -39,10 +39,10 @@ aws cognito-idp admin-add-user-to-group --user-pool-id YOUR_POOL_ID --username o
 Create the matching local profile without a password:
 
 ```powershell
-npm run provision-staff -- officer@example.com "Registration Officer" RO-001 REGISTRATION_OFFICER
+pnpm provision-staff -- officer@example.com "Registration Officer" RO-001 REGISTRATION_OFFICER
 ```
 
-Repeat with the Cognito group and local role required by the staff member. The supported pairs are `Admin`/`ADMINISTRATOR`, `EventManager`/`EVENT_MANAGER`, `RegistrationOfficer`/`REGISTRATION_OFFICER`, `Screener`/`SCREENER`, and `Reviewer`/`REVIEWER`. Both the verified Cognito group and local role must match; an inactive local account or missing group receives `403`.
+Repeat with the Cognito group and local role required by the staff member. The supported pairs are `Admin` (or legacy `ADMIN`)/`ADMINISTRATOR`, `EventManager`/`EVENT_MANAGER`, `RegistrationOfficer`/`REGISTRATION_OFFICER`, `Screener`/`SCREENER`, `Reviewer`/`REVIEWER`, and `Support`/`SUPPORT`. Support accounts receive assigned event and shift visibility only; they cannot access participant data, registration, screening, clinical review, organisation accounts, or event deletion. Both the verified Cognito group and local role must match; an inactive local account or missing group receives `403`.
 
 Selecting Sign in redirects the browser to Cognito managed login. Cognito handles temporary-password changes, password recovery, and MFA before returning an authorization code to `/auth/callback`; the backend exchanges it with PKCE and stores tokens only in HttpOnly cookies.
 
