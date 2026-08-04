@@ -1310,10 +1310,10 @@ paths:
     post:
       tags: [QR Codes]
       operationId: manualQrCheckIn
-      summary: Check in a participant using a registration ID or identifier
+      summary: Check in a participant using a registration reference or QR token
       requestBody: { required: true, content: { application/json: { schema: { $ref: "#/components/schemas/ManualCheckInRequest" } } } }
       responses:
-        "200": { description: Participant checked in, content: { application/json: { schema: { $ref: "#/components/schemas/ApiDataResponse" } } } }
+        "200": { description: Participant checked in, content: { application/json: { schema: { $ref: "#/components/schemas/ManualCheckInResponse" } } } }
         "400": { $ref: "#/components/responses/ValidationFailed" }
         "401": { $ref: "#/components/responses/Unauthorized" }
         "404": { $ref: "#/components/responses/NotFound" }
@@ -3135,9 +3135,28 @@ components:
       required: [eventId]
       properties:
         registrationId: { type: string, format: uuid }
-        identifier: { type: string }
+        identifier: { type: string, pattern: "^[a-fA-F0-9]{64}$", description: Active QR pass token only; NRIC lookup is not supported. }
         eventId: { type: string, format: uuid }
-      description: Supply either registrationId or identifier together with eventId.
+      description: Supply exactly one registrationId or active QR token together with eventId. NRIC lookup is not supported.
+    ManualCheckInResult:
+      type: object
+      additionalProperties: false
+      required: [registrationId, eventId, registrationStatus, checkedIn, checkedInAt, queueNumber]
+      properties:
+        registrationId: { type: string, format: uuid }
+        eventId: { type: string, format: uuid }
+        registrationStatus: { $ref: "#/components/schemas/RegistrationStatus" }
+        checkedIn: { type: boolean, enum: [true] }
+        checkedInAt: { type: string, format: date-time }
+        queueNumber: { type: integer, nullable: true }
+    ManualCheckInResponse:
+      type: object
+      additionalProperties: false
+      required: [success, data]
+      properties:
+        success: { type: boolean, enum: [true] }
+        message: { type: string }
+        data: { $ref: "#/components/schemas/ManualCheckInResult" }
     ScreeningStation:
       type: object
       additionalProperties: true

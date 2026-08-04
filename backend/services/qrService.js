@@ -3,6 +3,7 @@ const crypto = require("crypto");
 const prisma = require("../prisma/prismaClient");
 const env = require("../config/env");
 const { decrypt, encrypt, encryptionContext } = require("../utils/cryptoUtils");
+const { assertUuid } = require("../utils/validation");
 const AppError = require("../errors/AppError");
 
 function buildQRTargetUrl(token) {
@@ -56,6 +57,26 @@ const qrLookupRegistration = (registration) => ({
     registrationStatus: registration.registrationStatus,
     checkedIn: registration.checkedIn,
 });
+
+const manualCheckInRegistrationSelect = {
+    registrationId: true,
+    eventId: true,
+    registrationStatus: true,
+    checkedIn: true,
+    checkedInAt: true,
+    queueNumber: true,
+};
+
+const manualCheckInRegistration = (registration) => ({
+    registrationId: registration.registrationId,
+    eventId: registration.eventId,
+    registrationStatus: registration.registrationStatus,
+    checkedIn: registration.checkedIn,
+    checkedInAt: registration.checkedInAt,
+    queueNumber: registration.queueNumber,
+});
+
+const QR_TOKEN_PATTERN = /^[a-f0-9]{64}$/i;
 
 const decryptQrToken = (qr) => {
     if (qr.tokenEncryptionVersion !== 2 || !qr.tokenCiphertext) {
@@ -433,18 +454,27 @@ exports.printQR = async (qrId, db = prisma) => {
 // Manual Check-In Procedure
 // ==========================================
 exports.manualCheckIn = async (params, db = prisma) => {
-    const { registrationId, identifier, eventId, userId } =
+    let { registrationId, identifier, eventId, userId } =
         typeof params === "object" ? params : { registrationId: params };
 
-    if (!registrationId && !identifier) {
-        throw new AppError(400, "IDENTIFIER_REQUIRED", "Registration ID or Identifier is required.");
+    if (!eventId) {
+        throw new AppError(400, "EVENT_ID_REQUIRED", "Event ID is required for manual check-in.");
     }
+    eventId = assertUuid(eventId, "eventId");
+
+    if (Boolean(registrationId) === Boolean(identifier)) {
+        throw new AppError(400, "CHECKIN_REFERENCE_REQUIRED", "Supply exactly one registration reference or QR token.");
+    }
+    if (registrationId) registrationId = assertUuid(registrationId, "registrationId");
+    if (identifier && (typeof identifier !== "string" || !QR_TOKEN_PATTERN.test(identifier))) {
+        throw new AppError(400, "INVALID_QR", "QR Code is invalid, expired, or unavailable.");
+    }
+    if (identifier) identifier = identifier.toLowerCase();
 
     return await db.$transaction(async (tx) => {
         let regIdToUpdate = registrationId;
 
         if (!regIdToUpdate && identifier) {
-            // Step A: Search by QR Token
             const qr = await tx.qRCodePass.findFirst({
                 where: activeQrWhere(tokenSelector(identifier)),
                 select: {
@@ -458,22 +488,6 @@ exports.manualCheckIn = async (params, db = prisma) => {
                     throw new AppError(400, "QR_EVENT_MISMATCH", "QR Code is not valid for this specific event.");
                 }
                 regIdToUpdate = qr.registrationId;
-            } else {
-                // Step B: Search by Encrypted NRIC
-                const encryptedIdentifier = encrypt(identifier, encryptionContext("ManualCheckIn", eventId || "unscoped", "identifier"));
-                const participant = await tx.participant.findFirst({
-                    where: { nric: encryptedIdentifier },
-                });
-
-                if (participant) {
-                    const registration = await tx.eventRegistration.findFirst({
-                        where: {
-                            participantId: participant.id,
-                            ...(eventId ? { eventId } : {}),
-                        },
-                    });
-                    if (registration) regIdToUpdate = registration.registrationId;
-                }
             }
         }
 
@@ -484,22 +498,40 @@ exports.manualCheckIn = async (params, db = prisma) => {
         const registration = await tx.eventRegistration.findFirst({
             where: {
                 registrationId: regIdToUpdate,
-                ...(eventId ? { eventId } : {}),
+                eventId,
             },
-            select: { registrationId: true },
+            select: manualCheckInRegistrationSelect,
         });
         if (!registration) {
             throw new AppError(404, "REGISTRATION_NOT_FOUND", "Registration record was not found for this event.");
         }
+        if (registration.registrationStatus !== "SIGNED_UP" || registration.checkedIn) {
+            throw new AppError(409, "CHECKIN_STATE_CONFLICT", "Only a signed-up participant can be checked in.");
+        }
 
-        const updatedRegistration = await tx.eventRegistration.update({
-            where: { registrationId: registration.registrationId },
+        const checkedInAt = new Date();
+        const updated = await tx.eventRegistration.updateMany({
+            where: {
+                registrationId: registration.registrationId,
+                eventId,
+                registrationStatus: "SIGNED_UP",
+                checkedIn: false,
+            },
             data: {
                 checkedIn: true,
-                checkedInAt: new Date(),
+                checkedInAt,
                 registrationStatus: "CHECKED_IN",
             },
-            include: { participant: true, event: true },
+        });
+        if (updated.count !== 1) {
+            throw new AppError(409, "CHECKIN_STATE_CONFLICT", "Registration was changed before check-in completed.");
+        }
+
+        const result = manualCheckInRegistration({
+            ...registration,
+            registrationStatus: "CHECKED_IN",
+            checkedIn: true,
+            checkedInAt,
         });
 
         await writeAudit(tx, {
@@ -508,11 +540,11 @@ exports.manualCheckIn = async (params, db = prisma) => {
             entityName: "EventRegistration",
             entityId: regIdToUpdate,
             newValue: {
-                identifierUsed: identifier || "REGISTRATION_ID",
-                eventId: updatedRegistration.eventId,
+                eventId: result.eventId,
+                checkInMethod: identifier ? "QR_TOKEN" : "REGISTRATION_REFERENCE",
             },
         });
 
-        return updatedRegistration;
+        return result;
     });
 };

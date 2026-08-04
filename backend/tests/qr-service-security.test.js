@@ -237,3 +237,163 @@ test("verification rejects any pass that does not satisfy the shared active-expi
     (error) => error.code === "INVALID_QR" && error.status === 404,
   );
 });
+
+test("manual QR check-in writes no bearer or participant data and returns a minimal projection", async () => {
+  const token = "e".repeat(64);
+  let qrQuery;
+  let registrationQuery;
+  let updateQuery;
+  let audit;
+  const db = {
+    $transaction: async (work) => work({
+      qRCodePass: {
+        findFirst: async (query) => {
+          qrQuery = query;
+          return { registrationId, registration: { eventId } };
+        },
+      },
+      eventRegistration: {
+        findFirst: async (query) => {
+          registrationQuery = query;
+          return {
+            registrationId,
+            eventId,
+            registrationStatus: "SIGNED_UP",
+            checkedIn: false,
+            checkedInAt: null,
+            queueNumber: 7,
+            participant: { nric: "encrypted-nric", firstName: "Ada" },
+            event: { name: "Internal event" },
+          };
+        },
+        updateMany: async (query) => {
+          updateQuery = query;
+          return { count: 1 };
+        },
+      },
+      auditLog: { create: async ({ data }) => { audit = data; return data; } },
+    }),
+  };
+
+  const result = await qrService.manualCheckIn({ identifier: token, eventId, userId: qrId }, db);
+
+  assert.deepEqual(qrQuery.select, {
+    registrationId: true,
+    registration: { select: { eventId: true } },
+  });
+  assert.equal(qrQuery.where.tokenHash, tokenHash(token));
+  assert.equal(JSON.stringify(qrQuery).includes(token), false);
+  assert.deepEqual(registrationQuery.select, {
+    registrationId: true,
+    eventId: true,
+    registrationStatus: true,
+    checkedIn: true,
+    checkedInAt: true,
+    queueNumber: true,
+  });
+  assert.deepEqual(updateQuery.where, {
+    registrationId,
+    eventId,
+    registrationStatus: "SIGNED_UP",
+    checkedIn: false,
+  });
+  assert.equal(updateQuery.data.registrationStatus, "CHECKED_IN");
+  assert.equal(updateQuery.data.checkedIn, true);
+  assert.ok(updateQuery.data.checkedInAt instanceof Date);
+  assert.deepEqual(audit.newValue, { eventId, checkInMethod: "QR_TOKEN" });
+  assert.equal(JSON.stringify(audit).includes(token), false);
+  assert.equal(JSON.stringify(audit).includes("encrypted-nric"), false);
+  assert.deepEqual(Object.keys(result).sort(), ["checkedIn", "checkedInAt", "eventId", "queueNumber", "registrationId", "registrationStatus"]);
+  assert.equal(result.registrationStatus, "CHECKED_IN");
+  assert.equal(result.checkedIn, true);
+  assert.equal(JSON.stringify(result).includes("Ada"), false);
+  assert.equal(JSON.stringify(result).includes("encrypted-nric"), false);
+});
+
+test("manual registration-reference check-in does not resolve participant identifiers", async () => {
+  let qrLookup = false;
+  let audit;
+  const db = {
+    $transaction: async (work) => work({
+      qRCodePass: { findFirst: async () => { qrLookup = true; return null; } },
+      eventRegistration: {
+        findFirst: async () => ({
+          registrationId,
+          eventId,
+          registrationStatus: "SIGNED_UP",
+          checkedIn: false,
+          checkedInAt: null,
+          queueNumber: null,
+        }),
+        updateMany: async () => ({ count: 1 }),
+      },
+      auditLog: { create: async ({ data }) => { audit = data; return data; } },
+    }),
+  };
+
+  const result = await qrService.manualCheckIn({ registrationId, eventId, userId: qrId }, db);
+
+  assert.equal(qrLookup, false);
+  assert.deepEqual(audit.newValue, { eventId, checkInMethod: "REGISTRATION_REFERENCE" });
+  assert.deepEqual(Object.keys(result).sort(), ["checkedIn", "checkedInAt", "eventId", "queueNumber", "registrationId", "registrationStatus"]);
+});
+
+test("manual check-in rejects NRIC input and QR tokens from another event", async () => {
+  let openedTransaction = false;
+  const invalidDb = { $transaction: async () => { openedTransaction = true; } };
+  await assert.rejects(
+    qrService.manualCheckIn({ identifier: "S1234567A", eventId, userId: qrId }, invalidDb),
+    (error) => error.code === "INVALID_QR" && error.status === 400,
+  );
+  assert.equal(openedTransaction, false);
+
+  let updated = false;
+  const wrongEventDb = {
+    $transaction: async (work) => work({
+      qRCodePass: { findFirst: async () => ({ registrationId, registration: { eventId: "99999999-9999-4999-8999-999999999999" } }) },
+      eventRegistration: { updateMany: async () => { updated = true; return { count: 1 }; } },
+      auditLog: { create: async () => ({}) },
+    }),
+  };
+  await assert.rejects(
+    qrService.manualCheckIn({ identifier: "f".repeat(64), eventId, userId: qrId }, wrongEventDb),
+    (error) => error.code === "QR_EVENT_MISMATCH" && error.status === 400,
+  );
+  assert.equal(updated, false);
+});
+
+test("manual check-in cannot reopen terminal registrations or win a stale update race", async () => {
+  for (const [registrationStatus, checkedIn] of [["CANCELLED", false], ["COMPLETED", false], ["CHECKED_IN", true]]) {
+    let updated = false;
+    const db = {
+      $transaction: async (work) => work({
+        eventRegistration: {
+          findFirst: async () => ({ registrationId, eventId, registrationStatus, checkedIn, checkedInAt: null, queueNumber: 1 }),
+          updateMany: async () => { updated = true; return { count: 1 }; },
+        },
+        auditLog: { create: async () => ({}) },
+      }),
+    };
+    await assert.rejects(
+      qrService.manualCheckIn({ registrationId, eventId, userId: qrId }, db),
+      (error) => error.code === "CHECKIN_STATE_CONFLICT" && error.status === 409,
+    );
+    assert.equal(updated, false);
+  }
+
+  let auditWrites = 0;
+  const staleDb = {
+    $transaction: async (work) => work({
+      eventRegistration: {
+        findFirst: async () => ({ registrationId, eventId, registrationStatus: "SIGNED_UP", checkedIn: false, checkedInAt: null, queueNumber: 1 }),
+        updateMany: async () => ({ count: 0 }),
+      },
+      auditLog: { create: async () => { auditWrites += 1; return {}; } },
+    }),
+  };
+  await assert.rejects(
+    qrService.manualCheckIn({ registrationId, eventId, userId: qrId }, staleDb),
+    (error) => error.code === "CHECKIN_STATE_CONFLICT" && error.status === 409,
+  );
+  assert.equal(auditWrites, 0);
+});
