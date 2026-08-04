@@ -78,17 +78,57 @@ test("event service exposes list functions after merge resolution", () => {
 test("listStationTemplates reads active StationTemplate rows", () => {
     const source = read("services/eventService.js");
     const listFn = source.slice(source.indexOf("const listStationTemplates"));
-    assert.match(listFn, /stationTemplate\.findMany/);
-    assert.match(listFn, /active:\s*true/);
-    assert.match(listFn, /stationTemplateId:\s*true/);
-    assert.match(listFn, /templateKey:\s*true/);
-    assert.match(listFn, /defaultCapacity:\s*true/);
-    assert.doesNotMatch(listFn.slice(0, listFn.indexOf("stationTemplatesUnavailable")), /return\s+\[\];/);
+    const end = listFn.indexOf("\nconst importStations");
+    const body = end === -1 ? listFn : listFn.slice(0, end);
+    assert.match(body, /stationTemplate\.findMany/);
+    assert.match(body, /active:\s*true/);
+    assert.match(body, /stationTemplateId:\s*true/);
+    assert.match(body, /templateKey:\s*true/);
+    assert.match(body, /defaultCapacity:\s*true/);
+    assert.doesNotMatch(body, /return\s+\[\];/);
+});
+
+test("importStations and updateStation use Prisma Station not EventStation", () => {
+    const source = read("services/eventService.js");
+    assert.match(source, /const importStations = async/);
+    assert.match(source, /const updateStation = async/);
+    assert.doesNotMatch(source, /STATION_TEMPLATES_NOT_AVAILABLE/);
+    assert.doesNotMatch(source, /tx\.eventStation\./);
+    const importFn = source.slice(source.indexOf("const importStations = async"));
+    const importBody = importFn.slice(0, importFn.indexOf("\nconst updateStation"));
+    assert.match(importBody, /tx\.station\.(create|update|upsert)/);
+    assert.match(importBody, /STATION_TEMPLATE_NOT_IMPORTABLE/);
+    assert.match(importBody, /classifyTemplates|stationTypeForTemplateKey/);
+    const updateFn = source.slice(source.indexOf("const updateStation = async"));
+    const updateBody = updateFn.slice(0, updateFn.indexOf("\nconst addStaffAssignment"));
+    assert.match(updateBody, /tx\.station\.update/);
+    assert.match(updateBody, /isActive:\s*body\.isAvailable/);
+});
+
+test("station template mapping only imports screening StationTypes", () => {
+    const mapping = require("../services/stationTemplateMapping");
+    assert.equal(mapping.stationTypeForTemplateKey("VISUAL_ACUITY"), "VISUAL_ACUITY");
+    assert.equal(mapping.stationTypeForTemplateKey("REFRACTION"), "REFRACTION");
+    assert.equal(mapping.stationTypeForTemplateKey("COLOUR_VISION"), "COLOUR_VISION");
+    assert.equal(mapping.stationTypeForTemplateKey("EYE_HEALTH"), "EYE_HEALTH");
+    assert.equal(mapping.stationTypeForTemplateKey("REGISTRATION"), null);
+    assert.equal(mapping.stationTypeForTemplateKey("CLINICAL_REVIEW"), null);
+
+    const { importable, skipped } = mapping.classifyTemplates([
+        { templateKey: "REGISTRATION", name: "Registration" },
+        { templateKey: "VISUAL_ACUITY", name: "Visual acuity" },
+        { templateKey: "CLINICAL_REVIEW", name: "Clinical review" },
+        { templateKey: "EYE_HEALTH", name: "Eye health" },
+    ]);
+    assert.deepEqual(importable.map(({ stationType }) => stationType), ["VISUAL_ACUITY", "EYE_HEALTH"]);
+    assert.deepEqual(skipped.map((template) => template.templateKey), ["REGISTRATION", "CLINICAL_REVIEW"]);
 });
 
 test("participant search matches any supplied identifier", () => {
+    const service = read("services/participantService.js");
     const controller = read("controllers/participantController.js");
-    assert.match(controller, /return\s+\{\s*OR:\s*clauses\s*\}/);
+    assert.match(service, /return\s+\{\s*OR:\s*clauses\s*\}/);
+    assert.match(controller, /searchParticipantsService/);
 });
 
 test("development authentication uses the local credential service", () => {
