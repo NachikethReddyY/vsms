@@ -1,6 +1,6 @@
 import axios, { type AxiosError, type InternalAxiosRequestConfig } from "axios";
 import type { AuthSession } from "../types";
-import { clearStoredSession, getStoredSession, setStoredSession } from "./session";
+import { clearStoredSession, getStoredSession, markLogoutPending, setStoredSession } from "./session";
 import { getCognitoAuthorizeUrl } from "./cognitoAuth";
 
 const baseURL = import.meta.env.VITE_API_BASE_URL ?? "/api/v1";
@@ -11,6 +11,8 @@ let accessToken: string | null = null;
 let csrfToken: string | null = null;
 let refreshPromise: Promise<AuthSession> | null = null;
 let loginRedirectStarted = false;
+let logoutStarted = false;
+let authGeneration = 0;
 
 export function setSessionTokens(tokens: TokenPayload | null) {
   accessToken = tokens?.accessToken || null;
@@ -18,9 +20,17 @@ export function setSessionTokens(tokens: TokenPayload | null) {
 }
 
 export function getCsrfToken() {
-  if (csrfToken) return csrfToken;
   const match = document.cookie.match(/(?:^|; )vsms_csrf=([^;]+)/);
-  return match ? decodeURIComponent(match[1]) : null;
+  return match ? decodeURIComponent(match[1]) : csrfToken;
+}
+
+export function beginLogout() {
+  authGeneration += 1;
+  logoutStarted = true;
+  refreshPromise = null;
+  setSessionTokens(null);
+  clearStoredSession();
+  markLogoutPending();
 }
 
 function getDeviceId() {
@@ -51,7 +61,7 @@ const refreshClient = axios.create({ baseURL, withCredentials: true, headers: co
 apiClient.interceptors.request.use((config) => {
   config.headers["X-Device-Id"] = getDeviceId();
   config.headers["X-Device-Name"] = "VSMS staff web";
-  const eventId = getEventContext();
+  const eventId = logoutStarted ? null : getEventContext();
   if (eventId) config.headers["X-Event-Id"] = eventId;
 
   if (accessToken) config.headers.Authorization = `Bearer ${accessToken}`;
@@ -63,6 +73,7 @@ apiClient.interceptors.request.use((config) => {
 });
 
 async function rotateSession(): Promise<AuthSession> {
+  const requestGeneration = authGeneration;
   const response = await refreshClient.post("/auth/refresh", {}, {
     headers: {
       "X-CSRF-Token": getCsrfToken(),
@@ -70,6 +81,7 @@ async function rotateSession(): Promise<AuthSession> {
       "X-Device-Name": "VSMS staff web",
     },
   });
+  if (requestGeneration !== authGeneration) throw new Error("Auth session was cleared");
   setSessionTokens(response.data);
   const session = {
     user: response.data.user,
@@ -101,7 +113,7 @@ apiClient.interceptors.response.use(
       } catch (refreshError) {
         setSessionTokens(null);
         clearStoredSession();
-        if (!loginRedirectStarted) {
+        if (!logoutStarted && !loginRedirectStarted) {
           loginRedirectStarted = true;
           window.location.replace(getCognitoAuthorizeUrl(`${window.location.pathname}${window.location.search}`));
         }

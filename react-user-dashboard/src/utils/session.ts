@@ -1,6 +1,8 @@
 import type { AuthSession } from "../types";
 
 const SESSION_KEY = "vsms_staff_session";
+const EVENT_CONTEXT_KEY = "vsms_event_id";
+const LOGOUT_PENDING_KEY = "vsms_logout_pending";
 export const REFERRAL_ISSUE_STORAGE_PREFIX = "vsms.referral-issue:";
 
 function canUseStorage() {
@@ -29,6 +31,33 @@ export function setStoredSession(session: AuthSession) {
   window.sessionStorage.setItem(SESSION_KEY, JSON.stringify(session));
 }
 
+export function isLogoutPending() {
+  if (!canUseStorage()) return false;
+  try {
+    return window.sessionStorage.getItem(LOGOUT_PENDING_KEY) === "true";
+  } catch {
+    return false;
+  }
+}
+
+export function markLogoutPending() {
+  if (!canUseStorage()) return;
+  try {
+    window.sessionStorage.setItem(LOGOUT_PENDING_KEY, "true");
+  } catch {
+    // The in-memory logout guard still prevents a same-page reauthorization.
+  }
+}
+
+export function clearLogoutPending() {
+  if (!canUseStorage()) return;
+  try {
+    window.sessionStorage.removeItem(LOGOUT_PENDING_KEY);
+  } catch {
+    // A successful sign-in remains usable even if storage is unavailable.
+  }
+}
+
 export function clearStoredReferralIssues() {
   if (!canUseStorage()) return;
   try {
@@ -44,6 +73,7 @@ export function clearStoredSession() {
   if (!canUseStorage()) return;
   try {
     window.sessionStorage.removeItem(SESSION_KEY);
+    window.sessionStorage.removeItem(EVENT_CONTEXT_KEY);
   } catch {
     // Continue so referral recovery metadata is still given its own cleanup attempt.
   }

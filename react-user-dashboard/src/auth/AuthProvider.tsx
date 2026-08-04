@@ -1,7 +1,7 @@
 import { createContext, useContext, useEffect, useMemo, useState, type PropsWithChildren } from "react";
 import type { AuthSession } from "../types";
-import { getCsrfToken, refreshAuthSession, setSessionTokens } from "../utils/apiClient";
-import { clearStoredSession, getStoredSession, setStoredSession } from "../utils/session";
+import { beginLogout, getCsrfToken, refreshAuthSession, setSessionTokens } from "../utils/apiClient";
+import { clearLogoutPending, clearStoredSession, getStoredSession, isLogoutPending, setStoredSession } from "../utils/session";
 
 interface AuthContextValue {
   session: AuthSession | null;
@@ -16,7 +16,7 @@ export function AuthProvider({ children }: PropsWithChildren) {
   const [session, setSessionState] = useState<AuthSession | null>(() => getStoredSession());
 
   useEffect(() => {
-    if (!getCsrfToken()) return;
+    if (!getCsrfToken() || isLogoutPending()) return;
     refreshAuthSession()
       .then(setSessionState)
       .catch(() => {
@@ -31,12 +31,12 @@ export function AuthProvider({ children }: PropsWithChildren) {
       session,
       isAuthenticated: Boolean(session?.user?.id && session.expiresAt > Date.now()),
       setSession(nextSession) {
+        clearLogoutPending();
         setStoredSession(nextSession);
         setSessionState(nextSession);
       },
       clearSession() {
-        setSessionTokens(null);
-        clearStoredSession();
+        beginLogout();
         setSessionState(null);
       },
     }),

@@ -12,17 +12,31 @@ process.env.COGNITO_LOGOUT_URI = "https://localhost:5173";
 
 const app = require("../app");
 
-test("logout clears browser auth without requiring a valid access token", async () => {
+for (const route of ["logout", "global-logout"]) {
+    test(`${route} clears browser auth without requiring a valid access token`, async () => {
+        const response = await request(app)
+            .post(`/api/v1/auth/${route}`)
+            .set("Origin", "https://localhost:5173")
+            .set("Cookie", "vsms_csrf=test-token")
+            .set("X-CSRF-Token", "test-token")
+            .send({});
+
+        assert.equal(response.status, 200);
+        assert.equal(response.body.logoutUrl, "https://vsms.auth.us-east-1.amazoncognito.com/logout?client_id=test-client&logout_uri=https%3A%2F%2Flocalhost%3A5173");
+        assert.ok(response.headers["set-cookie"].every((value) => value.includes("Max-Age=0")));
+    });
+}
+
+test("logout does not clear cookies when CSRF validation rejects the request", async () => {
     const response = await request(app)
         .post("/api/v1/auth/logout")
         .set("Origin", "https://localhost:5173")
         .set("Cookie", "vsms_csrf=test-token")
-        .set("X-CSRF-Token", "test-token")
         .send({});
 
-    assert.equal(response.status, 200);
-    assert.equal(response.body.logoutUrl, "https://vsms.auth.us-east-1.amazoncognito.com/logout?client_id=test-client&logout_uri=https%3A%2F%2Flocalhost%3A5173");
-    assert.ok(response.headers["set-cookie"].every((value) => value.includes("Max-Age=0")));
+    assert.equal(response.status, 403);
+    assert.equal(response.body.code, "CSRF_VALIDATION_FAILED");
+    assert.equal(response.headers["set-cookie"], undefined);
 });
 
 test("logout does not wait for Cognito global sign-out", async () => {
