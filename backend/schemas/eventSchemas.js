@@ -185,6 +185,26 @@ const listQuery = z.object({
   search: z.string().trim().max(150).optional(),
 }).strict();
 const auditQuery = z.object({ cursor: z.string().max(2048).optional(), limit: z.coerce.number().int().min(1).max(100).default(50) }).strict();
+const reportDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Use an ISO calendar date").refine(
+  (value) => !Number.isNaN(new Date(`${value}T00:00:00.000Z`).getTime()),
+  "Use a valid calendar date",
+);
+const reportQuery = z.object({
+  eventId: uuid.optional(),
+  from: reportDate.optional(),
+  to: reportDate.optional(),
+}).strict().superRefine((value, ctx) => {
+  if (!value.from || !value.to) return;
+  const from = new Date(`${value.from}T00:00:00.000Z`);
+  const to = new Date(`${value.to}T00:00:00.000Z`);
+  if (to < from) {
+    ctx.addIssue({ code: "custom", path: ["to"], message: "Report end date must be on or after the start date" });
+    return;
+  }
+  if (to.getTime() - from.getTime() > 366 * 86400000) {
+    ctx.addIssue({ code: "custom", path: ["to"], message: "Report date range cannot exceed 366 days" });
+  }
+});
 
 const assignmentParams = z.object({ eventId: uuid, shiftId: uuid }).strict();
 const assignmentDeleteParams = z.object({ eventId: uuid, shiftId: uuid, assignmentId: uuid }).strict();
@@ -222,6 +242,7 @@ module.exports = {
   eventParams,
   listQuery,
   auditQuery,
+  reportQuery,
   assignmentParams,
   assignmentDeleteParams,
   versionQuery,

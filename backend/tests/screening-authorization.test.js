@@ -11,7 +11,7 @@ const { stationTypeForTemplateKey } = require("../services/stationTemplateMappin
 const eventId = crypto.randomUUID();
 const stationA = crypto.randomUUID();
 const stationB = crypto.randomUUID();
-const user = { userId: crypto.randomUUID(), systemRole: "STAFF" };
+const user = { userId: crypto.randomUUID(), systemRole: "STAFF", roles: ["SCREENER"] };
 
 function replace(t, target, key, value) {
   const original = target[key];
@@ -52,4 +52,41 @@ test("only a screener assigned to the requested station can read its queue", asy
   const queue = await screeningService.listQueue(eventId, stationA, user);
   assert.deepEqual(queue.registrations, []);
   assert.equal(stationTypeForTemplateKey("EYE_HEALTH"), null);
+});
+
+test("an administrator remains denied even if a screener role is misconfigured", async (t) => {
+  let eventChecked = false;
+  replace(t, prisma.event, "findUnique", async () => { eventChecked = true; return null; });
+
+  await assert.rejects(
+    screeningService.listStations(eventId, { ...user, roles: ["ADMINISTRATOR", "SCREENER"] }),
+    (error) => error.status === 403 && error.code === "SCREENER_ROLE_REQUIRED",
+  );
+  assert.equal(eventChecked, false);
+});
+
+test("assigned stations publish an offline expiry capped by the event and active shift", async (t) => {
+  const eventEndsAt = new Date("2026-08-04T12:00:00.000Z");
+  const laterShiftEnd = new Date("2026-08-04T14:00:00.000Z");
+  const earlierShiftEnd = new Date("2026-08-04T11:00:00.000Z");
+  replace(t, prisma.event, "findUnique", async () => ({
+    eventId, name: "Live", status: "IN_PROGRESS", venue: "Hall", endsAt: eventEndsAt,
+  }));
+  replace(t, prisma.staffAssignment, "findFirst", async () => ({ id: crypto.randomUUID() }));
+  replace(t, prisma.staffAssignment, "findMany", async () => ([
+    { stationId: stationA, shift: { endsAt: laterShiftEnd } },
+    { stationId: stationB, shift: { endsAt: earlierShiftEnd } },
+  ]));
+  replace(t, prisma.station, "findMany", async ({ where }) => {
+    assert.deepEqual(where.stationId.in, [stationA, stationB]);
+    return [
+      { stationId: stationA, eventId, stationType: "VISUAL_ACUITY", stationName: "VA", stationOrder: 1, isActive: true },
+      { stationId: stationB, eventId, stationType: "REFRACTION", stationName: "Refraction", stationOrder: 2, isActive: true },
+    ];
+  });
+
+  const result = await screeningService.listStations(eventId, user);
+
+  assert.equal(result.stations[0].offlineAccessExpiresAt, eventEndsAt.toISOString());
+  assert.equal(result.stations[1].offlineAccessExpiresAt, earlierShiftEnd.toISOString());
 });
