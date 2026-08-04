@@ -54,7 +54,14 @@ describe("clinical review context and request contract", () => {
   });
 
   test("referral fields are accepted only for referral outcomes", () => {
-    const common = { contextVersion: "a".repeat(64), confirmed: true, clinicalSummary: "Clear clinical summary" };
+    const common = {
+      contextVersion: "a".repeat(64),
+      confirmed: true,
+      clinicalSummary: "Clear clinical summary",
+      signatureObjectKey: "signatures/10000000-0000-4000-8000-000000000001/review-decision-10000000-0000-4000-8000-000000000002-10000000-0000-4000-8000-000000000003.png",
+      signatureSha256: "b".repeat(64),
+      signatureMimeType: "image/png",
+    };
     expect(reviewDecisionBody.safeParse({ ...common, outcome: "COMPLETE" }).success).toBe(true);
     expect(reviewDecisionBody.safeParse({ ...common, outcome: "COMPLETE", referral: { destinationName: "Eye clinic", reason: "Follow-up is required" } }).success).toBe(false);
     expect(reviewDecisionBody.safeParse({ ...common, outcome: "REFER", urgency: "PRIORITY" }).success).toBe(false);

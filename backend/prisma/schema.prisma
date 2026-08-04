@@ -189,6 +189,7 @@ enum ConsentStatus {
 enum SignaturePurpose {
   CONSENT
   REFERRAL
+  REVIEW_DECISION
 }
 
 enum AuthOutcome {
@@ -238,6 +239,7 @@ model User {
   securityIncidents        SecurityIncident[]            @relation("IncidentUser")
   resolvedIncidents        SecurityIncident[]            @relation("ResolvedBy")
   reviews                  Review[]                      @relation("ReviewReviewer")
+  reviewSignatures         Review[]                      @relation("ReviewSignatureSigner")
   referrals                Referral[]                    @relation("ReferralCreator")
   documentArtifacts        DocumentArtifact[]            @relation("DocumentGenerator")
   syncActions              SyncAction[]                  @relation("SyncActor")
@@ -778,58 +780,73 @@ model ScreeningRequestLedger {
 }
 
 model Review {
-  reviewId         String          @id @default(uuid()) @map("review_id") @db.Uuid
-  registrationId   String          @map("registration_id") @db.Uuid
-  version          Int             @default(1)
-  reviewedByUserId String          @map("reviewed_by_user_id") @db.Uuid
-  parentReviewId   String?         @map("parent_review_id") @db.Uuid
-  outcome          ReviewOutcome
-  urgency          ClinicalUrgency
-  clinicalSummary  String          @map("clinical_summary")
-  recommendations  String?
-  reviewedAt       DateTime        @default(now()) @map("reviewed_at") @db.Timestamptz(3)
-  createdAt        DateTime        @default(now()) @map("created_at") @db.Timestamptz(3)
-  updatedAt        DateTime        @updatedAt @map("updated_at") @db.Timestamptz(3)
+  reviewId              String          @id @default(uuid()) @map("review_id") @db.Uuid
+  registrationId        String          @map("registration_id") @db.Uuid
+  version               Int             @default(1)
+  reviewedByUserId      String          @map("reviewed_by_user_id") @db.Uuid
+  parentReviewId        String?         @map("parent_review_id") @db.Uuid
+  outcome               ReviewOutcome
+  urgency               ClinicalUrgency
+  clinicalSummary       String          @map("clinical_summary")
+  recommendations       String?
+  signatureObjectKey    String?         @unique @map("signature_object_key") @db.VarChar(500)
+  signatureSha256       String?         @map("signature_sha256") @db.Char(64)
+  signatureMimeType     String?         @map("signature_mime_type") @db.VarChar(100)
+  signatureSignerUserId String?         @map("signature_signer_user_id") @db.Uuid
+  signedPayloadHash     String?         @map("signed_payload_hash") @db.Char(64)
+  signedAt              DateTime?       @map("signed_at") @db.Timestamptz(3)
+  reviewedAt            DateTime        @default(now()) @map("reviewed_at") @db.Timestamptz(3)
+  createdAt             DateTime        @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt             DateTime        @updatedAt @map("updated_at") @db.Timestamptz(3)
 
-  registration EventRegistration  @relation(fields: [registrationId], references: [registrationId], onDelete: Restrict, onUpdate: Cascade)
-  reviewer     User               @relation("ReviewReviewer", fields: [reviewedByUserId], references: [id], onDelete: Restrict, onUpdate: Cascade)
-  parentReview Review?            @relation("ReviewHierarchy", fields: [parentReviewId], references: [reviewId], onDelete: Restrict, onUpdate: Cascade)
-  childReviews Review[]           @relation("ReviewHierarchy")
-  referrals    Referral[]
-  documents    DocumentArtifact[]
+  registration    EventRegistration  @relation(fields: [registrationId], references: [registrationId], onDelete: Restrict, onUpdate: Cascade)
+  reviewer        User               @relation("ReviewReviewer", fields: [reviewedByUserId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  signatureSigner User?              @relation("ReviewSignatureSigner", fields: [signatureSignerUserId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  parentReview    Review?            @relation("ReviewHierarchy", fields: [parentReviewId], references: [reviewId], onDelete: Restrict, onUpdate: Cascade)
+  childReviews    Review[]           @relation("ReviewHierarchy")
+  referrals       Referral[]
+  documents       DocumentArtifact[]
 
   @@unique([registrationId, version])
   @@index([registrationId, reviewedAt])
   @@index([reviewedByUserId])
+  @@index([signatureSignerUserId, signedAt])
   @@index([outcome, urgency])
   @@map("reviews")
 }
 
 model Referral {
-  referralId         String          @id @default(uuid()) @map("referral_id") @db.Uuid
-  reviewId           String          @map("review_id") @db.Uuid
-  registrationId     String          @map("registration_id") @db.Uuid
-  createdByUserId    String          @map("created_by_user_id") @db.Uuid
-  destinationName    String          @map("destination_name") @db.VarChar(200)
-  destinationEmail   String?         @map("destination_email") @db.VarChar(255)
-  reason             String
-  instructions       String?
-  urgency            ClinicalUrgency
-  status             ReferralStatus  @default(DRAFT)
-  referredAt         DateTime?       @map("referred_at") @db.Timestamptz(3)
-  signatureObjectKey String?         @map("signature_object_key") @db.VarChar(500)
-  signatureSha256    String?         @map("signature_sha256") @db.Char(64)
-  signatureMimeType  String?         @map("signature_mime_type") @db.VarChar(100)
-  signedPayloadHash  String?         @map("signed_payload_hash") @db.Char(64)
-  signedAt           DateTime?       @map("signed_at") @db.Timestamptz(3)
-  createdAt          DateTime        @default(now()) @map("created_at") @db.Timestamptz(3)
-  updatedAt          DateTime        @updatedAt @map("updated_at") @db.Timestamptz(3)
+  referralId                 String          @id @default(uuid()) @map("referral_id") @db.Uuid
+  reviewId                   String          @map("review_id") @db.Uuid
+  registrationId             String          @map("registration_id") @db.Uuid
+  createdByUserId            String          @map("created_by_user_id") @db.Uuid
+  revisionNumber             Int             @default(1) @map("revision_number")
+  supersedesReferralId       String?         @unique @map("supersedes_referral_id") @db.Uuid
+  revisionIdempotencyKey     String?         @unique @map("revision_idempotency_key") @db.VarChar(100)
+  revisionRequestFingerprint String?         @map("revision_request_fingerprint") @db.Char(64)
+  destinationName            String          @map("destination_name") @db.VarChar(200)
+  destinationEmail           String?         @map("destination_email") @db.VarChar(255)
+  reason                     String
+  instructions               String?
+  urgency                    ClinicalUrgency
+  status                     ReferralStatus  @default(DRAFT)
+  referredAt                 DateTime?       @map("referred_at") @db.Timestamptz(3)
+  signatureObjectKey         String?         @map("signature_object_key") @db.VarChar(500)
+  signatureSha256            String?         @map("signature_sha256") @db.Char(64)
+  signatureMimeType          String?         @map("signature_mime_type") @db.VarChar(100)
+  signedPayloadHash          String?         @map("signed_payload_hash") @db.Char(64)
+  signedAt                   DateTime?       @map("signed_at") @db.Timestamptz(3)
+  createdAt                  DateTime        @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt                  DateTime        @updatedAt @map("updated_at") @db.Timestamptz(3)
 
   review                 Review                 @relation(fields: [reviewId], references: [reviewId], onDelete: Restrict, onUpdate: Cascade)
   creator                User                   @relation("ReferralCreator", fields: [createdByUserId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  supersedesReferral     Referral?              @relation("ReferralRevisions", fields: [supersedesReferralId], references: [referralId], onDelete: Restrict, onUpdate: Cascade)
+  revisions              Referral[]             @relation("ReferralRevisions")
   documentArtifacts      DocumentArtifact[]
   notificationDeliveries NotificationDelivery[]
 
+  @@unique([reviewId, revisionNumber])
   @@index([registrationId, createdAt])
   @@index([reviewId])
   @@index([createdByUserId])

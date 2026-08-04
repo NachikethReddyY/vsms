@@ -7,6 +7,7 @@ const { deleteEventSignature, signatureMetadata } = require("../utils/signatureS
 const TYPES = Object.freeze({
   CONSENT_SIGNATURE: "CONSENT_SIGNATURE",
   REFERRAL_SIGNATURE: "REFERRAL_SIGNATURE",
+  REVIEW_DECISION_SIGNATURE: "REVIEW_DECISION_SIGNATURE",
   REFERRAL_DOCUMENT: "REFERRAL_DOCUMENT",
 });
 const DOCUMENT_KEY = /^documents\/([a-f0-9]{8}-[a-f0-9]{4}-[1-5][a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}\.pdf)$/;
@@ -71,14 +72,18 @@ const collectEventArtifactTasks = async (tx, eventId) => {
     ...consents.map(({ signatureObjectKey }) => ({ artifactType: TYPES.CONSENT_SIGNATURE, storageKey: signatureObjectKey })),
     ...referrals.map(({ signatureObjectKey }) => ({ artifactType: TYPES.REFERRAL_SIGNATURE, storageKey: signatureObjectKey })),
     ...signatures.map(({ purpose, signatureObjectKey }) => ({
-      artifactType: purpose === "REFERRAL" ? TYPES.REFERRAL_SIGNATURE : TYPES.CONSENT_SIGNATURE,
+      artifactType: purpose === "REFERRAL"
+        ? TYPES.REFERRAL_SIGNATURE
+        : purpose === "REVIEW_DECISION"
+          ? TYPES.REVIEW_DECISION_SIGNATURE
+          : TYPES.CONSENT_SIGNATURE,
       storageKey: signatureObjectKey,
     })),
     ...documents.map(({ storageKey }) => ({ artifactType: TYPES.REFERRAL_DOCUMENT, storageKey })),
   ];
 
   for (const entry of entries) {
-    if ([TYPES.CONSENT_SIGNATURE, TYPES.REFERRAL_SIGNATURE].includes(entry.artifactType)) {
+    if ([TYPES.CONSENT_SIGNATURE, TYPES.REFERRAL_SIGNATURE, TYPES.REVIEW_DECISION_SIGNATURE].includes(entry.artifactType)) {
       signatureMetadata(entry.storageKey, eventId);
     } else {
       documentPathForKey(entry.storageKey);
@@ -110,7 +115,7 @@ const enqueueEventArtifactCleanup = async (tx, eventId) => {
 };
 
 const removeTaskArtifact = async (task) => {
-  if ([TYPES.CONSENT_SIGNATURE, TYPES.REFERRAL_SIGNATURE].includes(task.artifactType)) {
+  if ([TYPES.CONSENT_SIGNATURE, TYPES.REFERRAL_SIGNATURE, TYPES.REVIEW_DECISION_SIGNATURE].includes(task.artifactType)) {
     return deleteEventSignature(task.storageKey, task.eventId);
   }
   if (task.artifactType === TYPES.REFERRAL_DOCUMENT) {
