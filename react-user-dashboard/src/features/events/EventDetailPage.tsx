@@ -1,4 +1,5 @@
 import {
+  ArrowLeftIcon,
   ArrowUpTrayIcon,
   CalendarDaysIcon,
   CheckIcon,
@@ -16,11 +17,11 @@ import {
   UserGroupIcon,
   XMarkIcon,
 } from '@heroicons/react/24/outline';
-import { Button } from '@astryxdesign/core/Button';
-import { Selector } from '@astryxdesign/core/Selector';
 import { useEffect, useMemo, useRef, useState, type ChangeEvent, type FormEvent } from 'react';
-import { Link, useLocation, useParams } from 'react-router-dom';
+import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
 import { useAuth } from '../../auth/AuthProvider';
+import { AppDialog } from '../../components/AppDialog';
+import { AppToast } from '../../components/AppToast';
 import { getApiError as getApiMessage } from '../../utils/apiClient';
 import { getDisplayName } from '../../utils/identity';
 import { eventApi, formatEventDate, STATUS_LABEL, type AuditRecord, type EventRecord, type EventStatus, type StaffAssignmentRole, type StaffDirectoryEntry, type StationTemplate } from './eventApi';
@@ -35,9 +36,9 @@ const applicationRoleByAssignment: Record<StaffAssignmentRole, StaffDirectoryEnt
 const roleLabel = (role: string) => role.toLowerCase().replace(/_/g, ' ').replace(/^\w/, (letter: string) => letter.toUpperCase());
 
 const nextAction: Record<string, { action: 'publish' | 'start' | 'complete'; status: EventStatus; label: string; prompt: string } | undefined> = {
-  DRAFT: { action: 'publish', status: 'PUBLISHED', label: 'Save as published', prompt: 'Publish this event? Staff with access will see it as ready for operations.' },
-  PUBLISHED: { action: 'start', status: 'IN_PROGRESS', label: 'Save as in progress', prompt: 'Start operations now? Planned shifts will become active.' },
-  IN_PROGRESS: { action: 'complete', status: 'COMPLETED', label: 'Save as completed', prompt: 'Complete this event? This is a terminal action and cannot be undone.' },
+  DRAFT: { action: 'publish', status: 'PUBLISHED', label: 'Publish event', prompt: 'Publish this event? Staff with access will see it as ready for operations.' },
+  PUBLISHED: { action: 'start', status: 'IN_PROGRESS', label: 'Start event', prompt: 'Start operations now? Planned shifts will become active.' },
+  IN_PROGRESS: { action: 'complete', status: 'COMPLETED', label: 'Complete event', prompt: 'Complete this event? This is a terminal action and cannot be undone.' },
 };
 
 const lifecycleStages = [
@@ -74,8 +75,8 @@ export default function EventDetailPage() {
   const { session } = useAuth();
   const user = session?.user;
   const location = useLocation();
+  const navigate = useNavigate();
   const [event, setEvent] = useState<EventRecord | null>(null);
-  const [statusChoice, setStatusChoice] = useState<EventStatus>('DRAFT');
   const [audit, setAudit] = useState<AuditRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [pending, setPending] = useState(false);
@@ -100,6 +101,16 @@ export default function EventDetailPage() {
   const [auditLoading, setAuditLoading] = useState(false);
   const [auditError, setAuditError] = useState('');
   const fileInput = useRef<HTMLInputElement>(null);
+  const deleteDialog = useRef<HTMLDialogElement>(null);
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const [deleteConfirmation, setDeleteConfirmation] = useState('');
+  const [deleteAcknowledged, setDeleteAcknowledged] = useState(false);
+  const [deletePending, setDeletePending] = useState(false);
+  const [deleteError, setDeleteError] = useState('');
+  const [statusConfirmOpen, setStatusConfirmOpen] = useState(false);
+  const [cancelOpen, setCancelOpen] = useState(false);
+  const [cancellationReason, setCancellationReason] = useState('');
+  const [cancellationError, setCancellationError] = useState('');
   const [error, setError] = useState('');
   const [notice, setNotice] = useState((location.state as { notice?: string } | null)?.notice ?? '');
 
@@ -113,29 +124,65 @@ export default function EventDetailPage() {
   const load = async () => {
     setLoading(true); setError('');
     try {
-      const detail = await eventApi.get(eventId); setEvent(detail); setStatusChoice(detail.status);
+      const detail = await eventApi.get(eventId); setEvent(detail);
       if (detail.canManage) void refreshAudit(detail.eventId);
     } catch (cause) { setError(getApiMessage(cause, 'Event details could not be loaded.')); }
     finally { setLoading(false); }
   };
   useEffect(() => { void load(); }, [eventId]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    const dialog = deleteDialog.current;
+    if (!dialog) return;
+    if (deleteOpen && !dialog.open) dialog.showModal();
+    if (!deleteOpen && dialog.open) dialog.close();
+  }, [deleteOpen]);
 
   const transition = async () => {
-    const next = event && nextAction[event.status]; if (!event || !next || !window.confirm(next.prompt)) return;
+    const next = event && nextAction[event.status]; if (!event || !next) return;
     setPending(true); setError('');
-    try { const updated = await eventApi.transition(event.eventId, next.action, event.version); setEvent(updated); setStatusChoice(updated.status); setNotice(`${STATUS_LABEL[updated.status]} status saved.`); await refreshAudit(event.eventId); }
+    try { const updated = await eventApi.transition(event.eventId, next.action, event.version); setEvent(updated); setStatusConfirmOpen(false); setNotice(`${STATUS_LABEL[updated.status]} status saved.`); await refreshAudit(event.eventId); }
     catch (cause) { setError(getApiMessage(cause, 'The status could not be changed. Refresh and try again.')); }
     finally { setPending(false); }
   };
 
   const cancel = async () => {
     if (!event) return;
-    const reason = window.prompt('Give a clear cancellation reason (10-500 characters).');
-    if (!reason) return;
+    const reason = cancellationReason.trim();
+    if (reason.length < 10 || reason.length > 500) {
+      setCancellationError('Enter a cancellation reason between 10 and 500 characters.');
+      return;
+    }
     setPending(true); setError('');
-    try { const updated = await eventApi.cancel(event.eventId, event.version, reason); setEvent(updated); setStatusChoice(updated.status); setNotice('Event cancelled and reason recorded.'); void refreshAudit(event.eventId); }
+    try { const updated = await eventApi.cancel(event.eventId, event.version, reason); setEvent(updated); setCancelOpen(false); setCancellationReason(''); setCancellationError(''); setNotice('Event cancelled and reason recorded.'); void refreshAudit(event.eventId); }
     catch (cause) { setError(getApiMessage(cause, 'The event could not be cancelled.')); }
     finally { setPending(false); }
+  };
+
+  const closeDeleteDialog = () => {
+    setDeleteOpen(false);
+    setDeleteConfirmation('');
+    setDeleteAcknowledged(false);
+    setDeleteError('');
+  };
+
+  const deleteEvent = async (submitEvent: FormEvent<HTMLFormElement>) => {
+    submitEvent.preventDefault();
+    if (!event || deleteConfirmation !== event.name || !deleteAcknowledged) return;
+    setDeletePending(true);
+    setDeleteError('');
+    try {
+      await eventApi.delete(event.eventId, {
+        version: event.version,
+        confirmationName: deleteConfirmation,
+        acknowledgePermanentDeletion: true,
+      });
+      window.sessionStorage.removeItem('vsms_event_id');
+      navigate('/events', { replace: true });
+    } catch (cause) {
+      setDeleteError(getApiMessage(cause, 'The event could not be permanently deleted. Refresh and try again.'));
+    } finally {
+      setDeletePending(false);
+    }
   };
 
   const saveBanner = async () => {
@@ -273,6 +320,7 @@ export default function EventDetailPage() {
   const availableTemplates = stationTemplates.filter((template) => !event.eventStations.some((station) => station.stationTemplateId === template.stationTemplateId));
   const canCancel = canManage && !terminal && (event.status !== 'IN_PROGRESS' || user?.systemRole === 'ADMIN');
   const isAdministrator = user?.roles.includes('ADMINISTRATOR') ?? false;
+  const canPermanentlyDelete = terminal && user?.systemRole === 'ADMIN' && isAdministrator;
   const canReview = !isAdministrator && user?.roles.includes('REVIEWER') && event.status === 'IN_PROGRESS' && event.shifts.some((shift) => (
     shift.status === 'ACTIVE' && shift.staffAssignments.some((assignment) => (
       assignment.assignmentRole === 'REVIEWER'
@@ -292,100 +340,96 @@ export default function EventDetailPage() {
   const activeStage = lifecycleStages.findIndex((stage) => stage.status === event.status);
   const totalRequiredStaff = event.shifts.reduce((total, shift) => total + shift.requiredStaff, 0);
   const next = nextAction[event.status];
+  const routeSection = location.pathname.split('/').filter(Boolean).pop();
+  const view = routeSection && ['stations', 'staff', 'activity'].includes(routeSection) ? routeSection : 'overview';
+  const eventPath = `/events/${event.eventId}`;
 
   return <div className="page-frame detail-page">
+    <div className="detail-topline"><Link className="event-detail-back" to="/events"><ArrowLeftIcon />Back to events</Link><span className="event-record-reference">Event record / {event.eventId.slice(0, 8)}</span></div>
+
     <section className="event-detail-hero" aria-labelledby="event-title">
+      <figure className="event-hero-artwork" aria-label={`Artwork for ${event.name}`}>
+        <img src={getEventArtwork(event.bannerKey, event.artworkDataUrl)} alt="" />
+        {canManage && !terminal && <button type="button" aria-expanded={bannerOpen} aria-controls="event-banner-picker" onClick={() => { setSelectedBannerKey(event.bannerKey ?? 'COMMUNITY_SCREENING'); setArtworkFile(event.artworkDataUrl ?? ''); setBannerOpen((open) => !open); }}><PhotoIcon />Edit artwork</button>}
+      </figure>
+
       <div className="event-summary">
-        <div className="detail-topline"><Link to="/events">Events</Link><span className="event-record-reference">Event record / {event.eventId.slice(0, 8)}</span></div>
         <div className="event-summary-heading">
-          <span className="status-line"><i className={`status-dot ${event.status.toLowerCase()}`} />{STATUS_LABEL[event.status]}</span>
           <h1 id="event-title">{event.name}</h1>
           <p>{event.description || 'No event description has been added.'}</p>
-        </div>
-        <nav className="event-detail-tabs" aria-label="Event sections">
-          <a className="active" href="#overview">Overview</a>
-          <a href="#stations">Stations</a>
-          <a href="#staff">Staff</a>
-          <a href="#activity">Activity</a>
-        </nav>
-      </div>
-
-      <aside className="event-command-panel" aria-label="Event actions">
-        {canManage && !terminal && next && <section className="status-editor" aria-labelledby="status-editor-title">
-          <div className="status-editor-copy">
-            <strong id="status-editor-title">Event status</strong>
-            <span>Choose the next validated lifecycle stage, then save it.</span>
+          <div className="event-summary-actions">
+            {canManage ? <details className="event-status-control">
+              <summary><i className={`status-dot ${event.status.toLowerCase()}`} />{STATUS_LABEL[event.status]}<ChevronDownIcon /></summary>
+              <div>
+                {next ? <><span>Next stage</span><button className="primary compact" type="button" disabled={pending} onClick={() => setStatusConfirmOpen(true)}>{pending ? 'Saving…' : next.label}</button></> : <span>This lifecycle is complete.</span>}
+                {canCancel && <button className="danger-button compact" type="button" disabled={pending} onClick={() => { setCancellationReason(''); setCancellationError(''); setCancelOpen(true); }}>Cancel event</button>}
+              </div>
+            </details> : <span className="event-status-readonly"><i className={`status-dot ${event.status.toLowerCase()}`} />{STATUS_LABEL[event.status]}</span>}
+            {terminal && canManage && <Link className="secondary compact" to="/events/new" state={{ duplicateFrom: event }}><DocumentDuplicateIcon />Duplicate event</Link>}
           </div>
-          <Selector
-            label="Event status"
-            isLabelHidden
-            options={[
-              { value: event.status, label: STATUS_LABEL[event.status] },
-              { value: next.status, label: STATUS_LABEL[next.status] },
-            ]}
-            value={statusChoice}
-            onChange={(value) => setStatusChoice(value as EventStatus)}
-            width="100%"
-          />
-          <Button
-            label={next.label}
-            variant="primary"
-            width="100%"
-            isDisabled={pending || statusChoice !== next.status}
-            isLoading={pending}
-            onClick={() => void transition()}
-          />
-        </section>}
-
-        {canManage && <div className="action-cluster">
-          {terminal ? <Link className="secondary" to="/events/new" state={{ duplicateFrom: event }}><DocumentDuplicateIcon />Duplicate event</Link> : <>
-            <Link className="secondary" to={`/events/${event.eventId}/edit`}><PencilSquareIcon />Edit details</Link>
-            {canCancel && <button className="danger-button" onClick={() => void cancel()} disabled={pending}>Cancel event</button>}
-          </>}
-        </div>}
-        <div className="action-cluster">
-          {assignedStationTypes.has('VISUAL_ACUITY') && <Link className="primary" to={`/events/${event.eventId}/stations/visual-acuity`}>Open Visual Acuity station</Link>}
-          {assignedStationTypes.has('REFRACTION') && <Link className="primary" to={`/events/${event.eventId}/stations/refraction`}>Open Refraction station</Link>}
-          {assignedStationTypes.has('COLOUR_VISION') && <Link className="primary" to={`/events/${event.eventId}/stations/colour-vision`}>Open Colour Vision station</Link>}
-          {canReview && <Link className="secondary" to={`/events/${event.eventId}/reviews`}><ClipboardDocumentCheckIcon />Open clinical review</Link>}
         </div>
-      </aside>
+
+        <div className="event-role-actions">
+          {assignedStationTypes.has('VISUAL_ACUITY') && <Link className="primary" to={`${eventPath}/stations/visual-acuity`}>Open Visual Acuity station</Link>}
+          {assignedStationTypes.has('REFRACTION') && <Link className="primary" to={`${eventPath}/stations/refraction`}>Open Refraction station</Link>}
+          {assignedStationTypes.has('COLOUR_VISION') && <Link className="primary" to={`${eventPath}/stations/colour-vision`}>Open Colour Vision station</Link>}
+          {canReview && <Link className="secondary" to={`${eventPath}/reviews`}><ClipboardDocumentCheckIcon />Open clinical review</Link>}
+        </div>
+      </div>
     </section>
 
-    {notice && <div className="alert success" role="status"><CheckIcon />{notice}<button className="icon-button" onClick={() => setNotice('')} aria-label="Dismiss message"><XMarkIcon /></button></div>}
+    <nav className="event-detail-tabs" aria-label="Event sections">
+      <Link className={view === 'overview' ? 'active' : undefined} to={eventPath}>Overview</Link>
+      <Link className={view === 'stations' ? 'active' : undefined} to={`${eventPath}/stations`}>Stations</Link>
+      <Link className={view === 'staff' ? 'active' : undefined} to={`${eventPath}/staff`}>Staff</Link>
+      <Link className={view === 'activity' ? 'active' : undefined} to={`${eventPath}/activity`}>Activity</Link>
+    </nav>
+
+    <AppToast message={notice} onDismiss={() => setNotice('')} />
     {error && <div className="alert error" role="alert">{error}</div>}
 
-    <section className="event-metric-grid" id="overview" aria-label="Event overview">
-      <div className="event-info-row"><CalendarDaysIcon /><div><small>Date and time</small><strong>{dateParts.weekday}, {dateParts.month} {dateParts.day}, {dateParts.year}</strong><span>{formatTime(event.startsAt, event.timezone)} to {formatTime(event.endsAt, event.timezone)}, {eventDuration(event.startsAt, event.endsAt)}</span></div></div>
-      <div className="event-info-row"><MapPinIcon /><div><small>Venue</small><strong>{event.venue}</strong><span>{event.address || 'Address entered manually'}{event.postalCode ? ` · Singapore ${event.postalCode}` : ''} · {event.timezone}</span></div></div>
-      <div className="event-info-row"><UserGroupIcon /><div><small>At venue now</small><strong>{event.activeCapacityCount.toLocaleString()} of {event.capacity.toLocaleString()} people</strong><span>Signed up or checked in</span></div></div>
-      <div className="event-info-row"><ClipboardDocumentListIcon /><div><small>Expected</small><strong>{event.expectedAttendance?.toLocaleString() || 'Not set'} visitors</strong><span>{event.signupCount.toLocaleString()} signups collected</span></div></div>
-      <div className="event-info-row"><ClockIcon /><div><small>Staffing plan</small><strong>{event.shifts.length} {event.shifts.length === 1 ? 'shift' : 'shifts'}, {totalRequiredStaff} required</strong><span>Event operations coverage</span></div></div>
-    </section>
+    {bannerOpen && !terminal && <section className="banner-picker event-hero-banner-picker" id="event-banner-picker" aria-labelledby="banner-picker-title">
+      <div className="banner-picker-heading"><div><h2 id="banner-picker-title">Choose event artwork</h2><p>Use a built-in image or select your own file.</p></div><button className="icon-button" type="button" onClick={() => setBannerOpen(false)} aria-label="Close artwork picker"><XMarkIcon /></button></div>
+      <input ref={fileInput} className="visually-hidden" type="file" accept="image/jpeg,image/webp" onChange={chooseArtwork} />
+      <div className="banner-options" role="radiogroup" aria-label="Available event artwork">
+        {EVENT_BANNERS.map((option) => <button className={`banner-option ${!artworkFile && selectedBannerKey === option.key ? 'selected' : ''}`} type="button" role="radio" aria-checked={!artworkFile && selectedBannerKey === option.key} key={option.key} onClick={() => { setSelectedBannerKey(option.key); setArtworkFile(''); }}><span className="banner-option-image"><img src={option.src} alt="" />{!artworkFile && selectedBannerKey === option.key && <i><CheckIcon /></i>}</span><span><strong>{option.label}</strong><small>{option.description}</small></span></button>)}
+        <button className={`banner-option banner-upload-option ${artworkFile ? 'selected' : ''}`} type="button" role="radio" aria-checked={!!artworkFile} onClick={() => fileInput.current?.click()}><span className="banner-option-image"><ArrowUpTrayIcon />{artworkFile && <i><CheckIcon /></i>}</span><span><strong>Upload your image</strong><small>JPEG or WebP, up to 130 KB</small></span></button>
+      </div>
+      <div className="banner-picker-actions"><button className="secondary" type="button" onClick={() => setBannerOpen(false)}>Cancel</button><button className="primary" type="button" disabled={bannerPending} onClick={() => void saveBanner()}>{bannerPending ? 'Saving…' : 'Use selected artwork'}</button></div>
+    </section>}
 
-    <section className="lifecycle" aria-labelledby="lifecycle-title">
-      <div className="lifecycle-heading"><h2 id="lifecycle-title">Event lifecycle</h2><span>{event.status === 'CANCELLED' ? 'Cancelled before completion' : `${STATUS_LABEL[event.status]} stage`}</span></div>
-      <ol className={event.status === 'CANCELLED' ? 'is-cancelled' : ''}>
-        {lifecycleStages.map((stage, index) => <li className={index < activeStage ? 'complete' : index === activeStage ? 'current' : ''} key={stage.status}><i>{index < activeStage ? <CheckIcon /> : null}</i><span>{stage.label}</span></li>)}
-      </ol>
-    </section>
+    {view === 'overview' && <div className="event-view">
+      <div className="event-view-heading"><h2>Overview</h2>{canManage && !terminal && <Link className="secondary compact" to={`${eventPath}/edit`}><PencilSquareIcon />Edit overview</Link>}</div>
+      <section className="event-metric-grid" aria-label="Event overview">
+        <div className="event-info-row"><CalendarDaysIcon /><div><small>Date and time</small><strong>{dateParts.weekday}, {dateParts.month} {dateParts.day}, {dateParts.year}</strong><span>{formatTime(event.startsAt, event.timezone)} to {formatTime(event.endsAt, event.timezone)}, {eventDuration(event.startsAt, event.endsAt)}</span></div></div>
+        <div className="event-info-row"><MapPinIcon /><div><small>Venue</small><strong>{event.venue}</strong><span>{event.address || 'Address entered manually'}{event.postalCode ? ` · Singapore ${event.postalCode}` : ''} · {event.timezone}</span></div></div>
+        <div className="event-info-row"><UserGroupIcon /><div><small>At venue now</small><strong>{event.activeCapacityCount.toLocaleString()} of {event.capacity.toLocaleString()} people</strong><span>Signed up or checked in</span></div></div>
+        <div className="event-info-row"><ClipboardDocumentListIcon /><div><small>Expected</small><strong>{event.expectedAttendance?.toLocaleString() || 'Not set'} visitors</strong><span>{event.signupCount.toLocaleString()} signups collected</span></div></div>
+        <div className="event-info-row"><ClockIcon /><div><small>Staffing plan</small><strong>{event.shifts.length} {event.shifts.length === 1 ? 'shift' : 'shifts'}, {totalRequiredStaff} required</strong><span>Event operations coverage</span></div></div>
+      </section>
+      <section className="lifecycle" aria-labelledby="lifecycle-title">
+        <div className="lifecycle-heading"><h2 id="lifecycle-title">Event lifecycle</h2><span>{event.status === 'CANCELLED' ? 'Cancelled before completion' : `${STATUS_LABEL[event.status]} stage`}</span></div>
+        <ol className={event.status === 'CANCELLED' ? 'is-cancelled' : ''}>{lifecycleStages.map((stage, index) => <li className={index < activeStage ? 'complete' : index === activeStage ? 'current' : ''} key={stage.status}><i>{index < activeStage ? <CheckIcon /> : null}</i><span>{stage.label}</span></li>)}</ol>
+      </section>
+      {event.status === 'CANCELLED' && <section className="cancellation"><strong>Cancellation reason</strong><p>{event.cancellationReason}</p></section>}
+      {canPermanentlyDelete && <section className="event-danger-zone" aria-labelledby="event-danger-zone-title">
+        <div><h2 id="event-danger-zone-title">Danger zone</h2><p>This completed event can be permanently deleted. Its event-owned operational records will be removed; shared accounts and participant profiles will remain.</p></div>
+        <button className="danger-button compact" type="button" onClick={() => setDeleteOpen(true)}><TrashIcon />Delete event</button>
+      </section>}
+    </div>}
 
-    {event.status === 'CANCELLED' && <section className="cancellation"><strong>Cancellation reason</strong><p>{event.cancellationReason}</p></section>}
-
-    <div className="event-content-grid">
-      <section className="shift-section" aria-labelledby="shift-title">
-        <div className="station-section" id="stations">
+    {view === 'stations' && <section className="event-view station-section" aria-labelledby="stations-title">
           <div className="section-title">
-            <div><span className="section-kicker">Screening route</span><h2>Event stations</h2></div>
+            <div><h2 id="stations-title">Event stations</h2><p>Availability follows the event’s scheduled days.</p></div>
             {canConfigureStations && <button className="secondary compact" type="button" aria-expanded={stationPanelOpen} aria-controls="station-template-panel" onClick={() => void openStationTemplates()}><PlusIcon />Import station</button>}
           </div>
           {stationPanelOpen && <div className="station-template-panel" id="station-template-panel" aria-live="polite">
             <div><strong>Station templates</strong><span>Importing creates an event-owned copy. Changes here will not alter the reusable template.</span></div>
             {stationLoading ? <p>Loading station templates…</p> : stationTemplatesError ? <div className="inline-retry" role="alert"><p>{stationTemplatesError}</p><button className="secondary compact" type="button" onClick={() => void loadStationTemplates()}>Retry</button></div> : stationTemplatesLoaded && availableTemplates.length === 0 ? <p>All active station templates are already in this event.</p> : <ul>{availableTemplates.map((template) => <li key={template.stationTemplateId}><span><strong>{template.name}</strong><small>{template.description || 'No template description.'} · Default capacity {template.defaultCapacity}</small></span><button className="secondary compact" type="button" disabled={!!stationPending} onClick={() => void importStation(template.stationTemplateId)}>{stationPending === template.stationTemplateId ? 'Importing…' : 'Import'}</button></li>)}</ul>}
           </div>}
-          {event.eventStations.length === 0 ? <p className="quiet-empty">{canConfigureStations ? 'No stations imported yet. Import a template to build the participant route.' : 'No stations are configured for this event.'}</p> : <div className="station-table">{event.eventStations.map((station, index) => <article className={`station-record ${station.isAvailable ? '' : 'is-unavailable'}`} key={station.eventStationId}>
+          {event.eventStations.length === 0 ? <p className="quiet-empty">{canConfigureStations ? 'No stations imported yet. Import a template to build the screening route.' : 'No stations are configured for this event.'}</p> : <div className="station-table">{event.eventStations.map((station, index) => <article className={`station-record ${station.isAvailable ? '' : 'is-unavailable'}`} key={station.eventStationId}>
             <div className="station-order"><strong>{station.stationOrder}</strong><span>Route order</span></div>
-            <div className="station-record-copy"><strong>{station.name}</strong><span>{station.description || 'No station instructions.'}</span><small>Template v{station.templateVersion} · {station.isAvailable ? 'Available' : 'Unavailable'}</small></div>
+            <div className="station-record-copy"><strong>{station.name}</strong><span>{station.description || 'No station instructions.'}</span><small>Template v{station.templateVersion}</small><div className="station-day-list">{(station.availabilities.length ? station.availabilities : event.eventDays.map((day) => ({ eventStationAvailabilityId: `${station.eventStationId}-${day.eventDayId}`, eventDay: day, isAvailable: station.isAvailable, capacity: station.capacity }))).map((availability) => <span className={availability.isAvailable ? 'is-available' : 'is-unavailable'} key={availability.eventStationAvailabilityId}>{formatEventDate(availability.eventDay.date, event.timezone, false)} · {availability.isAvailable ? `${availability.capacity} places` : 'Unavailable'}</span>)}</div></div>
             {canConfigureStations ? <div className="station-controls">
               <div className="station-reorder" aria-label={`Change ${station.name} route order`}>
                 <button className="icon-button" type="button" aria-label={`Move ${station.name} earlier`} disabled={index === 0 || !!stationPending} onClick={() => void updateStation(station.eventStationId, { stationOrder: station.stationOrder - 1 })}><ChevronUpIcon /></button>
@@ -398,9 +442,10 @@ export default function EventDetailPage() {
               <button className="secondary compact" type="button" disabled={!!stationPending} onClick={() => void updateStation(station.eventStationId, { isAvailable: !station.isAvailable })}>{station.isAvailable ? 'Mark unavailable' : 'Make available'}</button>
             </div> : <strong className="station-capacity-readonly">{station.capacity} concurrent</strong>}
           </article>)}</div>}
-        </div>
+    </section>}
 
-        <div className="section-title" id="staff"><div><span className="section-kicker">Staffing plan</span><h2 id="shift-title">Shifts</h2></div><span>{event.shifts.length} scheduled</span></div>
+    {view === 'staff' && <section className="event-view shift-section" aria-labelledby="shift-title">
+        <div className="section-title"><h2 id="shift-title">Shifts</h2><span>{event.shifts.length} scheduled</span></div>
         {event.shifts.length === 0 ? <p className="quiet-empty">No shifts have been added. The event can still be saved as a draft.</p> : <div className="shift-table">{event.shifts.map((shift) => {
           const draft = assignmentDrafts[shift.shiftId] ?? emptyAssignment;
           const selectedStaff = staffDirectory.find((person) => person.userId === draft.userId);
@@ -420,36 +465,52 @@ export default function EventDetailPage() {
             </form>}
           </article>;
         })}</div>}
-      </section>
+    </section>}
 
-      <aside className="event-detail-aside">
-        <figure className="event-banner" aria-label={`Banner for ${event.name}`}>
-          <div className="event-banner-image"><img src={getEventArtwork(event.bannerKey, event.artworkDataUrl)} alt="" /></div>
-          <figcaption className="event-banner-toolbar">
-            <strong>{event.artworkDataUrl ? 'Your uploaded artwork' : 'Default event artwork'}</strong>
-            {canManage && !terminal && <button className="secondary banner-edit-button" type="button" aria-expanded={bannerOpen} aria-controls="event-banner-picker" onClick={() => { setSelectedBannerKey(event.bannerKey ?? 'COMMUNITY_SCREENING'); setArtworkFile(event.artworkDataUrl ?? ''); setBannerOpen((open) => !open); }}><PhotoIcon />Change</button>}
-          </figcaption>
-        </figure>
-
-        {bannerOpen && !terminal && <section className="banner-picker" id="event-banner-picker" aria-labelledby="banner-picker-title">
-          <div className="banner-picker-heading"><div><h2 id="banner-picker-title">Choose event artwork</h2><p>Use a built-in image or select your own file.</p></div><button className="icon-button" type="button" onClick={() => setBannerOpen(false)} aria-label="Close banner picker"><XMarkIcon /></button></div>
-          <input ref={fileInput} className="visually-hidden" type="file" accept="image/jpeg,image/webp" onChange={chooseArtwork} />
-          <div className="banner-options" role="radiogroup" aria-label="Available event artwork">
-            {EVENT_BANNERS.map((option) => <button className={`banner-option ${!artworkFile && selectedBannerKey === option.key ? 'selected' : ''}`} type="button" role="radio" aria-checked={!artworkFile && selectedBannerKey === option.key} key={option.key} onClick={() => { setSelectedBannerKey(option.key); setArtworkFile(''); }}><span className="banner-option-image"><img src={option.src} alt="" />{!artworkFile && selectedBannerKey === option.key && <i><CheckIcon /></i>}</span><span><strong>{option.label}</strong><small>{option.description}</small></span></button>)}
-            <button className={`banner-option banner-upload-option ${artworkFile ? 'selected' : ''}`} type="button" role="radio" aria-checked={!!artworkFile} onClick={() => fileInput.current?.click()}><span className="banner-option-image"><ArrowUpTrayIcon />{artworkFile && <i><CheckIcon /></i>}</span><span><strong>Upload your image</strong><small>JPEG or WebP, up to 130 KB</small></span></button>
-          </div>
-          <div className="banner-picker-actions"><button className="secondary" type="button" onClick={() => setBannerOpen(false)}>Cancel</button><button className="primary" type="button" disabled={bannerPending} onClick={() => void saveBanner()}>{bannerPending ? 'Saving…' : 'Use selected artwork'}</button></div>
-        </section>}
-
-        <section className="history" id="activity" aria-labelledby="activity-title">
-          <span className="section-kicker">Immutable record</span>
-          <h2 id="activity-title">Activity</h2>
-          {!canManage ? <p>History is available to the event’s managers and administrators.</p> : <>
-            {auditError && <div className="inline-retry" role="alert"><p>{auditError}</p><button className="secondary compact" type="button" onClick={() => void refreshAudit(event.eventId)}>Retry</button></div>}
-            {auditLoading && audit.length === 0 ? <p>Loading activity…</p> : !auditError && audit.length === 0 ? <p>No history is available.</p> : audit.length > 0 ? <ol>{audit.map((item) => <li key={item.eventAuditLogId}><i /><div><strong>{item.action.toLowerCase().replace(/_/g, ' ')}</strong><span>{item.actor?.email ?? 'System actor'}</span><time dateTime={item.createdAt}>{formatEventDate(item.createdAt, event.timezone)}</time></div></li>)}</ol> : null}
-          </>}
-        </section>
-      </aside>
-    </div>
+    {view === 'activity' && <section className="event-view history event-activity" aria-labelledby="activity-title">
+      <h2 id="activity-title">Activity</h2>
+      <p>Consequential event actions retain the authenticated actor and timestamp.</p>
+      {!canManage ? <p>History is available to the event’s managers and administrators.</p> : <>
+        {auditError && <div className="inline-retry" role="alert"><p>{auditError}</p><button className="secondary compact" type="button" onClick={() => void refreshAudit(event.eventId)}>Retry</button></div>}
+        {auditLoading && audit.length === 0 ? <p>Loading activity…</p> : !auditError && audit.length === 0 ? <p>No history is available.</p> : audit.length > 0 ? <ol>{audit.map((item) => <li key={item.eventAuditLogId}><i /><div><strong>{item.action.toLowerCase().replace(/_/g, ' ')}</strong><span>{item.actor?.email ?? 'System actor'}</span><time dateTime={item.createdAt}>{formatEventDate(item.createdAt, event.timezone)}</time></div></li>)}</ol> : null}
+      </>}
+    </section>}
+    <AppDialog
+      open={statusConfirmOpen}
+      onOpenChange={setStatusConfirmOpen}
+      title={next?.label ?? 'Update event status'}
+      description={next?.prompt}
+      dismissible={!pending}
+    >
+      <div className="app-dialog-actions">
+        <button className="secondary" type="button" data-dialog-autofocus disabled={pending} onClick={() => setStatusConfirmOpen(false)}>Keep current status</button>
+        <button className="primary" type="button" disabled={pending} onClick={() => void transition()}>{pending ? 'Saving…' : next?.label ?? 'Save status'}</button>
+      </div>
+    </AppDialog>
+    <AppDialog
+      open={cancelOpen}
+      onOpenChange={(open) => { if (!open && !pending) { setCancelOpen(false); setCancellationReason(''); setCancellationError(''); } }}
+      title="Cancel this event?"
+      description="Record a clear reason before cancelling. This action cannot be reversed."
+      dismissible={!pending}
+    >
+      <form className="app-dialog-form" noValidate onSubmit={(submitEvent) => { submitEvent.preventDefault(); void cancel(); }}>
+        <label className="app-dialog-field"><span>Cancellation reason</span><textarea required minLength={10} maxLength={500} rows={4} value={cancellationReason} data-dialog-autofocus aria-invalid={!!cancellationError} aria-describedby={cancellationError ? 'event-cancellation-help event-cancellation-error' : 'event-cancellation-help'} onChange={(change) => { setCancellationReason(change.target.value); setCancellationError(''); }} /></label>
+        <p className="app-dialog-help" id="event-cancellation-help">{cancellationReason.length}/500 characters</p>
+        {cancellationError && <p className="app-dialog-error" id="event-cancellation-error" role="alert">{cancellationError}</p>}
+        <div className="app-dialog-actions"><button className="secondary" type="button" disabled={pending} onClick={() => { setCancelOpen(false); setCancellationReason(''); setCancellationError(''); }}>Keep event</button><button className="danger-button" type="submit" disabled={pending}>{pending ? 'Cancelling…' : 'Cancel event'}</button></div>
+      </form>
+    </AppDialog>
+    <dialog className="event-delete-dialog" ref={deleteDialog} aria-labelledby="event-delete-title" onClose={() => setDeleteOpen(false)}>
+      <form method="dialog" onSubmit={(submitEvent) => void deleteEvent(submitEvent)}>
+        <div className="event-delete-dialog-heading"><div><span>Permanent deletion</span><h2 id="event-delete-title">Delete {event.name}?</h2></div><button className="icon-button" type="button" onClick={closeDeleteDialog} aria-label="Close delete event confirmation"><XMarkIcon /></button></div>
+        <p>This cannot be undone. Type the event name and acknowledge the deletion to continue.</p>
+        <label><span>Event name</span><input value={deleteConfirmation} autoFocus onChange={(change) => setDeleteConfirmation(change.target.value)} aria-describedby="event-delete-name-help" /></label>
+        <small id="event-delete-name-help">Type <strong>{event.name}</strong> exactly.</small>
+        <label className="event-delete-acknowledgement"><input type="checkbox" checked={deleteAcknowledged} onChange={(change) => setDeleteAcknowledged(change.target.checked)} /><span>I understand that this permanently deletes this event’s operational records.</span></label>
+        {deleteError && <p className="event-delete-error" role="alert">{deleteError}</p>}
+        <div className="event-delete-dialog-actions"><button className="secondary" type="button" onClick={closeDeleteDialog}>Cancel</button><button className="danger-button" type="submit" disabled={deletePending || deleteConfirmation !== event.name || !deleteAcknowledged}>{deletePending ? 'Deleting…' : 'Permanently delete'}</button></div>
+      </form>
+    </dialog>
   </div>;
 }

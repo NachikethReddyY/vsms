@@ -1,4 +1,4 @@
-import { MagnifyingGlassIcon, MapPinIcon, PlusIcon, TicketIcon, UsersIcon } from '@heroicons/react/24/outline';
+import { ChartBarSquareIcon, MagnifyingGlassIcon, MapPinIcon, PlusIcon, TicketIcon, UserGroupIcon, UsersIcon } from '@heroicons/react/24/outline';
 import { SegmentedControl } from '@astryxdesign/core';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
@@ -62,7 +62,7 @@ function toEventItem(event: EventRecord, now: Date): EventItem {
     status: STATUS_LABEL[statusKey],
     statusKey,
     artwork: getEventArtwork(event.bannerKey, event.artworkDataUrl),
-    attendance: `${event.activeCapacityCount.toLocaleString()} / ${event.capacity.toLocaleString()}`,
+    attendance: `${event.activeCapacityCount.toLocaleString()} checked in / ${event.capacity.toLocaleString()} capacity`,
     staff: names.slice(0, 4),
     extraStaff: names.length > 4 ? names.length - 4 : undefined,
   };
@@ -80,6 +80,7 @@ export default function EventsPage() {
   const user = session?.user;
   const navigate = useNavigate();
   const canCreate = user?.roles.some((role) => ['ADMINISTRATOR', 'EVENT_MANAGER'].includes(role)) ?? false;
+  const canManageStaff = user?.roles.includes('ADMINISTRATOR') ?? false;
   const loadEvents = useCallback(async () => {
     setLoading(true);
     setError('');
@@ -139,6 +140,8 @@ export default function EventsPage() {
 
         <nav className="events-header-nav" aria-label="Primary navigation">
           <a href="#events-register" aria-current="page"><TicketIcon aria-hidden="true" />Events</a>
+          {canCreate && <Link to="/reports"><ChartBarSquareIcon aria-hidden="true" />Reports</Link>}
+          {canManageStaff && <Link to="/staff"><UserGroupIcon aria-hidden="true" />Staff</Link>}
         </nav>
 
         <div className={`events-header-actions ${searchOpen ? 'searching' : ''}`}>
@@ -195,6 +198,8 @@ export default function EventsPage() {
           <DockIcon>
             <a className="events-dock-action active" href="#events-register" aria-label="Events" aria-current="page"><TicketIcon aria-hidden="true" /></a>
           </DockIcon>
+          {canCreate && <DockIcon><Link className="events-dock-action" to="/reports" aria-label="Operational reports"><ChartBarSquareIcon aria-hidden="true" /></Link></DockIcon>}
+          {canManageStaff && <DockIcon><Link className="events-dock-action" to="/staff" aria-label="Staff accounts"><UserGroupIcon aria-hidden="true" /></Link></DockIcon>}
           <DockIcon>
             <button className={`events-dock-action ${searchOpen ? 'active' : ''}`} type="button" aria-label={searchOpen ? 'Close search' : 'Search events'} aria-expanded={searchOpen} onClick={() => {
               setSearchOpen((open) => !open);

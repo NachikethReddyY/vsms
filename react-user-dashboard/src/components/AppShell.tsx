@@ -1,25 +1,28 @@
-import { ArrowLeftIcon, CalendarDaysIcon, PlusIcon, QueueListIcon } from '@heroicons/react/24/outline';
+import { CalendarDaysIcon, ChartBarSquareIcon, PencilSquareIcon, PlusIcon, UserGroupIcon } from '@heroicons/react/24/outline';
 import { useEffect, useRef, type ReactNode } from 'react';
-import { Link, NavLink, useLocation, useNavigate } from 'react-router-dom';
+import { Link, NavLink, useLocation } from 'react-router-dom';
 import { useAuth } from '../auth/AuthProvider';
 import { SuccessConfetti, ThemeToggle } from './MagicEffects';
 import ProfileMenu from './ProfileMenu';
+import { OfflineSyncControl } from '../features/screening/OfflineSyncControl';
 import './EventsPage.css';
 
 const eventManagerRoles = new Set(['ADMINISTRATOR', 'EVENT_MANAGER']);
-const registrationRoles = new Set(['ADMINISTRATOR', 'REGISTRATION_OFFICER']);
+const adminRoles = new Set(['ADMINISTRATOR']);
 
 export default function AppShell({ children }: { children: ReactNode }) {
   const { session } = useAuth();
   const location = useLocation();
-  const navigate = useNavigate();
   const workspaceRef = useRef<HTMLElement>(null);
   const roles = session?.user.roles ?? [];
   const canCreateEvent = roles.some((role) => eventManagerRoles.has(role));
-  const canRegister = roles.some((role) => registrationRoles.has(role));
-  const eventId = location.pathname.match(/^\/events\/([^/]+)/)?.[1];
-  const backTarget = location.pathname.endsWith('/edit') && eventId ? `/events/${eventId}` : '/events';
-
+  const canManageStaff = roles.some((role) => adminRoles.has(role));
+  const canUseOfflineScreening = roles.includes('SCREENER') && !roles.includes('ADMINISTRATOR');
+  const eventManagementMatch = location.pathname.match(/^\/events\/([^/]+)(?:\/(overview|stations|staff|activity))?$/);
+  const stationWorkflowMatch = location.pathname.match(/^\/events\/([^/]+)\/stations\/(visual-acuity|refraction|colour-vision)$/);
+  const eventEditPath = eventManagementMatch && eventManagementMatch[1] !== 'new'
+    ? `/events/${eventManagementMatch[1]}/edit`
+    : null;
   useEffect(() => {
     workspaceRef.current?.scrollTo({ top: 0 });
   }, [location.pathname]);
@@ -40,11 +43,13 @@ export default function AppShell({ children }: { children: ReactNode }) {
 
         <nav className="workspace-primary-nav" aria-label="Primary navigation">
           <NavLink to="/events" className={({ isActive }) => isActive ? 'active' : undefined}><CalendarDaysIcon aria-hidden="true" />Events</NavLink>
-          {canRegister && <NavLink to="/participants/search" className={({ isActive }) => isActive ? 'active' : undefined}><QueueListIcon aria-hidden="true" />Participants</NavLink>}
+          {canCreateEvent && <NavLink to="/reports" className={({ isActive }) => isActive ? 'active' : undefined}><ChartBarSquareIcon aria-hidden="true" />Reports</NavLink>}
+          {canManageStaff && <NavLink to="/staff" className={({ isActive }) => isActive ? 'active' : undefined}><UserGroupIcon aria-hidden="true" />Staff</NavLink>}
         </nav>
 
         <div className="workspace-nav-actions">
-          {location.pathname !== '/events' && <button className="workspace-icon-action" type="button" onClick={() => navigate(backTarget)} aria-label="Go back"><ArrowLeftIcon /></button>}
+          {canUseOfflineScreening && stationWorkflowMatch && <OfflineSyncControl eventId={stationWorkflowMatch[1]} />}
+          {canCreateEvent && eventEditPath && <Link className="workspace-edit-action" to={eventEditPath}><PencilSquareIcon aria-hidden="true" /><span>Edit event</span></Link>}
           <ThemeToggle className="workspace-icon-action" />
           {canCreateEvent && location.pathname !== '/events/new' && <Link className="workspace-create-action" to="/events/new"><PlusIcon aria-hidden="true" />New event</Link>}
           <ProfileMenu triggerClassName="workspace-profile-action" compact />
