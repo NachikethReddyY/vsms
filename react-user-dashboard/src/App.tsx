@@ -5,7 +5,7 @@ import { CognitoCallback } from "./auth/CognitoRoutes";
 import AppShell from "./components/AppShell";
 import LandingPage from "./components/LandingPage";
 import SettingsPage from "./components/SettingsPage";
-import TestHomePage from "./components/TestHomePage";
+import EventsPage from "./components/EventsPage";
 import QRCodePage from "./components/qr/QRCodePage";
 import EventDetailPage from "./features/events/EventDetailPage";
 import EventFormPage from "./features/events/EventFormPage";
@@ -52,7 +52,7 @@ export default function App() {
 
       <Route element={<ProtectedRoute />}>
         <Route path="/dashboard" element={<Navigate to="/events" replace />} />
-        <Route path="/events" element={<TestHomePage />} />
+        <Route path="/events" element={<EventsPage />} />
 
         <Route element={<EventWorkspace />}>
           <Route path="/account/security" element={<AccountSecurityPage />} />
@@ -95,11 +95,10 @@ export default function App() {
             <Route path="/registrations/:registrationId/qr" element={<RegistrationQrPage />} />
           </Route>
 
-        </Route>
-
-        <Route element={<RoleGuard allowedRoles={adminRoles} />}>
-          <Route path="/admin/audit-logs" element={<RegistrationAuditLogsPage />} />
-          <Route path="/admin/system-audit-logs" element={<Navigate to="/admin/audit-logs" replace />} />
+          <Route element={<RoleGuard allowedRoles={adminRoles} />}>
+            <Route path="/admin/audit-logs" element={<RegistrationAuditLogsPage />} />
+            <Route path="/admin/system-audit-logs" element={<Navigate to="/admin/audit-logs" replace />} />
+          </Route>
         </Route>
       </Route>
 

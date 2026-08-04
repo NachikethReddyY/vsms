@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, Navigate } from 'react-router-dom';
+import { useAuth } from '../auth/AuthProvider';
 import { ThemeToggle } from './MagicEffects';
 import { getCognitoAuthorizeUrl } from '../utils/cognitoAuth';
 import styles from './LandingPage.module.css';
@@ -131,6 +132,7 @@ function OutlineIcon({ children }: { children: ReactNode }) {
 }
 
 export default function LandingPage() {
+  const { isAuthenticated } = useAuth();
   const workflowRef = useRef<HTMLElement>(null);
   const [motionReady] = useState(
     () => typeof window !== 'undefined'
@@ -166,6 +168,8 @@ export default function LandingPage() {
     syncThemeColor();
     return () => observer.disconnect();
   }, []);
+
+  if (isAuthenticated) return <Navigate to="/events" replace />;
 
   return (
     <div className={`${styles['landing-page']} ${motionReady ? styles['motion-ready'] : ''}`}>
