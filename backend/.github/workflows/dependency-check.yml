@@ -7,8 +7,8 @@ on:
     branches: [main, master]
 
 jobs:
-  npm-audit:
-    name: Fast NPM Security Audit
+  pnpm-audit:
+    name: Fast pnpm Security Audit
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
@@ -19,13 +19,18 @@ jobs:
         with:
           node-version: "20"
 
-      - name: Run NPM Audit
-        run: npm audit --audit-level=high
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 11.18.0
+
+      - name: Run pnpm Audit
+        run: pnpm audit --audit-level=high
 
   owasp-dep-check:
     name: Deep OWASP Dependency Check
     runs-on: ubuntu-latest
-    needs: npm-audit
+    needs: pnpm-audit
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4

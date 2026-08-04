@@ -1,9 +1,10 @@
 const { createAuthAuditLog } = require("../utils/AuthAudit");
 
-function requireAnyRole(...allowedRoles) {
+function buildRoleGuard(allowedRoles, denyAdministrator) {
     return async (req, res, next) => {
         const roles = req.auth?.roles || [];
-        const allowed = allowedRoles.some((role) => roles.includes(role));
+        const allowed = (!denyAdministrator || !roles.includes("ADMINISTRATOR"))
+            && allowedRoles.some((role) => roles.includes(role));
 
         if (!allowed) {
             await createAuthAuditLog({
@@ -22,5 +23,11 @@ function requireAnyRole(...allowedRoles) {
         next();
     };
 }
+
+function requireAnyRole(...allowedRoles) {
+    return buildRoleGuard(allowedRoles, false);
+}
+
+requireAnyRole.operational = (...allowedRoles) => buildRoleGuard(allowedRoles, true);
 
 module.exports = requireAnyRole;

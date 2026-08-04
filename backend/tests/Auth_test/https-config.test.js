@@ -30,3 +30,45 @@ test("transport configuration rejects HTTP origins and Cognito URLs", () => {
     COGNITO_REDIRECT_URI: "https://localhost:5173/auth/callback",
   }).status, 0);
 });
+
+test("production requires a valid versioned encryption keyring", () => {
+  const production = {
+    NODE_ENV: "production",
+    JWT_ACCESS_SECRET: "x".repeat(48),
+    CORS_ORIGINS: "https://app.example.com",
+    PUBLIC_APP_ORIGIN: "https://app.example.com",
+    ENCRYPTION_KEY: "",
+    ENCRYPTION_ACTIVE_KEY_ID: "",
+    ENCRYPTION_KEYRING_JSON: "",
+  };
+  assert.notEqual(loadConfig(production).status, 0);
+  assert.notEqual(loadConfig({
+    ...production,
+    ENCRYPTION_ACTIVE_KEY_ID: "current",
+    ENCRYPTION_KEYRING_JSON: JSON.stringify({ previous: "1".repeat(64) }),
+  }).status, 0);
+  assert.notEqual(loadConfig({
+    ...production,
+    ENCRYPTION_ACTIVE_KEY_ID: "current",
+    ENCRYPTION_KEYRING_JSON: "not-json",
+  }).status, 0);
+  assert.equal(loadConfig({
+    ...production,
+    ENCRYPTION_ACTIVE_KEY_ID: "current",
+    ENCRYPTION_KEYRING_JSON: JSON.stringify({ previous: "1".repeat(64), current: "2".repeat(64) }),
+  }).status, 0);
+});
+
+test("production QR origins require a non-local HTTPS public origin", () => {
+  const production = {
+    NODE_ENV: "production",
+    JWT_ACCESS_SECRET: "x".repeat(48),
+    CORS_ORIGINS: "https://app.example.com",
+    ENCRYPTION_ACTIVE_KEY_ID: "current",
+    ENCRYPTION_KEYRING_JSON: JSON.stringify({ current: "2".repeat(64) }),
+  };
+
+  assert.notEqual(loadConfig({ ...production, PUBLIC_APP_ORIGIN: "http://app.example.com" }).status, 0);
+  assert.notEqual(loadConfig({ ...production, PUBLIC_APP_ORIGIN: "https://localhost:5173" }).status, 0);
+  assert.equal(loadConfig({ ...production, PUBLIC_APP_ORIGIN: "https://app.example.com" }).status, 0);
+});

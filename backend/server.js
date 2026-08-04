@@ -1,5 +1,5 @@
 const fs = require("fs");
-const http = http = require("http");
+const http = require("http");
 const https = require("https");
 const path = require("path");
 const cors = require("cors");
@@ -135,7 +135,7 @@ app.use("/events", eventRoutes);
 app.use("/queues", queueRoutes);
 
 // -----------------------------------------------------------------------------
-// 5. GLOBAL ERROR HANDLER (Catches downstream async/sync errors cleanly)
+// 5. GLOBAL ERROR HANDLER
 // -----------------------------------------------------------------------------
 app.use((err, req, res, next) => {
   const statusCode = err.statusCode || 500;
@@ -163,9 +163,10 @@ app.use((req, res) => {
 // -----------------------------------------------------------------------------
 // 6. SERVER CREATION, SOCKET.IO & LISTENING
 // -----------------------------------------------------------------------------
-let server;
+const useHttps = !env.isProduction && env.localHttps;
 
-if (!env.isProduction && env.localHttps) {
+let server;
+if (useHttps) {
   server = https.createServer(
     {
       key: fs.readFileSync(path.resolve(__dirname, env.TLS_KEY_PATH)),
@@ -179,7 +180,7 @@ if (!env.isProduction && env.localHttps) {
 
 const io = new Server(server, { cors: corsOptions });
 
-// Make io accessible globally via Express context for web sockets & controllers
+// Make io accessible globally via Express context
 app.set("io", io);
 
 io.on("connection", (socket) => {
@@ -200,7 +201,7 @@ if (require.main === module) {
   const host = env.HOST || "localhost";
 
   server.listen(port, host, () => {
-    const protocol = !env.isProduction && env.localHttps ? "https" : "http";
+    const protocol = useHttps ? "https" : "http";
     const serverUrl = `${protocol}://${host}:${port}`;
     
     console.log(`[Server Status] Running successfully on ${serverUrl}`);

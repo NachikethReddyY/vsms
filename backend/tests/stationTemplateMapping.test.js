@@ -11,7 +11,6 @@ const {
 test("importable keys match StationType enum", () => {
   assert.deepEqual(Object.keys(IMPORTABLE_TEMPLATE_KEYS).sort(), [
     "COLOUR_VISION",
-    "EYE_HEALTH",
     "REFRACTION",
     "VISUAL_ACUITY",
   ]);
@@ -22,8 +21,8 @@ test("importable keys match StationType enum", () => {
   }
 });
 
-test("registration and clinical review stay catalog-only", () => {
-  assert.deepEqual([...NON_IMPORTABLE_TEMPLATE_KEYS].sort(), ["CLINICAL_REVIEW", "REGISTRATION"]);
+test("templates without implemented capture flows stay catalog-only", () => {
+  assert.deepEqual([...NON_IMPORTABLE_TEMPLATE_KEYS].sort(), ["CLINICAL_REVIEW", "EYE_HEALTH", "REGISTRATION"]);
   for (const key of NON_IMPORTABLE_TEMPLATE_KEYS) {
     assert.equal(stationTypeForTemplateKey(key), null);
     assert.equal(isImportableTemplateKey(key), false);

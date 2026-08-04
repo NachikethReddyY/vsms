@@ -4,12 +4,14 @@ const asyncHandler = require("../utils/asyncHandler");
 
 const qrController = require("../controllers/qrController");
 const authenticate = require("../middlewares/authenticate");
+const requireAnyRole = require("../middlewares/requireAnyRole");
 
 // ==========================================
 // Apply Auth Middleware Globally for QR Routes
 // (All routes below this line require authentication)
 // ==========================================
 router.use(authenticate);
+router.use(requireAnyRole.operational("REGISTRATION_OFFICER"));
 
 // ==========================================
 // 1. GENERATION & REISSUING
@@ -27,8 +29,11 @@ router.post("/check-in/manual", asyncHandler(qrController.manualCheckIn));
 // 3. LOOKUPS & HISTORY
 // ==========================================
 router.get("/participant/:token", asyncHandler(qrController.getParticipantByQR));
+<<<<<<< HEAD
 router.get("/participants/:participantId/history", asyncHandler(qrController.getParticipantQRCodes));
 router.get("/registrations/:token", asyncHandler(qrController.getRegistrationByQR));
+=======
+>>>>>>> f1cd61b8d8e08f18ef538dda89c72678d88d1033
 
 // ==========================================
 // 4. MANAGEMENT (REVOCATION, DOWNLOAD, PRINT)

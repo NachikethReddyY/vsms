@@ -7,6 +7,40 @@ const REF_RULE_VERSION = "VSMS-REF-1.0";
 const CV_RULE_VERSION = "VSMS-CV-1.0";
 const FLAG_RANK = { NORMAL: 0, REVIEW: 1, REFER: 2, URGENT: 3 };
 
+const canonicalJson = (value) => {
+  if (Array.isArray(value)) return value.map(canonicalJson);
+  if (value && typeof value === "object") {
+    return Object.fromEntries(Object.keys(value).sort().map((key) => [key, canonicalJson(value[key])]));
+  }
+  return value;
+};
+
+const screeningRequestFingerprint = ({ eventId, stationId, registrationId, userId, body }) => crypto
+  .createHash("sha256")
+  .update(JSON.stringify(canonicalJson({
+    eventId,
+    stationId,
+    registrationId,
+    userId,
+    payload: { acknowledged: body.acknowledged, resultData: body.resultData },
+  })))
+  .digest("hex");
+
+const replayReceipt = (receipt, { eventId, stationId, registrationId, userId, fingerprint }) => {
+  if (
+    receipt.actorUserId !== userId
+    || receipt.eventId !== eventId
+    || receipt.registrationId !== registrationId
+    || receipt.stationId !== stationId
+    || receipt.requestFingerprint !== fingerprint
+  ) {
+    throw new AppError(409, "IDEMPOTENCY_KEY_REUSED", "Idempotency key was already used for a different screening request");
+  }
+  return { result: receipt.resultSnapshot, created: false };
+};
+
+const immutableSnapshot = (value) => JSON.parse(JSON.stringify(value));
+
 const worstFlag = (reasons) => reasons.reduce((worst, item) => (
   FLAG_RANK[item.flag] > FLAG_RANK[worst] ? item.flag : worst
 ), "NORMAL");
@@ -119,20 +153,34 @@ const evaluateColourVision = (resultData) => {
   };
 };
 
-const assertCanScreen = async (eventId, user) => {
-  if (user.systemRole === "ADMIN" || user.systemRole === "EVENT_MANAGER") return;
+const assertCanScreen = async (eventId, user, stationId) => {
+  if (user.roles?.includes("ADMINISTRATOR") || !user.roles?.includes("SCREENER")) {
+    throw new AppError(403, "SCREENER_ROLE_REQUIRED", "A screener account role is required");
+  }
+  const event = await prisma.event.findUnique({
+    where: { eventId },
+    select: { eventId: true, name: true, status: true, venue: true, endsAt: true },
+  });
+  if (!event) throw new AppError(404, "EVENT_NOT_FOUND", "Event not found");
+  if (event.status !== "IN_PROGRESS") {
+    throw new AppError(409, "EVENT_NOT_IN_PROGRESS", "Screening is available only while the event is in progress");
+  }
+  const now = new Date();
   const assignment = await prisma.staffAssignment.findFirst({
     where: {
+      eventId,
       userId: user.userId,
       status: { in: ["ASSIGNED", "CONFIRMED"] },
-      assignmentRole: { in: ["SCREENER", "SUPPORT", "REGISTRATION"] },
-      shift: { eventId, status: "ACTIVE" },
+      assignmentRole: "SCREENER",
+      ...(stationId ? { stationId } : {}),
+      shift: { eventId, status: "ACTIVE", startsAt: { lte: now }, endsAt: { gt: now } },
     },
     select: { id: true },
   });
   if (!assignment) {
     throw new AppError(403, "FORBIDDEN", "You are not assigned to screen this event");
   }
+  return event;
 };
 
 const assertStation = async (eventId, stationId, stationType, label) => {
@@ -144,23 +192,50 @@ const assertStation = async (eventId, stationId, stationType, label) => {
 };
 
 const listStations = async (eventId, user) => {
-  await assertCanScreen(eventId, user);
-  const event = await prisma.event.findUnique({
-    where: { eventId },
-    select: { eventId: true, name: true, status: true, venue: true },
+  const event = await assertCanScreen(eventId, user);
+
+  const now = new Date();
+  const assignments = await prisma.staffAssignment.findMany({
+    where: {
+      eventId,
+      userId: user.userId,
+      status: { in: ["ASSIGNED", "CONFIRMED"] },
+      assignmentRole: "SCREENER",
+      stationId: { not: null },
+      shift: { eventId, status: "ACTIVE", startsAt: { lte: now }, endsAt: { gt: now } },
+    },
+    select: { stationId: true, shift: { select: { endsAt: true } } },
   });
-  if (!event) throw new AppError(404, "EVENT_NOT_FOUND", "Event not found");
 
   const stations = await prisma.station.findMany({
-    where: { eventId, isActive: true },
+    where: { eventId, stationId: { in: assignments.map(({ stationId }) => stationId) }, isActive: true },
     orderBy: { stationOrder: "asc" },
   });
 
-  return { event, stations };
+  const latestAssignmentEndByStation = new Map();
+  for (const assignment of assignments) {
+    const current = latestAssignmentEndByStation.get(assignment.stationId);
+    if (!current || assignment.shift.endsAt > current) {
+      latestAssignmentEndByStation.set(assignment.stationId, assignment.shift.endsAt);
+    }
+  }
+
+  return {
+    event,
+    stations: stations.map((station) => {
+      const assignmentEndsAt = latestAssignmentEndByStation.get(station.stationId);
+      if (!event.endsAt || !assignmentEndsAt) return station;
+      return {
+        ...station,
+        // Offline access may never outlive either the live event or this user's active shift.
+        offlineAccessExpiresAt: new Date(Math.min(event.endsAt.getTime(), assignmentEndsAt.getTime())).toISOString(),
+      };
+    }),
+  };
 };
 
 const listQueue = async (eventId, stationId, user) => {
-  await assertCanScreen(eventId, user);
+  await assertCanScreen(eventId, user, stationId);
   const station = await prisma.station.findFirst({ where: { stationId, eventId, isActive: true } });
   if (!station) throw new AppError(404, "STATION_NOT_FOUND", "Station not found for this event");
 
@@ -219,7 +294,7 @@ const resolveParticipant = async (eventId, query, user) => {
 };
 
 const previewStationResult = async (eventId, stationId, stationType, label, evaluate, body, user) => {
-  await assertCanScreen(eventId, user);
+  await assertCanScreen(eventId, user, stationId);
   await assertStation(eventId, stationId, stationType, label);
   return evaluate(body.resultData);
 };
@@ -234,21 +309,24 @@ const saveStationResult = async ({
   body,
   user,
 }) => {
-  await assertCanScreen(eventId, user);
+  await assertCanScreen(eventId, user, stationId);
   await assertStation(eventId, stationId, stationType, label);
-
-  const evaluation = evaluate(body.resultData);
-  if (evaluation.isFlagged && body.acknowledged !== true) {
-    throw new AppError(
-      400,
-      "ACKNOWLEDGEMENT_REQUIRED",
-      `Flagged result (${evaluation.overallFlag}) must be acknowledged before save`,
-      { evaluation },
-    );
-  }
+  const fingerprint = screeningRequestFingerprint({ eventId, stationId, registrationId: body.registrationId, userId: user.userId, body });
+  const replayContext = {
+    eventId,
+    stationId,
+    registrationId: body.registrationId,
+    userId: user.userId,
+    fingerprint,
+  };
 
   try {
     return await prisma.$transaction(async (tx) => {
+      const existingByKey = await tx.screeningRequestLedger.findUnique({
+        where: { idempotencyKey: body.idempotencyKey },
+      });
+      if (existingByKey) return replayReceipt(existingByKey, replayContext);
+
       const registration = await tx.eventRegistration.findFirst({
         where: { registrationId: body.registrationId, eventId },
       });
@@ -257,10 +335,15 @@ const saveStationResult = async ({
         throw new AppError(409, "REGISTRATION_NOT_SCREENABLE", "Completed or cancelled registrations cannot be changed");
       }
 
-      const existingByKey = await tx.screeningResult.findUnique({
-        where: { idempotencyKey: body.idempotencyKey },
-      });
-      if (existingByKey) return { result: existingByKey, created: false };
+      const evaluation = evaluate(body.resultData);
+      if (evaluation.isFlagged && body.acknowledged !== true) {
+        throw new AppError(
+          400,
+          "ACKNOWLEDGEMENT_REQUIRED",
+          `Flagged result (${evaluation.overallFlag}) must be acknowledged before save`,
+          { evaluation },
+        );
+      }
 
       const payload = {
         recordedByUserId: user.userId,
@@ -272,6 +355,7 @@ const saveStationResult = async ({
         ruleVersion,
         acknowledgedAt: evaluation.isFlagged ? new Date() : null,
         idempotencyKey: body.idempotencyKey,
+        requestFingerprint: fingerprint,
       };
 
       const result = await tx.screeningResult.upsert({
@@ -281,21 +365,38 @@ const saveStationResult = async ({
             stationId,
           },
         },
-        update: payload,
+        update: { ...payload, version: { increment: 1 } },
         create: {
           registrationId: body.registrationId,
           stationId,
+          version: 1,
           ...payload,
         },
       });
-      return { result: { ...result, evaluation }, created: true };
+      const responseResult = { ...result, evaluation };
+      await tx.screeningRequestLedger.create({
+        data: {
+          idempotencyKey: body.idempotencyKey,
+          requestFingerprint: fingerprint,
+          actorUserId: user.userId,
+          eventId,
+          registrationId: body.registrationId,
+          stationId,
+          resultId: result.resultId,
+          resultVersion: result.version,
+          resultSnapshot: immutableSnapshot(responseResult),
+        },
+      });
+      return { result: responseResult, created: true };
     }, { isolationLevel: "Serializable" });
   } catch (error) {
     if (error.code === "P2002") {
-      const raced = await prisma.screeningResult.findUnique({ where: { idempotencyKey: body.idempotencyKey } });
-      if (raced) return { result: raced, created: false };
+      const raced = await prisma.screeningRequestLedger.findUnique({ where: { idempotencyKey: body.idempotencyKey } });
+      if (raced) return replayReceipt(raced, replayContext);
     }
     if (error.code === "P2034") {
+      const raced = await prisma.screeningRequestLedger.findUnique({ where: { idempotencyKey: body.idempotencyKey } });
+      if (raced) return replayReceipt(raced, replayContext);
       const registration = await prisma.eventRegistration.findUnique({ where: { registrationId: body.registrationId } });
       if (registration && ["COMPLETED", "CANCELLED"].includes(registration.registrationStatus)) {
         throw new AppError(409, "REGISTRATION_NOT_SCREENABLE", "Completed or cancelled registrations cannot be changed");
@@ -398,4 +499,5 @@ module.exports = {
   evaluateVisualAcuity,
   evaluateRefraction,
   evaluateColourVision,
+  screeningRequestFingerprint,
 };

@@ -841,7 +841,7 @@ export function ConsentPage() {
     try {
       let signature = {};
       if (form.consentStatus === "ACCEPTED") {
-        const upload = await apiClient.post("/signatures", { dataUrl: signatureDataUrl });
+        const upload = await apiClient.post("/signatures", { dataUrl: signatureDataUrl, eventId, purpose: "CONSENT", targetId: participantId });
         signature = upload.data;
       }
       await apiClient.post(`/participants/${participantId}/consents`, {
