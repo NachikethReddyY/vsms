@@ -152,6 +152,7 @@ paths:
       tags: [Authentication]
       operationId: logout
       summary: Clear the local browser session and finish the hosted Cognito logout
+      parameters: [{ $ref: "#/components/parameters/ConditionalCsrfToken" }]
       responses:
         "200":
           description: Browser session cleared
@@ -161,8 +162,10 @@ paths:
   /api/v1/auth/global-logout:
     post:
       tags: [Authentication]
+      security: [{ accessCookie: [] }]
       operationId: globalLogout
       summary: Revoke Cognito sessions everywhere and clear local browser cookies
+      parameters: [{ $ref: "#/components/parameters/CsrfToken" }]
       responses:
         "200":
           description: Cognito sessions revoked and browser session cleared
@@ -1468,6 +1471,11 @@ components:
       type: apiKey
       in: cookie
       name: vsms_refresh
+    accessCookie:
+      type: apiKey
+      in: cookie
+      name: vsms_access
+      description: HttpOnly Cognito access token used for global session revocation
   parameters:
     EventId:
       name: eventId
@@ -1555,6 +1563,12 @@ components:
       required: true
       schema: { type: string, minLength: 32 }
       description: Must equal the `vsms_csrf` cookie; requests also require an allowed Origin
+    ConditionalCsrfToken:
+      name: X-CSRF-Token
+      in: header
+      required: false
+      schema: { type: string, minLength: 32 }
+      description: Required when credential or CSRF cookies are present; must equal the `vsms_csrf` cookie and include an allowed Origin
   requestBodies:
     TransitionRequest:
       required: true
