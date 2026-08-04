@@ -52,5 +52,6 @@ run(pnpm, [
   ".tests/reviews.integration.test.js",
   ".tests/locationService.test.js",
   ".tests/reviewService.test.js",
+  ".tests/qr.integration.test.js",
   ".tests/sync.integration.test.js",
 ], databaseEnvironment);

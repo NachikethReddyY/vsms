@@ -3,6 +3,7 @@ const crypto = require("crypto");
 const prisma = require("../prisma/prismaClient");
 const env = require("../config/env");
 const { decrypt, encrypt, encryptionContext } = require("../utils/cryptoUtils");
+const { assertUuid } = require("../utils/validation");
 const AppError = require("../errors/AppError");
 
 function buildQRTargetUrl(token) {
@@ -57,6 +58,26 @@ const qrLookupRegistration = (registration) => ({
     checkedIn: registration.checkedIn,
 });
 
+const manualCheckInRegistrationSelect = {
+    registrationId: true,
+    eventId: true,
+    registrationStatus: true,
+    checkedIn: true,
+    checkedInAt: true,
+    queueNumber: true,
+};
+
+const manualCheckInRegistration = (registration) => ({
+    registrationId: registration.registrationId,
+    eventId: registration.eventId,
+    registrationStatus: registration.registrationStatus,
+    checkedIn: registration.checkedIn,
+    checkedInAt: registration.checkedInAt,
+    queueNumber: registration.queueNumber,
+});
+
+const QR_TOKEN_PATTERN = /^[a-f0-9]{64}$/i;
+
 const decryptQrToken = (qr) => {
     if (qr.tokenEncryptionVersion !== 2 || !qr.tokenCiphertext) {
         throw new AppError(410, "QR_REISSUE_REQUIRED", "This QR pass must be reissued before it can be rendered.");
@@ -79,17 +100,47 @@ const safeQrRecord = (qr) => ({
     revokedReason: qr.revokedReason,
 });
 
-const lockRegistrationForQrIssuance = async (tx, registrationId) => {
+const lockRegistration = async (tx, registrationId, eventId = null) => {
     if (typeof tx.$queryRaw !== "function") return;
-    const rows = await tx.$queryRaw`
-        SELECT registration_id
-        FROM event_registrations
-        WHERE registration_id = CAST(${registrationId} AS uuid)
-        FOR UPDATE
-    `;
+    const rows = eventId
+        ? await tx.$queryRaw`
+            SELECT registration_id
+            FROM event_registrations
+            WHERE registration_id = CAST(${registrationId} AS uuid)
+              AND event_id = CAST(${eventId} AS uuid)
+            FOR UPDATE
+        `
+        : await tx.$queryRaw`
+            SELECT registration_id
+            FROM event_registrations
+            WHERE registration_id = CAST(${registrationId} AS uuid)
+            FOR UPDATE
+        `;
     if (Array.isArray(rows) && rows.length === 0) {
+        if (eventId) {
+            throw new AppError(404, "REGISTRATION_NOT_FOUND", "Registration record was not found for this event.");
+        }
         throw new AppError(404, "REGISTRATION_NOT_FOUND", "Event registration not found.");
     }
+};
+
+const lockActiveQrPass = async (tx, qrId, registrationId, now = new Date()) => {
+    if (typeof tx.$queryRaw !== "function") {
+        return tx.qRCodePass.findFirst({
+            where: activeQrWhere({ id: qrId, registrationId }, now),
+            select: { id: true, registrationId: true },
+        });
+    }
+    const rows = await tx.$queryRaw`
+        SELECT qr_id AS "id", registration_id AS "registrationId"
+        FROM qr_code_passes
+        WHERE qr_id = CAST(${qrId} AS uuid)
+          AND registration_id = CAST(${registrationId} AS uuid)
+          AND is_active = true
+          AND expires_at > ${now}
+        FOR UPDATE
+    `;
+    return Array.isArray(rows) ? rows[0] || null : null;
 };
 
 const renderQr = async (qr, token) => ({
@@ -183,7 +234,7 @@ exports.generateQR = async (registrationId, userId = null, externalTx = null) =>
     const execute = async (tx) => {
         // Serialize first issuance on the registration row so concurrent calls
         // converge on one active pass.
-        await lockRegistrationForQrIssuance(tx, registrationId);
+        await lockRegistration(tx, registrationId);
         const registration = await tx.eventRegistration.findUnique({
             where: { registrationId },
             include: { participant: true, event: true },
@@ -336,9 +387,16 @@ exports.revokeQR = async (qrId, revokedReason = "Revoked by staff", revokedBy = 
 
     return await db.$transaction(async (tx) => {
         const now = new Date();
-        const qr = await tx.qRCodePass.findFirst({ where: activeQrWhere({ id: qrId }, now) });
+        const qr = await tx.qRCodePass.findFirst({
+            where: activeQrWhere({ id: qrId }, now),
+            select: { id: true, registrationId: true },
+        });
 
         if (!qr) throw new AppError(404, "QR_NOT_FOUND", "QR Code is invalid, expired, or unavailable.");
+        await lockRegistration(tx, qr.registrationId);
+        if (!await lockActiveQrPass(tx, qr.id, qr.registrationId, now)) {
+            throw new AppError(409, "QR_STATE_CONFLICT", "QR Code is no longer active.");
+        }
 
         const updated = await tx.qRCodePass.updateMany({
             where: activeQrWhere({ id: qrId }, now),
@@ -374,7 +432,7 @@ exports.reissueQR = async (registrationId, userId = null, db = prisma) => {
 
     return await db.$transaction(async (tx) => {
         const now = new Date();
-        await lockRegistrationForQrIssuance(tx, registrationId);
+        await lockRegistration(tx, registrationId);
         // 1. Deactivate existing passes
         await tx.qRCodePass.updateMany({
             where: { registrationId, isActive: true },
@@ -433,73 +491,91 @@ exports.printQR = async (qrId, db = prisma) => {
 // Manual Check-In Procedure
 // ==========================================
 exports.manualCheckIn = async (params, db = prisma) => {
-    const { registrationId, identifier, eventId, userId } =
+    let { registrationId, identifier, eventId, userId } =
         typeof params === "object" ? params : { registrationId: params };
 
-    if (!registrationId && !identifier) {
-        throw new AppError(400, "IDENTIFIER_REQUIRED", "Registration ID or Identifier is required.");
+    if (!eventId) {
+        throw new AppError(400, "EVENT_ID_REQUIRED", "Event ID is required for manual check-in.");
     }
+    eventId = assertUuid(eventId, "eventId");
+
+    if (Boolean(registrationId) === Boolean(identifier)) {
+        throw new AppError(400, "CHECKIN_REFERENCE_REQUIRED", "Supply exactly one registration reference or QR token.");
+    }
+    if (registrationId) registrationId = assertUuid(registrationId, "registrationId");
+    if (identifier && (typeof identifier !== "string" || !QR_TOKEN_PATTERN.test(identifier))) {
+        throw new AppError(400, "INVALID_QR", "QR Code is invalid, expired, or unavailable.");
+    }
+    if (identifier) identifier = identifier.toLowerCase();
 
     return await db.$transaction(async (tx) => {
         let regIdToUpdate = registrationId;
+        let qrIdToUse = null;
 
         if (!regIdToUpdate && identifier) {
-            // Step A: Search by QR Token
             const qr = await tx.qRCodePass.findFirst({
-                where: activeQrWhere(tokenSelector(identifier)),
+                where: activeQrWhere({
+                    ...tokenSelector(identifier),
+                    registration: { eventId },
+                }),
                 select: {
+                    id: true,
                     registrationId: true,
-                    registration: { select: { eventId: true } },
                 },
             });
 
             if (qr) {
-                if (eventId && qr.registration.eventId !== eventId) {
-                    throw new AppError(400, "QR_EVENT_MISMATCH", "QR Code is not valid for this specific event.");
-                }
                 regIdToUpdate = qr.registrationId;
-            } else {
-                // Step B: Search by Encrypted NRIC
-                const encryptedIdentifier = encrypt(identifier, encryptionContext("ManualCheckIn", eventId || "unscoped", "identifier"));
-                const participant = await tx.participant.findFirst({
-                    where: { nric: encryptedIdentifier },
-                });
-
-                if (participant) {
-                    const registration = await tx.eventRegistration.findFirst({
-                        where: {
-                            participantId: participant.id,
-                            ...(eventId ? { eventId } : {}),
-                        },
-                    });
-                    if (registration) regIdToUpdate = registration.registrationId;
-                }
+                qrIdToUse = qr.id;
             }
         }
 
         if (!regIdToUpdate) {
-            throw new AppError(404, "REGISTRATION_NOT_FOUND", "Registration record not found for manual check-in.");
+            throw new AppError(404, "INVALID_QR", "QR Code is invalid, expired, or unavailable.");
+        }
+
+        await lockRegistration(tx, regIdToUpdate, eventId);
+        if (qrIdToUse && !await lockActiveQrPass(tx, qrIdToUse, regIdToUpdate)) {
+            throw new AppError(404, "INVALID_QR", "QR Code is invalid, expired, or unavailable.");
         }
 
         const registration = await tx.eventRegistration.findFirst({
             where: {
                 registrationId: regIdToUpdate,
-                ...(eventId ? { eventId } : {}),
+                eventId,
             },
-            select: { registrationId: true },
+            select: manualCheckInRegistrationSelect,
         });
         if (!registration) {
             throw new AppError(404, "REGISTRATION_NOT_FOUND", "Registration record was not found for this event.");
         }
+        if (registration.registrationStatus !== "SIGNED_UP" || registration.checkedIn) {
+            throw new AppError(409, "CHECKIN_STATE_CONFLICT", "Only a signed-up participant can be checked in.");
+        }
 
-        const updatedRegistration = await tx.eventRegistration.update({
-            where: { registrationId: registration.registrationId },
+        const checkedInAt = new Date();
+        const updated = await tx.eventRegistration.updateMany({
+            where: {
+                registrationId: registration.registrationId,
+                eventId,
+                registrationStatus: "SIGNED_UP",
+                checkedIn: false,
+            },
             data: {
                 checkedIn: true,
-                checkedInAt: new Date(),
+                checkedInAt,
                 registrationStatus: "CHECKED_IN",
             },
-            include: { participant: true, event: true },
+        });
+        if (updated.count !== 1) {
+            throw new AppError(409, "CHECKIN_STATE_CONFLICT", "Registration was changed before check-in completed.");
+        }
+
+        const result = manualCheckInRegistration({
+            ...registration,
+            registrationStatus: "CHECKED_IN",
+            checkedIn: true,
+            checkedInAt,
         });
 
         await writeAudit(tx, {
@@ -508,11 +584,11 @@ exports.manualCheckIn = async (params, db = prisma) => {
             entityName: "EventRegistration",
             entityId: regIdToUpdate,
             newValue: {
-                identifierUsed: identifier || "REGISTRATION_ID",
-                eventId: updatedRegistration.eventId,
+                eventId: result.eventId,
+                checkInMethod: identifier ? "QR_TOKEN" : "REGISTRATION_REFERENCE",
             },
         });
 
-        return updatedRegistration;
+        return result;
     });
 };
