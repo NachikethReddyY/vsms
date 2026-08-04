@@ -2,6 +2,7 @@ const crypto = require("crypto");
 const bcrypt = require("bcrypt");
 require("dotenv").config();
 const prisma = require("./prismaClient");
+const { encrypt, encryptionContext } = require("../utils/cryptoUtils");
 
 const DEMO_PASSWORD = process.env.VSMS_DEMO_PASSWORD || "Demo-Only-Change-Me-2026!";
 if (process.env.NODE_ENV === "production" && !process.env.VSMS_DEMO_PASSWORD) {
@@ -14,6 +15,7 @@ const roleDefinitions = [
   ["REGISTRATION_OFFICER", "Registers participants and records consent", 3],
   ["SCREENER", "Performs participant screening", 4],
   ["REVIEWER", "Reviews screening outcomes", 5],
+  ["SUPPORT", "Supports event operations", 6],
 ];
 
 const permissionNames = [
@@ -100,7 +102,7 @@ async function seedStaff(roles, passwordHash) {
       email,
       employeeNumber: process.env.SEED_STAFF_EMPLOYEE_NUMBER || "SEED-ADMIN-001",
       department: "Operations",
-      designation: "Registration Officer",
+      designation: "Event Administrator",
       status: "ACTIVE",
       sysRole: "ADMIN",
     },
@@ -111,14 +113,42 @@ async function seedStaff(roles, passwordHash) {
     create: { userId: user.id, passwordHash },
   });
 
-  for (const roleName of ["ADMINISTRATOR", "REGISTRATION_OFFICER"]) {
-    await prisma.userRole.upsert({
-      where: { userId_roleId: { userId: user.id, roleId: roles.get(roleName).id } },
-      update: {},
-      create: { userId: user.id, roleId: roles.get(roleName).id },
-    });
-  }
+  await prisma.userRole.deleteMany({ where: { userId: user.id, roleId: { not: roles.get("ADMINISTRATOR").id } } });
+  await prisma.userRole.upsert({
+    where: { userId_roleId: { userId: user.id, roleId: roles.get("ADMINISTRATOR").id } },
+    update: {},
+    create: { userId: user.id, roleId: roles.get("ADMINISTRATOR").id },
+  });
   return user;
+}
+
+async function seedRegistrationOfficer(roles, staff, passwordHash) {
+  const email = String(process.env.SEED_REGISTRATION_EMAIL || "registration@vsms.local").trim().toLowerCase();
+  const officer = await prisma.user.upsert({
+    where: { email },
+    update: { status: "ACTIVE", sysRole: "STAFF" },
+    create: {
+      username: email,
+      fullName: process.env.SEED_REGISTRATION_NAME || "Avery Lim",
+      email,
+      employeeNumber: process.env.SEED_REGISTRATION_EMPLOYEE_NUMBER || "SEED-REG-001",
+      department: "Event Operations",
+      designation: "Registration Officer",
+      status: "ACTIVE",
+      sysRole: "STAFF",
+    },
+  });
+  await prisma.userCredential.upsert({
+    where: { userId: officer.id },
+    update: { passwordHash },
+    create: { userId: officer.id, passwordHash },
+  });
+  await prisma.userRole.upsert({
+    where: { userId_roleId: { userId: officer.id, roleId: roles.get("REGISTRATION_OFFICER").id } },
+    update: { assignedById: staff.id },
+    create: { userId: officer.id, roleId: roles.get("REGISTRATION_OFFICER").id, assignedById: staff.id },
+  });
+  return officer;
 }
 
 async function seedReviewer(roles, staff, passwordHash) {
@@ -325,13 +355,13 @@ async function seedEventStructure(event, staff) {
     }));
   }
 
+  await prisma.staffAssignment.deleteMany({
+    where: { eventId: event.eventId, userId: staff.id, assignmentRole: "REGISTRATION" },
+  });
   const registrationOfficers = await prisma.user.findMany({
     where: {
       status: "ACTIVE",
-      OR: [
-        { id: staff.id },
-        { userRoles: { some: { role: { roleName: "REGISTRATION_OFFICER" } } } },
-      ],
+      userRoles: { some: { role: { roleName: "REGISTRATION_OFFICER" } } },
     },
     select: { id: true },
   });
@@ -341,19 +371,20 @@ async function seedEventStructure(event, staff) {
         eventId: event.eventId,
         userId: officer.id,
         assignmentRole: "REGISTRATION",
-        shiftId: null,
+        shiftId: shift.shiftId,
         stationId: null,
       },
     });
     if (assignment) {
       await prisma.staffAssignment.update({
         where: { id: assignment.id },
-        data: { status: "ASSIGNED", assignmentStatus: "ASSIGNED", assignedBy: staff.id },
+        data: { shiftId: shift.shiftId, status: "ASSIGNED", assignmentStatus: "ASSIGNED", assignedBy: staff.id },
       });
     } else {
       await prisma.staffAssignment.create({
         data: {
           eventId: event.eventId,
+          shiftId: shift.shiftId,
           userId: officer.id,
           assignedBy: staff.id,
           assignmentRole: "REGISTRATION",
@@ -369,6 +400,7 @@ async function seedEventStructure(event, staff) {
 
 async function upsertDemoParticipant(staff, {
   participantReference,
+  nric,
   firstName,
   lastName,
   dateOfBirth,
@@ -381,6 +413,8 @@ async function upsertDemoParticipant(staff, {
     update: {
       firstName,
       lastName,
+      nric,
+      nricMasked: `••••${nric.slice(-4)}`,
       dateOfBirth: new Date(`${dateOfBirth}T00:00:00.000Z`),
       contactNumber,
       email,
@@ -390,6 +424,8 @@ async function upsertDemoParticipant(staff, {
     },
     create: {
       participantReference,
+      nric,
+      nricMasked: `••••${nric.slice(-4)}`,
       firstName,
       lastName,
       dateOfBirth: new Date(`${dateOfBirth}T00:00:00.000Z`),
@@ -525,25 +561,33 @@ async function ensureDemoRegistration(staff, participant, event, consent) {
   });
 
   const token = "VSMS-DEMO-QR-001";
-  const qr = await prisma.qRCodePass.upsert({
-    where: { token },
-    update: {
-      registrationId: registration.registrationId,
-      tokenHash: crypto.createHash("sha256").update(token).digest("hex"),
-      expiresAt: demoDate(30, 23, 59),
-      isActive: true,
-      revokedAt: null,
-      revokedBy: null,
-      revokedReason: null,
-    },
-    create: {
-      registrationId: registration.registrationId,
-      token,
-      tokenHash: crypto.createHash("sha256").update(token).digest("hex"),
-      expiresAt: demoDate(30, 23, 59),
-      isActive: true,
-    },
+  const existingQr = await prisma.qRCodePass.findFirst({
+    where: { registrationId: registration.registrationId },
+    select: { id: true },
   });
+  const qrId = existingQr?.id || crypto.randomUUID();
+  const qrData = {
+    registrationId: registration.registrationId,
+    tokenHash: crypto.createHash("sha256").update(token).digest("hex"),
+    tokenCiphertext: encrypt(token, encryptionContext("QRCodePass", qrId, "token")),
+    tokenEncryptionVersion: 2,
+    expiresAt: demoDate(30, 23, 59),
+    isActive: true,
+    revokedAt: null,
+    revokedBy: null,
+    revokedReason: null,
+  };
+  const qr = existingQr
+    ? await prisma.qRCodePass.update({
+      where: { id: qrId },
+      data: qrData,
+    })
+    : await prisma.qRCodePass.create({
+      data: {
+        id: qrId,
+        ...qrData,
+      },
+    });
   return { registration, qr };
 }
 
@@ -611,6 +655,7 @@ async function seedDemoData(staff, reviewer, consentForm) {
 
   const aisha = await upsertDemoParticipant(staff, {
     participantReference: "VSMS-DEMO-000001",
+    nric: "S1000001A",
     firstName: "Aisha",
     lastName: "Rahman",
     dateOfBirth: "1988-04-12",
@@ -620,6 +665,7 @@ async function seedDemoData(staff, reviewer, consentForm) {
   });
   const daniel = await upsertDemoParticipant(staff, {
     participantReference: "VSMS-DEMO-000002",
+    nric: "S1000002B",
     firstName: "Daniel",
     lastName: "Tan",
     dateOfBirth: "1975-09-23",
@@ -628,6 +674,7 @@ async function seedDemoData(staff, reviewer, consentForm) {
   });
   const priya = await upsertDemoParticipant(staff, {
     participantReference: "VSMS-DEMO-000003",
+    nric: "S1000003C",
     firstName: "Priya",
     lastName: "Nair",
     dateOfBirth: "1992-02-18",
@@ -636,6 +683,7 @@ async function seedDemoData(staff, reviewer, consentForm) {
   });
   const marcus = await upsertDemoParticipant(staff, {
     participantReference: "VSMS-DEMO-000004",
+    nric: "S1000004D",
     firstName: "Marcus",
     lastName: "Lim",
     dateOfBirth: "1983-11-05",
@@ -746,6 +794,7 @@ async function main() {
   const passwordHash = await bcrypt.hash(DEMO_PASSWORD, 12);
   const roles = await seedRoles();
   const staff = await seedStaff(roles, passwordHash);
+  await seedRegistrationOfficer(roles, staff, passwordHash);
   const reviewer = await seedReviewer(roles, staff, passwordHash);
   await seedPermissions(roles, staff);
   await seedStationTemplates();
@@ -760,7 +809,7 @@ async function main() {
   console.log(`Registered participant: ${demo.participants.daniel.participantReference} - Daniel Tan`);
   console.log(`Reviewer profile: ${reviewer.email} (local role: REVIEWER)`);
   console.log(`Registration ID: ${demo.registration.registrationId}`);
-  console.log(`Demo QR token: ${demo.qr.token}`);
+  console.log(`Demo QR pass: ${demo.qr.id}`);
 }
 
 main()
