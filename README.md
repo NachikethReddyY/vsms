@@ -23,15 +23,16 @@ The event lifecycle is `DRAFT → PUBLISHED → IN_PROGRESS → COMPLETED`, with
 
 - Node.js 20 or newer
 - PostgreSQL 15 or newer
-- npm
+- pnpm 11.18.0 (via Corepack)
 
 ## Local setup
 
 1. Install dependencies.
 
    ```bash
-   npm --prefix backend install
-   npm --prefix react-user-dashboard install
+   corepack enable
+   pnpm --dir backend install --frozen-lockfile
+   pnpm --dir react-user-dashboard install --frozen-lockfile
    ```
 
 2. Create the backend environment file.
@@ -45,16 +46,16 @@ The event lifecycle is `DRAFT → PUBLISHED → IN_PROGRESS → COMPLETED`, with
 3. Apply migrations, generate Prisma Client, and seed development data.
 
    ```bash
-   npm --prefix backend run prisma:migrate
-   npm --prefix backend exec prisma generate
-   npm --prefix backend run prisma:seed
+   pnpm --dir backend prisma:migrate
+   pnpm --dir backend exec prisma generate
+   pnpm --dir backend prisma:seed
    ```
 
 4. Start both applications in separate terminals.
 
    ```bash
-   npm --prefix backend run dev
-   npm --prefix react-user-dashboard run dev
+   pnpm --dir backend dev
+   pnpm --dir react-user-dashboard dev
    ```
 
 Open `https://localhost:5173`. The API is available at `https://localhost:5050`; non-production API documentation is at `https://localhost:5050/api-docs`. Plain HTTP is intentionally unavailable on both ports.
@@ -75,21 +76,21 @@ These credentials are development-only. Set `VSMS_DEMO_PASSWORD` before seeding 
 The backend test command derives a database name ending in `_test`, applies all migrations there, and refuses to prepare any other database.
 
 ```bash
-npm --prefix backend run prisma:validate
-npm --prefix backend run openapi:lint
-npm --prefix backend run contracts:check
-npm --prefix backend test
-npm --prefix react-user-dashboard run lint
-npm --prefix react-user-dashboard run build
-npm run check:https
+pnpm --dir backend prisma:validate
+pnpm --dir backend openapi:lint
+pnpm --dir backend contracts:check
+pnpm --dir backend test
+pnpm --dir react-user-dashboard lint
+pnpm --dir react-user-dashboard build
+pnpm check:https
 ```
 
 The Bruno collection is in `api-testing/bruno`. Select its `Local` environment after both applications are running. Generated result files are ignored because they may contain short-lived credentials.
 
 ## Deployment notes
 
-- Run `npm --prefix backend run prisma:migrate` before starting a new API release.
-- Set `NODE_ENV=production`, a 32+ character `JWT_ACCESS_SECRET`, the production `DATABASE_URL`, and exact `CORS_ORIGINS`.
+- Run `pnpm --dir backend prisma:migrate` before starting a new API release.
+- Set `NODE_ENV=production`, a 32+ character `JWT_ACCESS_SECRET`, the production `DATABASE_URL`, exact `CORS_ORIGINS`, and a bare HTTPS `PUBLIC_APP_ORIGIN` (used in QR payloads).
 - Keep `PUBLIC_SIGNUP_ENABLED=false` for internet-facing deployments unless account creation is intentionally open.
 - Terminate TLS at the trusted reverse proxy and set `TRUST_PROXY=true` only when that proxy is controlled.
 - Build the frontend with `npm --prefix react-user-dashboard run build`. Set `VITE_API_BASE_URL` when the API is not served at the frontend's expected origin.

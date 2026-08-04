@@ -16,7 +16,7 @@ async function main() {
     const employeeNumber = String(employeeNumberArg || "").trim();
     const roleName = String(roleArg || "").trim().toUpperCase();
     if (!email || !fullName || !employeeNumber || !roles.has(roleName)) {
-        throw new Error(`Usage: npm run provision-staff -- email fullName employeeNumber [${[...roles].join("|")}]`);
+        throw new Error(`Usage: pnpm provision-staff -- email fullName employeeNumber [${[...roles].join("|")}]`);
     }
 
     const role = await prisma.role.upsert({

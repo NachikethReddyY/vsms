@@ -21,7 +21,7 @@ try {
     normalizeLineEndings(readFileSync(temporary, "utf8")) !==
     normalizeLineEndings(readFileSync(generated, "utf8"))
   ) {
-    console.error("Generated frontend API types have drifted. Run npm run contracts:generate.");
+    console.error("Generated frontend API types have drifted. Run pnpm contracts:generate.");
     process.exitCode = 1;
   } else {
     console.log("Generated frontend API types match the OpenAPI contract.");
