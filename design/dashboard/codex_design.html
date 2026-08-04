@@ -1,0 +1,2250 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>VSMS Operations Board</title>
+  <meta name="description" content="Independent VSMS dashboard prototype for community vision screening operations.">
+  <style>
+    :root {
+      color-scheme: light;
+      --rail: #17211f;
+      --rail-2: #22302d;
+      --canvas: #eef2ef;
+      --surface: #fbfcfa;
+      --surface-2: #f3f6f3;
+      --ink: #14201e;
+      --ink-2: #485653;
+      --muted: #687570;
+      --line: #d8dfdb;
+      --line-strong: #b8c4bf;
+      --accent: #006e68;
+      --accent-hover: #005b56;
+      --accent-soft: #dcefeb;
+      --success: #19704d;
+      --success-soft: #e2f1e8;
+      --warning: #9a560e;
+      --warning-soft: #fbedd9;
+      --danger: #a23d38;
+      --danger-soft: #f8e4e2;
+      --info: #315d8a;
+      --info-soft: #e5edf5;
+      --focus: #00a297;
+      --shadow: 0 16px 46px rgba(20, 32, 30, .14);
+      --r: 10px;
+      --r-sm: 6px;
+      --mono: ui-monospace, "SFMono-Regular", Consolas, monospace;
+      --sans: "Aptos", "Segoe UI Variable", "Segoe UI", system-ui, -apple-system, sans-serif;
+    }
+
+    * { box-sizing: border-box; }
+    html { min-width: 320px; background: var(--rail); }
+    body {
+      margin: 0;
+      min-height: 100dvh;
+      overflow-x: hidden;
+      background: var(--canvas);
+      color: var(--ink);
+      font-family: var(--sans);
+      font-size: 15px;
+      line-height: 1.45;
+      -webkit-font-smoothing: antialiased;
+    }
+    button, input, select, textarea { font: inherit; }
+    button, select { min-height: 44px; }
+    button { cursor: pointer; }
+    button:disabled { cursor: not-allowed; opacity: .48; }
+    :focus-visible {
+      outline: 3px solid var(--focus);
+      outline-offset: 2px;
+    }
+    button:active:not(:disabled) { transform: scale(.975); }
+    a { color: inherit; }
+    .skip-link {
+      position: fixed;
+      z-index: 100;
+      inset: 12px auto auto 12px;
+      padding: 10px 14px;
+      background: white;
+      color: var(--ink);
+      border-radius: var(--r-sm);
+      transform: translateY(-150%);
+    }
+    .skip-link:focus { transform: translateY(0); }
+
+    .app {
+      display: grid;
+      grid-template-columns: 232px minmax(0, 1fr);
+      min-height: 100dvh;
+    }
+    .rail {
+      position: sticky;
+      top: 0;
+      height: 100dvh;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      background: var(--rail);
+      color: #eef5f2;
+    }
+    .brand {
+      min-height: 74px;
+      padding: 16px 18px;
+      display: flex;
+      align-items: center;
+      gap: 11px;
+      border-bottom: 1px solid rgba(255, 255, 255, .1);
+    }
+    .brand-mark {
+      width: 38px;
+      height: 38px;
+      display: grid;
+      place-items: center;
+      flex: none;
+      border: 1px solid rgba(255, 255, 255, .28);
+      border-radius: 9px;
+      color: #d9fff6;
+      font: 700 13px/1 var(--mono);
+      letter-spacing: -.04em;
+    }
+    .brand strong { display: block; font-size: 15px; letter-spacing: -.01em; }
+    .brand span { display: block; margin-top: 1px; color: #a6b6b1; font-size: 11px; }
+    .rail-context {
+      margin: 14px 12px 8px;
+      padding: 12px;
+      border-radius: var(--r);
+      background: var(--rail-2);
+    }
+    .rail-context small {
+      display: block;
+      margin-bottom: 4px;
+      color: #9fb1ab;
+      font-size: 11px;
+      letter-spacing: .06em;
+      text-transform: uppercase;
+    }
+    .rail-context strong { display: block; font-size: 13px; }
+    .rail-context span { display: block; margin-top: 3px; color: #c5d3cf; font-size: 12px; }
+    .rail-nav {
+      flex: 1;
+      padding: 8px 10px;
+      overflow-y: auto;
+    }
+    .nav-label {
+      margin: 18px 10px 7px;
+      color: #83968f;
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: .1em;
+      text-transform: uppercase;
+    }
+    .nav-button {
+      position: relative;
+      width: 100%;
+      min-height: 46px;
+      padding: 0 12px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      border: 0;
+      border-radius: 7px;
+      background: transparent;
+      color: #c7d4d0;
+      text-align: left;
+    }
+    .nav-button:hover { background: rgba(255,255,255,.06); color: white; }
+    .nav-button.active {
+      background: rgba(77, 218, 202, .12);
+      color: #e5fffa;
+      font-weight: 700;
+    }
+    .nav-button.active::before {
+      content: "";
+      position: absolute;
+      inset: 10px auto 10px 0;
+      width: 3px;
+      border-radius: 3px;
+      background: #55d6c7;
+    }
+    .nav-count {
+      min-width: 25px;
+      padding: 2px 6px;
+      border-radius: 99px;
+      background: rgba(255,255,255,.1);
+      color: #dce8e4;
+      font: 700 11px/1.4 var(--mono);
+      text-align: center;
+    }
+    .rail-footer {
+      padding: 13px 14px 15px;
+      border-top: 1px solid rgba(255, 255, 255, .1);
+    }
+    .connection {
+      display: flex;
+      align-items: flex-start;
+      gap: 9px;
+      margin-bottom: 13px;
+      color: #d6e2de;
+      font-size: 12px;
+    }
+    .state-mark {
+      width: 9px;
+      height: 9px;
+      margin-top: 4px;
+      flex: none;
+      border-radius: 50%;
+      background: #59c894;
+      box-shadow: 0 0 0 3px rgba(89, 200, 148, .13);
+    }
+    .connection span { display: block; color: #91a49d; font-size: 11px; }
+    .profile {
+      display: grid;
+      grid-template-columns: 34px minmax(0,1fr);
+      gap: 9px;
+      align-items: center;
+    }
+    .avatar {
+      width: 34px;
+      height: 34px;
+      display: grid;
+      place-items: center;
+      border-radius: 50%;
+      background: #d7e8e2;
+      color: #153b35;
+      font-weight: 800;
+      font-size: 12px;
+    }
+    .profile strong, .profile span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .profile strong { display: block; font-size: 12px; }
+    .profile span { display: block; color: #91a49d; font-size: 11px; }
+
+    .stage { min-width: 0; }
+    .command-bar {
+      position: sticky;
+      top: 0;
+      z-index: 20;
+      min-height: 66px;
+      padding: 9px 22px;
+      display: flex;
+      align-items: center;
+      gap: 18px;
+      background: rgba(251, 252, 250, .94);
+      border-bottom: 1px solid var(--line);
+      backdrop-filter: blur(14px);
+    }
+    .command-title { min-width: 190px; }
+    .command-title small { display: block; color: var(--muted); font-size: 11px; }
+    .command-title strong { display: block; font-size: 16px; letter-spacing: -.015em; }
+    .command-spacer { flex: 1; }
+    .command-actions { display: flex; align-items: center; gap: 8px; }
+    .sync-command {
+      min-height: 44px;
+      padding: 0 12px;
+      display: flex;
+      align-items: center;
+      gap: 9px;
+      border: 1px solid var(--line);
+      border-radius: var(--r-sm);
+      background: var(--surface);
+      color: var(--ink-2);
+    }
+    .sync-command strong { color: var(--ink); font-size: 12px; }
+    .sync-command span { display: block; font-size: 10px; }
+    .text-button, .secondary, .primary, .danger-button {
+      min-height: 44px;
+      padding: 0 15px;
+      border-radius: var(--r-sm);
+      font-weight: 700;
+      white-space: nowrap;
+      transition: background .15s ease, border-color .15s ease, transform .12s ease;
+    }
+    .text-button {
+      border: 0;
+      background: transparent;
+      color: var(--ink-2);
+    }
+    .text-button:hover { background: var(--surface-2); color: var(--ink); }
+    .secondary {
+      border: 1px solid var(--line-strong);
+      background: var(--surface);
+      color: var(--ink);
+    }
+    .secondary:hover { border-color: var(--accent); color: var(--accent); }
+    .primary {
+      border: 1px solid var(--accent);
+      background: var(--accent);
+      color: white;
+    }
+    .primary:hover { border-color: var(--accent-hover); background: var(--accent-hover); }
+    .danger-button {
+      border: 1px solid var(--danger);
+      background: transparent;
+      color: var(--danger);
+    }
+    .danger-button:hover { background: var(--danger-soft); }
+    .small-button { min-height: 44px; padding: 0 11px; font-size: 12px; }
+
+    .dry-run-bar {
+      display: none;
+      position: sticky;
+      top: 66px;
+      z-index: 19;
+      min-height: 50px;
+      padding: 7px 22px;
+      align-items: center;
+      gap: 12px;
+      background: #fff2c7;
+      border-bottom: 1px solid #dfb84f;
+      color: #5d4202;
+    }
+    .dry-run-bar.visible { display: flex; }
+    .dry-run-bar strong { font-size: 13px; }
+    .dry-run-bar span { flex: 1; font-size: 12px; }
+    .dry-run-bar button {
+      min-height: 44px;
+      padding: 0 12px;
+      border: 1px solid #806313;
+      border-radius: var(--r-sm);
+      background: #fff8de;
+      color: #523b00;
+      font-weight: 700;
+    }
+
+    main {
+      width: 100%;
+      max-width: 1550px;
+      margin: 0 auto;
+      padding: 26px 28px 52px;
+    }
+    .page-head {
+      margin-bottom: 22px;
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 24px;
+    }
+    .page-head h1 {
+      margin: 0;
+      font-size: clamp(26px, 3vw, 38px);
+      line-height: 1.08;
+      letter-spacing: -.035em;
+    }
+    .page-head p { max-width: 670px; margin: 7px 0 0; color: var(--ink-2); font-size: 15px; }
+    .page-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; }
+    .kicker {
+      margin: 0 0 5px;
+      color: var(--accent);
+      font-size: 11px;
+      font-weight: 800;
+      letter-spacing: .08em;
+      text-transform: uppercase;
+    }
+    .toolbar {
+      margin-bottom: 16px;
+      padding: 10px;
+      display: grid;
+      grid-template-columns: minmax(210px, 1.4fr) repeat(2, minmax(150px, .6fr)) auto;
+      gap: 8px;
+      border: 1px solid var(--line);
+      border-radius: var(--r);
+      background: var(--surface);
+    }
+    .field-control, .field textarea, .field input, .field select {
+      width: 100%;
+      min-height: 44px;
+      padding: 9px 11px;
+      border: 1px solid var(--line-strong);
+      border-radius: var(--r-sm);
+      background: white;
+      color: var(--ink);
+    }
+    .field textarea { min-height: 88px; resize: vertical; }
+    .field-control::placeholder, .field input::placeholder, .field textarea::placeholder { color: #78847f; }
+    .field-control:focus, .field textarea:focus, .field input:focus, .field select:focus {
+      border-color: var(--accent);
+      outline: 3px solid rgba(0, 162, 151, .18);
+      outline-offset: 0;
+    }
+
+    .section-strip {
+      margin: 24px 0 10px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .section-strip h2 { margin: 0; font-size: 16px; letter-spacing: -.01em; }
+    .section-strip span { color: var(--muted); font-size: 12px; }
+    .section-strip::after { content: ""; height: 1px; flex: 1; background: var(--line); }
+
+    .event-list {
+      overflow: visible;
+      border: 1px solid var(--line);
+      border-radius: var(--r);
+      background: var(--surface);
+    }
+    .event-row {
+      position: relative;
+      display: grid;
+      grid-template-columns: 92px minmax(260px, 1.35fr) minmax(190px, .75fr) minmax(190px, .72fr);
+      min-height: 142px;
+      border-bottom: 1px solid var(--line);
+    }
+    .event-row:last-child { border-bottom: 0; }
+    .event-row::before {
+      content: "";
+      position: absolute;
+      inset: 0 auto 0 0;
+      width: 5px;
+      background: var(--line-strong);
+    }
+    .event-row[data-status="in_progress"]::before { background: var(--accent); }
+    .event-row[data-status="upcoming"]::before { background: var(--info); }
+    .event-row[data-status="draft"]::before { background: #7a7161; }
+    .event-row[data-status="completed"]::before { background: var(--success); }
+    .event-date {
+      padding: 20px 14px 18px 19px;
+      border-right: 1px solid var(--line);
+      text-align: center;
+    }
+    .event-date strong { display: block; font: 800 28px/1 var(--mono); letter-spacing: -.05em; }
+    .event-date span { display: block; margin-top: 5px; color: var(--ink-2); font-size: 11px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; }
+    .event-date small { display: block; margin-top: 8px; color: var(--muted); font-size: 11px; }
+    .event-main, .event-readiness, .event-next { padding: 18px 18px 16px; }
+    .event-readiness, .event-next { border-left: 1px solid var(--line); }
+    .event-status {
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      margin-bottom: 7px;
+      color: var(--ink-2);
+      font-size: 11px;
+      font-weight: 800;
+      letter-spacing: .04em;
+      text-transform: uppercase;
+    }
+    .event-status i, .status i {
+      width: 9px;
+      height: 9px;
+      display: inline-block;
+      flex: none;
+      border-radius: 50%;
+      background: currentColor;
+    }
+    .status-live { color: var(--accent); }
+    .status-upcoming { color: var(--info); }
+    .status-draft { color: #6d6558; }
+    .status-completed { color: var(--success); }
+    .event-main h3 { margin: 0; font-size: 19px; letter-spacing: -.02em; }
+    .event-meta {
+      margin-top: 7px;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 5px 15px;
+      color: var(--ink-2);
+      font-size: 12px;
+    }
+    .event-actions {
+      margin-top: 14px;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 4px 12px;
+    }
+    .link-action {
+      min-height: 44px;
+      padding: 0;
+      border: 0;
+      background: transparent;
+      color: var(--accent);
+      font-size: 12px;
+      font-weight: 800;
+      text-decoration: underline;
+      text-decoration-color: transparent;
+      text-underline-offset: 3px;
+    }
+    .link-action:hover { text-decoration-color: currentColor; }
+    .link-action.destructive { color: var(--danger); }
+    .readiness-label {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      font-size: 12px;
+    }
+    .readiness-label strong { font-family: var(--mono); font-size: 12px; }
+    .readiness-track {
+      height: 7px;
+      margin: 7px 0 11px;
+      overflow: hidden;
+      border-radius: 5px;
+      background: #e0e5e2;
+    }
+    .readiness-track span { display: block; height: 100%; background: var(--accent); }
+    .warning-line {
+      margin-top: 8px;
+      padding: 8px 9px;
+      border-left: 3px solid var(--warning);
+      background: var(--warning-soft);
+      color: #6f3c06;
+      font-size: 11px;
+    }
+    .clear-line {
+      margin-top: 8px;
+      color: var(--success);
+      font-size: 11px;
+      font-weight: 700;
+    }
+    .event-next small {
+      display: block;
+      color: var(--muted);
+      font-size: 10px;
+      font-weight: 800;
+      letter-spacing: .07em;
+      text-transform: uppercase;
+    }
+    .event-next strong { display: block; margin: 5px 0 11px; font-size: 14px; line-height: 1.35; }
+    .event-next .primary, .event-next .secondary { width: 100%; }
+
+    .empty-state, .permission-state {
+      padding: 54px 24px;
+      border: 1px dashed var(--line-strong);
+      border-radius: var(--r);
+      background: var(--surface);
+      text-align: center;
+    }
+    .empty-state .empty-symbol, .permission-state .empty-symbol {
+      width: 56px;
+      height: 56px;
+      margin: 0 auto 16px;
+      display: grid;
+      place-items: center;
+      border-radius: 50%;
+      background: var(--surface-2);
+      color: var(--accent);
+      font: 800 22px/1 var(--mono);
+    }
+    .empty-state h2, .permission-state h2 { margin: 0; font-size: 21px; }
+    .empty-state p, .permission-state p { max-width: 530px; margin: 7px auto 18px; color: var(--ink-2); }
+
+    .throughput {
+      margin-bottom: 18px;
+      display: grid;
+      grid-template-columns: repeat(7, minmax(100px, 1fr));
+      overflow: hidden;
+      border: 1px solid var(--line);
+      border-radius: var(--r);
+      background: var(--surface);
+    }
+    .throughput-item {
+      min-height: 84px;
+      padding: 14px;
+      border-right: 1px solid var(--line);
+    }
+    .throughput-item:last-child { border-right: 0; }
+    .throughput-item strong { display: block; font: 800 25px/1.05 var(--mono); }
+    .throughput-item span { display: block; margin-top: 7px; color: var(--ink-2); font-size: 11px; }
+    .throughput-item.attention { background: var(--warning-soft); }
+    .throughput-item.danger { background: var(--danger-soft); }
+    .live-grid {
+      display: grid;
+      grid-template-columns: minmax(0, 1.45fr) minmax(290px, .65fr);
+      gap: 16px;
+      align-items: start;
+    }
+    .board-panel {
+      border: 1px solid var(--line);
+      border-radius: var(--r);
+      background: var(--surface);
+      overflow: hidden;
+    }
+    .panel-head {
+      min-height: 58px;
+      padding: 11px 15px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 14px;
+      border-bottom: 1px solid var(--line);
+    }
+    .panel-head h2 { margin: 0; font-size: 16px; }
+    .panel-head p { margin: 2px 0 0; color: var(--muted); font-size: 11px; }
+    .attention-row {
+      min-height: 78px;
+      padding: 13px 15px;
+      display: grid;
+      grid-template-columns: 32px minmax(0, 1fr) auto;
+      align-items: center;
+      gap: 12px;
+      border-bottom: 1px solid var(--line);
+    }
+    .attention-row:last-child { border-bottom: 0; }
+    .priority-number {
+      width: 28px;
+      height: 28px;
+      display: grid;
+      place-items: center;
+      border-radius: 50%;
+      background: var(--warning-soft);
+      color: var(--warning);
+      font: 800 12px/1 var(--mono);
+    }
+    .attention-row strong { display: block; font-size: 13px; }
+    .attention-row span { display: block; margin-top: 3px; color: var(--ink-2); font-size: 11px; }
+    .station-row {
+      padding: 12px 15px;
+      display: grid;
+      grid-template-columns: minmax(0,1fr) auto;
+      gap: 14px;
+      align-items: center;
+      border-bottom: 1px solid var(--line);
+    }
+    .station-row:last-child { border-bottom: 0; }
+    .station-row strong { font-size: 13px; }
+    .station-row span { display: block; color: var(--muted); font-size: 11px; }
+    .station-state { text-align: right; }
+    .station-state strong { font-family: var(--mono); }
+    .callout {
+      margin: 16px 0;
+      padding: 13px 15px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      border: 1px solid var(--line);
+      border-left: 4px solid var(--accent);
+      border-radius: var(--r-sm);
+      background: var(--surface);
+    }
+    .callout.warning { border-left-color: var(--warning); background: var(--warning-soft); }
+    .callout.danger { border-left-color: var(--danger); background: var(--danger-soft); }
+    .callout.success { border-left-color: var(--success); background: var(--success-soft); }
+    .callout div { flex: 1; }
+    .callout strong { display: block; font-size: 13px; }
+    .callout span { display: block; margin-top: 2px; color: var(--ink-2); font-size: 11px; }
+
+    .workspace {
+      min-height: 645px;
+      display: grid;
+      grid-template-columns: 242px minmax(380px, 1fr) 275px;
+      overflow: hidden;
+      border: 1px solid var(--line);
+      border-radius: var(--r);
+      background: var(--surface);
+    }
+    .workspace-pane { min-width: 0; }
+    .workspace-pane + .workspace-pane { border-left: 1px solid var(--line); }
+    .pane-head {
+      min-height: 62px;
+      padding: 12px 15px;
+      border-bottom: 1px solid var(--line);
+      background: var(--surface-2);
+    }
+    .pane-head strong { display: block; font-size: 13px; }
+    .pane-head span { display: block; margin-top: 2px; color: var(--muted); font-size: 11px; }
+    .queue-person {
+      width: 100%;
+      min-height: 74px;
+      padding: 12px 14px;
+      border: 0;
+      border-bottom: 1px solid var(--line);
+      background: transparent;
+      color: var(--ink);
+      text-align: left;
+    }
+    .queue-person:hover, .queue-person.active { background: var(--accent-soft); }
+    .queue-person strong { display: block; font-size: 13px; }
+    .queue-person span { display: block; margin-top: 3px; color: var(--muted); font: 11px/1.4 var(--mono); }
+    .active-work { padding: 20px; }
+    .identity-strip {
+      margin: -20px -20px 20px;
+      padding: 14px 20px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 18px;
+      border-bottom: 1px solid var(--line);
+      background: #f7faf8;
+    }
+    .identity-strip strong { display: block; font-size: 17px; }
+    .identity-strip span { display: block; margin-top: 2px; color: var(--ink-2); font: 11px/1.4 var(--mono); }
+    .status {
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      color: var(--ink-2);
+      font-size: 11px;
+      font-weight: 800;
+      white-space: nowrap;
+    }
+    .status.success { color: var(--success); }
+    .status.warning { color: var(--warning); }
+    .status.danger { color: var(--danger); }
+    .status.info { color: var(--info); }
+    .scan-target {
+      min-height: 310px;
+      padding: 38px;
+      display: grid;
+      place-items: center;
+      border: 2px dashed var(--line-strong);
+      border-radius: var(--r);
+      background:
+        linear-gradient(90deg, var(--accent) 26px, transparent 26px) top left / 48px 3px no-repeat,
+        linear-gradient(var(--accent) 26px, transparent 26px) top left / 3px 48px no-repeat,
+        linear-gradient(-90deg, var(--accent) 26px, transparent 26px) top right / 48px 3px no-repeat,
+        linear-gradient(var(--accent) 26px, transparent 26px) top right / 3px 48px no-repeat,
+        linear-gradient(90deg, var(--accent) 26px, transparent 26px) bottom left / 48px 3px no-repeat,
+        linear-gradient(-180deg, var(--accent) 26px, transparent 26px) bottom left / 3px 48px no-repeat,
+        linear-gradient(-90deg, var(--accent) 26px, transparent 26px) bottom right / 48px 3px no-repeat,
+        linear-gradient(-180deg, var(--accent) 26px, transparent 26px) bottom right / 3px 48px no-repeat,
+        var(--surface-2);
+      text-align: center;
+    }
+    .scan-target strong { display: block; font-size: 22px; letter-spacing: -.02em; }
+    .scan-target p { max-width: 440px; margin: 8px auto 18px; color: var(--ink-2); }
+    .pass-code {
+      margin: 14px 0;
+      padding: 12px;
+      border: 1px solid var(--line);
+      border-radius: var(--r-sm);
+      background: var(--surface-2);
+      color: var(--accent);
+      font: 800 18px/1.3 var(--mono);
+      letter-spacing: .08em;
+    }
+    .confirm-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+    }
+    .fact {
+      min-height: 78px;
+      padding: 13px;
+      border: 1px solid var(--line);
+      border-radius: var(--r-sm);
+      background: var(--surface-2);
+    }
+    .fact small { display: block; color: var(--muted); font-size: 10px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; }
+    .fact strong { display: block; margin-top: 5px; font-size: 14px; }
+    .progress-path { padding: 14px; }
+    .progress-step {
+      position: relative;
+      min-height: 62px;
+      padding: 5px 0 14px 31px;
+    }
+    .progress-step::before {
+      content: "";
+      position: absolute;
+      inset: 11px auto auto 7px;
+      width: 11px;
+      height: 11px;
+      border: 2px solid var(--line-strong);
+      border-radius: 50%;
+      background: var(--surface);
+    }
+    .progress-step::after {
+      content: "";
+      position: absolute;
+      inset: 24px auto 0 12px;
+      width: 1px;
+      background: var(--line);
+    }
+    .progress-step:last-child::after { display: none; }
+    .progress-step.complete::before { border-color: var(--success); background: var(--success); }
+    .progress-step.current::before { border: 3px solid var(--accent); background: white; }
+    .progress-step strong { display: block; font-size: 12px; }
+    .progress-step span { display: block; color: var(--muted); font-size: 10px; }
+    .form-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 14px;
+    }
+    .field { display: grid; gap: 6px; }
+    .field.full { grid-column: 1 / -1; }
+    .field label, fieldset legend { color: var(--ink-2); font-size: 12px; font-weight: 800; }
+    .field small { color: var(--muted); font-size: 10px; }
+    fieldset {
+      margin: 0;
+      padding: 12px;
+      border: 1px solid var(--line);
+      border-radius: var(--r-sm);
+    }
+    .check-row, .radio-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px 18px;
+    }
+    .check-row label, .radio-row label {
+      min-height: 44px;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      color: var(--ink);
+      font-size: 12px;
+    }
+    input[type="checkbox"], input[type="radio"] { width: 18px; height: 18px; accent-color: var(--accent); }
+    .form-actions {
+      margin-top: 20px;
+      display: flex;
+      justify-content: flex-end;
+      gap: 8px;
+    }
+    .handoff {
+      min-height: 450px;
+      display: grid;
+      place-items: center;
+      text-align: center;
+    }
+    .handoff-inner { max-width: 520px; }
+    .handoff-symbol {
+      width: 72px;
+      height: 72px;
+      margin: 0 auto 17px;
+      display: grid;
+      place-items: center;
+      border-radius: 50%;
+      background: var(--success-soft);
+      color: var(--success);
+      font: 800 26px/1 var(--mono);
+    }
+    .handoff h2 { margin: 0; font-size: 28px; letter-spacing: -.03em; }
+    .handoff p { color: var(--ink-2); }
+
+    .review-layout {
+      min-height: 650px;
+      display: grid;
+      grid-template-columns: 248px minmax(380px, 1fr) 320px;
+      overflow: hidden;
+      border: 1px solid var(--line);
+      border-radius: var(--r);
+      background: var(--surface);
+    }
+    .review-layout > section + section { border-left: 1px solid var(--line); }
+    .review-record { padding: 20px; }
+    .result-group { margin-top: 20px; }
+    .result-group h3 { margin: 0 0 9px; font-size: 13px; }
+    .result-row {
+      min-height: 47px;
+      padding: 9px 0;
+      display: grid;
+      grid-template-columns: minmax(0,1fr) auto;
+      gap: 14px;
+      align-items: center;
+      border-bottom: 1px solid var(--line);
+    }
+    .result-row span { color: var(--ink-2); font-size: 12px; }
+    .result-row strong { font: 800 12px/1.3 var(--mono); text-align: right; }
+    .flag-panel {
+      margin-top: 16px;
+      padding: 12px;
+      border-left: 4px solid var(--warning);
+      background: var(--warning-soft);
+      color: #633a0c;
+      font-size: 12px;
+    }
+    .missing-panel {
+      margin-top: 10px;
+      padding: 12px;
+      border-left: 4px solid var(--danger);
+      background: var(--danger-soft);
+      color: #7d302c;
+      font-size: 12px;
+    }
+    .decision-pane { padding: 16px; background: var(--surface-2); }
+    .decision-pane h2 { margin: 0 0 4px; font-size: 16px; }
+    .decision-pane > p { margin: 0 0 15px; color: var(--ink-2); font-size: 11px; }
+    .decision-options { display: grid; gap: 8px; }
+    .decision-option {
+      min-height: 52px;
+      padding: 9px 10px;
+      display: flex;
+      align-items: flex-start;
+      gap: 9px;
+      border: 1px solid var(--line);
+      border-radius: var(--r-sm);
+      background: var(--surface);
+      font-size: 12px;
+    }
+    .decision-option input { margin-top: 2px; }
+    .review-disclaimer {
+      margin: 14px 0;
+      padding: 10px;
+      border: 1px solid var(--line);
+      border-radius: var(--r-sm);
+      color: var(--ink-2);
+      font-size: 10px;
+    }
+
+    .data-table-wrap {
+      overflow: auto;
+      border: 1px solid var(--line);
+      border-radius: var(--r);
+      background: var(--surface);
+    }
+    table { width: 100%; border-collapse: collapse; }
+    th {
+      padding: 11px 13px;
+      background: var(--surface-2);
+      color: var(--muted);
+      font-size: 10px;
+      letter-spacing: .06em;
+      text-align: left;
+      text-transform: uppercase;
+    }
+    td {
+      min-height: 60px;
+      padding: 11px 13px;
+      border-top: 1px solid var(--line);
+      vertical-align: middle;
+      font-size: 12px;
+    }
+    td strong { display: block; font-size: 13px; }
+    td small { display: block; margin-top: 2px; color: var(--muted); font-size: 10px; }
+    .row-actions { display: flex; flex-wrap: wrap; gap: 5px 10px; }
+    .role-note {
+      margin: 16px 0;
+      padding: 13px 15px;
+      display: grid;
+      grid-template-columns: auto minmax(0,1fr);
+      gap: 12px;
+      border: 1px solid var(--line);
+      border-radius: var(--r);
+      background: var(--info-soft);
+      color: #294c70;
+    }
+    .role-note strong { font-size: 12px; }
+    .role-note span { font-size: 11px; }
+    .sync-summary {
+      margin-bottom: 16px;
+      display: grid;
+      grid-template-columns: repeat(5, 1fr);
+      overflow: hidden;
+      border: 1px solid var(--line);
+      border-radius: var(--r);
+      background: var(--surface);
+    }
+    .sync-summary div { padding: 15px; border-right: 1px solid var(--line); }
+    .sync-summary div:last-child { border-right: 0; }
+    .sync-summary strong { display: block; font: 800 22px/1 var(--mono); }
+    .sync-summary span { display: block; margin-top: 7px; color: var(--muted); font-size: 10px; }
+
+    .skeleton {
+      overflow: hidden;
+      border: 1px solid var(--line);
+      border-radius: var(--r);
+      background: var(--surface);
+    }
+    .skeleton-row {
+      min-height: 120px;
+      padding: 18px;
+      display: grid;
+      grid-template-columns: 75px 1.4fr .8fr .7fr;
+      gap: 18px;
+      border-bottom: 1px solid var(--line);
+    }
+    .skeleton-row:last-child { border-bottom: 0; }
+    .bone {
+      min-height: 18px;
+      border-radius: 5px;
+      background: linear-gradient(90deg, #e5eae7 25%, #f2f5f3 50%, #e5eae7 75%);
+      background-size: 200% 100%;
+      animation: shimmer 1.2s infinite;
+    }
+    .bone.tall { min-height: 60px; }
+    @keyframes shimmer { to { background-position: -200% 0; } }
+
+    .modal-layer {
+      position: fixed;
+      z-index: 60;
+      inset: 0;
+      display: none;
+      place-items: center;
+      padding: 22px;
+      background: rgba(10, 17, 15, .56);
+    }
+    .modal-layer.open { display: grid; }
+    .modal {
+      width: min(680px, 100%);
+      max-height: min(820px, calc(100dvh - 44px));
+      overflow: auto;
+      border: 1px solid rgba(255,255,255,.35);
+      border-radius: 14px;
+      background: var(--surface);
+      box-shadow: var(--shadow);
+    }
+    .modal.wide { width: min(860px, 100%); }
+    .modal-head {
+      min-height: 68px;
+      padding: 15px 19px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 20px;
+      border-bottom: 1px solid var(--line);
+    }
+    .modal-head h2 { margin: 0; font-size: 20px; letter-spacing: -.02em; }
+    .modal-head p { margin: 3px 0 0; color: var(--muted); font-size: 11px; }
+    .modal-close {
+      width: 44px;
+      min-width: 44px;
+      padding: 0;
+      border: 1px solid var(--line);
+      border-radius: var(--r-sm);
+      background: var(--surface);
+      color: var(--ink);
+      font-size: 19px;
+    }
+    .modal-body { padding: 19px; }
+    .modal-actions {
+      padding: 13px 19px;
+      display: flex;
+      justify-content: flex-end;
+      gap: 8px;
+      border-top: 1px solid var(--line);
+      background: var(--surface-2);
+    }
+    .modal .form-grid { grid-template-columns: 1fr 1fr; }
+    .danger-summary {
+      padding: 14px;
+      border: 1px solid #dda29f;
+      border-left: 5px solid var(--danger);
+      border-radius: var(--r-sm);
+      background: var(--danger-soft);
+    }
+    .danger-summary strong { display: block; font-size: 16px; }
+    .danger-summary span { display: block; margin-top: 4px; color: #71332f; font-size: 12px; }
+    .inline-error {
+      margin-top: 8px;
+      color: var(--danger);
+      font-size: 11px;
+      font-weight: 700;
+    }
+    .permission-preview {
+      margin-top: 10px;
+      padding: 12px;
+      border-left: 4px solid var(--info);
+      background: var(--info-soft);
+      color: #294c70;
+      font-size: 11px;
+    }
+    .toast {
+      position: fixed;
+      z-index: 90;
+      inset: auto 22px 22px auto;
+      max-width: 390px;
+      padding: 13px 15px;
+      border: 1px solid rgba(255,255,255,.14);
+      border-radius: var(--r);
+      background: var(--rail);
+      color: white;
+      box-shadow: var(--shadow);
+      opacity: 0;
+      transform: translateY(14px);
+      pointer-events: none;
+      transition: opacity .18s ease, transform .18s ease;
+    }
+    .toast.show { opacity: 1; transform: translateY(0); }
+    .dev-label {
+      position: fixed;
+      z-index: 30;
+      inset: auto 10px 8px auto;
+      color: #78847f;
+      font: 9px/1 var(--mono);
+      opacity: .7;
+      pointer-events: none;
+    }
+
+    @media (max-width: 1180px) {
+      .app { grid-template-columns: 196px minmax(0, 1fr); }
+      .event-row { grid-template-columns: 82px minmax(240px, 1.2fr) minmax(180px, .8fr); }
+      .event-next { grid-column: 2 / -1; border-top: 1px solid var(--line); border-left: 0; padding-top: 12px; display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 14px; }
+      .event-next strong { margin-bottom: 0; }
+      .event-next .primary, .event-next .secondary { width: auto; }
+      .workspace, .review-layout { grid-template-columns: 220px minmax(380px, 1fr); }
+      .workspace-pane:last-child, .review-layout > section:last-child {
+        grid-column: 1 / -1;
+        border-top: 1px solid var(--line);
+        border-left: 0;
+      }
+      .progress-path { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; }
+      .progress-step { min-height: auto; padding: 30px 5px 5px; text-align: center; }
+      .progress-step::before { inset: 5px auto auto calc(50% - 6px); }
+      .progress-step::after { inset: 11px -50% auto calc(50% + 8px); width: auto; height: 1px; }
+      .decision-pane { display: grid; grid-template-columns: 1fr 1fr; gap: 12px 16px; }
+      .decision-pane > h2, .decision-pane > p, .decision-pane .review-disclaimer, .decision-pane .form-actions { grid-column: 1 / -1; }
+    }
+    @media (max-width: 900px) {
+      .app { grid-template-columns: 74px minmax(0, 1fr); }
+      .brand { justify-content: center; padding: 12px 8px; }
+      .brand > div:last-child, .rail-context, .nav-label, .nav-button > span:first-child, .rail-footer .connection div, .profile > div:last-child { display: none; }
+      .rail-nav { padding-inline: 8px; }
+      .nav-button { justify-content: center; padding: 0; }
+      .nav-button::after { content: attr(data-short); font: 800 10px/1 var(--mono); }
+      .nav-button.active::before { inset-block: 9px; }
+      .nav-count { position: absolute; inset: 4px 2px auto auto; min-width: 19px; padding: 1px 4px; font-size: 9px; }
+      .rail-footer { padding-inline: 20px; }
+      .profile { display: block; }
+      main { padding-inline: 20px; }
+      .command-bar { padding-inline: 18px; }
+      .sync-command span, .command-actions .text-button { display: none; }
+      .toolbar { grid-template-columns: 1fr 1fr; }
+      .toolbar > :first-child { grid-column: 1 / -1; }
+      .throughput { grid-template-columns: repeat(4, 1fr); }
+      .throughput-item:nth-child(4) { border-right: 0; }
+      .throughput-item:nth-child(n+5) { border-top: 1px solid var(--line); }
+      .live-grid { grid-template-columns: 1fr; }
+      .event-row { grid-template-columns: 78px minmax(0, 1fr); }
+      .event-main { min-width: 0; }
+      .event-readiness { grid-column: 2; border-top: 1px solid var(--line); border-left: 0; }
+      .event-next { grid-column: 2; }
+      .sync-summary { grid-template-columns: repeat(3, 1fr); }
+      .sync-summary div:nth-child(3) { border-right: 0; }
+      .sync-summary div:nth-child(n+4) { border-top: 1px solid var(--line); }
+    }
+    @media (max-width: 680px) {
+      .app { display: block; }
+      .rail {
+        position: sticky;
+        z-index: 30;
+        width: 100%;
+        height: auto;
+        display: block;
+      }
+      .brand { display: none; }
+      .rail-nav { display: flex; gap: 4px; overflow-x: auto; }
+      .nav-button { min-width: 58px; }
+      .rail-footer { display: none; }
+      .command-bar { top: 50px; min-height: 58px; }
+      .dry-run-bar { top: 108px; }
+      .command-title { min-width: 0; }
+      .command-title small, .sync-command { display: none; }
+      .page-head { display: block; }
+      .page-actions { margin-top: 15px; justify-content: flex-start; }
+      main { padding: 20px 14px 44px; }
+      .toolbar { grid-template-columns: 1fr; }
+      .toolbar > :first-child { grid-column: auto; }
+      .event-row { display: block; padding-left: 5px; }
+      .event-date { text-align: left; border-right: 0; border-bottom: 1px solid var(--line); }
+      .event-date strong, .event-date span, .event-date small { display: inline; margin-right: 7px; }
+      .event-date strong { font-size: 18px; }
+      .event-readiness, .event-next { border-left: 0; }
+      .event-next { display: block; }
+      .event-next .primary, .event-next .secondary { width: 100%; margin-top: 8px; }
+      .throughput { grid-template-columns: repeat(2, 1fr); }
+      .throughput-item { border-top: 1px solid var(--line); }
+      .workspace, .review-layout { display: block; }
+      .workspace-pane + .workspace-pane, .review-layout > section + section { border-left: 0; border-top: 1px solid var(--line); }
+      .workspace-pane:first-child, .review-layout > section:first-child { max-height: 220px; overflow: auto; }
+      .form-grid, .modal .form-grid, .confirm-grid, .decision-pane { grid-template-columns: 1fr; }
+      .field.full { grid-column: auto; }
+      .identity-strip { align-items: flex-start; }
+      .progress-path { grid-template-columns: 1fr; }
+      .progress-step { min-height: 48px; padding: 3px 0 10px 31px; text-align: left; }
+      .progress-step::before { inset: 6px auto auto 7px; }
+      .progress-step::after { inset: 19px auto 0 12px; width: 1px; height: auto; }
+      .decision-pane > h2, .decision-pane > p, .decision-pane .review-disclaimer, .decision-pane .form-actions { grid-column: auto; }
+      .sync-summary { grid-template-columns: 1fr 1fr; }
+      .modal-layer { padding: 0; align-items: end; }
+      .modal, .modal.wide { width: 100%; max-height: 92dvh; border-radius: 14px 14px 0 0; }
+      .toast { inset: auto 12px 12px 12px; max-width: none; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after {
+        scroll-behavior: auto !important;
+        animation-duration: .01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: .01ms !important;
+      }
+      button:active:not(:disabled) { transform: none; }
+    }
+  </style>
+</head>
+<body>
+  <a class="skip-link" href="#main">Skip to main content</a>
+  <div class="app">
+    <aside class="rail" aria-label="Primary navigation">
+      <div class="brand">
+        <div class="brand-mark" aria-hidden="true">VS</div>
+        <div><strong>VSMS</strong><span>Screening operations</span></div>
+      </div>
+      <div class="rail-context">
+        <small>Today</small>
+        <strong>1 event live</strong>
+        <span>3 items need attention</span>
+      </div>
+      <nav class="rail-nav">
+        <div class="nav-label">Coordinate</div>
+        <button class="nav-button active" data-nav="events" data-short="EV"><span>Events</span><span class="nav-count" id="event-nav-count">5</span></button>
+        <button class="nav-button" data-nav="live" data-short="LV"><span>Live event</span><span class="nav-count">18</span></button>
+        <div class="nav-label">Deliver</div>
+        <button class="nav-button" data-nav="screening" data-short="QR"><span>Scan &amp; screening</span><span></span></button>
+        <button class="nav-button" data-nav="review" data-short="RV"><span>Clinical review</span><span class="nav-count" id="review-nav-count">4</span></button>
+        <div class="nav-label">Manage</div>
+        <button class="nav-button" data-nav="people" data-short="PP"><span>People &amp; access</span><span class="nav-count" id="people-nav-count">2</span></button>
+        <button class="nav-button" data-nav="sync" data-short="SY"><span>Sync centre</span><span class="nav-count" id="sync-nav-count">2</span></button>
+        <button class="nav-button" data-nav="audit" data-short="AU"><span>Audit log</span><span></span></button>
+      </nav>
+      <div class="rail-footer">
+        <div class="connection"><i class="state-mark"></i><div>Connected<span>2 records pending sync</span></div></div>
+        <div class="profile"><div class="avatar">MA</div><div><strong>Mei Ananda</strong><span>Event Manager</span></div></div>
+      </div>
+    </aside>
+
+    <div class="stage">
+      <header class="command-bar">
+        <div class="command-title"><small id="command-eyebrow">Operations board</small><strong id="command-title">Events</strong></div>
+        <div class="command-spacer"></div>
+        <div class="command-actions">
+          <button class="sync-command" data-nav="sync" aria-label="Open sync centre">
+            <i class="state-mark" aria-hidden="true"></i>
+            <span><strong id="sync-command-title">Saved locally</strong><span id="sync-command-copy">2 pending, 1 failed</span></span>
+          </button>
+          <button class="text-button" data-action="refresh">Refresh data</button>
+          <button class="text-button" data-action="reset">Reset prototype</button>
+        </div>
+      </header>
+      <div class="dry-run-bar" id="dry-run-bar" role="status">
+        <strong>DRY RUN</strong>
+        <span id="dry-run-copy">Testing event workflows. Changes will not affect live records.</span>
+        <button data-action="exit-dry-run">Exit dry run</button>
+      </div>
+      <main id="main" tabindex="-1"></main>
+    </div>
+  </div>
+
+  <div class="modal-layer" id="modal-layer" aria-hidden="true"></div>
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+  <div class="dev-label">DESIGN_ID: codex_design</div>
+
+  <script>
+    (() => {
+      "use strict";
+
+      const initialEvents = [
+        { id: 1, name: "Tampines North Community Screening", date: "2026-07-31", time: "08:00", venue: "Tampines Hub, Hall 3", capacity: 220, participants: 184, status: "in_progress", stations: ["Registration", "Visual acuity", "Refraction", "Colour vision", "Eye health"], staff: 15, staffReady: 14, registration: "Walk-in and pre-registered", warning: "Refraction station needs relief cover at 12:30." },
+        { id: 2, name: "Bedok Active Ageing Screening", date: "2026-08-03", time: "09:00", venue: "Heartbeat@Bedok, Studio 2", capacity: 160, participants: 126, status: "upcoming", stations: ["Registration", "Visual acuity", "Refraction", "Colour vision", "Eye health"], staff: 12, staffReady: 11, registration: "Pre-registration open", warning: "One invited screener has not accepted access." },
+        { id: 3, name: "Queenstown Library Outreach", date: "", time: "10:00", venue: "Queenstown Public Library", capacity: 90, participants: 0, status: "draft", stations: ["Registration", "Visual acuity", "Refraction", "Eye health"], staff: 8, staffReady: 5, registration: "Walk-in only", warning: "Choose a date and assign three remaining staff." },
+        { id: 4, name: "Jurong Spring Wellness Day", date: "2026-07-19", time: "08:30", venue: "Jurong Spring Community Club", capacity: 190, participants: 173, status: "completed", stations: ["Registration", "Visual acuity", "Refraction", "Colour vision", "Eye health"], staff: 14, staffReady: 14, registration: "Walk-in and pre-registered", warning: "" },
+        { id: 5, name: "Sengkang Riverside Screening", date: "2026-08-12", time: "08:30", venue: "Anchorvale Community Club", capacity: 200, participants: 141, status: "upcoming", stations: ["Registration", "Visual acuity", "Refraction", "Colour vision", "Eye health"], staff: 13, staffReady: 13, registration: "Pre-registration open", warning: "" }
+      ];
+
+      const initialStaff = [
+        { id: 1, name: "Mei Ananda", email: "mei.ananda@vsms.test", role: "Event Manager", event: "Tampines North Community Screening", station: "Event command", status: "Active", permissions: ["Configure event", "Assign staff", "Monitor event"] },
+        { id: 2, name: "Dr Farah Nordin", email: "farah.nordin@vsms.test", role: "Doctor / Reviewer", event: "Tampines North Community Screening", station: "Clinical review", status: "Active", permissions: ["View screening results", "Finalise review", "Record referral"] },
+        { id: 3, name: "Dinesh Kumar", email: "dinesh.kumar@vsms.test", role: "Screener", event: "Tampines North Community Screening", station: "Visual acuity", status: "Active", permissions: ["Scan participant pass", "Record station results"] },
+        { id: 4, name: "Siti Hajar", email: "siti.hajar@vsms.test", role: "Registration Officer", event: "Bedok Active Ageing Screening", station: "Registration", status: "Pending", permissions: ["Register participant", "Issue QR pass"] },
+        { id: 5, name: "Marcus Tan", email: "marcus.tan@vsms.test", role: "Screener", event: "Bedok Active Ageing Screening", station: "Refraction", status: "Pending", permissions: ["Scan participant pass", "Record station results"] },
+        { id: 6, name: "Jia Wei Lim", email: "jiawei.lim@vsms.test", role: "Administrator", event: "All events", station: "Not assigned", status: "Active", permissions: ["Manage access", "View all events", "Configure system"] }
+      ];
+
+      const initialReviews = [
+        { id: 1, name: "Evelyn Ng", code: "VSMS-260731-035", age: 68, queue: "12 min", status: "Awaiting review", flag: "Distance acuity crossed the configured review threshold.", missing: "", right: "6/18", left: "6/24", pinhole: "Improves to 6/12", pressure: "Within screening range", finalized: false },
+        { id: 2, name: "Rahimah Salleh", code: "VSMS-260731-081", age: 61, queue: "8 min", status: "Incomplete", flag: "Eye health image requires reviewer assessment.", missing: "Colour vision result is incomplete.", right: "6/9", left: "6/12", pinhole: "Not recorded", pressure: "Within screening range", finalized: false },
+        { id: 3, name: "Peter Goh", code: "VSMS-260731-109", age: 72, queue: "5 min", status: "Awaiting review", flag: "Near vision result crossed the configured review threshold.", missing: "", right: "6/12", left: "6/12", pinhole: "No material change", pressure: "Within screening range", finalized: false },
+        { id: 4, name: "Nurul Izzati", code: "VSMS-260731-118", age: 57, queue: "2 min", status: "Conflict", flag: "Conflicting locally saved screening results require review.", missing: "Resolve sync conflict before finalisation.", right: "6/9", left: "6/18", pinhole: "Improves to 6/9", pressure: "Within screening range", finalized: false }
+      ];
+
+      const initialSync = [
+        { id: 1, participant: "Evelyn Ng", code: "VSMS-260731-035", area: "Visual acuity", status: "Saved offline", updated: "10:42" },
+        { id: 2, participant: "Peter Goh", code: "VSMS-260731-109", area: "Refraction", status: "Pending sync", updated: "10:39" },
+        { id: 3, participant: "Nurul Izzati", code: "VSMS-260731-118", area: "Eye health", status: "Sync failed", updated: "10:36" },
+        { id: 4, participant: "Rahimah Salleh", code: "VSMS-260731-081", area: "Colour vision", status: "Conflict requires review", updated: "10:31" },
+        { id: 5, participant: "Daniel Chua", code: "VSMS-260731-022", area: "Registration", status: "Synced", updated: "10:44" },
+        { id: 6, participant: "Aminah Kassim", code: "VSMS-260731-015", area: "Visual acuity", status: "Syncing", updated: "10:43" }
+      ];
+
+      const participants = [
+        { name: "Aminah Kassim", code: "VSMS-260731-126", age: 64, pass: "VP-7Q4M", current: "Visual acuity", next: "Refraction" },
+        { name: "Daniel Chua", code: "VSMS-260731-127", age: 59, pass: "VP-2N8K", current: "Visual acuity", next: "Refraction" },
+        { name: "Salmah Osman", code: "VSMS-260731-128", age: 70, pass: "VP-9P3A", current: "Visual acuity", next: "Refraction" }
+      ];
+
+      const roleExplanations = {
+        "Event Manager": "Can configure assigned events, manage staff assignments, monitor queues, and resolve operational issues.",
+        "Registration Officer": "Can find or register participant records, confirm event details, and issue event QR passes.",
+        "Screener": "Can scan participant passes and record results only for assigned screening stations.",
+        "Doctor / Reviewer": "Can review structured screening results, add notes, and finalise follow-up or referral actions.",
+        "Administrator": "Can manage system access and all events. This role should be assigned sparingly."
+      };
+
+      const makeState = () => ({
+        view: "events",
+        loading: false,
+        events: structuredClone(initialEvents),
+        staff: structuredClone(initialStaff),
+        reviews: structuredClone(initialReviews),
+        sync: structuredClone(initialSync),
+        selectedEventId: 1,
+        selectedReviewId: 1,
+        eventQuery: "",
+        eventStatus: "all",
+        eventSort: "date-asc",
+        peopleQuery: "",
+        dryRun: false,
+        screenPhase: "scan",
+        participantIndex: 0,
+        scanned: false,
+        localSaved: false,
+        screenSyncState: "Not saved",
+        reviewCompleted: false
+      });
+
+      let state = makeState();
+      let drySnapshot = null;
+      let toastTimer;
+      let lastFocus = null;
+      const main = document.getElementById("main");
+      const modalLayer = document.getElementById("modal-layer");
+      const toast = document.getElementById("toast");
+
+      const esc = value => String(value ?? "").replace(/[&<>"']/g, char => ({
+        "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#039;"
+      })[char]);
+
+      const statusLabel = value => ({
+        in_progress: "In progress", upcoming: "Upcoming", draft: "Draft", completed: "Completed"
+      })[value] || value;
+
+      const statusClass = value => ({
+        in_progress: "status-live", upcoming: "status-upcoming", draft: "status-draft", completed: "status-completed"
+      })[value] || "";
+
+      const dateParts = value => {
+        if (!value) return { day: "TBD", month: "DATE", year: "Required" };
+        const date = new Date(value + "T00:00:00");
+        return {
+          day: String(date.getDate()).padStart(2, "0"),
+          month: date.toLocaleDateString("en-SG", { month: "short" }).toUpperCase(),
+          year: String(date.getFullYear())
+        };
+      };
+
+      const formatDate = value => value
+        ? new Date(value + "T00:00:00").toLocaleDateString("en-SG", { weekday: "short", day: "numeric", month: "short", year: "numeric" })
+        : "Date required";
+
+      const showToast = message => {
+        clearTimeout(toastTimer);
+        toast.textContent = message;
+        toast.classList.add("show");
+        toastTimer = setTimeout(() => toast.classList.remove("show"), 2600);
+      };
+
+      const openModal = (content, wide = false) => {
+        lastFocus = document.activeElement;
+        modalLayer.innerHTML = `<div class="modal${wide ? " wide" : ""}" role="dialog" aria-modal="true">${content}</div>`;
+        modalLayer.classList.add("open");
+        modalLayer.setAttribute("aria-hidden", "false");
+        setTimeout(() => modalLayer.querySelector("input, select, textarea, button")?.focus(), 0);
+      };
+
+      const closeModal = () => {
+        modalLayer.classList.remove("open");
+        modalLayer.setAttribute("aria-hidden", "true");
+        modalLayer.innerHTML = "";
+        lastFocus?.focus?.();
+      };
+
+      const selectedEvent = () => state.events.find(event => event.id === state.selectedEventId) || state.events[0];
+      const selectedReview = () => state.reviews.find(review => review.id === state.selectedReviewId) || state.reviews.find(review => !review.finalized) || state.reviews[0];
+      const currentParticipant = () => participants[state.participantIndex % participants.length];
+
+      function render() {
+        document.querySelectorAll("[data-nav]").forEach(button => button.classList.toggle("active", button.dataset.nav === state.view));
+        document.getElementById("event-nav-count").textContent = state.events.length;
+        document.getElementById("review-nav-count").textContent = state.reviews.filter(item => !item.finalized).length;
+        document.getElementById("people-nav-count").textContent = state.staff.filter(item => item.status === "Pending").length;
+        document.getElementById("sync-nav-count").textContent = state.sync.filter(item => ["Sync failed", "Conflict requires review"].includes(item.status)).length;
+        document.getElementById("dry-run-bar").classList.toggle("visible", state.dryRun);
+        const failed = state.sync.filter(item => item.status === "Sync failed").length;
+        const pending = state.sync.filter(item => ["Saved offline", "Pending sync", "Syncing"].includes(item.status)).length;
+        document.getElementById("sync-command-copy").textContent = `${pending} pending, ${failed} failed`;
+
+        const titles = {
+          events: ["Operations board", "Events"],
+          live: ["Tampines North", "Live event"],
+          screening: ["Visual acuity station", "Participant workflow"],
+          review: ["Clinical review", "Review queue"],
+          people: ["Access management", "People & access"],
+          sync: ["Event resilience", "Sync centre"],
+          audit: ["Restricted area", "Audit log"]
+        };
+        const title = titles[state.view] || titles.events;
+        document.getElementById("command-eyebrow").textContent = title[0];
+        document.getElementById("command-title").textContent = title[1];
+
+        if (state.loading) {
+          main.innerHTML = renderLoading();
+          return;
+        }
+        const views = {
+          events: renderEvents,
+          live: renderLive,
+          screening: renderScreening,
+          review: renderReview,
+          people: renderPeople,
+          sync: renderSync,
+          audit: renderPermissionDenied
+        };
+        main.innerHTML = (views[state.view] || renderEvents)();
+      }
+
+      function renderLoading() {
+        return `
+          <div class="page-head">
+            <div><p class="kicker">Updating operations</p><h1>Loading current state</h1><p>Refreshing events, assignments, and local synchronisation status.</p></div>
+          </div>
+          <div class="skeleton" aria-busy="true" aria-label="Loading event list">
+            ${Array.from({ length: 4 }, () => `<div class="skeleton-row"><div class="bone tall"></div><div><div class="bone"></div><div class="bone" style="margin-top:12px;width:72%"></div></div><div class="bone tall"></div><div class="bone tall"></div></div>`).join("")}
+          </div>`;
+      }
+
+      function filteredEvents() {
+        const query = state.eventQuery.trim().toLowerCase();
+        const filtered = state.events.filter(event => {
+          const matchesText = !query || [event.name, event.venue, statusLabel(event.status)].some(value => value.toLowerCase().includes(query));
+          const matchesStatus = state.eventStatus === "all" || event.status === state.eventStatus;
+          return matchesText && matchesStatus;
+        });
+        return filtered.sort((a, b) => {
+          if (state.eventSort === "date-desc") return (b.date || "9999").localeCompare(a.date || "9999");
+          if (state.eventSort === "status") return a.status.localeCompare(b.status);
+          return (a.date || "9999").localeCompare(b.date || "9999");
+        });
+      }
+
+      function eventNext(event) {
+        if (event.status === "in_progress") return ["Open live event", "open-live", "primary"];
+        if (event.status === "completed") return ["Open event summary", "open-summary", "secondary"];
+        if (event.status === "draft") return [event.date ? "Review event draft" : "Choose a date", "edit-event", "primary"];
+        return ["Start event", "start-event", "primary"];
+      }
+
+      function renderEventRows() {
+        const events = filteredEvents();
+        if (!events.length) return `
+          <div class="empty-state">
+            <div class="empty-symbol" aria-hidden="true">0</div>
+            <h2>No events match these filters</h2>
+            <p>Clear the search or show all statuses. Existing events have not been changed.</p>
+            <button class="secondary" data-action="clear-event-filters">Clear filters</button>
+          </div>`;
+        return `<div class="event-list">${events.map(event => {
+          const date = dateParts(event.date);
+          const readiness = Math.round((event.staffReady / event.staff) * 100);
+          const next = eventNext(event);
+          return `
+            <article class="event-row" data-status="${event.status}">
+              <div class="event-date"><strong>${date.day}</strong><span>${date.month}</span><small>${date.year}</small></div>
+              <div class="event-main">
+                <div class="event-status ${statusClass(event.status)}"><i></i>${statusLabel(event.status)}</div>
+                <h3>${esc(event.name)}</h3>
+                <div class="event-meta">
+                  <span>${esc(event.time || "Time TBD")}</span>
+                  <span>${esc(event.venue)}</span>
+                  <span>${event.participants ? `${event.participants} participants` : `Capacity ${event.capacity}`}</span>
+                </div>
+                <div class="event-actions" aria-label="Actions for ${esc(event.name)}">
+                  <button class="link-action" data-action="${event.status === "in_progress" ? "open-live" : event.status === "completed" ? "open-summary" : "open-event"}" data-id="${event.id}">${event.status === "in_progress" ? "Open event" : event.status === "completed" ? "Open summary" : "Open event"}</button>
+                  ${event.status !== "completed" ? `<button class="link-action" data-action="dry-run" data-id="${event.id}">Dry run</button>` : ""}
+                  ${event.status === "upcoming" ? `<button class="link-action" data-action="start-event" data-id="${event.id}">Start event</button>` : ""}
+                  ${event.status !== "completed" ? `<button class="link-action" data-action="edit-event" data-id="${event.id}">Edit</button>` : ""}
+                  <button class="link-action" data-action="duplicate-event" data-id="${event.id}">Duplicate</button>
+                  <button class="link-action destructive" data-action="delete-event" data-id="${event.id}">Delete</button>
+                </div>
+              </div>
+              <div class="event-readiness">
+                <div class="readiness-label"><span>Staff ready</span><strong>${event.staffReady}/${event.staff}</strong></div>
+                <div class="readiness-track" aria-label="${readiness}% of staff ready"><span style="width:${readiness}%"></span></div>
+                <div class="readiness-label"><span>Stations configured</span><strong>${event.stations.length}/${event.stations.length}</strong></div>
+                ${event.warning ? `<div class="warning-line">${esc(event.warning)}</div>` : `<div class="clear-line">No operational warnings</div>`}
+              </div>
+              <div class="event-next">
+                <div><small>Next safe action</small><strong>${next[0]}</strong></div>
+                <button class="${next[2]}" data-action="${next[1]}" data-id="${event.id}">${next[0]}</button>
+              </div>
+            </article>`;
+        }).join("")}</div>`;
+      }
+
+      function renderEvents() {
+        return `
+          <div class="page-head">
+            <div><p class="kicker">Friday, 31 July</p><h1>Keep the day moving.</h1><p>Live work is first, then the events that need preparation. Warnings sit beside normal readiness so the next action stays clear.</p></div>
+            <div class="page-actions"><button class="primary" data-action="create-event">Create event</button></div>
+          </div>
+          <div class="toolbar" aria-label="Event filters">
+            <input class="field-control" id="event-search" type="search" placeholder="Search events or venues" value="${esc(state.eventQuery)}" aria-label="Search events">
+            <select class="field-control" id="event-status" aria-label="Filter by event status">
+              ${["all","in_progress","upcoming","draft","completed"].map(value => `<option value="${value}" ${state.eventStatus === value ? "selected" : ""}>${value === "all" ? "All statuses" : statusLabel(value)}</option>`).join("")}
+            </select>
+            <select class="field-control" id="event-sort" aria-label="Sort events">
+              <option value="date-asc" ${state.eventSort === "date-asc" ? "selected" : ""}>Date: soonest first</option>
+              <option value="date-desc" ${state.eventSort === "date-desc" ? "selected" : ""}>Date: latest first</option>
+              <option value="status" ${state.eventSort === "status" ? "selected" : ""}>Sort by status</option>
+            </select>
+            <button class="secondary" data-action="clear-event-filters">Clear</button>
+          </div>
+          <div class="section-strip"><h2>Event ledger</h2><span>${filteredEvents().length} shown</span></div>
+          <div id="event-list-region">${renderEventRows()}</div>`;
+      }
+
+      function renderLive() {
+        const event = selectedEvent();
+        const completeMode = event.status === "completed";
+        return `
+          <div class="page-head">
+            <div>
+              <p class="kicker">${completeMode ? "Completed event summary" : "Live since 08:04"}</p>
+              <h1>${esc(event.name)}</h1>
+              <p>${formatDate(event.date)} at ${esc(event.venue)}. ${completeMode ? "Review final throughput and follow-up work." : "Readiness is stable. Three operational items need attention now."}</p>
+            </div>
+            <div class="page-actions">
+              ${completeMode ? `<button class="secondary" data-nav="events">Back to events</button><button class="primary" data-action="report-ready">Prepare report</button>` : `<button class="secondary" data-action="dry-run" data-id="${event.id}">Start dry run</button><button class="primary" data-action="open-screening">Scan participant QR</button>`}
+            </div>
+          </div>
+          <div class="throughput" aria-label="Participant flow summary">
+            <div class="throughput-item"><strong>${completeMode ? 173 : 184}</strong><span>Registered</span></div>
+            <div class="throughput-item"><strong>${completeMode ? 0 : 18}</strong><span>Waiting</span></div>
+            <div class="throughput-item"><strong>${completeMode ? 0 : 7}</strong><span>Screening now</span></div>
+            <div class="throughput-item attention"><strong>${completeMode ? 0 : 12}</strong><span>Awaiting review</span></div>
+            <div class="throughput-item"><strong>${completeMode ? 158 : 72}</strong><span>Completed</span></div>
+            <div class="throughput-item attention"><strong>${completeMode ? 15 : 9}</strong><span>Follow-up required</span></div>
+            <div class="throughput-item danger"><strong>${completeMode ? 0 : 3}</strong><span>Incomplete records</span></div>
+          </div>
+          ${completeMode ? `
+            <div class="callout success"><div><strong>Event closed with all local records synchronised</strong><span>15 participants have documented follow-up actions. No records remain incomplete.</span></div><button class="secondary small-button" data-action="report-ready">Open report preview</button></div>
+          ` : `
+            <div class="callout warning"><div><strong>Next action: send relief to Refraction at 12:30</strong><span>Current worker has been assigned continuously for 3 hours 42 minutes.</span></div><button class="secondary small-button" data-nav="people">Adjust assignment</button></div>
+          `}
+          <div class="live-grid">
+            <section class="board-panel">
+              <div class="panel-head"><div><h2>${completeMode ? "Follow-up actions" : "Needs action now"}</h2><p>Exceptions are ordered by operational risk</p></div><span class="status ${completeMode ? "success" : "warning"}"><i></i>${completeMode ? "Closed" : "3 open"}</span></div>
+              ${completeMode ? `
+                <div class="attention-row"><div class="priority-number">1</div><div><strong>9 routine follow-up letters prepared</strong><span>Ready for authorised staff to send</span></div><button class="secondary small-button" data-action="report-ready">Review</button></div>
+                <div class="attention-row"><div class="priority-number">2</div><div><strong>6 referral actions recorded</strong><span>All reviewer decisions are finalised</span></div><button class="secondary small-button" data-action="report-ready">Open</button></div>
+              ` : `
+                <div class="attention-row"><div class="priority-number">1</div><div><strong>Sync failed for Nurul Izzati</strong><span>Eye health result is saved on this device</span></div><button class="secondary small-button" data-action="retry-sync" data-id="3">Retry sync</button></div>
+                <div class="attention-row"><div class="priority-number">2</div><div><strong>Rahimah Salleh has an incomplete result</strong><span>Colour vision is missing before review can be finalised</span></div><button class="secondary small-button" data-action="open-review" data-id="2">Open review</button></div>
+                <div class="attention-row"><div class="priority-number">3</div><div><strong>Refraction needs relief cover</strong><span>Assign one available screener before 12:30</span></div><button class="secondary small-button" data-nav="people">Assign worker</button></div>
+              `}
+            </section>
+            <section class="board-panel">
+              <div class="panel-head"><div><h2>Stations</h2><p>Workers, queues, and local save health</p></div><span class="status success"><i></i>5 open</span></div>
+              ${[
+                ["Registration", completeMode ? "Closed" : "3 workers", completeMode ? "0" : "6 waiting", "success"],
+                ["Visual acuity", completeMode ? "Closed" : "2 workers", completeMode ? "0" : "4 waiting", "success"],
+                ["Refraction", completeMode ? "Closed" : "2 workers", completeMode ? "0" : "8 waiting", completeMode ? "success" : "warning"],
+                ["Colour vision", completeMode ? "Closed" : "1 worker", completeMode ? "0" : "2 waiting", "success"],
+                ["Eye health", completeMode ? "Closed" : "2 workers", completeMode ? "0" : "3 waiting", "success"],
+                ["Clinical review", completeMode ? "Closed" : "2 reviewers", completeMode ? "0" : "12 waiting", completeMode ? "success" : "warning"]
+              ].map(row => `<div class="station-row"><div><strong>${row[0]}</strong><span>${row[1]}</span></div><div class="station-state"><strong>${row[2]}</strong><span class="status ${row[3]}"><i></i>${row[3] === "warning" ? "Needs attention" : "Ready"}</span></div></div>`).join("")}
+            </section>
+          </div>`;
+      }
+
+      function queuePane(activeName) {
+        return `
+          <div class="pane-head"><strong>Visual acuity queue</strong><span>3 waiting, longest wait 9 min</span></div>
+          ${participants.map((person, index) => `<button class="queue-person ${person.name === activeName ? "active" : ""}" data-action="select-participant" data-id="${index}"><strong>${esc(person.name)}</strong><span>${esc(person.code)} / ${index * 3 + 3} min</span></button>`).join("")}`;
+      }
+
+      function pathPane() {
+        return `
+          <div class="pane-head"><strong>Participant path</strong><span>Correct event confirmed at every handoff</span></div>
+          <div class="progress-path">
+            <div class="progress-step complete"><strong>Registration</strong><span>Complete at 09:42</span></div>
+            <div class="progress-step current"><strong>Visual acuity</strong><span>Current station</span></div>
+            <div class="progress-step"><strong>Refraction</strong><span>Next station</span></div>
+            <div class="progress-step"><strong>Colour vision</strong><span>Pending</span></div>
+            <div class="progress-step"><strong>Eye health</strong><span>Pending</span></div>
+          </div>`;
+      }
+
+      function renderScreening() {
+        const person = currentParticipant();
+        let content = "";
+        if (state.screenPhase === "scan") {
+          content = `
+            <div class="active-work">
+              <div class="scan-target">
+                <div><strong>Scan participant event pass</strong><p>The pass contains an event-scoped identifier only. It does not contain clinical information.</p><button class="primary" data-action="simulate-scan">Simulate QR scan</button></div>
+              </div>
+              <div class="callout"><div><strong>Camera ready</strong><span>Hold the event pass inside the guide. Manual lookup remains available at Registration.</span></div></div>
+            </div>`;
+        } else if (state.screenPhase === "confirm") {
+          content = `
+            <div class="active-work">
+              <p class="kicker">Pass recognised</p>
+              <h2 style="margin:0 0 6px;font-size:26px">${esc(person.name)}</h2>
+              <p style="margin:0 0 18px;color:var(--ink-2)">Confirm the participant and event before opening screening results.</p>
+              <div class="pass-code">${esc(person.pass)}</div>
+              <div class="confirm-grid">
+                <div class="fact"><small>Participant</small><strong>${esc(person.name)}, ${person.age} years</strong></div>
+                <div class="fact"><small>Event</small><strong>Tampines North Community Screening</strong></div>
+                <div class="fact"><small>Completed</small><strong>Registration</strong></div>
+                <div class="fact"><small>Current / next</small><strong>Visual acuity / Refraction</strong></div>
+              </div>
+              <div class="form-actions"><button class="secondary" data-action="rescan">Scan again</button><button class="primary" data-action="confirm-participant">Confirm participant</button></div>
+            </div>`;
+        } else if (state.screenPhase === "handoff") {
+          content = `
+            <div class="active-work">
+              <div class="identity-strip"><div><strong>${esc(person.name)}</strong><span>${esc(person.code)} / ${person.age} years</span></div><span class="status success"><i></i>${state.localSaved ? "Saved locally" : "Not saved"}</span></div>
+              <div class="handoff"><div class="handoff-inner"><div class="handoff-symbol">OK</div><h2>Send ${esc(person.name)} to Refraction</h2><p>Visual acuity is complete. The result is saved on this device and the participant path now points to the next station.</p><div class="callout success" style="text-align:left"><div><strong>Handoff ready</strong><span>Ask the next station to scan the same event pass. No screening result is stored in the QR.</span></div></div><button class="primary" data-action="next-participant">Continue to next participant</button></div></div>
+            </div>`;
+        } else {
+          content = `
+            <div class="active-work">
+              <div class="identity-strip">
+                <div><strong>${esc(person.name)}</strong><span>${esc(person.code)} / ${person.age} years / Tampines North</span></div>
+                <span class="status ${state.localSaved ? "success" : "info"}"><i></i>${esc(state.screenSyncState)}</span>
+              </div>
+              <form id="screening-form">
+                <div class="form-grid">
+                  <div class="field"><label for="right-distance">Right eye distance acuity</label><select id="right-distance" name="rightDistance" required><option value="">Choose result</option><option>6/6</option><option>6/9</option><option selected>6/12</option><option>6/18</option><option>6/24</option><option>6/36</option></select><small>Record the measured screening result.</small></div>
+                  <div class="field"><label for="left-distance">Left eye distance acuity</label><select id="left-distance" name="leftDistance" required><option value="">Choose result</option><option>6/6</option><option selected>6/9</option><option>6/12</option><option>6/18</option><option>6/24</option><option>6/36</option></select><small>Record the measured screening result.</small></div>
+                  <fieldset class="field full"><legend>Screened with habitual correction?</legend><div class="radio-row"><label><input type="radio" name="correction" value="Yes" checked> Yes</label><label><input type="radio" name="correction" value="No"> No</label></div></fieldset>
+                  <div class="field full"><label for="screen-notes">Operational note</label><textarea id="screen-notes" name="notes" placeholder="Add only information relevant to completing this screening station"></textarea></div>
+                </div>
+                ${state.localSaved ? `<div class="callout success"><div><strong>Saved safely on this device</strong><span>${state.dryRun ? "Dry run record will not enter the live event." : "Local save complete. Current sync state: " + esc(state.screenSyncState) + "."}</span></div></div>` : ""}
+                <div class="form-actions"><button type="submit" class="secondary">${state.localSaved ? "Save changes" : "Save result"}</button><button type="button" class="primary" data-action="handoff" ${state.localSaved ? "" : "disabled"}>Hand off to Refraction</button></div>
+              </form>
+            </div>`;
+        }
+        return `
+          <div class="page-head">
+            <div><p class="kicker">${state.dryRun ? "Dry run / " : ""}Visual acuity</p><h1>${state.screenPhase === "scan" ? "Ready for the next participant" : "Participant screening"}</h1><p>Identity, event, save state, and the next station stay visible through the handoff.</p></div>
+            <div class="page-actions"><button class="secondary" data-nav="live">Back to event</button>${state.screenPhase !== "scan" ? `<button class="secondary" data-action="rescan">Scan another pass</button>` : ""}</div>
+          </div>
+          <div class="workspace">
+            <section class="workspace-pane">${queuePane(state.screenPhase === "scan" ? "" : person.name)}</section>
+            <section class="workspace-pane">${content}</section>
+            <section class="workspace-pane">${pathPane()}</section>
+          </div>`;
+      }
+
+      function renderReview() {
+        const review = selectedReview();
+        const pendingReviews = state.reviews.filter(item => !item.finalized);
+        if (!pendingReviews.length) return `
+          <div class="page-head"><div><p class="kicker">Clinical review</p><h1>Review queue</h1><p>Reviewer decisions complete the screening pathway without making a diagnosis.</p></div></div>
+          <div class="empty-state"><div class="empty-symbol">OK</div><h2>All review records are finalised</h2><p>New screening flags and incomplete records will appear here when they need a reviewer.</p><button class="secondary" data-nav="live">Return to live event</button></div>`;
+        if (state.reviewCompleted) return `
+          <div class="page-head"><div><p class="kicker">Decision recorded</p><h1>Review finalised</h1><p>The screening outcome and follow-up action were saved explicitly.</p></div></div>
+          <div class="empty-state"><div class="empty-symbol">OK</div><h2>${esc(review.name)} is complete</h2><p>This record has left the active review queue. ${pendingReviews.length} records still require review.</p><button class="primary" data-action="next-review">Open next review</button></div>`;
+        return `
+          <div class="page-head">
+            <div><p class="kicker">${state.dryRun ? "Dry run / " : ""}Reviewer workspace</p><h1>Clinical review queue</h1><p>Structured results, missing work, and screening flags stay beside the explicit reviewer decision.</p></div>
+            <div class="page-actions"><button class="secondary" data-nav="live">Back to event</button></div>
+          </div>
+          <div class="review-layout">
+            <section>
+              <div class="pane-head"><strong>Awaiting review</strong><span>${pendingReviews.length} records, oldest wait 12 min</span></div>
+              ${pendingReviews.map(item => `<button class="queue-person ${item.id === review.id ? "active" : ""}" data-action="open-review" data-id="${item.id}"><strong>${esc(item.name)}</strong><span>${esc(item.code)} / ${esc(item.queue)}</span></button>`).join("")}
+            </section>
+            <section class="review-record">
+              <div class="identity-strip"><div><strong>${esc(review.name)}</strong><span>${esc(review.code)} / ${review.age} years / Tampines North</span></div><span class="status warning"><i></i>${esc(review.status)}</span></div>
+              <div class="result-group"><h3>Visual acuity</h3>
+                <div class="result-row"><span>Right eye distance</span><strong>${esc(review.right)}</strong></div>
+                <div class="result-row"><span>Left eye distance</span><strong>${esc(review.left)}</strong></div>
+                <div class="result-row"><span>Pinhole result</span><strong>${esc(review.pinhole)}</strong></div>
+              </div>
+              <div class="result-group"><h3>Eye health screening</h3>
+                <div class="result-row"><span>Pressure screening</span><strong>${esc(review.pressure)}</strong></div>
+                <div class="result-row"><span>Image quality</span><strong>${review.missing ? "Review required" : "Acceptable"}</strong></div>
+              </div>
+              <div class="flag-panel"><strong>Screening flag</strong><br>${esc(review.flag)} This is a screening flag, not a diagnosis.</div>
+              ${review.missing ? `<div class="missing-panel"><strong>Incomplete result</strong><br>${esc(review.missing)}</div>` : ""}
+            </section>
+            <section class="decision-pane">
+              <h2>Reviewer decision</h2>
+              <p>Choose the final screening disposition, document the reasoning, then finalise.</p>
+              <form id="review-form">
+                <div class="decision-options">
+                  <label class="decision-option"><input type="radio" name="decision" value="Screening complete" required><span><strong>Screening complete</strong><br>No follow-up action recorded.</span></label>
+                  <label class="decision-option"><input type="radio" name="decision" value="Follow-up required"><span><strong>Follow-up required</strong><br>Record a non-urgent follow-up action.</span></label>
+                  <label class="decision-option"><input type="radio" name="decision" value="Referral action"><span><strong>Referral action</strong><br>Record the reviewer-approved referral next step.</span></label>
+                </div>
+                <div class="field" style="margin-top:12px"><label for="review-notes">Reviewer notes</label><textarea id="review-notes" name="notes" required placeholder="Record the basis for this screening decision"></textarea></div>
+                <div class="field" style="margin-top:12px"><label for="follow-up">Follow-up or referral action</label><select id="follow-up" name="followUp"><option>No action</option><option>Routine optometry follow-up</option><option>Primary care follow-up</option><option>Reviewer-approved referral</option></select></div>
+                <div class="review-disclaimer">VSMS supports screening and review. It does not diagnose. Final decisions are recorded by an authorised reviewer.</div>
+                <div class="form-actions"><button class="primary" type="submit">Finalise review</button></div>
+              </form>
+            </section>
+          </div>`;
+      }
+
+      function filteredStaff() {
+        const query = state.peopleQuery.trim().toLowerCase();
+        return state.staff.filter(person => !query || [person.name, person.email, person.role, person.event, person.station, person.status].some(value => value.toLowerCase().includes(query)));
+      }
+
+      function renderPeopleRows() {
+        const people = filteredStaff();
+        if (!people.length) return `<div class="empty-state"><div class="empty-symbol">0</div><h2>No staff match this search</h2><p>Try a name, email, role, event, or station.</p><button class="secondary" data-action="clear-people-search">Clear search</button></div>`;
+        return `<div class="data-table-wrap"><table>
+          <thead><tr><th>Staff member</th><th>Role</th><th>Event & station</th><th>Access status</th><th>Actions</th></tr></thead>
+          <tbody>${people.map(person => `<tr>
+            <td><strong>${esc(person.name)}</strong><small>${esc(person.email)}</small></td>
+            <td>${esc(person.role)}<small>${esc(roleExplanations[person.role] || "")}</small></td>
+            <td>${esc(person.event)}<small>${esc(person.station)}</small></td>
+            <td><span class="status ${person.status === "Active" ? "success" : person.status === "Pending" ? "warning" : "danger"}"><i></i>${esc(person.status)}</span></td>
+            <td><div class="row-actions">
+              ${person.status === "Pending" ? `<button class="link-action" data-action="approve-staff" data-id="${person.id}">Approve</button><button class="link-action destructive" data-action="reject-staff" data-id="${person.id}">Reject</button>` : ""}
+              <button class="link-action" data-action="assign-staff" data-id="${person.id}">Change assignment</button>
+              ${person.status !== "Pending" ? `<button class="link-action ${person.status === "Deactivated" ? "" : "destructive"}" data-action="toggle-staff" data-id="${person.id}">${person.status === "Deactivated" ? "Reactivate access" : "Deactivate access"}</button>` : ""}
+            </div></td>
+          </tr>`).join("")}</tbody>
+        </table></div>`;
+      }
+
+      function renderPeople() {
+        return `
+          <div class="page-head">
+            <div><p class="kicker">Managers only</p><h1>People & access</h1><p>Assign staff to an event, station, and role together. Participants are records and never appear as sign-in users.</p></div>
+            <div class="page-actions"><button class="secondary" data-action="import-staff">Import staff</button><button class="primary" data-action="invite-staff">Invite staff</button></div>
+          </div>
+          <div class="role-note"><strong>Permission preview</strong><span>Every assignment explains what the role allows before it is confirmed. Access changes apply only to staff accounts.</span></div>
+          <div class="toolbar" style="grid-template-columns:minmax(240px,1fr) auto auto">
+            <input class="field-control" id="people-search" type="search" placeholder="Search staff, roles, events, or stations" value="${esc(state.peopleQuery)}" aria-label="Search staff">
+            <button class="secondary" data-action="show-pending">Show pending</button>
+            <button class="secondary" data-action="clear-people-search">Clear</button>
+          </div>
+          <div id="people-list-region">${renderPeopleRows()}</div>`;
+      }
+
+      const syncStatusClass = status => {
+        if (status === "Synced") return "success";
+        if (["Saved offline", "Pending sync", "Syncing"].includes(status)) return "info";
+        if (status === "Sync failed") return "danger";
+        return "warning";
+      };
+
+      function renderSync() {
+        const counts = label => state.sync.filter(item => item.status === label).length;
+        return `
+          <div class="page-head">
+            <div><p class="kicker">Local-first resilience</p><h1>Sync centre</h1><p>Locally saved work remains recoverable. Retry failures here without making discard an easy action.</p></div>
+            <div class="page-actions"><button class="primary" data-action="sync-all">Sync pending records</button></div>
+          </div>
+          <div class="sync-summary">
+            <div><strong>${counts("Saved offline")}</strong><span>Saved offline</span></div>
+            <div><strong>${counts("Pending sync")}</strong><span>Pending sync</span></div>
+            <div><strong>${counts("Syncing")}</strong><span>Syncing</span></div>
+            <div><strong>${counts("Sync failed")}</strong><span>Sync failed</span></div>
+            <div><strong>${counts("Conflict requires review")}</strong><span>Conflict requires review</span></div>
+          </div>
+          <div class="callout"><div><strong>Local save is healthy</strong><span>Results are written to this device before synchronisation. Closing this view will not discard pending work.</span></div></div>
+          <div class="data-table-wrap"><table>
+            <thead><tr><th>Participant record</th><th>Area</th><th>State</th><th>Last update</th><th>Safe action</th></tr></thead>
+            <tbody>${state.sync.map(record => `<tr>
+              <td><strong>${esc(record.participant)}</strong><small>${esc(record.code)}</small></td>
+              <td>${esc(record.area)}</td>
+              <td><span class="status ${syncStatusClass(record.status)}"><i></i>${esc(record.status)}</span></td>
+              <td>${esc(record.updated)}</td>
+              <td>${record.status === "Sync failed" ? `<button class="secondary small-button" data-action="retry-sync" data-id="${record.id}">Retry sync</button>` : record.status === "Conflict requires review" ? `<button class="secondary small-button" data-action="review-conflict" data-id="${record.id}">Review conflict</button>` : `<span style="color:var(--muted)">No action needed</span>`}</td>
+            </tr>`).join("")}</tbody>
+          </table></div>`;
+      }
+
+      function renderPermissionDenied() {
+        return `
+          <div class="page-head"><div><p class="kicker">Access controlled</p><h1>Audit log</h1><p>Audit history is restricted separately from normal event management.</p></div></div>
+          <div class="permission-state">
+            <div class="empty-symbol" aria-hidden="true">!</div>
+            <h2>You do not have permission to view the audit log</h2>
+            <p>Your Event Manager role can manage assigned events and staff, but cannot open the system-wide audit history. Ask an Administrator if access is required.</p>
+            <button class="primary" data-nav="events">Return to events</button>
+          </div>`;
+      }
+
+      function eventForm(event = null, duplicate = false) {
+        const item = event || { name: "", date: "", time: "09:00", venue: "", capacity: 120, status: "draft", stations: ["Registration", "Visual acuity", "Refraction", "Colour vision", "Eye health"], staff: 10, registration: "Walk-in and pre-registered" };
+        const title = event ? (duplicate ? "Complete duplicated event" : "Edit event") : "Create event";
+        return `
+          <form id="event-form" data-id="${event?.id || ""}">
+            <div class="modal-head"><div><h2>${title}</h2><p>${duplicate ? "A duplicated event remains Draft until a new date is chosen." : "Configure the event, readiness, and registration settings."}</p></div><button type="button" class="modal-close" data-close aria-label="Close">×</button></div>
+            <div class="modal-body">
+              ${duplicate && !item.date ? `<div class="callout warning"><div><strong>New date required</strong><span>This copy cannot become active until its date is set.</span></div></div>` : ""}
+              <div class="form-grid">
+                <div class="field full"><label for="event-name">Event name</label><input id="event-name" name="name" required maxlength="90" value="${esc(item.name)}"></div>
+                <div class="field"><label for="event-date">Date</label><input id="event-date" name="date" type="date" value="${esc(item.date)}"></div>
+                <div class="field"><label for="event-time">Start time</label><input id="event-time" name="time" type="time" required value="${esc(item.time)}"></div>
+                <div class="field full"><label for="event-venue">Venue</label><input id="event-venue" name="venue" required maxlength="120" value="${esc(item.venue)}"></div>
+                <div class="field"><label for="event-capacity">Capacity</label><input id="event-capacity" name="capacity" type="number" min="1" max="100000" required value="${item.capacity}"></div>
+                <div class="field"><label for="event-staff">Assigned staff</label><input id="event-staff" name="staff" type="number" min="1" max="100" required value="${item.staff}"></div>
+                <div class="field"><label for="registration-setting">Registration setting</label><select id="registration-setting" name="registration">${["Walk-in and pre-registered","Pre-registration open","Walk-in only"].map(value => `<option ${item.registration === value ? "selected" : ""}>${value}</option>`).join("")}</select></div>
+                <div class="field"><label for="event-form-status">Event status</label><select id="event-form-status" name="status">${["draft","upcoming","in_progress"].map(value => `<option value="${value}" ${item.status === value ? "selected" : ""}>${statusLabel(value)}</option>`).join("")}</select><small>A date is required before an event can become Upcoming or In progress.</small></div>
+                <fieldset class="field full"><legend>Screening stations</legend><div class="check-row">${["Registration","Visual acuity","Refraction","Colour vision","Eye health"].map(value => `<label><input type="checkbox" name="stations" value="${value}" ${item.stations.includes(value) ? "checked" : ""}> ${value}</label>`).join("")}</div></fieldset>
+              </div>
+              <div class="inline-error" id="event-form-error" role="alert"></div>
+            </div>
+            <div class="modal-actions"><button type="button" class="secondary" data-close>Cancel</button><button type="submit" class="primary">Save event</button></div>
+          </form>`;
+      }
+
+      function openDeleteModal(event) {
+        openModal(`
+          <div class="modal-head"><div><h2>Delete event?</h2><p>This removes the event from this prototype state.</p></div><button class="modal-close" data-close aria-label="Close">×</button></div>
+          <div class="modal-body">
+            <div class="danger-summary"><strong>${esc(event.name)}</strong><span>${formatDate(event.date)} at ${esc(event.venue)}</span></div>
+            <p>This action will not be performed until you choose Delete event below. Pending screening records are never discarded from this control.</p>
+          </div>
+          <div class="modal-actions"><button class="primary" data-close>Keep event</button><button class="danger-button" data-action="confirm-delete" data-id="${event.id}">Delete event</button></div>`);
+      }
+
+      function assignmentForm(person) {
+        const eventOptions = state.events.map(event => event.name);
+        const stations = ["Event command", "Registration", "Visual acuity", "Refraction", "Colour vision", "Eye health", "Clinical review", "Not assigned"];
+        const roles = Object.keys(roleExplanations);
+        return `
+          <form id="assignment-form" data-id="${person.id}">
+            <div class="modal-head"><div><h2>Change staff assignment</h2><p>${esc(person.name)} / ${esc(person.email)}</p></div><button type="button" class="modal-close" data-close aria-label="Close">×</button></div>
+            <div class="modal-body">
+              <div class="form-grid">
+                <div class="field full"><label for="assign-event">Event</label><select id="assign-event" name="event">${eventOptions.map(value => `<option ${person.event === value ? "selected" : ""}>${esc(value)}</option>`).join("")}<option ${person.event === "All events" ? "selected" : ""}>All events</option></select></div>
+                <div class="field"><label for="assign-role">Role</label><select id="assign-role" name="role" data-role-field>${roles.map(value => `<option ${person.role === value ? "selected" : ""}>${value}</option>`).join("")}</select></div>
+                <div class="field"><label for="assign-station">Station</label><select id="assign-station" name="station">${stations.map(value => `<option ${person.station === value ? "selected" : ""}>${value}</option>`).join("")}</select></div>
+                <fieldset class="field full"><legend>Additional permissions</legend><div class="check-row"><label><input type="checkbox" name="permission" value="Manage queue" ${person.permissions.includes("Manage queue") ? "checked" : ""}> Manage queue</label><label><input type="checkbox" name="permission" value="View operational reports" ${person.permissions.includes("View operational reports") ? "checked" : ""}> View operational reports</label><label><input type="checkbox" name="permission" value="Manage staff" ${person.permissions.includes("Manage staff") ? "checked" : ""}> Manage staff</label></div></fieldset>
+              </div>
+              <div class="permission-preview" id="permission-preview"><strong>${esc(person.role)} allows:</strong> ${esc(roleExplanations[person.role])}</div>
+            </div>
+            <div class="modal-actions"><button type="button" class="secondary" data-close>Cancel</button><button type="submit" class="primary">Confirm assignment</button></div>
+          </form>`;
+      }
+
+      function inviteForm() {
+        return `
+          <form id="invite-form">
+            <div class="modal-head"><div><h2>Invite staff</h2><p>The invite remains pending until approved.</p></div><button type="button" class="modal-close" data-close aria-label="Close">×</button></div>
+            <div class="modal-body"><div class="form-grid">
+              <div class="field"><label for="invite-name">Full name</label><input id="invite-name" name="name" required placeholder="e.g. Kavitha Raj"></div>
+              <div class="field"><label for="invite-email">Work email</label><input id="invite-email" name="email" type="email" required placeholder="name@organisation.test"></div>
+              <div class="field"><label for="invite-role">Role</label><select id="invite-role" name="role" data-role-field>${Object.keys(roleExplanations).map(role => `<option>${role}</option>`).join("")}</select></div>
+              <div class="field"><label for="invite-station">Station</label><select id="invite-station" name="station">${["Registration","Visual acuity","Refraction","Colour vision","Eye health","Clinical review"].map(value => `<option>${value}</option>`).join("")}</select></div>
+              <div class="field full"><label for="invite-event">Event</label><select id="invite-event" name="event">${state.events.map(event => `<option>${esc(event.name)}</option>`).join("")}</select></div>
+            </div><div class="permission-preview" id="permission-preview"><strong>Event Manager allows:</strong> ${roleExplanations["Event Manager"]}</div></div>
+            <div class="modal-actions"><button type="button" class="secondary" data-close>Cancel</button><button type="submit" class="primary">Send invitation</button></div>
+          </form>`;
+      }
+
+      function importForm() {
+        return `
+          <form id="import-form">
+            <div class="modal-head"><div><h2>Import staff</h2><p>Prototype import validates one fictional CSV row.</p></div><button type="button" class="modal-close" data-close aria-label="Close">×</button></div>
+            <div class="modal-body">
+              <div class="field"><label for="staff-file">Staff CSV file</label><input id="staff-file" type="file" accept=".csv" aria-describedby="import-help"><small id="import-help">Expected columns: name, email, role, event, station. Choose any CSV to simulate import.</small></div>
+              <div class="callout"><div><strong>Preview</strong><span>Nur Aisyah Rahman / Screener / Tampines North / Colour vision / Pending approval</span></div></div>
+            </div>
+            <div class="modal-actions"><button type="button" class="secondary" data-close>Cancel</button><button type="submit" class="primary">Import 1 staff member</button></div>
+          </form>`;
+      }
+
+      function refreshEventList() {
+        const region = document.getElementById("event-list-region");
+        if (region) region.innerHTML = renderEventRows();
+      }
+
+      function refreshPeopleList() {
+        const region = document.getElementById("people-list-region");
+        if (region) region.innerHTML = renderPeopleRows();
+      }
+
+      document.addEventListener("input", event => {
+        if (event.target.id === "event-search") {
+          state.eventQuery = event.target.value;
+          refreshEventList();
+        }
+        if (event.target.id === "people-search") {
+          state.peopleQuery = event.target.value;
+          refreshPeopleList();
+        }
+      });
+
+      document.addEventListener("change", event => {
+        if (event.target.id === "event-status") { state.eventStatus = event.target.value; refreshEventList(); }
+        if (event.target.id === "event-sort") { state.eventSort = event.target.value; refreshEventList(); }
+        if (event.target.matches("[data-role-field]")) {
+          const preview = document.getElementById("permission-preview");
+          if (preview) preview.innerHTML = `<strong>${esc(event.target.value)} allows:</strong> ${esc(roleExplanations[event.target.value])}`;
+        }
+      });
+
+      document.addEventListener("submit", event => {
+        event.preventDefault();
+        const form = event.target;
+        const data = new FormData(form);
+
+        if (form.id === "event-form") {
+          const status = data.get("status");
+          const date = data.get("date");
+          const error = document.getElementById("event-form-error");
+          if (status !== "draft" && !date) {
+            error.textContent = "Choose a date before changing this event from Draft.";
+            document.getElementById("event-date").focus();
+            return;
+          }
+          const stations = data.getAll("stations");
+          if (!stations.length) {
+            error.textContent = "Choose at least one screening station.";
+            return;
+          }
+          const id = Number(form.dataset.id);
+          const existing = state.events.find(item => item.id === id);
+          const next = {
+            id: id || Math.max(0, ...state.events.map(item => item.id)) + 1,
+            name: data.get("name").trim(),
+            date,
+            time: data.get("time"),
+            venue: data.get("venue").trim(),
+            capacity: Number(data.get("capacity")),
+            participants: existing?.participants || 0,
+            status,
+            stations,
+            staff: Number(data.get("staff")),
+            staffReady: Math.min(existing?.staffReady || Number(data.get("staff")), Number(data.get("staff"))),
+            registration: data.get("registration"),
+            warning: existing?.warning || ""
+          };
+          if (existing) Object.assign(existing, next); else state.events.unshift(next);
+          closeModal();
+          state.view = "events";
+          render();
+          showToast(existing ? "Event changes saved." : "Draft event created.");
+        }
+
+        if (form.id === "screening-form") {
+          state.localSaved = true;
+          state.screenSyncState = state.dryRun ? "Dry run save" : "Pending sync";
+          render();
+          showToast(state.dryRun ? "Dry run result saved locally only." : "Result saved locally. Sync queued.");
+          if (!state.dryRun) {
+            setTimeout(() => {
+              if (state.view === "screening" && state.localSaved) {
+                state.screenSyncState = "Synced";
+                render();
+              }
+            }, 1500);
+          }
+        }
+
+        if (form.id === "review-form") {
+          const review = selectedReview();
+          review.finalized = true;
+          review.status = data.get("decision");
+          review.notes = data.get("notes");
+          review.followUp = data.get("followUp");
+          state.reviewCompleted = true;
+          render();
+          showToast(state.dryRun ? "Dry run decision recorded outside live data." : "Reviewer decision finalised.");
+        }
+
+        if (form.id === "assignment-form") {
+          const person = state.staff.find(item => item.id === Number(form.dataset.id));
+          person.event = data.get("event");
+          person.role = data.get("role");
+          person.station = data.get("station");
+          person.permissions = data.getAll("permission");
+          closeModal();
+          render();
+          showToast(`Assignment updated for ${person.name}.`);
+        }
+
+        if (form.id === "invite-form") {
+          state.staff.push({
+            id: Math.max(...state.staff.map(item => item.id)) + 1,
+            name: data.get("name").trim(),
+            email: data.get("email").trim(),
+            role: data.get("role"),
+            event: data.get("event"),
+            station: data.get("station"),
+            status: "Pending",
+            permissions: []
+          });
+          closeModal();
+          render();
+          showToast("Staff invitation added for approval.");
+        }
+
+        if (form.id === "import-form") {
+          if (!state.staff.some(item => item.email === "nur.aisyah@vsms.test")) {
+            state.staff.push({ id: Math.max(...state.staff.map(item => item.id)) + 1, name: "Nur Aisyah Rahman", email: "nur.aisyah@vsms.test", role: "Screener", event: "Tampines North Community Screening", station: "Colour vision", status: "Pending", permissions: ["Scan participant pass", "Record station results"] });
+          }
+          closeModal();
+          render();
+          showToast("1 staff member imported for approval.");
+        }
+      });
+
+      document.addEventListener("click", event => {
+        const target = event.target.closest("button");
+        if (!target) return;
+
+        if (target.hasAttribute("data-close")) {
+          closeModal();
+          return;
+        }
+
+        const nav = target.dataset.nav;
+        if (nav) {
+          if (nav === "live" && !selectedEvent()) state.selectedEventId = 1;
+          state.view = nav;
+          state.reviewCompleted = false;
+          render();
+          main.focus();
+          return;
+        }
+
+        const action = target.dataset.action;
+        const id = Number(target.dataset.id);
+        if (!action) return;
+
+        if (action === "refresh") {
+          state.loading = true;
+          render();
+          setTimeout(() => { state.loading = false; render(); showToast("Current prototype data refreshed."); }, 650);
+        }
+        if (action === "reset") {
+          openModal(`
+            <div class="modal-head"><div><h2>Reset prototype?</h2><p>Restore the original fictional events, staff, review queue, and sync states.</p></div><button class="modal-close" data-close aria-label="Close">×</button></div>
+            <div class="modal-body"><p>All temporary changes in this browser session will be removed. No backend data exists.</p></div>
+            <div class="modal-actions"><button class="primary" data-close>Keep changes</button><button class="danger-button" data-action="confirm-reset">Reset prototype</button></div>`);
+        }
+        if (action === "confirm-reset") {
+          state = makeState();
+          drySnapshot = null;
+          closeModal();
+          render();
+          showToast("Prototype reset to its original state.");
+        }
+        if (action === "create-event") openModal(eventForm(), true);
+        if (action === "edit-event" || action === "open-event") {
+          const item = state.events.find(event => event.id === id);
+          if (item) openModal(eventForm(item), true);
+        }
+        if (action === "duplicate-event") {
+          const source = state.events.find(event => event.id === id);
+          const copy = {
+            ...structuredClone(source),
+            id: Math.max(...state.events.map(event => event.id)) + 1,
+            name: `${source.name} Copy`,
+            date: "",
+            status: "draft",
+            participants: 0,
+            staffReady: 0,
+            warning: "Choose a new date before this copy can become active."
+          };
+          state.events.unshift(copy);
+          render();
+          openModal(eventForm(copy, true), true);
+          showToast("Draft copy created. Choose a new date to activate it.");
+        }
+        if (action === "delete-event") {
+          const item = state.events.find(event => event.id === id);
+          if (item) openDeleteModal(item);
+        }
+        if (action === "confirm-delete") {
+          const item = state.events.find(event => event.id === id);
+          state.events = state.events.filter(event => event.id !== id);
+          closeModal();
+          render();
+          showToast(`${item?.name || "Event"} deleted from prototype state.`);
+        }
+        if (action === "clear-event-filters") {
+          state.eventQuery = "";
+          state.eventStatus = "all";
+          state.eventSort = "date-asc";
+          render();
+        }
+        if (action === "start-event") {
+          const item = state.events.find(event => event.id === id);
+          if (item && !item.date) {
+            openModal(eventForm(item), true);
+            showToast("Choose a date before starting this event.");
+          } else if (item) {
+            item.status = "in_progress";
+            state.selectedEventId = item.id;
+            state.view = "live";
+            render();
+            showToast(`${item.name} is now in progress.`);
+          }
+        }
+        if (action === "open-live" || action === "open-summary") {
+          state.selectedEventId = id || 1;
+          state.view = "live";
+          render();
+        }
+        if (action === "dry-run") {
+          if (!state.dryRun) {
+            drySnapshot = {
+              events: structuredClone(state.events),
+              staff: structuredClone(state.staff),
+              reviews: structuredClone(state.reviews),
+              sync: structuredClone(state.sync)
+            };
+          }
+          state.selectedEventId = id || state.selectedEventId;
+          state.dryRun = true;
+          state.view = "live";
+          state.screenPhase = "scan";
+          state.localSaved = false;
+          render();
+          showToast("Dry run started. Live event data will not change.");
+        }
+        if (action === "exit-dry-run") {
+          if (drySnapshot) {
+            state.events = drySnapshot.events;
+            state.staff = drySnapshot.staff;
+            state.reviews = drySnapshot.reviews;
+            state.sync = drySnapshot.sync;
+            drySnapshot = null;
+          }
+          state.dryRun = false;
+          state.view = "events";
+          state.screenPhase = "scan";
+          state.localSaved = false;
+          render();
+          showToast("Dry run ended. No live records were changed.");
+        }
+        if (action === "open-screening") {
+          state.view = "screening";
+          state.screenPhase = "scan";
+          state.localSaved = false;
+          render();
+        }
+        if (action === "simulate-scan") {
+          state.scanned = true;
+          state.screenPhase = "confirm";
+          render();
+          showToast("Participant pass recognised.");
+        }
+        if (action === "rescan") {
+          state.screenPhase = "scan";
+          state.scanned = false;
+          state.localSaved = false;
+          state.screenSyncState = "Not saved";
+          render();
+        }
+        if (action === "confirm-participant") {
+          state.screenPhase = "result";
+          state.localSaved = false;
+          state.screenSyncState = "Not saved";
+          render();
+        }
+        if (action === "select-participant") {
+          state.participantIndex = id;
+          state.screenPhase = "confirm";
+          state.scanned = true;
+          state.localSaved = false;
+          render();
+        }
+        if (action === "handoff" && state.localSaved) {
+          state.screenPhase = "handoff";
+          render();
+        }
+        if (action === "next-participant") {
+          state.participantIndex = (state.participantIndex + 1) % participants.length;
+          state.screenPhase = "scan";
+          state.scanned = false;
+          state.localSaved = false;
+          state.screenSyncState = "Not saved";
+          render();
+          showToast("Ready for the next participant.");
+        }
+        if (action === "open-review") {
+          state.selectedReviewId = id;
+          state.reviewCompleted = false;
+          state.view = "review";
+          render();
+        }
+        if (action === "next-review") {
+          const next = state.reviews.find(review => !review.finalized);
+          if (next) state.selectedReviewId = next.id;
+          state.reviewCompleted = false;
+          render();
+        }
+        if (action === "invite-staff") openModal(inviteForm(), true);
+        if (action === "import-staff") openModal(importForm());
+        if (action === "assign-staff") {
+          const person = state.staff.find(item => item.id === id);
+          if (person) openModal(assignmentForm(person), true);
+        }
+        if (action === "approve-staff") {
+          const person = state.staff.find(item => item.id === id);
+          if (person) person.status = "Active";
+          render();
+          showToast(`${person?.name || "Staff member"} approved.`);
+        }
+        if (action === "reject-staff") {
+          const person = state.staff.find(item => item.id === id);
+          state.staff = state.staff.filter(item => item.id !== id);
+          render();
+          showToast(`${person?.name || "Pending staff member"} rejected.`);
+        }
+        if (action === "toggle-staff") {
+          const person = state.staff.find(item => item.id === id);
+          if (person) person.status = person.status === "Deactivated" ? "Active" : "Deactivated";
+          render();
+          showToast(`${person?.name || "Staff member"} access is now ${person?.status.toLowerCase()}.`);
+        }
+        if (action === "show-pending") {
+          state.peopleQuery = "pending";
+          const pending = state.staff.filter(person => person.status === "Pending");
+          const region = document.getElementById("people-list-region");
+          if (region) region.innerHTML = pending.length ? `<div class="data-table-wrap"><table><thead><tr><th>Staff member</th><th>Role</th><th>Event & station</th><th>Status</th><th>Actions</th></tr></thead><tbody>${pending.map(person => `<tr><td><strong>${esc(person.name)}</strong><small>${esc(person.email)}</small></td><td>${esc(person.role)}</td><td>${esc(person.event)}<small>${esc(person.station)}</small></td><td><span class="status warning"><i></i>Pending</span></td><td><div class="row-actions"><button class="link-action" data-action="approve-staff" data-id="${person.id}">Approve</button><button class="link-action destructive" data-action="reject-staff" data-id="${person.id}">Reject</button><button class="link-action" data-action="assign-staff" data-id="${person.id}">Change assignment</button></div></td></tr>`).join("")}</tbody></table></div>` : `<div class="empty-state"><h2>No pending staff</h2><p>All invitations have been resolved.</p></div>`;
+        }
+        if (action === "clear-people-search") {
+          state.peopleQuery = "";
+          render();
+        }
+        if (action === "retry-sync") {
+          const record = state.sync.find(item => item.id === id);
+          if (record) {
+            record.status = "Syncing";
+            record.updated = "Now";
+            render();
+            showToast("Retrying saved record.");
+            setTimeout(() => {
+              record.status = "Synced";
+              record.updated = "Now";
+              render();
+              showToast(`${record.participant} synced successfully.`);
+            }, 1100);
+          }
+        }
+        if (action === "sync-all") {
+          const pending = state.sync.filter(item => ["Saved offline", "Pending sync", "Sync failed"].includes(item.status));
+          pending.forEach(item => { item.status = "Syncing"; item.updated = "Now"; });
+          render();
+          showToast(`Syncing ${pending.length} saved records.`);
+          setTimeout(() => {
+            pending.forEach(item => item.status = "Synced");
+            render();
+            showToast("Pending records synced. Conflict still requires review.");
+          }, 1300);
+        }
+        if (action === "review-conflict") {
+          const record = state.sync.find(item => item.id === id);
+          openModal(`
+            <div class="modal-head"><div><h2>Review sync conflict</h2><p>${esc(record.participant)} / ${esc(record.code)}</p></div><button class="modal-close" data-close aria-label="Close">×</button></div>
+            <div class="modal-body"><div class="callout warning"><div><strong>Two saved versions need authorised review</strong><span>The local result remains intact. Compare timestamps and screening context before choosing a version.</span></div></div><div class="result-row"><span>Local device</span><strong>10:31 / complete</strong></div><div class="result-row"><span>Server</span><strong>10:28 / incomplete</strong></div></div>
+            <div class="modal-actions"><button class="secondary" data-close>Review later</button><button class="primary" data-action="resolve-conflict" data-id="${record.id}">Keep complete local version</button></div>`);
+        }
+        if (action === "resolve-conflict") {
+          const record = state.sync.find(item => item.id === id);
+          if (record) record.status = "Pending sync";
+          closeModal();
+          render();
+          showToast("Conflict reviewed. Complete local version is pending sync.");
+        }
+        if (action === "report-ready") showToast("Report preview prepared from fictional prototype data.");
+      });
+
+      document.addEventListener("keydown", event => {
+        if (event.key === "Escape" && modalLayer.classList.contains("open")) closeModal();
+      });
+
+      render();
+    })();
+  </script>
+</body>
+</html>
