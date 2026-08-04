@@ -17,6 +17,8 @@ import {
 import axios from 'axios';
 import { useCallback, useEffect, useRef, useState, type FormEvent, type ReactNode } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
+import { AppDialog } from '../../components/AppDialog';
+import { SignaturePad } from '../../components/SignaturePad';
 import {
   reviewApi,
   type OverallFlag,
@@ -25,6 +27,8 @@ import {
   type ReviewOutcome,
   type ReviewQueueItem,
   type ReviewQueueResponse,
+  type IssueReferralRequest,
+  type IssueReferralResponse,
 } from './reviewApi';
 import './ReviewWorkspacePage.css';
 
@@ -79,6 +83,10 @@ const displayValue = (value: unknown) => {
   if (typeof value === 'string' || typeof value === 'number') return String(value);
   try { return JSON.stringify(value); } catch { return 'Recorded value'; }
 };
+
+const genderLabel = (value: string) => ({
+  M: 'Male', F: 'Female', O: 'Other', U: 'Prefer not to say',
+}[value] ?? 'Not recorded');
 
 const eyeReading = (value: unknown, distance: unknown) => {
   if (!value || typeof value !== 'object') return 'Not recorded';
@@ -138,13 +146,13 @@ function ResultData({ station }: { station: ReviewDetailResponse['stations'][num
 function ParticipantReport({ detail }: { detail: ReviewDetailResponse }) {
   return <section className="participant-report" aria-hidden="true">
     <header className="participant-report-header">
-      <div><strong>VSMS</strong><span>Participant clinical report</span></div>
+      <div><strong>VSMS</strong><span>De-identified clinical screening summary</span></div>
       <p>Generated {new Date().toLocaleString()}</p>
     </header>
 
     <section className="participant-report-title">
       <p>{detail.event.name}</p>
-      <h1>{detail.participant.participantDisplayName}</h1>
+      <h1>Registration {detail.participant.registrationId.slice(0, 8)}</h1>
       <span>{detail.event.venue}</span>
     </section>
 
@@ -152,9 +160,6 @@ function ParticipantReport({ detail }: { detail: ReviewDetailResponse }) {
       <div><dt>Registration ID</dt><dd>{detail.participant.registrationId}</dd></div>
       <div><dt>Queue number</dt><dd>{detail.participant.queueNumber ?? 'Not assigned'}</dd></div>
       <div><dt>Registration status</dt><dd>{detail.participant.registrationStatus.replace(/_/g, ' ')}</dd></div>
-      <div><dt>NRIC</dt><dd>{detail.participant.maskedNric}</dd></div>
-      <div><dt>Date of birth</dt><dd>{new Date(`${detail.participant.dateOfBirth}T00:00:00`).toLocaleDateString()}</dd></div>
-      <div><dt>Gender</dt><dd>{detail.participant.gender}</dd></div>
     </dl>
 
     <section className="participant-report-section">
@@ -197,7 +202,139 @@ function DetailSkeleton() {
   </div>;
 }
 
-function ReviewedDecision({ review }: { review: NonNullable<ReviewDetailResponse['existingReview']> }) {
+type RecordedReferral = NonNullable<NonNullable<ReviewDetailResponse['existingReview']>['referral']>;
+
+const referralIssueStorageKey = (eventId: string, referralId: string) => `vsms.referral-issue:${eventId}:${referralId}`;
+
+const savedReferralIssue = (eventId: string, referralId: string): IssueReferralRequest | null => {
+  try {
+    const value = window.sessionStorage.getItem(referralIssueStorageKey(eventId, referralId));
+    if (!value) return null;
+    const parsed = JSON.parse(value) as IssueReferralRequest;
+    return typeof parsed.idempotencyKey === 'string' && typeof parsed.destinationEmail === 'string' ? parsed : null;
+  } catch {
+    return null;
+  }
+};
+
+function ReferralIssuance({ eventId, referral }: { eventId: string; referral: RecordedReferral }) {
+  const [savedIssue, setSavedIssue] = useState<IssueReferralRequest | null>(() => savedReferralIssue(eventId, referral.referralId));
+  const [email, setEmail] = useState(() => savedIssue?.destinationEmail || '');
+  const [signature, setSignature] = useState<string | null>(null);
+  const [confirmed, setConfirmed] = useState(false);
+  const [issuing, setIssuing] = useState(false);
+  const [downloading, setDownloading] = useState(false);
+  const [secretCopied, setSecretCopied] = useState(false);
+  const [acknowledging, setAcknowledging] = useState(false);
+  const [error, setError] = useState('');
+  const [result, setResult] = useState<IssueReferralResponse | null>(null);
+  const documentId = result?.documentId || referral.document?.documentId;
+  const delivery = result?.delivery || referral.delivery;
+  const storageKey = referralIssueStorageKey(eventId, referral.referralId);
+
+  const saveIssue = (request: IssueReferralRequest) => {
+    window.sessionStorage.setItem(storageKey, JSON.stringify(request));
+    setSavedIssue(request);
+  };
+
+  const recover = async () => {
+    if (!savedIssue) return setError('This browser does not have the original issuance request, so the passphrase cannot be recovered here.');
+    setIssuing(true);
+    setError('');
+    try {
+      setResult(await reviewApi.issueReferral(eventId, referral.referralId, savedIssue));
+    } catch (requestError) {
+      setError(apiProblem(requestError)?.title || 'The secure referral recovery request could not be completed.');
+    } finally {
+      setIssuing(false);
+    }
+  };
+
+  const copyAndAcknowledge = async () => {
+    if (!result?.handoffSecret || !savedIssue) return;
+    setAcknowledging(true);
+    setError('');
+    try {
+      await navigator.clipboard.writeText(result.handoffSecret);
+      await reviewApi.acknowledgeReferralHandoff(eventId, referral.referralId, { idempotencyKey: savedIssue.idempotencyKey });
+      window.sessionStorage.removeItem(storageKey);
+      setSavedIssue(null);
+      setResult({ ...result, handoffSecret: null, handoffSecretExpiresAt: null });
+      setSecretCopied(true);
+    } catch (requestError) {
+      setError(apiProblem(requestError)?.title || 'The passphrase was not acknowledged. Keep it secure and try again.');
+    } finally {
+      setAcknowledging(false);
+    }
+  };
+
+  const download = async () => {
+    if (!documentId) return;
+    setDownloading(true);
+    setError('');
+    try {
+      const blob = await reviewApi.downloadReferral(eventId, referral.referralId, documentId);
+      const url = URL.createObjectURL(blob);
+      const anchor = document.createElement('a');
+      anchor.href = url;
+      anchor.download = `vision-referral-${referral.referralId.slice(0, 8)}.pdf`;
+      anchor.click();
+      URL.revokeObjectURL(url);
+    } catch (requestError) {
+      setError(apiProblem(requestError)?.title || 'The encrypted referral could not be downloaded.');
+    } finally {
+      setDownloading(false);
+    }
+  };
+
+  const issue = async (event: FormEvent) => {
+    event.preventDefault();
+    if (!savedIssue && !signature) return setError('Add your electronic signature before issuing the referral.');
+    if (!savedIssue && !confirmed) return setError('Confirm the passphrase handoff and delivery instructions before issuing.');
+    setIssuing(true);
+    setError('');
+    try {
+      let request = savedIssue;
+      if (!request) {
+        if (!signature) return setError('Add your electronic signature before issuing the referral.');
+        const uploaded = await reviewApi.uploadSignature(eventId, referral.referralId, signature);
+        request = { destinationEmail: email.trim().toLowerCase(), ...uploaded, idempotencyKey: crypto.randomUUID(), confirmed: true };
+        saveIssue(request);
+      }
+      const issued = await reviewApi.issueReferral(eventId, referral.referralId, request);
+      setResult(issued);
+    } catch (requestError) {
+      setError(apiProblem(requestError)?.title || 'The referral could not be issued. Nothing was marked as sent.');
+    } finally {
+      setIssuing(false);
+    }
+  };
+
+  if (referral.status !== 'DRAFT' || result) return <section className="referral-issuance issued" aria-labelledby="issued-referral-title">
+    <div><CheckCircleIcon /><span><strong id="issued-referral-title">Encrypted referral ready</strong><small>Version {result?.documentVersion || referral.document?.version || 1} · electronically signed</small></span></div>
+    {delivery?.status === 'SENT' || delivery?.status === 'DELIVERED'
+      ? <p className="referral-delivery-success">Email accepted for {delivery.recipient}. Delivery status: {delivery.status.toLowerCase()}.</p>
+      : delivery?.status === 'SENDING'
+        ? <p className="referral-delivery-warning">Delivery confirmation is pending. To prevent a duplicate clinical email, this referral will not be sent again automatically.</p>
+        : <p className="referral-delivery-warning">Email not sent{delivery?.failureReason === 'DELIVERY_PROVIDER_NOT_CONFIGURED' ? ': the delivery provider is not configured.' : '.'} The encrypted PDF remains available.</p>}
+    {result?.handoffSecret && <div className="referral-handoff" role="status"><strong>Securely hand off this passphrase</strong><p>It can be recovered only in this browser until {result.handoffSecretExpiresAt ? new Date(result.handoffSecretExpiresAt).toLocaleTimeString() : 'expiry'}. Share it by phone or another separate channel—never in the referral email.</p><div><code>{result.handoffSecret}</code><button className="secondary compact" type="button" disabled={acknowledging} onClick={() => void copyAndAcknowledge()}>{acknowledging ? 'Acknowledging…' : secretCopied ? 'Copied and acknowledged' : 'Copy and acknowledge'}</button></div></div>}
+    {!result?.handoffSecret && savedIssue && <button className="secondary compact" type="button" disabled={issuing} onClick={() => void recover()}>{issuing ? 'Recovering…' : 'Recover passphrase and delivery status'}</button>}
+    {!result?.handoffSecret && !savedIssue && <p>The passphrase is not stored after acknowledgement or expiry and is never included in the email.</p>}
+    {error && <div className="review-error-summary" role="alert">{error}</div>}
+    <button className="secondary" type="button" onClick={() => void download()} disabled={downloading}>{downloading ? 'Downloading…' : 'Download encrypted PDF'}</button>
+  </section>;
+
+  return <form className="referral-issuance" onSubmit={(event) => void issue(event)}>
+    <header><h4>Issue encrypted referral</h4><p>Generate the medical referral, sign it, and send the password-protected attachment.</p></header>
+    {error && <div className="review-error-summary" role="alert">{error}</div>}
+    <label className="review-field"><span>Destination email</span><input type="email" required maxLength={255} value={email} onChange={(event) => { if (savedIssue && event.target.value.trim().toLowerCase() !== savedIssue.destinationEmail) { window.sessionStorage.removeItem(storageKey); setSavedIssue(null); } setEmail(event.target.value); }} placeholder="clinic@example.com" /></label>
+    <div className="referral-signature"><span>Reviewer electronic signature</span><SignaturePad onChange={setSignature} /></div>
+    <label className="decision-confirm"><input type="checkbox" checked={confirmed} onChange={(event) => setConfirmed(event.target.checked)} /><span><strong>I confirm this referral and delivery</strong><small>A random passphrase is held in encrypted recovery escrow for 15 minutes. I will share it through a separate channel, never in the referral email.</small></span></label>
+    <button className="primary" type="submit" disabled={issuing}>{issuing ? 'Signing and issuing…' : 'Sign and issue referral'}</button>
+  </form>;
+}
+
+function ReviewedDecision({ eventId, review }: { eventId: string; review: NonNullable<ReviewDetailResponse['existingReview']> }) {
   return <section className="reviewed-decision" aria-labelledby="recorded-decision-title">
     <div className="reviewed-heading"><ShieldCheckIcon /><div><h3 id="recorded-decision-title">Decision recorded</h3><p>This clinical review is immutable and read-only.</p></div></div>
     <dl className="reviewed-fields">
@@ -209,11 +346,12 @@ function ReviewedDecision({ review }: { review: NonNullable<ReviewDetailResponse
       {review.recommendations && <div className="wide"><dt>Recommendations</dt><dd>{review.recommendations}</dd></div>}
     </dl>
     {review.referral && <div className="recorded-referral">
-      <strong>Draft referral · {review.referral.urgency}</strong>
+      <strong>Referral · {review.referral.urgency}</strong>
       <span>{review.referral.destinationName}</span>
       <p>{review.referral.reason}</p>
       {review.referral.instructions && <p>{review.referral.instructions}</p>}
     </div>}
+    {review.referral && <ReferralIssuance eventId={eventId} referral={review.referral} />}
   </section>;
 }
 
@@ -237,6 +375,9 @@ export default function ReviewWorkspacePage() {
   const [mobileDetail, setMobileDetail] = useState(Boolean(directRegistrationId));
   const errorSummaryRef = useRef<HTMLDivElement>(null);
   const detailHeadingRef = useRef<HTMLHeadingElement>(null);
+  const pendingDraftActionRef = useRef<(() => void) | null>(null);
+  const restoringHistoryRef = useRef(false);
+  const [discardDialogOpen, setDiscardDialogOpen] = useState(false);
 
   const loadQueue = useCallback(async (initial = false) => {
     if (initial) setQueueLoading(true);
@@ -281,44 +422,65 @@ export default function ReviewWorkspacePage() {
   useEffect(() => { void loadQueue(true); }, [loadQueue]);
   useEffect(() => { void loadDetail(selectedId); }, [loadDetail, selectedId]);
 
+  const requestDraftDiscard = useCallback((action: () => void) => {
+    if (!dirty) { action(); return; }
+    pendingDraftActionRef.current = action;
+    setDiscardDialogOpen(true);
+  }, [dirty]);
+
+  const closeDiscardDialog = () => {
+    pendingDraftActionRef.current = null;
+    setDiscardDialogOpen(false);
+  };
+
+  const discardDraft = () => {
+    const action = pendingDraftActionRef.current;
+    pendingDraftActionRef.current = null;
+    setDiscardDialogOpen(false);
+    setDirty(false);
+    setForm(EMPTY_FORM);
+    setFormErrors([]);
+    action?.();
+  };
+
   useEffect(() => {
     if (!dirty) return;
-    let restoringHistory = false;
     const beforeUnload = (event: BeforeUnloadEvent) => { event.preventDefault(); };
-    const beforeNavigation = (event: Event) => {
-      if (!window.confirm('Discard the unsaved clinical review draft?')) event.preventDefault();
-    };
     const anchorNavigation = (event: MouseEvent) => {
       const anchor = (event.target as Element | null)?.closest('a[href]') as HTMLAnchorElement | null;
-      if (!anchor || new URL(anchor.href).href === window.location.href) return;
-      if (!window.confirm('Discard the unsaved clinical review draft?')) event.preventDefault();
+      if (!anchor || event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey || anchor.target || anchor.hasAttribute('download')) return;
+      const target = new URL(anchor.href);
+      if (target.origin !== window.location.origin || target.href === window.location.href) return;
+      event.preventDefault();
+      requestDraftDiscard(() => navigate(`${target.pathname}${target.search}${target.hash}`));
     };
     const historyNavigation = () => {
-      if (restoringHistory) { restoringHistory = false; return; }
-      if (!window.confirm('Discard the unsaved clinical review draft?')) {
-        restoringHistory = true;
-        window.history.go(1);
-      }
+      if (restoringHistoryRef.current) { restoringHistoryRef.current = false; return; }
+      restoringHistoryRef.current = true;
+      window.history.go(1);
+      requestDraftDiscard(() => {
+        restoringHistoryRef.current = true;
+        window.history.back();
+      });
     };
     window.addEventListener('beforeunload', beforeUnload);
-    window.addEventListener('vsms:before-navigation', beforeNavigation);
     window.addEventListener('popstate', historyNavigation);
     document.addEventListener('click', anchorNavigation, true);
     return () => {
       window.removeEventListener('beforeunload', beforeUnload);
-      window.removeEventListener('vsms:before-navigation', beforeNavigation);
       window.removeEventListener('popstate', historyNavigation);
       document.removeEventListener('click', anchorNavigation, true);
     };
-  }, [dirty]);
+  }, [dirty, navigate, requestDraftDiscard]);
 
   const chooseParticipant = (item: ReviewQueueItem) => {
     if (item.registrationId === selectedId) { setMobileDetail(true); return; }
-    if (dirty && !window.confirm('Discard the unsaved clinical review draft?')) return;
-    setSelectedId(item.registrationId);
-    setMobileDetail(true);
-    if (directRegistrationId) navigate(`/events/${eventId}/reviews`, { replace: true });
-    window.setTimeout(() => detailHeadingRef.current?.focus(), 0);
+    requestDraftDiscard(() => {
+      setSelectedId(item.registrationId);
+      setMobileDetail(true);
+      if (directRegistrationId) navigate(`/events/${eventId}/reviews`, { replace: true });
+      window.setTimeout(() => detailHeadingRef.current?.focus(), 0);
+    });
   };
 
   const updateForm = <K extends keyof FormState>(key: K, value: FormState[K]) => {
@@ -378,6 +540,7 @@ export default function ReviewWorkspacePage() {
     setFormErrors([]);
     try {
       const result = await reviewApi.decide(eventId, detail.participant.registrationId, decisionRequest());
+      const reviewedRegistrationId = detail.participant.registrationId;
       const queue = queueData?.queue || [];
       const completedIndex = queue.findIndex((item) => item.registrationId === detail.participant.registrationId);
       const remaining = queue.filter((item) => item.registrationId !== detail.participant.registrationId);
@@ -385,6 +548,13 @@ export default function ReviewWorkspacePage() {
       setAnnouncement(`${result.review.outcome.replace(/_/g, ' ')} decision recorded for ${detail.participant.participantDisplayName}.`);
       setDirty(false);
       setForm(EMPTY_FORM);
+      if (result.referral) {
+        setSelectedId(reviewedRegistrationId);
+        setMobileDetail(true);
+        await loadDetail(reviewedRegistrationId);
+        navigate(`/events/${eventId}/reviews/${reviewedRegistrationId}`, { replace: true });
+        return;
+      }
       const next = remaining[Math.min(Math.max(completedIndex, 0), Math.max(remaining.length - 1, 0))];
       setSelectedId(next?.registrationId || '');
       setDetail(next ? detail : null);
@@ -427,8 +597,7 @@ export default function ReviewWorkspacePage() {
     document.title = title;
   };
   const exitConsole = () => {
-    const event = new CustomEvent('vsms:before-navigation', { cancelable: true });
-    if (window.dispatchEvent(event)) navigate(`/events/${eventId}`);
+    requestDraftDiscard(() => navigate(`/events/${eventId}`));
   };
 
   if (accessState) return <div className="review-gate-state">
@@ -444,22 +613,17 @@ export default function ReviewWorkspacePage() {
   </div>;
 
   return <div className="clinical-console">
-    <header className="clinical-console-bar">
-      <button className="clinical-console-exit" type="button" onClick={exitConsole}><ArrowLeftIcon />Exit console</button>
-      <div className="clinical-console-identity">
-        <span className="clinical-console-mark"><ClipboardDocumentCheckIcon /></span>
-        <div><strong>Clinical review console</strong><span>{eventName}</span></div>
-      </div>
-      <div className="clinical-console-actions">
-        <button className="clinical-console-bypass" type="button" onClick={openWithoutQr} disabled={queueLoading || queueItems.length === 0}><QrCodeIcon />Temporary: open without QR</button>
-        <div className="clinical-console-status"><span aria-hidden="true" />Event live</div>
-      </div>
-    </header>
-
-    <main className={`review-page ${mobileDetail ? 'show-detail' : ''}`}>
+    <section className={`review-page ${mobileDetail ? 'show-detail' : ''}`}>
       <header className="review-page-heading">
-      <div><span>Clinical review · {eventName}</span><h1>Actionable participant queue</h1><p>Screening flags are rule recommendations. The reviewer makes the final clinical decision.</p></div>
-      <button className="secondary" type="button" onClick={() => void loadQueue()} disabled={refreshing}><ArrowPathIcon className={refreshing ? 'is-spinning' : ''} />{refreshing ? 'Refreshing…' : 'Refresh queue'}</button>
+        <div className="review-heading-copy">
+          <button className="review-heading-back" type="button" onClick={exitConsole}><ArrowLeftIcon />Back to event</button>
+          <div className="review-heading-title"><h1>Clinical review</h1><span className="clinical-console-status"><i aria-hidden="true" />Event live</span></div>
+          <p><strong>{eventName}</strong> · Screening flags are rule recommendations. The reviewer makes the final clinical decision.</p>
+        </div>
+        <div className="review-heading-actions">
+          <button className="secondary" type="button" onClick={openWithoutQr} disabled={queueLoading || queueItems.length === 0}><QrCodeIcon />Open without QR</button>
+          <button className="secondary" type="button" onClick={() => void loadQueue()} disabled={refreshing}><ArrowPathIcon className={refreshing ? 'is-spinning' : ''} />{refreshing ? 'Refreshing…' : 'Refresh queue'}</button>
+        </div>
       </header>
 
       <div className="review-announcer" role="status" aria-live="polite">{announcement}</div>
@@ -483,13 +647,13 @@ export default function ReviewWorkspacePage() {
         {detailLoading ? <DetailSkeleton /> : detailError ? <div className="review-detail-state" role="alert"><ExclamationCircleIcon /><h2>Participant unavailable</h2><p>{detailError}</p><button className="secondary" type="button" onClick={() => void loadDetail(selectedId)}>Retry</button></div> : !detail ? <div className="review-detail-state"><UserIcon /><h2>Select a participant</h2><p>Choose an actionable participant from the queue to inspect screening results and record a decision.</p></div> : <>
           <header className="review-participant-heading">
             <div><span>{detail.participant.queueNumber == null ? 'Unnumbered registration' : `Queue ${detail.participant.queueNumber}`}</span><h2 ref={detailHeadingRef} tabIndex={-1}>{detail.participant.participantDisplayName}</h2></div>
-            <div className="review-participant-actions"><FlagBadge flag={detail.readiness.highestFlag} /><button className="secondary" type="button" onClick={downloadReport}><ArrowDownTrayIcon />Download PDF report</button></div>
+            <div className="review-participant-actions"><FlagBadge flag={detail.readiness.highestFlag} /><button className="secondary" type="button" onClick={downloadReport}><ArrowDownTrayIcon />Print clinical report</button></div>
           </header>
 
           <dl className="review-participant-facts">
             <div><IdentificationIcon /><dt>NRIC</dt><dd>{detail.participant.maskedNric}</dd></div>
             <div><ClockIcon /><dt>Date of birth</dt><dd>{new Date(`${detail.participant.dateOfBirth}T00:00:00`).toLocaleDateString()}</dd></div>
-            <div><UserIcon /><dt>Gender</dt><dd>{detail.participant.gender}</dd></div>
+            <div><UserIcon /><dt>Gender</dt><dd>{genderLabel(detail.participant.gender)}</dd></div>
           </dl>
 
           <section className="screening-summary" aria-labelledby="screening-summary-title">
@@ -503,7 +667,7 @@ export default function ReviewWorkspacePage() {
             </div>
           </section>
 
-          {detail.existingReview ? <ReviewedDecision review={detail.existingReview} /> : !detail.readiness.ready ? <div className="review-not-ready" role="status"><ClockIcon /><div><strong>Not ready for a decision</strong><p>Complete all active stations or record an urgent station result first.</p></div></div> : <form className="decision-form" noValidate onSubmit={(event) => void submitDecision(event)}>
+          {detail.existingReview ? <ReviewedDecision eventId={eventId} review={detail.existingReview} /> : !detail.readiness.ready ? <div className="review-not-ready" role="status"><ClockIcon /><div><strong>Not ready for a decision</strong><p>Complete all active stations or record an urgent station result first.</p></div></div> : <form className="decision-form" noValidate onSubmit={(event) => void submitDecision(event)}>
             <div className="review-section-heading"><div><h3>Reviewer notes and decision</h3><p>One immutable decision completes this registration.</p></div></div>
 
             {formErrors.length > 0 && <div className="review-error-summary" role="alert" tabIndex={-1} ref={errorSummaryRef}><ExclamationCircleIcon /><div><strong>Review the following</strong><ul>{formErrors.map((error) => <li key={error}>{error}</li>)}</ul></div></div>}
@@ -527,7 +691,18 @@ export default function ReviewWorkspacePage() {
         </>}
       </section>
       </div>
-    </main>
+    </section>
+    <AppDialog
+      open={discardDialogOpen}
+      onOpenChange={(open) => { if (!open) closeDiscardDialog(); }}
+      title="Discard clinical review draft?"
+      description="Your notes and unrecorded decision will be removed."
+    >
+      <div className="app-dialog-actions">
+        <button className="secondary" type="button" data-dialog-autofocus onClick={closeDiscardDialog}>Keep editing</button>
+        <button className="danger-button" type="button" onClick={discardDraft}>Discard draft</button>
+      </div>
+    </AppDialog>
     {detail && <ParticipantReport detail={detail} />}
   </div>;
 }

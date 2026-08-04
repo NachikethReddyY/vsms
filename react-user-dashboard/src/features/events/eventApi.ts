@@ -12,6 +12,8 @@ export type StationTemplate = components['schemas']['StationTemplate'];
 export type EventStation = components['schemas']['EventStation'];
 export type CreateEvent = components['schemas']['CreateEventRequest'];
 export type UpdateEvent = components['schemas']['UpdateEventRequest'];
+export type EventDeletionRequest = components['schemas']['EventDeletionRequest'];
+export type EventDeletionResponse = components['schemas']['EventDeletionResponse'];
 export type AuditRecord = components['schemas']['EventAuditLog'];
 export type LocationResult = components['schemas']['LocationResult'];
 
@@ -38,6 +40,10 @@ export const eventApi = {
   },
   async cancel(id: string, version: number, reason: string) {
     const { data } = await apiClient.post<EventRecord>(`/events/${id}/cancel`, { version, reason });
+    return data;
+  },
+  async delete(id: string, input: EventDeletionRequest) {
+    const { data } = await apiClient.delete<EventDeletionResponse>(`/events/${id}`, { data: input });
     return data;
   },
   async staffDirectory() {
