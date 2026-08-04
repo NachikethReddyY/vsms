@@ -151,7 +151,7 @@ paths:
     post:
       tags: [Authentication]
       operationId: logout
-      summary: Sign out from Cognito and clear browser cookies
+      summary: Clear the local browser session and finish the hosted Cognito logout
       responses:
         "200":
           description: Browser session cleared
@@ -162,12 +162,14 @@ paths:
     post:
       tags: [Authentication]
       operationId: globalLogout
-      summary: Alias for Cognito sign-out and local cookie clearing
+      summary: Revoke Cognito sessions everywhere and clear local browser cookies
       responses:
         "200":
-          description: Browser session cleared
+          description: Cognito sessions revoked and browser session cleared
           content: { application/json: { schema: { $ref: "#/components/schemas/LogoutResponse" } } }
+        "401": { $ref: "#/components/responses/Unauthorized" }
         "403": { $ref: "#/components/responses/Forbidden" }
+        "502": { description: Cognito global sign-out could not be completed }
         "503": { description: Cognito managed login is not configured }
   /api/v1/auth/me:
     get:

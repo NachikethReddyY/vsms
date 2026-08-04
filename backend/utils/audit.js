@@ -1,5 +1,5 @@
 const crypto = require("crypto");
-const { v4: uuidv4 } = require("uuid");
+const { v4: uuidv4, validate: isUuid } = require("uuid");
 const prisma = require("../prisma/prismaClient");
 const { sanitizeMetadata } = require("./sanitize");
 
@@ -21,7 +21,7 @@ function hashIdentifier(identifier) {
 
 async function resolveAuditContext({ userId, context, client = prisma }) {
     const requestedDeviceId = typeof context === "object" ? context?.deviceId : null;
-    const device = requestedDeviceId && userId ? await client.device.findFirst({
+    const device = requestedDeviceId && isUuid(requestedDeviceId) && userId ? await client.device.findFirst({
         where: { id: requestedDeviceId, userId, status: "ACTIVE" },
         select: { id: true },
     }) : null;
@@ -42,22 +42,7 @@ async function createAuthAuditLog({
     context,
     client = prisma,
 }) {
-    if (context.deviceId) {
-        await client.device.upsert({
-            where: { id: context.deviceId },
-            update: {
-                ...(userId ? { userId } : {}),
-                deviceName: trimValue(context.deviceName || "VSMS staff web", 100),
-                lastSeenAt: new Date(),
-            },
-            create: {
-                id: context.deviceId,
-                userId,
-                deviceName: trimValue(context.deviceName || "VSMS staff web", 100),
-                lastSeenAt: new Date(),
-            },
-        });
-    }
+    const auditContext = await resolveAuditContext({ userId, context, client });
     return client.authAuditLog.create({
         data: {
             userId,
@@ -65,10 +50,10 @@ async function createAuthAuditLog({
             outcome,
             failureCategory: trimValue(failureCategory, 50),
             identifierHash: hashIdentifier(identifier),
-            ipAddress: context.ipAddress,
-            userAgent: trimValue(context.userAgent, 500),
-            requestId: context.requestId,
-            deviceId: context.deviceId,
+            ipAddress: auditContext.ipAddress,
+            userAgent: trimValue(context?.userAgent, 500),
+            requestId: auditContext.requestId,
+            deviceId: auditContext.deviceId,
         },
     });
 }
