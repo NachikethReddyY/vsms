@@ -853,7 +853,7 @@ const transitionEvent = async (eventId, command, body, user, correlationId) => {
   }
   return prisma.$transaction(async (tx) => {
     const changed = await tx.event.updateMany({
-      where: { id: eventId, version: body.version, status: transition.from },
+      where: { eventId, version: body.version, status: transition.from },
       data: { status: transition.to, version: { increment: 1 } },
     });
     if (changed.count !== 1) throw new AppError(409, "STALE_EVENT_VERSION", "This event was changed by someone else");
@@ -865,7 +865,7 @@ const transitionEvent = async (eventId, command, body, user, correlationId) => {
     }
 
     const updated = await tx.event.findUniqueOrThrow({
-      where: { id: eventId },
+      where: { eventId },
       include: eventInclude,
     });
 
@@ -882,7 +882,7 @@ const transitionEvent = async (eventId, command, body, user, correlationId) => {
       },
     });
 
-    return toEventResponse(updated);
+    return toEventResponse(updated, user, tx);
   });
 };
 
@@ -901,7 +901,7 @@ const cancelEvent = async (eventId, body, user, correlationId) => {
   }
   return prisma.$transaction(async (tx) => {
     const changed = await tx.event.updateMany({
-      where: { id: eventId, version: body.version, status: current.status },
+      where: { eventId, version: body.version, status: current.status },
       data: {
         status: "CANCELLED",
         cancellationReason: body.reason,
@@ -925,7 +925,7 @@ const cancelEvent = async (eventId, body, user, correlationId) => {
     });
 
     const updated = await tx.event.findUniqueOrThrow({
-      where: { id: eventId },
+      where: { eventId },
       include: eventInclude,
     });
 
@@ -942,7 +942,7 @@ const cancelEvent = async (eventId, body, user, correlationId) => {
       },
     });
 
-    return toEventResponse(updated);
+    return toEventResponse(updated, user, tx);
   });
 };
 
@@ -1088,12 +1088,58 @@ const updateStation = async (eventId, eventStationId, body, user, correlationId)
   });
 };
 
-const addStaffAssignment = async () => {
-  throw new AppError(
-    501,
-    "STAFF_ASSIGNMENT_NOT_AVAILABLE",
-    "Staff assignment via this endpoint is not available yet",
-  );
+const addStaffAssignment = async (eventId, shiftId, body, user, correlationId) => {
+  const current = await requireEvent(eventId, user, true);
+  if (!["DRAFT", "PUBLISHED", "IN_PROGRESS"].includes(current.status)) {
+    throw new AppError(409, "STAFFING_NOT_EDITABLE", "Staffing cannot be changed for a completed or cancelled event");
+  }
+  const shift = current.shifts.find((candidate) => candidate.shiftId === shiftId);
+  if (!shift) throw new AppError(404, "SHIFT_NOT_FOUND", "Shift was not found");
+  const station = body.eventStationId
+    ? current.stations.find((candidate) => candidate.stationId === body.eventStationId && candidate.isActive)
+    : null;
+  if (body.eventStationId && !station) {
+    throw new AppError(422, "STATION_NOT_AVAILABLE", "The selected event station is unavailable");
+  }
+
+  return prisma.$transaction(async (tx) => {
+    await bumpEventVersion(tx, eventId, body.version);
+    await lockStaffSchedules(tx, [body.userId]);
+
+    const activeUser = await tx.user.findFirst({
+      where: { id: body.userId, status: "ACTIVE" },
+      select: { id: true },
+    });
+    if (!activeUser) throw new AppError(422, "STAFF_NOT_AVAILABLE", "The selected staff member is unavailable");
+
+    const conflict = await tx.staffAssignment.findFirst({
+      where: {
+        userId: body.userId,
+        status: { in: ACTIVE_ASSIGNMENT_STATUSES },
+        shift: { startsAt: { lt: shift.endsAt }, endsAt: { gt: shift.startsAt } },
+      },
+      select: { id: true },
+    });
+    if (conflict) throw scheduleConflictError();
+
+    await tx.staffAssignment.create({
+      data: {
+        eventId,
+        shiftId,
+        userId: body.userId,
+        stationId: station?.stationId || null,
+        assignedBy: user.userId,
+        assignmentRole: body.assignmentRole,
+        notes: body.notes || null,
+        assignmentStatus: "ASSIGNED",
+        status: "ASSIGNED",
+      },
+    });
+
+    const updated = await tx.event.findUniqueOrThrow({ where: { eventId }, include: eventInclude });
+    await auditUpdate(tx, current, updated, user, correlationId);
+    return toEventResponse(updated, user, tx);
+  });
 };
 
 const removeStaffAssignment = async (eventId, shiftId, assignmentId, version, user, correlationId) => {
@@ -1103,10 +1149,11 @@ const removeStaffAssignment = async (eventId, shiftId, assignmentId, version, us
   }
   const assignment = current.shifts
     .find((shift) => shift.shiftId === shiftId)
-    ?.staffAssignments.find((candidate) => candidate.staffAssignmentId === assignmentId);
+    ?.staffAssignments.find((candidate) => candidate.id === assignmentId);
   if (!assignment) throw new AppError(404, "ASSIGNMENT_NOT_FOUND", "Staff assignment was not found");
 
   return prisma.$transaction(async (tx) => {
+    await bumpEventVersion(tx, eventId, version);
     const assignment = await tx.staffAssignment.findFirst({
       where: { id: assignmentId, shiftId, shift: { eventId } },
       select: { id: true },
@@ -1125,11 +1172,12 @@ const removeStaffAssignment = async (eventId, shiftId, assignmentId, version, us
     });
 
     const updated = await tx.event.findUniqueOrThrow({
-      where: { id: eventId },
+      where: { eventId },
       include: eventInclude,
     });
 
-    return toEventResponse(updated);
+    await auditUpdate(tx, current, updated, user, correlationId);
+    return toEventResponse(updated, user, tx);
   });
 };
 
