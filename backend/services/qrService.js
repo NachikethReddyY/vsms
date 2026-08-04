@@ -1,37 +1,95 @@
 const QRCode = require("qrcode");
 const crypto = require("crypto");
-const os = require("os");
 const prisma = require("../prisma/prismaClient");
-const { encrypt } = require("../utils/cryptoUtils");
+const env = require("../config/env");
+const { decrypt, encrypt, encryptionContext } = require("../utils/cryptoUtils");
 const AppError = require("../errors/AppError");
 
-/**
- * Helper: Detects local IPv4 for local network testing.
- */
-function getLocalIpAddress() {
-    const interfaces = os.networkInterfaces();
-    for (const name of Object.keys(interfaces)) {
-        for (const net of interfaces[name]) {
-            if (net.family === "IPv4" && !net.internal) {
-                return net.address;
-            }
-        }
-    }
-    return "localhost";
-}
-
-/**
- * Helper: Constructs target URL encoded inside QR image.
- */
 function buildQRTargetUrl(token) {
-    const hostIp = getLocalIpAddress();
-    const frontendPort = process.env.FRONTEND_PORT || 3000;
-    return `http://${hostIp}:${frontendPort}/participant-status/${token}`;
+    return `${env.publicAppOrigin}/participant-status/${encodeURIComponent(token)}`;
 }
 
 function hashToken(token) {
     return crypto.createHash("sha256").update(token).digest("hex");
 }
+
+const activeQrWhere = (selector = {}, now = new Date()) => ({
+    ...selector,
+    isActive: true,
+    expiresAt: { gt: now },
+});
+
+const tokenSelector = (token) => ({ tokenHash: hashToken(token) });
+
+const qrTokenContext = (qrId) => encryptionContext("QRCodePass", qrId, "token");
+
+const decryptQrToken = (qr) => {
+    if (qr.tokenEncryptionVersion !== 2 || !qr.tokenCiphertext) {
+        throw new AppError(410, "QR_REISSUE_REQUIRED", "This QR pass must be reissued before it can be rendered.");
+    }
+    try {
+        return decrypt(qr.tokenCiphertext, qrTokenContext(qr.id));
+    } catch {
+        throw new AppError(410, "QR_REISSUE_REQUIRED", "This QR pass must be reissued before it can be rendered.");
+    }
+};
+
+const safeQrRecord = (qr) => ({
+    id: qr.id,
+    registrationId: qr.registrationId,
+    expiresAt: qr.expiresAt,
+    issuedAt: qr.issuedAt,
+    isActive: qr.isActive,
+    revokedAt: qr.revokedAt,
+    revokedBy: qr.revokedBy,
+    revokedReason: qr.revokedReason,
+});
+
+const lockRegistrationForQrIssuance = async (tx, registrationId) => {
+    if (typeof tx.$queryRaw !== "function") return;
+    const rows = await tx.$queryRaw`
+        SELECT registration_id
+        FROM event_registrations
+        WHERE registration_id = CAST(${registrationId} AS uuid)
+        FOR UPDATE
+    `;
+    if (Array.isArray(rows) && rows.length === 0) {
+        throw new AppError(404, "REGISTRATION_NOT_FOUND", "Event registration not found.");
+    }
+};
+
+const renderQr = async (qr, token) => ({
+    qrId: qr.id,
+    registrationId: qr.registrationId,
+    issuedAt: qr.issuedAt,
+    expiresAt: qr.expiresAt,
+    qrImage: await QRCode.toDataURL(buildQRTargetUrl(token), {
+        errorCorrectionLevel: "H",
+        margin: 2,
+        width: 300,
+    }),
+});
+
+exports.getEventIdForAccess = async ({ eventId, registrationId, qrId, token }, db = prisma) => {
+    let resolvedEventId = null;
+    if (registrationId) {
+        resolvedEventId = (await db.eventRegistration.findUnique({
+            where: { registrationId },
+            select: { eventId: true },
+        }))?.eventId;
+    } else if (qrId || token) {
+        resolvedEventId = (await db.qRCodePass.findFirst({
+            where: activeQrWhere(qrId ? { id: qrId } : tokenSelector(token)),
+            select: { registration: { select: { eventId: true } } },
+        }))?.registration?.eventId;
+    } else if (eventId) {
+        resolvedEventId = eventId;
+    }
+
+    if (!resolvedEventId) throw new AppError(404, "REGISTRATION_NOT_FOUND", "Registration event was not found.");
+    if (eventId && resolvedEventId !== eventId) throw new AppError(400, "QR_EVENT_MISMATCH", "QR Code is not valid for this specific event.");
+    return resolvedEventId;
+};
 
 /**
  * Audit Logger Helper conforming to unified schema
@@ -63,18 +121,13 @@ exports.generateRegistrationQR = async (registrationId, userId) => {
 // ==========================================
 // Get Registration By QR (Compatibility Endpoint)
 // ==========================================
-exports.getRegistrationByQR = async (token) => {
+exports.getRegistrationByQR = async (token, db = prisma) => {
     if (!token) {
         throw new AppError(400, "TOKEN_REQUIRED", "QR Token is required.");
     }
 
-    const qr = await prisma.qRCodePass.findFirst({
-        where: {
-            OR: [
-                { token },
-                { tokenHash: hashToken(token) },
-            ],
-        },
+    const qr = await db.qRCodePass.findFirst({
+        where: activeQrWhere(tokenSelector(token)),
         include: {
             registration: {
                 include: { participant: true, event: true },
@@ -98,6 +151,9 @@ exports.generateQR = async (registrationId, userId = null, externalTx = null) =>
     }
 
     const execute = async (tx) => {
+        // Serialize first issuance on the registration row so concurrent calls
+        // converge on one active pass.
+        await lockRegistrationForQrIssuance(tx, registrationId);
         const registration = await tx.eventRegistration.findUnique({
             where: { registrationId },
             include: { participant: true, event: true },
@@ -107,14 +163,36 @@ exports.generateQR = async (registrationId, userId = null, externalTx = null) =>
             throw new AppError(404, "REGISTRATION_NOT_FOUND", "Event registration not found.");
         }
 
+        const now = new Date();
+        const existing = await tx.qRCodePass.findFirst({
+            where: activeQrWhere({ registrationId }, now),
+            orderBy: { issuedAt: "desc" },
+        });
+        if (existing) return renderQr(existing, decryptQrToken(existing));
+
+        const qrId = crypto.randomUUID();
         const token = crypto.randomBytes(32).toString("hex");
         const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 Hours
 
+        await tx.qRCodePass.updateMany({
+            // Expired rows can still have is_active=true and therefore occupy
+            // the database partial-unique slot.
+            where: { registrationId, isActive: true },
+            data: {
+                isActive: false,
+                revokedAt: now,
+                revokedBy: userId,
+                revokedReason: "Superseded by a newly generated QR pass",
+            },
+        });
+
         const qrRecord = await tx.qRCodePass.create({
             data: {
+                id: qrId,
                 registrationId,
-                token,
                 tokenHash: hashToken(token),
+                tokenCiphertext: encrypt(token, qrTokenContext(qrId)),
+                tokenEncryptionVersion: 2,
                 expiresAt,
                 isActive: true,
             },
@@ -128,22 +206,7 @@ exports.generateQR = async (registrationId, userId = null, externalTx = null) =>
             newValue: { registrationId, expiresAt },
         });
 
-        const targetUrl = buildQRTargetUrl(token);
-        const qrImage = await QRCode.toDataURL(targetUrl, {
-            errorCorrectionLevel: "H",
-            margin: 2,
-            width: 300,
-        });
-
-        return {
-            qrId: qrRecord.id,
-            registrationId,
-            token,
-            targetUrl,
-            issuedAt: qrRecord.issuedAt,
-            expiresAt: qrRecord.expiresAt,
-            qrImage,
-        };
+        return renderQr({ ...qrRecord, registrationId }, token);
     };
 
     return externalTx ? execute(externalTx) : prisma.$transaction(execute);
@@ -152,19 +215,14 @@ exports.generateQR = async (registrationId, userId = null, externalTx = null) =>
 // ==========================================
 // Verify QR Pass Token
 // ==========================================
-exports.verifyQR = async (token, eventId = null, userId = null) => {
+exports.verifyQR = async (token, eventId = null, userId = null, db = prisma) => {
     if (!token) {
         throw new AppError(400, "TOKEN_REQUIRED", "QR Token is required.");
     }
 
-    return await prisma.$transaction(async (tx) => {
+    return await db.$transaction(async (tx) => {
         const qr = await tx.qRCodePass.findFirst({
-            where: {
-                OR: [
-                    { token },
-                    { tokenHash: hashToken(token) },
-                ],
-            },
+            where: activeQrWhere(tokenSelector(token)),
             include: {
                 registration: {
                     include: { participant: true, event: true },
@@ -172,9 +230,7 @@ exports.verifyQR = async (token, eventId = null, userId = null) => {
             },
         });
 
-        if (!qr) throw new AppError(404, "INVALID_QR", "QR Code is invalid or does not exist.");
-        if (!qr.isActive) throw new AppError(400, "QR_REVOKED", "QR Code has been revoked.");
-        if (new Date() > qr.expiresAt) throw new AppError(400, "QR_EXPIRED", "QR Code has expired.");
+        if (!qr) throw new AppError(404, "INVALID_QR", "QR Code is invalid, expired, or unavailable.");
         if (eventId && qr.registration.eventId !== eventId) {
             throw new AppError(400, "QR_EVENT_MISMATCH", "QR Code is not valid for this specific event.");
         }
@@ -208,20 +264,13 @@ exports.verifyQR = async (token, eventId = null, userId = null) => {
 // ==========================================
 // Get Active Participant Info by QR Token
 // ==========================================
-exports.getParticipant = async (token) => {
+exports.getParticipant = async (token, db = prisma) => {
     if (!token) {
         throw new AppError(400, "TOKEN_REQUIRED", "QR Token is required.");
     }
 
-    const qr = await prisma.qRCodePass.findFirst({
-        where: {
-            OR: [
-                { token },
-                { tokenHash: hashToken(token) },
-            ],
-            isActive: true,
-            expiresAt: { gt: new Date() },
-        },
+    const qr = await db.qRCodePass.findFirst({
+        where: activeQrWhere(tokenSelector(token)),
         include: {
             registration: {
                 include: { participant: true, event: true },
@@ -247,26 +296,28 @@ exports.getParticipant = async (token) => {
 // ==========================================
 // Revoke Active QR Code
 // ==========================================
-exports.revokeQR = async (qrId, revokedReason = "Revoked by staff", revokedBy = null) => {
+exports.revokeQR = async (qrId, revokedReason = "Revoked by staff", revokedBy = null, db = prisma) => {
     if (!qrId) {
         throw new AppError(400, "QR_ID_REQUIRED", "QR ID is required.");
     }
 
-    return await prisma.$transaction(async (tx) => {
-        const qr = await tx.qRCodePass.findUnique({ where: { id: qrId } });
+    return await db.$transaction(async (tx) => {
+        const now = new Date();
+        const qr = await tx.qRCodePass.findFirst({ where: activeQrWhere({ id: qrId }, now) });
 
-        if (!qr) throw new AppError(404, "QR_NOT_FOUND", "QR Code not found.");
-        if (!qr.isActive) throw new AppError(400, "QR_ALREADY_REVOKED", "QR Code is already revoked.");
+        if (!qr) throw new AppError(404, "QR_NOT_FOUND", "QR Code is invalid, expired, or unavailable.");
 
-        const updatedQr = await tx.qRCodePass.update({
-            where: { id: qrId },
+        const updated = await tx.qRCodePass.updateMany({
+            where: activeQrWhere({ id: qrId }, now),
             data: {
                 isActive: false,
-                revokedAt: new Date(),
+                revokedAt: now,
                 revokedBy,
                 revokedReason,
             },
         });
+        if (updated.count !== 1) throw new AppError(409, "QR_STATE_CONFLICT", "QR Code is no longer active.");
+        const updatedQr = await tx.qRCodePass.findUnique({ where: { id: qrId } });
 
         await writeAudit(tx, {
             userId: revokedBy,
@@ -276,25 +327,27 @@ exports.revokeQR = async (qrId, revokedReason = "Revoked by staff", revokedBy = 
             newValue: { reason: revokedReason },
         });
 
-        return updatedQr;
+        return safeQrRecord(updatedQr);
     });
 };
 
 // ==========================================
 // Reissue QR Code
 // ==========================================
-exports.reissueQR = async (registrationId, userId = null) => {
+exports.reissueQR = async (registrationId, userId = null, db = prisma) => {
     if (!registrationId) {
         throw new AppError(400, "REGISTRATION_ID_REQUIRED", "Registration ID is required.");
     }
 
-    return await prisma.$transaction(async (tx) => {
+    return await db.$transaction(async (tx) => {
+        const now = new Date();
+        await lockRegistrationForQrIssuance(tx, registrationId);
         // 1. Deactivate existing passes
         await tx.qRCodePass.updateMany({
             where: { registrationId, isActive: true },
             data: {
                 isActive: false,
-                revokedAt: new Date(),
+                revokedAt: now,
                 revokedBy: userId,
                 revokedReason: "Reissued new QR code",
             },
@@ -316,53 +369,37 @@ exports.reissueQR = async (registrationId, userId = null) => {
 // ==========================================
 // Download QR Image
 // ==========================================
-exports.downloadQR = async (qrId) => {
+exports.downloadQR = async (qrId, db = prisma) => {
     if (!qrId) {
         throw new AppError(400, "QR_ID_REQUIRED", "QR ID is required.");
     }
 
-    const qr = await prisma.qRCodePass.findUnique({ where: { id: qrId } });
-    if (!qr) throw new AppError(404, "QR_NOT_FOUND", "QR Code not found.");
+    const qr = await db.qRCodePass.findFirst({ where: activeQrWhere({ id: qrId }) });
+    if (!qr) throw new AppError(404, "QR_NOT_FOUND", "QR Code is invalid, expired, or unavailable.");
 
-    const targetUrl = buildQRTargetUrl(qr.token);
-    const qrImage = await QRCode.toDataURL(targetUrl, {
+    const qrImage = await QRCode.toDataURL(buildQRTargetUrl(decryptQrToken(qr)), {
         errorCorrectionLevel: "H",
         margin: 2,
         width: 600,
     });
 
-    return { qrId: qr.id, targetUrl, qrImage };
+    return { qrId: qr.id, expiresAt: qr.expiresAt, qrImage };
 };
 
 // ==========================================
 // Print QR Helper
 // ==========================================
-exports.printQR = async (qrId) => {
+exports.printQR = async (qrId, db = prisma) => {
     if (!qrId) {
         throw new AppError(400, "QR_ID_REQUIRED", "QR ID is required.");
     }
-    return await exports.downloadQR(qrId);
-};
-
-// ==========================================
-// Get All Passes for a Participant
-// ==========================================
-exports.getParticipantQRCodes = async (participantId) => {
-    if (!participantId) {
-        throw new AppError(400, "PARTICIPANT_ID_REQUIRED", "Participant ID is required.");
-    }
-
-    return await prisma.qRCodePass.findMany({
-        where: { registration: { participantId } },
-        orderBy: { issuedAt: "desc" },
-        include: { registration: { include: { event: true } } },
-    });
+    return exports.downloadQR(qrId, db);
 };
 
 // ==========================================
 // Manual Check-In Procedure
 // ==========================================
-exports.manualCheckIn = async (params) => {
+exports.manualCheckIn = async (params, db = prisma) => {
     const { registrationId, identifier, eventId, userId } =
         typeof params === "object" ? params : { registrationId: params };
 
@@ -370,20 +407,27 @@ exports.manualCheckIn = async (params) => {
         throw new AppError(400, "IDENTIFIER_REQUIRED", "Registration ID or Identifier is required.");
     }
 
-    return await prisma.$transaction(async (tx) => {
+    return await db.$transaction(async (tx) => {
         let regIdToUpdate = registrationId;
 
         if (!regIdToUpdate && identifier) {
             // Step A: Search by QR Token
             const qr = await tx.qRCodePass.findFirst({
-                where: { token: identifier },
+                where: activeQrWhere(tokenSelector(identifier)),
+                select: {
+                    registrationId: true,
+                    registration: { select: { eventId: true } },
+                },
             });
 
             if (qr) {
+                if (eventId && qr.registration.eventId !== eventId) {
+                    throw new AppError(400, "QR_EVENT_MISMATCH", "QR Code is not valid for this specific event.");
+                }
                 regIdToUpdate = qr.registrationId;
             } else {
                 // Step B: Search by Encrypted NRIC
-                const encryptedIdentifier = encrypt(identifier);
+                const encryptedIdentifier = encrypt(identifier, encryptionContext("ManualCheckIn", eventId || "unscoped", "identifier"));
                 const participant = await tx.participant.findFirst({
                     where: { nric: encryptedIdentifier },
                 });
@@ -404,8 +448,19 @@ exports.manualCheckIn = async (params) => {
             throw new AppError(404, "REGISTRATION_NOT_FOUND", "Registration record not found for manual check-in.");
         }
 
+        const registration = await tx.eventRegistration.findFirst({
+            where: {
+                registrationId: regIdToUpdate,
+                ...(eventId ? { eventId } : {}),
+            },
+            select: { registrationId: true },
+        });
+        if (!registration) {
+            throw new AppError(404, "REGISTRATION_NOT_FOUND", "Registration record was not found for this event.");
+        }
+
         const updatedRegistration = await tx.eventRegistration.update({
-            where: { registrationId: regIdToUpdate },
+            where: { registrationId: registration.registrationId },
             data: {
                 checkedIn: true,
                 checkedInAt: new Date(),

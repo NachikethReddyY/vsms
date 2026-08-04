@@ -1,11 +1,20 @@
 const qrService = require("../services/qrService");
+const prisma = require("../prisma/prismaClient");
+const { assertRegistrationAssignment } = require("../utils/staff");
+
+async function assertQrAccess(req, selectors) {
+    const eventId = await qrService.getEventIdForAccess(selectors);
+    await assertRegistrationAssignment(prisma, eventId, req.auth);
+    return eventId;
+}
 
 // Registration-module compatibility endpoint
 exports.generateRegistrationQR = async (req, res, next) => {
     try {
+        await assertQrAccess(req, { registrationId: req.params.registrationId });
         const qr = await qrService.generateRegistrationQR(
             req.params.registrationId,
-            req.user?.id || req.auth?.userId
+            req.auth.userId
         );
         const { token: _token, ...safeQr } = qr;
         return res.status(201).json(safeQr);
@@ -16,6 +25,7 @@ exports.generateRegistrationQR = async (req, res, next) => {
 
 exports.getRegistrationByQR = async (req, res, next) => {
     try {
+        await assertQrAccess(req, { token: req.params.token });
         const result = await qrService.getRegistrationByQR(req.params.token);
         return res.json({ registration: result });
     } catch (err) {
@@ -30,7 +40,8 @@ exports.getRegistrationByQR = async (req, res, next) => {
 exports.generateQR = async (req, res, next) => {
     try {
         const { registrationId } = req.params;
-        const userId = req.user?.id;
+        const userId = req.auth.userId;
+        await assertQrAccess(req, { registrationId });
 
         const qr = await qrService.generateQR(registrationId, userId);
         const { token: _token, ...safeQr } = qr;
@@ -52,7 +63,8 @@ exports.generateQR = async (req, res, next) => {
 exports.verifyQR = async (req, res, next) => {
     try {
         const { token, eventId } = req.body;
-        const userId = req.user?.id;
+        const userId = req.auth.userId;
+        await assertQrAccess(req, { token, eventId });
 
         const result = await qrService.verifyQR(token, eventId, userId);
 
@@ -72,6 +84,7 @@ exports.verifyQR = async (req, res, next) => {
 exports.getParticipantByQR = async (req, res, next) => {
     try {
         const { token } = req.params;
+        await assertQrAccess(req, { token });
         const participant = await qrService.getParticipant(token);
 
         return res.status(200).json({
@@ -91,7 +104,8 @@ exports.revokeQR = async (req, res, next) => {
     try {
         const { qrId } = req.params;
         const { revokedReason } = req.body;
-        const revokedBy = req.body.revokedBy || req.user?.id;
+        const revokedBy = req.auth.userId;
+        await assertQrAccess(req, { qrId });
 
         const qr = await qrService.revokeQR(qrId, revokedReason, revokedBy);
 
@@ -112,14 +126,16 @@ exports.revokeQR = async (req, res, next) => {
 exports.reissueQR = async (req, res, next) => {
     try {
         const { registrationId } = req.params;
-        const userId = req.user?.id;
+        const userId = req.auth.userId;
+        await assertQrAccess(req, { registrationId });
 
         const qr = await qrService.reissueQR(registrationId, userId);
+        const { token: _token, ...safeQr } = qr;
 
         return res.status(201).json({
             success: true,
             message: "QR Code reissued successfully.",
-            data: qr
+            data: safeQr
         });
     } catch (err) {
         next(err);
@@ -133,6 +149,7 @@ exports.reissueQR = async (req, res, next) => {
 exports.downloadQR = async (req, res, next) => {
     try {
         const { qrId } = req.params;
+        await assertQrAccess(req, { qrId });
         const qr = await qrService.downloadQR(qrId);
 
         return res.status(200).json({
@@ -151,29 +168,12 @@ exports.downloadQR = async (req, res, next) => {
 exports.printQR = async (req, res, next) => {
     try {
         const { qrId } = req.params;
+        await assertQrAccess(req, { qrId });
         const qr = await qrService.printQR(qrId);
 
         return res.status(200).json({
             success: true,
             data: qr
-        });
-    } catch (err) {
-        next(err);
-    }
-};
-
-// ==========================================
-// QR History
-// GET /qr/history/:participantId
-// ==========================================
-exports.getParticipantQRCodes = async (req, res, next) => {
-    try {
-        const { participantId } = req.params;
-        const qrs = await qrService.getParticipantQRCodes(participantId);
-
-        return res.status(200).json({
-            success: true,
-            data: qrs
         });
     } catch (err) {
         next(err);
@@ -187,7 +187,11 @@ exports.getParticipantQRCodes = async (req, res, next) => {
 exports.manualCheckIn = async (req, res, next) => {
     try {
         const { registrationId, identifier, eventId } = req.body;
-        const userId = req.user?.id;
+        const userId = req.auth.userId;
+        // Manual identifiers may be either a QR token or an encrypted participant identifier.
+        // Authorize the claimed event first; qrService then applies the same active/expiry
+        // predicate to QR tokens and verifies that they belong to this event.
+        await assertQrAccess(req, { eventId });
 
         const result = await qrService.manualCheckIn({
             registrationId,
