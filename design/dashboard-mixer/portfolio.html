@@ -1,0 +1,2048 @@
+<div id="vsms-portfolio-atlas" data-concept="portfolio" data-source="portfolio" data-fragment="dashboard-4-portfolio">
+
+<style>
+  [data-concept="portfolio"] {
+    --vp-canvas: #F7F7F4;
+    --vp-canvas-soft: #FAFAF7;
+    --vp-surface: #FFFFFF;
+    --vp-surface-2: #F2F1EC;
+    --vp-ink: #26251E;
+    --vp-ink-2: #5A5852;
+    --vp-ink-3: #807D72;
+    --vp-muted: #A09C92;
+    --vp-line: #E6E5E0;
+    --vp-line-soft: #EFEEE8;
+    --vp-line-strong: #CFCDC4;
+    --vp-accent: #2563EB;
+    --vp-accent-strong: #1D4ED8;
+    --vp-accent-tint: rgba(37, 99, 235, 0.09);
+    --vp-green: #1F8A65;
+    --vp-amber: #B45309;
+    --vp-orange: #C2410C;
+    --vp-red: #CF2D56;
+    --vp-radius-ctl: 8px;
+    --vp-radius-panel: 12px;
+    --vp-font: "Geist", "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
+    --vp-max: 1240px;
+    --vp-grid-gap: 12px;
+    color: var(--vp-ink);
+    font-family: var(--vp-font);
+    font-size: 13px;
+    line-height: 1.35;
+    font-variant-numeric: tabular-nums;
+    background: var(--vp-canvas);
+  }
+
+  [data-concept="portfolio"][data-theme="dark"] {
+    --vp-canvas: #100F0D;
+    --vp-canvas-soft: #141310;
+    --vp-surface: #1A1916;
+    --vp-surface-2: #22211D;
+    --vp-ink: #EDEBE4;
+    --vp-ink-2: #B0ACA2;
+    --vp-ink-3: #8A867C;
+    --vp-muted: #6B6860;
+    --vp-line: rgba(237, 235, 228, 0.09);
+    --vp-line-soft: rgba(237, 235, 228, 0.06);
+    --vp-line-strong: rgba(237, 235, 228, 0.18);
+    --vp-accent: #93C5FD;
+    --vp-accent-strong: #BFDBFE;
+    --vp-accent-tint: rgba(147, 197, 253, 0.16);
+    --vp-green: #3FA37F;
+    --vp-amber: #D9964A;
+    --vp-orange: #E07B4C;
+    --vp-red: #E05C7E;
+  }
+
+  [data-concept="portfolio"] * {
+    box-sizing: border-box;
+  }
+
+  [data-concept="portfolio"] .vp-shell {
+    max-width: var(--vp-max);
+    margin: 0 auto;
+    padding: 12px;
+    display: grid;
+    grid-template-columns: 216px minmax(0, 1fr) 306px;
+    grid-template-areas:
+      "vp-nav vp-header vp-header"
+      "vp-nav vp-metrics vp-rail"
+      "vp-nav vp-workspace vp-rail"
+      "vp-nav vp-activity vp-activity";
+    gap: var(--vp-grid-gap);
+    min-height: 100%;
+    color: var(--vp-ink);
+    background: var(--vp-canvas);
+  }
+
+  [data-concept="portfolio"] .vp-region {
+    background: var(--vp-surface);
+    border: 1px solid var(--vp-line);
+    border-radius: var(--vp-radius-panel);
+    padding: 12px;
+  }
+
+  [data-concept="portfolio"] .vp-region-head {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    justify-content: space-between;
+    margin-bottom: 10px;
+  }
+
+  [data-concept="portfolio"] .vp-region-title {
+    margin: 0;
+    color: var(--vp-ink);
+    font-size: 14px;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+  }
+
+  [data-concept="portfolio"] .vp-subtitle {
+    color: var(--vp-ink-3);
+    font-size: 11px;
+  }
+
+  [data-concept="portfolio"] .vp-chip {
+    height: 28px;
+    border-radius: 999px;
+    border: 1px solid var(--vp-line-strong);
+    padding: 0 10px;
+    display: inline-flex;
+    align-items: center;
+    font-size: 11px;
+    color: var(--vp-ink-2);
+    font-weight: 500;
+    white-space: nowrap;
+    background: var(--vp-surface);
+  }
+
+  [data-concept="portfolio"] .vp-chip.status-success { color: var(--vp-green); border-color: color-mix(in srgb, var(--vp-green) 40%, transparent); }
+  [data-concept="portfolio"] .vp-chip.status-amber { color: var(--vp-amber); border-color: color-mix(in srgb, var(--vp-amber) 40%, transparent); }
+  [data-concept="portfolio"] .vp-chip.status-red { color: var(--vp-red); border-color: color-mix(in srgb, var(--vp-red) 40%, transparent); }
+  [data-concept="portfolio"] .vp-chip.status-blue { color: var(--vp-accent); border-color: color-mix(in srgb, var(--vp-accent) 45%, transparent); }
+
+  [data-concept="portfolio"] .vp-btn,
+  [data-concept="portfolio"] .vp-input,
+  [data-concept="portfolio"] .vp-select {
+    min-height: 44px;
+    border-radius: var(--vp-radius-ctl);
+    border: 1px solid var(--vp-line-strong);
+    background: var(--vp-surface);
+    color: var(--vp-ink);
+    font: inherit;
+    padding: 0 12px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    cursor: pointer;
+    min-width: 44px;
+    white-space: nowrap;
+  }
+
+  [data-concept="portfolio"] .vp-btn {
+    color: var(--vp-ink);
+  }
+
+  [data-concept="portfolio"] .vp-btn:hover {
+    border-color: var(--vp-ink-3);
+  }
+
+  [data-concept="portfolio"] .vp-btn:active {
+    transform: scale(0.98);
+  }
+
+  [data-concept="portfolio"] .vp-btn:disabled {
+    opacity: 0.55;
+    cursor: not-allowed;
+  }
+
+  [data-concept="portfolio"] .vp-btn-primary {
+    background: var(--vp-accent);
+    color: #fff;
+    border-color: var(--vp-accent);
+  }
+
+  [data-concept="portfolio"] .vp-btn-primary:hover {
+    background: var(--vp-accent-strong);
+    border-color: var(--vp-accent-strong);
+  }
+
+  [data-concept="portfolio"] .vp-btn-soft {
+    background: var(--vp-surface-2);
+  }
+
+  [data-concept="portfolio"] .vp-btn-ghost {
+    background: transparent;
+  }
+
+  [data-concept="portfolio"] .vp-input,
+  [data-concept="portfolio"] .vp-select {
+    width: 100%;
+  }
+
+  [data-concept="portfolio"] .vp-input::placeholder {
+    color: var(--vp-ink-3);
+  }
+
+  [data-concept="portfolio"] .vp-btn,
+  [data-concept="portfolio"] .vp-input,
+  [data-concept="portfolio"] .vp-select,
+  [data-concept="portfolio"] .vp-mix-btn {
+    transition: border-color 120ms ease-out, background 120ms ease-out, color 120ms ease-out, transform 80ms ease-out;
+  }
+
+  [data-concept="portfolio"] .vp-mix-btn {
+    height: 44px;
+    min-width: 108px;
+    padding: 0 12px;
+    border-radius: 999px;
+    border: 1px solid transparent;
+    color: var(--vp-ink-2);
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    background: var(--vp-surface-2);
+  }
+
+  [data-concept="portfolio"] .vp-mix-btn:hover {
+    border-color: var(--vp-line-strong);
+    color: var(--vp-accent);
+  }
+
+  [data-concept="portfolio"] .vp-mix-btn:focus-visible,
+  [data-concept="portfolio"] .vp-btn:focus-visible,
+  [data-concept="portfolio"] .vp-input:focus-visible,
+  [data-concept="portfolio"] .vp-select:focus-visible,
+  [data-concept="portfolio"] a:focus-visible,
+  [data-concept="portfolio"] button:focus-visible {
+    outline: 2px solid var(--vp-accent);
+    outline-offset: 2px;
+    border-radius: 8px;
+  }
+
+  [data-concept="portfolio"] .vp-nav {
+    grid-area: vp-nav;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    gap: 10px;
+    min-height: 0;
+    overflow: hidden;
+  }
+
+  [data-concept="portfolio"] .vp-nav-head {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+    justify-content: space-between;
+  }
+
+  [data-concept="portfolio"] .vp-brand {
+    font-size: 16px;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+    margin: 0;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    color: var(--vp-ink);
+  }
+
+  [data-concept="portfolio"] .vp-dot {
+    width: 9px;
+    height: 9px;
+    border-radius: 50%;
+    background: var(--vp-green);
+    display: inline-block;
+    margin-top: -1px;
+  }
+
+  [data-concept="portfolio"] .vp-nav-list {
+    margin-top: 10px;
+    display: grid;
+    gap: 4px;
+  }
+
+  [data-concept="portfolio"] .vp-nav-item {
+    height: 44px;
+    justify-content: flex-start;
+    background: transparent;
+    border-color: transparent;
+    color: var(--vp-ink-2);
+    font-weight: 500;
+  }
+
+  [data-concept="portfolio"] .vp-nav-item.is-active {
+    background: var(--vp-accent-tint);
+    border-color: var(--vp-accent);
+    color: var(--vp-accent);
+    font-weight: 600;
+  }
+
+  [data-concept="portfolio"] .vp-nav-foot {
+    padding-top: 10px;
+    border-top: 1px solid var(--vp-line);
+    display: grid;
+    gap: 8px;
+    color: var(--vp-ink-2);
+    font-size: 11px;
+  }
+
+  [data-concept="portfolio"] .vp-signal {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    color: var(--vp-ink-2);
+  }
+
+  [data-concept="portfolio"] .vp-dotline {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: var(--vp-red);
+  }
+
+  [data-concept="portfolio"] .vp-header {
+    grid-area: vp-header;
+    display: grid;
+    gap: 10px;
+  }
+
+  [data-concept="portfolio"] .vp-header-top {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+  }
+
+  [data-concept="portfolio"] .vp-title-wrap {
+    min-width: 260px;
+    flex: 1;
+    display: grid;
+    gap: 2px;
+  }
+
+  [data-concept="portfolio"] .vp-page-title {
+    margin: 0;
+    font-size: 18px;
+    letter-spacing: -0.01em;
+    font-weight: 600;
+  }
+
+  [data-concept="portfolio"] .vp-title-meta {
+    color: var(--vp-ink-3);
+    font-size: 12px;
+  }
+
+  [data-concept="portfolio"] .vp-controls {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+  }
+
+  [data-concept="portfolio"] .vp-controls .vp-select { max-width: 250px; }
+
+  [data-concept="portfolio"] .vp-event-meta {
+    display: grid;
+    gap: 6px;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    background: var(--vp-canvas-soft);
+    border: 1px solid var(--vp-line);
+    border-radius: var(--vp-radius-panel);
+    padding: 10px;
+  }
+
+  [data-concept="portfolio"] .vp-meta-item {
+    min-width: 0;
+  }
+
+  [data-concept="portfolio"] .vp-meta-label {
+    font-size: 11px;
+    color: var(--vp-ink-3);
+    margin-bottom: 2px;
+  }
+
+  [data-concept="portfolio"] .vp-meta-value {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--vp-ink);
+    letter-spacing: -0.01em;
+  }
+
+  [data-concept="portfolio"] .vp-state-tag {
+    height: 22px;
+    border-radius: 999px;
+    border: 1px solid var(--vp-line-strong);
+    padding: 0 8px;
+    display: inline-flex;
+    align-items: center;
+    font-size: 11px;
+    font-weight: 600;
+    margin-left: 6px;
+  }
+
+  [data-concept="portfolio"] .vp-state-tag.status-live { color: var(--vp-green); border-color: color-mix(in srgb, var(--vp-green) 40%, transparent); }
+  [data-concept="portfolio"] .vp-state-tag.status-upcoming { color: var(--vp-accent); border-color: color-mix(in srgb, var(--vp-accent) 35%, transparent); }
+  [data-concept="portfolio"] .vp-state-tag.status-complete { color: var(--vp-ink-2); border-color: var(--vp-line-strong); }
+
+  [data-concept="portfolio"] .vp-metrics {
+    grid-area: vp-metrics;
+  }
+
+  [data-concept="portfolio"] .vp-metric-grid {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 8px;
+  }
+
+  [data-concept="portfolio"] .vp-metric {
+    border: 1px solid var(--vp-line);
+    border-radius: var(--vp-radius-panel);
+    padding: 12px;
+    min-height: 86px;
+    background: var(--vp-surface);
+    display: grid;
+    gap: 4px;
+    min-width: 0;
+  }
+
+  [data-concept="portfolio"] .vp-metric-label {
+    font-size: 11px;
+    color: var(--vp-ink-3);
+    text-transform: none;
+  }
+
+  [data-concept="portfolio"] .vp-metric-value {
+    font-size: 20px;
+    letter-spacing: -0.02em;
+    font-weight: 600;
+    line-height: 1.18;
+  }
+
+  [data-concept="portfolio"] .vp-metric-foot {
+    font-size: 11px;
+    color: var(--vp-ink-3);
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  [data-concept="portfolio"] .vp-metric .vp-severity {
+    font-size: 11px;
+    font-weight: 600;
+  }
+
+  [data-concept="portfolio"] .vp-workspace {
+    grid-area: vp-workspace;
+    display: grid;
+    gap: 12px;
+    min-height: 0;
+  }
+
+  [data-concept="portfolio"] .vp-card { border: 1px solid var(--vp-line); border-radius: var(--vp-radius-panel); background: var(--vp-surface); }
+
+  [data-concept="portfolio"] .vp-card + .vp-card { margin-top: 10px; }
+
+  [data-concept="portfolio"] .vp-card-head { padding: 10px 12px; border-bottom: 1px solid var(--vp-line-soft); display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+
+  [data-concept="portfolio"] .vp-card-head h3 { margin: 0; font-size: 13px; font-weight: 600; }
+
+  [data-concept="portfolio"] .vp-card-body { padding: 10px 12px; }
+
+  [data-concept="portfolio"] .vp-event-list {
+    display: grid;
+    gap: 8px;
+  }
+
+  [data-concept="portfolio"] .vp-event-row {
+    border: 1px solid var(--vp-line-soft);
+    border-radius: var(--vp-radius-panel);
+    padding: 10px;
+    display: grid;
+    gap: 8px;
+  }
+
+  [data-concept="portfolio"] .vp-event-row.is-selected {
+    border-color: var(--vp-accent);
+    background: var(--vp-accent-tint);
+  }
+
+  [data-concept="portfolio"] .vp-event-row-top {
+    display: grid;
+    gap: 5px;
+    grid-template-columns: 130px 1fr 100px;
+    align-items: center;
+  }
+
+  [data-concept="portfolio"] .vp-event-name {
+    font-size: 14px;
+    font-weight: 600;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  [data-concept="portfolio"] .vp-event-loc { font-size: 11px; color: var(--vp-ink-3); }
+
+  [data-concept="portfolio"] .vp-progress {
+    width: 100%;
+    height: 8px;
+    border-radius: 999px;
+    background: var(--vp-line-soft);
+    overflow: hidden;
+  }
+
+  [data-concept="portfolio"] .vp-progress > span {
+    display: block;
+    height: 100%;
+    border-radius: 999px;
+    background: var(--vp-ink-2);
+  }
+
+  [data-concept="portfolio"] .vp-progress > span.pct-green { background: var(--vp-green); }
+  [data-concept="portfolio"] .vp-progress > span.pct-amber { background: var(--vp-amber); }
+
+  [data-concept="portfolio"] .vp-micro {
+    display: grid;
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+    gap: 6px;
+    margin-top: 8px;
+  }
+
+  [data-concept="portfolio"] .vp-mini {
+    border: 1px solid var(--vp-line-soft);
+    border-radius: var(--vp-radius-ctl);
+    padding: 7px;
+    background: var(--vp-surface-2);
+    min-width: 0;
+  }
+
+  [data-concept="portfolio"] .vp-mini .vp-mini-k {
+    font-size: 10px;
+    color: var(--vp-ink-3);
+    margin-bottom: 2px;
+  }
+
+  [data-concept="portfolio"] .vp-mini .vp-mini-v {
+    font-size: 12px;
+    font-weight: 600;
+  }
+
+  [data-concept="portfolio"] .vp-queue-tools {
+    display: grid;
+    grid-template-columns: minmax(200px, 1fr) 170px 130px 114px;
+    gap: 8px;
+    align-items: end;
+  }
+
+  [data-concept="portfolio"] .vp-queue-head {
+    margin: 8px 0;
+    display: grid;
+    grid-template-columns: 1fr 130px 140px 130px 100px;
+    gap: 8px;
+    color: var(--vp-ink-3);
+    font-size: 11px;
+    padding: 0 4px;
+  }
+
+  [data-concept="portfolio"] .vp-queue-list {
+    border: 1px solid var(--vp-line-soft);
+    border-radius: var(--vp-radius-panel);
+    display: grid;
+    background: var(--vp-surface);
+    min-height: 240px;
+  }
+
+  [data-concept="portfolio"] .vp-queue-row,
+  [data-concept="portfolio"] .vp-queue-row-main {
+    display: grid;
+    grid-template-columns: 1fr 108px 82px 132px 128px;
+    align-items: center;
+    padding: 10px 10px;
+    gap: 8px;
+    border-bottom: 1px solid var(--vp-line-soft);
+  }
+
+  [data-concept="portfolio"] .vp-queue-row:last-child { border-bottom: none; }
+
+  [data-concept="portfolio"] .vp-queue-row {
+    cursor: pointer;
+  }
+
+  [data-concept="portfolio"] .vp-queue-row:hover {
+    background: var(--vp-canvas-soft);
+  }
+
+  [data-concept="portfolio"] .vp-queue-row.is-selected {
+    background: var(--vp-accent-tint);
+    border-left: 3px solid var(--vp-accent);
+  }
+
+  [data-concept="portfolio"] .vp-queue-name {
+    min-width: 0;
+    display: grid;
+    gap: 2px;
+  }
+
+  [data-concept="portfolio"] .vp-queue-name .t {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-weight: 600;
+    color: var(--vp-ink);
+  }
+
+  [data-concept="portfolio"] .vp-queue-name .s {
+    color: var(--vp-ink-3);
+    font-size: 11px;
+  }
+
+  [data-concept="portfolio"] .vp-status {
+    font-weight: 600;
+    font-size: 12px;
+  }
+
+  [data-concept="portfolio"] .vp-status.ok { color: var(--vp-green); }
+  [data-concept="portfolio"] .vp-status.amb { color: var(--vp-amber); }
+  [data-concept="portfolio"] .vp-status.red { color: var(--vp-red); }
+  [data-concept="portfolio"] .vp-status.blk { color: var(--vp-ink-2); }
+
+  [data-concept="portfolio"] .vp-empty,
+  [data-concept="portfolio"] .vp-loading,
+  [data-concept="portfolio"] .vp-error {
+    padding: 24px;
+    text-align: center;
+    color: var(--vp-ink-2);
+    min-height: 120px;
+    display: grid;
+    place-items: center;
+  }
+
+  [data-concept="portfolio"] .vp-error { color: var(--vp-red); }
+
+  [data-concept="portfolio"] .vp-detail {
+    border: 1px solid var(--vp-line-soft);
+    border-radius: var(--vp-radius-panel);
+    background: var(--vp-surface-2);
+    padding: 10px;
+  }
+
+  [data-concept="portfolio"] .vp-detail-head {
+    display: flex;
+    justify-content: space-between;
+    gap: 8px;
+    align-items: baseline;
+  }
+
+  [data-concept="portfolio"] .vp-detail h3 {
+    margin: 0;
+    font-size: 14px;
+    letter-spacing: -0.01em;
+  }
+
+  [data-concept="portfolio"] .vp-detail p {
+    margin: 0;
+    color: var(--vp-ink-2);
+    font-size: 12px;
+  }
+
+  [data-concept="portfolio"] .vp-stage-grid {
+    display: grid;
+    gap: 6px;
+    margin-top: 10px;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  [data-concept="portfolio"] .vp-stage {
+    border: 1px solid var(--vp-line-soft);
+    border-radius: var(--vp-radius-ctl);
+    padding: 8px;
+    background: var(--vp-surface);
+    min-width: 0;
+  }
+
+  [data-concept="portfolio"] .vp-stage .k {
+    font-size: 10px;
+    color: var(--vp-ink-3);
+    margin-bottom: 2px;
+  }
+
+  [data-concept="portfolio"] .vp-stage .v {
+    font-size: 12px;
+    font-weight: 600;
+  }
+
+  [data-concept="portfolio"] .vp-stage .v.flagged {
+    color: var(--vp-amber);
+  }
+
+  [data-concept="portfolio"] .vp-rail {
+    grid-area: vp-rail;
+    display: grid;
+    gap: 10px;
+    min-height: 0;
+  }
+
+  [data-concept="portfolio"] .vp-rail-list {
+    display: grid;
+    gap: 6px;
+  }
+
+  [data-concept="portfolio"] .vp-rail-item {
+    display: grid;
+    gap: 4px;
+    border-bottom: 1px dashed var(--vp-line-soft);
+    padding-bottom: 6px;
+  }
+
+  [data-concept="portfolio"] .vp-rail-item:last-child {
+    border-bottom: none;
+    padding-bottom: 0;
+  }
+
+  [data-concept="portfolio"] .vp-rail-name {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--vp-ink);
+  }
+
+  [data-concept="portfolio"] .vp-rail-meta {
+    font-size: 11px;
+    color: var(--vp-ink-2);
+  }
+
+  [data-concept="portfolio"] .vp-bar {
+    margin-top: 5px;
+    height: 6px;
+    border-radius: 999px;
+    background: var(--vp-line-soft);
+    position: relative;
+    overflow: hidden;
+  }
+
+  [data-concept="portfolio"] .vp-bar > i {
+    position: absolute;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    border-radius: inherit;
+  }
+
+  [data-concept="portfolio"] .vp-bar > .fill-green { background: var(--vp-green); }
+  [data-concept="portfolio"] .vp-bar > .fill-amber { background: var(--vp-amber); }
+  [data-concept="portfolio"] .vp-bar > .fill-red { background: var(--vp-red); }
+
+  [data-concept="portfolio"] .vp-activity {
+    grid-area: vp-activity;
+    display: grid;
+    gap: 10px;
+  }
+
+  [data-concept="portfolio"] .vp-activity-grid {
+    display: grid;
+    gap: 10px;
+    grid-template-columns: 1fr 1fr;
+  }
+
+  [data-concept="portfolio"] .vp-state-list {
+    display: grid;
+    gap: 8px;
+    margin-top: 8px;
+  }
+
+  [data-concept="portfolio"] .vp-state-row {
+    display: grid;
+    gap: 3px;
+    border: 1px solid var(--vp-line-soft);
+    border-radius: var(--vp-radius-ctl);
+    padding: 8px;
+    background: var(--vp-surface);
+  }
+
+  [data-concept="portfolio"] .vp-state-row .t { font-size: 11px; color: var(--vp-ink-3); }
+  [data-concept="portfolio"] .vp-state-row .d { font-size: 12px; color: var(--vp-ink); }
+
+  [data-concept="portfolio"] .vp-audit {
+    border: 1px solid var(--vp-line-soft);
+    border-radius: var(--vp-radius-panel);
+    background: var(--vp-surface);
+  }
+
+  [data-concept="portfolio"] .vp-audit-head,
+  [data-concept="portfolio"] .vp-audit-body {
+    padding: 8px 10px;
+  }
+
+  [data-concept="portfolio"] .vp-audit-head { border-bottom: 1px solid var(--vp-line-soft); }
+
+  [data-concept="portfolio"] .vp-audit-entry {
+    padding: 7px 10px;
+    border-bottom: 1px dashed var(--vp-line-soft);
+    display: grid;
+    gap: 3px;
+  }
+
+  [data-concept="portfolio"] .vp-audit-entry:last-child { border-bottom: none; }
+
+  [data-concept="portfolio"] .vp-audit-entry .r {
+    display: flex;
+    gap: 8px;
+    align-items: baseline;
+    color: var(--vp-ink-3);
+    font-size: 11px;
+  }
+
+  [data-concept="portfolio"] .vp-audit-entry .r strong {
+    color: var(--vp-ink);
+    font-weight: 600;
+  }
+
+  [data-concept="portfolio"] .vp-announce {
+    position: fixed;
+    left: -9999px;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+  }
+
+  [data-concept="portfolio"] .vp-offline {
+    border-color: var(--vp-red);
+    color: var(--vp-red);
+    background: color-mix(in srgb, var(--vp-red) 8%, transparent);
+  }
+
+  [data-concept="portfolio"] .visually-hidden {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    border: 0;
+  }
+
+  @media (max-width: 1120px) {
+    [data-concept="portfolio"] .vp-shell {
+      grid-template-columns: 1fr;
+      grid-template-areas:
+        "vp-header"
+        "vp-metrics"
+        "vp-workspace"
+        "vp-activity"
+        "vp-rail"
+        "vp-nav";
+    }
+
+    [data-concept="portfolio"] .vp-nav {
+      flex-direction: row;
+      flex-wrap: wrap;
+      padding-bottom: 6px;
+    }
+
+    [data-concept="portfolio"] .vp-nav-list,
+    [data-concept="portfolio"] .vp-nav-foot {
+      display: none;
+    }
+
+    [data-concept="portfolio"] .vp-metric-grid {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    [data-concept="portfolio"] .vp-activity-grid {
+      grid-template-columns: 1fr;
+    }
+
+    [data-concept="portfolio"] .vp-queue-tools {
+      grid-template-columns: 1fr;
+    }
+
+    [data-concept="portfolio"] .vp-queue-head,
+    [data-concept="portfolio"] .vp-queue-row {
+      display: none;
+    }
+
+    [data-concept="portfolio"] .vp-queue-row-main {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr);
+      padding: 12px;
+      gap: 6px;
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    [data-concept="portfolio"] * {
+      transition: none !important;
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+    }
+  }
+</style>
+
+<div class="vp-shell" role="application" aria-label="Event portfolio atlas dashboard">
+  <aside class="vp-region vp-nav" data-region="navigation-shell" data-use-region="navigation-shell" data-source="portfolio" aria-label="Navigation shell">
+    <div>
+      <div class="vp-nav-head">
+        <p class="vp-brand"><span class="vp-dot" aria-hidden="true"></span>VSMS Dashboard</p>
+        <button class="vp-mix-btn" type="button" data-region="navigation-shell" data-use-region="navigation-shell" data-source="portfolio">Use in mix</button>
+      </div>
+      <p class="vp-subtitle">Navigation shell</p>
+      <div class="vp-nav-list">
+        <button type="button" class="vp-btn vp-nav-item is-active">Events</button>
+        <button type="button" class="vp-btn vp-nav-item">Queue</button>
+        <button type="button" class="vp-btn vp-nav-item">Clinical review</button>
+        <button type="button" class="vp-btn vp-nav-item">Sync health</button>
+        <button type="button" class="vp-btn vp-nav-item">Audit logs</button>
+      </div>
+    </div>
+    <div class="vp-nav-foot" aria-live="polite">
+      <span class="vp-signal"><span class="vp-dotline"></span> Network: <strong id="nav-net-state">Online</strong></span>
+      <span class="vp-signal">Device role: <strong>Event manager</strong></span>
+    </div>
+  </aside>
+
+  <header class="vp-region vp-header" data-region="event-context-header" data-use-region="event-context-header" data-source="portfolio">
+    <div class="vp-region-head">
+      <div>
+        <h1 class="vp-page-title" id="vp-page-title">Event portfolio atlas</h1>
+        <div class="vp-title-meta">Live event operations for Northside Community Screening, stitched to one operational surface.</div>
+      </div>
+      <button class="vp-mix-btn" type="button" data-region="event-context-header" data-use-region="event-context-header" data-source="portfolio">Use in mix</button>
+    </div>
+
+    <div class="vp-header-top">
+      <label class="vp-subtitle" for="eventSelect">Event context</label>
+      <select id="eventSelect" class="vp-select" aria-label="Event context selector">
+      </select>
+
+      <div class="vp-controls">
+        <button class="vp-btn vp-btn-ghost" type="button" id="themeToggle">Dark theme</button>
+        <label class="vp-subtitle" for="queueModeSelect">Queue state</label>
+        <select id="queueModeSelect" class="vp-select" aria-label="Queue mock state">
+          <option value="ready">Ready</option>
+          <option value="loading">Loading</option>
+          <option value="empty">Empty</option>
+          <option value="error">Error</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="vp-event-meta" id="eventMeta" role="list" aria-label="Selected event metadata"></div>
+  </header>
+
+  <section class="vp-region vp-metrics" data-region="headline-metrics" data-use-region="headline-metrics" data-source="portfolio">
+    <div class="vp-region-head">
+      <div>
+        <h2 class="vp-region-title">Headline metrics</h2>
+        <p class="vp-subtitle">Readiness, queue health, and referral risk.</p>
+      </div>
+      <button class="vp-mix-btn" type="button" data-region="headline-metrics" data-use-region="headline-metrics" data-source="portfolio">Use in mix</button>
+    </div>
+    <div class="vp-metric-grid" id="metricGrid" aria-live="polite"></div>
+  </section>
+
+  <section class="vp-region vp-workspace" data-region="primary-workspace" data-use-region="primary-workspace" data-source="portfolio">
+    <div class="vp-region-head">
+      <div>
+        <h2 class="vp-region-title">Primary workspace</h2>
+        <p class="vp-subtitle">Multi-event timeline, risk, and live queue control.</p>
+      </div>
+      <button class="vp-mix-btn" type="button" data-region="primary-workspace" data-use-region="primary-workspace" data-source="portfolio">Use in mix</button>
+    </div>
+
+    <div class="vp-card">
+      <div class="vp-card-head">
+        <h3>Event timeline</h3>
+        <span class="vp-chip status-blue">Northside portfolio - one live event</span>
+      </div>
+      <div class="vp-card-body">
+        <div class="vp-event-list" id="eventTimeline" aria-label="Event timeline"></div>
+      </div>
+    </div>
+
+    <div class="vp-card">
+      <div class="vp-card-head">
+        <h3>Live queue</h3>
+        <span class="vp-chip status-amber">Clinical referrals use reviewer decision</span>
+      </div>
+      <div class="vp-card-body">
+        <div class="vp-queue-tools">
+          <input id="queueSearch" class="vp-input" type="search" placeholder="Search by name or participant ID …" aria-label="Search participants" />
+          <select id="queueStation" class="vp-select" aria-label="Filter station">
+            <option value="All">All stations</option>
+          </select>
+          <button class="vp-btn" id="urgentFirst" type="button" aria-pressed="false" data-pressed="false">Urgent first</button>
+          <button class="vp-btn vp-btn-primary" id="showOfflineState" type="button">Toggle offline</button>
+        </div>
+
+        <div class="vp-queue-head" aria-hidden="true">
+          <span>Participant</span><span>Station</span><span>Wait</span><span>Status</span><span>Action</span>
+        </div>
+
+        <div id="queueRows" class="vp-queue-list" aria-live="polite" aria-label="Queue participants"></div>
+
+        <div class="vp-detail" style="margin-top: 10px;">
+          <div class="vp-detail-head">
+            <h3 id="detailHeading">Select a participant to inspect screening context.</h3>
+            <span class="vp-chip status-blue" id="detailState"></span>
+          </div>
+          <p class="vp-subtitle" id="detailMeta"></p>
+          <div class="vp-stage-grid" id="detailGrid"></div>
+          <div class="vp-stage-grid" id="referralPanel" style="margin-top: 8px;"></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <aside class="vp-region vp-rail" data-region="supporting-rail" data-use-region="supporting-rail" data-source="portfolio">
+    <div class="vp-region-head">
+      <div>
+        <h2 class="vp-region-title">Supporting rail</h2>
+        <p class="vp-subtitle">Staffing, stations, sync health.</p>
+      </div>
+      <button class="vp-mix-btn" type="button" data-region="supporting-rail" data-use-region="supporting-rail" data-source="portfolio">Use in mix</button>
+    </div>
+
+    <div class="vp-card">
+      <div class="vp-card-head">
+        <h3>Staffing</h3>
+      </div>
+      <div class="vp-card-body">
+        <div class="vp-rail-list" id="staffingList"></div>
+      </div>
+    </div>
+
+    <div class="vp-card">
+      <div class="vp-card-head">
+        <h3>Station throughput</h3>
+      </div>
+      <div class="vp-card-body">
+        <div class="vp-rail-list" id="stationList"></div>
+      </div>
+    </div>
+
+    <div class="vp-card vp-sync-card">
+      <div class="vp-card-head">
+        <h3>Sync state</h3>
+      </div>
+      <div class="vp-card-body" id="syncPanel"></div>
+    </div>
+  </aside>
+
+  <section class="vp-region vp-activity" data-region="activity-compliance" data-use-region="activity-compliance" data-source="portfolio">
+    <div class="vp-region-head">
+      <div>
+        <h2 class="vp-region-title">Activity and compliance</h2>
+        <p class="vp-subtitle">Recent workflow activity and audit trail.</p>
+      </div>
+      <button class="vp-mix-btn" type="button" data-region="activity-compliance" data-use-region="activity-compliance" data-source="portfolio">Use in mix</button>
+    </div>
+
+    <div class="vp-activity-grid">
+      <div class="vp-card">
+        <div class="vp-card-head">
+          <h3>Recent activity</h3>
+          <div class="vp-controls">
+            <select id="activityStateSelect" class="vp-select" aria-label="Activity state">
+              <option value="ready">Ready</option>
+              <option value="loading">Loading</option>
+              <option value="error">Error</option>
+            </select>
+          </div>
+        </div>
+        <div class="vp-card-body"><div class="vp-state-list" id="activityList"></div></div>
+      </div>
+
+      <div class="vp-card">
+        <div class="vp-card-head">
+          <h3>Audit trail</h3>
+        </div>
+        <div class="vp-card-body">
+          <div class="vp-audit" id="auditList"></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+<script>
+  (() => {
+    const REQUIRED_REGIONS = ['navigation-shell', 'event-context-header', 'headline-metrics', 'primary-workspace', 'supporting-rail', 'activity-compliance'];
+
+    const root = document.getElementById('vsms-portfolio-atlas');
+    const announcement = document.getElementById('vp-mix-announcement');
+    const query = new URLSearchParams(window.location.search);
+    const embedMode = query.get('embed') === '1';
+    const requestedRegion = query.get('region');
+
+    function normalizeTheme(value) {
+      if (typeof value !== 'string') return null;
+      const theme = value.toLowerCase();
+      return theme === 'dark' || theme === 'light' ? theme : null;
+    }
+
+    function applyTheme(theme) {
+      const safeTheme = normalizeTheme(theme);
+      if (!safeTheme) return;
+      root?.setAttribute('data-theme', safeTheme);
+      document.documentElement.setAttribute('data-theme', safeTheme);
+      document.body.setAttribute('data-theme', safeTheme);
+      if (announcement) announcement.textContent = `Theme synced to ${safeTheme}.`;
+    }
+
+    function selectedRegion() {
+      return REQUIRED_REGIONS.includes(requestedRegion) ? requestedRegion : REQUIRED_REGIONS[0];
+    }
+
+    function applyEmbed() {
+      if (!embedMode || !root) return;
+      document.body.classList.add('mixer-embed');
+      const region = selectedRegion();
+
+      const shell = root.querySelector('.vp-shell');
+      const regionEls = root.querySelectorAll('[data-region]');
+      const regionSelector = `[data-region="${region}"]`;
+      const target = root.querySelector(regionSelector);
+
+      document.body.style.margin = '0';
+      document.body.style.padding = '0';
+      document.documentElement.style.margin = '0';
+      document.documentElement.style.padding = '0';
+
+      regionEls.forEach((regionEl) => {
+        regionEl.style.display = regionEl.matches(regionSelector) ? 'block' : 'none';
+      });
+
+      if (shell) {
+        shell.style.display = 'block';
+        shell.style.gridTemplateColumns = '1fr';
+        shell.style.gridTemplateAreas = 'none';
+        shell.style.gap = '0';
+        shell.style.padding = '0';
+        shell.style.maxWidth = 'none';
+        shell.style.margin = '0';
+        shell.style.minHeight = 'auto';
+      }
+
+      if (target) {
+        target.style.borderRadius = '0';
+        target.style.margin = '0';
+        target.style.width = '100%';
+        target.style.boxSizing = 'border-box';
+      }
+
+      const embedStyle = document.createElement('style');
+      embedStyle.textContent =
+        '.vp-announce { position: static !important; left: auto !important; width: auto !important; height: auto !important; overflow: visible !important; }
+'
+        + '[data-region="supporting-rail"], [data-region="activity-compliance"], [data-region="navigation-shell"], [data-region="event-context-header"], [data-region="headline-metrics"], [data-region="primary-workspace"] {
+  box-sizing: border-box;
+}
+'
+        + 'body.mixer-embed .vp-shell { display: block !important; }';
+      root.appendChild(embedStyle);
+    }
+
+    function activeRegion() {
+      const region = selectedRegion();
+      return root ? root.querySelector(`[data-region="${region}"]`) : null;
+    }
+
+    function postHeight(region) {
+      if (!window.parent || window.parent === window) return;
+      const target = region ? root.querySelector(`[data-region="${region}"]`) : null;
+      const height = Math.max(1, Math.ceil(((target && target.getBoundingClientRect().height) || (root && root.scrollHeight) || document.body.scrollHeight || 0)));
+      window.parent.postMessage({ type: 'vsms-height', source: 'portfolio', region: region || selectedRegion(), height }, '*');
+    }
+
+    function connectHeight() {
+      if (!embedMode) return;
+      const region = selectedRegion();
+      const target = root.querySelector(`[data-region="${region}"]`) || root;
+      let rafId = 0;
+      const schedule = () => {
+        if (rafId) return;
+        rafId = requestAnimationFrame(() => {
+          rafId = 0;
+          postHeight(region);
+        });
+      };
+
+      schedule();
+      if ('ResizeObserver' in window) {
+        const observer = new ResizeObserver(schedule);
+        observer.observe(target);
+      } else {
+        window.addEventListener('resize', schedule, { passive: true });
+      }
+      window.addEventListener('load', schedule);
+    }
+
+    window.addEventListener('message', (event) => {
+      const message = event && event.data ? event.data : null;
+      if (message && message.type === 'vsms-theme') {
+        applyTheme(message.theme);
+        if (embedMode) {
+          postHeight();
+        }
+      }
+    });
+
+    if (root && document.querySelectorAll('[data-region][data-source="portfolio"]').length >= 6) {
+      applyEmbed();
+      connectHeight();
+    }
+  })();
+</script>
+
+</div>
+
+<div id="vp-mix-announcement" class="vp-announce" aria-live="polite"></div>
+
+<script>
+  const vsmsPortfolioData = {
+    events: [
+      {
+        id: 'evt_live_northside',
+        name: 'Northside Community Screening',
+        status: 'Live',
+        statusKey: 'live',
+        dateLabel: '31 Jul 2026',
+        timeLabel: '09:00  -  16:00',
+        location: 'Northside Community Centre - Hall A',
+        registrations: { recorded: 148, expected: 180 },
+        queueCount: 18,
+        avgWaitMinutes: 11,
+        staffTotal: 17,
+        risk: { level: 'amber', score: 3, label: 'High-risk participants', note: '2 urgent flags and 1 escalation draft' },
+        readiness: {
+          Registration: 148,
+          'Visual acuity': 118,
+          Refraction: 94,
+          'Colour vision': 76,
+          'Eye health': 63,
+          'Clinical review': 42,
+        },
+        participants: [
+          {
+            id: 'VSMS-240719-041',
+            name: 'Aisha Rahman',
+            age: 61,
+            queue: 'Queue 2',
+            station: 'Clinical review',
+            waitMinutes: 16,
+            status: 'Referral',
+            priority: 'Urgent',
+            screening: {
+              registration: 'Complete · checked in at 09:14',
+              visualAcuity: {
+                right: '6/18',
+                left: '6/24',
+                flagged: true,
+                note: 'Flagged for reviewer assessment: threshold not met for right eye',
+              },
+              refraction: {
+                spherical: '+1.25',
+                cylindrical: '+0.50',
+                axis: '170°',
+                note: 'Needs close follow-up in refraction path',
+              },
+              colourVision: { result: 'Pass', flagged: false, note: 'Ishihara full plate pass' },
+              eyeHealth: { result: 'Conjunctival irritation noted', flagged: true, note: 'No acute symptoms; no diagnosis made' },
+              clinicalReview: {
+                recommendation: 'Referral recommendation generated by screening rules.',
+                decision: 'Pending',
+              },
+            },
+            referral: {
+              destination: 'Northside GP & Eye Clinic',
+              urgency: 'URGENT',
+              reason: 'Reduced visual acuity with colour vision discrepancy and symptomatic referral criteria met.'
+            }
+          },
+          {
+            id: 'VSMS-240719-055',
+            name: 'Marcus Thompson',
+            age: 63,
+            queue: 'Queue 2',
+            station: 'Refraction',
+            waitMinutes: 9,
+            status: 'Review',
+            priority: 'Routine',
+            screening: {
+              registration: 'Complete · checked in at 09:31',
+              visualAcuity: {
+                right: '6/12',
+                left: '6/9',
+                flagged: true,
+                note: 'Flagged for reviewer assessment based on anisometropia threshold',
+              },
+              refraction: {
+                spherical: '+2.00',
+                cylindrical: '+1.00',
+                axis: '165°',
+                note: 'Awaiting staff confirmation' },
+              colourVision: { result: 'Pass', flagged: false, note: 'No colour deficiency flagged' },
+              eyeHealth: { result: 'Passed', flagged: false, note: 'No signs requiring immediate review' },
+              clinicalReview: {
+                recommendation: 'Flagged for reviewer assessment: refraction pattern requires verification.',
+                decision: 'Pending',
+              },
+            },
+            referral: null
+          },
+          {
+            id: 'VSMS-240719-057',
+            name: 'Grace Adeyemi',
+            age: 54,
+            queue: 'Queue 1',
+            station: 'Visual acuity',
+            waitMinutes: 7,
+            status: 'Screening',
+            priority: 'Routine',
+            screening: {
+              registration: 'Complete · checked in at 10:02',
+              visualAcuity: { right: '6/9', left: '6/9', flagged: false, note: 'Within expected range' },
+              refraction: { spherical: null, cylindrical: null, axis: null, note: 'Not recorded' },
+              colourVision: { result: 'Pass', flagged: false, note: 'Complete' },
+              eyeHealth: { result: 'Pass', flagged: false, note: 'No acute finding' },
+              clinicalReview: {
+                recommendation: 'No referral recommendation by screening rules.',
+                decision: 'Pending',
+              },
+            },
+            referral: null
+          },
+          {
+            id: 'VSMS-240719-060',
+            name: 'Robert Cairn',
+            age: 74,
+            queue: 'Queue 3',
+            station: 'Clinical review',
+            waitMinutes: 18,
+            status: 'Referral',
+            priority: 'Urgent',
+            screening: {
+              registration: 'Complete · checked in at 08:42',
+              visualAcuity: { right: '6/36', left: '6/24', flagged: true, note: 'Flagged for reviewer assessment in both eyes' },
+              refraction: { spherical: '+1.50', cylindrical: '+0.75', axis: '90°', note: 'Needs clinical corroboration' },
+              colourVision: { result: 'Fail', flagged: true, note: 'Colour perception delay noted' },
+              eyeHealth: { result: 'Needs observation', flagged: true, note: 'Patient reports new floaters, no acute distress' },
+              clinicalReview: {
+                recommendation: 'Referral recommendation generated by screening rules.',
+                decision: 'Pending',
+              },
+            },
+            referral: {
+              destination: 'Northside Eye Centre',
+              urgency: 'URGENT',
+              reason: 'Urgent referral indicated by multi-station rule set, pending reviewer assessment decision.'
+            }
+          },
+          {
+            id: 'VSMS-240719-062',
+            name: 'Mina Patel',
+            age: 42,
+            queue: 'Queue 4',
+            station: 'Eye health',
+            waitMinutes: 4,
+            status: 'Awaiting',
+            priority: 'Routine',
+            screening: {
+              registration: 'Complete · checked in at 10:20',
+              visualAcuity: { right: '6/18', left: '6/18', flagged: false, note: 'Within rule threshold' },
+              refraction: { spherical: '0.00', cylindrical: '0.00', axis: '0°', note: 'No correction required' },
+              colourVision: { result: 'Pass', flagged: false, note: 'Pass' },
+              eyeHealth: { result: 'In progress', flagged: false, note: 'Awaiting pinhole test' },
+              clinicalReview: {
+                recommendation: 'No referral recommendation by screening rules.',
+                decision: 'Not needed',
+              },
+            },
+            referral: null
+          },
+          {
+            id: 'VSMS-240719-066',
+            name: 'Daniel Okafor',
+            age: 58,
+            queue: 'Queue 5',
+            station: 'Registration',
+            waitMinutes: 2,
+            status: 'Queued',
+            priority: 'Routine',
+            screening: {
+              registration: 'In progress',
+              visualAcuity: { right: null, left: null, flagged: false, note: 'Not started' },
+              refraction: { spherical: null, cylindrical: null, axis: null, note: 'Not started' },
+              colourVision: { result: 'Not started', flagged: false, note: 'Not started' },
+              eyeHealth: { result: 'Not started', flagged: false, note: 'Not started' },
+              clinicalReview: {
+                recommendation: 'No referral recommendation by screening rules.',
+                decision: 'Pending',
+              },
+            },
+            referral: null
+          }
+        ],
+        staffing: [
+          { role: 'Event manager', name: 'K. Mensah', status: 'On station' },
+          { role: 'Clinical reviewer', name: 'S. Malik', status: 'On station' },
+          { role: 'Station lead', name: 'N. Osei', status: 'On station' },
+          { role: 'Data steward', name: 'L. Patel', status: 'On station' },
+          { role: 'Volunteer coordinator', name: 'J. Carter', status: 'On station' },
+        ],
+        stations: [
+          { name: 'Registration', targetPerHour: 45, completed: 148, queued: 4, health: 'green' },
+          { name: 'Visual acuity', targetPerHour: 42, completed: 118, queued: 6, health: 'green' },
+          { name: 'Refraction', targetPerHour: 38, completed: 94, queued: 8, health: 'amber' },
+          { name: 'Colour vision', targetPerHour: 36, completed: 76, queued: 10, health: 'amber' },
+          { name: 'Eye health', targetPerHour: 34, completed: 63, queued: 14, health: 'red' },
+          { name: 'Clinical review', targetPerHour: 28, completed: 42, queued: 5, health: 'red' },
+        ],
+        sync: {
+          status: 'Pending',
+          pendingOps: 7,
+          queuedRecords: [
+            'Referral draft: VSMS-240719-041',
+            'Clinical decision: VSMS-240719-055',
+            'Queue reorder: Queue 3',
+            'Registration edit: VSMS-240719-057',
+          ],
+          lastSynced: '10:18',
+          failed: 1,
+          conflict: 'VSMS-240719-041 has duplicate referral draft versions; pending conflict review.'
+        },
+        recentActivity: [
+          { time: '09:31', text: 'Aisha Rahman moved to clinical review after acuity flag raised.' },
+          { time: '09:48', text: 'Marcus Thompson completed visual acuity and was queued for refraction.' },
+          { time: '10:02', text: 'Colour vision station completed for Daniel Okafor - queue moved.' },
+          { time: '10:14', text: 'Offline-safe save: 7 records queued. Sync pending.' },
+        ],
+      },
+      {
+        id: 'evt_upcoming_riverside',
+        name: 'Northside Community Screening',
+        status: 'Upcoming',
+        statusKey: 'upcoming',
+        dateLabel: '04 Aug 2026',
+        timeLabel: '09:30  -  14:00',
+        location: 'Riverside Youth Hall - Community Wing',
+        registrations: { recorded: 0, expected: 200 },
+        queueCount: 0,
+        avgWaitMinutes: 0,
+        staffTotal: 16,
+        risk: { level: 'green', score: 0, label: 'No flags yet', note: 'Pre-event planning stage' },
+        readiness: {
+          Registration: 0,
+          'Visual acuity': 0,
+          Refraction: 0,
+          'Colour vision': 0,
+          'Eye health': 0,
+          'Clinical review': 0,
+        },
+        participants: [],
+        staffing: [
+          { role: 'Event manager', name: 'M. Osei', status: 'Scheduled' },
+          { role: 'Clinical reviewer', name: 'R. Ochieng', status: 'Scheduled' },
+          { role: 'Screening lead', name: 'A. Tan', status: 'Scheduled' },
+        ],
+        stations: [
+          { name: 'Registration', targetPerHour: 50, completed: 0, queued: 0, health: 'green' },
+          { name: 'Visual acuity', targetPerHour: 44, completed: 0, queued: 0, health: 'green' },
+          { name: 'Refraction', targetPerHour: 42, completed: 0, queued: 0, health: 'green' },
+          { name: 'Colour vision', targetPerHour: 40, completed: 0, queued: 0, health: 'green' },
+          { name: 'Eye health', targetPerHour: 32, completed: 0, queued: 0, health: 'green' },
+          { name: 'Clinical review', targetPerHour: 24, completed: 0, queued: 0, health: 'green' },
+        ],
+        sync: {
+          status: 'Saved locally',
+          pendingOps: 0,
+          queuedRecords: [],
+          lastSynced: '09:59',
+          failed: 0,
+          conflict: ''
+        },
+        recentActivity: [
+          { time: '08:40', text: 'Logistics checklist complete. Registration staff assigned.' },
+          { time: '09:05', text: 'Ambulance access route verified.' },
+        ]
+      },
+      {
+        id: 'evt_completed_kingsmill',
+        name: 'Northside Community Screening',
+        status: 'Completed',
+        statusKey: 'complete',
+        dateLabel: '22 Jul 2026',
+        timeLabel: '09:00  -  15:30',
+        location: 'Kingsmill Hall - Atrium',
+        registrations: { recorded: 171, expected: 171 },
+        queueCount: 0,
+        avgWaitMinutes: 0,
+        staffTotal: 15,
+        risk: { level: 'green', score: 0, label: 'No active risk', note: 'All referrals closed by reviewer team' },
+        readiness: {
+          Registration: 171,
+          'Visual acuity': 164,
+          Refraction: 150,
+          'Colour vision': 144,
+          'Eye health': 136,
+          'Clinical review': 126,
+        },
+        participants: [],
+        staffing: [
+          { role: 'Event manager', name: 'S. Malik', status: 'Complete' },
+          { role: 'Clinical reviewer', name: 'K. Osei', status: 'Complete' },
+          { role: 'Data steward', name: 'M. Patel', status: 'Complete' },
+        ],
+        stations: [
+          { name: 'Registration', targetPerHour: 48, completed: 171, queued: 0, health: 'green' },
+          { name: 'Visual acuity', targetPerHour: 36, completed: 164, queued: 0, health: 'green' },
+          { name: 'Refraction', targetPerHour: 33, completed: 150, queued: 0, health: 'green' },
+          { name: 'Colour vision', targetPerHour: 28, completed: 144, queued: 0, health: 'green' },
+          { name: 'Eye health', targetPerHour: 26, completed: 136, queued: 0, health: 'green' },
+          { name: 'Clinical review', targetPerHour: 20, completed: 126, queued: 0, health: 'green' },
+        ],
+        sync: {
+          status: 'Synced',
+          pendingOps: 0,
+          queuedRecords: [],
+          lastSynced: '19:10',
+          failed: 0,
+          conflict: ''
+        },
+        recentActivity: [
+          { time: '15:05', text: 'All remaining referrals escalated and exported.' },
+          { time: '15:12', text: 'Audit handoff complete and signed by administrator.' },
+          { time: '15:30', text: 'Event closed. Records sealed and synced.' },
+        ]
+      }
+    ],
+    audit: [
+      { time: '09:14', user: 'k.mensah@vsms.local', role: 'Event manager', action: 'PARTICIPANT_REGISTRATION', resource: 'participant', status: 'SUCCESS', details: 'VSMS-240719-041 created; offline-safe save queued.' },
+      { time: '09:31', user: 'a.ochen@vsms.local', role: 'Technician', action: 'SCREENING_COMPLETE', resource: 'visual_acuity', status: 'SUCCESS', details: 'Aisha Rahman visual acuity completed with rule match.' },
+      { time: '09:44', user: 's.malik@vsms.local', role: 'Clinical reviewer', action: 'REFERRAL_DRAFT', resource: 'referral', status: 'WARNING', details: 'Duplicate draft detected for VSMS-240719-041.' },
+      { time: '10:18', user: 'sync@vsms.local', role: 'System', action: 'SYNC_FAILED', resource: 'sync_queue', status: 'FAILED', details: '1 record conflict pending resolution.' },
+      { time: '10:28', user: 'sys-admin', role: 'Administrator', action: 'AUDIT_EXPORT', resource: 'audit_log', status: 'SUCCESS', details: 'Operator-generated compliance export downloaded.' }
+    ]
+  };
+
+  const state = {
+    selectedEventId: 'evt_live_northside',
+    queueMode: 'ready',
+    queueSearch: '',
+    queueStation: 'All',
+    urgentFirst: false,
+    selectedParticipantId: 'VSMS-240719-041',
+    activityState: 'ready',
+    offline: false,
+    theme: document.documentElement.getAttribute('data-theme') || 'light'
+  };
+
+  const eventSelect = document.getElementById('eventSelect');
+  const eventMeta = document.getElementById('eventMeta');
+  const metricGrid = document.getElementById('metricGrid');
+  const queueModeSelect = document.getElementById('queueModeSelect');
+  const queueRows = document.getElementById('queueRows');
+  const queueSearch = document.getElementById('queueSearch');
+  const queueStation = document.getElementById('queueStation');
+  const urgentFirstBtn = document.getElementById('urgentFirst');
+  const showOfflineState = document.getElementById('showOfflineState');
+  const detailHeading = document.getElementById('detailHeading');
+  const detailMeta = document.getElementById('detailMeta');
+  const detailState = document.getElementById('detailState');
+  const detailGrid = document.getElementById('detailGrid');
+  const referralPanel = document.getElementById('referralPanel');
+  const staffingList = document.getElementById('staffingList');
+  const stationList = document.getElementById('stationList');
+  const syncPanel = document.getElementById('syncPanel');
+  const activityList = document.getElementById('activityList');
+  const activityStateSelect = document.getElementById('activityStateSelect');
+  const auditList = document.getElementById('auditList');
+  const eventTimeline = document.getElementById('eventTimeline');
+  const themeToggle = document.getElementById('themeToggle');
+  const root = document.getElementById('vsms-portfolio-atlas');
+  const navNetState = document.getElementById('nav-net-state');
+  const mixAnnouncement = document.getElementById('vp-mix-announcement');
+
+  const pct = (n, d) => (d === 0 ? 0 : Math.round((n / d) * 100));
+  const statusClass = (status) => {
+    if (status === 'Live') return 'status-green';
+    if (status === 'Upcoming') return 'status-blue';
+    if (status === 'Completed') return 'status-blue';
+    return 'status-blue';
+  };
+
+  function selectedEvent() {
+    return vsmsPortfolioData.events.find((item) => item.id === state.selectedEventId) || vsmsPortfolioData.events[0];
+  }
+
+  function availableStations(eventData) {
+    return [...new Set(eventData.participants.map((p) => p.station))];
+  }
+
+  function renderEventSelect() {
+    eventSelect.innerHTML = '';
+    vsmsPortfolioData.events.forEach((eventData) => {
+      const option = document.createElement('option');
+      option.value = eventData.id;
+      option.textContent = `${eventData.name} - ${eventData.status}`;
+      if (eventData.id === state.selectedEventId) option.selected = true;
+      eventSelect.appendChild(option);
+    });
+  }
+
+  function renderEventMeta(eventData) {
+    const completion = pct(eventData.registrations.recorded, eventData.registrations.expected);
+    const statusClassName = eventData.status === 'Live' ? 'status-live' : eventData.status === 'Upcoming' ? 'status-upcoming' : 'status-complete';
+    eventMeta.innerHTML = `
+      <div class="vp-meta-item"><div class="vp-meta-label">Location</div><div class="vp-meta-value">${eventData.location}</div></div>
+      <div class="vp-meta-item"><div class="vp-meta-label">Timing</div><div class="vp-meta-value">${eventData.dateLabel} · ${eventData.timeLabel}</div></div>
+      <div class="vp-meta-item"><div class="vp-meta-label">Readiness</div><div class="vp-meta-value">${completion}% ${eventData.registrations.recorded}/${eventData.registrations.expected}<span class="vp-state-tag ${statusClassName}">${eventData.status}</span></div></div>
+    `;
+  }
+
+  function renderMetrics(eventData) {
+    metricGrid.innerHTML = '';
+    const metrics = [
+      {
+        label: 'Registrations',
+        value: `${eventData.registrations.recorded} / ${eventData.registrations.expected}`,
+        tone: 'blk',
+        foot: `${eventData.registrations.recorded > eventData.registrations.expected ? 'Over target' : `Completion ${pct(eventData.registrations.recorded, eventData.registrations.expected)}%`}`,
+      },
+      {
+        label: 'Active queue',
+        value: `${eventData.queueCount} participants`,
+        tone: eventData.queueCount > 20 ? 'red' : eventData.queueCount > 12 ? 'amb' : 'ok',
+        foot: eventData.avgWaitMinutes > 15 ? 'Wait above 15m for some stations' : 'Wait within target',
+      },
+      {
+        label: 'Referrals',
+        value: `${eventData.participants.filter((p) => p.status === 'Referral').length} active`,
+        tone: eventData.risk.level === 'amber' ? 'amb' : 'ok',
+        foot: eventData.risk.note,
+      },
+      {
+        label: 'Sync queue',
+        value: `${eventData.sync.pendingOps} pending`,
+        tone: eventData.sync.failed ? 'red' : eventData.sync.pendingOps > 0 ? 'amb' : 'ok',
+        foot: `Last sync ${eventData.sync.lastSynced || 'none'}`,
+      },
+    ];
+
+    metrics.forEach((metric) => {
+      const box = document.createElement('article');
+      box.className = 'vp-metric';
+      box.innerHTML = `
+        <div class="vp-metric-label">${metric.label}</div>
+        <div class="vp-metric-value">${metric.value}</div>
+        <div class="vp-metric-foot">
+          <span class="vp-severity status-${metric.tone}">◆</span>
+          <span>${metric.foot}</span>
+        </div>
+      `;
+      metricGrid.appendChild(box);
+    });
+  }
+
+  function renderTimeline() {
+    eventTimeline.innerHTML = '';
+    vsmsPortfolioData.events.forEach((eventData) => {
+      const completion = pct(eventData.registrations.recorded, eventData.registrations.expected);
+      const cls = eventData.id === state.selectedEventId ? 'is-selected' : '';
+      const statusToneClass = eventData.statusKey === 'live' ? 'ok' : eventData.statusKey === 'upcoming' ? 'blk' : 'ok';
+      const readiness = [
+        ['Registration', eventData.readiness.Registration],
+        ['Visual acuity', eventData.readiness['Visual acuity']],
+        ['Refraction', eventData.readiness.Refraction],
+      ];
+
+      const row = document.createElement('article');
+      row.className = `vp-event-row ${cls}`;
+      row.tabIndex = 0;
+      row.role = 'button';
+      row.setAttribute('aria-label', `Select ${eventData.name}`);
+      row.addEventListener('click', () => {
+        state.selectedEventId = eventData.id;
+        state.selectedParticipantId = eventData.participants[0]?.id || '';
+        renderAll();
+      });
+      row.innerHTML = `
+        <div class="vp-event-row-top">
+          <div>
+            <div class="vp-event-name">${eventData.name}</div>
+            <div class="vp-event-loc">${eventData.dateLabel} · ${eventData.location}</div>
+          </div>
+          <div>
+            <div class="vp-chip status-${statusToneClass}">${eventData.status}</div>
+            <div class="vp-subtitle">${eventData.timeLabel}</div>
+          </div>
+          <div>
+            <div class="vp-chip status-green">${eventData.risk.label}</div>
+            <div class="vp-subtitle">Risk score ${eventData.risk.score}</div>
+          </div>
+        </div>
+        <div class="vp-progress"><span class="pct-${completion >= 90 ? 'green' : completion >= 70 ? 'amber' : 'red'}" style="width:${completion}%;"></span></div>
+        <div class="vp-micro">
+          ${readiness
+            .map(
+              ([name, value]) => `<div class="vp-mini"><div class="vp-mini-k">${name}</div><div class="vp-mini-v">${value || 0}</div></div>`
+            )
+            .join('')}
+        </div>
+      `;
+      eventTimeline.appendChild(row);
+    });
+  }
+
+  function renderStationFilter(eventData) {
+    const stations = availableStations(eventData);
+    const current = queueStation.value;
+    queueStation.innerHTML = '<option value="All">All stations</option>';
+    stations.forEach((station) => {
+      const option = document.createElement('option');
+      option.value = station;
+      option.textContent = station;
+      option.selected = station === current;
+      queueStation.appendChild(option);
+    });
+  }
+
+  function renderQueueRows(eventData) {
+    queueRows.classList.add('vp-loading');
+    queueRows.innerHTML = '';
+
+    if (state.queueMode === 'loading') {
+      queueRows.innerHTML = '<div class="vp-loading">Loading queue from live station cache…</div>';
+      return;
+    }
+
+    if (state.queueMode === 'error') {
+      queueRows.innerHTML = '<div class="vp-error">Queue unavailable. Verify station sync and retry.</div>';
+      return;
+    }
+
+    let rows = eventData.participants.slice();
+    const q = (state.queueSearch || '').trim().toLowerCase();
+    const station = state.queueStation;
+
+    if (q) {
+      rows = rows.filter((row) => row.name.toLowerCase().includes(q) || row.id.toLowerCase().includes(q));
+    }
+    if (station !== 'All') {
+      rows = rows.filter((row) => row.station === station);
+    }
+
+    if (state.urgentFirst) {
+      rows.sort((a, b) => {
+        if (a.priority === b.priority) return a.waitMinutes - b.waitMinutes;
+        return a.priority === 'Urgent' ? -1 : 1;
+      });
+    }
+
+    if (state.queueMode === 'empty' || rows.length === 0) {
+      queueRows.innerHTML = '<div class="vp-empty">No participants match the current filters.</div>';
+      detailHeading.textContent = 'No participant selected';
+      detailMeta.textContent = 'Try a different filter or select another event.';
+      detailState.textContent = '';
+      detailGrid.innerHTML = '';
+      referralPanel.innerHTML = '';
+      return;
+    }
+
+    rows.forEach((participant) => {
+      const row = document.createElement('button');
+      row.type = 'button';
+      row.className = 'vp-queue-row';
+      if (participant.id === state.selectedParticipantId) row.classList.add('is-selected');
+      const statusText = `${participant.status}`;
+      const statusTone = participant.status === 'Referral' || participant.priority === 'Urgent' ? 'red' : participant.status === 'Review' ? 'amb' : 'ok';
+      const waitText = typeof participant.waitMinutes === 'number' ? `${participant.waitMinutes}m` : '-';
+      row.innerHTML = `
+        <span class="vp-queue-name"><span class="t">${participant.name}</span><span class="s">${participant.id} · ${participant.queue}</span></span>
+        <span>${participant.station}</span>
+        <span>${waitText}</span>
+        <span class="vp-status ${statusTone}">${statusText}</span>
+        <span class="vp-chip status-blue">Open</span>
+      `;
+      row.addEventListener('click', () => {
+        state.selectedParticipantId = participant.id;
+        renderQueueRows(eventData);
+        renderParticipantDetails(participant);
+      });
+      queueRows.appendChild(row);
+
+      const mobileRow = document.createElement('div');
+      mobileRow.className = 'vp-queue-row-main';
+      mobileRow.innerHTML = `<div class="vp-queue-name"><span class="t">${participant.name}</span><span class="s">${participant.id} · ${participant.queue}</span></span><span class="vp-status ${statusTone}">${statusText}</span><span class="vp-subtitle">${participant.station}</span><span class="vp-subtitle">Wait ${waitText}</span><span class="vp-chip status-blue">${participant.priority}</span>`;
+      mobileRow.style.display = 'none';
+      queueRows.appendChild(mobileRow);
+    });
+
+    const selected = eventData.participants.find((p) => p.id === state.selectedParticipantId);
+    renderParticipantDetails(selected || rows[0]);
+  }
+
+  function renderParticipantDetails(participant) {
+    if (!participant) {
+      detailHeading.textContent = 'Select a participant to inspect screening context.';
+      detailMeta.textContent = 'No participant selected.';
+      detailState.textContent = '';
+      detailGrid.innerHTML = '';
+      referralPanel.innerHTML = '';
+      return;
+    }
+
+    state.selectedParticipantId = participant.id;
+    detailHeading.textContent = participant.name;
+    detailMeta.textContent = `${participant.id} · age ${participant.age} · ${participant.queue} · ${participant.station} · ${participant.status}`;
+    detailState.textContent = participant.priority === 'Urgent' ? 'Urgent' : 'Routine';
+
+    const s = participant.screening;
+    detailGrid.innerHTML = [
+      { k: 'Registration', v: s.registration },
+      { k: 'Visual acuity', v: `${s.visualAcuity.right || '-'} / ${s.visualAcuity.left || '-'} · ${s.visualAcuity.note}` },
+      { k: 'Refraction', v: `${s.refraction.spherical || '-'} · ${s.refraction.cylindrical || '-'} ${s.refraction.axis ? `@ ${s.refraction.axis}` : ''}` },
+      { k: 'Colour vision', v: `${s.colourVision.result} ${s.colourVision.note ? `· ${s.colourVision.note}` : ''}` },
+      { k: 'Eye health', v: `${s.eyeHealth.result} · ${s.eyeHealth.note}` },
+      { k: 'Clinical review', v: `${s.clinicalReview.decision} · ${s.clinicalReview.recommendation}` },
+    ].map((entry) => `
+      <div class="vp-stage">
+        <div class="k">${entry.k}</div>
+        <div class="v ${entry.k === 'Clinical review' && participant.screening.clinicalReview.recommendation.includes('Flagged') ? 'flagged' : ''}">${entry.v}</div>
+      </div>
+    `).join('');
+
+    referralPanel.innerHTML = participant.referral
+      ? `<div class="vp-stage"><div class="k">Referral draft</div><div class="v flagged">${participant.referral.destination} · ${participant.referral.urgency}</div><p class="vp-subtitle">${participant.referral.reason}</p></div>`
+      : '<div class="vp-stage"><div class="k">Referral draft</div><div class="v">No draft referral currently active.</div></div>';
+  }
+
+  function renderSupportRail(eventData) {
+    staffingList.innerHTML = '';
+    eventData.staffing.forEach((member) => {
+      const item = document.createElement('div');
+      item.className = 'vp-rail-item';
+      const statusTone = member.status === 'On station' ? 'ok' : member.status === 'Scheduled' ? 'blk' : 'green';
+      item.innerHTML = `
+        <div class="vp-rail-name">${member.name}</div>
+        <div class="vp-rail-meta">${member.role}</div>
+        <div class="vp-chip status-${statusTone}">${member.status}</div>
+      `;
+      staffingList.appendChild(item);
+    });
+
+    stationList.innerHTML = '';
+    const maxTarget = Math.max(...eventData.stations.map((s) => s.targetPerHour));
+    eventData.stations.forEach((station) => {
+      const percent = Math.min(100, Math.round((station.completed / station.targetPerHour) * 100));
+      const healthClass = station.health === 'green' ? 'fill-green' : station.health === 'amber' ? 'fill-amber' : 'fill-red';
+      const item = document.createElement('div');
+      item.className = 'vp-rail-item';
+      item.innerHTML = `
+        <div class="vp-rail-name">${station.name}</div>
+        <div class="vp-rail-meta">Target ${station.targetPerHour}/h · Completed ${station.completed} · Queue ${station.queued}</div>
+        <div class="vp-bar" aria-hidden="true"><i class="${healthClass}" style="width:${percent}%;"></i></div>
+      `;
+      stationList.appendChild(item);
+    });
+
+    const sync = eventData.sync;
+    const syncTone = sync.failed ? 'red' : sync.pendingOps > 2 ? 'amb' : 'ok';
+    const conflictMsg = sync.conflict
+      ? `<div class="vp-chip status-red">Conflict</div><div class="vp-subtitle">${sync.conflict}</div>`
+      : '';
+    syncPanel.innerHTML = `
+      <p class="vp-subtitle">${state.offline ? 'Offline-safe mode is active.' : 'Network connected.'}</p>
+      <p class="vp-rail-name">Saved safely on this device.</p>
+      <p class="vp-subtitle">${state.offline ? 'Records remain pending until connection returns.' : 'Records sync automatically when station packets are available.'}</p>
+      <div class="vp-meta-item" style="margin-top:8px;"><div class="vp-meta-label">Sync status</div><div class="vp-meta-value"><span class="vp-chip status-${syncTone}">${sync.status}</span></div></div>
+      <div class="vp-meta-item"><div class="vp-meta-label">Pending sync</div><div class="vp-meta-value">${sync.pendingOps}</div></div>
+      <div class="vp-meta-item"><div class="vp-meta-label">Last synced</div><div class="vp-meta-value">${sync.lastSynced || 'Not synced yet'}</div></div>
+      ${conflictMsg}
+      <button type="button" class="vp-btn vp-btn-primary" id="retrySyncBtn" ${state.offline || sync.pendingOps === 0 ? 'disabled' : ''}>Retry sync</button>
+    `;
+
+    document.getElementById('retrySyncBtn')?.addEventListener('click', () => {
+      queueModeSelect.value = 'ready';
+      state.queueMode = 'ready';
+      eventData.sync.failed = 0;
+      eventData.sync.pendingOps = 0;
+      eventData.sync.status = 'Synced';
+      renderAll();
+    });
+  }
+
+  function renderActivity() {
+    if (state.activityState === 'loading') {
+      activityList.innerHTML = '<div class="vp-loading">Loading activity and audit feed…</div>';
+    } else if (state.activityState === 'error') {
+      activityList.innerHTML = '<div class="vp-error">Activity feed unavailable while endpoint returns 503.</div>';
+    } else {
+      activityList.innerHTML = '';
+      const eventData = selectedEvent();
+      eventData.recentActivity.forEach((item) => {
+        const row = document.createElement('article');
+        row.className = 'vp-state-row';
+        row.innerHTML = `<div class="t">${item.time}</div><div class="d">${item.text}</div>`;
+        activityList.appendChild(row);
+      });
+      if (!eventData.recentActivity.length) {
+        activityList.innerHTML = '<div class="vp-empty">No recent activity for this event.</div>';
+      }
+    }
+
+    auditList.innerHTML = '';
+    vsmsPortfolioData.audit.forEach((entry) => {
+      const statusTone = entry.status === 'FAILED' ? 'red' : entry.status === 'WARNING' ? 'amb' : 'ok';
+      const row = document.createElement('div');
+      row.className = 'vp-audit-entry';
+      row.innerHTML = `<div class="r"><span class="vp-chip status-${statusTone}">${entry.status}</span><strong>${entry.user}</strong><span>· ${entry.role}</span><span class="vp-subtitle">${entry.time}</span></div><p class="vp-subtitle">${entry.action} · ${entry.resource} · ${entry.details}</p>`;
+      auditList.appendChild(row);
+    });
+    if (!vsmsPortfolioData.audit.length) {
+      auditList.innerHTML = '<div class="vp-empty">No audit rows yet.</div>';
+    }
+  }
+
+  function setTheme() {
+    root.removeAttribute('data-theme');
+    if (state.theme === 'dark') {
+      root.setAttribute('data-theme', 'dark');
+      themeToggle.textContent = 'Light theme';
+    } else {
+      themeToggle.textContent = 'Dark theme';
+    }
+    localStorage.setItem('vsms-portfolio-theme', state.theme);
+  }
+
+  function updateConnectionState() {
+    navNetState.textContent = state.offline ? 'Offline' : 'Online';
+    navNetState.parentElement.classList.toggle('vp-offline', state.offline);
+    if (state.offline) {
+      showOfflineState.textContent = 'Set online';
+      queueStation.disabled = true;
+      urgentFirstBtn.disabled = true;
+    } else {
+      showOfflineState.textContent = 'Toggle offline';
+      queueStation.disabled = false;
+      urgentFirstBtn.disabled = false;
+    }
+  }
+
+  function renderAll() {
+    const eventData = selectedEvent();
+    renderEventMeta(eventData);
+    renderMetrics(eventData);
+    renderTimeline();
+    renderStationFilter(eventData);
+    renderQueueRows(eventData);
+    renderSupportRail(eventData);
+    renderActivity();
+    updateConnectionState();
+    queueModeSelect.value = state.queueMode;
+    queueSearch.value = state.queueSearch;
+    queueStation.value = state.queueStation;
+  }
+
+  function bindEvents() {
+    eventSelect.addEventListener('change', () => {
+      state.selectedEventId = eventSelect.value;
+      const eventData = selectedEvent();
+      state.queueMode = eventData.id === 'evt_live_northside' ? 'ready' : 'ready';
+      state.selectedParticipantId = eventData.participants[0]?.id || '';
+      renderAll();
+    });
+
+    queueModeSelect.addEventListener('change', () => {
+      state.queueMode = queueModeSelect.value;
+      renderQueueRows(selectedEvent());
+    });
+
+    queueSearch.addEventListener('input', () => {
+      state.queueSearch = queueSearch.value;
+      renderQueueRows(selectedEvent());
+    });
+
+    queueStation.addEventListener('change', () => {
+      state.queueStation = queueStation.value;
+      renderQueueRows(selectedEvent());
+    });
+
+    urgentFirstBtn.addEventListener('click', () => {
+      state.urgentFirst = !state.urgentFirst;
+      urgentFirstBtn.setAttribute('aria-pressed', state.urgentFirst);
+      renderQueueRows(selectedEvent());
+    });
+
+    showOfflineState.addEventListener('click', () => {
+      state.offline = !state.offline;
+      renderAll();
+    });
+
+    activityStateSelect.addEventListener('change', () => {
+      state.activityState = activityStateSelect.value;
+      renderActivity();
+    });
+
+    themeToggle.addEventListener('click', () => {
+      state.theme = state.theme === 'dark' ? 'light' : 'dark';
+      setTheme();
+    });
+
+    document.querySelectorAll('[data-region][data-use-region][data-source="portfolio"]').forEach((button) => {
+      const region = button.dataset.useRegion || button.dataset.region || 'unknown';
+      button.addEventListener('click', () => {
+        const source = button.dataset.source || 'portfolio';
+        const message = { type: 'vsms-use-region', region, source };
+        mixAnnouncement.textContent = `Use in mix selected for ${region}; source ${source}.`;
+        if (window.parent && window.parent !== window && window.parent.postMessage) {
+          window.parent.postMessage(message, '*');
+        }
+        window.dispatchEvent(new CustomEvent('vsms-mix:region-selected', {
+          detail: {
+            region,
+            source,
+            concept: 'portfolio'
+          }
+        }));
+      });
+    });
+  }
+
+  const savedTheme = localStorage.getItem('vsms-portfolio-theme');
+  if (savedTheme === 'dark') state.theme = 'dark';
+
+  renderEventSelect();
+  renderAll();
+  bindEvents();
+  setTheme();
+
+  window.vsmsPortfolioAtlas = {
+    concept: 'portfolio',
+    source: 'portfolio',
+    regions: {
+      'navigation-shell': 'data-region',
+      'event-context-header': 'data-region',
+      'headline-metrics': 'data-region',
+      'primary-workspace': 'data-region',
+      'supporting-rail': 'data-region',
+      'activity-compliance': 'data-region',
+    },
+    events: vsmsPortfolioData.events.length,
+    offlineSafeDefault: 'Saved safely on this device until sync returns.',
+    readyState: {
+      queue: state.queueMode,
+      activity: state.activityState,
+      offline: state.offline,
+    },
+  };
+</script>
+
+</div>
