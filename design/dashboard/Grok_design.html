@@ -1,0 +1,2671 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>VSMS — Operations Board · Grok_design</title>
+  <style id="vsms-css">
+:root {
+  --bg: #e8eddf;
+  --bg-deep: #dfe6d4;
+  --surface: #f7f9f2;
+  --surface-2: #eef3e8;
+  --ink: #1a2e24;
+  --ink-2: #3d5448;
+  --muted: #5c7366;
+  --muted-2: #7a9184;
+  --line: #c5d1c4;
+  --line-strong: #a8b8a6;
+  --teal: #0f6b5c;
+  --teal-strong: #0a5448;
+  --teal-soft: rgba(15, 107, 92, 0.12);
+  --teal-ink: #f4faf7;
+  --amber: #a65f00;
+  --amber-soft: rgba(166, 95, 0, 0.14);
+  --red: #b4233a;
+  --red-soft: rgba(180, 35, 58, 0.12);
+  --green: #1b6b45;
+  --green-soft: rgba(27, 107, 69, 0.14);
+  --violet: #5b4b8a;
+  --violet-soft: rgba(91, 75, 138, 0.12);
+  --dry: #6b3fa0;
+  --shadow: 0 1px 0 rgba(26, 46, 36, 0.06);
+  --radius: 10px;
+  --radius-sm: 6px;
+  --font: "IBM Plex Sans", "Segoe UI", system-ui, -apple-system, sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, monospace;
+  --rail-w: 232px;
+  --touch: 44px;
+  --focus: 0 0 0 3px var(--surface), 0 0 0 5px var(--teal);
+}
+
+*, *::before, *::after { box-sizing: border-box; }
+html, body { height: 100%; }
+body {
+  margin: 0;
+  font-family: var(--font);
+  font-size: 14px;
+  line-height: 1.45;
+  color: var(--ink);
+  background: var(--bg);
+  -webkit-font-smoothing: antialiased;
+}
+button, input, select, textarea { font: inherit; color: inherit; }
+button { cursor: pointer; border: none; background: none; }
+a { color: var(--teal); }
+:focus { outline: none; }
+:focus-visible { box-shadow: var(--focus); border-radius: 4px; }
+.sr-only {
+  position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+  overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0;
+}
+[hidden] { display: none !important; }
+
+.dev-label {
+  position: fixed; bottom: 8px; right: 10px; z-index: 9999;
+  font-size: 10px; letter-spacing: 0.04em; color: var(--muted-2);
+  background: rgba(247,249,242,0.9); border: 1px solid var(--line);
+  padding: 3px 8px; border-radius: 4px; pointer-events: none;
+}
+.skip-link {
+  position: absolute; left: -999px; top: 8px; z-index: 10000;
+  background: var(--teal); color: var(--teal-ink); padding: 10px 16px;
+  border-radius: var(--radius-sm); font-weight: 600;
+}
+.skip-link:focus { left: 12px; }
+
+/* App shell — rail + main (not generic SaaS top nav) */
+.app {
+  display: grid;
+  grid-template-columns: var(--rail-w) 1fr;
+  min-height: 100vh;
+  min-height: 100dvh;
+}
+.rail {
+  background: var(--ink);
+  color: #e6f0ea;
+  display: flex;
+  flex-direction: column;
+  padding: 18px 14px;
+  border-right: 1px solid #0f1f18;
+  position: sticky;
+  top: 0;
+  height: 100vh;
+  height: 100dvh;
+}
+.rail-brand {
+  display: flex; gap: 12px; align-items: center;
+  padding: 4px 8px 20px;
+}
+.mark {
+  width: 36px; height: 36px; border-radius: 9px;
+  background: var(--teal); color: var(--teal-ink);
+  display: grid; place-items: center; font-weight: 700; font-size: 16px;
+}
+.brand-name { font-weight: 700; letter-spacing: -0.02em; font-size: 15px; }
+.brand-sub { font-size: 11px; color: #9bb5a8; margin-top: 1px; }
+.rail-nav { display: flex; flex-direction: column; gap: 4px; flex: 1; }
+.nav-item {
+  display: flex; align-items: center; gap: 10px;
+  min-height: var(--touch); padding: 0 12px;
+  border-radius: var(--radius-sm); color: #c5d9ce; text-align: left;
+  width: 100%; transition: background 0.15s ease, color 0.15s ease;
+}
+.nav-item:hover { background: rgba(255,255,255,0.06); color: #fff; }
+.nav-item.is-active { background: rgba(15,107,92,0.45); color: #fff; font-weight: 600; }
+.nav-item:focus-visible { box-shadow: 0 0 0 3px rgba(15,107,92,0.7); }
+.nav-ico { width: 18px; opacity: 0.85; font-size: 13px; }
+.nav-badge {
+  margin-left: auto; min-width: 22px; height: 22px; padding: 0 6px;
+  border-radius: 11px; background: var(--amber); color: #fff;
+  font-size: 11px; font-weight: 700; display: grid; place-items: center;
+}
+.nav-badge.warn { background: var(--red); }
+.rail-foot { margin-top: auto; display: flex; flex-direction: column; gap: 10px; }
+.session-card {
+  background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.08);
+  border-radius: var(--radius); padding: 12px;
+}
+.session-name { font-weight: 600; font-size: 13px; }
+.session-role { font-size: 12px; color: #9bb5a8; margin-bottom: 10px; }
+.field-label {
+  display: block; font-size: 11px; text-transform: uppercase;
+  letter-spacing: 0.06em; color: #9bb5a8; margin-bottom: 4px; font-weight: 600;
+}
+
+.main-col { display: flex; flex-direction: column; min-width: 0; min-height: 100vh; }
+.topbar {
+  display: flex; align-items: flex-start; justify-content: space-between; gap: 16px;
+  padding: 20px 28px 12px; border-bottom: 1px solid var(--line);
+  background: var(--surface);
+  position: sticky; top: 0; z-index: 20;
+}
+.page-title {
+  margin: 0; font-size: 22px; letter-spacing: -0.03em; font-weight: 700; line-height: 1.15;
+}
+.page-sub { margin: 4px 0 0; color: var(--muted); font-size: 13px; max-width: 52ch; }
+.topbar-right { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; justify-content: flex-end; }
+.workspace { padding: 18px 28px 40px; flex: 1; min-width: 0; }
+
+/* Buttons */
+.btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+  min-height: var(--touch); padding: 0 16px;
+  border-radius: var(--radius-sm); font-weight: 600; font-size: 13px;
+  border: 1px solid transparent; transition: background 0.12s, border-color 0.12s, transform 0.08s;
+  white-space: nowrap;
+}
+.btn:active { transform: translateY(1px); }
+.btn-primary { background: var(--teal); color: var(--teal-ink); }
+.btn-primary:hover { background: var(--teal-strong); }
+.btn-secondary {
+  background: var(--surface); color: var(--ink);
+  border-color: var(--line-strong);
+}
+.btn-secondary:hover { background: var(--surface-2); }
+.btn-ghost { background: transparent; color: var(--ink-2); border-color: transparent; }
+.btn-ghost:hover { background: rgba(26,46,36,0.06); }
+.btn-danger { background: var(--red); color: #fff; }
+.btn-danger-ghost { color: var(--red); border-color: transparent; background: transparent; }
+.btn-danger-ghost:hover { background: var(--red-soft); }
+.btn-sm { min-height: 36px; padding: 0 12px; font-size: 12px; }
+.btn-block { width: 100%; }
+.btn-icon { width: 40px; min-height: 40px; padding: 0; }
+.btn:disabled { opacity: 0.45; cursor: not-allowed; transform: none; }
+
+.rail .btn-ghost { color: #c5d9ce; }
+.rail .btn-ghost:hover { background: rgba(255,255,255,0.08); color: #fff; }
+.rail .select {
+  background: rgba(0,0,0,0.25); color: #e6f0ea; border-color: rgba(255,255,255,0.15); width: 100%;
+}
+.rail .select option { color: #111; }
+
+/* Inputs */
+.input, .select, .textarea {
+  width: 100%; min-height: var(--touch); padding: 10px 12px;
+  border: 1px solid var(--line-strong); border-radius: var(--radius-sm);
+  background: #fff; color: var(--ink);
+}
+.textarea { min-height: 80px; resize: vertical; line-height: 1.4; }
+.input:focus-visible, .select:focus-visible, .textarea:focus-visible {
+  border-color: var(--teal); box-shadow: var(--focus);
+}
+.select.compact { min-height: 40px; padding: 8px 10px; width: auto; min-width: 140px; }
+.field { display: flex; flex-direction: column; gap: 6px; }
+.field label { font-size: 12px; font-weight: 600; color: var(--ink-2); }
+.form-grid {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 12px;
+}
+.check-row, .radio-row {
+  display: flex; align-items: flex-start; gap: 10px;
+  min-height: 40px; padding: 8px 0; cursor: pointer;
+}
+.check-row input, .radio-row input { width: 18px; height: 18px; margin-top: 2px; flex-shrink: 0; accent-color: var(--teal); }
+.decision-set { border: 1px solid var(--line); border-radius: var(--radius); padding: 8px 14px 12px; margin: 0 0 12px; }
+.decision-set legend { padding: 0 6px; font-weight: 600; font-size: 12px; }
+
+/* Chips / pills */
+.chip {
+  min-height: 36px; padding: 0 14px; border-radius: 999px;
+  border: 1px solid var(--line-strong); background: var(--surface);
+  color: var(--ink-2); font-weight: 600; font-size: 12px;
+}
+.chip.is-on { background: var(--teal-soft); border-color: var(--teal); color: var(--teal-strong); }
+.status-pill {
+  display: inline-flex; align-items: center; gap: 6px;
+  min-height: 28px; padding: 0 10px; border-radius: 999px;
+  font-size: 11px; font-weight: 700; letter-spacing: 0.02em;
+  background: var(--surface-2); color: var(--ink-2); border: 1px solid var(--line);
+  text-transform: uppercase;
+}
+.status-pill.draft { background: #eef0ea; color: var(--muted); }
+.status-pill.upcoming { background: var(--teal-soft); color: var(--teal-strong); border-color: rgba(15,107,92,0.25); }
+.status-pill.in_progress { background: #1a2e24; color: #e8f5ef; border-color: #1a2e24; }
+.status-pill.completed { background: var(--green-soft); color: var(--green); border-color: rgba(27,107,69,0.25); }
+.status-pill.amber { background: var(--amber-soft); color: var(--amber); border-color: rgba(166,95,0,0.25); }
+.status-pill.red { background: var(--red-soft); color: var(--red); }
+.status-pill.violet { background: var(--violet-soft); color: var(--violet); }
+
+.sync-chip {
+  display: inline-flex; align-items: center; gap: 8px;
+  min-height: 36px; padding: 0 12px; border-radius: 999px;
+  background: var(--surface-2); border: 1px solid var(--line); font-size: 12px; font-weight: 600;
+}
+.sync-dot {
+  width: 8px; height: 8px; border-radius: 50%; background: var(--green);
+  box-shadow: 0 0 0 3px var(--green-soft);
+}
+.sync-chip.is-pending .sync-dot { background: var(--amber); box-shadow: 0 0 0 3px var(--amber-soft); }
+.sync-chip.is-failed .sync-dot { background: var(--red); box-shadow: 0 0 0 3px var(--red-soft); }
+.sync-chip.is-offline .sync-dot { background: var(--violet); box-shadow: 0 0 0 3px var(--violet-soft); }
+.sync-chip.is-syncing .sync-dot { background: var(--teal); animation: pulse 1s ease infinite; }
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.35; }
+}
+
+/* Toolbar */
+.toolbar {
+  display: flex; flex-wrap: wrap; gap: 10px; align-items: center;
+  margin-bottom: 18px;
+}
+.search-wrap { flex: 1 1 220px; min-width: 180px; max-width: 360px; }
+.filter-row { display: flex; flex-wrap: wrap; gap: 6px; }
+.sort-wrap { margin-left: auto; }
+.section-label {
+  margin: 0; font-size: 11px; font-weight: 700; letter-spacing: 0.08em;
+  text-transform: uppercase; color: var(--muted);
+}
+.muted { color: var(--muted); }
+.hint { font-size: 12px; color: var(--muted); margin: 0 0 10px; }
+.mono { font-family: var(--mono); font-size: 12px; }
+.t-num { font-variant-numeric: tabular-nums; font-weight: 700; font-size: 22px; letter-spacing: -0.02em; display: block; }
+
+/* Event board — horizontal tickets, not metric cards */
+.needs-block { margin-bottom: 22px; }
+.needs-head, .slate-head {
+  display: flex; align-items: baseline; justify-content: space-between;
+  margin-bottom: 10px;
+}
+.event-stack { display: flex; flex-direction: column; gap: 8px; }
+.event-ticket {
+  display: grid;
+  grid-template-columns: 6px 1fr auto;
+  gap: 0;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  overflow: hidden;
+  box-shadow: var(--shadow);
+  transition: border-color 0.12s, background 0.12s;
+}
+.event-ticket:hover { border-color: var(--line-strong); background: #fbfcf7; }
+.event-ticket.is-attention { border-color: rgba(166,95,0,0.45); }
+.event-ticket .ticket-stripe { background: var(--line-strong); }
+.event-ticket[data-status="draft"] .ticket-stripe { background: var(--muted-2); }
+.event-ticket[data-status="upcoming"] .ticket-stripe { background: var(--teal); }
+.event-ticket[data-status="in_progress"] .ticket-stripe { background: #1a2e24; }
+.event-ticket[data-status="completed"] .ticket-stripe { background: var(--green); }
+.ticket-body {
+  padding: 14px 16px; display: grid;
+  grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr) minmax(160px, 0.9fr);
+  gap: 16px; align-items: start; min-width: 0;
+}
+.ticket-title {
+  margin: 0 0 4px; font-size: 15px; font-weight: 700; letter-spacing: -0.02em;
+}
+.ticket-meta { font-size: 12px; color: var(--muted); display: flex; flex-wrap: wrap; gap: 6px 12px; }
+.ticket-meta span::before { content: ""; }
+.ticket-stats {
+  display: flex; flex-direction: column; gap: 6px; font-size: 12px; color: var(--ink-2);
+}
+.stat-line { display: flex; justify-content: space-between; gap: 8px; }
+.stat-line b { font-variant-numeric: tabular-nums; color: var(--ink); }
+.warn-line {
+  color: var(--amber); font-weight: 600; font-size: 12px;
+  display: flex; align-items: center; gap: 6px;
+}
+.warn-line.urgent { color: var(--red); }
+.next-action {
+  font-size: 12px; color: var(--ink-2); margin-top: 6px;
+}
+.next-action strong { color: var(--teal-strong); }
+.ticket-actions {
+  display: flex; flex-direction: column; gap: 6px; padding: 12px 12px 12px 0;
+  min-width: 148px; align-self: stretch; justify-content: center;
+}
+.ticket-actions .btn { width: 100%; }
+.ticket-more {
+  display: flex; gap: 4px; flex-wrap: wrap; justify-content: flex-end;
+  padding: 0 4px 10px 0; grid-column: 2 / -1;
+}
+.ticket-more .btn { min-height: 36px; }
+
+/* Panels */
+.panel {
+  background: var(--surface); border: 1px solid var(--line);
+  border-radius: var(--radius); padding: 14px 16px;
+}
+.panel-head-row {
+  display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 10px;
+}
+.panel-head-row .section-label { margin: 0; }
+
+/* Live event */
+.event-top {
+  display: flex; flex-wrap: wrap; align-items: flex-start; gap: 14px;
+  margin-bottom: 16px;
+}
+.event-top-main { flex: 1; min-width: 200px; }
+.event-status-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.event-status-row h2 { margin: 0; font-size: 20px; letter-spacing: -0.02em; }
+.event-top-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.live-grid {
+  display: grid;
+  grid-template-columns: 1.4fr 1fr;
+  grid-template-areas:
+    "flow stations"
+    "queue team"
+    "queue sync";
+  gap: 12px;
+}
+.live-flow { grid-area: flow; }
+.live-stations { grid-area: stations; }
+.live-team { grid-area: team; }
+.live-queue { grid-area: queue; min-height: 220px; }
+.live-sync { grid-area: sync; }
+
+.flow-rail {
+  display: grid; grid-template-columns: repeat(6, 1fr); gap: 6px; margin: 12px 0;
+}
+.flow-stage {
+  background: var(--bg); border: 1px solid var(--line); border-radius: var(--radius-sm);
+  padding: 10px 8px; text-align: center; min-height: 72px;
+}
+.flow-stage .n { font-size: 22px; font-weight: 700; font-variant-numeric: tabular-nums; letter-spacing: -0.03em; }
+.flow-stage .l { font-size: 10px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); font-weight: 700; margin-top: 2px; }
+.flow-stage.is-hot { border-color: rgba(166,95,0,0.5); background: var(--amber-soft); }
+.flow-stage.is-hot .n { color: var(--amber); }
+
+.alert-strip { display: flex; flex-direction: column; gap: 6px; }
+.alert-item {
+  display: flex; gap: 10px; align-items: flex-start;
+  padding: 10px 12px; border-radius: var(--radius-sm);
+  background: var(--amber-soft); border: 1px solid rgba(166,95,0,0.25);
+  font-size: 13px; font-weight: 600; color: var(--ink);
+}
+.alert-item.urgent { background: var(--red-soft); border-color: rgba(180,35,58,0.25); }
+.alert-item.ok { background: var(--green-soft); border-color: rgba(27,107,69,0.2); font-weight: 500; }
+
+.station-board { display: flex; flex-direction: column; gap: 8px; margin-top: 8px; }
+.station-row {
+  display: grid; grid-template-columns: 1fr auto auto; gap: 10px; align-items: center;
+  padding: 10px 0; border-bottom: 1px solid var(--line);
+  font-size: 13px;
+}
+.station-row:last-child { border-bottom: 0; }
+.station-name { font-weight: 600; }
+.station-staff { color: var(--muted); font-size: 12px; }
+.queue-n {
+  min-width: 52px; text-align: right; font-weight: 700;
+  font-variant-numeric: tabular-nums; color: var(--ink);
+}
+.queue-n.busy { color: var(--amber); }
+.queue-n.blocked { color: var(--red); }
+.dot-status {
+  width: 10px; height: 10px; border-radius: 50%; background: var(--green); display: inline-block;
+}
+.dot-status.busy { background: var(--amber); }
+.dot-status.offline { background: var(--red); }
+.dot-status.idle { background: var(--muted-2); }
+
+.duty-list, .attention-queue { display: flex; flex-direction: column; gap: 6px; margin-top: 8px; }
+.duty-item, .attn-item {
+  display: flex; justify-content: space-between; gap: 10px; align-items: center;
+  padding: 10px 12px; background: var(--bg); border-radius: var(--radius-sm);
+  border: 1px solid var(--line); min-height: 48px;
+}
+.attn-item { cursor: pointer; text-align: left; width: 100%; }
+.attn-item:hover { border-color: var(--teal); background: var(--teal-soft); }
+.attn-item .why { font-size: 12px; color: var(--muted); }
+
+/* People */
+.people-layout {
+  display: grid; grid-template-columns: 1fr 1.4fr; gap: 12px;
+}
+.people-list { display: flex; flex-direction: column; gap: 8px; margin-top: 10px; }
+.person-row {
+  display: grid; grid-template-columns: 1fr auto; gap: 10px; align-items: center;
+  padding: 12px; border: 1px solid var(--line); border-radius: var(--radius-sm);
+  background: #fff; min-height: 64px;
+}
+.person-name { font-weight: 700; }
+.person-meta { font-size: 12px; color: var(--muted); margin-top: 2px; }
+.person-actions { display: flex; flex-wrap: wrap; gap: 6px; justify-content: flex-end; }
+.role-tag {
+  display: inline-block; font-size: 11px; font-weight: 700;
+  padding: 2px 8px; border-radius: 4px; background: var(--surface-2); color: var(--ink-2);
+}
+
+/* Sync list */
+.sync-summary {
+  display: flex; flex-wrap: wrap; gap: 18px; align-items: center; margin-bottom: 14px;
+}
+.sync-stat { min-width: 72px; }
+.sync-stat span:last-child { font-size: 12px; color: var(--muted); }
+.sync-list { display: flex; flex-direction: column; gap: 8px; }
+.sync-row {
+  display: grid; grid-template-columns: 1fr auto auto; gap: 12px; align-items: center;
+  padding: 12px 14px; background: var(--surface); border: 1px solid var(--line);
+  border-radius: var(--radius); min-height: 56px;
+}
+.sync-state {
+  font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em;
+  padding: 4px 8px; border-radius: 4px;
+}
+.sync-state.pending { background: var(--amber-soft); color: var(--amber); }
+.sync-state.failed { background: var(--red-soft); color: var(--red); }
+.sync-state.conflict { background: var(--violet-soft); color: var(--violet); }
+.sync-state.synced { background: var(--green-soft); color: var(--green); }
+.sync-state.syncing { background: var(--teal-soft); color: var(--teal); }
+.sync-state.offline { background: var(--surface-2); color: var(--muted); }
+
+/* Tri-pane screening */
+.screen-top {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 14px; margin-bottom: 14px;
+}
+.screen-top h2 { margin: 0; font-size: 18px; letter-spacing: -0.02em; }
+.tri-pane {
+  display: grid;
+  grid-template-columns: minmax(200px, 0.85fr) minmax(280px, 1.5fr) minmax(200px, 0.9fr);
+  gap: 10px;
+  min-height: calc(100vh - 160px);
+}
+.pane {
+  background: var(--surface); border: 1px solid var(--line);
+  border-radius: var(--radius); padding: 12px; min-width: 0;
+  display: flex; flex-direction: column;
+}
+.pane-head {
+  display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 10px;
+}
+.pane h3 { margin: 0 0 10px; font-size: 13px; font-weight: 700; }
+.pane-work { background: #fbfcf7; }
+.queue-list { display: flex; flex-direction: column; gap: 6px; overflow: auto; flex: 1; }
+.q-item {
+  display: block; width: 100%; text-align: left;
+  padding: 12px; border-radius: var(--radius-sm);
+  border: 1px solid var(--line); background: #fff; min-height: 56px;
+}
+.q-item:hover, .q-item.is-sel { border-color: var(--teal); background: var(--teal-soft); }
+.q-item .qn { font-weight: 700; font-size: 13px; }
+.q-item .qm { font-size: 11px; color: var(--muted); margin-top: 2px; }
+
+.part-banner {
+  display: flex; justify-content: space-between; align-items: flex-start; gap: 12px;
+  padding: 12px 14px; background: var(--ink); color: #e8f0eb;
+  border-radius: var(--radius); margin-bottom: 12px;
+}
+.part-name { font-size: 18px; font-weight: 700; letter-spacing: -0.02em; }
+.part-meta { font-size: 12px; color: #9bb5a8; margin-top: 4px; }
+.part-banner .status-pill { background: rgba(255,255,255,0.12); color: #fff; border-color: transparent; }
+
+.path-strip {
+  display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 14px;
+}
+.path-step {
+  font-size: 11px; font-weight: 700; padding: 6px 10px; border-radius: 999px;
+  background: var(--bg); border: 1px solid var(--line); color: var(--muted);
+}
+.path-step.done { background: var(--green-soft); color: var(--green); border-color: rgba(27,107,69,0.25); }
+.path-step.current { background: var(--teal); color: #fff; border-color: var(--teal); }
+.path-step.next { background: var(--amber-soft); color: var(--amber); border-color: rgba(166,95,0,0.3); }
+
+.result-form fieldset {
+  border: 1px solid var(--line); border-radius: var(--radius); padding: 12px 14px 14px; margin: 0 0 12px;
+}
+.result-form legend { font-weight: 700; padding: 0 6px; font-size: 13px; }
+.form-actions {
+  display: flex; flex-wrap: wrap; gap: 8px; align-items: center; justify-content: flex-end;
+  padding-top: 4px;
+}
+.save-state {
+  margin-right: auto; font-size: 12px; font-weight: 700; color: var(--muted);
+}
+.save-state.saved { color: var(--green); }
+.save-state.pending { color: var(--amber); }
+.save-state.failed { color: var(--red); }
+
+.handoff-panel { font-size: 13px; }
+.handoff-panel .h-row {
+  display: flex; justify-content: space-between; gap: 8px;
+  padding: 8px 0; border-bottom: 1px solid var(--line);
+}
+.handoff-panel .h-row:last-child { border-bottom: 0; }
+.ctx-block { margin-top: 16px; padding-top: 12px; border-top: 1px solid var(--line); }
+.ctx-block h4 { margin: 0 0 8px; font-size: 12px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); }
+.plain-list { margin: 0; padding-left: 18px; color: var(--ink-2); font-size: 12px; }
+.plain-list li { margin-bottom: 4px; }
+
+.results-block {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 12px;
+}
+.res-card {
+  padding: 10px 12px; background: var(--bg); border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+}
+.res-card .k { font-size: 11px; color: var(--muted); font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; }
+.res-card .v { font-size: 15px; font-weight: 700; margin-top: 4px; font-variant-numeric: tabular-nums; }
+.missing-block {
+  padding: 10px 12px; background: var(--amber-soft); border-radius: var(--radius-sm);
+  margin-bottom: 12px; font-size: 13px; font-weight: 600; color: var(--amber);
+}
+
+/* Empty / loading */
+.empty-state {
+  text-align: center; padding: 48px 24px; color: var(--ink-2);
+}
+.empty-state.large { padding: 80px 24px; }
+.empty-state h2, .empty-state h3 { color: var(--ink); margin: 0 0 8px; }
+.empty-state p { max-width: 40ch; margin: 0 auto 16px; color: var(--muted); }
+.empty-inline {
+  padding: 20px; text-align: center; color: var(--muted); font-size: 13px;
+  border: 1px dashed var(--line); border-radius: var(--radius-sm);
+}
+.loading-state { display: flex; flex-direction: column; gap: 8px; }
+.skeleton {
+  height: 72px; border-radius: var(--radius); background:
+    linear-gradient(90deg, var(--surface-2) 25%, #e4ebe0 50%, var(--surface-2) 75%);
+  background-size: 200% 100%; animation: shimmer 1.2s infinite;
+}
+@keyframes shimmer {
+  0% { background-position: 100% 0; }
+  100% { background-position: -100% 0; }
+}
+
+/* Modal */
+.modal-root {
+  position: fixed; inset: 0; z-index: 1000;
+  display: grid; place-items: center; padding: 24px;
+}
+.modal-backdrop {
+  position: absolute; inset: 0; background: rgba(26, 46, 36, 0.45);
+}
+.modal {
+  position: relative; width: min(560px, 100%); max-height: min(86vh, 800px);
+  overflow: auto; background: var(--surface); border-radius: 12px;
+  border: 1px solid var(--line-strong); box-shadow: 0 24px 48px rgba(26,46,36,0.2);
+  display: flex; flex-direction: column;
+}
+.modal.wide { width: min(720px, 100%); }
+.modal-head {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 14px 16px; border-bottom: 1px solid var(--line);
+  position: sticky; top: 0; background: var(--surface); z-index: 1;
+}
+.modal-head h2 { margin: 0; font-size: 16px; letter-spacing: -0.02em; }
+.modal-body { padding: 16px; display: flex; flex-direction: column; gap: 12px; }
+.modal-foot {
+  display: flex; flex-wrap: wrap; gap: 8px; justify-content: flex-end;
+  padding: 12px 16px; border-top: 1px solid var(--line);
+  position: sticky; bottom: 0; background: var(--surface);
+}
+.modal-danger-name {
+  padding: 12px; background: var(--red-soft); border-radius: var(--radius-sm);
+  font-weight: 700; color: var(--red); border: 1px solid rgba(180,35,58,0.2);
+}
+.perm-preview {
+  padding: 12px; background: var(--bg); border: 1px solid var(--line);
+  border-radius: var(--radius-sm); font-size: 13px;
+}
+.perm-preview ul { margin: 6px 0 0; padding-left: 18px; }
+
+/* Dry run + toasts + banner */
+.dry-run-bar {
+  position: sticky; top: 0; z-index: 50;
+  display: flex; flex-wrap: wrap; align-items: center; gap: 10px;
+  padding: 10px 16px; background: #3b1f5c; color: #f3eaff;
+  font-size: 13px;
+}
+.dry-run-bar .btn-ghost { color: #f3eaff; border: 1px solid rgba(255,255,255,0.25); min-height: 36px; }
+.dry-run-bar .btn-ghost:hover { background: rgba(255,255,255,0.1); }
+.dry-run-dot {
+  width: 8px; height: 8px; border-radius: 50%; background: #d4a8ff;
+  box-shadow: 0 0 0 3px rgba(212,168,255,0.25); animation: pulse 1.4s ease infinite;
+}
+.global-banner {
+  position: sticky; top: 0; z-index: 40;
+  padding: 10px 16px; background: var(--amber-soft); color: var(--ink);
+  border-bottom: 1px solid rgba(166,95,0,0.3); font-size: 13px; font-weight: 600;
+  display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+}
+.toast-root {
+  position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%);
+  z-index: 2000; display: flex; flex-direction: column; gap: 8px; width: min(420px, calc(100% - 32px));
+  pointer-events: none;
+}
+.toast {
+  pointer-events: auto; padding: 12px 16px; border-radius: var(--radius);
+  background: var(--ink); color: #e8f0eb; font-size: 13px; font-weight: 600;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.2); animation: toast-in 0.2s ease;
+}
+.toast.ok { background: var(--green); }
+.toast.err { background: var(--red); }
+@keyframes toast-in {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.summary-grid {
+  display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px;
+}
+.summary-cell {
+  padding: 16px; background: var(--bg); border-radius: var(--radius-sm); border: 1px solid var(--line);
+}
+.summary-cell .n { font-size: 28px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.summary-cell .l { font-size: 12px; color: var(--muted); margin-top: 4px; font-weight: 600; }
+
+/* Scan modal QR mock */
+.qr-mock {
+  width: 140px; height: 140px; margin: 8px auto;
+  background:
+    linear-gradient(90deg, #1a2e24 10px, transparent 10px) 0 0 / 20px 20px,
+    linear-gradient(#1a2e24 10px, transparent 10px) 0 0 / 20px 20px,
+    #f7f9f2;
+  border: 3px solid var(--ink); border-radius: 8px;
+  position: relative;
+}
+.qr-mock::after {
+  content: "PASS"; position: absolute; inset: 40px; background: var(--surface);
+  display: grid; place-items: center; font-family: var(--mono); font-size: 11px; font-weight: 700;
+}
+
+/* Responsive — tablet landscape ~1024 and down */
+@media (max-width: 1100px) {
+  .ticket-body {
+    grid-template-columns: 1fr;
+    gap: 10px;
+  }
+  .ticket-actions {
+    flex-direction: row; flex-wrap: wrap; padding: 0 12px 12px;
+    min-width: 0; grid-column: 2;
+  }
+  .ticket-actions .btn { width: auto; flex: 1 1 auto; }
+  .live-grid {
+    grid-template-columns: 1fr;
+    grid-template-areas: "flow" "stations" "queue" "team" "sync";
+  }
+  .flow-rail { grid-template-columns: repeat(3, 1fr); }
+  .tri-pane {
+    grid-template-columns: 1fr;
+    min-height: 0;
+  }
+  .people-layout { grid-template-columns: 1fr; }
+  .summary-grid { grid-template-columns: 1fr 1fr; }
+  .form-grid { grid-template-columns: 1fr; }
+}
+@media (max-width: 860px) {
+  .app { grid-template-columns: 1fr; }
+  .rail {
+    position: relative; height: auto;
+    flex-direction: row; flex-wrap: wrap; align-items: center;
+    gap: 8px; padding: 12px;
+  }
+  .rail-brand { padding: 0 8px 0 0; }
+  .rail-nav { flex-direction: row; flex-wrap: wrap; flex: 1; }
+  .nav-item { width: auto; }
+  .rail-foot {
+    flex-direction: row; width: 100%; align-items: flex-end; gap: 12px;
+  }
+  .session-card { flex: 1; }
+  .workspace { padding: 14px 16px 32px; }
+  .topbar { padding: 14px 16px 10px; flex-direction: column; }
+  .sort-wrap { margin-left: 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+  </style>
+</head>
+<body>
+  <div class="dev-label" aria-hidden="true">DESIGN_ID: Grok_design</div>
+  <a class="skip-link" href="#main">Skip to main content</a>
+
+  <!-- Toast + banner -->
+  <div id="toast-root" class="toast-root" aria-live="polite"></div>
+  <div id="global-banner" class="global-banner" hidden role="status"></div>
+  <div id="dry-run-bar" class="dry-run-bar" hidden>
+    <span class="dry-run-dot"></span>
+    <strong>Dry run</strong>
+    <span id="dry-run-label">Simulated event — no live records will change.</span>
+    <button type="button" class="btn btn-ghost btn-sm" id="btn-exit-dry-run">Exit dry run</button>
+  </div>
+
+  <div class="app" id="app">
+    <!-- LEFT RAIL -->
+    <aside class="rail" aria-label="Primary">
+      <div class="rail-brand">
+        <div class="mark" aria-hidden="true">V</div>
+        <div>
+          <div class="brand-name">VSMS</div>
+          <div class="brand-sub">Vision screening</div>
+        </div>
+      </div>
+
+      <nav class="rail-nav" aria-label="Sections">
+        <button type="button" class="nav-item is-active" data-nav="board" id="nav-board">
+          <span class="nav-ico" aria-hidden="true">▦</span>
+          <span>Day board</span>
+        </button>
+        <button type="button" class="nav-item" data-nav="people" id="nav-people">
+          <span class="nav-ico" aria-hidden="true">☖</span>
+          <span>People</span>
+          <span class="nav-badge" id="people-badge" hidden>0</span>
+        </button>
+        <button type="button" class="nav-item" data-nav="sync" id="nav-sync">
+          <span class="nav-ico" aria-hidden="true">↻</span>
+          <span>Sync health</span>
+          <span class="nav-badge warn" id="sync-badge" hidden>0</span>
+        </button>
+      </nav>
+
+      <div class="rail-foot">
+        <div class="session-card">
+          <div class="session-name" id="session-name">Priya Nair</div>
+          <div class="session-role" id="session-role">Event Manager</div>
+          <label class="field-label" for="role-switch">View as</label>
+          <select id="role-switch" class="select compact">
+            <option value="Event Manager">Event Manager</option>
+            <option value="Registration Officer">Registration Officer</option>
+            <option value="Screener">Screener</option>
+            <option value="Doctor / Reviewer">Doctor / Reviewer</option>
+            <option value="Administrator">Administrator</option>
+            <option value="Denied">No access (demo)</option>
+          </select>
+        </div>
+        <button type="button" class="btn btn-ghost btn-block" id="btn-reset">Reset prototype</button>
+      </div>
+    </aside>
+
+    <!-- MAIN COLUMN -->
+    <div class="main-col">
+      <header class="topbar">
+        <div class="topbar-left">
+          <h1 class="page-title" id="page-title">Day board</h1>
+          <p class="page-sub" id="page-sub">Events needing action today, then the rest of the slate.</p>
+        </div>
+        <div class="topbar-right">
+          <div class="sync-chip" id="sync-chip" title="Sync status">
+            <span class="sync-dot" id="sync-dot"></span>
+            <span id="sync-chip-text">All synced</span>
+          </div>
+          <button type="button" class="btn btn-primary" id="btn-create-event">Create event</button>
+        </div>
+      </header>
+
+      <main id="main" class="workspace">
+        <!-- PERMISSION DENIED -->
+        <section id="view-denied" class="view" hidden>
+          <div class="empty-state large">
+            <h2>Permission denied</h2>
+            <p>This account cannot open the operations board. Ask an administrator to assign a staff role.</p>
+            <button type="button" class="btn btn-secondary" id="btn-denied-back">Switch demo role</button>
+          </div>
+        </section>
+
+        <!-- DAY BOARD / EVENTS -->
+        <section id="view-board" class="view">
+          <div class="toolbar">
+            <div class="search-wrap">
+              <label class="sr-only" for="event-search">Search events</label>
+              <input type="search" id="event-search" class="input" placeholder="Search name, venue, or code…" autocomplete="off" />
+            </div>
+            <div class="filter-row" role="group" aria-label="Status filter">
+              <button type="button" class="chip is-on" data-status-filter="all">All</button>
+              <button type="button" class="chip" data-status-filter="draft">Draft</button>
+              <button type="button" class="chip" data-status-filter="upcoming">Upcoming</button>
+              <button type="button" class="chip" data-status-filter="in_progress">In progress</button>
+              <button type="button" class="chip" data-status-filter="completed">Completed</button>
+            </div>
+            <div class="sort-wrap">
+              <label class="sr-only" for="event-sort">Sort</label>
+              <select id="event-sort" class="select compact">
+                <option value="date_asc">Date · soonest</option>
+                <option value="date_desc">Date · latest</option>
+                <option value="name">Name</option>
+                <option value="status">Status</option>
+              </select>
+            </div>
+          </div>
+
+          <div id="needs-attention" class="needs-block" hidden>
+            <div class="needs-head">
+              <h2 class="section-label">Needs attention</h2>
+              <span class="muted" id="needs-count"></span>
+            </div>
+            <div id="needs-list" class="event-stack"></div>
+          </div>
+
+          <div class="slate-head">
+            <h2 class="section-label">Event slate</h2>
+            <span class="muted" id="slate-count"></span>
+          </div>
+          <div id="event-list" class="event-stack"></div>
+          <div id="event-empty" class="empty-state" hidden>
+            <h3>No events match</h3>
+            <p>Clear filters or create a new community screening event.</p>
+            <button type="button" class="btn btn-primary" id="btn-empty-create">Create event</button>
+          </div>
+          <div id="event-loading" class="loading-state" hidden>
+            <div class="skeleton sk-row"></div>
+            <div class="skeleton sk-row"></div>
+            <div class="skeleton sk-row"></div>
+          </div>
+        </section>
+
+        <!-- PEOPLE -->
+        <section id="view-people" class="view" hidden>
+          <div class="toolbar">
+            <div class="search-wrap">
+              <label class="sr-only" for="staff-search">Search staff</label>
+              <input type="search" id="staff-search" class="input" placeholder="Search staff by name or email…" />
+            </div>
+            <button type="button" class="btn btn-secondary" id="btn-import-staff">Import staff</button>
+            <button type="button" class="btn btn-primary" id="btn-invite-staff">Invite staff</button>
+          </div>
+
+          <div class="people-layout">
+            <div class="people-pending panel">
+              <h2 class="section-label">Pending access</h2>
+              <div id="pending-list" class="people-list"></div>
+              <div id="pending-empty" class="empty-inline" hidden>No pending requests.</div>
+            </div>
+            <div class="people-active panel">
+              <h2 class="section-label">Active staff</h2>
+              <p class="hint">Participants never appear here — only authorised staff accounts.</p>
+              <div id="staff-list" class="people-list"></div>
+            </div>
+          </div>
+        </section>
+
+        <!-- SYNC -->
+        <section id="view-sync" class="view" hidden>
+          <div class="sync-summary panel">
+            <div class="sync-stat"><span class="t-num" id="sync-pending-n">0</span><span>Pending</span></div>
+            <div class="sync-stat"><span class="t-num" id="sync-failed-n">0</span><span>Failed</span></div>
+            <div class="sync-stat"><span class="t-num" id="sync-conflict-n">0</span><span>Conflicts</span></div>
+            <div class="sync-stat"><span class="t-num" id="sync-ok-n">0</span><span>Synced</span></div>
+            <button type="button" class="btn btn-primary" id="btn-retry-all-failed">Retry failed</button>
+          </div>
+          <div id="sync-record-list" class="sync-list"></div>
+          <div id="sync-empty" class="empty-state" hidden>
+            <h3>Nothing waiting to sync</h3>
+            <p>Local saves will appear here when the device is offline or a transfer fails.</p>
+          </div>
+        </section>
+
+        <!-- LIVE EVENT DASHBOARD -->
+        <section id="view-event" class="view" hidden>
+          <div class="event-top">
+            <button type="button" class="btn btn-ghost btn-sm" id="btn-back-board">← Day board</button>
+            <div class="event-top-main">
+              <div class="event-status-row">
+                <span class="status-pill" id="live-status-pill">In progress</span>
+                <h2 id="live-event-name">Event</h2>
+              </div>
+              <p class="muted" id="live-event-meta"></p>
+            </div>
+            <div class="event-top-actions">
+              <button type="button" class="btn btn-secondary" id="btn-live-edit">Edit event</button>
+              <button type="button" class="btn btn-primary" id="btn-open-screen">Open screening</button>
+              <button type="button" class="btn btn-secondary" id="btn-open-review">Clinical review</button>
+            </div>
+          </div>
+
+          <div class="live-grid">
+            <div class="live-flow panel">
+              <h3 class="section-label">Participant flow</h3>
+              <div class="flow-rail" id="flow-rail" aria-label="Stage counts"></div>
+              <div class="alert-strip" id="live-alerts"></div>
+            </div>
+            <div class="live-stations panel">
+              <h3 class="section-label">Stations</h3>
+              <div id="station-board" class="station-board"></div>
+            </div>
+            <div class="live-team panel">
+              <h3 class="section-label">On duty</h3>
+              <div id="duty-list" class="duty-list"></div>
+            </div>
+            <div class="live-queue panel">
+              <div class="panel-head-row">
+                <h3 class="section-label">What needs you next</h3>
+                <button type="button" class="btn btn-ghost btn-sm" id="btn-scan-from-live">Scan QR</button>
+              </div>
+              <div id="attention-queue" class="attention-queue"></div>
+            </div>
+            <div class="live-sync panel">
+              <h3 class="section-label">Device sync</h3>
+              <div id="live-sync-body"></div>
+            </div>
+          </div>
+        </section>
+
+        <!-- SCREENING WORKSPACE -->
+        <section id="view-screen" class="view screen-view" hidden>
+          <div class="screen-top">
+            <button type="button" class="btn btn-ghost btn-sm" id="btn-back-event-from-screen">← Event</button>
+            <div>
+              <h2 id="screen-title">Screening station</h2>
+              <p class="muted" id="screen-sub"></p>
+            </div>
+            <div class="sync-chip" id="screen-sync-chip">
+              <span class="sync-dot"></span>
+              <span id="screen-sync-text">Ready</span>
+            </div>
+          </div>
+
+          <div class="tri-pane">
+            <aside class="pane pane-queue">
+              <div class="pane-head">
+                <h3>Station queue</h3>
+                <button type="button" class="btn btn-primary btn-sm" id="btn-scan-qr">Scan QR</button>
+              </div>
+              <div id="station-queue" class="queue-list"></div>
+              <div id="queue-empty" class="empty-inline" hidden>Queue clear. Scan the next pass.</div>
+            </aside>
+
+            <div class="pane pane-work">
+              <div id="work-empty" class="empty-state">
+                <h3>No participant open</h3>
+                <p>Scan a QR pass or pick someone waiting at this station.</p>
+                <button type="button" class="btn btn-primary" id="btn-scan-empty">Scan QR</button>
+              </div>
+              <div id="work-active" hidden>
+                <div class="part-banner">
+                  <div>
+                    <div class="part-name" id="part-name">—</div>
+                    <div class="part-meta"><span id="part-id" class="mono"></span> · <span id="part-age"></span> · Event <span id="part-event-check"></span></div>
+                  </div>
+                  <span class="status-pill" id="part-stage-pill">Screening</span>
+                </div>
+                <div class="path-strip" id="path-strip" aria-label="Station path"></div>
+                <form id="result-form" class="result-form" autocomplete="off">
+                  <fieldset>
+                    <legend>Visual acuity (this station)</legend>
+                    <div class="form-grid">
+                      <div class="field">
+                        <label for="va-right">Right eye (logMAR)</label>
+                        <input id="va-right" name="vaRight" class="input" inputmode="decimal" placeholder="e.g. 0.2" required />
+                      </div>
+                      <div class="field">
+                        <label for="va-left">Left eye (logMAR)</label>
+                        <input id="va-left" name="vaLeft" class="input" inputmode="decimal" placeholder="e.g. 0.1" required />
+                      </div>
+                      <div class="field">
+                        <label for="va-binocular">Binocular</label>
+                        <input id="va-binocular" name="vaBin" class="input" inputmode="decimal" placeholder="optional" />
+                      </div>
+                      <div class="field">
+                        <label for="va-aid">With correction</label>
+                        <select id="va-aid" name="aid" class="select">
+                          <option value="none">None</option>
+                          <option value="glasses">Glasses</option>
+                          <option value="contacts">Contacts</option>
+                        </select>
+                      </div>
+                    </div>
+                    <div class="field">
+                      <label for="va-notes">Station notes</label>
+                      <textarea id="va-notes" name="notes" class="input textarea" rows="2" placeholder="Observations for handoff (not a diagnosis)"></textarea>
+                    </div>
+                    <label class="check-row">
+                      <input type="checkbox" id="va-flag" name="flag" />
+                      <span>Flag for clinical review (screening rule — not a diagnosis)</span>
+                    </label>
+                  </fieldset>
+                  <div class="form-actions">
+                    <div class="save-state" id="save-state">Unsaved</div>
+                    <button type="button" class="btn btn-secondary" id="btn-save-local">Save on device</button>
+                    <button type="submit" class="btn btn-primary" id="btn-save-handoff">Save & hand off</button>
+                  </div>
+                </form>
+              </div>
+            </div>
+
+            <aside class="pane pane-ctx">
+              <h3>Handoff</h3>
+              <div id="handoff-panel" class="handoff-panel">
+                <p class="muted">Open a participant to see completed, current, and next station.</p>
+              </div>
+              <div class="ctx-block">
+                <h4>Safety</h4>
+                <ul class="plain-list">
+                  <li>QR holds pass ID only — no clinical data.</li>
+                  <li>Results save locally first, then sync.</li>
+                  <li>Flags request review; they do not diagnose.</li>
+                </ul>
+              </div>
+            </aside>
+          </div>
+        </section>
+
+        <!-- CLINICAL REVIEW -->
+        <section id="view-review" class="view" hidden>
+          <div class="screen-top">
+            <button type="button" class="btn btn-ghost btn-sm" id="btn-back-event-from-review">← Event</button>
+            <div>
+              <h2>Clinical review</h2>
+              <p class="muted">Screening flags and incomplete packets — final decision by reviewer.</p>
+            </div>
+          </div>
+          <div class="tri-pane review-pane">
+            <aside class="pane pane-queue">
+              <h3>Review queue <span class="muted" id="review-count"></span></h3>
+              <div id="review-queue" class="queue-list"></div>
+              <div id="review-empty" class="empty-inline" hidden>Queue clear.</div>
+            </aside>
+            <div class="pane pane-work">
+              <div id="review-empty-work" class="empty-state">
+                <h3>Select a record</h3>
+                <p>Choose a flagged or incomplete packet from the queue.</p>
+              </div>
+              <div id="review-work" hidden>
+                <div class="part-banner">
+                  <div>
+                    <div class="part-name" id="rev-name">—</div>
+                    <div class="part-meta"><span id="rev-id" class="mono"></span> · <span id="rev-meta"></span></div>
+                  </div>
+                  <span class="status-pill amber" id="rev-flag-pill">Flagged</span>
+                </div>
+                <div class="results-block" id="rev-results"></div>
+                <div class="missing-block" id="rev-missing"></div>
+                <form id="review-form" class="result-form">
+                  <div class="field">
+                    <label for="rev-notes">Reviewer notes</label>
+                    <textarea id="rev-notes" class="input textarea" rows="3" placeholder="Assessment of screening packet (not a free-text diagnosis claim)"></textarea>
+                  </div>
+                  <fieldset class="decision-set">
+                    <legend>Final decision</legend>
+                    <label class="radio-row"><input type="radio" name="decision" value="clear" required /> Clear — no follow-up from this screen</label>
+                    <label class="radio-row"><input type="radio" name="decision" value="followup" /> Follow-up recommended</label>
+                    <label class="radio-row"><input type="radio" name="decision" value="referral" /> Referral pathway</label>
+                    <label class="radio-row"><input type="radio" name="decision" value="incomplete" /> Return — incomplete results</label>
+                  </fieldset>
+                  <div class="form-actions">
+                    <button type="submit" class="btn btn-primary">Finalise review</button>
+                  </div>
+                </form>
+              </div>
+            </div>
+            <aside class="pane pane-ctx">
+              <h3>Context</h3>
+              <div id="rev-ctx" class="handoff-panel"></div>
+            </aside>
+          </div>
+        </section>
+
+        <!-- EVENT SUMMARY (completed) -->
+        <section id="view-summary" class="view" hidden>
+          <div class="screen-top">
+            <button type="button" class="btn btn-ghost btn-sm" id="btn-back-board-summary">← Day board</button>
+            <div>
+              <h2 id="summary-title">Event summary</h2>
+              <p class="muted" id="summary-meta"></p>
+            </div>
+          </div>
+          <div class="summary-grid panel" id="summary-body"></div>
+        </section>
+      </main>
+    </div>
+  </div>
+
+  <!-- MODALS -->
+  <div id="modal-root" class="modal-root" hidden>
+    <div class="modal-backdrop" data-close-modal></div>
+    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="modal-title" id="modal-dialog">
+      <header class="modal-head">
+        <h2 id="modal-title">Dialog</h2>
+        <button type="button" class="btn btn-ghost btn-icon" data-close-modal aria-label="Close">✕</button>
+      </header>
+      <div class="modal-body" id="modal-body"></div>
+      <footer class="modal-foot" id="modal-foot"></footer>
+    </div>
+  </div>
+
+  <script id="vsms-js">
+
+(function () {
+  "use strict";
+
+  var STORAGE_KEY = "vsms_grok_design_v1";
+  var STATIONS = ["Registration", "Visual acuity", "Refraction", "Colour vision", "Eye health", "Clinical review"];
+
+  var ROLE_PERMS = {
+    "Event Manager": ["board", "people", "sync", "event", "screen", "review", "edit", "create", "delete", "assign"],
+    "Registration Officer": ["board", "event", "screen", "sync"],
+    "Screener": ["board", "event", "screen", "sync"],
+    "Doctor / Reviewer": ["board", "event", "review", "sync"],
+    "Administrator": ["board", "people", "sync", "event", "screen", "review", "edit", "create", "delete", "assign"],
+    "Denied": []
+  };
+
+  function uid(p) {
+    return (p || "id") + "_" + Math.random().toString(36).slice(2, 9);
+  }
+
+  function seedStaff() {
+    return [
+      { id: "s1", name: "Priya Nair", email: "priya.nair@vsms.example", role: "Event Manager", status: "active", eventId: "e1", station: "—", perms: "Configure events, assign staff, monitor queues" },
+      { id: "s2", name: "Marcus Soh", email: "marcus.soh@vsms.example", role: "Registration Officer", status: "active", eventId: "e1", station: "Registration", perms: "Register participants, issue QR passes" },
+      { id: "s3", name: "Aisha Rahman", email: "aisha.r@vsms.example", role: "Screener", status: "active", eventId: "e1", station: "Visual acuity", perms: "Scan QR, record station results, hand off" },
+      { id: "s4", name: "Dr. James Okafor", email: "j.okafor@vsms.example", role: "Doctor / Reviewer", status: "active", eventId: "e1", station: "Clinical review", perms: "Review flags, finalise follow-up decisions" },
+      { id: "s5", name: "Lina Petrov", email: "lina.p@vsms.example", role: "Screener", status: "active", eventId: "e1", station: "Refraction", perms: "Scan QR, record station results, hand off" },
+      { id: "s6", name: "Tom Hale", email: "tom.hale@vsms.example", role: "Screener", status: "active", eventId: "e2", station: "Colour vision", perms: "Scan QR, record station results, hand off" },
+      { id: "s7", name: "Mei Chen", email: "mei.chen@vsms.example", role: "Event Manager", status: "active", eventId: "e3", station: "—", perms: "Configure events, assign staff, monitor queues" },
+      { id: "s8", name: "Admin Desk", email: "admin@vsms.example", role: "Administrator", status: "active", eventId: null, station: "—", perms: "Full system access, deactivate accounts" }
+    ];
+  }
+
+  function seedPending() {
+    return [
+      { id: "p1", name: "Carlos Mendes", email: "c.mendes@health.example", role: "Screener", requested: "Today 08:12" },
+      { id: "p2", name: "Hannah Brooks", email: "h.brooks@clinic.example", role: "Registration Officer", requested: "Yesterday" }
+    ];
+  }
+
+  function seedEvents() {
+    return [
+      {
+        id: "e1", name: "Riverside Community Hall — Spring screen", code: "RV-2403", status: "in_progress",
+        date: "2026-07-31", time: "08:30", endTime: "16:00", venue: "Riverside Community Hall, Deck B",
+        capacity: 180, registered: 142, stations: STATIONS.slice(), staffIds: ["s1", "s2", "s3", "s4", "s5"],
+        readiness: "3/5 stations staffed", warnings: ["Review queue: 4", "1 sync failure on tablet VA-2"],
+        nextAction: "Open live event dashboard", dryRunAllowed: true
+      },
+      {
+        id: "e2", name: "Northside Primary — Year 5 cohort", code: "NS-118", status: "upcoming",
+        date: "2026-08-05", time: "09:00", endTime: "14:30", venue: "Northside Primary Gym",
+        capacity: 96, registered: 64, stations: STATIONS.slice(), staffIds: ["s6", "s2"],
+        readiness: "Staff incomplete — 2 roles open", warnings: ["2 station roles unassigned"],
+        nextAction: "Complete staff assignments", dryRunAllowed: true
+      },
+      {
+        id: "e3", name: "Harbour Market weekend clinic", code: "HM-077", status: "draft",
+        date: "2026-08-16", time: "10:00", endTime: "15:00", venue: "Harbour Market Pavilion",
+        capacity: 120, registered: 0, stations: STATIONS.slice(0, 5), staffIds: ["s7"],
+        readiness: "Draft — not published", warnings: [], nextAction: "Finish setup and publish", dryRunAllowed: true
+      },
+      {
+        id: "e4", name: "Cedar Heights retirement village", code: "CH-052", status: "upcoming",
+        date: "2026-08-02", time: "11:00", endTime: "15:30", venue: "Cedar Heights Community Room",
+        capacity: 60, registered: 48, stations: STATIONS.slice(), staffIds: ["s1", "s3", "s4"],
+        readiness: "Ready for dry run", warnings: [], nextAction: "Run dry run before open", dryRunAllowed: true
+      },
+      {
+        id: "e5", name: "Westbrook Library pop-up", code: "WB-301", status: "completed",
+        date: "2026-07-18", time: "09:00", endTime: "13:00", venue: "Westbrook Public Library",
+        capacity: 80, registered: 74, stations: STATIONS.slice(), staffIds: ["s7", "s5", "s4"],
+        readiness: "Closed", warnings: [], nextAction: "Open summary report", dryRunAllowed: false,
+        summary: { completed: 71, followUp: 9, referral: 3, noShow: 3 }
+      },
+      {
+        id: "e6", name: "Docklands worksite day", code: "DL-019", status: "draft",
+        date: "", time: "08:00", endTime: "12:00", venue: "Docklands Site Office 3",
+        capacity: 40, registered: 0, stations: ["Registration", "Visual acuity", "Eye health", "Clinical review"],
+        staffIds: [], readiness: "Needs date before activation", warnings: ["No date set", "No staff assigned"],
+        nextAction: "Set date and assign staff", dryRunAllowed: true
+      }
+    ];
+  }
+
+  function seedParticipants(eventId) {
+    return [
+      { id: "pt1", passId: "QR-8F2A1C", name: "Elena Vasquez", age: 34, eventId: eventId, stage: "waiting", station: "Visual acuity", completed: ["Registration"], results: {}, flag: false, sync: "synced", review: null },
+      { id: "pt2", passId: "QR-3B91DE", name: "Omar Farouk", age: 41, eventId: eventId, stage: "screening", station: "Visual acuity", completed: ["Registration"], results: {}, flag: false, sync: "synced", review: null },
+      { id: "pt3", passId: "QR-C44E02", name: "Grace Okonkwo", age: 29, eventId: eventId, stage: "screening", station: "Refraction", completed: ["Registration", "Visual acuity"], results: { va: { right: "0.1", left: "0.2", bin: "0.1", aid: "none", notes: "" } }, flag: false, sync: "pending", review: null },
+      { id: "pt4", passId: "QR-91AA7B", name: "Samir Patel", age: 52, eventId: eventId, stage: "review", station: "Clinical review", completed: ["Registration", "Visual acuity", "Refraction", "Colour vision", "Eye health"], results: { va: { right: "0.5", left: "0.6", bin: "0.5", aid: "glasses", notes: "Difficulty at 6m line" }, refraction: { sphereR: "+1.25", sphereL: "+1.50" }, colour: { result: "Fail Ishihara 8/14" }, eye: { notes: "Red reflex asymmetric — flag" } }, flag: true, flagReason: "VA outside screening threshold; colour fail", sync: "synced", review: { status: "queued" }, missing: [] },
+      { id: "pt5", passId: "QR-D01FE3", name: "Yuki Tanaka", age: 67, eventId: eventId, stage: "review", station: "Clinical review", completed: ["Registration", "Visual acuity", "Refraction", "Colour vision"], results: { va: { right: "0.8", left: "0.4", bin: "0.5", aid: "glasses", notes: "" } }, flag: true, flagReason: "Large inter-eye difference", sync: "failed", review: { status: "queued" }, missing: ["Eye health"] },
+      { id: "pt6", passId: "QR-55C0B2", name: "Noah Brennan", age: 8, eventId: eventId, stage: "completed", station: "—", completed: STATIONS.slice(0, 5), results: { va: { right: "0.0", left: "0.0", bin: "0.0", aid: "none", notes: "" } }, flag: false, sync: "synced", review: { status: "clear", decision: "clear" } },
+      { id: "pt7", passId: "QR-A7E319", name: "Fatima Al-Hassan", age: 45, eventId: eventId, stage: "waiting", station: "Colour vision", completed: ["Registration", "Visual acuity", "Refraction"], results: { va: { right: "0.2", left: "0.1", bin: "0.1", aid: "contacts", notes: "" } }, flag: false, sync: "offline", review: null },
+      { id: "pt8", passId: "QR-12D9F0", name: "Ben Cartwright", age: 38, eventId: eventId, stage: "followup", station: "—", completed: STATIONS.slice(), results: {}, flag: true, sync: "synced", review: { status: "done", decision: "followup", notes: "Community optometry follow-up advised" } },
+      { id: "pt9", passId: "QR-77B4E1", name: "Priya Iyer", age: 16, eventId: eventId, stage: "registered", station: "Registration", completed: [], results: {}, flag: false, sync: "synced", review: null },
+      { id: "pt10", passId: "QR-E8C203", name: "Daniel Mwangi", age: 55, eventId: eventId, stage: "review", station: "Clinical review", completed: ["Registration", "Visual acuity", "Refraction", "Colour vision", "Eye health"], results: { va: { right: "0.3", left: "0.3", bin: "0.2", aid: "none", notes: "Headache reported" } }, flag: true, flagReason: "Symptom + borderline VA", sync: "conflict", review: { status: "queued" }, missing: [] }
+    ];
+  }
+
+  function defaultState() {
+    return {
+      role: "Event Manager",
+      view: "board",
+      statusFilter: "all",
+      eventSort: "date_asc",
+      eventQuery: "",
+      staffQuery: "",
+      events: seedEvents(),
+      staff: seedStaff(),
+      pending: seedPending(),
+      participantsByEvent: { e1: seedParticipants("e1"), e2: [], e3: [], e4: [], e5: [], e6: [] },
+      activeEventId: null,
+      dryRun: false,
+      dryRunSnapshot: null,
+      selectedParticipantId: null,
+      selectedReviewId: null,
+      screenStation: "Visual acuity",
+      loading: false
+    };
+  }
+
+  function loadState() {
+    try {
+      var raw = localStorage.getItem(STORAGE_KEY);
+      if (!raw) return defaultState();
+      var parsed = JSON.parse(raw);
+      return Object.assign(defaultState(), parsed, { loading: false, dryRun: !!parsed.dryRun });
+    } catch (e) {
+      return defaultState();
+    }
+  }
+
+  function saveState() {
+    try {
+      var clone = JSON.parse(JSON.stringify(state));
+      delete clone.loading;
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(clone));
+    } catch (e) {}
+  }
+
+  var state = loadState();
+
+  function $(id) { return document.getElementById(id); }
+  function can(perm) {
+    return (ROLE_PERMS[state.role] || []).indexOf(perm) !== -1;
+  }
+  function toast(msg, kind) {
+    var root = $("toast-root");
+    var el = document.createElement("div");
+    el.className = "toast" + (kind ? " " + kind : "");
+    el.textContent = msg;
+    root.appendChild(el);
+    setTimeout(function () { if (el.parentNode) el.parentNode.removeChild(el); }, 2800);
+  }
+  function statusLabel(s) {
+    return ({ draft: "Draft", upcoming: "Upcoming", in_progress: "In progress", completed: "Completed" })[s] || s;
+  }
+  function formatDate(d) {
+    if (!d) return "Date not set";
+    try {
+      var parts = d.split("-");
+      var dt = new Date(+parts[0], +parts[1] - 1, +parts[2]);
+      return dt.toLocaleDateString(undefined, { weekday: "short", day: "numeric", month: "short", year: "numeric" });
+    } catch (e) { return d; }
+  }
+    function escapeHtml(s) {
+    return String(s == null ? "" : s)
+      .replace(/&/g, "&" + "amp;")
+      .replace(/</g, "&" + "lt;")
+      .replace(/>/g, "&" + "gt;")
+      .replace(/"/g, "&" + "quot;");
+  }
+  function h(strings) {
+    // join helper for HTML arrays
+    var out = "";
+    for (var i = 0; i < arguments.length; i++) out += arguments[i] == null ? "" : String(arguments[i]);
+    return out;
+  }
+  function getEvent(id) {
+    for (var i = 0; i < state.events.length; i++) if (state.events[i].id === id) return state.events[i];
+    return null;
+  }
+  function getParticipants(eventId) {
+    if (!state.participantsByEvent[eventId]) state.participantsByEvent[eventId] = [];
+    return state.participantsByEvent[eventId];
+  }
+  function getParticipant(eventId, pid) {
+    var list = getParticipants(eventId);
+    for (var i = 0; i < list.length; i++) if (list[i].id === pid) return list[i];
+    return null;
+  }
+  function countStages(parts) {
+    var c = { registered: 0, waiting: 0, screening: 0, review: 0, completed: 0, followup: 0 };
+    parts.forEach(function (p) { if (c[p.stage] !== undefined) c[p.stage]++; });
+    return c;
+  }
+  function collectSyncRecords() {
+    var rows = [];
+    Object.keys(state.participantsByEvent).forEach(function (eid) {
+      getParticipants(eid).forEach(function (p) {
+        if (p.sync && p.sync !== "synced") {
+          rows.push({ id: p.id, eventId: eid, name: p.name, passId: p.passId, sync: p.sync, station: p.station });
+        }
+      });
+    });
+    return rows;
+  }
+  function updateSyncChip() {
+    var rows = collectSyncRecords();
+    var failed = rows.filter(function (r) { return r.sync === "failed" || r.sync === "conflict"; }).length;
+    var pending = rows.filter(function (r) { return r.sync === "pending" || r.sync === "offline" || r.sync === "syncing"; }).length;
+    var chip = $("sync-chip");
+    var text = $("sync-chip-text");
+    var badge = $("sync-badge");
+    chip.className = "sync-chip";
+    if (failed) { chip.classList.add("is-failed"); text.textContent = failed + " need attention"; }
+    else if (pending) { chip.classList.add("is-pending"); text.textContent = pending + " pending sync"; }
+    else text.textContent = "All synced";
+    if (failed + pending > 0) { badge.hidden = false; badge.textContent = String(failed + pending); }
+    else badge.hidden = true;
+    var pb = $("people-badge");
+    if (state.pending.length) { pb.hidden = false; pb.textContent = String(state.pending.length); }
+    else pb.hidden = true;
+  }
+
+  function openModal(opts) {
+    $("modal-title").textContent = opts.title || "Dialog";
+    $("modal-body").innerHTML = opts.bodyHtml || "";
+    $("modal-foot").innerHTML = "";
+    $("modal-dialog").classList.toggle("wide", !!opts.wide);
+    (opts.actions || []).forEach(function (a) {
+      var b = document.createElement("button");
+      b.type = "button";
+      b.className = "btn " + (a.className || "btn-secondary");
+      b.textContent = a.label;
+      b.addEventListener("click", function () {
+        if (a.close !== false) closeModal();
+        if (a.onClick) a.onClick();
+      });
+      $("modal-foot").appendChild(b);
+    });
+    $("modal-root").hidden = false;
+    var focusable = $("modal-dialog").querySelector("input, select, textarea, button");
+    if (focusable) focusable.focus();
+  }
+  function closeModal() {
+    $("modal-root").hidden = true;
+    $("modal-body").innerHTML = "";
+    $("modal-foot").innerHTML = "";
+  }
+  document.querySelectorAll("[data-close-modal]").forEach(function (el) {
+    el.addEventListener("click", closeModal);
+  });
+  document.addEventListener("keydown", function (e) {
+    if (e.key === "Escape" && !$("modal-root").hidden) closeModal();
+  });
+
+  function setView(view) {
+    if (state.role === "Denied") state.view = "denied";
+    else {
+      if (view === "people" && !can("people")) { toast("Your role cannot open People", "err"); return; }
+      if (view === "sync" && !can("sync")) { toast("Your role cannot open Sync", "err"); return; }
+      state.view = view;
+    }
+    render();
+    saveState();
+  }
+  function setRole(role) {
+    state.role = role;
+    $("session-name").textContent = role === "Denied" ? "Guest" : "Priya Nair";
+    $("session-role").textContent = role === "Denied" ? "No access" : role;
+    if (role === "Denied") state.view = "denied";
+    else if (state.view === "denied") state.view = "board";
+    render();
+    saveState();
+  }
+
+  function filteredEvents() {
+    var q = (state.eventQuery || "").toLowerCase().trim();
+    var list = state.events.filter(function (ev) {
+      if (state.statusFilter !== "all" && ev.status !== state.statusFilter) return false;
+      if (!q) return true;
+      return (ev.name + " " + ev.venue + " " + ev.code).toLowerCase().indexOf(q) !== -1;
+    });
+    list.sort(function (a, b) {
+      if (state.eventSort === "name") return a.name.localeCompare(b.name);
+      if (state.eventSort === "status") return a.status.localeCompare(b.status);
+      if (state.eventSort === "date_desc") return (b.date || "").localeCompare(a.date || "");
+      return (a.date || "9999").localeCompare(b.date || "9999");
+    });
+    return list;
+  }
+
+  function eventPrimaryAction(ev) {
+    if (ev.status === "in_progress") return { label: "Open live event", act: "open" };
+    if (ev.status === "completed") return { label: "Open summary", act: "summary" };
+    if (ev.status === "upcoming") return { label: "Start event", act: "start" };
+    return { label: "Edit draft", act: "edit" };
+  }
+
+  function needsAttention(ev) {
+    if (ev.status === "in_progress") return true;
+    if ((ev.warnings || []).length) return true;
+    if (ev.status === "upcoming" && !ev.date) return true;
+    return false;
+  }
+
+  function renderEventTicket(ev, attention) {
+    var primary = eventPrimaryAction(ev);
+    var warnHtml = (ev.warnings || []).slice(0, 2).map(function (w) {
+      var urgent = /fail|unassign/i.test(w);
+      return '<div class="warn-line' + (urgent ? " urgent" : "") + '">' + escapeHtml(w) + "</div>";
+    }).join("");
+
+    var dryBtn = (ev.status !== "completed" && ev.dryRunAllowed !== false)
+      ? '<button type="button" class="btn btn-secondary" data-ev-act="dry" data-id="' + ev.id + '">Dry run</button>'
+      : "";
+    var screenBtn = ev.status === "in_progress"
+      ? '<button type="button" class="btn btn-secondary" data-ev-act="screen" data-id="' + ev.id + '">Open screening</button>'
+      : "";
+
+    var el = document.createElement("article");
+    el.className = "event-ticket" + (attention ? " is-attention" : "");
+    el.dataset.status = ev.status;
+    el.dataset.id = ev.id;
+    el.innerHTML =
+      '<div class="ticket-stripe" aria-hidden="true"></div>' +
+      '<div class="ticket-body">' +
+        '<div>' +
+          '<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:4px">' +
+            '<span class="status-pill ' + ev.status + '">' + statusLabel(ev.status) + "</span>" +
+            '<span class="mono muted">' + escapeHtml(ev.code) + "</span>" +
+          "</div>" +
+          '<h3 class="ticket-title">' + escapeHtml(ev.name) + "</h3>" +
+          '<div class="ticket-meta">' +
+            "<span>" + escapeHtml(formatDate(ev.date)) + (ev.time ? " · " + escapeHtml(ev.time) + "–" + escapeHtml(ev.endTime || "") : "") + "</span>" +
+            "<span>" + escapeHtml(ev.venue) + "</span>" +
+          "</div>" +
+          '<div class="next-action">Next: <strong>' + escapeHtml(ev.nextAction || primary.label) + "</strong></div>" +
+        "</div>" +
+        '<div class="ticket-stats">' +
+          '<div class="stat-line"><span>Registered</span><b>' + ev.registered + " / " + ev.capacity + "</b></div>" +
+          '<div class="stat-line"><span>Stations</span><b>' + (ev.stations ? ev.stations.length : 0) + "</b></div>" +
+          '<div class="stat-line"><span>Readiness</span><b style="font-weight:600;font-size:12px">' + escapeHtml(ev.readiness || "—") + "</b></div>" +
+          warnHtml +
+        "</div>" +
+        '<div class="ticket-actions">' +
+          '<button type="button" class="btn btn-primary" data-ev-act="' + primary.act + '" data-id="' + ev.id + '">' + primary.label + "</button>" +
+          dryBtn + screenBtn +
+        "</div>" +
+      "</div>" +
+      '<div class="ticket-more">' +
+        '<button type="button" class="btn btn-ghost btn-sm" data-ev-act="edit" data-id="' + ev.id + '">Edit</button>' +
+        '<button type="button" class="btn btn-ghost btn-sm" data-ev-act="dup" data-id="' + ev.id + '">Duplicate</button>' +
+        '<button type="button" class="btn btn-danger-ghost btn-sm" data-ev-act="del" data-id="' + ev.id + '">Delete…</button>' +
+      "</div>";
+    return el;
+  }
+
+  function renderBoard() {
+    var list = filteredEvents();
+    var needs = list.filter(needsAttention);
+    var rest = list.filter(function (e) { return !needsAttention(e); });
+    var needsEl = $("needs-list");
+    var listEl = $("event-list");
+    var needsBlock = $("needs-attention");
+    needsEl.innerHTML = "";
+    listEl.innerHTML = "";
+    if (state.loading) {
+      $("event-loading").hidden = false;
+      $("event-empty").hidden = true;
+      needsBlock.hidden = true;
+      return;
+    }
+    $("event-loading").hidden = true;
+    if (!list.length) {
+      $("event-empty").hidden = false;
+      needsBlock.hidden = true;
+      $("slate-count").textContent = "0 events";
+      return;
+    }
+    $("event-empty").hidden = true;
+    if (needs.length && state.statusFilter === "all" && !state.eventQuery) {
+      needsBlock.hidden = false;
+      $("needs-count").textContent = needs.length + (needs.length === 1 ? " item" : " items");
+      needs.forEach(function (ev) { needsEl.appendChild(renderEventTicket(ev, true)); });
+      rest.forEach(function (ev) { listEl.appendChild(renderEventTicket(ev, false)); });
+      $("slate-count").textContent = rest.length + " more";
+    } else {
+      needsBlock.hidden = true;
+      list.forEach(function (ev) { listEl.appendChild(renderEventTicket(ev, needsAttention(ev))); });
+      $("slate-count").textContent = list.length + (list.length === 1 ? " event" : " events");
+    }
+  }
+
+  function handleEventAction(act, id) {
+    var ev = getEvent(id);
+    if (!ev) return;
+    if (act === "open" || act === "screen") openEvent(id, act === "screen" ? "screen" : "event");
+    else if (act === "start") {
+      if (!ev.date) { toast("Set a date before starting this event", "err"); openEditEvent(id); return; }
+      openModal({
+        title: "Start event?",
+        bodyHtml: "<p>This will mark <strong>" + escapeHtml(ev.name) + "</strong> as in progress and open the live dashboard.</p>",
+        actions: [
+          { label: "Cancel", className: "btn-ghost" },
+          { label: "Start event", className: "btn-primary", onClick: function () {
+            ev.status = "in_progress";
+            ev.nextAction = "Open live event dashboard";
+            openEvent(id, "event");
+            toast("Event started", "ok");
+          }}
+        ]
+      });
+    } else if (act === "summary") openSummary(id);
+    else if (act === "edit") {
+      if (!can("edit") && !can("create")) { toast("You cannot edit events", "err"); return; }
+      openEditEvent(id);
+    } else if (act === "dup") duplicateEvent(id);
+    else if (act === "del") {
+      if (!can("delete")) { toast("You cannot delete events", "err"); return; }
+      confirmDelete(id);
+    } else if (act === "dry") startDryRun(id);
+  }
+
+  function openCreateEvent() {
+    if (!can("create")) { toast("You cannot create events", "err"); return; }
+    openEditEvent(null);
+  }
+
+  function openEditEvent(id) {
+    var ev = id ? getEvent(id) : null;
+    var isNew = !ev;
+    var draft = ev ? JSON.parse(JSON.stringify(ev)) : {
+      id: uid("e"), name: "", code: "NW-" + Math.floor(100 + Math.random() * 900),
+      status: "draft", date: "", time: "09:00", endTime: "15:00", venue: "", capacity: 100,
+      registered: 0, stations: STATIONS.slice(), staffIds: [], readiness: "Draft — not published",
+      warnings: [], nextAction: "Finish setup and publish", dryRunAllowed: true
+    };
+
+    var staffOpts = state.staff.filter(function (s) { return s.status === "active"; }).map(function (s) {
+      var checked = (draft.staffIds || []).indexOf(s.id) !== -1 ? " checked" : "";
+      return '<label class="check-row"><input type="checkbox" name="staff" value="' + s.id + '"' + checked + " /><span>" + escapeHtml(s.name) + " · " + escapeHtml(s.role) + "</span></label>";
+    }).join("");
+
+    var stationOpts = STATIONS.map(function (st) {
+      var checked = (draft.stations || []).indexOf(st) !== -1 ? " checked" : "";
+      return '<label class="check-row"><input type="checkbox" name="station" value="' + escapeHtml(st) + '"' + checked + " /><span>" + escapeHtml(st) + "</span></label>";
+    }).join("");
+
+    var statusOpts = ["draft", "upcoming", "in_progress", "completed"].map(function (s) {
+      return '<option value="' + s + '"' + (draft.status === s ? " selected" : "") + ">" + statusLabel(s) + "</option>";
+    }).join("");
+
+    openModal({
+      title: isNew ? "Create event" : "Edit event",
+      wide: true,
+      bodyHtml:
+        '<div class="form-grid">' +
+          '<div class="field" style="grid-column:1/-1"><label for="f-name">Event name</label><input id="f-name" class="input" value="' + escapeHtml(draft.name) + '" /></div>' +
+          '<div class="field"><label for="f-date">Date</label><input id="f-date" type="date" class="input" value="' + escapeHtml(draft.date || "") + '" /></div>' +
+          '<div class="field"><label for="f-code">Code</label><input id="f-code" class="input mono" value="' + escapeHtml(draft.code) + '" /></div>' +
+          '<div class="field"><label for="f-time">Start time</label><input id="f-time" type="time" class="input" value="' + escapeHtml(draft.time || "09:00") + '" /></div>' +
+          '<div class="field"><label for="f-end">End time</label><input id="f-end" type="time" class="input" value="' + escapeHtml(draft.endTime || "15:00") + '" /></div>' +
+          '<div class="field" style="grid-column:1/-1"><label for="f-venue">Venue</label><input id="f-venue" class="input" value="' + escapeHtml(draft.venue) + '" /></div>' +
+          '<div class="field"><label for="f-cap">Capacity</label><input id="f-cap" type="number" min="1" class="input" value="' + draft.capacity + '" /></div>' +
+          '<div class="field"><label for="f-status">Status</label><select id="f-status" class="select">' + statusOpts + "</select></div>" +
+        "</div>" +
+        '<div class="field"><span class="field-label" style="color:var(--muted)">Screening stations</span>' + stationOpts + "</div>" +
+        '<div class="field"><span class="field-label" style="color:var(--muted)">Assigned staff</span>' + (staffOpts || '<p class="muted">No staff yet</p>') + "</div>" +
+        '<div class="field"><label for="f-reg">Registration settings</label><select id="f-reg" class="select"><option>Walk-in + pre-registered</option><option>Pre-registered only</option><option>Invitation only</option></select></div>',
+      actions: [
+        { label: "Cancel", className: "btn-ghost" },
+        { label: isNew ? "Create draft" : "Save changes", className: "btn-primary", close: false, onClick: function () {
+          var name = $("f-name").value.trim();
+          if (!name) { toast("Event name is required", "err"); return; }
+          var stations = Array.prototype.map.call(document.querySelectorAll('input[name="station"]:checked'), function (c) { return c.value; });
+          var staffIds = Array.prototype.map.call(document.querySelectorAll('input[name="staff"]:checked'), function (c) { return c.value; });
+          var status = $("f-status").value;
+          var date = $("f-date").value;
+          if ((status === "upcoming" || status === "in_progress") && !date) {
+            toast("A date is required before the event can be active", "err");
+            return;
+          }
+          draft.name = name;
+          draft.date = date;
+          draft.time = $("f-time").value;
+          draft.endTime = $("f-end").value;
+          draft.venue = $("f-venue").value.trim() || "Venue TBC";
+          draft.capacity = Math.max(1, parseInt($("f-cap").value, 10) || 1);
+          draft.code = $("f-code").value.trim() || draft.code;
+          draft.status = status;
+          draft.stations = stations.length ? stations : ["Registration", "Visual acuity"];
+          draft.staffIds = staffIds;
+          draft.readiness = status === "draft" ? "Draft — not published" : (staffIds.length ? staffIds.length + " staff assigned" : "Staff incomplete");
+          draft.warnings = date ? (draft.warnings || []).filter(function (w) { return !/date/i.test(w); }) : ["No date set"];
+          if (status === "in_progress") draft.nextAction = "Open live event dashboard";
+          else if (status === "completed") draft.nextAction = "Open summary report";
+          else if (status === "upcoming") draft.nextAction = "Start event or dry run";
+          else draft.nextAction = "Finish setup and publish";
+
+          if (isNew) {
+            state.events.unshift(draft);
+            state.participantsByEvent[draft.id] = [];
+            toast("Draft event created", "ok");
+          } else {
+            for (var i = 0; i < state.events.length; i++) {
+              if (state.events[i].id === draft.id) { state.events[i] = draft; break; }
+            }
+            toast("Event updated", "ok");
+          }
+          closeModal();
+          render();
+          saveState();
+        }}
+      ]
+    });
+  }
+
+  function duplicateEvent(id) {
+    var ev = getEvent(id);
+    if (!ev) return;
+    var copy = JSON.parse(JSON.stringify(ev));
+    copy.id = uid("e");
+    copy.name = ev.name + " (Copy)";
+    copy.code = ev.code + "-C";
+    copy.status = "draft";
+    copy.date = "";
+    copy.registered = 0;
+    copy.readiness = "Copy — set a new date before activation";
+    copy.warnings = ["No date set — required before active"];
+    copy.nextAction = "Set date and review configuration";
+    copy.dryRunAllowed = true;
+    delete copy.summary;
+    state.events.unshift(copy);
+    state.participantsByEvent[copy.id] = [];
+    toast("Duplicated as draft — set a new date", "ok");
+    render();
+    saveState();
+    openEditEvent(copy.id);
+  }
+
+  function confirmDelete(id) {
+    var ev = getEvent(id);
+    if (!ev) return;
+    openModal({
+      title: "Delete event?",
+      bodyHtml:
+        "<p>This removes the event from this device prototype.</p>" +
+        '<div class="modal-danger-name">Delete permanently: ' + escapeHtml(ev.name) + " (" + escapeHtml(ev.code) + ")</div>" +
+        '<label class="check-row"><input type="checkbox" id="del-confirm" /><span>I understand this cannot be undone in the prototype</span></label>',
+      actions: [
+        { label: "Keep event", className: "btn-secondary" },
+        { label: "Delete event", className: "btn-danger", close: false, onClick: function () {
+          if (!$("del-confirm").checked) { toast("Confirm the checkbox before deleting", "err"); return; }
+          state.events = state.events.filter(function (e) { return e.id !== id; });
+          delete state.participantsByEvent[id];
+          if (state.activeEventId === id) {
+            state.activeEventId = null;
+            state.view = "board";
+            exitDryRun(true);
+          }
+          closeModal();
+          toast("Event deleted", "ok");
+          render();
+          saveState();
+        }}
+      ]
+    });
+  }
+
+  function startDryRun(id) {
+    state.dryRunSnapshot = JSON.stringify({ events: state.events, participantsByEvent: state.participantsByEvent });
+    state.dryRun = true;
+    if (!state.participantsByEvent[id] || !state.participantsByEvent[id].length) {
+      state.participantsByEvent[id] = seedParticipants(id).map(function (p) {
+        p.name = "[Test] " + p.name;
+        p.passId = "DRY-" + p.passId.slice(3);
+        return p;
+      });
+    }
+    openEvent(id, "event");
+    toast("Dry run started — live data isolated", "ok");
+  }
+
+  function exitDryRun(silent) {
+    if (!state.dryRun) return;
+    if (state.dryRunSnapshot) {
+      try {
+        var snap = JSON.parse(state.dryRunSnapshot);
+        state.events = snap.events;
+        state.participantsByEvent = snap.participantsByEvent;
+      } catch (e) {}
+    }
+    state.dryRun = false;
+    state.dryRunSnapshot = null;
+    state.selectedParticipantId = null;
+    state.selectedReviewId = null;
+    if (!silent) toast("Exited dry run — live data restored", "ok");
+    render();
+    saveState();
+  }
+
+  function openEvent(id, view) {
+    state.activeEventId = id;
+    state.view = view || "event";
+    state.selectedParticipantId = null;
+    state.selectedReviewId = null;
+    render();
+    saveState();
+  }
+
+  function openSummary(id) {
+    state.activeEventId = id;
+    state.view = "summary";
+    render();
+    saveState();
+  }
+
+  function renderLiveEvent() {
+    var ev = getEvent(state.activeEventId);
+    if (!ev) { setView("board"); return; }
+    $("live-event-name").textContent = ev.name;
+    $("live-status-pill").textContent = statusLabel(ev.status);
+    $("live-status-pill").className = "status-pill " + ev.status;
+    $("live-event-meta").textContent = formatDate(ev.date) + " · " + (ev.time || "") + "–" + (ev.endTime || "") + " · " + ev.venue + " · " + ev.code;
+
+    var parts = getParticipants(ev.id);
+    var counts = countStages(parts);
+    if (!parts.length) {
+      counts = {
+        registered: Math.min(ev.registered, 12),
+        waiting: ev.status === "in_progress" ? 8 : 0,
+        screening: ev.status === "in_progress" ? 5 : 0,
+        review: ev.status === "in_progress" ? 2 : 0,
+        completed: ev.status === "completed" ? ((ev.summary && ev.summary.completed) || ev.registered) : 0,
+        followup: (ev.summary && ev.summary.followUp) || 0
+      };
+    }
+
+    var stages = [
+      ["registered", "Registered"], ["waiting", "Waiting"], ["screening", "Screening"],
+      ["review", "In review"], ["completed", "Completed"], ["followup", "Follow-up"]
+    ];
+    $("flow-rail").innerHTML = stages.map(function (pair) {
+      var hot = (pair[0] === "review" && counts.review > 0) || (pair[0] === "waiting" && counts.waiting > 10);
+      return '<div class="flow-stage' + (hot ? " is-hot" : "") + '"><div class="n">' + counts[pair[0]] + '</div><div class="l">' + pair[1] + "</div></div>";
+    }).join("");
+
+    var items = [];
+    (ev.warnings || []).forEach(function (w) { items.push({ t: w, u: /fail|conflict|unassign/i.test(w) }); });
+    var syncRows = collectSyncRecords().filter(function (r) { return r.eventId === ev.id; });
+    if (syncRows.some(function (r) { return r.sync === "failed"; })) items.push({ t: "Sync failed on one or more station records — retry from Sync health", u: true });
+    if (counts.review > 0) items.push({ t: counts.review + " record(s) awaiting clinical review", u: false });
+    if (!items.length) items.push({ t: "No operational alerts — queues within normal range", ok: true });
+    $("live-alerts").innerHTML = items.map(function (it) {
+      return '<div class="alert-item' + (it.u ? " urgent" : it.ok ? " ok" : "") + '">' + escapeHtml(it.t) + "</div>";
+    }).join("");
+
+    var stList = ev.stations && ev.stations.length ? ev.stations : STATIONS;
+    $("station-board").innerHTML = stList.map(function (st) {
+      var q = parts.filter(function (p) {
+        return p.station === st && (p.stage === "waiting" || p.stage === "screening" || p.stage === "registered" || p.stage === "review");
+      }).length;
+      var staff = state.staff.filter(function (s) { return s.station === st && s.eventId === ev.id; });
+      var staffLabel = staff.length ? staff.map(function (s) { return s.name.split(" ")[0]; }).join(", ") : "Unassigned";
+      var busy = q >= 3 ? "busy" : q === 0 ? "idle" : "";
+      var dot = q >= 4 ? "blocked" : busy;
+      return '<div class="station-row"><div><div class="station-name"><span class="dot-status ' + (q >= 4 ? "offline" : busy || "idle") + '"></span> ' +
+        escapeHtml(st) + '</div><div class="station-staff">' + escapeHtml(staffLabel) +
+        '</div></div><div class="queue-n ' + dot + '">' + q + " in q</div></div>";
+    }).join("");
+
+    var onDuty = state.staff.filter(function (s) { return (ev.staffIds || []).indexOf(s.id) !== -1; });
+    $("duty-list").innerHTML = onDuty.length ? onDuty.map(function (s) {
+      var st = (s.station && s.station !== "—") ? (" · " + escapeHtml(s.station)) : "";
+      return '<div class="duty-item"><div><div class="person-name" style="font-size:13px">' + escapeHtml(s.name) +
+        '</div><div class="person-meta">' + escapeHtml(s.role) + st +
+        '</div></div><span class="role-tag">On duty</span></div>';
+    }).join("") : '<div class="empty-inline">No staff assigned to this event.</div>';
+
+    var nextItems = [];
+    parts.filter(function (p) { return p.stage === "review"; }).forEach(function (p) {
+      nextItems.push({ id: p.id, title: p.name, why: "Clinical review · " + (p.flagReason || "Flagged"), go: "review" });
+    });
+    parts.filter(function (p) { return p.sync === "failed" || p.sync === "conflict"; }).forEach(function (p) {
+      nextItems.push({ id: p.id, title: p.name, why: "Sync: " + p.sync, go: "sync" });
+    });
+    parts.filter(function (p) { return p.stage === "waiting" || p.stage === "screening"; }).slice(0, 5).forEach(function (p) {
+      nextItems.push({ id: p.id, title: p.name, why: "At " + p.station, go: "screen" });
+    });
+
+    if (!nextItems.length) {
+      $("attention-queue").innerHTML = '<div class="empty-inline">Nothing queued — scan the next QR pass when ready.</div>';
+    } else {
+      $("attention-queue").innerHTML = nextItems.slice(0, 8).map(function (it) {
+        return '<button type="button" class="attn-item" data-attn="' + it.go + '" data-pid="' + it.id +
+          '"><div><div class="person-name" style="font-size:13px">' + escapeHtml(it.title) +
+          '</div><div class="why">' + escapeHtml(it.why) +
+          '</div></div><span class="muted">Open</span></button>';
+      }).join("");
+    }
+
+    if (!syncRows.length) {
+      $("live-sync-body").innerHTML = '<p class="muted" style="margin:8px 0 0">All records for this event are synced.</p>';
+    } else {
+      $("live-sync-body").innerHTML = syncRows.map(function (r) {
+        var btn = (r.sync === "failed" || r.sync === "pending" || r.sync === "offline")
+          ? '<button type="button" class="btn btn-secondary btn-sm" data-retry="' + r.id + '" data-eid="' + r.eventId + '">Retry</button>'
+          : "<span></span>";
+        return '<div class="sync-row" style="margin-top:8px"><div><strong>' + escapeHtml(r.name) +
+          '</strong><div class="person-meta mono">' + escapeHtml(r.passId) +
+          '</div></div><span class="sync-state ' + r.sync + '">' + escapeHtml(r.sync) + "</span>" + btn + "</div>";
+      }).join("");
+    }
+
+    $("btn-open-screen").hidden = !can("screen");
+    $("btn-open-review").hidden = !can("review");
+    $("btn-live-edit").hidden = !can("edit");
+  }
+
+  function renderScreen() {
+    var ev = getEvent(state.activeEventId);
+    if (!ev) { setView("board"); return; }
+    $("screen-title").textContent = state.screenStation + " station";
+    $("screen-sub").textContent = ev.name + (state.dryRun ? " · Dry run" : "");
+    var parts = getParticipants(ev.id);
+    var q = parts.filter(function (p) {
+      return p.station === state.screenStation && (p.stage === "waiting" || p.stage === "screening" || p.stage === "registered");
+    });
+    $("station-queue").innerHTML = q.map(function (p) {
+      return '<button type="button" class="q-item' + (state.selectedParticipantId === p.id ? " is-sel" : "") +
+        '" data-select-p="' + p.id + '"><div class="qn">' + escapeHtml(p.name) +
+        '</div><div class="qm mono">' + escapeHtml(p.passId) + " · " + escapeHtml(p.stage) + "</div></button>";
+    }).join("");
+    $("queue-empty").hidden = q.length > 0;
+
+    var p = state.selectedParticipantId ? getParticipant(ev.id, state.selectedParticipantId) : null;
+    if (!p) {
+      $("work-empty").hidden = false;
+      $("work-active").hidden = true;
+    } else {
+      $("work-empty").hidden = true;
+      $("work-active").hidden = false;
+      $("part-name").textContent = p.name;
+      $("part-id").textContent = p.passId;
+      $("part-age").textContent = "Age " + p.age;
+      $("part-event-check").textContent = ev.code + " ✓";
+      $("part-stage-pill").textContent = p.stage;
+      renderPath(p, ev);
+      renderHandoff(p, ev);
+      var va = (p.results && p.results.va) || {};
+      $("va-right").value = va.right || "";
+      $("va-left").value = va.left || "";
+      $("va-binocular").value = va.bin || "";
+      $("va-aid").value = va.aid || "none";
+      $("va-notes").value = va.notes || "";
+      $("va-flag").checked = !!p.flag;
+      updateSaveState(p);
+    }
+    updateScreenSync();
+  }
+
+  function renderPath(p, ev) {
+    var stations = ev.stations || STATIONS;
+    $("path-strip").innerHTML = stations.map(function (st) {
+      var cls = "path-step";
+      if ((p.completed || []).indexOf(st) !== -1) cls += " done";
+      else if (p.station === st) cls += " current";
+      else {
+        var idx = stations.indexOf(st);
+        var cur = stations.indexOf(p.station);
+        if (idx === cur + 1) cls += " next";
+      }
+      return '<span class="' + cls + '">' + escapeHtml(st) + "</span>";
+    }).join("");
+  }
+
+  function renderHandoff(p, ev) {
+    var stations = ev.stations || STATIONS;
+    var cur = p.station;
+    var idx = stations.indexOf(cur);
+    var next = idx >= 0 && idx < stations.length - 1 ? stations[idx + 1] : "Done";
+    var done = (p.completed || []).join(", ") || "None yet";
+    $("handoff-panel").innerHTML =
+      '<div class="h-row"><span>Completed</span><strong>' + escapeHtml(done) + "</strong></div>" +
+      '<div class="h-row"><span>Current</span><strong>' + escapeHtml(cur) + "</strong></div>" +
+      '<div class="h-row"><span>Next station</span><strong>' + escapeHtml(next) + "</strong></div>" +
+      '<div class="h-row"><span>Sync</span><strong>' + escapeHtml(p.sync || "—") + "</strong></div>";
+  }
+
+  function updateSaveState(p) {
+    var map = {
+      synced: ["Saved · synced", "saved"],
+      pending: ["Saved · pending sync", "pending"],
+      offline: ["Saved offline", "pending"],
+      syncing: ["Syncing…", "pending"],
+      failed: ["Sync failed — retry in Sync", "failed"],
+      conflict: ["Conflict — needs review", "failed"]
+    };
+    var m = map[p.sync] || ["Unsaved", ""];
+    $("save-state").textContent = m[0];
+    $("save-state").className = "save-state " + m[1];
+  }
+
+  function updateScreenSync() {
+    var chip = $("screen-sync-chip");
+    var rows = collectSyncRecords();
+    chip.className = "sync-chip";
+    if (rows.some(function (r) { return r.sync === "failed"; })) {
+      chip.classList.add("is-failed");
+      $("screen-sync-text").textContent = "Sync issues";
+    } else if (rows.some(function (r) { return r.sync === "pending" || r.sync === "offline"; })) {
+      chip.classList.add("is-pending");
+      $("screen-sync-text").textContent = "Pending sync";
+    } else {
+      $("screen-sync-text").textContent = "Synced";
+    }
+  }
+
+  function openScanModal() {
+    var ev = getEvent(state.activeEventId);
+    if (!ev) return;
+    var parts = getParticipants(ev.id);
+    var choices = parts.map(function (p) {
+      return '<option value="' + p.id + '">' + escapeHtml(p.passId) + " — " + escapeHtml(p.name) + "</option>";
+    }).join("");
+    openModal({
+      title: "Scan participant QR",
+      bodyHtml:
+        '<p class="muted">Simulator: choose a pass. QR carries pass ID only — no clinical information.</p>' +
+        '<div class="qr-mock" aria-hidden="true"></div>' +
+        '<div class="field"><label for="scan-pick">Detected pass</label><select id="scan-pick" class="select">' +
+        (choices || '<option value="">No participants loaded</option>') +
+        '</select></div>' +
+        '<div class="field"><label for="scan-manual">Or enter pass ID</label><input id="scan-manual" class="input mono" placeholder="QR-########" /></div>',
+      actions: [
+        { label: "Cancel", className: "btn-ghost" },
+        { label: "Confirm participant", className: "btn-primary", close: false, onClick: function () {
+          var id = $("scan-pick").value;
+          var manual = ($("scan-manual").value || "").trim().toUpperCase();
+          var p = null;
+          if (manual) p = parts.filter(function (x) { return x.passId.toUpperCase() === manual; })[0];
+          else if (id) p = getParticipant(ev.id, id);
+          if (!p) { toast("Pass not found for this event", "err"); return; }
+          closeModal();
+          confirmParticipant(p, ev);
+        }}
+      ]
+    });
+  }
+
+  function confirmParticipant(p, ev) {
+    openModal({
+      title: "Confirm participant",
+      bodyHtml:
+        '<div class="part-banner" style="margin:0"><div><div class="part-name">' + escapeHtml(p.name) +
+        '</div><div class="part-meta mono">' + escapeHtml(p.passId) + " · Age " + p.age +
+        '</div></div></div>' +
+        '<div class="perm-preview"><strong>Event check</strong><ul>' +
+        "<li>Pass event: <strong>" + escapeHtml(ev.code) + "</strong> — match confirmed</li>" +
+        "<li>Current station: " + escapeHtml(p.station) + "</li>" +
+        "<li>Completed: " + escapeHtml((p.completed || []).join(", ") || "None") + "</li>" +
+        "</ul></div>",
+      actions: [
+        { label: "Wrong person", className: "btn-ghost" },
+        { label: "Confirm & open", className: "btn-primary", onClick: function () {
+          if (p.stage === "registered" || p.stage === "waiting") p.stage = "screening";
+          if (!p.station || p.station === "—") p.station = state.screenStation;
+          state.selectedParticipantId = p.id;
+          state.view = "screen";
+          toast("Participant confirmed", "ok");
+          render();
+          saveState();
+        }}
+      ]
+    });
+  }
+
+  function readResultForm() {
+    return {
+      right: $("va-right").value.trim(),
+      left: $("va-left").value.trim(),
+      bin: $("va-binocular").value.trim(),
+      aid: $("va-aid").value,
+      notes: $("va-notes").value.trim(),
+      flag: $("va-flag").checked
+    };
+  }
+
+  function saveResult(handoff) {
+    var ev = getEvent(state.activeEventId);
+    var p = getParticipant(ev.id, state.selectedParticipantId);
+    if (!p) return;
+    var data = readResultForm();
+    if (!data.right || !data.left) { toast("Enter right and left acuity", "err"); return; }
+    p.results = p.results || {};
+    p.results.va = data;
+    p.flag = data.flag;
+    if (data.flag) p.flagReason = p.flagReason || "Flagged at visual acuity station";
+    p.sync = state.dryRun ? "synced" : "syncing";
+    if (!state.dryRun) {
+      setTimeout(function () {
+        if (p.sync === "syncing") p.sync = Math.random() < 0.15 ? "failed" : "synced";
+        render();
+        saveState();
+      }, 900);
+    }
+    if (handoff) {
+      var stations = ev.stations || STATIONS;
+      if ((p.completed || []).indexOf(state.screenStation) === -1) {
+        p.completed = (p.completed || []).concat([state.screenStation]);
+      }
+      var idx = stations.indexOf(state.screenStation);
+      if (data.flag) {
+        p.stage = "review";
+        p.station = "Clinical review";
+        p.review = { status: "queued" };
+        toast("Saved and sent to clinical review", "ok");
+      } else if (idx >= 0 && idx < stations.length - 1) {
+        p.station = stations[idx + 1];
+        p.stage = p.station === "Clinical review" ? "review" : "waiting";
+        toast("Saved — hand off to " + p.station, "ok");
+      } else {
+        p.stage = "completed";
+        p.station = "—";
+        toast("Screening path complete", "ok");
+      }
+      state.selectedParticipantId = null;
+    } else {
+      toast("Saved on device", "ok");
+    }
+    render();
+    saveState();
+  }
+
+  function renderReview() {
+    var ev = getEvent(state.activeEventId);
+    if (!ev) { setView("board"); return; }
+    var parts = getParticipants(ev.id).filter(function (p) {
+      return p.stage === "review" || (p.review && p.review.status === "queued");
+    });
+    $("review-count").textContent = "(" + parts.length + ")";
+    $("review-queue").innerHTML = parts.map(function (p) {
+      var miss = p.missing && p.missing.length ? (" · Missing: " + escapeHtml(p.missing.join(", "))) : "";
+      return '<button type="button" class="q-item' + (state.selectedReviewId === p.id ? " is-sel" : "") +
+        '" data-select-r="' + p.id + '"><div class="qn">' + escapeHtml(p.name) +
+        '</div><div class="qm">' + escapeHtml(p.flagReason || "Flagged for review") + miss + "</div></button>";
+    }).join("");
+    $("review-empty").hidden = parts.length > 0;
+
+    var p = state.selectedReviewId ? getParticipant(ev.id, state.selectedReviewId) : null;
+    if (!p) {
+      $("review-empty-work").hidden = false;
+      $("review-work").hidden = true;
+      $("rev-ctx").innerHTML = '<p class="muted">Select a packet. VSMS does not diagnose — the reviewer decides the next step.</p>';
+      return;
+    }
+    $("review-empty-work").hidden = true;
+    $("review-work").hidden = false;
+    $("rev-name").textContent = p.name;
+    $("rev-id").textContent = p.passId;
+    $("rev-meta").textContent = "Age " + p.age + " · " + ev.code;
+    $("rev-flag-pill").textContent = p.flag ? "Screening flag" : "Incomplete";
+
+    var va = (p.results && p.results.va) || {};
+    var cards = [];
+    if (va.right || va.left) {
+      cards.push(["VA right", va.right || "—"], ["VA left", va.left || "—"], ["Binocular", va.bin || "—"], ["Correction", va.aid || "—"]);
+    }
+    if (p.results && p.results.colour) cards.push(["Colour", p.results.colour.result || "—"]);
+    if (p.results && p.results.refraction) {
+      cards.push(["Refr. R", p.results.refraction.sphereR || "—"], ["Refr. L", p.results.refraction.sphereL || "—"]);
+    }
+    if (p.results && p.results.eye) cards.push(["Eye health", p.results.eye.notes || "—"]);
+    if (!cards.length) cards.push(["Results", "No structured results yet"]);
+    $("rev-results").innerHTML = cards.map(function (c) {
+      return '<div class="res-card"><div class="k">' + escapeHtml(c[0]) + '</div><div class="v">' + escapeHtml(c[1]) + "</div></div>";
+    }).join("");
+
+    if (p.missing && p.missing.length) {
+      $("rev-missing").hidden = false;
+      $("rev-missing").textContent = "Incomplete: " + p.missing.join(", ") + " not recorded";
+    } else if (p.flagReason) {
+      $("rev-missing").hidden = false;
+      $("rev-missing").textContent = "Flag reason: " + p.flagReason + " (not a diagnosis)";
+    } else {
+      $("rev-missing").hidden = true;
+    }
+
+    $("rev-ctx").innerHTML =
+      '<div class="h-row"><span>Completed stations</span><strong>' + escapeHtml((p.completed || []).join(", ") || "—") + "</strong></div>" +
+      '<div class="h-row"><span>Sync</span><strong>' + escapeHtml(p.sync) + "</strong></div>" +
+      '<div class="h-row"><span>Pass ID</span><strong class="mono">' + escapeHtml(p.passId) + "</strong></div>" +
+      '<p class="muted" style="margin-top:12px">Final decision is made by the reviewer. Screening flags only request assessment.</p>';
+    $("rev-notes").value = (p.review && p.review.notes) || "";
+  }
+
+  function finaliseReview(e) {
+    e.preventDefault();
+    var ev = getEvent(state.activeEventId);
+    var p = getParticipant(ev.id, state.selectedReviewId);
+    if (!p) return;
+    var decisionEl = document.querySelector('input[name="decision"]:checked');
+    var decision = decisionEl ? decisionEl.value : null;
+    if (!decision) { toast("Choose a final decision", "err"); return; }
+    p.review = { status: "done", decision: decision, notes: $("rev-notes").value.trim() };
+    if (decision === "incomplete") {
+      p.stage = "screening";
+      p.station = (p.missing && p.missing[0]) || "Visual acuity";
+    } else if (decision === "followup" || decision === "referral") {
+      p.stage = "followup";
+      p.station = "—";
+    } else {
+      p.stage = "completed";
+      p.station = "—";
+    }
+    p.flag = false;
+    p.sync = "pending";
+    state.selectedReviewId = null;
+    toast("Review finalised: " + decision, "ok");
+    render();
+    saveState();
+  }
+
+  function roleBullets(role) {
+    var m = {
+      "Event Manager": ["Create and configure events", "Assign staff to events and stations", "Monitor queues and sync", "Cannot diagnose participants"],
+      "Registration Officer": ["Register participants and issue QR passes", "Confirm consent", "No clinical result entry beyond registration"],
+      "Screener": ["Scan QR passes", "Record station screening results", "Hand off to next station", "Flag for review (not diagnose)"],
+      "Doctor / Reviewer": ["Open review queue", "Inspect structured results", "Record follow-up or referral decisions"],
+      "Administrator": ["Manage all staff access", "Deactivate accounts", "Full event configuration"]
+    };
+    return m[role] || ["Assigned staff access only"];
+  }
+
+  function renderPeople() {
+    var q = (state.staffQuery || "").toLowerCase();
+    $("pending-list").innerHTML = state.pending.map(function (p) {
+      return '<div class="person-row"><div><div class="person-name">' + escapeHtml(p.name) +
+        '</div><div class="person-meta">' + escapeHtml(p.email) + " · Requested " + escapeHtml(p.role) + " · " + escapeHtml(p.requested) +
+        '</div></div><div class="person-actions">' +
+        '<button type="button" class="btn btn-primary btn-sm" data-approve="' + p.id + '">Approve</button>' +
+        '<button type="button" class="btn btn-ghost btn-sm" data-reject="' + p.id + '">Reject</button>' +
+        "</div></div>";
+    }).join("");
+    $("pending-empty").hidden = state.pending.length > 0;
+
+    var staff = state.staff.filter(function (s) {
+      if (!q) return true;
+      return (s.name + " " + s.email + " " + s.role).toLowerCase().indexOf(q) !== -1;
+    });
+    $("staff-list").innerHTML = staff.map(function (s) {
+      var ev = s.eventId ? getEvent(s.eventId) : null;
+      var deact = s.status === "inactive" ? ' <span class="role-tag">Deactivated</span>' : "";
+      var meta = escapeHtml(s.email) + " · " + escapeHtml(s.role) +
+        (ev ? " · " + escapeHtml(ev.code) : "") +
+        (s.station && s.station !== "—" ? " · " + escapeHtml(s.station) : "");
+      var actions = s.status !== "inactive"
+        ? '<button type="button" class="btn btn-secondary btn-sm" data-assign="' + s.id + '">Assign</button>' +
+          '<button type="button" class="btn btn-ghost btn-sm" data-deactivate="' + s.id + '">Deactivate</button>'
+        : "";
+      return '<div class="person-row"><div><div class="person-name">' + escapeHtml(s.name) + deact +
+        '</div><div class="person-meta">' + meta +
+        '</div></div><div class="person-actions">' + actions + "</div></div>";
+    }).join("");
+  }
+
+  function approveStaff(id) {
+    var p = null;
+    for (var i = 0; i < state.pending.length; i++) if (state.pending[i].id === id) { p = state.pending[i]; break; }
+    if (!p) return;
+    var eventOpts = state.events.map(function (e) {
+      return '<option value="' + e.id + '">' + escapeHtml(e.name) + "</option>";
+    }).join("");
+    var stOpts = ["—"].concat(STATIONS).map(function (s) {
+      return '<option value="' + escapeHtml(s) + '">' + escapeHtml(s) + "</option>";
+    }).join("");
+    openModal({
+      title: "Approve staff access",
+      bodyHtml:
+        "<p>Approve <strong>" + escapeHtml(p.name) + "</strong> as <strong>" + escapeHtml(p.role) + "</strong>?</p>" +
+        '<div class="perm-preview"><strong>This role allows</strong><ul>' +
+        roleBullets(p.role).map(function (b) { return "<li>" + escapeHtml(b) + "</li>"; }).join("") +
+        '</ul></div>' +
+        '<div class="field"><label for="ap-event">Assign to event</label><select id="ap-event" class="select">' + eventOpts + "</select></div>" +
+        '<div class="field"><label for="ap-station">Station</label><select id="ap-station" class="select">' + stOpts + "</select></div>",
+      actions: [
+        { label: "Cancel", className: "btn-ghost" },
+        { label: "Confirm approval", className: "btn-primary", close: false, onClick: function () {
+          var eid = $("ap-event").value;
+          var st = $("ap-station").value;
+          state.pending = state.pending.filter(function (x) { return x.id !== id; });
+          var news = {
+            id: uid("s"), name: p.name, email: p.email, role: p.role, status: "active",
+            eventId: eid, station: st, perms: roleBullets(p.role).join("; ")
+          };
+          state.staff.push(news);
+          var ev = getEvent(eid);
+          if (ev) {
+            ev.staffIds = ev.staffIds || [];
+            if (ev.staffIds.indexOf(news.id) === -1) ev.staffIds.push(news.id);
+          }
+          closeModal();
+          toast(p.name + " approved", "ok");
+          render();
+          saveState();
+        }}
+      ]
+    });
+  }
+
+  function openAssign(staffId) {
+    var s = state.staff.filter(function (x) { return x.id === staffId; })[0];
+    if (!s) return;
+    var eventOpts = state.events.map(function (e) {
+      return '<option value="' + e.id + '"' + (s.eventId === e.id ? " selected" : "") + ">" + escapeHtml(e.name) + "</option>";
+    }).join("");
+    var roleOpts = ["Event Manager", "Registration Officer", "Screener", "Doctor / Reviewer", "Administrator"].map(function (r) {
+      return '<option value="' + r + '"' + (s.role === r ? " selected" : "") + ">" + r + "</option>";
+    }).join("");
+    var stOpts = ["—"].concat(STATIONS).map(function (st) {
+      return '<option value="' + escapeHtml(st) + '"' + (s.station === st ? " selected" : "") + ">" + escapeHtml(st) + "</option>";
+    }).join("");
+    openModal({
+      title: "Assign " + s.name,
+      bodyHtml:
+        '<div class="perm-preview"><strong>' + escapeHtml(s.role) + " allows</strong><ul>" +
+        roleBullets(s.role).map(function (b) { return "<li>" + escapeHtml(b) + "</li>"; }).join("") +
+        '</ul></div>' +
+        '<div class="field"><label for="as-event">Event</label><select id="as-event" class="select">' + eventOpts + "</select></div>" +
+        '<div class="field"><label for="as-role">Role</label><select id="as-role" class="select">' + roleOpts + "</select></div>" +
+        '<div class="field"><label for="as-station">Station</label><select id="as-station" class="select">' + stOpts + "</select></div>",
+      actions: [
+        { label: "Cancel", className: "btn-ghost" },
+        { label: "Save assignment", className: "btn-primary", close: false, onClick: function () {
+          var eid = $("as-event").value;
+          var role = $("as-role").value;
+          var st = $("as-station").value;
+          var where = st !== "—" ? (" at <strong>" + escapeHtml(st) + "</strong>") : "";
+          openModal({
+            title: "Confirm permissions",
+            bodyHtml: '<div class="perm-preview">Assign <strong>' + escapeHtml(s.name) + "</strong> as <strong>" +
+              escapeHtml(role) + "</strong> on the selected event" + where + "?<ul>" +
+              roleBullets(role).map(function (b) { return "<li>" + escapeHtml(b) + "</li>"; }).join("") +
+              "</ul></div>",
+            actions: [
+              { label: "Back", className: "btn-ghost", onClick: function () { openAssign(staffId); } },
+              { label: "Confirm assignment", className: "btn-primary", onClick: function () {
+                s.eventId = eid;
+                s.role = role;
+                s.station = st;
+                s.perms = roleBullets(role).join("; ");
+                var ev = getEvent(eid);
+                if (ev) {
+                  ev.staffIds = ev.staffIds || [];
+                  if (ev.staffIds.indexOf(s.id) === -1) ev.staffIds.push(s.id);
+                }
+                toast("Assignment saved", "ok");
+                render();
+                saveState();
+              }}
+            ]
+          });
+        }}
+      ]
+    });
+  }
+
+  function syncLabel(s) {
+    return ({
+      offline: "Saved offline", pending: "Pending sync", syncing: "Syncing",
+      synced: "Synced", failed: "Sync failed", conflict: "Conflict requires review"
+    })[s] || s;
+  }
+
+  function renderSync() {
+    var rows = collectSyncRecords();
+    var failed = rows.filter(function (r) { return r.sync === "failed"; });
+    var conflict = rows.filter(function (r) { return r.sync === "conflict"; });
+    var pending = rows.filter(function (r) { return r.sync === "pending" || r.sync === "offline" || r.sync === "syncing"; });
+    $("sync-pending-n").textContent = pending.length;
+    $("sync-failed-n").textContent = failed.length;
+    $("sync-conflict-n").textContent = conflict.length;
+    $("sync-ok-n").textContent = "—";
+    if (!rows.length) {
+      $("sync-empty").hidden = false;
+      $("sync-record-list").innerHTML = "";
+      return;
+    }
+    $("sync-empty").hidden = true;
+    $("sync-record-list").innerHTML = rows.map(function (r) {
+      var ev = getEvent(r.eventId);
+      var btnLabel = r.sync === "conflict" ? "Review conflict" : "Retry";
+      var btn = (r.sync === "failed" || r.sync === "offline" || r.sync === "pending" || r.sync === "conflict")
+        ? '<button type="button" class="btn btn-secondary btn-sm" data-retry="' + r.id + '" data-eid="' + r.eventId + '">' + btnLabel + "</button>"
+        : "<span></span>";
+      return '<div class="sync-row"><div><strong>' + escapeHtml(r.name) +
+        '</strong><div class="person-meta">' + escapeHtml(ev ? ev.name : r.eventId) +
+        ' · <span class="mono">' + escapeHtml(r.passId) +
+        '</span></div></div><span class="sync-state ' + r.sync + '">' + escapeHtml(syncLabel(r.sync)) + "</span>" + btn + "</div>";
+    }).join("");
+  }
+
+  function retrySync(pid, eid) {
+    var p = getParticipant(eid, pid);
+    if (!p) return;
+    p.sync = "syncing";
+    render();
+    saveState();
+    setTimeout(function () {
+      p.sync = "synced";
+      toast("Record synced", "ok");
+      render();
+      saveState();
+    }, 700);
+  }
+
+  function retryAllFailed() {
+    var rows = collectSyncRecords().filter(function (r) {
+      return r.sync === "failed" || r.sync === "offline" || r.sync === "pending";
+    });
+    if (!rows.length) { toast("Nothing to retry"); return; }
+    rows.forEach(function (r) {
+      var p = getParticipant(r.eventId, r.id);
+      if (p) p.sync = "syncing";
+    });
+    render();
+    setTimeout(function () {
+      rows.forEach(function (r) {
+        var p = getParticipant(r.eventId, r.id);
+        if (p && p.sync === "syncing") p.sync = "synced";
+      });
+      toast("Retried " + rows.length + " record(s)", "ok");
+      render();
+      saveState();
+    }, 800);
+  }
+
+  function renderSummary() {
+    var ev = getEvent(state.activeEventId);
+    if (!ev) { setView("board"); return; }
+    $("summary-title").textContent = ev.name;
+    $("summary-meta").textContent = formatDate(ev.date) + " · " + ev.venue + " · Completed";
+    var s = ev.summary || { completed: ev.registered, followUp: 0, referral: 0, noShow: 0 };
+    var parts = getParticipants(ev.id);
+    if (parts.length) {
+      s = {
+        completed: parts.filter(function (p) { return p.stage === "completed"; }).length,
+        followUp: parts.filter(function (p) { return p.stage === "followup"; }).length,
+        referral: parts.filter(function (p) { return p.review && p.review.decision === "referral"; }).length,
+        noShow: Math.max(0, ev.registered - parts.length)
+      };
+    }
+    function cell(n, l) {
+      return '<div class="summary-cell"><div class="n">' + n + '</div><div class="l">' + l + "</div></div>";
+    }
+    $("summary-body").innerHTML =
+      cell(s.completed, "Completed screens") +
+      cell(s.followUp, "Follow-up required") +
+      cell(s.referral, "Referral pathway") +
+      cell(s.noShow || 0, "Registered no-show") +
+      cell(ev.registered, "Registered") +
+      cell((ev.staffIds || []).length, "Staff assigned");
+  }
+
+  function render() {
+    updateSyncChip();
+    $("dry-run-bar").hidden = !state.dryRun;
+    if (state.dryRun) {
+      var evd = getEvent(state.activeEventId);
+      $("dry-run-label").textContent = (evd ? evd.name + " — " : "") + "Simulated event — no live records will change.";
+    }
+
+    var denied = state.role === "Denied" || state.view === "denied";
+    ["board", "people", "sync", "event", "screen", "review", "summary", "denied"].forEach(function (v) {
+      var el = $("view-" + v);
+      if (el) el.hidden = true;
+    });
+    document.querySelectorAll(".nav-item").forEach(function (n) {
+      var nav = n.getAttribute("data-nav");
+      var active = nav === state.view ||
+        ((state.view === "event" || state.view === "screen" || state.view === "review" || state.view === "summary") && nav === "board");
+      n.classList.toggle("is-active", active);
+    });
+    $("btn-create-event").hidden = !can("create") || denied;
+
+    if (denied) {
+      $("view-denied").hidden = false;
+      $("page-title").textContent = "Access";
+      $("page-sub").textContent = "This demo role has no dashboard permissions.";
+      return;
+    }
+
+    if (state.view === "board") {
+      $("view-board").hidden = false;
+      $("page-title").textContent = "Day board";
+      $("page-sub").textContent = "Events needing action first, then the full slate. Every card has a labelled next step.";
+      renderBoard();
+    } else if (state.view === "people") {
+      $("view-people").hidden = false;
+      $("page-title").textContent = "People";
+      $("page-sub").textContent = "Staff access only — participants are records, not sign-in users.";
+      renderPeople();
+    } else if (state.view === "sync") {
+      $("view-sync").hidden = false;
+      $("page-title").textContent = "Sync health";
+      $("page-sub").textContent = "Local saves, pending transfers, failures, and conflicts.";
+      renderSync();
+    } else if (state.view === "event") {
+      $("view-event").hidden = false;
+      $("page-title").textContent = "Live event";
+      $("page-sub").textContent = "Throughput, stations, exceptions, and the next safe action.";
+      renderLiveEvent();
+    } else if (state.view === "screen") {
+      $("view-screen").hidden = false;
+      $("page-title").textContent = "Screening";
+      $("page-sub").textContent = "Scan, confirm, record, save locally, hand off.";
+      renderScreen();
+    } else if (state.view === "review") {
+      $("view-review").hidden = false;
+      $("page-title").textContent = "Clinical review";
+      $("page-sub").textContent = "Flags and incomplete packets — reviewer decides next step.";
+      renderReview();
+    } else if (state.view === "summary") {
+      $("view-summary").hidden = false;
+      $("page-title").textContent = "Event summary";
+      $("page-sub").textContent = "Closed event outcomes.";
+      renderSummary();
+    }
+
+    $("role-switch").value = state.role;
+    $("event-search").value = state.eventQuery || "";
+    $("event-sort").value = state.eventSort || "date_asc";
+    document.querySelectorAll("[data-status-filter]").forEach(function (c) {
+      c.classList.toggle("is-on", c.getAttribute("data-status-filter") === state.statusFilter);
+    });
+    if ($("staff-search")) $("staff-search").value = state.staffQuery || "";
+  }
+
+  function on(el, evt, fn) { if (el) el.addEventListener(evt, fn); }
+
+  document.querySelectorAll("[data-nav]").forEach(function (btn) {
+    on(btn, "click", function () { setView(btn.getAttribute("data-nav")); });
+  });
+  on($("role-switch"), "change", function () { setRole($("role-switch").value); });
+  on($("btn-reset"), "click", function () {
+    openModal({
+      title: "Reset prototype?",
+      bodyHtml: "<p>Clears local prototype state and restores the sample dataset.</p>",
+      actions: [
+        { label: "Cancel", className: "btn-ghost" },
+        { label: "Reset", className: "btn-danger", onClick: function () {
+          localStorage.removeItem(STORAGE_KEY);
+          state = defaultState();
+          toast("Prototype reset", "ok");
+          render();
+        }}
+      ]
+    });
+  });
+  on($("btn-create-event"), "click", openCreateEvent);
+  on($("btn-empty-create"), "click", openCreateEvent);
+  on($("btn-exit-dry-run"), "click", function () { exitDryRun(false); setView("board"); });
+  on($("btn-denied-back"), "click", function () { $("role-switch").focus(); });
+
+  on($("event-search"), "input", function () {
+    state.eventQuery = $("event-search").value;
+    renderBoard();
+    saveState();
+  });
+  on($("event-sort"), "change", function () {
+    state.eventSort = $("event-sort").value;
+    renderBoard();
+    saveState();
+  });
+  document.querySelectorAll("[data-status-filter]").forEach(function (c) {
+    on(c, "click", function () {
+      state.statusFilter = c.getAttribute("data-status-filter");
+      render();
+      saveState();
+    });
+  });
+
+  on($("view-board"), "click", function (e) {
+    var btn = e.target.closest("[data-ev-act]");
+    if (!btn) return;
+    handleEventAction(btn.getAttribute("data-ev-act"), btn.getAttribute("data-id"));
+  });
+
+  on($("btn-back-board"), "click", function () { state.activeEventId = null; setView("board"); });
+  on($("btn-back-board-summary"), "click", function () { setView("board"); });
+  on($("btn-back-event-from-screen"), "click", function () { setView("event"); });
+  on($("btn-back-event-from-review"), "click", function () { setView("event"); });
+  on($("btn-live-edit"), "click", function () { openEditEvent(state.activeEventId); });
+  on($("btn-open-screen"), "click", function () {
+    if (!can("screen")) { toast("Your role cannot screen", "err"); return; }
+    state.view = "screen"; render(); saveState();
+  });
+  on($("btn-open-review"), "click", function () {
+    if (!can("review")) { toast("Your role cannot open review", "err"); return; }
+    state.view = "review"; render(); saveState();
+  });
+  on($("btn-scan-from-live"), "click", function () {
+    state.view = "screen"; render(); openScanModal();
+  });
+  on($("btn-scan-qr"), "click", openScanModal);
+  on($("btn-scan-empty"), "click", openScanModal);
+  on($("btn-save-local"), "click", function () { saveResult(false); });
+  on($("result-form"), "submit", function (e) { e.preventDefault(); saveResult(true); });
+
+  on($("view-screen"), "click", function (e) {
+    var b = e.target.closest("[data-select-p]");
+    if (b) {
+      state.selectedParticipantId = b.getAttribute("data-select-p");
+      var p = getParticipant(state.activeEventId, state.selectedParticipantId);
+      if (p && (p.stage === "waiting" || p.stage === "registered")) p.stage = "screening";
+      render(); saveState();
+    }
+  });
+
+  on($("view-review"), "click", function (e) {
+    var b = e.target.closest("[data-select-r]");
+    if (b) {
+      state.selectedReviewId = b.getAttribute("data-select-r");
+      render(); saveState();
+    }
+  });
+  on($("review-form"), "submit", finaliseReview);
+
+  on($("view-event"), "click", function (e) {
+    var attn = e.target.closest("[data-attn]");
+    if (attn) {
+      var go = attn.getAttribute("data-attn");
+      var pid = attn.getAttribute("data-pid");
+      if (go === "review") { state.selectedReviewId = pid; state.view = "review"; }
+      else if (go === "screen") { state.selectedParticipantId = pid; state.view = "screen"; }
+      else if (go === "sync") state.view = "sync";
+      render(); saveState();
+      return;
+    }
+    var retry = e.target.closest("[data-retry]");
+    if (retry) retrySync(retry.getAttribute("data-retry"), retry.getAttribute("data-eid"));
+  });
+
+  on($("view-sync"), "click", function (e) {
+    var retry = e.target.closest("[data-retry]");
+    if (retry) retrySync(retry.getAttribute("data-retry"), retry.getAttribute("data-eid"));
+  });
+  on($("btn-retry-all-failed"), "click", retryAllFailed);
+
+  on($("staff-search"), "input", function () {
+    state.staffQuery = $("staff-search").value;
+    renderPeople();
+    saveState();
+  });
+  on($("view-people"), "click", function (e) {
+    var a = e.target.closest("[data-approve]");
+    if (a) { approveStaff(a.getAttribute("data-approve")); return; }
+    var r = e.target.closest("[data-reject]");
+    if (r) {
+      state.pending = state.pending.filter(function (p) { return p.id !== r.getAttribute("data-reject"); });
+      toast("Request rejected", "ok");
+      render(); saveState();
+      return;
+    }
+    var asg = e.target.closest("[data-assign]");
+    if (asg) { openAssign(asg.getAttribute("data-assign")); return; }
+    var d = e.target.closest("[data-deactivate]");
+    if (d) {
+      var s = state.staff.filter(function (x) { return x.id === d.getAttribute("data-deactivate"); })[0];
+      if (s) {
+        openModal({
+          title: "Deactivate access?",
+          bodyHtml: "<p>Deactivate <strong>" + escapeHtml(s.name) + "</strong>? They will not be able to sign in.</p>",
+          actions: [
+            { label: "Cancel", className: "btn-ghost" },
+            { label: "Deactivate", className: "btn-danger", onClick: function () {
+              s.status = "inactive";
+              toast("Access deactivated", "ok");
+              render(); saveState();
+            }}
+          ]
+        });
+      }
+    }
+  });
+  on($("btn-import-staff"), "click", function () {
+    toast("Imported 2 staff from roster file (simulated)", "ok");
+    state.staff.push(
+      { id: uid("s"), name: "Imported One", email: "import1@vsms.example", role: "Screener", status: "active", eventId: null, station: "—", perms: "" },
+      { id: uid("s"), name: "Imported Two", email: "import2@vsms.example", role: "Screener", status: "active", eventId: null, station: "—", perms: "" }
+    );
+    render(); saveState();
+  });
+  on($("btn-invite-staff"), "click", function () {
+    openModal({
+      title: "Invite staff",
+      bodyHtml:
+        '<div class="field"><label for="inv-email">Email</label><input id="inv-email" class="input" type="email" placeholder="name@organisation.example" /></div>' +
+        '<div class="field"><label for="inv-role">Role</label><select id="inv-role" class="select">' +
+        ["Screener", "Registration Officer", "Event Manager", "Doctor / Reviewer"].map(function (r) {
+          return "<option>" + r + "</option>";
+        }).join("") +
+        '</select></div><div class="perm-preview" id="inv-perm"></div>',
+      actions: [
+        { label: "Cancel", className: "btn-ghost" },
+        { label: "Send invite", className: "btn-primary", close: false, onClick: function () {
+          var email = $("inv-email").value.trim();
+          var role = $("inv-role").value;
+          if (!email) { toast("Email required", "err"); return; }
+          state.pending.push({
+            id: uid("p"),
+            name: email.split("@")[0].replace(/\./g, " "),
+            email: email,
+            role: role,
+            requested: "Just now"
+          });
+          closeModal();
+          toast("Invite sent — pending approval", "ok");
+          render(); saveState();
+        }}
+      ]
+    });
+    function refreshPerm() {
+      var role = $("inv-role").value;
+      $("inv-perm").innerHTML = "<strong>This role allows</strong><ul>" +
+        roleBullets(role).map(function (b) { return "<li>" + escapeHtml(b) + "</li>"; }).join("") + "</ul>";
+    }
+    on($("inv-role"), "change", refreshPerm);
+    refreshPerm();
+  });
+
+  if (!localStorage.getItem(STORAGE_KEY + "_seen")) {
+    state.loading = true;
+    render();
+    setTimeout(function () {
+      state.loading = false;
+      localStorage.setItem(STORAGE_KEY + "_seen", "1");
+      render();
+    }, 500);
+  } else {
+    render();
+  }
+})();
+
+  </script>
+</body>
+</html>
