@@ -8,6 +8,7 @@ let staffToken;
 let adminToken;
 let manager;
 let staffUser;
+let administrator;
 
 const createUser = (applicationRole, label = `${applicationRole}-${crypto.randomUUID().slice(0, 8)}`) =>
   helpers.ensureTestUser(applicationRole, label);
@@ -15,7 +16,7 @@ const createUser = (applicationRole, label = `${applicationRole}-${crypto.random
 beforeAll(async () => {
   manager = await helpers.ensureTestUser("EVENT_MANAGER", "event-manager");
   staffUser = await helpers.ensureTestUser("REGISTRATION_OFFICER", "staff");
-  const administrator = await helpers.ensureTestUser("ADMINISTRATOR", "event-administrator");
+  administrator = await helpers.ensureTestUser("ADMINISTRATOR", "event-administrator");
   managerToken = helpers.accessTokenFor(manager);
   staffToken = helpers.accessTokenFor(staffUser);
   adminToken = helpers.accessTokenFor(administrator);
@@ -455,6 +456,36 @@ describe("event lifecycle", () => {
       .send(newEvent());
     expect(created.status).toBe(201);
 
+    const registrationId = crypto.randomUUID();
+    const syncAction = await helpers.prisma.syncAction.create({
+      data: {
+        userId: administrator.id,
+        eventId: created.body.eventId,
+        clientActionId: crypto.randomUUID(),
+        requestFingerprint: "a".repeat(64),
+        operation: "UPDATE",
+        entityType: "ScreeningResult",
+        entityId: registrationId,
+        payload: { schemaVersion: 1, stationType: "VISUAL_ACUITY" },
+        responseSnapshot: { registrationId, overallFlag: "REFER", isFlagged: true },
+        status: "APPLIED",
+        transitions: { create: { sequence: 0, status: "APPLIED", retryCount: 0 } },
+      },
+    });
+    const unrelatedSyncAction = await helpers.prisma.syncAction.create({
+      data: {
+        userId: administrator.id,
+        eventId: crypto.randomUUID(),
+        clientActionId: crypto.randomUUID(),
+        requestFingerprint: "b".repeat(64),
+        operation: "UPDATE",
+        entityType: "ScreeningResult",
+        entityId: crypto.randomUUID(),
+        payload: { schemaVersion: 1, stationType: "VISUAL_ACUITY" },
+        status: "APPLIED",
+      },
+    });
+
     const updated = await request(app)
       .patch(`/api/v1/events/${created.body.eventId}`)
       .set("Authorization", `Bearer ${adminToken}`)
@@ -488,6 +519,10 @@ describe("event lifecycle", () => {
     expect(removed.body).toEqual({ eventId: created.body.eventId, deleted: true });
     expect(await helpers.prisma.event.findUnique({ where: { eventId: created.body.eventId } })).toBeNull();
     expect(await helpers.prisma.eventAuditLog.count({ where: { eventId: created.body.eventId } })).toBe(0);
+    expect(await helpers.prisma.syncAction.findUnique({ where: { id: syncAction.id } })).toBeNull();
+    expect(await helpers.prisma.syncActionTransition.count({ where: { syncActionId: syncAction.id } })).toBe(0);
+    expect(await helpers.prisma.syncAction.findUnique({ where: { id: unrelatedSyncAction.id } })).toEqual(expect.objectContaining({ id: unrelatedSyncAction.id }));
+    await helpers.prisma.syncAction.delete({ where: { id: unrelatedSyncAction.id } });
     expect(await helpers.prisma.auditLog.count({ where: {
       entityName: "Event",
       entityId: created.body.eventId,
