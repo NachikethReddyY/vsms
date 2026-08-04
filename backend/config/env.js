@@ -14,8 +14,9 @@ const httpsOrigins = z.string().refine((value) => value.split(",").every((origin
 
 const schema = z.object({
   NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
+  LOCAL_HTTPS: z.enum(["true", "false"]).default("true"),
   HOST: z.enum(["127.0.0.1", "0.0.0.0"]).default("127.0.0.1"),
-  PORT: z.coerce.number().int().min(1).max(65535).default(5000),
+  PORT: z.coerce.number().int().min(1).max(65535).default(5050),
   DATABASE_URL: z.string().url(),
   JWT_ACCESS_SECRET: z.string().min(32).optional(),
   JWT_ISSUER: z.string().min(1).default("vsms-api"),
@@ -62,4 +63,5 @@ module.exports = Object.freeze({
   trustProxy: values.TRUST_PROXY === "true",
   publicSignupEnabled: values.PUBLIC_SIGNUP_ENABLED === "true",
   isProduction: values.NODE_ENV === "production",
+  localHttps: values.LOCAL_HTTPS === "true",
 });

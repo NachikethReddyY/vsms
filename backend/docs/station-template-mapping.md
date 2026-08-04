@@ -1,6 +1,6 @@
 # Station template → event Station → screening (Issue #30)
 
-**Status:** implemented for Issue **#24** (import/update against `Station`).  
+**Status:** implemented for Issue **#24** (import/update against `Station`).
 **Scope:** mapping and import semantics — see root [`erd.md`](../../erd.md) for the broader Issue #7 / platform ERD.
 
 ---

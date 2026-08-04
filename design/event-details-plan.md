@@ -213,9 +213,10 @@ distinct fixtures and policy branches.
 ### Audit properties
 
 - Audit events are append-only and created server-side.
-- Record actor, action, target event, timestamp, and correlation ID. The domain
-  audit contains successful committed mutations only; rejected attempts belong
-  in redacted security logs, not `EventAuditLog`.
+- The current delete flow preserves `EventAuditLog` retention rows and writes an
+  `AuditLog` tombstone only after the event delete succeeds in the same
+  transaction. Do not describe `EventAuditLog` as the current lifecycle mutation
+  feed, and do not claim rejected attempts are currently recorded there.
 - Snapshot only allowlisted event fields; never include tokens, secrets,
   passwords, or sensitive headers.
 - Never allow client-controlled actor IDs, timestamps, or audit actions.

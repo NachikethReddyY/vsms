@@ -1,6 +1,9 @@
+const crypto = require("crypto");
+
 const ACCESS_COOKIE = "vsms_access";
 const REFRESH_COOKIE = "vsms_refresh";
 const USERNAME_COOKIE = "vsms_username";
+const CSRF_COOKIE = "vsms_csrf";
 const OAUTH_STATE_COOKIE = "vsms_oauth_state";
 const OAUTH_VERIFIER_COOKIE = "vsms_oauth_verifier";
 const OAUTH_RETURN_TO_COOKIE = "vsms_oauth_return_to";
@@ -13,15 +16,19 @@ function parseCookies(header = "") {
         .reduce((cookies, part) => {
             const separator = part.indexOf("=");
             if (separator < 0) return cookies;
-            cookies[part.slice(0, separator)] = decodeURIComponent(part.slice(separator + 1));
+            try {
+                cookies[part.slice(0, separator)] = decodeURIComponent(part.slice(separator + 1));
+            } catch {
+                // Ignore malformed, attacker-controlled cookie values.
+            }
             return cookies;
         }, {});
 }
 
-function cookie(name, value, maxAgeSeconds) {
+function cookie(name, value, maxAgeSeconds, httpOnly = true) {
     const parts = [
         `${name}=${encodeURIComponent(value)}`,
-        "HttpOnly",
+        ...(httpOnly ? ["HttpOnly"] : []),
         "Path=/",
         "SameSite=Lax",
         "Secure",
@@ -38,14 +45,17 @@ function appendCookies(res, cookies) {
 function setAuthCookies(res, authenticationResult, username) {
     const accessMaxAge = Number(authenticationResult.ExpiresIn || 3600);
     const refreshMaxAge = Number(process.env.REFRESH_COOKIE_MAX_AGE_SECONDS || 30 * 24 * 60 * 60);
+    const csrfToken = crypto.randomBytes(32).toString("base64url");
     const cookies = [
         cookie(ACCESS_COOKIE, authenticationResult.AccessToken, accessMaxAge),
         cookie(USERNAME_COOKIE, username, refreshMaxAge),
+        cookie(CSRF_COOKIE, csrfToken, refreshMaxAge, false),
     ];
     if (authenticationResult.RefreshToken) {
         cookies.push(cookie(REFRESH_COOKIE, authenticationResult.RefreshToken, refreshMaxAge));
     }
     appendCookies(res, cookies);
+    return csrfToken;
 }
 
 function clearAuthCookies(res) {
@@ -53,6 +63,7 @@ function clearAuthCookies(res) {
         cookie(ACCESS_COOKIE, "", 0),
         cookie(REFRESH_COOKIE, "", 0),
         cookie(USERNAME_COOKIE, "", 0),
+        cookie(CSRF_COOKIE, "", 0, false),
     ]);
 }
 
@@ -77,6 +88,7 @@ module.exports = {
     ACCESS_COOKIE,
     REFRESH_COOKIE,
     USERNAME_COOKIE,
+    CSRF_COOKIE,
     OAUTH_STATE_COOKIE,
     OAUTH_VERIFIER_COOKIE,
     OAUTH_RETURN_TO_COOKIE,

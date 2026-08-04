@@ -433,7 +433,6 @@ model Event {
   eventDays           EventDay[]
   registrations       EventRegistration[]
   staffAssignments    StaffAssignment[]
-  auditLogs           EventAuditLog[]
   participantConsents ParticipantConsent[]
 
   @@unique([createdByUserId, createIdempotencyKey])
@@ -523,7 +522,6 @@ model EventAuditLog {
   correlationId   String           @map("correlation_id") @db.Uuid
   createdAt       DateTime         @default(now()) @map("created_at") @db.Timestamptz(3)
 
-  event Event @relation(fields: [eventId], references: [eventId], onDelete: Restrict)
   actor User  @relation("EventAuditActor", fields: [actorUserId], references: [id], onDelete: Restrict)
 
   @@index([eventId, createdAt, eventAuditLogId])

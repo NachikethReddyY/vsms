@@ -1,6 +1,6 @@
 const express = require("express");
+const { rateLimit } = require("express-rate-limit");
 const eventController = require("../controllers/eventController");
-const authenticate = require("../middlewares/authenticate");
 const validate = require("../middlewares/validate");
 const asyncHandler = require("../utils/asyncHandler");
 const { requireSystemRole } = require("../middlewares/authorize");
@@ -14,6 +14,8 @@ const {
     eventParams,
     listQuery,
     auditQuery,
+    attendeeQuery,
+    deleteEventBody,
     assignmentParams,
     assignmentDeleteParams,
     assignmentBody,
@@ -24,7 +26,17 @@ const {
 } = require("../schemas/eventSchemas");
 
 const router = express.Router();
-router.use(authenticate);
+const reportingLimiter = rateLimit({
+  windowMs: 60000,
+  limit: 60,
+  standardHeaders: "draft-8",
+  legacyHeaders: false,
+  keyGenerator: (req) => req.user.userId,
+});
+router.use((_req, res, next) => {
+  res.set("Cache-Control", "no-store");
+  next();
+});
 
 // 1. Static routes MUST come first so they are not captured by dynamic parameters like /:eventId
 router.get("/staff-directory", requireSystemRole("ADMIN", "EVENT_MANAGER"), asyncHandler(eventController.staffDirectory));
@@ -46,6 +58,10 @@ router.get(
 );
 
 // 3. Dynamic parameter routes come last
+router.get("/:eventId/metrics", reportingLimiter, validate({ params: eventParams }), asyncHandler(eventController.metrics));
+router.get("/:eventId/attendees", reportingLimiter, validate({ params: eventParams, query: attendeeQuery }), asyncHandler(eventController.attendees));
+router.get("/:eventId/export", reportingLimiter, validate({ params: eventParams }), asyncHandler(eventController.export));
+router.delete("/:eventId", validate({ params: eventParams, body: deleteEventBody }), asyncHandler(eventController.delete));
 router.get("/:eventId", validate({ params: eventParams }), asyncHandler(eventController.get));
 router.patch("/:eventId", validate({ params: eventParams, body: updateEventBody }), asyncHandler(eventController.update));
 router.post("/:eventId/stations/import", validate({ params: eventParams, body: stationImportBody }), asyncHandler(eventController.importStations));
@@ -56,6 +72,6 @@ router.post("/:eventId/complete", validate({ params: eventParams, body: transiti
 router.post("/:eventId/cancel", validate({ params: eventParams, body: cancelBody }), asyncHandler(eventController.cancel));
 router.post("/:eventId/shifts/:shiftId/assignments", validate({ params: assignmentParams, body: assignmentBody }), asyncHandler(eventController.addAssignment));
 router.delete("/:eventId/shifts/:shiftId/assignments/:assignmentId", validate({ params: assignmentDeleteParams, query: versionQuery }), asyncHandler(eventController.removeAssignment));
-router.get("/:eventId/audit-log", validate({ params: eventParams, query: auditQuery }), asyncHandler(eventController.audit));
+router.get("/:eventId/audit-log", reportingLimiter, validate({ params: eventParams, query: auditQuery }), asyncHandler(eventController.audit));
 
 module.exports = router;
