@@ -32,6 +32,11 @@ import {
   type ReviseReferralRequest,
   type SignatureResponse,
 } from './reviewApi';
+import {
+  readStoredReferralIssue,
+  removeStoredReferralIssue,
+  writeStoredReferralIssue,
+} from './referralRecovery';
 import './ReviewWorkspacePage.css';
 
 type FormState = {
@@ -208,21 +213,8 @@ function DetailSkeleton() {
 
 type RecordedReferral = NonNullable<NonNullable<ReviewDetailResponse['existingReview']>['referral']>;
 
-const referralIssueStorageKey = (eventId: string, referralId: string) => `vsms.referral-issue:${eventId}:${referralId}`;
-
-const savedReferralIssue = (eventId: string, referralId: string): IssueReferralRequest | null => {
-  try {
-    const value = window.sessionStorage.getItem(referralIssueStorageKey(eventId, referralId));
-    if (!value) return null;
-    const parsed = JSON.parse(value) as IssueReferralRequest;
-    return typeof parsed.idempotencyKey === 'string' && typeof parsed.destinationEmail === 'string' ? parsed : null;
-  } catch {
-    return null;
-  }
-};
-
 function ReferralIssuance({ eventId, referral, onRevised }: { eventId: string; referral: RecordedReferral; onRevised: () => Promise<void> }) {
-  const [savedIssue, setSavedIssue] = useState<IssueReferralRequest | null>(() => savedReferralIssue(eventId, referral.referralId));
+  const [savedIssue, setSavedIssue] = useState<IssueReferralRequest | null>(() => readStoredReferralIssue(eventId, referral.referralId));
   const [email, setEmail] = useState(() => savedIssue?.destinationEmail || '');
   const [signature, setSignature] = useState<string | null>(null);
   const [confirmed, setConfirmed] = useState(false);
@@ -242,19 +234,28 @@ function ReferralIssuance({ eventId, referral, onRevised }: { eventId: string; r
   });
   const documentId = result?.documentId || referral.document?.documentId;
   const delivery = result?.delivery || referral.delivery;
-  const storageKey = referralIssueStorageKey(eventId, referral.referralId);
 
-  const saveIssue = (request: IssueReferralRequest) => {
-    window.sessionStorage.setItem(storageKey, JSON.stringify(request));
-    setSavedIssue(request);
+  const saveIssue = (request: IssueReferralRequest, serverExpiresAt?: string | null) => {
+    const stored = writeStoredReferralIssue(eventId, referral.referralId, request, serverExpiresAt);
+    setSavedIssue(stored ? request : null);
   };
 
   const recover = async () => {
-    if (!savedIssue) return setError('This browser does not have the original issuance request, so the passphrase cannot be recovered here.');
+    const recoveryRequest = readStoredReferralIssue(eventId, referral.referralId);
+    if (!recoveryRequest) {
+      setSavedIssue(null);
+      return setError('This browser does not have an unexpired issuance request, so the passphrase cannot be recovered here.');
+    }
     setIssuing(true);
     setError('');
     try {
-      setResult(await reviewApi.issueReferral(eventId, referral.referralId, savedIssue));
+      const recovered = await reviewApi.issueReferral(eventId, referral.referralId, recoveryRequest);
+      if (recovered.handoffSecretExpiresAt) saveIssue(recoveryRequest, recovered.handoffSecretExpiresAt);
+      else if (!recovered.handoffSecret) {
+        removeStoredReferralIssue(eventId, referral.referralId);
+        setSavedIssue(null);
+      }
+      setResult(recovered);
     } catch (requestError) {
       setError(apiProblem(requestError)?.title || 'The secure referral recovery request could not be completed.');
     } finally {
@@ -269,7 +270,7 @@ function ReferralIssuance({ eventId, referral, onRevised }: { eventId: string; r
     try {
       await navigator.clipboard.writeText(result.handoffSecret);
       await reviewApi.acknowledgeReferralHandoff(eventId, referral.referralId, { idempotencyKey: savedIssue.idempotencyKey });
-      window.sessionStorage.removeItem(storageKey);
+      removeStoredReferralIssue(eventId, referral.referralId);
       setSavedIssue(null);
       setResult({ ...result, handoffSecret: null, handoffSecretExpiresAt: null });
       setSecretCopied(true);
@@ -314,6 +315,11 @@ function ReferralIssuance({ eventId, referral, onRevised }: { eventId: string; r
         saveIssue(request);
       }
       const issued = await reviewApi.issueReferral(eventId, referral.referralId, request);
+      if (issued.handoffSecretExpiresAt) saveIssue(request, issued.handoffSecretExpiresAt);
+      else if (!issued.handoffSecret) {
+        removeStoredReferralIssue(eventId, referral.referralId);
+        setSavedIssue(null);
+      }
       setResult(issued);
     } catch (requestError) {
       setError(apiProblem(requestError)?.title || 'The referral could not be issued. Nothing was marked as sent.');
@@ -377,7 +383,7 @@ function ReferralIssuance({ eventId, referral, onRevised }: { eventId: string; r
   return <form className="referral-issuance" onSubmit={(event) => void issue(event)}>
     <header><h4>Issue encrypted referral</h4><p>Generate the medical referral, sign it, and send the password-protected attachment.</p></header>
     {error && <div className="review-error-summary" role="alert">{error}</div>}
-    <label className="review-field"><span>Destination email</span><input type="email" required maxLength={255} value={email} onChange={(event) => { if (savedIssue && event.target.value.trim().toLowerCase() !== savedIssue.destinationEmail) { window.sessionStorage.removeItem(storageKey); setSavedIssue(null); } setEmail(event.target.value); }} placeholder="clinic@example.com" /></label>
+    <label className="review-field"><span>Destination email</span><input type="email" required maxLength={255} value={email} onChange={(event) => { if (savedIssue && event.target.value.trim().toLowerCase() !== savedIssue.destinationEmail) { removeStoredReferralIssue(eventId, referral.referralId); setSavedIssue(null); } setEmail(event.target.value); }} placeholder="clinic@example.com" /></label>
     <div className="referral-signature"><span>Reviewer electronic signature</span><SignaturePad onChange={setSignature} /></div>
     <label className="decision-confirm"><input type="checkbox" checked={confirmed} onChange={(event) => setConfirmed(event.target.checked)} /><span><strong>I confirm this referral and delivery</strong><small>A random passphrase is held in encrypted recovery escrow for 15 minutes. I will share it through a separate channel, never in the referral email.</small></span></label>
     <button className="primary" type="submit" disabled={issuing}>{issuing ? 'Signing and issuing…' : 'Sign and issue referral'}</button>
