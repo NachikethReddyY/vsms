@@ -1,7 +1,8 @@
+/* eslint-disable react-refresh/only-export-components */
 import { ExclamationTriangleIcon } from '@heroicons/react/24/outline';
 import { FormEvent, ReactNode, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { getApiMessage } from '../../auth/authState';
+import { getApiError as getApiMessage } from '../../utils/apiClient';
 import {
   FlagEvaluation,
   QueueRegistration,

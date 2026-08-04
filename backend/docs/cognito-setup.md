@@ -12,7 +12,8 @@ The versioned CloudFormation template is at `infrastructure/cognito.yaml`. It cr
 - verified-email account recovery;
 - mandatory software-token MFA;
 - advanced threat protection;
-- `Admin` and `RegistrationOfficer` groups;
+- Cognito managed login with an authorization-code grant and PKCE;
+- `Admin`, `EventManager`, `RegistrationOfficer`, `Screener`, and `Reviewer` groups;
 - administrator-only account creation.
 
 Deploy it from the project root:
@@ -21,10 +22,10 @@ Deploy it from the project root:
 aws cloudformation deploy `
   --template-file infrastructure/cognito.yaml `
   --stack-name vsms-staff-development `
-  --parameter-overrides EnvironmentName=development
+  --parameter-overrides EnvironmentName=development FrontendUrl=https://localhost:5173
 ```
 
-Copy the output values into `backend/.env` as `COGNITO_USER_POOL_ID`, `COGNITO_APP_CLIENT_ID`, and `COGNITO_REGION`.
+Copy the output values into `backend/.env` as `COGNITO_USER_POOL_ID`, `COGNITO_APP_CLIENT_ID`, `COGNITO_REGION`, `COGNITO_DOMAIN`, and `COGNITO_REDIRECT_URI`. Set `COGNITO_LOGOUT_URI` to the same frontend origin used by `FrontendUrl`.
 
 ## Create test staff
 
@@ -41,14 +42,14 @@ Create the matching local profile without a password:
 npm run provision-staff -- officer@example.com "Registration Officer" RO-001 REGISTRATION_OFFICER
 ```
 
-Repeat with the `Admin` Cognito group and `ADMINISTRATOR` local role for the administrator test account. Both the verified Cognito group and local role must match; an inactive local account or missing group receives `403`.
+Repeat with the Cognito group and local role required by the staff member. The supported pairs are `Admin`/`ADMINISTRATOR`, `EventManager`/`EVENT_MANAGER`, `RegistrationOfficer`/`REGISTRATION_OFFICER`, `Screener`/`SCREENER`, and `Reviewer`/`REVIEWER`. Both the verified Cognito group and local role must match; an inactive local account or missing group receives `403`.
 
-At first login, the web app handles Cognito's permanent-password challenge and software-token MFA enrollment. The staff member enters the setup key in an authenticator app and verifies the generated code before a session is issued.
+Selecting Sign in redirects the browser to Cognito managed login. Cognito handles temporary-password changes, password recovery, and MFA before returning an authorization code to `/auth/callback`; the backend exchanges it with PKCE and stores tokens only in HttpOnly cookies.
 
 ## Production settings
 
 - Serve both applications over HTTPS.
-- Set `COOKIE_SECURE=true`.
+- Auth cookies are always `Secure`; terminate TLS only at a trusted proxy.
 - Set `CORS_ORIGIN` to the exact frontend origin. Separate multiple approved origins with commas.
 - Point `SIGNATURE_STORAGE_DIR` to encrypted, access-controlled persistent storage.
 - Keep `.env` out of source control and use the deployment platform’s secret manager.
