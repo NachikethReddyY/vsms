@@ -29,7 +29,7 @@ design, or compatibility decisions:
 
 | File | Why it was used |
 |---|---|
-| `design/design.md` | Primary product design system, responsive shell, visual tokens, accessibility, wording, and offline behavior. |
+| `docs/design.md` | Current product design system, responsive shell, visual tokens, accessibility, wording, and offline behavior. |
 | `design/event-details-plan.md` | Approved preflight architecture and implementation sequence. |
 | `erd.md` | Current and proposed database models, relations, enums, and unresolved references. |
 | `backend/prisma/schema.prisma` | Canonical current Prisma schema and source for migration design. |

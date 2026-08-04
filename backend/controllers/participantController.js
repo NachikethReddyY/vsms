@@ -12,7 +12,7 @@ exports.createParticipant = asyncHandler(async (req, res) => {
 });
 
 exports.getParticipantById = asyncHandler(async (req, res) => {
-    const participant = await participantService.getParticipantByIdService(req.params.participantId);
+    const participant = await participantService.getParticipantByIdService(req.params.participantId, req.registrationEventId, req.auth.userId);
     res.json({ participant });
 });
 
@@ -22,17 +22,17 @@ exports.updateParticipant = asyncHandler(async (req, res) => {
 });
 
 exports.getParticipantRegistrations = asyncHandler(async (req, res) => {
-    const registrations = await participantService.getParticipantRegistrationsService(req.params.participantId);
+    const registrations = await participantService.getParticipantRegistrationsService(req.params.participantId, req.registrationEventId, req.auth.userId);
     res.json({ registrations });
 });
 
 exports.getParticipantConsents = asyncHandler(async (req, res) => {
-    const consents = await participantService.getParticipantConsentsService(req.params.participantId);
+    const consents = await participantService.getParticipantConsentsService(req.params.participantId, req.registrationEventId, req.auth.userId);
     res.json({ consents });
 });
 
 exports.getEmergencyContacts = asyncHandler(async (req, res) => {
-    const contacts = await participantService.getEmergencyContactsService(req.params.participantId);
+    const contacts = await participantService.getEmergencyContactsService(req.params.participantId, req.registrationEventId, req.auth.userId);
     res.json({ contacts });
 });
 

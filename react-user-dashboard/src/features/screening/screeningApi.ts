@@ -1,4 +1,6 @@
 import apiClient from '../../utils/apiClient';
+import { getStoredSession } from '../../utils/session';
+import { evaluateOfflineStation, isNetworkError, queueOfflineStationSave } from './offlineSync';
 
 export type StationType = 'VISUAL_ACUITY' | 'REFRACTION' | 'COLOUR_VISION' | 'EYE_HEALTH';
 export type OverallFlag = 'NORMAL' | 'REVIEW' | 'REFER' | 'URGENT';
@@ -10,6 +12,7 @@ export type Station = {
   stationType: StationType;
   stationOrder: number;
   isActive: boolean;
+  offlineAccessExpiresAt?: string;
 };
 
 export type QueueRegistration = {
@@ -88,21 +91,57 @@ export type ScreeningSaveResponse<T> = {
   acknowledgedAt?: string | null;
   resultData: T;
   evaluation?: FlagEvaluation;
+  queued?: boolean;
 };
 
 export type VisualAcuityPayload = ScreeningSavePayload<VisualAcuityResultData>;
 
-async function previewStation<T>(eventId: string, stationId: string, path: string, resultData: T) {
-  const { data } = await apiClient.post<FlagEvaluation>(
-    `/events/${eventId}/stations/${stationId}/${path}/preview`,
-    { resultData },
-  );
-  return data;
+type ScreeningPath = 'visual-acuity' | 'refraction' | 'colour-vision';
+
+async function previewStation<T extends VisualAcuityResultData | RefractionResultData | ColourVisionResultData>(
+  eventId: string,
+  stationId: string,
+  path: ScreeningPath,
+  resultData: T,
+) {
+  try {
+    const { data } = await apiClient.post<FlagEvaluation>(
+      `/events/${eventId}/stations/${stationId}/${path}/preview`,
+      { resultData },
+    );
+    return data;
+  } catch (error) {
+    if (!isNetworkError(error)) throw error;
+    return evaluateOfflineStation(path, resultData);
+  }
 }
 
-async function saveStation<T>(eventId: string, stationId: string, path: string, body: ScreeningSavePayload<T>) {
-  const { data } = await apiClient.post(`/events/${eventId}/stations/${stationId}/${path}`, body);
-  return data as ScreeningSaveResponse<T>;
+async function saveStation<T extends VisualAcuityResultData | RefractionResultData | ColourVisionResultData>(
+  eventId: string,
+  stationId: string,
+  path: ScreeningPath,
+  body: ScreeningSavePayload<T>,
+) {
+  try {
+    const { data } = await apiClient.post(`/events/${eventId}/stations/${stationId}/${path}`, body);
+    return data as ScreeningSaveResponse<T>;
+  } catch (error) {
+    if (!isNetworkError(error)) throw error;
+    const ownerId = getStoredSession()?.user.id;
+    if (!ownerId) throw error;
+    const evaluation = await queueOfflineStationSave(ownerId, eventId, stationId, path, body);
+    return {
+      resultId: `offline:${body.idempotencyKey}`,
+      overallFlag: evaluation.overallFlag,
+      isFlagged: evaluation.isFlagged,
+      flagSummary: evaluation.flagSummary,
+      ruleVersion: evaluation.ruleVersion,
+      acknowledgedAt: body.acknowledged ? new Date().toISOString() : null,
+      resultData: body.resultData,
+      evaluation,
+      queued: true,
+    };
+  }
 }
 
 export const screeningApi = {

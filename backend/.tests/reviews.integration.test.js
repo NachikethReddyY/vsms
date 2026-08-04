@@ -4,32 +4,29 @@ require("dotenv").config();
 
 let app;
 let prisma;
-let signAccessToken;
+let helpers;
 let eventId;
 let zeroStationEventId;
 let reviewerToken;
-let adminToken;
+let screenerToken;
 let stationByType;
 const registrations = {};
+const decisionSignatures = new Map();
 
-const userInput = (label, sysRole = "STAFF") => ({
-  id: crypto.randomUUID(),
-  username: `review-${label}-${crypto.randomUUID().slice(0, 6)}`,
-  fullName: `Review ${label}`,
-  email: `${crypto.randomUUID()}@reviews.tests.vsms.local`,
-  employeeNumber: `R${crypto.randomUUID().replaceAll("-", "").slice(0, 14)}`,
-  sysRole,
-  status: "ACTIVE",
-});
+const signatureDataUrl = () => {
+  const buffer = Buffer.alloc(128);
+  Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]).copy(buffer);
+  return `data:image/png;base64,${buffer.toString("base64")}`;
+};
 
 const auth = (token) => ({ Authorization: `Bearer ${token}` });
 
 const createRegistration = async (label, queueNumber, resultFlags) => {
   const participant = await prisma.participant.create({
     data: {
-      participantReference: `REVIEW-${crypto.randomUUID().slice(0, 20)}`,
       nric: `TEST-${crypto.randomUUID()}`,
-      nricMasked: "T****123A",
+      participantReference: `REV-${crypto.randomUUID().replaceAll("-", "").slice(0, 20)}`,
+      nricMasked: "••••123A",
       firstName: label,
       lastName: "Participant",
       dateOfBirth: new Date("1970-01-01T00:00:00.000Z"),
@@ -39,6 +36,7 @@ const createRegistration = async (label, queueNumber, resultFlags) => {
       consentGiven: true,
       createdById: testUsers.manager.id,
       updatedById: testUsers.manager.id,
+      onboardingEventId: eventId,
     },
   });
   const registration = await prisma.eventRegistration.create({
@@ -49,8 +47,8 @@ const createRegistration = async (label, queueNumber, resultFlags) => {
       registrationStatus: "CHECKED_IN",
       participantDisplayName: `${label} Participant`,
       queueNumber,
+      idempotencyKey: `review-${label.toLowerCase()}-${crypto.randomUUID()}`,
       checkedIn: true,
-      idempotencyKey: crypto.randomUUID(),
     },
   });
   for (const [stationType, overallFlag] of Object.entries(resultFlags)) {
@@ -79,29 +77,43 @@ const createRegistration = async (label, queueNumber, resultFlags) => {
 const allNormal = () => Object.fromEntries(["VISUAL_ACUITY", "REFRACTION", "COLOUR_VISION", "EYE_HEALTH"].map((type) => [type, "NORMAL"]));
 const testUsers = {};
 
+const uploadDecisionSignature = async (registrationId, token = reviewerToken) => {
+  const response = await request(app).post("/api/v1/signatures").set(auth(token)).send({
+    eventId,
+    targetId: registrationId,
+    purpose: "REVIEW_DECISION",
+    dataUrl: signatureDataUrl(),
+  });
+  expect(response.status).toBe(201);
+  return response.body;
+};
+
 beforeAll(async () => {
   process.env.NODE_ENV = "test";
   process.env.LOCAL_HTTPS = "false";
-  process.env.JWT_ACCESS_SECRET = "review-tests-access-secret-with-at-least-thirty-two-characters";
   const databaseUrl = new URL(process.env.DATABASE_URL);
   if (!databaseUrl.pathname.endsWith("_test")) databaseUrl.pathname = `${databaseUrl.pathname}_test`;
   process.env.DATABASE_URL = databaseUrl.toString();
 
+  helpers = require("./helpers");
   app = require("../app");
-  prisma = require("../prisma/prismaClient");
-  ({ signAccessToken } = require("../utils/tokens"));
+  prisma = helpers.prisma;
 
-  for (const [label, role] of Object.entries({ reviewer: "STAFF", admin: "ADMIN", manager: "EVENT_MANAGER", screener: "STAFF", inactive: "STAFF", inactiveShift: "STAFF" })) {
-    testUsers[label] = await prisma.user.create({ data: userInput(label, role) });
-    const roleName = role === "ADMIN" ? "ADMINISTRATOR" : role === "EVENT_MANAGER" ? "EVENT_MANAGER" : "SCREENER";
-    const applicationRole = await prisma.role.upsert({ where: { roleName }, update: {}, create: { roleName } });
-    await prisma.userRole.create({ data: { userId: testUsers[label].id, roleId: applicationRole.id } });
+  for (const [label, role] of Object.entries({
+    reviewer: "REVIEWER",
+    admin: "ADMINISTRATOR",
+    manager: "EVENT_MANAGER",
+    screener: "SCREENER",
+    inactive: "REVIEWER",
+    inactiveShift: "REVIEWER",
+  })) {
+    testUsers[label] = await helpers.ensureTestUser(role, `review-${label}`);
   }
-  reviewerToken = signAccessToken(testUsers.reviewer);
-  adminToken = signAccessToken(testUsers.admin);
+  reviewerToken = helpers.accessTokenFor(testUsers.reviewer);
+  screenerToken = helpers.accessTokenFor(testUsers.screener);
 
-  const startsAt = new Date("2035-01-01T00:00:00.000Z");
-  const endsAt = new Date("2035-01-01T08:00:00.000Z");
+  const startsAt = new Date(Date.now() - 60 * 60 * 1000);
+  const endsAt = new Date(Date.now() + 8 * 60 * 60 * 1000);
   const event = await prisma.event.create({
     data: { name: "Review integration", venue: "Test hall", timezone: "Asia/Singapore", startsAt, endsAt, capacity: 50, status: "IN_PROGRESS", createdByUserId: testUsers.manager.id },
   });
@@ -124,10 +136,11 @@ beforeAll(async () => {
 
   await createRegistration("Normal", 10, allNormal());
   await createRegistration("Flagged", 20, { ...allNormal(), EYE_HEALTH: "REFER" });
-  await createRegistration("Urgent", 30, { EYE_HEALTH: "URGENT" });
+  await createRegistration("Urgent", 30, { VISUAL_ACUITY: "URGENT" });
   await createRegistration("Incomplete", 40, { VISUAL_ACUITY: "REVIEW" });
   await createRegistration("Stale", 50, allNormal());
   await createRegistration("Concurrent", 60, allNormal());
+  await createRegistration("ReplayTarget", 70, allNormal());
 
   const zeroEvent = await prisma.event.create({
     data: { name: "Zero stations", venue: "Test hall", timezone: "Asia/Singapore", startsAt, endsAt, capacity: 5, status: "IN_PROGRESS", createdByUserId: testUsers.manager.id },
@@ -155,9 +168,11 @@ describe("clinical review API", () => {
 
   test("admin, manager, screener, inactive assignment, and inactive shift receive no bypass", async () => {
     for (const label of ["admin", "manager", "screener", "inactive", "inactiveShift"]) {
-      const response = await request(app).get(`/api/events/${eventId}/reviews`).set(auth(signAccessToken(testUsers[label])));
+      const response = await request(app).get(`/api/events/${eventId}/reviews`).set(auth(helpers.accessTokenFor(testUsers[label])));
       expect(response.status).toBe(403);
-      expect(response.body.code).toBe("REVIEWER_ASSIGNMENT_REQUIRED");
+      expect(response.body.code).toBe(["inactive", "inactiveShift"].includes(label)
+        ? "REVIEWER_ASSIGNMENT_REQUIRED"
+        : "REVIEWER_ROLE_REQUIRED");
     }
   });
 
@@ -169,8 +184,10 @@ describe("clinical review API", () => {
 
   test("complete writes one review, completion status, no referral, and one safe audit", async () => {
     const detail = await request(app).get(`/api/events/${eventId}/reviews/${registrations.Normal}`).set(auth(reviewerToken));
+    const signature = await uploadDecisionSignature(registrations.Normal);
+    decisionSignatures.set(registrations.Normal, signature);
     const response = await request(app).post(`/api/events/${eventId}/reviews/${registrations.Normal}/decision`).set(auth(reviewerToken)).send({
-      outcome: "COMPLETE", contextVersion: detail.body.contextVersion, confirmed: true, clinicalSummary: "Screening is within expected limits.",
+      outcome: "COMPLETE", contextVersion: detail.body.contextVersion, confirmed: true, clinicalSummary: "Screening is within expected limits.", ...signature,
     });
     expect(response.status).toBe(201);
     expect(await prisma.review.count({ where: { registrationId: registrations.Normal } })).toBe(1);
@@ -180,6 +197,14 @@ describe("clinical review API", () => {
     expect(audits).toHaveLength(1);
     expect(JSON.stringify(audits)).not.toContain("TEST-");
     expect(JSON.stringify(audits)).not.toContain("Screening is within expected limits");
+    expect(audits[0].details.signaturePurpose).toBe("REVIEW_DECISION");
+    expect(audits[0].details.signatureSha256).toBe(signature.signatureSha256);
+    const review = await prisma.review.findFirstOrThrow({ where: { registrationId: registrations.Normal } });
+    expect(review.signatureSignerUserId).toBe(testUsers.reviewer.id);
+    expect(review.signatureObjectKey).toBe(signature.signatureObjectKey);
+    expect(review.signedPayloadHash).toMatch(/^[a-f0-9]{64}$/);
+    expect(review.signedAt).toBeInstanceOf(Date);
+    expect((await prisma.signatureArtifact.findUnique({ where: { signatureObjectKey: signature.signatureObjectKey } })).consumedAt).toBeInstanceOf(Date);
   });
 
   test.each([
@@ -188,6 +213,8 @@ describe("clinical review API", () => {
   ])("%s referral decision atomically writes the review, draft referral, completion, and both audits", async (label, outcome, urgency) => {
     const registrationId = registrations[label];
     const detail = await request(app).get(`/api/events/${eventId}/reviews/${registrationId}`).set(auth(reviewerToken));
+    const signature = await uploadDecisionSignature(registrationId);
+    decisionSignatures.set(registrationId, signature);
     const response = await request(app).post(`/api/events/${eventId}/reviews/${registrationId}/decision`).set(auth(reviewerToken)).send({
       outcome,
       ...(urgency ? { urgency } : {}),
@@ -195,6 +222,7 @@ describe("clinical review API", () => {
       confirmed: true,
       clinicalSummary: "Findings require a documented referral.",
       referral: { destinationName: "Test Eye Centre", reason: "Specialist assessment is recommended." },
+      ...signature,
     });
     expect(response.status).toBe(201);
     expect(response.body.referral.status).toBe("DRAFT");
@@ -207,50 +235,69 @@ describe("clinical review API", () => {
 
   test("duplicate and concurrent decisions return 409 without duplicate records", async () => {
     const duplicate = await request(app).post(`/api/events/${eventId}/reviews/${registrations.Normal}/decision`).set(auth(reviewerToken)).send({
-      outcome: "COMPLETE", contextVersion: "a".repeat(64), confirmed: true, clinicalSummary: "Duplicate decision attempt.",
+      outcome: "COMPLETE", contextVersion: "a".repeat(64), confirmed: true, clinicalSummary: "Duplicate decision attempt.", ...decisionSignatures.get(registrations.Normal),
     });
     expect(duplicate.status).toBe(409);
     expect(duplicate.body.code).toBe("REVIEW_ALREADY_RECORDED");
 
     const detail = await request(app).get(`/api/events/${eventId}/reviews/${registrations.Concurrent}`).set(auth(reviewerToken));
-    const decide = () => request(app).post(`/api/events/${eventId}/reviews/${registrations.Concurrent}/decision`).set(auth(reviewerToken)).send({
-      outcome: "MONITOR", contextVersion: detail.body.contextVersion, confirmed: true, clinicalSummary: "Monitor and repeat screening if symptoms change.",
+    const signatures = await Promise.all([uploadDecisionSignature(registrations.Concurrent), uploadDecisionSignature(registrations.Concurrent)]);
+    const decide = (signature) => request(app).post(`/api/events/${eventId}/reviews/${registrations.Concurrent}/decision`).set(auth(reviewerToken)).send({
+      outcome: "MONITOR", contextVersion: detail.body.contextVersion, confirmed: true, clinicalSummary: "Monitor and repeat screening if symptoms change.", ...signature,
     });
-    const responses = await Promise.all([decide(), decide()]);
+    const responses = await Promise.all(signatures.map(decide));
     expect(responses.map((response) => response.status).sort()).toEqual([201, 409]);
     expect(await prisma.review.count({ where: { registrationId: registrations.Concurrent } })).toBe(1);
   });
 
   test("stale context returns 409 without a decision", async () => {
     const detail = await request(app).get(`/api/events/${eventId}/reviews/${registrations.Stale}`).set(auth(reviewerToken));
+    const signature = await uploadDecisionSignature(registrations.Stale);
     await prisma.screeningResult.update({
       where: { registrationId_stationId: { registrationId: registrations.Stale, stationId: stationByType.get("REFRACTION").stationId } },
       data: { resultData: { changed: true } },
     });
     const response = await request(app).post(`/api/events/${eventId}/reviews/${registrations.Stale}/decision`).set(auth(reviewerToken)).send({
-      outcome: "COMPLETE", contextVersion: detail.body.contextVersion, confirmed: true, clinicalSummary: "This context is deliberately stale.",
+      outcome: "COMPLETE", contextVersion: detail.body.contextVersion, confirmed: true, clinicalSummary: "This context is deliberately stale.", ...signature,
     });
     expect(response.status).toBe(409);
     expect(response.body.code).toBe("SCREENING_RESULTS_CHANGED");
     expect(await prisma.review.count({ where: { registrationId: registrations.Stale } })).toBe(0);
+    expect((await prisma.signatureArtifact.findUnique({ where: { signatureObjectKey: signature.signatureObjectKey } })).consumedAt).toBeNull();
   });
 
   test("strict validation requires referral fields only for referral decisions", async () => {
     const detail = await request(app).get(`/api/events/${eventId}/reviews/${registrations.Stale}`).set(auth(reviewerToken));
+    const signature = await uploadDecisionSignature(registrations.Stale);
     const extra = await request(app).post(`/api/events/${eventId}/reviews/${registrations.Stale}/decision`).set(auth(reviewerToken)).send({
-      outcome: "COMPLETE", contextVersion: detail.body.contextVersion, confirmed: true, clinicalSummary: "Valid summary, invalid extra referral.", referral: { destinationName: "Clinic", reason: "Not permitted here" },
+      outcome: "COMPLETE", contextVersion: detail.body.contextVersion, confirmed: true, clinicalSummary: "Valid summary, invalid extra referral.", referral: { destinationName: "Clinic", reason: "Not permitted here" }, ...signature,
     });
     const missing = await request(app).post(`/api/events/${eventId}/reviews/${registrations.Stale}/decision`).set(auth(reviewerToken)).send({
-      outcome: "REFER", urgency: "ROUTINE", contextVersion: detail.body.contextVersion, confirmed: true, clinicalSummary: "Referral fields are intentionally missing.",
+      outcome: "REFER", urgency: "ROUTINE", contextVersion: detail.body.contextVersion, confirmed: true, clinicalSummary: "Referral fields are intentionally missing.", ...signature,
     });
     expect(extra.status).toBe(422);
     expect(missing.status).toBe(422);
     expect(extra.body.code).toBe("VALIDATION_ERROR");
   });
 
+  test("a signature cannot be replayed across decision targets", async () => {
+    const sourceSignature = await uploadDecisionSignature(registrations.Stale);
+    const detail = await request(app).get(`/api/events/${eventId}/reviews/${registrations.ReplayTarget}`).set(auth(reviewerToken));
+    const response = await request(app).post(`/api/events/${eventId}/reviews/${registrations.ReplayTarget}/decision`).set(auth(reviewerToken)).send({
+      outcome: "COMPLETE",
+      contextVersion: detail.body.contextVersion,
+      confirmed: true,
+      clinicalSummary: "This signature belongs to a different registration.",
+      ...sourceSignature,
+    });
+    expect(response.status).toBe(409);
+    expect(response.body.code).toBe("SIGNATURE_ALREADY_USED");
+    expect(await prisma.review.count({ where: { registrationId: registrations.ReplayTarget } })).toBe(0);
+  });
+
   test("screening results cannot change after review completion", async () => {
     const station = stationByType.get("VISUAL_ACUITY");
-    const response = await request(app).post(`/api/events/${eventId}/stations/${station.stationId}/visual-acuity`).set(auth(adminToken)).send({
+    const response = await request(app).post(`/api/events/${eventId}/stations/${station.stationId}/visual-acuity`).set(auth(screenerToken)).send({
       registrationId: registrations.Normal,
       idempotencyKey: crypto.randomUUID(),
       acknowledged: true,

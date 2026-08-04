@@ -7,8 +7,8 @@ const { randomUUID } = require("crypto");
 const temporary = join(tmpdir(), `vsms-api-${randomUUID()}.ts`);
 const generated = resolve(__dirname, "../../react-user-dashboard/src/generated/api.ts");
 const normalizeLineEndings = (value) => value.replace(/\r\n/g, "\n");
-const npxCommand = process.platform === "win32" ? "npx.cmd" : "npx";
-const result = spawnSync(npxCommand, ["openapi-typescript", "docs/openapi.yaml", "-o", temporary], {
+const pnpmCommand = process.platform === "win32" ? "pnpm.cmd" : "pnpm";
+const result = spawnSync(pnpmCommand, ["exec", "openapi-typescript", "docs/openapi.yaml", "-o", temporary], {
   cwd: resolve(__dirname, ".."),
   stdio: "inherit",
   shell: process.platform === "win32",
@@ -21,7 +21,7 @@ try {
     normalizeLineEndings(readFileSync(temporary, "utf8")) !==
     normalizeLineEndings(readFileSync(generated, "utf8"))
   ) {
-    console.error("Generated frontend API types have drifted. Run npm run contracts:generate.");
+    console.error("Generated frontend API types have drifted. Run pnpm contracts:generate.");
     process.exitCode = 1;
   } else {
     console.log("Generated frontend API types match the OpenAPI contract.");

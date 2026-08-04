@@ -2,13 +2,14 @@
   "name": "react-nodejs-project2-cryptix",
   "version": "1.0.0",
   "description": "Secure event operations for the Visual Screening Management System.",
+  "packageManager": "pnpm@11.20.0",
   "main": "index.js",
   "directories": {
     "doc": "docs"
   },
   "scripts": {
     "test": "pnpm --dir backend test",
-    "check": "pnpm --dir backend run prisma:validate && pnpm --dir backend run openapi:lint && pnpm --dir backend run contracts:check && pnpm --dir react-user-dashboard run lint && pnpm --dir react-user-dashboard run build",
+    "check": "pnpm --dir backend prisma:validate && pnpm --dir backend openapi:lint && pnpm --dir backend contracts:check && pnpm --dir react-user-dashboard lint && pnpm --dir react-user-dashboard build",
     "check:https": "node scripts/check-local-https.mjs"
   },
   "repository": {

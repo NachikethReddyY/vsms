@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useId, useRef, useState } from "react";
 
 type Point = { x: number; y: number };
 type Stroke = Point[];
@@ -43,12 +43,29 @@ function signaturePng(strokes: Stroke[]) {
   return canvas.toDataURL("image/png");
 }
 
-export function SignaturePad({ onChange }: { onChange: (dataUrl: string | null) => void }) {
+function typedSignaturePng(name: string) {
+  const canvas = document.createElement("canvas");
+  canvas.width = PAD_WIDTH;
+  canvas.height = PAD_HEIGHT;
+  const context = canvas.getContext("2d");
+  if (!context) return null;
+  context.fillStyle = "#ffffff";
+  context.fillRect(0, 0, PAD_WIDTH, PAD_HEIGHT);
+  context.fillStyle = INK_COLOR;
+  context.font = "italic 58px Georgia, serif";
+  context.textBaseline = "middle";
+  context.fillText(name, 42, PAD_HEIGHT / 2, PAD_WIDTH - 84);
+  return canvas.toDataURL("image/png");
+}
+
+export function SignaturePad({ onChange, disabled = false }: { onChange: (dataUrl: string | null) => void; disabled?: boolean }) {
   const svgRef = useRef<SVGSVGElement>(null);
+  const instructionsId = useId();
   const strokesRef = useRef<Stroke[]>([]);
   const activePointerRef = useRef<number | null>(null);
   const [strokes, setStrokes] = useState<Stroke[]>([]);
   const [hasSignature, setHasSignature] = useState(false);
+  const [typedName, setTypedName] = useState("");
 
   function point(event: React.PointerEvent<SVGSVGElement>) {
     const rect = svgRef.current?.getBoundingClientRect();
@@ -67,11 +84,12 @@ export function SignaturePad({ onChange }: { onChange: (dataUrl: string | null) 
   function start(event: React.PointerEvent<SVGSVGElement>) {
     event.preventDefault();
     const svg = svgRef.current;
-    if (!svg || activePointerRef.current !== null) return;
+    if (disabled || !svg || activePointerRef.current !== null) return;
 
     svg.setPointerCapture(event.pointerId);
     activePointerRef.current = event.pointerId;
     publish([...strokesRef.current, [point(event)]]);
+    setTypedName("");
     setHasSignature(false);
     onChange(null);
   }
@@ -110,12 +128,24 @@ export function SignaturePad({ onChange }: { onChange: (dataUrl: string | null) 
     activePointerRef.current = null;
     publish([]);
     setHasSignature(false);
+    setTypedName("");
     onChange(null);
+  }
+
+  function useTypedSignature() {
+    const normalized = typedName.trim().replace(/\s+/g, " ");
+    if (disabled || normalized.length < 2) return;
+    const dataUrl = typedSignaturePng(normalized);
+    if (!dataUrl) return;
+    publish([]);
+    setTypedName(normalized);
+    setHasSignature(true);
+    onChange(dataUrl);
   }
 
   return (
     <div className="signature-pad-shell">
-      <p>
+      <p id={instructionsId}>
         Sign inside the box using a mouse, stylus, or finger.
       </p>
       <svg
@@ -124,7 +154,9 @@ export function SignaturePad({ onChange }: { onChange: (dataUrl: string | null) 
         preserveAspectRatio="none"
         className="signature-pad"
         role="img"
-        aria-label="Electronic signature pad"
+        aria-label="Electronic signature drawing area"
+        aria-describedby={instructionsId}
+        aria-disabled={disabled}
         onPointerDown={start}
         onPointerMove={move}
         onPointerUp={finish}
@@ -158,7 +190,7 @@ export function SignaturePad({ onChange }: { onChange: (dataUrl: string | null) 
           type="button"
           className="signature-pad-clear"
           onClick={clear}
-          disabled={!hasSignature}
+          disabled={disabled || !hasSignature}
         >
           Clear signature
         </button>
@@ -166,6 +198,24 @@ export function SignaturePad({ onChange }: { onChange: (dataUrl: string | null) 
           {hasSignature ? "Signature captured" : "Signature required"}
         </span>
       </div>
+      <details className="signature-keyboard-option">
+        <summary>Use a keyboard instead</summary>
+        <div>
+          <label htmlFor={`${instructionsId}-typed`}>Type your full name as your electronic signature</label>
+          <div>
+            <input
+              id={`${instructionsId}-typed`}
+              type="text"
+              autoComplete="name"
+              maxLength={100}
+              value={typedName}
+              disabled={disabled}
+              onChange={(event) => { setTypedName(event.target.value); setHasSignature(false); onChange(null); }}
+            />
+            <button type="button" onClick={useTypedSignature} disabled={disabled || typedName.trim().length < 2}>Use signature</button>
+          </div>
+        </div>
+      </details>
     </div>
   );
 }

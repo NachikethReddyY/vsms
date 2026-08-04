@@ -116,19 +116,11 @@ const validateEventRange = (value, ctx) => {
     ctx.addIssue({ code: "custom", path: ["timezone"], message: "OneMap locations use Asia/Singapore" });
   }
   const days = value.eventDays || [];
-  for (const [index, day] of days.entries()) {
-    if (new Date(day.startsAt) < eventStart || new Date(day.endsAt) > eventEnd) {
-      ctx.addIssue({ code: "custom", path: ["eventDays", index], message: "Event day must be within the event dates" });
-    }
-  }
   if (new Set(days.map((day) => day.date)).size !== days.length) {
     ctx.addIssue({ code: "custom", path: ["eventDays"], message: "Event dates must be unique" });
   }
   if (new Set((value.stations || []).map((station) => station.stationTemplateId)).size !== (value.stations || []).length) {
     ctx.addIssue({ code: "custom", path: ["stations"], message: "Station templates must be unique" });
-  }
-  if (new Set((value.stations || []).map((station) => station.stationOrder)).size !== (value.stations || []).length) {
-    ctx.addIssue({ code: "custom", path: ["stations"], message: "Station order must be unique" });
   }
   for (const [stationIndex, station] of (value.stations || []).entries()) {
     if (new Set(station.availabilities.map((entry) => entry.date)).size !== station.availabilities.length) {
@@ -153,7 +145,13 @@ const createEventBody = z.object({
   eventDays: z.array(eventDayInput).min(1).max(31).optional(),
   stations: z.array(eventStationInput).max(50).optional(),
   shifts: z.array(shiftInput).max(50).default([]),
-}).strict().superRefine(validateEventRange);
+}).strict().superRefine((value, ctx) => {
+  validateEventRange(value, ctx);
+  const stationOrders = (value.stations || []).map((station) => station.stationOrder);
+  if (new Set(stationOrders).size !== stationOrders.length) {
+    ctx.addIssue({ code: "custom", path: ["stations"], message: "Station order must be unique" });
+  }
+});
 const updateEventBody = z.object({
   version: z.number().int().positive(),
   name: eventFields.name.optional(),
@@ -175,7 +173,13 @@ const updateEventBody = z.object({
   eventDays: z.array(eventDayInput).min(1).max(31).optional(),
   stations: z.array(eventStationInput).max(50).optional(),
   shifts: z.array(shiftInput).max(50).optional(),
-}).strict().superRefine(validateEventRange).refine((value) => Object.keys(value).some((key) => key !== "version"), {
+}).strict().superRefine((value, ctx) => {
+  validateEventRange(value, ctx);
+  const stationOrders = (value.stations || []).map((station) => station.stationOrder);
+  if (new Set(stationOrders).size !== stationOrders.length) {
+    ctx.addIssue({ code: "custom", path: ["stations"], message: "Station order must be unique" });
+  }
+}).refine((value) => Object.keys(value).some((key) => key !== "version"), {
   message: "At least one editable field is required",
 });
 
@@ -183,6 +187,12 @@ const transitionBody = z.object({ version: z.number().int().positive() }).strict
 const cancelBody = z.object({
   version: z.number().int().positive(),
   reason: z.string().trim().min(10).max(1000),
+}).strict();
+const deleteEventBody = z.object({
+  version: z.number().int().positive(),
+  // Deliberately do not trim: this must be an exact acknowledgement of the event name.
+  confirmationName: z.string().min(1).max(150),
+  acknowledgePermanentDeletion: z.literal(true),
 }).strict();
 
 const eventParams = z.object({ eventId: uuid }).strict();
@@ -199,11 +209,26 @@ const attendeeQuery = z.object({
   status: z.enum(["SIGNED_UP", "CHECKED_IN", "COMPLETED", "CANCELLED"]).optional(),
   search: z.string().trim().max(150).optional(),
 }).strict();
-const deleteEventBody = z.object({
-  version: z.number().int().positive(),
-  eventName: z.string().min(1).max(150),
-  exportReceipt: z.string().min(1).max(2048).regex(/^[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$/),
-}).strict();
+const reportDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Use an ISO calendar date").refine(
+  (value) => !Number.isNaN(new Date(`${value}T00:00:00.000Z`).getTime()),
+  "Use a valid calendar date",
+);
+const reportQuery = z.object({
+  eventId: uuid.optional(),
+  from: reportDate.optional(),
+  to: reportDate.optional(),
+}).strict().superRefine((value, ctx) => {
+  if (!value.from || !value.to) return;
+  const from = new Date(`${value.from}T00:00:00.000Z`);
+  const to = new Date(`${value.to}T00:00:00.000Z`);
+  if (to < from) {
+    ctx.addIssue({ code: "custom", path: ["to"], message: "Report end date must be on or after the start date" });
+    return;
+  }
+  if (to.getTime() - from.getTime() > 366 * 86400000) {
+    ctx.addIssue({ code: "custom", path: ["to"], message: "Report date range cannot exceed 366 days" });
+  }
+});
 
 const assignmentParams = z.object({ eventId: uuid, shiftId: uuid }).strict();
 const assignmentDeleteParams = z.object({ eventId: uuid, shiftId: uuid, assignmentId: uuid }).strict();
@@ -238,11 +263,12 @@ module.exports = {
   updateEventBody,
   transitionBody,
   cancelBody,
+  deleteEventBody,
   eventParams,
   listQuery,
   auditQuery,
   attendeeQuery,
-  deleteEventBody,
+  reportQuery,
   assignmentParams,
   assignmentDeleteParams,
   versionQuery,

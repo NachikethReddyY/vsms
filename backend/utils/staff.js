@@ -1,18 +1,11 @@
 const crypto = require("crypto");
 const prisma = require("../prisma/prismaClient");
-const { rolesFromCognitoGroups } = require("./roles");
+const { APPLICATION_ROLES, normalizeApplicationRole, rolesFromCognitoGroups } = require("./roles");
 
-const ALLOWED_ROLES = [
-    "ADMINISTRATOR",
-    "EVENT_MANAGER",
-    "REGISTRATION_OFFICER",
-    "SCREENER",
-    "REVIEWER",
-];
+const ALLOWED_ROLES = APPLICATION_ROLES;
 
 function normalizeRole(role) {
-    const normalized = String(role || "").trim().toUpperCase().replace(/\s+/g, "_");
-    return ALLOWED_ROLES.includes(normalized) ? normalized : null;
+    return normalizeApplicationRole(role);
 }
 
 async function ensureRole(roleName) {
@@ -29,6 +22,38 @@ async function ensureRole(roleName) {
 function buildPendingEmployeeNumber(email) {
     const suffix = crypto.createHash("sha256").update(email).digest("hex").slice(0, 12);
     return `PENDING-${suffix}`;
+}
+
+async function assertRegistrationAssignment(db, eventId, auth) {
+    const roles = auth?.roles || [];
+    if (roles.includes("ADMINISTRATOR") || !roles.includes("REGISTRATION_OFFICER")) {
+        const error = new Error("A registration officer account role is required");
+        error.statusCode = 403;
+        throw error;
+    }
+    const now = new Date();
+    const assignment = await db.staffAssignment.findFirst({
+        where: {
+            ...(eventId ? { eventId } : {}),
+            userId: auth.userId,
+            assignmentRole: "REGISTRATION",
+            status: { in: ["ASSIGNED", "CONFIRMED"] },
+            shift: {
+                ...(eventId ? { eventId } : {}),
+                status: "ACTIVE",
+                startsAt: { lte: now },
+                endsAt: { gt: now },
+            },
+        },
+        select: { id: true },
+    });
+    if (!assignment) {
+        const error = new Error(eventId
+            ? "An active registration assignment is required for this event"
+            : "An active registration assignment is required");
+        error.statusCode = 403;
+        throw error;
+    }
 }
 
 async function syncLocalUser(profile, { allowCreate = false } = {}) {
@@ -99,5 +124,6 @@ module.exports = {
     normalizeRole,
     rolesFromCognitoGroups,
     syncLocalUser,
+    assertRegistrationAssignment,
     ALLOWED_ROLES,
 };

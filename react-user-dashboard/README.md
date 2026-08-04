@@ -5,11 +5,11 @@ The dashboard is the React 19 and Vite client for VSMS event operations. Setup, 
 Useful commands:
 
 ```bash
-npm install
-npm run dev
-npm run lint
-npm run build
-npm run preview
+pnpm install --frozen-lockfile
+pnpm dev
+pnpm lint
+pnpm build
+pnpm preview
 ```
 
 Local development is HTTPS-only and expects developer-generated certificates at `certs/localhost.pem` and `certs/localhost-key.pem`. These files are intentionally not committed. Vite exits instead of falling back to HTTP when the certificates are unavailable.
