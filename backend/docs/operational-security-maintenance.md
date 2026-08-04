@@ -1,6 +1,18 @@
 # Operational security maintenance
 
-Deploy `20260804230000_close_operational_security_gaps` before application code that emits `RECONCILIATION_REQUIRED` or creates artifact cleanup tasks.
+Deploy `20260804230000_close_operational_security_gaps` before application code that emits `RECONCILIATION_REQUIRED` or creates artifact cleanup tasks. Deploy `20260805003000_referral_revisions_and_provider_events` before enabling referral revisions or SES provider callbacks.
+
+## SES lifecycle callbacks
+
+Set `SES_SNS_TOPIC_ARNS` to the exact comma-separated SNS TopicArn values authorized for this deployment, then subscribe `POST /api/v1/webhooks/ses` as the HTTPS endpoint. The endpoint is intentionally outside browser cookie/CSRF authentication: it accepts a callback only after verifying the SNS canonical signature, certificate validity, exact AWS SNS HTTPS host/path and region, and TopicArn allowlist. Subscription confirmation uses the AWS SDK with authenticated unsubscribe enabled.
+
+Enable SES delivery, bounce, complaint, reject, and rendering-failure publishing. The SES-assigned message ID returned during send is the correlation key. Each SNS MessageId is durably receipted before a state change, so retries are idempotent. Lifecycle changes are monotonic: a later delivery notice cannot overwrite a bounce or complaint. Receipts retain only a SHA-256 provider-message identifier, internal delivery ID, coarse event type, and applied state. They never retain the SNS message body, recipient address, or provider diagnostic text.
+
+Treat `BOUNCED` and `COMPLAINT` as suppression signals. Verify a corrected destination and create a new referral revision; never overwrite or resend the issued referral. `FAILED` from an SES reject or rendering failure also requires operator review.
+
+## Referral revisions
+
+An issued referral is immutable. The issuing reviewer can create the next sequential draft through `POST /api/v1/events/{eventId}/referrals/{referralId}/revisions`. The new row records its superseded referral and a request fingerprint; a uniqueness constraint prevents branching or duplicate version numbers. The original signed payload, signature reference, encrypted PDF, delivery record, and audit history remain unchanged. The revised draft requires a new electronic signature and produces its own PDF version when issued.
 
 ## Event artifact cleanup
 

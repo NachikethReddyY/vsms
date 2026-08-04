@@ -24,6 +24,7 @@ const adminRoutes = require("./routes/adminRoutes");
 const consentRoutes = require("./routes/consentRoutes");
 const emergencyContactRoutes = require("./routes/emergencyContactRoutes");
 const signatureRoutes = require("./routes/signatureRoutes");
+const providerEventRoutes = require("./routes/providerEventRoutes");
 const { notFound, errorHandler } = require("./middlewares/errorHandler");
 
 // -----------------------------------------------------------------------------
@@ -96,6 +97,11 @@ app.use(cors({
     "Idempotency-Key",
   ],
 }));
+
+// Provider callbacks are authenticated with the signed SNS envelope rather
+// than a browser cookie/CSRF token. Mount this one route before browser CSRF.
+const providerEventLimiter = rateLimit({ windowMs: 60000, limit: 120, standardHeaders: "draft-8", legacyHeaders: false });
+app.use("/api/v1/webhooks/ses", providerEventLimiter, providerEventRoutes);
 
 app.use(cookieParser());
 app.use(["/api/v1", "/api"], (req, res, next) =>

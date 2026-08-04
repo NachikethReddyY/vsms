@@ -26,6 +26,8 @@ const HANDOFF_SECRET_TTL_MS = 15 * 60 * 1000;
 
 const signedPayload = (referral, destinationEmail, signatureSha256) => JSON.stringify({
   referralId: referral.referralId,
+  revisionNumber: referral.revisionNumber || 1,
+  supersedesReferralId: referral.supersedesReferralId || null,
   reviewId: referral.review.reviewId,
   registrationId: referral.registrationId,
   outcome: referral.review.outcome,
@@ -50,6 +52,18 @@ const referralIssueFingerprint = (eventId, referralId, userId, input) => payload
   signatureObjectKey: input.signatureObjectKey,
   signatureSha256: input.signatureSha256.toLowerCase(),
   signatureMimeType: input.signatureMimeType,
+  idempotencyKey: input.idempotencyKey,
+  confirmed: input.confirmed,
+}));
+
+const referralRevisionFingerprint = (eventId, referralId, userId, input) => payloadHash(JSON.stringify({
+  eventId,
+  referralId,
+  userId,
+  destinationName: input.destinationName,
+  reason: input.reason,
+  instructions: input.instructions || null,
+  urgency: input.urgency,
   idempotencyKey: input.idempotencyKey,
   confirmed: input.confirmed,
 }));
@@ -257,6 +271,78 @@ const assertIssuable = (referral) => {
   if (referral.status !== "DRAFT") throw new AppError(409, "REFERRAL_ALREADY_ISSUED", "This referral has already been issued");
 };
 
+const serializeRevision = (referral) => ({
+  referralId: referral.referralId,
+  revisionNumber: referral.revisionNumber,
+  supersedesReferralId: referral.supersedesReferralId,
+  destinationName: referral.destinationName,
+  reason: referral.reason,
+  instructions: referral.instructions,
+  urgency: referral.urgency,
+  status: referral.status,
+});
+
+const createReferralRevision = async (eventId, referralId, input, user, ipAddress) => {
+  const source = await loadReferral(eventId, referralId);
+  assertReferralOwner(source, user);
+  await requireReviewerAccess(prisma, eventId, user);
+  if (!["ISSUED", "SENT", "ACKNOWLEDGED"].includes(source.status)) {
+    throw new AppError(409, "REFERRAL_REVISION_NOT_ALLOWED", "Only an issued referral can be revised");
+  }
+  const fingerprint = referralRevisionFingerprint(eventId, referralId, user.userId, input);
+  const replay = await prisma.referral.findUnique({ where: { revisionIdempotencyKey: input.idempotencyKey } });
+  if (replay) {
+    if (replay.supersedesReferralId !== referralId || replay.createdByUserId !== user.userId || replay.revisionRequestFingerprint !== fingerprint) {
+      throw new AppError(409, "IDEMPOTENCY_KEY_REUSED", "Idempotency key was already used for a different request");
+    }
+    return serializeRevision(replay);
+  }
+
+  try {
+    const revised = await prisma.$transaction(async (tx) => {
+      const branch = await tx.referral.findUnique({ where: { supersedesReferralId: referralId }, select: { referralId: true } });
+      if (branch) throw new AppError(409, "REFERRAL_ALREADY_REVISED", "A newer referral revision already exists");
+      const created = await tx.referral.create({ data: {
+        reviewId: source.reviewId,
+        registrationId: source.registrationId,
+        createdByUserId: user.userId,
+        revisionNumber: (source.revisionNumber || 1) + 1,
+        supersedesReferralId: referralId,
+        revisionIdempotencyKey: input.idempotencyKey,
+        revisionRequestFingerprint: fingerprint,
+        destinationName: input.destinationName,
+        reason: input.reason,
+        instructions: input.instructions || null,
+        urgency: input.urgency,
+        status: "DRAFT",
+      } });
+      await tx.auditLog.create({ data: {
+        userId: user.userId,
+        action: "REFERRAL_REVISION_CREATED",
+        resource: "Referral",
+        entityName: "Referral",
+        entityId: created.referralId,
+        details: {
+          eventId,
+          reviewId: source.reviewId,
+          supersedesReferralId: referralId,
+          revisionNumber: created.revisionNumber,
+        },
+        ipAddress: String(ipAddress || "").slice(0, 45) || null,
+      } });
+      return created;
+    }, { isolationLevel: "Serializable" });
+    return serializeRevision(revised);
+  } catch (error) {
+    if (error?.code === "P2002" || error?.code === "P2034") {
+      const existing = await prisma.referral.findUnique({ where: { revisionIdempotencyKey: input.idempotencyKey } });
+      if (existing?.supersedesReferralId === referralId && existing.createdByUserId === user.userId && existing.revisionRequestFingerprint === fingerprint) return serializeRevision(existing);
+      throw new AppError(409, "REFERRAL_ALREADY_REVISED", "A newer referral revision already exists");
+    }
+    throw error;
+  }
+};
+
 const serializeDelivery = (delivery) => delivery ? {
   deliveryId: delivery.id,
   status: delivery.status,
@@ -265,11 +351,12 @@ const serializeDelivery = (delivery) => delivery ? {
   attemptCount: delivery.attemptCount,
   failureReason: delivery.failureReason,
   sentAt: delivery.sentAt,
+  deliveredAt: delivery.deliveredAt,
 } : null;
 
 const responseForDelivery = (referralId, delivery, handoffSecret = null) => ({
   referralId,
-  status: ["SENT", "DELIVERED"].includes(delivery.status) ? "SENT" : "ISSUED",
+  status: delivery.sentAt ? "SENT" : "ISSUED",
   documentId: delivery.documentId,
   documentVersion: delivery.document?.version,
   handoffSecret,
@@ -418,7 +505,7 @@ const issueReferral = async (eventId, referralId, input, user, ipAddress) => {
   const handoffSecretExpiresAt = new Date(Date.now() + HANDOFF_SECRET_TTL_MS);
   const signedPayloadHash = payloadHash(signedPayload(referral, destinationEmail, input.signatureSha256));
   const generatedAt = new Date();
-  const version = 1;
+  const version = referral.revisionNumber || 1;
   const document = await generateReferralPdf({ referral, signature, password: handoffSecret, version, generatedAt });
   const documentId = crypto.randomUUID();
   const deliveryId = crypto.randomUUID();
@@ -680,6 +767,8 @@ module.exports = {
   PDF_COLORS,
   resultSummary,
   referralIssueFingerprint,
+  referralRevisionFingerprint,
+  createReferralRevision,
   recoverHandoffSecret,
   resumeQueuedDelivery,
   reconcileReferralDeliveries,

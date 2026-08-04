@@ -17,6 +17,8 @@ const {
   recoverHandoffSecret,
   resumeQueuedDelivery,
   reconcileReferralDeliveries,
+  createReferralRevision,
+  referralRevisionFingerprint,
   PDF_COLORS,
   resultSummary,
 } = require("../services/referralService");
@@ -217,6 +219,23 @@ test("binds stored signatures to their user, event, and purpose", async (t) => {
     loadVerifiedSignature(stored, userId, eventId, "REFERRAL"),
     (error) => error.status === 422 && error.code === "INVALID_SIGNATURE",
   );
+
+  const reviewSignature = await storeSignature(image, "image/png", userId, eventId, "REVIEW_DECISION");
+  assert.match(reviewSignature.signatureObjectKey, /\/review-decision-/);
+  assert.deepEqual(
+    await loadVerifiedSignature(reviewSignature, userId, eventId, "REVIEW_DECISION"),
+    image,
+  );
+  for (const [owner, purpose, signature] of [
+    [crypto.randomUUID(), "REVIEW_DECISION", reviewSignature],
+    [userId, "REFERRAL", reviewSignature],
+    [userId, "REVIEW_DECISION", { ...reviewSignature, signatureSha256: "0".repeat(64) }],
+  ]) {
+    await assert.rejects(
+      loadVerifiedSignature(signature, owner, eventId, purpose),
+      (error) => error.status === 422 && error.code === "INVALID_SIGNATURE",
+    );
+  }
 });
 
 test("consumes a signature artifact once and only for its bound target", async () => {
@@ -479,4 +498,72 @@ test("acknowledging the secure handoff permanently clears its escrow", async (t)
   assert.ok(result.acknowledgedAt);
   assert.equal(update.data.handoffSecretCiphertext, null);
   assert.ok(update.data.handoffSecretAcknowledgedAt);
+});
+
+test("creates an immutable sequential referral revision for the issuing reviewer", async (t) => {
+  const eventId = crypto.randomUUID();
+  const reviewerId = crypto.randomUUID();
+  const source = referralFixture();
+  source.status = "SENT";
+  source.revisionNumber = 1;
+  source.supersedesReferralId = null;
+  source.review.reviewedByUserId = reviewerId;
+  const input = {
+    destinationName: "Community Eye Clinic",
+    reason: "Updated destination requested after clinical review.",
+    instructions: "Arrange a specialist appointment within one week.",
+    urgency: "URGENT",
+    idempotencyKey: crypto.randomUUID(),
+    confirmed: true,
+  };
+  replace(t, prisma.referral, "findFirst", async () => source);
+  replace(t, prisma.referral, "findUnique", async () => null);
+  replace(t, prisma.event, "findUnique", async () => ({ eventId, status: "IN_PROGRESS" }));
+  replace(t, prisma.staffAssignment, "findFirst", async () => ({ id: crypto.randomUUID() }));
+  let createdData;
+  let audit;
+  replace(t, prisma, "$transaction", async (work) => work({
+    referral: {
+      findUnique: async () => null,
+      create: async ({ data }) => {
+        createdData = data;
+        return { referralId: crypto.randomUUID(), ...data };
+      },
+    },
+    auditLog: { create: async ({ data }) => { audit = data; return data; } },
+  }));
+  const result = await createReferralRevision(eventId, source.referralId, input, { userId: reviewerId, roles: ["REVIEWER"] }, "127.0.0.1");
+  assert.equal(result.revisionNumber, 2);
+  assert.equal(result.supersedesReferralId, source.referralId);
+  assert.equal(result.status, "DRAFT");
+  assert.equal(createdData.revisionRequestFingerprint, referralRevisionFingerprint(eventId, source.referralId, reviewerId, input));
+  assert.equal(audit.action, "REFERRAL_REVISION_CREATED");
+  assert.deepEqual(audit.details, {
+    eventId,
+    reviewId: source.reviewId,
+    supersedesReferralId: source.referralId,
+    revisionNumber: 2,
+  });
+});
+
+test("does not allow an administrator or another reviewer to revise a referral", async (t) => {
+  const source = referralFixture();
+  source.status = "SENT";
+  source.revisionNumber = 1;
+  replace(t, prisma.referral, "findFirst", async () => source);
+  const input = {
+    destinationName: source.destinationName,
+    reason: source.reason,
+    urgency: "PRIORITY",
+    idempotencyKey: crypto.randomUUID(),
+    confirmed: true,
+  };
+  await assert.rejects(
+    createReferralRevision(crypto.randomUUID(), source.referralId, input, { userId: crypto.randomUUID(), roles: ["REVIEWER"] }),
+    (error) => error.status === 403 && error.code === "REFERRAL_REVIEWER_REQUIRED",
+  );
+  await assert.rejects(
+    createReferralRevision(crypto.randomUUID(), source.referralId, input, { userId: source.review.reviewedByUserId, roles: ["ADMINISTRATOR", "REVIEWER"] }),
+    (error) => error.status === 403 && error.code === "REFERRAL_REVIEWER_REQUIRED",
+  );
 });

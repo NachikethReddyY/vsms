@@ -19,10 +19,18 @@ const {
   referralDocumentParams,
   issueReferralBody,
   acknowledgeReferralHandoffBody,
+  reviseReferralBody,
+  screeningSyncBody,
 } = require("../schemas/screeningSchemas");
 
 const router = express.Router({ mergeParams: true });
 router.use(authenticate);
+
+router.post(
+  "/:eventId/sync/screening",
+  validate({ params: eventParams, body: screeningSyncBody }),
+  asyncHandler(screeningController.syncScreening),
+);
 
 router.get(
   "/:eventId/stations",
