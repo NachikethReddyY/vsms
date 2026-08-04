@@ -24,7 +24,7 @@ import { AppDialog } from '../../components/AppDialog';
 import { AppToast } from '../../components/AppToast';
 import { getApiError as getApiMessage } from '../../utils/apiClient';
 import { getDisplayName } from '../../utils/identity';
-import { eventApi, formatEventDate, STATUS_LABEL, type AuditRecord, type EventRecord, type EventStatus, type StaffAssignmentRole, type StaffDirectoryEntry, type StationTemplate } from './eventApi';
+import { eventApi, formatEventDate, STATUS_LABEL, type AuditRecord, type EventAttendee, type EventMetrics, type EventRecord, type EventStatus, type StaffAssignmentRole, type StaffDirectoryEntry, type StationTemplate } from './eventApi';
 import { EVENT_BANNERS, getEventArtwork, type EventBannerKey } from './eventBanners';
 
 type AssignmentDraft = { userId: string; assignmentRole: StaffAssignmentRole; eventStationId: string };
@@ -78,6 +78,17 @@ export default function EventDetailPage() {
   const navigate = useNavigate();
   const [event, setEvent] = useState<EventRecord | null>(null);
   const [audit, setAudit] = useState<AuditRecord[]>([]);
+  const [metrics, setMetrics] = useState<EventMetrics | null>(null);
+  const [metricsLoading, setMetricsLoading] = useState(false);
+  const [metricsError, setMetricsError] = useState('');
+  const [attendees, setAttendees] = useState<EventAttendee[]>([]);
+  const [attendeeTotal, setAttendeeTotal] = useState(0);
+  const [attendeeNextCursor, setAttendeeNextCursor] = useState<string | null>(null);
+  const [attendeeLoading, setAttendeeLoading] = useState(false);
+  const [attendeeError, setAttendeeError] = useState('');
+  const [attendeeSearch, setAttendeeSearch] = useState('');
+  const [attendeeStatus, setAttendeeStatus] = useState<EventAttendee['registrationStatus'] | ''>('');
+  const [exportPending, setExportPending] = useState(false);
   const [loading, setLoading] = useState(true);
   const [pending, setPending] = useState(false);
   const [bannerPending, setBannerPending] = useState(false);
@@ -121,11 +132,52 @@ export default function EventDetailPage() {
     finally { setAuditLoading(false); }
   };
 
+  const loadMetrics = async (id = eventId) => {
+    setMetricsLoading(true); setMetricsError('');
+    try { setMetrics(await eventApi.metrics(id)); }
+    catch (cause) { setMetricsError(getApiMessage(cause, 'Operational metrics could not be loaded.')); }
+    finally { setMetricsLoading(false); }
+  };
+
+  const loadAttendees = async (cursor?: string, append = false) => {
+    if (!event) return;
+    setAttendeeLoading(true); setAttendeeError('');
+    try {
+      const page = await eventApi.attendees(event.eventId, {
+        cursor,
+        limit: 50,
+        status: attendeeStatus || undefined,
+        search: attendeeSearch.trim() || undefined,
+      });
+      setAttendees((current) => append ? [...current, ...page.attendees] : page.attendees);
+      setAttendeeTotal(page.total);
+      setAttendeeNextCursor(page.nextCursor);
+    } catch (cause) { setAttendeeError(getApiMessage(cause, 'Attendees could not be loaded.')); }
+    finally { setAttendeeLoading(false); }
+  };
+
+  const downloadEventExport = async () => {
+    if (!event) return;
+    setExportPending(true); setError('');
+    try {
+      const payload = await eventApi.exportEvent(event.eventId);
+      const file = new Blob([JSON.stringify(payload.export, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(file);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `${event.name.replace(/[^a-z0-9]+/gi, '-').replace(/^-|-$/g, '').toLowerCase() || 'event'}-export.json`;
+      document.body.append(link); link.click(); link.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 0);
+      setNotice('Event export downloaded.');
+    } catch (cause) { setError(getApiMessage(cause, 'The event export could not be generated.')); }
+    finally { setExportPending(false); }
+  };
+
   const load = async () => {
     setLoading(true); setError('');
     try {
       const detail = await eventApi.get(eventId); setEvent(detail);
-      if (detail.canManage) void refreshAudit(detail.eventId);
+      if (detail.canManage) { void refreshAudit(detail.eventId); void loadMetrics(detail.eventId); }
     } catch (cause) { setError(getApiMessage(cause, 'Event details could not be loaded.')); }
     finally { setLoading(false); }
   };
@@ -136,6 +188,11 @@ export default function EventDetailPage() {
     if (deleteOpen && !dialog.open) dialog.showModal();
     if (!deleteOpen && dialog.open) dialog.close();
   }, [deleteOpen]);
+  useEffect(() => {
+    if (event?.canManage && location.pathname.endsWith('/attendees')) void loadAttendees();
+  // The attendee query is explicitly initiated by its form or pagination controls.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [event?.eventId, location.pathname]);
 
   const transition = async () => {
     const next = event && nextAction[event.status]; if (!event || !next) return;
@@ -341,7 +398,7 @@ export default function EventDetailPage() {
   const totalRequiredStaff = event.shifts.reduce((total, shift) => total + shift.requiredStaff, 0);
   const next = nextAction[event.status];
   const routeSection = location.pathname.split('/').filter(Boolean).pop();
-  const requestedView = routeSection && ['stations', 'staff', 'activity'].includes(routeSection) ? routeSection : 'overview';
+  const requestedView = routeSection && ['stations', 'staff', 'attendees', 'activity'].includes(routeSection) ? routeSection : 'overview';
   const view = canManage ? requestedView : 'overview';
   const eventPath = `/events/${event.eventId}`;
 
@@ -383,6 +440,7 @@ export default function EventDetailPage() {
       <Link className={view === 'overview' ? 'active' : undefined} to={eventPath}>Overview</Link>
       <Link className={view === 'stations' ? 'active' : undefined} to={`${eventPath}/stations`}>Stations</Link>
       <Link className={view === 'staff' ? 'active' : undefined} to={`${eventPath}/staff`}>Staff</Link>
+      <Link className={view === 'attendees' ? 'active' : undefined} to={`${eventPath}/attendees`}>Attendees</Link>
       <Link className={view === 'activity' ? 'active' : undefined} to={`${eventPath}/activity`}>Activity</Link>
     </nav>}
 
@@ -400,7 +458,7 @@ export default function EventDetailPage() {
     </section>}
 
     {view === 'overview' && <div className="event-view">
-      <div className="event-view-heading"><h2>Overview</h2>{canManage && !terminal && <Link className="secondary compact" to={`${eventPath}/edit`}><PencilSquareIcon />Edit overview</Link>}</div>
+      <div className="event-view-heading"><h2>Overview</h2><div>{canManage && <button className="secondary compact" type="button" disabled={exportPending} onClick={() => void downloadEventExport()}>{exportPending ? 'Preparing export…' : 'Download export'}</button>}{canManage && !terminal && <Link className="secondary compact" to={`${eventPath}/edit`}><PencilSquareIcon />Edit overview</Link>}</div></div>
       <section className="event-metric-grid" aria-label="Event overview">
         <div className="event-info-row"><CalendarDaysIcon /><div><small>Date and time</small><strong>{dateParts.weekday}, {dateParts.month} {dateParts.day}, {dateParts.year}</strong><span>{formatTime(event.startsAt, event.timezone)} to {formatTime(event.endsAt, event.timezone)}, {eventDuration(event.startsAt, event.endsAt)}</span></div></div>
         <div className="event-info-row"><MapPinIcon /><div><small>Venue</small><strong>{event.venue}</strong><span>{event.address || 'Address entered manually'}{event.postalCode ? ` · Singapore ${event.postalCode}` : ''} · {event.timezone}</span></div></div>
@@ -408,6 +466,14 @@ export default function EventDetailPage() {
         {canManage && <div className="event-info-row"><ClipboardDocumentListIcon /><div><small>Expected</small><strong>{event.expectedAttendance?.toLocaleString() || 'Not set'} visitors</strong><span>{event.signupCount.toLocaleString()} signups collected</span></div></div>}
         <div className="event-info-row"><ClockIcon /><div><small>Staffing plan</small><strong>{event.shifts.length} {event.shifts.length === 1 ? 'shift' : 'shifts'}, {totalRequiredStaff} required</strong><span>Event operations coverage</span></div></div>
       </section>
+      {canManage && <section className="event-metric-grid" aria-label="Operational metrics">
+        {metricsLoading ? <p>Loading operational metrics…</p> : metricsError ? <div className="inline-retry" role="alert"><p>{metricsError}</p><button className="secondary compact" type="button" onClick={() => void loadMetrics(event.eventId)}>Retry</button></div> : metrics && <>
+          <div className="event-info-row"><ClipboardDocumentListIcon /><div><small>Signups</small><strong>{metrics.signupCount.toLocaleString()}</strong><span>Non-cancelled registrations</span></div></div>
+          <div className="event-info-row"><UserGroupIcon /><div><small>Checked in</small><strong>{metrics.checkedInCount.toLocaleString()}</strong><span>{metrics.attendanceRatePercent}% attendance</span></div></div>
+          <div className="event-info-row"><ClockIcon /><div><small>Active</small><strong>{metrics.activeCount.toLocaleString()}</strong><span>Of {metrics.capacity.toLocaleString()} capacity</span></div></div>
+          <div className="event-info-row"><ClipboardDocumentCheckIcon /><div><small>Clinical results</small><strong>{metrics.screeningResultCount.toLocaleString()}</strong><span>{metrics.flaggedResultCount.toLocaleString()} flagged · {metrics.referralCount.toLocaleString()} referrals</span></div></div>
+        </>}
+      </section>}
       <section className="lifecycle" aria-labelledby="lifecycle-title">
         <div className="lifecycle-heading"><h2 id="lifecycle-title">Event lifecycle</h2><span>{event.status === 'CANCELLED' ? 'Cancelled before completion' : `${STATUS_LABEL[event.status]} stage`}</span></div>
         <ol className={event.status === 'CANCELLED' ? 'is-cancelled' : ''}>{lifecycleStages.map((stage, index) => <li className={index < activeStage ? 'complete' : index === activeStage ? 'current' : ''} key={stage.status}><i>{index < activeStage ? <CheckIcon /> : null}</i><span>{stage.label}</span></li>)}</ol>
@@ -466,6 +532,18 @@ export default function EventDetailPage() {
             </form>}
           </article>;
         })}</div>}
+    </section>}
+
+    {view === 'attendees' && <section className="event-view" aria-labelledby="attendees-title">
+      <div className="event-view-heading"><div><h2 id="attendees-title">Attendees</h2><p>{attendeeTotal.toLocaleString()} matching registrations</p></div></div>
+      <form className="station-template-panel" onSubmit={(submitEvent) => { submitEvent.preventDefault(); void loadAttendees(); }}>
+        <label><span>Search attendee</span><input value={attendeeSearch} onChange={(change) => setAttendeeSearch(change.target.value)} placeholder="Name or participant reference" /></label>
+        <label><span>Status</span><select value={attendeeStatus} onChange={(change) => setAttendeeStatus(change.target.value as EventAttendee['registrationStatus'] | '')}><option value="">All statuses</option><option value="SIGNED_UP">Signed up</option><option value="CHECKED_IN">Checked in</option><option value="COMPLETED">Completed</option><option value="CANCELLED">Cancelled</option></select></label>
+        <button className="secondary compact" type="submit" disabled={attendeeLoading}>{attendeeLoading ? 'Loading…' : 'Apply filters'}</button>
+      </form>
+      {attendeeError && <div className="inline-retry" role="alert"><p>{attendeeError}</p><button className="secondary compact" type="button" onClick={() => void loadAttendees()}>Retry</button></div>}
+      {!attendeeError && !attendeeLoading && attendees.length === 0 ? <p className="quiet-empty">No attendees match these filters.</p> : <div className="station-table">{attendees.map((attendee) => <article className="station-record" key={attendee.registrationId}><div className="station-record-copy"><strong>{attendee.participantDisplayName || attendee.participantReference}</strong><span>{attendee.participantReference} · {attendee.registrationStatus.toLowerCase().replace('_', ' ')}</span><small>{attendee.checkedInAt ? `Checked in ${formatEventDate(attendee.checkedInAt, event.timezone)}` : `Registered ${formatEventDate(attendee.createdAt, event.timezone)}`}</small></div><strong className="station-capacity-readonly">{attendee.queueNumber ? `#${attendee.queueNumber}` : '—'}</strong></article>)}</div>}
+      {attendeeNextCursor && <button className="secondary compact" type="button" disabled={attendeeLoading} onClick={() => void loadAttendees(attendeeNextCursor, true)}>{attendeeLoading ? 'Loading…' : 'Load more'}</button>}
     </section>}
 
     {view === 'activity' && <section className="event-view history event-activity" aria-labelledby="activity-title">

@@ -40,8 +40,8 @@ const eventRecord = (status = "DRAFT", version = 1, assignments = [], registrati
   cancelledByUserId: crypto.randomUUID(),
   createIdempotencyKey: "internal-replay-key",
   createPayloadHash: "a".repeat(64),
-  shifts: [{ shiftId, eventId, name: "Main", startsAt, endsAt, requiredStaff: 1, status: "PLANNED", staffAssignments: assignments }],
-  stations: [],
+  shifts: [{ shiftId, eventId, name: "Main", startsAt, endsAt, requiredStaff: 1, status: "PLANNED", staffAssignments: assignments.length ? assignments : [{ userId: manager.userId, status: "ASSIGNED" }] }],
+  stations: [{ stationId: crypto.randomUUID(), stationName: "Planning station", stationType: "VISUAL_ACUITY", stationOrder: 1, isActive: true }],
   eventDays: [],
   registrations,
   _count: { registrations: registrations.length },
@@ -375,10 +375,8 @@ test("terminal event deletion removes event-owned records and preserves the admi
   assert.ok(calls.some(([name]) => name === "stations"));
   assert.deepEqual(calls.find(([name]) => name === "syncActions")[1], { where: { eventId } });
   assert.ok(calls.findIndex(([name]) => name === "syncActions") < calls.findIndex(([name]) => name === "event.delete"));
-  assert.deepEqual(calls.filter(([name]) => name === "audit.deleteScope").map(([, input]) => input), [
-    ["SELECT set_config('vsms.event_audit_delete_event_id', $1, true)", eventId],
-    ["SELECT set_config('vsms.event_audit_delete_event_id', '', true)"],
-  ]);
+  assert.equal(calls.some(([name]) => name === "eventAudit"), false);
+  assert.equal(calls.some(([name]) => name === "audit.deleteScope"), false);
 });
 
 test("terminal event deletion denies non-administrators and stale versions", async (t) => {

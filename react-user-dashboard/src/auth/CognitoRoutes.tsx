@@ -1,6 +1,6 @@
 import { useEffect, useRef } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import apiClient from "../utils/apiClient";
+import apiClient, { setSessionTokens } from "../utils/apiClient";
 import { getCognitoAuthorizeUrl } from "../utils/cognitoAuth";
 import { useAuth } from "./AuthProvider";
 
@@ -30,6 +30,7 @@ export function CognitoCallback() {
 
     apiClient.get("/auth/callback", { params: { code, state } })
       .then((response) => {
+        setSessionTokens(response.data);
         setSession({
           user: response.data.user,
           expiresAt: Date.now() + Number(response.data.sessionExpiresIn || 2_592_000) * 1000,

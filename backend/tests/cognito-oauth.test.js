@@ -2,6 +2,7 @@ const assert = require("node:assert/strict");
 const test = require("node:test");
 const { buildAuthorizationUrl } = require("../utils/cognitoClient");
 const { setAuthCookies, setOAuthCookies } = require("../utils/httpCookies");
+const { normalizeReturnTo } = require("../controllers/authController");
 
 test("managed login uses an authorization-code grant with PKCE", () => {
     const previous = { ...process.env };
@@ -51,4 +52,11 @@ test("auth cookies include a script-readable CSRF token without exposing credent
     assert.ok(csrf);
     assert.ok(!csrf.includes("HttpOnly"));
     assert.ok(cookies.filter((value) => !value.startsWith("vsms_csrf=")).every((value) => value.includes("HttpOnly")));
+});
+
+test("managed login return paths stay on the configured application", () => {
+    assert.equal(normalizeReturnTo("/events/123?tab=operations"), "/events/123?tab=operations");
+    for (const unsafe of ["https://evil.example", "//evil.example", "/\\evil.example", "/%2f%2fevil.example", "/%5c%5cevil.example", "/%0aevil.example"]) {
+        assert.equal(normalizeReturnTo(unsafe), "/events");
+    }
 });

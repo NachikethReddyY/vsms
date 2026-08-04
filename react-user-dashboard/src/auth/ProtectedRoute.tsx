@@ -4,8 +4,12 @@ import { CognitoLoginRedirect } from "./CognitoRoutes";
 import { isLogoutPending } from "../utils/session";
 
 export function ProtectedRoute() {
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, isBootstrapping } = useAuth();
   const location = useLocation();
+
+  if (isBootstrapping) {
+    return <div role="status" aria-live="polite">Restoring your session…</div>;
+  }
 
   if (!isAuthenticated) {
     if (isLogoutPending()) return <Navigate to="/" replace />;

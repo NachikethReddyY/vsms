@@ -69,11 +69,13 @@ test("migration preserves history and enforces one active primary contact", () =
     assert.match(migration, /withdrawal_of_id/);
 });
 
-test("event audit log rows are immutable except for an exact event hard-delete scope", () => {
-    const migration = read("prisma/migrations/20260805023000_immutable_event_audit_log/migration.sql");
-    assert.match(migration, /BEFORE UPDATE OR DELETE ON "event_audit_logs"/);
-    assert.match(migration, /current_setting\('vsms\.event_audit_delete_event_id', true\)/);
-    assert.match(migration, /OLD\."event_id"::text/);
+test("event audit log rows are retained after hard delete and remain immutable", () => {
+    const retentionMigration = read("prisma/migrations/20260803090000_preserve_event_audit_history/migration.sql");
+    const triggerMigration = read("prisma/migrations/20260805023000_immutable_event_audit_log/migration.sql");
+    const migration = read("prisma/migrations/20260806010000_preserve_immutable_event_audit_history/migration.sql");
+    assert.match(retentionMigration, /DROP CONSTRAINT IF EXISTS "event_audit_logs_event_id_fkey"/);
+    assert.match(triggerMigration, /BEFORE UPDATE OR DELETE ON "event_audit_logs"/);
+    assert.doesNotMatch(migration, /event_audit_delete_event_id/);
     assert.match(migration, /ERRCODE = '42501'/);
 });
 

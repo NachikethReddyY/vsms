@@ -9,6 +9,7 @@ import EventsPage from "./components/EventsPage";
 import QRCodePage from "./components/qr/QRCodePage";
 import EventDetailPage from "./features/events/EventDetailPage";
 import EventFormPage from "./features/events/EventFormPage";
+import PublicEventPage from "./features/events/PublicEventPage";
 import ReviewWorkspacePage from "./features/reviews/ReviewWorkspacePage";
 import ReportsPage from "./features/reports/ReportsPage";
 import ColourVisionStationPage from "./features/screening/ColourVisionStationPage";
@@ -53,6 +54,7 @@ export default function App() {
     <Routes>
       <Route path="/" element={<LandingPage />} />
       <Route path="/auth/callback" element={<CognitoCallback />} />
+      <Route path="/e/:eventId" element={<PublicEventPage />} />
 
       <Route element={<ProtectedRoute />}>
         <Route path="/dashboard" element={<Navigate to="/events" replace />} />
@@ -67,6 +69,7 @@ export default function App() {
             <Route path="/events/:eventId/overview" element={<EventDetailPage />} />
             <Route path="/events/:eventId/stations" element={<EventDetailPage />} />
             <Route path="/events/:eventId/staff" element={<EventDetailPage />} />
+            <Route path="/events/:eventId/attendees" element={<EventDetailPage />} />
             <Route path="/events/:eventId/activity" element={<EventDetailPage />} />
           </Route>
 

@@ -1,5 +1,4 @@
 const express = require("express");
-const authenticate = require("../middlewares/authenticate");
 const validate = require("../middlewares/validate");
 const asyncHandler = require("../utils/asyncHandler");
 const screeningController = require("../controllers/screeningController");
@@ -24,7 +23,6 @@ const {
 } = require("../schemas/screeningSchemas");
 
 const router = express.Router({ mergeParams: true });
-router.use(authenticate);
 
 router.post(
   "/:eventId/sync/screening",

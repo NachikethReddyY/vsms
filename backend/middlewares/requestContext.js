@@ -1,11 +1,12 @@
 const crypto = require("crypto");
+const UUID = /^[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}$/i;
 
 module.exports = (req, res, next) => {
   const supplied = req.get("x-request-id");
-  req.requestId = supplied && /^[0-9a-f-]{36}$/i.test(supplied) ? supplied : crypto.randomUUID();
+  req.requestId = supplied && UUID.test(supplied) ? supplied : crypto.randomUUID();
   res.setHeader("x-request-id", req.requestId);
   const suppliedDeviceId = req.get("x-device-id");
-  const deviceId = suppliedDeviceId && /^[0-9a-f-]{36}$/i.test(suppliedDeviceId)
+  const deviceId = suppliedDeviceId && UUID.test(suppliedDeviceId)
     ? suppliedDeviceId
     : null;
   req.context = {

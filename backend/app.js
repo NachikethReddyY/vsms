@@ -1,6 +1,5 @@
 const path = require("path");
 const fs = require("fs");
-const crypto = require("crypto");
 const express = require("express");
 const cors = require("cors");
 const helmet = require("helmet");
@@ -15,6 +14,7 @@ const csrf = require("./middlewares/csrf");
 const authRoutes = require("./routes/authRoutes");
 const userRoutes = require("./routes/userRoutes");
 const eventRoutes = require("./routes/eventRoutes");
+const publicEventRoutes = require("./routes/publicEventRoutes");
 const locationRoutes = require("./routes/locationRoutes");
 const qrRoutes = require("./routes/qrRoutes");
 const screeningRoutes = require("./routes/screeningRoutes");
@@ -26,36 +26,7 @@ const emergencyContactRoutes = require("./routes/emergencyContactRoutes");
 const signatureRoutes = require("./routes/signatureRoutes");
 const providerEventRoutes = require("./routes/providerEventRoutes");
 const { notFound, errorHandler } = require("./middlewares/errorHandler");
-
-// -----------------------------------------------------------------------------
-// OPTIONAL STARTUP CODE SIGNING VERIFICATION (Deployment Integrity Guard)
-// -----------------------------------------------------------------------------
-if (env.isProduction) {
-  try {
-    const codePath = __filename;
-    const sigPath = path.join(__dirname, "../dist/server.js.sig");
-    const pubKeyPath = path.join(__dirname, "../public.pem");
-
-    if (fs.existsSync(sigPath) && fs.existsSync(pubKeyPath)) {
-      const codeBuffer = fs.readFileSync(codePath);
-      const signature = fs.readFileSync(sigPath);
-      const publicKey = fs.readFileSync(pubKeyPath, "utf8");
-
-      const verifier = crypto.createVerify("SHA256");
-      verifier.update(codeBuffer);
-      verifier.end();
-
-      if (!verifier.verify(publicKey, signature)) {
-        console.error("FATAL: Code signature verification failed! Artifact has been modified.");
-        process.exit(1);
-      }
-      console.log("🔒 Code signature successfully verified.");
-    }
-  } catch (err) {
-    console.error("Code integrity verification check failed with error:", err.message);
-    process.exit(1);
-  }
-}
+const authenticate = require("./middlewares/authenticate");
 
 const app = express();
 if (env.trustProxy) app.set("trust proxy", 1);
@@ -71,12 +42,17 @@ app.use(helmet({
   contentSecurityPolicy: {
     directives: {
       defaultSrc: ["'self'"],
-      scriptSrc: ["'self'"],
-      styleSrc: ["'self'", "'unsafe-inline'"],
+      scriptSrc: env.isProduction ? ["'self'"] : ["'self'", "'unsafe-inline'"],
+      styleSrc: env.isProduction ? ["'self'"] : ["'self'", "'unsafe-inline'"],
       imgSrc: ["'self'", "data:"],
+      frameAncestors: ["'none'"],
     },
   },
 }));
+app.use((_req, res, next) => {
+  res.set("Permissions-Policy", "camera=(), microphone=(), geolocation=()");
+  next();
+});
 
 app.use(cors({
   credentials: true,
@@ -104,9 +80,9 @@ const providerEventLimiter = rateLimit({ windowMs: 60000, limit: 120, standardHe
 app.use("/api/v1/webhooks/ses", providerEventLimiter, providerEventRoutes);
 
 app.use(cookieParser());
+app.use(express.json({ limit: "256kb", strict: true, type: "application/json" }));
 app.use(["/api/v1", "/api"], (req, res, next) =>
   ["POST", "PUT", "PATCH", "DELETE"].includes(req.method) ? csrf(req, res, next) : next());
-app.use(express.json({ limit: "256kb", strict: true, type: "application/json" }));
 
 const authLimiter = rateLimit({ windowMs: 15 * 60000, limit: 20, standardHeaders: "draft-8", legacyHeaders: false });
 const mutationLimiter = rateLimit({ windowMs: 60000, limit: 60, standardHeaders: "draft-8", legacyHeaders: false });
@@ -132,10 +108,10 @@ if (!env.isProduction) {
 // Versioned routes are the canonical integration surface. Selected legacy
 // aliases remain available for the existing event UI during the transition.
 app.use("/api/v1/auth", authLimiter, authRoutes);
+app.use("/api/v1/public/events", publicEventRoutes);
 app.use("/api/v1/users", userRoutes);
-app.use("/api/v1/events", (req, res, next) => ["POST", "PATCH", "PUT", "DELETE"].includes(req.method) ? mutationLimiter(req, res, next) : next(), eventRoutes);
+app.use("/api/v1/events", (req, res, next) => ["POST", "PATCH", "PUT", "DELETE"].includes(req.method) ? mutationLimiter(req, res, next) : next(), authenticate, eventRoutes, screeningRoutes);
 app.use("/api/v1/locations", locationRoutes);
-app.use("/api/v1/events", (req, res, next) => ["POST", "PATCH", "PUT", "DELETE"].includes(req.method) ? mutationLimiter(req, res, next) : next(), screeningRoutes);
 app.use("/api/v1/participants", participantRoutes);
 app.use("/api/v1/registrations", registrationRoutes);
 app.use("/api/v1/consent-forms", consentRoutes);
@@ -145,9 +121,9 @@ app.use("/api/v1/admin", adminRoutes);
 app.use("/api/v1/qr", mutationLimiter, qrRoutes);
 
 app.use("/api/users", userRoutes);
-app.use("/api/events", (req, res, next) => ["POST", "PATCH", "PUT", "DELETE"].includes(req.method) ? mutationLimiter(req, res, next) : next(), eventRoutes);
+app.use("/api/public/events", publicEventRoutes);
+app.use("/api/events", (req, res, next) => ["POST", "PATCH", "PUT", "DELETE"].includes(req.method) ? mutationLimiter(req, res, next) : next(), authenticate, eventRoutes, screeningRoutes);
 app.use("/api/locations", locationRoutes);
-app.use("/api/events", (req, res, next) => ["POST", "PATCH", "PUT", "DELETE"].includes(req.method) ? mutationLimiter(req, res, next) : next(), screeningRoutes);
 app.use("/api/qr", mutationLimiter, qrRoutes);
 
 app.use(notFound);

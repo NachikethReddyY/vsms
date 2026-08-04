@@ -2,7 +2,7 @@ import { CalendarDaysIcon, ChartBarSquareIcon, PencilSquareIcon, PlusIcon, UserG
 import { useEffect, useRef, type ReactNode } from 'react';
 import { Link, NavLink, useLocation } from 'react-router-dom';
 import { useAuth } from '../auth/AuthProvider';
-import { SuccessConfetti, ThemeToggle } from './MagicEffects';
+import { ThemeToggle } from './MagicEffects';
 import ProfileMenu from './ProfileMenu';
 import { OfflineSyncControl } from '../features/screening/OfflineSyncControl';
 import './EventsPage.css';
@@ -18,7 +18,7 @@ export default function AppShell({ children }: { children: ReactNode }) {
   const canCreateEvent = roles.some((role) => eventManagerRoles.has(role));
   const canManageStaff = roles.some((role) => adminRoles.has(role));
   const canUseOfflineScreening = roles.includes('SCREENER') && !roles.includes('ADMINISTRATOR');
-  const eventManagementMatch = location.pathname.match(/^\/events\/([^/]+)(?:\/(overview|stations|staff|activity))?$/);
+  const eventManagementMatch = location.pathname.match(/^\/events\/([^/]+)(?:\/(overview|stations|staff|attendees|activity))?$/);
   const stationWorkflowMatch = location.pathname.match(/^\/events\/([^/]+)\/stations\/(visual-acuity|refraction|colour-vision)$/);
   const eventEditPath = eventManagementMatch && eventManagementMatch[1] !== 'new'
     ? `/events/${eventManagementMatch[1]}/edit`
@@ -29,7 +29,6 @@ export default function AppShell({ children }: { children: ReactNode }) {
 
   return (
     <div className="events-workspace">
-      <SuccessConfetti />
       <header className="workspace-site-nav">
         <Link className="workspace-brand" to="/events" aria-label="VSMS events">
           <svg viewBox="0 0 32 32" fill="none" aria-hidden="true">

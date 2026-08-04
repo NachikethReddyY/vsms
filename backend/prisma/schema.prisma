@@ -542,7 +542,8 @@ model EventAuditLog {
   correlationId   String           @map("correlation_id") @db.Uuid
   createdAt       DateTime         @default(now()) @map("created_at") @db.Timestamptz(3)
 
-  event Event @relation(fields: [eventId], references: [eventId], onDelete: Restrict)
+  // Event audit records persist after their event is permanently deleted.
+  event Event? @relation(fields: [eventId], references: [eventId])
   actor User  @relation("EventAuditActor", fields: [actorUserId], references: [id], onDelete: Restrict)
 
   @@index([eventId, createdAt, eventAuditLogId])

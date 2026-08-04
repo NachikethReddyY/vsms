@@ -321,6 +321,74 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/public/events/{eventId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get public details for a non-draft event */
+        get: operations["getPublicEvent"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/events/{eventId}/metrics": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get event operations metrics */
+        get: operations["getEventMetrics"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/events/{eventId}/attendees": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List event attendees for an authorized manager */
+        get: operations["listEventAttendees"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/events/{eventId}/export": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Export an authorized event operations snapshot */
+        get: operations["exportEvent"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/events/{eventId}": {
         parameters: {
             query?: never;
@@ -1665,6 +1733,63 @@ export interface components {
             createdBy?: components["schemas"]["User"];
             /** @description Manager-only organisation identity projection. */
             cancelledBy?: components["schemas"]["User"] | null;
+        };
+        PublicEvent: {
+            /** Format: uuid */
+            eventId: string;
+            name: string;
+            description?: string | null;
+            bannerKey: string;
+            artworkDataUrl?: string | null;
+            venue: string;
+            address?: string | null;
+            postalCode?: string | null;
+            timezone: string;
+            /** Format: date-time */
+            startsAt: string;
+            /** Format: date-time */
+            endsAt: string;
+            capacity: number;
+            status: components["schemas"]["EventStatus"];
+            eventDays: components["schemas"]["EventDay"][];
+        };
+        EventMetrics: {
+            signupCount: number;
+            checkedInCount: number;
+            completedCount: number;
+            cancelledCount: number;
+            activeCount: number;
+            attendanceRatePercent: number;
+            screeningResultCount: number;
+            flaggedResultCount: number;
+            referralCount: number;
+            capacity: number;
+            expectedAttendance?: number | null;
+        };
+        EventAttendee: {
+            /** Format: uuid */
+            registrationId: string;
+            participantDisplayName?: string | null;
+            participantReference: string;
+            /** @enum {string} */
+            registrationStatus: "SIGNED_UP" | "CHECKED_IN" | "COMPLETED" | "CANCELLED";
+            checkedIn: boolean;
+            /** Format: date-time */
+            checkedInAt?: string | null;
+            queueNumber: number | null;
+            /** Format: date-time */
+            createdAt: string;
+        };
+        EventAttendeeList: {
+            total: number;
+            attendees: components["schemas"]["EventAttendee"][];
+            nextCursor: string | null;
+        };
+        EventExportResponse: {
+            export: {
+                [key: string]: unknown;
+            };
+            exportReceipt?: string;
         };
         LocationResult: {
             id: string;
@@ -3536,6 +3661,7 @@ export interface operations {
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
             422: components["responses"]["ValidationFailed"];
+            429: components["responses"]["RateLimited"];
         };
     };
     searchSingaporeLocations: {
@@ -3571,6 +3697,118 @@ export interface operations {
                     "application/json": components["schemas"]["Problem"];
                 };
             };
+        };
+    };
+    getPublicEvent: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                eventId: components["parameters"]["EventId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Public event detail */
+            200: {
+                headers: {
+                    "Cache-Control"?: "public, max-age=60";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PublicEvent"];
+                };
+            };
+            404: components["responses"]["NotFound"];
+            422: components["responses"]["ValidationFailed"];
+            429: components["responses"]["RateLimited"];
+        };
+    };
+    getEventMetrics: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                eventId: components["parameters"]["EventId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Event metrics */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EventMetrics"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            422: components["responses"]["ValidationFailed"];
+            429: components["responses"]["RateLimited"];
+        };
+    };
+    listEventAttendees: {
+        parameters: {
+            query?: {
+                cursor?: string;
+                limit?: number;
+                status?: "SIGNED_UP" | "CHECKED_IN" | "COMPLETED" | "CANCELLED";
+                search?: string;
+            };
+            header?: never;
+            path: {
+                eventId: components["parameters"]["EventId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Attendee page */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EventAttendeeList"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            422: components["responses"]["ValidationFailed"];
+            429: components["responses"]["RateLimited"];
+        };
+    };
+    exportEvent: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                eventId: components["parameters"]["EventId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Event export snapshot */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EventExportResponse"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            422: components["responses"]["ValidationFailed"];
+            429: components["responses"]["RateLimited"];
         };
     };
     getEvent: {
