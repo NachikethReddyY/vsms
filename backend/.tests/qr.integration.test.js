@@ -63,7 +63,7 @@ const fixture = async (label) => {
   });
   const participant = await helpers.prisma.participant.create({
     data: {
-      participantReference: `P-${crypto.randomUUID()}`,
+      participantReference: `P-${crypto.randomUUID().replaceAll("-", "").slice(0, 24)}`,
       firstName: "QR",
       lastName: "Race",
       dateOfBirth: new Date("1980-01-01T00:00:00.000Z"),
