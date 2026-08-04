@@ -461,17 +461,20 @@ export function ParticipantDetailPage() {
   const [participant, setParticipant] = useState<Participant | null>(null);
   const [contacts, setContacts] = useState<EmergencyContact[]>([]);
   const [consents, setConsents] = useState<ConsentRecord[]>([]);
+  const [registrations, setRegistrations] = useState<Registration[]>([]);
   const [error, setError] = useState<string | null>(null);
   useEffect(() => {
     Promise.all([
       apiClient.get(`/participants/${participantId}`),
       apiClient.get(`/participants/${participantId}/emergency-contacts`),
       apiClient.get(`/participants/${participantId}/consents`),
+      apiClient.get(`/participants/${participantId}/registrations`),
     ])
-      .then(([participantResponse, contactsResponse, consentsResponse]) => {
+      .then(([participantResponse, contactsResponse, consentsResponse, registrationsResponse]) => {
         setParticipant(participantResponse.data.participant);
         setContacts(contactsResponse.data.contacts ?? []);
         setConsents(consentsResponse.data.consents ?? []);
+        setRegistrations(registrationsResponse.data.registrations ?? []);
       })
       .catch((requestError: unknown) => setError(getApiError(requestError, "Unable to load participant details.")));
   }, [participantId]);
@@ -494,7 +497,6 @@ export function ParticipantDetailPage() {
         <p className="text-sm text-slate-600">{participant.participantReference} · {displayStatus(participant.status)} · {participant.contactNumber}</p>
         <div className="registration-actions">
           <Link className="secondary" to={`/participants/${participantId}/edit${eventId ? `?eventId=${eventId}` : ""}`}>Edit participant details</Link>
-          <Link className="secondary" to={`/participants/${participantId}/history`}>Registration history</Link>
         </div>
         <div className="participant-detail-sections" id="participant-requirements">
           <section>
@@ -520,6 +522,37 @@ export function ParticipantDetailPage() {
             </div>
           </section>
         </div>
+        <section className="participant-registration-history" aria-labelledby="participant-registration-history-title">
+          <header className="participant-registration-history-heading">
+            <div>
+              <span className="section-label">Registration history</span>
+              <h3 id="participant-registration-history-title">Past and current event registrations</h3>
+            </div>
+            <span className="participant-registration-history-count">{registrations.length} {registrations.length === 1 ? "registration" : "registrations"}</span>
+          </header>
+          {registrations.length === 0 ? (
+            <p className="participant-registration-history-empty">This participant has not been registered for an event yet.</p>
+          ) : (
+            <div className="participant-registration-history-list">
+              {registrations.map((registration) => {
+                const consent = consents.find((item) => item.event.id === registration.eventId && !item.withdrawals.some((withdrawal) => withdrawal.consentStatus === "WITHDRAWN"));
+                return (
+                  <article key={registration.id} className="participant-registration-history-row">
+                    <div>
+                      <h4>{registration.event.eventName}</h4>
+                      <p>Registered {new Date(registration.registeredAt).toLocaleDateString()} · Queue {registration.queueNumber}</p>
+                    </div>
+                    <div className="participant-registration-history-meta">
+                      <span>{displayStatus(registration.registrationStatus)}</span>
+                      <small>Consent: {consent ? displayStatus(consent.consentStatus) : "Not recorded"}</small>
+                      <Link to={`/registrations/${registration.id}/history`}>View history <ArrowRightIcon /></Link>
+                    </div>
+                  </article>
+                );
+              })}
+            </div>
+          )}
+        </section>
         {eventId ? (
           <div className="registration-next-step">
             <div><span>Next step</span><strong>{activeContact && eventConsent?.consentStatus === "ACCEPTED" ? "Review and create this event check-in" : "Complete the required participant information"}</strong></div>

@@ -16,6 +16,8 @@ import VisualAcuityStationPage from "./features/screening/VisualAcuityStationPag
 import { AuditLogsPage as RegistrationAuditLogsPage } from "./pages/AdminPages";
 import AccountSecurityPage from "./pages/AccountSecurityPage";
 import { QueuePage } from "./pages/QueuePages"; // Imported the QueuePage component
+import ParticipantV2Page from "./pages/ParticipantV2Page";
+import ParticipantV2ProfilePage from "./pages/ParticipantV2ProfilePage";
 import {
   ConsentPage,
   EmergencyContactsPage,
@@ -72,6 +74,8 @@ export default function App() {
           <Route element={<RoleGuard allowedRoles={registrationRoles} />}>
             <Route path="/participants" element={<Navigate to="/participants/search" replace />} />
             <Route path="/participants/search" element={<ParticipantSearchPage />} />
+            <Route path="/participants-v2" element={<ParticipantV2Page />} />
+            <Route path="/participants-v2/:participantId" element={<ParticipantV2ProfilePage />} />
             <Route path="/participants/new" element={<ParticipantCreatePage />} />
             <Route path="/participants/:participantId" element={<ParticipantDetailPage />} />
             <Route path="/participants/:participantId/edit" element={<ParticipantEditPage />} />
