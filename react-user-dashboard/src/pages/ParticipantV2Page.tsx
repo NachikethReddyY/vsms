@@ -10,7 +10,7 @@ import {
   UserPlusIcon,
 } from "@heroicons/react/24/outline";
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import { eventApi, formatEventDate, type EventRecord } from "../features/events/eventApi";
 import type { ParticipantSummary } from "../types";
 import apiClient, { getApiError } from "../utils/apiClient";
@@ -36,13 +36,15 @@ type SearchCriteria = {
 };
 
 const PAGE_SIZE = 20;
-const REGISTRATION_EVENT_STATUSES = new Set(["PUBLISHED", "UPCOMING", "ONGOING", "IN_PROGRESS"]);
+const REGISTRATION_EVENT_STATUSES = new Set(["PUBLISHED", "IN_PROGRESS"]);
 
 function initials(participant: ParticipantSummary) {
   return `${participant.firstName[0] ?? ""}${participant.lastName[0] ?? ""}`.toUpperCase() || "P";
 }
 
 export default function ParticipantV2Page() {
+  const [searchParams] = useSearchParams();
+  const requestedEventId = searchParams.get("eventId") ?? "";
   const [events, setEvents] = useState<EventRecord[]>([]);
   const [eventId, setEventId] = useState("");
   const [eventsLoading, setEventsLoading] = useState(true);
@@ -60,7 +62,7 @@ export default function ParticipantV2Page() {
         if (!active) return;
         const registrationEvents = response.events.filter((event) => REGISTRATION_EVENT_STATUSES.has(event.status));
         setEvents(registrationEvents);
-        setEventId((current) => registrationEvents.some((event) => event.eventId === current) ? current : registrationEvents[0]?.eventId || "");
+        setEventId(registrationEvents.some((event) => event.eventId === requestedEventId) ? requestedEventId : registrationEvents[0]?.eventId || "");
         setEventError(registrationEvents.length ? null : "No published or in-progress events are available for participant registration.");
       })
       .catch((requestError: unknown) => {
@@ -70,7 +72,7 @@ export default function ParticipantV2Page() {
         if (active) setEventsLoading(false);
       });
     return () => { active = false; };
-  }, []);
+  }, [requestedEventId]);
 
   const selectedEvent = useMemo(() => events.find((event) => event.eventId === eventId), [eventId, events]);
 
