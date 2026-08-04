@@ -2,7 +2,7 @@ require("dotenv").config();
 const prisma = require("./prismaClient");
 
 const [emailArg, fullNameArg, employeeNumberArg, roleArg = "REGISTRATION_OFFICER"] = process.argv.slice(2);
-const roles = new Set(["ADMINISTRATOR", "EVENT_MANAGER", "REGISTRATION_OFFICER", "SCREENER", "REVIEWER"]);
+const roles = new Set(["ADMINISTRATOR", "EVENT_MANAGER", "REGISTRATION_OFFICER", "SCREENER", "REVIEWER", "SUPPORT"]);
 
 function systemRoleFor(role) {
     if (role === "ADMINISTRATOR") return "ADMIN";

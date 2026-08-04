@@ -2,21 +2,21 @@ const express = require("express");
 const router = express.Router();
 
 const userController = require("../controllers/userController");
-const authenticate = require("../middlewares/authenticate");
-const { requireSystemRole } = require("../middlewares/authorize");
-const { validateExternalUrl } = require("../middlewares/validateExternalUrl"); // 1. Import it
+const requireAuthentication = require("../middlewares/requireAuthentication");
+const requireAnyRole = require("../middlewares/requireAnyRole");
+const validate = require("../middlewares/validate");
+const { createUserBody, updateUserBody, userParams } = require("../schemas/userSchemas");
 
-// Only ADMIN users can view all users
-router.get("/", authenticate, requireSystemRole("ADMIN"), userController.getUsers);
+// Organisation accounts use the application administrator role. `ADMIN` remains
+// a derived system role for legacy event capabilities, never the source of truth.
+router.use(requireAuthentication, requireAnyRole("ADMINISTRATOR"));
+router.get("/", userController.getUsers);
 
-// ADMIN or EVENT_MANAGER can access
-// 2. Add validateExternalUrl here if POST / users accepts an external URL payload
 router.post(
   "/",
-  authenticate,
-  requireSystemRole("ADMIN", "EVENT_MANAGER"),
-  validateExternalUrl, // Runs after auth and roles, but before your controller
+  validate({ body: createUserBody }),
   userController.createUser
 );
+router.patch("/:id", validate({ params: userParams, body: updateUserBody }), userController.updateUser);
 
 module.exports = router;
