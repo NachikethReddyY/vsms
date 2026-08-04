@@ -1,7 +1,8 @@
 import { ExclamationTriangleIcon, InformationCircleIcon } from '@heroicons/react/24/outline';
 import { FormEvent, useEffect, useMemo, useState } from 'react';
 import { Link, useParams, useSearchParams } from 'react-router-dom';
-import { getApiMessage } from '../../auth/authState';
+import { AppToast } from '../../components/AppToast';
+import { getApiError as getApiMessage } from '../../utils/apiClient';
 import {
   EyeReading,
   FlagEvaluation,
@@ -10,7 +11,7 @@ import {
   Station,
   VisualAcuityResultData,
 } from './screeningApi';
-import { StationHandoffLinks } from './StationShared';
+import { loadStationContext, StationHandoffLinks } from './StationShared';
 
 const EXCEPTION_CODES = ['CF', 'HM', 'LP', 'NLP', 'NOT_TESTABLE'] as const;
 const DENOMINATORS = [6, 9, 12, 15, 18, 24, 36, 60];
@@ -110,17 +111,12 @@ export default function VisualAcuityStationPage() {
     if (!eventId) return;
     setError(null);
     try {
-      const stationsPayload = await screeningApi.listStations(eventId);
-      setEventName(stationsPayload.event.name);
-      setEventStations(stationsPayload.stations);
-      const va = stationsPayload.stations.find((item) => item.stationType === 'VISUAL_ACUITY');
-      if (!va) throw new Error('Visual Acuity station is not configured for this event.');
-      setStation(va);
-      const queuePayload = await screeningApi.listQueue(eventId, va.stationId);
-      setQueue(queuePayload.registrations);
-      if (!selectedId && queuePayload.registrations[0]) {
-        setSelectedId(queuePayload.registrations[0].registrationId);
-      }
+      const context = await loadStationContext(eventId, 'VISUAL_ACUITY', 'Visual Acuity', selectedId);
+      setEventName(context.eventName);
+      setStation(context.station);
+      setEventStations(context.stations);
+      setQueue(context.queue);
+      if (!selectedId && context.nextSelectedId) setSelectedId(context.nextSelectedId);
     } catch (cause) {
       setError(getApiMessage(cause, 'Could not load the Visual Acuity station.'));
     }
@@ -181,11 +177,11 @@ export default function VisualAcuityStationPage() {
         acknowledged: preview.isFlagged ? acknowledged : false,
         resultData,
       });
-      setSuccess(
-        saved.isFlagged
+      setSuccess(saved.queued
+        ? 'Saved offline. It will sync when connected.'
+        : saved.isFlagged
           ? `Saved with ${saved.overallFlag} flag (${saved.ruleVersion ?? preview.ruleVersion}): ${saved.flagSummary}`
-          : `Saved Visual Acuity result (${saved.overallFlag}, ${saved.ruleVersion ?? preview.ruleVersion}).`,
-      );
+          : `Saved Visual Acuity result (${saved.overallFlag}, ${saved.ruleVersion ?? preview.ruleVersion}).`);
       setSavedRegistrationId(selected.registrationId);
       setEvaluation(null);
       setAcknowledged(false);
@@ -227,7 +223,7 @@ export default function VisualAcuityStationPage() {
       )}
 
       {error && <p className="form-error" role="alert">{error}</p>}
-      {success && <p className="banner-success" role="status">{success}</p>}
+      <AppToast message={success ?? ''} />
       {success && (
         <StationHandoffLinks
           eventId={eventId}

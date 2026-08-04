@@ -1,27 +1,4 @@
-import {
-  CloudArrowUpIcon,
-  EyeIcon,
-  ShieldCheckIcon,
-  UserGroupIcon,
-} from "@heroicons/react/24/outline";
-import { Link, useNavigate, useSearchParams } from "react-router-dom";
-import { useAuth } from "../auth/AuthProvider";
-import apiClient from "../utils/apiClient";
-import { ThemeToggle } from "./MagicEffects";
-
-const passwordRequirements = [
-  { label: "At least 12 characters", test: (password: string) => password.length >= 12 },
-  { label: "At least 1 uppercase letter", test: (password: string) => /[A-Z]/.test(password) },
-  { label: "At least 1 lowercase letter", test: (password: string) => /[a-z]/.test(password) },
-  { label: "At least 1 number", test: (password: string) => /\d/.test(password) },
-  { label: "At least 1 special character", test: (password: string) => /[^A-Za-z0-9]/.test(password) },
-];
-
-// Kept with PasswordRequirements so both use one authoritative policy.
-// eslint-disable-next-line react-refresh/only-export-components
-export function isPasswordValid(password: string) {
-  return passwordRequirements.every((requirement) => requirement.test(password));
-}
+import { passwordRequirements } from "../utils/passwordPolicy";
 
 export function PasswordRequirements({
   password,
@@ -78,45 +55,6 @@ export function FormErrorSummary({ error }: { error: string | null }) {
   );
 }
 
-export function SessionExpiredDialog() {
-  const [searchParams] = useSearchParams();
-  if (searchParams.get("reason") !== "session-expired") {
-    return null;
-  }
-
-  return (
-    <div className="mb-4 border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-800">
-      Your session expired. Sign in again to continue.
-    </div>
-  );
-}
-
-export function LogoutButton() {
-  const { clearSession } = useAuth();
-  const navigate = useNavigate();
-
-  async function handleLogout() {
-    try {
-      await apiClient.post("/auth/logout");
-    } catch (error) {
-      console.error("Logout request failed", error);
-    } finally {
-      clearSession();
-      navigate("/login");
-    }
-  }
-
-  return (
-    <button
-      type="button"
-      onClick={handleLogout}
-      className="border border-slate-400 bg-white px-3 py-2 text-sm text-slate-800 hover:bg-slate-100"
-    >
-      Logout
-    </button>
-  );
-}
-
 export function AppShell({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <section className="page-frame narrow registration-page">
@@ -129,53 +67,6 @@ export function AppShell({ title, children }: { title: string; children: React.R
       </header>
       {children}
     </section>
-  );
-}
-
-export function AuthPageLayout({
-  title,
-  description,
-  children,
-  footer,
-}: {
-  title: string;
-  description: string;
-  children: React.ReactNode;
-  footer?: React.ReactNode;
-}) {
-  return (
-    <main className="auth-page">
-      <header className="auth-topbar">
-        <Link className="login-brand" to="/">
-          <span aria-hidden="true">V</span>
-          <div><strong>VSMS</strong><small>Secure staff workspace</small></div>
-        </Link>
-        <ThemeToggle />
-      </header>
-      <div className="auth-layout">
-        <section className="auth-story" aria-labelledby="auth-title">
-          <span className="auth-context">Visual Screening Management System</span>
-          <h1 id="auth-title">{title}</h1>
-          <p>{description}</p>
-          <ul aria-label="Security and access commitments">
-            <li><ShieldCheckIcon /> Backend-enforced roles</li>
-            <li><UserGroupIcon /> Approved staff accounts only</li>
-            <li><CloudArrowUpIcon /> Secure event workspace</li>
-          </ul>
-        </section>
-        <div className="auth-card-wrap">
-          <section className="auth-card">
-            <div className="login-icon" aria-hidden="true"><EyeIcon /></div>
-            <div className="login-form">
-              <h2>Continue securely</h2>
-              <p>Your permissions come from your approved local staff account.</p>
-              <div className="login-form-content">{children}</div>
-              {footer ? <div className="auth-card-footer">{footer}</div> : null}
-            </div>
-          </section>
-        </div>
-      </div>
-    </main>
   );
 }
 

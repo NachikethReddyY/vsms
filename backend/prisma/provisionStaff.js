@@ -2,7 +2,13 @@ require("dotenv").config();
 const prisma = require("./prismaClient");
 
 const [emailArg, fullNameArg, employeeNumberArg, roleArg = "REGISTRATION_OFFICER"] = process.argv.slice(2);
-const roles = new Set(["ADMINISTRATOR", "REGISTRATION_OFFICER"]);
+const roles = new Set(["ADMINISTRATOR", "EVENT_MANAGER", "REGISTRATION_OFFICER", "SCREENER", "REVIEWER", "SUPPORT"]);
+
+function systemRoleFor(role) {
+    if (role === "ADMINISTRATOR") return "ADMIN";
+    if (role === "EVENT_MANAGER") return "EVENT_MANAGER";
+    return "STAFF";
+}
 
 async function main() {
     const email = String(emailArg || "").trim().toLowerCase();
@@ -10,7 +16,7 @@ async function main() {
     const employeeNumber = String(employeeNumberArg || "").trim();
     const roleName = String(roleArg || "").trim().toUpperCase();
     if (!email || !fullName || !employeeNumber || !roles.has(roleName)) {
-        throw new Error("Usage: npm run provision-staff -- email fullName employeeNumber [ADMINISTRATOR|REGISTRATION_OFFICER]");
+        throw new Error(`Usage: pnpm provision-staff -- email fullName employeeNumber [${[...roles].join("|")}]`);
     }
 
     const role = await prisma.role.upsert({
@@ -24,7 +30,7 @@ async function main() {
             fullName,
             employeeNumber,
             status: "ACTIVE",
-            sysRole: roleName === "ADMINISTRATOR" ? "ADMIN" : "STAFF",
+            sysRole: systemRoleFor(roleName),
         },
         create: {
             username: email,
@@ -32,7 +38,7 @@ async function main() {
             fullName,
             employeeNumber,
             status: "ACTIVE",
-            sysRole: roleName === "ADMINISTRATOR" ? "ADMIN" : "STAFF",
+            sysRole: systemRoleFor(roleName),
         },
     });
     await prisma.userRole.upsert({

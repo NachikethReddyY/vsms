@@ -30,7 +30,7 @@ OpenAPI contract, and backend tests pass.
 | Validation | Use Zod at Express boundaries and with React Hook Form; the server is authoritative and database constraints are final. | Rejected hand-written validation because rules would drift and cross-field validation would be fragile. |
 | Routing | Explicit REST commands for lifecycle transitions and separate React routes for list, create, detail, and edit. | Rejected a generic status patch because dedicated actions make authorization and legal transitions explicit. |
 | Authentication and authorization | Keep the user-facing login simple (username or email plus password), but retain bcrypt, a short-lived memory-only access token, and rotating secure HttpOnly refresh cookies; central authentication reloads current role/status and event authorization remains database-backed. | This follows the owner's simple-login direction without removing the cookie boundary or pretending the reference `User_Credentials`/role model is already migrated. |
-| CSS | Tailwind v4 utilities backed by the exact tokens and rules in `design/design.md`. | Rejected a second CSS methodology because Tailwind already exists and mixed styling would drift. |
+| CSS | Tailwind v4 utilities backed by the exact tokens and rules in `docs/design.md`. | Rejected a second CSS methodology because Tailwind already exists and mixed styling would drift. |
 | UI framework | Use accessible local/headless React primitives and the repository design system; do not add an opinionated component suite. | Avoids default-library styling that conflicts with the precision-instrument design language. |
 | Client-server communication | HTTPS REST via the existing Axios client, environment-based base URL, secure credentials, normalized errors, request cancellation, duplicate-submit protection, and optimistic concurrency. | Rejected GraphQL/tRPC and mixed patterns as unnecessary scope and coupling. |
 | Folder structure | Backend feature layers (`routes`, `controllers`, `services`, `repositories`, `schemas`, middleware, tests); frontend feature colocation under `src/features/events` plus shared UI primitives. | Rejected continuing controller-heavy and generic `components` placement because the lifecycle logic needs explicit boundaries. |
@@ -213,9 +213,10 @@ distinct fixtures and policy branches.
 ### Audit properties
 
 - Audit events are append-only and created server-side.
-- Record actor, action, target event, timestamp, and correlation ID. The domain
-  audit contains successful committed mutations only; rejected attempts belong
-  in redacted security logs, not `EventAuditLog`.
+- The current delete flow preserves `EventAuditLog` retention rows and writes an
+  `AuditLog` tombstone only after the event delete succeeds in the same
+  transaction. Do not describe `EventAuditLog` as the current lifecycle mutation
+  feed, and do not claim rejected attempts are currently recorded there.
 - Snapshot only allowlisted event fields; never include tokens, secrets,
   passwords, or sensitive headers.
 - Never allow client-controlled actor IDs, timestamps, or audit actions.
@@ -281,7 +282,7 @@ single-submit, repeated-command, success, failure, and post-action focus rules.
 
 ### Visual language
 
-- Follow `design/design.md`: warm cream canvas, warm ink, white dominant
+- Follow `docs/design.md`: warm cream canvas, warm ink, white dominant
   workspace, one blue interaction accent, semantic status colors only,
   hairline separators, 400/600 weights, 8px controls, and no card grid,
   gradients, glass effects, or decorative shadows.

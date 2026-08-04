@@ -1,6 +1,6 @@
 import { FormEvent, useEffect, useMemo, useState } from 'react';
 import { useParams, useSearchParams } from 'react-router-dom';
-import { getApiMessage } from '../../auth/authState';
+import { getApiError as getApiMessage } from '../../utils/apiClient';
 import {
   ColourVisionResultData,
   FlagEvaluation,
@@ -118,11 +118,11 @@ export default function ColourVisionStationPage() {
         acknowledged: preview.isFlagged ? acknowledged : false,
         resultData,
       });
-      setSuccess(
-        saved.isFlagged
+      setSuccess(saved.queued
+        ? 'Saved offline. It will sync when connected.'
+        : saved.isFlagged
           ? `Saved with ${saved.overallFlag} flag (${saved.ruleVersion ?? preview.ruleVersion}): ${saved.flagSummary}`
-          : `Saved Colour Vision result (${saved.overallFlag}, ${saved.ruleVersion ?? preview.ruleVersion}).`,
-      );
+          : `Saved Colour Vision result (${saved.overallFlag}, ${saved.ruleVersion ?? preview.ruleVersion}).`);
       setSavedRegistrationId(selected.registrationId);
       setEvaluation(null);
       setAcknowledged(false);

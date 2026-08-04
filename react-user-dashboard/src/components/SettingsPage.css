@@ -1,0 +1,51 @@
+.midnight-settings {
+  --settings-canvas:var(--canvas);
+  --settings-ink:var(--ink);
+  --settings-muted:var(--ink-2);
+  --settings-line:var(--hairline);
+  --settings-focus:var(--accent);
+  --settings-success:var(--green);
+  min-height:100%;
+  background:var(--settings-canvas);
+}
+
+.midnight-settings .settings-heading { align-items:flex-end; padding:0 0 44px; border-bottom:1px solid var(--settings-line); }
+.midnight-settings .settings-heading h1 { margin:0 0 8px; color:var(--settings-ink); font-size:34px; font-weight:720; line-height:1; letter-spacing:-.035em; }
+.midnight-settings .settings-heading p { margin:0; color:var(--settings-muted); font-size:14px; line-height:21px; }
+.midnight-settings .settings-list { border:0; }
+.midnight-settings .settings-list>section { min-height:0; display:grid; grid-template-columns:minmax(220px,.85fr) minmax(300px,1.15fr); gap:clamp(36px,7vw,96px); padding:34px 0; border-bottom:1px solid var(--settings-line); }
+.midnight-settings .settings-section-copy h2 { margin:0 0 5px; color:var(--settings-ink); font-size:18px; font-weight:720; letter-spacing:-.02em; }
+.midnight-settings .settings-section-copy p { margin:0; color:var(--settings-muted); font-size:13px; line-height:19px; }
+.midnight-settings dl { margin:0; }
+.midnight-settings dl>div { min-height:48px; display:grid; grid-template-columns:104px minmax(0,1fr); align-items:center; gap:18px; border-bottom:1px solid var(--settings-line); }
+.midnight-settings dl>div:last-child { border-bottom:0; }
+.midnight-settings dt { color:var(--settings-muted); font-size:12px; font-weight:650; }
+.midnight-settings dd { margin:0; overflow-wrap:anywhere; color:var(--settings-ink); font-size:14px; font-weight:650; text-transform:none; }
+.midnight-settings .settings-theme-control { min-height:48px; display:flex; align-items:center; gap:12px; color:var(--settings-ink); font-size:14px; font-weight:650; }
+.midnight-settings .settings-theme-toggle { width:48px; height:48px; border:1px solid var(--settings-line); border-radius:8px; background:transparent; color:var(--settings-ink); }
+.midnight-settings .settings-theme-toggle:hover { background:color-mix(in srgb,var(--settings-ink) 8%,transparent); }
+.midnight-settings .settings-security-link { min-height:48px; display:flex; align-items:center; gap:12px; width:fit-content; color:var(--settings-ink); text-decoration:none; }
+.midnight-settings .settings-security-link>svg { width:22px; height:22px; }
+.midnight-settings .settings-security-link>span { display:grid; gap:2px; }
+.midnight-settings .settings-security-link strong { font-size:14px; }
+.midnight-settings .settings-security-link small { color:var(--settings-muted); font-size:12px; }
+.midnight-settings .settings-security-link:hover strong { text-decoration:underline; text-underline-offset:3px; }
+.midnight-settings .account-security-form { width:min(100%,640px); display:grid; gap:18px; padding:34px 0; color:var(--settings-ink); }
+.midnight-settings .account-security-form .field { display:grid; gap:8px; color:var(--settings-ink); font-size:13px; font-weight:650; }
+.midnight-settings .account-security-form .form-control { min-height:48px; border:1px solid var(--settings-line); border-radius:8px; background:transparent; color:var(--settings-ink); padding:0 14px; }
+.midnight-settings .account-security-form .primary { min-height:48px; width:fit-content; border:0; border-radius:8px; background:var(--settings-ink); color:var(--settings-canvas); padding:0 18px; font-weight:700; }
+.midnight-settings .account-security-form .primary:disabled { opacity:.5; cursor:not-allowed; }
+.midnight-settings .account-security-success { margin:0; border:1px solid color-mix(in srgb,var(--settings-success) 35%,transparent); padding:12px 14px; color:var(--settings-success); }
+.midnight-settings .account-security-requirements>div { border-color:var(--settings-line); background:color-mix(in srgb,var(--settings-ink) 4%,transparent); }
+.midnight-settings .account-security-requirements p,
+.midnight-settings .account-security-requirements li { color:var(--settings-muted); }
+.midnight-settings :focus-visible { outline:3px solid var(--settings-focus); outline-offset:3px; }
+
+@media (max-width:700px) {
+  .midnight-settings .settings-heading { padding-bottom:32px; }
+  .midnight-settings .settings-list>section { grid-template-columns:1fr; gap:22px; padding:28px 0; }
+}
+
+@media (prefers-reduced-motion:reduce) {
+  .midnight-settings * { transition:none!important; animation:none!important; }
+}

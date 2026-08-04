@@ -1,7 +1,6 @@
 import { useEffect, useState } from "react";
 import apiClient from "../utils/apiClient";
-import AppShell from "../components/AppShell"; // Adjust relative path to match your AppShell location
-import { LoadingState } from "../components/ui"; // Adjust relative path if needed
+import { LoadingState } from "../components/ui";
 
 type AuditEntry = {
   id: string;
@@ -62,8 +61,7 @@ export function AuditLogsPage() {
   // 1. Restricted View (User is not an Administrator)
   if (isRestricted) {
     return (
-      <AppShell>
-        <div className="flex min-h-[60vh] items-center justify-center p-4">
+        <div className="page-frame narrow audit-hub flex min-h-[60vh] items-center justify-center p-4">
           <div className="w-full max-w-md rounded-2xl border border-red-500/30 bg-red-950/10 p-8 text-center shadow-lg">
             <h2 className="text-sm font-semibold uppercase tracking-wider text-red-500">
               RESTRICTED
@@ -75,34 +73,26 @@ export function AuditLogsPage() {
             </p>
           </div>
         </div>
-      </AppShell>
     );
   }
 
   // 2. Generic Error View
   if (error) {
     return (
-      <AppShell>
-        <div className="p-6 text-center text-sm font-medium text-red-500">
+        <div className="page-frame narrow audit-hub p-6 text-center text-sm font-medium text-red-500">
           {error}
         </div>
-      </AppShell>
     );
   }
 
   // 3. Loading State
   if (!logs || !authLogs) {
-    return (
-      <AppShell>
-        <LoadingState label="Loading audit logs..." />
-      </AppShell>
-    );
+    return <LoadingState label="Loading audit logs..." />;
   }
 
   // 4. Authorized View
   return (
-    <AppShell>
-      <div className="space-y-6">
+      <div className="page-frame narrow audit-hub space-y-6">
         <div>
           <h1 className="text-xl font-bold text-slate-900">Audit Logs Hub</h1>
           <p className="text-sm text-slate-500">
@@ -174,6 +164,5 @@ export function AuditLogsPage() {
           </section>
         </div>
       </div>
-    </AppShell>
   );
 }
