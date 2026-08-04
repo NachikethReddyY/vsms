@@ -202,31 +202,73 @@ const toEventResponse = async (event, user, db = prisma) => {
       };
     }),
   }));
-  const eventStations = stations.map((station) => mapStationDto(station, event, templatesByType));
+  const shifts = managerView ? fullShifts : fullShifts.flatMap((shift) => {
+    if (!user || !["PLANNED", "ACTIVE"].includes(shift.status)) return [];
+    const ownAssignments = shift.staffAssignments.filter((assignment) => (
+      assignment.user?.userId === user.userId
+      && ACTIVE_ASSIGNMENT_STATUSES.includes(assignment.status)
+    ));
+    return ownAssignments.length ? [{ ...shift, staffAssignments: ownAssignments }] : [];
+  });
+  const visibleStationIds = managerView ? null : new Set(shifts.flatMap((shift) => (
+    shift.staffAssignments.flatMap((assignment) => assignment.eventStation?.eventStationId || [])
+  )));
+  const eventStations = stations
+    .filter((station) => !visibleStationIds || visibleStationIds.has(station.stationId))
+    .map((station) => mapStationDto(station, event, templatesByType));
   const registrationCount = _count.registrations || 0;
-  const permissionEvent = { ...event, shifts };
 
-  return {
-    ...event,
+  const response = {
+    // This is deliberately an allowlist. Event persistence contains replay
+    // fingerprints and organisation foreign keys which must never become API
+    // fields merely because Prisma adds them to a result.
+    eventId: event.eventId,
     id: event.eventId,
+    name: event.name,
     eventName: event.name,
+    description: event.description,
+    bannerKey: event.bannerKey,
+    artworkDataUrl: event.artworkDataUrl,
+    venue: event.venue,
     location: event.venue,
+    address: event.address,
+    postalCode: event.postalCode,
+    latitude: event.latitude,
+    longitude: event.longitude,
+    locationProvider: event.locationProvider,
+    locationReference: event.locationReference,
+    timezone: event.timezone,
+    startsAt: event.startsAt,
     eventDate: event.startsAt,
     startTime: event.startsAt,
+    endsAt: event.endsAt,
     endTime: event.endsAt,
+    capacity: event.capacity,
+    expectedAttendance: event.expectedAttendance,
+    status: event.status,
+    version: event.version,
+    cancellationReason: event.cancellationReason,
+    cancelledAt: event.cancelledAt,
+    createdAt: event.createdAt,
+    updatedAt: event.updatedAt,
     eventDays: (event.eventDays || []).map((day) => ({
-      ...day,
+      eventDayId: day.eventDayId,
       date: day.date instanceof Date ? day.date.toISOString().slice(0, 10) : String(day.date).slice(0, 10),
+      startsAt: day.startsAt,
+      endsAt: day.endsAt,
     })),
     shifts,
     eventStations,
-    createdBy: publicUser(event.createdBy),
-    cancelledBy: publicUser(event.cancelledBy),
     signupCount: registrationCount,
     activeCapacityCount: registrations.filter(({ registrationStatus }) => registrationStatus === "CHECKED_IN").length,
     _count: { eventRegistrations: registrationCount },
-    canManage: user ? canManage(permissionEvent, user) : false,
+    canManage: managerView,
   };
+  if (managerView) {
+    response.createdBy = publicUser(event.createdBy);
+    response.cancelledBy = publicUser(event.cancelledBy);
+  }
+  return response;
 };
 
 const visibilityWhere = (user) => {
@@ -921,6 +963,16 @@ const transitionEvent = async (eventId, command, body, user, correlationId) => {
         newValue: snapshot(updated),
         ipAddress: "::1",
         deviceName: "Server",
+      },
+    });
+    await tx.eventAuditLog.create({
+      data: {
+        eventId,
+        actorUserId: user.userId,
+        action: transition.audit,
+        beforeSnapshot: snapshot(current),
+        afterSnapshot: snapshot(updated),
+        correlationId,
       },
     });
 
