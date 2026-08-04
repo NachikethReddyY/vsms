@@ -1,0 +1,1494 @@
+<div data-concept="quality" class="dq-quality-root" data-source="quality" data-visual-state="ready">
+  <style>
+    [data-concept="quality"] {
+      --dq-canvas: #f7f7f4;
+      --dq-surface: #ffffff;
+      --dq-surface-2: #f2f1ec;
+      --dq-border: #e6e5e0;
+      --dq-border-soft: #efeee8;
+      --dq-ink: #26251e;
+      --dq-ink-muted: #5a5852;
+      --dq-ink-soft: #807d72;
+      --dq-accent: #2563eb;
+      --dq-accent-ink: #ffffff;
+      --dq-accent-tint: rgba(37, 99, 235, 0.08);
+      --dq-green: #1f8a65;
+      --dq-amber: #b45309;
+      --dq-red: #cf2d56;
+      --dq-focus: #2563eb;
+      --dq-shadow: 0 8px 24px rgba(38, 37, 30, 0.08);
+      --dq-radius: 10px;
+      font-family: "Geist", "Geist Sans", -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", system-ui, sans-serif;
+      --dq-tablerow-h: 44px;
+      color: var(--dq-ink);
+      background: var(--dq-canvas);
+      font-size: 13px;
+      font-variant-numeric: tabular-nums;
+      line-height: 1.35;
+    }
+
+    [data-concept="quality"] * {
+      box-sizing: border-box;
+    }
+
+    [data-concept="quality"] .dq-quality-shell {
+      display: grid;
+      grid-template-columns: 248px minmax(0, 1fr);
+      gap: 12px;
+      min-height: 100%;
+      padding: 12px;
+      color: var(--dq-ink);
+      background: var(--dq-canvas);
+    }
+
+    [data-concept="quality"] .dq-region,
+    [data-concept="quality"] .dq-card {
+      background: var(--dq-surface);
+      border: 1px solid var(--dq-border);
+      border-radius: var(--dq-radius);
+    }
+
+    [data-concept="quality"] .dq-region {
+      padding: 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      min-width: 0;
+    }
+
+    [data-concept="quality"] .dq-region-head {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      align-items: center;
+      gap: 8px;
+      min-height: 44px;
+    }
+
+    [data-concept="quality"] .dq-region-title {
+      margin: 0;
+      font-size: 14px;
+      font-weight: 600;
+      letter-spacing: -0.01em;
+    }
+
+    [data-concept="quality"] .dq-crumb {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      color: var(--dq-ink-soft);
+      font-size: 11px;
+    }
+
+    [data-concept="quality"] .dq-nav-shell {
+      gap: 8px;
+      min-height: calc(100vh - 24px);
+    }
+
+    [data-concept="quality"] .dq-nav-title {
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--dq-ink-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    [data-concept="quality"] .dq-nav-pill {
+      height: 44px;
+      border: 1px solid var(--dq-border);
+      border-radius: var(--dq-radius);
+      background: var(--dq-surface);
+      color: var(--dq-ink);
+      display: grid;
+      grid-template-columns: auto 1fr auto;
+      align-items: center;
+      padding: 0 10px;
+      gap: 8px;
+      text-align: left;
+      width: 100%;
+      cursor: pointer;
+    }
+
+    [data-concept="quality"] .dq-nav-pill.active {
+      border-color: color-mix(in srgb, var(--dq-accent) 40%, transparent);
+      background: var(--dq-accent-tint);
+      font-weight: 600;
+      color: var(--dq-accent);
+      position: relative;
+    }
+
+    [data-concept="quality"] .dq-nav-pill.active::before {
+      content: "";
+      position: absolute;
+      left: -1px;
+      top: 8px;
+      bottom: 8px;
+      width: 2px;
+      border-radius: 2px;
+      background: var(--dq-accent);
+    }
+
+    [data-concept="quality"] .dq-nav-pill .dq-nav-count {
+      color: var(--dq-ink-soft);
+      font-size: 12px;
+    }
+
+    [data-concept="quality"] .dq-nav-status,
+    [data-concept="quality"] .dq-card-status,
+    [data-concept="quality"] .dq-offline-banner,
+    [data-concept="quality"] .dq-inline-state {
+      padding: 10px;
+      border-radius: var(--dq-radius);
+      border: 1px solid var(--dq-border);
+      background: var(--dq-surface-2);
+      font-size: 12px;
+    }
+
+    [data-concept="quality"] .dq-nav-footer {
+      margin-top: auto;
+      border-top: 1px solid var(--dq-border-soft);
+      padding-top: 8px;
+    }
+
+    [data-concept="quality"] .dq-main {
+      display: grid;
+      grid-template-rows: auto auto 1fr auto;
+      gap: 12px;
+      min-width: 0;
+    }
+
+    [data-concept="quality"] .dq-header {
+      display: grid;
+      gap: 10px;
+      padding-bottom: 12px;
+    }
+
+    [data-concept="quality"] .dq-header-top {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 10px;
+      align-items: center;
+      min-height: 44px;
+    }
+
+    [data-concept="quality"] .dq-header h1 {
+      margin: 0;
+      font-size: 19px;
+      line-height: 1.2;
+      letter-spacing: -0.01em;
+      font-weight: 600;
+    }
+
+    [data-concept="quality"] .dq-header-copy {
+      margin: 0;
+      color: var(--dq-ink-soft);
+      max-width: 68ch;
+      font-size: 13px;
+    }
+
+    [data-concept="quality"] .dq-inline-controls {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      align-items: center;
+      min-height: 44px;
+    }
+
+    [data-concept="quality"] .dq-chip,
+    [data-concept="quality"] .dq-btn,
+    [data-concept="quality"] .dq-mix-btn,
+    [data-concept="quality"] .dq-mode-btn,
+    [data-concept="quality"] .dq-retry {
+      min-height: 44px;
+      border-radius: var(--dq-radius);
+      border: 1px solid var(--dq-border);
+      background: var(--dq-surface);
+      color: var(--dq-ink);
+      padding: 0 12px;
+      font: inherit;
+      cursor: pointer;
+      transition: border-color 120ms ease, transform 120ms ease;
+    }
+
+    [data-concept="quality"] .dq-chip,
+    [data-concept="quality"] .dq-mode-btn {
+      min-width: 96px;
+      text-align: left;
+      justify-content: center;
+      display: inline-flex;
+      align-items: center;
+      color: var(--dq-ink-muted);
+      height: 44px;
+    }
+
+    [data-concept="quality"] .dq-btn,
+    [data-concept="quality"] .dq-retry {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+    }
+
+    [data-concept="quality"] .dq-mix-btn {
+      border-color: transparent;
+      background: transparent;
+      color: var(--dq-ink-muted);
+      min-width: 104px;
+      font-size: 12px;
+    }
+
+    [data-concept="quality"] .dq-mode-btn.active {
+      border-color: var(--dq-accent);
+      color: var(--dq-accent);
+      font-weight: 600;
+      background: var(--dq-accent-tint);
+    }
+
+    [data-concept="quality"] .dq-btn-primary,
+    [data-concept="quality"] .dq-retry {
+      background: var(--dq-accent);
+      color: var(--dq-accent-ink);
+      border-color: transparent;
+    }
+
+    [data-concept="quality"] .dq-card-grid {
+      display: grid;
+      grid-template-columns: 1.55fr 1fr;
+      gap: 12px;
+      min-width: 0;
+    }
+
+    [data-concept="quality"] .dq-card {
+      padding: 12px;
+      min-width: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    [data-concept="quality"] .dq-card-head {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      align-items: center;
+      gap: 10px;
+      min-height: 44px;
+    }
+
+    [data-concept="quality"] .dq-card-title {
+      margin: 0;
+      font-size: 14px;
+      font-weight: 600;
+      letter-spacing: -0.01em;
+    }
+
+    [data-concept="quality"] .dq-legend {
+      display: flex;
+      gap: 12px;
+      flex-wrap: wrap;
+      font-size: 11px;
+      color: var(--dq-ink-muted);
+      min-height: 44px;
+      align-items: center;
+    }
+
+    [data-concept="quality"] .dq-legend-item {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      white-space: nowrap;
+    }
+
+    [data-concept="quality"] .dq-legend-swatch {
+      width: 11px;
+      height: 11px;
+      border-radius: 2px;
+      background: var(--dq-accent);
+      flex-shrink: 0;
+    }
+
+    [data-concept="quality"] .dq-legend-swatch.amber { background: var(--dq-amber); }
+
+    [data-concept="quality"] .dq-chart-wrap {
+      position: relative;
+      border: 1px solid var(--dq-border-soft);
+      border-radius: var(--dq-radius);
+      background: var(--dq-surface);
+      padding: 8px;
+      min-height: 180px;
+    }
+
+    [data-concept="quality"] .dq-chart-wrap svg {
+      width: 100%;
+      height: auto;
+      display: block;
+      overflow: visible;
+    }
+
+    [data-concept="quality"] .dq-barchart {
+      display: grid;
+      gap: 8px;
+      min-height: 180px;
+    }
+
+    [data-concept="quality"] .dq-barchart .dq-bar-row {
+      display: grid;
+      grid-template-columns: minmax(120px, 1fr) 1fr auto;
+      gap: 8px;
+      align-items: center;
+      min-height: 44px;
+    }
+
+    [data-concept="quality"] .dq-barchart .dq-bar-track {
+      width: 100%;
+      height: 12px;
+      border-radius: 6px;
+      border: 1px solid var(--dq-border);
+      background: var(--dq-surface-2);
+      overflow: hidden;
+    }
+
+    [data-concept="quality"] .dq-barchart .dq-bar-fill {
+      height: 100%;
+      background: var(--dq-accent);
+      border-radius: 5px;
+      width: 0;
+      transition: width 240ms ease;
+    }
+
+    [data-concept="quality"] .dq-barchart .dq-bar-fill.warning { background: var(--dq-amber); }
+    [data-concept="quality"] .dq-barchart .dq-bar-fill.critical { background: var(--dq-red); }
+    [data-concept="quality"] .dq-barchart .dq-bar-label { font-weight: 600; font-size: 12px; color: var(--dq-ink); }
+    [data-concept="quality"] .dq-barchart .dq-bar-value { font-variant-numeric: tabular-nums; text-align: right; min-width: 58px; color: var(--dq-ink-muted); }
+
+    [data-concept="quality"] .dq-metric-grid {
+      display: grid;
+      grid-template-columns: repeat(5, minmax(0, 1fr));
+      gap: 8px;
+    }
+
+    [data-concept="quality"] .dq-metric {
+      border: 1px solid var(--dq-border);
+      border-radius: var(--dq-radius);
+      background: var(--dq-surface);
+      padding: 10px;
+      min-height: 78px;
+      display: grid;
+      gap: 4px;
+    }
+
+    [data-concept="quality"] .dq-metric-kpi {
+      margin: 0;
+      font-size: 21px;
+      font-weight: 600;
+      letter-spacing: -0.01em;
+      line-height: 1.05;
+    }
+
+    [data-concept="quality"] .dq-metric-label {
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      color: var(--dq-ink-muted);
+      font-weight: 600;
+    }
+
+    [data-concept="quality"] .dq-metric-delta {
+      font-size: 12px;
+      color: var(--dq-ink-soft);
+    }
+
+    [data-concept="quality"] .dq-metric-delta strong {
+      font-weight: 600;
+      color: var(--dq-green);
+    }
+
+    [data-concept="quality"] .dq-metric-delta.warn strong { color: var(--dq-amber); }
+    [data-concept="quality"] .dq-metric-delta.alert strong { color: var(--dq-red); }
+
+    [data-concept="quality"] .dq-supporting {
+      display: grid;
+      grid-template-columns: 1.1fr 1fr;
+      gap: 12px;
+      min-width: 0;
+      min-height: 0;
+    }
+
+    [data-concept="quality"] .dq-list {
+      margin: 0;
+      padding: 0;
+      list-style: none;
+      display: grid;
+      gap: 8px;
+    }
+
+    [data-concept="quality"] .dq-list li {
+      display: grid;
+      gap: 2px;
+      padding: 8px;
+      border: 1px solid var(--dq-border-soft);
+      border-radius: var(--dq-radius);
+      min-height: 70px;
+    }
+
+    [data-concept="quality"] .dq-list .dq-row-main {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      gap: 8px;
+      min-height: 44px;
+      align-items: center;
+    }
+
+    [data-concept="quality"] .dq-list .dq-name {
+      margin: 0;
+      font-weight: 600;
+      font-size: 13px;
+      color: var(--dq-ink);
+    }
+
+    [data-concept="quality"] .dq-list .dq-meta {
+      margin: 0;
+      font-size: 12px;
+      color: var(--dq-ink-muted);
+    }
+
+    [data-concept="quality"] .dq-table-wrap {
+      border: 1px solid var(--dq-border);
+      border-radius: var(--dq-radius);
+      overflow: hidden;
+    }
+
+    [data-concept="quality"] .dq-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 12px;
+      min-width: 0;
+    }
+
+    [data-concept="quality"] .dq-table th,
+    [data-concept="quality"] .dq-table td {
+      text-align: left;
+      padding: 9px 10px;
+      border-bottom: 1px solid var(--dq-border-soft);
+      vertical-align: top;
+    }
+
+    [data-concept="quality"] .dq-table th {
+      color: var(--dq-ink-soft);
+      font-weight: 600;
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      background: var(--dq-surface-2);
+      position: sticky;
+      top: 0;
+    }
+
+    [data-concept="quality"] .dq-status {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      min-height: 24px;
+      font-size: 12px;
+      padding: 0 8px;
+      border-radius: 999px;
+      border: 1px solid transparent;
+      white-space: nowrap;
+    }
+
+    [data-concept="quality"] .dq-status.complete { color: var(--dq-green); border-color: color-mix(in srgb, var(--dq-green) 28%, transparent); background: color-mix(in srgb, var(--dq-green) 8%, transparent); }
+    [data-concept="quality"] .dq-status.warning { color: var(--dq-amber); border-color: color-mix(in srgb, var(--dq-amber) 28%, transparent); background: color-mix(in srgb, var(--dq-amber) 8%, transparent); }
+    [data-concept="quality"] .dq-status.alert { color: var(--dq-red); border-color: color-mix(in srgb, var(--dq-red) 28%, transparent); background: color-mix(in srgb, var(--dq-red) 9%, transparent); }
+
+    [data-concept="quality"] .dq-inline-state {
+      display: none;
+      min-height: 44px;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      border-radius: 8px;
+    }
+
+    [data-concept="quality"] .dq-inline-state.active { display: flex; }
+
+    [data-concept="quality"] .dq-inline-state.error {
+      border-color: color-mix(in srgb, var(--dq-red) 28%, var(--dq-border));
+      background: color-mix(in srgb, var(--dq-red) 12%, var(--dq-surface));
+      color: var(--dq-red);
+    }
+
+    [data-concept="quality"] .dq-inline-state.loading {
+      border-color: color-mix(in srgb, var(--dq-accent) 34%, var(--dq-border));
+      background: color-mix(in srgb, var(--dq-accent) 9%, var(--dq-surface));
+      color: var(--dq-accent);
+    }
+
+    [data-concept="quality"] .dq-inline-state.offline {
+      border-color: color-mix(in srgb, var(--dq-amber) 34%, var(--dq-border));
+      background: color-mix(in srgb, var(--dq-amber) 12%, var(--dq-surface));
+      color: var(--dq-amber);
+    }
+
+    [data-concept="quality"] .dq-offline-banner {
+      border-color: color-mix(in srgb, var(--dq-amber) 34%, var(--dq-border));
+      background: color-mix(in srgb, var(--dq-amber) 12%, var(--dq-surface));
+      color: var(--dq-amber);
+      display: none;
+    }
+
+    [data-concept="quality"] [data-visual-state="offline"] .dq-offline-banner {
+      display: block;
+    }
+
+    [data-concept="quality"] .dq-a11y,
+    [data-concept="quality"] .dq-sr-only {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      clip: rect(0 0 0 0);
+      clip-path: inset(50%);
+      overflow: hidden;
+      white-space: nowrap;
+    }
+
+    [data-concept="quality"] .dq-mode-btn:disabled,
+    [data-concept="quality"] .dq-retry:disabled {
+      opacity: 0.7;
+      cursor: default;
+    }
+
+    [data-concept="quality"] .dq-chart-loading {
+      min-height: 170px;
+      display: grid;
+      place-items: center;
+      color: var(--dq-ink-muted);
+      gap: 10px;
+      font-size: 12px;
+      min-height: 44px;
+    }
+
+    [data-concept="quality"] .dq-chart-loading span {
+      width: 28px;
+      height: 28px;
+      border-radius: 50%;
+      border: 2px solid var(--dq-accent);
+      border-right-color: transparent;
+      animation: dq-spin 1s linear infinite;
+    }
+
+    [data-concept="quality"] .dq-pill-note {
+      border-radius: 999px;
+      border: 1px solid var(--dq-border);
+      font-size: 11px;
+      color: var(--dq-ink-soft);
+      min-height: 44px;
+      padding: 0 10px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      white-space: nowrap;
+    }
+
+    [data-concept="quality"] .dq-pill-note .ok { color: var(--dq-green); }
+
+    [data-concept="quality"] .dq-workspace,
+    [data-concept="quality"] .dq-activity {
+      min-width: 0;
+    }
+
+    [data-concept="quality"] .dq-card,
+    [data-concept="quality"] .dq-region,
+    [data-concept="quality"] .dq-metric,
+    [data-concept="quality"] .dq-list li,
+    [data-concept="quality"] .dq-table th,
+    [data-concept="quality"] .dq-table td {
+      -webkit-font-smoothing: antialiased;
+    }
+
+    [data-concept="quality"] :focus-visible {
+      outline: 2px solid var(--dq-focus);
+      outline-offset: 2px;
+      border-radius: 8px;
+    }
+
+    [data-concept="quality"] [data-visual-state="loading"] .dq-chart-host:not([data-empty]) .dq-chart-area {
+      display: none;
+    }
+
+    [data-concept="quality"] [data-visual-state="loading"] .dq-loading-state {
+      display: grid;
+    }
+
+    [data-concept="quality"] [data-visual-state="error"] .dq-error-state {
+      display: grid;
+    }
+
+    [data-concept="quality"] [data-visual-state="error"] .dq-error-state + .dq-chart-area,
+    [data-concept="quality"] [data-visual-state="error"] .dq-chart-area {
+      opacity: 0.45;
+      pointer-events: none;
+    }
+
+    [data-concept="quality"] [data-visual-state="offline"] .dq-offline-state {
+      display: grid;
+    }
+
+    [data-concept="quality"] .dq-loading-state,
+    [data-concept="quality"] .dq-error-state,
+    [data-concept="quality"] .dq-offline-state {
+      display: none;
+      grid-template-columns: 1fr;
+      align-items: center;
+      min-height: 44px;
+      justify-items: start;
+      gap: 6px;
+      font-size: 12px;
+      color: var(--dq-ink);
+      border: 1px dashed var(--dq-border);
+      border-radius: 8px;
+      padding: 8px 10px;
+      background: var(--dq-surface-2);
+      margin-bottom: 8px;
+    }
+
+    [data-concept="quality"] .dq-error-state strong { color: var(--dq-red); }
+
+    [data-concept="quality"] .dq-sparkline-label,
+    [data-concept="quality"] .dq-tooltip {
+      color: var(--dq-ink-muted);
+      font-size: 11px;
+    }
+
+    [data-concept="quality"] .dq-tooltip {
+      position: absolute;
+      z-index: 2;
+      pointer-events: none;
+      background: var(--dq-surface);
+      border: 1px solid var(--dq-border);
+      border-radius: 6px;
+      padding: 4px 8px;
+      font-size: 11px;
+      box-shadow: var(--dq-shadow);
+      display: none;
+      max-width: 180px;
+      white-space: nowrap;
+    }
+
+    [data-concept="quality"] .dq-visible {
+      display: grid;
+    }
+
+    @media (max-width: 1280px) {
+      [data-concept="quality"] .dq-metric-grid {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+      }
+
+      [data-concept="quality"] .dq-card-grid,
+      [data-concept="quality"] .dq-supporting {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    @media (max-width: 960px) {
+      [data-concept="quality"] .dq-quality-shell {
+        grid-template-columns: 1fr;
+        gap: 10px;
+      }
+
+      [data-concept="quality"] .dq-nav-shell {
+        min-height: auto;
+        display: grid;
+        grid-template-columns: repeat(6, minmax(120px, 1fr));
+        gap: 8px;
+      }
+
+      [data-concept="quality"] .dq-nav-title,
+      [data-concept="quality"] .dq-nav-footer,
+      [data-concept="quality"] .dq-nav-status {
+        grid-column: 1 / -1;
+      }
+
+      [data-concept="quality"] .dq-nav-pill {
+        grid-template-columns: 1fr;
+        height: 44px;
+        text-align: center;
+      }
+
+      [data-concept="quality"] .dq-nav-pill .dq-nav-count,
+      [data-concept="quality"] .dq-nav-pill .dq-nav-sub {
+        display: none;
+      }
+
+      [data-concept="quality"] .dq-card-grid,
+      [data-concept="quality"] .dq-supporting {
+        display: grid;
+      }
+    }
+
+    @media (max-width: 640px) {
+      [data-concept="quality"] .dq-quality-shell {
+        padding: 8px;
+        gap: 8px;
+      }
+
+      [data-concept="quality"] .dq-metric-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+
+      [data-concept="quality"] .dq-header-top,
+      [data-concept="quality"] .dq-card-head,
+      [data-concept="quality"] .dq-region-head {
+        grid-template-columns: 1fr;
+        gap: 8px;
+      }
+
+      [data-concept="quality"] .dq-inline-controls {
+        gap: 6px;
+      }
+
+      [data-concept="quality"] .dq-mode-btn {
+        min-width: auto;
+        flex: 1;
+      }
+
+      [data-concept="quality"] .dq-table-wrap {
+        overflow: auto;
+      }
+
+      [data-concept="quality"] .dq-table {
+        min-width: 620px;
+      }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      [data-concept="quality"] * {
+        animation: none !important;
+        transition: none !important;
+      }
+    }
+
+    @keyframes dq-spin {
+      to { transform: rotate(360deg); }
+    }
+
+    @media (max-width: 600px) {
+      [data-concept="quality"] [data-theme="dark"] .dq-region,
+      [data-concept="quality"] [data-theme="dark"] .dq-card,
+      [data-concept="quality"] [data-theme="dark"] .dq-nav-pill {
+        background: #1a1916;
+      }
+    }
+
+    [data-concept="quality"] [data-theme="dark"] {
+      --dq-canvas: #100f0d;
+      --dq-surface: #1a1916;
+      --dq-surface-2: #22211d;
+      --dq-border: rgba(237, 235, 228, 0.09);
+      --dq-border-soft: rgba(237, 235, 228, 0.06);
+      --dq-ink: #edece4;
+      --dq-ink-muted: #b0aca2;
+      --dq-ink-soft: #8a867c;
+      --dq-accent: #93c5fd;
+      --dq-accent-tint: rgba(147, 197, 253, 0.16);
+      --dq-focus: #93c5fd;
+      --dq-green: #3fa37f;
+      --dq-amber: #d9964a;
+      --dq-red: #e05c7e;
+    }
+  </style>
+
+  <div class="dq-quality-shell">
+    <aside class="dq-region dq-nav-shell" data-region="navigation-shell">
+      <div class="dq-region-head">
+        <h2 class="dq-region-title">Navigation shell</h2>
+        <button class="dq-mix-btn" type="button" data-region="navigation-shell" data-source="quality">Use in mix</button>
+      </div>
+      <p class="dq-nav-title">Northside operations</p>
+      <button class="dq-nav-pill active" type="button">
+        <span>Dashboard</span>
+        <span class="dq-nav-count">5</span>
+        <span class="dq-nav-sub">Quality view</span>
+      </button>
+      <button class="dq-nav-pill" type="button">
+        <span>Live queue</span>
+        <span class="dq-nav-count">18</span>
+        <span class="dq-nav-sub">Current</span>
+      </button>
+      <button class="dq-nav-pill" type="button">
+        <span>Review &amp; referrals</span>
+        <span class="dq-nav-count">12</span>
+        <span class="dq-nav-sub">Requires action</span>
+      </button>
+      <button class="dq-nav-pill" type="button">
+        <span>Sync centre</span>
+        <span class="dq-nav-count">4</span>
+        <span class="dq-nav-sub">Pending offline records</span>
+      </button>
+      <button class="dq-nav-pill" type="button">
+        <span>Audit logs</span>
+        <span class="dq-nav-count">86</span>
+        <span class="dq-nav-sub">Last 24h</span>
+      </button>
+      <div class="dq-nav-status" role="status" aria-live="polite">Connected</div>
+      <div class="dq-nav-footer">
+        <div class="dq-list">
+          <li>
+            <div class="dq-row-main">
+              <div>
+                <p class="dq-name">Adwoa Mensah</p>
+                <p class="dq-meta">Event Manager · Northside</p>
+              </div>
+              <span class="dq-pill-note ok">AM</span>
+            </div>
+          </li>
+          <li>
+            <p class="dq-meta">Station roles in session</p>
+            <p class="dq-meta">Registration · Screener · Reviewer · Sync monitor</p>
+          </li>
+        </div>
+      </div>
+    </aside>
+
+    <div class="dq-main">
+      <header class="dq-region dq-header" data-region="event-context-header">
+        <div class="dq-region-head">
+          <div>
+            <p class="dq-crumb" aria-label="Current event context">Northside Community Screening – Sat 19 Jul · 8:30am–4:00pm</p>
+            <h1>Quality signal room</h1>
+          </div>
+          <button class="dq-mix-btn" type="button" data-region="event-context-header" data-source="quality">Use in mix</button>
+        </div>
+        <p class="dq-header-copy">Analytics for queue health, station bottlenecks, review/referral trends, sync quality, and audit activity across registration, visual acuity, refraction, colour vision, eye health and clinical review.</p>
+        <div class="dq-inline-controls" role="group" aria-label="Demo state">
+          <button class="dq-mode-btn active" type="button" data-mode="ready">Live mode</button>
+          <button class="dq-mode-btn" type="button" data-mode="loading">Loading state</button>
+          <button class="dq-mode-btn" type="button" data-mode="error">Error state</button>
+          <button class="dq-mode-btn" type="button" data-mode="offline">Offline mode</button>
+          <button class="dq-btn dq-retry" type="button" data-action="refresh">Refresh charts</button>
+        </div>
+        <p class="dq-offline-banner" aria-live="polite">Offline mode: data is saved safely on this device and will sync when the connection returns.</p>
+        <div class="dq-inline-state dq-loading-state" role="status" aria-live="polite">
+          <span>Loading stream from all stations…</span>
+        </div>
+        <div class="dq-inline-state dq-error-state" role="status" aria-live="polite">
+          <strong>Error loading source</strong>
+          <span>Review station metrics are delayed. Retry from local cache.</span>
+        </div>
+        <div class="dq-inline-state dq-offline-state" role="status" aria-live="polite">
+          <span>Network unavailable. All writes are queued locally.</span>
+          <button class="dq-btn dq-retry" type="button" data-mode="ready">Recheck connection</button>
+        </div>
+      </header>
+
+      <section class="dq-region dq-headline" data-region="headline-metrics">
+        <div class="dq-region-head">
+          <h2 class="dq-region-title">Headline metrics</h2>
+          <button class="dq-mix-btn" type="button" data-region="headline-metrics" data-source="quality">Use in mix</button>
+        </div>
+        <div class="dq-metric-grid">
+          <article class="dq-metric">
+            <p class="dq-metric-label">Registered</p>
+            <p class="dq-metric-kpi" data-metric="registered">—</p>
+            <p class="dq-metric-delta"><strong data-metric-delta="registered">—</strong> this session</p>
+          </article>
+          <article class="dq-metric">
+            <p class="dq-metric-label">Waiting now</p>
+            <p class="dq-metric-kpi" data-metric="waiting">—</p>
+            <p class="dq-metric-delta"><strong data-metric-delta="waiting">—</strong> queue slots</p>
+          </article>
+          <article class="dq-metric">
+            <p class="dq-metric-label">Complete</p>
+            <p class="dq-metric-kpi" data-metric="complete">—</p>
+            <p class="dq-metric-delta"><strong data-metric-delta="complete">—</strong> records finalised</p>
+          </article>
+          <article class="dq-metric">
+            <p class="dq-metric-label">Require review</p>
+            <p class="dq-metric-kpi" data-metric="review">—</p>
+            <p class="dq-metric-delta warn"><strong data-metric-delta="reviewDelta">—</strong> pending review</p>
+          </article>
+          <article class="dq-metric">
+            <p class="dq-metric-label">Pending sync</p>
+            <p class="dq-metric-kpi" data-metric="pendingSync">—</p>
+            <p class="dq-metric-delta"><strong data-metric-delta="pendingDelta">—</strong> unsent entries</p>
+          </article>
+          <article class="dq-metric" hidden>
+            <p class="dq-metric-label">Referred</p>
+            <p class="dq-metric-kpi" data-metric="referrals">—</p>
+            <p class="dq-metric-delta alert"><strong data-metric-delta="referralDelta">—</strong> high-priority today</p>
+          </article>
+        </div>
+      </section>
+
+      <section class="dq-region dq-workspace" data-region="primary-workspace">
+        <div class="dq-region-head">
+          <h2 class="dq-region-title">Primary workspace</h2>
+          <button class="dq-mix-btn" type="button" data-region="primary-workspace" data-source="quality">Use in mix</button>
+        </div>
+
+        <div class="dq-card-grid">
+          <article class="dq-card" data-chart-host="throughput">
+            <div class="dq-card-head">
+              <h3 class="dq-card-title">Throughput trend</h3>
+              <span class="dq-pill-note">single scale: participants/hour</span>
+            </div>
+            <div class="dq-loading-state dq-chart-loading" role="status" aria-live="polite">
+              <span aria-hidden="true"></span><span>Loading latest throughput…</span>
+            </div>
+            <div class="dq-error-state" role="status">
+              <strong>Throughput stream unavailable</strong>
+              <span>Retry available after connection checks.</span>
+            </div>
+            <div class="dq-offline-state" role="status">
+              <span>Offline cache contains last 30 minutes of throughput points.</span>
+            </div>
+            <div class="dq-chart-wrap dq-chart-area" data-chart-area="throughput" aria-label="Throughput trend line chart"></div>
+            <div class="dq-legend" aria-label="Throughput legend">
+              <span class="dq-legend-item"><span class="dq-legend-swatch"></span>Throughput</span>
+            </div>
+            <details class="dq-data-details">
+              <summary class="dq-btn">Show throughput table</summary>
+              <div class="dq-table-wrap" data-chart-table="throughput"></div>
+            </details>
+          </article>
+
+          <article class="dq-card" data-chart-host="stations">
+            <div class="dq-card-head">
+              <h3 class="dq-card-title">Station bottlenecks</h3>
+              <span class="dq-pill-note">single scale: queue wait (min)</span>
+            </div>
+            <div class="dq-chart-wrap">
+              <div class="dq-barchart" data-chart-area="stations" aria-label="Station bottleneck chart"></div>
+            </div>
+          </article>
+        </div>
+
+        <article class="dq-card" data-chart-host="review-referral">
+          <div class="dq-card-head">
+            <h3 class="dq-card-title">Review &amp; referral trend</h3>
+            <span class="dq-pill-note">single scale: decisions/hour</span>
+          </div>
+          <div class="dq-loading-state dq-chart-loading" role="status" aria-live="polite">
+            <span aria-hidden="true"></span><span>Calculating review and referral trend…</span>
+          </div>
+          <div class="dq-error-state" role="status">
+            <strong>Review and referral metrics delayed</strong>
+            <span>Clinical review endpoint unavailable.</span>
+          </div>
+          <div class="dq-offline-state" role="status">
+            <span>Offline mode: local trend derived from saved clinical decisions only.</span>
+          </div>
+          <div class="dq-chart-wrap dq-chart-area" data-chart-area="review-referral" aria-label="Review and referral trend chart"></div>
+          <div class="dq-legend" aria-label="Review and referral legend">
+            <span class="dq-legend-item"><span class="dq-legend-swatch"></span>Review completed</span>
+            <span class="dq-legend-item"><span class="dq-legend-swatch amber"></span>Referrals</span>
+          </div>
+          <details class="dq-data-details">
+            <summary class="dq-btn">Show review/referral table</summary>
+            <div class="dq-table-wrap" data-chart-table="review-referral"></div>
+          </details>
+        </article>
+      </section>
+
+      <section class="dq-region dq-supporting" data-region="supporting-rail">
+        <div class="dq-region-head">
+          <h2 class="dq-region-title">Supporting rail</h2>
+          <button class="dq-mix-btn" type="button" data-region="supporting-rail" data-source="quality">Use in mix</button>
+        </div>
+        <div class="dq-supporting">
+          <article class="dq-card">
+            <div class="dq-card-head">
+              <h3 class="dq-card-title">Queue hotspots (urgent-first)</h3>
+              <span class="dq-pill-note">current snapshot</span>
+            </div>
+            <ul class="dq-list" data-list="queue"></ul>
+          </article>
+
+          <article class="dq-card">
+            <div class="dq-card-head">
+              <h3 class="dq-card-title">Staffing &amp; sync health</h3>
+              <span class="dq-pill-note">table + status</span>
+            </div>
+            <p class="dq-sparkline-label">Staffing</p>
+            <ul class="dq-list" data-list="staffing"></ul>
+            <p class="dq-sparkline-label">Sync health</p>
+            <div class="dq-barchart" data-chart-area="sync" aria-label="Sync state counts"></div>
+          </article>
+        </div>
+      </section>
+
+      <section class="dq-region dq-activity" data-region="activity-compliance">
+        <div class="dq-region-head">
+          <h2 class="dq-region-title">Activity / compliance</h2>
+          <button class="dq-mix-btn" type="button" data-region="activity-compliance" data-source="quality">Use in mix</button>
+        </div>
+        <div class="dq-card dq-card-noheader" data-table="activity">
+          <div class="dq-inline-state dq-error-state" role="status" aria-live="polite">
+            <strong>Audit feed temporarily unavailable</strong>
+            <span>Showing cached entries and a compliance note.</span>
+          </div>
+          <div class="dq-inline-state dq-loading-state" role="status" aria-live="polite">
+            <span aria-hidden="true"></span>
+            <span>Loading compliance log…</span>
+          </div>
+          <div class="dq-table-wrap">
+            <table class="dq-table" aria-label="Recent audit activity and compliance">
+              <thead>
+                <tr>
+                  <th>Time</th>
+                  <th>Actor</th>
+                  <th>Action</th>
+                  <th>Resource</th>
+                  <th>Result</th>
+                </tr>
+              </thead>
+              <tbody data-audit-body></tbody>
+            </table>
+          </div>
+          <div class="dq-list" style="margin-top:8px;" data-list="compliance"></div>
+          <div class="dq-card-status" role="note" aria-live="polite">
+            Compliance checks: referral rule recommendation is advisory; reviewer decisions remain immutable once submitted.
+          </div>
+        </div>
+      </section>
+    </div>
+  </div>
+
+  <script id="dq-quality-data" type="application/json">
+  {
+    "event": {
+      "name": "Northside Community Screening",
+      "date": "Sat 19 Jul",
+      "time": "8:30am–4:00pm",
+      "status": "Live",
+      "venue": "Northside Community Hall"
+    },
+    "metrics": {
+      "registered": 146,
+      "registeredDelta": 12,
+      "waiting": 18,
+      "waitingDelta": 2,
+      "complete": 72,
+      "completeDelta": 9,
+      "review": 12,
+      "reviewDelta": 3,
+      "pendingSync": 3,
+      "pendingDelta": 1,
+      "referrals": 4,
+      "referralDelta": 1
+    },
+    "throughput": [
+      {"time": "08:30", "throughput": 12},
+      {"time": "09:00", "throughput": 16},
+      {"time": "09:30", "throughput": 22},
+      {"time": "10:00", "throughput": 21},
+      {"time": "10:30", "throughput": 18},
+      {"time": "11:00", "throughput": 26},
+      {"time": "11:30", "throughput": 24},
+      {"time": "12:00", "throughput": 17},
+      {"time": "12:30", "throughput": 19},
+      {"time": "13:00", "throughput": 20},
+      {"time": "13:30", "throughput": 23},
+      {"time": "14:00", "throughput": 15},
+      {"time": "14:30", "throughput": 17},
+      {"time": "15:00", "throughput": 14}
+    ],
+    "stations": [
+      {"name": "Registration", "avgWait": 8, "queued": 28, "throughput": 54, "status": "good"},
+      {"name": "Visual acuity", "avgWait": 17, "queued": 18, "throughput": 41, "status": "warning"},
+      {"name": "Refraction", "avgWait": 11, "queued": 11, "throughput": 31, "status": "good"},
+      {"name": "Colour vision", "avgWait": 6, "queued": 9, "throughput": 27, "status": "good"},
+      {"name": "Eye health", "avgWait": 14, "queued": 6, "throughput": 19, "status": "warning"},
+      {"name": "Clinical review", "avgWait": 29, "queued": 12, "throughput": 16, "status": "alert"}
+    ],
+    "reviewReferral": [
+      {"time": "08:00", "reviews": 2, "referrals": 0},
+      {"time": "09:00", "reviews": 6, "referrals": 1},
+      {"time": "10:00", "reviews": 8, "referrals": 2},
+      {"time": "11:00", "reviews": 11, "referrals": 3},
+      {"time": "12:00", "reviews": 9, "referrals": 1},
+      {"time": "13:00", "reviews": 7, "referrals": 2},
+      {"time": "14:00", "reviews": 8, "referrals": 1},
+      {"time": "15:00", "reviews": 5, "referrals": 1}
+    ],
+    "queue": [
+      {"name": "Ingrid Johansson", "station": "Clinical review", "wait": 42, "status": "Urgent", "id": "VSMS-240719-009"},
+      {"name": "Aisha Rahman", "station": "Refraction", "wait": 26, "status": "Urgent", "id": "VSMS-240719-041"},
+      {"name": "Robert Cairn", "station": "Visual acuity", "wait": 24, "status": "Review", "id": "VSMS-240719-019"},
+      {"name": "Mei-Lin Chao", "station": "Clinical review", "wait": 21, "status": "Review", "id": "VSMS-240719-014"},
+      {"name": "Henry Walsh", "station": "Eye health", "wait": 18, "status": "Referral", "id": "VSMS-240719-011"}
+    ],
+    "staffing": [
+      {"role": "Registration Officer", "active": 2, "capacity": 3},
+      {"role": "Screener", "active": 3, "capacity": 4},
+      {"role": "Reviewer", "active": 2, "capacity": 3},
+      {"role": "Sync monitor", "active": 1, "capacity": 1}
+    ],
+    "sync": {
+      "ready": {
+        "synced": 132,
+        "pending": 3,
+        "offline": 1,
+        "syncing": 1,
+        "conflict": 1,
+        "failed": 0
+      },
+      "offline": {
+        "synced": 113,
+        "pending": 9,
+        "offline": 8,
+        "syncing": 0,
+        "conflict": 1,
+        "failed": 0
+      },
+      "error": {
+        "synced": 132,
+        "pending": 3,
+        "offline": 1,
+        "syncing": 1,
+        "conflict": 1,
+        "failed": 1
+      },
+      "loading": {
+        "synced": 0,
+        "pending": 0,
+        "offline": 0,
+        "syncing": 0,
+        "conflict": 0,
+        "failed": 0
+      }
+    },
+    "audit": [
+      {
+        "time": "09:58",
+        "actor": "Evelyn Ng",
+        "action": "visual acuity threshold set to 6/18",
+        "resource": "Clinical rule",
+        "status": "complete"
+      },
+      {
+        "time": "10:05",
+        "actor": "K. Osei",
+        "action": "started referral review",
+        "resource": "VSMS-240719-035",
+        "status": "warning"
+      },
+      {
+        "time": "10:11",
+        "actor": "Sync Agent",
+        "action": "queued offline record",
+        "resource": "Clinical review action",
+        "status": "warning"
+      },
+      {
+        "time": "10:16",
+        "actor": "A. Mensah",
+        "action": "signed completed referral",
+        "resource": "VSMS-240719-014",
+        "status": "complete"
+      },
+      {
+        "time": "10:20",
+        "actor": "Network monitor",
+        "action": "sync conflict detected",
+        "resource": "Audit export",
+        "status": "alert"
+      }
+    ],
+    "compliance": [
+      "Rule recommendation remains advisory; final clinical decisions are immutable and reviewer-only.",
+      "All queue records are persisted locally if network is down.",
+      "QR passes include event token only; no medical results in encoded payload.",
+      "Audit logs include registration, screening input, review outcomes, referral creation, and sync status changes."
+    ]
+  }
+  </script>
+
+  <script>
+    (() => {
+      const root = document.currentScript.closest('[data-concept="quality"]');
+      const dataEl = root.querySelector('#dq-quality-data');
+      const source = JSON.parse(dataEl.textContent);
+      const stateButtons = root.querySelectorAll('[data-mode]');
+      const refreshButton = root.querySelector('[data-action="refresh"]');
+      const chartTables = root.querySelectorAll('[data-chart-table]');
+      const queueList = root.querySelector('[data-list="queue"]');
+      const staffingList = root.querySelector('[data-list="staffing"]');
+      const complianceList = root.querySelector('[data-list="compliance"]');
+      const auditBody = root.querySelector('[data-audit-body]');
+      const setVisual = (mode) => {
+        stateButtons.forEach((btn) => btn.classList.toggle('active', btn.dataset.mode === mode));
+        root.setAttribute('data-visual-state', mode);
+        refreshMode(mode);
+      };
+
+      function fmt(v) {
+        return new Intl.NumberFormat('en-GB').format(v ?? 0);
+      }
+
+      function refreshMode(mode) {
+        const state = source.sync[mode] || source.sync.ready;
+        root.querySelector('[data-metric="registered"]').textContent = fmt(source.metrics.registered);
+        root.querySelector('[data-metric="waiting"]').textContent = fmt(source.metrics.waiting);
+        root.querySelector('[data-metric="complete"]').textContent = fmt(source.metrics.complete);
+        root.querySelector('[data-metric="review"]').textContent = fmt(source.metrics.review);
+        root.querySelector('[data-metric="pendingSync"]').textContent = fmt(state.pending + state.offline);
+        root.querySelector('[data-metric="referrals"]').textContent = fmt(source.metrics.referrals);
+        root.querySelector('[data-metric-delta="registered"]').textContent = `+${source.metrics.registeredDelta}`;
+        root.querySelector('[data-metric-delta="waiting"]').textContent = `+${source.metrics.waitingDelta}`;
+        root.querySelector('[data-metric-delta="complete"]').textContent = `+${source.metrics.completeDelta}`;
+        root.querySelector('[data-metric-delta="reviewDelta"]').textContent = `+${source.metrics.reviewDelta}`;
+        root.querySelector('[data-metric-delta="pendingDelta"]').textContent = `+${state.pending + state.offline}`;
+        root.querySelector('[data-metric-delta="referralDelta"]').textContent = `+${source.metrics.referralDelta}`;
+
+        renderThroughput(mode);
+        renderStations();
+        renderReviewReferral(mode);
+        renderLists();
+        renderSyncBar(state);
+        renderAudit(mode);
+
+        // Keep state feedback inline with mode.
+        if (mode === 'offline') {
+          root.querySelector('[data-action="refresh"]').disabled = false;
+        } else {
+          root.querySelector('[data-action="refresh"]').disabled = false;
+        }
+      }
+
+      function renderThroughput(mode) {
+        const host = root.querySelector('[data-chart-area="throughput"]');
+        const tableHost = root.querySelector('[data-chart-table="throughput"]');
+        if (mode === 'loading') {
+          host.innerHTML = '';
+        } else {
+          const data = source.throughput;
+          const width = 720;
+          const height = 150;
+          const top = 18;
+          const left = 32;
+          const right = 18;
+          const bottom = 22;
+          const plotW = width - left - right;
+          const plotH = height - top - bottom;
+          const max = Math.max(...data.map((row) => row.throughput));
+          const step = plotW / (data.length - 1);
+          const scale = plotH / Math.max(max, 1);
+
+          const dots = data
+            .map((row, index) => {
+              const x = left + index * step;
+              const y = top + (plotH - row.throughput * scale);
+              return `\n                <g>\n                  <circle cx="${x}" cy="${y}" r="4" fill="var(--dq-accent)" tabindex="0">\n                    <title>${row.time} · ${row.throughput} participants/hour</title>\n                  </circle>\n                  <text x="${x}" y="${y - 7}" text-anchor="middle" fill="var(--dq-ink-muted)" font-size="9">${row.throughput}</text>\n                </g>`;
+            })
+            .join('');
+
+          const linePoints = data
+            .map((row, index) => {
+              const x = left + index * step;
+              const y = top + (plotH - row.throughput * scale);
+              return `${x},${y}`;
+            })
+            .join(' ');
+
+          const yTicks = [0, Math.ceil(max / 2), max];
+          const yGuides = yTicks
+            .map((tick) => {
+              const y = top + (plotH - tick * scale);
+              return `<line x1="${left}" x2="${width - right}" y1="${y}" y2="${y}" stroke="var(--dq-border-soft)"/>\n                <text x="${left - 6}" y="${y + 3}" text-anchor="end" fill="var(--dq-ink-muted)" font-size="10">${tick}</text>`;
+            })
+            .join('');
+
+          host.innerHTML = `
+            <svg viewBox="0 0 ${width} ${height}" role="img" aria-label="Throughput trend chart">
+              <rect x="0" y="0" width="${width}" height="${height}" fill="transparent"/>
+              <line x1="${left}" y1="${height - bottom}" x2="${width - right}" y2="${height - bottom}" stroke="var(--dq-border)"/>
+              ${yGuides}
+              <polyline fill="none" stroke="var(--dq-accent)" stroke-width="2" points="${linePoints}" stroke-linejoin="round"/>
+              ${dots}
+            </svg>`;
+
+          let rows = '<table class="dq-table"><thead><tr><th>Time</th><th>Throughput</th></tr></thead><tbody>';
+          rows += data.map((row) => `<tr><td>${row.time}</td><td>${row.throughput} participants/hour</td></tr>`).join('');
+          rows += '</tbody></table>';
+          tableHost.innerHTML = rows;
+        }
+      }
+
+      function renderStations() {
+        const host = root.querySelector('[data-chart-area="stations"]');
+        const max = Math.max(...source.stations.map((row) => row.avgWait));
+        host.innerHTML = source.stations
+          .map((row) => {
+            const width = Math.round((row.avgWait / max) * 100);
+            return `
+              <div class="dq-bar-row">
+                <span class="dq-bar-label">${row.name}</span>
+                <span class="dq-bar-track"><span class="dq-bar-fill ${row.status === 'alert' ? 'critical' : row.status === 'warning' ? 'warning' : ''}" style="width:${Math.max(width, 12)}%"></span></span>
+                <span class="dq-bar-value">${row.avgWait}m (q ${row.queued})</span>
+              </div>`;
+          })
+          .join('');
+      }
+
+      function renderReviewReferral(mode) {
+        const host = root.querySelector('[data-chart-area="review-referral"]');
+        const tableHost = root.querySelector('[data-chart-table="review-referral"]');
+        if (mode === 'loading') {
+          host.innerHTML = '';
+        } else {
+          const data = source.reviewReferral;
+          const width = 720;
+          const height = 150;
+          const top = 18;
+          const left = 32;
+          const right = 18;
+          const bottom = 22;
+          const max = Math.max(...data.flatMap((row) => [row.reviews, row.referrals]));
+          const plotW = width - left - right;
+          const plotH = height - top - bottom;
+          const band = plotW / data.length;
+          const w = Math.min(14, band * 0.35);
+          const scale = plotH / Math.max(max, 1);
+
+          const bars = data
+            .map((row, index) => {
+              const baseX = left + (index * band) + band * 0.25;
+              const reviewHeight = row.reviews * scale;
+              const referralHeight = row.referrals * scale;
+              const yReview = top + (plotH - reviewHeight);
+              const yReferral = top + (plotH - referralHeight);
+              const yTop = Math.min(yReview, yReferral);
+              return `
+                <g>
+                  <title>${row.time} review: ${row.reviews}, referral: ${row.referrals}</title>
+                  <rect x="${baseX}" y="${yReview}" width="${w}" height="${reviewHeight}" fill="var(--dq-accent)" rx="2">
+                    <title>${row.time} review completed ${row.reviews}</title>
+                  </rect>
+                  <rect x="${baseX + w + 5}" y="${yReferral}" width="${w}" height="${referralHeight}" fill="var(--dq-amber)" rx="2">
+                    <title>${row.time} referrals ${row.referrals}</title>
+                  </rect>
+                  <text x="${baseX}" y="${height - 8}" fill="var(--dq-ink-muted)" font-size="10">${row.time}</text>
+                </g>`;
+            })
+            .join('');
+
+          const yTicks = [0, Math.ceil(max / 2), max];
+          const yGuides = yTicks
+            .map((tick) => {
+              const y = top + (plotH - tick * scale);
+              return `<line x1="${left}" x2="${width - right}" y1="${y}" y2="${y}" stroke="var(--dq-border-soft)"/><text x="${left - 6}" y="${y + 3}" text-anchor="end" fill="var(--dq-ink-muted)" font-size="10">${tick}</text>`;
+            })
+            .join('');
+
+          host.innerHTML = `
+            <svg viewBox="0 0 ${width} ${height}" role="img" aria-label="Review and referral trend chart">
+              <line x1="${left}" y1="${height - bottom}" x2="${width - right}" y2="${height - bottom}" stroke="var(--dq-border)"/>
+              ${yGuides}
+              ${bars}
+            </svg>`;
+
+          let rows = '<table class="dq-table"><thead><tr><th>Hour</th><th>Review completed</th><th>Referrals</th></tr></thead><tbody>';
+          rows += data
+            .map((row) => `<tr><td>${row.time}</td><td>${row.reviews}</td><td>${row.referrals}</td></tr>`)
+            .join('');
+          rows += '</tbody></table>';
+          tableHost.innerHTML = rows;
+        }
+      }
+
+      function renderSyncBar(state) {
+        const host = root.querySelector('[data-chart-area="sync"]');
+        const rows = [
+          { label: 'Synced', count: state.synced, kind: 'good' },
+          { label: 'Pending sync', count: state.pending, kind: 'warning' },
+          { label: 'Saved offline', count: state.offline, kind: 'warning' },
+          { label: 'Syncing', count: state.syncing, kind: 'primary' },
+          { label: 'Conflict', count: state.conflict, kind: 'warning' },
+          { label: 'Failed', count: state.failed, kind: 'alert' }
+        ];
+        const max = Math.max(...rows.map((row) => row.count), 1);
+        host.innerHTML = rows
+          .map((row) => {
+            const width = Math.max(8, Math.round((row.count / max) * 100));
+            return `
+              <div class="dq-bar-row">
+                <span class="dq-bar-label">${row.label}</span>
+                <span class="dq-bar-track"><span class="dq-bar-fill ${row.kind === 'alert' ? 'critical' : row.kind === 'warning' ? 'warning' : ''}" style="width:${width}%"></span></span>
+                <span class="dq-bar-value">${fmt(row.count)}</span>
+              </div>`;
+          })
+          .join('');
+      }
+
+      function renderLists() {
+        queueList.innerHTML = source.queue
+          .map((row) => `
+            <li>
+              <p class="dq-row-main">
+                <span>
+                  <strong class="dq-name">${row.name}</strong>
+                  <span class="dq-meta">${row.id} · ${row.station}</span>
+                </span>
+                <span class="dq-status ${row.status.toLowerCase()}" aria-label="${row.status}">${row.status} · ${row.wait}m</span>
+              </p>
+            </li>`)
+          .join('');
+
+        staffingList.innerHTML = source.staffing
+          .map((row) => {
+            const ratio = Math.round((row.active / row.capacity) * 100);
+            return `
+              <li>
+                <div class="dq-row-main">
+                  <span>
+                    <strong class="dq-name">${row.role}</strong>
+                    <span class="dq-meta">Active ${row.active} / ${row.capacity}</span>
+                  </span>
+                  <span class="dq-status ${ratio >= 90 ? 'complete' : ratio >= 75 ? 'warning' : ''}">${ratio}%</span>
+                </div>
+              </li>`;
+          })
+          .join('');
+
+        complianceList.innerHTML = source.compliance
+          .map((line) => `<li><p class="dq-meta">${line}</p></li>`)
+          .join('');
+      }
+
+      function renderAudit(mode) {
+        const rows = source.audit.map((row) => {
+          const statusMap = {
+            complete: 'Complete',
+            warning: 'Warning',
+            alert: 'Conflict'
+          };
+          const cls = row.status === 'complete' ? 'complete' : row.status === 'warning' ? 'warning' : 'alert';
+          return `<tr>
+            <td>${row.time}</td>
+            <td>${row.actor}</td>
+            <td>${row.action}</td>
+            <td>${row.resource}</td>
+            <td><span class="dq-status ${cls}">${statusMap[row.status] || row.status}</span></td>
+          </tr>`;
+        });
+
+        if (mode === 'error') {
+          rows.unshift(`<tr><td>—</td><td>Audit service</td><td>service timeout</td><td>Audit feed</td><td><span class="dq-status alert">Conflict</span></td></tr>`);
+        }
+        auditBody.innerHTML = rows.join('');
+      }
+
+      stateButtons.forEach((button) => {
+        button.addEventListener('click', () => {
+          setVisual(button.dataset.mode);
+        });
+      });
+
+      refreshButton.addEventListener('click', () => {
+        const mode = root.getAttribute('data-visual-state') || 'ready';
+        setVisual(mode);
+      });
+
+      setVisual('ready');
+    })();
+  </script>
+</div>
