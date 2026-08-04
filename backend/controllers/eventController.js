@@ -7,6 +7,10 @@ exports.create = async (req, res) => {
   res.status(201).json(await eventService.createEvent(req.body, req.user, req.requestId, idempotencyKey));
 };
 exports.get = async (req, res) => res.json(await eventService.getEvent(req.params.eventId, req.user));
+exports.publicGet = async (req, res) => res.set("Cache-Control", "public, max-age=60").json(await eventService.getPublicEvent(req.params.eventId));
+exports.metrics = async (req, res) => res.set("Cache-Control", "no-store").json(await eventService.getEventMetrics(req.params.eventId, req.user));
+exports.attendees = async (req, res) => res.set("Cache-Control", "no-store").json(await eventService.listEventAttendees(req.params.eventId, req.query, req.user));
+exports.export = async (req, res) => res.set("Cache-Control", "no-store").json(await eventService.exportEvent(req.params.eventId, req.user));
 exports.update = async (req, res) => res.json(await eventService.updateEvent(req.params.eventId, req.body, req.user, req.requestId));
 exports.publish = async (req, res) => res.json(await eventService.transitionEvent(req.params.eventId, "publish", req.body, req.user, req.requestId));
 exports.start = async (req, res) => res.json(await eventService.transitionEvent(req.params.eventId, "start", req.body, req.user, req.requestId));

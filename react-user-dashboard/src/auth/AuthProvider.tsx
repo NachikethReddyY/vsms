@@ -6,6 +6,7 @@ import { clearLogoutPending, clearStoredSession, getStoredSession, isLogoutPendi
 interface AuthContextValue {
   session: AuthSession | null;
   isAuthenticated: boolean;
+  isBootstrapping: boolean;
   setSession: (session: AuthSession) => void;
   clearSession: () => void;
 }
@@ -14,22 +15,35 @@ const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 
 export function AuthProvider({ children }: PropsWithChildren) {
   const [session, setSessionState] = useState<AuthSession | null>(() => getStoredSession());
+  const [isBootstrapping, setIsBootstrapping] = useState(true);
 
   useEffect(() => {
-    if (!getCsrfToken() || isLogoutPending()) return;
-    refreshAuthSession()
-      .then(setSessionState)
-      .catch(() => {
+    let active = true;
+    const restore = async () => {
+      if (!getCsrfToken() || isLogoutPending()) {
+        if (active) setIsBootstrapping(false);
+        return;
+      }
+      try {
+        const restored = await refreshAuthSession();
+        if (active) setSessionState(restored);
+      } catch {
         setSessionTokens(null);
         clearStoredSession();
-        setSessionState(null);
-      });
+        if (active) setSessionState(null);
+      } finally {
+        if (active) setIsBootstrapping(false);
+      }
+    };
+    void restore();
+    return () => { active = false; };
   }, []);
 
   const value = useMemo<AuthContextValue>(
     () => ({
       session,
       isAuthenticated: Boolean(session?.user?.id && session.expiresAt > Date.now()),
+      isBootstrapping,
       setSession(nextSession) {
         clearLogoutPending();
         setStoredSession(nextSession);
@@ -40,7 +54,7 @@ export function AuthProvider({ children }: PropsWithChildren) {
         setSessionState(null);
       },
     }),
-    [session]
+    [isBootstrapping, session]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

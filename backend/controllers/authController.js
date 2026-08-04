@@ -47,12 +47,18 @@ function ensureCognitoConfigured() {
 
 function normalizeReturnTo(value) {
     const returnTo = String(value || "").trim();
-    const isPath = returnTo.startsWith("/") && !returnTo.startsWith("//");
-    const isAbsoluteUrl = /^[a-z][a-z\d+.-]*:\/\//i.test(returnTo);
-    if (!isPath && !isAbsoluteUrl) return "/events";
+    let decoded;
+    try {
+        decoded = decodeURIComponent(returnTo);
+    } catch {
+        return "/events";
+    }
+    const isPath = decoded.startsWith("/") && !decoded.startsWith("//");
+    const isAbsoluteUrl = /^[a-z][a-z\d+.-]*:\/\//i.test(decoded);
+    if (!isPath && !isAbsoluteUrl || decoded.includes("\\") || /[\u0000-\u001f\u007f]/.test(decoded)) return "/events";
 
     try {
-        const url = new URL(returnTo, env.publicAppOrigin);
+        const url = new URL(decoded, env.publicAppOrigin);
         if (url.origin !== env.publicAppOrigin || url.pathname.startsWith("//") || ["/", "/api"].includes(url.pathname) || url.pathname.startsWith("/auth/") || url.pathname.startsWith("/api/")) {
             return "/events";
         }
@@ -61,6 +67,8 @@ function normalizeReturnTo(value) {
         return "/events";
     }
 }
+
+exports.normalizeReturnTo = normalizeReturnTo;
 
 function extractProfileFromIdToken(payload) {
     return {

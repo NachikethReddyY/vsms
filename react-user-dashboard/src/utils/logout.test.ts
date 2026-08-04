@@ -36,10 +36,10 @@ describe('logoutAndReturnHome', () => {
     expect(post).toHaveBeenCalledWith('/auth/logout');
     expect(clearSession).toHaveBeenCalledOnce();
     expect(replace).not.toHaveBeenCalled();
-    resolveLogout({ data: { logoutUrl: 'http://localhost:5173/' } });
+    resolveLogout({ data: { logoutUrl: 'https://vsms.auth.ap-southeast-1.amazoncognito.com/logout?client_id=test-client&logout_uri=https%3A%2F%2Flocalhost%3A5173%2F' } });
     await logout;
     expect(clearOfflineData).toHaveBeenCalledOnce();
-    expect(replace).toHaveBeenCalledWith('https://localhost:5173/');
+    expect(replace).toHaveBeenCalledWith('https://vsms.auth.ap-southeast-1.amazoncognito.com/logout?client_id=test-client&logout_uri=https%3A%2F%2Flocalhost%3A5173%2F');
   });
 
   it('still clears local artifacts and returns home when server revocation fails', async () => {

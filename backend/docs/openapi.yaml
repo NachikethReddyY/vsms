@@ -385,6 +385,7 @@ paths:
         "401": { $ref: "#/components/responses/Unauthorized" }
         "403": { $ref: "#/components/responses/Forbidden" }
         "422": { $ref: "#/components/responses/ValidationFailed" }
+        "429": { $ref: "#/components/responses/RateLimited" }
   /api/v1/locations/search:
     get:
       tags: [Events]
@@ -407,6 +408,74 @@ paths:
         "422": { $ref: "#/components/responses/ValidationFailed" }
         "429": { $ref: "#/components/responses/RateLimited" }
         "503": { description: OneMap is unavailable or not configured, content: { application/json: { schema: { $ref: "#/components/schemas/Problem" } } } }
+  /api/v1/public/events/{eventId}:
+    get:
+      tags: [Events]
+      security: []
+      operationId: getPublicEvent
+      summary: Get public details for a non-draft event
+      parameters: [{ $ref: "#/components/parameters/EventId" }]
+      responses:
+        "200":
+          description: Public event detail
+          headers:
+            Cache-Control: { schema: { type: string, enum: ["public, max-age=60"] } }
+          content: { application/json: { schema: { $ref: "#/components/schemas/PublicEvent" } } }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "422": { $ref: "#/components/responses/ValidationFailed" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+  /api/v1/events/{eventId}/metrics:
+    get:
+      tags: [Events]
+      operationId: getEventMetrics
+      summary: Get event operations metrics
+      parameters: [{ $ref: "#/components/parameters/EventId" }]
+      responses:
+        "200": { description: Event metrics, content: { application/json: { schema: { $ref: "#/components/schemas/EventMetrics" } } } }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "422": { $ref: "#/components/responses/ValidationFailed" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+  /api/v1/events/{eventId}/attendees:
+    get:
+      tags: [Events]
+      operationId: listEventAttendees
+      summary: List event attendees for an authorized manager
+      parameters:
+        - $ref: "#/components/parameters/EventId"
+        - name: cursor
+          in: query
+          schema: { type: string }
+        - name: limit
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 100, default: 50 }
+        - name: status
+          in: query
+          schema: { type: string, enum: [SIGNED_UP, CHECKED_IN, COMPLETED, CANCELLED] }
+        - name: search
+          in: query
+          schema: { type: string, maxLength: 150 }
+      responses:
+        "200": { description: Attendee page, content: { application/json: { schema: { $ref: "#/components/schemas/EventAttendeeList" } } } }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "422": { $ref: "#/components/responses/ValidationFailed" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+  /api/v1/events/{eventId}/export:
+    get:
+      tags: [Events]
+      operationId: exportEvent
+      summary: Export an authorized event operations snapshot
+      parameters: [{ $ref: "#/components/parameters/EventId" }]
+      responses:
+        "200": { description: Event export snapshot, content: { application/json: { schema: { $ref: "#/components/schemas/EventExportResponse" } } } }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "422": { $ref: "#/components/responses/ValidationFailed" }
+        "429": { $ref: "#/components/responses/RateLimited" }
   /api/v1/events/{eventId}:
     parameters:
       - $ref: "#/components/parameters/EventId"
@@ -1907,6 +1976,72 @@ components:
               type: object
               allOf: [{ $ref: "#/components/schemas/User" }]
               nullable: true
+    PublicEvent:
+      type: object
+      additionalProperties: false
+      required: [eventId, name, bannerKey, venue, timezone, startsAt, endsAt, capacity, status, eventDays]
+      properties:
+        eventId: { type: string, format: uuid }
+        name: { type: string, maxLength: 150 }
+        description: { type: string, nullable: true }
+        bannerKey: { type: string }
+        artworkDataUrl: { type: string, nullable: true }
+        venue: { type: string }
+        address: { type: string, nullable: true }
+        postalCode: { type: string, nullable: true }
+        timezone: { type: string }
+        startsAt: { type: string, format: date-time }
+        endsAt: { type: string, format: date-time }
+        capacity: { type: integer, minimum: 1 }
+        status: { $ref: "#/components/schemas/EventStatus" }
+        eventDays: { type: array, items: { $ref: "#/components/schemas/EventDay" } }
+    EventMetrics:
+      type: object
+      additionalProperties: false
+      required: [signupCount, checkedInCount, completedCount, cancelledCount, activeCount, attendanceRatePercent, screeningResultCount, flaggedResultCount, referralCount, capacity]
+      properties:
+        signupCount: { type: integer, minimum: 0 }
+        checkedInCount: { type: integer, minimum: 0 }
+        completedCount: { type: integer, minimum: 0 }
+        cancelledCount: { type: integer, minimum: 0 }
+        activeCount: { type: integer, minimum: 0 }
+        attendanceRatePercent: { type: integer, minimum: 0, maximum: 100 }
+        screeningResultCount: { type: integer, minimum: 0 }
+        flaggedResultCount: { type: integer, minimum: 0 }
+        referralCount: { type: integer, minimum: 0 }
+        capacity: { type: integer, minimum: 1 }
+        expectedAttendance: { type: integer, nullable: true }
+    EventAttendee:
+      type: object
+      additionalProperties: false
+      required: [registrationId, registrationStatus, checkedIn, queueNumber, participantReference, createdAt]
+      properties:
+        registrationId: { type: string, format: uuid }
+        participantDisplayName: { type: string, nullable: true }
+        participantReference: { type: string }
+        registrationStatus: { type: string, enum: [SIGNED_UP, CHECKED_IN, COMPLETED, CANCELLED] }
+        checkedIn: { type: boolean }
+        checkedInAt: { type: string, format: date-time, nullable: true }
+        queueNumber: { type: integer, nullable: true }
+        createdAt: { type: string, format: date-time }
+    EventAttendeeList:
+      type: object
+      additionalProperties: false
+      required: [total, attendees, nextCursor]
+      properties:
+        total: { type: integer, minimum: 0 }
+        attendees: { type: array, items: { $ref: "#/components/schemas/EventAttendee" } }
+        nextCursor: { type: string, nullable: true }
+    EventExportResponse:
+      type: object
+      additionalProperties: false
+      required: [export]
+      properties:
+        export:
+          type: object
+          additionalProperties: true
+        exportReceipt:
+          type: string
     LocationResult:
       type: object
       additionalProperties: false

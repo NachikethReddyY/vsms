@@ -16,7 +16,11 @@ function parseCookies(header = "") {
         .reduce((cookies, part) => {
             const separator = part.indexOf("=");
             if (separator < 0) return cookies;
-            cookies[part.slice(0, separator)] = decodeURIComponent(part.slice(separator + 1));
+            try {
+                cookies[part.slice(0, separator)] = decodeURIComponent(part.slice(separator + 1));
+            } catch {
+                // Ignore malformed, attacker-controlled cookie values.
+            }
             return cookies;
         }, {});
 }
@@ -41,15 +45,17 @@ function appendCookies(res, cookies) {
 function setAuthCookies(res, authenticationResult, username) {
     const accessMaxAge = Number(authenticationResult.ExpiresIn || 3600);
     const refreshMaxAge = Number(process.env.REFRESH_COOKIE_MAX_AGE_SECONDS || 30 * 24 * 60 * 60);
+    const csrfToken = crypto.randomBytes(32).toString("base64url");
     const cookies = [
         cookie(ACCESS_COOKIE, authenticationResult.AccessToken, accessMaxAge),
         cookie(USERNAME_COOKIE, username, refreshMaxAge),
-        cookie(CSRF_COOKIE, crypto.randomBytes(32).toString("base64url"), refreshMaxAge, false),
+        cookie(CSRF_COOKIE, csrfToken, refreshMaxAge, false),
     ];
     if (authenticationResult.RefreshToken) {
         cookies.push(cookie(REFRESH_COOKIE, authenticationResult.RefreshToken, refreshMaxAge));
     }
     appendCookies(res, cookies);
+    return csrfToken;
 }
 
 function clearAuthCookies(res) {

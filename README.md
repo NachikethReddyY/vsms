@@ -7,23 +7,25 @@ VSMS is a secure event-operations application for planning, publishing, running,
 Public routes:
 
 - `/` — product landing page
-- `/login` — staff sign-in
-- `/signup` — staff registration; the API keeps registration disabled unless an administrator opts in
+- sign-in actions — redirect to `/api/v1/auth/authorize` for managed Cognito login
+- `/auth/callback` — completes the authorization-code + PKCE browser flow
+- `/e/:eventId` — read-only public landing page for a non-draft event
 
 Authenticated routes:
 
-- `/events` — graphical upcoming and past event cards
+- `/events` — chronological upcoming and past event register
 - `/events/new` — create an event
-- `/events/:eventId` — event details and lifecycle actions
-- `/events/:eventId/edit` — edit an event, including its banner
+- `/events/:eventId` — event overview, attendees, station/manpower operations, lifecycle, export, and guarded deletion
+- `/events/:eventId/edit` — full event, station-availability, shift, and staffing plan
+- `/settings` — profile, appearance, and account-security entry points
 
 The event lifecycle is `DRAFT → PUBLISHED → IN_PROGRESS → COMPLETED`, with cancellation available from non-terminal states. Mutations use role checks, optimistic concurrency, and immutable audit records.
 
 ## Prerequisites
 
-- Node.js 20 or newer
+- Node.js 24 or newer
 - PostgreSQL 15 or newer
-- pnpm 11.18.0 (via Corepack)
+- pnpm 11.20.0 (via Corepack)
 
 ## Local setup
 
@@ -60,16 +62,9 @@ The event lifecycle is `DRAFT → PUBLISHED → IN_PROGRESS → COMPLETED`, with
 
 Open `https://localhost:5173`. The API is available at `https://localhost:5050`; non-production API documentation is at `https://localhost:5050/api-docs`. Plain HTTP is intentionally unavailable on both ports.
 
-### Seeded development accounts
+### Managed login
 
-Cognito is temporarily disabled in development. After running the seed, use either local username/password pair:
-
-| Username | Password | Access |
-| --- | --- | --- |
-| `seed.admin@cryptix.local` | `Demo-Only-Change-Me-2026!` | Administrator |
-| `reviewer@vsms.local` | `Demo-Only-Change-Me-2026!` | Reviewer |
-
-These credentials are development-only. Set `VSMS_DEMO_PASSWORD` before seeding to replace the shared password; production seeding refuses to run without an explicit value.
+Configure the Cognito region, user pool, app client, hosted domain, redirect URI, and logout URI from `backend/.env.example`. Authorization code + PKCE is used. Browser credential tokens stay in Secure, HttpOnly cookies; JavaScript receives only the rotating CSRF token. Cognito group membership is intersected with locally assigned roles, so both provider and application authorization must agree.
 
 ## Verification
 
@@ -80,8 +75,12 @@ pnpm --dir backend prisma:validate
 pnpm --dir backend openapi:lint
 pnpm --dir backend contracts:check
 pnpm --dir backend test
+pnpm --dir backend test:integration
 pnpm --dir react-user-dashboard lint
 pnpm --dir react-user-dashboard build
+pnpm --dir react-user-dashboard test:participants
+pnpm --dir react-user-dashboard test:queue
+pnpm --dir react-user-dashboard test:offline
 pnpm check:https
 ```
 
@@ -102,7 +101,3 @@ The Bruno collection is in `api-testing/bruno`. Select its `Local` environment a
 - [Event delivery plan](design/event-details-plan.md)
 - [Entity relationship model](erd.md)
 - [OpenAPI contract](backend/docs/openapi.yaml)
-
-
-
-Manually remove the event

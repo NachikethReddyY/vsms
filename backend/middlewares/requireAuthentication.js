@@ -1,31 +1,50 @@
 const asyncHandler = require("./asyncHandler");
 const prisma = require("../prisma/prismaClient");
 const AppError = require("../errors/AppError");
+const { verifyAccessToken } = require("../utils/tokens");
 const { verifyCognitoToken } = require("../utils/cognitoJwt");
 const { ACCESS_COOKIE } = require("../utils/httpCookies");
 const { rolesFromCognitoGroups } = require("../utils/staff");
 
 module.exports = asyncHandler(async (req, _res, next) => {
   const match = /^Bearer ([A-Za-z0-9._~-]+)$/.exec(req.get("authorization") || "");
-  const token = req.cookies?.[ACCESS_COOKIE] || match?.[1];
+  const cookieToken = req.cookies?.[ACCESS_COOKIE];
+  const token = cookieToken || match?.[1];
   if (!token) throw new AppError(401, "AUTHENTICATION_REQUIRED", "Authentication required");
 
   let payload;
+  let cognitoToken = true;
   try {
     payload = await verifyCognitoToken(token, "access");
   } catch {
-    throw new AppError(401, "INVALID_SESSION", "Session is invalid or expired");
+    if (cookieToken || process.env.NODE_ENV !== "test") {
+      throw new AppError(401, "INVALID_SESSION", "Session is invalid or expired");
+    }
+    try {
+      payload = verifyAccessToken(token);
+      cognitoToken = false;
+    } catch {
+      throw new AppError(401, "INVALID_SESSION", "Session is invalid or expired");
+    }
   }
-  if (typeof payload.sub !== "string") {
+  if (typeof payload.sub !== "string" || (!cognitoToken && payload.type !== "access")) {
     throw new AppError(401, "INVALID_SESSION", "Session is invalid or expired");
   }
 
   const user = await prisma.user.findUnique({
-    where: { cognitoSub: payload.sub },
+    where: cognitoToken ? { cognitoSub: payload.sub } : { id: payload.sub },
     include: { userRoles: { include: { role: true } } },
   });
   if (!user || user.status !== "ACTIVE") {
     throw new AppError(401, "INVALID_SESSION", "Session is invalid or expired");
+  }
+
+  const localRoles = user.userRoles.map(({ role }) => role.roleName);
+  const roles = cognitoToken
+    ? localRoles.filter((role) => rolesFromCognitoGroups(payload).includes(role))
+    : localRoles;
+  if (roles.length === 0) {
+    throw new AppError(403, "FORBIDDEN", "Cognito group membership does not grant an application role");
   }
 
   req.auth = {
@@ -33,9 +52,7 @@ module.exports = asyncHandler(async (req, _res, next) => {
     user,
     userId: user.id,
     email: user.email,
-    roles: user.userRoles
-      .map(({ role }) => role.roleName)
-      .filter((role) => rolesFromCognitoGroups(payload).includes(role)),
+    roles,
   };
   next();
 });

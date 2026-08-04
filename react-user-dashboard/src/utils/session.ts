@@ -11,7 +11,12 @@ function canUseStorage() {
 
 export function getStoredSession(): AuthSession | null {
   if (!canUseStorage()) return null;
-  const raw = window.sessionStorage.getItem(SESSION_KEY);
+  let raw: string | null;
+  try {
+    raw = window.sessionStorage.getItem(SESSION_KEY);
+  } catch {
+    return null;
+  }
   if (!raw) return null;
   try {
     const session = JSON.parse(raw) as AuthSession;
@@ -28,7 +33,11 @@ export function getStoredSession(): AuthSession | null {
 
 export function setStoredSession(session: AuthSession) {
   if (!canUseStorage()) return;
-  window.sessionStorage.setItem(SESSION_KEY, JSON.stringify(session));
+  try {
+    window.sessionStorage.setItem(SESSION_KEY, JSON.stringify(session));
+  } catch {
+    // Browser storage is optional; the in-memory auth state remains usable.
+  }
 }
 
 export function isLogoutPending() {

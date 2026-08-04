@@ -6,7 +6,8 @@ import App from './App.tsx'
 import { AuthProvider } from './auth/AuthProvider.tsx'
 import { OfflineSyncProvider } from './features/screening/OfflineSyncProvider.tsx'
 
-const savedTheme = localStorage.getItem('vsms-theme')
+let savedTheme: string | null = null
+try { savedTheme = localStorage.getItem('vsms-theme') } catch { /* Use the system preference when storage is unavailable. */ }
 const preferredTheme = savedTheme === 'light' || savedTheme === 'dark'
   ? savedTheme
   : window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'

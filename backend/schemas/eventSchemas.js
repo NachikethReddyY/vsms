@@ -145,7 +145,13 @@ const createEventBody = z.object({
   eventDays: z.array(eventDayInput).min(1).max(31).optional(),
   stations: z.array(eventStationInput).max(50).optional(),
   shifts: z.array(shiftInput).max(50).default([]),
-}).strict().superRefine(validateEventRange);
+}).strict().superRefine((value, ctx) => {
+  validateEventRange(value, ctx);
+  const stationOrders = (value.stations || []).map((station) => station.stationOrder);
+  if (new Set(stationOrders).size !== stationOrders.length) {
+    ctx.addIssue({ code: "custom", path: ["stations"], message: "Station order must be unique" });
+  }
+});
 const updateEventBody = z.object({
   version: z.number().int().positive(),
   name: eventFields.name.optional(),
@@ -167,7 +173,13 @@ const updateEventBody = z.object({
   eventDays: z.array(eventDayInput).min(1).max(31).optional(),
   stations: z.array(eventStationInput).max(50).optional(),
   shifts: z.array(shiftInput).max(50).optional(),
-}).strict().superRefine(validateEventRange).refine((value) => Object.keys(value).some((key) => key !== "version"), {
+}).strict().superRefine((value, ctx) => {
+  validateEventRange(value, ctx);
+  const stationOrders = (value.stations || []).map((station) => station.stationOrder);
+  if (new Set(stationOrders).size !== stationOrders.length) {
+    ctx.addIssue({ code: "custom", path: ["stations"], message: "Station order must be unique" });
+  }
+}).refine((value) => Object.keys(value).some((key) => key !== "version"), {
   message: "At least one editable field is required",
 });
 
@@ -191,6 +203,12 @@ const listQuery = z.object({
   search: z.string().trim().max(150).optional(),
 }).strict();
 const auditQuery = z.object({ cursor: z.string().max(2048).optional(), limit: z.coerce.number().int().min(1).max(100).default(50) }).strict();
+const attendeeQuery = z.object({
+  cursor: z.string().max(2048).optional(),
+  limit: z.coerce.number().int().min(1).max(100).default(50),
+  status: z.enum(["SIGNED_UP", "CHECKED_IN", "COMPLETED", "CANCELLED"]).optional(),
+  search: z.string().trim().max(150).optional(),
+}).strict();
 const reportDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Use an ISO calendar date").refine(
   (value) => !Number.isNaN(new Date(`${value}T00:00:00.000Z`).getTime()),
   "Use a valid calendar date",
@@ -249,6 +267,7 @@ module.exports = {
   eventParams,
   listQuery,
   auditQuery,
+  attendeeQuery,
   reportQuery,
   assignmentParams,
   assignmentDeleteParams,

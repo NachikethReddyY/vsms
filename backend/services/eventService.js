@@ -11,6 +11,8 @@ const {
   enqueueEventArtifactCleanup,
   processArtifactCleanupTasks,
 } = require("./artifactCleanupService");
+const { createExportReceipt } = require("../utils/eventExportReceipt");
+const env = require("../config/env");
 
 const EVENT_FIELDS = [
   "name", "description", "bannerKey", "artworkDataUrl", "venue", "address", "postalCode",
@@ -22,6 +24,16 @@ const ACTIONS = {
   publish: { from: "DRAFT", to: "PUBLISHED", audit: "PUBLISHED" },
   start: { from: "PUBLISHED", to: "IN_PROGRESS", audit: "STARTED" },
   complete: { from: "IN_PROGRESS", to: "COMPLETED", audit: "COMPLETED" },
+};
+
+const assertPublishReady = (event) => {
+  const hasStation = (event.stations || []).some((station) => station.isActive !== false);
+  const hasAssignedPerson = (event.shifts || []).some((shift) => (
+    shift.staffAssignments || []
+  ).some((assignment) => ACTIVE_ASSIGNMENT_STATUSES.includes(assignment.status || assignment.assignmentStatus)));
+  if (!hasStation || !hasAssignedPerson) {
+    throw new AppError(422, "EVENT_NOT_READY", "Add at least one station and assign at least one person before publishing");
+  }
 };
 
 const snapshot = (event) => ({
@@ -104,7 +116,7 @@ const eventInclude = {
     where: { registrationStatus: "CHECKED_IN" },
     select: { registrationId: true, registrationStatus: true },
   },
-  _count: { select: { registrations: true } },
+  _count: { select: { registrations: { where: { registrationStatus: { not: "CANCELLED" } } } } },
 };
 
 const eventListInclude = {
@@ -124,13 +136,13 @@ const eventListInclude = {
       },
     },
   },
-  createdBy: { select: { userId: true, username: true, email: true, systemRole: true, status: true } },
-  cancelledBy: { select: { userId: true, username: true, email: true, systemRole: true, status: true } },
+  createdBy: { select: { id: true, username: true, fullName: true, email: true, sysRole: true, status: true } },
+  cancelledBy: { select: { id: true, username: true, fullName: true, email: true, sysRole: true, status: true } },
   registrations: {
-    where: { status: { in: ["SIGNED_UP", "CHECKED_IN"] } },
+    where: { registrationStatus: "CHECKED_IN" },
     select: { registrationId: true },
   },
-  _count: { select: { registrations: true } },
+  _count: { select: { registrations: { where: { registrationStatus: { not: "CANCELLED" } } } } },
 };
 
 const publicUser = (value) => value ? {
@@ -141,12 +153,18 @@ const publicUser = (value) => value ? {
   status: value.status,
 } : null;
 
+const rosterOwner = (value) => value ? {
+  userId: value.id,
+  username: value.username || value.fullName || null,
+} : null;
+
 const assignmentUser = (value) => value ? {
   userId: value.id,
   username: value.username || value.fullName || "Staff member",
 } : null;
 
 const loadTemplatesByStationType = async (db = prisma) => {
+  if (!db.stationTemplate?.findMany) return new Map();
   const templates = await db.stationTemplate.findMany({ where: { active: true } });
   const byType = new Map();
   for (const template of templates) {
@@ -174,7 +192,7 @@ const mapStationDto = (station, event, templatesByType) => {
   };
 };
 
-const toEventResponse = async (event, user, db = prisma) => {
+const toEventResponse = async (event, user, db = prisma, options = {}) => {
   const { _count = {}, registrations = [], stations = [] } = event;
   const templatesByType = await loadTemplatesByStationType(db);
   const managerView = user ? canManage(event, user) : false;
@@ -204,10 +222,16 @@ const toEventResponse = async (event, user, db = prisma) => {
   }));
   const shifts = managerView ? fullShifts : fullShifts.flatMap((shift) => {
     if (!user || !["PLANNED", "ACTIVE"].includes(shift.status)) return [];
-    const ownAssignments = shift.staffAssignments.filter((assignment) => (
-      assignment.user?.userId === user.userId
-      && ACTIVE_ASSIGNMENT_STATUSES.includes(assignment.status)
-    ));
+    const ownAssignments = shift.staffAssignments
+      .filter((assignment) => (
+        assignment.user?.userId === user.userId
+        && ACTIVE_ASSIGNMENT_STATUSES.includes(assignment.status)
+      ))
+      // Roster summaries never expose private assignment notes. A staff
+      // member's event-detail view can still carry their own instructions.
+      .map((assignment) => options.redactStaffNotes
+        ? (({ notes: _notes, ...safeAssignment }) => safeAssignment)(assignment)
+        : assignment);
     return ownAssignments.length ? [{ ...shift, staffAssignments: ownAssignments }] : [];
   });
   const visibleStationIds = managerView ? null : new Set(shifts.flatMap((shift) => (
@@ -260,13 +284,20 @@ const toEventResponse = async (event, user, db = prisma) => {
     shifts,
     eventStations,
     signupCount: registrationCount,
-    activeCapacityCount: registrations.filter(({ registrationStatus }) => registrationStatus === "CHECKED_IN").length,
+    // Detail queries include the status; list queries deliberately select only
+    // already-checked-in registration ids. Treat the latter as that trusted
+    // projection rather than accidentally reporting zero occupancy.
+    activeCapacityCount: registrations.filter(({ registrationStatus }) => (
+      registrationStatus === undefined || registrationStatus === "CHECKED_IN"
+    )).length,
     _count: { eventRegistrations: registrationCount },
     canManage: managerView,
   };
   if (managerView) {
     response.createdBy = publicUser(event.createdBy);
     response.cancelledBy = publicUser(event.cancelledBy);
+  } else if (options.includeRosterOwner) {
+    response.createdBy = rosterOwner(event.createdBy);
   }
   return response;
 };
@@ -304,8 +335,8 @@ const canManage = (event, user) =>
         )
       )));
 
-const requireEvent = async (eventId, user, manage = false) => {
-  const event = await loadEventWithAssignment(eventId, user);
+const requireEvent = async (eventId, user, manage = false, db = prisma) => {
+  const event = await loadEventWithAssignment(eventId, user, db);
   if (!event || (manage && !canManage(event, user))) {
     throw new AppError(404, "EVENT_NOT_FOUND", "Event was not found");
   }
@@ -346,13 +377,30 @@ const normalizeEventDay = (day, eventId) => ({
   endsAt: new Date(day.endsAt),
 });
 
-const assertRange = (data, shifts) => {
+const assertRange = (data, shifts, eventDays = []) => {
   if (data.endsAt <= data.startsAt) throw new AppError(422, "INVALID_EVENT_RANGE", "Event end must be after its start");
   for (const shift of shifts) {
     if (new Date(shift.startsAt) < data.startsAt || new Date(shift.endsAt) > data.endsAt) {
       throw new AppError(422, "INVALID_SHIFT_RANGE", "Every shift must be within the event schedule");
     }
   }
+  for (const day of eventDays || []) {
+    const startsAt = new Date(day.startsAt);
+    const endsAt = new Date(day.endsAt);
+    if (startsAt < data.startsAt || endsAt > data.endsAt || endsAt <= startsAt) {
+      throw new AppError(422, "INVALID_EVENT_DAY_RANGE", "Every event day must be within the event schedule");
+    }
+  }
+};
+
+const requestIdFor = (context) => typeof context === "string" ? context : context?.requestId;
+const auditFields = (context) => {
+  const requestId = requestIdFor(context);
+  return {
+    ...(requestId ? { requestId } : {}),
+    ...(typeof context === "object" && context?.ipAddress ? { ipAddress: context.ipAddress } : {}),
+    ...(typeof context === "object" && context?.deviceName ? { deviceName: context.deviceName } : {}),
+  };
 };
 
 const bumpEventVersion = async (tx, eventId, version) => {
@@ -430,7 +478,7 @@ const auditUpdate = (tx, current, updated, user, correlationId) => tx.eventAudit
     action: "UPDATED",
     beforeSnapshot: snapshot(current),
     afterSnapshot: snapshot(updated),
-    correlationId,
+    correlationId: requestIdFor(correlationId),
   },
 });
 
@@ -611,7 +659,7 @@ const createShiftAssignments = async (tx, eventId, shiftInputs, stationsByTempla
   }
 };
 
-const createEvent = async (body, user, correlationId, rawIdempotencyKey) => {
+const createEvent = async (body, user, correlationId, rawIdempotencyKey, db = prisma) => {
   if (!["ADMIN", "EVENT_MANAGER"].includes(user.systemRole)) {
     throw new AppError(403, "FORBIDDEN", "You do not have permission to create events");
   }
@@ -620,7 +668,7 @@ const createEvent = async (body, user, correlationId, rawIdempotencyKey) => {
     throw new AppError(422, "INVALID_IDEMPOTENCY_KEY", "Idempotency-Key must contain 8 to 100 letters, numbers, underscores, or hyphens");
   }
   const payloadHash = crypto.createHash("sha256").update(JSON.stringify(body)).digest("hex");
-  return prisma.$transaction(async (tx) => {
+  return db.$transaction(async (tx) => {
     if (idempotencyKey) {
       const replay = await tx.event.findUnique({
         where: { createdByUserId_createIdempotencyKey: { createdByUserId: user.userId, createIdempotencyKey: idempotencyKey } },
@@ -634,7 +682,7 @@ const createEvent = async (body, user, correlationId, rawIdempotencyKey) => {
       }
     }
     const eventData = normalizeEventData(body);
-    assertRange(eventData, body.shifts);
+    assertRange(eventData, body.shifts, body.eventDays);
     const templatesById = await requireTemplates(tx, body.stations);
     const created = await tx.event.create({
       data: {
@@ -664,6 +712,7 @@ const createEvent = async (body, user, correlationId, rawIdempotencyKey) => {
         newValue: snapshot(full),
         ipAddress: "::1",
         deviceName: "Server",
+        ...auditFields(correlationId),
       },
     });
     await tx.eventAuditLog.create({
@@ -673,14 +722,14 @@ const createEvent = async (body, user, correlationId, rawIdempotencyKey) => {
         action: "CREATED",
         beforeSnapshot: null,
         afterSnapshot: snapshot(full),
-        correlationId,
+        correlationId: requestIdFor(correlationId),
       },
     });
     return toEventResponse(full, user, tx);
   });
 };
 
-const listEvents = async (query, user) => {
+const listEvents = async (query, user, db = prisma) => {
   const statuses = query.statuses || (query.status ? [query.status] : null);
   const scope = `events:${statuses?.join(",") || "all"}:${query.search || ""}:${query.limit}`;
   const cursor = decodeCursor(query.cursor, scope);
@@ -716,7 +765,7 @@ const listEvents = async (query, user) => {
 
   const where = conditions.length > 0 ? { AND: conditions } : {};
 
-  const rows = await prisma.event.findMany({
+  const rows = await db.event.findMany({
     where,
     include: eventInclude,
     orderBy: [{ startsAt: "asc" }, { eventId: "asc" }],
@@ -727,7 +776,10 @@ const listEvents = async (query, user) => {
   const events = hasMore ? rows.slice(0, query.limit) : rows;
   const last = events.at(-1);
   return {
-    events: await Promise.all(events.map((event) => toEventResponse(event, user))),
+    events: await Promise.all(events.map((event) => toEventResponse(event, user, db, {
+      redactStaffNotes: true,
+      includeRosterOwner: true,
+    }))),
     nextCursor:
       hasMore && last
         ? encodeCursor({
@@ -739,12 +791,12 @@ const listEvents = async (query, user) => {
   };
 };
 
-const listActiveEvents = (user) => listEvents({
+const listActiveEvents = (user, db = prisma) => listEvents({
   statuses: ["PUBLISHED", "IN_PROGRESS"],
   limit: 100,
-}, user);
+}, user, db);
 
-const getEvent = async (eventId, user) => toEventResponse(await requireEvent(eventId, user), user);
+const getEvent = async (eventId, user, db = prisma) => toEventResponse(await requireEvent(eventId, user, false, db), user, db);
 
 const editableEventKeys = new Set([
   "name", "description", "bannerKey", "artworkDataUrl", "venue", "address", "postalCode",
@@ -831,8 +883,8 @@ const allowedUpdateKeys = {
   CANCELLED: new Set(["bannerKey", "artworkDataUrl"]),
 };
 
-const updateEvent = async (eventId, body, user, correlationId) => {
-  const current = await requireEvent(eventId, user, true);
+const updateEvent = async (eventId, body, user, correlationId, db = prisma) => {
+  const current = await requireEvent(eventId, user, true, db);
   const suppliedKeys = Object.keys(body).filter(
     (key) => !["version"].includes(key)
   );
@@ -859,9 +911,9 @@ const updateEvent = async (eventId, body, user, correlationId) => {
 
   const combined = { ...current, ...normalizeEventData(body) };
   const desiredShifts = body.shifts || current.shifts;
-  assertRange(combined, desiredShifts);
+  assertRange(combined, desiredShifts, body.eventDays);
 
-return prisma.$transaction(async (tx) => {
+return db.$transaction(async (tx) => {
   const changed = await tx.event.updateMany({
     where: { eventId, version: body.version },
     data: { ...normalizeEventData(body), version: { increment: 1 } },
@@ -948,6 +1000,8 @@ return prisma.$transaction(async (tx) => {
         newValue: snapshot(updated),
       },
       ipAddress: "::1",
+      deviceName: "Server",
+      ...auditFields(correlationId),
     },
   });
   await auditUpdate(tx, current, updated, user, correlationId);
@@ -956,13 +1010,14 @@ return prisma.$transaction(async (tx) => {
 });
 };
 
-const transitionEvent = async (eventId, command, body, user, correlationId) => {
-  const current = await requireEvent(eventId, user, true);
+const transitionEvent = async (eventId, command, body, user, correlationId, db = prisma) => {
+  const current = await requireEvent(eventId, user, true, db);
   const transition = ACTIONS[command];
   if (!transition || current.status !== transition.from) {
     throw new AppError(409, "INVALID_EVENT_TRANSITION", "Event cannot perform that transition from its current state");
   }
-  return prisma.$transaction(async (tx) => {
+  if (command === "publish") assertPublishReady(current);
+  return db.$transaction(async (tx) => {
     const changed = await tx.event.updateMany({
       where: { eventId, version: body.version, status: transition.from },
       data: { status: transition.to, version: { increment: 1 } },
@@ -990,6 +1045,7 @@ const transitionEvent = async (eventId, command, body, user, correlationId) => {
         newValue: snapshot(updated),
         ipAddress: "::1",
         deviceName: "Server",
+        ...auditFields(correlationId),
       },
     });
     await tx.eventAuditLog.create({
@@ -999,7 +1055,7 @@ const transitionEvent = async (eventId, command, body, user, correlationId) => {
         action: transition.audit,
         beforeSnapshot: snapshot(current),
         afterSnapshot: snapshot(updated),
-        correlationId,
+        correlationId: requestIdFor(correlationId),
       },
     });
 
@@ -1007,8 +1063,8 @@ const transitionEvent = async (eventId, command, body, user, correlationId) => {
   });
 };
 
-const cancelEvent = async (eventId, body, user, correlationId) => {
-  const current = await requireEvent(eventId, user, true);
+const cancelEvent = async (eventId, body, user, correlationId, db = prisma) => {
+  const current = await requireEvent(eventId, user, true, db);
 
   if (
     !["DRAFT", "PUBLISHED", "UPCOMING", "IN_PROGRESS", "ONGOING"].includes(current.status) ||
@@ -1020,7 +1076,7 @@ const cancelEvent = async (eventId, body, user, correlationId) => {
       "Event cannot be cancelled from its current state"
     );
   }
-  return prisma.$transaction(async (tx) => {
+  return db.$transaction(async (tx) => {
     const changed = await tx.event.updateMany({
       where: { eventId, version: body.version, status: current.status },
       data: {
@@ -1060,6 +1116,7 @@ const cancelEvent = async (eventId, body, user, correlationId) => {
         newValue: snapshot(updated),
         ipAddress: "::1",
         deviceName: "Server",
+        ...auditFields(correlationId),
       },
     });
     await tx.eventAuditLog.create({
@@ -1069,7 +1126,7 @@ const cancelEvent = async (eventId, body, user, correlationId) => {
         action: "CANCELLED",
         beforeSnapshot: snapshot(current),
         afterSnapshot: snapshot(updated),
-        correlationId,
+        correlationId: requestIdFor(correlationId),
       },
     });
 
@@ -1105,26 +1162,46 @@ const assertNoCrossEventReferences = async (tx, eventId) => {
     select: { id: true },
   }));
   if (registrationIds.length || stationIds.length) {
-    const outsideRegistrations = registrationIds.length ? { notIn: registrationIds } : { not: null };
-    const outsideStations = stationIds.length ? { notIn: stationIds } : { not: null };
     checks.push(tx.queueEntry.findFirst({
       where: { OR: [
-        ...(registrationIds.length ? [{ registrationId: { in: registrationIds }, stationId: outsideStations }] : []),
-        ...(stationIds.length ? [{ stationId: { in: stationIds }, registrationId: outsideRegistrations }] : []),
+        // If one side has no rows, every reference from the existing side is
+        // external. Do not fabricate `not: null` filters for required UUID
+        // columns: Prisma rejects those and the ownership check is clearer
+        // without them.
+        ...(registrationIds.length ? [{
+          registrationId: { in: registrationIds },
+          ...(stationIds.length ? { stationId: { notIn: stationIds } } : {}),
+        }] : []),
+        ...(stationIds.length ? [{
+          stationId: { in: stationIds },
+          ...(registrationIds.length ? { registrationId: { notIn: registrationIds } } : {}),
+        }] : []),
       ] },
       select: { id: true },
     }));
     checks.push(tx.queueMovement.findFirst({
       where: { OR: [
-        ...(registrationIds.length ? [{ registrationId: { in: registrationIds }, OR: [{ fromStationId: outsideStations }, { toStationId: outsideStations }] }] : []),
-        ...(stationIds.length ? [{ registrationId: outsideRegistrations, OR: [{ fromStationId: { in: stationIds } }, { toStationId: { in: stationIds } }] }] : []),
+        ...(registrationIds.length ? [{
+          registrationId: { in: registrationIds },
+          ...(stationIds.length ? { OR: [{ fromStationId: { notIn: stationIds } }, { toStationId: { notIn: stationIds } }] } : {}),
+        }] : []),
+        ...(stationIds.length ? [{
+          ...(registrationIds.length ? { registrationId: { notIn: registrationIds } } : {}),
+          OR: [{ fromStationId: { in: stationIds } }, { toStationId: { in: stationIds } }],
+        }] : []),
       ] },
       select: { id: true },
     }));
     checks.push(tx.screeningResult.findFirst({
       where: { OR: [
-        ...(registrationIds.length ? [{ registrationId: { in: registrationIds }, stationId: outsideStations }] : []),
-        ...(stationIds.length ? [{ stationId: { in: stationIds }, registrationId: outsideRegistrations }] : []),
+        ...(registrationIds.length ? [{
+          registrationId: { in: registrationIds },
+          ...(stationIds.length ? { stationId: { notIn: stationIds } } : {}),
+        }] : []),
+        ...(stationIds.length ? [{
+          stationId: { in: stationIds },
+          ...(registrationIds.length ? { registrationId: { notIn: registrationIds } } : {}),
+        }] : []),
       ] },
       select: { resultId: true },
     }));
@@ -1135,11 +1212,11 @@ const assertNoCrossEventReferences = async (tx, eventId) => {
   }
 };
 
-const deleteEvent = async (eventId, body, user, correlationId) => {
+const deleteEvent = async (eventId, body, user, correlationId, db = prisma) => {
   if (user.systemRole !== "ADMIN" || !user.roles?.includes("ADMINISTRATOR")) {
     throw new AppError(403, "FORBIDDEN", "Only an administrator can permanently delete an event");
   }
-  const current = await requireEvent(eventId, user, true);
+  const current = await requireEvent(eventId, user, true, db);
   if (!['COMPLETED', 'CANCELLED'].includes(current.status)) {
     throw new AppError(409, "EVENT_NOT_TERMINAL", "Only completed or cancelled events can be permanently deleted");
   }
@@ -1147,7 +1224,7 @@ const deleteEvent = async (eventId, body, user, correlationId) => {
     throw new AppError(422, "EVENT_DELETE_CONFIRMATION_MISMATCH", "Type the event name exactly to confirm permanent deletion");
   }
 
-  const deletion = await prisma.$transaction(async (tx) => {
+  const deletion = await db.$transaction(async (tx) => {
     // Claim the exact state before removing children so a stale administrator cannot delete a changed event.
     const claimed = await tx.event.updateMany({
       where: { eventId, version: body.version, status: current.status },
@@ -1194,17 +1271,8 @@ const deleteEvent = async (eventId, body, user, correlationId) => {
     await tx.eventDay.deleteMany({ where: { eventId } });
     await tx.station.deleteMany({ where: { eventId } });
 
-    // Event audit rows are immutable at the database layer. The only deletion
-    // escape hatch is transaction-local and scoped to this already validated,
-    // terminal event; the trigger rejects every UPDATE and every other DELETE.
-    await tx.$queryRawUnsafe(
-      "SELECT set_config('vsms.event_audit_delete_event_id', $1, true)",
-      eventId,
-    );
-    await tx.eventAuditLog.deleteMany({ where: { eventId } });
-    await tx.$queryRawUnsafe(
-      "SELECT set_config('vsms.event_audit_delete_event_id', '', true)",
-    );
+    // Event audit rows deliberately outlive the event. The migration removes
+    // their event FK, so an immutable evidence trail remains after deletion.
 
     const deleted = await tx.event.deleteMany({
       where: { eventId, version: body.version + 1, status: current.status },
@@ -1219,10 +1287,11 @@ const deleteEvent = async (eventId, body, user, correlationId) => {
         resource: "Event",
         entityName: "Event",
         entityId: eventId,
-        requestId: correlationId,
+        requestId: requestIdFor(correlationId),
         details: { status: current.status, version: body.version },
         ipAddress: "::1",
         deviceName: "Server",
+        ...auditFields(correlationId),
       },
     });
     return { result: { eventId, deleted: true }, cleanupTaskCount };
@@ -1271,11 +1340,11 @@ const listStationTemplates = async () => {
   return templates.filter((template) => stationTypeForTemplateKey(template.templateKey));
 };
 
-const importStations = async (eventId, body, user, correlationId) => {
-  const current = await requireEvent(eventId, user, true);
+const importStations = async (eventId, body, user, correlationId, db = prisma) => {
+  const current = await requireEvent(eventId, user, true, db);
   assertStationPlanningState(current);
 
-  const templates = await prisma.stationTemplate.findMany({
+  const templates = await db.stationTemplate.findMany({
     where: { stationTemplateId: { in: body.stationTemplateIds }, active: true },
   });
   if (templates.length !== body.stationTemplateIds.length) {
@@ -1300,7 +1369,7 @@ const importStations = async (eventId, body, user, correlationId) => {
     throw new AppError(422, "STATION_LIMIT_EXCEEDED", "An event can have at most 50 stations");
   }
 
-  return prisma.$transaction(async (tx) => {
+  return db.$transaction(async (tx) => {
     await bumpEventVersion(tx, eventId, body.version);
 
     let nextOrder = existingStations.reduce((max, station) => Math.max(max, station.stationOrder), 0);
@@ -1335,8 +1404,8 @@ const importStations = async (eventId, body, user, correlationId) => {
   });
 };
 
-const updateStation = async (eventId, eventStationId, body, user, correlationId) => {
-  const current = await requireEvent(eventId, user, true);
+const updateStation = async (eventId, eventStationId, body, user, correlationId, db = prisma) => {
+  const current = await requireEvent(eventId, user, true, db);
   assertStationPlanningState(current);
   const stations = current.stations || [];
   const station = stations.find((candidate) => candidate.stationId === eventStationId);
@@ -1345,7 +1414,7 @@ const updateStation = async (eventId, eventStationId, body, user, correlationId)
     throw new AppError(422, "INVALID_STATION_ORDER", "Station order must be within the event station list");
   }
 
-  return prisma.$transaction(async (tx) => {
+  return db.$transaction(async (tx) => {
     await bumpEventVersion(tx, eventId, body.version);
 
     if (body.stationOrder !== undefined && body.stationOrder !== station.stationOrder) {
@@ -1380,8 +1449,8 @@ const updateStation = async (eventId, eventStationId, body, user, correlationId)
   });
 };
 
-const addStaffAssignment = async (eventId, shiftId, body, user, correlationId) => {
-  const current = await requireEvent(eventId, user, true);
+const addStaffAssignment = async (eventId, shiftId, body, user, correlationId, db = prisma) => {
+  const current = await requireEvent(eventId, user, true, db);
   if (!["DRAFT", "PUBLISHED", "IN_PROGRESS"].includes(current.status)) {
     throw new AppError(409, "STAFFING_NOT_EDITABLE", "Staffing cannot be changed for a completed or cancelled event");
   }
@@ -1394,7 +1463,7 @@ const addStaffAssignment = async (eventId, shiftId, body, user, correlationId) =
     throw new AppError(422, "STATION_NOT_AVAILABLE", "The selected event station is unavailable");
   }
 
-  return prisma.$transaction(async (tx) => {
+  return db.$transaction(async (tx) => {
     await bumpEventVersion(tx, eventId, body.version);
     await lockStaffSchedules(tx, [body.userId]);
 
@@ -1434,12 +1503,25 @@ const addStaffAssignment = async (eventId, shiftId, body, user, correlationId) =
 
     const updated = await tx.event.findUniqueOrThrow({ where: { eventId }, include: eventInclude });
     await auditUpdate(tx, current, updated, user, correlationId);
+    await tx.auditLog.create({
+      data: {
+        userId: user.userId,
+        action: "STAFF_ASSIGNMENT_ADDED",
+        resource: "Event",
+        entityName: "Event",
+        entityId: eventId,
+        details: { shiftId, assignmentRole: body.assignmentRole, assignedUserId: body.userId },
+        ipAddress: "::1",
+        deviceName: "Server",
+        ...auditFields(correlationId),
+      },
+    });
     return toEventResponse(updated, user, tx);
   });
 };
 
-const removeStaffAssignment = async (eventId, shiftId, assignmentId, version, user, correlationId) => {
-  const current = await requireEvent(eventId, user, true);
+const removeStaffAssignment = async (eventId, shiftId, assignmentId, version, user, correlationId, db = prisma) => {
+  const current = await requireEvent(eventId, user, true, db);
   if (!["DRAFT", "PUBLISHED", "IN_PROGRESS"].includes(current.status)) {
     throw new AppError(409, "STAFFING_NOT_EDITABLE", "Staffing cannot be changed for a completed or cancelled event");
   }
@@ -1448,7 +1530,7 @@ const removeStaffAssignment = async (eventId, shiftId, assignmentId, version, us
     ?.staffAssignments.find((candidate) => candidate.id === assignmentId);
   if (!assignment) throw new AppError(404, "ASSIGNMENT_NOT_FOUND", "Staff assignment was not found");
 
-  return prisma.$transaction(async (tx) => {
+  return db.$transaction(async (tx) => {
     await bumpEventVersion(tx, eventId, version);
     const assignment = await tx.staffAssignment.findFirst({
       where: { id: assignmentId, shiftId, shift: { eventId } },
@@ -1473,26 +1555,46 @@ const removeStaffAssignment = async (eventId, shiftId, assignmentId, version, us
     });
 
     await auditUpdate(tx, current, updated, user, correlationId);
+    await tx.auditLog.create({
+      data: {
+        userId: user.userId,
+        action: "STAFF_ASSIGNMENT_REMOVED",
+        resource: "Event",
+        entityName: "Event",
+        entityId: eventId,
+        details: { shiftId, assignmentId },
+        ipAddress: "::1",
+        deviceName: "Server",
+        ...auditFields(correlationId),
+      },
+    });
     return toEventResponse(updated, user, tx);
   });
 };
 
-const getAuditLog = async (eventId, query, user) => {
-  await requireEvent(eventId, user, true);
+const getAuditLog = async (eventId, query, user, db = prisma) => {
+  await requireEvent(eventId, user, true, db);
   const scope = `event-audit:${eventId}:${query.limit}`;
   const cursor = decodeCursor(query.cursor, scope);
-
-  const rows = await prisma.eventAuditLog.findMany({
-    where: {
-      eventId,
-      ...(cursor
-        ? {
-            createdAt: { lt: new Date(cursor.createdAt) },
-          }
-        : {}),
-    },
+  const usesEventAuditLog = Boolean(db.eventAuditLog);
+  const recordId = usesEventAuditLog ? "eventAuditLogId" : "id";
+  const filters = usesEventAuditLog
+    ? { eventId }
+    : { entityName: "Event", entityId: eventId };
+  const rows = await (usesEventAuditLog ? db.eventAuditLog : db.auditLog).findMany({
+    where: cursor ? {
+      AND: [
+        filters,
+        {
+          OR: [
+            { createdAt: { lt: new Date(cursor.createdAt) } },
+            { createdAt: new Date(cursor.createdAt), [recordId]: { lt: cursor.id } },
+          ],
+        },
+      ],
+    } : filters,
     include: {
-      actor: {
+      [usesEventAuditLog ? "actor" : "user"]: {
         select: {
           id: true,
           fullName: true,
@@ -1501,7 +1603,7 @@ const getAuditLog = async (eventId, query, user) => {
         },
       },
     },
-    orderBy: [{ createdAt: "desc" }, { eventAuditLogId: "desc" }],
+    orderBy: [{ createdAt: "desc" }, { [recordId]: "desc" }],
     take: query.limit + 1,
   });
   const hasMore = rows.length > query.limit;
@@ -1515,9 +1617,223 @@ const getAuditLog = async (eventId, query, user) => {
         ? encodeCursor({
             scope,
             createdAt: last.createdAt.toISOString(),
-            id: last.eventAuditLogId,
+            id: last[recordId],
           })
         : null,
+  };
+};
+
+const publicEventStatuses = ["PUBLISHED", "IN_PROGRESS", "COMPLETED", "CANCELLED"];
+const dateTime = (value) => value ? value.toISOString() : null;
+const attendeeSelect = {
+  registrationId: true,
+  participantDisplayName: true,
+  registrationStatus: true,
+  checkedIn: true,
+  checkedInAt: true,
+  queueNumber: true,
+  createdAt: true,
+  participant: { select: { participantReference: true } },
+};
+const attendeeProjection = ({ participant, ...registration }) => ({
+  ...registration,
+  participantReference: participant.participantReference,
+  checkedInAt: dateTime(registration.checkedInAt),
+  createdAt: dateTime(registration.createdAt),
+});
+
+const publicEventProjection = (event) => ({
+  eventId: event.eventId,
+  name: event.name,
+  description: event.description,
+  bannerKey: event.bannerKey,
+  artworkDataUrl: event.artworkDataUrl,
+  venue: event.venue,
+  address: event.address,
+  postalCode: event.postalCode,
+  timezone: event.timezone,
+  startsAt: dateTime(event.startsAt),
+  endsAt: dateTime(event.endsAt),
+  capacity: event.capacity,
+  status: event.status,
+  eventDays: (event.eventDays || []).map((day) => ({
+    eventDayId: day.eventDayId,
+    date: day.date.toISOString().slice(0, 10),
+    startsAt: dateTime(day.startsAt),
+    endsAt: dateTime(day.endsAt),
+  })),
+});
+
+const metricsForEvent = async (event, db = prisma) => {
+  const registrationWhere = { eventId: event.eventId };
+  const [signupCount, checkedInCount, completedCount, cancelledCount, activeCount, screeningResultCount, flaggedResultCount, referralCount] = await Promise.all([
+    db.eventRegistration.count({ where: { ...registrationWhere, registrationStatus: { not: "CANCELLED" } } }),
+    db.eventRegistration.count({ where: { ...registrationWhere, registrationStatus: { not: "CANCELLED" }, checkedIn: true } }),
+    db.eventRegistration.count({ where: { ...registrationWhere, registrationStatus: "COMPLETED" } }),
+    db.eventRegistration.count({ where: { ...registrationWhere, registrationStatus: "CANCELLED" } }),
+    db.eventRegistration.count({ where: { ...registrationWhere, registrationStatus: { in: ["SIGNED_UP", "CHECKED_IN"] } } }),
+    db.screeningResult.count({ where: { registration: { eventId: event.eventId } } }),
+    db.screeningResult.count({ where: { registration: { eventId: event.eventId }, isFlagged: true } }),
+    db.referral.count({ where: { review: { registration: { eventId: event.eventId } } } }),
+  ]);
+  return {
+    signupCount,
+    checkedInCount,
+    completedCount,
+    cancelledCount,
+    activeCount,
+    attendanceRatePercent: signupCount ? Math.round((checkedInCount / signupCount) * 100) : 0,
+    screeningResultCount,
+    flaggedResultCount,
+    referralCount,
+    capacity: event.capacity,
+    expectedAttendance: event.expectedAttendance,
+  };
+};
+
+const getPublicEvent = async (eventId, db = prisma) => {
+  const event = await db.event.findFirst({
+    where: { eventId, status: { in: publicEventStatuses } },
+    select: {
+      eventId: true,
+      name: true,
+      description: true,
+      bannerKey: true,
+      artworkDataUrl: true,
+      venue: true,
+      address: true,
+      postalCode: true,
+      timezone: true,
+      startsAt: true,
+      endsAt: true,
+      capacity: true,
+      status: true,
+      eventDays: { orderBy: { date: "asc" }, select: { eventDayId: true, date: true, startsAt: true, endsAt: true } },
+    },
+  });
+  if (!event) throw new AppError(404, "EVENT_NOT_FOUND", "Event was not found");
+  return publicEventProjection(event);
+};
+
+const getEventMetrics = async (eventId, user, db = prisma) => metricsForEvent(await requireEvent(eventId, user, true, db), db);
+
+const listEventAttendees = async (eventId, query, user, db = prisma) => {
+  await requireEvent(eventId, user, true, db);
+  const limit = query.limit ?? 50;
+  const scope = `event-attendees:${eventId}:${query.status || "all"}:${query.search || ""}:${limit}`;
+  const cursor = decodeCursor(query.cursor, scope);
+  const filters = {
+    eventId,
+    ...(query.status ? { registrationStatus: query.status } : {}),
+    ...(query.search ? {
+      OR: [
+        { participantDisplayName: { contains: query.search, mode: "insensitive" } },
+        { participant: { participantReference: { contains: query.search, mode: "insensitive" } } },
+      ],
+    } : {}),
+  };
+  const where = cursor ? {
+    AND: [filters, {
+      OR: [
+        { createdAt: { lt: new Date(cursor.createdAt) } },
+        { createdAt: new Date(cursor.createdAt), registrationId: { lt: cursor.registrationId } },
+      ],
+    }],
+  } : filters;
+  const [total, rows] = await Promise.all([
+    db.eventRegistration.count({ where: filters }),
+    db.eventRegistration.findMany({
+      where,
+      select: attendeeSelect,
+      orderBy: [{ createdAt: "desc" }, { registrationId: "desc" }],
+      take: limit + 1,
+    }),
+  ]);
+  const hasMore = rows.length > limit;
+  const attendees = hasMore ? rows.slice(0, limit) : rows;
+  const last = attendees.at(-1);
+  return {
+    total,
+    attendees: attendees.map(attendeeProjection),
+    nextCursor: hasMore && last ? encodeCursor({ scope, createdAt: last.createdAt.toISOString(), registrationId: last.registrationId }) : null,
+  };
+};
+
+const exportEventSelect = {
+  eventId: true, name: true, description: true, bannerKey: true, artworkDataUrl: true,
+  venue: true, address: true, postalCode: true, timezone: true, startsAt: true, endsAt: true,
+  capacity: true, expectedAttendance: true, status: true, version: true,
+  eventDays: {
+    orderBy: { date: "asc" },
+    select: {
+      eventDayId: true, date: true, startsAt: true, endsAt: true,
+      stationAvailabilities: {
+        orderBy: [{ eventStationId: "asc" }, { eventStationAvailabilityId: "asc" }],
+        select: {
+          eventStationAvailabilityId: true, eventStationId: true, eventDayId: true,
+          isAvailable: true, startsAt: true, endsAt: true, capacity: true,
+        },
+      },
+    },
+  },
+  stations: { orderBy: [{ stationOrder: "asc" }, { stationId: "asc" }], select: { stationId: true, stationName: true, stationType: true, stationOrder: true, isActive: true } },
+  shifts: { orderBy: [{ startsAt: "asc" }, { shiftId: "asc" }], select: { shiftId: true, name: true, startsAt: true, endsAt: true, requiredStaff: true, status: true } },
+  staffAssignments: {
+    orderBy: { id: "asc" },
+    select: { id: true, eventId: true, stationId: true, shiftId: true, userId: true, assignedBy: true, assignedAt: true, assignmentRole: true, assignmentStatus: true, status: true },
+  },
+  registrations: { orderBy: [{ createdAt: "desc" }, { registrationId: "desc" }], select: attendeeSelect },
+};
+
+const exportSnapshot = async (eventId, db = prisma) => {
+  const event = await db.event.findUnique({
+    where: { eventId },
+    select: exportEventSelect,
+  });
+  if (!event) throw new AppError(404, "EVENT_NOT_FOUND", "Event was not found");
+  const { eventDays, stations, shifts, staffAssignments, registrations, ...eventFields } = event;
+  return {
+    event: { ...eventFields, startsAt: dateTime(event.startsAt), endsAt: dateTime(event.endsAt) },
+    metrics: await metricsForEvent(event, db),
+    eventDays: (eventDays || []).map(({ stationAvailabilities = [], ...day }) => ({
+      ...day,
+      date: day.date.toISOString().slice(0, 10),
+      startsAt: dateTime(day.startsAt),
+      endsAt: dateTime(day.endsAt),
+      stationAvailabilities: stationAvailabilities.map((availability) => ({
+        ...availability,
+        startsAt: dateTime(availability.startsAt),
+        endsAt: dateTime(availability.endsAt),
+      })),
+    })),
+    stations: stations || [],
+    shifts: (shifts || []).map((shift) => ({ ...shift, startsAt: dateTime(shift.startsAt), endsAt: dateTime(shift.endsAt) })),
+    staffAssignments: (staffAssignments || []).map(({ assignedAt, notes: _notes, ...assignment }) => ({
+      ...assignment,
+      assignedAt: dateTime(assignedAt),
+    })),
+    attendees: (registrations || []).map(attendeeProjection),
+  };
+};
+
+const exportHashFor = (snapshot) => crypto
+  .createHash("sha256")
+  .update(JSON.stringify({ schemaVersion: 1, ...snapshot }))
+  .digest("hex");
+
+const exportEvent = async (eventId, user, db = prisma) => {
+  await requireEvent(eventId, user, true, db);
+  const snapshot = await exportSnapshot(eventId, db);
+  const exportHash = exportHashFor(snapshot);
+  return {
+    export: { schemaVersion: 1, generatedAt: new Date().toISOString(), ...snapshot },
+    exportReceipt: createExportReceipt({
+      eventId,
+      version: snapshot.event.version,
+      actorUserId: user.userId,
+      exportHash,
+      secret: env.jwtAccessSecret,
+    }),
   };
 };
 
@@ -1537,4 +1853,11 @@ module.exports = {
   addStaffAssignment,
   removeStaffAssignment,
   getAuditLog,
+  getPublicEvent,
+  getEventMetrics,
+  metricsForEvent,
+  listEventAttendees,
+  exportEvent,
+  exportSnapshot,
+  exportHashFor,
 };
