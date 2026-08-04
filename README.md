@@ -57,7 +57,7 @@ The event lifecycle is `DRAFT → PUBLISHED → IN_PROGRESS → COMPLETED`, with
    npm --prefix react-user-dashboard run dev
    ```
 
-Open `http://localhost:5173`. The API is available at `http://localhost:5050`; non-production API documentation is at `http://localhost:5050/api-docs`.
+Open `http://localhost:5173`. The API is available at `http://localhost:5000`; non-production API documentation is at `http://localhost:5000/api-docs`.
 
 ### Seeded development accounts
 
