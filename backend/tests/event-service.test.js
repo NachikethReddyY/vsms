@@ -1,6 +1,8 @@
 const assert = require("node:assert/strict");
 const test = require("node:test");
 const crypto = require("node:crypto");
+const fs = require("node:fs");
+const path = require("node:path");
 
 process.env.DATABASE_URL ||= "postgresql://test:test@localhost:5432/vsms_test";
 
@@ -377,6 +379,21 @@ test("terminal event deletion removes event-owned records and preserves the admi
   assert.ok(calls.findIndex(([name]) => name === "syncActions") < calls.findIndex(([name]) => name === "event.delete"));
   assert.equal(calls.some(([name]) => name === "eventAudit"), false);
   assert.equal(calls.some(([name]) => name === "audit.deleteScope"), false);
+});
+
+test("event audit schema matches the retained-history migration", () => {
+  const schema = fs.readFileSync(path.join(__dirname, "../prisma/schema.prisma"), "utf8");
+  const retainedHistoryMigration = fs.readFileSync(
+    path.join(__dirname, "../prisma/migrations/20260803090000_preserve_event_audit_history/migration.sql"),
+    "utf8",
+  );
+  const eventModel = schema.match(/model Event \{[\s\S]*?\n\}/)?.[0] || "";
+  const eventAuditModel = schema.match(/model EventAuditLog \{[\s\S]*?\n\}/)?.[0] || "";
+
+  assert.match(retainedHistoryMigration, /DROP CONSTRAINT IF EXISTS "event_audit_logs_event_id_fkey"/);
+  assert.match(eventAuditModel, /eventId\s+String\s+@map\("event_id"\)/);
+  assert.doesNotMatch(eventAuditModel, /event\s+Event\??\s+@relation/);
+  assert.doesNotMatch(eventModel, /auditLogs\s+EventAuditLog\[\]/);
 });
 
 test("terminal event deletion denies non-administrators and stale versions", async (t) => {
