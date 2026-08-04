@@ -3130,14 +3130,23 @@ components:
         message: { type: string }
         data: { type: object, additionalProperties: true }
     ManualCheckInRequest:
+      oneOf:
+        - $ref: "#/components/schemas/ManualCheckInByRegistration"
+        - $ref: "#/components/schemas/ManualCheckInByQrToken"
+    ManualCheckInByRegistration:
       type: object
       additionalProperties: false
-      required: [eventId]
+      required: [eventId, registrationId]
       properties:
         registrationId: { type: string, format: uuid }
+        eventId: { type: string, format: uuid }
+    ManualCheckInByQrToken:
+      type: object
+      additionalProperties: false
+      required: [eventId, identifier]
+      properties:
         identifier: { type: string, pattern: "^[a-fA-F0-9]{64}$", description: Active QR pass token only; NRIC lookup is not supported. }
         eventId: { type: string, format: uuid }
-      description: Supply exactly one registrationId or active QR token together with eventId. NRIC lookup is not supported.
     ManualCheckInResult:
       type: object
       additionalProperties: false
@@ -3152,7 +3161,7 @@ components:
     ManualCheckInResponse:
       type: object
       additionalProperties: false
-      required: [success, data]
+      required: [success, message, data]
       properties:
         success: { type: boolean, enum: [true] }
         message: { type: string }
