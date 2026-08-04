@@ -43,7 +43,8 @@ function transactionDb(current, updated, handlers = {}) {
     station: { findMany: async () => [], deleteMany: async () => ({ count: 0 }) },
     eventDay: { findMany: async () => [] },
     stationTemplate: { findMany: async () => [] },
-    eventAuditLog: { create: async () => ({}) },
+    device: { findFirst: handlers.device || (async () => null) },
+    eventAuditLog: { create: handlers.eventAudit || (async () => ({})) },
     auditLog: { create: handlers.audit || (async () => ({})) },
     ...handlers.tx,
   };
@@ -58,19 +59,35 @@ test("event lifecycle commands use the real primary key and retain management ac
   const current = { ...eventRecord("DRAFT", 1, [assignedShift]), stations: [{ stationId: "55555555-5555-4555-8555-555555555555", isActive: true }] };
   const updated = eventRecord("PUBLISHED", 2);
   let updateWhere;
+  let deviceWhere;
   let audit;
+  let eventAudit;
+  const context = {
+    requestId,
+    deviceId: "44444444-4444-4444-8444-444444444444",
+    ipAddress: "203.0.113.8",
+    deviceName: "Event laptop",
+    userAgent: "private-device-fingerprint",
+  };
   const db = transactionDb(current, updated, {
     updateEvent: async ({ where }) => { updateWhere = where; return { count: 1 }; },
     audit: async ({ data }) => { audit = data; return {}; },
+    eventAudit: async ({ data }) => { eventAudit = data; return {}; },
+    device: async ({ where }) => { deviceWhere = where; return { id: context.deviceId }; },
   });
 
-  const result = await eventService.transitionEvent(eventId, "publish", { version: 1 }, user, { requestId, ipAddress: "203.0.113.8", deviceName: "Event laptop" }, db);
+  const result = await eventService.transitionEvent(eventId, "publish", { version: 1 }, user, context, db);
 
   assert.deepEqual(updateWhere, { eventId, version: 1, status: "DRAFT" });
   assert.equal(audit.entityId, eventId);
   assert.equal(audit.requestId, requestId);
+  assert.equal(audit.deviceId, context.deviceId);
+  assert.deepEqual(deviceWhere, { id: context.deviceId, userId, status: "ACTIVE" });
   assert.equal(audit.ipAddress, "203.0.113.8");
   assert.equal(audit.deviceName, "Event laptop");
+  assert.equal(eventAudit.correlationId, requestId);
+  assert.equal(Object.hasOwn(audit, "userAgent"), false);
+  assert.doesNotMatch(JSON.stringify(audit), /private-device-fingerprint/);
   assert.equal(result.canManage, true);
   assert.equal(result.status, "PUBLISHED");
 
@@ -84,6 +101,27 @@ test("event lifecycle commands use the real primary key and retain management ac
   assert.deepEqual(cancelWhere, { eventId, version: 2, status: "PUBLISHED" });
   assert.equal(cancelResult.status, "CANCELLED");
   assert.equal(cancelResult.canManage, true);
+});
+
+test("event audit metadata ignores an unknown device foreign key", async () => {
+  const current = eventRecord("PUBLISHED", 2);
+  const updated = eventRecord("CANCELLED", 3);
+  let audit;
+  const db = transactionDb(current, updated, {
+    audit: async ({ data }) => { audit = data; return {}; },
+  });
+
+  await eventService.cancelEvent(eventId, { version: 2, reason: "Venue is no longer available" }, user, {
+    requestId,
+    deviceId: "55555555-5555-4555-8555-555555555555",
+    ipAddress: "203.0.113.10",
+    deviceName: "Unknown tablet",
+  }, db);
+
+  assert.equal(audit.requestId, requestId);
+  assert.equal(audit.deviceId, null);
+  assert.equal(audit.ipAddress, "203.0.113.10");
+  assert.equal(audit.deviceName, "Unknown tablet");
 });
 
 test("publishing requires a station and an assigned person", async () => {
