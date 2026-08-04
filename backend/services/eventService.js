@@ -758,10 +758,19 @@ const allowedUpdateKeys = {
     "bannerKey",
     "artworkDataUrl",
     "venue",
+    "address",
+    "postalCode",
+    "latitude",
+    "longitude",
+    "locationProvider",
+    "locationReference",
     "timezone",
     "startsAt",
     "endsAt",
     "capacity",
+    "expectedAttendance",
+    "eventDays",
+    "stations",
     "shifts",
   ]),
   PUBLISHED: new Set([
@@ -770,10 +779,19 @@ const allowedUpdateKeys = {
     "bannerKey",
     "artworkDataUrl",
     "venue",
+    "address",
+    "postalCode",
+    "latitude",
+    "longitude",
+    "locationProvider",
+    "locationReference",
     "timezone",
     "startsAt",
     "endsAt",
     "capacity",
+    "expectedAttendance",
+    "eventDays",
+    "stations",
     "shifts",
   ]),
   UPCOMING: new Set([
@@ -782,10 +800,19 @@ const allowedUpdateKeys = {
     "bannerKey",
     "artworkDataUrl",
     "venue",
+    "address",
+    "postalCode",
+    "latitude",
+    "longitude",
+    "locationProvider",
+    "locationReference",
     "timezone",
     "startsAt",
     "endsAt",
     "capacity",
+    "expectedAttendance",
+    "eventDays",
+    "stations",
     "shifts",
   ]),
   ONGOING: new Set([
@@ -1035,6 +1062,16 @@ const cancelEvent = async (eventId, body, user, correlationId) => {
         deviceName: "Server",
       },
     });
+    await tx.eventAuditLog.create({
+      data: {
+        eventId,
+        actorUserId: user.userId,
+        action: "CANCELLED",
+        beforeSnapshot: snapshot(current),
+        afterSnapshot: snapshot(updated),
+        correlationId,
+      },
+    });
 
     return toEventResponse(updated, user, tx);
   });
@@ -1155,7 +1192,18 @@ const deleteEvent = async (eventId, body, user, correlationId) => {
     await tx.eventStationAvailability.deleteMany({ where: { eventDay: { eventId } } });
     await tx.eventDay.deleteMany({ where: { eventId } });
     await tx.station.deleteMany({ where: { eventId } });
+
+    // Event audit rows are immutable at the database layer. The only deletion
+    // escape hatch is transaction-local and scoped to this already validated,
+    // terminal event; the trigger rejects every UPDATE and every other DELETE.
+    await tx.$queryRawUnsafe(
+      "SELECT set_config('vsms.event_audit_delete_event_id', $1, true)",
+      eventId,
+    );
     await tx.eventAuditLog.deleteMany({ where: { eventId } });
+    await tx.$queryRawUnsafe(
+      "SELECT set_config('vsms.event_audit_delete_event_id', '', true)",
+    );
 
     const deleted = await tx.event.deleteMany({
       where: { eventId, version: body.version + 1, status: current.status },
@@ -1433,10 +1481,9 @@ const getAuditLog = async (eventId, query, user) => {
   const scope = `event-audit:${eventId}:${query.limit}`;
   const cursor = decodeCursor(query.cursor, scope);
 
-  const rows = await prisma.auditLog.findMany({
+  const rows = await prisma.eventAuditLog.findMany({
     where: {
-      entityName: "Event",
-      entityId: eventId,
+      eventId,
       ...(cursor
         ? {
             createdAt: { lt: new Date(cursor.createdAt) },
