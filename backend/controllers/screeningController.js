@@ -1,6 +1,16 @@
 const screeningService = require("../services/screeningService");
 const reviewService = require("../services/reviewService");
 const referralService = require("../services/referralService");
+const syncService = require("../services/syncService");
+
+exports.syncScreening = async (req, res) => {
+  res.json(await syncService.processScreeningSync(
+    req.params.eventId,
+    req.body,
+    req.user,
+    req.context,
+  ));
+};
 
 exports.listStations = async (req, res) => {
   res.json(await screeningService.listStations(req.params.eventId, req.user));

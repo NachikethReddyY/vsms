@@ -170,6 +170,33 @@ const saveColourVisionBody = z.object({
   resultData: colourVisionResultData,
 });
 
+const screeningSyncAction = z.discriminatedUnion("stationType", [
+  z.object({
+    clientActionId: z.string().uuid(),
+    stationId: z.string().uuid(),
+    stationType: z.literal("VISUAL_ACUITY"),
+    payload: saveVisualAcuityBody.strict(),
+  }).strict(),
+  z.object({
+    clientActionId: z.string().uuid(),
+    stationId: z.string().uuid(),
+    stationType: z.literal("REFRACTION"),
+    payload: saveRefractionBody.strict(),
+  }).strict(),
+  z.object({
+    clientActionId: z.string().uuid(),
+    stationId: z.string().uuid(),
+    stationType: z.literal("COLOUR_VISION"),
+    payload: saveColourVisionBody.strict(),
+  }).strict(),
+]);
+
+const screeningSyncBody = z.object({
+  clientBatchId: z.string().uuid(),
+  cursor: z.string().datetime({ offset: true }).optional(),
+  actions: z.array(screeningSyncAction).max(25),
+}).strict();
+
 module.exports = {
   eventParams,
   stationParams,
@@ -187,4 +214,5 @@ module.exports = {
   saveRefractionBody,
   previewColourVisionBody,
   saveColourVisionBody,
+  screeningSyncBody,
 };
