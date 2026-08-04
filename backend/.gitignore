@@ -16,3 +16,10 @@ yarn-error.log*
 Thumbs.db
 
 /generated/prisma
+
+# Never commit database exports. Store encrypted backups outside the source tree.
+backups/*.sql
+backups/*.dump
+backups/*.backup
+backups/*.tar
+*.pgdump
