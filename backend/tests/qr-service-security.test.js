@@ -32,6 +32,109 @@ test("token access hashes the bearer and requires an active, unexpired pass", as
   assert.equal(JSON.stringify(where).includes(token), false);
 });
 
+test("QR lookups return only the operational registration projection", async () => {
+  const token = "d".repeat(64);
+  const expiresAt = new Date(Date.now() + 60_000);
+  const queries = [];
+  const db = {
+    qRCodePass: {
+      findFirst: async (query) => {
+        queries.push(query);
+        return {
+          id: qrId,
+          registrationId,
+          tokenHash: tokenHash(token),
+          tokenCiphertext: "v2:secret",
+          expiresAt,
+          isActive: true,
+          registration: {
+            registrationId,
+            eventId,
+            participantId: "44444444-4444-4444-8444-444444444444",
+            registeredBy: "55555555-5555-4555-8555-555555555555",
+            registrationStatus: "SIGNED_UP",
+            queueNumber: 7,
+            checkedIn: false,
+            passToken: "registration-secret",
+            idempotencyKey: "registration-idempotency-key",
+            participant: {
+              firstName: "Ada",
+              lastName: "Lovelace",
+              nric: "encrypted-nric",
+              contactNumber: "+6512345678",
+              consentGiven: true,
+              createdById: "66666666-6666-4666-8666-666666666666",
+            },
+            event: {
+              eventId,
+              name: "Community screening",
+              description: "Internal event details",
+              createdByUserId: "77777777-7777-4777-8777-777777777777",
+              createIdempotencyKey: "event-idempotency-key",
+            },
+          },
+        };
+      },
+    },
+  };
+
+  const participant = await qrService.getParticipant(token, db);
+  const registration = await qrService.getRegistrationByQR(token, db);
+
+  assert.deepEqual(participant, {
+    qrId,
+    registrationId,
+    participant: { firstName: "Ada", lastName: "Lovelace" },
+    event: { eventId, name: "Community screening" },
+    queueNumber: 7,
+    expiresAt,
+    isActive: true,
+  });
+  assert.deepEqual(registration, {
+    registrationId,
+    eventId,
+    registrationStatus: "SIGNED_UP",
+    queueNumber: 7,
+    checkedIn: false,
+    participant: { firstName: "Ada", lastName: "Lovelace" },
+    event: { eventId, name: "Community screening" },
+  });
+
+  for (const query of queries) {
+    assert.equal(query.include, undefined);
+    assert.equal(query.where.tokenHash, tokenHash(token));
+    assert.equal(query.where.isActive, true);
+    assert.ok(query.where.expiresAt.gt instanceof Date);
+  }
+  assert.deepEqual(queries[0].select, {
+    id: true,
+    registrationId: true,
+    expiresAt: true,
+    isActive: true,
+    registration: {
+      select: {
+        registrationId: true,
+        queueNumber: true,
+        participant: { select: { firstName: true, lastName: true } },
+        event: { select: { eventId: true, name: true } },
+      },
+    },
+  });
+  assert.deepEqual(queries[1].select, {
+    registration: {
+      select: {
+        registrationId: true,
+        queueNumber: true,
+        participant: { select: { firstName: true, lastName: true } },
+        event: { select: { eventId: true, name: true } },
+        eventId: true,
+        registrationStatus: true,
+        checkedIn: true,
+      },
+    },
+  });
+});
+
 test("generated QR passes retain only a hash and authenticated ciphertext", async () => {
   let supersededWhere;
   let created;

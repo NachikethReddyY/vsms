@@ -1323,10 +1323,10 @@ paths:
     get:
       tags: [QR Codes]
       operationId: getParticipantByQrCode
-      summary: Resolve participant data from a QR token
+      summary: Resolve operational participant data from a QR token
       parameters: [{ $ref: "#/components/parameters/QrToken" }]
       responses:
-        "200": { description: Participant data, content: { application/json: { schema: { $ref: "#/components/schemas/ApiDataResponse" } } } }
+        "200": { description: Participant lookup, content: { application/json: { schema: { $ref: "#/components/schemas/QrParticipantLookupResponse" } } } }
         "401": { $ref: "#/components/responses/Unauthorized" }
         "404": { $ref: "#/components/responses/NotFound" }
   /api/v1/qr/revoke/{qrId}:
@@ -1374,17 +1374,14 @@ paths:
     get:
       tags: [QR Codes]
       operationId: getRegistrationByQrCode
-      summary: Resolve a registration from a QR token
+      summary: Resolve operational registration data from a QR token
       parameters: [{ $ref: "#/components/parameters/QrToken" }]
       responses:
         "200":
           description: Registration resolved
           content:
             application/json:
-              schema:
-                type: object
-                required: [registration]
-                properties: { registration: { type: object, additionalProperties: true } }
+              schema: { $ref: "#/components/schemas/QrRegistrationLookupResponse" }
         "401": { $ref: "#/components/responses/Unauthorized" }
         "404": { $ref: "#/components/responses/NotFound" }
   /api/v1/admin/maintenance/referral-deliveries:
@@ -3073,6 +3070,57 @@ components:
             qrId: { type: string, format: uuid }
             expiresAt: { type: string, format: date-time }
             qrImage: { type: string, description: Data URL containing the QR image }
+    QrLookupParticipant:
+      type: object
+      additionalProperties: false
+      required: [firstName, lastName]
+      properties:
+        firstName: { type: string }
+        lastName: { type: string }
+    QrLookupEvent:
+      type: object
+      additionalProperties: false
+      required: [eventId, name]
+      properties:
+        eventId: { type: string, format: uuid }
+        name: { type: string }
+    QrRegistrationLookup:
+      type: object
+      additionalProperties: false
+      required: [registrationId, eventId, registrationStatus, queueNumber, checkedIn, participant, event]
+      properties:
+        registrationId: { type: string, format: uuid }
+        eventId: { type: string, format: uuid }
+        registrationStatus: { $ref: "#/components/schemas/RegistrationStatus" }
+        queueNumber: { type: integer, nullable: true }
+        checkedIn: { type: boolean }
+        participant: { $ref: "#/components/schemas/QrLookupParticipant" }
+        event: { $ref: "#/components/schemas/QrLookupEvent" }
+    QrParticipantLookup:
+      type: object
+      additionalProperties: false
+      required: [qrId, registrationId, participant, event, queueNumber, expiresAt, isActive]
+      properties:
+        qrId: { type: string, format: uuid }
+        registrationId: { type: string, format: uuid }
+        participant: { $ref: "#/components/schemas/QrLookupParticipant" }
+        event: { $ref: "#/components/schemas/QrLookupEvent" }
+        queueNumber: { type: integer, nullable: true }
+        expiresAt: { type: string, format: date-time }
+        isActive: { type: boolean, enum: [true] }
+    QrParticipantLookupResponse:
+      type: object
+      additionalProperties: false
+      required: [success, data]
+      properties:
+        success: { type: boolean, enum: [true] }
+        data: { $ref: "#/components/schemas/QrParticipantLookup" }
+    QrRegistrationLookupResponse:
+      type: object
+      additionalProperties: false
+      required: [registration]
+      properties:
+        registration: { $ref: "#/components/schemas/QrRegistrationLookup" }
     ApiDataResponse:
       type: object
       additionalProperties: false

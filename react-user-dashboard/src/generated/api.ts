@@ -1286,7 +1286,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Resolve participant data from a QR token */
+        /** Resolve operational participant data from a QR token */
         get: operations["getParticipantByQrCode"];
         put?: never;
         post?: never;
@@ -1354,7 +1354,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Resolve a registration from a QR token */
+        /** Resolve operational registration data from a QR token */
         get: operations["getRegistrationByQrCode"];
         put?: never;
         post?: never;
@@ -2708,6 +2708,47 @@ export interface components {
                 /** @description Data URL containing the QR image */
                 qrImage: string;
             };
+        };
+        QrLookupParticipant: {
+            firstName: string;
+            lastName: string;
+        };
+        QrLookupEvent: {
+            /** Format: uuid */
+            eventId: string;
+            name: string;
+        };
+        QrRegistrationLookup: {
+            /** Format: uuid */
+            registrationId: string;
+            /** Format: uuid */
+            eventId: string;
+            registrationStatus: components["schemas"]["RegistrationStatus"];
+            queueNumber: number | null;
+            checkedIn: boolean;
+            participant: components["schemas"]["QrLookupParticipant"];
+            event: components["schemas"]["QrLookupEvent"];
+        };
+        QrParticipantLookup: {
+            /** Format: uuid */
+            qrId: string;
+            /** Format: uuid */
+            registrationId: string;
+            participant: components["schemas"]["QrLookupParticipant"];
+            event: components["schemas"]["QrLookupEvent"];
+            queueNumber: number | null;
+            /** Format: date-time */
+            expiresAt: string;
+            /** @enum {boolean} */
+            isActive: true;
+        };
+        QrParticipantLookupResponse: {
+            /** @enum {boolean} */
+            success: true;
+            data: components["schemas"]["QrParticipantLookup"];
+        };
+        QrRegistrationLookupResponse: {
+            registration: components["schemas"]["QrRegistrationLookup"];
         };
         ApiDataResponse: {
             /** @enum {boolean} */
@@ -5425,13 +5466,13 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description Participant data */
+            /** @description Participant lookup */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["ApiDataResponse"];
+                    "application/json": components["schemas"]["QrParticipantLookupResponse"];
                 };
             };
             401: components["responses"]["Unauthorized"];
@@ -5534,11 +5575,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        registration: {
-                            [key: string]: unknown;
-                        };
-                    };
+                    "application/json": components["schemas"]["QrRegistrationLookupResponse"];
                 };
             };
             401: components["responses"]["Unauthorized"];
