@@ -30,6 +30,8 @@ tags:
     description: Restricted operational audit data
   - name: Clinical Reviews
     description: Event-scoped clinical review queue and immutable decisions
+  - name: Referrals
+    description: Signed, encrypted clinical referral documents and delivery tracking
 security:
   - bearerAuth: []
 paths:
@@ -175,10 +177,10 @@ paths:
     get:
       tags: [Users]
       operationId: listUsers
-      summary: List projected user records (ADMIN only)
+      summary: List organisation staff accounts (administrator only)
       responses:
         "200":
-          description: Up to 100 users without credential material
+          description: Staff accounts without credential material
           content:
             application/json:
               schema:
@@ -188,7 +190,7 @@ paths:
     post:
       tags: [Users]
       operationId: createUser
-      summary: Create a staff user (ADMIN or EVENT_MANAGER)
+      summary: Create a local staff account (administrator only)
       requestBody:
         required: true
         content:
@@ -202,6 +204,30 @@ paths:
         "401": { $ref: "#/components/responses/Unauthorized" }
         "403": { $ref: "#/components/responses/Forbidden" }
         "409": { $ref: "#/components/responses/Conflict" }
+        "422": { $ref: "#/components/responses/ValidationFailed" }
+  /api/v1/users/{id}:
+    patch:
+      tags: [Users]
+      operationId: updateUser
+      summary: Update local staff roles or active state (administrator only)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/UpdateUserRequest" }
+      responses:
+        "200":
+          description: Staff user updated
+          content: { application/json: { schema: { $ref: "#/components/schemas/UserMutationResponse" } } }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "422": { $ref: "#/components/responses/ValidationFailed" }
   /api/v1/events:
     get:
       tags: [Events]
@@ -293,6 +319,36 @@ paths:
                 items: { $ref: "#/components/schemas/StationTemplate" }
         "401": { $ref: "#/components/responses/Unauthorized" }
         "403": { $ref: "#/components/responses/Forbidden" }
+  /api/v1/events/reports/operations:
+    get:
+      tags: [Events]
+      operationId: getOperationalReport
+      summary: Report aggregate event operations for authorized management accounts
+      description: Administrator and event-manager reporting only. Event managers receive events they created or actively manage. The response intentionally excludes participant identity, clinical detail, delivery recipients, and synchronization payloads or error logs. Viewing a report is audited.
+      parameters:
+        - name: eventId
+          in: query
+          schema: { type: string, format: uuid }
+        - name: from
+          in: query
+          description: Inclusive event-date range start; defaults to 30 days before today
+          schema: { type: string, format: date }
+        - name: to
+          in: query
+          description: Inclusive event-date range end; defaults to 30 days after today. The range cannot exceed 366 days.
+          schema: { type: string, format: date }
+      responses:
+        "200":
+          description: Aggregate-only operational report
+          headers:
+            Cache-Control:
+              schema: { type: string, enum: [no-store] }
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/OperationalReport" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "422": { $ref: "#/components/responses/ValidationFailed" }
   /api/v1/locations/search:
     get:
       tags: [Events]
@@ -346,6 +402,27 @@ paths:
             application/json:
               schema: { $ref: "#/components/schemas/Event" }
         "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "422": { $ref: "#/components/responses/ValidationFailed" }
+    delete:
+      tags: [Events]
+      operationId: deleteTerminalEvent
+      summary: Permanently delete a completed or cancelled event
+      description: Administrator-only hard deletion. Event-owned operational records are removed; shared staff accounts, participants, templates, forms, and devices are retained.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/EventDeletionRequest" }
+      responses:
+        "200":
+          description: Event permanently deleted
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EventDeletionResponse" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
         "409": { $ref: "#/components/responses/Conflict" }
         "422": { $ref: "#/components/responses/ValidationFailed" }
@@ -660,6 +737,73 @@ paths:
         "404": { $ref: "#/components/responses/NotFound" }
         "409": { $ref: "#/components/responses/Conflict" }
         "422": { $ref: "#/components/responses/ValidationFailed" }
+  /api/v1/events/{eventId}/referrals/{referralId}/issue:
+    post:
+      tags: [Referrals]
+      operationId: issueReferral
+      summary: Sign a draft referral, generate an encrypted PDF, and attempt secure email delivery
+      parameters:
+        - $ref: "#/components/parameters/EventId"
+        - $ref: "#/components/parameters/ReferralId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/IssueReferralRequest" }
+      responses:
+        "201":
+          description: Referral issued; delivery status reports provider acceptance or explicit failure
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/IssueReferralResponse" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "422": { $ref: "#/components/responses/ValidationFailed" }
+  /api/v1/events/{eventId}/referrals/{referralId}/issue/acknowledge:
+    post:
+      tags: [Referrals]
+      operationId: acknowledgeReferralHandoff
+      summary: Acknowledge secure passphrase handoff and permanently remove its recovery escrow
+      parameters:
+        - $ref: "#/components/parameters/EventId"
+        - $ref: "#/components/parameters/ReferralId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/AcknowledgeReferralHandoffRequest" }
+      responses:
+        "200":
+          description: Passphrase escrow acknowledged and removed
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AcknowledgeReferralHandoffResponse" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "422": { $ref: "#/components/responses/ValidationFailed" }
+  /api/v1/events/{eventId}/referrals/{referralId}/documents/{documentId}:
+    get:
+      tags: [Referrals]
+      operationId: downloadReferralDocument
+      summary: Download an integrity-checked encrypted referral PDF
+      parameters:
+        - $ref: "#/components/parameters/EventId"
+        - $ref: "#/components/parameters/ReferralId"
+        - $ref: "#/components/parameters/DocumentId"
+      responses:
+        "200":
+          description: Password-protected PDF
+          headers:
+            Content-Disposition: { schema: { type: string } }
+          content:
+            application/pdf:
+              schema: { type: string, format: binary }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
   /api/v1/events/{eventId}/audit-log:
     get:
       tags: [Events]
@@ -960,7 +1104,7 @@ paths:
       summary: Generate a safe QR pass for a registration
       parameters: [{ $ref: "#/components/parameters/RegistrationId" }]
       responses:
-        "201": { description: QR pass generated, content: { application/json: { schema: { $ref: "#/components/schemas/QrCode" } } } }
+        "201": { description: QR pass generated, content: { application/json: { schema: { $ref: "#/components/schemas/QrPass" } } } }
         "401": { $ref: "#/components/responses/Unauthorized" }
         "404": { $ref: "#/components/responses/NotFound" }
         "409": { $ref: "#/components/responses/Conflict" }
@@ -1033,16 +1177,6 @@ paths:
         "200": { description: Participant data, content: { application/json: { schema: { $ref: "#/components/schemas/ApiDataResponse" } } } }
         "401": { $ref: "#/components/responses/Unauthorized" }
         "404": { $ref: "#/components/responses/NotFound" }
-  /api/v1/qr/history/{participantId}:
-    get:
-      tags: [QR Codes]
-      operationId: listParticipantQrCodes
-      summary: List QR passes issued to a participant
-      parameters: [{ $ref: "#/components/parameters/ParticipantId" }]
-      responses:
-        "200": { description: QR pass history, content: { application/json: { schema: { $ref: "#/components/schemas/ApiDataResponse" } } } }
-        "401": { $ref: "#/components/responses/Unauthorized" }
-        "404": { $ref: "#/components/responses/NotFound" }
   /api/v1/qr/revoke/{qrId}:
     put:
       tags: [QR Codes]
@@ -1059,9 +1193,8 @@ paths:
               required: [revokedReason]
               properties:
                 revokedReason: { type: string, minLength: 1, maxLength: 255 }
-                revokedBy: { type: string, format: uuid }
       responses:
-        "200": { description: QR pass revoked, content: { application/json: { schema: { $ref: "#/components/schemas/QrMutationResponse" } } } }
+        "200": { description: QR pass revoked, content: { application/json: { schema: { $ref: "#/components/schemas/QrRevokeResponse" } } } }
         "400": { $ref: "#/components/responses/ValidationFailed" }
         "401": { $ref: "#/components/responses/Unauthorized" }
         "404": { $ref: "#/components/responses/NotFound" }
@@ -1072,7 +1205,7 @@ paths:
       summary: Get QR pass download data
       parameters: [{ $ref: "#/components/parameters/QrId" }]
       responses:
-        "200": { description: Download data, content: { application/json: { schema: { $ref: "#/components/schemas/ApiDataResponse" } } } }
+        "200": { description: Download data, content: { application/json: { schema: { $ref: "#/components/schemas/QrRenderResponse" } } } }
         "401": { $ref: "#/components/responses/Unauthorized" }
         "404": { $ref: "#/components/responses/NotFound" }
   /api/v1/qr/print/{qrId}:
@@ -1082,7 +1215,7 @@ paths:
       summary: Get QR pass print data
       parameters: [{ $ref: "#/components/parameters/QrId" }]
       responses:
-        "200": { description: Print data, content: { application/json: { schema: { $ref: "#/components/schemas/ApiDataResponse" } } } }
+        "200": { description: Print data, content: { application/json: { schema: { $ref: "#/components/schemas/QrRenderResponse" } } } }
         "401": { $ref: "#/components/responses/Unauthorized" }
         "404": { $ref: "#/components/responses/NotFound" }
   /api/v1/qr/{token}:
@@ -1102,6 +1235,77 @@ paths:
                 properties: { registration: { type: object, additionalProperties: true } }
         "401": { $ref: "#/components/responses/Unauthorized" }
         "404": { $ref: "#/components/responses/NotFound" }
+  /api/v1/admin/maintenance/referral-deliveries:
+    post:
+      tags: [Referrals]
+      operationId: reconcileReferralDeliveries
+      summary: Clear expired handoff escrow and reconcile ambiguous referral deliveries
+      description: Administrator-only maintenance. Stale sends are quarantined for reconciliation and are never sent again automatically. A provider-confirmed unsent delivery may be explicitly authorized for retry while its immutable issuance identity is retained.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ReferralDeliveryMaintenanceRequest" }
+      responses:
+        "200":
+          description: Maintenance results
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ReferralDeliveryMaintenanceResponse" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "422": { $ref: "#/components/responses/ValidationFailed" }
+  /api/v1/admin/maintenance/artifact-cleanup:
+    get:
+      tags: [Administration]
+      operationId: listArtifactCleanupTasks
+      summary: List artifact cleanup tasks requiring administrator attention
+      parameters:
+        - name: status
+          in: query
+          schema: { type: string, enum: [ESCALATED, RESOLVED, FAILED, PENDING], default: ESCALATED }
+        - name: eventId
+          in: query
+          schema: { type: string, format: uuid }
+        - name: limit
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 200, default: 100 }
+      responses:
+        "200":
+          description: Safe cleanup-task metadata; storage paths are never returned
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ArtifactCleanupTaskList" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "422": { $ref: "#/components/responses/ValidationFailed" }
+  /api/v1/admin/maintenance/artifact-cleanup/{taskId}:
+    post:
+      tags: [Administration]
+      operationId: maintainArtifactCleanupTask
+      summary: Requeue or administratively resolve an escalated artifact cleanup task
+      parameters:
+        - name: taskId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ArtifactCleanupActionRequest" }
+      responses:
+        "200":
+          description: Updated cleanup task
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ArtifactCleanupTask" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "422": { $ref: "#/components/responses/ValidationFailed" }
 components:
   securitySchemes:
     bearerAuth:
@@ -1126,6 +1330,16 @@ components:
       schema: { type: string, format: uuid }
     RegistrationId:
       name: registrationId
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+    ReferralId:
+      name: referralId
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+    DocumentId:
+      name: documentId
       in: path
       required: true
       schema: { type: string, format: uuid }
@@ -1262,11 +1476,15 @@ components:
     StaffDirectoryEntry:
       type: object
       additionalProperties: false
-      required: [userId, username, systemRole]
+      required: [userId, username, systemRole, roles]
       properties:
         userId: { type: string, format: uuid }
         username: { type: string }
         systemRole: { $ref: "#/components/schemas/SystemRole" }
+        roles:
+          type: array
+          uniqueItems: true
+          items: { type: string, enum: [ADMINISTRATOR, EVENT_MANAGER, REGISTRATION_OFFICER, SCREENER, REVIEWER, SUPPORT] }
     StationTemplate:
       type: object
       additionalProperties: false
@@ -1455,8 +1673,11 @@ components:
         department: { type: string, nullable: true }
         designation: { type: string, nullable: true }
         systemRole: { $ref: "#/components/schemas/SystemRole" }
-        status: { type: string, enum: [ACTIVE, DISABLED] }
-        roles: { type: array, items: { type: string } }
+        status: { type: string, enum: [ACTIVE, INACTIVE, DISABLED, SUSPENDED] }
+        roles:
+          type: array
+          uniqueItems: true
+          items: { type: string, enum: [ADMINISTRATOR, EVENT_MANAGER, REGISTRATION_OFFICER, SCREENER, REVIEWER, SUPPORT] }
         createdAt: { type: string, format: date-time }
     AuthResponse:
       type: object
@@ -1555,6 +1776,21 @@ components:
       properties:
         version: { type: integer, minimum: 1 }
         reason: { type: string, minLength: 10, maxLength: 1000 }
+    EventDeletionRequest:
+      type: object
+      additionalProperties: false
+      required: [version, confirmationName, acknowledgePermanentDeletion]
+      properties:
+        version: { type: integer, minimum: 1 }
+        confirmationName: { type: string, minLength: 1, maxLength: 150, description: Exact event name acknowledgement }
+        acknowledgePermanentDeletion: { type: boolean, enum: [true] }
+    EventDeletionResponse:
+      type: object
+      additionalProperties: false
+      required: [eventId, deleted]
+      properties:
+        eventId: { type: string, format: uuid }
+        deleted: { type: boolean, enum: [true] }
     Event:
       allOf:
         - $ref: "#/components/schemas/CreateEventRequest"
@@ -1574,7 +1810,7 @@ components:
             eventDays: { type: array, items: { $ref: "#/components/schemas/EventDay" } }
             eventStations: { type: array, items: { $ref: "#/components/schemas/EventStation" } }
             signupCount: { type: integer, minimum: 0, description: Number of collected registration entries for this event }
-            activeCapacityCount: { type: integer, minimum: 0, description: Number of signed-up or checked-in registrations not marked completed or cancelled }
+            activeCapacityCount: { type: integer, minimum: 0, description: Number of registrations checked in to the event; this is not a live count of people still at the venue }
             canManage: { type: boolean, description: Whether the current caller may change this event }
             createdBy: { $ref: "#/components/schemas/User" }
             cancelledBy: { type: object, allOf: [{ $ref: "#/components/schemas/User" }], nullable: true }
@@ -1605,6 +1841,135 @@ components:
       properties:
         events: { type: array, items: { $ref: "#/components/schemas/Event" } }
         nextCursor: { type: string, nullable: true }
+    RegistrationReportMetrics:
+      type: object
+      additionalProperties: false
+      required: [total, signedUp, checkedIn, completed, cancelled, completionRate]
+      properties:
+        total: { type: integer, minimum: 0 }
+        signedUp: { type: integer, minimum: 0 }
+        checkedIn: { type: integer, minimum: 0 }
+        completed: { type: integer, minimum: 0 }
+        cancelled: { type: integer, minimum: 0 }
+        completionRate: { type: number, minimum: 0, maximum: 100 }
+    QueueReportMetrics:
+      type: object
+      additionalProperties: false
+      required: [waiting, active, completed, skipped, cancelled]
+      properties:
+        waiting: { type: integer, minimum: 0 }
+        active: { type: integer, minimum: 0 }
+        completed: { type: integer, minimum: 0 }
+        skipped: { type: integer, minimum: 0 }
+        cancelled: { type: integer, minimum: 0 }
+    ReferralReportMetrics:
+      type: object
+      additionalProperties: false
+      required: [total, actionRequired, sentOrAcknowledged, cancelled]
+      properties:
+        total: { type: integer, minimum: 0 }
+        actionRequired: { type: integer, minimum: 0 }
+        sentOrAcknowledged: { type: integer, minimum: 0 }
+        cancelled: { type: integer, minimum: 0 }
+    DeliveryReportMetrics:
+      type: object
+      additionalProperties: false
+      required: [inFlight, delivered, issues]
+      properties:
+        inFlight: { type: integer, minimum: 0 }
+        delivered: { type: integer, minimum: 0 }
+        issues: { type: integer, minimum: 0 }
+    SyncReportMetrics:
+      type: object
+      additionalProperties: false
+      required: [total, pending, applied, issues]
+      properties:
+        total: { type: integer, minimum: 0 }
+        pending: { type: integer, minimum: 0 }
+        applied: { type: integer, minimum: 0 }
+        issues: { type: integer, minimum: 0 }
+    OperationalReportEvent:
+      type: object
+      additionalProperties: false
+      required: [eventId, name, status, startsAt, endsAt, timezone, registrations, queue, referrals, deliveries, sync]
+      properties:
+        eventId: { type: string, format: uuid }
+        name: { type: string, maxLength: 150 }
+        status: { $ref: "#/components/schemas/EventStatus" }
+        startsAt: { type: string, format: date-time }
+        endsAt: { type: string, format: date-time }
+        timezone: { type: string }
+        registrations: { $ref: "#/components/schemas/RegistrationReportMetrics" }
+        queue: { $ref: "#/components/schemas/QueueReportMetrics" }
+        referrals: { $ref: "#/components/schemas/ReferralReportMetrics" }
+        deliveries: { $ref: "#/components/schemas/DeliveryReportMetrics" }
+        sync: { $ref: "#/components/schemas/SyncReportMetrics" }
+    OperationalReportEventOption:
+      type: object
+      additionalProperties: false
+      required: [eventId, name, status, startsAt]
+      properties:
+        eventId: { type: string, format: uuid }
+        name: { type: string, maxLength: 150 }
+        status: { $ref: "#/components/schemas/EventStatus" }
+        startsAt: { type: string, format: date-time }
+    OperationalReportSummary:
+      type: object
+      additionalProperties: false
+      required: [events, registrations, queue, referrals, deliveries, sync]
+      properties:
+        events: { type: integer, minimum: 0 }
+        registrations:
+          type: object
+          additionalProperties: false
+          required: [total, checkedIn, completed, completionRate]
+          properties:
+            total: { type: integer, minimum: 0 }
+            checkedIn: { type: integer, minimum: 0 }
+            completed: { type: integer, minimum: 0 }
+            completionRate: { type: number, minimum: 0, maximum: 100 }
+        queue:
+          type: object
+          additionalProperties: false
+          required: [waiting, active, completed]
+          properties:
+            waiting: { type: integer, minimum: 0 }
+            active: { type: integer, minimum: 0 }
+            completed: { type: integer, minimum: 0 }
+        referrals:
+          type: object
+          additionalProperties: false
+          required: [total, actionRequired, sentOrAcknowledged]
+          properties:
+            total: { type: integer, minimum: 0 }
+            actionRequired: { type: integer, minimum: 0 }
+            sentOrAcknowledged: { type: integer, minimum: 0 }
+        deliveries: { $ref: "#/components/schemas/DeliveryReportMetrics" }
+        sync: { $ref: "#/components/schemas/SyncReportMetrics" }
+    OperationalReport:
+      type: object
+      additionalProperties: false
+      required: [filters, summary, events, eventOptions, truncated, eventOptionsTruncated]
+      properties:
+        filters:
+          type: object
+          additionalProperties: false
+          required: [eventId, from, to]
+          properties:
+            eventId: { type: string, format: uuid, nullable: true }
+            from: { type: string, format: date }
+            to: { type: string, format: date }
+        summary: { $ref: "#/components/schemas/OperationalReportSummary" }
+        events:
+          type: array
+          maxItems: 100
+          items: { $ref: "#/components/schemas/OperationalReportEvent" }
+        eventOptions:
+          type: array
+          maxItems: 100
+          items: { $ref: "#/components/schemas/OperationalReportEventOption" }
+        truncated: { type: boolean }
+        eventOptionsTruncated: { type: boolean }
     EventAuditLog:
       type: object
       required: [eventAuditLogId, eventId, actorUserId, action, correlationId, createdAt]
@@ -1711,7 +2076,7 @@ components:
     ReferralSummary:
       type: object
       additionalProperties: false
-      required: [referralId, destinationName, reason, instructions, urgency, status]
+      required: [referralId, destinationName, reason, instructions, urgency, status, signedAt, document, delivery]
       properties:
         referralId: { type: string, format: uuid }
         destinationName: { type: string }
@@ -1719,6 +2084,153 @@ components:
         instructions: { type: string, nullable: true }
         urgency: { $ref: "#/components/schemas/ClinicalUrgency" }
         status: { type: string, enum: [DRAFT, ISSUED, SENT, ACKNOWLEDGED, CANCELLED] }
+        signedAt: { type: string, format: date-time, nullable: true }
+        document:
+          type: object
+          nullable: true
+          allOf: [{ $ref: "#/components/schemas/ReferralDocumentSummary" }]
+        delivery:
+          type: object
+          nullable: true
+          allOf: [{ $ref: "#/components/schemas/ReferralDeliverySummary" }]
+    ReferralDocumentSummary:
+      type: object
+      additionalProperties: false
+      required: [documentId, version, generatedAt]
+      properties:
+        documentId: { type: string, format: uuid }
+        version: { type: integer, minimum: 1 }
+        generatedAt: { type: string, format: date-time }
+    ReferralDeliverySummary:
+      type: object
+      additionalProperties: false
+      required: [deliveryId, status, recipient, providerMessageId, attemptCount, failureReason, sentAt]
+      properties:
+        deliveryId: { type: string, format: uuid }
+        status: { type: string, enum: [QUEUED, SENDING, RECONCILIATION_REQUIRED, SENT, DELIVERED, FAILED, BOUNCED, CANCELLED] }
+        recipient: { type: string }
+        providerMessageId: { type: string, nullable: true }
+        attemptCount: { type: integer, minimum: 0 }
+        failureReason: { type: string, nullable: true }
+        sentAt: { type: string, format: date-time, nullable: true }
+    IssueReferralRequest:
+      type: object
+      additionalProperties: false
+      required: [destinationEmail, signatureObjectKey, signatureSha256, signatureMimeType, idempotencyKey, confirmed]
+      properties:
+        destinationEmail: { type: string, format: email, maxLength: 255 }
+        signatureObjectKey: { type: string, pattern: '^signatures/[a-f0-9-]{36}/referral-[a-f0-9-]{36}-[a-f0-9-]{36}\\.(png|jpg)$' }
+        signatureSha256: { type: string, pattern: '^[a-fA-F0-9]{64}$' }
+        signatureMimeType: { type: string, enum: [image/png, image/jpeg] }
+        idempotencyKey: { type: string, format: uuid }
+        confirmed: { type: boolean, enum: [true] }
+    IssueReferralResponse:
+      type: object
+      additionalProperties: false
+      required: [referralId, status, documentId, documentVersion, handoffSecret, handoffSecretExpiresAt, delivery]
+      properties:
+        referralId: { type: string, format: uuid }
+        status: { type: string, enum: [ISSUED, SENT] }
+        documentId: { type: string, format: uuid }
+        documentVersion: { type: integer, minimum: 1 }
+        handoffSecret:
+          type: string
+          nullable: true
+          minLength: 20
+          maxLength: 64
+          description: Returned only to the issuing reviewer until explicit handoff acknowledgement or expiry. It is encrypted at rest, never emailed, and never included in a clinical report.
+        handoffSecretExpiresAt:
+          type: string
+          format: date-time
+          nullable: true
+          description: The final time an unacknowledged passphrase can be recovered with the same idempotency key.
+        delivery: { $ref: "#/components/schemas/ReferralDeliverySummary" }
+    AcknowledgeReferralHandoffRequest:
+      type: object
+      additionalProperties: false
+      required: [idempotencyKey]
+      properties:
+        idempotencyKey: { type: string, format: uuid }
+    AcknowledgeReferralHandoffResponse:
+      type: object
+      additionalProperties: false
+      required: [acknowledgedAt]
+      properties:
+        acknowledgedAt: { type: string, format: date-time }
+    ReferralDeliveryMaintenanceRequest:
+      type: object
+      additionalProperties: false
+      properties:
+        staleAfterMinutes: { type: integer, minimum: 5, maximum: 1440, default: 30 }
+        resolutions:
+          type: array
+          maxItems: 200
+          default: []
+          items:
+            type: object
+            additionalProperties: false
+            required: [deliveryId, outcome]
+            properties:
+              deliveryId: { type: string, format: uuid }
+              outcome: { type: string, enum: [SENT, FAILED] }
+              providerMessageId: { type: string, minLength: 1, maxLength: 255 }
+        retryDeliveryIds:
+          type: array
+          maxItems: 200
+          default: []
+          items: { type: string, format: uuid }
+    ReferralDeliveryMaintenanceResponse:
+      type: object
+      additionalProperties: false
+      required: [deliveries, artifactCleanup]
+      properties:
+        deliveries:
+          type: object
+          additionalProperties: false
+          required: [expiredEscrowsCleared, ambiguousDeliveriesFlagged, deliveriesReconciled, deliveriesRetryAuthorized]
+          properties:
+            expiredEscrowsCleared: { type: integer, minimum: 0 }
+            ambiguousDeliveriesFlagged: { type: integer, minimum: 0 }
+            deliveriesReconciled: { type: integer, minimum: 0 }
+            deliveriesRetryAuthorized: { type: integer, minimum: 0 }
+        artifactCleanup:
+          type: object
+          additionalProperties: false
+          required: [inspected, completed, failed, escalated]
+          properties:
+            inspected: { type: integer, minimum: 0 }
+            completed: { type: integer, minimum: 0 }
+            failed: { type: integer, minimum: 0 }
+            escalated: { type: integer, minimum: 0 }
+    ArtifactCleanupTask:
+      type: object
+      additionalProperties: false
+      required: [taskId, eventId, artifactType, status, attemptCount, lastError, nextAttemptAt, claimedAt, completedAt, createdAt, updatedAt]
+      properties:
+        taskId: { type: string, format: uuid }
+        eventId: { type: string, format: uuid }
+        artifactType: { type: string, enum: [CONSENT_SIGNATURE, REFERRAL_SIGNATURE, REFERRAL_DOCUMENT] }
+        status: { type: string, enum: [PENDING, PROCESSING, FAILED, ESCALATED, COMPLETED, RESOLVED] }
+        attemptCount: { type: integer, minimum: 0 }
+        lastError: { type: string, nullable: true }
+        nextAttemptAt: { type: string, format: date-time }
+        claimedAt: { type: string, format: date-time, nullable: true }
+        completedAt: { type: string, format: date-time, nullable: true }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+    ArtifactCleanupTaskList:
+      type: object
+      additionalProperties: false
+      required: [tasks]
+      properties:
+        tasks: { type: array, items: { $ref: "#/components/schemas/ArtifactCleanupTask" } }
+    ArtifactCleanupActionRequest:
+      type: object
+      additionalProperties: false
+      required: [action, resolutionNote]
+      properties:
+        action: { type: string, enum: [REQUEUE, RESOLVE] }
+        resolutionNote: { type: string, minLength: 10, maxLength: 500 }
     ExistingReview:
       type: object
       additionalProperties: false
@@ -1855,15 +2367,36 @@ components:
     CreateUserRequest:
       type: object
       additionalProperties: false
-      required: [fullName, email, employeeNumber]
+      required: [fullName, email, employeeNumber, roles]
       properties:
         fullName: { type: string, minLength: 1, maxLength: 100 }
         email: { type: string, format: email, maxLength: 255 }
         employeeNumber: { type: string, minLength: 1, maxLength: 20 }
-        contactNumber: { type: string, maxLength: 20 }
-        department: { type: string, maxLength: 100 }
-        designation: { type: string, maxLength: 100 }
-        status: { type: string, enum: [ACTIVE, DISABLED] }
+        department: { type: string, nullable: true, maxLength: 100 }
+        designation: { type: string, nullable: true, maxLength: 100 }
+        status: { type: string, enum: [ACTIVE, INACTIVE], default: INACTIVE }
+        roles:
+          type: array
+          minItems: 1
+          maxItems: 6
+          uniqueItems: true
+          items: { type: string, enum: [ADMINISTRATOR, EVENT_MANAGER, REGISTRATION_OFFICER, SCREENER, REVIEWER, SUPPORT] }
+    UpdateUserRequest:
+      type: object
+      additionalProperties: false
+      minProperties: 1
+      properties:
+        fullName: { type: string, minLength: 1, maxLength: 100 }
+        employeeNumber: { type: string, minLength: 1, maxLength: 20 }
+        department: { type: string, nullable: true, maxLength: 100 }
+        designation: { type: string, nullable: true, maxLength: 100 }
+        status: { type: string, enum: [ACTIVE, INACTIVE] }
+        roles:
+          type: array
+          minItems: 1
+          maxItems: 6
+          uniqueItems: true
+          items: { type: string, enum: [ADMINISTRATOR, EVENT_MANAGER, REGISTRATION_OFFICER, SCREENER, REVIEWER, SUPPORT] }
     UserListResponse:
       type: object
       additionalProperties: false
@@ -2178,18 +2711,21 @@ components:
     SignatureRequest:
       type: object
       additionalProperties: false
-      required: [dataUrl]
+      required: [dataUrl, eventId, purpose, targetId]
       properties:
         dataUrl:
           type: string
           maxLength: 140000
           pattern: '^data:image/(png|jpeg);base64,'
+        eventId: { type: string, format: uuid }
+        purpose: { type: string, enum: [CONSENT, REFERRAL] }
+        targetId: { type: string, format: uuid, description: Participant ID for consent or referral ID for referral issuance. }
     SignatureResponse:
       type: object
       additionalProperties: false
       required: [signatureObjectKey, signatureSha256, signatureMimeType]
       properties:
-        signatureObjectKey: { type: string }
+        signatureObjectKey: { type: string, pattern: '^signatures/[a-f0-9-]{36}/(consent|referral)-[a-f0-9-]{36}-[a-f0-9-]{36}\\.(png|jpg)$' }
         signatureSha256: { type: string, pattern: '^[a-f0-9]{64}$' }
         signatureMimeType: { type: string, enum: [image/png, image/jpeg] }
     AdminAuditLogsResponse:
@@ -2212,6 +2748,16 @@ components:
         revokedAt: { type: string, format: date-time, nullable: true }
         revokedBy: { type: string, format: uuid, nullable: true }
         revokedReason: { type: string, nullable: true }
+    QrPass:
+      type: object
+      additionalProperties: false
+      required: [qrId, registrationId, issuedAt, expiresAt, qrImage]
+      properties:
+        qrId: { type: string, format: uuid }
+        registrationId: { type: string, format: uuid }
+        issuedAt: { type: string, format: date-time }
+        expiresAt: { type: string, format: date-time }
+        qrImage: { type: string, description: Data URL containing the QR image }
     QrMutationResponse:
       type: object
       additionalProperties: false
@@ -2219,7 +2765,29 @@ components:
       properties:
         success: { type: boolean, enum: [true] }
         message: { type: string }
+        data: { $ref: "#/components/schemas/QrPass" }
+    QrRevokeResponse:
+      type: object
+      additionalProperties: false
+      required: [success, message, data]
+      properties:
+        success: { type: boolean, enum: [true] }
+        message: { type: string }
         data: { $ref: "#/components/schemas/QrCode" }
+    QrRenderResponse:
+      type: object
+      additionalProperties: false
+      required: [success, data]
+      properties:
+        success: { type: boolean, enum: [true] }
+        data:
+          type: object
+          additionalProperties: false
+          required: [qrId, expiresAt, qrImage]
+          properties:
+            qrId: { type: string, format: uuid }
+            expiresAt: { type: string, format: date-time }
+            qrImage: { type: string, description: Data URL containing the QR image }
     ApiDataResponse:
       type: object
       additionalProperties: false
@@ -2403,7 +2971,7 @@ components:
     ScreeningResult:
       type: object
       additionalProperties: true
-      required: [resultId, registrationId, stationId, screeningType, resultData, overallFlag, isFlagged, idempotencyKey, createdAt, updatedAt]
+      required: [resultId, registrationId, stationId, screeningType, resultData, overallFlag, isFlagged, idempotencyKey, version, createdAt, updatedAt]
       properties:
         resultId: { type: string, format: uuid }
         registrationId: { type: string, format: uuid }
@@ -2416,6 +2984,7 @@ components:
         ruleVersion: { type: string }
         acknowledgedAt: { type: string, format: date-time, nullable: true }
         idempotencyKey: { type: string }
+        version: { type: integer, minimum: 1 }
         evaluation: { $ref: "#/components/schemas/ScreeningEvaluation" }
         createdAt: { type: string, format: date-time }
         updatedAt: { type: string, format: date-time }

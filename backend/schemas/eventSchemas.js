@@ -176,6 +176,12 @@ const cancelBody = z.object({
   version: z.number().int().positive(),
   reason: z.string().trim().min(10).max(1000),
 }).strict();
+const deleteEventBody = z.object({
+  version: z.number().int().positive(),
+  // Deliberately do not trim: this must be an exact acknowledgement of the event name.
+  confirmationName: z.string().min(1).max(150),
+  acknowledgePermanentDeletion: z.literal(true),
+}).strict();
 
 const eventParams = z.object({ eventId: uuid }).strict();
 const listQuery = z.object({
@@ -239,6 +245,7 @@ module.exports = {
   updateEventBody,
   transitionBody,
   cancelBody,
+  deleteEventBody,
   eventParams,
   listQuery,
   auditQuery,
