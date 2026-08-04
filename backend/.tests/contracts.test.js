@@ -68,6 +68,14 @@ test("migration preserves history and enforces one active primary contact", () =
     assert.match(migration, /withdrawal_of_id/);
 });
 
+test("event audit log rows are immutable except for an exact event hard-delete scope", () => {
+    const migration = read("prisma/migrations/20260805023000_immutable_event_audit_log/migration.sql");
+    assert.match(migration, /BEFORE UPDATE OR DELETE ON "event_audit_logs"/);
+    assert.match(migration, /current_setting\('vsms\.event_audit_delete_event_id', true\)/);
+    assert.match(migration, /OLD\."event_id"::text/);
+    assert.match(migration, /ERRCODE = '42501'/);
+});
+
 test("event service exposes list functions after merge resolution", () => {
     const eventService = require("../services/eventService");
     assert.equal(typeof eventService.listEvents, "function");

@@ -1491,7 +1491,7 @@ const getAuditLog = async (eventId, query, user) => {
         : {}),
     },
     include: {
-      user: {
+      actor: {
         select: {
           id: true,
           fullName: true,
@@ -1500,7 +1500,7 @@ const getAuditLog = async (eventId, query, user) => {
         },
       },
     },
-    orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+    orderBy: [{ createdAt: "desc" }, { eventAuditLogId: "desc" }],
     take: query.limit + 1,
   });
   const hasMore = rows.length > query.limit;
@@ -1514,7 +1514,7 @@ const getAuditLog = async (eventId, query, user) => {
         ? encodeCursor({
             scope,
             createdAt: last.createdAt.toISOString(),
-            id: last.id,
+            id: last.eventAuditLogId,
           })
         : null,
   };
