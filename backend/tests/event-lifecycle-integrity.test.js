@@ -1,6 +1,7 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
 const eventService = require("../services/eventService");
+const { createEventBody } = require("../schemas/eventSchemas");
 
 const eventId = "11111111-1111-4111-8111-111111111111";
 const userId = "22222222-2222-4222-8222-222222222222";
@@ -169,6 +170,32 @@ test("event creation rejects day slots outside the overall schedule", async () =
   );
 });
 
+test("event plans reject duplicate station orders", () => {
+  const station = (stationTemplateId) => ({
+    stationTemplateId,
+    stationOrder: 1,
+    capacity: 10,
+    isAvailable: true,
+    availabilities: [],
+  });
+  const result = createEventBody.safeParse({
+    name: "Community screening",
+    venue: "Library hall",
+    timezone: "Asia/Singapore",
+    startsAt: "2026-08-10T01:00:00.000Z",
+    endsAt: "2026-08-10T09:00:00.000Z",
+    capacity: 100,
+    stations: [
+      station("55555555-5555-4555-8555-555555555555"),
+      station("66666666-6666-4666-8666-666666666666"),
+    ],
+    shifts: [],
+  });
+
+  assert.equal(result.success, false);
+  assert.match(result.error.issues.find((issue) => issue.path[0] === "stations").message, /order must be unique/);
+});
+
 test("simple event edits bypass unavailable station models", async () => {
   const current = eventRecord("DRAFT", 1);
   const updated = { ...eventRecord("DRAFT", 2), address: "100 Victoria Street", postalCode: "188064" };
@@ -214,4 +241,62 @@ test("staff removal checks and increments the event version before deleting", as
   assert.deepEqual(calls, ["version", "delete"]);
   assert.equal(result.version, 8);
   assert.equal(result.canManage, true);
+});
+
+test("staff assignment commits with schedule locking and the event version", async () => {
+  const shiftId = "44444444-4444-4444-8444-444444444444";
+  const stationId = "55555555-5555-4555-8555-555555555555";
+  const assigneeId = "66666666-6666-4666-8666-666666666666";
+  const shift = {
+    shiftId,
+    name: "Morning",
+    startsAt: new Date("2026-08-10T01:00:00.000Z"),
+    endsAt: new Date("2026-08-10T05:00:00.000Z"),
+    requiredStaff: 1,
+    status: "PLANNED",
+    staffAssignments: [],
+  };
+  const station = { stationId, stationName: "Visual acuity", stationType: "VISUAL_ACUITY", stationOrder: 1, isActive: true };
+  const current = { ...eventRecord("DRAFT", 3, [shift]), stations: [station] };
+  const assignment = {
+    id: "77777777-7777-4777-8777-777777777777",
+    userId: assigneeId,
+    assignmentRole: "SCREENER",
+    status: "ASSIGNED",
+    notes: "Arrive early",
+    assignedUser: { id: assigneeId, username: "screener" },
+    station,
+  };
+  const updated = { ...eventRecord("DRAFT", 4, [{ ...shift, staffAssignments: [assignment] }]), stations: [station] };
+  let versionWhere;
+  let createdAssignment;
+  let audit;
+  const db = transactionDb(current, updated, {
+    updateEvent: async ({ where }) => { versionWhere = where; return { count: 1 }; },
+    audit: async ({ data }) => { audit = data; return {}; },
+    tx: {
+      $executeRawUnsafe: async () => 1,
+      user: { findFirst: async () => ({ id: assigneeId }) },
+      staffAssignment: {
+        findFirst: async () => null,
+        create: async ({ data }) => { createdAssignment = data; return assignment; },
+      },
+    },
+  });
+
+  const result = await eventService.addStaffAssignment(eventId, shiftId, {
+    version: 3,
+    userId: assigneeId,
+    assignmentRole: "SCREENER",
+    eventStationId: stationId,
+    notes: "Arrive early",
+  }, user, { requestId, ipAddress: "203.0.113.9", deviceName: "Planner" }, db);
+
+  assert.deepEqual(versionWhere, { eventId, version: 3 });
+  assert.equal(createdAssignment.stationId, stationId);
+  assert.equal(createdAssignment.assignmentStatus, "ASSIGNED");
+  assert.equal(createdAssignment.status, "ASSIGNED");
+  assert.equal(audit.action, "STAFF_ASSIGNMENT_ADDED");
+  assert.equal(audit.requestId, requestId);
+  assert.equal(result.shifts[0].staffAssignments[0].user.username, "screener");
 });

@@ -10,6 +10,10 @@ jobs:
   npm-audit:
     name: Fast NPM Security Audit
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        project: [backend, react-user-dashboard]
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -21,7 +25,7 @@ jobs:
 
       - name: Run NPM Audit
         run: npm audit --omit=dev --audit-level=high
-        working-directory: backend
+        working-directory: ${{ matrix.project }}
 
   owasp-dep-check:
     name: Deep OWASP Dependency Check

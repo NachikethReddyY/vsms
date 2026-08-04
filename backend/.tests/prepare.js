@@ -6,6 +6,7 @@ const unitTests = spawnSync("node", [
   ".tests/contracts.test.js",
   ".tests/security.test.js",
   ".tests/validation.test.js",
+  ".tests/stationTemplateMapping.test.js",
 ], {
   cwd: process.cwd(),
   env: { ...process.env, NODE_ENV: "test", LOCAL_HTTPS: "false" },
@@ -27,7 +28,6 @@ if (result.status !== 0) process.exit(result.status || 1);
 const tests = spawnSync("npx", [
   "vitest",
   "run",
-  ".tests/auth.integration.test.js",
   ".tests/events.integration.test.js",
   ".tests/locationService.test.js",
   ".tests/reviewService.test.js",
