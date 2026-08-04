@@ -13,6 +13,18 @@ const eventId = crypto.randomUUID();
 const shiftId = crypto.randomUUID();
 const startsAt = new Date("2040-01-01T01:00:00.000Z");
 const endsAt = new Date("2040-01-01T05:00:00.000Z");
+const FORBIDDEN_EVENT_RESPONSE_KEYS = [
+  "createIdempotencyKey",
+  "createPayloadHash",
+  "createdByUserId",
+  "cancelledByUserId",
+];
+
+const assertForbiddenEventKeysAbsent = (value) => {
+  for (const key of FORBIDDEN_EVENT_RESPONSE_KEYS) {
+    assert.equal(Object.hasOwn(value, key), false, `event response must not own ${key}`);
+  }
+};
 
 const eventRecord = (status = "DRAFT", version = 1, assignments = [], registrations = []) => ({
   eventId,
@@ -107,6 +119,79 @@ test("event transitions update by eventId and keep the next manager action avail
   assert.equal(updateWhere.eventId, eventId);
   assert.equal(updateWhere.id, undefined);
   assert.equal(result.status, "PUBLISHED");
+  assert.equal(result.canManage, true);
+});
+
+test("draft event managers can save the complete edit-form planning payload", async (t) => {
+  const current = { ...eventRecord(), shifts: [], stations: [], eventDays: [] };
+  const day = {
+    eventDayId: crypto.randomUUID(),
+    date: new Date("2040-01-01T00:00:00.000Z"),
+    startsAt,
+    endsAt,
+  };
+  const updated = {
+    ...current,
+    version: 2,
+    address: "1 Test Street",
+    postalCode: "123456",
+    latitude: 1.3,
+    longitude: 103.8,
+    locationProvider: "ONEMAP",
+    locationReference: "test-location",
+    expectedAttendance: 8,
+    eventDays: [day],
+  };
+  let updateData;
+  installTransaction(t, current, updated, {
+    event: {
+      updateMany: async ({ data }) => { updateData = data; return { count: 1 }; },
+      findUniqueOrThrow: async () => updated,
+    },
+    eventDay: {
+      deleteMany: async () => ({ count: 0 }),
+      create: async () => day,
+      findMany: async () => [],
+    },
+    eventStationAvailability: {
+      deleteMany: async () => ({ count: 0 }),
+      create: async () => ({}),
+    },
+    station: { findMany: async () => [] },
+    stationTemplate: { findMany: async () => [] },
+    shift: {
+      deleteMany: async () => ({ count: 0 }),
+      findMany: async () => [],
+    },
+    staffAssignment: { findFirst: async () => null },
+  });
+
+  const result = await eventService.updateEvent(eventId, {
+    version: 1,
+    name: current.name,
+    description: null,
+    bannerKey: "COMMUNITY_SCREENING",
+    artworkDataUrl: null,
+    venue: current.venue,
+    address: updated.address,
+    postalCode: updated.postalCode,
+    latitude: updated.latitude,
+    longitude: updated.longitude,
+    locationProvider: updated.locationProvider,
+    locationReference: updated.locationReference,
+    timezone: current.timezone,
+    startsAt: startsAt.toISOString(),
+    endsAt: endsAt.toISOString(),
+    capacity: current.capacity,
+    expectedAttendance: updated.expectedAttendance,
+    eventDays: [{ date: "2040-01-01", startsAt: startsAt.toISOString(), endsAt: endsAt.toISOString() }],
+    stations: [],
+    shifts: [],
+  }, manager, crypto.randomUUID());
+
+  assert.equal(updateData.address, "1 Test Street");
+  assert.equal(updateData.expectedAttendance, 8);
+  assert.equal(result.eventDays.length, 1);
   assert.equal(result.canManage, true);
 });
 

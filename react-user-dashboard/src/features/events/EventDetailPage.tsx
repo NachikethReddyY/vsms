@@ -341,7 +341,8 @@ export default function EventDetailPage() {
   const totalRequiredStaff = event.shifts.reduce((total, shift) => total + shift.requiredStaff, 0);
   const next = nextAction[event.status];
   const routeSection = location.pathname.split('/').filter(Boolean).pop();
-  const view = routeSection && ['stations', 'staff', 'activity'].includes(routeSection) ? routeSection : 'overview';
+  const requestedView = routeSection && ['stations', 'staff', 'activity'].includes(routeSection) ? routeSection : 'overview';
+  const view = canManage ? requestedView : 'overview';
   const eventPath = `/events/${event.eventId}`;
 
   return <div className="page-frame detail-page">
@@ -378,12 +379,12 @@ export default function EventDetailPage() {
       </div>
     </section>
 
-    <nav className="event-detail-tabs" aria-label="Event sections">
+    {canManage && <nav className="event-detail-tabs" aria-label="Event sections">
       <Link className={view === 'overview' ? 'active' : undefined} to={eventPath}>Overview</Link>
       <Link className={view === 'stations' ? 'active' : undefined} to={`${eventPath}/stations`}>Stations</Link>
       <Link className={view === 'staff' ? 'active' : undefined} to={`${eventPath}/staff`}>Staff</Link>
       <Link className={view === 'activity' ? 'active' : undefined} to={`${eventPath}/activity`}>Activity</Link>
-    </nav>
+    </nav>}
 
     <AppToast message={notice} onDismiss={() => setNotice('')} />
     {error && <div className="alert error" role="alert">{error}</div>}
@@ -403,8 +404,8 @@ export default function EventDetailPage() {
       <section className="event-metric-grid" aria-label="Event overview">
         <div className="event-info-row"><CalendarDaysIcon /><div><small>Date and time</small><strong>{dateParts.weekday}, {dateParts.month} {dateParts.day}, {dateParts.year}</strong><span>{formatTime(event.startsAt, event.timezone)} to {formatTime(event.endsAt, event.timezone)}, {eventDuration(event.startsAt, event.endsAt)}</span></div></div>
         <div className="event-info-row"><MapPinIcon /><div><small>Venue</small><strong>{event.venue}</strong><span>{event.address || 'Address entered manually'}{event.postalCode ? ` · Singapore ${event.postalCode}` : ''} · {event.timezone}</span></div></div>
-        <div className="event-info-row"><UserGroupIcon /><div><small>At venue now</small><strong>{event.activeCapacityCount.toLocaleString()} of {event.capacity.toLocaleString()} people</strong><span>Signed up or checked in</span></div></div>
-        <div className="event-info-row"><ClipboardDocumentListIcon /><div><small>Expected</small><strong>{event.expectedAttendance?.toLocaleString() || 'Not set'} visitors</strong><span>{event.signupCount.toLocaleString()} signups collected</span></div></div>
+        {canManage && <div className="event-info-row"><UserGroupIcon /><div><small>At venue now</small><strong>{event.activeCapacityCount.toLocaleString()} of {event.capacity.toLocaleString()} people</strong><span>Signed up or checked in</span></div></div>}
+        {canManage && <div className="event-info-row"><ClipboardDocumentListIcon /><div><small>Expected</small><strong>{event.expectedAttendance?.toLocaleString() || 'Not set'} visitors</strong><span>{event.signupCount.toLocaleString()} signups collected</span></div></div>}
         <div className="event-info-row"><ClockIcon /><div><small>Staffing plan</small><strong>{event.shifts.length} {event.shifts.length === 1 ? 'shift' : 'shifts'}, {totalRequiredStaff} required</strong><span>Event operations coverage</span></div></div>
       </section>
       <section className="lifecycle" aria-labelledby="lifecycle-title">

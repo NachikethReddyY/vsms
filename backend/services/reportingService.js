@@ -208,15 +208,18 @@ const getOperationalReport = async (query, user, db = prisma, now = new Date()) 
   const syncRows = entityEvent.size
     ? await db.syncAction.findMany({
         where: {
-          entityId: { in: [...entityEvent.keys()] },
+          OR: [
+            { eventId: { in: eventIds } },
+            { entityId: { in: [...entityEvent.keys()] } },
+          ],
           createdAt: { gte: range.startsAt, lt: range.endsBefore },
         },
-        select: { entityId: true, status: true },
+        select: { eventId: true, entityId: true, status: true },
       })
     : [];
 
   for (const row of syncRows) {
-    const metrics = byEvent.get(entityEvent.get(row.entityId));
+    const metrics = byEvent.get(row.eventId || entityEvent.get(row.entityId));
     if (!metrics) continue;
     metrics.sync.total += 1;
     if (["PENDING", "PROCESSING"].includes(row.status)) metrics.sync.pending += 1;

@@ -57,16 +57,18 @@ const reportDb = (capturedWhere) => ({
   },
   syncAction: {
     findMany: async ({ where, select }) => {
-      assert.deepEqual(select, { entityId: true, status: true });
-      assert.ok(where.entityId.in.includes(eventId));
-      assert.ok(where.entityId.in.includes(registrationId));
-      assert.ok(where.entityId.in.includes(queueId));
-      assert.ok(where.entityId.in.includes(referralId));
-      assert.ok(where.entityId.in.includes(resultId));
-      assert.ok(where.entityId.in.includes(reviewId));
+      assert.deepEqual(select, { eventId: true, entityId: true, status: true });
+      assert.ok(where.OR[0].eventId.in.includes(eventId));
+      assert.ok(where.OR[1].entityId.in.includes(eventId));
+      assert.ok(where.OR[1].entityId.in.includes(registrationId));
+      assert.ok(where.OR[1].entityId.in.includes(queueId));
+      assert.ok(where.OR[1].entityId.in.includes(referralId));
+      assert.ok(where.OR[1].entityId.in.includes(resultId));
+      assert.ok(where.OR[1].entityId.in.includes(reviewId));
       return [
-        { entityId: registrationId, status: "APPLIED" },
-        { entityId: resultId, status: "CONFLICT" },
+        { eventId, entityId: registrationId, status: "APPLIED" },
+        { eventId: null, entityId: resultId, status: "CONFLICT" },
+        { eventId, entityId: registrationId, status: "PROCESSING" },
       ];
     },
   },
@@ -94,7 +96,7 @@ test("event-manager reports remain event scoped and return aggregate-only metric
   assert.deepEqual(report.summary.queue, { waiting: 1, active: 0, completed: 1 });
   assert.deepEqual(report.summary.referrals, { total: 1, actionRequired: 1, sentOrAcknowledged: 0 });
   assert.deepEqual(report.summary.deliveries, { inFlight: 0, delivered: 0, issues: 1 });
-  assert.deepEqual(report.summary.sync, { total: 2, pending: 0, applied: 1, issues: 1 });
+  assert.deepEqual(report.summary.sync, { total: 3, pending: 1, applied: 1, issues: 1 });
 
   const serialized = JSON.stringify(report).toLowerCase();
   for (const forbidden of ["nric", "clinicalsummary", "resultdata", "recipient", "destinationemail", "payload", "errorlog"]) {

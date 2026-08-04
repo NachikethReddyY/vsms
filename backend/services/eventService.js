@@ -141,6 +141,11 @@ const publicUser = (value) => value ? {
   status: value.status,
 } : null;
 
+const assignmentUser = (value) => value ? {
+  userId: value.id,
+  username: value.username || value.fullName || "Staff member",
+} : null;
+
 const loadTemplatesByStationType = async (db = prisma) => {
   const templates = await db.stationTemplate.findMany({ where: { active: true } });
   const byType = new Map();
@@ -608,6 +613,16 @@ const createEvent = async (body, user, correlationId, rawIdempotencyKey) => {
         newValue: snapshot(full),
         ipAddress: "::1",
         deviceName: "Server",
+      },
+    });
+    await tx.eventAuditLog.create({
+      data: {
+        eventId: created.eventId,
+        actorUserId: user.userId,
+        action: "CREATED",
+        beforeSnapshot: null,
+        afterSnapshot: snapshot(full),
+        correlationId,
       },
     });
     return toEventResponse(full, user, tx);
