@@ -100,7 +100,7 @@ const safeQrRecord = (qr) => ({
     revokedReason: qr.revokedReason,
 });
 
-const lockRegistrationForQrIssuance = async (tx, registrationId) => {
+const lockRegistration = async (tx, registrationId) => {
     if (typeof tx.$queryRaw !== "function") return;
     const rows = await tx.$queryRaw`
         SELECT registration_id
@@ -111,6 +111,25 @@ const lockRegistrationForQrIssuance = async (tx, registrationId) => {
     if (Array.isArray(rows) && rows.length === 0) {
         throw new AppError(404, "REGISTRATION_NOT_FOUND", "Event registration not found.");
     }
+};
+
+const lockActiveQrPass = async (tx, qrId, registrationId, now = new Date()) => {
+    if (typeof tx.$queryRaw !== "function") {
+        return tx.qRCodePass.findFirst({
+            where: activeQrWhere({ id: qrId, registrationId }, now),
+            select: { id: true, registrationId: true },
+        });
+    }
+    const rows = await tx.$queryRaw`
+        SELECT qr_id AS "id", registration_id AS "registrationId"
+        FROM qr_code_passes
+        WHERE qr_id = CAST(${qrId} AS uuid)
+          AND registration_id = CAST(${registrationId} AS uuid)
+          AND is_active = true
+          AND expires_at > ${now}
+        FOR UPDATE
+    `;
+    return Array.isArray(rows) ? rows[0] || null : null;
 };
 
 const renderQr = async (qr, token) => ({
@@ -204,7 +223,7 @@ exports.generateQR = async (registrationId, userId = null, externalTx = null) =>
     const execute = async (tx) => {
         // Serialize first issuance on the registration row so concurrent calls
         // converge on one active pass.
-        await lockRegistrationForQrIssuance(tx, registrationId);
+        await lockRegistration(tx, registrationId);
         const registration = await tx.eventRegistration.findUnique({
             where: { registrationId },
             include: { participant: true, event: true },
@@ -357,9 +376,16 @@ exports.revokeQR = async (qrId, revokedReason = "Revoked by staff", revokedBy = 
 
     return await db.$transaction(async (tx) => {
         const now = new Date();
-        const qr = await tx.qRCodePass.findFirst({ where: activeQrWhere({ id: qrId }, now) });
+        const qr = await tx.qRCodePass.findFirst({
+            where: activeQrWhere({ id: qrId }, now),
+            select: { id: true, registrationId: true },
+        });
 
         if (!qr) throw new AppError(404, "QR_NOT_FOUND", "QR Code is invalid, expired, or unavailable.");
+        await lockRegistration(tx, qr.registrationId);
+        if (!await lockActiveQrPass(tx, qr.id, qr.registrationId, now)) {
+            throw new AppError(409, "QR_STATE_CONFLICT", "QR Code is no longer active.");
+        }
 
         const updated = await tx.qRCodePass.updateMany({
             where: activeQrWhere({ id: qrId }, now),
@@ -395,7 +421,7 @@ exports.reissueQR = async (registrationId, userId = null, db = prisma) => {
 
     return await db.$transaction(async (tx) => {
         const now = new Date();
-        await lockRegistrationForQrIssuance(tx, registrationId);
+        await lockRegistration(tx, registrationId);
         // 1. Deactivate existing passes
         await tx.qRCodePass.updateMany({
             where: { registrationId, isActive: true },
@@ -473,11 +499,13 @@ exports.manualCheckIn = async (params, db = prisma) => {
 
     return await db.$transaction(async (tx) => {
         let regIdToUpdate = registrationId;
+        let qrIdToUse = null;
 
         if (!regIdToUpdate && identifier) {
             const qr = await tx.qRCodePass.findFirst({
                 where: activeQrWhere(tokenSelector(identifier)),
                 select: {
+                    id: true,
                     registrationId: true,
                     registration: { select: { eventId: true } },
                 },
@@ -488,11 +516,17 @@ exports.manualCheckIn = async (params, db = prisma) => {
                     throw new AppError(400, "QR_EVENT_MISMATCH", "QR Code is not valid for this specific event.");
                 }
                 regIdToUpdate = qr.registrationId;
+                qrIdToUse = qr.id;
             }
         }
 
         if (!regIdToUpdate) {
             throw new AppError(404, "REGISTRATION_NOT_FOUND", "Registration record not found for manual check-in.");
+        }
+
+        await lockRegistration(tx, regIdToUpdate);
+        if (qrIdToUse && !await lockActiveQrPass(tx, qrIdToUse, regIdToUpdate)) {
+            throw new AppError(404, "INVALID_QR", "QR Code is invalid, expired, or unavailable.");
         }
 
         const registration = await tx.eventRegistration.findFirst({

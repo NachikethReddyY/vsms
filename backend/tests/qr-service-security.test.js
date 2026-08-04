@@ -240,7 +240,7 @@ test("verification rejects any pass that does not satisfy the shared active-expi
 
 test("manual QR check-in writes no bearer or participant data and returns a minimal projection", async () => {
   const token = "e".repeat(64);
-  let qrQuery;
+  const qrQueries = [];
   let registrationQuery;
   let updateQuery;
   let audit;
@@ -248,8 +248,10 @@ test("manual QR check-in writes no bearer or participant data and returns a mini
     $transaction: async (work) => work({
       qRCodePass: {
         findFirst: async (query) => {
-          qrQuery = query;
-          return { registrationId, registration: { eventId } };
+          qrQueries.push(query);
+          return qrQueries.length === 1
+            ? { id: qrId, registrationId, registration: { eventId } }
+            : { id: qrId, registrationId };
         },
       },
       eventRegistration: {
@@ -277,12 +279,18 @@ test("manual QR check-in writes no bearer or participant data and returns a mini
 
   const result = await qrService.manualCheckIn({ identifier: token, eventId, userId: qrId }, db);
 
-  assert.deepEqual(qrQuery.select, {
+  assert.deepEqual(qrQueries[0].select, {
+    id: true,
     registrationId: true,
     registration: { select: { eventId: true } },
   });
-  assert.equal(qrQuery.where.tokenHash, tokenHash(token));
-  assert.equal(JSON.stringify(qrQuery).includes(token), false);
+  assert.equal(qrQueries[0].where.tokenHash, tokenHash(token));
+  assert.equal(JSON.stringify(qrQueries[0]).includes(token), false);
+  assert.deepEqual(qrQueries[1].select, { id: true, registrationId: true });
+  assert.equal(qrQueries[1].where.id, qrId);
+  assert.equal(qrQueries[1].where.registrationId, registrationId);
+  assert.equal(qrQueries[1].where.isActive, true);
+  assert.ok(qrQueries[1].where.expiresAt.gt instanceof Date);
   assert.deepEqual(registrationQuery.select, {
     registrationId: true,
     eventId: true,
@@ -360,6 +368,23 @@ test("manual check-in rejects NRIC input and QR tokens from another event", asyn
     (error) => error.code === "QR_EVENT_MISMATCH" && error.status === 400,
   );
   assert.equal(updated, false);
+});
+
+test("manual check-in requires exactly one registration reference or QR token", async () => {
+  let openedTransactions = 0;
+  const db = { $transaction: async () => { openedTransactions += 1; } };
+
+  for (const params of [
+    { eventId, userId: qrId },
+    { eventId, userId: qrId, registrationId, identifier: "a".repeat(64) },
+  ]) {
+    await assert.rejects(
+      qrService.manualCheckIn(params, db),
+      (error) => error.code === "CHECKIN_REFERENCE_REQUIRED" && error.status === 400,
+    );
+  }
+
+  assert.equal(openedTransactions, 0);
 });
 
 test("manual check-in cannot reopen terminal registrations or win a stale update race", async () => {

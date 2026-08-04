@@ -2758,12 +2758,16 @@ export interface components {
                 [key: string]: unknown;
             };
         };
-        /** @description Supply exactly one registrationId or active QR token together with eventId. NRIC lookup is not supported. */
-        ManualCheckInRequest: {
+        ManualCheckInRequest: components["schemas"]["ManualCheckInByRegistration"] | components["schemas"]["ManualCheckInByQrToken"];
+        ManualCheckInByRegistration: {
             /** Format: uuid */
-            registrationId?: string;
+            registrationId: string;
+            /** Format: uuid */
+            eventId: string;
+        };
+        ManualCheckInByQrToken: {
             /** @description Active QR pass token only; NRIC lookup is not supported. */
-            identifier?: string;
+            identifier: string;
             /** Format: uuid */
             eventId: string;
         };
@@ -2782,7 +2786,7 @@ export interface components {
         ManualCheckInResponse: {
             /** @enum {boolean} */
             success: true;
-            message?: string;
+            message: string;
             data: components["schemas"]["ManualCheckInResult"];
         };
         ScreeningStation: {
