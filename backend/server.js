@@ -1,5 +1,5 @@
 const fs = require("fs");
-const https = https = require("https");
+const http = require("http");
 const path = require("path");
 const express = require("express");
 const cookieParser = require("cookie-parser");
@@ -146,38 +146,32 @@ app.use((req, res) => {
 // -----------------------------------------------------------------------------
 // 5. SERVER CREATION, SOCKET.IO & LISTENING
 // -----------------------------------------------------------------------------
-const server = !env.isProduction && env.localHttps
-  ? https.createServer({
-      key: fs.readFileSync(path.resolve(__dirname, env.TLS_KEY_PATH)),
-      cert: fs.readFileSync(path.resolve(__dirname, env.TLS_CERT_PATH)),
-    }, app)
-  : require("http").createServer(app);
 
-// Attach Socket.io with your existing enterprise CORS policies
-const io = new Server(server, {
-  cors: {
-    origin: allowedOrigins,
-    methods: ["GET", "POST"],
-    credentials: true,
-  },
-});
+// Create the HTTP or HTTPS server depending on production / local settings
+let server;
 
-// Make io accessible globally or export it if needed across controllers/routes
-app.set("io", io);
+if (!env.isProduction && env.localHttps) {
 
-io.on("connection", (socket) => {
-  logger.info(`Client connected via WebSockets: ${socket.id}`);
+  server = https.createServer(
+    {
+      key: fs.readFileSync(
+        path.resolve(__dirname, env.TLS_KEY_PATH)
+      ),
+      cert: fs.readFileSync(
+        path.resolve(__dirname, env.TLS_CERT_PATH)
+      ),
+    },
+    app
+  );
 
-  // Example event room join for your active event queues
-  socket.on("join-event-queue", (eventId) => {
-    socket.join(`event-${eventId}`);
-    logger.info(`Socket ${socket.id} joined room: event-${eventId}`);
-  });
+} else {
 
-  socket.on("disconnect", () => {
-    logger.info(`Client disconnected: ${socket.id}`);
-  });
-});
+  server = http.createServer(app);
+
+}
+
+// Initialize Socket.io attached to the server instance
+const io = new Server(server, { cors: corsOptions });
 
 server.on("error", (error) => {
   logger.error("server.failed", { message: error.message, stack: error.stack });
@@ -190,9 +184,7 @@ if (require.main === module) {
     const protocol = !env.isProduction && env.localHttps ? "https" : "http";
     const serverUrl = `${protocol}://localhost:${port}`;
     
-    // Console log to explicitly confirm the server is running in the terminal
     console.log(`[Server Status] Running successfully on ${serverUrl}`);
-    
     logger.info(`Server & WebSocket engine running securely on ${serverUrl}`);
   });
 }

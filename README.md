@@ -57,7 +57,7 @@ The event lifecycle is `DRAFT → PUBLISHED → IN_PROGRESS → COMPLETED`, with
    npm --prefix react-user-dashboard run dev
    ```
 
-Open `http://localhost:5173`. The API is available at `http://localhost:5050`; non-production API documentation is at `http://localhost:5050/api-docs`.
+Open `https://localhost:5173`. The API is available at `https://localhost:5000`; non-production API documentation is at `https://localhost:5000/api-docs`. Plain HTTP is intentionally unavailable on both ports.
 
 ### Seeded development accounts
 
@@ -81,6 +81,7 @@ npm --prefix backend run contracts:check
 npm --prefix backend test
 npm --prefix react-user-dashboard run lint
 npm --prefix react-user-dashboard run build
+npm run check:https
 ```
 
 The Bruno collection is in `api-testing/bruno`. Select its `Local` environment after both applications are running. Generated result files are ignored because they may contain short-lived credentials.
