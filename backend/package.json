@@ -26,7 +26,9 @@
   "packageManager": "pnpm@11.18.0",
   "type": "commonjs",
   "dependencies": {
+    "@aws-sdk/client-cognito-identity-provider": "^3.1101.0",
     "@aws-sdk/client-sesv2": "^3.1102.0",
+    "@aws-sdk/client-sns": "^3.1102.0",
     "@prisma/client": "^6.19.3",
     "bcrypt": "^6.0.0",
     "cookie-parser": "^1.4.7",
