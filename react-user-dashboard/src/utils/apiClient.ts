@@ -46,14 +46,15 @@ apiClient.interceptors.request.use((config) => {
   config.headers["X-Device-Name"] = "VSMS staff web";
 
   if (accessToken) config.headers.Authorization = `Bearer ${accessToken}`;
-  if (csrfToken && !["get", "head", "options"].includes(config.method || "get")) {
-    config.headers["X-CSRF-Token"] = csrfToken;
+  const requestCsrfToken = getCsrfToken();
+  if (requestCsrfToken && !["get", "head", "options"].includes(config.method || "get")) {
+    config.headers["X-CSRF-Token"] = requestCsrfToken;
   }
   return config;
 });
 
 async function rotateSession(): Promise<AuthSession> {
-  const response = await refreshClient.post("/auth/refresh", null, {
+  const response = await refreshClient.post("/auth/refresh", {}, {
     headers: {
       "X-CSRF-Token": getCsrfToken(),
       "X-Device-Id": getDeviceId(),

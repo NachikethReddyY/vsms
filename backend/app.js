@@ -11,6 +11,7 @@ const YAML = require("yaml");
 const env = require("./config/env");
 const AppError = require("./errors/AppError");
 const requestContext = require("./middlewares/requestContext");
+const csrf = require("./middlewares/csrf");
 const authRoutes = require("./routes/authRoutes");
 const userRoutes = require("./routes/userRoutes");
 const eventRoutes = require("./routes/eventRoutes");
@@ -96,6 +97,8 @@ app.use(cors({
 }));
 
 app.use(cookieParser());
+app.use(["/api/v1", "/api"], (req, res, next) =>
+  ["POST", "PUT", "PATCH", "DELETE"].includes(req.method) ? csrf(req, res, next) : next());
 app.use(express.json({ limit: "256kb", strict: true, type: "application/json" }));
 
 const authLimiter = rateLimit({ windowMs: 15 * 60000, limit: 20, standardHeaders: "draft-8", legacyHeaders: false });
