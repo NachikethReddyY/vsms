@@ -1,7 +1,7 @@
 import { ExclamationTriangleIcon, InformationCircleIcon } from '@heroicons/react/24/outline';
 import { FormEvent, useEffect, useMemo, useState } from 'react';
 import { Link, useParams, useSearchParams } from 'react-router-dom';
-import { getApiMessage } from '../../auth/authState';
+import { getApiError as getApiMessage } from '../../utils/apiClient';
 import {
   EyeReading,
   FlagEvaluation,

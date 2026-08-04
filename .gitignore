@@ -32,6 +32,7 @@ test-results/
 
 # Local TLS certificates and private keys (generate these per developer machine)
 react-user-dashboard/certs/*.pem
+backend/certs/*.pem
 
 # Bruno reports can contain short-lived bearer tokens and response headers
 api-testing/results/

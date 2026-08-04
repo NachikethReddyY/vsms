@@ -8,7 +8,8 @@
   },
   "scripts": {
     "test": "npm --prefix backend test",
-    "check": "npm --prefix backend run prisma:validate && npm --prefix backend run openapi:lint && npm --prefix backend run contracts:check && npm --prefix react-user-dashboard run lint && npm --prefix react-user-dashboard run build"
+    "check": "npm --prefix backend run prisma:validate && npm --prefix backend run openapi:lint && npm --prefix backend run contracts:check && npm --prefix react-user-dashboard run lint && npm --prefix react-user-dashboard run build",
+    "check:https": "node scripts/check-local-https.mjs"
   },
   "repository": {
     "type": "git",
