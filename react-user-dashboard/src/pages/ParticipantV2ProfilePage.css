@@ -1,0 +1,51 @@
+/* Keep the profile header aligned with the app's plain surface-card design. */
+.participant-v2-profile-hero {
+  position:static;
+  overflow:visible;
+  border:1px solid var(--hairline-strong);
+  border-radius:14px;
+  background:var(--surface);
+  box-shadow:none;
+}
+
+.participant-v2-profile-hero:after { display:none; }
+
+.participant-v2-profile-identity,
+.participant-v2-profile-status,
+.participant-v2-profile-facts {
+  position:static;
+  z-index:auto;
+}
+
+.participant-v2-profile-avatar {
+  border:1px solid color-mix(in srgb,var(--accent) 20%,var(--hairline));
+  background:var(--accent-tint);
+  box-shadow:none;
+  color:var(--accent);
+}
+
+.participant-v2-profile-facts>div {
+  border-color:var(--hairline);
+  background:var(--canvas-soft);
+}
+
+.participant-v2-profile-summary { grid-template-columns:1fr 1fr; }
+
+.participant-v2-profile-summary article+article {
+  border-left:1px solid var(--hairline);
+  padding-left:20px;
+}
+
+.participant-v2-profile-summary .participant-v2-consent-status { color:var(--muted); }
+.participant-v2-profile-summary .participant-v2-consent-status.accepted { color:var(--green); }
+.participant-v2-profile-summary .participant-v2-consent-status.declined,
+.participant-v2-profile-summary .participant-v2-consent-status.withdrawn { color:var(--orange); }
+
+@media (max-width:640px) {
+  .participant-v2-profile-summary { grid-template-columns:1fr; }
+  .participant-v2-profile-summary article+article {
+    border-top:1px solid var(--hairline);
+    border-left:0;
+    padding-left:0;
+  }
+}
