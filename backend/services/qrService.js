@@ -23,6 +23,40 @@ const tokenSelector = (token) => ({ tokenHash: hashToken(token) });
 
 const qrTokenContext = (qrId) => encryptionContext("QRCodePass", qrId, "token");
 
+const qrLookupIdentitySelect = {
+    registrationId: true,
+    queueNumber: true,
+    participant: { select: { firstName: true, lastName: true } },
+    event: { select: { eventId: true, name: true } },
+};
+
+const qrLookupIdentity = (registration) => ({
+    registrationId: registration.registrationId,
+    queueNumber: registration.queueNumber,
+    participant: {
+        firstName: registration.participant.firstName,
+        lastName: registration.participant.lastName,
+    },
+    event: {
+        eventId: registration.event.eventId,
+        name: registration.event.name,
+    },
+});
+
+const qrLookupRegistrationSelect = {
+    ...qrLookupIdentitySelect,
+    eventId: true,
+    registrationStatus: true,
+    checkedIn: true,
+};
+
+const qrLookupRegistration = (registration) => ({
+    ...qrLookupIdentity(registration),
+    eventId: registration.eventId,
+    registrationStatus: registration.registrationStatus,
+    checkedIn: registration.checkedIn,
+});
+
 const decryptQrToken = (qr) => {
     if (qr.tokenEncryptionVersion !== 2 || !qr.tokenCiphertext) {
         throw new AppError(410, "QR_REISSUE_REQUIRED", "This QR pass must be reissued before it can be rendered.");
@@ -128,18 +162,14 @@ exports.getRegistrationByQR = async (token, db = prisma) => {
 
     const qr = await db.qRCodePass.findFirst({
         where: activeQrWhere(tokenSelector(token)),
-        include: {
-            registration: {
-                include: { participant: true, event: true },
-            },
-        },
+        select: { registration: { select: qrLookupRegistrationSelect } },
     });
 
     if (!qr) {
         throw new AppError(404, "NOT_FOUND", "Registration not found for this QR token.");
     }
 
-    return qr.registration;
+    return qrLookupRegistration(qr.registration);
 };
 
 // ==========================================
@@ -271,10 +301,12 @@ exports.getParticipant = async (token, db = prisma) => {
 
     const qr = await db.qRCodePass.findFirst({
         where: activeQrWhere(tokenSelector(token)),
-        include: {
-            registration: {
-                include: { participant: true, event: true },
-            },
+        select: {
+            id: true,
+            registrationId: true,
+            expiresAt: true,
+            isActive: true,
+            registration: { select: qrLookupIdentitySelect },
         },
     });
 
@@ -282,12 +314,13 @@ exports.getParticipant = async (token, db = prisma) => {
         throw new AppError(404, "PARTICIPANT_NOT_FOUND", "QR Code is invalid, expired, or deactivated.");
     }
 
+    const registration = qrLookupIdentity(qr.registration);
     return {
         qrId: qr.id,
-        registrationId: qr.registration.registrationId,
-        participant: qr.registration.participant,
-        event: qr.registration.event,
-        queueNumber: qr.registration.queueNumber,
+        registrationId: registration.registrationId,
+        participant: registration.participant,
+        event: registration.event,
+        queueNumber: registration.queueNumber,
         expiresAt: qr.expiresAt,
         isActive: qr.isActive,
     };
