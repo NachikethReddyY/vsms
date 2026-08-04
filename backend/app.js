@@ -134,7 +134,6 @@ app.use("/api/v1/signatures", signatureRoutes);
 app.use("/api/v1/admin", adminRoutes);
 app.use("/api/v1/qr", mutationLimiter, qrRoutes);
 
-app.use("/api/auth", authLimiter, authRoutes);
 app.use("/api/users", userRoutes);
 app.use("/api/events", (req, res, next) => ["POST", "PATCH", "PUT", "DELETE"].includes(req.method) ? mutationLimiter(req, res, next) : next(), eventRoutes);
 app.use("/api/locations", locationRoutes);

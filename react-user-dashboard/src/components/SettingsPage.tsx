@@ -1,8 +1,9 @@
-import { useAuth } from '../auth/authState';
+import { useAuth } from '../auth/AuthProvider';
 import { ThemeToggle } from './MagicEffects';
 
 export default function SettingsPage() {
-  const { user } = useAuth();
+  const { session } = useAuth();
+  const user = session?.user;
   return (
     <section className="page-frame narrow settings-page">
       <header className="page-heading">

@@ -1,12 +1,14 @@
-import { Bell, MapPin, Plus, QrCode, Search, Ticket, Users } from 'lucide-react';
+import { BellIcon, MagnifyingGlassIcon, MapPinIcon, PlusIcon, TicketIcon, UsersIcon } from '@heroicons/react/24/outline';
 import { SegmentedControl } from '@astryxdesign/core';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { getEventArtwork } from '../features/events/eventBanners';
 import { eventApi, type EventRecord, type EventStatus } from '../features/events/eventApi';
-import { getApiMessage, useAuth } from '../auth/authState';
+import { useAuth } from '../auth/AuthProvider';
+import { getApiError as getApiMessage } from '../utils/apiClient';
 import { Button } from './ui/button';
 import { Dock, DockIcon } from './ui/dock';
+import { ThemeToggle } from './MagicEffects';
 import './TestHomePage.css';
 import ProfileMenu from './ProfileMenu';
 
@@ -18,7 +20,8 @@ type EventItem = {
   title: string;
   time: string;
   venue: string;
-  status: 'Live' | 'Ready' | 'Draft' | 'Complete' | 'Cancelled';
+  status: 'To plan' | 'Assigned' | 'Ongoing' | 'Completed' | 'Cancelled';
+  statusKey: EventStatus;
   artwork: string;
   attendance: string;
   staff: string[];
@@ -26,10 +29,10 @@ type EventItem = {
 };
 
 const STATUS_LABEL: Record<EventStatus, EventItem['status']> = {
-  DRAFT: 'Draft',
-  PUBLISHED: 'Ready',
-  IN_PROGRESS: 'Live',
-  COMPLETED: 'Complete',
+  DRAFT: 'To plan',
+  PUBLISHED: 'Assigned',
+  IN_PROGRESS: 'Ongoing',
+  COMPLETED: 'Completed',
   CANCELLED: 'Cancelled',
 };
 
@@ -46,9 +49,7 @@ function toEventItem(event: EventRecord): EventItem {
   const shortDate = new Intl.DateTimeFormat('en-SG', { day: 'numeric', month: 'short', timeZone: event.timezone }).format(startsAt);
   const names = [...new Set(event.shifts.flatMap((shift) => shift.staffAssignments.map((assignment) => assignment.user.username)))];
   const timeFormatter = new Intl.DateTimeFormat('en-SG', { hour: 'numeric', minute: '2-digit', timeZone: event.timezone });
-  const zone = new Intl.DateTimeFormat('en-SG', { timeZone: event.timezone, timeZoneName: 'short' })
-    .formatToParts(startsAt).find((part) => part.type === 'timeZoneName')?.value ?? event.timezone;
-  const time = `${timeFormatter.format(startsAt)} – ${timeFormatter.format(endsAt)} ${zone}`.toUpperCase().replace('SGT', 'GMT+8');
+  const time = `${timeFormatter.format(startsAt)} – ${timeFormatter.format(endsAt)}`.toUpperCase();
 
   return {
     eventId: event.eventId,
@@ -59,6 +60,7 @@ function toEventItem(event: EventRecord): EventItem {
     time,
     venue: event.venue,
     status: STATUS_LABEL[event.status],
+    statusKey: event.status,
     artwork: getEventArtwork(event.bannerKey, event.artworkDataUrl),
     attendance: `${event.activeCapacityCount.toLocaleString()} / ${event.capacity.toLocaleString()}`,
     staff: names.slice(0, 4),
@@ -75,7 +77,8 @@ export default function TestHomePage() {
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [period, setPeriod] = useState<'upcoming' | 'past'>('upcoming');
   const [now, setNow] = useState(() => new Date());
-  const { user } = useAuth();
+  const { session } = useAuth();
+  const user = session?.user;
   const navigate = useNavigate();
   const canCreate = user?.systemRole !== 'STAFF';
   const loadEvents = useCallback(async () => {
@@ -114,17 +117,16 @@ export default function TestHomePage() {
     minute: '2-digit',
     hour12: true,
     timeZone: 'Asia/Singapore',
-    timeZoneName: 'short',
-  }).format(now).toUpperCase().replace('SGT', 'GMT+8');
+  }).format(now).toUpperCase();
   const visibleEvents = useMemo(
     () => events.map(toEventItem)
-      .filter((event) => period === 'past' ? ['Complete', 'Cancelled'].includes(event.status) : !['Complete', 'Cancelled'].includes(event.status))
+      .filter((event) => period === 'past' ? ['COMPLETED', 'CANCELLED'].includes(event.statusKey) : !['COMPLETED', 'CANCELLED'].includes(event.statusKey))
       .filter((event) => `${event.title} ${event.venue}`.toLowerCase().includes(query.toLowerCase())),
     [events, period, query],
   );
 
   return (
-    <div className="test-events-page reference-events vsms-landing-system" data-theme="dark">
+    <div className="test-events-page reference-events vsms-landing-system">
       <header className="test-site-nav">
         <Link className="test-site-brand" to="/" aria-label="VSMS landing page">
           <span className="test-brand-mark" aria-hidden="true">
@@ -139,16 +141,15 @@ export default function TestHomePage() {
         </Link>
 
         <nav className="reference-header-nav" aria-label="Primary navigation">
-          <a href="#events-register" aria-current="page"><Ticket aria-hidden="true" />Events</a>
-          <Link to="/qr-generator"><QrCode aria-hidden="true" />QR passes</Link>
+          <a href="#events-register" aria-current="page"><TicketIcon aria-hidden="true" />Events</a>
         </nav>
 
         <div className={`test-header-actions ${searchOpen ? 'searching' : ''}`}>
-          {canCreate && <Button className="test-header-create reference-header-create" onClick={() => navigate('/events/new')}><Plus aria-hidden="true" />New event</Button>}
+          {canCreate && <Button className="test-header-create reference-header-create" onClick={() => navigate('/events/new')}><PlusIcon aria-hidden="true" />New event</Button>}
           <time className="reference-local-time" dateTime={now.toISOString()}>{localTime}</time>
           {searchOpen && (
             <label className="test-header-search">
-              <Search aria-hidden="true" />
+              <MagnifyingGlassIcon aria-hidden="true" />
               <span className="sr-only">Search events</span>
               <input id="desktop-event-search"
                 autoFocus
@@ -163,8 +164,9 @@ export default function TestHomePage() {
               setSearchOpen((open) => !open);
               if (searchOpen) setQuery('');
             }}>
-            <Search aria-hidden="true" />
+            <MagnifyingGlassIcon aria-hidden="true" />
           </Button>
+          <ThemeToggle className="test-header-icon test-theme-toggle" />
           <Button
             id="event-notification-button"
             className="test-header-icon"
@@ -175,7 +177,7 @@ export default function TestHomePage() {
             aria-controls="desktop-notifications"
             onClick={() => setNotificationsOpen((open) => !open)}
           >
-            <Bell aria-hidden="true" />
+            <BellIcon aria-hidden="true" />
           </Button>
           {notificationsOpen && <div id="desktop-notifications" className="test-notification-popover" role="status"><strong>You’re all caught up</strong><span>No new event alerts.</span></div>}
           <ProfileMenu triggerClassName="test-profile-action" compact />
@@ -197,14 +199,14 @@ export default function TestHomePage() {
             setNotificationsOpen((open) => !open);
             setSearchOpen(false);
             setQuery('');
-          }}><Bell aria-hidden="true" /></button>
+          }}><BellIcon aria-hidden="true" /></button>
           <ProfileMenu triggerClassName="reference-mobile-profile" compact />
         </div>
       </div>
 
       {searchOpen && (
         <label className="reference-mobile-search">
-          <Search aria-hidden="true" />
+          <MagnifyingGlassIcon aria-hidden="true" />
           <span className="sr-only">Search events</span>
           <input autoFocus type="search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search events" />
         </label>
@@ -214,17 +216,17 @@ export default function TestHomePage() {
       <nav className="reference-mobile-dock" aria-label="Mobile navigation">
         <Dock iconSize={44} iconMagnification={52} iconDistance={100} disableMagnification direction="middle">
           <DockIcon>
-            <a className="reference-dock-action active" href="#events-register" aria-label="Events" aria-current="page"><Ticket aria-hidden="true" /></a>
+            <a className="reference-dock-action active" href="#events-register" aria-label="Events" aria-current="page"><TicketIcon aria-hidden="true" /></a>
           </DockIcon>
           <DockIcon>
             <button className={`reference-dock-action ${searchOpen ? 'active' : ''}`} type="button" aria-label={searchOpen ? 'Close search' : 'Search events'} aria-expanded={searchOpen} onClick={() => {
               setSearchOpen((open) => !open);
               setNotificationsOpen(false);
               if (searchOpen) setQuery('');
-            }}><Search aria-hidden="true" /></button>
+            }}><MagnifyingGlassIcon aria-hidden="true" /></button>
           </DockIcon>
-          <DockIcon><Link className="reference-dock-action" to="/qr-generator" aria-label="QR passes"><QrCode aria-hidden="true" /></Link></DockIcon>
-          {canCreate && <DockIcon><Link className="reference-dock-action" to="/events/new" aria-label="Create event"><Plus aria-hidden="true" /></Link></DockIcon>}
+          <DockIcon><ThemeToggle className="reference-dock-action reference-mobile-theme" /></DockIcon>
+          {canCreate && <DockIcon><Link className="reference-dock-action" to="/events/new" aria-label="Create event"><PlusIcon aria-hidden="true" /></Link></DockIcon>}
         </Dock>
       </nav>
 
@@ -251,7 +253,7 @@ export default function TestHomePage() {
         ) : visibleEvents.length ? (
           <section className="test-event-register" id="events-register" aria-label={`${period === 'upcoming' ? 'Upcoming' : 'Past'} events`}>
             {visibleEvents.map((event) => (
-              <article className={`test-register-row ${event.status.toLowerCase()}`} key={event.eventId} aria-label={`${event.title}, status ${event.status}`}>
+              <article className={`test-register-row status-${event.statusKey.toLowerCase()} ${event.date === 'Today' ? 'today' : ''}`} key={event.eventId} aria-label={`${event.title}, status ${event.status}`}>
                 <div className="test-register-row-date">
                   <strong>{event.date}</strong>
                   <span>{event.day}</span>
@@ -265,18 +267,18 @@ export default function TestHomePage() {
                   </div>
                   <div className="test-register-event">
                     <div className="reference-event-time">
-                      {event.status === 'Live' && <span><i aria-hidden="true" />Live</span>}
+                      <span className={`reference-status-tag status-${event.statusKey.toLowerCase()}`}><i aria-hidden="true" />{event.status}</span>
                       <time className="reference-time-desktop">{event.time}</time>
                       <time className="reference-time-mobile">{event.date === 'Today' ? event.time : `${event.date}, ${event.time}`}</time>
                     </div>
                     <h2>{event.title}</h2>
-                    <p><MapPin aria-hidden="true" />{event.venue}</p>
-                    <p className="reference-attendance-desktop"><Users aria-hidden="true" />{event.attendance}</p>
-                    <p className="reference-attendance-mobile"><Users aria-hidden="true" />{event.attendance}</p>
+                    <p><MapPinIcon aria-hidden="true" />{event.venue}</p>
+                    <p className="reference-attendance-desktop"><UsersIcon aria-hidden="true" />{event.attendance}</p>
+                    <p className="reference-attendance-mobile"><UsersIcon aria-hidden="true" />{event.attendance}</p>
                     <div className={`reference-team ${event.staff.length ? '' : 'empty'}`} aria-label={event.staff.length ? `Assigned staff: ${event.staff.join(', ')}${event.extraStaff ? `, plus ${event.extraStaff} more` : ''}` : 'No staff assigned'}>
                       {event.staff.map((name, index) => <span className={`reference-team-avatar team-${index + 1}`} key={name} title={name} aria-label={name}>{name.split(' ').map((part) => part[0]).join('').slice(0, 2).toUpperCase()}</span>)}
                       {event.extraStaff ? <small className="reference-team-more">+{event.extraStaff}</small> : null}
-                      {!event.staff.length && <><span className="reference-team-empty-icon" aria-hidden="true"><Users /></span><em>No staff assigned</em></>}
+                      {!event.staff.length && <><span className="reference-team-empty-icon" aria-hidden="true"><UsersIcon /></span><em>No staff assigned</em></>}
                     </div>
                   </div>
                   <div className="test-register-state">
@@ -288,11 +290,11 @@ export default function TestHomePage() {
           </section>
         ) : (
           <section className="test-empty-state" aria-live="polite">
-            <Search aria-hidden="true" />
+            <MagnifyingGlassIcon aria-hidden="true" />
             <h2>{query ? 'No events found' : period === 'upcoming' ? 'No upcoming events' : 'No past events'}</h2>
             <p>{query ? 'Try a different event or venue name.' : period === 'upcoming' ? 'Assigned and newly created events will appear here.' : 'Completed and cancelled events will appear here.'}</p>
             {query && <Button variant="ghost" onClick={() => setQuery('')}>Clear search</Button>}
-            {!query && period === 'upcoming' && canCreate && <Button onClick={() => navigate('/events/new')}><Plus aria-hidden="true" />Create event</Button>}
+            {!query && period === 'upcoming' && canCreate && <Button onClick={() => navigate('/events/new')}><PlusIcon aria-hidden="true" />Create event</Button>}
           </section>
         )}
 

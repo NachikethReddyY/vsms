@@ -5,19 +5,6 @@ type ButtonProps = ButtonHTMLAttributes<HTMLButtonElement> & {
   variant?: 'default' | 'ghost';
 };
 
-export function Button({
-  className = '',
-  size = 'default',
-  variant = 'default',
-  type = 'button',
-  ...props
-}: ButtonProps) {
-  return (
-    <button
-      type={type}
-      data-slot="button"
-      className={`ui-button ui-button-${variant} ui-button-${size} ${className}`}
-      {...props}
-    />
-  );
+export function Button({ className = '', size = 'default', variant = 'default', type = 'button', ...props }: ButtonProps) {
+  return <button type={type} className={`ui-button ui-button-${variant} ui-button-${size} ${className}`} {...props} />;
 }

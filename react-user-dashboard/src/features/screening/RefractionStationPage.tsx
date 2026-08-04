@@ -1,6 +1,6 @@
 import { FormEvent, useEffect, useMemo, useState } from 'react';
 import { useParams, useSearchParams } from 'react-router-dom';
-import { getApiMessage } from '../../auth/authState';
+import { getApiError as getApiMessage } from '../../utils/apiClient';
 import {
   FlagEvaluation,
   newIdempotencyKey,

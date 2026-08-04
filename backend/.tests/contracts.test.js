@@ -72,6 +72,18 @@ test("event service exposes list functions after merge resolution", () => {
     const eventService = require("../services/eventService");
     assert.equal(typeof eventService.listEvents, "function");
     assert.equal(typeof eventService.listActiveEvents, "function");
+    assert.equal(typeof eventService.listStationTemplates, "function");
+});
+
+test("listStationTemplates reads active StationTemplate rows", () => {
+    const source = read("services/eventService.js");
+    const listFn = source.slice(source.indexOf("const listStationTemplates"));
+    assert.match(listFn, /stationTemplate\.findMany/);
+    assert.match(listFn, /active:\s*true/);
+    assert.match(listFn, /stationTemplateId:\s*true/);
+    assert.match(listFn, /templateKey:\s*true/);
+    assert.match(listFn, /defaultCapacity:\s*true/);
+    assert.doesNotMatch(listFn.slice(0, listFn.indexOf("stationTemplatesUnavailable")), /return\s+\[\];/);
 });
 
 test("participant search matches any supplied identifier", () => {

@@ -3843,7 +3843,7 @@ items:
     seq: 9
 environments:
 - uid: XspUJP06CHvRSqA6Ay87X
-  name: Same-origin API server; local development uses https://localhost:5050
+  name: Same-origin API server; local development uses https://localhost:5000
   variables:
   - uid: yKIggdbGLTThjELsMGxph
     name: baseUrl

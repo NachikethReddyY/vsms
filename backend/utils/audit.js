@@ -19,27 +19,6 @@ function hashIdentifier(identifier) {
     return crypto.createHash("sha256").update(identifier.toLowerCase()).digest("hex");
 }
 
-async function ensureDeviceForAudit({ userId = null, context = {}, client = prisma }) {
-    if (!context.deviceId) {
-        return;
-    }
-
-    await client.device.upsert({
-        where: { id: context.deviceId },
-        update: {
-            ...(userId ? { userId } : {}),
-            deviceName: trimValue(context.deviceName || "VSMS staff web", 100),
-            lastSeenAt: new Date(),
-        },
-        create: {
-            id: context.deviceId,
-            userId,
-            deviceName: trimValue(context.deviceName || "VSMS staff web", 100),
-            lastSeenAt: new Date(),
-        },
-    });
-}
-
 async function createAuthAuditLog({
     userId = null,
     eventType,
@@ -49,7 +28,22 @@ async function createAuthAuditLog({
     context,
     client = prisma,
 }) {
-    await ensureDeviceForAudit({ userId, context, client });
+    if (context.deviceId) {
+        await client.device.upsert({
+            where: { id: context.deviceId },
+            update: {
+                ...(userId ? { userId } : {}),
+                deviceName: trimValue(context.deviceName || "VSMS staff web", 100),
+                lastSeenAt: new Date(),
+            },
+            create: {
+                id: context.deviceId,
+                userId,
+                deviceName: trimValue(context.deviceName || "VSMS staff web", 100),
+                lastSeenAt: new Date(),
+            },
+        });
+    }
     return client.authAuditLog.create({
         data: {
             userId,
@@ -76,7 +70,6 @@ async function createAuditLog({
     context,
     client = prisma,
 }) {
-    await ensureDeviceForAudit({ userId, context, client });
     return client.auditLog.create({
         data: {
             userId,
