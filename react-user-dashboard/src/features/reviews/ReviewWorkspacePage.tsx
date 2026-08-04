@@ -29,6 +29,8 @@ import {
   type ReviewQueueResponse,
   type IssueReferralRequest,
   type IssueReferralResponse,
+  type ReviseReferralRequest,
+  type SignatureResponse,
 } from './reviewApi';
 import './ReviewWorkspacePage.css';
 
@@ -178,6 +180,8 @@ function ParticipantReport({ detail }: { detail: ReviewDetailResponse }) {
         <div><dt>Urgency</dt><dd>{detail.existingReview.urgency}</dd></div>
         <div><dt>Reviewed by</dt><dd>{detail.existingReview.reviewedByName}</dd></div>
         <div><dt>Recorded</dt><dd>{new Date(detail.existingReview.reviewedAt).toLocaleString()}</dd></div>
+        <div><dt>Electronic signature</dt><dd>{detail.existingReview.signedAt ? `Signed by ${detail.existingReview.signatureSignerName} on ${new Date(detail.existingReview.signedAt).toLocaleString()}` : 'Legacy unsigned record'}</dd></div>
+        <div><dt>Signature fingerprint</dt><dd>{detail.existingReview.signatureSha256 ? detail.existingReview.signatureSha256.slice(0, 16).toUpperCase() : 'Not available'}</dd></div>
         <div className="wide"><dt>Clinical summary</dt><dd>{detail.existingReview.clinicalSummary}</dd></div>
         {detail.existingReview.recommendations && <div className="wide"><dt>Recommendations</dt><dd>{detail.existingReview.recommendations}</dd></div>}
       </dl> : <p className="participant-report-pending">No clinical decision has been recorded.</p>}
@@ -217,7 +221,7 @@ const savedReferralIssue = (eventId: string, referralId: string): IssueReferralR
   }
 };
 
-function ReferralIssuance({ eventId, referral }: { eventId: string; referral: RecordedReferral }) {
+function ReferralIssuance({ eventId, referral, onRevised }: { eventId: string; referral: RecordedReferral; onRevised: () => Promise<void> }) {
   const [savedIssue, setSavedIssue] = useState<IssueReferralRequest | null>(() => savedReferralIssue(eventId, referral.referralId));
   const [email, setEmail] = useState(() => savedIssue?.destinationEmail || '');
   const [signature, setSignature] = useState<string | null>(null);
@@ -228,6 +232,14 @@ function ReferralIssuance({ eventId, referral }: { eventId: string; referral: Re
   const [acknowledging, setAcknowledging] = useState(false);
   const [error, setError] = useState('');
   const [result, setResult] = useState<IssueReferralResponse | null>(null);
+  const [showRevision, setShowRevision] = useState(false);
+  const [revising, setRevising] = useState(false);
+  const [revision, setRevision] = useState({
+    destinationName: referral.destinationName,
+    reason: referral.reason,
+    instructions: referral.instructions || '',
+    urgency: referral.urgency as ReviseReferralRequest['urgency'],
+  });
   const documentId = result?.documentId || referral.document?.documentId;
   const delivery = result?.delivery || referral.delivery;
   const storageKey = referralIssueStorageKey(eventId, referral.referralId);
@@ -310,18 +322,56 @@ function ReferralIssuance({ eventId, referral }: { eventId: string; referral: Re
     }
   };
 
+  const revise = async (event: FormEvent) => {
+    event.preventDefault();
+    setRevising(true);
+    setError('');
+    try {
+      await reviewApi.reviseReferral(eventId, referral.referralId, {
+        destinationName: revision.destinationName.trim(),
+        reason: revision.reason.trim(),
+        ...(revision.instructions.trim() ? { instructions: revision.instructions.trim() } : {}),
+        urgency: revision.urgency,
+        idempotencyKey: crypto.randomUUID(),
+        confirmed: true,
+      });
+      await onRevised();
+    } catch (requestError) {
+      setError(apiProblem(requestError)?.title || 'A revised referral could not be created. The issued version was not changed.');
+    } finally {
+      setRevising(false);
+    }
+  };
+
   if (referral.status !== 'DRAFT' || result) return <section className="referral-issuance issued" aria-labelledby="issued-referral-title">
     <div><CheckCircleIcon /><span><strong id="issued-referral-title">Encrypted referral ready</strong><small>Version {result?.documentVersion || referral.document?.version || 1} · electronically signed</small></span></div>
-    {delivery?.status === 'SENT' || delivery?.status === 'DELIVERED'
-      ? <p className="referral-delivery-success">Email accepted for {delivery.recipient}. Delivery status: {delivery.status.toLowerCase()}.</p>
-      : delivery?.status === 'SENDING'
+    {delivery?.status === 'DELIVERED'
+      ? <p className="referral-delivery-success">Delivered to the recipient mail server for {delivery.recipient}{delivery.deliveredAt ? ` on ${new Date(delivery.deliveredAt).toLocaleString()}` : ''}.</p>
+      : delivery?.status === 'SENT'
+        ? <p className="referral-delivery-success">SES accepted the encrypted email for {delivery.recipient}; final delivery confirmation is pending.</p>
+      : delivery?.status === 'SENDING' || delivery?.status === 'RECONCILIATION_REQUIRED'
         ? <p className="referral-delivery-warning">Delivery confirmation is pending. To prevent a duplicate clinical email, this referral will not be sent again automatically.</p>
+        : delivery?.status === 'BOUNCED'
+          ? <p className="referral-delivery-warning">The recipient mail server rejected this email. Create a revised referral only after verifying a new destination.</p>
+          : delivery?.status === 'COMPLAINT'
+            ? <p className="referral-delivery-warning">A recipient complaint was reported. Do not resend; follow the secure escalation process.</p>
         : <p className="referral-delivery-warning">Email not sent{delivery?.failureReason === 'DELIVERY_PROVIDER_NOT_CONFIGURED' ? ': the delivery provider is not configured.' : '.'} The encrypted PDF remains available.</p>}
     {result?.handoffSecret && <div className="referral-handoff" role="status"><strong>Securely hand off this passphrase</strong><p>It can be recovered only in this browser until {result.handoffSecretExpiresAt ? new Date(result.handoffSecretExpiresAt).toLocaleTimeString() : 'expiry'}. Share it by phone or another separate channel—never in the referral email.</p><div><code>{result.handoffSecret}</code><button className="secondary compact" type="button" disabled={acknowledging} onClick={() => void copyAndAcknowledge()}>{acknowledging ? 'Acknowledging…' : secretCopied ? 'Copied and acknowledged' : 'Copy and acknowledge'}</button></div></div>}
     {!result?.handoffSecret && savedIssue && <button className="secondary compact" type="button" disabled={issuing} onClick={() => void recover()}>{issuing ? 'Recovering…' : 'Recover passphrase and delivery status'}</button>}
     {!result?.handoffSecret && !savedIssue && <p>The passphrase is not stored after acknowledgement or expiry and is never included in the email.</p>}
     {error && <div className="review-error-summary" role="alert">{error}</div>}
-    <button className="secondary" type="button" onClick={() => void download()} disabled={downloading}>{downloading ? 'Downloading…' : 'Download encrypted PDF'}</button>
+    <div className="referral-issued-actions">
+      <button className="secondary" type="button" onClick={() => void download()} disabled={downloading}>{downloading ? 'Downloading…' : 'Download encrypted PDF'}</button>
+      <button className="secondary" type="button" onClick={() => setShowRevision((open) => !open)}>{showRevision ? 'Cancel revision' : 'Create revised referral'}</button>
+    </div>
+    {showRevision && <form className="referral-revision-form" onSubmit={(event) => void revise(event)}>
+      <header><strong>Create version {(referral.revisionNumber || 1) + 1}</strong><p>The issued version, signature, audit trail, and delivery remain immutable.</p></header>
+      <label className="review-field"><span>Destination</span><input required minLength={2} maxLength={200} value={revision.destinationName} onChange={(event) => setRevision((current) => ({ ...current, destinationName: event.target.value }))} /></label>
+      <label className="review-field"><span>Urgency</span><select value={revision.urgency} onChange={(event) => setRevision((current) => ({ ...current, urgency: event.target.value as ReviseReferralRequest['urgency'] }))}><option value="ROUTINE">Routine</option><option value="PRIORITY">Priority</option><option value="URGENT">Urgent</option><option value="EMERGENCY">Emergency</option></select></label>
+      <label className="review-field"><span>Reason</span><textarea required minLength={10} maxLength={2000} value={revision.reason} onChange={(event) => setRevision((current) => ({ ...current, reason: event.target.value }))} /></label>
+      <label className="review-field"><span>Instructions</span><textarea maxLength={2000} value={revision.instructions} onChange={(event) => setRevision((current) => ({ ...current, instructions: event.target.value }))} /></label>
+      <button className="primary" type="submit" disabled={revising}>{revising ? 'Creating revision…' : 'Create unsigned draft revision'}</button>
+    </form>}
   </section>;
 
   return <form className="referral-issuance" onSubmit={(event) => void issue(event)}>
@@ -334,7 +384,7 @@ function ReferralIssuance({ eventId, referral }: { eventId: string; referral: Re
   </form>;
 }
 
-function ReviewedDecision({ eventId, review }: { eventId: string; review: NonNullable<ReviewDetailResponse['existingReview']> }) {
+function ReviewedDecision({ eventId, review, onReferralRevised }: { eventId: string; review: NonNullable<ReviewDetailResponse['existingReview']>; onReferralRevised: () => Promise<void> }) {
   return <section className="reviewed-decision" aria-labelledby="recorded-decision-title">
     <div className="reviewed-heading"><ShieldCheckIcon /><div><h3 id="recorded-decision-title">Decision recorded</h3><p>This clinical review is immutable and read-only.</p></div></div>
     <dl className="reviewed-fields">
@@ -342,6 +392,8 @@ function ReviewedDecision({ eventId, review }: { eventId: string; review: NonNul
       <div><dt>Urgency</dt><dd>{review.urgency}</dd></div>
       <div><dt>Reviewed by</dt><dd>{review.reviewedByName}</dd></div>
       <div><dt>Recorded</dt><dd>{new Date(review.reviewedAt).toLocaleString()}</dd></div>
+      <div><dt>Electronic signature</dt><dd>{review.signedAt ? `Signed by ${review.signatureSignerName}` : 'Legacy unsigned record'}</dd></div>
+      <div><dt>Signed</dt><dd>{review.signedAt ? new Date(review.signedAt).toLocaleString() : 'Not available'}</dd></div>
       <div className="wide"><dt>Clinical summary</dt><dd>{review.clinicalSummary}</dd></div>
       {review.recommendations && <div className="wide"><dt>Recommendations</dt><dd>{review.recommendations}</dd></div>}
     </dl>
@@ -351,7 +403,7 @@ function ReviewedDecision({ eventId, review }: { eventId: string; review: NonNul
       <p>{review.referral.reason}</p>
       {review.referral.instructions && <p>{review.referral.instructions}</p>}
     </div>}
-    {review.referral && <ReferralIssuance eventId={eventId} referral={review.referral} />}
+    {review.referral && <ReferralIssuance eventId={eventId} referral={review.referral} onRevised={onReferralRevised} />}
   </section>;
 }
 
@@ -371,6 +423,10 @@ export default function ReviewWorkspacePage() {
   const [dirty, setDirty] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [formErrors, setFormErrors] = useState<string[]>([]);
+  const [decisionSignature, setDecisionSignature] = useState<string | null>(null);
+  const [decisionSignatureArtifact, setDecisionSignatureArtifact] = useState<SignatureResponse | null>(null);
+  const [signaturePadKey, setSignaturePadKey] = useState(0);
+  const [submissionStage, setSubmissionStage] = useState<'idle' | 'uploading' | 'recording'>('idle');
   const [announcement, setAnnouncement] = useState('');
   const [mobileDetail, setMobileDetail] = useState(Boolean(directRegistrationId));
   const errorSummaryRef = useRef<HTMLDivElement>(null);
@@ -407,6 +463,10 @@ export default function ReviewWorkspacePage() {
       setDetail(await reviewApi.get(eventId, registrationId));
       if (!preserveForm) {
         setForm(EMPTY_FORM);
+        setDecisionSignature(null);
+        setDecisionSignatureArtifact(null);
+        setSignaturePadKey((current) => current + 1);
+        setSubmissionStage('idle');
         setDirty(false);
         setFormErrors([]);
       }
@@ -439,6 +499,10 @@ export default function ReviewWorkspacePage() {
     setDiscardDialogOpen(false);
     setDirty(false);
     setForm(EMPTY_FORM);
+    setDecisionSignature(null);
+    setDecisionSignatureArtifact(null);
+    setSignaturePadKey((current) => current + 1);
+    setSubmissionStage('idle');
     setFormErrors([]);
     action?.();
   };
@@ -485,6 +549,19 @@ export default function ReviewWorkspacePage() {
 
   const updateForm = <K extends keyof FormState>(key: K, value: FormState[K]) => {
     setForm((current) => ({ ...current, [key]: value }));
+    if (decisionSignature || decisionSignatureArtifact) {
+      setDecisionSignature(null);
+      setDecisionSignatureArtifact(null);
+      setSignaturePadKey((current) => current + 1);
+      setSubmissionStage('idle');
+    }
+    setDirty(true);
+  };
+
+  const captureDecisionSignature = (dataUrl: string | null) => {
+    setDecisionSignature(dataUrl);
+    setDecisionSignatureArtifact(null);
+    setSubmissionStage('idle');
     setDirty(true);
   };
 
@@ -499,17 +576,19 @@ export default function ReviewWorkspacePage() {
       if (form.instructions.trim().length > 2000) errors.push('Referral instructions cannot exceed 2,000 characters.');
     }
     if (!form.confirmed) errors.push('Confirm that the screening results and clinical decision were reviewed.');
+    if (!decisionSignature && !decisionSignatureArtifact) errors.push('Add a fresh electronic signature for this clinical decision.');
     setFormErrors(errors);
     if (errors.length) window.setTimeout(() => errorSummaryRef.current?.focus(), 0);
     return errors.length === 0;
   };
 
-  const decisionRequest = (): ReviewDecisionRequest => {
+  const decisionRequest = (signature: SignatureResponse): ReviewDecisionRequest => {
     const common = {
       contextVersion: detail!.contextVersion,
       confirmed: true as const,
       clinicalSummary: form.clinicalSummary.trim(),
       ...(form.recommendations.trim() ? { recommendations: form.recommendations.trim() } : {}),
+      ...signature,
     };
     if (form.outcome === 'REFER') return {
       ...common,
@@ -539,7 +618,14 @@ export default function ReviewWorkspacePage() {
     setSubmitting(true);
     setFormErrors([]);
     try {
-      const result = await reviewApi.decide(eventId, detail.participant.registrationId, decisionRequest());
+      let signature = decisionSignatureArtifact;
+      if (!signature) {
+        setSubmissionStage('uploading');
+        signature = await reviewApi.uploadDecisionSignature(eventId, detail.participant.registrationId, decisionSignature!);
+        setDecisionSignatureArtifact(signature);
+      }
+      setSubmissionStage('recording');
+      const result = await reviewApi.decide(eventId, detail.participant.registrationId, decisionRequest(signature));
       const reviewedRegistrationId = detail.participant.registrationId;
       const queue = queueData?.queue || [];
       const completedIndex = queue.findIndex((item) => item.registrationId === detail.participant.registrationId);
@@ -548,6 +634,10 @@ export default function ReviewWorkspacePage() {
       setAnnouncement(`${result.review.outcome.replace(/_/g, ' ')} decision recorded for ${detail.participant.participantDisplayName}.`);
       setDirty(false);
       setForm(EMPTY_FORM);
+      setDecisionSignature(null);
+      setDecisionSignatureArtifact(null);
+      setSignaturePadKey((current) => current + 1);
+      setSubmissionStage('idle');
       if (result.referral) {
         setSelectedId(reviewedRegistrationId);
         setMobileDetail(true);
@@ -564,12 +654,20 @@ export default function ReviewWorkspacePage() {
       const problem = apiProblem(error);
       if (problem?.code === 'SCREENING_RESULTS_CHANGED') {
         await loadDetail(detail.participant.registrationId, true);
+        setDecisionSignature(null);
+        setDecisionSignatureArtifact(null);
+        setSignaturePadKey((current) => current + 1);
         setFormErrors(['Screening results changed. Reassess the refreshed results before submitting again.']);
       } else if (problem?.code === 'REVIEW_ALREADY_RECORDED') {
         await loadDetail(detail.participant.registrationId, true);
         setAnnouncement('Another reviewer already recorded this immutable decision. The record is now read-only.');
         setDirty(false);
         setFormErrors([]);
+      } else if (problem?.code === 'SIGNATURE_ALREADY_USED' || problem?.code === 'INVALID_SIGNATURE') {
+        setDecisionSignature(null);
+        setDecisionSignatureArtifact(null);
+        setSignaturePadKey((current) => current + 1);
+        setFormErrors(['This electronic signature is unavailable or no longer valid. Capture a fresh signature and retry.']);
       } else if (problem?.errors?.length) {
         setFormErrors(problem.errors.map((item) => item.message));
       } else {
@@ -578,6 +676,7 @@ export default function ReviewWorkspacePage() {
       window.setTimeout(() => errorSummaryRef.current?.focus(), 0);
     } finally {
       setSubmitting(false);
+      setSubmissionStage('idle');
     }
   };
 
@@ -667,7 +766,7 @@ export default function ReviewWorkspacePage() {
             </div>
           </section>
 
-          {detail.existingReview ? <ReviewedDecision eventId={eventId} review={detail.existingReview} /> : !detail.readiness.ready ? <div className="review-not-ready" role="status"><ClockIcon /><div><strong>Not ready for a decision</strong><p>Complete all active stations or record an urgent station result first.</p></div></div> : <form className="decision-form" noValidate onSubmit={(event) => void submitDecision(event)}>
+          {detail.existingReview ? <ReviewedDecision eventId={eventId} review={detail.existingReview} onReferralRevised={() => loadDetail(detail.participant.registrationId, true)} /> : !detail.readiness.ready ? <div className="review-not-ready" role="status"><ClockIcon /><div><strong>Not ready for a decision</strong><p>Complete all active stations or record an urgent station result first.</p></div></div> : <form className="decision-form" noValidate onSubmit={(event) => void submitDecision(event)}>
             <div className="review-section-heading"><div><h3>Reviewer notes and decision</h3><p>One immutable decision completes this registration.</p></div></div>
 
             {formErrors.length > 0 && <div className="review-error-summary" role="alert" tabIndex={-1} ref={errorSummaryRef}><ExclamationCircleIcon /><div><strong>Review the following</strong><ul>{formErrors.map((error) => <li key={error}>{error}</li>)}</ul></div></div>}
@@ -686,7 +785,12 @@ export default function ReviewWorkspacePage() {
             </fieldset>}
 
             <label className="decision-confirm"><input type="checkbox" checked={form.confirmed} onChange={(event) => updateForm('confirmed', event.target.checked)} /><span><strong>I confirm this clinical decision</strong><small>I reviewed the current screening results and understand this record cannot be edited.</small></span></label>
-            <div className="decision-actions"><button className="primary" type="submit" disabled={submitting}>{submitting ? 'Recording decision…' : `Record ${OUTCOMES.find((item) => item.value === form.outcome)?.label} decision`}</button></div>
+            <section className="decision-signature" aria-labelledby="decision-signature-title">
+              <div><ShieldCheckIcon aria-hidden="true" /><span><strong id="decision-signature-title">Sign this decision</strong><small>Your signature is bound only to this participant, event, and decision. Referral delivery requires a separate signature.</small></span></div>
+              <SignaturePad key={signaturePadKey} onChange={captureDecisionSignature} disabled={submitting} />
+              {decisionSignatureArtifact && <p className="decision-signature-secured" role="status"><CheckCircleIcon aria-hidden="true" />Signature secured for retry. Editing the decision will require a fresh signature.</p>}
+            </section>
+            <div className="decision-actions"><button className="primary" type="submit" disabled={submitting || (!decisionSignature && !decisionSignatureArtifact)}>{submissionStage === 'uploading' ? 'Securing signature…' : submissionStage === 'recording' ? 'Recording signed decision…' : `Sign and record ${OUTCOMES.find((item) => item.value === form.outcome)?.label} decision`}</button></div>
           </form>}
         </>}
       </section>
