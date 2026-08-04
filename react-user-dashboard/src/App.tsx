@@ -61,11 +61,14 @@ export default function App() {
         <Route element={<EventWorkspace />}>
           <Route path="/account/security" element={<AccountSecurityPage />} />
           <Route path="/events/:eventId" element={<EventDetailPage />} />
-          <Route path="/events/:eventId/overview" element={<EventDetailPage />} />
-          <Route path="/events/:eventId/stations" element={<EventDetailPage />} />
-          <Route path="/events/:eventId/staff" element={<EventDetailPage />} />
-          <Route path="/events/:eventId/activity" element={<EventDetailPage />} />
           <Route path="/settings" element={<SettingsPage />} />
+
+          <Route element={<RoleGuard allowedRoles={eventManagerRoles} />}>
+            <Route path="/events/:eventId/overview" element={<EventDetailPage />} />
+            <Route path="/events/:eventId/stations" element={<EventDetailPage />} />
+            <Route path="/events/:eventId/staff" element={<EventDetailPage />} />
+            <Route path="/events/:eventId/activity" element={<EventDetailPage />} />
+          </Route>
 
           <Route element={<RoleGuard allowedRoles={reviewerRoles} deniedRoles={adminRoles} />}>
             <Route path="/events/:eventId/reviews" element={<ReviewWorkspacePage />} />

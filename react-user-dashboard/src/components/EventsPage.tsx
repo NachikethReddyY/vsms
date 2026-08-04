@@ -23,6 +23,7 @@ type EventItem = {
   status: 'To plan' | 'Assigned' | 'Ongoing' | 'Completed' | 'Cancelled';
   statusKey: EventStatus;
   artwork: string;
+  canManage: boolean;
   attendance: string;
   staff: string[];
   extraStaff?: number;
@@ -47,7 +48,9 @@ function toEventItem(event: EventRecord, now: Date): EventItem {
   const statusKey = event.status === 'IN_PROGRESS' && endsAt <= now ? 'COMPLETED' : event.status;
   const eventDate = dateKey(startsAt, event.timezone);
   const shortDate = new Intl.DateTimeFormat('en-SG', { day: 'numeric', month: 'short', timeZone: event.timezone }).format(startsAt);
-  const names = [...new Set(event.shifts.flatMap((shift) => shift.staffAssignments.map((assignment) => assignment.user.username)))];
+  const names = event.canManage
+    ? [...new Set(event.shifts.flatMap((shift) => shift.staffAssignments.map((assignment) => assignment.user.username)))]
+    : [];
   const timeFormatter = new Intl.DateTimeFormat('en-SG', { hour: 'numeric', minute: '2-digit', timeZone: event.timezone });
   const time = `${timeFormatter.format(startsAt)} – ${timeFormatter.format(endsAt)}`.toUpperCase();
 
@@ -62,6 +65,7 @@ function toEventItem(event: EventRecord, now: Date): EventItem {
     status: STATUS_LABEL[statusKey],
     statusKey,
     artwork: getEventArtwork(event.bannerKey, event.artworkDataUrl),
+    canManage: event.canManage,
     attendance: `${event.activeCapacityCount.toLocaleString()} checked in / ${event.capacity.toLocaleString()} capacity`,
     staff: names.slice(0, 4),
     extraStaff: names.length > 4 ? names.length - 4 : undefined,
@@ -253,13 +257,13 @@ export default function EventsPage() {
                     </div>
                     <h2>{event.title}</h2>
                     <p><MapPinIcon aria-hidden="true" />{event.venue}</p>
-                    <p className="events-attendance-desktop"><UsersIcon aria-hidden="true" />{event.attendance}</p>
+                    {event.canManage && <><p className="events-attendance-desktop"><UsersIcon aria-hidden="true" />{event.attendance}</p>
                     <p className="events-attendance-mobile"><UsersIcon aria-hidden="true" />{event.attendance}</p>
                     <div className={`events-team ${event.staff.length ? '' : 'empty'}`} aria-label={event.staff.length ? `Assigned staff: ${event.staff.join(', ')}${event.extraStaff ? `, plus ${event.extraStaff} more` : ''}` : 'No staff assigned'}>
                       {event.staff.map((name, index) => <span className={`events-team-avatar team-${index + 1}`} key={name} title={name} aria-label={name}>{name.split(' ').map((part) => part[0]).join('').slice(0, 2).toUpperCase()}</span>)}
                       {event.extraStaff ? <small className="events-team-more">+{event.extraStaff}</small> : null}
                       {!event.staff.length && <><span className="events-team-empty-icon" aria-hidden="true"><UsersIcon /></span><em>No staff assigned</em></>}
-                    </div>
+                    </div></>}
                   </div>
                   <div className="events-register-state">
                     <Link className="events-row-action" to={`/events/${event.eventId}`} aria-label={`Open ${event.title}`}>Open</Link>
