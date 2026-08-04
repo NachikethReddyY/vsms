@@ -3091,7 +3091,7 @@ components:
       properties:
         registrationId: { type: string, format: uuid }
         eventId: { type: string, format: uuid }
-        registrationStatus: { type: string }
+        registrationStatus: { $ref: "#/components/schemas/RegistrationStatus" }
         queueNumber: { type: integer, nullable: true }
         checkedIn: { type: boolean }
         participant: { $ref: "#/components/schemas/QrLookupParticipant" }

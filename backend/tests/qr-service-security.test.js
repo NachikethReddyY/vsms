@@ -105,14 +105,34 @@ test("QR lookups return only the operational registration projection", async () 
     assert.equal(query.where.tokenHash, tokenHash(token));
     assert.equal(query.where.isActive, true);
     assert.ok(query.where.expiresAt.gt instanceof Date);
-    for (const field of ["nric", "contactNumber", "consentGiven", "createdBy", "registeredBy", "passToken", "idempotencyKey", "tokenHash", "tokenCiphertext", "description"]) {
-      assert.equal(JSON.stringify(query.select).includes(field), false);
-    }
   }
-  assert.equal(queries[0].select.registration.select.registrationStatus, undefined);
-  assert.equal(queries[0].select.registration.select.checkedIn, undefined);
-  assert.equal(queries[1].select.registration.select.registrationStatus, true);
-  assert.equal(queries[1].select.registration.select.checkedIn, true);
+  assert.deepEqual(queries[0].select, {
+    id: true,
+    registrationId: true,
+    expiresAt: true,
+    isActive: true,
+    registration: {
+      select: {
+        registrationId: true,
+        queueNumber: true,
+        participant: { select: { firstName: true, lastName: true } },
+        event: { select: { eventId: true, name: true } },
+      },
+    },
+  });
+  assert.deepEqual(queries[1].select, {
+    registration: {
+      select: {
+        registrationId: true,
+        queueNumber: true,
+        participant: { select: { firstName: true, lastName: true } },
+        event: { select: { eventId: true, name: true } },
+        eventId: true,
+        registrationStatus: true,
+        checkedIn: true,
+      },
+    },
+  });
 });
 
 test("generated QR passes retain only a hash and authenticated ciphertext", async () => {

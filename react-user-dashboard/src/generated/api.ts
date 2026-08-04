@@ -2723,7 +2723,7 @@ export interface components {
             registrationId: string;
             /** Format: uuid */
             eventId: string;
-            registrationStatus: string;
+            registrationStatus: components["schemas"]["RegistrationStatus"];
             queueNumber: number | null;
             checkedIn: boolean;
             participant: components["schemas"]["QrLookupParticipant"];
