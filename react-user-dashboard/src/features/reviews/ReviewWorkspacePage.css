@@ -472,6 +472,12 @@
 .referral-handoff>p { margin:0; color:var(--ink-2); }
 .referral-handoff>div { display:flex; align-items:center; gap:10px; }
 .referral-handoff code { min-width:0; flex:1; overflow-wrap:anywhere; font-size:15px; font-weight:700; letter-spacing:.04em; }
+.referral-issued-actions { display:flex; flex-wrap:wrap; justify-content:flex-end; gap:8px; }
+.referral-revision-form { display:grid; grid-template-columns:1fr 180px; gap:14px; padding-top:16px; border-top:1px solid var(--hairline); }
+.referral-revision-form header, .referral-revision-form .review-field:has(textarea), .referral-revision-form>.primary { grid-column:1 / -1; }
+.referral-revision-form header p { margin:4px 0 0; color:var(--muted); font-size:11px; line-height:18px; }
+.referral-revision-form textarea { min-height:86px; resize:vertical; }
+.referral-revision-form>.primary { justify-self:end; }
 
 .review-not-ready {
   display: flex;

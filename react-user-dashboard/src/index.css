@@ -338,6 +338,15 @@ svg.signature-pad:focus-visible { outline:3px solid var(--accent-tint); border-c
 .signature-pad-clear { min-height:30px; padding:0; border:0; background:transparent; color:var(--ink-2); font-size:12px; text-decoration:underline; cursor:pointer; }
 .signature-pad-clear:disabled { color:var(--muted-soft); cursor:not-allowed; }
 .signature-pad-status { color:var(--muted); font-size:12px; }.signature-pad-status.captured { color:var(--green); }
+.signature-keyboard-option { color:var(--ink-2); font-size:12px; }
+.signature-keyboard-option summary { width:max-content; cursor:pointer; text-decoration:underline; text-underline-offset:3px; }
+.signature-keyboard-option>div { display:grid; gap:7px; margin-top:9px; }
+.signature-keyboard-option label { color:var(--ink-2); font-weight:650; }
+.signature-keyboard-option>div>div { display:flex; flex-wrap:wrap; gap:8px; }
+.signature-keyboard-option input { min-width:min(100%,280px); min-height:44px; flex:1; padding:10px 12px; border:1px solid var(--hairline-strong); border-radius:8px; outline:0; background:var(--surface); color:var(--ink); font:inherit; }
+.signature-keyboard-option input:focus-visible { border-color:var(--accent); box-shadow:0 0 0 3px var(--accent-tint); }
+.signature-keyboard-option button { min-height:44px; padding:0 15px; border:1px solid var(--hairline-strong); border-radius:8px; background:var(--surface); color:var(--ink); font:inherit; font-weight:700; cursor:pointer; }
+.signature-keyboard-option button:disabled { opacity:.5; cursor:not-allowed; }
 .registration-next-step { display:flex; align-items:center; justify-content:space-between; gap:20px; margin-top:22px; }.registration-next-step span,.registration-next-step strong { display:block; }.registration-next-step span { color:var(--muted); font-size:10px; text-transform:uppercase; letter-spacing:.06em; }.registration-next-step strong { margin-top:3px; font-size:13px; }.registration-next-step a[aria-disabled="true"] { pointer-events:none; opacity:.5; }
 .alert { display:flex; align-items:flex-start; gap:8px; margin-bottom:14px; padding:12px 14px; border:1px solid var(--hairline-strong); border-radius:8px; font-size:12px; line-height:18px; }.alert.error { border-color:color-mix(in srgb,var(--red) 38%,var(--hairline)); background:color-mix(in srgb,var(--red) 8%,var(--surface)); color:var(--red); }.loading-state { margin:0; padding:18px; border:1px solid var(--hairline); border-radius:10px; background:var(--surface); color:var(--muted); font-size:12px; }
 [data-theme="dark"] .registration-page .bg-white { background-color:var(--surface)!important; color:var(--ink); }
