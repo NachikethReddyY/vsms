@@ -221,6 +221,14 @@ Resources:
       Precedence: 30
       UserPoolId: !Ref StaffUserPool
 
+  SupportGroup:
+    Type: AWS::Cognito::UserPoolGroup
+    Properties:
+      GroupName: Support
+      Description: Staff permitted to view only their assigned event and shift instructions
+      Precedence: 40
+      UserPoolId: !Ref StaffUserPool
+
 Outputs:
   UserPoolId:
     Value: !Ref StaffUserPool

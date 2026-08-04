@@ -61,8 +61,11 @@ const schema = z.object({
   ONEMAP_API_EMAIL: optionalEnv(z.string().email()),
   ONEMAP_API_PASSWORD: optionalEnv(z.string().min(1)),
   COGNITO_DOMAIN: optionalEnv(httpsUrl),
+  COGNITO_REGION: optionalEnv(z.string().min(1)),
+  COGNITO_USER_POOL_ID: optionalEnv(z.string().min(1)),
   COGNITO_REDIRECT_URI: optionalEnv(httpsUrl),
   COGNITO_LOGOUT_URI: optionalEnv(httpsUrl),
+  COGNITO_STAFF_SYNC_MODE: z.enum(["required", "local-only"]).default("required"),
   ENCRYPTION_KEY: optionalEnv(z.string().regex(/^[a-fA-F0-9]{64}$/)),
   ENCRYPTION_ACTIVE_KEY_ID: optionalEnv(z.string().regex(/^[A-Za-z0-9_-]{1,32}$/)),
   ENCRYPTION_KEYRING_JSON: optionalEnv(z.string().min(1)),
@@ -78,6 +81,9 @@ if (!parsed.success) {
 const values = parsed.data;
 if (values.NODE_ENV === "production" && !values.JWT_ACCESS_SECRET) {
   throw new Error("JWT_ACCESS_SECRET is required in production");
+}
+if (values.NODE_ENV === "production" && values.COGNITO_STAFF_SYNC_MODE === "local-only") {
+  throw new Error("COGNITO_STAFF_SYNC_MODE=local-only is forbidden in production");
 }
 if (new URL(values.ONEMAP_BASE_URL).origin !== "https://www.onemap.gov.sg") {
   throw new Error("ONEMAP_BASE_URL must use the official https://www.onemap.gov.sg origin");

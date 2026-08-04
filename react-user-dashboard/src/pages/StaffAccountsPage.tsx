@@ -171,7 +171,7 @@ export default function StaffAccountsPage() {
       open={dialogOpen}
       onOpenChange={closeDialog}
       title={editing ? `Edit ${editing.fullName}` : 'Add staff member'}
-      description={editing ? 'Change the local account profile, access state, and application roles.' : 'This prepares a local account. The colleague also needs the matching Cognito group before they can sign in.'}
+      description={editing ? 'Change the staff profile, access state, and application roles. Sign-in groups stay synchronized with Cognito.' : 'Create the staff profile and Cognito sign-in identity. The colleague will receive the account invitation by email.'}
       dismissible={!saving}
       className="staff-account-dialog"
     >
@@ -184,7 +184,7 @@ export default function StaffAccountsPage() {
           <label className="app-dialog-field"><span>Department <small>Optional</small></span><input maxLength={100} value={draft.department} onChange={(event) => setDraft((current) => ({ ...current, department: event.target.value }))} /></label>
           <label className="app-dialog-field"><span>Designation <small>Optional</small></span><input maxLength={100} value={draft.designation} onChange={(event) => setDraft((current) => ({ ...current, designation: event.target.value }))} /></label>
         </div>
-        <label className="app-dialog-field"><span>Access status</span><select value={draft.status} onChange={(event) => setDraft((current) => ({ ...current, status: event.target.value as StaffDraft['status'] }))}><option value="ACTIVE">Active — can sign in when Cognito access matches</option><option value="INACTIVE">Inactive — sign-in blocked</option></select></label>
+        <label className="app-dialog-field"><span>Access status</span><select value={draft.status} onChange={(event) => setDraft((current) => ({ ...current, status: event.target.value as StaffDraft['status'] }))}><option value="ACTIVE">Active — sign-in roles synchronized with Cognito</option><option value="INACTIVE">Inactive — sign-in blocked and Cognito groups removed</option></select></label>
         <fieldset className="staff-role-selector"><legend>Application roles</legend><p>Select every role this person is approved to perform.</p><div>{ROLE_OPTIONS.map((role) => <label key={role.value}><input type="checkbox" checked={draft.roles.includes(role.value)} onChange={() => toggleRole(role.value)} /><span><strong>{role.label}</strong><small>{role.description}</small></span></label>)}</div></fieldset>
         <div className="app-dialog-actions"><button className="secondary" type="button" disabled={saving} onClick={() => closeDialog(false)}>Cancel</button><button className="primary" type="submit" disabled={saving}>{saving ? 'Saving…' : editing ? 'Save changes' : 'Create account'}</button></div>
       </form>

@@ -591,6 +591,163 @@ async function ensureDemoRegistration(staff, participant, event, consent) {
   return { registration, qr };
 }
 
+async function seedReferralDeliveryLifecycle(staff, reviewer, event) {
+  const participant = await upsertDemoParticipant(staff, {
+    participantReference: "VSMS-DEMO-REFERRAL",
+    nric: "S1000005E",
+    firstName: "Referral",
+    lastName: "Example",
+    dateOfBirth: "1980-01-01",
+    contactNumber: "+65 8000 0005",
+    email: "referral.example@example.test",
+  });
+  const registration = await prisma.eventRegistration.upsert({
+    where: { participantId_eventId: { participantId: participant.id, eventId: event.eventId } },
+    update: { registrationStatus: "COMPLETED", participantDisplayName: "Referral Example" },
+    create: {
+      participantId: participant.id,
+      eventId: event.eventId,
+      registeredBy: staff.id,
+      registrationStatus: "COMPLETED",
+      participantDisplayName: "Referral Example",
+      queueNumber: 99,
+      idempotencyKey: "seed-referral-lifecycle-registration",
+    },
+  });
+  const review = await prisma.review.upsert({
+    where: { registrationId_version: { registrationId: registration.registrationId, version: 1 } },
+    update: {},
+    create: {
+      reviewId: "71000000-0000-4000-8000-000000000001",
+      registrationId: registration.registrationId,
+      version: 1,
+      reviewedByUserId: reviewer.id,
+      outcome: "REFER",
+      urgency: "ROUTINE",
+      clinicalSummary: "Synthetic seed review used only to demonstrate referral delivery lifecycle states.",
+      recommendations: "No real participant or recipient data is associated with this demonstration record.",
+    },
+  });
+  const referral = await prisma.referral.upsert({
+    where: { referralId: "72000000-0000-4000-8000-000000000001" },
+    update: { status: "SENT" },
+    create: {
+      referralId: "72000000-0000-4000-8000-000000000001",
+      reviewId: review.reviewId,
+      registrationId: registration.registrationId,
+      createdByUserId: reviewer.id,
+      revisionNumber: 1,
+      destinationName: "Demonstration Eye Clinic",
+      destinationEmail: "c***@example.invalid",
+      reason: "Synthetic seed referral for delivery-status demonstrations only.",
+      instructions: "Do not use this record for clinical care.",
+      urgency: "ROUTINE",
+      status: "SENT",
+      referredAt: new Date(),
+    },
+  });
+  const delivery = await prisma.notificationDelivery.upsert({
+    where: { id: "73000000-0000-4000-8000-000000000001" },
+    update: { status: "DELIVERED", deliveredAt: new Date() },
+    create: {
+      id: "73000000-0000-4000-8000-000000000001",
+      userId: reviewer.id,
+      referralId: referral.referralId,
+      status: "DELIVERED",
+      recipient: "c***@example.invalid",
+      recipientCiphertext: null,
+      subject: "Synthetic encrypted referral demonstration",
+      body: "Synthetic lifecycle record; no recipient or clinical content.",
+      providerMessageId: "seed-ses-delivered-message",
+      attemptCount: 1,
+      sentAt: new Date(),
+      deliveredAt: new Date(),
+    },
+  });
+  await prisma.providerEventReceipt.upsert({
+    where: { providerEventId: "seed-sns-delivery-event" },
+    update: { deliveryId: delivery.id, appliedStatus: "DELIVERED" },
+    create: {
+      id: "74000000-0000-4000-8000-000000000001",
+      provider: "AWS_SES_SNS",
+      providerEventId: "seed-sns-delivery-event",
+      providerMessageIdHash: crypto.createHash("sha256").update("seed-ses-delivered-message").digest("hex"),
+      deliveryId: delivery.id,
+      eventType: "DELIVERY",
+      appliedStatus: "DELIVERED",
+    },
+  });
+  return { referral, delivery };
+}
+
+async function seedSyncEvidence(staff, event, registration, stations) {
+  const definitions = [
+    { suffix: "001", status: "APPLIED", errorCode: null },
+    { suffix: "002", status: "PENDING", errorCode: null },
+    { suffix: "003", status: "CONFLICT", errorCode: "REGISTRATION_NOT_SCREENABLE" },
+    { suffix: "004", status: "FAILED", errorCode: "SYNC_APPLY_FAILED" },
+    { suffix: "005", status: "PROCESSING", errorCode: null },
+  ];
+  const seeded = [];
+  for (const [index, definition] of definitions.entries()) {
+    const station = stations[index % stations.length];
+    const id = `75000000-0000-4000-8000-000000000${definition.suffix}`;
+    const clientActionId = `75200000-0000-4000-8000-000000000${definition.suffix}`;
+    const requestFingerprint = crypto.createHash("sha256").update(`seed-sync-${definition.suffix}`).digest("hex");
+    const data = {
+      userId: staff.id,
+      eventId: event.eventId,
+      stationId: station.stationId,
+      clientActionId,
+      requestFingerprint,
+      operation: "UPDATE",
+      entityType: "ScreeningResult",
+      entityId: registration.registrationId,
+      payload: { schemaVersion: 1, stationType: station.stationType },
+      status: definition.status,
+      retryCount: 0,
+      version: definition.status === "PENDING" ? 0 : definition.status === "PROCESSING" ? 1 : 2,
+      processingStartedAt: definition.status === "PROCESSING" ? new Date() : null,
+      errorCode: definition.errorCode,
+      ...(definition.status === "APPLIED" ? {
+        responseSnapshot: {
+          resultId: registration.registrationId,
+          overallFlag: "NORMAL",
+          isFlagged: false,
+          ruleVersion: "VSMS-SEED-1.0",
+        },
+      } : {}),
+    };
+    const syncAction = await prisma.syncAction.upsert({
+      where: { id },
+      update: data,
+      create: { id, ...data },
+    });
+    const transitionStatuses = definition.status === "PENDING"
+      ? ["PENDING"]
+      : definition.status === "PROCESSING"
+        ? ["PENDING", "PROCESSING"]
+        : ["PENDING", "PROCESSING", definition.status];
+    for (const [transitionIndex, status] of transitionStatuses.entries()) {
+      const transitionId = `75100000-0000-4${index}${transitionIndex}0-8000-000000000${definition.suffix}`;
+      const transitionData = {
+        syncActionId: syncAction.id,
+        sequence: transitionIndex,
+        status,
+        retryCount: 0,
+        errorCode: status === definition.status ? definition.errorCode : null,
+      };
+      await prisma.syncActionTransition.upsert({
+        where: { id: transitionId },
+        update: transitionData,
+        create: { id: transitionId, ...transitionData },
+      });
+    }
+    seeded.push(syncAction);
+  }
+  return seeded;
+}
+
 async function seedDemoData(staff, reviewer, consentForm) {
   const upcomingEvent = await upsertDemoEvent(staff, {
     key: "seed-demo-tampines",
@@ -781,12 +938,18 @@ async function seedDemoData(staff, reviewer, consentForm) {
     });
   }
 
+  const syncEvidence = await seedSyncEvidence(staff, liveEvent, registration, liveStructure.stations);
+
+  const referralLifecycle = await seedReferralDeliveryLifecycle(staff, reviewer, completedEvent);
+
   return {
     events: { upcomingEvent, liveEvent, completedEvent },
     participants: { aisha, daniel, priya, marcus },
     aishaConsent,
     registration,
     qr,
+    syncEvidence,
+    referralLifecycle,
   };
 }
 
@@ -810,6 +973,7 @@ async function main() {
   console.log(`Reviewer profile: ${reviewer.email} (local role: REVIEWER)`);
   console.log(`Registration ID: ${demo.registration.registrationId}`);
   console.log(`Demo QR pass: ${demo.qr.id}`);
+  console.log(`Synthetic referral delivery: ${demo.referralLifecycle.delivery.status} (${demo.referralLifecycle.delivery.id})`);
 }
 
 main()
