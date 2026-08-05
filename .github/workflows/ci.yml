@@ -78,9 +78,10 @@ jobs:
             -print0 | xargs -0 node --test
         working-directory: backend
 
-      - name: Run Vitest backend tests
+      - name: Run database integration tests
+        shell: bash
         run: >-
-          pnpm exec vitest run
+          node --test
           tests/auth.integration.test.js
           tests/events.integration.test.js
           tests/locationService.test.js
