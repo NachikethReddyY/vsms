@@ -1019,7 +1019,6 @@ paths:
         "401": { $ref: "#/components/responses/Unauthorized" }
         "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
-  paths:
   /api/v1/participants/{participantId}:
     parameters: 
       - $ref: "#/components/parameters/ParticipantId"
@@ -1028,7 +1027,7 @@ paths:
       operationId: getParticipant
       summary: Get a participant and emergency contacts
       security:
-        - BearerAuth: []
+        - bearerAuth: []
       responses:
         "200": 
           description: Participant detail
@@ -1044,7 +1043,7 @@ paths:
       operationId: updateParticipant
       summary: Update supplied participant fields
       security:
-        - BearerAuth: []
+        - bearerAuth: []
       requestBody: 
         required: true
         content: 
