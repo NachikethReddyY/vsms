@@ -8,19 +8,22 @@ let staffUser;
 let staffToken;
 let managerUser;
 let managerToken;
+let publicEventId;
 
 before(async () => {
   staffUser = await helpers.ensureTestUser("REGISTRATION_OFFICER", "rbac-staff");
   staffToken = helpers.accessTokenFor(staffUser);
   managerUser = await helpers.ensureTestUser("EVENT_MANAGER", "rbac-manager");
   managerToken = helpers.accessTokenFor(managerUser);
+  const event = await helpers.prisma.event.findFirst({ select: { eventId: true } });
+  publicEventId = event.eventId;
 });
 
 after(async () => helpers.prisma.$disconnect());
 
 test("REGISTRATION_OFFICER token works on public endpoint", async () => {
   const res = await request(app)
-    .get("/api/v1/public/events")
+    .get(`/api/v1/public/events/${publicEventId}`)
     .set("Authorization", `Bearer ${staffToken}`);
 
   expect(res.statusCode).toBe(200);
