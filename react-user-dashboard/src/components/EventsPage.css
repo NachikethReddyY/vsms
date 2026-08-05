@@ -276,6 +276,14 @@ html[data-theme="light"] .events-workspace {
 .workspace-sync-action svg { width:17px; height:17px; }
 .workspace-sync-action[aria-busy="true"] svg { animation:workspace-sync-spin .9s linear infinite; }
 .workspace-sync-control.has-attention .workspace-sync-action { color:var(--status-cancelled); }
+.workspace-sync-hint {
+  margin:6px 0 0;
+  max-width:28ch;
+  color:var(--muted);
+  font-size:11px;
+  line-height:15px;
+}
+.workspace-sync-control.has-attention .workspace-sync-hint { color:var(--status-cancelled); }
 @keyframes workspace-sync-spin { to { transform:rotate(360deg); } }
 .workspace-icon-action,.workspace-profile-action {
   width:44px;
