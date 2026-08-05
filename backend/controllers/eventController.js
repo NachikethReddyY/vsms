@@ -1,14 +1,11 @@
 const eventService = require("../services/eventService");
 
 exports.list = async (req, res) => res.json(await eventService.listEvents(req.query, req.user));
-
 exports.listActive = async (req, res) => res.json(await eventService.listActiveEvents(req.user));
-
 exports.create = async (req, res) => {
   const idempotencyKey = req.get("Idempotency-Key");
   res.status(201).json(await eventService.createEvent(req.body, req.user, req.context, idempotencyKey));
 };
-
 exports.get = async (req, res) => res.json(await eventService.getEvent(req.params.eventId, req.user));
 exports.publicGet = async (req, res) => res.set("Cache-Control", "public, max-age=60").json(await eventService.getPublicEvent(req.params.eventId));
 exports.metrics = async (req, res) => res.set("Cache-Control", "no-store").json(await eventService.getEventMetrics(req.params.eventId, req.user));
@@ -21,7 +18,6 @@ exports.complete = async (req, res) => res.json(await eventService.transitionEve
 exports.cancel = async (req, res) => res.json(await eventService.cancelEvent(req.params.eventId, req.body, req.user, req.context));
 exports.remove = async (req, res) => res.json(await eventService.deleteEvent(req.params.eventId, req.body, req.user, req.context));
 exports.staffDirectory = async (_req, res) => res.json(await eventService.listStaffDirectory());
-
 exports.stationTemplates = async (_req, res) => res.json(await eventService.listStationTemplates());
 exports.importStations = async (req, res) => res.status(201).json(await eventService.importStations(req.params.eventId, req.body, req.user, req.context));
 exports.updateStation = async (req, res) => res.json(await eventService.updateStation(req.params.eventId, req.params.eventStationId, req.body, req.user, req.context));

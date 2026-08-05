@@ -7,6 +7,30 @@ const authenticate = require("../middlewares/authenticate");
 const requireAnyRole = require("../middlewares/requireAnyRole");
 
 // ==========================================
+// Public pass-status lookup for the QR scan target.
+// Intentionally mounted before auth: only non-sensitive
+// validity/queue/expiry data is returned, never names or PII.
+// ==========================================
+router.get("/public-status/:token", asyncHandler(qrController.getPublicStatus));
+
+// ==========================================
+// Dev-only QR preview (no auth). Blocked in production by controller.
+// ==========================================
+router.get("/dev-view/:registrationId", asyncHandler(qrController.devViewQR));
+router.get("/dev-page/:registrationId", asyncHandler(qrController.devPageQR));
+router.get("/dev-status/:token", asyncHandler(qrController.devStatusQR));
+
+// ==========================================
+// View QR code as SVG in browser (authenticated)
+// ==========================================
+router.get(
+  "/view/:registrationId",
+  authenticate,
+  requireAnyRole.operational("REGISTRATION_OFFICER"),
+  asyncHandler(qrController.viewQR)
+);
+
+// ==========================================
 // Apply Auth Middleware Globally for QR Routes
 // (All routes below this line require authentication)
 // ==========================================

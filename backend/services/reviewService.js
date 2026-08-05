@@ -1,6 +1,7 @@
 const crypto = require("crypto");
 const prisma = require("../prisma/prismaClient");
 const AppError = require("../errors/AppError");
+const { resolveRegistrationByQrValue } = require("../utils/qrToken");
 const { IMPORTABLE_TEMPLATE_KEYS } = require("./stationTemplateMapping");
 const { loadVerifiedSignature, consumeSignatureArtifact } = require("../utils/signatureStorage");
 
@@ -156,10 +157,7 @@ const listQueue = async (eventId, user) => {
 
 const resolveScannedRegistration = async (eventId, passToken, user, db = prisma) => {
   await requireReviewerAccess(db, eventId, user);
-  const registration = await db.eventRegistration.findFirst({
-    where: { eventId, passToken },
-    select: { registrationId: true },
-  });
+  const registration = await resolveRegistrationByQrValue(db, { eventId, value: passToken });
   if (!registration) throw new AppError(404, "QR_REGISTRATION_NOT_FOUND", "This QR pass is not valid for this event");
   return registration;
 };

@@ -1,6 +1,8 @@
 const crypto = require("crypto");
 const prisma = require("../prisma/prismaClient");
 const AppError = require("../errors/AppError");
+const { createAuditLog } = require("../utils/audit");
+const { resolveRegistrationByQrValue } = require("../utils/qrToken");
 
 const VA_RULE_VERSION = "VSMS-VA-1.0";
 const REF_RULE_VERSION = "VSMS-REF-1.0";
@@ -273,15 +275,13 @@ const listQueue = async (eventId, stationId, user) => {
 
 const resolveParticipant = async (eventId, query, user) => {
   await assertCanScreen(eventId, user);
-  const registration = await prisma.eventRegistration.findFirst({
-    where: {
-      eventId,
-      OR: [
-        query.registrationId ? { registrationId: query.registrationId } : undefined,
-        query.passToken ? { passToken: query.passToken } : undefined,
-      ].filter(Boolean),
-    },
-  });
+  const registrationId = query.registrationId
+    || (query.passToken
+      ? (await resolveRegistrationByQrValue(prisma, { eventId, value: query.passToken }))?.registrationId
+      : null);
+  const registration = registrationId
+    ? await prisma.eventRegistration.findFirst({ where: { eventId, registrationId } })
+    : null;
   if (!registration) throw new AppError(404, "REGISTRATION_NOT_FOUND", "No registration matched that pass or id");
 
   return {
@@ -308,6 +308,7 @@ const saveStationResult = async ({
   evaluate,
   body,
   user,
+  context = null,
 }) => {
   await assertCanScreen(eventId, user, stationId);
   await assertStation(eventId, stationId, stationType, label);
@@ -387,6 +388,23 @@ const saveStationResult = async ({
           resultSnapshot: immutableSnapshot(responseResult),
         },
       });
+      await createAuditLog({
+        userId: user.userId,
+        action: "SCREENING_RESULT_RECORDED",
+        entityName: "ScreeningResult",
+        entityId: result.resultId,
+        newValue: {
+          eventId,
+          stationId,
+          stationType,
+          registrationId: body.registrationId,
+          overallFlag: evaluation.overallFlag,
+          isFlagged: evaluation.isFlagged,
+          version: result.version,
+        },
+        context,
+        client: tx,
+      });
       return { result: responseResult, created: true };
     }, { isolationLevel: "Serializable" });
   } catch (error) {
@@ -411,7 +429,7 @@ const previewVisualAcuity = (eventId, stationId, body, user) => previewStationRe
   eventId, stationId, "VISUAL_ACUITY", "Visual acuity", evaluateVisualAcuity, body, user,
 );
 
-const saveVisualAcuity = (eventId, stationId, body, user) => saveStationResult({
+const saveVisualAcuity = (eventId, stationId, body, user, context) => saveStationResult({
   eventId,
   stationId,
   stationType: "VISUAL_ACUITY",
@@ -420,13 +438,14 @@ const saveVisualAcuity = (eventId, stationId, body, user) => saveStationResult({
   evaluate: evaluateVisualAcuity,
   body,
   user,
+  context,
 });
 
 const previewRefraction = (eventId, stationId, body, user) => previewStationResult(
   eventId, stationId, "REFRACTION", "Refraction", evaluateRefraction, body, user,
 );
 
-const saveRefraction = (eventId, stationId, body, user) => saveStationResult({
+const saveRefraction = (eventId, stationId, body, user, context) => saveStationResult({
   eventId,
   stationId,
   stationType: "REFRACTION",
@@ -435,13 +454,14 @@ const saveRefraction = (eventId, stationId, body, user) => saveStationResult({
   evaluate: evaluateRefraction,
   body,
   user,
+  context,
 });
 
 const previewColourVision = (eventId, stationId, body, user) => previewStationResult(
   eventId, stationId, "COLOUR_VISION", "Colour vision", evaluateColourVision, body, user,
 );
 
-const saveColourVision = (eventId, stationId, body, user) => saveStationResult({
+const saveColourVision = (eventId, stationId, body, user, context) => saveStationResult({
   eventId,
   stationId,
   stationType: "COLOUR_VISION",
@@ -450,6 +470,7 @@ const saveColourVision = (eventId, stationId, body, user) => saveStationResult({
   evaluate: evaluateColourVision,
   body,
   user,
+  context,
 });
 
 const ensureDemoStations = async (eventId) => {

@@ -1,3 +1,5 @@
+const { test, after } = require("node:test");
+const { expect } = require("expect");
 const crypto = require("node:crypto");
 const helpers = require("./helpers");
 const qrService = require("../services/qrService");
@@ -97,7 +99,7 @@ const fixture = async (label) => {
   return { activeQr, event, registration, token, user };
 };
 
-afterAll(async () => helpers.prisma.$disconnect());
+after(async () => helpers.prisma.$disconnect());
 
 for (const operation of ["revoke", "reissue"]) {
   test(`an old QR cannot check in after concurrent ${operation}`, async () => {

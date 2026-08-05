@@ -175,7 +175,7 @@ export function ParticipantLookup({
   onSelect: (registrationId: string) => void;
   selected: QueueRegistration | null;
 }) {
-  const [passToken, setPassToken] = useState('VSMS-DEMO-QR-001');
+  const [passToken, setPassToken] = useState('abababababababababababababababababababababababababababababababab');
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
 
@@ -200,7 +200,7 @@ export function ParticipantLookup({
       <div className="va-resolve-row">
         <label>
           Pass token / QR value
-          <input value={passToken} onChange={(event) => setPassToken(event.target.value)} placeholder="VSMS-DEMO-QR-001" />
+          <input value={passToken} onChange={(event) => setPassToken(event.target.value)} placeholder="abababababababababababababababababababababababababababababababab" />
         </label>
         <button type="button" className="primary" onClick={() => void resolvePass()}>Load pass</button>
       </div>

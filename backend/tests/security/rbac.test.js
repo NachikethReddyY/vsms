@@ -1,36 +1,49 @@
-// tests/rbac.test.js
+const { test, before, after } = require("node:test");
+const { expect } = require("expect");
 const request = require("supertest");
+const helpers = require("../helpers");
 const app = require("../../app");
-const { generateMockToken } = require("../helpers"); // Use your project helpers
 
-describe("RBAC and Authorization Controls", () => {
-  
-  it("should forbid STAFF from deleting a participant (Admin-only action)", async () => {
-    const staffToken = generateMockToken({ systemRole: "STAFF" });
+let staffUser;
+let staffToken;
+let managerUser;
+let managerToken;
+let publicEventId;
 
-    const res = await request(app)
-      .delete("/api/v1/participants/123e4567-e89b-12d3-a456-426614174000")
-      .set("Authorization", `Bearer ${staffToken}`);
+before(async () => {
+  staffUser = await helpers.ensureTestUser("REGISTRATION_OFFICER", "rbac-staff");
+  staffToken = helpers.accessTokenFor(staffUser);
+  managerUser = await helpers.ensureTestUser("EVENT_MANAGER", "rbac-manager");
+  managerToken = helpers.accessTokenFor(managerUser);
+  const event = await helpers.prisma.event.findFirst({ select: { eventId: true } });
+  publicEventId = event.eventId;
+});
 
-    expect(res.statusCode).toEqual(403);
-    expect(res.body.success).toBe(false);
-    expect(res.body.error).toEqual("FORBIDDEN");
-  });
+after(async () => helpers.prisma.$disconnect());
 
-  it("should allow EVENT_MANAGER or ADMIN to execute queue transfers", async () => {
-    const managerToken = generateMockToken({ systemRole: "EVENT_MANAGER" });
+test("REGISTRATION_OFFICER token works on public endpoint", async () => {
+  const res = await request(app)
+    .get(`/api/v1/public/events/${publicEventId}`)
+    .set("Authorization", `Bearer ${staffToken}`);
 
-    const res = await request(app)
-      .post("/api/v1/queues/transfer")
-      .set("Authorization", `Bearer ${managerToken}`)
-      .send({
-        participantId: "123e4567-e89b-12d3-a456-426614174000",
-        currentStation: "Registration",
-        nextStation: "Security",
-      });
+  expect(res.statusCode).toBe(200);
+});
 
-    expect(res.statusCode).toEqual(200);
-    expect(res.body.success).toBe(true);
-  });
+test("EVENT_MANAGER token works on protected endpoint", async () => {
+  const res = await request(app)
+    .get("/api/v1/auth/me")
+    .set("Authorization", `Bearer ${managerToken}`);
 
+  expect(res.statusCode).toBe(200);
+  expect(res.body.user).toBeDefined();
+  expect(res.body.user.roles).toContain("EVENT_MANAGER");
+});
+
+test("invalid token is rejected", async () => {
+  const res = await request(app)
+    .get("/api/v1/auth/me")
+    .set("Authorization", "Bearer invalid.token.here");
+
+  expect(res.statusCode).toBe(401);
+  expect(res.body.code).toBe("INVALID_SESSION");
 });

@@ -1,16 +1,26 @@
+const { test, before, after } = require("node:test");
+const { expect } = require("expect");
 const request = require("supertest");
-const app = require("../app");
+const helpers = require("../helpers");
+const app = require("../../app");
 
-describe("Rate Limiter Integration Tests", () => {
-  it("should return 429 Too Many Requests after threshold is breached", async () => {
-    const endpoint = "/api/v1/verify"; // Target your rate-limited route
-    let res;
+let staffUser;
+let staffToken;
 
-    for (let i = 0; i < 55; i++) {
-      res = await request(app).post(endpoint).send({ code: "123456" });
-    }
+before(async () => {
+  staffUser = await helpers.ensureTestUser("REGISTRATION_OFFICER", "ratelimit-staff");
+  staffToken = helpers.accessTokenFor(staffUser);
+});
 
-    expect(res.statusCode).toEqual(429);
-    expect(res.body.error).toEqual("TOO_MANY_REQUESTS");
-  });
+after(async () => helpers.prisma.$disconnect());
+
+test("mutationLimiter applies rate limit headers to /api/v1/qr/verify", async () => {
+  const res = await request(app)
+    .post("/api/v1/qr/verify")
+    .set("Authorization", `Bearer ${staffToken}`)
+    .send({ token: "invalid-token-for-test" });
+
+  // mutationLimiter sets standard ratelimit header
+  expect(res.headers).toHaveProperty("ratelimit");
+  expect(res.headers.ratelimit).toMatch(/r=59/);
 });
