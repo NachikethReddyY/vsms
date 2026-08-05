@@ -55,6 +55,7 @@
   },
   "devDependencies": {
     "@redocly/cli": "^2.40.0",
+    "expect": "^30.4.1",
     "openapi-typescript": "^7.13.0",
     "supertest": "^7.2.2",
     "vitest": "^4.1.10"
