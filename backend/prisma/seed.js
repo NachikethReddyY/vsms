@@ -752,6 +752,44 @@ async function seedSyncEvidence(staff, event, registration, stations) {
   return seeded;
 }
 
+async function seedQueueEntries(staff, event, registration, stations) {
+  if (event.status !== "IN_PROGRESS" || stations.length === 0) return null;
+
+  const firstStation = stations[0];
+  const existing = await prisma.queueEntry.findFirst({
+    where: { registrationId: registration.registrationId, stationId: firstStation.stationId },
+  });
+  if (existing) return existing;
+
+  const queueEntry = await prisma.queueEntry.create({
+    data: {
+      registrationId: registration.registrationId,
+      stationId: firstStation.stationId,
+      queueNumber: registration.queueNumber || 1,
+      status: "WAITING",
+      enteredAt: new Date(),
+    },
+  });
+  await prisma.auditLog.create({
+    data: {
+      userId: staff.id,
+      action: "QUEUE_JOINED",
+      entityName: "QueueEntry",
+      entityId: queueEntry.id,
+      outcome: "SUCCESS",
+      oldValue: null,
+      newValue: {
+        eventId: event.eventId,
+        stationId: firstStation.stationId,
+        registrationId: registration.registrationId,
+        queueNumber: queueEntry.queueNumber,
+        status: "WAITING",
+      },
+    },
+  });
+  return queueEntry;
+}
+
 async function seedDemoData(staff, reviewer, consentForm) {
   const upcomingEvent = await upsertDemoEvent(staff, {
     key: "seed-demo-tampines",
@@ -944,6 +982,8 @@ async function seedDemoData(staff, reviewer, consentForm) {
 
   const syncEvidence = await seedSyncEvidence(staff, liveEvent, registration, liveStructure.stations);
 
+  const queueEntry = await seedQueueEntries(staff, liveEvent, registration, liveStructure.stations);
+
   const referralLifecycle = await seedReferralDeliveryLifecycle(staff, reviewer, completedEvent);
 
   return {
@@ -952,6 +992,7 @@ async function seedDemoData(staff, reviewer, consentForm) {
     aishaConsent,
     registration,
     qr,
+    queueEntry,
     syncEvidence,
     referralLifecycle,
   };

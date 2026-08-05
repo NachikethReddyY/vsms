@@ -25,6 +25,7 @@ const consentRoutes = require("./routes/consentRoutes");
 const emergencyContactRoutes = require("./routes/emergencyContactRoutes");
 const signatureRoutes = require("./routes/signatureRoutes");
 const providerEventRoutes = require("./routes/providerEventRoutes");
+const queueRoutes = require("./routes/queueRoutes");
 const { notFound, errorHandler } = require("./middlewares/errorHandler");
 const authenticate = require("./middlewares/authenticate");
 
@@ -32,47 +33,55 @@ const app = express();
 if (env.trustProxy) app.set("trust proxy", 1);
 app.disable("x-powered-by");
 
+// Silence browser favicon logs
+app.get("/favicon.ico", (_req, res) => res.status(204).end());
+
 app.use(requestContext);
 app.use((req, _res, next) => {
   if (env.isProduction && !req.secure) return next(new AppError(426, "HTTPS_REQUIRED", "HTTPS is required"));
   return next();
 });
 
-app.use(helmet({
-  contentSecurityPolicy: {
-    directives: {
-      defaultSrc: ["'self'"],
-      scriptSrc: env.isProduction ? ["'self'"] : ["'self'", "'unsafe-inline'"],
-      styleSrc: env.isProduction ? ["'self'"] : ["'self'", "'unsafe-inline'"],
-      imgSrc: ["'self'", "data:"],
-      frameAncestors: ["'none'"],
+app.use(
+  helmet({
+    contentSecurityPolicy: {
+      directives: {
+        defaultSrc: ["'self'"],
+        scriptSrc: env.isProduction ? ["'self'"] : ["'self'", "'unsafe-inline'"],
+        styleSrc: env.isProduction ? ["'self'"] : ["'self'", "'unsafe-inline'"],
+        imgSrc: ["'self'", "data:"],
+        frameAncestors: ["'none'"],
+      },
     },
-  },
-}));
+  })
+);
+
 app.use((_req, res, next) => {
   res.set("Permissions-Policy", "camera=(), microphone=(), geolocation=()");
   next();
 });
 
-app.use(cors({
-  credentials: true,
-  origin(origin, callback) {
-    if (!origin || env.corsOrigins.includes(origin)) return callback(null, true);
-    return callback(new AppError(403, "ORIGIN_NOT_ALLOWED", "Request origin is not allowed"));
-  },
-  methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-  allowedHeaders: [
-    "Authorization",
-    "Content-Type",
-    "X-CSRF-Token",
-    "X-Request-Id",
-    "X-Requested-With",
-    "X-Device-Id",
-    "X-Device-Name",
-    "X-Event-Id",
-    "Idempotency-Key",
-  ],
-}));
+app.use(
+  cors({
+    credentials: true,
+    origin(origin, callback) {
+      if (!origin || env.corsOrigins.includes(origin)) return callback(null, true);
+      return callback(new AppError(403, "ORIGIN_NOT_ALLOWED", "Request origin is not allowed"));
+    },
+    methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    allowedHeaders: [
+      "Authorization",
+      "Content-Type",
+      "X-CSRF-Token",
+      "X-Request-Id",
+      "X-Requested-With",
+      "X-Device-Id",
+      "X-Device-Name",
+      "X-Event-Id",
+      "Idempotency-Key",
+    ],
+  })
+);
 
 // Provider callbacks are authenticated with the signed SNS envelope rather
 // than a browser cookie/CSRF token. Mount this one route before browser CSRF.
@@ -82,35 +91,59 @@ app.use("/api/v1/webhooks/ses", providerEventLimiter, providerEventRoutes);
 app.use(cookieParser());
 app.use(express.json({ limit: "256kb", strict: true, type: "application/json" }));
 app.use(["/api/v1", "/api"], (req, res, next) =>
-  ["POST", "PUT", "PATCH", "DELETE"].includes(req.method) ? csrf(req, res, next) : next());
+  ["POST", "PUT", "PATCH", "DELETE"].includes(req.method) ? csrf(req, res, next) : next()
+);
 
 const authLimiter = rateLimit({ windowMs: 15 * 60000, limit: 20, standardHeaders: "draft-8", legacyHeaders: false });
 const mutationLimiter = rateLimit({ windowMs: 60000, limit: 60, standardHeaders: "draft-8", legacyHeaders: false });
 
 app.get("/health", (_req, res) => res.json({ status: "ok" }));
 
+// Safely load Swagger OpenAPI specs in non-production environments
 if (!env.isProduction) {
-  const swaggerDocument = YAML.parse(fs.readFileSync(path.join(__dirname, "docs/openapi.yaml"), "utf8"));
-  app.get("/api-docs/openapi.json", (_req, res) => res.set("Cache-Control", "no-store").json(swaggerDocument));
-  app.use("/api-docs", swaggerUi.serve, swaggerUi.setup(swaggerDocument, {
-    customCss: "",
-    customSiteTitle: "VSMS API documentation",
-    swaggerOptions: {
-      displayRequestDuration: true,
-      filter: true,
-      persistAuthorization: true,
-      tryItOutEnabled: true,
-    },
-  }));
+  try {
+    const openApiPath = path.resolve(__dirname, "docs/openapi.yaml");
+    if (fs.existsSync(openApiPath)) {
+      const fileContents = fs.readFileSync(openApiPath, "utf8");
+      const swaggerDocument = YAML.parse(fileContents);
+
+      app.get("/api-docs/openapi.json", (_req, res) =>
+        res.set("Cache-Control", "no-store").json(swaggerDocument)
+      );
+      app.use(
+        "/api-docs",
+        swaggerUi.serve,
+        swaggerUi.setup(swaggerDocument, {
+          customCss: "",
+          customSiteTitle: "VSMS API documentation",
+          swaggerOptions: {
+            displayRequestDuration: true,
+            filter: true,
+            persistAuthorization: true,
+            tryItOutEnabled: true,
+          },
+        })
+      );
+    } else {
+      console.warn(`[WARN] OpenAPI documentation file not found at: ${openApiPath}`);
+    }
+  } catch (err) {
+    console.error("[ERROR] Failed to load or parse openapi.yaml:", err.message);
+  }
 }
 
-// FIX: Updated route mapping with consistent /api namespaces and isolated paths
-// Versioned routes are the canonical integration surface. Selected legacy
-// aliases remain available for the existing event UI during the transition.
+// Versioned API Routes
 app.use("/api/v1/auth", authLimiter, authRoutes);
 app.use("/api/v1/public/events", publicEventRoutes);
 app.use("/api/v1/users", userRoutes);
-app.use("/api/v1/events", (req, res, next) => ["POST", "PATCH", "PUT", "DELETE"].includes(req.method) ? mutationLimiter(req, res, next) : next(), authenticate, eventRoutes, screeningRoutes);
+app.use(
+  "/api/v1/events",
+  (req, res, next) =>
+    ["POST", "PATCH", "PUT", "DELETE"].includes(req.method) ? mutationLimiter(req, res, next) : next(),
+  authenticate,
+  eventRoutes,
+  screeningRoutes
+);
 app.use("/api/v1/locations", locationRoutes);
 app.use("/api/v1/participants", participantRoutes);
 app.use("/api/v1/registrations", registrationRoutes);
@@ -119,12 +152,32 @@ app.use("/api/v1/emergency-contacts", emergencyContactRoutes);
 app.use("/api/v1/signatures", signatureRoutes);
 app.use("/api/v1/admin", adminRoutes);
 app.use("/api/v1/qr", mutationLimiter, qrRoutes);
+app.use(
+  "/api/v1/queues",
+  (req, res, next) =>
+    ["POST", "PATCH", "PUT", "DELETE"].includes(req.method) ? mutationLimiter(req, res, next) : next(),
+  queueRoutes
+);
 
+// Legacy API Route Aliases
 app.use("/api/users", userRoutes);
 app.use("/api/public/events", publicEventRoutes);
-app.use("/api/events", (req, res, next) => ["POST", "PATCH", "PUT", "DELETE"].includes(req.method) ? mutationLimiter(req, res, next) : next(), authenticate, eventRoutes, screeningRoutes);
+app.use(
+  "/api/events",
+  (req, res, next) =>
+    ["POST", "PATCH", "PUT", "DELETE"].includes(req.method) ? mutationLimiter(req, res, next) : next(),
+  authenticate,
+  eventRoutes,
+  screeningRoutes
+);
 app.use("/api/locations", locationRoutes);
 app.use("/api/qr", mutationLimiter, qrRoutes);
+app.use(
+  "/api/queues",
+  (req, res, next) =>
+    ["POST", "PATCH", "PUT", "DELETE"].includes(req.method) ? mutationLimiter(req, res, next) : next(),
+  queueRoutes
+);
 
 app.use(notFound);
 app.use(errorHandler);
