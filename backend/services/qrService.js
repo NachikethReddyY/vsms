@@ -237,15 +237,19 @@ exports.generateQR = async (registrationId, userId = null, externalTx = null) =>
         }
 
         const now = new Date();
+        const rotationMs = env.qrRotationIntervalMinutes > 0 ? env.qrRotationIntervalMinutes * 60 * 1000 : 0;
         const existing = await tx.qRCodePass.findFirst({
             where: activeQrWhere({ registrationId }, now),
             orderBy: { issuedAt: "desc" },
         });
-        if (existing) return renderQr(existing, decryptQrToken(existing));
+        const shouldRotate = rotationMs > 0
+            && existing
+            && now.getTime() - existing.issuedAt.getTime() >= rotationMs;
+        if (existing && !shouldRotate) return renderQr(existing, decryptQrToken(existing));
 
         const qrId = crypto.randomUUID();
         const token = crypto.randomBytes(32).toString("hex");
-        const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 Hours
+        const expiresAt = new Date(Date.now() + env.qrTtlHours * 60 * 60 * 1000);
 
         await tx.qRCodePass.updateMany({
             // Expired rows can still have is_active=true and therefore occupy
