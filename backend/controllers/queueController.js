@@ -1,4 +1,4 @@
-const queueModel = require("../models/queueModel");
+const queueModel = require("../models/qrService");
 const { logAudit } = require("../utils/auditLogger");
 
 exports.getQueueStatus = async (req, res) => {
