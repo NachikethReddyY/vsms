@@ -35,6 +35,17 @@ const emptyConsent: ConsentFormState = {
   guardianContactEmail: "",
 };
 
+type EventConsentRecord = {
+  id: string;
+  consentStatus: string;
+  signerName?: string | null;
+  createdAt: string;
+  eventId?: string;
+  consentFormVersion?: ConsentFormVersion;
+  event?: { id?: string; eventId?: string };
+  withdrawals?: Array<{ consentStatus: string }>;
+};
+
 export default function ParticipantConsentPage() {
   const navigate = useNavigate();
   const { participantId = "" } = useParams();
@@ -42,6 +53,7 @@ export default function ParticipantConsentPage() {
   const eventId = searchParams.get("eventId") ?? "";
   const [participant, setParticipant] = useState<Participant | null>(null);
   const [consentForm, setConsentForm] = useState<ConsentFormVersion | null>(null);
+  const [existingAcceptedConsent, setExistingAcceptedConsent] = useState<EventConsentRecord | null>(null);
   const [form, setForm] = useState<ConsentFormState>(emptyConsent);
   const [signatureDataUrl, setSignatureDataUrl] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -56,15 +68,24 @@ export default function ParticipantConsentPage() {
     setIsLoading(true);
     setError(null);
     try {
-      const [participantResponse, formResponse] = await Promise.all([
-        apiClient.get(`/participants/${participantId}`),
-        apiClient.get("/participants/active-consent-form"),
+      const requestConfig = eventId ? { headers: { "X-Event-Id": eventId } } : undefined;
+      const [participantResponse, formResponse, consentsResponse] = await Promise.all([
+        apiClient.get(`/participants/${participantId}`, requestConfig),
+        apiClient.get("/participants/active-consent-form", requestConfig),
+        apiClient.get(`/participants/${participantId}/consents`, requestConfig),
       ]);
       setParticipant(participantResponse.data.participant);
       setConsentForm(formResponse.data.consentForm);
+      const signedConsent = (consentsResponse.data.consents ?? []).find((consent: EventConsentRecord) => {
+        const consentEventId = consent.eventId ?? consent.event?.id ?? consent.event?.eventId;
+        const withdrawn = consent.withdrawals?.some((withdrawal) => withdrawal.consentStatus === "WITHDRAWN");
+        return consentEventId === eventId && consent.consentStatus === "ACCEPTED" && !withdrawn;
+      }) ?? null;
+      setExistingAcceptedConsent(signedConsent);
     } catch (requestError: unknown) {
       setParticipant(null);
       setConsentForm(null);
+      setExistingAcceptedConsent(null);
       setError(getApiError(requestError, "Unable to load the consent form."));
     } finally {
       setIsLoading(false);
@@ -151,7 +172,23 @@ export default function ParticipantConsentPage() {
         </section>
       ) : null}
 
-      {!isLoading && consentForm ? (
+      {!isLoading && consentForm && existingAcceptedConsent ? (
+        <section className="participant-v2-consent-signed" aria-label="Recorded consent">
+          <span><CheckCircleIcon /></span>
+          <div>
+            <p>Consent already signed</p>
+            <h2>This participant has accepted the current consent requirement for this event.</h2>
+            <dl>
+              <div><dt>Signed by</dt><dd>{existingAcceptedConsent.signerName || "Recorded signer"}</dd></div>
+              <div><dt>Recorded</dt><dd>{new Date(existingAcceptedConsent.createdAt).toLocaleString("en-SG")}</dd></div>
+              <div><dt>Form version</dt><dd>{existingAcceptedConsent.consentFormVersion?.versionNumber ?? consentForm.versionNumber}</dd></div>
+            </dl>
+            <div><Link className="secondary" to={profileLink}>Back to profile</Link><Link className="primary" to={`/participants/${participantId}/check-in?eventId=${encodeURIComponent(eventId)}`}>Continue to check-in</Link></div>
+          </div>
+        </section>
+      ) : null}
+
+      {!isLoading && consentForm && !existingAcceptedConsent ? (
         <form className="participant-v2-consent-layout" onSubmit={submit} noValidate>
           <section className="participant-v2-consent-document" aria-labelledby="consent-document-title">
             <div className="participant-v2-consent-document-title"><div><span>01 · Approved form</span><h2 id="consent-document-title">{consentForm.title}</h2><p>Read the current approved version before recording a decision.</p></div><strong>Version {consentForm.versionNumber}</strong></div>

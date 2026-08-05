@@ -70,8 +70,10 @@ export default function ParticipantProfilePage() {
     () => eventId ? consents.find((consent) => consent.event.id === eventId) : undefined,
     [consents, eventId],
   );
-  const consentWithdrawn = latestEventConsent?.consentStatus === "ACCEPTED"
-    && latestEventConsent.withdrawals.some((withdrawal) => withdrawal.consentStatus === "WITHDRAWN");
+  // A withdrawal is stored as the latest consent record, rather than only as
+  // a nested item on the original accepted consent.
+  const consentWithdrawn = latestEventConsent?.consentStatus === "WITHDRAWN"
+    || latestEventConsent?.withdrawals.some((withdrawal) => withdrawal.consentStatus === "WITHDRAWN") === true;
   const consentStatus = !eventId
     ? "Choose an event"
     : consentWithdrawn
@@ -80,7 +82,7 @@ export default function ParticipantProfilePage() {
         ? displayStatus(latestEventConsent.consentStatus)
         : "Not recorded";
   const consentStatusClass = consentStatus.toLowerCase().replace(/ /g, "-");
-  const consentMissing = Boolean(eventId) && !latestEventConsent;
+  const consentMissing = Boolean(eventId) && (!latestEventConsent || consentWithdrawn);
   const searchLink = `/participants${eventId ? `?eventId=${encodeURIComponent(eventId)}` : ""}`;
   const registrationForEvent = registrations.find((registration) => registration.eventId === eventId);
   const registrationLink = `/participants/${participantId}/register${eventId ? `?eventId=${encodeURIComponent(eventId)}` : ""}`;
@@ -150,11 +152,11 @@ export default function ParticipantProfilePage() {
               <span>Consent status</span>
               {consentMissing ? <em className="participant-v2-profile-required">Required</em> : null}
               <h2 className={`participant-v2-consent-status ${consentStatusClass}`}>{consentStatus}</h2>
-              <p>{!eventId ? "Select an event to see the consent record for that event." : latestEventConsent ? `Version ${latestEventConsent.consentFormVersion.versionNumber} recorded ${displayDate(latestEventConsent.createdAt)}.` : "Consent is required before this participant can be registered for the selected event."}</p>
+              <p>{!eventId ? "Select an event to see the consent record for that event." : consentWithdrawn ? "This consent was withdrawn. A new consent record is required before this participant can be registered for the selected event." : latestEventConsent ? `Version ${latestEventConsent.consentFormVersion.versionNumber} recorded ${displayDate(latestEventConsent.createdAt)}.` : "Consent is required before this participant can be registered for the selected event."}</p>
               {eventId
-                ? latestEventConsent
-                  ? <Link to={`/participants/${participantId}/consents?eventId=${encodeURIComponent(eventId)}`}>View consent history <ArrowRightIcon /></Link>
-                  : <Link to={`/participants/${participantId}/consent?eventId=${encodeURIComponent(eventId)}`}>Record consent <ArrowRightIcon /></Link>
+                ? consentMissing
+                  ? <Link to={`/participants/${participantId}/consent?eventId=${encodeURIComponent(eventId)}`}>Record consent <ArrowRightIcon /></Link>
+                  : <Link to={`/participants/${participantId}/consents?eventId=${encodeURIComponent(eventId)}`}>View consent history <ArrowRightIcon /></Link>
                 : <Link to={searchLink}>Choose an event <ArrowRightIcon /></Link>}
             </div>
           </article>
