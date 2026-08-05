@@ -1,3 +1,5 @@
+const { test, describe, before, after } = require("node:test");
+const { expect } = require("expect");
 const crypto = require("crypto");
 
 let helpers;
@@ -5,7 +7,7 @@ let fixture;
 let processScreeningSync;
 let requestFingerprint;
 
-beforeAll(async () => {
+before(async () => {
   process.env.NODE_ENV = "test";
   process.env.LOCAL_HTTPS = "false";
   process.env.JWT_ACCESS_SECRET = "test-only-access-secret-with-at-least-thirty-two-characters";
@@ -103,7 +105,7 @@ beforeAll(async () => {
   fixture = { screener, event, station, participant, registration };
 });
 
-afterAll(async () => {
+after(async () => {
   if (fixture) {
     await helpers.prisma.syncAction.deleteMany({ where: { userId: fixture.screener.id } });
     await helpers.prisma.screeningRequestLedger.deleteMany({ where: { registrationId: fixture.registration.registrationId } });

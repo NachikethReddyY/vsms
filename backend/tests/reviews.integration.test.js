@@ -1,3 +1,5 @@
+const { test, describe, before, after } = require("node:test");
+const { expect } = require("expect");
 const crypto = require("crypto");
 const request = require("supertest");
 require("dotenv").config();
@@ -88,7 +90,7 @@ const uploadDecisionSignature = async (registrationId, token = reviewerToken) =>
   return response.body;
 };
 
-beforeAll(async () => {
+before(async () => {
   process.env.NODE_ENV = "test";
   process.env.LOCAL_HTTPS = "false";
   const databaseUrl = new URL(process.env.DATABASE_URL);
@@ -150,7 +152,7 @@ beforeAll(async () => {
   await prisma.staffAssignment.create({ data: { eventId: zeroStationEventId, userId: testUsers.reviewer.id, assignedBy: testUsers.manager.id, shiftId: zeroShift.shiftId, assignmentRole: "REVIEWER", status: "CONFIRMED", assignmentStatus: "CONFIRMED" } });
 });
 
-afterAll(async () => prisma?.$disconnect());
+after(async () => prisma?.$disconnect());
 
 describe("clinical review API", () => {
   test("assigned reviewer lists only complete or urgent registrations and inspects a redacted detail", async () => {
@@ -207,31 +209,33 @@ describe("clinical review API", () => {
     expect((await prisma.signatureArtifact.findUnique({ where: { signatureObjectKey: signature.signatureObjectKey } })).consumedAt).toBeInstanceOf(Date);
   });
 
-  test.each([
+  for (const [label, outcome, urgency] of [
     ["Flagged", "REFER", "PRIORITY"],
     ["Urgent", "URGENT_ESCALATION", undefined],
-  ])("%s referral decision atomically writes the review, draft referral, completion, and both audits", async (label, outcome, urgency) => {
-    const registrationId = registrations[label];
-    const detail = await request(app).get(`/api/events/${eventId}/reviews/${registrationId}`).set(auth(reviewerToken));
-    const signature = await uploadDecisionSignature(registrationId);
-    decisionSignatures.set(registrationId, signature);
-    const response = await request(app).post(`/api/events/${eventId}/reviews/${registrationId}/decision`).set(auth(reviewerToken)).send({
-      outcome,
-      ...(urgency ? { urgency } : {}),
-      contextVersion: detail.body.contextVersion,
-      confirmed: true,
-      clinicalSummary: "Findings require a documented referral.",
-      referral: { destinationName: "Test Eye Centre", reason: "Specialist assessment is recommended." },
-      ...signature,
+  ]) {
+    test(`${label} referral decision atomically writes the review, draft referral, completion, and both audits`, async () => {
+      const registrationId = registrations[label];
+      const detail = await request(app).get(`/api/events/${eventId}/reviews/${registrationId}`).set(auth(reviewerToken));
+      const signature = await uploadDecisionSignature(registrationId);
+      decisionSignatures.set(registrationId, signature);
+      const response = await request(app).post(`/api/events/${eventId}/reviews/${registrationId}/decision`).set(auth(reviewerToken)).send({
+        outcome,
+        ...(urgency ? { urgency } : {}),
+        contextVersion: detail.body.contextVersion,
+        confirmed: true,
+        clinicalSummary: "Findings require a documented referral.",
+        referral: { destinationName: "Test Eye Centre", reason: "Specialist assessment is recommended." },
+        ...signature,
+      });
+      expect(response.status).toBe(201);
+      expect(response.body.referral.status).toBe("DRAFT");
+      expect(await prisma.review.count({ where: { registrationId } })).toBe(1);
+      expect(await prisma.referral.count({ where: { registrationId, status: "DRAFT" } })).toBe(1);
+      expect((await prisma.eventRegistration.findUnique({ where: { registrationId } })).registrationStatus).toBe("COMPLETED");
+      const audits = (await prisma.auditLog.findMany({ where: { userId: testUsers.reviewer.id } })).filter((audit) => audit.details?.registrationId === registrationId);
+      expect(audits.map((audit) => audit.action).sort()).toEqual(["CLINICAL_REVIEW_RECORDED", "REFERRAL_DRAFT_CREATED"]);
     });
-    expect(response.status).toBe(201);
-    expect(response.body.referral.status).toBe("DRAFT");
-    expect(await prisma.review.count({ where: { registrationId } })).toBe(1);
-    expect(await prisma.referral.count({ where: { registrationId, status: "DRAFT" } })).toBe(1);
-    expect((await prisma.eventRegistration.findUnique({ where: { registrationId } })).registrationStatus).toBe("COMPLETED");
-    const audits = (await prisma.auditLog.findMany({ where: { userId: testUsers.reviewer.id } })).filter((audit) => audit.details?.registrationId === registrationId);
-    expect(audits.map((audit) => audit.action).sort()).toEqual(["CLINICAL_REVIEW_RECORDED", "REFERRAL_DRAFT_CREATED"]);
-  });
+  }
 
   test("duplicate and concurrent decisions return 409 without duplicate records", async () => {
     const duplicate = await request(app).post(`/api/events/${eventId}/reviews/${registrations.Normal}/decision`).set(auth(reviewerToken)).send({

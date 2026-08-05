@@ -1,3 +1,5 @@
+const { test, describe, before, after } = require("node:test");
+const { expect } = require("expect");
 const crypto = require("crypto");
 const request = require("supertest");
 const helpers = require("./helpers");
@@ -14,7 +16,7 @@ let defaultStationTemplate;
 const createUser = (applicationRole, label = `${applicationRole}-${crypto.randomUUID().slice(0, 8)}`) =>
   helpers.ensureTestUser(applicationRole, label);
 
-beforeAll(async () => {
+before(async () => {
   manager = await helpers.ensureTestUser("EVENT_MANAGER", "event-manager");
   staffUser = await helpers.ensureTestUser("REGISTRATION_OFFICER", "staff");
   administrator = await helpers.ensureTestUser("ADMINISTRATOR", "event-administrator");
@@ -35,7 +37,7 @@ beforeAll(async () => {
   adminToken = helpers.accessTokenFor(administrator);
 });
 
-afterAll(async () => helpers.prisma.$disconnect());
+after(async () => helpers.prisma.$disconnect());
 
 const newEvent = () => {
   const startsAt = new Date(Date.UTC(2030 + crypto.randomInt(10), crypto.randomInt(12), crypto.randomInt(1, 25), 1));
