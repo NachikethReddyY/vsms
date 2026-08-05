@@ -13,6 +13,7 @@ const {
   previewColourVisionBody,
   saveColourVisionBody,
   reviewParams,
+  reviewScanBody,
   reviewDecisionBody,
   referralParams,
   referralDocumentParams,
@@ -88,6 +89,12 @@ router.get(
   "/:eventId/reviews",
   validate({ params: eventParams }),
   asyncHandler(screeningController.listReviews),
+);
+
+router.post(
+  "/:eventId/reviews/scan",
+  validate({ params: eventParams, body: reviewScanBody }),
+  asyncHandler(screeningController.scanReviewParticipant),
 );
 
 router.get(
