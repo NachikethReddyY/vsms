@@ -154,6 +154,16 @@ const listQueue = async (eventId, user) => {
   return { event, queue };
 };
 
+const resolveScannedRegistration = async (eventId, passToken, user, db = prisma) => {
+  await requireReviewerAccess(db, eventId, user);
+  const registration = await db.eventRegistration.findFirst({
+    where: { eventId, passToken },
+    select: { registrationId: true },
+  });
+  if (!registration) throw new AppError(404, "QR_REGISTRATION_NOT_FOUND", "This QR pass is not valid for this event");
+  return registration;
+};
+
 const loadRegistration = async (db, eventId, registrationId, stations) => {
   const stationIds = stations.map((station) => station.stationId);
   return db.eventRegistration.findFirst({
@@ -476,6 +486,7 @@ const recordDecision = async (eventId, registrationId, decision, user, ipAddress
 
 module.exports = {
   listQueue,
+  resolveScannedRegistration,
   getDetail,
   recordDecision,
   reviewReadiness,
