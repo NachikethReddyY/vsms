@@ -1312,6 +1312,21 @@ paths:
         "401": { $ref: "#/components/responses/Unauthorized" }
         "404": { $ref: "#/components/responses/NotFound" }
         "429": { $ref: "#/components/responses/RateLimited" }
+  /api/v1/qr/view/{registrationId}:
+    get:
+      tags: [QR Codes]
+      operationId: viewRegistrationQrSvg
+      summary: Render the active QR pass as SVG in the browser (authenticated)
+      description: Authenticated helper that returns the active pass for a registration as a raw SVG image, useful for embedding or quick in-browser inspection. Requires a REGISTRATION_OFFICER (or higher) role. The SVG is regenerated on every request so it always reflects the current active pass.
+      parameters: [{ $ref: "#/components/parameters/RegistrationId" }]
+      responses:
+        "200":
+          description: QR pass rendered as an SVG image
+          content:
+            image/svg+xml:
+              schema: { type: string, format: binary }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
   /api/v1/qr/verify:
     post:
       tags: [QR Codes]
@@ -1358,6 +1373,52 @@ paths:
         "200": { description: Pass status, content: { application/json: { schema: { $ref: "#/components/schemas/QrPublicStatusResponse" } } } }
         "400": { $ref: "#/components/responses/ValidationFailed" }
         "429": { $ref: "#/components/responses/RateLimited" }
+  /api/v1/qr/dev-view/{registrationId}:
+    get:
+      tags: [QR Codes]
+      operationId: getDevQrSvg
+      summary: Render the active QR pass as raw SVG (development only)
+      description: Development-only helper that renders the QR pass SVG directly in the browser for quick visual checks. Returns 403 in production. No authentication required; useful for rapid manual inspection of a pass.
+      parameters: [{ $ref: "#/components/parameters/RegistrationId" }]
+      responses:
+        "200":
+          description: QR pass rendered as an SVG image
+          content:
+            image/svg+xml:
+              schema: { type: string, format: binary }
+        "400": { $ref: "#/components/responses/ValidationFailed" }
+        "403": { description: Not available in production }
+        "404": { $ref: "#/components/responses/NotFound" }
+  /api/v1/qr/dev-page/{registrationId}:
+    get:
+      tags: [QR Codes]
+      operationId: getDevQrPage
+      summary: Development QR preview page with live status poller
+      description: Development-only HTML page showing a large, LAN-targeted QR pass alongside participant/event info and a live pass-status poller. The QR encodes the dev-status page URL so it can be scanned by a phone camera on the same network. Returns 403 in production. No authentication required.
+      parameters: [{ $ref: "#/components/parameters/RegistrationId" }]
+      responses:
+        "200":
+          description: Interactive QR preview HTML page
+          content:
+            text/html:
+              schema: { type: string, format: binary }
+        "400": { $ref: "#/components/responses/ValidationFailed" }
+        "403": { description: Not available in production }
+        "404": { $ref: "#/components/responses/NotFound" }
+  /api/v1/qr/dev-status/{token}:
+    get:
+      tags: [QR Codes]
+      operationId: getDevQrStatusPage
+      summary: Phone-friendly pass status page (development QR scan target)
+      description: Development-only HTML page opened when a dev QR is scanned on a phone. It self-locates its own token from the URL and polls the public status endpoint to show VALID/INVALID. Returns 403 in production. No authentication required.
+      parameters: [{ $ref: "#/components/parameters/QrToken" }]
+      responses:
+        "200":
+          description: Mobile status HTML page
+          content:
+            text/html:
+              schema: { type: string, format: binary }
+        "403": { description: Not available in production }
   /api/v1/qr/participant/{token}:
     get:
       tags: [QR Codes]
