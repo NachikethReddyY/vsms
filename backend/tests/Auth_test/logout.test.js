@@ -10,7 +10,7 @@ process.env.COGNITO_DOMAIN = "https://vsms.auth.us-east-1.amazoncognito.com";
 process.env.COGNITO_REDIRECT_URI = "https://localhost:5173/auth/callback";
 process.env.COGNITO_LOGOUT_URI = "https://localhost:5173";
 
-const app = require("../app");
+const app = require("../../app");
 
 test("logout clears browser auth without requiring a valid access token", async () => {
     const response = await request(app)
