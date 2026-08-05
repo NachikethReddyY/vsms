@@ -1245,6 +1245,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/qr/view/{registrationId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Render the active QR pass as SVG in the browser (authenticated)
+         * @description Authenticated helper that returns the active pass for a registration as a raw SVG image, useful for embedding or quick in-browser inspection. Requires a REGISTRATION_OFFICER (or higher) role. The SVG is regenerated on every request so it always reflects the current active pass.
+         */
+        get: operations["viewRegistrationQrSvg"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/qr/verify": {
         parameters: {
             query?: never;
@@ -1291,6 +1311,66 @@ export interface paths {
          * @description Resolves the URL encoded in a scanned VSMS pass. Public and unauthenticated; returns only validity, event name, queue number, and expiry — never participant names or clinical data.
          */
         get: operations["getPublicQrPassStatus"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/qr/dev-view/{registrationId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Render the active QR pass as raw SVG (development only)
+         * @description Development-only helper that renders the QR pass SVG directly in the browser for quick visual checks. Returns 403 in production. No authentication required; useful for rapid manual inspection of a pass.
+         */
+        get: operations["getDevQrSvg"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/qr/dev-page/{registrationId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Development QR preview page with live status poller
+         * @description Development-only HTML page showing a large, LAN-targeted QR pass alongside participant/event info and a live pass-status poller. The QR encodes the dev-status page URL so it can be scanned by a phone camera on the same network. Returns 403 in production. No authentication required.
+         */
+        get: operations["getDevQrPage"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/qr/dev-status/{token}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Phone-friendly pass status page (development QR scan target)
+         * @description Development-only HTML page opened when a dev QR is scanned on a phone. It self-locates its own token from the URL and polls the public status endpoint to show VALID/INVALID. Returns 403 in production. No authentication required.
+         */
+        get: operations["getDevQrStatusPage"];
         put?: never;
         post?: never;
         delete?: never;
@@ -5765,6 +5845,30 @@ export interface operations {
             429: components["responses"]["RateLimited"];
         };
     };
+    viewRegistrationQrSvg: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                registrationId: components["parameters"]["RegistrationId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description QR pass rendered as an SVG image */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "image/svg+xml": string;
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+        };
+    };
     verifyQrCode: {
         parameters: {
             query?: never;
@@ -5848,6 +5952,97 @@ export interface operations {
             };
             400: components["responses"]["ValidationFailed"];
             429: components["responses"]["RateLimited"];
+        };
+    };
+    getDevQrSvg: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                registrationId: components["parameters"]["RegistrationId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description QR pass rendered as an SVG image */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "image/svg+xml": string;
+                };
+            };
+            400: components["responses"]["ValidationFailed"];
+            /** @description Not available in production */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            404: components["responses"]["NotFound"];
+        };
+    };
+    getDevQrPage: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                registrationId: components["parameters"]["RegistrationId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Interactive QR preview HTML page */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/html": string;
+                };
+            };
+            400: components["responses"]["ValidationFailed"];
+            /** @description Not available in production */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            404: components["responses"]["NotFound"];
+        };
+    };
+    getDevQrStatusPage: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                token: components["parameters"]["QrToken"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Mobile status HTML page */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/html": string;
+                };
+            };
+            /** @description Not available in production */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
         };
     };
     getParticipantByQrCode: {
