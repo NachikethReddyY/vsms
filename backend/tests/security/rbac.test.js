@@ -21,16 +21,16 @@ describe("RBAC and Authorization Controls", () => {
     const managerToken = generateMockToken({ systemRole: "EVENT_MANAGER" });
 
     const res = await request(app)
-      .post("/api/v1/queues/transfer")
+      .patch("/api/v1/queues/123e4567-e89b-12d3-a456-426614174000/advance")
       .set("Authorization", `Bearer ${managerToken}`)
       .send({
-        participantId: "123e4567-e89b-12d3-a456-426614174000",
-        currentStation: "Registration",
-        nextStation: "Security",
+        toStationId: "123e4567-e89b-12d3-a456-426614174001",
+        reason: "Proceed to next screening station",
       });
 
     expect(res.statusCode).toEqual(200);
-    expect(res.body.success).toBe(true);
+    expect(res.body).toHaveProperty("completed");
+    expect(res.body).toHaveProperty("nextEntry");
   });
 
 });
