@@ -10,9 +10,9 @@ import { useEffect, useMemo, useState } from "react";
 import { Link, useParams, useSearchParams } from "react-router-dom";
 import type { ConsentFormVersion, EmergencyContact, EventSummary, Participant, Registration } from "../types";
 import apiClient, { getApiError } from "../utils/apiClient";
-import "./ParticipantV2Page.css";
-import "./ParticipantV2ProfilePage.css";
-import "./ParticipantV2ProfileMarkers.css";
+import "./ParticipantPage.css";
+import "./ParticipantProfilePage.css";
+import "./ParticipantProfileMarkers.css";
 
 function displayStatus(value: string) {
   return value.toLowerCase().split("_").map((word) => word.charAt(0).toUpperCase() + word.slice(1)).join(" ");
@@ -31,7 +31,7 @@ type ConsentRecord = {
   withdrawals: Array<{ id: string; consentStatus: string }>;
 };
 
-export default function ParticipantV2ProfilePage() {
+export default function ParticipantProfilePage() {
   const { participantId = "" } = useParams();
   const [searchParams] = useSearchParams();
   const eventId = searchParams.get("eventId") ?? "";

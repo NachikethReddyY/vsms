@@ -4,9 +4,9 @@ import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom"
 import { SignaturePad } from "../components/SignaturePad";
 import type { ConsentFormVersion, Participant } from "../types";
 import apiClient, { getApiError } from "../utils/apiClient";
-import "./ParticipantV2Page.css";
-import "./ParticipantV2ConsentPage.css";
-import "./ParticipantV2ConsentRefinement.css";
+import "./ParticipantPage.css";
+import "./ParticipantConsentPage.css";
+import "./ParticipantConsentRefinement.css";
 
 type ConsentFormState = {
   consentStatus: "ACCEPTED" | "DECLINED";
@@ -35,7 +35,7 @@ const emptyConsent: ConsentFormState = {
   guardianContactEmail: "",
 };
 
-export default function ParticipantV2ConsentPage() {
+export default function ParticipantConsentPage() {
   const navigate = useNavigate();
   const { participantId = "" } = useParams();
   const [searchParams] = useSearchParams();

@@ -3,8 +3,8 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useParams, useSearchParams } from "react-router-dom";
 import type { ConsentFormVersion, EmergencyContact, EventSummary, Participant, Registration } from "../types";
 import apiClient, { getApiError } from "../utils/apiClient";
-import "./ParticipantV2Page.css";
-import "./ParticipantV2CheckInPage.css";
+import "./ParticipantPage.css";
+import "./ParticipantCheckInPage.css";
 
 type ConsentRecord = {
   id: string;
@@ -30,7 +30,7 @@ function displayDate(value: string) {
   return new Date(value).toLocaleDateString("en-SG", { weekday: "short", day: "numeric", month: "short", year: "numeric" });
 }
 
-export default function ParticipantV2CheckInPage() {
+export default function ParticipantCheckInPage() {
   const { participantId = "" } = useParams();
   const [searchParams] = useSearchParams();
   const eventId = searchParams.get("eventId") ?? "";

@@ -19,12 +19,12 @@ import { AuditLogsPage as RegistrationAuditLogsPage } from "./pages/AdminPages";
 import AccountSecurityPage from "./pages/AccountSecurityPage";
 import StaffAccountsPage from "./pages/StaffAccountsPage";
 import { QueuePage } from "./pages/QueuePages"; // Imported the QueuePage component
-import ParticipantV2CheckInPage from "./pages/ParticipantV2CheckInPage";
-import ParticipantV2ConsentPage from "./pages/ParticipantV2ConsentPage";
-import ParticipantV2CreatePage from "./pages/ParticipantV2CreatePage";
-import ParticipantV2Page from "./pages/ParticipantV2Page";
-import ParticipantV2ProfilePage from "./pages/ParticipantV2ProfilePage";
-import ParticipantV2RegistrationPage from "./pages/ParticipantV2RegistrationPage";
+import ParticipantCheckInPage from "./pages/ParticipantCheckInPage";
+import ParticipantConsentPage from "./pages/ParticipantConsentPage";
+import ParticipantCreatePage from "./pages/ParticipantCreatePage";
+import ParticipantPage from "./pages/ParticipantPage";
+import ParticipantProfilePage from "./pages/ParticipantProfilePage";
+import ParticipantRegistrationPage from "./pages/ParticipantRegistrationPage";
 import {
   EmergencyContactsPage,
   ParticipantConsentsPage,
@@ -115,18 +115,18 @@ export default function App() {
             <Route path="/events/:eventId/queue" element={<QueuePage />} />
             <Route path="/events/qr-pass/:registrationId" element={<QRCodePage />} />
             <Route path="/qr-generator" element={<QRCodePage />} />
-            <Route path="/participants" element={<ParticipantV2Page />} />
-            <Route path="/participants/new" element={<ParticipantV2CreatePage />} />
+            <Route path="/participants" element={<ParticipantPage />} />
+            <Route path="/participants/new" element={<ParticipantCreatePage />} />
             <Route path="/participants/:participantId/edit" element={<ParticipantEditPage />} />
             <Route path="/participants/:participantId/consents" element={<ParticipantConsentsPage />} />
             <Route path="/participants/:participantId/emergency-contacts" element={<EmergencyContactsPage />} />
-            <Route path="/participants/:participantId/register" element={<ParticipantV2RegistrationPage />} />
-            <Route path="/participants/:participantId/consent" element={<ParticipantV2ConsentPage />} />
-            <Route path="/participants/:participantId/check-in" element={<ParticipantV2CheckInPage />} />
+            <Route path="/participants/:participantId/register" element={<ParticipantRegistrationPage />} />
+            <Route path="/participants/:participantId/consent" element={<ParticipantConsentPage />} />
+            <Route path="/participants/:participantId/check-in" element={<ParticipantCheckInPage />} />
             <Route path="/participants/registrations/:registrationId/history" element={<RegistrationHistoryPage />} />
             <Route path="/participants/registrations/:registrationId/qr" element={<RegistrationQrPage />} />
             <Route path="/participants/:participantId/history" element={<LegacyParticipantHistoryRedirect />} />
-            <Route path="/participants/:participantId" element={<ParticipantV2ProfilePage />} />
+            <Route path="/participants/:participantId" element={<ParticipantProfilePage />} />
 
             <Route path="/participants/search" element={<LegacySearchRedirect />} />
             <Route path="/events/:eventId/register" element={<LegacyEventRegistrationRedirect />} />
