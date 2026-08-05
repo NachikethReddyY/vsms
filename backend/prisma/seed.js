@@ -256,11 +256,19 @@ async function seedConsentForm(staff) {
 }
 
 function demoDate(dayOffset, hour, minute = 0) {
-  const value = new Date();
-  value.setUTCHours(0, 0, 0, 0);
-  value.setUTCDate(value.getUTCDate() + dayOffset);
-  value.setUTCHours(hour, minute, 0, 0);
-  return value;
+  // Demo events are configured for Asia/Singapore. Derive the calendar date
+  // there, then return the equivalent UTC instant for storage in PostgreSQL.
+  const singaporeOffsetMs = 8 * 60 * 60 * 1000;
+  const singaporeNow = new Date(Date.now() + singaporeOffsetMs);
+  return new Date(Date.UTC(
+    singaporeNow.getUTCFullYear(),
+    singaporeNow.getUTCMonth(),
+    singaporeNow.getUTCDate() + dayOffset,
+    hour - 8,
+    minute,
+    0,
+    0,
+  ));
 }
 
 async function upsertDemoEvent(staff, {

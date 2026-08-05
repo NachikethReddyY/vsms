@@ -14,7 +14,7 @@ import { Link, useSearchParams } from "react-router-dom";
 import { eventApi, formatEventDate, type EventRecord } from "../features/events/eventApi";
 import type { ParticipantSummary } from "../types";
 import apiClient, { getApiError } from "../utils/apiClient";
-import "./ParticipantV2Page.css";
+import "./ParticipantPage.css";
 
 type Pagination = {
   page: number;
@@ -42,7 +42,7 @@ function initials(participant: ParticipantSummary) {
   return `${participant.firstName[0] ?? ""}${participant.lastName[0] ?? ""}`.toUpperCase() || "P";
 }
 
-export default function ParticipantV2Page() {
+export default function ParticipantPage() {
   const [searchParams] = useSearchParams();
   const requestedEventId = searchParams.get("eventId") ?? "";
   const [events, setEvents] = useState<EventRecord[]>([]);

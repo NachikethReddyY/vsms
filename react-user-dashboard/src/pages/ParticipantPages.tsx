@@ -9,7 +9,7 @@ import {
   UserPlusIcon,
 } from "@heroicons/react/24/outline";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Link, useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom";
+import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import apiClient, { getApiError } from "../utils/apiClient";
 import type {
   ConsentFormVersion,
@@ -386,14 +386,10 @@ export function ParticipantSearchPage() {
 
 export function ParticipantCreatePage() {
   const navigate = useNavigate();
-  const location = useLocation();
   const eventId = useEventIdFromRouteOrQuery();
   const [searchParams] = useSearchParams();
   const searchConfirmed = searchParams.get("searchConfirmed") === "1";
-  const returnToParticipantV2 = searchParams.get("flow") === "participant-v2" || location.pathname.startsWith("/participants-v2");
-  const searchLink = returnToParticipantV2
-    ? `/participants-v2${eventId ? `?eventId=${eventId}` : ""}`
-    : `/participants/search${eventId ? `?eventId=${eventId}` : ""}`;
+  const searchLink = `/participants${eventId ? `?eventId=${eventId}` : ""}`;
   const [form, setForm] = useState<ParticipantFormState>(() => {
     const searchedName = (searchParams.get("name") ?? "").trim().split(/\s+/).filter(Boolean);
     return {
@@ -423,11 +419,9 @@ export function ParticipantCreatePage() {
     try {
       const response = await apiClient.post("/participants", currentForm);
       const id = response.data.participant.id;
-      navigate(returnToParticipantV2 && eventId
-        ? `/participants-v2/${id}/register?eventId=${eventId}`
-        : eventId
-          ? `/participants/${id}/emergency-contacts?eventId=${eventId}`
-          : `/participants/${id}`);
+      navigate(eventId
+        ? `/participants/${id}/register?eventId=${eventId}`
+        : `/participants/${id}`);
     } catch (requestError: unknown) {
       setError(getApiError(requestError, "Unable to create participant."));
     } finally {

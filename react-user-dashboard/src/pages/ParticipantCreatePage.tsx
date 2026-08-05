@@ -2,8 +2,8 @@ import { ArrowLeftIcon, CalendarDaysIcon, EnvelopeIcon, ExclamationTriangleIcon,
 import { useState, type FormEvent } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import apiClient, { getApiError } from "../utils/apiClient";
-import "./ParticipantV2Page.css";
-import "./ParticipantV2CreatePage.css";
+import "./ParticipantPage.css";
+import "./ParticipantCreatePage.css";
 
 type ParticipantForm = {
   firstName: string;
@@ -19,7 +19,7 @@ type ParticipantForm = {
 const phonePattern = /^\+?[0-9][0-9\s-]{6,19}$/;
 const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
-export default function ParticipantV2CreatePage() {
+export default function ParticipantCreatePage() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const eventId = searchParams.get("eventId") ?? "";
