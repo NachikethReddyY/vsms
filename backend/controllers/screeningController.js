@@ -88,6 +88,10 @@ exports.listReviews = async (req, res) => {
   res.json(await reviewService.listQueue(req.params.eventId, req.user));
 };
 
+exports.scanReviewParticipant = async (req, res) => {
+  res.json(await reviewService.resolveScannedRegistration(req.params.eventId, req.body.passToken, req.user));
+};
+
 exports.getReview = async (req, res) => {
   res.json(await reviewService.getDetail(req.params.eventId, req.params.registrationId, req.user));
 };

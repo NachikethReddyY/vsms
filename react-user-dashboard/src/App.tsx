@@ -85,7 +85,7 @@ export default function App() {
             <Route path="/events/:eventId/stations/refraction" element={<RefractionStationPage />} />
             <Route path="/events/:eventId/stations/colour-vision" element={<ColourVisionStationPage />} />
           </Route>
-
+          
           <Route element={<RoleGuard allowedRoles={eventManagerRoles} />}>
             <Route path="/reports" element={<ReportsPage />} />
             <Route path="/events/new" element={<EventFormPage mode="create" />} />

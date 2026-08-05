@@ -5,14 +5,11 @@ const env = require("../config/env");
 const { decrypt, encrypt, encryptionContext } = require("../utils/cryptoUtils");
 const { renderBrandedQrSvg } = require("../utils/qrBranding");
 const { assertUuid } = require("../utils/validation");
+const { hashToken, QR_TOKEN_PATTERN } = require("../utils/qrToken");
 const AppError = require("../errors/AppError");
 
 function buildQRTargetUrl(token) {
     return `${env.publicAppOrigin}/participant-status/${encodeURIComponent(token)}`;
-}
-
-function hashToken(token) {
-    return crypto.createHash("sha256").update(token).digest("hex");
 }
 
 const activeQrWhere = (selector = {}, now = new Date()) => ({
@@ -76,8 +73,6 @@ const manualCheckInRegistration = (registration) => ({
     checkedInAt: registration.checkedInAt,
     queueNumber: registration.queueNumber,
 });
-
-const QR_TOKEN_PATTERN = /^[a-f0-9]{64}$/i;
 
 const decryptQrToken = (qr) => {
     if (qr.tokenEncryptionVersion !== 2 || !qr.tokenCiphertext) {
@@ -354,6 +349,7 @@ exports.getPublicStatus = async (token, db = prisma) => {
             isActive: true,
             registration: {
                 select: {
+                    eventId: true,
                     queueNumber: true,
                     event: { select: { name: true } },
                 },
@@ -373,14 +369,21 @@ exports.getPublicStatus = async (token, db = prisma) => {
         return {
             valid: false,
             eventName: null,
+            currentQueueNumber: null,
             queueNumber: null,
             expiresAt: qr?.expiresAt ?? null,
         };
     }
 
+    const currentQueueNumber = (await db.eventRegistration.aggregate({
+        where: { eventId: qr.registration.eventId, checkedIn: true },
+        _max: { queueNumber: true },
+    }))._max.queueNumber ?? null;
+
     return {
         valid: true,
         eventName: qr.registration.event.name,
+        currentQueueNumber,
         queueNumber: qr.registration.queueNumber,
         expiresAt: qr.expiresAt,
     };

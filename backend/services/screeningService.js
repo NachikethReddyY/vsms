@@ -2,6 +2,7 @@ const crypto = require("crypto");
 const prisma = require("../prisma/prismaClient");
 const AppError = require("../errors/AppError");
 const { createAuditLog } = require("../utils/audit");
+const { resolveRegistrationByQrValue } = require("../utils/qrToken");
 
 const VA_RULE_VERSION = "VSMS-VA-1.0";
 const REF_RULE_VERSION = "VSMS-REF-1.0";
@@ -274,15 +275,13 @@ const listQueue = async (eventId, stationId, user) => {
 
 const resolveParticipant = async (eventId, query, user) => {
   await assertCanScreen(eventId, user);
-  const registration = await prisma.eventRegistration.findFirst({
-    where: {
-      eventId,
-      OR: [
-        query.registrationId ? { registrationId: query.registrationId } : undefined,
-        query.passToken ? { passToken: query.passToken } : undefined,
-      ].filter(Boolean),
-    },
-  });
+  const registrationId = query.registrationId
+    || (query.passToken
+      ? (await resolveRegistrationByQrValue(prisma, { eventId, value: query.passToken }))?.registrationId
+      : null);
+  const registration = registrationId
+    ? await prisma.eventRegistration.findFirst({ where: { eventId, registrationId } })
+    : null;
   if (!registration) throw new AppError(404, "REGISTRATION_NOT_FOUND", "No registration matched that pass or id");
 
   return {

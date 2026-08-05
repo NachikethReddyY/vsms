@@ -3311,10 +3311,11 @@ components:
         data:
           type: object
           additionalProperties: false
-          required: [valid, eventName, queueNumber, expiresAt]
+          required: [valid, eventName, currentQueueNumber, queueNumber, expiresAt]
           properties:
             valid: { type: boolean, description: Whether the pass is active and unexpired }
             eventName: { type: string, nullable: true, description: "Only the event name; never participant data. Unset when the pass is invalid" }
+            currentQueueNumber: { type: integer, nullable: true, description: "Highest queue number already checked in for the event (now serving). Unset when the pass is invalid" }
             queueNumber: { type: integer, nullable: true }
             expiresAt: { type: string, format: date-time, nullable: true }
     QrMutationResponse:

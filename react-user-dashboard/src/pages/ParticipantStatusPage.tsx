@@ -7,6 +7,7 @@ import './ParticipantStatusPage.css';
 type PublicPassStatus = {
   valid: boolean;
   eventName: string | null;
+  currentQueueNumber: number | null;
   queueNumber: number | null;
   expiresAt: string | null;
 };
@@ -55,9 +56,19 @@ export default function ParticipantStatusPage() {
       <CheckBadgeIcon aria-hidden="true" />
       <span className="ps-badge">Valid pass</span>
       <h1>{status.eventName ?? 'Event pass'}</h1>
-      <p>This pass is active and may be scanned at the event entrance.</p>
+      <div className="ps-queue-grid">
+        <div className="ps-queue-cell ps-queue-now">
+          <span className="ps-queue-label">Now serving</span>
+          <strong className="ps-queue-value">{status.currentQueueNumber != null ? `#${status.currentQueueNumber}` : '—'}</strong>
+          <span className="ps-queue-hint">people checked in so far</span>
+        </div>
+        <div className="ps-queue-cell ps-queue-yours">
+          <span className="ps-queue-label">Your queue number</span>
+          <strong className="ps-queue-value">{status.queueNumber != null ? `#${status.queueNumber}` : '—'}</strong>
+          <span className="ps-queue-hint">keep this pass ready</span>
+        </div>
+      </div>
       <dl className="ps-facts">
-        <div><dt>Queue number</dt><dd>{status.queueNumber != null ? `#${status.queueNumber}` : '—'}</dd></div>
         {status.expiresAt ? <div><dt>Expires</dt><dd>{formatExpiry(status.expiresAt)}</dd></div> : null}
       </dl>
       <Link to="/">Return to VSMS</Link>

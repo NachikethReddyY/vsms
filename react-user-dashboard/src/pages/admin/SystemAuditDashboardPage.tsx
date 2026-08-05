@@ -56,6 +56,7 @@ interface AuditDashboardResponse {
   authLogs: AuthAuditRecord[];
 }
 
+// eslint-disable-next-line react-refresh/only-export-components
 export function deriveCategory(action: string): AuditCategory {
   const normalized = action.toUpperCase();
   if (/(AUTH|LOGIN|LOGOUT|PASSWORD|DEVICE|DENIED|FORBIDDEN)/.test(normalized)) return "SECURITY";
@@ -74,6 +75,7 @@ function truncateDetails(value: unknown): string {
   }
 }
 
+// eslint-disable-next-line react-refresh/only-export-components
 export function mapAuditRows(response: AuditDashboardResponse): AuditRow[] {
   const rows: AuditRow[] = [];
   for (const log of response.logs || []) {
