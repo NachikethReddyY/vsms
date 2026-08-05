@@ -22,15 +22,15 @@ import { QueuePage } from "./pages/QueuePages"; // Imported the QueuePage compon
 import ParticipantCheckInPage from "./pages/ParticipantCheckInPage";
 import ParticipantConsentPage from "./pages/ParticipantConsentPage";
 import ParticipantCreatePage from "./pages/ParticipantCreatePage";
+import ParticipantEmergencyContactsPage from "./pages/ParticipantEmergencyContactsPage";
 import ParticipantPage from "./pages/ParticipantPage";
 import ParticipantProfilePage from "./pages/ParticipantProfilePage";
+import ParticipantQrPage from "./pages/ParticipantQrPage";
 import ParticipantRegistrationPage from "./pages/ParticipantRegistrationPage";
 import {
-  EmergencyContactsPage,
   ParticipantConsentsPage,
   ParticipantEditPage,
   RegistrationHistoryPage,
-  RegistrationQrPage,
 } from './pages/ParticipantPages';
 
 const adminRoles = ["ADMINISTRATOR"];
@@ -119,12 +119,12 @@ export default function App() {
             <Route path="/participants/new" element={<ParticipantCreatePage />} />
             <Route path="/participants/:participantId/edit" element={<ParticipantEditPage />} />
             <Route path="/participants/:participantId/consents" element={<ParticipantConsentsPage />} />
-            <Route path="/participants/:participantId/emergency-contacts" element={<EmergencyContactsPage />} />
+            <Route path="/participants/:participantId/emergency-contacts" element={<ParticipantEmergencyContactsPage />} />
             <Route path="/participants/:participantId/register" element={<ParticipantRegistrationPage />} />
             <Route path="/participants/:participantId/consent" element={<ParticipantConsentPage />} />
             <Route path="/participants/:participantId/check-in" element={<ParticipantCheckInPage />} />
             <Route path="/participants/registrations/:registrationId/history" element={<RegistrationHistoryPage />} />
-            <Route path="/participants/registrations/:registrationId/qr" element={<RegistrationQrPage />} />
+            <Route path="/participants/registrations/:registrationId/qr" element={<ParticipantQrPage />} />
             <Route path="/participants/:participantId/history" element={<LegacyParticipantHistoryRedirect />} />
             <Route path="/participants/:participantId" element={<ParticipantProfilePage />} />
 
