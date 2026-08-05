@@ -19,6 +19,7 @@ import { AuditLogsPage as RegistrationAuditLogsPage } from "./pages/AdminPages";
 import AccountSecurityPage from "./pages/AccountSecurityPage";
 import StaffAccountsPage from "./pages/StaffAccountsPage";
 import { QueuePage } from "./pages/QueuePages"; // Imported the QueuePage component
+import ParticipantStatusPage from "./pages/ParticipantStatusPage";
 import ParticipantV2ConsentPage from "./pages/ParticipantV2ConsentPage";
 import ParticipantV2Page from "./pages/ParticipantV2Page";
 import ParticipantV2ProfilePage from "./pages/ParticipantV2ProfilePage";
@@ -55,6 +56,7 @@ export default function App() {
       <Route path="/" element={<LandingPage />} />
       <Route path="/auth/callback" element={<CognitoCallback />} />
       <Route path="/e/:eventId" element={<PublicEventPage />} />
+      <Route path="/participant-status/:token" element={<ParticipantStatusPage />} />
 
       <Route element={<ProtectedRoute />}>
         <Route path="/dashboard" element={<Navigate to="/events" replace />} />

@@ -3,6 +3,7 @@ const crypto = require("crypto");
 const prisma = require("../prisma/prismaClient");
 const env = require("../config/env");
 const { decrypt, encrypt, encryptionContext } = require("../utils/cryptoUtils");
+const { renderBrandedQrSvg } = require("../utils/qrBranding");
 const { assertUuid } = require("../utils/validation");
 const AppError = require("../errors/AppError");
 
@@ -148,11 +149,7 @@ const renderQr = async (qr, token) => ({
     registrationId: qr.registrationId,
     issuedAt: qr.issuedAt,
     expiresAt: qr.expiresAt,
-    qrImage: await QRCode.toDataURL(buildQRTargetUrl(token), {
-        errorCorrectionLevel: "H",
-        margin: 2,
-        width: 300,
-    }),
+    qrImage: await renderBrandedQrSvg(buildQRTargetUrl(token), { width: 300 }),
 });
 
 exports.getEventIdForAccess = async ({ eventId, registrationId, qrId, token }, db = prisma) => {
@@ -343,6 +340,53 @@ exports.verifyQR = async (token, eventId = null, userId = null, db = prisma) => 
 };
 
 // ==========================================
+// Public Pass Status (scan target, no PII)
+// ==========================================
+exports.getPublicStatus = async (token, db = prisma) => {
+    if (!token) {
+        throw new AppError(400, "TOKEN_REQUIRED", "QR Token is required.");
+    }
+
+    const qr = await db.qRCodePass.findFirst({
+        where: { tokenHash: hashToken(String(token).toLowerCase().trim()) },
+        select: {
+            expiresAt: true,
+            isActive: true,
+            registration: {
+                select: {
+                    queueNumber: true,
+                    event: { select: { name: true } },
+                },
+            },
+        },
+    });
+
+    const now = new Date();
+    const valid = Boolean(
+        qr
+        && qr.isActive
+        && qr.expiresAt > now
+        && qr.registration
+    );
+
+    if (!valid) {
+        return {
+            valid: false,
+            eventName: null,
+            queueNumber: null,
+            expiresAt: qr?.expiresAt ?? null,
+        };
+    }
+
+    return {
+        valid: true,
+        eventName: qr.registration.event.name,
+        queueNumber: qr.registration.queueNumber,
+        expiresAt: qr.expiresAt,
+    };
+};
+
+// ==========================================
 // Get Active Participant Info by QR Token
 // ==========================================
 exports.getParticipant = async (token, db = prisma) => {
@@ -468,11 +512,7 @@ exports.downloadQR = async (qrId, db = prisma) => {
     const qr = await db.qRCodePass.findFirst({ where: activeQrWhere({ id: qrId }) });
     if (!qr) throw new AppError(404, "QR_NOT_FOUND", "QR Code is invalid, expired, or unavailable.");
 
-    const qrImage = await QRCode.toDataURL(buildQRTargetUrl(decryptQrToken(qr)), {
-        errorCorrectionLevel: "H",
-        margin: 2,
-        width: 600,
-    });
+    const qrImage = await renderBrandedQrSvg(buildQRTargetUrl(decryptQrToken(qr)), { width: 600 });
 
     return { qrId: qr.id, expiresAt: qr.expiresAt, qrImage };
 };

@@ -1346,6 +1346,17 @@ paths:
         "404": { $ref: "#/components/responses/NotFound" }
         "409": { $ref: "#/components/responses/Conflict" }
         "429": { $ref: "#/components/responses/RateLimited" }
+  /api/v1/qr/public-status/{token}:
+    get:
+      tags: [QR Codes]
+      operationId: getPublicQrPassStatus
+      summary: Public pass-status lookup for the QR scan target (no PII)
+      description: Resolves the URL encoded in a scanned VSMS pass. Public and unauthenticated; returns only validity, event name, queue number, and expiry — never participant names or clinical data.
+      parameters: [{ $ref: "#/components/parameters/QrToken" }]
+      responses:
+        "200": { description: Pass status, content: { application/json: { schema: { $ref: "#/components/schemas/QrPublicStatusResponse" } } } }
+        "400": { $ref: "#/components/responses/ValidationFailed" }
+        "429": { $ref: "#/components/responses/RateLimited" }
   /api/v1/qr/participant/{token}:
     get:
       tags: [QR Codes]
@@ -3053,8 +3064,52 @@ components:
       additionalProperties: false
       required: [logs, authLogs]
       properties:
-        logs: { type: array, items: { type: object, additionalProperties: true } }
-        authLogs: { type: array, items: { type: object, additionalProperties: true } }
+        logs:
+          type: array
+          description: Reverse-chronological application audit records (max 100)
+          items:
+            type: object
+            additionalProperties: true
+            required: [id, action, outcome, createdAt]
+            properties:
+              id: { type: string, format: uuid }
+              userId: { type: string, format: uuid, nullable: true }
+              deviceId: { type: string, format: uuid, nullable: true }
+              action:
+                type: string
+                enum: [CREATED, UPDATED, PUBLISHED, STARTED, COMPLETED, CANCELLED, EVENT_DELETED, EVENT_REGISTRATION_CREATED, REGISTRATION_STATUS_CHANGED, DUPLICATE_REGISTRATION_BLOCKED, PARTICIPANT_CREATED, PARTICIPANT_UPDATED, EMERGENCY_CONTACT_CREATED, EMERGENCY_CONTACT_UPDATED, CONSENT_WITHDRAWN, SCREENING_RESULT_RECORDED, CLINICAL_REVIEW_RECORDED, REFERRAL_ISSUED, REFERRAL_REVISION_CREATED, REFERRAL_HANDOFF_ACKNOWLEDGED, REFERRAL_EMAIL_FAILED, REFERRAL_EMAIL_CONFIRMATION_PENDING, REFERRAL_EMAIL_RECONCILIATION_REQUIRED, REFERRAL_EMAIL_RETRY_AUTHORIZED, REFERRAL_DRAFT_CREATED, QR_GENERATED, QR_VERIFIED, QR_REVOKED, QR_REISSUED_REVOCATION, MANUAL_CHECKIN_PERFORMED, STAFF_ACCOUNT_CREATED, STAFF_ACCOUNT_UPDATED, STAFF_ASSIGNMENT_ADDED, STAFF_ASSIGNMENT_REMOVED, REPORT_VIEWED, SCREENING_SYNC_BATCH, ARTIFACT_CLEANUP_ESCALATED, ENCRYPTION_BACKFILL_APPLIED]
+              resource: { type: string, nullable: true }
+              entityName: { type: string, nullable: true }
+              entityId: { type: string, format: uuid, nullable: true }
+              outcome: { type: string, enum: [SUCCESS, FAILED, DENIED, BLOCKED] }
+              requestId: { type: string, format: uuid, nullable: true }
+              details: { type: object, nullable: true, additionalProperties: true }
+              oldValue: { type: object, nullable: true, additionalProperties: true }
+              newValue: { type: object, nullable: true, additionalProperties: true }
+              ipAddress: { type: string, nullable: true }
+              deviceName: { type: string, nullable: true }
+              createdAt: { type: string, format: date-time }
+              user: { $ref: "#/components/schemas/User" }
+        authLogs:
+          type: array
+          description: Reverse-chronological authentication audit records (max 100)
+          items:
+            type: object
+            additionalProperties: true
+            required: [id, eventType, outcome, occurredAt]
+            properties:
+              id: { type: string, format: uuid }
+              userId: { type: string, format: uuid, nullable: true }
+              deviceId: { type: string, format: uuid, nullable: true }
+              eventType: { type: string }
+              outcome: { type: string, enum: [SUCCESS, FAILED, DENIED, BLOCKED] }
+              failureCategory: { type: string, nullable: true }
+              identifierHash: { type: string, nullable: true }
+              ipAddress: { type: string, nullable: true }
+              userAgent: { type: string, nullable: true }
+              requestId: { type: string, format: uuid, nullable: true }
+              occurredAt: { type: string, format: date-time }
+              user: { $ref: "#/components/schemas/User" }
     QrCode:
       type: object
       additionalProperties: true
@@ -3077,7 +3132,22 @@ components:
         registrationId: { type: string, format: uuid }
         issuedAt: { type: string, format: date-time }
         expiresAt: { type: string, format: date-time }
-        qrImage: { type: string, description: Data URL containing the QR image }
+        qrImage: { type: string, description: "SVG data URL of the VSMS-branded QR image (center logo and wordmark overlay)" }
+    QrPublicStatusResponse:
+      type: object
+      additionalProperties: false
+      required: [success, data]
+      properties:
+        success: { type: boolean, enum: [true] }
+        data:
+          type: object
+          additionalProperties: false
+          required: [valid, eventName, queueNumber, expiresAt]
+          properties:
+            valid: { type: boolean, description: Whether the pass is active and unexpired }
+            eventName: { type: string, nullable: true, description: "Only the event name; never participant data. Unset when the pass is invalid" }
+            queueNumber: { type: integer, nullable: true }
+            expiresAt: { type: string, format: date-time, nullable: true }
     QrMutationResponse:
       type: object
       additionalProperties: false
@@ -3107,7 +3177,7 @@ components:
           properties:
             qrId: { type: string, format: uuid }
             expiresAt: { type: string, format: date-time }
-            qrImage: { type: string, description: Data URL containing the QR image }
+            qrImage: { type: string, description: "SVG data URL of the VSMS-branded QR image (center logo and wordmark overlay)" }
     QrLookupParticipant:
       type: object
       additionalProperties: false
