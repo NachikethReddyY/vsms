@@ -973,7 +973,17 @@ async function main() {
   console.log(`Reviewer profile: ${reviewer.email} (local role: REVIEWER)`);
   console.log(`Registration ID: ${demo.registration.registrationId}`);
   console.log(`Demo QR pass: ${demo.qr.id}`);
+  console.log(`Demo QR token: VSMS-DEMO-QR-001`);
   console.log(`Synthetic referral delivery: ${demo.referralLifecycle.delivery.status} (${demo.referralLifecycle.delivery.id})`);
+  const liveStations = await prisma.station.findMany({
+    where: { eventId: demo.events.liveEvent.eventId, isActive: true },
+    orderBy: { stationOrder: "asc" },
+    select: { stationType: true, stationName: true },
+  });
+  console.log(
+    `Live event stations: ${liveStations.map((s) => s.stationType).join(", ") || "(none)"}`,
+  );
+  console.log("Confirm stations via GET /api/v1/events/{eventId}/stations");
 }
 
 main()

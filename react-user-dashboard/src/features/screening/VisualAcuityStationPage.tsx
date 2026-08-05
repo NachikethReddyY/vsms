@@ -11,7 +11,7 @@ import {
   Station,
   VisualAcuityResultData,
 } from './screeningApi';
-import { loadStationContext, StationHandoffLinks } from './StationShared';
+import { loadStationContext, ParticipantLookup, StationHandoffLinks } from './StationShared';
 
 const EXCEPTION_CODES = ['CF', 'HM', 'LP', 'NLP', 'NOT_TESTABLE'] as const;
 const DENOMINATORS = [6, 9, 12, 15, 18, 24, 36, 60];
@@ -76,7 +76,6 @@ export default function VisualAcuityStationPage() {
   const [eventStations, setEventStations] = useState<Station[]>([]);
   const [queue, setQueue] = useState<QueueRegistration[]>([]);
   const [selectedId, setSelectedId] = useState(() => searchParams.get('registrationId') || '');
-  const [passToken, setPassToken] = useState('VSMS-DEMO-QR-001');
   const [od, setOd] = useState<EyeReading>({ kind: 'FRACTION', denominator: 6 });
   const [os, setOs] = useState<EyeReading>({ kind: 'FRACTION', denominator: 6 });
   const [glasses, setGlasses] = useState<'yes' | 'no' | 'unknown'>('unknown');
@@ -126,18 +125,6 @@ export default function VisualAcuityStationPage() {
     void load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [eventId]);
-
-  const resolvePass = async () => {
-    if (!eventId || !passToken.trim()) return;
-    setError(null);
-    try {
-      const person = await screeningApi.resolve(eventId, { passToken: passToken.trim() });
-      setSelectedId(person.registrationId);
-      setSuccess(`Loaded ${person.participantDisplayName} from pass token.`);
-    } catch (cause) {
-      setError(getApiMessage(cause, 'Could not resolve that participant pass.'));
-    }
-  };
 
   const runPreview = async () => {
     if (!eventId || !station) return null;
@@ -233,34 +220,13 @@ export default function VisualAcuityStationPage() {
         />
       )}
 
-      <section className="detail-panel" style={{ marginBottom: 24 }}>
-        <h2>Find participant</h2>
-        <div className="va-resolve-row">
-          <label>
-            Pass token / QR value
-            <input value={passToken} onChange={(event) => setPassToken(event.target.value)} placeholder="VSMS-DEMO-QR-001" />
-          </label>
-          <button type="button" className="primary" onClick={() => void resolvePass()}>Load pass</button>
-        </div>
-        <label>
-          Or choose from station queue
-          <select value={selectedId} onChange={(event) => setSelectedId(event.target.value)}>
-            <option value="" disabled>Select participant</option>
-            {queue.map((row) => (
-              <option key={row.registrationId} value={row.registrationId}>
-                #{row.queueNumber ?? '—'} {row.participantDisplayName}
-                {row.existingResult ? ` · ${row.existingResult.overallFlag}` : ''}
-              </option>
-            ))}
-          </select>
-        </label>
-        {selected && (
-          <p>
-            Screening <strong>{selected.participantDisplayName}</strong>
-            {selected.passToken ? <> · pass <code>{selected.passToken}</code></> : null}
-          </p>
-        )}
-      </section>
+      <ParticipantLookup
+        eventId={eventId}
+        queue={queue}
+        selectedId={selectedId}
+        onSelect={setSelectedId}
+        selected={selected}
+      />
 
       <form className="detail-panel va-form" onSubmit={(event) => void submit(event)}>
         <h2>Chart result</h2>

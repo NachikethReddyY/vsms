@@ -46,6 +46,8 @@ VISUAL_ACUITY | REFRACTION | COLOUR_VISION | EYE_HEALTH
 
 Demo event seeding creates **runtime** `Station` rows only for VA / Refraction / Colour Vision (not Registration, Clinical Review, or Eye Health). Screening’s `ensureDemoStations` matches that VA/REF/CV set. `EYE_HEALTH` is a valid `StationType` and appears in review tests, but is not auto-created by demo helpers today.
 
+QR scan → station handoff (token-only QR; `eventId` + `registrationId` after verify) is documented in [`qr-station-handoff.md`](./qr-station-handoff.md).
+
 ---
 
 ## 3. API stub status (as of main after #23)
