@@ -3,15 +3,13 @@ const crypto = require("crypto");
 const prisma = require("../prisma/prismaClient");
 const env = require("../config/env");
 const { decrypt, encrypt, encryptionContext } = require("../utils/cryptoUtils");
+const { renderBrandedQrSvg } = require("../utils/qrBranding");
 const { assertUuid } = require("../utils/validation");
+const { hashToken, QR_TOKEN_PATTERN } = require("../utils/qrToken");
 const AppError = require("../errors/AppError");
 
 function buildQRTargetUrl(token) {
     return `${env.publicAppOrigin}/participant-status/${encodeURIComponent(token)}`;
-}
-
-function hashToken(token) {
-    return crypto.createHash("sha256").update(token).digest("hex");
 }
 
 const activeQrWhere = (selector = {}, now = new Date()) => ({
@@ -75,8 +73,6 @@ const manualCheckInRegistration = (registration) => ({
     checkedInAt: registration.checkedInAt,
     queueNumber: registration.queueNumber,
 });
-
-const QR_TOKEN_PATTERN = /^[a-f0-9]{64}$/i;
 
 const decryptQrToken = (qr) => {
     if (qr.tokenEncryptionVersion !== 2 || !qr.tokenCiphertext) {
@@ -148,11 +144,7 @@ const renderQr = async (qr, token) => ({
     registrationId: qr.registrationId,
     issuedAt: qr.issuedAt,
     expiresAt: qr.expiresAt,
-    qrImage: await QRCode.toDataURL(buildQRTargetUrl(token), {
-        errorCorrectionLevel: "H",
-        margin: 2,
-        width: 300,
-    }),
+    qrImage: await renderBrandedQrSvg(buildQRTargetUrl(token), { width: 300 }),
 });
 
 exports.getEventIdForAccess = async ({ eventId, registrationId, qrId, token }, db = prisma) => {
@@ -245,15 +237,19 @@ exports.generateQR = async (registrationId, userId = null, externalTx = null) =>
         }
 
         const now = new Date();
+        const rotationMs = env.qrRotationIntervalMinutes > 0 ? env.qrRotationIntervalMinutes * 60 * 1000 : 0;
         const existing = await tx.qRCodePass.findFirst({
             where: activeQrWhere({ registrationId }, now),
             orderBy: { issuedAt: "desc" },
         });
-        if (existing) return renderQr(existing, decryptQrToken(existing));
+        const shouldRotate = rotationMs > 0
+            && existing
+            && now.getTime() - existing.issuedAt.getTime() >= rotationMs;
+        if (existing && !shouldRotate) return renderQr(existing, decryptQrToken(existing));
 
         const qrId = crypto.randomUUID();
         const token = crypto.randomBytes(32).toString("hex");
-        const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 Hours
+        const expiresAt = new Date(Date.now() + env.qrTtlHours * 60 * 60 * 1000);
 
         await tx.qRCodePass.updateMany({
             // Expired rows can still have is_active=true and therefore occupy
@@ -340,6 +336,61 @@ exports.verifyQR = async (token, eventId = null, userId = null, db = prisma) => 
             queueNumber: qr.registration.queueNumber,
         };
     });
+};
+
+// ==========================================
+// Public Pass Status (scan target, no PII)
+// ==========================================
+exports.getPublicStatus = async (token, db = prisma) => {
+    if (!token) {
+        throw new AppError(400, "TOKEN_REQUIRED", "QR Token is required.");
+    }
+
+    const qr = await db.qRCodePass.findFirst({
+        where: { tokenHash: hashToken(String(token).toLowerCase().trim()) },
+        select: {
+            expiresAt: true,
+            isActive: true,
+            registration: {
+                select: {
+                    eventId: true,
+                    queueNumber: true,
+                    event: { select: { name: true } },
+                },
+            },
+        },
+    });
+
+    const now = new Date();
+    const valid = Boolean(
+        qr
+        && qr.isActive
+        && qr.expiresAt > now
+        && qr.registration
+    );
+
+    if (!valid) {
+        return {
+            valid: false,
+            eventName: null,
+            currentQueueNumber: null,
+            queueNumber: null,
+            expiresAt: qr?.expiresAt ?? null,
+        };
+    }
+
+    const currentQueueNumber = (await db.eventRegistration.aggregate({
+        where: { eventId: qr.registration.eventId, checkedIn: true },
+        _max: { queueNumber: true },
+    }))._max.queueNumber ?? null;
+
+    return {
+        valid: true,
+        eventName: qr.registration.event.name,
+        currentQueueNumber,
+        queueNumber: qr.registration.queueNumber,
+        expiresAt: qr.expiresAt,
+    };
 };
 
 // ==========================================
@@ -468,11 +519,7 @@ exports.downloadQR = async (qrId, db = prisma) => {
     const qr = await db.qRCodePass.findFirst({ where: activeQrWhere({ id: qrId }) });
     if (!qr) throw new AppError(404, "QR_NOT_FOUND", "QR Code is invalid, expired, or unavailable.");
 
-    const qrImage = await QRCode.toDataURL(buildQRTargetUrl(decryptQrToken(qr)), {
-        errorCorrectionLevel: "H",
-        margin: 2,
-        width: 600,
-    });
+    const qrImage = await renderBrandedQrSvg(buildQRTargetUrl(decryptQrToken(qr)), { width: 600 });
 
     return { qrId: qr.id, expiresAt: qr.expiresAt, qrImage };
 };

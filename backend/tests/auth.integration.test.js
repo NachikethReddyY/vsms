@@ -1,3 +1,5 @@
+const { test, describe, before, after } = require("node:test");
+const { expect } = require("expect");
 const request = require("supertest");
 const helpers = require("./helpers");
 
@@ -5,12 +7,12 @@ const app = require("../app");
 let manager;
 let managerToken;
 
-beforeAll(async () => {
+before(async () => {
   manager = await helpers.ensureTestUser("EVENT_MANAGER", "auth-event-manager");
   managerToken = helpers.accessTokenFor(manager);
 });
 
-afterAll(async () => helpers.prisma.$disconnect());
+after(async () => helpers.prisma.$disconnect());
 
 describe("Cognito authentication boundary", () => {
   test("a verified Cognito access token resolves only the approved local role", async () => {

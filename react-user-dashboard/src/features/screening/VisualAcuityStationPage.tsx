@@ -76,7 +76,7 @@ export default function VisualAcuityStationPage() {
   const [eventStations, setEventStations] = useState<Station[]>([]);
   const [queue, setQueue] = useState<QueueRegistration[]>([]);
   const [selectedId, setSelectedId] = useState(() => searchParams.get('registrationId') || '');
-  const [passToken, setPassToken] = useState('VSMS-DEMO-QR-001');
+  const [passToken, setPassToken] = useState('abababababababababababababababababababababababababababababababab');
   const [od, setOd] = useState<EyeReading>({ kind: 'FRACTION', denominator: 6 });
   const [os, setOs] = useState<EyeReading>({ kind: 'FRACTION', denominator: 6 });
   const [glasses, setGlasses] = useState<'yes' | 'no' | 'unknown'>('unknown');
@@ -238,7 +238,7 @@ export default function VisualAcuityStationPage() {
         <div className="va-resolve-row">
           <label>
             Pass token / QR value
-            <input value={passToken} onChange={(event) => setPassToken(event.target.value)} placeholder="VSMS-DEMO-QR-001" />
+            <input value={passToken} onChange={(event) => setPassToken(event.target.value)} placeholder="abababababababababababababababababababababababababababababababab" />
           </label>
           <button type="button" className="primary" onClick={() => void resolvePass()}>Load pass</button>
         </div>

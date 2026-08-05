@@ -1,3 +1,5 @@
+const { test, describe } = require("node:test");
+const { expect } = require("expect");
 const { compareQueueItems, contextVersion, reviewReadiness } = require("../services/reviewService");
 const { reviewDecisionBody } = require("../schemas/screeningSchemas");
 
@@ -13,14 +15,17 @@ const result = (stationId, overallFlag = "NORMAL", minute = 0) => ({
 });
 
 describe("clinical review eligibility and ordering", () => {
-  test.each([
+  const readinessCases = [
     ["completed normal", [result(stations[0].stationId), result(stations[1].stationId)], true, "SCREENING_COMPLETE"],
     ["completed flagged", [result(stations[0].stationId, "REFER"), result(stations[1].stationId)], true, "SCREENING_COMPLETE"],
     ["incomplete urgent", [result(stations[0].stationId, "URGENT")], true, "URGENT_FLAG"],
     ["incomplete non-urgent", [result(stations[0].stationId, "REVIEW")], false, null],
-  ])("evaluates %s registrations", (_name, results, ready, readyReason) => {
-    expect(reviewReadiness(stations, results)).toMatchObject({ ready, readyReason });
-  });
+  ];
+  for (const [name, results, ready, readyReason] of readinessCases) {
+    test(`evaluates ${name} registrations`, () => {
+      expect(reviewReadiness(stations, results)).toMatchObject({ ready, readyReason });
+    });
+  }
 
   test("a zero-station event is never ready", () => {
     expect(reviewReadiness([], [])).toMatchObject({ ready: false, totalStationCount: 0 });
