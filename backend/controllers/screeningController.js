@@ -24,6 +24,14 @@ exports.resolveParticipant = async (req, res) => {
   res.json(await screeningService.resolveParticipant(req.params.eventId, req.query, req.user));
 };
 
+exports.getPassDisplay = async (req, res) => {
+  res.json(await screeningService.getPassDisplay(
+    req.params.eventId,
+    req.params.registrationId,
+    req.user,
+  ));
+};
+
 exports.saveVisualAcuity = async (req, res) => {
   const { result, created } = await screeningService.saveVisualAcuity(
     req.params.eventId,

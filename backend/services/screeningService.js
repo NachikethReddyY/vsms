@@ -1,6 +1,7 @@
 const crypto = require("crypto");
 const prisma = require("../prisma/prismaClient");
 const AppError = require("../errors/AppError");
+const qrService = require("./qrService");
 
 const VA_RULE_VERSION = "VSMS-VA-1.0";
 const REF_RULE_VERSION = "VSMS-REF-1.0";
@@ -153,7 +154,9 @@ const evaluateColourVision = (resultData) => {
   };
 };
 
-const assertCanScreen = async (eventId, user, stationId) => {
+const SCREENING_STATION_TYPES = ["VISUAL_ACUITY", "REFRACTION", "COLOUR_VISION"];
+
+const assertCanScreen = async (eventId, user, _stationId) => {
   if (user.roles?.includes("ADMINISTRATOR") || !user.roles?.includes("SCREENER")) {
     throw new AppError(403, "SCREENER_ROLE_REQUIRED", "A screener account role is required");
   }
@@ -166,18 +169,37 @@ const assertCanScreen = async (eventId, user, stationId) => {
     throw new AppError(409, "EVENT_NOT_IN_PROGRESS", "Screening is available only while the event is in progress");
   }
   const now = new Date();
+  // Any active SCREENER assignment on this in-progress event unlocks the screening route
+  // (VA → refraction → colour vision). Once Admin has started the event and the shift is
+  // ACTIVE, do not also gate on wall-clock shift hours — overtime / stale seed windows
+  // should not block screening.
   const assignment = await prisma.staffAssignment.findFirst({
     where: {
       eventId,
       userId: user.userId,
       status: { in: ["ASSIGNED", "CONFIRMED"] },
       assignmentRole: "SCREENER",
-      ...(stationId ? { stationId } : {}),
-      shift: { eventId, status: "ACTIVE", startsAt: { lte: now }, endsAt: { gt: now } },
+      shift: { eventId, status: "ACTIVE" },
     },
     select: { id: true },
   });
   if (!assignment) {
+    const rostered = await prisma.staffAssignment.findFirst({
+      where: {
+        eventId,
+        userId: user.userId,
+        status: { in: ["ASSIGNED", "CONFIRMED"] },
+        assignmentRole: "SCREENER",
+      },
+      select: { id: true, shift: { select: { status: true, startsAt: true, endsAt: true } } },
+    });
+    if (rostered && rostered.shift.status !== "ACTIVE") {
+      throw new AppError(
+        403,
+        "SHIFT_NOT_ACTIVE",
+        "You are rostered, but your screening shift is not active right now",
+      );
+    }
     throw new AppError(403, "FORBIDDEN", "You are not assigned to screen this event");
   }
   return event;
@@ -194,7 +216,6 @@ const assertStation = async (eventId, stationId, stationType, label) => {
 const listStations = async (eventId, user) => {
   const event = await assertCanScreen(eventId, user);
 
-  const now = new Date();
   const assignments = await prisma.staffAssignment.findMany({
     where: {
       eventId,
@@ -202,28 +223,27 @@ const listStations = async (eventId, user) => {
       status: { in: ["ASSIGNED", "CONFIRMED"] },
       assignmentRole: "SCREENER",
       stationId: { not: null },
-      shift: { eventId, status: "ACTIVE", startsAt: { lte: now }, endsAt: { gt: now } },
+      shift: { eventId, status: "ACTIVE" },
     },
     select: { stationId: true, shift: { select: { endsAt: true } } },
   });
 
   const stations = await prisma.station.findMany({
-    where: { eventId, stationId: { in: assignments.map(({ stationId }) => stationId) }, isActive: true },
+    where: {
+      eventId,
+      isActive: true,
+      stationType: { in: SCREENING_STATION_TYPES },
+    },
     orderBy: { stationOrder: "asc" },
   });
 
-  const latestAssignmentEndByStation = new Map();
-  for (const assignment of assignments) {
-    const current = latestAssignmentEndByStation.get(assignment.stationId);
-    if (!current || assignment.shift.endsAt > current) {
-      latestAssignmentEndByStation.set(assignment.stationId, assignment.shift.endsAt);
-    }
-  }
+  const assignmentEndsAt = assignments.reduce((latest, assignment) => (
+    !latest || assignment.shift.endsAt > latest ? assignment.shift.endsAt : latest
+  ), null);
 
   return {
     event,
     stations: stations.map((station) => {
-      const assignmentEndsAt = latestAssignmentEndByStation.get(station.stationId);
       if (!event.endsAt || !assignmentEndsAt) return station;
       return {
         ...station,
@@ -271,18 +291,41 @@ const listQueue = async (eventId, stationId, user) => {
   };
 };
 
+const hashQrToken = (token) => crypto.createHash("sha256").update(token).digest("hex");
+
 const resolveParticipant = async (eventId, query, user) => {
   await assertCanScreen(eventId, user);
-  const registration = await prisma.eventRegistration.findFirst({
-    where: {
-      eventId,
-      OR: [
-        query.registrationId ? { registrationId: query.registrationId } : undefined,
-        query.passToken ? { passToken: query.passToken } : undefined,
-      ].filter(Boolean),
-    },
-  });
-  if (!registration) throw new AppError(404, "REGISTRATION_NOT_FOUND", "No registration matched that pass or id");
+
+  const orClauses = [
+    query.registrationId ? { registrationId: query.registrationId } : undefined,
+    query.passToken ? { passToken: query.passToken } : undefined,
+  ].filter(Boolean);
+
+  let registration = orClauses.length
+    ? await prisma.eventRegistration.findFirst({
+      where: { eventId, OR: orClauses },
+    })
+    : null;
+
+  // Prefer registration.passToken first (keeps VSMS-DEMO-QR-001 working), then QRCodePass.token.
+  const qrLookupToken = query.qrToken || (!registration ? query.passToken : null);
+  if (!registration && qrLookupToken) {
+    const qr = await prisma.qRCodePass.findFirst({
+      where: {
+        OR: [
+          { token: qrLookupToken },
+          { tokenHash: hashQrToken(qrLookupToken) },
+        ],
+        registration: { eventId },
+      },
+      include: { registration: true },
+    });
+    registration = qr?.registration || null;
+  }
+
+  if (!registration) {
+    throw new AppError(404, "REGISTRATION_NOT_FOUND", "No registration matched that pass, QR token, or id");
+  }
 
   return {
     registrationId: registration.registrationId,
@@ -291,6 +334,16 @@ const resolveParticipant = async (eventId, query, user) => {
     status: registration.registrationStatus,
     passToken: registration.passToken,
   };
+};
+
+const getPassDisplay = async (eventId, registrationId, user) => {
+  await assertCanScreen(eventId, user);
+  const registration = await prisma.eventRegistration.findFirst({
+    where: { eventId, registrationId },
+    select: { registrationId: true },
+  });
+  if (!registration) throw new AppError(404, "REGISTRATION_NOT_FOUND", "Registration was not found for this event");
+  return qrService.renderActivePassForRegistration(registrationId);
 };
 
 const previewStationResult = async (eventId, stationId, stationType, label, evaluate, body, user) => {
@@ -489,6 +542,7 @@ module.exports = {
   listStations,
   listQueue,
   resolveParticipant,
+  getPassDisplay,
   previewVisualAcuity,
   saveVisualAcuity,
   previewRefraction,

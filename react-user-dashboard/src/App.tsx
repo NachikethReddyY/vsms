@@ -4,6 +4,7 @@ import { RoleGuard } from "./auth/RoleGuard";
 import { CognitoCallback } from "./auth/CognitoRoutes";
 import AppShell from "./components/AppShell";
 import LandingPage from "./components/LandingPage";
+import ParticipantStatusPage from "./components/registration/ParticipantStatusPage";
 import SettingsPage from "./components/SettingsPage";
 import EventsPage from "./components/EventsPage";
 import QRCodePage from "./components/qr/QRCodePage";
@@ -13,6 +14,7 @@ import PublicEventPage from "./features/events/PublicEventPage";
 import ReviewWorkspacePage from "./features/reviews/ReviewWorkspacePage";
 import ReportsPage from "./features/reports/ReportsPage";
 import ColourVisionStationPage from "./features/screening/ColourVisionStationPage";
+import QRScannerPage from "./features/screening/QRScannerPage";
 import RefractionStationPage from "./features/screening/RefractionStationPage";
 import VisualAcuityStationPage from "./features/screening/VisualAcuityStationPage";
 import { AuditLogsPage as RegistrationAuditLogsPage } from "./pages/AdminPages";
@@ -82,6 +84,11 @@ export default function App() {
             <Route path="/events/:eventId/stations/visual-acuity" element={<VisualAcuityStationPage />} />
             <Route path="/events/:eventId/stations/refraction" element={<RefractionStationPage />} />
             <Route path="/events/:eventId/stations/colour-vision" element={<ColourVisionStationPage />} />
+            <Route path="/qr-scanner" element={<QRScannerPage />} />
+          </Route>
+
+          <Route element={<RoleGuard allowedRoles={[...screenerRoles, ...registrationRoles]} deniedRoles={adminRoles} />}>
+            <Route path="/participant-status/:token" element={<ParticipantStatusPage />} />
           </Route>
 
           <Route element={<RoleGuard allowedRoles={eventManagerRoles} />}>
