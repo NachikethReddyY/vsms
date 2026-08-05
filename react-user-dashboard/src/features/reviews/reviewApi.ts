@@ -25,6 +25,10 @@ export const reviewApi = {
     const { data } = await apiClient.get<ReviewDetailResponse>(`/events/${eventId}/reviews/${registrationId}`);
     return data;
   },
+  async scan(eventId: string, passToken: string) {
+    const { data } = await apiClient.post<{ registrationId: string }>(`/events/${eventId}/reviews/scan`, { passToken });
+    return data;
+  },
   async decide(eventId: string, registrationId: string, decision: ReviewDecisionRequest) {
     const { data } = await apiClient.post<ReviewDecisionResponse>(`/events/${eventId}/reviews/${registrationId}/decision`, decision);
     return data;

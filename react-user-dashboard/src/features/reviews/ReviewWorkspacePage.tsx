@@ -3,19 +3,17 @@ import {
   ArrowLeftIcon,
   ArrowPathIcon,
   ArrowTopRightOnSquareIcon,
+  CameraIcon,
   CheckCircleIcon,
-  ClipboardDocumentCheckIcon,
   ClockIcon,
   ExclamationCircleIcon,
   ExclamationTriangleIcon,
   IdentificationIcon,
-  QueueListIcon,
-  QrCodeIcon,
   ShieldCheckIcon,
   UserIcon,
 } from '@heroicons/react/24/outline';
 import axios from 'axios';
-import { useCallback, useEffect, useRef, useState, type FormEvent, type ReactNode } from 'react';
+import { useCallback, useEffect, useId, useRef, useState, type FormEvent, type ReactNode } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { AppDialog } from '../../components/AppDialog';
 import { SignaturePad } from '../../components/SignaturePad';
@@ -199,10 +197,81 @@ function ParticipantReport({ detail }: { detail: ReviewDetailResponse }) {
   </section>;
 }
 
-function QueueSkeleton() {
-  return <div className="review-queue-skeleton" aria-label="Loading review queue">
-    {[0, 1, 2, 3].map((item) => <span key={item} />)}
-  </div>;
+function QrScanner({ open, onOpenChange, onScan }: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  onScan: (value: string) => Promise<void>;
+}) {
+  const scannerId = `review-qr-${useId().replace(/:/g, '')}`;
+  const [error, setError] = useState('');
+  const [resolving, setResolving] = useState(false);
+
+  useEffect(() => {
+    if (!open) return;
+    let stopped = false;
+    let running = false;
+    let scanner: import('html5-qrcode').Html5Qrcode | null = null;
+
+    const start = async () => {
+      setError('');
+      try {
+        const { Html5Qrcode } = await import('html5-qrcode');
+        if (stopped) return;
+        scanner = new Html5Qrcode(scannerId);
+        await scanner.start(
+          { facingMode: 'environment' },
+          { fps: 10, qrbox: { width: 260, height: 260 } },
+          async (value) => {
+            if (stopped) return;
+            stopped = true;
+            setResolving(true);
+            try {
+              if (running) await scanner?.stop();
+              running = false;
+              await onScan(value);
+              onOpenChange(false);
+            } catch (cause) {
+              setError(apiProblem(cause)?.title || (cause instanceof Error ? cause.message : 'The QR pass could not be read.'));
+              stopped = false;
+              void start();
+            } finally {
+              setResolving(false);
+            }
+          },
+          () => {},
+        );
+        running = true;
+      } catch (cause) {
+        setError(cause instanceof DOMException && cause.name === 'NotAllowedError'
+          ? 'Camera access was blocked. Allow camera access and try again.'
+          : 'The camera could not be opened.');
+      }
+    };
+
+    void start();
+    return () => {
+      stopped = true;
+      if (running) void scanner?.stop().catch(() => {});
+      setResolving(false);
+    };
+  }, [onOpenChange, onScan, open, scannerId]);
+
+  return <AppDialog
+    open={open}
+    onOpenChange={onOpenChange}
+    title="Scan participant QR"
+    description="Hold the participant pass inside the frame. Their clinical review will open automatically."
+    className="review-scanner-dialog"
+  >
+    <div className="review-scanner">
+      <div className="review-scanner-viewport">
+        <div id={scannerId} aria-label="Live camera preview" />
+        <div className="review-scanner-frame" aria-hidden="true" />
+        {resolving && <div className="review-scanner-status">Loading participant…</div>}
+      </div>
+      {error && <p className="review-scanner-error" role="alert">{error}</p>}
+    </div>
+  </AppDialog>;
 }
 
 function DetailSkeleton() {
@@ -440,6 +509,7 @@ export default function ReviewWorkspacePage() {
   const pendingDraftActionRef = useRef<(() => void) | null>(null);
   const restoringHistoryRef = useRef(false);
   const [discardDialogOpen, setDiscardDialogOpen] = useState(false);
+  const [scannerOpen, setScannerOpen] = useState(false);
 
   const loadQueue = useCallback(async (initial = false) => {
     if (initial) setQueueLoading(true);
@@ -689,11 +759,21 @@ export default function ReviewWorkspacePage() {
   const queueItems = queueData?.queue || [];
   const referralRequired = form.outcome === 'REFER' || form.outcome === 'URGENT_ESCALATION';
   const eventName = queueData?.event.name || detail?.event.name || 'Clinical review';
-  const openWithoutQr = () => {
-    const participant = queueItems.find((item) => item.registrationId === selectedId) || queueItems[0];
+  const openNextParticipant = () => {
+    const currentIndex = queueItems.findIndex((item) => item.registrationId === selectedId);
+    const participant = queueItems[currentIndex >= 0 ? (currentIndex + 1) % queueItems.length : 0];
     if (participant) chooseParticipant(participant);
-    else setAnnouncement('No participant is currently available to open.');
+    else setAnnouncement('No participant is currently ready for review.');
   };
+  const scanParticipant = useCallback(async (passToken: string) => {
+    const scanned = await reviewApi.scan(eventId, passToken);
+    requestDraftDiscard(() => {
+      setSelectedId(scanned.registrationId);
+      setMobileDetail(true);
+      navigate(`/events/${eventId}/reviews/${scanned.registrationId}`, { replace: true });
+      window.setTimeout(() => detailHeadingRef.current?.focus(), 0);
+    });
+  }, [eventId, navigate, requestDraftDiscard]);
   const downloadReport = () => {
     if (!detail) return;
     const title = document.title;
@@ -726,29 +806,22 @@ export default function ReviewWorkspacePage() {
           <p><strong>{eventName}</strong> · Screening flags are rule recommendations. The reviewer makes the final clinical decision.</p>
         </div>
         <div className="review-heading-actions">
-          <button className="secondary" type="button" onClick={openWithoutQr} disabled={queueLoading || queueItems.length === 0}><QrCodeIcon />Open without QR</button>
+          <button className="primary review-scan-button" type="button" onClick={() => setScannerOpen(true)}><CameraIcon />Scan</button>
           <button className="secondary" type="button" onClick={() => void loadQueue()} disabled={refreshing}><ArrowPathIcon className={refreshing ? 'is-spinning' : ''} />{refreshing ? 'Refreshing…' : 'Refresh queue'}</button>
         </div>
       </header>
 
       <div className="review-announcer" role="status" aria-live="polite">{announcement}</div>
 
+      <div className="review-queue-summary" aria-label="Review queue summary">
+        <div><span>Ready for review</span><strong>{queueLoading ? '…' : queueItems.length}</strong></div>
+        <p>{queueItems.length === 1 ? 'participant waiting' : 'participants waiting'}</p>
+        <button className="secondary" type="button" onClick={openNextParticipant} disabled={queueLoading || queueItems.length === 0}>Next participant</button>
+      </div>
+
       <div className="review-workspace">
-      <aside className="review-queue" aria-label="Actionable participants">
-        <div className="review-queue-heading"><div><QueueListIcon /><strong>Ready for review</strong></div><span>{queueItems.length}</span></div>
-        {queueLoading ? <QueueSkeleton /> : queueItems.length === 0 ? <div className="review-empty-queue"><ClipboardDocumentCheckIcon /><strong>Queue clear</strong><p>No participants currently meet the review criteria. Refresh after screening progresses.</p></div> : <ol>
-          {queueItems.map((item) => <li key={item.registrationId}>
-            <button type="button" className={selectedId === item.registrationId ? 'selected' : ''} aria-current={selectedId === item.registrationId ? 'true' : undefined} onClick={() => chooseParticipant(item)}>
-              <span className="queue-person"><strong>{item.participantDisplayName}</strong><small>{item.queueNumber == null ? 'No queue number' : `Queue ${item.queueNumber}`}</small></span>
-              <FlagBadge flag={item.highestFlag} />
-              <span className="queue-progress">{item.completedStationCount}/{item.totalStationCount} stations · {item.readyReason === 'URGENT_FLAG' ? 'urgent early review' : 'screening complete'}</span>
-            </button>
-          </li>)}
-        </ol>}
-      </aside>
 
       <section className="review-detail" aria-label="Participant clinical review">
-        <button className="review-mobile-back" type="button" onClick={() => setMobileDetail(false)}><ArrowLeftIcon />Back to queue</button>
         {detailLoading ? <DetailSkeleton /> : detailError ? <div className="review-detail-state" role="alert"><ExclamationCircleIcon /><h2>Participant unavailable</h2><p>{detailError}</p><button className="secondary" type="button" onClick={() => void loadDetail(selectedId)}>Retry</button></div> : !detail ? <div className="review-detail-state"><UserIcon /><h2>Select a participant</h2><p>Choose an actionable participant from the queue to inspect screening results and record a decision.</p></div> : <>
           <header className="review-participant-heading">
             <div><span>{detail.participant.queueNumber == null ? 'Unnumbered registration' : `Queue ${detail.participant.queueNumber}`}</span><h2 ref={detailHeadingRef} tabIndex={-1}>{detail.participant.participantDisplayName}</h2></div>
@@ -813,6 +886,7 @@ export default function ReviewWorkspacePage() {
         <button className="danger-button" type="button" onClick={discardDraft}>Discard draft</button>
       </div>
     </AppDialog>
+    <QrScanner open={scannerOpen} onOpenChange={setScannerOpen} onScan={scanParticipant} />
     {detail && <ParticipantReport detail={detail} />}
   </div>;
 }

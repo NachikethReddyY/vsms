@@ -23,6 +23,10 @@ const reviewParams = eventParams.extend({
   registrationId: z.string().uuid(),
 }).strict();
 
+const reviewScanBody = z.object({
+  passToken: z.string().trim().min(4).max(255),
+}).strict();
+
 const referralParams = eventParams.extend({ referralId: z.string().uuid() }).strict();
 const referralDocumentParams = referralParams.extend({ documentId: z.string().uuid() }).strict();
 const issueReferralBody = z.object({
@@ -201,6 +205,7 @@ module.exports = {
   eventParams,
   stationParams,
   reviewParams,
+  reviewScanBody,
   reviewDecisionBody,
   referralParams,
   referralDocumentParams,
