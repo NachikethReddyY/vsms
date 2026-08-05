@@ -15,9 +15,7 @@ const localHostnames = new Set(["localhost", "127.0.0.1", "::1"]);
 const snsTopicArn = /^arn:(aws|aws-us-gov|aws-cn):sns:[a-z0-9-]+:\d{12}:[A-Za-z0-9_.-]{1,256}$/;
 
 const resolvePublicAppOrigin = (value, nodeEnv) => {
-  if (!value && nodeEnv === "production") {
-    throw new Error("PUBLIC_APP_ORIGIN is required in production");
-  }
+  if (!value && nodeEnv === "production") throw new Error("PUBLIC_APP_ORIGIN is required in production");
 
   let url;
   try {
@@ -28,12 +26,8 @@ const resolvePublicAppOrigin = (value, nodeEnv) => {
 
   const isLocal = localHostnames.has(url.hostname.toLowerCase());
   const allowsLocalHttp = nodeEnv === "development" && isLocal && url.protocol === "http:";
-  if (url.protocol !== "https:" && !allowsLocalHttp) {
-    throw new Error("PUBLIC_APP_ORIGIN must use HTTPS outside local development");
-  }
-  if (nodeEnv === "production" && isLocal) {
-    throw new Error("PUBLIC_APP_ORIGIN must not target a local host in production");
-  }
+  if (url.protocol !== "https:" && !allowsLocalHttp) throw new Error("PUBLIC_APP_ORIGIN must use HTTPS outside local development");
+  if (nodeEnv === "production" && isLocal) throw new Error("PUBLIC_APP_ORIGIN must not target a local host in production");
   if (url.username || url.password || url.pathname !== "/" || url.search || url.hash) {
     throw new Error("PUBLIC_APP_ORIGIN must be a bare origin without credentials, path, query, or fragment");
   }
@@ -51,6 +45,8 @@ const schema = z.object({
   JWT_AUDIENCE: z.string().min(1).default("vsms-dashboard"),
   ACCESS_TOKEN_TTL: z.string().default("15m"),
   REFRESH_TOKEN_TTL_DAYS: z.coerce.number().int().min(1).max(90).default(7),
+  QR_TTL_HOURS: z.coerce.number().int().min(1).max(168).default(24),
+  QR_ROTATION_INTERVAL_MINUTES: z.coerce.number().int().min(0).max(1440).default(0),
   PUBLIC_SIGNUP_ENABLED: z.enum(["true", "false"]).default("false"),
   CORS_ORIGINS: httpsOrigins.default("https://localhost:5173"),
   CORS_ORIGIN: optionalEnv(httpsOrigins),
@@ -80,23 +76,13 @@ const schema = z.object({
 });
 
 const parsed = schema.safeParse(process.env);
-if (!parsed.success) {
-  throw new Error(`Invalid environment configuration: ${parsed.error.issues.map((issue) => issue.path.join(".")).join(", ")}`);
-}
+if (!parsed.success) throw new Error(`Invalid environment configuration: ${parsed.error.issues.map((issue) => issue.path.join(".")).join(", ")}`);
 
 const values = parsed.data;
-if (values.NODE_ENV === "production" && !values.JWT_ACCESS_SECRET) {
-  throw new Error("JWT_ACCESS_SECRET is required in production");
-}
-if (values.NODE_ENV === "production" && values.COGNITO_STAFF_SYNC_MODE === "local-only") {
-  throw new Error("COGNITO_STAFF_SYNC_MODE=local-only is forbidden in production");
-}
-if (new URL(values.ONEMAP_BASE_URL).origin !== "https://www.onemap.gov.sg") {
-  throw new Error("ONEMAP_BASE_URL must use the official https://www.onemap.gov.sg origin");
-}
-if (Boolean(values.ONEMAP_API_EMAIL) !== Boolean(values.ONEMAP_API_PASSWORD)) {
-  throw new Error("ONEMAP_API_EMAIL and ONEMAP_API_PASSWORD must be configured together");
-}
+if (values.NODE_ENV === "production" && !values.JWT_ACCESS_SECRET) throw new Error("JWT_ACCESS_SECRET is required in production");
+if (values.NODE_ENV === "production" && values.COGNITO_STAFF_SYNC_MODE === "local-only") throw new Error("COGNITO_STAFF_SYNC_MODE=local-only is forbidden in production");
+if (new URL(values.ONEMAP_BASE_URL).origin !== "https://www.onemap.gov.sg") throw new Error("ONEMAP_BASE_URL must use the official https://www.onemap.gov.sg origin");
+if (Boolean(values.ONEMAP_API_EMAIL) !== Boolean(values.ONEMAP_API_PASSWORD)) throw new Error("ONEMAP_API_EMAIL and ONEMAP_API_PASSWORD must be configured together");
 const publicAppOrigin = resolvePublicAppOrigin(values.PUBLIC_APP_ORIGIN, values.NODE_ENV);
 
 let encryptionKeyring = null;
@@ -113,15 +99,9 @@ if (values.ENCRYPTION_KEYRING_JSON) {
     throw new Error("ENCRYPTION_KEYRING_JSON must be a JSON object containing 1-10 unique named 256-bit hexadecimal keys");
   }
 }
-if (Boolean(values.ENCRYPTION_ACTIVE_KEY_ID) !== Boolean(encryptionKeyring)) {
-  throw new Error("ENCRYPTION_ACTIVE_KEY_ID and ENCRYPTION_KEYRING_JSON must be configured together");
-}
-if (values.ENCRYPTION_ACTIVE_KEY_ID && !encryptionKeyring[values.ENCRYPTION_ACTIVE_KEY_ID]) {
-  throw new Error("ENCRYPTION_ACTIVE_KEY_ID must identify a key in ENCRYPTION_KEYRING_JSON");
-}
-if (values.NODE_ENV === "production" && (!values.ENCRYPTION_ACTIVE_KEY_ID || !encryptionKeyring)) {
-  throw new Error("Versioned encryption keyring configuration is required in production");
-}
+if (Boolean(values.ENCRYPTION_ACTIVE_KEY_ID) !== Boolean(encryptionKeyring)) throw new Error("ENCRYPTION_ACTIVE_KEY_ID and ENCRYPTION_KEYRING_JSON must be configured together");
+if (values.ENCRYPTION_ACTIVE_KEY_ID && !encryptionKeyring[values.ENCRYPTION_ACTIVE_KEY_ID]) throw new Error("ENCRYPTION_ACTIVE_KEY_ID must identify a key in ENCRYPTION_KEYRING_JSON");
+if (values.NODE_ENV === "production" && (!values.ENCRYPTION_ACTIVE_KEY_ID || !encryptionKeyring)) throw new Error("Versioned encryption keyring configuration is required in production");
 
 const ephemeralAccessSecret = crypto.randomBytes(48).toString("base64url");
 
@@ -133,6 +113,8 @@ module.exports = Object.freeze({
   publicSignupEnabled: values.PUBLIC_SIGNUP_ENABLED === "true",
   isProduction: values.NODE_ENV === "production",
   localHttps: values.LOCAL_HTTPS === "true",
+  qrTtlHours: values.QR_TTL_HOURS,
+  qrRotationIntervalMinutes: values.QR_ROTATION_INTERVAL_MINUTES,
   publicAppOrigin,
   encryptionActiveKeyId: values.ENCRYPTION_ACTIVE_KEY_ID || null,
   encryptionKeyring,
