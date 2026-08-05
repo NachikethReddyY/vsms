@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "node server.js",
     "start": "node server.js",
-    "test": "node --test tests/*.test.js",
+    "test": "jest",
     "test:integration": "node .tests/prepare.js",
     "test:watch": "vitest .tests",
     "prisma:validate": "prisma validate",
@@ -44,9 +44,13 @@
     "prisma": "^6.19.3",
     "qrcode": "^1.5.4",
     "qrcode.react": "^4.2.0",
+    "rate-limit-redis": "^6.0.1",
+    "redis": "^6.2.0",
+    "socket.io": "^4.8.3",
     "swagger-ui-express": "^5.0.1",
     "uuid": "^14.0.1",
     "yaml": "^2.9.0",
+    "yamljs": "^0.3.0",
     "zod": "^4.4.3"
   },
   "devDependencies": {

@@ -14,25 +14,32 @@ router.use(authenticate);
 router.use(requireAnyRole.operational("REGISTRATION_OFFICER"));
 
 // ==========================================
-// QR Code Management Routes
+// 1. GENERATION & REISSUING
 // ==========================================
-
-// Generation & Reissuing
-router.post("/registrations/:registrationId", asyncHandler(qrController.generateRegistrationQR));
 router.post("/generate/:registrationId", asyncHandler(qrController.generateQR));
-router.post("/reissue/:registrationId", asyncHandler(qrController.reissueQR));
+router.patch("/reissue/:registrationId", asyncHandler(qrController.reissueQR));
 
-// Verification & Attendance
+// ==========================================
+// 2. VERIFICATION & ATTENDANCE
+// ==========================================
 router.post("/verify", asyncHandler(qrController.verifyQR));
-router.post("/manual-checkin", asyncHandler(qrController.manualCheckIn));
+router.post("/check-in/manual", asyncHandler(qrController.manualCheckIn));
 
-// Participant & History Lookup
+// ==========================================
+// 3. LOOKUPS & HISTORY
+// ==========================================
 router.get("/participant/:token", asyncHandler(qrController.getParticipantByQR));
+<<<<<<< HEAD
+router.get("/participants/:participantId/history", asyncHandler(qrController.getParticipantQRCodes));
+router.get("/registrations/:token", asyncHandler(qrController.getRegistrationByQR));
+=======
+>>>>>>> f1cd61b8d8e08f18ef538dda89c72678d88d1033
 
-// Revocation & File Output
-router.put("/revoke/:qrId", asyncHandler(qrController.revokeQR));
-router.get("/download/:qrId", asyncHandler(qrController.downloadQR));
-router.get("/print/:qrId", asyncHandler(qrController.printQR));
-router.get("/:token", asyncHandler(qrController.getRegistrationByQR));
+// ==========================================
+// 4. MANAGEMENT (REVOCATION, DOWNLOAD, PRINT)
+// ==========================================
+router.patch("/:qrId/revoke", asyncHandler(qrController.revokeQR));
+router.get("/:qrId/download", asyncHandler(qrController.downloadQR));
+router.get("/:qrId/print", asyncHandler(qrController.printQR));
 
 module.exports = router;

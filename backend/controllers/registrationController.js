@@ -1,6 +1,6 @@
 const prisma = require("../prisma/prismaClient");
 const asyncHandler = require("../middlewares/asyncHandler");
-const { createAuditLog } = require("../utils/audit");
+const { createAuditLog } = require("../utils/AuthAudit");
 const {
     assertUuid,
     cleanString,
