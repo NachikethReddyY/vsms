@@ -9,6 +9,10 @@ if (process.env.NODE_ENV === "production" && !process.env.VSMS_DEMO_PASSWORD) {
   throw new Error("VSMS_DEMO_PASSWORD is required for production seed execution");
 }
 
+// Valid 64-char hex token (matches the QR_TOKEN_PATTERN used by manual check-in)
+// so the seeded demo pass is demonstrable end-to-end.
+const DEMO_QR_TOKEN = "ab".repeat(32);
+
 const roleDefinitions = [
   ["ADMINISTRATOR", "Full administrative access", 1],
   ["EVENT_MANAGER", "Creates and manages events", 2],
@@ -528,7 +532,7 @@ async function ensureDemoRegistration(staff, participant, event, consent) {
     update: {
       registrationStatus: "SIGNED_UP",
       participantDisplayName: `${participant.firstName} ${participant.lastName}`,
-      passToken: "VSMS-DEMO-QR-001",
+      passToken: DEMO_QR_TOKEN,
     },
     create: {
       participantId: participant.id,
@@ -538,7 +542,7 @@ async function ensureDemoRegistration(staff, participant, event, consent) {
       participantDisplayName: `${participant.firstName} ${participant.lastName}`,
       queueNumber: 1,
       idempotencyKey,
-      passToken: "VSMS-DEMO-QR-001",
+      passToken: DEMO_QR_TOKEN,
     },
   });
   const history = await prisma.registrationStatusHistory.findFirst({
@@ -560,7 +564,7 @@ async function ensureDemoRegistration(staff, participant, event, consent) {
     data: { registrationId: registration.registrationId },
   });
 
-  const token = "VSMS-DEMO-QR-001";
+  const token = DEMO_QR_TOKEN;
   const existingQr = await prisma.qRCodePass.findFirst({
     where: { registrationId: registration.registrationId },
     select: { id: true },

@@ -78,6 +78,20 @@ exports.verifyQR = async (req, res, next) => {
 };
 
 // ==========================================
+// Public Pass Status (no auth, no PII)
+// GET /qr/public-status/:token
+// ==========================================
+exports.getPublicStatus = async (req, res, next) => {
+    try {
+        const { token } = req.params;
+        const status = await qrService.getPublicStatus(token);
+        return res.json({ success: true, data: status });
+    } catch (err) {
+        next(err);
+    }
+};
+
+// ==========================================
 // Get Participant By QR
 // GET /qr/participant/:token
 // ==========================================
