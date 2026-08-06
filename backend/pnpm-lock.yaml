@@ -62,9 +62,6 @@ importers:
       qrcode.react:
         specifier: ^4.2.0
         version: 4.2.0(react@19.2.7)
-      react-nodejs-project2-cryptix:
-        specifier: file:..
-        version: file:..
       rate-limit-redis:
         specifier: ^6.0.1
         version: 6.0.1(express-rate-limit@8.6.1(express@5.2.1(supports-color@10.2.2))(supports-color@10.2.2))
@@ -1457,8 +1454,6 @@ packages:
   rc9@2.1.2:
     resolution: {integrity: sha512-btXCnMmRIBINM2LDZoEmOogIZU7Qe7zn4BpomSKZ/ykbLObuBdvG+mFq11DL6fjH1DRwHhrlgtYWG96bJiC7Cg==}
 
-  react-nodejs-project2-cryptix@file:..:
-    resolution: {directory: .., type: directory}
   react-is@18.3.1:
     resolution: {integrity: sha512-/LLMVyas0ljjAtoYiPqYiL8VWXzUUdThrmU5+n20DZv+a+ClRoevUzw5JxU+Ieh5/c87ytoTBV9G1FiKfNJdmg==}
 
@@ -3226,7 +3221,6 @@ snapshots:
       defu: 6.1.7
       destr: 2.0.5
 
-  react-nodejs-project2-cryptix@file:..: {}
   react-is@18.3.1: {}
 
   react-is@19.2.8: {}

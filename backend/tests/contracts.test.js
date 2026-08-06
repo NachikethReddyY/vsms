@@ -206,10 +206,13 @@ test("resolveParticipant looks up QRCodePass when passToken is not on registrati
     const source = read("services/screeningService.js");
     const fn = source.slice(source.indexOf("const resolveParticipant"));
     const body = fn.slice(0, fn.indexOf("\nconst previewStationResult"));
-    assert.match(body, /qRCodePass\.findFirst/);
-    assert.match(body, /tokenHash/);
+    assert.match(body, /resolveRegistrationByQrValue/);
     assert.match(body, /passToken/);
     assert.match(body, /qrToken/);
+
+    const tokenHelper = read("utils/qrToken.js");
+    assert.match(tokenHelper, /qRCodePass\.findFirst/);
+    assert.match(tokenHelper, /tokenHash/);
 });
 
 test("QR station handoff contract is documented", () => {

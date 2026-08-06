@@ -18,6 +18,9 @@ The QR must **not** embed `stationId`, station slug, or screening type. Station 
 
 `POST /api/v1/qr/verify` with `{ "token": "<qr token>" }` returns (among other fields):
 
+Requires **REGISTRATION_OFFICER** or **SCREENER** (plus an active assignment for that event).
+Generation / revoke / print stay registration-officer only.
+
 | Field | Use |
 | --- | --- |
 | `registrationId` | Participant registration to screen |
