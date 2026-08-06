@@ -1,7 +1,7 @@
 import { ArrowLeftIcon, ArrowPathIcon, CheckCircleIcon, QrCodeIcon, ShieldCheckIcon } from "@heroicons/react/24/outline";
 import { useState } from "react";
 import { Link, useParams } from "react-router-dom";
-import apiClient, { getApiError } from "../utils/apiClient";
+import apiClient, { getApiError } from "../../utils/apiClient";
 import "./ParticipantPage.css";
 import "./ParticipantQrPage.css";
 
@@ -37,3 +37,4 @@ export default function ParticipantQrPage() {
     </section>
   );
 }
+

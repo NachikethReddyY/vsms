@@ -1,8 +1,8 @@
 import { ArrowLeftIcon, ArrowRightIcon, CheckCircleIcon, ClipboardDocumentCheckIcon, ExclamationTriangleIcon, PhoneIcon, TicketIcon, UserIcon } from "@heroicons/react/24/outline";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useParams, useSearchParams } from "react-router-dom";
-import type { ConsentFormVersion, EmergencyContact, EventSummary, Participant, Registration } from "../types";
-import apiClient, { getApiError } from "../utils/apiClient";
+import type { ConsentFormVersion, EmergencyContact, EventSummary, Participant, Registration } from "../../types";
+import apiClient, { getApiError } from "../../utils/apiClient";
 import "./ParticipantPage.css";
 import "./ParticipantCheckInPage.css";
 
@@ -194,3 +194,4 @@ export default function ParticipantCheckInPage() {
     </section>
   );
 }
+

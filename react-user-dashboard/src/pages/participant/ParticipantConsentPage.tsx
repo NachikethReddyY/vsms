@@ -1,9 +1,9 @@
 import { ArrowLeftIcon, CheckCircleIcon, DocumentTextIcon, ExclamationTriangleIcon, PencilSquareIcon } from "@heroicons/react/24/outline";
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
-import { SignaturePad } from "../components/SignaturePad";
-import type { ConsentFormVersion, Participant } from "../types";
-import apiClient, { getApiError } from "../utils/apiClient";
+import { SignaturePad } from "../../components/SignaturePad";
+import type { ConsentFormVersion, Participant } from "../../types";
+import apiClient, { getApiError } from "../../utils/apiClient";
 import "./ParticipantPage.css";
 import "./ParticipantConsentPage.css";
 import "./ParticipantConsentRefinement.css";
@@ -240,3 +240,4 @@ export default function ParticipantConsentPage() {
     </section>
   );
 }
+

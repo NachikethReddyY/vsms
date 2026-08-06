@@ -1,7 +1,7 @@
 import { ArrowLeftIcon, CalendarDaysIcon, EnvelopeIcon, ExclamationTriangleIcon, PhoneIcon, UserPlusIcon } from "@heroicons/react/24/outline";
 import { useState, type FormEvent } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
-import apiClient, { getApiError } from "../utils/apiClient";
+import apiClient, { getApiError } from "../../utils/apiClient";
 import "./ParticipantPage.css";
 import "./ParticipantCreatePage.css";
 
@@ -126,3 +126,4 @@ export default function ParticipantCreatePage() {
     </section>
   );
 }
+

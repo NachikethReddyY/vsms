@@ -11,9 +11,9 @@ import {
 } from "@heroicons/react/24/outline";
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
 import { Link, useSearchParams } from "react-router-dom";
-import { eventApi, formatEventDate, type EventRecord } from "../features/events/eventApi";
-import type { ParticipantSummary } from "../types";
-import apiClient, { getApiError } from "../utils/apiClient";
+import { eventApi, formatEventDate, type EventRecord } from "../../features/events/eventApi";
+import type { ParticipantSummary } from "../../types";
+import apiClient, { getApiError } from "../../utils/apiClient";
 import "./ParticipantPage.css";
 
 type Pagination = {
@@ -183,3 +183,4 @@ export default function ParticipantPage() {
     </section>
   );
 }
+

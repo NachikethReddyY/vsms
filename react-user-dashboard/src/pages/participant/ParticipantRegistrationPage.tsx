@@ -10,8 +10,8 @@ import {
 } from "@heroicons/react/24/outline";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useParams, useSearchParams } from "react-router-dom";
-import type { ConsentFormVersion, EmergencyContact, EventSummary, Participant, Registration } from "../types";
-import apiClient, { getApiError } from "../utils/apiClient";
+import type { ConsentFormVersion, EmergencyContact, EventSummary, Participant, Registration } from "../../types";
+import apiClient, { getApiError } from "../../utils/apiClient";
 import "./ParticipantPage.css";
 import "./ParticipantCheckInPage.css";
 import "./ParticipantRegistrationPage.css";
@@ -176,3 +176,4 @@ export default function ParticipantRegistrationPage() {
     </section>
   );
 }
+

@@ -20,20 +20,20 @@ import { AuditLogsPage as RegistrationAuditLogsPage } from "./pages/AdminPages";
 import AccountSecurityPage from "./pages/AccountSecurityPage";
 import StaffAccountsPage from "./pages/StaffAccountsPage";
 import { QueuePage } from "./pages/QueuePages"; // Imported the QueuePage component
-import ParticipantCheckInPage from "./pages/ParticipantCheckInPage";
-import ParticipantConsentPage from "./pages/ParticipantConsentPage";
-import ParticipantCreatePage from "./pages/ParticipantCreatePage";
-import ParticipantEmergencyContactsPage from "./pages/ParticipantEmergencyContactsPage";
-import ParticipantPage from "./pages/ParticipantPage";
-import ParticipantProfilePage from "./pages/ParticipantProfilePage";
-import ParticipantQrPage from "./pages/ParticipantQrPage";
-import ParticipantRegistrationPage from "./pages/ParticipantRegistrationPage";
-import ParticipantStatusPage from "./pages/ParticipantStatusPage";
+import ParticipantCheckInPage from "./pages/participant/ParticipantCheckInPage";
+import ParticipantConsentPage from "./pages/participant/ParticipantConsentPage";
+import ParticipantCreatePage from "./pages/participant/ParticipantCreatePage";
+import ParticipantEmergencyContactsPage from "./pages/participant/ParticipantEmergencyContactsPage";
+import ParticipantPage from "./pages/participant/ParticipantPage";
+import ParticipantProfilePage from "./pages/participant/ParticipantProfilePage";
+import ParticipantQrPage from "./pages/participant/ParticipantQrPage";
+import ParticipantRegistrationPage from "./pages/participant/ParticipantRegistrationPage";
+import ParticipantStatusPage from "./pages/participant/ParticipantStatusPage";
 import {
   ParticipantConsentsPage,
   ParticipantEditPage,
   RegistrationHistoryPage,
-} from './pages/ParticipantPages';
+} from './pages/participant/ParticipantPages';
 
 const adminRoles = ["ADMINISTRATOR"];
 const eventManagerRoles = ["ADMINISTRATOR", "EVENT_MANAGER"];

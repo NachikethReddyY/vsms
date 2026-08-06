@@ -1,8 +1,8 @@
 import { ArrowLeftIcon, CheckCircleIcon, EnvelopeIcon, PencilSquareIcon, PhoneIcon, PlusIcon, StarIcon, TrashIcon } from "@heroicons/react/24/outline";
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
 import { Link, useParams, useSearchParams } from "react-router-dom";
-import type { EmergencyContact } from "../types";
-import apiClient, { getApiError } from "../utils/apiClient";
+import type { EmergencyContact } from "../../types";
+import apiClient, { getApiError } from "../../utils/apiClient";
 import "./ParticipantPage.css";
 import "./ParticipantEmergencyContactsPage.css";
 
@@ -198,3 +198,4 @@ export default function ParticipantEmergencyContactsPage() {
     </section>
   );
 }
+
