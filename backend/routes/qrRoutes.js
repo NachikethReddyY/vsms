@@ -35,23 +35,26 @@ router.get(
 );
 
 // ==========================================
-// Apply Auth Middleware Globally for QR Routes
-// (All routes below this line require authentication)
+// Authenticated QR routes
 // ==========================================
 router.use(authenticate);
-router.use(requireAnyRole.operational("REGISTRATION_OFFICER"));
 
-// ==========================================
-// QR Code Management Routes
-// ==========================================
+// Station handoff: screeners verify passes; officers keep the same capability.
+router.post(
+  "/verify",
+  requireAnyRole.operational("REGISTRATION_OFFICER", "SCREENER"),
+  asyncHandler(qrController.verifyQR),
+);
+
+// Registration desk / QR management stays registration-officer only.
+router.use(requireAnyRole.operational("REGISTRATION_OFFICER"));
 
 // Generation & Reissuing
 router.post("/registrations/:registrationId", asyncHandler(qrController.generateRegistrationQR));
 router.post("/generate/:registrationId", asyncHandler(qrController.generateQR));
 router.post("/reissue/:registrationId", asyncHandler(qrController.reissueQR));
 
-// Verification & Attendance
-router.post("/verify", asyncHandler(qrController.verifyQR));
+// Attendance (desk)
 router.post("/manual-checkin", asyncHandler(qrController.manualCheckIn));
 
 // Participant & History Lookup

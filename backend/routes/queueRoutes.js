@@ -20,14 +20,14 @@ router.use(requireAuthentication);
 router.use(requireAnyRole("REGISTRATION_OFFICER", "SCREENER", "EVENT_MANAGER", "ADMINISTRATOR"));
 
 router.post(
-  "/:eventId/stations/:stationId/join",
+  "/events/:eventId/stations/:stationId/join",
   checkIdempotency,
   validate({ params: stationParams, body: joinQueueBody }),
   asyncHandler(queueController.joinQueue),
 );
 
 router.get(
-  "/:eventId",
+  "/events/:eventId",
   validate({ params: eventParams }),
   asyncHandler(queueController.getEventQueueStatus),
 );
@@ -39,38 +39,38 @@ router.get(
 );
 
 router.patch(
-  "/:queueId/call",
+  "/entries/:queueId/call",
   validate({ params: queueEntryParams }),
   asyncHandler(queueController.callQueueEntry),
 );
 
 router.patch(
-  "/:queueId/start",
+  "/entries/:queueId/start",
   validate({ params: queueEntryParams }),
   asyncHandler(queueController.startQueueEntry),
 );
 
 router.patch(
-  "/:queueId/advance",
+  "/entries/:queueId/advance",
   checkIdempotency,
   validate({ params: queueEntryParams, body: advanceQueueBody }),
   asyncHandler(queueController.advanceQueueEntry),
 );
 
 router.patch(
-  "/:queueId/complete",
+  "/entries/:queueId/complete",
   validate({ params: queueEntryParams }),
   asyncHandler(queueController.completeQueueEntry),
 );
 
 router.patch(
-  "/:queueId/skip",
+  "/entries/:queueId/skip",
   validate({ params: queueEntryParams }),
   asyncHandler(queueController.skipQueueEntry),
 );
 
 router.delete(
-  "/:queueId",
+  "/entries/:queueId",
   validate({ params: queueEntryParams }),
   asyncHandler(queueController.leaveQueue),
 );

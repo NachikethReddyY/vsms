@@ -5,11 +5,17 @@ const { decrypt } = require("../utils/cryptoUtils");
 const { encryptionContext } = require("../utils/cryptoUtils");
 const { renderBrandedQrSvg } = require("../utils/qrBranding");
 const { assertUuid } = require("../utils/validation");
-const { assertRegistrationAssignment } = require("../utils/staff");
+const { assertRegistrationAssignment, assertQrVerifyAccess } = require("../utils/staff");
 
 async function assertQrAccess(req, selectors) {
     const eventId = await qrService.getEventIdForAccess(selectors);
     await assertRegistrationAssignment(prisma, eventId, req.auth);
+    return eventId;
+}
+
+async function assertVerifyAccess(req, selectors) {
+    const eventId = await qrService.getEventIdForAccess(selectors);
+    await assertQrVerifyAccess(prisma, eventId, req.auth);
     return eventId;
 }
 
@@ -71,7 +77,7 @@ exports.verifyQR = async (req, res, next) => {
     try {
         const { token, eventId } = req.body;
         const userId = req.auth.userId;
-        await assertQrAccess(req, { token, eventId });
+        await assertVerifyAccess(req, { token, eventId });
 
         const result = await qrService.verifyQR(token, eventId, userId, prisma, { ipAddress: req.ip });
 

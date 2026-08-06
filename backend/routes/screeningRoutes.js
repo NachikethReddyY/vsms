@@ -52,6 +52,12 @@ router.get(
   asyncHandler(screeningController.resolveParticipant),
 );
 
+router.get(
+  "/:eventId/registrations/:registrationId/pass-display",
+  validate({ params: reviewParams }),
+  asyncHandler(screeningController.getPassDisplay),
+);
+
 router.post(
   "/:eventId/stations/:stationId/visual-acuity/preview",
   validate({ params: stationParams, body: previewVisualAcuityBody }),

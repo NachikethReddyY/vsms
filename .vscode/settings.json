@@ -5,5 +5,14 @@
     "bun.lock": "jsonc",
     "bun.lockb": "jsonc"
   },
-  "prisma.pinToPrisma6": true
+  "prisma.pinToPrisma6": true,
+  "workbench.colorCustomizations": {
+    "commandCenter.border": "#e7e7e799",
+    "commandCenter.foreground": "#e7e7e7",
+    "titleBar.activeBackground": "#084798",
+    "titleBar.activeForeground": "#e7e7e7",
+    "titleBar.inactiveBackground": "#08479899",
+    "titleBar.inactiveForeground": "#e7e7e799"
+  },
+  "peacock.color": "#084798"
 }
