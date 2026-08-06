@@ -5,6 +5,7 @@
   "main": "server.js",
   "scripts": {
     "dev": "node server.js",
+    "dev:tailscale": "node --env-file=.env --env-file=.env.tailscale server.js",
     "start": "node server.js",
     "prisma:generate": "prisma generate",
     "prisma:validate": "prisma validate",

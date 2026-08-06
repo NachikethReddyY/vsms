@@ -570,6 +570,65 @@ exports.downloadQR = async (qrId, db = prisma) => {
     return { qrId: qr.id, expiresAt: qr.expiresAt, qrImage };
 };
 
+/**
+ * Re-render the active participant pass for station tablets (next-queue handoff).
+ * Prefers QRCodePass; falls back to EventRegistration.passToken for demo seeds.
+ */
+exports.renderActivePassForRegistration = async (registrationId, db = prisma) => {
+    if (!registrationId) {
+        throw new AppError(400, "REGISTRATION_ID_REQUIRED", "Registration ID is required.");
+    }
+
+    const registration = await db.eventRegistration.findUnique({
+        where: { registrationId },
+        select: {
+            registrationId: true,
+            passToken: true,
+            queueNumber: true,
+            participant: { select: { firstName: true, lastName: true } },
+        },
+    });
+    if (!registration) {
+        throw new AppError(404, "REGISTRATION_NOT_FOUND", "Registration was not found.");
+    }
+
+    const displayName = [registration.participant?.firstName, registration.participant?.lastName]
+        .filter(Boolean)
+        .join(" ")
+        .trim() || "Participant";
+
+    const qr = await db.qRCodePass.findFirst({
+        where: activeQrWhere({ registrationId }),
+        orderBy: { issuedAt: "desc" },
+    });
+    if (qr) {
+        const rendered = await renderQr(qr, decryptQrToken(qr));
+        return {
+            ...rendered,
+            participantDisplayName: displayName,
+            queueNumber: registration.queueNumber,
+        };
+    }
+
+    if (!registration.passToken) {
+        throw new AppError(404, "QR_NOT_FOUND", "No active QR pass is available for this participant.");
+    }
+
+    return {
+        qrId: null,
+        registrationId: registration.registrationId,
+        issuedAt: null,
+        expiresAt: null,
+        qrImage: await QRCode.toDataURL(buildQRTargetUrl(registration.passToken), {
+            errorCorrectionLevel: "H",
+            margin: 2,
+            width: 300,
+        }),
+        participantDisplayName: displayName,
+        queueNumber: registration.queueNumber,
+    };
+};
+
 // ==========================================
 // Print QR Helper
 // ==========================================

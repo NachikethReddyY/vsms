@@ -1,6 +1,7 @@
 const crypto = require("crypto");
 const prisma = require("../prisma/prismaClient");
 const AppError = require("../errors/AppError");
+const qrService = require("./qrService");
 const { createAuditLog } = require("../utils/audit");
 const { resolveRegistrationByQrValue } = require("../utils/qrToken");
 
@@ -275,14 +276,26 @@ const listQueue = async (eventId, stationId, user) => {
 
 const resolveParticipant = async (eventId, query, user) => {
   await assertCanScreen(eventId, user);
-  const registrationId = query.registrationId
-    || (query.passToken
-      ? (await resolveRegistrationByQrValue(prisma, { eventId, value: query.passToken }))?.registrationId
-      : null);
-  const registration = registrationId
-    ? await prisma.eventRegistration.findFirst({ where: { eventId, registrationId } })
+
+  let registration = query.registrationId
+    ? await prisma.eventRegistration.findFirst({
+      where: { eventId, registrationId: query.registrationId },
+    })
     : null;
-  if (!registration) throw new AppError(404, "REGISTRATION_NOT_FOUND", "No registration matched that pass or id");
+
+  const token = query.qrToken || query.passToken;
+  if (!registration && token) {
+    const resolved = await resolveRegistrationByQrValue(prisma, { eventId, value: token });
+    registration = resolved?.registrationId
+      ? await prisma.eventRegistration.findFirst({
+        where: { eventId, registrationId: resolved.registrationId },
+      })
+      : null;
+  }
+
+  if (!registration) {
+    throw new AppError(404, "REGISTRATION_NOT_FOUND", "No registration matched that pass, QR token, or id");
+  }
 
   return {
     registrationId: registration.registrationId,
@@ -291,6 +304,16 @@ const resolveParticipant = async (eventId, query, user) => {
     status: registration.registrationStatus,
     passToken: registration.passToken,
   };
+};
+
+const getPassDisplay = async (eventId, registrationId, user) => {
+  await assertCanScreen(eventId, user);
+  const registration = await prisma.eventRegistration.findFirst({
+    where: { eventId, registrationId },
+    select: { registrationId: true },
+  });
+  if (!registration) throw new AppError(404, "REGISTRATION_NOT_FOUND", "Registration was not found for this event");
+  return qrService.renderActivePassForRegistration(registrationId);
 };
 
 const previewStationResult = async (eventId, stationId, stationType, label, evaluate, body, user) => {
@@ -510,6 +533,7 @@ module.exports = {
   listStations,
   listQueue,
   resolveParticipant,
+  getPassDisplay,
   previewVisualAcuity,
   saveVisualAcuity,
   previewRefraction,

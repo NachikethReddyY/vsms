@@ -189,3 +189,45 @@ test("authentication uses verified Cognito tokens and approved local role inters
     assert.match(authRoutes, /"\/authorize"/);
     assert.doesNotMatch(authRoutes, /"\/login"|"\/signup"/);
 });
+
+test("registration resolve accepts passToken, qrToken, or registrationId", () => {
+    const { resolveQuery } = require("../schemas/screeningSchemas");
+    assert.doesNotThrow(() => resolveQuery.parse({ passToken: "VSMS-DEMO-QR-001" }));
+    assert.doesNotThrow(() => resolveQuery.parse({
+        qrToken: "a".repeat(64),
+    }));
+    assert.doesNotThrow(() => resolveQuery.parse({
+        registrationId: "11111111-1111-4111-8111-111111111111",
+    }));
+    assert.throws(() => resolveQuery.parse({}), /passToken, qrToken, or registrationId/);
+});
+
+test("resolveParticipant looks up QRCodePass when passToken is not on registration", () => {
+    const source = read("services/screeningService.js");
+    const fn = source.slice(source.indexOf("const resolveParticipant"));
+    const body = fn.slice(0, fn.indexOf("\nconst previewStationResult"));
+    assert.match(body, /resolveRegistrationByQrValue/);
+    assert.match(body, /passToken/);
+    assert.match(body, /qrToken/);
+
+    const tokenHelper = read("utils/qrToken.js");
+    assert.match(tokenHelper, /qRCodePass\.findFirst/);
+    assert.match(tokenHelper, /tokenHash/);
+});
+
+test("QR station handoff contract is documented", () => {
+    const doc = read("docs/qr-station-handoff.md");
+    assert.match(doc, /token-only|token only/i);
+    assert.match(doc, /registrationId/);
+    assert.match(doc, /Do \*\*not\*\* put `stationId`|must \*\*not\*\* embed `stationId`/i);
+    assert.match(doc, /\/events\/\{eventId\}\/stations\/\{slug\}\?registrationId=/);
+    assert.match(doc, /visual-acuity/);
+});
+
+test("seed creates VA / refraction / colour vision Station rows", () => {
+    const seed = read("prisma/seed.js");
+    assert.match(seed, /\["VISUAL_ACUITY"/);
+    assert.match(seed, /\["REFRACTION"/);
+    assert.match(seed, /\["COLOUR_VISION"/);
+    assert.match(seed, /Live event stations/);
+});
