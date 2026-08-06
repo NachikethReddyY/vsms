@@ -118,7 +118,7 @@ export default function ParticipantCheckInPage() {
     return (
       <section className="participant-v2-page participant-v2-checkin">
         <Link className="participant-v2-back" to={`/participants/${participantId}`}><ArrowLeftIcon /> Back to participant profile</Link>
-        <section className="participant-v2-checkin-empty"><ExclamationTriangleIcon /><h1>Choose an event first</h1><p>Return to Participants, choose an open event, then open this participant to start an event check-in.</p><Link className="primary" to="/participants">Choose an event</Link></section>
+        <section className="participant-v2-checkin-empty"><ExclamationTriangleIcon /><h1>Choose an event first</h1><p>Return to Events, choose an open event, then open this participant to start an event check-in.</p><Link className="primary" to="/events">Choose an event</Link></section>
       </section>
     );
   }
@@ -151,8 +151,8 @@ export default function ParticipantCheckInPage() {
           <p className="participant-v2-checkin-success-note">{isCheckedIn ? "Attendance was recorded securely. The QR pass remains available for the participant's event record." : "A duplicate registration was not created. Confirm their arrival below, or continue to the QR handoff."}</p>
           <div>
             {!isCheckedIn ? <button className="primary" type="button" disabled={isCheckingIn} onClick={() => void markAsCheckedIn(registration)}>{isCheckingIn ? "Checking in..." : "Mark participant as checked in"}</button> : null}
-            <Link className={isCheckedIn ? "primary" : "secondary"} to={`/participants/registrations/${registration.id}/qr`}>View QR pass <ArrowRightIcon /></Link>
-            <Link className="secondary" to={`/participants/registrations/${registration.id}/history`}>View registration history</Link>
+            <Link className={isCheckedIn ? "primary" : "secondary"} to={`/participants/registrations/${registration.id}/qr?eventId=${encodeURIComponent(eventId)}`}>View QR pass <ArrowRightIcon /></Link>
+            <Link className="secondary" to={`/participants/registrations/${registration.id}/history?eventId=${encodeURIComponent(eventId)}`}>View registration history</Link>
           </div>
           {error ? <p className="participant-v2-alert participant-v2-checkin-alert" role="alert">{error}</p> : null}
         </section>

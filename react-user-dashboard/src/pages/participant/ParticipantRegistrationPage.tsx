@@ -109,7 +109,7 @@ export default function ParticipantRegistrationPage() {
     return (
       <section className="participant-v2-page participant-v2-checkin participant-v2-registration">
         <Link className="participant-v2-back" to={`/participants/${participantId}`}><ArrowLeftIcon /> Back to participant profile</Link>
-        <section className="participant-v2-checkin-empty"><ExclamationTriangleIcon /><h1>Choose an event first</h1><p>Return to Participants, choose an open event, then open this participant to register them.</p><Link className="primary" to="/participants">Choose an event</Link></section>
+        <section className="participant-v2-checkin-empty"><ExclamationTriangleIcon /><h1>Choose an event first</h1><p>Return to Events, choose an open event, then start registration from that event.</p><Link className="primary" to="/events">Choose an event</Link></section>
       </section>
     );
   }
@@ -139,7 +139,7 @@ export default function ParticipantRegistrationPage() {
           <p className="participant-v2-checkin-success-note">The participant is ready for event check-in when they arrive.</p>
           <div>
             <Link className="primary" to={`/participants/${participantId}/check-in?eventId=${encodeURIComponent(eventId)}`}>Start event check-in <ArrowRightIcon /></Link>
-            <Link className="secondary" to={`/participants/registrations/${registration.id}/history`}>View registration history</Link>
+            <Link className="secondary" to={`/participants/registrations/${registration.id}/history?eventId=${encodeURIComponent(eventId)}`}>View registration history</Link>
           </div>
         </section>
       </section>

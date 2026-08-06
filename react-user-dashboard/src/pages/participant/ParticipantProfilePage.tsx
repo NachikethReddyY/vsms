@@ -83,7 +83,7 @@ export default function ParticipantProfilePage() {
         : "Not recorded";
   const consentStatusClass = consentStatus.toLowerCase().replace(/ /g, "-");
   const consentMissing = Boolean(eventId) && (!latestEventConsent || consentWithdrawn);
-  const searchLink = `/participants${eventId ? `?eventId=${encodeURIComponent(eventId)}` : ""}`;
+  const searchLink = eventId ? `/events/${encodeURIComponent(eventId)}/register` : "/events";
   const registrationForEvent = registrations.find((registration) => registration.eventId === eventId);
   const registrationLink = `/participants/${participantId}/register${eventId ? `?eventId=${encodeURIComponent(eventId)}` : ""}`;
   const checkInLink = `/participants/${participantId}/check-in${eventId ? `?eventId=${encodeURIComponent(eventId)}` : ""}`;
@@ -95,7 +95,7 @@ export default function ParticipantProfilePage() {
   if (!participant) {
     return (
       <section className="participant-v2-page participant-v2-profile">
-        <Link className="participant-v2-back" to={searchLink}><ArrowLeftIcon /> Back to participants</Link>
+        <Link className="participant-v2-back" to={searchLink}><ArrowLeftIcon /> {eventId ? "Back to event registration" : "Back to events"}</Link>
         <p className="participant-v2-alert participant-v2-profile-alert" role="alert">{error}</p>
       </section>
     );
@@ -103,7 +103,7 @@ export default function ParticipantProfilePage() {
 
   return (
     <section className="participant-v2-page participant-v2-profile" aria-labelledby="participant-v2-profile-title">
-      <Link className="participant-v2-back" to={searchLink}><ArrowLeftIcon /> Back to participants</Link>
+      <Link className="participant-v2-back" to={searchLink}><ArrowLeftIcon /> {eventId ? "Back to event registration" : "Back to events"}</Link>
       <header className="participant-v2-profile-hero">
         <div className="participant-v2-profile-identity">
           <span className="participant-v2-profile-avatar" aria-hidden="true">{`${participant.firstName[0] ?? ""}${participant.lastName[0] ?? ""}`.toUpperCase() || "P"}</span>
@@ -181,7 +181,7 @@ export default function ParticipantProfilePage() {
                 </div>
                 <div className="participant-v2-history-meta">
                   <strong>{displayStatus(registration.registrationStatus)}</strong>
-                  <Link to={`/participants/registrations/${registration.id}/history`}>View history <ArrowRightIcon /></Link>
+                  <Link to={`/participants/registrations/${registration.id}/history${eventId ? `?eventId=${encodeURIComponent(eventId)}` : ""}`}>View history <ArrowRightIcon /></Link>
                 </div>
               </article>)}
             </div>

@@ -25,7 +25,6 @@ import ParticipantCheckInPage from "./pages/participant/ParticipantCheckInPage";
 import ParticipantConsentPage from "./pages/participant/ParticipantConsentPage";
 import ParticipantCreatePage from "./pages/participant/ParticipantCreatePage";
 import ParticipantEmergencyContactsPage from "./pages/participant/ParticipantEmergencyContactsPage";
-import ParticipantPage from "./pages/participant/ParticipantPage";
 import ParticipantProfilePage from "./pages/participant/ParticipantProfilePage";
 import ParticipantQrPage from "./pages/participant/ParticipantQrPage";
 import ParticipantRegistrationPage from "./pages/participant/ParticipantRegistrationPage";
@@ -48,12 +47,13 @@ function EventWorkspace() {
 
 function LegacySearchRedirect() {
   const location = useLocation();
-  return <Navigate to={`/participants${location.search}`} replace />;
+  const eventId = new URLSearchParams(location.search).get("eventId");
+  return <Navigate to={eventId ? `/events/${encodeURIComponent(eventId)}/register` : "/events"} replace />;
 }
 
 function LegacyEventRegistrationRedirect() {
   const { eventId = "" } = useParams();
-  return <Navigate to={`/participants?eventId=${encodeURIComponent(eventId)}`} replace />;
+  return <Navigate to={`/events/${eventId}`} replace />;
 }
 
 function LegacyParticipantStepRedirect({ step }: { step: "consent" | "register" }) {
@@ -69,7 +69,7 @@ function LegacyParticipantHistoryRedirect() {
 
 function LegacyRegistrationRedirect({ destination }: { destination: "history" | "qr" | "search" }) {
   const { registrationId = "" } = useParams();
-  if (destination === "search") return <Navigate to="/participants" replace />;
+  if (destination === "search") return <Navigate to="/events" replace />;
   return <Navigate to={`/participants/registrations/${registrationId}/${destination}`} replace />;
 }
 
@@ -120,7 +120,7 @@ export default function App() {
             <Route path="/events/:eventId/queue" element={<QueuePage />} />
             <Route path="/events/qr-pass/:registrationId" element={<QRCodePage />} />
             <Route path="/qr-generator" element={<QRCodePage />} />
-            <Route path="/participants" element={<ParticipantPage />} />
+            <Route path="/participants" element={<Navigate to="/events" replace />} />
             <Route path="/participants/new" element={<ParticipantCreatePage />} />
             <Route path="/participants/:participantId/edit" element={<ParticipantEditPage />} />
             <Route path="/participants/:participantId/consents" element={<ParticipantConsentsPage />} />

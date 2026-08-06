@@ -38,7 +38,7 @@ export default function ParticipantCreatePage() {
   });
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
-  const searchLink = `/participants${eventId ? `?eventId=${encodeURIComponent(eventId)}` : ""}`;
+  const searchLink = eventId ? `/events/${encodeURIComponent(eventId)}/register` : "/events";
 
   function update<K extends keyof ParticipantForm>(field: K, value: ParticipantForm[K]) {
     setForm((current) => ({ ...current, [field]: value }));
@@ -80,7 +80,7 @@ export default function ParticipantCreatePage() {
   if (!searchConfirmed) {
     return (
       <section className="participant-v2-page participant-v2-create">
-        <Link className="participant-v2-back" to={searchLink}><ArrowLeftIcon /> Back to participants</Link>
+        <Link className="participant-v2-back" to={searchLink}><ArrowLeftIcon /> {eventId ? "Back to event registration" : "Back to events"}</Link>
         <section className="participant-v2-create-guard">
           <ExclamationTriangleIcon />
           <h1>Search before creating</h1>
@@ -93,7 +93,7 @@ export default function ParticipantCreatePage() {
 
   return (
     <section className="participant-v2-page participant-v2-create" aria-labelledby="participant-v2-create-title">
-      <Link className="participant-v2-back" to={searchLink}><ArrowLeftIcon /> Back to search results</Link>
+      <Link className="participant-v2-back" to={searchLink}><ArrowLeftIcon /> {eventId ? "Back to event registration" : "Back to events"}</Link>
       <header className="participant-v2-create-heading">
         <span><UserPlusIcon /></span>
         <div><p>Registration workspace · Participant details</p><h1 id="participant-v2-create-title">Register a new participant</h1><small>Enter the participant's details for the selected event. You can add consent and an emergency contact from the profile afterwards.</small></div>
