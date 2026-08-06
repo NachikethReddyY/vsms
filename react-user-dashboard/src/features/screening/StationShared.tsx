@@ -228,13 +228,13 @@ export function ParticipantLookup({
   const [success, setSuccess] = useState<string | null>(null);
   const [scannerOpen, setScannerOpen] = useState(false);
 
-  const applyResolved = (person: {
+  const applyResolved = useCallback((person: {
     registrationId: string;
     participantDisplayName: string;
   }, source: string) => {
     onSelect(person.registrationId);
     setSuccess(`Loaded ${person.participantDisplayName} from ${source}.`);
-  };
+  }, [onSelect]);
 
   const resolvePass = async () => {
     if (!eventId || !passToken.trim()) return;
@@ -270,7 +270,7 @@ export function ParticipantLookup({
       setError(message);
       throw new Error(message);
     }
-  }, [eventId, onSelect]);
+  }, [eventId, applyResolved]);
 
   return (
     <section className="detail-panel" style={{ marginBottom: 24 }}>
@@ -285,7 +285,6 @@ export function ParticipantLookup({
             onChange={(event) => setPassToken(event.target.value)}
             placeholder="VSMS-DEMO-QR-001 or QR hex token"
           />
-          <input value={passToken} onChange={(event) => setPassToken(event.target.value)} placeholder="abababababababababababababababababababababababababababababababab" />
         </label>
         <button type="button" className="primary" onClick={() => void resolvePass()}>Load pass</button>
         <button type="button" className="secondary" onClick={() => setScannerOpen(true)}>
