@@ -1,4 +1,3 @@
-const crypto = require("crypto");
 const prisma = require("../prisma/prismaClient");
 const { APPLICATION_ROLES, normalizeApplicationRole, rolesFromCognitoGroups } = require("./roles");
 
@@ -6,22 +5,6 @@ const ALLOWED_ROLES = APPLICATION_ROLES;
 
 function normalizeRole(role) {
     return normalizeApplicationRole(role);
-}
-
-async function ensureRole(roleName) {
-    return prisma.role.upsert({
-        where: { roleName },
-        update: {},
-        create: {
-            roleName,
-            description: `${roleName} application role`,
-        },
-    });
-}
-
-function buildPendingEmployeeNumber(email) {
-    const suffix = crypto.createHash("sha256").update(email).digest("hex").slice(0, 12);
-    return `PENDING-${suffix}`;
 }
 
 async function assertRegistrationAssignment(db, eventId, auth) {
@@ -115,7 +98,7 @@ async function syncLocalUser(profile, { allowCreate = false } = {}) {
         : null;
 
     if (!user && !allowCreate) {
-        const error = new Error("No approved local staff profile exists for this Cognito account");
+        const error = new Error("No local staff profile exists for this Cognito account");
         error.statusCode = 403;
         throw error;
     }
@@ -127,19 +110,13 @@ async function syncLocalUser(profile, { allowCreate = false } = {}) {
                 username: normalizedEmail,
                 fullName: profile.fullName || "Pending Staff",
                 email: normalizedEmail,
-                employeeNumber: profile.employeeNumber || buildPendingEmployeeNumber(normalizedEmail),
+                employeeNumber: profile.employeeNumber || null,
                 department: profile.department || null,
                 designation: profile.designation || null,
                 status: "INACTIVE",
                 sysRole: "STAFF",
-            },
-        });
-
-        const role = await ensureRole("REGISTRATION_OFFICER");
-        await prisma.userRole.create({
-            data: {
-                userId: user.id,
-                roleId: role.id,
+                approvalState: "PENDING",
+                accessState: "ENABLED",
             },
         });
     } else {

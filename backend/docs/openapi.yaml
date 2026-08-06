@@ -213,6 +213,29 @@ paths:
         "400": { $ref: "#/components/responses/ValidationFailed" }
         "401": { $ref: "#/components/responses/Unauthorized" }
         "503": { description: Cognito managed login is not configured }
+  /api/v1/account:
+    get:
+      tags: [Users]
+      operationId: getCurrentAccount
+      summary: Get the current account profile, lifecycle state, and event memberships
+      description: Available to pending, rejected, approved, and suspended sessions. Disabled or deprovisioned accounts cannot authenticate.
+      responses:
+        "200": { description: Current account, content: { application/json: { schema: { $ref: "#/components/schemas/AccountEnvelope" } } } }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+    patch:
+      tags: [Users]
+      operationId: updateCurrentAccount
+      summary: Update non-authoritative current-account profile fields
+      parameters: [{ $ref: "#/components/parameters/ConditionalCsrfToken" }]
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: "#/components/schemas/AccountProfileUpdateRequest" } } }
+      responses:
+        "200": { description: Updated account, content: { application/json: { schema: { $ref: "#/components/schemas/AccountEnvelope" } } } }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "422": { $ref: "#/components/responses/ValidationFailed" }
   /api/v1/users:
     get:
       tags: [Users]
@@ -238,20 +261,24 @@ paths:
             schema: { $ref: "#/components/schemas/CreateUserRequest" }
       responses:
         "201":
-          description: Staff user created
+          description: Staff user created and identity-provider synchronization completed
+          content: { application/json: { schema: { $ref: "#/components/schemas/UserMutationResponse" } } }
+        "202":
+          description: Staff user created; identity-provider synchronization remains queued or owned by another worker
           content: { application/json: { schema: { $ref: "#/components/schemas/UserMutationResponse" } } }
         "400": { $ref: "#/components/responses/ValidationFailed" }
         "401": { $ref: "#/components/responses/Unauthorized" }
         "403": { $ref: "#/components/responses/Forbidden" }
         "409": { $ref: "#/components/responses/Conflict" }
         "422": { $ref: "#/components/responses/ValidationFailed" }
-        "502": { description: Cognito access synchronization failed and the local account was not committed }
+        "502": { description: Local account committed; identity-provider operation escalated for administrator attention }
         "503": { description: Cognito staff synchronization is not configured }
   /api/v1/users/{id}:
     patch:
       tags: [Users]
       operationId: updateUser
-      summary: Update staff roles or active state across the application and Cognito (administrator only)
+      summary: Update authoritative staff profile fields or legacy roles (administrator only)
+      description: Lifecycle status is intentionally excluded. Use account approval, suspend, reactivate, or deprovision actions for state changes.
       parameters:
         - name: id
           in: path
@@ -264,13 +291,16 @@ paths:
             schema: { $ref: "#/components/schemas/UpdateUserRequest" }
       responses:
         "200":
-          description: Staff user updated
+          description: Staff user updated and identity-provider synchronization completed, or no provider work was required
+          content: { application/json: { schema: { $ref: "#/components/schemas/UserMutationResponse" } } }
+        "202":
+          description: Staff user updated; identity-provider synchronization remains queued or owned by another worker
           content: { application/json: { schema: { $ref: "#/components/schemas/UserMutationResponse" } } }
         "401": { $ref: "#/components/responses/Unauthorized" }
         "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
         "422": { $ref: "#/components/responses/ValidationFailed" }
-        "502": { description: Cognito access synchronization failed and local role changes were rolled back }
+        "502": { description: Local role changes committed; identity-provider operation escalated for administrator attention }
         "503": { description: Cognito staff synchronization is not configured }
   /api/v1/events:
     get:
@@ -1268,6 +1298,136 @@ paths:
         "401": { $ref: "#/components/responses/Unauthorized" }
         "403": { $ref: "#/components/responses/Forbidden" }
         "429": { $ref: "#/components/responses/RateLimited" }
+  /api/v1/admin/accounts:
+    get:
+      tags: [Administration]
+      operationId: listAccounts
+      summary: Search and filter lifecycle accounts
+      parameters:
+        - { name: page, in: query, schema: { type: integer, minimum: 1, default: 1 } }
+        - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 100, default: 25 } }
+        - { name: search, in: query, schema: { type: string, minLength: 1, maxLength: 100 } }
+        - { name: approvalState, in: query, schema: { $ref: "#/components/schemas/AccountApprovalState" } }
+        - { name: accessState, in: query, schema: { $ref: "#/components/schemas/AccountAccessState" } }
+        - { name: professionalCategory, in: query, schema: { $ref: "#/components/schemas/ProfessionalCategory" } }
+        - { name: eventRole, in: query, schema: { $ref: "#/components/schemas/EventMembershipRoleType" } }
+      responses:
+        "200": { description: Paginated accounts and pending count, content: { application/json: { schema: { $ref: "#/components/schemas/AccountListResponse" } } } }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "422": { $ref: "#/components/responses/ValidationFailed" }
+  /api/v1/admin/accounts/{accountId}:
+    get:
+      tags: [Administration]
+      operationId: getAccountDetail
+      summary: Get an account with decisions, memberships, and provider operations
+      parameters: [{ $ref: "#/components/parameters/AccountId" }]
+      responses:
+        "200": { description: Account detail, content: { application/json: { schema: { $ref: "#/components/schemas/AccountDetailEnvelope" } } } }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+  /api/v1/admin/accounts/{accountId}/approve:
+    post:
+      tags: [Administration]
+      operationId: approveAccount
+      summary: Approve a pending account without assigning an operational role
+      parameters: [{ $ref: "#/components/parameters/AccountId" }]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: "#/components/schemas/OptionalAccountReasonRequest" } } } }
+      responses:
+        "200": { description: Approved account, content: { application/json: { schema: { $ref: "#/components/schemas/AccountEnvelope" } } } }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "422": { $ref: "#/components/responses/ValidationFailed" }
+  /api/v1/admin/accounts/{accountId}/reject:
+    post:
+      tags: [Administration]
+      operationId: rejectAccount
+      summary: Reject a pending or approved account with an immutable reason
+      parameters: [{ $ref: "#/components/parameters/AccountId" }]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: "#/components/schemas/RequiredAccountReasonRequest" } } } }
+      responses:
+        "200": { description: Rejected account, content: { application/json: { schema: { $ref: "#/components/schemas/AccountEnvelope" } } } }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "422": { $ref: "#/components/responses/ValidationFailed" }
+  /api/v1/admin/accounts/{accountId}/suspend:
+    post:
+      tags: [Administration]
+      operationId: suspendAccount
+      summary: Suspend an approved active account and enqueue global sign-out
+      parameters: [{ $ref: "#/components/parameters/AccountId" }]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: "#/components/schemas/RequiredAccountReasonRequest" } } } }
+      responses:
+        "200": { description: Suspended account with global sign-out completed, content: { application/json: { schema: { $ref: "#/components/schemas/AccountEnvelope" } } } }
+        "202": { description: Suspended account; global sign-out remains queued or owned by another worker, content: { application/json: { schema: { $ref: "#/components/schemas/AccountEnvelope" } } } }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "422": { $ref: "#/components/responses/ValidationFailed" }
+        "502": { description: Suspension committed; global sign-out escalated for administrator attention }
+  /api/v1/admin/accounts/{accountId}/reactivate:
+    post:
+      tags: [Administration]
+      operationId: reactivateAccount
+      summary: Reactivate an approved suspended or dormant inactive account
+      parameters: [{ $ref: "#/components/parameters/AccountId" }]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: "#/components/schemas/OptionalAccountReasonRequest" } } } }
+      responses:
+        "200": { description: Reactivated account with Cognito synchronization completed, content: { application/json: { schema: { $ref: "#/components/schemas/AccountEnvelope" } } } }
+        "202": { description: Reactivated account; Cognito synchronization remains queued or owned by another worker, content: { application/json: { schema: { $ref: "#/components/schemas/AccountEnvelope" } } } }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "422": { $ref: "#/components/responses/ValidationFailed" }
+        "502": { description: Reactivation committed; Cognito synchronization escalated for administrator attention }
+  /api/v1/admin/accounts/{accountId}/revoke-sessions:
+    post:
+      tags: [Administration]
+      operationId: revokeAccountSessions
+      summary: Invalidate sessions by Cognito auth_time and enqueue global sign-out
+      parameters: [{ $ref: "#/components/parameters/AccountId" }]
+      responses:
+        "200": { description: Account with updated invalid-before time and global sign-out completed, content: { application/json: { schema: { $ref: "#/components/schemas/AccountEnvelope" } } } }
+        "202": { description: Session cutoff committed; global sign-out remains queued or owned by another worker, content: { application/json: { schema: { $ref: "#/components/schemas/AccountEnvelope" } } } }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "502": { description: Session cutoff committed; global sign-out escalated for administrator attention }
+  /api/v1/admin/accounts/{accountId}/deprovision:
+    post:
+      tags: [Administration]
+      operationId: deprovisionAccount
+      summary: Soft-deprovision an account and enqueue Cognito disable plus global sign-out
+      parameters: [{ $ref: "#/components/parameters/AccountId" }]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: "#/components/schemas/RequiredAccountReasonRequest" } } } }
+      responses:
+        "200": { description: Deprovisioned account with Cognito disable and sign-out completed, content: { application/json: { schema: { $ref: "#/components/schemas/AccountEnvelope" } } } }
+        "202": { description: Deprovisioned account; Cognito disable or sign-out remains queued or owned by another worker, content: { application/json: { schema: { $ref: "#/components/schemas/AccountEnvelope" } } } }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "422": { $ref: "#/components/responses/ValidationFailed" }
+        "502": { description: Deprovision committed; Cognito disable or sign-out escalated for administrator attention }
+  /api/v1/admin/accounts/{accountId}/resend-lifecycle:
+    post:
+      tags: [Administration]
+      operationId: resendAccountLifecycleNotification
+      summary: Request resend through the optional account lifecycle notification seam
+      parameters: [{ $ref: "#/components/parameters/AccountId" }]
+      responses:
+        "200": { description: Enqueue result, content: { application/json: { schema: { $ref: "#/components/schemas/LifecycleNotificationResult" } } } }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
   /api/v1/admin/audit-logs:
     get:
       tags: [Administration]
@@ -1529,6 +1689,56 @@ paths:
               schema: { $ref: "#/components/schemas/QrRegistrationLookupResponse" }
         "401": { $ref: "#/components/responses/Unauthorized" }
         "404": { $ref: "#/components/responses/NotFound" }
+  /api/v1/admin/maintenance/account-provider-operations/drain:
+    post:
+      tags: [Administration]
+      operationId: drainAccountProviderOperations
+      summary: Process a bounded page of due account identity-provider operations
+      description: Recovers expired leases, respects per-account generation order and retry backoff, and escalates operations after the bounded attempt limit. Freshly owned operations are reported as pending rather than executed concurrently.
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: "#/components/schemas/AccountProviderDrainRequest" } } }
+      responses:
+        "200": { description: Audited drain summary, content: { application/json: { schema: { $ref: "#/components/schemas/AccountProviderDrainResponse" } } } }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "422": { $ref: "#/components/responses/ValidationFailed" }
+  /api/v1/admin/maintenance/account-provider-operations/{operationId}/requeue:
+    post:
+      tags: [Administration]
+      operationId: requeueAccountProviderOperation
+      summary: Requeue an escalated account identity-provider operation as a new ordered generation
+      description: Preserves the escalated source and its failure evidence as administratively handled. Requeue is rejected when a newer generation already supersedes the source.
+      parameters: [{ $ref: "#/components/parameters/AccountProviderOperationId" }]
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: "#/components/schemas/AccountProviderOperationMaintenanceRequest" } } }
+      responses:
+        "200": { description: Requeued provider operation completed, content: { application/json: { schema: { $ref: "#/components/schemas/AccountProviderOperationRequeueResponse" } } } }
+        "202": { description: Requeued provider operation remains queued or owned, content: { application/json: { schema: { $ref: "#/components/schemas/AccountProviderOperationRequeueResponse" } } } }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "422": { $ref: "#/components/responses/ValidationFailed" }
+        "502": { description: Requeued provider operation escalated again for administrator attention }
+  /api/v1/admin/maintenance/account-provider-operations/{operationId}/resolve:
+    post:
+      tags: [Administration]
+      operationId: resolveAccountProviderOperation
+      summary: Administratively resolve an escalated account identity-provider operation
+      description: Requires and durably stores a reason while preserving attempts, failure code, generation, and audit evidence.
+      parameters: [{ $ref: "#/components/parameters/AccountProviderOperationId" }]
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: "#/components/schemas/AccountProviderOperationMaintenanceRequest" } } }
+      responses:
+        "200": { description: Escalated provider operation resolved, content: { application/json: { schema: { $ref: "#/components/schemas/AccountProviderOperationResolveResponse" } } } }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "422": { $ref: "#/components/responses/ValidationFailed" }
   /api/v1/admin/maintenance/referral-deliveries:
     post:
       tags: [Referrals]
@@ -1784,6 +1994,16 @@ components:
       name: vsms_access
       description: HttpOnly Cognito access token used for global session revocation
   parameters:
+    AccountId:
+      name: accountId
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+    AccountProviderOperationId:
+      name: operationId
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
     EventId:
       name: eventId
       in: path
@@ -2136,22 +2356,289 @@ components:
         assignmentRole: { $ref: "#/components/schemas/StaffAssignmentRole" }
         stationTemplateId: { type: string, format: uuid, nullable: true }
         notes: { type: string, nullable: true, maxLength: 500 }
+    AccountApprovalState:
+      type: string
+      enum: [PENDING, APPROVED, REJECTED]
+    AccountAccessState:
+      type: string
+      enum: [ENABLED, SUSPENDED, DISABLED]
+    ProfessionalCategory:
+      type: string
+      enum: [STAFF, DOCTOR]
+    EventMembershipRoleType:
+      type: string
+      enum: [EVENT_MANAGER, REGISTRATION, SCREENER, REVIEWER, SUPPORT]
+    AccountProviderOperationStatus:
+      type: string
+      enum: [PENDING, PROCESSING, SUCCEEDED, FAILED, CANCELED, ESCALATED, RESOLVED]
+    AccountProviderOperationType:
+      type: string
+      enum: [SYNC_ACCESS, GLOBAL_SIGN_OUT, DISABLE_AND_SIGN_OUT]
+    EventMembershipRole:
+      type: object
+      additionalProperties: false
+      required: [role, assignedAt]
+      properties:
+        role: { $ref: "#/components/schemas/EventMembershipRoleType" }
+        assignedAt: { type: string, format: date-time }
+    AccountEventSummary:
+      type: object
+      additionalProperties: false
+      required: [eventId, name, status, startsAt, endsAt]
+      properties:
+        eventId: { type: string, format: uuid }
+        name: { type: string }
+        status: { $ref: "#/components/schemas/EventStatus" }
+        startsAt: { type: string, format: date-time }
+        endsAt: { type: string, format: date-time }
+    EventMembership:
+      type: object
+      additionalProperties: false
+      required: [id, eventId, userId, status, addedById, addedAt, event, roles]
+      properties:
+        id: { type: string, format: uuid }
+        eventId: { type: string, format: uuid }
+        userId: { type: string, format: uuid }
+        status: { type: string, enum: [ACTIVE, REMOVED] }
+        addedById: { type: string, format: uuid }
+        addedAt: { type: string, format: date-time }
+        removedById: { type: string, format: uuid, nullable: true }
+        removedAt: { type: string, format: date-time, nullable: true }
+        removalReason: { type: string, nullable: true, maxLength: 500 }
+        event: { $ref: "#/components/schemas/AccountEventSummary" }
+        roles: { type: array, items: { $ref: "#/components/schemas/EventMembershipRole" } }
+    AccountSummary:
+      type: object
+      additionalProperties: true
+      required: [id, fullName, email, approvalState, accessState, status, roles, createdAt, updatedAt]
+      properties:
+        id: { type: string, format: uuid }
+        fullName: { type: string, minLength: 1, maxLength: 100 }
+        email: { type: string, format: email }
+        contactNumber: { type: string, nullable: true, maxLength: 20 }
+        employeeNumber: { type: string, nullable: true, maxLength: 20 }
+        department: { type: string, nullable: true, maxLength: 100 }
+        designation: { type: string, nullable: true, maxLength: 100 }
+        professionalCategory:
+          type: string
+          nullable: true
+          enum: [STAFF, DOCTOR]
+        approvalState: { $ref: "#/components/schemas/AccountApprovalState" }
+        accessState: { $ref: "#/components/schemas/AccountAccessState" }
+        status: { type: string, enum: [ACTIVE, INACTIVE, DISABLED, SUSPENDED] }
+        lastLoginAt: { type: string, format: date-time, nullable: true }
+        sessionInvalidBefore: { type: string, format: date-time, nullable: true }
+        deprovisionedAt: { type: string, format: date-time, nullable: true }
+        deprovisionReason: { type: string, nullable: true, maxLength: 500 }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+        roles:
+          type: array
+          uniqueItems: true
+          items: { type: string, enum: [ADMINISTRATOR, EVENT_MANAGER, REGISTRATION_OFFICER, SCREENER, REVIEWER, SUPPORT] }
+    Account:
+      allOf:
+        - $ref: "#/components/schemas/AccountSummary"
+        - type: object
+          required: [eventMemberships]
+          properties:
+            eventMemberships: { type: array, items: { $ref: "#/components/schemas/EventMembership" } }
+    AccountApprovalDecision:
+      type: object
+      additionalProperties: false
+      required: [id, userId, decision, decidedById, decidedAt, decidedBy]
+      properties:
+        id: { type: string, format: uuid }
+        userId: { type: string, format: uuid }
+        decision: { type: string, enum: [APPROVED, REJECTED] }
+        decidedById: { type: string, format: uuid }
+        reason: { type: string, nullable: true, maxLength: 500 }
+        decidedAt: { type: string, format: date-time }
+        decidedBy:
+          type: object
+          additionalProperties: false
+          required: [id, fullName, email]
+          properties:
+            id: { type: string, format: uuid }
+            fullName: { type: string }
+            email: { type: string, format: email }
+    AccountProviderOperation:
+      type: object
+      additionalProperties: false
+      required: [id, operationType, status, generation, attemptCount, nextAttemptAt, createdAt]
+      properties:
+        id: { type: string, format: uuid }
+        operationType: { $ref: "#/components/schemas/AccountProviderOperationType" }
+        status: { $ref: "#/components/schemas/AccountProviderOperationStatus" }
+        generation: { type: integer, minimum: 1 }
+        attemptCount: { type: integer, minimum: 0, maximum: 5 }
+        nextAttemptAt: { type: string, format: date-time }
+        completedAt: { type: string, format: date-time, nullable: true }
+        lastErrorCode: { type: string, nullable: true, maxLength: 80 }
+        resolvedAt: { type: string, format: date-time, nullable: true }
+        resolutionReason: { type: string, nullable: true, maxLength: 500 }
+        createdAt: { type: string, format: date-time }
+    AccountDetail:
+      allOf:
+        - $ref: "#/components/schemas/Account"
+        - type: object
+          required: [approvalDecisions, providerOperations]
+          properties:
+            approvalDecisions: { type: array, items: { $ref: "#/components/schemas/AccountApprovalDecision" } }
+            providerOperations: { type: array, maxItems: 25, items: { $ref: "#/components/schemas/AccountProviderOperation" } }
+    AccountListItem:
+      allOf:
+        - $ref: "#/components/schemas/AccountSummary"
+        - type: object
+          required: [_count]
+          properties:
+            _count:
+              type: object
+              additionalProperties: false
+              required: [eventMemberships]
+              properties: { eventMemberships: { type: integer, minimum: 0 } }
+    AccountEnvelope:
+      type: object
+      additionalProperties: false
+      required: [account]
+      properties:
+        account: { $ref: "#/components/schemas/Account" }
+        providerOperation: { $ref: "#/components/schemas/AccountProviderProcessingState" }
+    AccountDetailEnvelope:
+      type: object
+      additionalProperties: false
+      required: [account]
+      properties: { account: { $ref: "#/components/schemas/AccountDetail" } }
+    AccountListResponse:
+      type: object
+      additionalProperties: false
+      required: [items, page, limit, total, totalPages, pendingCount]
+      properties:
+        items: { type: array, items: { $ref: "#/components/schemas/AccountListItem" } }
+        page: { type: integer, minimum: 1 }
+        limit: { type: integer, minimum: 1, maximum: 100 }
+        total: { type: integer, minimum: 0 }
+        totalPages: { type: integer, minimum: 0 }
+        pendingCount: { type: integer, minimum: 0 }
+    AccountProfileUpdateRequest:
+      type: object
+      additionalProperties: false
+      minProperties: 1
+      properties:
+        fullName: { type: string, minLength: 1, maxLength: 100 }
+        contactNumber: { type: string, nullable: true, maxLength: 20 }
+        professionalCategory:
+          type: string
+          nullable: true
+          enum: [STAFF, DOCTOR]
+    OptionalAccountReasonRequest:
+      type: object
+      additionalProperties: false
+      properties: { reason: { type: string, nullable: true, maxLength: 500 } }
+    RequiredAccountReasonRequest:
+      type: object
+      additionalProperties: false
+      required: [reason]
+      properties: { reason: { type: string, minLength: 3, maxLength: 500 } }
+    LifecycleNotificationResult:
+      type: object
+      additionalProperties: false
+      required: [queued]
+      properties: { queued: { type: boolean } }
+    AccountProviderDrainRequest:
+      type: object
+      additionalProperties: false
+      properties: { limit: { type: integer, minimum: 1, maximum: 100, default: 25 } }
+    AccountProviderDrainItem:
+      type: object
+      additionalProperties: false
+      required: [id, status, pending]
+      properties:
+        id: { type: string, format: uuid }
+        status: { $ref: "#/components/schemas/AccountProviderOperationStatus" }
+        pending: { type: boolean }
+    AccountProviderDrainResponse:
+      type: object
+      additionalProperties: false
+      required: [attempted, succeeded, failed, pending, escalated, operations]
+      properties:
+        attempted: { type: integer, minimum: 0, maximum: 100 }
+        succeeded: { type: integer, minimum: 0, maximum: 100 }
+        failed: { type: integer, minimum: 0, maximum: 100 }
+        pending: { type: integer, minimum: 0, maximum: 100 }
+        escalated: { type: integer, minimum: 0, maximum: 100 }
+        operations: { type: array, maxItems: 100, items: { $ref: "#/components/schemas/AccountProviderDrainItem" } }
+    AccountProviderProcessingState:
+      type: object
+      additionalProperties: false
+      required: [id, operationType, generation, status, pending]
+      properties:
+        id: { type: string, format: uuid }
+        operationType: { $ref: "#/components/schemas/AccountProviderOperationType" }
+        generation: { type: integer, minimum: 1 }
+        status: { $ref: "#/components/schemas/AccountProviderOperationStatus" }
+        pending: { type: boolean }
+        reason: { type: string, enum: [OLDER_GENERATION_PENDING, LEASE_OWNED, BACKOFF, STALE_COMPLETION_REPAIRED, RETRY_QUEUED] }
+    AccountProviderOperationMaintenanceRequest:
+      type: object
+      additionalProperties: false
+      required: [reason]
+      properties:
+        reason: { type: string, minLength: 10, maxLength: 500 }
+    AccountProviderOperationMaintenanceItem:
+      type: object
+      additionalProperties: false
+      required: [id, userId, operationType, status, generation, attemptCount, nextAttemptAt, createdAt, updatedAt]
+      properties:
+        id: { type: string, format: uuid }
+        userId: { type: string, format: uuid }
+        operationType: { $ref: "#/components/schemas/AccountProviderOperationType" }
+        status: { $ref: "#/components/schemas/AccountProviderOperationStatus" }
+        generation: { type: integer, minimum: 1 }
+        attemptCount: { type: integer, minimum: 0 }
+        nextAttemptAt: { type: string, format: date-time }
+        completedAt: { type: string, format: date-time, nullable: true }
+        lastErrorCode: { type: string, nullable: true, maxLength: 80 }
+        resolvedAt: { type: string, format: date-time, nullable: true }
+        resolutionReason: { type: string, nullable: true, maxLength: 500 }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+    AccountProviderOperationRequeueResponse:
+      type: object
+      additionalProperties: false
+      required: [operation, requeuedOperation, providerOperation]
+      properties:
+        operation: { $ref: "#/components/schemas/AccountProviderOperationMaintenanceItem" }
+        requeuedOperation: { $ref: "#/components/schemas/AccountProviderOperationMaintenanceItem" }
+        providerOperation: { $ref: "#/components/schemas/AccountProviderProcessingState" }
+    AccountProviderOperationResolveResponse:
+      type: object
+      additionalProperties: false
+      required: [operation]
+      properties:
+        operation: { $ref: "#/components/schemas/AccountProviderOperationMaintenanceItem" }
     User:
       type: object
       additionalProperties: true
-      required: [id, email, fullName, employeeNumber, status]
+      required: [id, email, fullName, status]
       properties:
         id: { type: string, format: uuid }
         userId: { type: string, format: uuid }
         username: { type: string, minLength: 3, maxLength: 100 }
         email: { type: string, format: email }
         fullName: { type: string }
-        employeeNumber: { type: string }
+        employeeNumber: { type: string, nullable: true }
         contactNumber: { type: string, nullable: true }
         department: { type: string, nullable: true }
         designation: { type: string, nullable: true }
         systemRole: { $ref: "#/components/schemas/SystemRole" }
         status: { type: string, enum: [ACTIVE, INACTIVE, DISABLED, SUSPENDED] }
+        approvalState: { $ref: "#/components/schemas/AccountApprovalState" }
+        accessState: { $ref: "#/components/schemas/AccountAccessState" }
+        professionalCategory:
+          type: string
+          nullable: true
+          enum: [STAFF, DOCTOR]
         roles:
           type: array
           uniqueItems: true
@@ -2960,9 +3447,10 @@ components:
     AuthConfigStatus:
       type: object
       additionalProperties: false
-      required: [configured, supportedRoles, requestId]
+      required: [configured, publicSignupEnabled, supportedRoles, requestId]
       properties:
         configured: { type: boolean }
+        publicSignupEnabled: { type: boolean }
         supportedRoles: { type: array, items: { type: string } }
         requestId: { type: string, format: uuid }
     LogoutResponse:
@@ -2982,7 +3470,7 @@ components:
         employeeNumber: { type: string, minLength: 1, maxLength: 20 }
         department: { type: string, nullable: true, maxLength: 100 }
         designation: { type: string, nullable: true, maxLength: 100 }
-        status: { type: string, enum: [ACTIVE, INACTIVE], default: INACTIVE }
+        status: { type: string, enum: [ACTIVE, INACTIVE], default: INACTIVE, description: INACTIVE creates an approved dormant account that can later be activated only through the Reactivate action. }
         roles:
           type: array
           minItems: 1
@@ -2998,7 +3486,6 @@ components:
         employeeNumber: { type: string, minLength: 1, maxLength: 20 }
         department: { type: string, nullable: true, maxLength: 100 }
         designation: { type: string, nullable: true, maxLength: 100 }
-        status: { type: string, enum: [ACTIVE, INACTIVE] }
         roles:
           type: array
           minItems: 1
@@ -3020,6 +3507,7 @@ components:
         success: { type: boolean, enum: [true] }
         message: { type: string }
         data: { $ref: "#/components/schemas/User" }
+        providerOperation: { $ref: "#/components/schemas/AccountProviderProcessingState" }
     Pagination:
       type: object
       additionalProperties: false
