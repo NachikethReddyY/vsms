@@ -4,7 +4,7 @@ const fs = require("node:fs");
 const path = require("node:path");
 const YAML = require("yaml");
 
-const backendRoot = path.resolve(__dirname, "..");
+const backendRoot = path.resolve(__dirname, "../..");
 const read = (relativePath) => fs.readFileSync(path.join(backendRoot, relativePath), "utf8");
 
 test("manual check-in contract accepts exactly one reference and always returns a message", () => {
@@ -116,7 +116,7 @@ test("event audit log rows are retained after hard delete and remain immutable",
 });
 
 test("event service exposes list functions after merge resolution", () => {
-    const eventService = require("../services/eventService");
+    const eventService = require("../../services/eventService");
     assert.equal(typeof eventService.listEvents, "function");
     assert.equal(typeof eventService.listActiveEvents, "function");
     assert.equal(typeof eventService.listStationTemplates, "function");
@@ -153,7 +153,7 @@ test("importStations and updateStation use Prisma Station not EventStation", () 
 });
 
 test("station template mapping only imports screening StationTypes", () => {
-    const mapping = require("../services/stationTemplateMapping");
+    const mapping = require("../../services/stationTemplateMapping");
     assert.equal(mapping.stationTypeForTemplateKey("VISUAL_ACUITY"), "VISUAL_ACUITY");
     assert.equal(mapping.stationTypeForTemplateKey("REFRACTION"), "REFRACTION");
     assert.equal(mapping.stationTypeForTemplateKey("COLOUR_VISION"), "COLOUR_VISION");

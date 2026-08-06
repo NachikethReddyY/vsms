@@ -4,9 +4,9 @@ const crypto = require("node:crypto");
 
 process.env.DATABASE_URL ||= "postgresql://test:test@localhost:5432/vsms_test";
 
-const AppError = require("../errors/AppError");
-const { screeningSyncBody } = require("../schemas/screeningSchemas");
-const { processScreeningSync, requestFingerprint } = require("../services/syncService");
+const AppError = require("../../errors/AppError");
+const { screeningSyncBody } = require("../../schemas/screeningSchemas");
+const { processScreeningSync, requestFingerprint } = require("../../services/syncService");
 
 const eventId = crypto.randomUUID();
 const stationId = crypto.randomUUID();

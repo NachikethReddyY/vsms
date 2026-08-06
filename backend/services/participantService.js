@@ -1,6 +1,6 @@
 const crypto = require("crypto");
 const prisma = require("../prisma/prismaClient");
-const { createAuditLog } = require("../utils/AuthAudit");
+const { createAuditLog } = require("../utils/audit");
 const {
     assertUuid,
     cleanString,

@@ -6,8 +6,8 @@ const path = require("node:path");
 
 process.env.DATABASE_URL ||= "postgresql://test:test@localhost:5432/vsms_test";
 
-const prisma = require("../prisma/prismaClient");
-const eventService = require("../services/eventService");
+const prisma = require("../../prisma/prismaClient");
+const eventService = require("../../services/eventService");
 
 const manager = { userId: crypto.randomUUID(), systemRole: "ADMIN" };
 const staffId = crypto.randomUUID();
@@ -382,9 +382,9 @@ test("terminal event deletion removes event-owned records and preserves the admi
 });
 
 test("event audit schema matches the retained-history migration", () => {
-  const schema = fs.readFileSync(path.join(__dirname, "../prisma/schema.prisma"), "utf8");
+  const schema = fs.readFileSync(path.join(__dirname, "../../prisma/schema.prisma"), "utf8");
   const retainedHistoryMigration = fs.readFileSync(
-    path.join(__dirname, "../prisma/migrations/20260803090000_preserve_event_audit_history/migration.sql"),
+    path.join(__dirname, "../../prisma/migrations/20260803090000_preserve_event_audit_history/migration.sql"),
     "utf8",
   );
   const eventModel = schema.match(/model Event \{[\s\S]*?\n\}/)?.[0] || "";

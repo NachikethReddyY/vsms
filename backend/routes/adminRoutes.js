@@ -8,6 +8,7 @@ const requireAnyRole = require("../middlewares/requireAnyRole");
 const validate = require("../middlewares/validate");
 const {
   referralDeliveryMaintenanceBody,
+  auditLogListQuery,
   artifactCleanupListQuery,
   artifactCleanupParams,
   artifactCleanupActionBody,
@@ -16,7 +17,7 @@ const {
 router.use(requireAuthentication);
 router.use(requireAnyRole("ADMINISTRATOR"));
 
-router.get("/audit-logs", adminController.getAuditLogs);
+router.get("/audit-logs", validate({ query: auditLogListQuery }), adminController.getAuditLogs);
 router.post(
   "/maintenance/referral-deliveries",
   validate({ body: referralDeliveryMaintenanceBody }),

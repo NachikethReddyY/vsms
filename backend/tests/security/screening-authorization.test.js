@@ -4,9 +4,9 @@ const crypto = require("node:crypto");
 
 process.env.DATABASE_URL ||= "postgresql://test:test@localhost:5432/vsms_test";
 
-const prisma = require("../prisma/prismaClient");
-const screeningService = require("../services/screeningService");
-const { stationTypeForTemplateKey } = require("../services/stationTemplateMapping");
+const prisma = require("../../prisma/prismaClient");
+const screeningService = require("../../services/screeningService");
+const { stationTypeForTemplateKey } = require("../../services/stationTemplateMapping");
 
 const eventId = crypto.randomUUID();
 const stationA = crypto.randomUUID();

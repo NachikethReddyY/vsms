@@ -122,9 +122,10 @@ provide a native YAML result reporter. The implementation will therefore:
 
 ## Test storage
 
-Automated backend test source is stored in `backend/.tests/` and committed so a
-clean clone can run the same verification. Coverage, browser, and Bruno result
-artifacts remain ignored because they are generated and may contain credentials.
+Automated backend test source is stored in `backend/tests/` (organised into
+`unit/`, `integration/`, and `security/`) and committed so a clean clone can run
+the same verification. Coverage, browser, and Bruno result artifacts remain
+ignored because they are generated and may contain credentials.
 
 ## Security verification status
 

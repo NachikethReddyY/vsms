@@ -15,7 +15,18 @@ before(async () => {
   staffToken = helpers.accessTokenFor(staffUser);
   managerUser = await helpers.ensureTestUser("EVENT_MANAGER", "rbac-manager");
   managerToken = helpers.accessTokenFor(managerUser);
-  const event = await helpers.prisma.event.findFirst({ select: { eventId: true } });
+  const event = await helpers.prisma.event.create({
+    data: {
+      name: "RBAC Public Event",
+      venue: "Test Hall",
+      capacity: 10,
+      startsAt: new Date(Date.now() + 86_400_000),
+      endsAt: new Date(Date.now() + 90_000_000),
+      status: "PUBLISHED",
+      createdByUserId: managerUser.id,
+    },
+    select: { eventId: true },
+  });
   publicEventId = event.eventId;
 });
 

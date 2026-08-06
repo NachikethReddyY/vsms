@@ -7,13 +7,13 @@ const {
   VA_RULE_VERSION,
   REF_RULE_VERSION,
   CV_RULE_VERSION,
-} = require("../services/screeningService");
+} = require("../../services/screeningService");
 const {
   saveRefractionBody,
   saveColourVisionBody,
   previewRefractionBody,
   previewColourVisionBody,
-} = require("../schemas/screeningSchemas");
+} = require("../../schemas/screeningSchemas");
 
 test("visual acuity rule version and normal reading", () => {
   const result = evaluateVisualAcuity({

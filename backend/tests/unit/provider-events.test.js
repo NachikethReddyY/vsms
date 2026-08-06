@@ -2,17 +2,17 @@ const test = require("node:test");
 const assert = require("node:assert/strict");
 const crypto = require("node:crypto");
 const request = require("supertest");
-const app = require("../app");
+const app = require("../../app");
 const {
   canonicalSnsMessage,
   validateAwsSnsUrl,
   verifySnsMessage,
   confirmSnsSubscription,
-} = require("../services/snsMessageService");
+} = require("../../services/snsMessageService");
 const {
   parseSesEvent,
   recordProviderEvent,
-} = require("../services/sesProviderEventService");
+} = require("../../services/sesProviderEventService");
 
 const TOPIC_ARN = "arn:aws:sns:us-east-1:123456789012:vsms-ses-events";
 const CERT_URL = "https://sns.us-east-1.amazonaws.com/SimpleNotificationService-test.pem";

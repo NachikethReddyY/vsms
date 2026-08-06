@@ -1,6 +1,6 @@
 const assert = require("node:assert/strict");
 const test = require("node:test");
-const { createExportReceipt, verifyExportReceipt } = require("../utils/eventExportReceipt");
+const { createExportReceipt, verifyExportReceipt } = require("../../utils/eventExportReceipt");
 
 const secret = "a".repeat(32);
 const claim = {

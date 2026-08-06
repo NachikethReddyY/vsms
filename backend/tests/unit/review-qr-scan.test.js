@@ -1,8 +1,8 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 
-const { resolveScannedRegistration } = require('../services/reviewService');
-const { hashToken } = require('../utils/qrToken');
+const { resolveScannedRegistration } = require('../../services/reviewService');
+const { hashToken } = require('../../utils/qrToken');
 
 const urlToken = 'b'.repeat(64);
 const qrUrl = `https://app.example.com/participant-status/${urlToken}`;

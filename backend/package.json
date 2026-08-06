@@ -1,26 +1,42 @@
 {
   "name": "backend",
   "version": "1.0.0",
-  "description": "",
+  "description": "Visual Screening Management System Backend API",
   "main": "server.js",
   "scripts": {
     "dev": "node server.js",
     "start": "node server.js",
-    "test": "node --test \"tests/**/*.test.js\"",
-    "test:integration": "node .tests/prepare.js",
-    "test:watch": "vitest .tests",
+    "prisma:generate": "prisma generate",
     "prisma:validate": "prisma validate",
+    "prisma:format": "prisma format",
     "prisma:migrate": "prisma migrate deploy",
+    "prisma:push": "prisma db push",
     "prisma:seed": "node prisma/seed.js",
     "seed": "node prisma/seed.js",
-    "provision-staff": "node prisma/provisionStaff.js",
+    "db:reset": "prisma migrate reset --force",
+    "db:setup": "pnpm prisma:generate && pnpm prisma:migrate && pnpm prisma:seed",
+    "test": "node --test tests/unit tests/security",
+    "test:watch": "node --test --watch tests/unit tests/security",
+    "test:coverage": "node --test --experimental-test-coverage tests/unit tests/security",
+    "test:integration": "node --test tests/integration tests/security/rateLimit.test.js tests/security/rbac.test.js",
     "openapi:lint": "redocly lint docs/openapi.yaml",
     "contracts:generate": "openapi-typescript docs/openapi.yaml -o ../react-user-dashboard/src/generated/api.ts",
     "contracts:check": "node scripts/check-contract.js",
     "audit": "pnpm audit",
-    "audit:fix": "pnpm audit --fix"
+    "audit:fix": "pnpm audit --fix",
+    "provision-staff": "node prisma/provisionStaff.js",
+    "dev:preset": "node scripts/dev-preset.js",
+    "deploy": "pnpm install && pnpm db:setup && pnpm start",
+    "deploy:prod": "pnpm install --prod && pnpm db:setup && pnpm start",
+    "ci": "pnpm prisma:validate && pnpm prisma:generate && pnpm test && pnpm openapi:lint"
   },
-  "keywords": [],
+  "keywords": [
+    "express",
+    "nodejs",
+    "prisma",
+    "postgresql",
+    "vsms"
+  ],
   "author": "",
   "license": "ISC",
   "packageManager": "pnpm@11.20.0",
@@ -41,6 +57,8 @@
     "jsonwebtoken": "^9.0.3",
     "pdfkit": "^0.19.1",
     "pg": "^8.16.0",
+    "pino": "^10.3.1",
+    "pino-http": "^11.0.0",
     "prisma": "^6.19.3",
     "qrcode": "^1.5.4",
     "qrcode.react": "^4.2.0",
@@ -57,7 +75,6 @@
     "@redocly/cli": "^2.40.0",
     "expect": "^30.4.1",
     "openapi-typescript": "^7.13.0",
-    "supertest": "^7.2.2",
-    "vitest": "^4.1.10"
+    "supertest": "^7.2.2"
   }
 }

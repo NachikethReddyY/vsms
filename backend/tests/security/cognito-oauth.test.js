@@ -1,8 +1,8 @@
 const assert = require("node:assert/strict");
 const test = require("node:test");
-const { buildAuthorizationUrl } = require("../utils/cognitoClient");
-const { setAuthCookies, setOAuthCookies } = require("../utils/httpCookies");
-const { normalizeReturnTo } = require("../controllers/authController");
+const { buildAuthorizationUrl } = require("../../utils/cognitoClient");
+const { setAuthCookies, setOAuthCookies } = require("../../utils/httpCookies");
+const { normalizeReturnTo } = require("../../controllers/authController");
 
 test("managed login uses an authorization-code grant with PKCE", () => {
     const previous = { ...process.env };

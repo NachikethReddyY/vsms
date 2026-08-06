@@ -4,7 +4,7 @@ const test = require("node:test");
 
 process.env.DATABASE_URL ||= "postgresql://test:test@localhost:5432/vsms_test";
 
-const { synchronizeStaffAccess } = require("../services/cognitoStaffAccessService");
+const { synchronizeStaffAccess } = require("../../services/cognitoStaffAccessService");
 
 class FakeCognitoClient {
   constructor({ exists = true, groups = [] } = {}) {

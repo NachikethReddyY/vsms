@@ -4,8 +4,8 @@ const test = require("node:test");
 
 process.env.DATABASE_URL ||= "postgresql://test:test@localhost:5432/vsms_test";
 
-const { encrypt, encryptionContext } = require("../utils/cryptoUtils");
-const qrService = require("../services/qrService");
+const { encrypt, encryptionContext } = require("../../utils/cryptoUtils");
+const qrService = require("../../services/qrService");
 
 const eventId = "11111111-1111-4111-8111-111111111111";
 const registrationId = "22222222-2222-4222-8222-222222222222";
@@ -169,8 +169,8 @@ test("generated QR passes retain only a hash and authenticated ciphertext", asyn
   assert.equal(Object.hasOwn(result, "targetUrl"), false);
   assert.match(result.qrImage, /^data:image\/svg\+xml;base64,/);
   const branded = Buffer.from(result.qrImage.split(",")[1], "base64").toString("utf8");
-  assert.match(branded, /VSMS/);
-  assert.match(branded, /SECURE EVENT PASS/);
+  assert.match(branded, /^<svg/);
+  assert.doesNotMatch(branded, /VSMS|SECURE EVENT PASS/);
 });
 
 test("serialized concurrent first issuance returns one database pass", async () => {
@@ -226,7 +226,50 @@ test("download renders an active pass from encrypted storage without returning i
   assert.equal(Object.hasOwn(result, "targetUrl"), false);
   assert.match(result.qrImage, /^data:image\/svg\+xml;base64,/);
   const branded = Buffer.from(result.qrImage.split(",")[1], "base64").toString("utf8");
-  assert.match(branded, /VSMS/);
+  assert.match(branded, /^<svg/);
+  assert.doesNotMatch(branded, /VSMS|SECURE EVENT PASS/);
+});
+
+test("handoff QR encodes a station URL pre-loaded with the registration, exposing no bearer", async () => {
+  const token = "f".repeat(64);
+  let where;
+  const db = {
+    qRCodePass: {
+      findFirst: async (query) => {
+        where = query.where;
+        return { registration: { registrationId, eventId } };
+      },
+    },
+  };
+
+  const result = await qrService.getStationHandoffQR(token, "VISUAL_ACUITY", db);
+  assert.equal(where.tokenHash, tokenHash(token));
+  assert.equal(where.isActive, true);
+
+  const svg = Buffer.from(result.qrImage.split(",")[1], "base64").toString("utf8");
+  assert.match(result.qrImage, /^data:image\/svg\+xml;base64,/);
+  assert.match(svg, /^<svg/);
+  assert.doesNotMatch(svg, new RegExp(token));
+  assert.doesNotMatch(svg, /VSMS|SECURE EVENT PASS/);
+});
+
+test("handoff QR target URL resolves to the selected station pre-loaded with the registration", async () => {
+  const url = qrService.buildStationHandoffUrl(eventId, registrationId, "REFRACTION");
+  assert.match(url, new RegExp(`^https?://[^/]+/events/${eventId}/stations/refraction\\?registrationId=${registrationId}$`));
+  assert.equal(qrService.buildStationHandoffUrl(eventId, registrationId, "EYE_HEALTH"), null);
+  assert.equal(qrService.buildStationHandoffUrl(eventId, registrationId, "VISUAL_ACUITY").includes("visual-acuity"), true);
+  assert.equal(qrService.buildStationHandoffUrl(eventId, registrationId, "COLOUR_VISION").includes("colour-vision"), true);
+});
+
+test("handoff QR rejects an unsupported station type and an inactive pass", async () => {
+  await assert.rejects(
+    qrService.getStationHandoffQR("a".repeat(64), "EYE_HEALTH"),
+    (error) => error.code === "STATION_UNSUPPORTED" && error.status === 400,
+  );
+  await assert.rejects(
+    qrService.getStationHandoffQR("b".repeat(64), "VISUAL_ACUITY", { qRCodePass: { findFirst: async () => null } }),
+    (error) => error.code === "INVALID_QR" && error.status === 404,
+  );
 });
 
 test("verification rejects any pass that does not satisfy the shared active-expiry predicate", async () => {

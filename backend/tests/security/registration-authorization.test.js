@@ -4,8 +4,8 @@ const crypto = require("node:crypto");
 
 process.env.DATABASE_URL ||= "postgresql://test:test@localhost:5432/vsms_test";
 
-const { assertRegistrationAssignment } = require("../utils/staff");
-const { getEventIdForAccess } = require("../services/qrService");
+const { assertRegistrationAssignment } = require("../../utils/staff");
+const { getEventIdForAccess } = require("../../services/qrService");
 
 test("registration requires a non-admin role and a current event assignment", async () => {
   const eventId = crypto.randomUUID();

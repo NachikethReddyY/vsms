@@ -2,7 +2,7 @@ process.env.NODE_ENV = "test";
 
 const test = require("node:test");
 const assert = require("node:assert/strict");
-const { errorHandler } = require("../middlewares/errorHandler");
+const { errorHandler } = require("../../middlewares/errorHandler");
 
 test("unknown errors never expose their message and only honor bounded status hints", () => {
   let statusCode;

@@ -7,7 +7,7 @@ const test = require("node:test");
 
 process.env.DATABASE_URL ||= "postgresql://test:test@localhost:5432/vsms_test";
 
-const { storeSignature } = require("../utils/signatureStorage");
+const { storeSignature } = require("../../utils/signatureStorage");
 const {
   TYPES,
   collectEventArtifactTasks,
@@ -16,7 +16,7 @@ const {
   maintainArtifactCleanupTask,
   processArtifactCleanupTasks,
   removeTaskArtifact,
-} = require("../services/artifactCleanupService");
+} = require("../../services/artifactCleanupService");
 
 const png = () => {
   const buffer = Buffer.alloc(128);

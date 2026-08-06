@@ -3,7 +3,7 @@ const { spawnSync } = require("node:child_process");
 const path = require("node:path");
 const test = require("node:test");
 
-const backend = path.resolve(__dirname, "..");
+const backend = path.resolve(__dirname, "../..");
 
 function loadConfig(overrides) {
   return spawnSync(process.execPath, ["-e", "require('./config/env')"], {
