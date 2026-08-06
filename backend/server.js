@@ -21,7 +21,9 @@ server.on("error", (error) => {
 if (require.main === module) {
   server.listen(env.PORT, env.HOST, () => {
     const protocol = useHttps ? "https" : "http";
-    logger.info(`Server running on ${protocol}://${env.HOST}:${env.PORT}`);
+    const serverUrl = `${protocol}://${env.HOST}:${env.PORT}`;
+
+    logger.info(`Server & WebSocket engine running securely on ${serverUrl}`);
   });
 }
 
