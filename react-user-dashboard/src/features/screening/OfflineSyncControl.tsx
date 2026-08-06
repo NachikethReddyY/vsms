@@ -1,13 +1,33 @@
+import { useEffect } from 'react';
 import { ArrowDownTrayIcon, ArrowPathIcon, ExclamationTriangleIcon } from '@heroicons/react/24/outline';
 import { useOfflineSync } from './OfflineSyncProvider';
 
+const QUIET_REFRESH_MS = 5 * 60 * 1000;
+
 export function OfflineSyncControl({ eventId }: { eventId: string }) {
-  const { online, statusFor, downloadEvent, syncEvent } = useOfflineSync();
+  const { online, statusFor, downloadEvent, syncEvent, ensureOfflineReady } = useOfflineSync();
   const status = statusFor(eventId);
   const working = status.downloading || status.syncing;
   const hasAttention = status.conflicts > 0;
+
+  // Prefetch (or refresh) as soon as a screener opens this event while online.
+  useEffect(() => {
+    if (!eventId || !online) return;
+    void ensureOfflineReady(eventId);
+  }, [ensureOfflineReady, eventId, online]);
+
+  // Keep the assigned-station snapshot fresh while the tablet stays on this event.
+  useEffect(() => {
+    if (!eventId || !online) return undefined;
+    const timer = window.setInterval(() => {
+      if (!navigator.onLine) return;
+      void ensureOfflineReady(eventId, { refreshIfPresent: true });
+    }, QUIET_REFRESH_MS);
+    return () => window.clearInterval(timer);
+  }, [ensureOfflineReady, eventId, online]);
+
   const label = status.downloading
-    ? 'Downloading'
+    ? 'Preparing offline'
     : status.syncing
       ? 'Syncing'
       : hasAttention
@@ -15,18 +35,20 @@ export function OfflineSyncControl({ eventId }: { eventId: string }) {
         : status.pending > 0
           ? `${status.pending} pending`
           : status.downloaded
-            ? 'Offline copy'
+            ? 'Offline ready'
             : online
-              ? 'Download offline'
+              ? 'Retry offline prep'
               : 'Offline unavailable';
-  const action = status.downloaded ? () => void syncEvent(eventId) : () => void downloadEvent(eventId);
+  const action = status.downloaded
+    ? () => void syncEvent(eventId)
+    : () => void downloadEvent(eventId);
   const disabled = working || (!status.downloaded && !online);
   const title = status.error
     ?? (hasAttention
       ? 'One or more offline results need staff attention before they can be sent. Open the station, fix the flagged save, then sync again.'
       : status.downloaded
-        ? 'Sync downloaded screening data now.'
-        : 'Download your assigned station queues for temporary offline use.');
+        ? 'Offline pack is ready. Tap to sync pending results now.'
+        : 'Assigned station queues download automatically while you are online. Tap to retry if preparation failed.');
 
   return (
     <div className={`workspace-sync-control${hasAttention ? ' has-attention' : ''}`}>
