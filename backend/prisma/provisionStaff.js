@@ -30,6 +30,8 @@ async function main() {
             fullName,
             employeeNumber,
             status: "ACTIVE",
+            approvalState: "APPROVED",
+            accessState: "ENABLED",
             sysRole: systemRoleFor(roleName),
         },
         create: {
@@ -38,6 +40,8 @@ async function main() {
             fullName,
             employeeNumber,
             status: "ACTIVE",
+            approvalState: "APPROVED",
+            accessState: "ENABLED",
             sysRole: systemRoleFor(roleName),
         },
     });
