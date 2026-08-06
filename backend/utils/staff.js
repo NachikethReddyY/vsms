@@ -1,5 +1,6 @@
 const prisma = require("../prisma/prismaClient");
 const { APPLICATION_ROLES, normalizeApplicationRole, rolesFromCognitoGroups } = require("./roles");
+const eventAuthorization = require("../services/eventAuthorizationService");
 
 const ALLOWED_ROLES = APPLICATION_ROLES;
 
@@ -8,83 +9,20 @@ function normalizeRole(role) {
 }
 
 async function assertRegistrationAssignment(db, eventId, auth) {
-    const roles = auth?.roles || [];
-    if (roles.includes("ADMINISTRATOR") || !roles.includes("REGISTRATION_OFFICER")) {
-        const error = new Error("A registration officer account role is required");
-        error.statusCode = 403;
-        throw error;
-    }
-    const now = new Date();
-    const assignment = await db.staffAssignment.findFirst({
-        where: {
-            ...(eventId ? { eventId } : {}),
-            userId: auth.userId,
-            assignmentRole: "REGISTRATION",
-            status: { in: ["ASSIGNED", "CONFIRMED"] },
-            shift: {
-                ...(eventId ? { eventId } : {}),
-                status: "ACTIVE",
-                startsAt: { lte: now },
-                endsAt: { gt: now },
-            },
-        },
-        select: { id: true },
-    });
-    if (!assignment) {
-        const error = new Error(eventId
-            ? "An active registration assignment is required for this event"
-            : "An active registration assignment is required");
-        error.statusCode = 403;
-        throw error;
-    }
+    return eventAuthorization.requireEventRoleAndDuty(eventId, auth?.user || auth, "REGISTRATION", { db });
 }
 
 async function assertScreenerAssignment(db, eventId, auth, stationId) {
-    const roles = auth?.roles || [];
-    if (roles.includes("ADMINISTRATOR") || !roles.includes("SCREENER")) {
-        const error = new Error("A screener account role is required");
-        error.statusCode = 403;
-        throw error;
-    }
-    const now = new Date();
-    const assignment = await db.staffAssignment.findFirst({
-        where: {
-            ...(eventId ? { eventId } : {}),
-            userId: auth.userId,
-            assignmentRole: "SCREENER",
-            status: { in: ["ASSIGNED", "CONFIRMED"] },
-            ...(stationId ? { stationId } : {}),
-            shift: {
-                ...(eventId ? { eventId } : {}),
-                status: "ACTIVE",
-                startsAt: { lte: now },
-                endsAt: { gt: now },
-            },
-        },
-        select: { id: true },
-    });
-    if (!assignment) {
-        const error = new Error(eventId
-            ? "An active screener assignment is required for this event"
-            : "An active screener assignment is required");
-        error.statusCode = 403;
-        throw error;
-    }
+    return eventAuthorization.requireEventRoleAndDuty(eventId, auth?.user || auth, "SCREENER", { db, stationId });
 }
 
 async function assertQrVerifyAccess(db, eventId, auth) {
-    const roles = auth?.roles || [];
-    if (roles.includes("REGISTRATION_OFFICER") && !roles.includes("ADMINISTRATOR")) {
-        await assertRegistrationAssignment(db, eventId, auth);
-        return;
+    const user = auth?.user || auth;
+    const membership = await eventAuthorization.requireEventRoles(eventId, user, ["REGISTRATION", "SCREENER"], { db });
+    if (membership.roles.has("REGISTRATION")) {
+        try { return await eventAuthorization.requireCurrentDuty(eventId, user, "REGISTRATION", { db }); } catch (_error) {}
     }
-    if (roles.includes("SCREENER") && !roles.includes("ADMINISTRATOR")) {
-        await assertScreenerAssignment(db, eventId, auth);
-        return;
-    }
-    const error = new Error("A registration officer or screener account role is required");
-    error.statusCode = 403;
-    throw error;
+    return eventAuthorization.requireCurrentDuty(eventId, user, "SCREENER", { db });
 }
 
 async function syncLocalUser(profile, { allowCreate = false } = {}) {

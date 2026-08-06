@@ -228,10 +228,12 @@ export default function EventDetailPage() {
     setDeletePending(true);
     setDeleteError('');
     try {
+      const preview = await eventApi.deletionPreview(event.eventId);
       await eventApi.delete(event.eventId, {
         version: event.version,
         confirmationName: deleteConfirmation,
         acknowledgePermanentDeletion: true,
+        previewToken: preview.previewToken,
       });
       window.sessionStorage.removeItem('vsms_event_id');
       navigate('/events', { replace: true });

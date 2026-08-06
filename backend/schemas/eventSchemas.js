@@ -142,6 +142,7 @@ const validateEventRange = (value, ctx) => {
 
 const createEventBody = z.object({
   ...eventFields,
+  firstManagerUserId: uuid.optional(),
   eventDays: z.array(eventDayInput).min(1).max(31).optional(),
   stations: z.array(eventStationInput).max(50).optional(),
   shifts: z.array(shiftInput).max(50).default([]),
@@ -193,6 +194,21 @@ const deleteEventBody = z.object({
   // Deliberately do not trim: this must be an exact acknowledgement of the event name.
   confirmationName: z.string().min(1).max(150),
   acknowledgePermanentDeletion: z.literal(true),
+  previewToken: z.string().min(32).max(4096),
+}).strict();
+
+const membershipRole = z.enum(["EVENT_MANAGER", "REGISTRATION", "SCREENER", "REVIEWER", "SUPPORT"]);
+const membershipParams = z.object({ eventId: uuid, membershipId: uuid }).strict();
+const membershipRoleParams = z.object({ eventId: uuid, membershipId: uuid, role: membershipRole }).strict();
+const membershipBody = z.object({
+  userId: uuid,
+  roles: z.array(membershipRole).min(1).max(5).refine((roles) => new Set(roles).size === roles.length, "Roles must be unique"),
+}).strict();
+const membershipRemovalBody = z.object({ reason: z.string().trim().min(3).max(500) }).strict();
+const membershipRoleBody = z.object({ role: membershipRole }).strict();
+const eligibleUsersQuery = z.object({
+  search: z.string().trim().min(2).max(150).optional(),
+  limit: z.coerce.number().int().min(1).max(200).default(100),
 }).strict();
 
 const eventParams = z.object({ eventId: uuid }).strict();
@@ -276,4 +292,10 @@ module.exports = {
   stationParams,
   stationImportBody,
   stationUpdateBody,
+  membershipParams,
+  membershipRoleParams,
+  membershipBody,
+  membershipRemovalBody,
+  membershipRoleBody,
+  eligibleUsersQuery,
 };

@@ -6,14 +6,15 @@ const {
   classifyTemplates,
   stationTypeForTemplateKey,
 } = require("./stationTemplateMapping");
-const { ASSIGNMENT_APPLICATION_ROLES } = require("../utils/roles");
 const {
   enqueueEventArtifactCleanup,
   processArtifactCleanupTasks,
+  collectEventArtifactTasks,
 } = require("./artifactCleanupService");
 const { createExportReceipt } = require("../utils/eventExportReceipt");
 const { resolveAuditContext } = require("../utils/audit");
 const env = require("../config/env");
+const { eventVisibilityWhere } = require("./eventAuthorizationService");
 
 const EVENT_FIELDS = [
   "name", "description", "bannerKey", "artworkDataUrl", "venue", "address", "postalCode",
@@ -116,6 +117,10 @@ const eventInclude = {
     // Venue occupancy must be derived from an actual check-in, never from a signup.
     where: { registrationStatus: "CHECKED_IN" },
     select: { registrationId: true, registrationStatus: true },
+  },
+  memberships: {
+    where: { status: "ACTIVE" },
+    select: { userId: true, roles: { select: { role: true } } },
   },
   _count: { select: { registrations: { where: { registrationStatus: { not: "CANCELLED" } } } } },
 };
@@ -304,16 +309,7 @@ const toEventResponse = async (event, user, db = prisma, options = {}) => {
 };
 
 const visibilityWhere = (user) => {
-  // Assuming SUPER_ADMIN handles full access based on your schema enum SystemRole
-  if (user.systemRole === "SUPER_ADMIN" || user.systemRole === "ADMIN") return {};
-  const assigned = {
-    staffAssignments: {
-      some: { userId: user.userId, status: { in: ACTIVE_ASSIGNMENT_STATUSES } },
-    },
-  };
-  return user.systemRole === "EVENT_MANAGER"
-    ? { OR: [{ createdByUserId: user.userId }, assigned] }
-    : assigned;
+  return eventVisibilityWhere(user);
 };
 
 const loadEventWithAssignment = (eventId, user, db = prisma) =>
@@ -323,18 +319,10 @@ const loadEventWithAssignment = (eventId, user, db = prisma) =>
   });
 
 const canManage = (event, user) =>
-  user.systemRole === "SUPER_ADMIN" ||
-  user.systemRole === "ADMIN" ||
-  (user.systemRole === "EVENT_MANAGER" &&
-    (event.createdByUserId === user.userId ||
-      event.shifts.some((shift) =>
-        shift.staffAssignments.some(
-          (assignment) =>
-            assignment.userId === user.userId &&
-            assignment.assignmentRole === "EVENT_MANAGER" &&
-            ["ASSIGNED", "CONFIRMED"].includes(assignment.status)
-        )
-      )));
+  (event.memberships || []).some((membership) => (
+    membership.userId === user.userId
+    && membership.roles.some(({ role }) => role === "EVENT_MANAGER")
+  ));
 
 const requireEvent = async (eventId, user, manage = false, db = prisma) => {
   const event = await loadEventWithAssignment(eventId, user, db);
@@ -503,16 +491,31 @@ const assertAssignmentSchedulesAvailable = async (tx, eventId, shifts) => {
   await lockStaffSchedules(tx, schedules.map(({ userId }) => userId));
 
   const activeUsers = await tx.user.findMany({
-    where: { id: { in: [...new Set(schedules.map(({ userId }) => userId))] }, status: "ACTIVE" },
-    select: { id: true, userRoles: { select: { role: { select: { roleName: true } } } } },
+    where: {
+      id: { in: [...new Set(schedules.map(({ userId }) => userId))] },
+      status: "ACTIVE",
+      approvalState: "APPROVED",
+      accessState: "ENABLED",
+      deprovisionedAt: null,
+    },
+    select: {
+      id: true,
+      eventMemberships: {
+        where: { eventId, status: "ACTIVE" },
+        select: { roles: { select: { role: true } } },
+      },
+    },
   });
   if (activeUsers.length !== new Set(schedules.map(({ userId }) => userId)).size) {
     throw new AppError(422, "STAFF_NOT_AVAILABLE", "One or more selected staff members are unavailable");
   }
-  const rolesByUser = new Map(activeUsers.map((member) => [member.id, new Set(member.userRoles.map(({ role }) => role.roleName))]));
+  const rolesByUser = new Map(activeUsers.map((member) => [
+    member.id,
+    new Set(member.eventMemberships.flatMap((membership) => membership.roles.map(({ role }) => role))),
+  ]));
   if (schedules.some(({ userId, assignmentRole }) => {
     const roles = rolesByUser.get(userId);
-    return roles?.has("ADMINISTRATOR") || !roles?.has(ASSIGNMENT_APPLICATION_ROLES[assignmentRole]);
+    return !roles?.has(assignmentRole);
   })) {
     throw new AppError(422, "STAFF_ROLE_MISMATCH", "A selected staff member does not hold the required account role");
   }
@@ -654,7 +657,7 @@ const createShiftAssignments = async (tx, eventId, shiftInputs, stationsByTempla
 };
 
 const createEvent = async (body, user, correlationId, rawIdempotencyKey, db = prisma) => {
-  if (!["ADMIN", "EVENT_MANAGER"].includes(user.systemRole)) {
+  if (user.systemRole !== "ADMIN" || !user.roles?.includes("ADMINISTRATOR")) {
     throw new AppError(403, "FORBIDDEN", "You do not have permission to create events");
   }
   const idempotencyKey = rawIdempotencyKey && /^[A-Za-z0-9_-]{8,100}$/.test(rawIdempotencyKey) ? rawIdempotencyKey : null;
@@ -687,6 +690,46 @@ const createEvent = async (body, user, correlationId, rawIdempotencyKey, db = pr
         shifts: { create: (body.shifts || []).map((shift) => ({ ...normalizeShift(shift), eventId: undefined })) },
       },
     });
+
+    const firstManagerUserId = body.firstManagerUserId || user.userId;
+    const managerIds = [...new Set([user.userId, firstManagerUserId])];
+    const eligibleManagers = await tx.user.count({
+      where: {
+        id: { in: managerIds },
+        status: "ACTIVE",
+        approvalState: "APPROVED",
+        accessState: "ENABLED",
+        deprovisionedAt: null,
+      },
+    });
+    if (eligibleManagers !== managerIds.length) {
+      throw new AppError(422, "FIRST_MANAGER_NOT_ELIGIBLE", "The first event manager must have an approved and enabled account");
+    }
+    for (const userId of managerIds) {
+      await tx.eventMembership.create({
+        data: {
+          eventId: created.eventId,
+          userId,
+          addedById: user.userId,
+          roles: { create: { role: "EVENT_MANAGER", assignedById: user.userId } },
+        },
+      });
+    }
+
+    // Initial wizard duties are dual-written because no membership endpoint can
+    // be called before the event exists. Subsequent duties require an existing role.
+    for (const assignment of (body.shifts || []).flatMap((shift) => shift.assignments || [])) {
+      const membership = await tx.eventMembership.upsert({
+        where: { eventId_userId: { eventId: created.eventId, userId: assignment.userId } },
+        update: { status: "ACTIVE", removedById: null, removedAt: null, removalReason: null },
+        create: { eventId: created.eventId, userId: assignment.userId, addedById: user.userId },
+      });
+      await tx.eventMembershipRole.upsert({
+        where: { membershipId_role: { membershipId: membership.id, role: assignment.assignmentRole } },
+        update: {},
+        create: { membershipId: membership.id, role: assignment.assignmentRole, assignedById: user.userId },
+      });
+    }
 
     const daysByDate = await createEventDays(tx, created.eventId, body.eventDays);
     const stationsByTemplate = await createEventStations(tx, created.eventId, body.stations, daysByDate, templatesById);
@@ -1198,11 +1241,163 @@ const assertNoCrossEventReferences = async (tx, eventId) => {
   }
 };
 
-const deleteEvent = async (eventId, body, user, correlationId, db = prisma) => {
+const canonicalJson = (value) => {
+  if (Array.isArray(value)) return value.map(canonicalJson);
+  if (value && typeof value === "object") {
+    return Object.fromEntries(Object.keys(value).sort().map((key) => [key, canonicalJson(value[key])]));
+  }
+  return value;
+};
+
+const impactDigest = (impact) => crypto.createHash("sha256")
+  .update(JSON.stringify(canonicalJson(impact)))
+  .digest("hex");
+
+const signDeletionPreview = (claims) => {
+  const payload = Buffer.from(JSON.stringify(claims)).toString("base64url");
+  const signature = crypto.createHmac("sha256", env.jwtAccessSecret).update(payload).digest("base64url");
+  return `${payload}.${signature}`;
+};
+
+const verifyDeletionPreview = (token, eventId, userId, version, now = new Date()) => {
+  const [payload, signature, extra] = String(token || "").split(".");
+  if (!payload || !signature || extra) throw new AppError(422, "INVALID_DELETION_PREVIEW_TOKEN", "Deletion preview token is invalid");
+  const expected = crypto.createHmac("sha256", env.jwtAccessSecret).update(payload).digest();
+  let supplied;
+  try { supplied = Buffer.from(signature, "base64url"); } catch { supplied = Buffer.alloc(0); }
+  if (supplied.length !== expected.length || !crypto.timingSafeEqual(supplied, expected)) {
+    throw new AppError(422, "INVALID_DELETION_PREVIEW_TOKEN", "Deletion preview token is invalid");
+  }
+  let claims;
+  try { claims = JSON.parse(Buffer.from(payload, "base64url").toString("utf8")); } catch {
+    throw new AppError(422, "INVALID_DELETION_PREVIEW_TOKEN", "Deletion preview token is invalid");
+  }
+  if (claims.eventId !== eventId || claims.adminId !== userId || claims.version !== version) {
+    throw new AppError(422, "DELETION_PREVIEW_MISMATCH", "Deletion preview does not match this event, administrator, or version");
+  }
+  if (!Number.isInteger(claims.expiresAt) || claims.expiresAt <= now.getTime()) {
+    throw new AppError(409, "DELETION_PREVIEW_EXPIRED", "Deletion preview has expired");
+  }
+  return claims;
+};
+
+const collectDeletionEntityIds = async (tx, eventId) => {
+  const [registrations, stations, queues, screenings, reviews, referrals, documents, consents, qrCodes, signatures] = await Promise.all([
+    tx.eventRegistration.findMany({ where: { eventId }, select: { registrationId: true } }),
+    tx.station.findMany({ where: { eventId }, select: { stationId: true } }),
+    tx.queueEntry.findMany({ where: { registration: { eventId } }, select: { id: true } }),
+    tx.screeningResult.findMany({ where: { registration: { eventId } }, select: { resultId: true } }),
+    tx.review.findMany({ where: { registration: { eventId } }, select: { reviewId: true } }),
+    tx.referral.findMany({ where: { review: { registration: { eventId } } }, select: { referralId: true } }),
+    tx.documentArtifact.findMany({ where: { review: { registration: { eventId } } }, select: { documentId: true } }),
+    tx.participantConsent.findMany({ where: { eventId }, select: { id: true } }),
+    tx.qRCodePass.findMany({ where: { registration: { eventId } }, select: { id: true } }),
+    tx.signatureArtifact.findMany({ where: { eventId }, select: { id: true } }),
+  ]);
+  return {
+    registrations: registrations.map(({ registrationId }) => registrationId),
+    stations: stations.map(({ stationId }) => stationId),
+    queues: queues.map(({ id }) => id),
+    screenings: screenings.map(({ resultId }) => resultId),
+    reviews: reviews.map(({ reviewId }) => reviewId),
+    referrals: referrals.map(({ referralId }) => referralId),
+    documents: documents.map(({ documentId }) => documentId),
+    consents: consents.map(({ id }) => id),
+    qrCodes: qrCodes.map(({ id }) => id),
+    signatures: signatures.map(({ id }) => id),
+  };
+};
+
+const deletionImpact = async (tx, event, entityIds = null) => {
+  const ids = entityIds || await collectDeletionEntityIds(tx, event.eventId);
+  let blocker = null;
+  try { await assertNoCrossEventReferences(tx, event.eventId); } catch (error) {
+    if (error.code !== "EVENT_DELETE_INTEGRITY_CONFLICT") throw error;
+    blocker = { code: error.code, message: error.message };
+  }
+  const [emails, cleanup, artifactTasks, reportCount, activeReportJobs] = await Promise.all([
+    tx.notificationDelivery.count({ where: { OR: [
+      { referral: { review: { registration: { eventId: event.eventId } } } },
+      { document: { review: { registration: { eventId: event.eventId } } } },
+    ] } }),
+    tx.artifactCleanupTask.count({ where: { eventId: event.eventId } }),
+    collectEventArtifactTasks(tx, event.eventId),
+    tx.reportExportJob.count({ where: { eventId: event.eventId } }),
+    tx.reportExportJob.count({ where: { eventId: event.eventId, status: { in: ["QUEUED", "GENERATING"] } } }),
+  ]);
+  const counts = {
+    registrations: ids.registrations.length,
+    queues: ids.queues.length,
+    screenings: ids.screenings.length,
+    reviews: ids.reviews.length,
+    files: artifactTasks.length,
+    emails,
+    cleanup,
+    reports: reportCount,
+  };
+  const blockers = [blocker, activeReportJobs ? {
+    code: "ACTIVE_REPORT_JOBS",
+    message: "Active report jobs must finish or be cancelled before deletion",
+    count: activeReportJobs,
+  } : null].filter(Boolean);
+  return {
+    eventId: event.eventId,
+    eventName: event.name,
+    status: event.status,
+    version: event.version,
+    counts,
+    blockers,
+  };
+};
+
+const assertDeletionAdministrator = (user) => {
   if (user.systemRole !== "ADMIN" || !user.roles?.includes("ADMINISTRATOR")) {
     throw new AppError(403, "FORBIDDEN", "Only an administrator can permanently delete an event");
   }
-  const current = await requireEvent(eventId, user, true, db);
+};
+
+const previewEventDeletion = async (eventId, user, db = prisma, now = new Date()) => {
+  assertDeletionAdministrator(user);
+  const event = await db.event.findUnique({ where: { eventId }, select: { eventId: true, name: true, status: true, version: true } });
+  if (!event) throw new AppError(404, "EVENT_NOT_FOUND", "Event was not found");
+  if (!["COMPLETED", "CANCELLED"].includes(event.status)) {
+    throw new AppError(409, "EVENT_NOT_TERMINAL", "Only completed or cancelled events can be permanently deleted");
+  }
+  const impact = await deletionImpact(db, event);
+  const digest = impactDigest(impact);
+  const expiresAt = new Date(now.getTime() + 5 * 60_000);
+  return {
+    ...impact,
+    impactDigest: digest,
+    previewExpiresAt: expiresAt,
+    previewToken: signDeletionPreview({ eventId, adminId: user.userId, version: event.version, impactDigest: digest, expiresAt: expiresAt.getTime() }),
+  };
+};
+
+const cleanupStateFor = async (eventId, db = prisma) => {
+  const tasks = await db.artifactCleanupTask.findMany({ where: { eventId }, select: { status: true } });
+  if (tasks.some(({ status }) => ["ESCALATED", "FAILED"].includes(status))) return "NEEDS_ATTENTION";
+  if (tasks.some(({ status }) => ["PENDING", "PROCESSING"].includes(status))) return "QUEUED";
+  return "COMPLETED";
+};
+
+const getEventDeletionCleanupStatus = async (eventId, user, db = prisma) => {
+  assertDeletionAdministrator(user);
+  const tasks = await db.artifactCleanupTask.findMany({
+    where: { eventId },
+    select: { id: true, artifactType: true, status: true, attemptCount: true, lastError: true, completedAt: true },
+    orderBy: { createdAt: "asc" },
+  });
+  const deletedAudit = await db.eventAuditLog.findFirst({ where: { eventId, action: "DELETED" }, select: { eventAuditLogId: true } });
+  if (!deletedAudit && tasks.length === 0) throw new AppError(404, "EVENT_DELETION_NOT_FOUND", "No event deletion record was found");
+  return { eventId, cleanupState: await cleanupStateFor(eventId, db), tasks };
+};
+
+const deleteEvent = async (eventId, body, user, correlationId, db = prisma) => {
+  assertDeletionAdministrator(user);
+  const claims = verifyDeletionPreview(body.previewToken, eventId, user.userId, body.version);
+  const current = await db.event.findUnique({ where: { eventId }, include: eventInclude });
+  if (!current) throw new AppError(404, "EVENT_NOT_FOUND", "Event was not found");
   if (!['COMPLETED', 'CANCELLED'].includes(current.status)) {
     throw new AppError(409, "EVENT_NOT_TERMINAL", "Only completed or cancelled events can be permanently deleted");
   }
@@ -1211,6 +1406,19 @@ const deleteEvent = async (eventId, body, user, correlationId, db = prisma) => {
   }
 
   const deletion = await db.$transaction(async (tx) => {
+    const transactionEvent = await tx.event.findUnique({ where: { eventId }, include: eventInclude });
+    if (!transactionEvent || transactionEvent.version !== body.version || transactionEvent.status !== current.status) {
+      throw new AppError(409, "STALE_EVENT_VERSION", "This event was changed by someone else");
+    }
+    const entityIds = await collectDeletionEntityIds(tx, eventId);
+    const impact = await deletionImpact(tx, transactionEvent, entityIds);
+    const digest = impactDigest(impact);
+    if (digest !== claims.impactDigest) {
+      throw new AppError(409, "DELETION_IMPACT_CHANGED", "Deletion impact changed; review a new preview before deleting");
+    }
+    if (impact.blockers.length) {
+      throw new AppError(409, "EVENT_DELETE_BLOCKED", "Event deletion is blocked", { blockers: impact.blockers });
+    }
     // Claim the exact state before removing children so a stale administrator cannot delete a changed event.
     const claimed = await tx.event.updateMany({
       where: { eventId, version: body.version, status: current.status },
@@ -1240,7 +1448,19 @@ const deleteEvent = async (eventId, body, user, correlationId, db = prisma) => {
     await tx.signatureArtifact.deleteMany({ where: { eventId } });
     await tx.registrationStatusHistory.deleteMany({ where: { registration: { eventId } } });
     await tx.screeningResult.deleteMany({ where: { registration: { eventId } } });
-    await tx.syncAction.deleteMany({ where: { eventId } });
+    const historicalSyncScopes = [
+      ["ScreeningResult", [...entityIds.registrations, ...entityIds.screenings]],
+      ["EventRegistration", entityIds.registrations],
+      ["Station", entityIds.stations],
+      ["QueueEntry", entityIds.queues],
+      ["Review", entityIds.reviews],
+      ["Referral", entityIds.referrals],
+      ["DocumentArtifact", entityIds.documents],
+      ["ParticipantConsent", entityIds.consents],
+      ["QRCodePass", entityIds.qrCodes],
+      ["SignatureArtifact", entityIds.signatures],
+    ].filter(([, ids]) => ids.length).map(([entityType, ids]) => ({ eventId: null, entityType, entityId: { in: ids } }));
+    await tx.syncAction.deleteMany({ where: { OR: [{ eventId }, ...historicalSyncScopes] } });
     await tx.scanLog.deleteMany({ where: { OR: [{ registration: { eventId } }, { station: { eventId } }] } });
     await tx.qRCodePass.deleteMany({ where: { registration: { eventId } } });
     await tx.queueMovement.deleteMany({ where: { registration: { eventId } } });
@@ -1257,8 +1477,20 @@ const deleteEvent = async (eventId, body, user, correlationId, db = prisma) => {
     await tx.eventDay.deleteMany({ where: { eventId } });
     await tx.station.deleteMany({ where: { eventId } });
 
-    // Event audit rows deliberately outlive the event. The migration removes
-    // their event FK, so an immutable evidence trail remains after deletion.
+    await tx.eventAuditLog.create({
+      data: {
+        eventId,
+        actorUserId: user.userId,
+        action: "DELETED",
+        beforeSnapshot: snapshot(transactionEvent),
+        afterSnapshot: {
+          impact,
+          impactDigest: digest,
+          confirmation: { exactName: true, permanentDeletionAcknowledged: true, previewBound: true, version: body.version },
+        },
+        correlationId: requestIdFor(correlationId),
+      },
+    });
 
     const deleted = await tx.event.deleteMany({
       where: { eventId, version: body.version + 1, status: current.status },
@@ -1273,12 +1505,12 @@ const deleteEvent = async (eventId, body, user, correlationId, db = prisma) => {
         resource: "Event",
         entityName: "Event",
         entityId: eventId,
-        details: { status: current.status, version: body.version },
+        details: { status: current.status, version: body.version, impact, impactDigest: digest, confirmation: "EXACT_NAME_AND_SIGNED_PREVIEW" },
         ...await auditFields(tx, user, correlationId),
       },
     });
     return { result: { eventId, deleted: true }, cleanupTaskCount };
-  });
+  }, { isolationLevel: "Serializable" });
 
   if (deletion.cleanupTaskCount > 0) {
     await processArtifactCleanupTasks({ eventId }).catch((error) => {
@@ -1286,7 +1518,7 @@ const deleteEvent = async (eventId, body, user, correlationId, db = prisma) => {
       console.error("Post-delete artifact cleanup deferred", { eventId, code: error?.code || "ARTIFACT_CLEANUP_FAILED" });
     });
   }
-  return deletion.result;
+  return { ...deletion.result, cleanupState: await cleanupStateFor(eventId, db) };
 };
 
 const listStaffDirectory = async () => {
@@ -1473,14 +1705,19 @@ const addStaffAssignment = async (eventId, shiftId, body, user, correlationId, d
     await lockStaffSchedules(tx, [body.userId]);
 
     const activeUser = await tx.user.findFirst({
-      where: { id: body.userId, status: "ACTIVE" },
-      select: { id: true, userRoles: { select: { role: { select: { roleName: true } } } } },
+      where: {
+        id: body.userId,
+        status: "ACTIVE",
+        approvalState: "APPROVED",
+        accessState: "ENABLED",
+        deprovisionedAt: null,
+        eventMemberships: {
+          some: { eventId, status: "ACTIVE", roles: { some: { role: body.assignmentRole } } },
+        },
+      },
+      select: { id: true },
     });
     if (!activeUser) throw new AppError(422, "STAFF_NOT_AVAILABLE", "The selected staff member is unavailable");
-    const applicationRoles = new Set(activeUser.userRoles.map(({ role }) => role.roleName));
-    if (applicationRoles.has("ADMINISTRATOR") || !applicationRoles.has(ASSIGNMENT_APPLICATION_ROLES[body.assignmentRole])) {
-      throw new AppError(422, "STAFF_ROLE_MISMATCH", "The selected staff member does not hold the required account role");
-    }
 
     // Same shift + different station is allowed (VA / refraction / colour vision).
     // Conflict only when another overlapping shift already has this person, or this
@@ -1858,7 +2095,9 @@ module.exports = {
   updateEvent,
   transitionEvent,
   cancelEvent,
+  previewEventDeletion,
   deleteEvent,
+  getEventDeletionCleanupStatus,
   listStaffDirectory,
   listStationTemplates,
   importStations,
@@ -1873,4 +2112,5 @@ module.exports = {
   exportEvent,
   exportSnapshot,
   exportHashFor,
+  __deletionTest: { impactDigest, signDeletionPreview, verifyDeletionPreview },
 };

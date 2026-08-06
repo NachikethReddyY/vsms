@@ -50,6 +50,33 @@ test("participant detail scope rejects a participant linked only to another even
   );
 });
 
+test("participant search reuses registration or creator-owned onboarding scope and excludes consent", async (t) => {
+  const eventId = crypto.randomUUID();
+  const userId = crypto.randomUUID();
+  const captured = [];
+  replace(t, prisma.participant, "count", async ({ where }) => { captured.push(where); return 0; });
+  replace(t, prisma.participant, "findMany", async ({ where }) => { captured.push(where); return []; });
+
+  await participantService.searchParticipantsService({
+    query: { name: "Daniel" },
+    registrationEventId: eventId,
+    auth: { userId },
+  });
+
+  for (const where of captured) {
+    const scope = where.AND[1];
+    assert.deepEqual(scope.OR[0], { eventRegistrations: { some: { eventId } } });
+    assert.deepEqual(scope.OR[1], {
+      AND: [
+        { createdById: userId },
+        { onboardingEventId: eventId },
+        { eventRegistrations: { none: {} } },
+      ],
+    });
+    assert.equal(JSON.stringify(scope).includes("consents"), false);
+  }
+});
+
 test("participant profile service does not load data outside the current event", async (t) => {
   const participantId = crypto.randomUUID();
   const eventId = crypto.randomUUID();

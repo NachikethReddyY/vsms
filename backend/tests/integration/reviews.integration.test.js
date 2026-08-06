@@ -93,10 +93,6 @@ const uploadDecisionSignature = async (registrationId, token = reviewerToken) =>
 before(async () => {
   process.env.NODE_ENV = "test";
   process.env.LOCAL_HTTPS = "false";
-  const databaseUrl = new URL(process.env.DATABASE_URL);
-  if (!databaseUrl.pathname.endsWith("_test")) databaseUrl.pathname = `${databaseUrl.pathname}_test`;
-  process.env.DATABASE_URL = databaseUrl.toString();
-
   helpers = require("../helpers");
   app = require("../../app");
   prisma = helpers.prisma;
@@ -120,6 +116,19 @@ before(async () => {
     data: { name: "Review integration", venue: "Test hall", timezone: "Asia/Singapore", startsAt, endsAt, capacity: 50, status: "IN_PROGRESS", createdByUserId: testUsers.manager.id },
   });
   eventId = event.eventId;
+  const addMembership = (scopedEventId, member, roles) => prisma.eventMembership.create({
+    data: {
+      eventId: scopedEventId,
+      userId: member.id,
+      addedById: testUsers.manager.id,
+      roles: { create: roles.map((role) => ({ role, assignedById: testUsers.manager.id })) },
+    },
+  });
+  await addMembership(eventId, testUsers.manager, ["EVENT_MANAGER"]);
+  await addMembership(eventId, testUsers.reviewer, ["REVIEWER"]);
+  await addMembership(eventId, testUsers.screener, ["SCREENER"]);
+  await addMembership(eventId, testUsers.inactive, ["REVIEWER"]);
+  await addMembership(eventId, testUsers.inactiveShift, ["REVIEWER"]);
   const activeShift = await prisma.shift.create({ data: { eventId, name: "Active review", startsAt, endsAt, status: "ACTIVE" } });
   const inactiveShift = await prisma.shift.create({ data: { eventId, name: "Inactive review", startsAt, endsAt, status: "PLANNED" } });
   const stations = [];
@@ -148,6 +157,8 @@ before(async () => {
     data: { name: "Zero stations", venue: "Test hall", timezone: "Asia/Singapore", startsAt, endsAt, capacity: 5, status: "IN_PROGRESS", createdByUserId: testUsers.manager.id },
   });
   zeroStationEventId = zeroEvent.eventId;
+  await addMembership(zeroStationEventId, testUsers.manager, ["EVENT_MANAGER"]);
+  await addMembership(zeroStationEventId, testUsers.reviewer, ["REVIEWER"]);
   const zeroShift = await prisma.shift.create({ data: { eventId: zeroStationEventId, name: "Review", startsAt, endsAt, status: "ACTIVE" } });
   await prisma.staffAssignment.create({ data: { eventId: zeroStationEventId, userId: testUsers.reviewer.id, assignedBy: testUsers.manager.id, shiftId: zeroShift.shiftId, assignmentRole: "REVIEWER", status: "CONFIRMED", assignmentStatus: "CONFIRMED" } });
 });
@@ -173,8 +184,8 @@ describe("clinical review API", () => {
       const response = await request(app).get(`/api/events/${eventId}/reviews`).set(auth(helpers.accessTokenFor(testUsers[label])));
       expect(response.status).toBe(403);
       expect(response.body.code).toBe(["inactive", "inactiveShift"].includes(label)
-        ? "REVIEWER_ASSIGNMENT_REQUIRED"
-        : "REVIEWER_ROLE_REQUIRED");
+        ? "CURRENT_DUTY_REQUIRED"
+        : "EVENT_ROLE_REQUIRED");
     }
   });
 

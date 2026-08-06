@@ -313,8 +313,8 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * Report aggregate event operations for authorized management accounts
-         * @description Administrator and event-manager reporting only. Event managers receive events they created or actively manage. The response intentionally excludes participant identity, clinical detail, delivery recipients, and synchronization payloads or error logs. Viewing a report is audited.
+         * Report aggregate event operations for active event-manager memberships
+         * @description Requires an active EVENT_MANAGER membership. Reports include only events covered by that membership; platform administrator status and event creation do not grant implicit access. The response intentionally excludes participant identity, clinical detail, delivery recipients, and synchronization payloads or error logs. Viewing a report is audited.
          */
         get: operations["getOperationalReport"];
         put?: never;
@@ -369,7 +369,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Get event operations metrics */
+        /**
+         * Get event operations metrics
+         * @description Requires an active EVENT_MANAGER membership for this event. Platform administrator status and event creation do not grant implicit access.
+         */
         get: operations["getEventMetrics"];
         put?: never;
         post?: never;
@@ -428,13 +431,53 @@ export interface paths {
         post?: never;
         /**
          * Permanently delete a completed or cancelled event
-         * @description Administrator-only hard deletion. Event-owned operational records are removed; shared staff accounts, participants, templates, forms, and devices are retained.
+         * @description Administrator-only hard deletion. Requires the exact event name, permanent-deletion acknowledgement, current version, and the unexpired signed token from the latest unchanged impact preview. Event-owned operational records are removed; shared staff accounts, participants, templates, forms, and devices are retained.
          */
         delete: operations["deleteTerminalEvent"];
         options?: never;
         head?: never;
         /** Update allowed fields using optimistic concurrency */
         patch: operations["updateEvent"];
+        trace?: never;
+    };
+    "/api/v1/events/{eventId}/deletion-preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Preview permanent deletion impact and blockers
+         * @description Platform administrator only. The signed token is bound to this administrator, event, event version, and exact impact digest, and expires after five minutes.
+         */
+        get: operations["previewTerminalEventDeletion"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/events/{eventId}/deletion-cleanup": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Read post-deletion artifact cleanup state
+         * @description Platform administrator only. Available after the event row has been deleted because cleanup tasks and immutable deletion audit evidence are event-detached.
+         */
+        get: operations["getTerminalEventDeletionCleanup"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
         trace?: never;
     };
     "/api/v1/events/{eventId}/registrations": {
@@ -457,6 +500,100 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/events/{eventId}/memberships": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                eventId: components["parameters"]["EventId"];
+            };
+            cookie?: never;
+        };
+        /**
+         * List active and removed event memberships
+         * @description Requires an active EVENT_MANAGER membership. Completed-event managers retain access without a current duty.
+         */
+        get: operations["listEventMemberships"];
+        put?: never;
+        /**
+         * Add or reactivate an approved eligible account
+         * @description Membership is durable. Removing the final duty never removes this record.
+         */
+        post: operations["addOrReactivateEventMembership"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/events/{eventId}/memberships/eligible-users": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List approved and enabled accounts eligible for event membership */
+        get: operations["listEligibleEventMembers"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/events/{eventId}/memberships/{membershipId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Remove a membership and cancel its current duties */
+        delete: operations["removeEventMembership"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/events/{eventId}/memberships/{membershipId}/roles": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Assign one granular event role */
+        post: operations["assignEventMembershipRole"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/events/{eventId}/memberships/{membershipId}/roles/{role}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Remove a granular role after its current duties are removed */
+        delete: operations["removeEventMembershipRole"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/events/{eventId}/shifts/{shiftId}/assignments": {
         parameters: {
             query?: never;
@@ -466,7 +603,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Assign an active user to an event shift */
+        /** Schedule a duty for an active event member who already has the matching granular role */
         post: operations["assignEventStaff"];
         delete?: never;
         options?: never;
@@ -484,7 +621,7 @@ export interface paths {
         get?: never;
         put?: never;
         post?: never;
-        /** Remove a user from an event shift */
+        /** Remove a duty without removing the durable event membership */
         delete: operations["removeEventStaffAssignment"];
         options?: never;
         head?: never;
@@ -1792,6 +1929,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/queues/events/{eventId}/participants/{registrationId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Participant queue status and movement history in an explicit event scope */
+        get: operations["getParticipantQueueStatus"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/queues/participant/{registrationId}": {
         parameters: {
             query?: never;
@@ -1799,11 +1953,116 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Participant queue status and movement history */
-        get: operations["getParticipantQueueStatus"];
+        /**
+         * Compatibility lookup that derives the event from the registration
+         * @deprecated
+         */
+        get: operations["getParticipantQueueStatusCompatibility"];
         put?: never;
         post?: never;
         delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/queues/events/{eventId}/entries/{queueId}/call": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Call an event-scoped queue entry */
+        patch: operations["callEventQueueEntry"];
+        trace?: never;
+    };
+    "/api/v1/queues/events/{eventId}/entries/{queueId}/start": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Start an event-scoped queue entry */
+        patch: operations["startEventQueueEntry"];
+        trace?: never;
+    };
+    "/api/v1/queues/events/{eventId}/entries/{queueId}/advance": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Advance an event-scoped queue entry */
+        patch: operations["advanceEventQueueEntry"];
+        trace?: never;
+    };
+    "/api/v1/queues/events/{eventId}/entries/{queueId}/complete": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Complete an event-scoped queue entry */
+        patch: operations["completeEventQueueEntry"];
+        trace?: never;
+    };
+    "/api/v1/queues/events/{eventId}/entries/{queueId}/skip": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Skip an event-scoped queue entry */
+        patch: operations["skipEventQueueEntry"];
+        trace?: never;
+    };
+    "/api/v1/queues/events/{eventId}/entries/{queueId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Cancel an event-scoped queue entry */
+        delete: operations["leaveEventQueue"];
         options?: never;
         head?: never;
         patch?: never;
@@ -2087,6 +2346,74 @@ export interface components {
         ProfessionalCategory: "STAFF" | "DOCTOR";
         /** @enum {string} */
         EventMembershipRoleType: "EVENT_MANAGER" | "REGISTRATION" | "SCREENER" | "REVIEWER" | "SUPPORT";
+        EventMembershipRequest: {
+            /** Format: uuid */
+            userId: string;
+            roles: components["schemas"]["EventMembershipRoleType"][];
+        };
+        EventMembershipRoleRequest: {
+            role: components["schemas"]["EventMembershipRoleType"];
+        };
+        MembershipRemovalRequest: {
+            reason: string;
+        };
+        EventMemberUser: {
+            /** Format: uuid */
+            id: string;
+            fullName: string;
+            /** Format: email */
+            email: string;
+            approvalState: components["schemas"]["AccountApprovalState"];
+            accessState: components["schemas"]["AccountAccessState"];
+            /** @enum {string} */
+            status: "ACTIVE" | "INACTIVE" | "DISABLED" | "SUSPENDED";
+            /** @enum {string|null} */
+            professionalCategory?: "STAFF" | "DOCTOR" | null;
+        };
+        EventMembershipDetail: {
+            /** Format: uuid */
+            membershipId: string;
+            /** Format: uuid */
+            eventId: string;
+            /** Format: uuid */
+            userId: string;
+            /** @enum {string} */
+            status: "ACTIVE" | "REMOVED";
+            /** Format: date-time */
+            addedAt: string;
+            /** Format: date-time */
+            removedAt?: string | null;
+            removalReason?: string | null;
+            user: components["schemas"]["EventMemberUser"];
+            roles: {
+                /** Format: uuid */
+                id: string;
+                role: components["schemas"]["EventMembershipRoleType"];
+                /** Format: date-time */
+                assignedAt: string;
+                /** Format: uuid */
+                assignedById: string;
+            }[];
+        };
+        EventMembershipListResponse: {
+            memberships: components["schemas"]["EventMembershipDetail"][];
+        };
+        EligibleEventUsersResponse: {
+            users: ({
+                /** Format: uuid */
+                id: string;
+                fullName: string;
+                /** Format: email */
+                email: string;
+                /** @enum {string|null} */
+                professionalCategory?: "STAFF" | "DOCTOR" | null;
+                eventMemberships: {
+                    [key: string]: unknown;
+                }[];
+            } & {
+                [key: string]: unknown;
+            })[];
+        };
         /** @enum {string} */
         AccountProviderOperationStatus: "PENDING" | "PROCESSING" | "SUCCEEDED" | "FAILED" | "CANCELED" | "ESCALATED" | "RESOLVED";
         /** @enum {string} */
@@ -2353,6 +2680,11 @@ export interface components {
             staffAssignments: components["schemas"]["StaffAssignment"][];
         };
         CreateEventRequest: {
+            /**
+             * Format: uuid
+             * @description Approved and enabled first manager; defaults to the administrator creating the event. The creator is always dual-written as an EVENT_MANAGER membership.
+             */
+            firstManagerUserId?: string;
             name: string;
             description?: string | null;
             bannerKey?: components["schemas"]["EventBannerKey"];
@@ -2417,12 +2749,63 @@ export interface components {
             confirmationName: string;
             /** @enum {boolean} */
             acknowledgePermanentDeletion: true;
+            /** @description Unexpired token from the latest unchanged deletion preview */
+            previewToken: string;
         };
         EventDeletionResponse: {
             /** Format: uuid */
             eventId: string;
             /** @enum {boolean} */
             deleted: true;
+            /** @enum {string} */
+            cleanupState: "QUEUED" | "COMPLETED" | "NEEDS_ATTENTION";
+        };
+        EventDeletionCounts: {
+            registrations: number;
+            queues: number;
+            screenings: number;
+            reviews: number;
+            files: number;
+            emails: number;
+            cleanup: number;
+            reports: number;
+        };
+        EventDeletionPreview: {
+            /** Format: uuid */
+            eventId: string;
+            eventName: string;
+            /** @enum {string} */
+            status: "COMPLETED" | "CANCELLED";
+            version: number;
+            counts: components["schemas"]["EventDeletionCounts"];
+            blockers: ({
+                code: string;
+                message: string;
+                count?: number;
+            } & {
+                [key: string]: unknown;
+            })[];
+            impactDigest: string;
+            /** Format: date-time */
+            previewExpiresAt: string;
+            previewToken: string;
+        };
+        EventDeletionCleanupStatus: {
+            /** Format: uuid */
+            eventId: string;
+            /** @enum {string} */
+            cleanupState: "QUEUED" | "COMPLETED" | "NEEDS_ATTENTION";
+            tasks: {
+                /** Format: uuid */
+                id: string;
+                artifactType: string;
+                /** @enum {string} */
+                status: "PENDING" | "PROCESSING" | "COMPLETED" | "FAILED" | "ESCALATED" | "RESOLVED";
+                attemptCount: number;
+                lastError?: string | null;
+                /** Format: date-time */
+                completedAt?: string | null;
+            }[];
         };
         Event: components["schemas"]["CreateEventRequest"] & {
             /** Format: uuid */
@@ -4030,6 +4413,8 @@ export interface components {
         AccountId: string;
         AccountProviderOperationId: string;
         EventId: string;
+        MembershipId: string;
+        QueueId: string;
         ShiftId: string;
         RegistrationId: string;
         ReferralId: string;
@@ -4938,6 +5323,57 @@ export interface operations {
             422: components["responses"]["ValidationFailed"];
         };
     };
+    previewTerminalEventDeletion: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                eventId: components["parameters"]["EventId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Reviewed deletion impact and signed confirmation token */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EventDeletionPreview"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+        };
+    };
+    getTerminalEventDeletionCleanup: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                eventId: components["parameters"]["EventId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Cleanup state and safe task metadata */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EventDeletionCleanupStatus"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+        };
+    };
     listEventRegistrations: {
         parameters: {
             query?: {
@@ -5007,6 +5443,174 @@ export interface operations {
             400: components["responses"]["ValidationFailed"];
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
+            409: components["responses"]["Conflict"];
+        };
+    };
+    listEventMemberships: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                eventId: components["parameters"]["EventId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Membership roster */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EventMembershipListResponse"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    addOrReactivateEventMembership: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                eventId: components["parameters"]["EventId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["EventMembershipRequest"];
+            };
+        };
+        responses: {
+            /** @description Membership added or reactivated and audited */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EventMembershipDetail"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            409: components["responses"]["Conflict"];
+            422: components["responses"]["ValidationFailed"];
+        };
+    };
+    listEligibleEventMembers: {
+        parameters: {
+            query?: {
+                search?: string;
+                limit?: number;
+            };
+            header?: never;
+            path: {
+                eventId: components["parameters"]["EventId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Eligible accounts and event membership state */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EligibleEventUsersResponse"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+        };
+    };
+    removeEventMembership: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                eventId: components["parameters"]["EventId"];
+                membershipId: components["parameters"]["MembershipId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MembershipRemovalRequest"];
+            };
+        };
+        responses: {
+            /** @description Membership removed and audited */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EventMembershipDetail"];
+                };
+            };
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+        };
+    };
+    assignEventMembershipRole: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                eventId: components["parameters"]["EventId"];
+                membershipId: components["parameters"]["MembershipId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["EventMembershipRoleRequest"];
+            };
+        };
+        responses: {
+            /** @description Role assigned and audited */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EventMembershipDetail"];
+                };
+            };
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    removeEventMembershipRole: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                eventId: components["parameters"]["EventId"];
+                membershipId: components["parameters"]["MembershipId"];
+                role: components["schemas"]["EventMembershipRoleType"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Role removed and audited */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EventMembershipDetail"];
+                };
+            };
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
             409: components["responses"]["Conflict"];
         };
     };
@@ -7333,6 +7937,7 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
+                eventId: components["parameters"]["EventId"];
                 registrationId: string;
             };
             cookie?: never;
@@ -7352,6 +7957,193 @@ export interface operations {
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
             422: components["responses"]["ValidationFailed"];
+        };
+    };
+    getParticipantQueueStatusCompatibility: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                registrationId: components["parameters"]["RegistrationId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Participant queue status */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ParticipantQueueStatusResponse"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    callEventQueueEntry: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                eventId: components["parameters"]["EventId"];
+                queueId: components["parameters"]["QueueId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Queue entry called */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["QueueEntry"];
+                };
+            };
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+        };
+    };
+    startEventQueueEntry: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                eventId: components["parameters"]["EventId"];
+                queueId: components["parameters"]["QueueId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Queue entry started */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["QueueEntry"];
+                };
+            };
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+        };
+    };
+    advanceEventQueueEntry: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                eventId: components["parameters"]["EventId"];
+                queueId: components["parameters"]["QueueId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AdvanceQueueRequest"];
+            };
+        };
+        responses: {
+            /** @description Participant transferred */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdvanceQueueResponse"];
+                };
+            };
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+        };
+    };
+    completeEventQueueEntry: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                eventId: components["parameters"]["EventId"];
+                queueId: components["parameters"]["QueueId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Queue entry completed */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["QueueEntry"];
+                };
+            };
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+        };
+    };
+    skipEventQueueEntry: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                eventId: components["parameters"]["EventId"];
+                queueId: components["parameters"]["QueueId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Queue entry skipped */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["QueueEntry"];
+                };
+            };
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+        };
+    };
+    leaveEventQueue: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                eventId: components["parameters"]["EventId"];
+                queueId: components["parameters"]["QueueId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Queue entry cancelled */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["QueueEntry"];
+                };
+            };
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
         };
     };
     callQueueEntry: {

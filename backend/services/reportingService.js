@@ -1,7 +1,7 @@
 const prisma = require("../prisma/prismaClient");
 const AppError = require("../errors/AppError");
+const { assertOperationalAccount, requireEventManager } = require("./eventAuthorizationService");
 
-const ACTIVE_ASSIGNMENT_STATUSES = ["ASSIGNED", "CONFIRMED"];
 const EVENT_LIMIT = 100;
 
 const dayString = (date) => date.toISOString().slice(0, 10);
@@ -20,26 +20,8 @@ const reportRange = (query, now = new Date()) => {
 };
 
 const reportVisibility = (user) => {
-  if (user.systemRole === "ADMIN") return {};
-  if (user.systemRole !== "EVENT_MANAGER") {
-    throw new AppError(403, "REPORT_FORBIDDEN", "Operational reports are available to administrators and event managers only");
-  }
   return {
-    OR: [
-      { createdByUserId: user.userId },
-      {
-        staffAssignments: {
-          some: {
-            userId: user.userId,
-            assignmentRole: "EVENT_MANAGER",
-            OR: [
-              { status: { in: ACTIVE_ASSIGNMENT_STATUSES } },
-              { assignmentStatus: { in: ACTIVE_ASSIGNMENT_STATUSES } },
-            ],
-          },
-        },
-      },
-    ],
+    memberships: { some: { userId: user.userId, status: "ACTIVE", roles: { some: { role: "EVENT_MANAGER" } } } },
   };
 };
 
@@ -90,6 +72,16 @@ const totalMetrics = (events) => {
 };
 
 const getOperationalReport = async (query, user, db = prisma, now = new Date()) => {
+  assertOperationalAccount(user);
+  if (query.eventId) {
+    await requireEventManager(query.eventId, user, { db });
+  } else {
+    const managerMembership = await db.eventMembership.findFirst({
+      where: { userId: user.userId, status: "ACTIVE", roles: { some: { role: "EVENT_MANAGER" } } },
+      select: { id: true },
+    });
+    if (!managerMembership) throw new AppError(403, "REPORT_FORBIDDEN", "An EVENT_MANAGER membership is required for event reports");
+  }
   const visibility = reportVisibility(user);
   const range = reportRange(query, now);
   const reportWhere = {
