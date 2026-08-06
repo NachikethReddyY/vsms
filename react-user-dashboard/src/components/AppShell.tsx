@@ -20,6 +20,9 @@ export default function AppShell({ children }: { children: ReactNode }) {
   const canUseOfflineScreening = roles.includes('SCREENER') && !roles.includes('ADMINISTRATOR');
   const eventManagementMatch = location.pathname.match(/^\/events\/([^/]+)(?:\/(overview|stations|staff|attendees|activity))?$/);
   const stationWorkflowMatch = location.pathname.match(/^\/events\/([^/]+)\/stations\/(visual-acuity|refraction|colour-vision)$/);
+  const eventDetailMatch = location.pathname.match(/^\/events\/([^/]+)$/);
+  const offlineEventId = stationWorkflowMatch?.[1]
+    ?? (eventDetailMatch && eventDetailMatch[1] !== 'new' ? eventDetailMatch[1] : null);
   const eventEditPath = eventManagementMatch && eventManagementMatch[1] !== 'new'
     ? `/events/${eventManagementMatch[1]}/edit`
     : null;
@@ -47,7 +50,7 @@ export default function AppShell({ children }: { children: ReactNode }) {
         </nav>
 
         <div className="workspace-nav-actions">
-          {canUseOfflineScreening && stationWorkflowMatch && <OfflineSyncControl eventId={stationWorkflowMatch[1]} />}
+          {canUseOfflineScreening && offlineEventId && <OfflineSyncControl eventId={offlineEventId} />}
           {canCreateEvent && eventEditPath && <Link className="workspace-edit-action" to={eventEditPath}><PencilSquareIcon aria-hidden="true" /><span>Edit event</span></Link>}
           <ThemeToggle className="workspace-icon-action" />
           {canCreateEvent && location.pathname !== '/events/new' && <Link className="workspace-create-action" to="/events/new"><PlusIcon aria-hidden="true" />New event</Link>}
