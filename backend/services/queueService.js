@@ -1,37 +1,58 @@
+/**
+ * @fileoverview Queue & Station Transfer Service Layer
+ * @module services/queueService
+ * @description Implements business logic, state validations, database transactions, and audit logging for virtual queues, station routing, and workflow transitions.
+ */
+
 const prisma = require("../prisma/prismaClient");
-const AppError = require("../errors/AppError");
+const { AppError, ValidationError, NotFoundError, ConflictError } = require("../middlewares/errorHandler");
 const { createAuditLog } = require("../utils/audit");
 
 const QUEUE_OPERATIONAL_ROLES = ["REGISTRATION_OFFICER", "SCREENER", "EVENT_MANAGER", "ADMINISTRATOR"];
 const ACTIVE_QUEUE_STATUSES = ["WAITING", "CALLED", "IN_PROGRESS"];
 const ACTIVE_ASSIGNMENT_STATUSES = ["ASSIGNED", "CONFIRMED"];
 
+/**
+ * Validates that the user has operational rights and that the event is actively in progress.
+ * @private
+ */
 const requireQueueManagement = async (db, eventId, user) => {
   const operational = (user.roles || []).some((role) => QUEUE_OPERATIONAL_ROLES.includes(role));
-  if (!operational) throw new AppError(403, "QUEUE_ROLE_REQUIRED", "An operational role is required to manage queues");
+  if (!operational) {
+    throw new AppError("An operational role is required to manage queues", 403);
+  }
+  
   const event = await db.event.findUnique({
     where: { eventId },
     select: { eventId: true, name: true, status: true, venue: true },
   });
-  if (!event) throw new AppError(404, "EVENT_NOT_FOUND", "Event not found");
+  
+  if (!event) throw new NotFoundError("Event not found");
   if (event.status !== "IN_PROGRESS") {
-    throw new AppError(409, "EVENT_NOT_IN_PROGRESS", "Queue operations are available only while the event is in progress");
+    throw new AppError("Queue operations are available only while the event is in progress", 409);
   }
   return event;
 };
 
+/**
+ * Validates station assignment rules for Screeners versus Management.
+ * @private
+ */
 const requireQueueStationOperation = async (db, eventId, stationId, user) => {
-  if ((user.roles || []).includes("ADMINISTRATOR") || (user.roles || []).includes("EVENT_MANAGER")) {
+  const roles = user.roles || [];
+  
+  if (roles.includes("ADMINISTRATOR") || roles.includes("EVENT_MANAGER")) {
     const event = await requireQueueManagement(db, eventId, user);
     const station = await db.station.findFirst({ where: { stationId, eventId, isActive: true } });
-    if (!station) throw new AppError(404, "STATION_NOT_FOUND", "Station not found for this event");
+    if (!station) throw new NotFoundError("Station not found for this event");
     return { event, station };
   }
 
-  if ((user.roles || []).includes("SCREENER")) {
+  if (roles.includes("SCREENER")) {
     await requireQueueManagement(db, eventId, user);
     const station = await db.station.findFirst({ where: { stationId, eventId, isActive: true } });
-    if (!station) throw new AppError(404, "STATION_NOT_FOUND", "Station not found for this event");
+    if (!station) throw new NotFoundError("Station not found for this event");
+    
     const now = new Date();
     const assignment = await db.staffAssignment.findFirst({
       where: {
@@ -44,15 +65,20 @@ const requireQueueStationOperation = async (db, eventId, stationId, user) => {
       },
       select: { id: true },
     });
+    
     if (!assignment) {
-      throw new AppError(403, "FORBIDDEN", "You are not assigned to operate this station queue");
+      throw new AppError("You are not assigned to operate this station queue", 403);
     }
     return { event: station, station };
   }
 
-  throw new AppError(403, "QUEUE_ROLE_REQUIRED", "Screener, event manager, or administrator access is required");
+  throw new AppError("Screener, event manager, or administrator access is required", 403);
 };
 
+/**
+ * Loads a queue entry with associated relations or throws NotFound.
+ * @private
+ */
 const loadQueueEntry = async (db, queueId) => {
   const entry = await db.queueEntry.findUnique({
     where: { id: queueId },
@@ -61,36 +87,36 @@ const loadQueueEntry = async (db, queueId) => {
       station: { select: { stationId: true, stationName: true } },
     },
   });
-  if (!entry) throw new AppError(404, "QUEUE_ENTRY_NOT_FOUND", "Queue entry not found");
+  if (!entry) throw new NotFoundError("Queue entry not found");
   return entry;
 };
 
+/**
+ * Enters a participant into a station's virtual queue.
+ */
 const joinQueue = async ({ eventId, stationId, registrationId }, user, context = null, db = prisma) => {
   await requireQueueManagement(db, eventId, user);
   const station = await db.station.findFirst({ where: { stationId, eventId, isActive: true } });
-  if (!station) throw new AppError(404, "STATION_NOT_FOUND", "Station not found for this event");
+  if (!station) throw new NotFoundError("Station not found for this event");
 
   return db.$transaction(async (tx) => {
     const registration = await tx.eventRegistration.findFirst({ where: { registrationId, eventId } });
-    if (!registration) throw new AppError(404, "REGISTRATION_NOT_FOUND", "Registration not found for this event");
+    if (!registration) throw new NotFoundError("Registration not found for this event");
+    
     if (["COMPLETED", "CANCELLED"].includes(registration.registrationStatus)) {
-      throw new AppError(409, "REGISTRATION_NOT_QUEUEABLE", "Completed or cancelled registrations cannot join a queue");
+      throw new ConflictError("Completed or cancelled registrations cannot join a queue");
     }
 
     const existing = await tx.queueEntry.findFirst({
       where: { registrationId, status: { in: ACTIVE_QUEUE_STATUSES } },
       orderBy: { enteredAt: "desc" },
     });
+    
     if (existing) {
       if (existing.stationId === stationId) {
         return { queueEntry: existing, created: false };
       }
-      throw new AppError(
-        409,
-        "ALREADY_IN_QUEUE",
-        "Registration is already in an active queue at another station",
-        { queueEntryId: existing.id, stationId: existing.stationId },
-      );
+      throw new ConflictError("Registration is already in an active queue at another station");
     }
 
     let queueNumber = registration.queueNumber;
@@ -107,6 +133,7 @@ const joinQueue = async ({ eventId, stationId, registrationId }, user, context =
         status: "WAITING",
       },
     });
+
     await createAuditLog({
       userId: user.userId,
       action: "QUEUE_JOINED",
@@ -116,10 +143,14 @@ const joinQueue = async ({ eventId, stationId, registrationId }, user, context =
       context,
       client: tx,
     });
+
     return { queueEntry, created: true };
   });
 };
 
+/**
+ * Retrieves the live status of all queues across stations for an event.
+ */
 const getEventQueueStatus = async (eventId, user, db = prisma) => {
   const event = await requireQueueManagement(db, eventId, user);
   const [stations, entries] = await Promise.all([
@@ -160,10 +191,13 @@ const getEventQueueStatus = async (eventId, user, db = prisma) => {
   return { event, stations: [...byStation.values()] };
 };
 
+/**
+ * Tracks an individual participant's complete queue timeline and history.
+ */
 const getParticipantQueueStatus = async (eventId, registrationId, user, db = prisma) => {
   await requireQueueManagement(db, eventId, user);
   const registration = await db.eventRegistration.findFirst({ where: { registrationId, eventId } });
-  if (!registration) throw new AppError(404, "REGISTRATION_NOT_FOUND", "Registration not found for this event");
+  if (!registration) throw new NotFoundError("Registration not found for this event");
 
   const entries = await db.queueEntry.findMany({
     where: { registrationId },
@@ -173,6 +207,7 @@ const getParticipantQueueStatus = async (eventId, registrationId, user, db = pri
       screeningResults: { select: { resultId: true, overallFlag: true } },
     },
   });
+  
   const activeEntry = entries.find((entry) => ACTIVE_QUEUE_STATUSES.includes(entry.status)) || null;
 
   return {
@@ -184,20 +219,38 @@ const getParticipantQueueStatus = async (eventId, registrationId, user, db = pri
   };
 };
 
+/**
+ * Automatically fetches the next waiting participant for a given station.
+ */
+const getNextQueueEntry = async (eventId, stationId, user, db = prisma) => {
+  await requireQueueStationOperation(db, eventId, stationId, user);
+  const nextEntry = await db.queueEntry.findFirst({
+    where: { stationId, status: "WAITING" },
+    orderBy: [{ queueNumber: "asc" }, { enteredAt: "asc" }],
+    include: { registration: { select: { participantDisplayName: true } } },
+  });
+  return nextEntry || null;
+};
+
+/**
+ * Calls a waiting participant to the station desk.
+ */
 const callQueueEntry = async (queueId, user, context = null, db = prisma) => {
   const entry = await loadQueueEntry(db, queueId);
   await requireQueueStationOperation(db, entry.registration.eventId, entry.stationId, user);
 
   return db.$transaction(async (tx) => {
     const current = await tx.queueEntry.findUnique({ where: { id: queueId } });
-    if (!current) throw new AppError(404, "QUEUE_ENTRY_NOT_FOUND", "Queue entry not found");
+    if (!current) throw new NotFoundError("Queue entry not found");
     if (current.status !== "WAITING") {
-      throw new AppError(409, "INVALID_QUEUE_STATE", "Only a WAITING queue entry can be called", { status: current.status });
+      throw new ConflictError("Only a WAITING queue entry can be called");
     }
+    
     const updated = await tx.queueEntry.update({
       where: { id: queueId },
       data: { status: "CALLED", calledAt: new Date() },
     });
+
     await createAuditLog({
       userId: user.userId,
       action: "QUEUE_CALLED",
@@ -212,20 +265,25 @@ const callQueueEntry = async (queueId, user, context = null, db = prisma) => {
   });
 };
 
+/**
+ * Starts active screening/processing for a called participant.
+ */
 const startQueueEntry = async (queueId, user, context = null, db = prisma) => {
   const entry = await loadQueueEntry(db, queueId);
   await requireQueueStationOperation(db, entry.registration.eventId, entry.stationId, user);
 
   return db.$transaction(async (tx) => {
     const current = await tx.queueEntry.findUnique({ where: { id: queueId } });
-    if (!current) throw new AppError(404, "QUEUE_ENTRY_NOT_FOUND", "Queue entry not found");
+    if (!current) throw new NotFoundError("Queue entry not found");
     if (current.status !== "CALLED") {
-      throw new AppError(409, "INVALID_QUEUE_STATE", "Only a CALLED queue entry can be started", { status: current.status });
+      throw new ConflictError("Only a CALLED queue entry can be started");
     }
+    
     const updated = await tx.queueEntry.update({
       where: { id: queueId },
       data: { status: "IN_PROGRESS", startedAt: new Date() },
     });
+
     await createAuditLog({
       userId: user.userId,
       action: "QUEUE_STARTED",
@@ -240,25 +298,30 @@ const startQueueEntry = async (queueId, user, context = null, db = prisma) => {
   });
 };
 
-const advanceQueueEntry = async ({ queueId, toStationId, reason = "STATION_TRANSFER" }, user, context = null, db = prisma) => {
+/**
+ * Transfers a participant from the current station to a target destination station.
+ */
+const transferQueueEntry = async ({ queueId, toStationId, reason = "STATION_TRANSFER" }, user, context = null, db = prisma) => {
   const entry = await loadQueueEntry(db, queueId);
   await requireQueueStationOperation(db, entry.registration.eventId, entry.stationId, user);
+  
   const targetStation = await db.station.findFirst({
     where: { stationId: toStationId, eventId: entry.registration.eventId, isActive: true },
   });
-  if (!targetStation) throw new AppError(404, "STATION_NOT_FOUND", "Target station not found for this event");
+  if (!targetStation) throw new NotFoundError("Target station not found for this event");
 
   return db.$transaction(async (tx) => {
     const current = await tx.queueEntry.findUnique({ where: { id: queueId } });
-    if (!current) throw new AppError(404, "QUEUE_ENTRY_NOT_FOUND", "Queue entry not found");
-    if (current.status === "COMPLETED" || current.status === "CANCELLED" || current.status === "SKIPPED") {
-      throw new AppError(409, "INVALID_QUEUE_STATE", "A closed queue entry cannot be transferred", { status: current.status });
+    if (!current) throw new NotFoundError("Queue entry not found");
+    if (["COMPLETED", "CANCELLED", "SKIPPED"].includes(current.status)) {
+      throw new ConflictError("A closed queue entry cannot be transferred");
     }
 
     const completed = await tx.queueEntry.update({
       where: { id: queueId },
       data: { status: "COMPLETED", completedAt: new Date(), leftQueueAt: new Date() },
     });
+
     const nextEntry = await tx.queueEntry.create({
       data: {
         registrationId: current.registrationId,
@@ -267,6 +330,7 @@ const advanceQueueEntry = async ({ queueId, toStationId, reason = "STATION_TRANS
         status: "WAITING",
       },
     });
+
     await tx.queueMovement.create({
       data: {
         registrationId: current.registrationId,
@@ -276,6 +340,7 @@ const advanceQueueEntry = async ({ queueId, toStationId, reason = "STATION_TRANS
         movementReason: reason.slice(0, 100),
       },
     });
+
     await createAuditLog({
       userId: user.userId,
       action: "QUEUE_TRANSFERRED",
@@ -286,20 +351,25 @@ const advanceQueueEntry = async ({ queueId, toStationId, reason = "STATION_TRANS
       context,
       client: tx,
     });
+
     return { completed, nextEntry };
   });
 };
 
+/**
+ * Marks the active station queue entry as completed.
+ */
 const completeQueueEntry = async (queueId, user, context = null, db = prisma) => {
   const entry = await loadQueueEntry(db, queueId);
   await requireQueueStationOperation(db, entry.registration.eventId, entry.stationId, user);
 
   return db.$transaction(async (tx) => {
     const current = await tx.queueEntry.findUnique({ where: { id: queueId } });
-    if (!current) throw new AppError(404, "QUEUE_ENTRY_NOT_FOUND", "Queue entry not found");
+    if (!current) throw new NotFoundError("Queue entry not found");
     if (current.status !== "IN_PROGRESS") {
-      throw new AppError(409, "INVALID_QUEUE_STATE", "Only an IN_PROGRESS queue entry can be completed", { status: current.status });
+      throw new ConflictError("Only an IN_PROGRESS queue entry can be completed");
     }
+
     const updated = await tx.queueEntry.update({
       where: { id: queueId },
       data: { status: "COMPLETED", completedAt: new Date(), leftQueueAt: new Date() },
@@ -332,24 +402,30 @@ const completeQueueEntry = async (queueId, user, context = null, db = prisma) =>
       context,
       client: tx,
     });
+
     return updated;
   });
 };
 
+/**
+ * Skips an unresponsive queue participant.
+ */
 const skipQueueEntry = async (queueId, user, context = null, db = prisma) => {
   const entry = await loadQueueEntry(db, queueId);
   await requireQueueStationOperation(db, entry.registration.eventId, entry.stationId, user);
 
   return db.$transaction(async (tx) => {
     const current = await tx.queueEntry.findUnique({ where: { id: queueId } });
-    if (!current) throw new AppError(404, "QUEUE_ENTRY_NOT_FOUND", "Queue entry not found");
+    if (!current) throw new NotFoundError("Queue entry not found");
     if (!["WAITING", "CALLED"].includes(current.status)) {
-      throw new AppError(409, "INVALID_QUEUE_STATE", "Only a WAITING or CALLED queue entry can be skipped", { status: current.status });
+      throw new ConflictError("Only a WAITING or CALLED queue entry can be skipped");
     }
+
     const updated = await tx.queueEntry.update({
       where: { id: queueId },
       data: { status: "SKIPPED", leftQueueAt: new Date() },
     });
+
     await createAuditLog({
       userId: user.userId,
       action: "QUEUE_SKIPPED",
@@ -360,24 +436,30 @@ const skipQueueEntry = async (queueId, user, context = null, db = prisma) => {
       context,
       client: tx,
     });
+
     return updated;
   });
 };
 
+/**
+ * Removes/cancels a participant entry from the queue entirely.
+ */
 const leaveQueue = async (queueId, user, context = null, db = prisma) => {
   const entry = await loadQueueEntry(db, queueId);
   await requireQueueStationOperation(db, entry.registration.eventId, entry.stationId, user);
 
   return db.$transaction(async (tx) => {
     const current = await tx.queueEntry.findUnique({ where: { id: queueId } });
-    if (!current) throw new AppError(404, "QUEUE_ENTRY_NOT_FOUND", "Queue entry not found");
-    if (current.status === "COMPLETED" || current.status === "CANCELLED") {
-      throw new AppError(409, "INVALID_QUEUE_STATE", "A closed queue entry cannot be left again", { status: current.status });
+    if (!current) throw new NotFoundError("Queue entry not found");
+    if (["COMPLETED", "CANCELLED"].includes(current.status)) {
+      throw new ConflictError("A closed queue entry cannot be left again");
     }
+
     const updated = await tx.queueEntry.update({
       where: { id: queueId },
       data: { status: "CANCELLED", leftQueueAt: new Date() },
     });
+
     await createAuditLog({
       userId: user.userId,
       action: "QUEUE_LEFT",
@@ -388,18 +470,34 @@ const leaveQueue = async (queueId, user, context = null, db = prisma) => {
       context,
       client: tx,
     });
+
     return updated;
   });
+};
+
+/**
+ * Fetches real-time station workload metrics and volume data.
+ */
+const getStationWorkload = async (eventId, user, db = prisma) => {
+  const statusPayload = await getEventQueueStatus(eventId, user, db);
+  return statusPayload.stations.map((station) => ({
+    stationId: station.stationId,
+    stationName: station.stationName,
+    stationType: station.stationType,
+    workload: station.workload,
+  }));
 };
 
 module.exports = {
   joinQueue,
   getEventQueueStatus,
   getParticipantQueueStatus,
+  getNextQueueEntry,
   callQueueEntry,
   startQueueEntry,
-  advanceQueueEntry,
+  transferQueueEntry,
   completeQueueEntry,
   skipQueueEntry,
   leaveQueue,
+  getStationWorkload,
 };
