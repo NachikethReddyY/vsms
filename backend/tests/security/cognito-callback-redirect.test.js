@@ -18,7 +18,6 @@ const cognitoClient = require("../../utils/cognitoClient");
 const cognitoJwt = require("../../utils/cognitoJwt");
 const staff = require("../../utils/staff");
 const AuthAudit = require("../../utils/audit");
-const prisma = require("../../prisma/prismaClient");
 
 cognitoClient.exchangeAuthorizationCode = async (code, verifier) => {
     assert.equal(code, "authorization-code");
@@ -36,7 +35,6 @@ staff.syncLocalUser = async () => ({
 });
 staff.rolesFromCognitoGroups = () => ["EVENT_MANAGER"];
 AuthAudit.createAuthAuditLog = async () => {};
-prisma.user.update = async () => ({});
 
 const app = require("../../app");
 

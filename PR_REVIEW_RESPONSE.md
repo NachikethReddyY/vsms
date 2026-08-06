@@ -49,9 +49,10 @@ The participant QR generator exposes participant PII through new endpoints, so t
 | --- | --- |
 | Redis-backed rate limiting (`backend/middlewares/rateLimiter.js`, `docker-compose.yml`, `RATE_LIMIT_STORE`) | Protects the new participant-facing QR endpoints and the existing auth/registration routes from brute-force and abuse |
 | `Permission`/`RolePermission` RBAC enforcement (`requirePermission.js`, wired into participant/consent/registration/admin routes) | The QR feature grants end-users access to participant records; every mutation and read now goes through explicit permission checks (`participants:read`, `consents:record`, `registrations:read`, `audit:read`) |
-| Account lockout (`backend/utils/accountLockout.js`) | Defense-in-depth on local session issuance (Cognito remains the real identity provider; this guards the session layer) |
 | Immutable audit logging + migrations | Needed so the new `audit:read`-gated admin routes operate on trustworthy, tamper-evident logs |
 | CI fixes (this PR) | The test/contract checks would not actually run without them |
+
+A local account-lockout helper was initially added but removed after review: Cognito is the real password gate, so there is no genuine failed-password signal to key a local lockout on, and counting OAuth/refresh errors as login failures would be incorrect.
 
 These are interdependent:
 
@@ -64,7 +65,7 @@ These are interdependent:
 If you still prefer focused PRs, I can split this into:
 
 1. **Rate limiting + Redis** — limiter middleware, `docker-compose.yml`, env config
-2. **RBAC + account lockout** — permission model, `requirePermission`, `accountLockout`, tests
+2. **RBAC** — permission model, `requirePermission`, tests
 3. **Immutable audit logging** — triggers, migrations
 4. **CI fixes** — `if: always()`, legacy route aliases
 

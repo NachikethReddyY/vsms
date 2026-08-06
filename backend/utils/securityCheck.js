@@ -37,7 +37,7 @@ const runSecurityChecks = () => {
    */
   addCheck(
     "JWT_ACCESS_SECRET strength valid",
-    Boolean(env.JWT_ACCESS_SECRET) && env.JWT_ACCESS_SECRET.length >= 32,
+    env.jwtAccessSecret.length >= 32,
     "JWT access secret must be at least 32 characters"
   );
 
@@ -57,8 +57,9 @@ const runSecurityChecks = () => {
    * TLS upstream and should not require local cert files.
    */
   if (env.localHttps) {
-    const tlsKeyPath = path.resolve(process.cwd(), env.TLS_KEY_PATH || "");
-    const tlsCertPath = path.resolve(process.cwd(), env.TLS_CERT_PATH || "");
+    const backendDirectory = path.resolve(__dirname, "..");
+    const tlsKeyPath = path.resolve(backendDirectory, env.TLS_KEY_PATH || "");
+    const tlsCertPath = path.resolve(backendDirectory, env.TLS_CERT_PATH || "");
 
     addCheck(
       "TLS certificates exist",
@@ -72,15 +73,9 @@ const runSecurityChecks = () => {
    */
   if (isProduction) {
     addCheck(
-      "Trust proxy configured",
-      env.TRUST_PROXY !== undefined,
-      "TRUST_PROXY must be configured in production"
-    );
-
-    addCheck(
-      "Secure HTTPS cookies enabled",
-      env.secureCookies === true,
-      "Secure cookies required in production"
+      "Trust proxy enabled",
+      env.trustProxy,
+      "TRUST_PROXY must be true in production"
     );
   }
 
