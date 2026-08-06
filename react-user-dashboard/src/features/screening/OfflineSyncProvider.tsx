@@ -23,6 +23,8 @@ type OfflineSyncContextValue = {
   statusFor: (eventId: string) => EventSyncState;
   downloadEvent: (eventId: string) => Promise<void>;
   syncEvent: (eventId: string) => Promise<void>;
+  /** Download if missing, or refresh the snapshot when already present. Safe to call repeatedly. */
+  ensureOfflineReady: (eventId: string, options?: { refreshIfPresent?: boolean }) => Promise<void>;
 };
 
 const EMPTY_STATE: EventSyncState = {
@@ -47,6 +49,7 @@ export function OfflineSyncProvider({ children }: PropsWithChildren) {
   const [online, setOnline] = useState(() => navigator.onLine);
   const [states, setStates] = useState<Record<string, EventSyncState>>({});
   const previousOwnerId = useRef<string | null>(null);
+  const ensureInFlight = useRef(new Set<string>());
 
   const setEventState = useCallback((eventId: string, update: Partial<EventSyncState>) => {
     setStates((current) => ({
@@ -61,20 +64,24 @@ export function OfflineSyncProvider({ children }: PropsWithChildren) {
     setEventState(eventId, { ...status, error: null });
   }, [ownerId, setEventState]);
 
-  const downloadEvent = useCallback(async (eventId: string) => {
+  const downloadEvent = useCallback(async (eventId: string, options: { quiet?: boolean } = {}) => {
     if (!ownerId) return;
     if (!navigator.onLine) {
-      setEventState(eventId, { error: 'Connect to the network before downloading an offline copy.' });
+      if (!options.quiet) {
+        setEventState(eventId, { error: 'Connect to the network before downloading an offline copy.' });
+      }
       return;
     }
-    setEventState(eventId, { downloading: true, error: null });
+    if (!options.quiet) setEventState(eventId, { downloading: true, error: null });
     try {
       const status = await downloadOfflineEvent(ownerId, eventId);
       setEventState(eventId, { ...status, error: null });
     } catch (error) {
-      setEventState(eventId, { error: readableError(error, 'Could not download the offline copy.') });
+      if (!options.quiet) {
+        setEventState(eventId, { error: readableError(error, 'Could not download the offline copy.') });
+      }
     } finally {
-      setEventState(eventId, { downloading: false });
+      if (!options.quiet) setEventState(eventId, { downloading: false });
     }
   }, [ownerId, setEventState]);
 
@@ -93,6 +100,26 @@ export function OfflineSyncProvider({ children }: PropsWithChildren) {
       setEventState(eventId, { syncing: false });
     }
   }, [ownerId, setEventState]);
+
+  const ensureOfflineReady = useCallback(async (
+    eventId: string,
+    options: { refreshIfPresent?: boolean } = {},
+  ) => {
+    if (!ownerId || !navigator.onLine || !eventId) return;
+    if (ensureInFlight.current.has(eventId)) return;
+
+    ensureInFlight.current.add(eventId);
+    try {
+      const status = await getOfflineSyncStatus(ownerId, eventId);
+      setEventState(eventId, { ...status, error: null });
+      if (status.downloaded && !options.refreshIfPresent) return;
+      await downloadEvent(eventId, { quiet: Boolean(status.downloaded && options.refreshIfPresent) });
+    } catch (error) {
+      setEventState(eventId, { error: readableError(error, 'Could not prepare the offline copy.') });
+    } finally {
+      ensureInFlight.current.delete(eventId);
+    }
+  }, [downloadEvent, ownerId, setEventState]);
 
   useEffect(() => {
     const ownerChanged = previousOwnerId.current !== null && previousOwnerId.current !== ownerId;
@@ -164,7 +191,8 @@ export function OfflineSyncProvider({ children }: PropsWithChildren) {
     },
     downloadEvent,
     syncEvent,
-  }), [downloadEvent, online, states, syncEvent]);
+    ensureOfflineReady,
+  }), [downloadEvent, ensureOfflineReady, online, states, syncEvent]);
 
   return <OfflineSyncContext.Provider value={value}>{children}</OfflineSyncContext.Provider>;
 }

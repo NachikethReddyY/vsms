@@ -4,11 +4,13 @@ Staff tablets must keep working when the venue Wi‑Fi drops. VSMS treats offlin
 
 ## Staff flow
 
-1. While online: open the live event → **Download offline** (nav control).
+1. While online: open the live event or a station page → offline pack **downloads automatically** (nav shows “Preparing offline” → “Offline ready”).
 2. Disconnect: station forms still load from the encrypted local snapshot.
 3. Save VA / Refraction / Colour Vision → queued locally (`Saved offline…`).
 4. Reconnect: auto-sync (or tap sync) → `POST /api/v1/events/{eventId}/sync/screening`.
 5. Conflicts stay local until staff fixes the cause (ack required, event ended, etc.).
+
+While the screener stays on the event, the tablet quietly refreshes the offline snapshot about every five minutes so queues stay current before a Wi‑Fi drop.
 
 ## Database (server)
 
