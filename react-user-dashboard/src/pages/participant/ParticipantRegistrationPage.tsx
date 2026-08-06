@@ -1,6 +1,5 @@
 import {
   ArrowLeftIcon,
-  ArrowRightIcon,
   CheckCircleIcon,
   ClipboardDocumentCheckIcon,
   ExclamationTriangleIcon,
@@ -9,7 +8,7 @@ import {
   UserIcon,
 } from "@heroicons/react/24/outline";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Link, useParams, useSearchParams } from "react-router-dom";
+import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import type { ConsentFormVersion, EmergencyContact, EventSummary, Participant, Registration } from "../../types";
 import apiClient, { getApiError } from "../../utils/apiClient";
 import "./ParticipantPage.css";
@@ -42,14 +41,14 @@ function displayDate(value: string) {
 
 export default function ParticipantRegistrationPage() {
   const { participantId = "" } = useParams();
+  const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const eventId = searchParams.get("eventId") ?? "";
   const profileLink = `/participants/${participantId}${eventId ? `?eventId=${encodeURIComponent(eventId)}` : ""}`;
   const [review, setReview] = useState<RegistrationReview | null>(null);
-  const [existingRegistration, setExistingRegistration] = useState<Registration | null>(null);
-  const [createdRegistration, setCreatedRegistration] = useState<Registration | null>(null);
   const [isLoading, setIsLoading] = useState(Boolean(eventId));
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [showConfirmation, setShowConfirmation] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const idempotencyKey = useRef(crypto.randomUUID());
 
@@ -62,8 +61,15 @@ export default function ParticipantRegistrationPage() {
     ])
       .then(([reviewResponse, registrationsResponse]) => {
         if (!active) return;
+        const existingRegistration = (registrationsResponse.data.registrations ?? [])
+          .find((registration: Registration) => registration.eventId === eventId) ?? null;
+
+        if (existingRegistration) {
+          navigate(`/participants/registrations/${existingRegistration.id}/qr?eventId=${encodeURIComponent(eventId)}`, { replace: true });
+          return;
+        }
+
         setReview(reviewResponse.data);
-        setExistingRegistration((registrationsResponse.data.registrations ?? []).find((registration: Registration) => registration.eventId === eventId) ?? null);
       })
       .catch((requestError: unknown) => {
         if (active) setError(getApiError(requestError, "Unable to load registration requirements."));
@@ -72,7 +78,7 @@ export default function ParticipantRegistrationPage() {
         if (active) setIsLoading(false);
       });
     return () => { active = false; };
-  }, [eventId, participantId]);
+  }, [eventId, navigate, participantId]);
 
   const requirements = useMemo(() => {
     if (!review) return [];
@@ -87,7 +93,7 @@ export default function ParticipantRegistrationPage() {
   }, [review]);
 
   const missingRequirement = requirements.find((item) => !item.complete)?.label;
-  const canRegister = Boolean(review && !existingRegistration && !createdRegistration && !missingRequirement && !isSubmitting);
+  const canRegister = Boolean(review && !missingRequirement && !isSubmitting);
 
   async function createRegistration() {
     if (!canRegister) return;
@@ -97,7 +103,8 @@ export default function ParticipantRegistrationPage() {
       const response = await apiClient.post(`/events/${eventId}/registrations`, { participantId }, {
         headers: { "Idempotency-Key": idempotencyKey.current },
       });
-      setCreatedRegistration(response.data.registration);
+      const registrationId = response.data.registration?.id ?? response.data.registrationId;
+      navigate(`/participants/registrations/${registrationId}/qr?eventId=${encodeURIComponent(eventId)}`);
     } catch (requestError: unknown) {
       setError(getApiError(requestError, "Unable to create the event registration."));
     } finally {
@@ -125,27 +132,6 @@ export default function ParticipantRegistrationPage() {
     );
   }
 
-  const registration = createdRegistration ?? existingRegistration;
-  if (registration) {
-    const wasJustCreated = Boolean(createdRegistration);
-    return (
-      <section className="participant-v2-page participant-v2-checkin participant-v2-registration" aria-labelledby="participant-v2-registration-title">
-        <Link className="participant-v2-back" to={profileLink}><ArrowLeftIcon /> Back to participant profile</Link>
-        <section className="participant-v2-checkin-success">
-          <span><CheckCircleIcon /></span>
-          <p>{wasJustCreated ? "Event registration created" : "Already registered for this event"}</p>
-          <h1 id="participant-v2-registration-title">{review.participant.firstName} {review.participant.lastName} is registered</h1>
-          <div className="participant-v2-checkin-ticket"><TicketIcon /><div><span>Queue number</span><strong>{registration.queueNumber}</strong></div><div><span>Status</span><strong>{displayStatus(registration.registrationStatus)}</strong></div></div>
-          <p className="participant-v2-checkin-success-note">The participant is ready for event check-in when they arrive.</p>
-          <div>
-            <Link className="primary" to={`/participants/${participantId}/check-in?eventId=${encodeURIComponent(eventId)}`}>Start event check-in <ArrowRightIcon /></Link>
-            <Link className="secondary" to={`/participants/registrations/${registration.id}/history?eventId=${encodeURIComponent(eventId)}`}>View registration history</Link>
-          </div>
-        </section>
-      </section>
-    );
-  }
-
   return (
     <section className="participant-v2-page participant-v2-checkin participant-v2-registration" aria-labelledby="participant-v2-registration-title">
       <Link className="participant-v2-back" to={profileLink}><ArrowLeftIcon /> Back to participant profile</Link>
@@ -169,10 +155,27 @@ export default function ParticipantRegistrationPage() {
         </section>
         <footer className="participant-v2-checkin-actions">
           <Link className="secondary" to={profileLink}>Back to profile</Link>
-          <button className="primary" type="button" disabled={!canRegister} onClick={() => void createRegistration()}>{isSubmitting ? "Creating registration..." : "Confirm event registration"}</button>
+          <button className="primary" type="button" disabled={!canRegister} onClick={() => setShowConfirmation(true)}>Confirm participant</button>
         </footer>
         {!canRegister ? <p className="participant-v2-checkin-feedback" role="status">{missingRequirement ? `${missingRequirement} must be completed before registration.` : "Preparing registration..."}</p> : <p className="participant-v2-checkin-feedback ready"><UserIcon /> Queue number will be assigned after confirmation.</p>}
       </section>
+      {showConfirmation ? (
+        <div className="participant-registration-backdrop" role="presentation">
+          <section className="participant-registration-dialog" role="dialog" aria-modal="true" aria-labelledby="registration-confirm-title">
+            <span><CheckCircleIcon /></span>
+            <p>Final confirmation</p>
+            <h2 id="registration-confirm-title">Confirm participant registration</h2>
+            <dl>
+              <div><dt>Participant</dt><dd>{review.participant.firstName} {review.participant.lastName}</dd></div>
+              <div><dt>Event</dt><dd>{review.event.eventName}</dd></div>
+              <div><dt>Participant reference</dt><dd>{review.participant.participantReference}</dd></div>
+            </dl>
+            <p className="participant-registration-dialog-note">This creates the event registration and opens the participant's secure QR pass.</p>
+            {error ? <p className="participant-v2-alert participant-v2-checkin-alert" role="alert">{error}</p> : null}
+            <footer><button className="secondary" type="button" disabled={isSubmitting} onClick={() => setShowConfirmation(false)}>Cancel</button><button className="primary" type="button" disabled={isSubmitting} onClick={() => void createRegistration()}>{isSubmitting ? "Creating registration..." : "Confirm and open QR handoff"}</button></footer>
+          </section>
+        </div>
+      ) : null}
     </section>
   );
 }
