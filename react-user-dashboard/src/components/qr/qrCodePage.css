@@ -24,10 +24,20 @@
 .qr-image-container { width:min(280px,100%); aspect-ratio:1; display:grid; place-items:center; margin:28px auto 18px; padding:18px; border:1px solid var(--hairline-strong); border-radius:10px; background:#fff; }
 .qr-image { width:100%; height:100%; display:block; object-fit:contain; }
 .qr-expiry { margin:0 0 20px; color:var(--ink-2); font-size:12px; font-variant-numeric:tabular-nums; }
+.qr-actions { display:grid; grid-template-columns:1fr 1fr; gap:8px; width:100%; max-width:280px; }
+.qr-actions .secondary,.qr-actions .danger-button { width:100%; min-height:42px; justify-content:center; gap:7px; font-size:12px; }
+.qr-actions svg { width:16px; }
+.qr-reset { margin-top:14px; padding:0; border:0; background:none; color:var(--muted); font-size:11px; cursor:pointer; text-decoration:underline; }
 .qr-idle { display:grid; justify-items:center; gap:8px; color:var(--muted); }
 .qr-idle>svg { width:40px; height:40px; margin-bottom:6px; }
 .qr-idle h2,.qr-idle p { margin:0; }
 .qr-idle p { max-width:36ch; font-size:12px; line-height:19px; }
+.qr-checkin { margin-top:clamp(36px,6vw,64px); padding-top:34px; border-top:1px solid var(--hairline); }
+.qr-checkin-form { max-width:560px; }
+.qr-checkin-mode { display:flex; gap:6px; margin:24px 0 4px; }
+.qr-checkin-mode button { min-height:38px; padding:0 14px; border:1px solid var(--hairline-strong); border-radius:8px; background:var(--surface); color:var(--ink-2); font-size:12px; cursor:pointer; }
+.qr-checkin-mode button.selected { border-color:var(--accent); background:var(--accent-tint); color:var(--accent); font-weight:600; }
+.qr-checkin-form .alert.success { border-color:color-mix(in srgb,var(--green) 35%,var(--hairline)); background:color-mix(in srgb,var(--green) 8%,var(--surface)); color:var(--ink-2); }
 @media (max-width:860px) { .qr-layout { grid-template-columns:1fr; }.qr-preview { min-height:360px; } }
-@media (max-width:640px) { .qr-layout { gap:36px; padding-top:30px; }.qr-preview { min-height:330px; padding:24px 18px; }.qr-form .primary { width:100%; } }
+@media (max-width:640px) { .qr-layout { gap:36px; padding-top:30px; }.qr-preview { min-height:330px; padding:24px 18px; }.qr-form .primary { width:100%; }.qr-actions { max-width:none; } }
 @media (prefers-reduced-motion:reduce) { .qr-spin { animation:none; } }

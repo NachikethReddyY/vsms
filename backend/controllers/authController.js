@@ -14,6 +14,7 @@ const { verifyCognitoToken } = require("../utils/cognitoJwt");
 const { createAuthAuditLog } = require("../utils/audit");
 const { timingSafeEqual } = require("../utils/security");
 const { syncLocalUser, rolesFromCognitoGroups, ALLOWED_ROLES } = require("../utils/staff");
+const prisma = require("../prisma/prismaClient");
 const {
     ACCESS_COOKIE,
     REFRESH_COOKIE,

@@ -23,6 +23,10 @@ const reviewParams = eventParams.extend({
   registrationId: z.string().uuid(),
 }).strict();
 
+const reviewScanBody = z.object({
+  passToken: z.string().trim().min(4).max(255),
+}).strict();
+
 const referralParams = eventParams.extend({ referralId: z.string().uuid() }).strict();
 const referralDocumentParams = referralParams.extend({ documentId: z.string().uuid() }).strict();
 const issueReferralBody = z.object({
@@ -81,10 +85,13 @@ const reviewDecisionBody = z.discriminatedUnion("outcome", [
 ]);
 
 const resolveQuery = z.object({
+  // Demo seed uses EventRegistration.passToken (e.g. VSMS-DEMO-QR-001).
+  // Staff may also paste QRCodePass.token (hex); service looks up either.
   passToken: z.string().min(4).max(255).optional(),
+  qrToken: z.string().min(4).max(255).optional(),
   registrationId: z.string().uuid().optional(),
-}).refine((value) => Boolean(value.passToken || value.registrationId), {
-  message: "passToken or registrationId is required",
+}).refine((value) => Boolean(value.passToken || value.qrToken || value.registrationId), {
+  message: "passToken, qrToken, or registrationId is required",
 });
 
 const visualAcuityResultData = z.object({
@@ -201,6 +208,7 @@ module.exports = {
   eventParams,
   stationParams,
   reviewParams,
+  reviewScanBody,
   reviewDecisionBody,
   referralParams,
   referralDocumentParams,

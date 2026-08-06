@@ -1,0 +1,131 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>My VSMS update — 27 July–5 August 2026</title>
+  <style>
+    :root { color-scheme:light; --ink:#17191c; --muted:#4f545b; --line:rgba(23,25,28,.24); --paper:#ffffff; --wash:#f7f7f4; --done:#1f8a65; --next:#b84d25; --link:#315a8c; }
+    * { box-sizing:border-box; }
+    body { margin:0; background:var(--wash); color:var(--ink); font:15px/1.55 system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; }
+    main { width:min(1040px,calc(100% - 32px)); margin:32px auto; background:var(--paper); border:1px solid var(--line); border-radius:12px; padding:clamp(24px,5vw,56px); }
+    h1 { margin:0; font-size:clamp(2rem,5vw,4rem); line-height:1.05; letter-spacing:-.045em; }
+    h2 { margin:48px 0 8px; font-size:1.6rem; }
+    h3 { margin:0 0 6px; font-size:1.05rem; }
+    p { margin:8px 0; } a { color:var(--link); }
+    .eyebrow { color:var(--muted); font-weight:700; letter-spacing:.08em; text-transform:uppercase; }
+    .lead { max-width:76ch; color:var(--muted); font-size:1.1rem; }
+    .stats { display:grid; grid-template-columns:repeat(3,1fr); gap:12px; margin:28px 0; }
+    .stat,.card,.alert { border:1px solid var(--line); border-radius:12px; padding:18px; }
+    .stat strong { display:block; font-size:2rem; line-height:1.1; }
+    .stat span,.meta,.note { color:var(--muted); font-size:.9rem; }
+    .day { border-top:1px solid var(--line); margin-top:28px; padding-top:22px; }
+    .day-head { display:flex; justify-content:space-between; gap:16px; align-items:baseline; margin-bottom:12px; }
+    .day-head h3 { font-size:1.25rem; }
+    .cards { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:12px; }
+    .tag { display:inline-block; margin-bottom:9px; border:1px solid currentColor; border-radius:999px; padding:3px 9px; background:var(--paper); color:var(--done); font-size:.76rem; font-weight:750; }
+    .next .tag,.alert .tag { color:var(--next); }
+    .details { margin:12px 0 0; padding-left:18px; color:var(--muted); font-size:.9rem; }
+    .details li + li { margin-top:5px; }
+    .impact { margin-top:12px; padding-top:10px; border-top:1px solid var(--line); font-size:.9rem; }
+    .impact strong { color:var(--done); }
+    table { width:100%; border-collapse:collapse; margin-top:16px; }
+    th,td { padding:12px; border-bottom:1px solid var(--line); text-align:left; vertical-align:top; }
+    th { color:var(--muted); font-size:.8rem; text-transform:uppercase; letter-spacing:.05em; }
+    footer { border-top:1px solid var(--line); margin-top:48px; padding-top:18px; color:var(--muted); font-size:.88rem; }
+    @media (max-width:700px) { .stats,.cards { grid-template-columns:1fr; } main { margin:16px auto; } table { display:block; overflow-x:auto; } }
+    @media print { body { background:#ffffff; } main { width:100%; margin:0; border:0; padding:24px; } a { color:inherit; text-decoration:none; } }
+  </style>
+</head>
+<body>
+<main>
+  <header>
+    <p class="eyebrow">My VSMS development update</p>
+    <h1>27 July–5 August 2026</h1>
+    <p class="lead">This is my personal update. It includes only pull requests that I opened, merged, or explicitly closed using my GitHub account, NachikethReddyY. All dates and times use Singapore time (UTC+8).</p>
+    <div class="stats">
+      <div class="stat"><strong>13</strong><span>PR updates by me</span></div>
+      <div class="stat"><strong>4</strong><span>PR updates by AI</span></div>
+      <div class="stat"><strong>1</strong><span>open PR assigned to me</span></div>
+    </div>
+  </header>
+
+  <section>
+    <h2>Contribution attribution</h2>
+    <p class="lead">For this update, I am classifying PRs #70–#73 as AI-updated work. The other 13 completed PR actions in this report are recorded as my work. This is a PR-level count; it avoids double-counting Git commits repeated across merged branches.</p>
+    <table><thead><tr><th>Source</th><th>Count</th><th>Human verification</th></tr></thead><tbody>
+      <tr><td>My updates</td><td>13 PRs</td><td>Human-led work</td></tr>
+      <tr><td>AI updates</td><td>4 PRs: <a href="https://github.com/soc-DBSP/react-nodejs-project2-cryptix/pull/70">#70</a>, <a href="https://github.com/soc-DBSP/react-nodejs-project2-cryptix/pull/71">#71</a>, <a href="https://github.com/soc-DBSP/react-nodejs-project2-cryptix/pull/72">#72</a> and <a href="https://github.com/soc-DBSP/react-nodejs-project2-cryptix/pull/73">#73</a></td><td>PR #72 verified by me. PRs #70, #71 and #73 are pending my review.</td></tr>
+    </tbody></table>
+  </section>
+
+  <section>
+    <h2>What I did</h2>
+    <p class="lead">I integrated participant, registration, queue, QR, event, clinical review, offline, reporting, audit, and authentication work. I then hardened the main security boundaries and aligned the implementation, API contract, database schema, tests, and documentation.</p>
+
+    <div class="day"><div class="day-head"><h3>27–29 July</h3><span class="meta">No PR actions in my scope</span></div><p>I had no PR opened, merged, or closed by my account during these three days.</p></div>
+
+    <div class="day"><div class="day-head"><h3>Thursday, 30 July</h3><span class="meta">1 PR</span></div><div class="cards">
+      <article class="card"><span class="tag">Opened and merged · 30 files</span><h3><a href="https://github.com/soc-DBSP/react-nodejs-project2-cryptix/pull/54">PR #54 · Clinical review workflow</a></h3><p>I implemented the end-to-end clinical review workflow.</p><ul class="details"><li><strong>Pages:</strong> Review Workspace, Event Detail, Events, Participant Status, Audit Logs, application shell and routing.</li><li><strong>Frontend:</strong> review and screening API clients, printable participant report support, generated API types, and review workspace styling.</li><li><strong>Backend:</strong> screening controller/routes, review and screening services, validation schemas, OpenAPI contract, seed data, and review integration/unit tests.</li></ul><p class="impact"><strong>Submission impact:</strong> completed Issue #10 with a demonstrable, audited clinical decision and referral flow backed by automated tests.</p></article>
+    </div></div>
+
+    <div class="day"><div class="day-head"><h3>Friday, 31 July</h3><span class="meta">4 PRs</span></div><div class="cards">
+      <article class="card"><span class="tag">Merged · 10 files</span><h3><a href="https://github.com/soc-DBSP/react-nodejs-project2-cryptix/pull/55">PR #55 · Queue dashboard UI</a></h3><p>I integrated Keefe’s queue operations interface.</p><ul class="details"><li><strong>Pages/components:</strong> Queue Dashboard, Now Serving card, queue header, statistics cards and queue tables.</li><li><strong>Quality:</strong> repaired the branch against main, consolidated queue styling, and updated queue page tests.</li></ul><p class="impact"><strong>Submission impact:</strong> added the operational dashboard needed to demonstrate live station queue monitoring.</p></article>
+      <article class="card"><span class="tag">Merged · integration change</span><h3><a href="https://github.com/soc-DBSP/react-nodejs-project2-cryptix/pull/56">PR #56 · Registration management</a></h3><p>I connected Mike’s participant search and registration workflow to the main application router.</p><ul class="details"><li><strong>Page exposed:</strong> participant search, search results and update/registration navigation.</li><li><strong>Integration:</strong> linked the completed feature through <code>App.tsx</code> so it was reachable from the application.</li></ul><p class="impact"><strong>Submission impact:</strong> turned an unlinked feature into a demonstrable participant-management flow.</p></article>
+      <article class="card"><span class="tag">Opened and closed · 16 files</span><h3><a href="https://github.com/soc-DBSP/react-nodejs-project2-cryptix/pull/59">PR #59 · Events UI draft</a></h3><p>I created the initial visual direction for the responsive Events experience.</p><ul class="details"><li><strong>Pages:</strong> application home/events prototype, landing page and test home page.</li><li><strong>Design:</strong> mobile dock, button primitives, landing assets, responsive layout and global styling.</li></ul><p class="impact"><strong>Submission impact:</strong> established the visual baseline, then closed the draft when PR #60 superseded it with an integrated version.</p></article>
+      <article class="card"><span class="tag">Opened · 39 files</span><h3><a href="https://github.com/soc-DBSP/react-nodejs-project2-cryptix/pull/60">PR #60 · Events experience redesign</a></h3><p>I opened the integrated responsive Events redesign.</p><ul class="details"><li><strong>Pages:</strong> Events, Login, Forgot Password, Settings, Profile Menu, QR Code, Review Workspace, landing and application shell.</li><li><strong>Security/routing:</strong> role guard, authentication state/context, event and QR services, environment validation and security preflight.</li><li><strong>UX:</strong> desktop/tablet/mobile navigation, timeline, search, notifications, staff avatars and accessible controls.</li></ul><p class="impact"><strong>Submission impact:</strong> unified previously separate screens into one coherent, responsive and role-aware application experience.</p></article>
+    </div></div>
+
+    <div class="day"><div class="day-head"><h3>Saturday, 1 August</h3><span class="meta">2 PRs</span></div><div class="cards">
+      <article class="card"><span class="tag">Merged · 39 files</span><h3><a href="https://github.com/soc-DBSP/react-nodejs-project2-cryptix/pull/60">PR #60 · Events experience redesign</a></h3><p>I merged the final Events redesign described above, including authentication pages, settings/profile navigation, QR and review screens, responsive event navigation, and backend security integration.</p><p class="impact"><strong>Submission impact:</strong> supplied the polished frontend and consistent interaction design used for the final demonstration.</p></article>
+      <article class="card"><span class="tag">Merged · 22 files</span><h3><a href="https://github.com/soc-DBSP/react-nodejs-project2-cryptix/pull/58">PR #58 · Participant status and system audit</a></h3><p>I integrated Keefe’s participant QR/status branch with queue and audit capabilities.</p><ul class="details"><li><strong>Pages:</strong> System Audit Dashboard, application shell, queue table and inspector sidebar.</li><li><strong>Backend:</strong> participant, QR, queue, user and audit controllers, models, routes and services.</li><li><strong>Shared UI:</strong> global design tokens and authenticated API client updates.</li></ul><p class="impact"><strong>Submission impact:</strong> connected participant status, queue operations and system audit visibility across frontend and backend.</p></article>
+    </div></div>
+
+    <div class="day"><div class="day-head"><h3>Sunday, 2 August</h3><span class="meta">No PR actions in my scope</span></div></div>
+
+    <div class="day"><div class="day-head"><h3>Monday, 3 August</h3><span class="meta">1 PR</span></div><div class="cards">
+      <article class="card"><span class="tag">Closed · 8 files</span><h3><a href="https://github.com/soc-DBSP/react-nodejs-project2-cryptix/pull/61">PR #61 · Event-driven audit prototype</a></h3><p>I reviewed and closed a prototype that introduced an event broker, audit worker, audit routes/service changes, QR generation updates and Vite configuration changes.</p><p class="impact"><strong>Submission impact:</strong> no code entered the submission; closing it prevented an incomplete event-driven architecture from duplicating the integrated audit implementation.</p></article>
+    </div></div>
+
+    <div class="day"><div class="day-head"><h3>Tuesday, 4 August</h3><span class="meta">7 merged · 1 closed</span></div><div class="cards">
+      <article class="card"><span class="tag">Merged · 12 files</span><h3><a href="https://github.com/soc-DBSP/react-nodejs-project2-cryptix/pull/62">PR #62 · Participant management</a></h3><p>I merged participant search, editable profiles and registration history.</p><ul class="details"><li><strong>Pages:</strong> Participant list/search, Participant V2 profile and profile editor.</li><li><strong>Integration:</strong> application routing, app shell navigation, event-selection preservation, page styling and participant page tests.</li></ul><p class="impact"><strong>Submission impact:</strong> provided the staff-facing participant lookup and profile-management evidence required for the participant workflow.</p></article>
+      <article class="card"><span class="tag">Merged · 15 files</span><h3><a href="https://github.com/soc-DBSP/react-nodejs-project2-cryptix/pull/63">PR #63 · Participant consent</a></h3><p>I merged the participant consent experience on top of the participant profile flow.</p><ul class="details"><li><strong>Pages:</strong> Participant list, editable profile, Consent page, consent status and consent refinement styling.</li><li><strong>Integration:</strong> application routes, app shell, participant tests and eligible-event selection behavior.</li></ul><p class="impact"><strong>Submission impact:</strong> made consent capture and consent status visible within the end-to-end participant journey.</p></article>
+      <article class="card"><span class="tag">Opened and merged · 91 files</span><h3><a href="https://github.com/soc-DBSP/react-nodejs-project2-cryptix/pull/66">PR #66 · Events and application integration</a></h3><p>I integrated the event lifecycle and reporting backend, unified event workspace UI, generated API client, CI validation, design evidence, and supporting security and integration tests.</p><ul class="details"><li><strong>Pages:</strong> Event Detail, Event Workspace, Public Event, Landing, Settings, Account Security, Admin pages, Participant Status and Review Workspace.</li><li><strong>Backend:</strong> event/auth controllers and routes, public event routes, event/screening services, Prisma schema and retained-audit migration, seed data, CSRF, authentication, request context, validation and safe error handling.</li><li><strong>Contracts/tooling:</strong> OpenAPI, generated TypeScript client, Bruno/API collections, HTTPS check, pnpm CI workflows and repository design system.</li><li><strong>Evidence:</strong> event lifecycle, reporting security, export receipts, Cognito OAuth, cookies/logout, screening authorization, startup, contracts and database integration tests.</li></ul><p class="impact"><strong>Submission impact:</strong> converted the event feature from separate frontend/backend work into a testable, documented, role-aware submission flow with implementation evidence.</p></article>
+      <article class="card"><span class="tag">Opened and merged · 190 files</span><h3><a href="https://github.com/soc-DBSP/react-nodejs-project2-cryptix/pull/67">PR #67 · Complete operational workflows</a></h3><p>I completed and secured the main application workflows across Issues #10–#13.</p><ul class="details"><li><strong>Pages:</strong> role-aware Event Workspace, staff administration, signed Review Workspace, referral UI, operational reporting, offline synchronization and secure sign-in/callback/logout navigation.</li><li><strong>Backend:</strong> Cognito staff provisioning, event/participant/QR/screening/review/referral/reporting/sync services, scoped controllers/routes, SES/SNS delivery events and artifact cleanup.</li><li><strong>Database:</strong> migrations for referral delivery/revisions, decision signatures, QR bearer hardening, screening idempotency/sync batches, immutable audit history and cleanup state.</li><li><strong>Security and delivery:</strong> CSRF/RBAC, least-privilege projections, encryption rotation, backup response, OpenAPI, CI dependency checks, 168-test integration gate and offline/referral frontend tests.</li></ul><p class="impact"><strong>Submission impact:</strong> supplied the core end-to-end submission: authenticated role-based operations, clinical evidence, durable offline behavior, reports, auditability and security verification.</p></article>
+      <article class="card"><span class="tag">Closed · 52 files</span><h3><a href="https://github.com/soc-DBSP/react-nodejs-project2-cryptix/pull/68">PR #68 · Event-driven and idempotent API branch</a></h3><p>I reviewed and closed a branch containing queue/auth/event/registration controllers, idempotency and rate-limit middleware, audit workers, API contracts and a broad test set.</p><p class="impact"><strong>Submission impact:</strong> no code was merged; closure avoided reintroducing package-lock files and overlapping backend implementations after the secured main integration.</p></article>
+      <article class="card"><span class="tag">Rogue AI update · pending human review · 4 files</span><h3><a href="https://github.com/soc-DBSP/react-nodejs-project2-cryptix/pull/70">PR #70 · Secure QR response projections</a></h3><p>Rogue AI updated the QR lookup boundary so the server selects and returns only operational identifiers, names, queue/check-in state and event labels.</p><ul class="details"><li><strong>Verification:</strong> pending my human review.</li><li><strong>Files changed:</strong> <code>backend/services/qrService.js</code>, <code>backend/docs/openapi.yaml</code>, <code>backend/tests/qr-service-security.test.js</code> and <code>react-user-dashboard/src/generated/api.ts</code>.</li><li><strong>Security:</strong> stopped QR responses exposing NRIC, contact data, consent, bearer tokens, audit records, creator data and event internals.</li><li><strong>Contract:</strong> narrowed OpenAPI, regenerated frontend types and pinned the projection with security tests.</li></ul><p class="impact"><strong>Submission impact:</strong> strengthened sensitive-data minimisation evidence and kept the documented API, frontend client and tested implementation consistent.</p></article>
+      <article class="card"><span class="tag">Opened and merged · 7 files</span><h3><a href="https://github.com/soc-DBSP/react-nodejs-project2-cryptix/pull/69">PR #69 · Audit request context</a></h3><p>I preserved sanitized request, device and IP context across event mutations.</p><ul class="details"><li><strong>Files:</strong> event controller/service, user service, shared audit utility, event integration tests, lifecycle integrity tests and reporting security tests.</li><li><strong>Behavior:</strong> replaced loopback/server placeholders with truthful request metadata while keeping user-agent, request bodies and secrets out of audit rows.</li></ul><p class="impact"><strong>Submission impact:</strong> improved the accuracy and defensibility of audit evidence used for accountability and incident review.</p></article>
+      <article class="card"><span class="tag">Rogue AI update · pending human review · 2 files</span><h3><a href="https://github.com/soc-DBSP/react-nodejs-project2-cryptix/pull/71">PR #71 · Retained audit history</a></h3><p>Rogue AI aligned the Prisma model with the already-deployed retained-history migration.</p><ul class="details"><li><strong>Verification:</strong> pending my human review.</li><li><strong>Files changed:</strong> <code>backend/prisma/schema.prisma</code> and <code>backend/tests/event-service.test.js</code>.</li><li><strong>Database behavior:</strong> removed the stale Event-to-EventAuditLog relation while retaining indexed <code>eventId</code> as a historical identifier.</li><li><strong>Regression protection:</strong> added a schema/migration contract proving that hard-deleting an event does not delete its audit history.</li></ul><p class="impact"><strong>Submission impact:</strong> ensured the ERD/schema, migration history and audit-retention claim agree, preventing a future migration from restoring the unsafe foreign key.</p></article>
+    </div></div>
+
+    <div class="day"><div class="day-head"><h3>Wednesday, 5 August</h3><span class="meta">2 merged · 1 open</span></div><div class="cards">
+      <article class="card"><span class="tag">Rogue AI update · human verified · 7 files</span><h3><a href="https://github.com/soc-DBSP/react-nodejs-project2-cryptix/pull/72">PR #72 · Authentication and logout hardening</a></h3><p>Rogue AI hardened authenticated device enrollment and made local and Cognito global logout behavior truthful.</p><ul class="details"><li><strong>Verification:</strong> reviewed and verified by me.</li><li><strong>Files changed:</strong> auth controller/routes, shared audit utility, OpenAPI, auth-device and logout tests, and generated frontend API client.</li><li><strong>Device ownership:</strong> enrolls a valid first-seen device only after successful login, never reassigns an existing device and rejects foreign, inactive or malformed IDs.</li><li><strong>Logout:</strong> ordinary logout clears local cookies; global logout requires authentication and matching CSRF, awaits Cognito revocation and reports failure truthfully.</li></ul><p class="impact"><strong>Submission impact:</strong> improved authentication, CSRF, audit-device ownership and session-revocation evidence while synchronizing backend behavior, API documentation and client types.</p></article>
+      <article class="card"><span class="tag">Rogue AI update · pending human review · 9 files</span><h3><a href="https://github.com/soc-DBSP/react-nodejs-project2-cryptix/pull/73">PR #73 · Manual QR check-in hardening</a></h3><p>Rogue AI hardened manual QR check-in and its event-scoped security boundary.</p><ul class="details"><li><strong>Verification:</strong> pending my human review.</li><li><strong>Files changed:</strong> QR controller/service, OpenAPI, backend contract fixtures, QR integration/security tests, generated API types and generated-client contract type test.</li><li><strong>Lookup:</strong> removed nonfunctional NRIC/ciphertext search and accepts exactly one active QR token or registration reference without revealing cross-event existence.</li><li><strong>State integrity:</strong> serializes check-in/pass revocation and conditionally permits only <code>SIGNED_UP → CHECKED_IN</code>, blocking cancelled, completed, duplicate and racing requests.</li><li><strong>Data minimisation:</strong> returns a dedicated operational projection and never records submitted QR tokens or NRIC in the audit payload.</li></ul><p class="impact"><strong>Submission impact:</strong> strengthened QR confidentiality, event isolation and concurrency correctness, with integration, security, contract and generated-client evidence for assessment.</p></article>
+    </div></div>
+  </section>
+
+  <section>
+    <h2>PR I need to close</h2>
+    <div class="alert"><span class="tag">Open · assigned to me</span><h3><a href="https://github.com/soc-DBSP/react-nodejs-project2-cryptix/pull/74">PR #74 · Participant QR generator</a></h3><p>Keefe opened this PR and I am an assignee. I need to review it, resolve or confirm the three failing CI checks, decide whether its changes are already superseded, and then merge or close it.</p><p class="note">Current failing checks: backend tests/contracts, backend migration/integration tests, and deep OWASP dependency check.</p></div>
+  </section>
+
+  <section class="next">
+    <h2>What I have to do next</h2>
+    <table><thead><tr><th>Workstream</th><th>Planned work</th></tr></thead><tbody>
+      <tr><td>Sign-in flow</td><td>Complete sign-in, sign-out, session refresh and timeout, password change/reset, safe authentication errors, and failed-login monitoring.</td></tr>
+      <tr><td>User profiles and roles</td><td>Complete the user profile experience, show the user’s assigned role and permissions, and enforce those permissions consistently in frontend routes and backend APIs.</td></tr>
+      <tr><td>Admin user list</td><td>Build the administrator list for users and staff, including account state, roles, search, and the actions an administrator is allowed to perform.</td></tr>
+      <tr><td>Approvals</td><td>Add the required approval workflow, decision states, audit history, and clear visibility of who approved or rejected each request.</td></tr>
+      <tr><td>Event analytics and downloads</td><td>Complete the event analytics dashboard for registrations, attendance, queue performance, station throughput, screening outcomes and referrals. Add permission-controlled CSV or report downloads for a selected event, with clear filters, generation status and audit records for exported data.</td></tr>
+      <tr><td>Event deletion</td><td>Complete the administrator-only event deletion flow with a clear impact summary, explicit confirmation, conflict checks and safe cleanup of dependent operational data. Preserve immutable audit history, record who deleted the event and verify that deleted events no longer appear in operational pages or reports.</td></tr>
+      <tr><td>Google SMTP</td><td>Configure Google SMTP for application email, keep credentials in secret management, verify the sender, and test delivery and failure handling.</td></tr>
+      <tr><td>Cloud deployment</td><td>Deploy the frontend, backend, and PostgreSQL database; run migrations safely; configure CI/CD, domains/TLS, secrets, monitoring, encrypted backups, recovery, and rollback.</td></tr>
+      <tr><td>Redis decision</td><td>Confirm whether production needs Redis for shared rate limiting, sessions, caching, or background coordination before adding infrastructure.</td></tr>
+    </tbody></table>
+    <p class="note">Release prerequisite: remove previously deleted sensitive material from reachable Git history, purge provider caches, invalidate old clones, and rotate affected credentials and sessions.</p>
+  </section>
+
+  <footer>Source: GitHub PR authors, merge actors, close-event actors, assignments, CI checks, repository history, and the cryptix GitHub Project. Updated 5 August 2026.</footer>
+</main>
+</body>
+</html>

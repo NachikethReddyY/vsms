@@ -56,6 +56,54 @@ async function assertRegistrationAssignment(db, eventId, auth) {
     }
 }
 
+async function assertScreenerAssignment(db, eventId, auth, stationId) {
+    const roles = auth?.roles || [];
+    if (roles.includes("ADMINISTRATOR") || !roles.includes("SCREENER")) {
+        const error = new Error("A screener account role is required");
+        error.statusCode = 403;
+        throw error;
+    }
+    const now = new Date();
+    const assignment = await db.staffAssignment.findFirst({
+        where: {
+            ...(eventId ? { eventId } : {}),
+            userId: auth.userId,
+            assignmentRole: "SCREENER",
+            status: { in: ["ASSIGNED", "CONFIRMED"] },
+            ...(stationId ? { stationId } : {}),
+            shift: {
+                ...(eventId ? { eventId } : {}),
+                status: "ACTIVE",
+                startsAt: { lte: now },
+                endsAt: { gt: now },
+            },
+        },
+        select: { id: true },
+    });
+    if (!assignment) {
+        const error = new Error(eventId
+            ? "An active screener assignment is required for this event"
+            : "An active screener assignment is required");
+        error.statusCode = 403;
+        throw error;
+    }
+}
+
+async function assertQrVerifyAccess(db, eventId, auth) {
+    const roles = auth?.roles || [];
+    if (roles.includes("REGISTRATION_OFFICER") && !roles.includes("ADMINISTRATOR")) {
+        await assertRegistrationAssignment(db, eventId, auth);
+        return;
+    }
+    if (roles.includes("SCREENER") && !roles.includes("ADMINISTRATOR")) {
+        await assertScreenerAssignment(db, eventId, auth);
+        return;
+    }
+    const error = new Error("A registration officer or screener account role is required");
+    error.statusCode = 403;
+    throw error;
+}
+
 async function syncLocalUser(profile, { allowCreate = false } = {}) {
     const normalizedEmail = String(profile.email || "").trim().toLowerCase();
     const identityMatches = [];
@@ -125,5 +173,7 @@ module.exports = {
     rolesFromCognitoGroups,
     syncLocalUser,
     assertRegistrationAssignment,
+    assertScreenerAssignment,
+    assertQrVerifyAccess,
     ALLOWED_ROLES,
 };

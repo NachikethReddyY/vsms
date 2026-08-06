@@ -1,12 +1,35 @@
 const { z } = require("zod");
 
-const advanceQueueSchema = z.object({
-  body: z.object({
-    nextStationId: z.string().uuid("Invalid station ID format").optional().nullable(),
-    status: z.enum(["WAITING", "IN_PROGRESS", "COMPLETED"]).optional(),
-  }),
-});
+const eventParams = z.object({
+  eventId: z.string().uuid(),
+}).strict();
+
+const stationParams = eventParams.extend({
+  stationId: z.string().uuid(),
+}).strict();
+
+const queueEntryParams = z.object({
+  queueId: z.string().uuid(),
+}).strict();
+
+const participantParams = z.object({
+  registrationId: z.string().uuid(),
+}).strict();
+
+const joinQueueBody = z.object({
+  registrationId: z.string().uuid(),
+}).strict();
+
+const advanceQueueBody = z.object({
+  toStationId: z.string().uuid(),
+  reason: z.string().trim().min(1).max(100).optional(),
+}).strict();
 
 module.exports = {
-  advanceQueueSchema,
+  eventParams,
+  stationParams,
+  queueEntryParams,
+  participantParams,
+  joinQueueBody,
+  advanceQueueBody,
 };

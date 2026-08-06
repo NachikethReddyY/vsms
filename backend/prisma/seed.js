@@ -9,6 +9,10 @@ if (process.env.NODE_ENV === "production" && !process.env.VSMS_DEMO_PASSWORD) {
   throw new Error("VSMS_DEMO_PASSWORD is required for production seed execution");
 }
 
+// Valid 64-char hex token (matches the QR_TOKEN_PATTERN used by manual check-in)
+// so the seeded demo pass is demonstrable end-to-end.
+const DEMO_QR_TOKEN = "ab".repeat(32);
+
 const roleDefinitions = [
   ["ADMINISTRATOR", "Full administrative access", 1],
   ["EVENT_MANAGER", "Creates and manages events", 2],
@@ -536,7 +540,7 @@ async function ensureDemoRegistration(staff, participant, event, consent) {
     update: {
       registrationStatus: "SIGNED_UP",
       participantDisplayName: `${participant.firstName} ${participant.lastName}`,
-      passToken: "VSMS-DEMO-QR-001",
+      passToken: DEMO_QR_TOKEN,
     },
     create: {
       participantId: participant.id,
@@ -546,7 +550,7 @@ async function ensureDemoRegistration(staff, participant, event, consent) {
       participantDisplayName: `${participant.firstName} ${participant.lastName}`,
       queueNumber: 1,
       idempotencyKey,
-      passToken: "VSMS-DEMO-QR-001",
+      passToken: DEMO_QR_TOKEN,
     },
   });
   const history = await prisma.registrationStatusHistory.findFirst({
@@ -568,7 +572,7 @@ async function ensureDemoRegistration(staff, participant, event, consent) {
     data: { registrationId: registration.registrationId },
   });
 
-  const token = "VSMS-DEMO-QR-001";
+  const token = DEMO_QR_TOKEN;
   const existingQr = await prisma.qRCodePass.findFirst({
     where: { registrationId: registration.registrationId },
     select: { id: true },
@@ -754,6 +758,184 @@ async function seedSyncEvidence(staff, event, registration, stations) {
     seeded.push(syncAction);
   }
   return seeded;
+}
+
+async function seedQueueEntries(staff, event, registration, stations) {
+  if (event.status !== "IN_PROGRESS" || stations.length === 0) return null;
+
+  const firstStation = stations[0];
+  const existing = await prisma.queueEntry.findFirst({
+    where: { registrationId: registration.registrationId, stationId: firstStation.stationId },
+  });
+  if (existing) return existing;
+
+  const queueEntry = await prisma.queueEntry.create({
+    data: {
+      registrationId: registration.registrationId,
+      stationId: firstStation.stationId,
+      queueNumber: registration.queueNumber || 1,
+      status: "WAITING",
+      enteredAt: new Date(),
+    },
+  });
+  await prisma.auditLog.create({
+    data: {
+      userId: staff.id,
+      action: "QUEUE_JOINED",
+      entityName: "QueueEntry",
+      entityId: queueEntry.id,
+      outcome: "SUCCESS",
+      oldValue: null,
+      newValue: {
+        eventId: event.eventId,
+        stationId: firstStation.stationId,
+        registrationId: registration.registrationId,
+        queueNumber: queueEntry.queueNumber,
+        status: "WAITING",
+      },
+    },
+  });
+  return queueEntry;
+}
+
+// Representative append-only audit evidence across every audited domain.
+// Idempotent: each record carries a deterministic requestId; if one already
+// exists the block is skipped so re-seeding does not duplicate history.
+async function seedDomainAuditEvidence({ staff, reviewer, liveEvent, completedEvent, registration, qr, queueEntry }) {
+  const records = [
+    {
+      table: "authAuditLog",
+      key: "76000000-0000-4000-8000-000000000001",
+      data: {
+        userId: staff.id,
+        eventType: "LOGIN_SUCCESS",
+        outcome: "SUCCESS",
+        ipAddress: "127.0.0.1",
+        userAgent: "seed-data",
+      },
+    },
+    {
+      table: "authAuditLog",
+      key: "76000000-0000-4000-8000-000000000002",
+      data: {
+        userId: staff.id,
+        eventType: "LOGIN_FAILURE",
+        outcome: "FAILED",
+        failureCategory: "INVALID_CREDENTIALS",
+        ipAddress: "127.0.0.1",
+        userAgent: "seed-data",
+      },
+    },
+    {
+      table: "auditLog",
+      key: "76000000-0000-4000-8000-000000000011",
+      data: {
+        userId: staff.id,
+        action: "EVENT_REGISTRATION_CREATED",
+        entityName: "EventRegistration",
+        entityId: registration.registrationId,
+        outcome: "SUCCESS",
+        newValue: { eventId: liveEvent.eventId, participantReference: "VSMS-DEMO-000002" },
+      },
+    },
+    {
+      table: "auditLog",
+      key: "76000000-0000-4000-8000-000000000012",
+      data: {
+        userId: reviewer.id,
+        action: "SCREENING_RESULT_RECORDED",
+        entityName: "ScreeningResult",
+        entityId: registration.registrationId,
+        outcome: "SUCCESS",
+        newValue: { eventId: liveEvent.eventId, overallFlag: "REVIEW" },
+      },
+    },
+    {
+      table: "auditLog",
+      key: "76000000-0000-4000-8000-000000000013",
+      data: {
+        userId: staff.id,
+        action: "QR_GENERATED",
+        entityName: "QRCodePass",
+        entityId: qr.id,
+        outcome: "SUCCESS",
+        newValue: { registrationId: registration.registrationId },
+      },
+    },
+    {
+      table: "auditLog",
+      key: "76000000-0000-4000-8000-000000000014",
+      data: {
+        userId: reviewer.id,
+        action: "QR_VERIFIED",
+        entityName: "QRCodePass",
+        entityId: qr.id,
+        outcome: "SUCCESS",
+        newValue: { eventId: liveEvent.eventId, valid: true },
+      },
+    },
+    {
+      table: "auditLog",
+      key: "76000000-0000-4000-8000-000000000015",
+      data: {
+        userId: reviewer.id,
+        action: "CLINICAL_REVIEW_RECORDED",
+        entityName: "Review",
+        entityId: registration.registrationId,
+        outcome: "SUCCESS",
+        newValue: { eventId: liveEvent.eventId, outcome: "REFER" },
+      },
+    },
+    {
+      table: "auditLog",
+      key: "76000000-0000-4000-8000-000000000016",
+      data: {
+        userId: reviewer.id,
+        action: "REFERRAL_ISSUED",
+        entityName: "Referral",
+        entityId: registration.registrationId,
+        outcome: "SUCCESS",
+        newValue: { eventId: completedEvent.eventId, status: "SENT" },
+      },
+    },
+    {
+      table: "auditLog",
+      key: "76000000-0000-4000-8000-000000000017",
+      data: {
+        userId: staff.id,
+        action: "SCREENING_SYNC_BATCH",
+        entityName: "SyncActionBatch",
+        entityId: registration.registrationId,
+        outcome: "SUCCESS",
+        newValue: { eventId: liveEvent.eventId, applied: 5 },
+      },
+    },
+    {
+      table: "auditLog",
+      key: "76000000-0000-4000-8000-000000000018",
+      data: {
+        userId: staff.id,
+        action: "QUEUE_JOINED",
+        entityName: "QueueEntry",
+        entityId: queueEntry?.id || registration.registrationId,
+        outcome: "SUCCESS",
+        newValue: { eventId: liveEvent.eventId, queueNumber: registration.queueNumber || 1 },
+      },
+    },
+  ];
+
+  for (const record of records) {
+    const existing = await prisma[record.table].findUnique({ where: { id: record.key } }).catch(() => null);
+    if (existing) continue;
+    await prisma[record.table].create({
+      data: {
+        id: record.key,
+        requestId: record.key,
+        ...record.data,
+      },
+    });
+  }
+  return records.length;
 }
 
 async function seedDemoData(staff, reviewer, consentForm) {
@@ -948,7 +1130,19 @@ async function seedDemoData(staff, reviewer, consentForm) {
 
   const syncEvidence = await seedSyncEvidence(staff, liveEvent, registration, liveStructure.stations);
 
+  const queueEntry = await seedQueueEntries(staff, liveEvent, registration, liveStructure.stations);
+
   const referralLifecycle = await seedReferralDeliveryLifecycle(staff, reviewer, completedEvent);
+
+  const auditEvidenceCount = await seedDomainAuditEvidence({
+    staff,
+    reviewer,
+    liveEvent,
+    completedEvent,
+    registration,
+    qr,
+    queueEntry,
+  });
 
   return {
     events: { upcomingEvent, liveEvent, completedEvent },
@@ -956,8 +1150,10 @@ async function seedDemoData(staff, reviewer, consentForm) {
     aishaConsent,
     registration,
     qr,
+    queueEntry,
     syncEvidence,
     referralLifecycle,
+    auditEvidenceCount,
   };
 }
 
@@ -981,7 +1177,18 @@ async function main() {
   console.log(`Reviewer profile: ${reviewer.email} (local role: REVIEWER)`);
   console.log(`Registration ID: ${demo.registration.registrationId}`);
   console.log(`Demo QR pass: ${demo.qr.id}`);
+  console.log(`Audit evidence records: ${demo.auditEvidenceCount}`);
+  console.log(`Demo QR token: VSMS-DEMO-QR-001`);
   console.log(`Synthetic referral delivery: ${demo.referralLifecycle.delivery.status} (${demo.referralLifecycle.delivery.id})`);
+  const liveStations = await prisma.station.findMany({
+    where: { eventId: demo.events.liveEvent.eventId, isActive: true },
+    orderBy: { stationOrder: "asc" },
+    select: { stationType: true, stationName: true },
+  });
+  console.log(
+    `Live event stations: ${liveStations.map((s) => s.stationType).join(", ") || "(none)"}`,
+  );
+  console.log("Confirm stations via GET /api/v1/events/{eventId}/stations");
 }
 
 main()

@@ -23,6 +23,9 @@
   },
   "homepage": "https://github.com/soc-DBSP/react-nodejs-project2-cryptix#readme",
   "devDependencies": {
-    "prisma": "^6.19.3"
+    "@babel/preset-env": "^7.29.7",
+    "jest": "^30.4.2",
+    "prisma": "^6.19.3",
+    "supertest": "^7.2.2"
   }
 }

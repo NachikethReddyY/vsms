@@ -6,31 +6,91 @@ const {
     listArtifactCleanupTasks,
     maintainArtifactCleanupTask,
 } = require("../services/artifactCleanupService");
+const { encodeCursor, decodeCursor } = require("../utils/cursor");
+
+// Keyset cursor pagination so reads stay O(page) and bounded even when the
+// audit tables grow to tens of thousands of rows. Both audit tables share the
+// (createdAt desc, id desc) ordering; index-backed.
+function pageQuery(cursorValue, filters, limit, scope, sortField, recordId) {
+    const where = cursorValue
+        ? {
+              ...filters,
+              OR: [
+                  { [sortField]: { lt: new Date(cursorValue.createdAt) } },
+                  {
+                      [sortField]: new Date(cursorValue.createdAt),
+                      [recordId]: { lt: cursorValue.id },
+                  },
+              ],
+          }
+        : filters;
+    return {
+        where,
+        orderBy: [{ [sortField]: "desc" }, { [recordId]: "desc" }],
+        take: limit + 1,
+        include: { user: { select: { id: true, fullName: true, email: true, status: true } } },
+    };
+}
+
+function pageResult(rows, limit, scope, sortField, recordId) {
+    const hasMore = rows.length > limit;
+    const items = hasMore ? rows.slice(0, limit) : rows;
+    const last = items.at(-1);
+    return {
+        items,
+        nextCursor:
+            hasMore && last
+                ? encodeCursor({
+                      scope,
+                      createdAt: last[sortField].toISOString(),
+                      id: last[recordId],
+                  })
+                : null,
+    };
+}
 
 exports.getAuditLogs = asyncHandler(async (req, res) => {
-    const logs = await prisma.auditLog.findMany({
-        include: {
-            user: true,
-        },
-        orderBy: {
-            createdAt: "desc",
-        },
-        take: 100,
-    });
+    const { cursor, authCursor, limit, entityName, action, eventType, outcome, from, to } = req.query;
 
-    const authLogs = await prisma.authAuditLog.findMany({
-        include: {
-            user: true,
-        },
-        orderBy: {
-            occurredAt: "desc",
-        },
-        take: 100,
-    });
+    const auditScope = "admin-audit";
+    const authScope = "admin-auth-audit";
+    const auditCursor = decodeCursor(cursor ?? null, auditScope);
+    const authPageCursor = decodeCursor(authCursor ?? null, authScope);
+
+    const auditFilters = {
+        ...(entityName ? { entityName } : {}),
+        ...(action ? { action } : {}),
+        ...(outcome ? { outcome } : {}),
+        ...(from || to
+            ? { createdAt: { ...(from ? { gte: from } : {}), ...(to ? { lte: to } : {}) } }
+            : {}),
+    };
+
+    const authFilters = {
+        ...(eventType ? { eventType } : {}),
+        ...(outcome ? { outcome } : {}),
+        ...(from || to
+            ? { occurredAt: { ...(from ? { gte: from } : {}), ...(to ? { lte: to } : {}) } }
+            : {}),
+    };
+
+    const [logs, authLogs] = await Promise.all([
+        prisma.auditLog.findMany(
+            pageQuery(auditCursor, auditFilters, limit, auditScope, "createdAt", "id")
+        ),
+        prisma.authAuditLog.findMany(
+            pageQuery(authPageCursor, authFilters, limit, authScope, "occurredAt", "id")
+        ),
+    ]);
+
+    const logsPage = pageResult(logs, limit, auditScope, "createdAt", "id");
+    const authPage = pageResult(authLogs, limit, authScope, "occurredAt", "id");
 
     res.json({
-        logs,
-        authLogs,
+        logs: logsPage.items,
+        authLogs: authPage.items,
+        nextCursor: logsPage.nextCursor,
+        nextAuthCursor: authPage.nextCursor,
     });
 });
 

@@ -24,12 +24,21 @@ exports.resolveParticipant = async (req, res) => {
   res.json(await screeningService.resolveParticipant(req.params.eventId, req.query, req.user));
 };
 
+exports.getPassDisplay = async (req, res) => {
+  res.json(await screeningService.getPassDisplay(
+    req.params.eventId,
+    req.params.registrationId,
+    req.user,
+  ));
+};
+
 exports.saveVisualAcuity = async (req, res) => {
   const { result, created } = await screeningService.saveVisualAcuity(
     req.params.eventId,
     req.params.stationId,
     req.body,
     req.user,
+    req.context,
   );
   res.status(created ? 201 : 200).json(result);
 };
@@ -49,6 +58,7 @@ exports.saveRefraction = async (req, res) => {
     req.params.stationId,
     req.body,
     req.user,
+    req.context,
   );
   res.status(created ? 201 : 200).json(result);
 };
@@ -68,6 +78,7 @@ exports.saveColourVision = async (req, res) => {
     req.params.stationId,
     req.body,
     req.user,
+    req.context,
   );
   res.status(created ? 201 : 200).json(result);
 };
@@ -83,6 +94,10 @@ exports.previewColourVision = async (req, res) => {
 
 exports.listReviews = async (req, res) => {
   res.json(await reviewService.listQueue(req.params.eventId, req.user));
+};
+
+exports.scanReviewParticipant = async (req, res) => {
+  res.json(await reviewService.resolveScannedRegistration(req.params.eventId, req.body.passToken, req.user));
 };
 
 exports.getReview = async (req, res) => {
