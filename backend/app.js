@@ -1,16 +1,32 @@
+/**
+ * ============================================================================
+ * APPLICATION ENTRY POINT & MIDDLEWARE CONFIGURATION
+ * Visual Screening Management System (VSMS) Backend API
+ * ============================================================================
+ */
+
+// Core Node.js & Framework Modules
 const path = require("path");
 const fs = require("fs");
 const express = require("express");
 const cors = require("cors");
 const helmet = require("helmet");
 const cookieParser = require("cookie-parser");
-const { rateLimit } = require("express-rate-limit");
+const { rateLimit } = require("./middlewares/rateLimiter");
 const swaggerUi = require("swagger-ui-express");
 const YAML = require("yaml");
+
+// Environment Configuration & Error Handling
 const env = require("./config/env");
 const AppError = require("./errors/AppError");
+
+// Custom Middlewares
 const requestContext = require("./middlewares/requestContext");
 const csrf = require("./middlewares/csrf");
+const authenticate = require("./middlewares/authenticate");
+const { notFound, errorHandler } = require("./middlewares/errorHandler");
+
+// Route Modules
 const authRoutes = require("./routes/authRoutes");
 const userRoutes = require("./routes/userRoutes");
 const eventRoutes = require("./routes/eventRoutes");
@@ -26,22 +42,42 @@ const emergencyContactRoutes = require("./routes/emergencyContactRoutes");
 const signatureRoutes = require("./routes/signatureRoutes");
 const providerEventRoutes = require("./routes/providerEventRoutes");
 const queueRoutes = require("./routes/queueRoutes");
-const { notFound, errorHandler } = require("./middlewares/errorHandler");
-const authenticate = require("./middlewares/authenticate");
 
+// Initialize Express App
 const app = express();
-if (env.trustProxy) app.set("trust proxy", 1);
+
+/**
+ * ============================================================================
+ * 1. CORE SERVER SETTINGS & PROXY CONFIG
+ * ============================================================================
+ */
+if (env.trustProxy) {
+  app.set("trust proxy", 1);
+}
+
+// Disable Express fingerprinting header for security hardening
 app.disable("x-powered-by");
 
-// Silence browser favicon logs
-app.get("/favicon.ico", (_req, res) => res.status(204).end());
-
+// Attach baseline tracking context to incoming requests
 app.use(requestContext);
+
+/**
+ * ============================================================================
+ * 2. SECURITY HEADERS & PROTOCOL ENFORCEMENT
+ * ============================================================================
+ */
+
+// Enforce HTTPS redirection in production environments
 app.use((req, _res, next) => {
-  if (env.isProduction && !req.secure) return next(new AppError(426, "HTTPS_REQUIRED", "HTTPS is required"));
-  return next();
+  if (env.isProduction && !req.secure) {
+    return next(
+      new AppError(426, "HTTPS_REQUIRED", "HTTPS is required")
+    );
+  }
+  next();
 });
 
+// Comprehensive security header hardening via Helmet
 app.use(
   helmet({
     contentSecurityPolicy: {
@@ -51,22 +87,49 @@ app.use(
         styleSrc: env.isProduction ? ["'self'"] : ["'self'", "'unsafe-inline'"],
         imgSrc: ["'self'", "data:"],
         frameAncestors: ["'none'"],
-      },
+        objectSrc: ["'none'"]
+      }
     },
+    hsts: {
+      maxAge: 31536000,
+      includeSubDomains: true,
+      preload: true
+    },
+    referrerPolicy: { policy: "strict-origin-when-cross-origin" },
+    frameguard: { action: "deny" },
+    noSniff: true,
+    crossOriginEmbedderPolicy: false,
+    crossOriginOpenerPolicy: { policy: "same-origin" },
+    crossOriginResourcePolicy: { policy: "same-origin" }
   })
 );
 
+// Granular browser permissions policy control
 app.use((_req, res, next) => {
-  res.set("Permissions-Policy", "camera=(), microphone=(), geolocation=()");
+  res.set(
+    "Permissions-Policy",
+    "camera=(self), microphone=(), geolocation=()"
+  );
   next();
 });
 
+/**
+ * ============================================================================
+ * 3. CORS & RATE LIMITERS CONFIGURATION
+ * ============================================================================
+ */
+
+// Strict CORS Policy Configuration
 app.use(
   cors({
     credentials: true,
     origin(origin, callback) {
-      if (!origin || env.corsOrigins.includes(origin)) return callback(null, true);
-      return callback(new AppError(403, "ORIGIN_NOT_ALLOWED", "Request origin is not allowed"));
+      if (!origin || env.corsOrigins.includes(origin)) {
+        return callback(null, true);
+      }
+      return callback(
+        new AppError(403, "ORIGIN_NOT_ALLOWED", "Request origin is not allowed")
+      );
     },
     methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     allowedHeaders: [
@@ -78,28 +141,81 @@ app.use(
       "X-Device-Id",
       "X-Device-Name",
       "X-Event-Id",
-      "Idempotency-Key",
-    ],
+      "Idempotency-Key"
+    ]
   })
 );
 
-// Provider callbacks are authenticated with the signed SNS envelope rather
-// than a browser cookie/CSRF token. Mount this one route before browser CSRF.
-const providerEventLimiter = rateLimit({ windowMs: 60000, limit: 120, standardHeaders: "draft-8", legacyHeaders: false });
+// Dedicated Rate Limiters
+const mutationLimiter = rateLimit({
+  name: "mutation",
+  windowMs: 60000,
+  limit: 60,
+  standardHeaders: "draft-8",
+  legacyHeaders: false
+});
+
+const qrLimiter = rateLimit({
+  name: "qr",
+  windowMs: 60000,
+  limit: 30,
+  standardHeaders: "draft-8",
+  legacyHeaders: false
+});
+
+const providerEventLimiter = rateLimit({
+  name: "provider-events",
+  windowMs: 60000,
+  limit: 120,
+  standardHeaders: "draft-8",
+  legacyHeaders: false
+});
+
+/**
+ * ============================================================================
+ * 4. BODY PARSERS & GLOBAL MIDDLEWARES
+ * ============================================================================
+ */
+
+// Unprotected Webhook / Provider Routes (must mount before body parsers if signature verification requires raw bodies)
 app.use("/api/v1/webhooks/ses", providerEventLimiter, providerEventRoutes);
 
+// Cookie Parser Middleware
 app.use(cookieParser());
-app.use(express.json({ limit: "256kb", strict: true, type: "application/json" }));
-app.use(["/api/v1", "/api"], (req, res, next) =>
-  ["POST", "PUT", "PATCH", "DELETE"].includes(req.method) ? csrf(req, res, next) : next()
+
+// JSON Body Parser with strict payload size limits
+app.use(
+  express.json({
+    limit: "256kb",
+    strict: true,
+    type: "application/json"
+  })
 );
 
-const authLimiter = rateLimit({ windowMs: 15 * 60000, limit: 20, standardHeaders: "draft-8", legacyHeaders: false });
-const mutationLimiter = rateLimit({ windowMs: 60000, limit: 60, standardHeaders: "draft-8", legacyHeaders: false });
+// Global CSRF Protection on Mutative API Requests (POST, PUT, PATCH, DELETE)
+app.use(["/api/v1", "/api"], (req, res, next) => {
+  if (["POST", "PUT", "PATCH", "DELETE"].includes(req.method)) {
+    return csrf(req, res, next);
+  }
+  next();
+});
 
-app.get("/health", (_req, res) => res.json({ status: "ok" }));
+/**
+ * ============================================================================
+ * 5. UTILITY & SYSTEM ENDPOINTS
+ * ============================================================================
+ */
 
-// Safely load Swagger OpenAPI specs in non-production environments
+app.get("/favicon.ico", (_req, res) => res.status(204).end());
+
+app.get("/health", (_req, res) =>
+  res.json({
+    status: "ok",
+    environment: env.isProduction ? "production" : "development"
+  })
+);
+
+// Swagger API Documentation UI (Non-Production Only)
 if (!env.isProduction) {
   try {
     const openApiPath = path.resolve(__dirname, "docs/openapi.yaml");
@@ -110,40 +226,38 @@ if (!env.isProduction) {
       app.get("/api-docs/openapi.json", (_req, res) =>
         res.set("Cache-Control", "no-store").json(swaggerDocument)
       );
+
       app.use(
         "/api-docs",
         swaggerUi.serve,
         swaggerUi.setup(swaggerDocument, {
-          customCss: "",
-          customSiteTitle: "VSMS API documentation",
+          customSiteTitle: "VSMS API Documentation",
           swaggerOptions: {
             displayRequestDuration: true,
             filter: true,
             persistAuthorization: true,
-            tryItOutEnabled: true,
-          },
+            tryItOutEnabled: true
+          }
         })
       );
-    } else {
-      console.warn(`[WARN] OpenAPI documentation file not found at: ${openApiPath}`);
     }
   } catch (err) {
-    console.error("[ERROR] Failed to load or parse openapi.yaml:", err.message);
+    console.error("Swagger loading failed:", err.message);
   }
 }
 
-// Versioned API Routes
-app.use("/api/v1/auth", authLimiter, authRoutes);
+/**
+ * ============================================================================
+ * 6. API ROUTE MOUNTING
+ * ============================================================================
+ */
+
+// Authentication & Public Routes
+app.use("/api/v1/auth", authRoutes);
 app.use("/api/v1/public/events", publicEventRoutes);
+
+// Core Entity Routes
 app.use("/api/v1/users", userRoutes);
-app.use(
-  "/api/v1/events",
-  (req, res, next) =>
-    ["POST", "PATCH", "PUT", "DELETE"].includes(req.method) ? mutationLimiter(req, res, next) : next(),
-  authenticate,
-  eventRoutes,
-  screeningRoutes
-);
 app.use("/api/v1/locations", locationRoutes);
 app.use("/api/v1/participants", participantRoutes);
 app.use("/api/v1/registrations", registrationRoutes);
@@ -151,35 +265,59 @@ app.use("/api/v1/consent-forms", consentRoutes);
 app.use("/api/v1/emergency-contacts", emergencyContactRoutes);
 app.use("/api/v1/signatures", signatureRoutes);
 app.use("/api/v1/admin", adminRoutes);
-app.use("/api/v1/qr", mutationLimiter, qrRoutes);
+
+// Specialized Rate-Limited & Authenticated Routes
+app.use("/api/v1/qr", qrLimiter, qrRoutes);
+
+app.use(
+  "/api/v1/events",
+  (req, res, next) => {
+    if (["POST", "PATCH", "PUT", "DELETE"].includes(req.method)) {
+      return mutationLimiter(req, res, next);
+    }
+    next();
+  },
+  authenticate,
+  eventRoutes,
+  screeningRoutes
+);
+
 app.use(
   "/api/v1/queues",
-  (req, res, next) =>
-    ["POST", "PATCH", "PUT", "DELETE"].includes(req.method) ? mutationLimiter(req, res, next) : next(),
+  (req, res, next) => {
+    if (["POST", "PATCH", "PUT", "DELETE"].includes(req.method)) {
+      return mutationLimiter(req, res, next);
+    }
+    next();
+  },
   queueRoutes
 );
 
-// Legacy API Route Aliases
+// Legacy API Route Aliases (backward compatibility; new code should use /api/v1)
 app.use("/api/users", userRoutes);
 app.use("/api/public/events", publicEventRoutes);
 app.use(
   "/api/events",
-  (req, res, next) =>
-    ["POST", "PATCH", "PUT", "DELETE"].includes(req.method) ? mutationLimiter(req, res, next) : next(),
+  (req, res, next) => {
+    if (["POST", "PATCH", "PUT", "DELETE"].includes(req.method)) {
+      return mutationLimiter(req, res, next);
+    }
+    next();
+  },
   authenticate,
   eventRoutes,
   screeningRoutes
 );
 app.use("/api/locations", locationRoutes);
-app.use("/api/qr", mutationLimiter, qrRoutes);
-app.use(
-  "/api/queues",
-  (req, res, next) =>
-    ["POST", "PATCH", "PUT", "DELETE"].includes(req.method) ? mutationLimiter(req, res, next) : next(),
-  queueRoutes
-);
+app.use("/api/qr", qrLimiter, qrRoutes);
 
+/**
+ * ============================================================================
+ * 7. ERROR HANDLING MIDDLEWARES
+ * ============================================================================
+ */
 app.use(notFound);
 app.use(errorHandler);
 
+// Export Application Instance
 module.exports = app;

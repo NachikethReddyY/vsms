@@ -14,13 +14,13 @@ before(async () => {
 
 after(async () => helpers.prisma.$disconnect());
 
-test("mutationLimiter applies rate limit headers to /api/v1/qr/verify", async () => {
+test("qrLimiter applies rate limit headers to /api/v1/qr/verify", async () => {
   const res = await request(app)
     .post("/api/v1/qr/verify")
     .set("Authorization", `Bearer ${staffToken}`)
     .send({ token: "invalid-token-for-test" });
 
-  // mutationLimiter sets standard ratelimit header
+  // The dedicated QR limiter (30/min) sets the standard ratelimit header.
   expect(res.headers).toHaveProperty("ratelimit");
-  expect(res.headers.ratelimit).toMatch(/r=59/);
+  expect(res.headers.ratelimit).toMatch(/r=29/);
 });

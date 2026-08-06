@@ -1,5 +1,5 @@
-import { CheckBadgeIcon, ClockIcon, ExclamationTriangleIcon, XCircleIcon } from '@heroicons/react/24/outline';
-import { useEffect, useState } from 'react';
+import { CheckBadgeIcon, ClockIcon, ExclamationTriangleIcon, QrCodeIcon, XCircleIcon } from '@heroicons/react/24/outline';
+import { useEffect, useRef, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import apiClient, { getApiError as getApiMessage } from '../utils/apiClient';
 import './ParticipantStatusPage.css';
@@ -12,6 +12,19 @@ type PublicPassStatus = {
   expiresAt: string | null;
 };
 
+type HandoffStation = {
+  type: string;
+  label: string;
+};
+
+const HANDOFF_STATIONS: HandoffStation[] = [
+  { type: 'VISUAL_ACUITY', label: 'Visual Acuity' },
+  { type: 'REFRACTION', label: 'Refraction' },
+  { type: 'COLOUR_VISION', label: 'Colour Vision' },
+];
+
+const POLL_MS = 5000;
+
 const formatExpiry = (value: string) =>
   new Intl.DateTimeFormat(undefined, { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(value));
 
@@ -21,14 +34,29 @@ export default function ParticipantStatusPage() {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(true);
 
+  const [handoffOpen, setHandoffOpen] = useState(false);
+  const [handoffLoading, setHandoffLoading] = useState(false);
+  const [handoffError, setHandoffError] = useState('');
+  const [handoffQr, setHandoffQr] = useState('');
+  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const hasStatusRef = useRef(false);
+  const dialogRef = useRef<HTMLDialogElement | null>(null);
+
   useEffect(() => {
     const controller = new AbortController();
-    setStatus(null); setError(''); setLoading(true);
-    apiClient.get<{ success: boolean; data: PublicPassStatus }>(`/qr/public-status/${encodeURIComponent(token)}`, { signal: controller.signal })
-      .then(({ data }) => { if (!controller.signal.aborted) setStatus(data.data); })
-      .catch((cause) => { if (!controller.signal.aborted) setError(getApiMessage(cause, 'This pass could not be verified.')); })
-      .finally(() => { if (!controller.signal.aborted) setLoading(false); });
-    return () => controller.abort();
+    const fetchStatus = () => {
+      if (!hasStatusRef.current) setLoading(true);
+      return apiClient.get<{ success: boolean; data: PublicPassStatus }>(`/qr/public-status/${encodeURIComponent(token)}`, { signal: controller.signal })
+        .then(({ data }) => { if (!controller.signal.aborted) { setStatus(data.data); setError(''); } })
+        .catch((cause) => { if (!controller.signal.aborted) setError(getApiMessage(cause, 'This pass could not be verified.')); })
+        .finally(() => { if (!controller.signal.aborted) { setLoading(false); hasStatusRef.current = true; } });
+    };
+    void fetchStatus();
+    pollRef.current = setInterval(() => void fetchStatus(), POLL_MS);
+    return () => {
+      controller.abort();
+      if (pollRef.current) clearInterval(pollRef.current);
+    };
   }, [token]);
 
   useEffect(() => {
@@ -36,6 +64,34 @@ export default function ParticipantStatusPage() {
     document.title = 'Pass status · VSMS';
     return () => { document.title = previousTitle; };
   }, []);
+
+  useEffect(() => {
+    const dialog = dialogRef.current;
+    if (!dialog) return;
+    if (handoffOpen && !dialog.open) dialog.showModal();
+    else if (!handoffOpen && dialog.open) dialog.close();
+  }, [handoffOpen]);
+
+  const closeHandoff = () => {
+    setHandoffOpen(false);
+    setHandoffLoading(false);
+    setHandoffError('');
+    setHandoffQr('');
+  };
+
+  const showHandoff = async (station: HandoffStation) => {
+    setHandoffLoading(true);
+    setHandoffError('');
+    setHandoffQr('');
+    try {
+      const { data } = await apiClient.get<{ success: boolean; data: { qrImage: string } }>(`/qr/handoff/${encodeURIComponent(token)}?station=${encodeURIComponent(station.type)}`);
+      setHandoffQr(data.data.qrImage);
+    } catch (cause) {
+      setHandoffError(getApiMessage(cause, 'This screener pass could not be created.'));
+    } finally {
+      setHandoffLoading(false);
+    }
+  };
 
   let content;
   if (error) {
@@ -56,7 +112,8 @@ export default function ParticipantStatusPage() {
       <CheckBadgeIcon aria-hidden="true" />
       <span className="ps-badge">Valid pass</span>
       <h1>{status.eventName ?? 'Event pass'}</h1>
-      <div className="ps-queue-grid">
+
+      <div className="ps-queue-stack">
         <div className="ps-queue-cell ps-queue-now">
           <span className="ps-queue-label">Now serving</span>
           <strong className="ps-queue-value">{status.currentQueueNumber != null ? `#${status.currentQueueNumber}` : '—'}</strong>
@@ -65,12 +122,27 @@ export default function ParticipantStatusPage() {
         <div className="ps-queue-cell ps-queue-yours">
           <span className="ps-queue-label">Your queue number</span>
           <strong className="ps-queue-value">{status.queueNumber != null ? `#${status.queueNumber}` : '—'}</strong>
-          <span className="ps-queue-hint">keep this pass ready</span>
+          <span className="ps-queue-hint">watch for your number below</span>
         </div>
       </div>
+
+      <p className="ps-live-note"><ClockIcon aria-hidden="true" />Updates automatically every few seconds.</p>
+
       <dl className="ps-facts">
         {status.expiresAt ? <div><dt>Expires</dt><dd>{formatExpiry(status.expiresAt)}</dd></div> : null}
       </dl>
+
+      <div className="ps-handoff">
+        <button
+          type="button"
+          className="ps-handoff-toggle"
+          aria-haspopup="dialog"
+          onClick={() => setHandoffOpen(true)}
+        >
+          <QrCodeIcon aria-hidden="true" />Show a screener pass
+        </button>
+      </div>
+
       <Link to="/">Return to VSMS</Link>
     </section>;
   } else {
@@ -88,5 +160,40 @@ export default function ParticipantStatusPage() {
       {content}
       <footer className="participant-status-footer"><span>No personal information is shown on this page.</span><Link to="/">Staff sign in</Link></footer>
     </div>
+
+    <dialog
+      ref={dialogRef}
+      className="ps-handoff-dialog"
+      aria-labelledby="ps-handoff-title"
+      onClose={() => {
+        setHandoffOpen(false);
+        setHandoffLoading(false);
+      }}
+    >
+      <button type="button" className="ps-handoff-close" aria-label="Close" onClick={closeHandoff}>✕</button>
+      <h2 id="ps-handoff-title">Screener pass</h2>
+      <p className="ps-handoff-lead">Pick the station you are heading to next. The screener scans the pass to open your screening record directly.</p>
+      <div className="ps-handoff-stations">
+        {HANDOFF_STATIONS.map((station) => (
+          <button
+            key={station.type}
+            type="button"
+            className="ps-handoff-station"
+            disabled={handoffLoading}
+            onClick={() => void showHandoff(station)}
+          >
+            {station.label}
+          </button>
+        ))}
+      </div>
+      {handoffLoading && <p className="ps-handoff-state" role="status">Creating screener pass…</p>}
+      {handoffError && <p className="ps-handoff-state ps-handoff-error" role="alert">{handoffError}</p>}
+      {handoffQr && (
+        <div className="ps-handoff-qr">
+          <img src={handoffQr} alt="Screener pass QR code" />
+          <p>Show this to the station screener. No personal information is stored in the code.</p>
+        </div>
+      )}
+    </dialog>
   </main>;
 }
