@@ -13,6 +13,7 @@ import PublicEventPage from "./features/events/PublicEventPage";
 import ReviewWorkspacePage from "./features/reviews/ReviewWorkspacePage";
 import ReportsPage from "./features/reports/ReportsPage";
 import ColourVisionStationPage from "./features/screening/ColourVisionStationPage";
+import QRScannerPage from "./features/screening/QRScannerPage";
 import RefractionStationPage from "./features/screening/RefractionStationPage";
 import VisualAcuityStationPage from "./features/screening/VisualAcuityStationPage";
 import { AuditLogsPage as RegistrationAuditLogsPage } from "./pages/AdminPages";
@@ -84,8 +85,9 @@ export default function App() {
             <Route path="/events/:eventId/stations/visual-acuity" element={<VisualAcuityStationPage />} />
             <Route path="/events/:eventId/stations/refraction" element={<RefractionStationPage />} />
             <Route path="/events/:eventId/stations/colour-vision" element={<ColourVisionStationPage />} />
+            <Route path="/qr-scanner" element={<QRScannerPage />} />
           </Route>
-          
+
           <Route element={<RoleGuard allowedRoles={eventManagerRoles} />}>
             <Route path="/reports" element={<ReportsPage />} />
             <Route path="/events/new" element={<EventFormPage mode="create" />} />

@@ -161,7 +161,7 @@ export const screeningApi = {
     return data;
   },
 
-  async resolve(eventId: string, params: { passToken?: string; registrationId?: string }) {
+  async resolve(eventId: string, params: { passToken?: string; qrToken?: string; registrationId?: string }) {
     const { data } = await apiClient.get<{
       registrationId: string;
       participantDisplayName: string;
@@ -169,6 +169,18 @@ export const screeningApi = {
       status: string;
       passToken: string | null;
     }>(`/events/${eventId}/registrations/resolve`, { params });
+    return data;
+  },
+
+  async getPassDisplay(eventId: string, registrationId: string) {
+    const { data } = await apiClient.get<{
+      qrId: string | null;
+      registrationId: string;
+      qrImage: string;
+      expiresAt: string | null;
+      participantDisplayName: string;
+      queueNumber: number | null;
+    }>(`/events/${eventId}/registrations/${registrationId}/pass-display`);
     return data;
   },
 

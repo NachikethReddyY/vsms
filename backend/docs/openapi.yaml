@@ -1555,7 +1555,7 @@ paths:
         "404": { $ref: "#/components/responses/NotFound" }
         "409": { $ref: "#/components/responses/Conflict" }
         "422": { $ref: "#/components/responses/ValidationFailed" }
-  /api/v1/queues/{eventId}:
+  /api/v1/queues/events/{eventId}:
     get:
       tags: [Queue]
       operationId: getEventQueueStatus
@@ -1572,7 +1572,7 @@ paths:
         "404": { $ref: "#/components/responses/NotFound" }
         "409": { $ref: "#/components/responses/Conflict" }
         "422": { $ref: "#/components/responses/ValidationFailed" }
-  /api/v1/queues/{eventId}/stations/{stationId}/join:
+  /api/v1/queues/events/{eventId}/stations/{stationId}/join:
     post:
       tags: [Queue]
       operationId: joinQueue
@@ -1615,7 +1615,7 @@ paths:
         "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
         "422": { $ref: "#/components/responses/ValidationFailed" }
-  /api/v1/queues/{queueId}/call:
+  /api/v1/queues/entries/{queueId}/call:
     patch:
       tags: [Queue]
       operationId: callQueueEntry
@@ -1632,7 +1632,7 @@ paths:
         "404": { $ref: "#/components/responses/NotFound" }
         "409": { $ref: "#/components/responses/Conflict" }
         "422": { $ref: "#/components/responses/ValidationFailed" }
-  /api/v1/queues/{queueId}/start:
+  /api/v1/queues/entries/{queueId}/start:
     patch:
       tags: [Queue]
       operationId: startQueueEntry
@@ -1649,7 +1649,7 @@ paths:
         "404": { $ref: "#/components/responses/NotFound" }
         "409": { $ref: "#/components/responses/Conflict" }
         "422": { $ref: "#/components/responses/ValidationFailed" }
-  /api/v1/queues/{queueId}/advance:
+  /api/v1/queues/entries/{queueId}/advance:
     patch:
       tags: [Queue]
       operationId: advanceQueueEntry
@@ -1671,7 +1671,7 @@ paths:
         "404": { $ref: "#/components/responses/NotFound" }
         "409": { $ref: "#/components/responses/Conflict" }
         "422": { $ref: "#/components/responses/ValidationFailed" }
-  /api/v1/queues/{queueId}/complete:
+  /api/v1/queues/entries/{queueId}/complete:
     patch:
       tags: [Queue]
       operationId: completeQueueEntry
@@ -1688,7 +1688,7 @@ paths:
         "404": { $ref: "#/components/responses/NotFound" }
         "409": { $ref: "#/components/responses/Conflict" }
         "422": { $ref: "#/components/responses/ValidationFailed" }
-  /api/v1/queues/{queueId}/skip:
+  /api/v1/queues/entries/{queueId}/skip:
     patch:
       tags: [Queue]
       operationId: skipQueueEntry
@@ -1705,7 +1705,7 @@ paths:
         "404": { $ref: "#/components/responses/NotFound" }
         "409": { $ref: "#/components/responses/Conflict" }
         "422": { $ref: "#/components/responses/ValidationFailed" }
-  /api/v1/queues/{queueId}:
+  /api/v1/queues/entries/{queueId}:
     delete:
       tags: [Queue]
       operationId: leaveQueue
