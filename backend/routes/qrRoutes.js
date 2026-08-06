@@ -13,6 +13,10 @@ const requireAnyRole = require("../middlewares/requireAnyRole");
 // ==========================================
 router.get("/public-status/:token", asyncHandler(qrController.getPublicStatus));
 
+// Public screener-handoff QR. Encodes only a station URL pre-loaded with the
+// registration reference; the station page itself stays role-guarded.
+router.get("/handoff/:token", asyncHandler(qrController.getStationHandoffQR));
+
 // ==========================================
 // Dev-only QR preview (no auth). Blocked in production by controller.
 // ==========================================

@@ -44,6 +44,22 @@ const artifactCleanupListQuery = z.object({
   limit: z.coerce.number().int().min(1).max(200).default(100),
 }).strict();
 
+const auditLogListQuery = z.object({
+  cursor: z.string().trim().min(1).max(512).optional(),
+  authCursor: z.string().trim().min(1).max(512).optional(),
+  limit: z.coerce.number().int().min(1).max(100).default(50),
+  entityName: z.string().trim().min(1).max(50).optional(),
+  action: z.string().trim().min(1).max(100).optional(),
+  eventType: z.string().trim().min(1).max(50).optional(),
+  outcome: z.enum(["SUCCESS", "FAILED", "DENIED"]).optional(),
+  from: z.coerce.date().optional(),
+  to: z.coerce.date().optional(),
+}).strict().superRefine((value, context) => {
+  if (value.from && value.to && value.from > value.to) {
+    context.addIssue({ code: "custom", path: ["from"], message: "from must not be after to" });
+  }
+});
+
 const artifactCleanupParams = z.object({ taskId: z.string().uuid() }).strict();
 
 const artifactCleanupActionBody = z.object({
@@ -53,6 +69,7 @@ const artifactCleanupActionBody = z.object({
 
 module.exports = {
   referralDeliveryMaintenanceBody,
+  auditLogListQuery,
   artifactCleanupListQuery,
   artifactCleanupParams,
   artifactCleanupActionBody,

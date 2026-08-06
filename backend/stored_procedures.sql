@@ -36,27 +36,45 @@ RETURNS TRIGGER
 LANGUAGE plpgsql
 AS $$
 BEGIN
+    -- Reset flag status before evaluation
     NEW.is_flagged := FALSE;
     NEW.flag_reason := '';
 
-    -- Check Driving Standard Flag: Uncorrected or corrected VA worse than 20/40
-    IF NEW.left_eye_va IN ('20/50', '20/100', '20/200') OR NEW.right_eye_va IN ('20/50', '20/100', '20/200') THEN
+    /*
+        Driving Standard Check:
+        Flags participants with visual acuity worse than 20/40
+    */
+    IF NEW.left_eye_va IN ('20/50', '20/60', '20/80', '20/100', '20/200')
+       OR NEW.right_eye_va IN ('20/50', '20/60', '20/80', '20/100', '20/200') THEN
+        
         NEW.is_flagged := TRUE;
-        NEW.flag_reason := NEW.flag_reason || '[Driving Standard: VA worse than 20/40] ';
+        NEW.flag_reason := NEW.flag_reason ||
+        '[Driving Standard: Visual acuity worse than 20/40] ';
     END IF;
 
-    -- Check Pathology & Pinhole Flag: Corrected VA <= 20/30 and pinhole does not improve
-    IF NEW.pinhole_left IN ('20/40', '20/50', '20/100', '20/200') THEN
+
+    /*
+        Pathology Check:
+        Flags participants where pinhole correction does not significantly improve vision
+    */
+    IF NEW.pinhole_left IN ('20/40', '20/50', '20/60', '20/80', '20/100', '20/200')
+       OR NEW.pinhole_right IN ('20/40', '20/50', '20/60', '20/80', '20/100', '20/200') THEN
+        
         NEW.is_flagged := TRUE;
-        NEW.flag_reason := NEW.flag_reason || '[Pathology: Pinhole fails to improve vision] ';
+        NEW.flag_reason := NEW.flag_reason ||
+        '[Pathology Risk: Pinhole improvement insufficient] ';
     END IF;
+
 
     RETURN NEW;
 END;
 $$;
 
--- Attach auto-flagging trigger to visual_acuity_results table
-DROP TRIGGER IF EXISTS trg_auto_flag_va ON visual_acuity_results;
+
+-- Attach trigger to visual_acuity_results table
+DROP TRIGGER IF EXISTS trg_auto_flag_va 
+ON visual_acuity_results;
+
 CREATE TRIGGER trg_auto_flag_va
 BEFORE INSERT OR UPDATE ON visual_acuity_results
 FOR EACH ROW

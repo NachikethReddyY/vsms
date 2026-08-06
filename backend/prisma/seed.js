@@ -790,6 +790,146 @@ async function seedQueueEntries(staff, event, registration, stations) {
   return queueEntry;
 }
 
+// Representative append-only audit evidence across every audited domain.
+// Idempotent: each record carries a deterministic requestId; if one already
+// exists the block is skipped so re-seeding does not duplicate history.
+async function seedDomainAuditEvidence({ staff, reviewer, liveEvent, completedEvent, registration, qr, queueEntry }) {
+  const records = [
+    {
+      table: "authAuditLog",
+      key: "76000000-0000-4000-8000-000000000001",
+      data: {
+        userId: staff.id,
+        eventType: "LOGIN_SUCCESS",
+        outcome: "SUCCESS",
+        ipAddress: "127.0.0.1",
+        userAgent: "seed-data",
+      },
+    },
+    {
+      table: "authAuditLog",
+      key: "76000000-0000-4000-8000-000000000002",
+      data: {
+        userId: staff.id,
+        eventType: "LOGIN_FAILURE",
+        outcome: "FAILED",
+        failureCategory: "INVALID_CREDENTIALS",
+        ipAddress: "127.0.0.1",
+        userAgent: "seed-data",
+      },
+    },
+    {
+      table: "auditLog",
+      key: "76000000-0000-4000-8000-000000000011",
+      data: {
+        userId: staff.id,
+        action: "EVENT_REGISTRATION_CREATED",
+        entityName: "EventRegistration",
+        entityId: registration.registrationId,
+        outcome: "SUCCESS",
+        newValue: { eventId: liveEvent.eventId, participantReference: "VSMS-DEMO-000002" },
+      },
+    },
+    {
+      table: "auditLog",
+      key: "76000000-0000-4000-8000-000000000012",
+      data: {
+        userId: reviewer.id,
+        action: "SCREENING_RESULT_RECORDED",
+        entityName: "ScreeningResult",
+        entityId: registration.registrationId,
+        outcome: "SUCCESS",
+        newValue: { eventId: liveEvent.eventId, overallFlag: "REVIEW" },
+      },
+    },
+    {
+      table: "auditLog",
+      key: "76000000-0000-4000-8000-000000000013",
+      data: {
+        userId: staff.id,
+        action: "QR_GENERATED",
+        entityName: "QRCodePass",
+        entityId: qr.id,
+        outcome: "SUCCESS",
+        newValue: { registrationId: registration.registrationId },
+      },
+    },
+    {
+      table: "auditLog",
+      key: "76000000-0000-4000-8000-000000000014",
+      data: {
+        userId: reviewer.id,
+        action: "QR_VERIFIED",
+        entityName: "QRCodePass",
+        entityId: qr.id,
+        outcome: "SUCCESS",
+        newValue: { eventId: liveEvent.eventId, valid: true },
+      },
+    },
+    {
+      table: "auditLog",
+      key: "76000000-0000-4000-8000-000000000015",
+      data: {
+        userId: reviewer.id,
+        action: "CLINICAL_REVIEW_RECORDED",
+        entityName: "Review",
+        entityId: registration.registrationId,
+        outcome: "SUCCESS",
+        newValue: { eventId: liveEvent.eventId, outcome: "REFER" },
+      },
+    },
+    {
+      table: "auditLog",
+      key: "76000000-0000-4000-8000-000000000016",
+      data: {
+        userId: reviewer.id,
+        action: "REFERRAL_ISSUED",
+        entityName: "Referral",
+        entityId: registration.registrationId,
+        outcome: "SUCCESS",
+        newValue: { eventId: completedEvent.eventId, status: "SENT" },
+      },
+    },
+    {
+      table: "auditLog",
+      key: "76000000-0000-4000-8000-000000000017",
+      data: {
+        userId: staff.id,
+        action: "SCREENING_SYNC_BATCH",
+        entityName: "SyncActionBatch",
+        entityId: registration.registrationId,
+        outcome: "SUCCESS",
+        newValue: { eventId: liveEvent.eventId, applied: 5 },
+      },
+    },
+    {
+      table: "auditLog",
+      key: "76000000-0000-4000-8000-000000000018",
+      data: {
+        userId: staff.id,
+        action: "QUEUE_JOINED",
+        entityName: "QueueEntry",
+        entityId: queueEntry?.id || registration.registrationId,
+        outcome: "SUCCESS",
+        newValue: { eventId: liveEvent.eventId, queueNumber: registration.queueNumber || 1 },
+      },
+    },
+  ];
+
+  for (const record of records) {
+    const existing = await prisma[record.table].findUnique({ where: { id: record.key } }).catch(() => null);
+    if (existing) continue;
+    await prisma[record.table].create({
+      data: {
+        id: record.key,
+        requestId: record.key,
+        ...record.data,
+      },
+    });
+  }
+  return records.length;
+}
+
 async function seedDemoData(staff, reviewer, consentForm) {
   const upcomingEvent = await upsertDemoEvent(staff, {
     key: "seed-demo-tampines",
@@ -986,6 +1126,16 @@ async function seedDemoData(staff, reviewer, consentForm) {
 
   const referralLifecycle = await seedReferralDeliveryLifecycle(staff, reviewer, completedEvent);
 
+  const auditEvidenceCount = await seedDomainAuditEvidence({
+    staff,
+    reviewer,
+    liveEvent,
+    completedEvent,
+    registration,
+    qr,
+    queueEntry,
+  });
+
   return {
     events: { upcomingEvent, liveEvent, completedEvent },
     participants: { aisha, daniel, priya, marcus },
@@ -995,6 +1145,7 @@ async function seedDemoData(staff, reviewer, consentForm) {
     queueEntry,
     syncEvidence,
     referralLifecycle,
+    auditEvidenceCount,
   };
 }
 
@@ -1018,6 +1169,7 @@ async function main() {
   console.log(`Reviewer profile: ${reviewer.email} (local role: REVIEWER)`);
   console.log(`Registration ID: ${demo.registration.registrationId}`);
   console.log(`Demo QR pass: ${demo.qr.id}`);
+  console.log(`Audit evidence records: ${demo.auditEvidenceCount}`);
   console.log(`Demo QR token: VSMS-DEMO-QR-001`);
   console.log(`Synthetic referral delivery: ${demo.referralLifecycle.delivery.status} (${demo.referralLifecycle.delivery.id})`);
   const liveStations = await prisma.station.findMany({

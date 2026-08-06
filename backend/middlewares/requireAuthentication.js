@@ -33,7 +33,13 @@ module.exports = asyncHandler(async (req, _res, next) => {
 
   const user = await prisma.user.findUnique({
     where: cognitoToken ? { cognitoSub: payload.sub } : { id: payload.sub },
-    include: { userRoles: { include: { role: true } } },
+    include: {
+      userRoles: {
+        include: {
+          role: { include: { rolePermissions: { include: { permission: true } } } },
+        },
+      },
+    },
   });
   if (!user || user.status !== "ACTIVE") {
     throw new AppError(401, "INVALID_SESSION", "Session is invalid or expired");
@@ -47,12 +53,22 @@ module.exports = asyncHandler(async (req, _res, next) => {
     throw new AppError(403, "FORBIDDEN", "Cognito group membership does not grant an application role");
   }
 
+  const effectiveRoles = new Set(roles);
+  const permissions = [
+    ...new Set(
+      user.userRoles
+        .filter(({ role }) => effectiveRoles.has(role.roleName))
+        .flatMap(({ role }) => (role.rolePermissions || []).map(({ permission }) => permission.permissionName)),
+    ),
+  ];
+
   req.auth = {
     token,
     user,
     userId: user.id,
     email: user.email,
     roles,
+    permissions,
   };
   next();
 });

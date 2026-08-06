@@ -1,45 +1,123 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import apiClient from "../utils/apiClient";
 import { LoadingState } from "../components/ui";
 
 type AuditEntry = {
   id: string;
   action: string;
-  entityName: string;
+  entityName: string | null;
   outcome: string;
-  timestamp?: string;
-  user?: { email?: string } | null;
+  createdAt?: string;
+  user?: { id: string; fullName?: string | null; email?: string | null } | null;
 };
 
 type AuthAuditEntry = {
   id: string;
   eventType: string;
   outcome: string;
-  timestamp?: string;
-  user?: { email?: string } | null;
+  occurredAt?: string;
+  user?: { id: string; fullName?: string | null; email?: string | null } | null;
 };
 
+type AuditListResponse = {
+  logs: AuditEntry[];
+  authLogs: AuthAuditEntry[];
+  nextCursor: string | null;
+  nextAuthCursor: string | null;
+};
+
+const OUTCOME_OPTIONS = ["SUCCESS", "FAILED", "DENIED"] as const;
+
+const formatTimestamp = (value?: string) =>
+  value ? new Date(value).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" }) : "";
+
 export function AuditLogsPage() {
-  const [logs, setLogs] = useState<AuditEntry[] | null>(null);
-  const [authLogs, setAuthLogs] = useState<AuthAuditEntry[] | null>(null);
+  const [logs, setLogs] = useState<AuditEntry[]>([]);
+  const [authLogs, setAuthLogs] = useState<AuthAuditEntry[]>([]);
+  const [nextCursor, setNextCursor] = useState<string | null>(null);
+  const [nextAuthCursor, setNextAuthCursor] = useState<string | null>(null);
+
+  const [filters, setFilters] = useState({ entityName: "", action: "", eventType: "", outcome: "" });
+
   const [isRestricted, setIsRestricted] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState<"logs" | "authLogs" | null>(null);
+  const [loadMoreError, setLoadMoreError] = useState<string | null>(null);
+
+  const load = useCallback(async (overrides?: { cursor?: string; authCursor?: string; reset?: boolean }) => {
+    setLoading(true);
+    setError(null);
+    try {
+      const response = await apiClient.get<AuditListResponse>("/admin/audit-logs", {
+        params: {
+          limit: 50,
+          ...(filters.entityName ? { entityName: filters.entityName } : {}),
+          ...(filters.action ? { action: filters.action } : {}),
+          ...(filters.eventType ? { eventType: filters.eventType } : {}),
+          ...(filters.outcome ? { outcome: filters.outcome } : {}),
+          ...(overrides?.cursor ? { cursor: overrides.cursor } : {}),
+          ...(overrides?.authCursor ? { authCursor: overrides.authCursor } : {}),
+        },
+      });
+      const data = response.data;
+      setLogs((previous) => (overrides?.reset ? (data.logs ?? []) : [...previous, ...(data.logs ?? [])]));
+      setAuthLogs((previous) =>
+        overrides?.reset ? (data.authLogs ?? []) : [...previous, ...(data.authLogs ?? [])]
+      );
+      setNextCursor(data.nextCursor);
+      setNextAuthCursor(data.nextAuthCursor);
+    } catch (err: unknown) {
+      const status = (err as { response?: { status?: number } })?.response?.status;
+      const message = (err as { response?: { data?: { message?: string } } })?.response?.data?.message;
+      if (status === 403) {
+        setIsRestricted(true);
+      } else {
+        setError(message || "Failed to load audit logs.");
+      }
+    } finally {
+      setLoading(false);
+    }
+  }, [filters]);
 
   useEffect(() => {
-    apiClient
-      .get("/admin/audit-logs")
-      .then((response) => {
-        setLogs(response.data.logs ?? []);
-        setAuthLogs(response.data.authLogs ?? []);
-      })
-      .catch((err) => {
-        if (err?.response?.status === 403) {
-          setIsRestricted(true);
+    void load({ reset: true });
+  }, [load]);
+
+  const loadMore = useCallback(
+    async (section: "logs" | "authLogs") => {
+      const cursor = section === "logs" ? nextCursor : nextAuthCursor;
+      if (!cursor) return;
+      setLoadingMore(section);
+      setLoadMoreError(null);
+      try {
+        const response = await apiClient.get<AuditListResponse>("/admin/audit-logs", {
+          params: {
+            limit: 50,
+            ...(filters.entityName ? { entityName: filters.entityName } : {}),
+            ...(filters.action ? { action: filters.action } : {}),
+            ...(filters.eventType ? { eventType: filters.eventType } : {}),
+            ...(filters.outcome ? { outcome: filters.outcome } : {}),
+            ...(section === "logs" ? { cursor } : { authCursor: cursor }),
+          },
+        });
+        const data = response.data;
+        if (section === "logs") {
+          setLogs((previous) => [...previous, ...(data.logs ?? [])]);
+          setNextCursor(data.nextCursor);
         } else {
-          setError(err?.response?.data?.message || "Failed to load audit logs.");
+          setAuthLogs((previous) => [...previous, ...(data.authLogs ?? [])]);
+          setNextAuthCursor(data.nextAuthCursor);
         }
-      });
-  }, []);
+      } catch (err: unknown) {
+        const message = (err as { response?: { data?: { message?: string } } })?.response?.data?.message;
+        setLoadMoreError(message || "Failed to load more records.");
+      } finally {
+        setLoadingMore(null);
+      }
+    },
+    [filters, nextCursor, nextAuthCursor]
+  );
 
   // Helper function to render status badges for outcomes
   const renderBadge = (outcome: string) => {
@@ -57,6 +135,56 @@ export function AuditLogsPage() {
       </span>
     );
   };
+
+  const renderFilters = () => (
+    <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+      <label className="block text-xs font-medium text-slate-600">
+        Entity name
+        <input
+          type="text"
+          value={filters.entityName}
+          onChange={(event) => setFilters({ ...filters, entityName: event.target.value })}
+          placeholder="e.g. Event, QRCodePass"
+          className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none"
+        />
+      </label>
+      <label className="block text-xs font-medium text-slate-600">
+        Action
+        <input
+          type="text"
+          value={filters.action}
+          onChange={(event) => setFilters({ ...filters, action: event.target.value })}
+          placeholder="e.g. QUEUE_JOINED"
+          className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none"
+        />
+      </label>
+      <label className="block text-xs font-medium text-slate-600">
+        Event type
+        <input
+          type="text"
+          value={filters.eventType}
+          onChange={(event) => setFilters({ ...filters, eventType: event.target.value })}
+          placeholder="e.g. LOGIN_SUCCESS"
+          className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none"
+        />
+      </label>
+      <label className="block text-xs font-medium text-slate-600">
+        Outcome
+        <select
+          value={filters.outcome}
+          onChange={(event) => setFilters({ ...filters, outcome: event.target.value })}
+          className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none"
+        >
+          <option value="">All outcomes</option>
+          {OUTCOME_OPTIONS.map((option) => (
+            <option key={option} value={option}>
+              {option}
+            </option>
+          ))}
+        </select>
+      </label>
+    </div>
+  );
 
   // 1. Restricted View (User is not an Administrator)
   if (isRestricted) {
@@ -86,7 +214,7 @@ export function AuditLogsPage() {
   }
 
   // 3. Loading State
-  if (!logs || !authLogs) {
+  if (loading) {
     return <LoadingState label="Loading audit logs..." />;
   }
 
@@ -99,6 +227,11 @@ export function AuditLogsPage() {
             Monitor administrative activities and authentication logs across the system.
           </p>
         </div>
+
+        <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+          <h2 className="mb-3 text-sm font-semibold text-slate-900">Filters</h2>
+          {renderFilters()}
+        </section>
 
         <div className="grid gap-6 xl:grid-cols-2">
           {/* Application Audit Logs Section */}
@@ -119,10 +252,10 @@ export function AuditLogsPage() {
                       {entry.outcome && renderBadge(entry.outcome)}
                     </div>
                     <p className="mt-1 text-xs text-slate-600">
-                      <span className="font-semibold text-slate-800">{entry.entityName}</span> - {entry.user?.email ?? "unknown user"}
+                      <span className="font-semibold text-slate-800">{entry.entityName ?? "—"}</span> - {entry.user?.email ?? "unknown user"}
                     </p>
-                    {entry.timestamp && (
-                      <p className="mt-1.5 text-[11px] font-mono text-slate-400">{entry.timestamp}</p>
+                    {formatTimestamp(entry.createdAt) && (
+                      <p className="mt-1.5 text-[11px] font-mono text-slate-400">{formatTimestamp(entry.createdAt)}</p>
                     )}
                   </article>
                 ))
@@ -130,6 +263,17 @@ export function AuditLogsPage() {
                 <p className="py-6 text-center text-sm text-slate-400">No application audit logs found.</p>
               )}
             </div>
+
+            {nextCursor && (
+              <button
+                type="button"
+                onClick={() => void loadMore("logs")}
+                disabled={loadingMore === "logs"}
+                className="mt-4 w-full rounded-lg border border-slate-300 bg-slate-50 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-100 disabled:opacity-50"
+              >
+                {loadingMore === "logs" ? "Loading more..." : "Load more"}
+              </button>
+            )}
           </section>
 
           {/* Authentication Audit Logs Section */}
@@ -152,8 +296,8 @@ export function AuditLogsPage() {
                     <p className="mt-1 text-xs text-slate-600">
                       {entry.user?.email ?? "unknown user"}
                     </p>
-                    {entry.timestamp && (
-                      <p className="mt-1.5 text-[11px] font-mono text-slate-400">{entry.timestamp}</p>
+                    {formatTimestamp(entry.occurredAt) && (
+                      <p className="mt-1.5 text-[11px] font-mono text-slate-400">{formatTimestamp(entry.occurredAt)}</p>
                     )}
                   </article>
                 ))
@@ -161,8 +305,23 @@ export function AuditLogsPage() {
                 <p className="py-6 text-center text-sm text-slate-400">No authentication audit logs found.</p>
               )}
             </div>
+
+            {nextAuthCursor && (
+              <button
+                type="button"
+                onClick={() => void loadMore("authLogs")}
+                disabled={loadingMore === "authLogs"}
+                className="mt-4 w-full rounded-lg border border-slate-300 bg-slate-50 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-100 disabled:opacity-50"
+              >
+                {loadingMore === "authLogs" ? "Loading more..." : "Load more"}
+              </button>
+            )}
           </section>
         </div>
+
+        {loadMoreError && (
+          <p className="text-center text-sm font-medium text-red-500">{loadMoreError}</p>
+        )}
       </div>
   );
 }

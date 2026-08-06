@@ -171,7 +171,7 @@ exports.getEventIdForAccess = async ({ eventId, registrationId, qrId, token }, d
 /**
  * Audit Logger Helper conforming to unified schema
  */
-async function writeAudit(tx, { userId, action, entityName, entityId, newValue }) {
+async function writeAudit(tx, { userId, action, entityName, entityId, newValue, ipAddress, deviceName }) {
     await tx.auditLog.create({
         data: {
             userId: userId || null,
@@ -179,8 +179,8 @@ async function writeAudit(tx, { userId, action, entityName, entityId, newValue }
             entityName,
             entityId: entityId || null,
             newValue: newValue ? JSON.parse(JSON.stringify(newValue)) : null,
-            ipAddress: "127.0.0.1",
-            deviceName: "Internal System / QR Service",
+            ipAddress: ipAddress || "127.0.0.1",
+            deviceName: deviceName || "Internal System / QR Service",
         },
     });
 }
@@ -188,11 +188,11 @@ async function writeAudit(tx, { userId, action, entityName, entityId, newValue }
 // ==========================================
 // Generate Registration QR (Compatibility Endpoint)
 // ==========================================
-exports.generateRegistrationQR = async (registrationId, userId) => {
+exports.generateRegistrationQR = async (registrationId, userId, auditContext = {}) => {
     if (!registrationId) {
         throw new AppError(400, "REGISTRATION_ID_REQUIRED", "Registration ID is required.");
     }
-    return await exports.generateQR(registrationId, userId);
+    return await exports.generateQR(registrationId, userId, null, auditContext);
 };
 
 // ==========================================
@@ -218,7 +218,7 @@ exports.getRegistrationByQR = async (token, db = prisma) => {
 // ==========================================
 // Generate Secure QR Pass
 // ==========================================
-exports.generateQR = async (registrationId, userId = null, externalTx = null) => {
+exports.generateQR = async (registrationId, userId = null, externalTx = null, auditContext = {}) => {
     if (!registrationId) {
         throw new AppError(400, "REGISTRATION_ID_REQUIRED", "Registration ID is required.");
     }
@@ -281,6 +281,7 @@ exports.generateQR = async (registrationId, userId = null, externalTx = null) =>
             entityName: "QRCodePass",
             entityId: qrRecord.id,
             newValue: { registrationId, expiresAt },
+            ...auditContext,
         });
 
         return renderQr({ ...qrRecord, registrationId }, token);
@@ -292,7 +293,7 @@ exports.generateQR = async (registrationId, userId = null, externalTx = null) =>
 // ==========================================
 // Verify QR Pass Token
 // ==========================================
-exports.verifyQR = async (token, eventId = null, userId = null, db = prisma) => {
+exports.verifyQR = async (token, eventId = null, userId = null, db = prisma, auditContext = {}) => {
     if (!token) {
         throw new AppError(400, "TOKEN_REQUIRED", "QR Token is required.");
     }
@@ -318,6 +319,7 @@ exports.verifyQR = async (token, eventId = null, userId = null, db = prisma) => 
             entityName: "QRCodePass",
             entityId: qr.id,
             newValue: { registrationId: qr.registration.registrationId, eventId },
+            ...auditContext,
         });
 
         return {
@@ -394,6 +396,48 @@ exports.getPublicStatus = async (token, db = prisma) => {
 };
 
 // ==========================================
+// Screener Handoff QR (scan target for station staff)
+// ==========================================
+const STATION_HANDOFF_SLUGS = {
+    VISUAL_ACUITY: "visual-acuity",
+    REFRACTION: "refraction",
+    COLOUR_VISION: "colour-vision",
+};
+
+function buildStationHandoffUrl(eventId, registrationId, stationType) {
+    const slug = STATION_HANDOFF_SLUGS[stationType];
+    if (!slug) return null;
+    return `${env.publicAppOrigin}/events/${eventId}/stations/${slug}?registrationId=${registrationId}`;
+}
+
+exports.buildStationHandoffUrl = buildStationHandoffUrl;
+
+exports.getStationHandoffQR = async (token, stationType, db = prisma) => {
+    if (!token) {
+        throw new AppError(400, "TOKEN_REQUIRED", "QR Token is required.");
+    }
+    const target = buildStationHandoffUrl("placeholder", "placeholder", stationType);
+    if (!target) {
+        throw new AppError(400, "STATION_UNSUPPORTED", "Station is not supported for screener handoff.");
+    }
+
+    const qr = await db.qRCodePass.findFirst({
+        where: activeQrWhere(tokenSelector(token)),
+        select: {
+            registration: { select: { registrationId: true, eventId: true } },
+        },
+    });
+
+    if (!qr) {
+        throw new AppError(404, "INVALID_QR", "QR Code is invalid, expired, or unavailable.");
+    }
+
+    const qrImage = await renderBrandedQrSvg(buildStationHandoffUrl(qr.registration.eventId, qr.registration.registrationId, stationType), { width: 300 });
+
+    return { qrImage };
+};
+
+// ==========================================
 // Get Active Participant Info by QR Token
 // ==========================================
 exports.getParticipant = async (token, db = prisma) => {
@@ -431,7 +475,7 @@ exports.getParticipant = async (token, db = prisma) => {
 // ==========================================
 // Revoke Active QR Code
 // ==========================================
-exports.revokeQR = async (qrId, revokedReason = "Revoked by staff", revokedBy = null, db = prisma) => {
+exports.revokeQR = async (qrId, revokedReason = "Revoked by staff", revokedBy = null, db = prisma, auditContext = {}) => {
     if (!qrId) {
         throw new AppError(400, "QR_ID_REQUIRED", "QR ID is required.");
     }
@@ -467,6 +511,7 @@ exports.revokeQR = async (qrId, revokedReason = "Revoked by staff", revokedBy = 
             entityName: "QRCodePass",
             entityId: qrId,
             newValue: { reason: revokedReason },
+            ...auditContext,
         });
 
         return safeQrRecord(updatedQr);
@@ -476,7 +521,7 @@ exports.revokeQR = async (qrId, revokedReason = "Revoked by staff", revokedBy = 
 // ==========================================
 // Reissue QR Code
 // ==========================================
-exports.reissueQR = async (registrationId, userId = null, db = prisma) => {
+exports.reissueQR = async (registrationId, userId = null, db = prisma, auditContext = {}) => {
     if (!registrationId) {
         throw new AppError(400, "REGISTRATION_ID_REQUIRED", "Registration ID is required.");
     }
@@ -501,10 +546,11 @@ exports.reissueQR = async (registrationId, userId = null, db = prisma) => {
             entityName: "EventRegistration",
             entityId: registrationId,
             newValue: { action: "Revoked prior active QRs" },
+            ...auditContext,
         });
 
         // 2. Generate new QR pass within the same active transaction client
-        return await exports.generateQR(registrationId, userId, tx);
+        return await exports.generateQR(registrationId, userId, tx, auditContext);
     });
 };
 
@@ -596,9 +642,13 @@ exports.printQR = async (qrId, db = prisma) => {
 // ==========================================
 // Manual Check-In Procedure
 // ==========================================
-exports.manualCheckIn = async (params, db = prisma) => {
-    let { registrationId, identifier, eventId, userId } =
+exports.manualCheckIn = async (params, db = prisma, auditContext = {}) => {
+    let { registrationId, identifier, eventId, userId, ipAddress, deviceName } =
         typeof params === "object" ? params : { registrationId: params };
+
+    if (ipAddress || deviceName) {
+        auditContext = { ...auditContext, ipAddress, deviceName };
+    }
 
     if (!eventId) {
         throw new AppError(400, "EVENT_ID_REQUIRED", "Event ID is required for manual check-in.");
@@ -693,6 +743,7 @@ exports.manualCheckIn = async (params, db = prisma) => {
                 eventId: result.eventId,
                 checkInMethod: identifier ? "QR_TOKEN" : "REGISTRATION_REFERENCE",
             },
+            ...auditContext,
         });
 
         return result;

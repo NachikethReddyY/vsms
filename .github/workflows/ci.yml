@@ -64,42 +64,42 @@ jobs:
         run: pnpm exec prisma migrate reset --force --skip-seed
         working-directory: backend
 
-      - name: Run Node.js backend tests
+      - name: Run Node.js backend unit tests
         shell: bash
-        run: |
-          find tests -maxdepth 1 -name '*.test.js' \
-            ! -name 'auth.integration.test.js' \
-            ! -name 'events.integration.test.js' \
-            ! -name 'locationService.test.js' \
-            ! -name 'qr.integration.test.js' \
-            ! -name 'reviewService.test.js' \
-            ! -name 'reviews.integration.test.js' \
-            ! -name 'sync.integration.test.js' \
+        run: >-
+          find tests/unit tests/security -maxdepth 1 -name '*.test.js' \
+            ! -name 'rateLimit.test.js' \
+            ! -name 'rbac.test.js' \
             -print0 | xargs -0 node --test
         working-directory: backend
 
-      - name: Run database integration tests
+      - name: Run database integration and security tests
+        if: always()
         shell: bash
         run: >-
           node --test
-          tests/auth.integration.test.js
-          tests/events.integration.test.js
-          tests/locationService.test.js
-          tests/qr.integration.test.js
-          tests/reviewService.test.js
-          tests/reviews.integration.test.js
-          tests/sync.integration.test.js
+          tests/integration/audit-immutability.test.js
+          tests/integration/auth.integration.test.js
+          tests/integration/events.integration.test.js
+          tests/integration/qr.integration.test.js
+          tests/integration/reviews.integration.test.js
+          tests/integration/sync.integration.test.js
+          tests/security/rateLimit.test.js
+          tests/security/rbac.test.js
         working-directory: backend
 
       - name: Validate Prisma schema
+        if: always()
         run: pnpm run prisma:validate
         working-directory: backend
 
       - name: Lint OpenAPI contract
+        if: always()
         run: pnpm run openapi:lint
         working-directory: backend
 
       - name: Verify generated API client
+        if: always()
         run: pnpm run contracts:check
         working-directory: backend
 
