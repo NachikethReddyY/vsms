@@ -11,12 +11,14 @@ Object.assign(process.env, {
     COGNITO_REDIRECT_URI: "https://localhost:5173/auth/callback",
     COGNITO_LOGOUT_URI: "https://localhost:5173",
     PUBLIC_APP_ORIGIN: "https://localhost:5173",
+    AUTH_RATE_LIMIT: "100",
 });
 
 const cognitoClient = require("../../utils/cognitoClient");
 const cognitoJwt = require("../../utils/cognitoJwt");
 const staff = require("../../utils/staff");
 const AuthAudit = require("../../utils/audit");
+const prisma = require("../../prisma/prismaClient");
 
 cognitoClient.exchangeAuthorizationCode = async (code, verifier) => {
     assert.equal(code, "authorization-code");
@@ -34,6 +36,7 @@ staff.syncLocalUser = async () => ({
 });
 staff.rolesFromCognitoGroups = () => ["EVENT_MANAGER"];
 AuthAudit.createAuthAuditLog = async () => {};
+prisma.user.update = async () => ({});
 
 const app = require("../../app");
 

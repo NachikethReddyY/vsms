@@ -14,6 +14,8 @@ const { verifyCognitoToken } = require("../utils/cognitoJwt");
 const { createAuthAuditLog } = require("../utils/audit");
 const { timingSafeEqual } = require("../utils/security");
 const { syncLocalUser, rolesFromCognitoGroups, ALLOWED_ROLES } = require("../utils/staff");
+const { assertAccountUnlocked, clearLoginFailures } = require("../utils/accountLockout");
+const prisma = require("../prisma/prismaClient");
 const {
     ACCESS_COOKIE,
     REFRESH_COOKIE,
@@ -114,6 +116,7 @@ async function finalizeSuccessfulLogin(authResult, username, context, res) {
         error.statusCode = 403;
         throw error;
     }
+    assertAccountUnlocked(localUser);
 
     const localRoles = localUser.userRoles.map((entry) => entry.role.roleName);
     const cognitoRoles = rolesFromCognitoGroups(accessTokenPayload);
@@ -124,6 +127,7 @@ async function finalizeSuccessfulLogin(authResult, username, context, res) {
         throw error;
     }
 
+    await clearLoginFailures(prisma, localUser.id);
     setAuthCookies(res, authResult, idTokenPayload.email || idTokenPayload["cognito:username"] || username);
     await createAuthAuditLog({
         userId: localUser.id,
@@ -214,6 +218,7 @@ exports.refresh = asyncHandler(async (req, res) => {
             error.statusCode = 403;
             throw error;
         }
+        assertAccountUnlocked(localUser);
 
         const localRoles = localUser.userRoles.map((entry) => entry.role.roleName);
         const cognitoRoles = rolesFromCognitoGroups(accessPayload);
@@ -224,6 +229,7 @@ exports.refresh = asyncHandler(async (req, res) => {
             throw error;
         }
 
+        await clearLoginFailures(prisma, localUser.id);
         setAuthCookies(res, { ...authResult, RefreshToken: refreshToken }, username);
         res.json({
             expiresIn: authResult.ExpiresIn,

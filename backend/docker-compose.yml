@@ -1,0 +1,25 @@
+# Local infrastructure for the VSMS backend.
+#
+# Redis backs the shared rate-limiting store (middlewares/rateLimiter.js).
+# All limiters reuse one connection and fall back to in-process memory when
+# Redis is unreachable, so the API keeps working if this service is down.
+#
+# Start it with:
+#   docker compose up -d
+services:
+  redis:
+    image: redis:7-alpine
+    container_name: vsms-redis
+    ports:
+      - "6379:6379"
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - vsms-redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+volumes:
+  vsms-redis-data:

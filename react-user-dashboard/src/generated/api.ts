@@ -1532,7 +1532,8 @@ export interface paths {
         get: operations["getEventQueueStatus"];
         put?: never;
         post?: never;
-        delete?: never;
+        /** Remove a participant from the queue (cancels the entry) */
+        delete: operations["leaveQueue"];
         options?: never;
         head?: never;
         patch?: never;
@@ -1655,23 +1656,6 @@ export interface paths {
         head?: never;
         /** Skip a waiting or called participant (does not advance them) */
         patch: operations["skipQueueEntry"];
-        trace?: never;
-    };
-    "/api/v1/queues/{queueId}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post?: never;
-        /** Remove a participant from the queue (cancels the entry) */
-        delete: operations["leaveQueue"];
-        options?: never;
-        head?: never;
-        patch?: never;
         trace?: never;
     };
 }
@@ -6322,6 +6306,34 @@ export interface operations {
             422: components["responses"]["ValidationFailed"];
         };
     };
+    leaveQueue: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The queue entry ID to remove. */
+                eventId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Queue entry cancelled */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["QueueEntry"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            422: components["responses"]["ValidationFailed"];
+        };
+    };
     joinQueue: {
         parameters: {
             query?: never;
@@ -6513,33 +6525,6 @@ export interface operations {
         requestBody?: never;
         responses: {
             /** @description Queue entry skipped */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["QueueEntry"];
-                };
-            };
-            401: components["responses"]["Unauthorized"];
-            403: components["responses"]["Forbidden"];
-            404: components["responses"]["NotFound"];
-            409: components["responses"]["Conflict"];
-            422: components["responses"]["ValidationFailed"];
-        };
-    };
-    leaveQueue: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                queueId: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Queue entry cancelled */
             200: {
                 headers: {
                     [name: string]: unknown;

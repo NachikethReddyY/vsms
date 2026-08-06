@@ -12,7 +12,7 @@ const express = require("express");
 const cors = require("cors");
 const helmet = require("helmet");
 const cookieParser = require("cookie-parser");
-const { rateLimit } = require("express-rate-limit");
+const { rateLimit } = require("./middlewares/rateLimiter");
 const swaggerUi = require("swagger-ui-express");
 const YAML = require("yaml");
 
@@ -147,15 +147,8 @@ app.use(
 );
 
 // Dedicated Rate Limiters
-const authLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  limit: 5,
-  standardHeaders: "draft-8",
-  legacyHeaders: false,
-  message: { error: "Too many authentication attempts" }
-});
-
 const mutationLimiter = rateLimit({
+  name: "mutation",
   windowMs: 60000,
   limit: 60,
   standardHeaders: "draft-8",
@@ -163,6 +156,7 @@ const mutationLimiter = rateLimit({
 });
 
 const qrLimiter = rateLimit({
+  name: "qr",
   windowMs: 60000,
   limit: 30,
   standardHeaders: "draft-8",
@@ -170,6 +164,7 @@ const qrLimiter = rateLimit({
 });
 
 const providerEventLimiter = rateLimit({
+  name: "provider-events",
   windowMs: 60000,
   limit: 120,
   standardHeaders: "draft-8",
@@ -258,7 +253,7 @@ if (!env.isProduction) {
  */
 
 // Authentication & Public Routes
-app.use("/api/v1/auth", authLimiter, authRoutes);
+app.use("/api/v1/auth", authRoutes);
 app.use("/api/v1/public/events", publicEventRoutes);
 
 // Core Entity Routes
@@ -297,6 +292,24 @@ app.use(
   },
   queueRoutes
 );
+
+// Legacy API Route Aliases (backward compatibility; new code should use /api/v1)
+app.use("/api/users", userRoutes);
+app.use("/api/public/events", publicEventRoutes);
+app.use(
+  "/api/events",
+  (req, res, next) => {
+    if (["POST", "PATCH", "PUT", "DELETE"].includes(req.method)) {
+      return mutationLimiter(req, res, next);
+    }
+    next();
+  },
+  authenticate,
+  eventRoutes,
+  screeningRoutes
+);
+app.use("/api/locations", locationRoutes);
+app.use("/api/qr", qrLimiter, qrRoutes);
 
 /**
  * ============================================================================
