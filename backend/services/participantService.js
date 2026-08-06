@@ -41,6 +41,34 @@ function participantPublicSummary(participant) {
     };
 }
 
+function searchMatchReasons(participant, query) {
+    const participantReferenceValue = cleanString(query.participantReference, "participantReference", { max: 30 });
+    const name = cleanString(query.name, "name", { max: 100 });
+    const contactNumber = cleanString(query.contactNumber, "contactNumber", { max: 30 });
+    const dateOfBirth = cleanString(query.dateOfBirth, "dateOfBirth", { max: 10 });
+    const reasons = [];
+
+    if (participantReferenceValue && participant.participantReference.toLowerCase().includes(participantReferenceValue.toLowerCase())) {
+        reasons.push("Participant reference");
+    }
+    if (name) {
+        const normalizedName = name.toLowerCase();
+        const parts = normalizedName.split(/\s+/).filter(Boolean);
+        const firstPart = parts[0];
+        const remainingParts = parts.slice(1).join(" ");
+        const nameMatches = participant.firstName.toLowerCase().includes(normalizedName)
+            || participant.lastName.toLowerCase().includes(normalizedName)
+            || (Boolean(remainingParts)
+                && participant.firstName.toLowerCase().includes(firstPart)
+                && participant.lastName.toLowerCase().includes(remainingParts));
+        if (nameMatches) reasons.push("Name");
+    }
+    if (contactNumber && String(participant.contactNumber).includes(contactNumber)) reasons.push("Contact number");
+    if (dateOfBirth && new Date(participant.dateOfBirth).toISOString().slice(0, 10) === dateOfBirth) reasons.push("Date of birth");
+
+    return reasons;
+}
+
 function eventPublicSummary(event) {
     return {
         ...event,
@@ -61,6 +89,98 @@ function registrationPublicSummary(registration) {
         event: registration.event ? eventPublicSummary(registration.event) : registration.event,
     };
 }
+
+function parseParticipantMatch(payload) {
+    const firstName = cleanString(payload.firstName, "firstName", { required: true, max: 100 });
+    const lastName = cleanString(payload.lastName, "lastName", { required: true, max: 100 });
+    const contactNumber = cleanString(payload.contactNumber, "contactNumber", { required: true, max: 30 });
+    const dateOfBirth = cleanString(payload.dateOfBirth, "dateOfBirth", { required: true, max: 10 });
+    const parsedDateOfBirth = new Date(`${dateOfBirth}T00:00:00.000Z`);
+    if (Number.isNaN(parsedDateOfBirth.getTime())) throw validationError("dateOfBirth is invalid");
+    if (parsedDateOfBirth > new Date()) throw validationError("dateOfBirth cannot be in the future");
+    return { firstName, lastName, contactNumber, dateOfBirth, parsedDateOfBirth };
+}
+
+function participantMatchReasons(participant, criteria) {
+    const reasons = [];
+    if (participant.firstName.localeCompare(criteria.firstName, undefined, { sensitivity: "accent" }) === 0
+        && participant.lastName.localeCompare(criteria.lastName, undefined, { sensitivity: "accent" }) === 0) {
+        reasons.push("Full name");
+    }
+    if (new Date(participant.dateOfBirth).toISOString().slice(0, 10) === criteria.dateOfBirth) reasons.push("Date of birth");
+    if (participant.contactNumber === criteria.contactNumber) reasons.push("Contact number");
+    return reasons;
+}
+
+exports.matchParticipantsForRegistrationService = async (req) => {
+    const criteria = parseParticipantMatch(req.body || {});
+    const fullName = {
+        AND: [
+            { firstName: { equals: criteria.firstName, mode: "insensitive" } },
+            { lastName: { equals: criteria.lastName, mode: "insensitive" } },
+        ],
+    };
+    // A name alone is not enough to classify a participant as a possible duplicate.
+    const participants = await prisma.participant.findMany({
+        where: {
+            OR: [
+                { AND: [fullName, { dateOfBirth: criteria.parsedDateOfBirth }] },
+                { AND: [fullName, { contactNumber: criteria.contactNumber }] },
+                { AND: [{ dateOfBirth: criteria.parsedDateOfBirth }, { contactNumber: criteria.contactNumber }] },
+            ],
+        },
+        orderBy: [{ updatedAt: "desc" }, { id: "asc" }],
+        take: 10,
+        include: {
+            eventRegistrations: {
+                include: {
+                    event: { select: { name: true } },
+                    queueEntries: {
+                        where: { status: { in: ["WAITING", "CALLED", "IN_PROGRESS"] } },
+                        include: { station: { select: { stationName: true } } },
+                        orderBy: { enteredAt: "desc" },
+                        take: 1,
+                    },
+                },
+                orderBy: { createdAt: "desc" },
+            },
+        },
+    });
+
+    const matches = participants.map((participant) => {
+        const currentEventRegistration = participant.eventRegistrations.find((registration) => registration.eventId === req.registrationEventId);
+        const previousRegistration = participant.eventRegistrations.find((registration) => registration.eventId !== req.registrationEventId);
+        const activeQueueEntry = currentEventRegistration?.queueEntries?.[0] ?? null;
+        return {
+            participant: {
+                id: participant.id,
+                participantReference: participant.participantReference,
+                firstName: participant.firstName,
+                lastName: participant.lastName,
+                dateOfBirth: participant.dateOfBirth.toISOString().slice(0, 10),
+                maskedContactNumber: maskPhone(participant.contactNumber),
+                preferredLanguage: participant.preferredLanguage,
+            },
+            matchReasons: participantMatchReasons(participant, criteria),
+            previousEvent: previousRegistration?.event ? { eventName: previousRegistration.event.name } : null,
+            currentEventRegistration: currentEventRegistration ? {
+                id: currentEventRegistration.registrationId,
+                queueNumber: currentEventRegistration.queueNumber,
+                status: currentEventRegistration.registrationStatus,
+                assignedBooth: activeQueueEntry?.station?.stationName ?? null,
+            } : null,
+        };
+    });
+
+    return {
+        result: matches.length === 0
+            ? "NO_MATCH"
+            : matches.every((match) => match.currentEventRegistration)
+                ? "ALREADY_REGISTERED"
+                : "POSSIBLE_MATCH",
+        matches,
+    };
+};
 
 function parseSearch(req) {
     const participantReferenceValue = cleanString(req.query.participantReference, "participantReference", { max: 30 });
@@ -123,7 +243,10 @@ exports.searchParticipantsService = async (req) => {
     ]);
 
     return {
-        participants: participants.map(participantPublicSummary),
+        participants: participants.map((participant) => ({
+            ...participantPublicSummary(participant),
+            matchReasons: searchMatchReasons(participant, req.query),
+        })),
         pagination: { page, pageSize, total, totalPages: Math.ceil(total / pageSize) },
     };
 };

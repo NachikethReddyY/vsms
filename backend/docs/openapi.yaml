@@ -1021,6 +1021,19 @@ paths:
         "401": { $ref: "#/components/responses/Unauthorized" }
         "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
+  /api/v1/participants/match:
+    post:
+      tags: [Participants]
+      operationId: matchParticipantsForRegistration
+      summary: Find possible participant matches for the assigned registration event
+      description: A name alone never produces a possible match. At least two of full name, date of birth, and contact number must agree.
+      requestBody: { required: true, content: { application/json: { schema: { $ref: "#/components/schemas/ParticipantMatchRequest" } } } }
+      responses:
+        "200": { description: Match outcome and limited identity data for officer review, content: { application/json: { schema: { $ref: "#/components/schemas/ParticipantMatchResponse" } } } }
+        "400": { $ref: "#/components/responses/ValidationFailed" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "429": { $ref: "#/components/responses/RateLimited" }
   /api/v1/participants/{participantId}:
     parameters: 
       - $ref: "#/components/parameters/ParticipantId"
@@ -3079,7 +3092,7 @@ components:
     ParticipantSummary:
       type: object
       additionalProperties: false
-      required: [id, participantReference, firstName, lastName, maskedContactNumber, maskedDateOfBirth, status]
+      required: [id, participantReference, firstName, lastName, maskedContactNumber, maskedDateOfBirth, matchReasons, status]
       properties:
         id: { type: string, format: uuid }
         participantReference: { type: string }
@@ -3087,6 +3100,9 @@ components:
         lastName: { type: string }
         maskedContactNumber: { type: string }
         maskedDateOfBirth: { type: string }
+        matchReasons:
+          type: array
+          items: { type: string }
         status: { type: string, enum: [ACTIVE, INACTIVE, DECEASED] }
     ParticipantEnvelope:
       type: object
@@ -3100,6 +3116,56 @@ components:
       properties:
         participants: { type: array, items: { $ref: "#/components/schemas/ParticipantSummary" } }
         pagination: { $ref: "#/components/schemas/Pagination" }
+    ParticipantMatchRequest:
+      type: object
+      additionalProperties: false
+      required: [firstName, lastName, dateOfBirth, contactNumber]
+      properties:
+        firstName: { type: string, minLength: 1, maxLength: 100 }
+        lastName: { type: string, minLength: 1, maxLength: 100 }
+        dateOfBirth: { type: string, format: date }
+        contactNumber: { type: string, minLength: 7, maxLength: 30 }
+    ParticipantMatchResponse:
+      type: object
+      additionalProperties: false
+      required: [result, matches]
+      properties:
+        result: { type: string, enum: [NO_MATCH, POSSIBLE_MATCH, ALREADY_REGISTERED] }
+        matches: { type: array, items: { $ref: "#/components/schemas/ParticipantMatch" } }
+    ParticipantMatch:
+      type: object
+      additionalProperties: false
+      required: [participant, matchReasons, previousEvent, currentEventRegistration]
+      properties:
+        participant:
+          type: object
+          additionalProperties: false
+          required: [id, participantReference, firstName, lastName, dateOfBirth, maskedContactNumber, preferredLanguage]
+          properties:
+            id: { type: string, format: uuid }
+            participantReference: { type: string }
+            firstName: { type: string }
+            lastName: { type: string }
+            dateOfBirth: { type: string, format: date }
+            maskedContactNumber: { type: string }
+            preferredLanguage: { type: string, nullable: true }
+        matchReasons: { type: array, items: { type: string, enum: [Full name, Date of birth, Contact number] } }
+        previousEvent:
+          nullable: true
+          type: object
+          additionalProperties: false
+          required: [eventName]
+          properties: { eventName: { type: string } }
+        currentEventRegistration:
+          nullable: true
+          type: object
+          additionalProperties: false
+          required: [id, queueNumber, status, assignedBooth]
+          properties:
+            id: { type: string, format: uuid }
+            queueNumber: { type: integer, nullable: true }
+            status: { type: string, enum: [SIGNED_UP, CHECKED_IN, COMPLETED, CANCELLED] }
+            assignedBooth: { type: string, nullable: true }
     EmergencyContactRequest:
       type: object
       additionalProperties: false

@@ -20,6 +20,7 @@ import { AuditLogsPage as RegistrationAuditLogsPage } from "./pages/AdminPages";
 import AccountSecurityPage from "./pages/AccountSecurityPage";
 import StaffAccountsPage from "./pages/StaffAccountsPage";
 import { QueuePage } from "./pages/QueuePages"; // Imported the QueuePage component
+import EventRegistrationPage from "./pages/participant/EventRegistrationPage";
 import ParticipantCheckInPage from "./pages/participant/ParticipantCheckInPage";
 import ParticipantConsentPage from "./pages/participant/ParticipantConsentPage";
 import ParticipantCreatePage from "./pages/participant/ParticipantCreatePage";
@@ -133,7 +134,7 @@ export default function App() {
             <Route path="/participants/:participantId" element={<ParticipantProfilePage />} />
 
             <Route path="/participants/search" element={<LegacySearchRedirect />} />
-            <Route path="/events/:eventId/register" element={<LegacyEventRegistrationRedirect />} />
+            <Route path="/events/:eventId/register" element={<EventRegistrationPage />} />
             <Route path="/events/:eventId/registrations" element={<LegacyEventRegistrationRedirect />} />
             <Route path="/events/:eventId/participants/:participantId/consent" element={<LegacyParticipantStepRedirect step="consent" />} />
             <Route path="/events/:eventId/participants/:participantId/review" element={<LegacyParticipantStepRedirect step="register" />} />
