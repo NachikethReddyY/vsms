@@ -14,7 +14,7 @@ const { verifyCognitoToken } = require("../utils/cognitoJwt");
 const { createAuthAuditLog } = require("../utils/audit");
 const { timingSafeEqual } = require("../utils/security");
 const { syncLocalUser, rolesFromCognitoGroups, ALLOWED_ROLES } = require("../utils/staff");
-const { assertAccountUnlocked, clearLoginFailures } = require("../utils/accountLockout");
+const { assertAccountUnlocked, recordFailedLogin, clearLoginFailures } = require("../utils/accountLockout");
 const prisma = require("../prisma/prismaClient");
 const {
     ACCESS_COOKIE,
@@ -83,6 +83,15 @@ function extractProfileFromIdToken(payload) {
     };
 }
 
+async function recordLoginFailureForUsername(username) {
+    const identity = String(username || "").trim().toLowerCase();
+    const matches = identity.includes("@")
+        ? [{ email: identity }, { username: identity }]
+        : [{ username: identity }];
+    const user = await prisma.user.findFirst({ where: { OR: matches }, select: { id: true } });
+    if (user) await recordFailedLogin(prisma, user.id);
+}
+
 function publicUser(localUser, roles) {
     const systemRole = roles.includes("ADMINISTRATOR")
         ? "ADMIN"
@@ -112,6 +121,7 @@ async function finalizeSuccessfulLogin(authResult, username, context, res) {
     const localUser = await syncLocalUser(extractProfileFromIdToken(idTokenPayload));
 
     if (localUser.status !== "ACTIVE") {
+        await recordFailedLogin(prisma, localUser.id).catch(() => {});
         const error = new Error("Local staff account is not active");
         error.statusCode = 403;
         throw error;
@@ -122,6 +132,7 @@ async function finalizeSuccessfulLogin(authResult, username, context, res) {
     const cognitoRoles = rolesFromCognitoGroups(accessTokenPayload);
     const roles = localRoles.filter((role) => cognitoRoles.includes(role));
     if (roles.length === 0) {
+        await recordFailedLogin(prisma, localUser.id).catch(() => {});
         const error = new Error("Cognito group membership does not grant an application role");
         error.statusCode = 403;
         throw error;
@@ -238,6 +249,9 @@ exports.refresh = asyncHandler(async (req, res) => {
         });
     } catch (error) {
         clearAuthCookies(res);
+        if (error.statusCode !== 423) {
+            await recordLoginFailureForUsername(username).catch(() => {});
+        }
         await createAuthAuditLog({
             eventType: "TOKEN_REFRESH_FAILED",
             outcome: "FAILED",
