@@ -96,7 +96,7 @@ test("QR verify accepts registration officers or screeners with active assignmen
 });
 
 test("QR verify route allows SCREENER while generation stays registration-officer only", () => {
-  const source = fs.readFileSync(path.join(__dirname, "../routes/qrRoutes.js"), "utf8");
+  const source = fs.readFileSync(path.join(__dirname, "../../routes/qrRoutes.js"), "utf8");
   assert.match(source, /\/verify[\s\S]*REGISTRATION_OFFICER[\s\S]*SCREENER/);
   const officerOnlyGuard = 'router.use(requireAnyRole.operational("REGISTRATION_OFFICER"));';
   assert.ok(source.includes(officerOnlyGuard));
