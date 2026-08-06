@@ -178,6 +178,17 @@ test("participant search matches any supplied identifier", () => {
     assert.match(controller, /searchParticipantsService/);
 });
 
+test("registration match requires at least two participant identifiers", () => {
+    const service = read("services/participantService.js");
+    const routes = read("routes/participantRoutes.js");
+    const document = YAML.parse(read("docs/openapi.yaml"));
+    const response = document.components.schemas.ParticipantMatchResponse;
+    assert.match(service, /matchParticipantsForRegistrationService/);
+    assert.match(service, /A name alone is not enough to classify a participant as a possible duplicate/);
+    assert.match(routes, /router\.post\("\/match"/);
+    assert.deepEqual(response.properties.result.enum, ["NO_MATCH", "POSSIBLE_MATCH", "ALREADY_REGISTERED"]);
+});
+
 test("authentication uses verified Cognito tokens and approved local role intersection", () => {
     const controller = read("controllers/authController.js");
     const middleware = read("middlewares/requireAuthentication.js");

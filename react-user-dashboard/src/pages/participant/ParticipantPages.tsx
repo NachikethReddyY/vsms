@@ -1,15 +1,18 @@
 import {
   ArrowLeftIcon,
   ArrowRightIcon,
+  CalendarDaysIcon,
   CheckCircleIcon,
   ClipboardDocumentCheckIcon,
+  ExclamationTriangleIcon,
+  IdentificationIcon,
   MagnifyingGlassIcon,
   PhoneIcon,
   UserIcon,
   UserPlusIcon,
 } from "@heroicons/react/24/outline";
-import { useCallback, useEffect, useRef, useState } from "react";
-import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Link, useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import apiClient, { getApiError } from "../../utils/apiClient";
 import type {
   ConsentFormVersion,
@@ -28,6 +31,18 @@ interface Pagination {
   pageSize: number;
   total: number;
   totalPages: number;
+}
+
+interface ParticipantMatchSearchResponse {
+  participants: ParticipantSummary[];
+  pagination: Pagination;
+}
+
+interface ParticipantMatchCriteria {
+  participantReference: string;
+  name: string;
+  contactNumber: string;
+  dateOfBirth: string;
 }
 
 interface ConsentRecord {
@@ -204,6 +219,25 @@ function SearchNoMatchNotice() {
       <MagnifyingGlassIcon />
       <p><strong>Search returned no match.</strong> Creating a new participant record. For a returning participant, search first and create a new event check-in instead of a duplicate.</p>
     </div>
+  );
+}
+
+function RegistrationMatchJourney({ active }: { active: "enter" | "match" | "continue" }) {
+  const steps = [
+    ["enter", "01", "Enter details"],
+    ["match", "02", "Check match"],
+    ["continue", "03", "Continue registration"],
+  ] as const;
+  const activeIndex = steps.findIndex(([key]) => key === active);
+  return (
+    <ol className="registration-journey" aria-label="Registration progress">
+      {steps.map(([key, number, label], index) => (
+        <li key={key} className={index === activeIndex ? "active" : index < activeIndex ? "complete" : ""}>
+          <span>{index < activeIndex ? <CheckCircleIcon /> : number}</span>
+          <strong>{label}</strong>
+        </li>
+      ))}
+    </ol>
   );
 }
 
@@ -567,9 +601,11 @@ export function ParticipantDetailPage() {
 
 export function ParticipantEditPage() {
   const navigate = useNavigate();
+  const location = useLocation();
   const { participantId = "" } = useParams();
   const eventId = useEventIdFromRouteOrQuery();
   const participantLink = `/participants/${participantId}${eventId ? `?eventId=${eventId}` : ""}`;
+  const registrationDraft = (location.state as { registrationDraft?: Partial<ParticipantFormState> } | null)?.registrationDraft;
   const [form, setForm] = useState<ParticipantFormState | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -585,10 +621,12 @@ export function ParticipantEditPage() {
         email: participant.email ?? "",
         preferredLanguage: participant.preferredLanguage ?? "",
         accessibilityNotes: participant.accessibilityNotes ?? "",
+        ...registrationDraft,
+        // A registration draft must never change the participant's lifecycle status.
         status: participant.status,
       });
     });
-  }, [participantId]);
+  }, [participantId, registrationDraft]);
   const setEditForm: React.Dispatch<React.SetStateAction<ParticipantFormState>> = (action) => {
     setForm((current) => {
       const value = current ?? emptyParticipantForm;

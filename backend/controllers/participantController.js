@@ -6,6 +6,11 @@ exports.searchParticipants = asyncHandler(async (req, res) => {
     res.json(result);
 });
 
+exports.matchParticipantsForRegistration = asyncHandler(async (req, res) => {
+    const result = await participantService.matchParticipantsForRegistrationService(req);
+    res.json(result);
+});
+
 exports.createParticipant = asyncHandler(async (req, res) => {
     const participant = await participantService.createParticipantService(req);
     res.status(201).json({ participant });

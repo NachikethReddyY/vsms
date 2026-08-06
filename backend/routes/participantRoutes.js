@@ -15,6 +15,7 @@ router.use(requireRegistrationAssignment);
 
 router.get("/", requirePermission("participants:read"), rateLimit({ windowMs: 60_000, max: 30 }), participantController.searchParticipants);
 router.post("/", requirePermission("participants:write"), participantController.createParticipant);
+router.post("/match", requirePermission("participants:read"), rateLimit({ windowMs: 60_000, max: 30 }), participantController.matchParticipantsForRegistration);
 router.get("/active-consent-form", requirePermission("consents:record"), participantController.getActiveConsentForm);
 router.get("/:participantId", requirePermission("participants:read"), participantController.getParticipantById);
 router.patch("/:participantId", requirePermission("participants:write"), participantController.updateParticipant);

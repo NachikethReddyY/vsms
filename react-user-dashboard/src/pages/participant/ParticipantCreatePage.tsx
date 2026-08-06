@@ -30,11 +30,11 @@ export default function ParticipantCreatePage() {
     firstName: searchedName[0] ?? "",
     lastName: searchedName.slice(1).join(" "),
     dateOfBirth: searchParams.get("dateOfBirth") ?? "",
-    gender: "U",
+    gender: searchParams.get("gender") ?? "U",
     contactNumber: searchParams.get("contactNumber") ?? "",
-    email: "",
-    preferredLanguage: "English",
-    accessibilityNotes: "",
+    email: searchParams.get("email") ?? "",
+    preferredLanguage: searchParams.get("preferredLanguage") ?? "English",
+    accessibilityNotes: searchParams.get("accessibilityNotes") ?? "",
   });
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -96,7 +96,7 @@ export default function ParticipantCreatePage() {
       <Link className="participant-v2-back" to={searchLink}><ArrowLeftIcon /> Back to search results</Link>
       <header className="participant-v2-create-heading">
         <span><UserPlusIcon /></span>
-        <div><p>Registration workspace · New participant</p><h1 id="participant-v2-create-title">Create participant record</h1><small>A new profile will be created for the selected event. You can add consent and an emergency contact from the profile afterwards.</small></div>
+        <div><p>Registration workspace · Participant details</p><h1 id="participant-v2-create-title">Register a new participant</h1><small>Enter the participant's details for the selected event. You can add consent and an emergency contact from the profile afterwards.</small></div>
       </header>
       <section className="participant-v2-create-panel">
         <div className="participant-v2-create-context"><span>Selected event</span><strong>{eventId ? "Event selected" : "No event selected"}</strong><p>The participant profile will open after this record is created.</p></div>
@@ -120,7 +120,7 @@ export default function ParticipantCreatePage() {
               <label className="participant-v2-create-notes"><span>Accessibility notes <small>optional</small></span><textarea value={form.accessibilityNotes} onChange={(event) => update("accessibilityNotes", event.target.value)} maxLength={1000} placeholder="Communication or access needs" /></label>
             </div>
           </section>
-          <footer className="participant-v2-create-actions"><p><ExclamationTriangleIcon /> Create this record only when the search returned no matching participant.</p><div><Link className="secondary" to={searchLink}>Cancel</Link><button className="primary" type="submit" disabled={submitting}>{submitting ? "Creating profile..." : "Create participant profile"}</button></div></footer>
+          <footer className="participant-v2-create-actions"><p><ExclamationTriangleIcon /> Continue only when the match check returned no existing participant.</p><div><Link className="secondary" to={searchLink}>Cancel</Link><button className="primary" type="submit" disabled={submitting}>{submitting ? "Saving participant..." : "Save participant details"}</button></div></footer>
         </form>
       </section>
     </section>
