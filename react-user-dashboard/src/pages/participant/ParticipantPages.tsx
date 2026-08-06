@@ -1,5 +1,5 @@
 import { ArrowLeftIcon, ClipboardDocumentCheckIcon } from "@heroicons/react/24/outline";
-import { useCallback, useEffect, useState, type FormEvent } from "react";
+import { useCallback, useEffect, useState, type Dispatch, type FormEvent, type SetStateAction } from "react";
 import { Link, useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { Field, FormErrorSummary, LoadingState, TextInput } from "../../components/ui";
 import type { ConsentFormVersion, Participant, RegistrationHistory } from "../../types";
@@ -60,7 +60,7 @@ function BackLink({ to, label }: { to: string; label: string }) {
 
 function ParticipantDetailsForm({ form, setForm, onSubmit, submitting, error }: {
   form: ParticipantFormState;
-  setForm: React.Dispatch<React.SetStateAction<ParticipantFormState>>;
+  setForm: Dispatch<SetStateAction<ParticipantFormState>>;
   onSubmit: (event: FormEvent<HTMLFormElement>) => void;
   submitting: boolean;
   error: string | null;
@@ -94,6 +94,12 @@ export function ParticipantEditPage() {
   const [form, setForm] = useState<ParticipantFormState | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const setParticipantForm: Dispatch<SetStateAction<ParticipantFormState>> = (action) => {
+    setForm((current) => {
+      const value = current ?? emptyParticipantForm;
+      return typeof action === "function" ? action(value) : action;
+    });
+  };
 
   useEffect(() => {
     let active = true;
@@ -136,7 +142,23 @@ export function ParticipantEditPage() {
   }
 
   if (!form && !error) return <section className="participant-v2-page"><LoadingState label="Loading participant..." /></section>;
-  return <section className="participant-v2-page"><BackLink to={participantLink} label="Back to participant profile" /><h1>Edit participant</h1>{form ? <ParticipantDetailsForm form={form} setForm={setForm} onSubmit={submit} submitting={submitting} error={error} /> : <FormErrorSummary error={error} />}</section>;
+  return (
+    <section className="participant-v2-page">
+      <BackLink to={participantLink} label="Back to participant profile" />
+      <h1>Edit participant</h1>
+      {form ? (
+        <ParticipantDetailsForm
+          form={form}
+          setForm={setParticipantForm}
+          onSubmit={submit}
+          submitting={submitting}
+          error={error}
+        />
+      ) : (
+        <FormErrorSummary error={error} />
+      )}
+    </section>
+  );
 }
 
 export function RegistrationHistoryPage() {
