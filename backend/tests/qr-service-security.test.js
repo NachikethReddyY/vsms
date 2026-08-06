@@ -167,7 +167,10 @@ test("generated QR passes retain only a hash and authenticated ciphertext", asyn
   assert.equal(supersededWhere.expiresAt, undefined);
   assert.equal(Object.hasOwn(result, "token"), false);
   assert.equal(Object.hasOwn(result, "targetUrl"), false);
-  assert.match(result.qrImage, /^data:image\/png;base64,/);
+  assert.match(result.qrImage, /^data:image\/svg\+xml;base64,/);
+  const branded = Buffer.from(result.qrImage.split(",")[1], "base64").toString("utf8");
+  assert.match(branded, /VSMS/);
+  assert.match(branded, /SECURE EVENT PASS/);
 });
 
 test("serialized concurrent first issuance returns one database pass", async () => {
@@ -221,7 +224,9 @@ test("download renders an active pass from encrypted storage without returning i
   assert.equal(where.isActive, true);
   assert.ok(where.expiresAt.gt instanceof Date);
   assert.equal(Object.hasOwn(result, "targetUrl"), false);
-  assert.match(result.qrImage, /^data:image\/png;base64,/);
+  assert.match(result.qrImage, /^data:image\/svg\+xml;base64,/);
+  const branded = Buffer.from(result.qrImage.split(",")[1], "base64").toString("utf8");
+  assert.match(branded, /VSMS/);
 });
 
 test("verification rejects any pass that does not satisfy the shared active-expiry predicate", async () => {
@@ -496,4 +501,75 @@ test("manual check-in cannot reopen terminal registrations or win a stale update
     (error) => error.code === "CHECKIN_STATE_CONFLICT" && error.status === 409,
   );
   assert.equal(auditWrites, 0);
+});
+
+test("each issuance mints a unique opaque token and supersedes the prior active pass", async () => {
+  const issuedAt = new Date();
+  const createdHashes = [];
+  const issuedIds = [];
+  const tx = {
+    eventRegistration: {
+      findUnique: async () => ({ registrationId, eventId, participant: {}, event: {} }),
+    },
+    qRCodePass: {
+      findFirst: async () => null,
+      updateMany: async () => ({ count: 0 }),
+      create: async ({ data }) => {
+        createdHashes.push(data.tokenHash);
+        issuedIds.push(data.id);
+        return { id: data.id, issuedAt, ...data };
+      },
+    },
+    auditLog: { create: async () => ({}) },
+  };
+
+  await qrService.generateQR(registrationId, null, tx);
+  await qrService.generateQR(registrationId, null, tx);
+  await qrService.generateQR(registrationId, null, tx);
+
+  assert.equal(createdHashes.length, 3);
+  assert.equal(new Set(createdHashes).size, 3);
+  assert.equal(issuedIds.length, new Set(issuedIds).size);
+  for (const hash of createdHashes) assert.match(hash, /^[a-f0-9]{64}$/);
+});
+
+test("public pass status reveals no PII and reports expired or revoked passes as invalid", async () => {
+  const token = "d".repeat(64);
+  let where;
+  const db = {
+    qRCodePass: {
+      findFirst: async (query) => {
+        where = query.where;
+        return {
+          expiresAt: new Date(Date.now() + 60_000),
+          isActive: true,
+          registration: { eventId: "event-1", queueNumber: 42, event: { name: "Community Vision Screening" } },
+        };
+      },
+    },
+    eventRegistration: {
+      aggregate: async () => ({ _max: { queueNumber: 99 } }),
+    },
+  };
+
+  const valid = await qrService.getPublicStatus(token, db);
+  assert.equal(valid.valid, true);
+  assert.equal(valid.eventName, "Community Vision Screening");
+  assert.equal(valid.queueNumber, 42);
+  assert.deepEqual(Object.keys(valid).sort(), ["currentQueueNumber", "eventName", "expiresAt", "queueNumber", "valid"]);
+  assert.equal(where.tokenHash, tokenHash(token));
+
+  const revokedDb = {
+    qRCodePass: { findFirst: async () => ({ expiresAt: new Date(Date.now() + 60_000), isActive: false, registration: null }) },
+  };
+  const revoked = await qrService.getPublicStatus(token, revokedDb);
+  assert.equal(revoked.valid, false);
+  assert.equal(revoked.eventName, null);
+
+  const expiredDb = {
+    qRCodePass: { findFirst: async () => ({ expiresAt: new Date(Date.now() - 60_000), isActive: true, registration: { queueNumber: 1, event: { name: "X" } } }) },
+  };
+  const expired = await qrService.getPublicStatus(token, expiredDb);
+  assert.equal(expired.valid, false);
+  assert.equal(expired.eventName, null);
 });

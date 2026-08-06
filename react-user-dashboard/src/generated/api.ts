@@ -1245,6 +1245,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/qr/view/{registrationId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Render the active QR pass as SVG in the browser (authenticated)
+         * @description Authenticated helper that returns the active pass for a registration as a raw SVG image, useful for embedding or quick in-browser inspection. Requires a REGISTRATION_OFFICER (or higher) role. The SVG is regenerated on every request so it always reflects the current active pass.
+         */
+        get: operations["viewRegistrationQrSvg"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/qr/verify": {
         parameters: {
             query?: never;
@@ -1273,6 +1293,86 @@ export interface paths {
         put?: never;
         /** Check in a participant using a registration reference or QR token */
         post: operations["manualQrCheckIn"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/qr/public-status/{token}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Public pass-status lookup for the QR scan target (no PII)
+         * @description Resolves the URL encoded in a scanned VSMS pass. Public and unauthenticated; returns only validity, event name, queue number, and expiry — never participant names or clinical data.
+         */
+        get: operations["getPublicQrPassStatus"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/qr/dev-view/{registrationId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Render the active QR pass as raw SVG (development only)
+         * @description Development-only helper that renders the QR pass SVG directly in the browser for quick visual checks. Returns 403 in production. No authentication required; useful for rapid manual inspection of a pass.
+         */
+        get: operations["getDevQrSvg"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/qr/dev-page/{registrationId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Development QR preview page with live status poller
+         * @description Development-only HTML page showing a large, LAN-targeted QR pass alongside participant/event info and a live pass-status poller. The QR encodes the dev-status page URL so it can be scanned by a phone camera on the same network. Returns 403 in production. No authentication required.
+         */
+        get: operations["getDevQrPage"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/qr/dev-status/{token}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Phone-friendly pass status page (development QR scan target)
+         * @description Development-only HTML page opened when a dev QR is scanned on a phone. It self-locates its own token from the URL and polls the public status endpoint to show VALID/INVALID. Returns 403 in production. No authentication required.
+         */
+        get: operations["getDevQrStatusPage"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -1413,6 +1513,159 @@ export interface paths {
         /** Requeue or administratively resolve an escalated artifact cleanup task */
         post: operations["maintainArtifactCleanupTask"];
         delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/queues/{eventId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Event queue summary with per-station workload and next-up participant */
+        get: operations["getEventQueueStatus"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/queues/{eventId}/stations/{stationId}/join": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Join a participant into a station queue */
+        post: operations["joinQueue"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/queues/participant/{registrationId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Participant queue status and movement history */
+        get: operations["getParticipantQueueStatus"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/queues/{queueId}/call": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Call the next waiting participant in a station queue */
+        patch: operations["callQueueEntry"];
+        trace?: never;
+    };
+    "/api/v1/queues/{queueId}/start": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Begin servicing a called participant */
+        patch: operations["startQueueEntry"];
+        trace?: never;
+    };
+    "/api/v1/queues/{queueId}/advance": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Transfer a participant to the next station and close the current queue entry */
+        patch: operations["advanceQueueEntry"];
+        trace?: never;
+    };
+    "/api/v1/queues/{queueId}/complete": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Complete the final queue station and mark the registration completed */
+        patch: operations["completeQueueEntry"];
+        trace?: never;
+    };
+    "/api/v1/queues/{queueId}/skip": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Skip a waiting or called participant (does not advance them) */
+        patch: operations["skipQueueEntry"];
+        trace?: never;
+    };
+    "/api/v1/queues/{queueId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Remove a participant from the queue (cancels the entry) */
+        delete: operations["leaveQueue"];
         options?: never;
         head?: never;
         patch?: never;
@@ -2648,12 +2901,64 @@ export interface components {
             signatureMimeType: "image/png" | "image/jpeg";
         };
         AdminAuditLogsResponse: {
-            logs: {
+            /** @description Reverse-chronological application audit records (max 100) */
+            logs: ({
+                /** Format: uuid */
+                id: string;
+                /** Format: uuid */
+                userId?: string | null;
+                /** Format: uuid */
+                deviceId?: string | null;
+                /** @enum {string} */
+                action: "CREATED" | "UPDATED" | "PUBLISHED" | "STARTED" | "COMPLETED" | "CANCELLED" | "EVENT_DELETED" | "EVENT_REGISTRATION_CREATED" | "REGISTRATION_STATUS_CHANGED" | "DUPLICATE_REGISTRATION_BLOCKED" | "PARTICIPANT_CREATED" | "PARTICIPANT_UPDATED" | "EMERGENCY_CONTACT_CREATED" | "EMERGENCY_CONTACT_UPDATED" | "CONSENT_WITHDRAWN" | "SCREENING_RESULT_RECORDED" | "CLINICAL_REVIEW_RECORDED" | "REFERRAL_ISSUED" | "REFERRAL_REVISION_CREATED" | "REFERRAL_HANDOFF_ACKNOWLEDGED" | "REFERRAL_EMAIL_FAILED" | "REFERRAL_EMAIL_CONFIRMATION_PENDING" | "REFERRAL_EMAIL_RECONCILIATION_REQUIRED" | "REFERRAL_EMAIL_RETRY_AUTHORIZED" | "REFERRAL_DRAFT_CREATED" | "QR_GENERATED" | "QR_VERIFIED" | "QR_REVOKED" | "QR_REISSUED_REVOCATION" | "MANUAL_CHECKIN_PERFORMED" | "STAFF_ACCOUNT_CREATED" | "STAFF_ACCOUNT_UPDATED" | "STAFF_ASSIGNMENT_ADDED" | "STAFF_ASSIGNMENT_REMOVED" | "REPORT_VIEWED" | "SCREENING_SYNC_BATCH" | "ARTIFACT_CLEANUP_ESCALATED" | "ENCRYPTION_BACKFILL_APPLIED";
+                resource?: string | null;
+                entityName?: string | null;
+                /** Format: uuid */
+                entityId?: string | null;
+                /** @enum {string} */
+                outcome: "SUCCESS" | "FAILED" | "DENIED" | "BLOCKED";
+                /** Format: uuid */
+                requestId?: string | null;
+                details?: {
+                    [key: string]: unknown;
+                } | null;
+                oldValue?: {
+                    [key: string]: unknown;
+                } | null;
+                newValue?: {
+                    [key: string]: unknown;
+                } | null;
+                ipAddress?: string | null;
+                deviceName?: string | null;
+                /** Format: date-time */
+                createdAt: string;
+                user?: components["schemas"]["User"];
+            } & {
                 [key: string]: unknown;
-            }[];
-            authLogs: {
+            })[];
+            /** @description Reverse-chronological authentication audit records (max 100) */
+            authLogs: ({
+                /** Format: uuid */
+                id: string;
+                /** Format: uuid */
+                userId?: string | null;
+                /** Format: uuid */
+                deviceId?: string | null;
+                eventType: string;
+                /** @enum {string} */
+                outcome: "SUCCESS" | "FAILED" | "DENIED" | "BLOCKED";
+                failureCategory?: string | null;
+                identifierHash?: string | null;
+                ipAddress?: string | null;
+                userAgent?: string | null;
+                /** Format: uuid */
+                requestId?: string | null;
+                /** Format: date-time */
+                occurredAt: string;
+                user?: components["schemas"]["User"];
+            } & {
                 [key: string]: unknown;
-            }[];
+            })[];
         };
         QrCode: {
             /** Format: uuid */
@@ -2682,8 +2987,23 @@ export interface components {
             issuedAt: string;
             /** Format: date-time */
             expiresAt: string;
-            /** @description Data URL containing the QR image */
+            /** @description SVG data URL of the VSMS-branded QR image (center logo and wordmark overlay) */
             qrImage: string;
+        };
+        QrPublicStatusResponse: {
+            /** @enum {boolean} */
+            success: true;
+            data: {
+                /** @description Whether the pass is active and unexpired */
+                valid: boolean;
+                /** @description Only the event name; never participant data. Unset when the pass is invalid */
+                eventName: string | null;
+                /** @description Highest queue number already checked in for the event (now serving). Unset when the pass is invalid */
+                currentQueueNumber: number | null;
+                queueNumber: number | null;
+                /** Format: date-time */
+                expiresAt: string | null;
+            };
         };
         QrMutationResponse: {
             /** @enum {boolean} */
@@ -2705,7 +3025,7 @@ export interface components {
                 qrId: string;
                 /** Format: date-time */
                 expiresAt: string;
-                /** @description Data URL containing the QR image */
+                /** @description SVG data URL of the VSMS-branded QR image (center logo and wordmark overlay) */
                 qrImage: string;
             };
         };
@@ -2834,6 +3154,88 @@ export interface components {
         ScreeningQueueResponse: {
             station: components["schemas"]["ScreeningStation"];
             registrations: components["schemas"]["ScreeningQueueItem"][];
+        };
+        /** @enum {string} */
+        QueueStatus: "WAITING" | "CALLED" | "IN_PROGRESS" | "COMPLETED" | "SKIPPED" | "CANCELLED";
+        QueueEntry: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            registrationId: string;
+            /** Format: uuid */
+            stationId: string;
+            queueNumber: number;
+            status: components["schemas"]["QueueStatus"];
+            /** Format: date-time */
+            enteredAt?: string | null;
+            /** Format: date-time */
+            calledAt?: string | null;
+            /** Format: date-time */
+            startedAt?: string | null;
+            /** Format: date-time */
+            leftQueueAt?: string | null;
+            /** Format: date-time */
+            completedAt?: string | null;
+        };
+        QueueStationWorkload: {
+            /** Format: uuid */
+            stationId: string;
+            stationName: string;
+            stationType: string;
+            stationOrder: number;
+            workload: {
+                WAITING: number;
+                CALLED: number;
+                IN_PROGRESS: number;
+                COMPLETED: number;
+                SKIPPED: number;
+                CANCELLED: number;
+            };
+            nextUp?: {
+                /** Format: uuid */
+                queueId: string;
+                queueNumber: number;
+                /** Format: uuid */
+                registrationId: string;
+                participantDisplayName: string;
+            } | null;
+        };
+        EventQueueStatusResponse: {
+            event: {
+                /** Format: uuid */
+                eventId: string;
+                name: string;
+                status: string;
+                venue: string | null;
+            };
+            stations: components["schemas"]["QueueStationWorkload"][];
+        };
+        JoinQueueRequest: {
+            /** Format: uuid */
+            registrationId: string;
+        };
+        JoinQueueResponse: {
+            queueEntry: components["schemas"]["QueueEntry"];
+            created: boolean;
+        };
+        ParticipantQueueStatusResponse: {
+            /** Format: uuid */
+            registrationId: string;
+            queueNumber: number | null;
+            status: string;
+            activeEntry: {
+                [key: string]: unknown;
+            } | null;
+            history: unknown[];
+        };
+        AdvanceQueueRequest: {
+            /** Format: uuid */
+            toStationId: string;
+            reason?: string;
+        };
+        AdvanceQueueResponse: {
+            completed: components["schemas"]["QueueEntry"];
+            nextEntry: components["schemas"]["QueueEntry"];
         };
         EyeReading: {
             /** @enum {string} */
@@ -5443,6 +5845,30 @@ export interface operations {
             429: components["responses"]["RateLimited"];
         };
     };
+    viewRegistrationQrSvg: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                registrationId: components["parameters"]["RegistrationId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description QR pass rendered as an SVG image */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "image/svg+xml": string;
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+        };
+    };
     verifyQrCode: {
         parameters: {
             query?: never;
@@ -5502,6 +5928,121 @@ export interface operations {
             404: components["responses"]["NotFound"];
             409: components["responses"]["Conflict"];
             429: components["responses"]["RateLimited"];
+        };
+    };
+    getPublicQrPassStatus: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                token: components["parameters"]["QrToken"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Pass status */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["QrPublicStatusResponse"];
+                };
+            };
+            400: components["responses"]["ValidationFailed"];
+            429: components["responses"]["RateLimited"];
+        };
+    };
+    getDevQrSvg: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                registrationId: components["parameters"]["RegistrationId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description QR pass rendered as an SVG image */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "image/svg+xml": string;
+                };
+            };
+            400: components["responses"]["ValidationFailed"];
+            /** @description Not available in production */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            404: components["responses"]["NotFound"];
+        };
+    };
+    getDevQrPage: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                registrationId: components["parameters"]["RegistrationId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Interactive QR preview HTML page */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/html": string;
+                };
+            };
+            400: components["responses"]["ValidationFailed"];
+            /** @description Not available in production */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            404: components["responses"]["NotFound"];
+        };
+    };
+    getDevQrStatusPage: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                token: components["parameters"]["QrToken"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Mobile status HTML page */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/html": string;
+                };
+            };
+            /** @description Not available in production */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
         };
     };
     getParticipantByQrCode: {
@@ -5708,6 +6249,266 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ArtifactCleanupTask"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            422: components["responses"]["ValidationFailed"];
+        };
+    };
+    getEventQueueStatus: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                eventId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Event queue summary */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EventQueueStatusResponse"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            422: components["responses"]["ValidationFailed"];
+        };
+    };
+    joinQueue: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                eventId: string;
+                stationId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["JoinQueueRequest"];
+            };
+        };
+        responses: {
+            /** @description Participant already in this station queue */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JoinQueueResponse"];
+                };
+            };
+            /** @description Participant joined the queue */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JoinQueueResponse"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            422: components["responses"]["ValidationFailed"];
+        };
+    };
+    getParticipantQueueStatus: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                registrationId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Participant queue status */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ParticipantQueueStatusResponse"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            422: components["responses"]["ValidationFailed"];
+        };
+    };
+    callQueueEntry: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                queueId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Queue entry called */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["QueueEntry"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            422: components["responses"]["ValidationFailed"];
+        };
+    };
+    startQueueEntry: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                queueId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Queue entry started */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["QueueEntry"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            422: components["responses"]["ValidationFailed"];
+        };
+    };
+    advanceQueueEntry: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                queueId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AdvanceQueueRequest"];
+            };
+        };
+        responses: {
+            /** @description Participant transferred */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdvanceQueueResponse"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            422: components["responses"]["ValidationFailed"];
+        };
+    };
+    completeQueueEntry: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                queueId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Queue entry completed */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["QueueEntry"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            422: components["responses"]["ValidationFailed"];
+        };
+    };
+    skipQueueEntry: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                queueId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Queue entry skipped */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["QueueEntry"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            422: components["responses"]["ValidationFailed"];
+        };
+    };
+    leaveQueue: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                queueId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Queue entry cancelled */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["QueueEntry"];
                 };
             };
             401: components["responses"]["Unauthorized"];

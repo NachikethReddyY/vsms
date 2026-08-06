@@ -76,6 +76,7 @@ export default function VisualAcuityStationPage() {
   const [eventStations, setEventStations] = useState<Station[]>([]);
   const [queue, setQueue] = useState<QueueRegistration[]>([]);
   const [selectedId, setSelectedId] = useState(() => searchParams.get('registrationId') || '');
+  const [passToken, setPassToken] = useState('abababababababababababababababababababababababababababababababab');
   const [od, setOd] = useState<EyeReading>({ kind: 'FRACTION', denominator: 6 });
   const [os, setOs] = useState<EyeReading>({ kind: 'FRACTION', denominator: 6 });
   const [glasses, setGlasses] = useState<'yes' | 'no' | 'unknown'>('unknown');
@@ -227,6 +228,34 @@ export default function VisualAcuityStationPage() {
         onSelect={setSelectedId}
         selected={selected}
       />
+      <section className="detail-panel" style={{ marginBottom: 24 }}>
+        <h2>Find participant</h2>
+        <div className="va-resolve-row">
+          <label>
+            Pass token / QR value
+            <input value={passToken} onChange={(event) => setPassToken(event.target.value)} placeholder="abababababababababababababababababababababababababababababababab" />
+          </label>
+          <button type="button" className="primary" onClick={() => void resolvePass()}>Load pass</button>
+        </div>
+        <label>
+          Or choose from station queue
+          <select value={selectedId} onChange={(event) => setSelectedId(event.target.value)}>
+            <option value="" disabled>Select participant</option>
+            {queue.map((row) => (
+              <option key={row.registrationId} value={row.registrationId}>
+                #{row.queueNumber ?? '—'} {row.participantDisplayName}
+                {row.existingResult ? ` · ${row.existingResult.overallFlag}` : ''}
+              </option>
+            ))}
+          </select>
+        </label>
+        {selected && (
+          <p>
+            Screening <strong>{selected.participantDisplayName}</strong>
+            {selected.passToken ? <> · pass <code>{selected.passToken}</code></> : null}
+          </p>
+        )}
+      </section>
 
       <form className="detail-panel va-form" onSubmit={(event) => void submit(event)}>
         <h2>Chart result</h2>

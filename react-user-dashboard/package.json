@@ -10,6 +10,8 @@
     "lint": "eslint .",
     "test:participants": "node --test src/pages/ParticipantV2Page.test.mjs",
     "test:queue": "node --test src/pages/QueuePages.test.mjs",
+    "test:audit": "node --test src/pages/admin/SystemAuditDashboardPage.test.mjs",
+    "test:qr": "node --test src/components/qr/QRCodePage.test.mjs",
     "test:offline": "vitest run src/features/screening/offlineSync.test.ts",
     "preview": "vite preview"
   },

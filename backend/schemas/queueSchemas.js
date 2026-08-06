@@ -1,58 +1,35 @@
 const { z } = require("zod");
 
-// -----------------------------------------------------------------------------
-// 1. REUSABLE PRIMITIVES & CUSTOM ERROR MAPS
-// -----------------------------------------------------------------------------
+const eventParams = z.object({
+  eventId: z.string().uuid(),
+}).strict();
 
-// Reusable regex patterns for strict validation
-const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-const HEX_64_REGEX = /^[a-f0-9]{64}$/;
+const stationParams = eventParams.extend({
+  stationId: z.string().uuid(),
+}).strict();
 
-/**
- * Enterprise Primitive Schemas with sanitization transforms (e.g., trimming strings)
- */
-const uuidSchema = z
-  .string({ required_error: "Participant ID is required" })
-  .trim()
-  .regex(UUID_REGEX, { message: "Invalid participant ID format. Must be a valid UUID v4." });
+const queueEntryParams = z.object({
+  queueId: z.string().uuid(),
+}).strict();
 
-const hexTokenSchema = z
-  .string({ required_error: "Token is required" })
-  .trim()
-  .regex(HEX_64_REGEX, { message: "Invalid token format. Must be a 64-character hexadecimal string." });
+const participantParams = z.object({
+  registrationId: z.string().uuid(),
+}).strict();
 
-// -----------------------------------------------------------------------------
-// 2. DOMAIN-SPECIFIC SCHEMAS (Strict & Sanitized)
-// -----------------------------------------------------------------------------
+const joinQueueBody = z.object({
+  registrationId: z.string().uuid(),
+}).strict();
 
-const participantParamsSchema = z
-  .object({
-    participantId: uuidSchema,
-  })
-  .strict(); // Strips or rejects unexpected path parameters for security
+const advanceQueueBody = z.object({
+  toStationId: z.string().uuid(),
+  reason: z.string().trim().min(1).max(100).optional(),
+}).strict();
 
-const tokenBodySchema = z
-  .object({
-    token: hexTokenSchema,
-  })
-  .strict(); // Rejects extra payload properties to protect against mass-assignment
-
-// Composite schema example (Combining params and body for an endpoint)
-const verifyParticipantRequestSchema = z.object({
-  params: participantParamsSchema,
-  body: tokenBodySchema,
-});
-
-// -----------------------------------------------------------------------------
-// 3. EXPORTS (Including Inferred Types for TypeScript projects)
-// -----------------------------------------------------------------------------
 module.exports = {
-  // Primitives
-  uuidSchema,
-  hexTokenSchema,
-  
-  // Endpoint Schemas
-  participantParamsSchema,
-  tokenBodySchema,
-  verifyParticipantRequestSchema,
+  eventParams,
+  stationParams,
+  queueEntryParams,
+  participantParams,
+  joinQueueBody,
+  advanceQueueBody,
 };

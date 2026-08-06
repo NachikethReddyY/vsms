@@ -1,108 +1,426 @@
-const request = require("supertest");
-const app = require("../app"); // Adjust to your main express server entry point
-const prisma = require("../prisma/prismaClient");
+const test = require('node:test');
+const assert = require('node:assert/strict');
+const crypto = require('node:crypto');
 
-describe("Queue Management & Participant Status API", () => {
-  let authToken;
-  let testEventId;
-  let testParticipantId;
-  let testStationId;
-  let createdQueueId;
+const queueService = require('../services/queueService');
 
-  // Seed or set up test data before running tests
-  beforeAll(async () => {
-    // 1. Setup mock user/admin token for authentication
-    // (Replace this with your actual test login or token generation logic)
-    const loginRes = await request(app)
-      .post("/auth/login")
-      .send({ email: "admin@example.com", password: "password123" });
-    
-    authToken = loginRes.body.token;
+const uuid = () => crypto.randomUUID();
+const eventId = uuid();
+const stationId = uuid();
+const targetStationId = uuid();
+const registrationId = uuid();
+const queueId = uuid();
 
-    // 2. Fetch or create a dummy event, participant, and station for testing
-    const event = await prisma.event.findFirst();
-    testEventId = event ? event.id : "dummy-event-id";
+const event = { eventId, name: 'Jurong Live', status: 'IN_PROGRESS', venue: 'Jurong Regional Library' };
+const station = { stationId, eventId, stationName: 'Visual Acuity', stationType: 'VISUAL_ACUITY', isActive: true };
+const targetStation = { stationId: targetStationId, eventId, stationName: 'Refraction', stationType: 'REFRACTION', isActive: true };
+const registration = {
+  registrationId,
+  eventId,
+  queueNumber: 7,
+  registrationStatus: 'CHECKED_IN',
+  participantDisplayName: 'Daniel Tan',
+};
+const queueEntry = {
+  id: queueId,
+  registrationId,
+  stationId,
+  queueNumber: 7,
+  status: 'WAITING',
+  enteredAt: new Date(),
+  calledAt: null,
+  startedAt: null,
+  leftQueueAt: null,
+  completedAt: null,
+  registration: { eventId, participantDisplayName: 'Daniel Tan' },
+  station: { stationId, stationName: 'Visual Acuity' },
+};
 
-    const participant = await prisma.participant.findFirst();
-    testParticipantId = participant ? participant.id : "dummy-participant-id";
+const context = { requestId: uuid(), deviceId: null, ipAddress: '203.0.113.7', deviceName: 'Queue test station' };
 
-    const station = await prisma.station.findFirst();
-    testStationId = station ? station.id : null;
+const audits = [];
+const captureAudit = async ({ data }) => {
+  audits.push(data);
+  return { ...data, id: uuid() };
+};
+
+const baseDb = (overrides = {}) => ({
+  event: {
+    findUnique: async () => event,
+    ...(overrides.event || {}),
+  },
+  station: {
+    findFirst: async ({ where }) => {
+      if (where.stationId === targetStationId) return targetStation;
+      if (where.stationId === stationId) return station;
+      return null;
+    },
+    ...(overrides.station || {}),
+  },
+  staffAssignment: {
+    findFirst: async () => ({ id: uuid() }),
+    ...(overrides.staffAssignment || {}),
+  },
+  queueEntry: {
+    findUnique: async () => queueEntry,
+    findMany: async () => [],
+    ...(overrides.queueEntry || {}),
+  },
+  $transaction: async (callback) => callback(baseTransaction()),
+  ...(overrides.root || {}),
+});
+
+const baseTransaction = (overrides = {}) => ({
+  eventRegistration: {
+    findFirst: async () => registration,
+    findUnique: async () => registration,
+    aggregate: async () => ({ _max: { queueNumber: 9 } }),
+    update: async ({ data }) => ({ ...registration, ...data }),
+    ...(overrides.eventRegistration || {}),
+  },
+  queueEntry: {
+    findFirst: async () => null,
+    findUnique: async () => queueEntry,
+    create: async ({ data }) => ({ id: queueId, ...data }),
+    update: async ({ data }) => ({ ...queueEntry, ...data }),
+    ...(overrides.queueEntry || {}),
+  },
+  queueMovement: {
+    create: async ({ data }) => ({ id: uuid(), ...data }),
+    ...(overrides.queueMovement || {}),
+  },
+  registrationStatusHistory: {
+    create: async ({ data }) => ({ id: uuid(), ...data }),
+    ...(overrides.registrationStatusHistory || {}),
+  },
+  auditLog: {
+    create: captureAudit,
+    ...(overrides.auditLog || {}),
+  },
+});
+
+const operationalUser = { userId: uuid(), roles: ['EVENT_MANAGER'] };
+const screenerUser = { userId: uuid(), roles: ['SCREENER'] };
+const staffUser = { userId: uuid(), roles: ['STAFF'] };
+
+test('queue join creates a WAITING entry and emits QUEUE_JOINED audit', async () => {
+  audits.length = 0;
+  const db = baseDb();
+  const result = await queueService.joinQueue(
+    { eventId, stationId, registrationId },
+    operationalUser,
+    context,
+    db,
+  );
+
+  assert.equal(result.created, true);
+  assert.equal(result.queueEntry.status, 'WAITING');
+  assert.equal(result.queueEntry.queueNumber, 7);
+  assert.equal(audits.length, 1);
+  assert.equal(audits[0].action, 'QUEUE_JOINED');
+  assert.equal(audits[0].entityName, 'QueueEntry');
+  assert.equal(audits[0].userId, operationalUser.userId);
+  assert.equal(audits[0].requestId, context.requestId);
+  assert.equal(audits[0].newValue.registrationId, registrationId);
+});
+
+test('queue join is idempotent when the participant is already active at the same station', async () => {
+  audits.length = 0;
+  const db = baseDb({
+    root: {
+      $transaction: async (callback) => callback(baseTransaction({
+        queueEntry: {
+          findFirst: async () => queueEntry,
+        },
+      })),
+    },
+  });
+  const result = await queueService.joinQueue(
+    { eventId, stationId, registrationId },
+    operationalUser,
+    context,
+    db,
+  );
+
+  assert.equal(result.created, false);
+  assert.equal(result.queueEntry.id, queueId);
+  assert.equal(audits.length, 0);
+});
+
+test('queue join rejects a participant already active at another station', async () => {
+  const db = baseDb({
+    root: {
+      $transaction: async (callback) => callback(baseTransaction({
+        queueEntry: {
+          findFirst: async () => ({ ...queueEntry, stationId: targetStationId }),
+        },
+      })),
+    },
   });
 
-  // Clean up created queue records after tests
-  afterAll(async () => {
-    if (createdQueueId) {
-      await prisma.queue.deleteMany({ where: { id: createdQueueId } }).catch(() => {});
-    }
-    await prisma.$disconnect();
+  await assert.rejects(
+    queueService.joinQueue({ eventId, stationId, registrationId }, operationalUser, context, db),
+    (error) => error.code === 'ALREADY_IN_QUEUE',
+  );
+});
+
+test('queue join rejects non-operational roles', async () => {
+  const db = baseDb();
+  await assert.rejects(
+    queueService.joinQueue({ eventId, stationId, registrationId }, staffUser, context, db),
+    (error) => error.code === 'QUEUE_ROLE_REQUIRED' && error.status === 403,
+  );
+});
+
+test('callQueueEntry transitions WAITING to CALLED and emits QUEUE_CALLED audit', async () => {
+  audits.length = 0;
+  const db = baseDb({
+    root: {
+      $transaction: async (callback) => callback(baseTransaction({
+        queueEntry: {
+          findUnique: async () => queueEntry,
+          update: async ({ data }) => ({ ...queueEntry, ...data }),
+        },
+      })),
+    },
   });
 
-  test("1. Should fail to fetch queue without authentication (Permission State)", async () => {
-    const res = await request(app).get(`/queue/${testEventId}`);
-    expect(res.statusCode).toEqual(401);
-    expect(res.body.success).toBe(false);
+  const result = await queueService.callQueueEntry(queueId, screenerUser, context, db);
+
+  assert.equal(result.status, 'CALLED');
+  assert.ok(result.calledAt);
+  assert.equal(audits.length, 1);
+  assert.equal(audits[0].action, 'QUEUE_CALLED');
+  assert.deepEqual(audits[0].oldValue, { status: 'WAITING' });
+  assert.deepEqual(audits[0].newValue, { status: 'CALLED' });
+});
+
+test('callQueueEntry rejects a non-WAITING entry', async () => {
+  const db = baseDb({
+    root: {
+      $transaction: async (callback) => callback(baseTransaction({
+        queueEntry: {
+          findUnique: async () => ({ ...queueEntry, status: 'IN_PROGRESS' }),
+        },
+      })),
+    },
   });
 
-  test("2. Should successfully register/join a participant into the queue", async () => {
-    const res = await request(app)
-      .post("/queue/join")
-      .set("Authorization", `Bearer ${authToken}`)
-      .send({
-        eventId: testEventId,
-        participantId: testParticipantId,
-        initialStationId: testStationId,
-      });
+  await assert.rejects(
+    queueService.callQueueEntry(queueId, screenerUser, context, db),
+    (error) => error.code === 'INVALID_QUEUE_STATE',
+  );
+});
 
-    expect(res.statusCode).toEqual(201);
-    expect(res.body.success).toBe(true);
-    expect(res.body.data).toHaveProperty("id");
-    
-    createdQueueId = res.body.data.id;
+test('advanceQueueEntry transfers to the target station, closes the old entry, and records movement', async () => {
+  audits.length = 0;
+  const movements = [];
+  const createdEntries = [];
+  const db = baseDb({
+    root: {
+      $transaction: async (callback) => callback(baseTransaction({
+        queueMovement: {
+          create: async ({ data }) => {
+            movements.push(data);
+            return { id: uuid(), ...data };
+          },
+        },
+        queueEntry: {
+          findUnique: async () => queueEntry,
+          update: async ({ data }) => ({ ...queueEntry, ...data }),
+          create: async ({ data }) => {
+            const created = { id: uuid(), ...data };
+            createdEntries.push(created);
+            return created;
+          },
+        },
+      })),
+    },
   });
 
-  test("3. Should fetch live event queue status successfully (Success State)", async () => {
-    const res = await request(app)
-      .get(`/queue/${testEventId}`)
-      .set("Authorization", `Bearer ${authToken}`);
+  const result = await queueService.advanceQueueEntry(
+    { queueId, toStationId: targetStationId, reason: 'Proceed to refraction' },
+    operationalUser,
+    context,
+    db,
+  );
 
-    expect(res.statusCode).toEqual(200);
-    expect(res.body.success).toBe(true);
-    expect(Array.isArray(res.body.data)).toBe(true);
+  assert.equal(result.completed.status, 'COMPLETED');
+  assert.ok(result.completed.completedAt);
+  assert.ok(result.completed.leftQueueAt);
+  assert.equal(result.nextEntry.stationId, targetStationId);
+  assert.equal(result.nextEntry.status, 'WAITING');
+  assert.equal(result.nextEntry.queueNumber, 7);
+  assert.equal(createdEntries.length, 1);
+  assert.equal(movements.length, 1);
+  assert.equal(movements[0].fromStationId, stationId);
+  assert.equal(movements[0].toStationId, targetStationId);
+  assert.equal(movements[0].movedBy, operationalUser.userId);
+  assert.equal(movements[0].movementReason, 'Proceed to refraction');
+  assert.equal(audits.length, 1);
+  assert.equal(audits[0].action, 'QUEUE_TRANSFERRED');
+});
+
+test('advanceQueueEntry rejects a transfer to a station outside the event', async () => {
+  const db = baseDb({
+    station: {
+      findFirst: async () => null,
+    },
   });
 
-  test("4. Should fetch individual participant queue status (Participant view)", async () => {
-    const res = await request(app)
-      .get(`/queue/participant/${testParticipantId}`)
-      .set("Authorization", `Bearer ${authToken}`);
+  await assert.rejects(
+    queueService.advanceQueueEntry({ queueId, toStationId: targetStationId }, operationalUser, context, db),
+    (error) => error.code === 'STATION_NOT_FOUND',
+  );
+});
 
-    expect(res.statusCode).toEqual(200);
-    expect(res.body.success).toBe(true);
-    expect(res.body.data).toHaveProperty("participantId", testParticipantId);
+test('completeQueueEntry marks the entry COMPLETED, completes the registration, and emits QUEUE_COMPLETED audit', async () => {
+  audits.length = 0;
+  const statusChanges = [];
+  const db = baseDb({
+    root: {
+      $transaction: async (callback) => callback(baseTransaction({
+        registrationStatusHistory: {
+          create: async ({ data }) => {
+            statusChanges.push(data);
+            return { id: uuid(), ...data };
+          },
+        },
+        eventRegistration: {
+          findUnique: async () => ({ ...registration, registrationStatus: 'CHECKED_IN' }),
+          update: async ({ data }) => ({ ...registration, ...data }),
+        },
+        queueEntry: {
+          findUnique: async () => ({ ...queueEntry, status: 'IN_PROGRESS' }),
+          update: async ({ data }) => ({ ...queueEntry, ...data }),
+        },
+      })),
+    },
   });
 
-  test("5. Should advance a participant through queue stations and emit audit log", async () => {
-    const res = await request(app)
-      .patch(`/queue/${createdQueueId}/advance`)
-      .set("Authorization", `Bearer ${authToken}`)
-      .send({
-        status: "IN_PROGRESS",
-      });
+  const result = await queueService.completeQueueEntry(queueId, screenerUser, context, db);
 
-    expect(res.statusCode).toEqual(200);
-    expect(res.body.success).toBe(true);
-    expect(res.body.data.status).toEqual("IN_PROGRESS");
+  assert.equal(result.status, 'COMPLETED');
+  assert.ok(result.completedAt);
+  assert.equal(statusChanges.length, 1);
+  assert.equal(statusChanges[0].fromStatus, 'CHECKED_IN');
+  assert.equal(statusChanges[0].toStatus, 'COMPLETED');
+  assert.equal(audits.length, 1);
+  assert.equal(audits[0].action, 'QUEUE_COMPLETED');
+});
+
+test('skipQueueEntry marks WAITING or CALLED entries as SKIPPED', async () => {
+  audits.length = 0;
+  const db = baseDb({
+    root: {
+      $transaction: async (callback) => callback(baseTransaction({
+        queueEntry: {
+          findUnique: async () => ({ ...queueEntry, status: 'CALLED' }),
+          update: async ({ data }) => ({ ...queueEntry, ...data }),
+        },
+      })),
+    },
   });
 
-  test("6. Should handle validation error for missing required fields on join", async () => {
-    const res = await request(app)
-      .post("/queue/join")
-      .set("Authorization", `Bearer ${authToken}`)
-      .send({
-        // Missing eventId and participantId intentionally
-      });
+  const result = await queueService.skipQueueEntry(queueId, screenerUser, context, db);
 
-    expect(res.statusCode).toEqual(400);
-    expect(res.body.success).toBe(false);
+  assert.equal(result.status, 'SKIPPED');
+  assert.ok(result.leftQueueAt);
+  assert.equal(audits.length, 1);
+  assert.equal(audits[0].action, 'QUEUE_SKIPPED');
+});
+
+test('leaveQueue cancels an active entry and emits QUEUE_LEFT audit', async () => {
+  audits.length = 0;
+  const db = baseDb({
+    root: {
+      $transaction: async (callback) => callback(baseTransaction({
+        queueEntry: {
+          findUnique: async () => ({ ...queueEntry, status: 'WAITING' }),
+          update: async ({ data }) => ({ ...queueEntry, ...data }),
+        },
+      })),
+    },
   });
+
+  const result = await queueService.leaveQueue(queueId, screenerUser, context, db);
+
+  assert.equal(result.status, 'CANCELLED');
+  assert.ok(result.leftQueueAt);
+  assert.equal(audits.length, 1);
+  assert.equal(audits[0].action, 'QUEUE_LEFT');
+});
+
+test('getEventQueueStatus reports per-station workload and next-up participant', async () => {
+  const db = baseDb({
+    root: {
+      station: {
+        findMany: async () => [station, targetStation],
+      },
+      queueEntry: {
+        findMany: async () => [
+          { ...queueEntry, id: uuid(), stationId, queueNumber: 7, status: 'WAITING', registration: { participantDisplayName: 'Daniel Tan' } },
+          { ...queueEntry, id: uuid(), stationId, queueNumber: 8, status: 'CALLED', registration: { participantDisplayName: 'Aisha Rahman' } },
+          { ...queueEntry, id: uuid(), stationId: targetStationId, queueNumber: 5, status: 'IN_PROGRESS', registration: { participantDisplayName: 'Priya Nair' } },
+        ],
+      },
+    },
+  });
+
+  const result = await queueService.getEventQueueStatus(eventId, operationalUser, db);
+
+  assert.equal(result.event.eventId, eventId);
+  assert.equal(result.stations.length, 2);
+  const va = result.stations.find((s) => s.stationId === stationId);
+  assert.equal(va.workload.WAITING, 1);
+  assert.equal(va.workload.CALLED, 1);
+  assert.equal(va.workload.IN_PROGRESS, 0);
+  assert.equal(va.nextUp.queueNumber, 7);
+  assert.equal(va.nextUp.participantDisplayName, 'Daniel Tan');
+});
+
+test('getParticipantQueueStatus returns active entry and movement history', async () => {
+  const db = baseDb({
+    root: {
+      eventRegistration: {
+        findFirst: async () => registration,
+      },
+      queueEntry: {
+        findMany: async () => [
+          { ...queueEntry, status: 'CALLED', station: { stationId, stationName: 'Visual Acuity', stationType: 'VISUAL_ACUITY' }, screeningResults: [] },
+        ],
+      },
+    },
+  });
+
+  const result = await queueService.getParticipantQueueStatus(eventId, registrationId, operationalUser, db);
+
+  assert.equal(result.registrationId, registrationId);
+  assert.equal(result.queueNumber, 7);
+  assert.equal(result.activeEntry.status, 'CALLED');
+  assert.equal(result.history.length, 1);
+});
+
+test('station operations require an active screener assignment', async () => {
+  const db = baseDb({
+    staffAssignment: {
+      findFirst: async () => null,
+    },
+  });
+
+  await assert.rejects(
+    queueService.callQueueEntry(queueId, screenerUser, context, db),
+    (error) => error.code === 'FORBIDDEN' && error.status === 403,
+  );
+});
+
+test('event managers and administrators bypass the screener assignment check', async () => {
+  const db = baseDb({
+    staffAssignment: {
+      findFirst: async () => null,
+    },
+  });
+
+  const called = await queueService.callQueueEntry(queueId, operationalUser, context, db);
+  assert.equal(called.status, 'CALLED');
 });
