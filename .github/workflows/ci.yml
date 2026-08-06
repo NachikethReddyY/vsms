@@ -74,6 +74,7 @@ jobs:
         working-directory: backend
 
       - name: Run database integration and security tests
+        if: always()
         shell: bash
         run: >-
           node --test
@@ -88,14 +89,17 @@ jobs:
         working-directory: backend
 
       - name: Validate Prisma schema
+        if: always()
         run: pnpm run prisma:validate
         working-directory: backend
 
       - name: Lint OpenAPI contract
+        if: always()
         run: pnpm run openapi:lint
         working-directory: backend
 
       - name: Verify generated API client
+        if: always()
         run: pnpm run contracts:check
         working-directory: backend
 

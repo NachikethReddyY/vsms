@@ -1,40 +1,20 @@
-const buckets = new Map();
+/**
+ * Backwards-compatible rate-limit helper used by route files that historically
+ * passed `max` / `key`. It delegates to the shared Redis-backed limiter so all
+ * application rate limits share one store (with an in-memory fallback).
+ */
 
-function rateLimit({ windowMs = 60_000, max = 60, key = (req) => req.ip }) {
-    return (req, res, next) => {
-        const now = Date.now();
-        const bucketKey = `${req.method}:${req.baseUrl}:${key(req) || "unknown"}`;
-        const current = buckets.get(bucketKey);
+const { rateLimit } = require("./rateLimiter");
 
-        if (!current || current.resetAt <= now) {
-            buckets.set(bucketKey, { count: 1, resetAt: now + windowMs });
-            return next();
-        }
-
-        current.count += 1;
-        if (current.count > max) {
-            res.setHeader("Retry-After", String(Math.ceil((current.resetAt - now) / 1000)));
-            return res.status(429).json({
-                error: "Too many requests. Please try again later.",
-                requestId: req.context?.requestId,
-            });
-        }
-
-        next();
-    };
+function securityRateLimit({ windowMs = 60_000, max = 60, key, ...rest } = {}) {
+  return rateLimit({
+    windowMs,
+    limit: max,
+    keyGenerator: key ? (req) => String(key(req) ?? "unknown") : undefined,
+    ...rest,
+  });
 }
-
-function cleanupRateLimitBuckets() {
-    const now = Date.now();
-    for (const [key, value] of buckets.entries()) {
-        if (value.resetAt <= now) buckets.delete(key);
-    }
-}
-
-const cleanupTimer = setInterval(cleanupRateLimitBuckets, 5 * 60_000);
-cleanupTimer.unref();
 
 module.exports = {
-    rateLimit,
-    cleanupRateLimitBuckets,
+  rateLimit: securityRateLimit,
 };

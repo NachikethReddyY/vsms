@@ -45,6 +45,33 @@ const COGNITO_GROUPS = {
   SUPPORT: "Support",
 };
 
+// Mirrors backend/prisma/seed.js so role-based permission checks behave the
+// same on a freshly migrated (unseeded) CI database and a seeded dev database.
+const TEST_PERMISSIONS = [
+  "participants:read",
+  "participants:write",
+  "consents:record",
+  "registrations:create",
+  "registrations:read",
+  "audit:read",
+];
+
+const grantRolePermissions = async (roleName, roleId) => {
+  for (const permissionName of TEST_PERMISSIONS) {
+    if (roleName !== "ADMINISTRATOR" && permissionName === "audit:read") continue;
+    const permission = await prisma.permission.upsert({
+      where: { permissionName },
+      update: {},
+      create: { permissionName, description: `Allows ${permissionName}` },
+    });
+    await prisma.rolePermission.upsert({
+      where: { roleId_permissionId: { roleId, permissionId: permission.id } },
+      update: {},
+      create: { roleId, permissionId: permission.id },
+    });
+  }
+};
+
 const applicationRoleFor = (role) => ROLE_ALIASES[role] || role;
 const systemRoleFor = (role) => role === "ADMINISTRATOR"
   ? "ADMIN"
@@ -60,6 +87,7 @@ const ensureTestUser = async (requestedRole = "EVENT_MANAGER", label = requested
     update: {},
     create: { roleName: applicationRole, description: `${applicationRole} integration role` },
   });
+  await grantRolePermissions(applicationRole, role.id);
   const existing = await prisma.user.findUnique({ where: { email } });
   const user = existing
     ? await prisma.user.update({

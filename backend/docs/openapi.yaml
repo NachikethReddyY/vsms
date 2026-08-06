@@ -1617,6 +1617,23 @@ paths:
         "404": { $ref: "#/components/responses/NotFound" }
         "409": { $ref: "#/components/responses/Conflict" }
         "422": { $ref: "#/components/responses/ValidationFailed" }
+    delete:
+      tags: [Queue]
+      operationId: leaveQueue
+      summary: Remove a participant from the queue (cancels the entry)
+      parameters:
+        - name: eventId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+          description: The queue entry ID to remove.
+      responses:
+        "200": { description: Queue entry cancelled, content: { application/json: { schema: { $ref: "#/components/schemas/QueueEntry" } } } }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "422": { $ref: "#/components/responses/ValidationFailed" }
   /api/v1/queues/{eventId}/stations/{stationId}/join:
     post:
       tags: [Queue]
@@ -1745,23 +1762,6 @@ paths:
           schema: { type: string, format: uuid }
       responses:
         "200": { description: Queue entry skipped, content: { application/json: { schema: { $ref: "#/components/schemas/QueueEntry" } } } }
-        "401": { $ref: "#/components/responses/Unauthorized" }
-        "403": { $ref: "#/components/responses/Forbidden" }
-        "404": { $ref: "#/components/responses/NotFound" }
-        "409": { $ref: "#/components/responses/Conflict" }
-        "422": { $ref: "#/components/responses/ValidationFailed" }
-  /api/v1/queues/{queueId}:
-    delete:
-      tags: [Queue]
-      operationId: leaveQueue
-      summary: Remove a participant from the queue (cancels the entry)
-      parameters:
-        - name: queueId
-          in: path
-          required: true
-          schema: { type: string, format: uuid }
-      responses:
-        "200": { description: Queue entry cancelled, content: { application/json: { schema: { $ref: "#/components/schemas/QueueEntry" } } } }
         "401": { $ref: "#/components/responses/Unauthorized" }
         "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
