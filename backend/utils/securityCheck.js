@@ -4,7 +4,7 @@ const fs = require("fs");
 const path = require("path");
 
 const env = require("../config/env");
-const { logger } = require("./logger/logger");
+const logger = require("./logger/logger");
 
 /**
  * Validates critical environment variables, TLS certificates, and production 
@@ -51,16 +51,21 @@ const runSecurityChecks = () => {
   );
 
   /**
-   * 4. HTTPS / TLS Configuration (Development Check)
+   * 4. HTTPS / TLS Configuration (Local HTTPS Only)
+   * When LOCAL_HTTPS=false the process trusts a TLS-terminating proxy and no
+   * certificate files are required. Production deployments likewise terminate
+   * TLS upstream and should not require local cert files.
    */
-  const tlsKeyPath = path.resolve(process.cwd(), env.TLS_KEY_PATH || "");
-  const tlsCertPath = path.resolve(process.cwd(), env.TLS_CERT_PATH || "");
+  if (env.localHttps) {
+    const tlsKeyPath = path.resolve(process.cwd(), env.TLS_KEY_PATH || "");
+    const tlsCertPath = path.resolve(process.cwd(), env.TLS_CERT_PATH || "");
 
-  addCheck(
-    "TLS certificates exist",
-    fs.existsSync(tlsKeyPath) && fs.existsSync(tlsCertPath),
-    "Missing TLS certificate files"
-  );
+    addCheck(
+      "TLS certificates exist",
+      fs.existsSync(tlsKeyPath) && fs.existsSync(tlsCertPath),
+      "Missing TLS certificate files"
+    );
+  }
 
   /**
    * 5. Production Security Rules
@@ -74,7 +79,7 @@ const runSecurityChecks = () => {
 
     addCheck(
       "Secure HTTPS cookies enabled",
-      env.SECURE_COOKIES === true,
+      env.secureCookies === true,
       "Secure cookies required in production"
     );
   }
