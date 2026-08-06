@@ -1,5 +1,5 @@
 import apiClient from '../../utils/apiClient';
-import { STATION_LABEL, STATION_PATH_SLUG, stationPath } from './StationShared';
+import { STATION_LABEL, STATION_PATH_SLUG, stationPath } from './stationConfig';
 import type { StationType } from './screeningApi';
 
 export type QrVerifyResult = {
