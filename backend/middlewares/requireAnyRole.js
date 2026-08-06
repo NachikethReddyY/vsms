@@ -1,4 +1,4 @@
-const { createAuthAuditLog } = require("../utils/AuthAudit");
+const { createAuthAuditLog } = require("../utils/audit");
 
 function buildRoleGuard(allowedRoles, denyAdministrator) {
     return async (req, res, next) => {

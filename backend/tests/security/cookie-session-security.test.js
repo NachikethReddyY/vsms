@@ -9,11 +9,11 @@ process.env.COGNITO_REGION = "ap-southeast-1";
 process.env.COGNITO_USER_POOL_ID = "ap-southeast-1_test";
 process.env.COGNITO_APP_CLIENT_ID = "test-client";
 
-const csrf = require("../middlewares/csrf");
-const requireAuthentication = require("../middlewares/requireAuthentication");
-const requestContext = require("../middlewares/requestContext");
-const prisma = require("../prisma/prismaClient");
-const { parseCookies, setAuthCookies } = require("../utils/httpCookies");
+const csrf = require("../../middlewares/csrf");
+const requireAuthentication = require("../../middlewares/requireAuthentication");
+const requestContext = require("../../middlewares/requestContext");
+const prisma = require("../../prisma/prismaClient");
+const { parseCookies, setAuthCookies } = require("../../utils/httpCookies");
 
 const response = () => ({
   headers: {},

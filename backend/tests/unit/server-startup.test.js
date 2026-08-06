@@ -6,6 +6,6 @@ process.env.NODE_ENV = "test";
 process.env.LOCAL_HTTPS = "false";
 
 test("server module loads without undeclared runtime dependencies", () => {
-  const { server } = require("../server");
+  const { server } = require("../../server");
   assert.equal(typeof server.listen, "function");
 });

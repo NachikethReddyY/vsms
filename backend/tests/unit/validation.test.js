@@ -5,7 +5,7 @@ const {
     validateEmergencyContactPayload,
     validateConsentPayload,
     validateIdempotencyKey,
-} = require("../utils/validation");
+} = require("../../utils/validation");
 
 test("valid participant payload is normalized", () => {
     const value = validateParticipantPayload({

@@ -1,9 +1,9 @@
 const { test, describe, before, after } = require("node:test");
 const { expect } = require("expect");
 const request = require("supertest");
-const helpers = require("./helpers");
+const helpers = require("../helpers");
 
-const app = require("../app");
+const app = require("../../app");
 let manager;
 let managerToken;
 

@@ -14,8 +14,8 @@ before(async () => {
   const url = new URL(process.env.DATABASE_URL);
   if (!url.pathname.endsWith("_test")) url.pathname = `${url.pathname}_test`;
   process.env.DATABASE_URL = url.toString();
-  helpers = require("./helpers");
-  ({ processScreeningSync, requestFingerprint } = require("../services/syncService"));
+  helpers = require("../helpers");
+  ({ processScreeningSync, requestFingerprint } = require("../../services/syncService"));
 
   const screener = await helpers.ensureTestUser("STAFF");
   const role = await helpers.prisma.role.upsert({

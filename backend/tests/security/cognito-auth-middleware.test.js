@@ -24,7 +24,7 @@ test("protected routes accept the Cognito access cookie", async (t) => {
   const originalFetch = global.fetch;
   global.fetch = async () => ({ ok: true, json: async () => ({ keys: [jwk] }) });
   t.after(() => { global.fetch = originalFetch; });
-  const prisma = require("../prisma/prismaClient");
+  const prisma = require("../../prisma/prismaClient");
   const originalFindUnique = prisma.user.findUnique;
   prisma.user.findUnique = async ({ where }) => {
     assert.deepEqual(where, { cognitoSub: "cognito-user" });
@@ -39,7 +39,7 @@ test("protected routes accept the Cognito access cookie", async (t) => {
 
   const app = express();
   app.use(cookieParser());
-  app.get("/protected", require("../middlewares/requireAuthentication"), (req, res) => {
+  app.get("/protected", require("../../middlewares/requireAuthentication"), (req, res) => {
     res.json({ userId: req.auth.userId, roles: req.auth.roles });
   });
   app.use((error, _req, res, _next) => res.status(error.statusCode || 500).json({ error: error.message }));

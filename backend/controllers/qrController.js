@@ -1,4 +1,3 @@
-const os = require("os");
 const qrService = require("../services/qrService");
 const prisma = require("../prisma/prismaClient");
 const env = require("../config/env");
@@ -7,17 +6,6 @@ const { encryptionContext } = require("../utils/cryptoUtils");
 const { renderBrandedQrSvg } = require("../utils/qrBranding");
 const { assertUuid } = require("../utils/validation");
 const { assertRegistrationAssignment } = require("../utils/staff");
-
-const getLanAddress = () => {
-    const interfaces = os.networkInterfaces();
-    for (const [name, addrs] of Object.entries(interfaces)) {
-        if (/VMware|vEthernet/i.test(name)) continue;
-        for (const addr of addrs || []) {
-            if (addr.family === "IPv4" && !addr.internal) return addr.address;
-        }
-    }
-    return "127.0.0.1";
-};
 
 async function assertQrAccess(req, selectors) {
     const eventId = await qrService.getEventIdForAccess(selectors);
@@ -31,7 +19,8 @@ exports.generateRegistrationQR = async (req, res, next) => {
         await assertQrAccess(req, { registrationId: req.params.registrationId });
         const qr = await qrService.generateRegistrationQR(
             req.params.registrationId,
-            req.auth.userId
+            req.auth.userId,
+            { ipAddress: req.ip }
         );
         const { token: _token, ...safeQr } = qr;
         return res.status(201).json(safeQr);
@@ -60,7 +49,8 @@ exports.generateQR = async (req, res, next) => {
         const userId = req.auth.userId;
         await assertQrAccess(req, { registrationId });
 
-        const qr = await qrService.generateQR(registrationId, userId);
+        const qr = await qrService.generateQR(registrationId, userId, null, { ipAddress: req.ip });
+
         const { token: _token, ...safeQr } = qr;
 
         return res.status(201).json({
@@ -83,7 +73,7 @@ exports.verifyQR = async (req, res, next) => {
         const userId = req.auth.userId;
         await assertQrAccess(req, { token, eventId });
 
-        const result = await qrService.verifyQR(token, eventId, userId);
+        const result = await qrService.verifyQR(token, eventId, userId, prisma, { ipAddress: req.ip });
 
         return res.status(200).json({
             success: true,
@@ -103,6 +93,23 @@ exports.getPublicStatus = async (req, res, next) => {
         const { token } = req.params;
         const status = await qrService.getPublicStatus(token);
         return res.json({ success: true, data: status });
+    } catch (err) {
+        next(err);
+    }
+};
+
+// ==========================================
+// Public Screener Handoff QR (no auth, no PII)
+// GET /qr/handoff/:token?station=VISUAL_ACUITY
+// Encodes a station URL pre-loaded with the registration so a screener who
+// scans it lands directly on their station with the participant selected.
+// ==========================================
+exports.getStationHandoffQR = async (req, res, next) => {
+    try {
+        const { token } = req.params;
+        const { station } = req.query;
+        const data = await qrService.getStationHandoffQR(token, String(station || ""));
+        return res.json({ success: true, data });
     } catch (err) {
         next(err);
     }
@@ -138,7 +145,7 @@ exports.revokeQR = async (req, res, next) => {
         const revokedBy = req.auth.userId;
         await assertQrAccess(req, { qrId });
 
-        const qr = await qrService.revokeQR(qrId, revokedReason, revokedBy);
+        const qr = await qrService.revokeQR(qrId, revokedReason, revokedBy, prisma, { ipAddress: req.ip });
 
         return res.status(200).json({
             success: true,
@@ -160,7 +167,7 @@ exports.reissueQR = async (req, res, next) => {
         const userId = req.auth.userId;
         await assertQrAccess(req, { registrationId });
 
-        const qr = await qrService.reissueQR(registrationId, userId);
+        const qr = await qrService.reissueQR(registrationId, userId, prisma, { ipAddress: req.ip });
         const { token: _token, ...safeQr } = qr;
 
         return res.status(201).json({
@@ -220,7 +227,8 @@ exports.viewQR = async (req, res, next) => {
         await assertQrAccess(req, { registrationId: req.params.registrationId });
         const qr = await qrService.generateRegistrationQR(
             req.params.registrationId,
-            req.auth.userId
+            req.auth.userId,
+            { ipAddress: req.ip }
         );
         const svgBase64 = qr.qrImage.split(",")[1]; // strip data:image/svg+xml;base64,
         const svg = Buffer.from(svgBase64, "base64").toString("utf8");
@@ -245,7 +253,8 @@ exports.devViewQR = async (req, res, next) => {
         assertUuid(req.params.registrationId, "registrationId");
         const qr = await qrService.generateRegistrationQR(
             req.params.registrationId,
-            null
+            null,
+            { ipAddress: req.ip }
         );
         const svgBase64 = qr.qrImage.split(",")[1];
         const svg = Buffer.from(svgBase64, "base64").toString("utf8");
@@ -281,7 +290,7 @@ exports.devPageQR = async (req, res, next) => {
             return res.status(404).send("<h1>Registration not found</h1>");
         }
 
-        const qr = await qrService.generateRegistrationQR(registrationId, null);
+        const qr = await qrService.generateRegistrationQR(registrationId, null, { ipAddress: req.ip });
         const svgBase64 = qr.qrImage.split(",")[1];
         const svg = Buffer.from(svgBase64, "base64").toString("utf8");
 
@@ -299,9 +308,7 @@ exports.devPageQR = async (req, res, next) => {
         let scanQr = svg;
         let statusUrl = null;
         if (token) {
-            const lan = getLanAddress();
-            const port = env.PORT;
-            const target = `https://${lan}:${port}/api/v1/qr/dev-status/${encodeURIComponent(token)}`;
+            const target = `${env.publicAppOrigin}/participant-status/${encodeURIComponent(token)}`;
             scanQr = await renderBrandedQrSvg(target, { width: 420 });
             const scanSvgBase64 = scanQr.split(",")[1];
             scanQr = Buffer.from(scanSvgBase64, "base64").toString("utf8");
@@ -527,7 +534,8 @@ exports.manualCheckIn = async (req, res, next) => {
             registrationId,
             identifier,
             eventId,
-            userId
+            userId,
+            ipAddress: req.ip
         });
 
         return res.status(200).json({

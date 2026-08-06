@@ -13,10 +13,10 @@ Object.assign(process.env, {
     PUBLIC_APP_ORIGIN: "https://localhost:5173",
 });
 
-const cognitoClient = require("../utils/cognitoClient");
-const cognitoJwt = require("../utils/cognitoJwt");
-const staff = require("../utils/staff");
-const AuthAudit = require("../utils/AuthAudit");
+const cognitoClient = require("../../utils/cognitoClient");
+const cognitoJwt = require("../../utils/cognitoJwt");
+const staff = require("../../utils/staff");
+const AuthAudit = require("../../utils/audit");
 
 cognitoClient.exchangeAuthorizationCode = async (code, verifier) => {
     assert.equal(code, "authorization-code");
@@ -35,7 +35,7 @@ staff.syncLocalUser = async () => ({
 staff.rolesFromCognitoGroups = () => ["EVENT_MANAGER"];
 AuthAudit.createAuthAuditLog = async () => {};
 
-const app = require("../app");
+const app = require("../../app");
 
 test("authorize route creates a PKCE authorization URL and stores the protected return target", async () => {
     const response = await request(app).get("/api/v1/auth/authorize?returnTo=%2Fevents%3Fview%3Dupcoming");

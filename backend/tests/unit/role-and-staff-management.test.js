@@ -4,9 +4,9 @@ const test = require("node:test");
 
 process.env.DATABASE_URL ||= "postgresql://test:test@localhost:5432/vsms_test";
 
-const prisma = require("../prisma/prismaClient");
-const userService = require("../services/userService");
-const { rolesFromCognitoGroups } = require("../utils/roles");
+const prisma = require("../../prisma/prismaClient");
+const userService = require("../../services/userService");
+const { rolesFromCognitoGroups } = require("../../utils/roles");
 
 const syncedAccess = (overrides = {}) => async () => ({
   managed: true,

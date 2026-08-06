@@ -26,8 +26,8 @@ describe("OneMap location search", () => {
   const originalFetch = global.fetch;
 
   const resetEnv = () => {
-    delete require.cache[require.resolve("../config/env")];
-    delete require.cache[require.resolve("../services/locationService")];
+    delete require.cache[require.resolve("../../config/env")];
+    delete require.cache[require.resolve("../../services/locationService")];
     process.env.ONEMAP_BASE_URL = "https://www.onemap.gov.sg";
     process.env.ONEMAP_API_EMAIL = "manager@example.com";
     process.env.ONEMAP_API_PASSWORD = "test-password";
@@ -66,7 +66,7 @@ describe("OneMap location search", () => {
     ]);
     global.fetch = fetch;
 
-    const { searchLocations } = require("../services/locationService");
+    const { searchLocations } = require("../../services/locationService");
     const locations = await searchLocations("Tampines Hub");
 
     expect(fetch.mock.calls).toHaveLength(4);
@@ -88,7 +88,7 @@ describe("OneMap location search", () => {
     ]);
     global.fetch = fetch;
 
-    const { searchLocations } = require("../services/locationService");
+    const { searchLocations } = require("../../services/locationService");
     await searchLocations("Tampines");
     await searchLocations("Bedok");
 
@@ -104,7 +104,7 @@ describe("OneMap location search", () => {
       }, 400),
     ]);
 
-    const { searchLocations } = require("../services/locationService");
+    const { searchLocations } = require("../../services/locationService");
 
     await expect(searchLocations("Compass One")).rejects.toMatchObject({
       status: 503,

@@ -11,7 +11,7 @@ const {
     globalSignOut,
 } = require("../utils/cognitoClient");
 const { verifyCognitoToken } = require("../utils/cognitoJwt");
-const { createAuthAuditLog } = require("../utils/AuthAudit");
+const { createAuthAuditLog } = require("../utils/audit");
 const { timingSafeEqual } = require("../utils/security");
 const { syncLocalUser, rolesFromCognitoGroups, ALLOWED_ROLES } = require("../utils/staff");
 const {

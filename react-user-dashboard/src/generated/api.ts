@@ -1184,7 +1184,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** List the latest application and authentication audit records */
+        /**
+         * List the latest application and authentication audit records
+         * @description Administrator-only paged read surface for the append-only audit trail. Application audit records (`logs`) and authentication audit records (`authLogs`) are returned together with independent signed keyset cursors (`nextCursor` / `nextAuthCursor`) for load-more pagination. Rows are immutable; this endpoint never mutates history.
+         */
         get: operations["listAdministrativeAuditLogs"];
         put?: never;
         post?: never;
@@ -2959,6 +2962,10 @@ export interface components {
             } & {
                 [key: string]: unknown;
             })[];
+            /** @description Signed keyset cursor for the next page of application logs */
+            nextCursor: string | null;
+            /** @description Signed keyset cursor for the next page of authentication logs */
+            nextAuthCursor: string | null;
         };
         QrCode: {
             /** Format: uuid */
@@ -3513,6 +3520,15 @@ export interface components {
         };
         /** @description Request validation failed */
         ValidationFailed: {
+            headers: {
+                [name: string]: unknown;
+            };
+            content: {
+                "application/json": components["schemas"]["Problem"];
+            };
+        };
+        /** @description Pagination cursor is malformed, expired, tampered with, or used against the wrong resource scope */
+        InvalidCursor: {
             headers: {
                 [name: string]: unknown;
             };
@@ -5748,7 +5764,26 @@ export interface operations {
     };
     listAdministrativeAuditLogs: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description Signed keyset cursor for the application audit page */
+                cursor?: string;
+                /** @description Signed keyset cursor for the authentication audit page */
+                authCursor?: string;
+                /** @description Maximum rows per table in this page */
+                limit?: number;
+                /** @description Filter application logs by target entity name */
+                entityName?: string;
+                /** @description Filter application logs by action verb */
+                action?: string;
+                /** @description Filter authentication logs by event type */
+                eventType?: string;
+                /** @description Filter both tables by outcome */
+                outcome?: "SUCCESS" | "FAILED" | "DENIED";
+                /** @description Inclusive lower bound (ISO-8601) for occurred/created time */
+                from?: string;
+                /** @description Inclusive upper bound (ISO-8601) for occurred/created time */
+                to?: string;
+            };
             header?: never;
             path?: never;
             cookie?: never;
@@ -5764,8 +5799,10 @@ export interface operations {
                     "application/json": components["schemas"]["AdminAuditLogsResponse"];
                 };
             };
+            400: components["responses"]["ValidationFailed"];
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
+            422: components["responses"]["InvalidCursor"];
         };
     };
     generateRegistrationQrCode: {

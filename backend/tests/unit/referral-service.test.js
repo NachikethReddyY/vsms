@@ -3,7 +3,7 @@ const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const path = require("node:path");
 const crypto = require("node:crypto");
-const prisma = require("../prisma/prismaClient");
+const prisma = require("../../prisma/prismaClient");
 const {
   generateHandoffSecret,
   maskEmail,
@@ -21,15 +21,15 @@ const {
   referralRevisionFingerprint,
   PDF_COLORS,
   resultSummary,
-} = require("../services/referralService");
+} = require("../../services/referralService");
 const {
   encrypt,
   decrypt,
   encryptionContext,
   encryptWithKeyring,
   decryptWithKeyring,
-} = require("../utils/cryptoUtils");
-const { storeSignature, loadVerifiedSignature, consumeSignatureArtifact } = require("../utils/signatureStorage");
+} = require("../../utils/cryptoUtils");
+const { storeSignature, loadVerifiedSignature, consumeSignatureArtifact } = require("../../utils/signatureStorage");
 
 const replace = (t, target, key, value) => {
   const original = target[key];
@@ -101,7 +101,7 @@ test("binds the referral idempotency key to the complete issuance request", () =
 });
 
 test("generates an encrypted PDF whose plaintext clinical values are not exposed", async () => {
-  const signature = fs.readFileSync(path.join(__dirname, "../../react-user-dashboard/src/assets/event-covers/event-operations.jpg"));
+  const signature = fs.readFileSync(path.join(__dirname, "../../../react-user-dashboard/src/assets/event-covers/event-operations.jpg"));
   const pdf = await generateReferralPdf({
     referral: referralFixture(),
     signature,

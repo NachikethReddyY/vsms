@@ -7,7 +7,7 @@ const request = require("supertest");
 process.env.DATABASE_URL ||= "postgresql://test:test@localhost:5432/vsms_test";
 process.env.CORS_ORIGINS ||= "https://localhost:5173";
 
-const csrf = require("../middlewares/csrf");
+const csrf = require("../../middlewares/csrf");
 const app = express();
 app.use(cookieParser());
 app.post("/mutation", csrf, (_req, res) => res.sendStatus(204));

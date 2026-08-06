@@ -1273,10 +1273,55 @@ paths:
       tags: [Administration]
       operationId: listAdministrativeAuditLogs
       summary: List the latest application and authentication audit records
+      description: >
+        Administrator-only paged read surface for the append-only audit trail.
+        Application audit records (`logs`) and authentication audit records
+        (`authLogs`) are returned together with independent signed keyset cursors
+        (`nextCursor` / `nextAuthCursor`) for load-more pagination. Rows are
+        immutable; this endpoint never mutates history.
+      parameters:
+        - name: cursor
+          in: query
+          description: Signed keyset cursor for the application audit page
+          schema: { type: string }
+        - name: authCursor
+          in: query
+          description: Signed keyset cursor for the authentication audit page
+          schema: { type: string }
+        - name: limit
+          in: query
+          description: Maximum rows per table in this page
+          schema: { type: integer, minimum: 1, maximum: 100, default: 50 }
+        - name: entityName
+          in: query
+          description: Filter application logs by target entity name
+          schema: { type: string, maxLength: 50 }
+        - name: action
+          in: query
+          description: Filter application logs by action verb
+          schema: { type: string, maxLength: 100 }
+        - name: eventType
+          in: query
+          description: Filter authentication logs by event type
+          schema: { type: string, maxLength: 50 }
+        - name: outcome
+          in: query
+          description: Filter both tables by outcome
+          schema: { type: string, enum: [SUCCESS, FAILED, DENIED] }
+        - name: from
+          in: query
+          description: Inclusive lower bound (ISO-8601) for occurred/created time
+          schema: { type: string, format: date-time }
+        - name: to
+          in: query
+          description: Inclusive upper bound (ISO-8601) for occurred/created time
+          schema: { type: string, format: date-time }
       responses:
         "200": { description: Latest audit records, content: { application/json: { schema: { $ref: "#/components/schemas/AdminAuditLogsResponse" } } } }
+        "400": { $ref: "#/components/responses/ValidationFailed" }
         "401": { $ref: "#/components/responses/Unauthorized" }
         "403": { $ref: "#/components/responses/Forbidden" }
+        "422": { $ref: "#/components/responses/InvalidCursor" }
   /api/v1/qr/registrations/{registrationId}:
     post:
       tags: [QR Codes]
@@ -1865,6 +1910,9 @@ components:
       content: { application/json: { schema: { $ref: "#/components/schemas/Problem" } } }
     ValidationFailed:
       description: Request validation failed
+      content: { application/json: { schema: { $ref: "#/components/schemas/Problem" } } }
+    InvalidCursor:
+      description: Pagination cursor is malformed, expired, tampered with, or used against the wrong resource scope
       content: { application/json: { schema: { $ref: "#/components/schemas/Problem" } } }
     RateLimited:
       description: Rate limit exceeded
@@ -3291,7 +3339,7 @@ components:
     AdminAuditLogsResponse:
       type: object
       additionalProperties: false
-      required: [logs, authLogs]
+      required: [logs, authLogs, nextCursor, nextAuthCursor]
       properties:
         logs:
           type: array
@@ -3339,6 +3387,14 @@ components:
               requestId: { type: string, format: uuid, nullable: true }
               occurredAt: { type: string, format: date-time }
               user: { $ref: "#/components/schemas/User" }
+        nextCursor:
+          type: string
+          nullable: true
+          description: Signed keyset cursor for the next page of application logs
+        nextAuthCursor:
+          type: string
+          nullable: true
+          description: Signed keyset cursor for the next page of authentication logs
     QrCode:
       type: object
       additionalProperties: true

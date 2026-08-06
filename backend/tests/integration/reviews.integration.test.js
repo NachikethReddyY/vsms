@@ -97,8 +97,8 @@ before(async () => {
   if (!databaseUrl.pathname.endsWith("_test")) databaseUrl.pathname = `${databaseUrl.pathname}_test`;
   process.env.DATABASE_URL = databaseUrl.toString();
 
-  helpers = require("./helpers");
-  app = require("../app");
+  helpers = require("../helpers");
+  app = require("../../app");
   prisma = helpers.prisma;
 
   for (const [label, role] of Object.entries({
