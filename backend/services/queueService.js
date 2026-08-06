@@ -19,7 +19,7 @@ const ACTIVE_ASSIGNMENT_STATUSES = ["ASSIGNED", "CONFIRMED"];
 const requireQueueManagement = async (db, eventId, user) => {
   const operational = (user.roles || []).some((role) => QUEUE_OPERATIONAL_ROLES.includes(role));
   if (!operational) {
-    throw new AppError("An operational role is required to manage queues", 403);
+    throw new AppError("An operational role is required to manage queues", 403, "FORBIDDEN");
   }
   
   const event = await db.event.findUnique({
@@ -29,7 +29,7 @@ const requireQueueManagement = async (db, eventId, user) => {
   
   if (!event) throw new NotFoundError("Event not found");
   if (event.status !== "IN_PROGRESS") {
-    throw new AppError("Queue operations are available only while the event is in progress", 409);
+    throw new AppError("Queue operations are available only while the event is in progress", 409, "CONFLICT");
   }
   return event;
 };
@@ -67,12 +67,12 @@ const requireQueueStationOperation = async (db, eventId, stationId, user) => {
     });
     
     if (!assignment) {
-      throw new AppError("You are not assigned to operate this station queue", 403);
+      throw new AppError("You are not assigned to operate this station queue", 403, "FORBIDDEN");
     }
     return { event: station, station };
   }
 
-  throw new AppError("Screener, event manager, or administrator access is required", 403);
+  throw new AppError("Screener, event manager, or administrator access is required", 403, "FORBIDDEN");
 };
 
 /**
@@ -357,6 +357,13 @@ const transferQueueEntry = async ({ queueId, toStationId, reason = "STATION_TRAN
 };
 
 /**
+ * Alias/Wrapper for advanceQueueEntry to satisfy test suites calling advanceQueueEntry directly.
+ */
+const advanceQueueEntry = async (queueId, targetStationId, user, context = null, db = prisma) => {
+  return transferQueueEntry({ queueId, toStationId: targetStationId }, user, context, db);
+};
+
+/**
  * Marks the active station queue entry as completed.
  */
 const completeQueueEntry = async (queueId, user, context = null, db = prisma) => {
@@ -496,6 +503,7 @@ module.exports = {
   callQueueEntry,
   startQueueEntry,
   transferQueueEntry,
+  advanceQueueEntry,
   completeQueueEntry,
   skipQueueEntry,
   leaveQueue,
