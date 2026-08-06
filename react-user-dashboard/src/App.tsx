@@ -13,6 +13,7 @@ import PublicEventPage from "./features/events/PublicEventPage";
 import ReviewWorkspacePage from "./features/reviews/ReviewWorkspacePage";
 import ReportsPage from "./features/reports/ReportsPage";
 import ColourVisionStationPage from "./features/screening/ColourVisionStationPage";
+import QRScannerPage from "./features/screening/QRScannerPage";
 import RefractionStationPage from "./features/screening/RefractionStationPage";
 import VisualAcuityStationPage from "./features/screening/VisualAcuityStationPage";
 import { AuditLogsPage as RegistrationAuditLogsPage } from "./pages/AdminPages";
@@ -27,6 +28,7 @@ import ParticipantPage from "./pages/ParticipantPage";
 import ParticipantProfilePage from "./pages/ParticipantProfilePage";
 import ParticipantQrPage from "./pages/ParticipantQrPage";
 import ParticipantRegistrationPage from "./pages/ParticipantRegistrationPage";
+import ParticipantStatusPage from "./pages/ParticipantStatusPage";
 import {
   ParticipantConsentsPage,
   ParticipantEditPage,
@@ -76,6 +78,7 @@ export default function App() {
       <Route path="/" element={<LandingPage />} />
       <Route path="/auth/callback" element={<CognitoCallback />} />
       <Route path="/e/:eventId" element={<PublicEventPage />} />
+      <Route path="/participant-status/:token" element={<ParticipantStatusPage />} />
 
       <Route element={<ProtectedRoute />}>
         <Route path="/dashboard" element={<Navigate to="/events" replace />} />
@@ -103,6 +106,7 @@ export default function App() {
             <Route path="/events/:eventId/stations/visual-acuity" element={<VisualAcuityStationPage />} />
             <Route path="/events/:eventId/stations/refraction" element={<RefractionStationPage />} />
             <Route path="/events/:eventId/stations/colour-vision" element={<ColourVisionStationPage />} />
+            <Route path="/qr-scanner" element={<QRScannerPage />} />
           </Route>
 
           <Route element={<RoleGuard allowedRoles={eventManagerRoles} />}>

@@ -1,4 +1,5 @@
 const express = require("express");
+const authenticate = require("../middlewares/authenticate");
 const validate = require("../middlewares/validate");
 const asyncHandler = require("../utils/asyncHandler");
 const screeningController = require("../controllers/screeningController");
@@ -13,6 +14,7 @@ const {
   previewColourVisionBody,
   saveColourVisionBody,
   reviewParams,
+  reviewScanBody,
   reviewDecisionBody,
   referralParams,
   referralDocumentParams,
@@ -23,6 +25,8 @@ const {
 } = require("../schemas/screeningSchemas");
 
 const router = express.Router({ mergeParams: true });
+
+router.use(authenticate);
 
 router.post(
   "/:eventId/sync/screening",
@@ -46,6 +50,12 @@ router.get(
   "/:eventId/registrations/resolve",
   validate({ params: eventParams, query: resolveQuery }),
   asyncHandler(screeningController.resolveParticipant),
+);
+
+router.get(
+  "/:eventId/registrations/:registrationId/pass-display",
+  validate({ params: reviewParams }),
+  asyncHandler(screeningController.getPassDisplay),
 );
 
 router.post(
@@ -88,6 +98,12 @@ router.get(
   "/:eventId/reviews",
   validate({ params: eventParams }),
   asyncHandler(screeningController.listReviews),
+);
+
+router.post(
+  "/:eventId/reviews/scan",
+  validate({ params: eventParams, body: reviewScanBody }),
+  asyncHandler(screeningController.scanReviewParticipant),
 );
 
 router.get(

@@ -1,0 +1,92 @@
+const assert = require("node:assert/strict");
+const test = require("node:test");
+const crypto = require("node:crypto");
+
+process.env.DATABASE_URL ||= "postgresql://test:test@localhost:5432/vsms_test";
+
+const prisma = require("../../prisma/prismaClient");
+const screeningService = require("../../services/screeningService");
+const { stationTypeForTemplateKey } = require("../../services/stationTemplateMapping");
+
+const eventId = crypto.randomUUID();
+const stationA = crypto.randomUUID();
+const stationB = crypto.randomUUID();
+const user = { userId: crypto.randomUUID(), systemRole: "STAFF", roles: ["SCREENER"] };
+
+function replace(t, target, key, value) {
+  const original = target[key];
+  target[key] = value;
+  t.after(() => { target[key] = original; });
+}
+
+test("screening is denied outside an in-progress event", async (t) => {
+  let assignmentChecked = false;
+  replace(t, prisma.event, "findUnique", async () => ({ eventId, name: "Draft", status: "DRAFT", venue: "Hall" }));
+  replace(t, prisma.staffAssignment, "findFirst", async () => { assignmentChecked = true; return { id: "unexpected" }; });
+
+  await assert.rejects(
+    screeningService.listStations(eventId, user),
+    (error) => error.status === 409 && error.code === "EVENT_NOT_IN_PROGRESS",
+  );
+  assert.equal(assignmentChecked, false);
+});
+
+test("only a screener assigned to the requested station can read its queue", async (t) => {
+  let assignmentWhere;
+  replace(t, prisma.event, "findUnique", async () => ({ eventId, name: "Live", status: "IN_PROGRESS", venue: "Hall" }));
+  replace(t, prisma.staffAssignment, "findFirst", async ({ where }) => {
+    assignmentWhere = where;
+    return where.stationId === stationA ? { id: crypto.randomUUID() } : null;
+  });
+  replace(t, prisma.station, "findFirst", async ({ where }) => ({ ...where, stationName: "Station A" }));
+  replace(t, prisma.eventRegistration, "findMany", async () => []);
+
+  await assert.rejects(
+    screeningService.listQueue(eventId, stationB, user),
+    (error) => error.status === 403 && error.code === "FORBIDDEN",
+  );
+  assert.equal(assignmentWhere.assignmentRole, "SCREENER");
+  assert.equal(assignmentWhere.stationId, stationB);
+  assert.equal(assignmentWhere.shift.status, "ACTIVE");
+
+  const queue = await screeningService.listQueue(eventId, stationA, user);
+  assert.deepEqual(queue.registrations, []);
+  assert.equal(stationTypeForTemplateKey("EYE_HEALTH"), null);
+});
+
+test("an administrator remains denied even if a screener role is misconfigured", async (t) => {
+  let eventChecked = false;
+  replace(t, prisma.event, "findUnique", async () => { eventChecked = true; return null; });
+
+  await assert.rejects(
+    screeningService.listStations(eventId, { ...user, roles: ["ADMINISTRATOR", "SCREENER"] }),
+    (error) => error.status === 403 && error.code === "SCREENER_ROLE_REQUIRED",
+  );
+  assert.equal(eventChecked, false);
+});
+
+test("assigned stations publish an offline expiry capped by the event and active shift", async (t) => {
+  const eventEndsAt = new Date("2026-08-04T12:00:00.000Z");
+  const laterShiftEnd = new Date("2026-08-04T14:00:00.000Z");
+  const earlierShiftEnd = new Date("2026-08-04T11:00:00.000Z");
+  replace(t, prisma.event, "findUnique", async () => ({
+    eventId, name: "Live", status: "IN_PROGRESS", venue: "Hall", endsAt: eventEndsAt,
+  }));
+  replace(t, prisma.staffAssignment, "findFirst", async () => ({ id: crypto.randomUUID() }));
+  replace(t, prisma.staffAssignment, "findMany", async () => ([
+    { stationId: stationA, shift: { endsAt: laterShiftEnd } },
+    { stationId: stationB, shift: { endsAt: earlierShiftEnd } },
+  ]));
+  replace(t, prisma.station, "findMany", async ({ where }) => {
+    assert.deepEqual(where.stationId.in, [stationA, stationB]);
+    return [
+      { stationId: stationA, eventId, stationType: "VISUAL_ACUITY", stationName: "VA", stationOrder: 1, isActive: true },
+      { stationId: stationB, eventId, stationType: "REFRACTION", stationName: "Refraction", stationOrder: 2, isActive: true },
+    ];
+  });
+
+  const result = await screeningService.listStations(eventId, user);
+
+  assert.equal(result.stations[0].offlineAccessExpiresAt, eventEndsAt.toISOString());
+  assert.equal(result.stations[1].offlineAccessExpiresAt, earlierShiftEnd.toISOString());
+});

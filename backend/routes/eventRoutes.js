@@ -1,5 +1,5 @@
 const express = require("express");
-const { rateLimit } = require("express-rate-limit");
+const { rateLimit } = require("../middlewares/rateLimiter");
 const eventController = require("../controllers/eventController");
 const reportingController = require("../controllers/reportingController");
 const validate = require("../middlewares/validate");
@@ -29,6 +29,7 @@ const {
 
 const router = express.Router();
 const reportingLimiter = rateLimit({
+  name: "reporting",
   windowMs: 60000,
   limit: 60,
   standardHeaders: "draft-8",

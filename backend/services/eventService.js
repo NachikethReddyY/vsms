@@ -1482,11 +1482,23 @@ const addStaffAssignment = async (eventId, shiftId, body, user, correlationId, d
       throw new AppError(422, "STAFF_ROLE_MISMATCH", "The selected staff member does not hold the required account role");
     }
 
+    // Same shift + different station is allowed (VA / refraction / colour vision).
+    // Conflict only when another overlapping shift already has this person, or this
+    // exact shift+station slot is already taken.
     const conflict = await tx.staffAssignment.findFirst({
       where: {
         userId: body.userId,
         status: { in: ACTIVE_ASSIGNMENT_STATUSES },
-        shift: { startsAt: { lt: shift.endsAt }, endsAt: { gt: shift.startsAt } },
+        OR: [
+          {
+            shiftId: { not: shiftId },
+            shift: { startsAt: { lt: shift.endsAt }, endsAt: { gt: shift.startsAt } },
+          },
+          {
+            shiftId,
+            stationId: station?.stationId || null,
+          },
+        ],
       },
       select: { id: true },
     });

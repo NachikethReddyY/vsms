@@ -1,6 +1,6 @@
 /* eslint-disable react-refresh/only-export-components */
 import { ExclamationTriangleIcon } from '@heroicons/react/24/outline';
-import { FormEvent, ReactNode, useState } from 'react';
+import { FormEvent, ReactNode, useCallback, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { AppToast } from '../../components/AppToast';
 import { getApiError as getApiMessage } from '../../utils/apiClient';
@@ -12,21 +12,11 @@ import {
   Station,
   StationType,
 } from './screeningApi';
+import { extractQrToken } from './qrHandoff';
 import { getOfflineStationContext, isNetworkError } from './offlineSync';
-
-/** Slugs for station pages that currently have UI routes. */
-export const STATION_PATH_SLUG: Partial<Record<StationType, string>> = {
-  VISUAL_ACUITY: 'visual-acuity',
-  REFRACTION: 'refraction',
-  COLOUR_VISION: 'colour-vision',
-};
-
-export const STATION_LABEL: Record<StationType, string> = {
-  VISUAL_ACUITY: 'Visual Acuity',
-  REFRACTION: 'Refraction',
-  COLOUR_VISION: 'Colour Vision',
-  EYE_HEALTH: 'Eye Health',
-};
+import { STATION_LABEL, STATION_PATH_SLUG, stationPath } from './stationConfig';
+import { StationCameraScanner } from './StationCameraScanner';
+import './StationCameraScanner.css';
 
 /** Default clinical order when event stationOrder is unavailable. */
 export const DEFAULT_STATION_ORDER: StationType[] = [
@@ -35,18 +25,6 @@ export const DEFAULT_STATION_ORDER: StationType[] = [
   'COLOUR_VISION',
   'EYE_HEALTH',
 ];
-
-export function stationPath(
-  eventId: string,
-  stationType: StationType,
-  registrationId?: string | null,
-): string | null {
-  const slug = STATION_PATH_SLUG[stationType];
-  if (!slug) return null;
-  const base = `/events/${eventId}/stations/${slug}`;
-  if (!registrationId) return base;
-  return `${base}?registrationId=${encodeURIComponent(registrationId)}`;
-}
 
 export function orderedStationTypes(stations?: Station[]): StationType[] {
   if (stations && stations.length > 0) {
@@ -82,13 +60,58 @@ export function StationHandoffLinks({
 }) {
   const next = nextStationTypes(currentStationType, stations);
   const isLastScreeningStation = next.length === 0;
+  const nextLabel = next[0] ? STATION_LABEL[next[0]] : null;
+  const [passImage, setPassImage] = useState<string | null>(null);
+  const [passName, setPassName] = useState<string | null>(null);
+  const [passQueue, setPassQueue] = useState<number | null>(null);
+  const [passError, setPassError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!eventId || !registrationId) return;
+    let cancelled = false;
+    setPassError(null);
+    setPassImage(null);
+    void screeningApi.getPassDisplay(eventId, registrationId)
+      .then((pass) => {
+        if (cancelled) return;
+        setPassImage(pass.qrImage);
+        setPassName(pass.participantDisplayName);
+        setPassQueue(pass.queueNumber);
+      })
+      .catch((cause) => {
+        if (!cancelled) setPassError(getApiMessage(cause, 'Could not load the participant QR for next queue.'));
+      });
+    return () => { cancelled = true; };
+  }, [eventId, registrationId]);
 
   return (
     <nav className="va-handoff" aria-label="Continue screening">
       <p className="va-handoff-label">
-        {next.length > 0 ? 'Continue to next station' : 'Screening stations complete for this route'}
+        {next.length > 0
+          ? `Station complete — show this QR so the participant can join the ${nextLabel} queue`
+          : 'Screening stations complete for this route'}
         {registrationId ? ' · same participant kept' : null}
       </p>
+
+      {registrationId && (
+        <div className="station-pass-qr" aria-live="polite">
+          {passError && <p className="form-error" role="alert">{passError}</p>}
+          {passImage && (
+            <>
+              <img src={passImage} alt="Participant QR pass for next station queue" />
+              <p>
+                Show this code to <strong>{passName || 'the participant'}</strong>
+                {nextLabel ? <> for <strong>{nextLabel}</strong></> : null}.
+              </p>
+              {passQueue != null && (
+                <p className="station-pass-qr-meta">Queue #{passQueue}</p>
+              )}
+            </>
+          )}
+          {!passImage && !passError && <p className="station-pass-qr-meta">Loading participant QR…</p>}
+        </div>
+      )}
+
       <div className="action-cluster" style={{ paddingTop: 0 }}>
         {next.map((type, index) => {
           const href = stationPath(eventId, type, registrationId);
@@ -99,7 +122,7 @@ export function StationHandoffLinks({
               className={index === 0 ? 'primary' : 'secondary'}
               to={href}
             >
-              {index === 0 ? 'Next: ' : ''}{STATION_LABEL[type]}
+              {index === 0 ? 'Open next station tablet: ' : ''}{STATION_LABEL[type]}
             </Link>
           );
         })}
@@ -175,22 +198,54 @@ export function ParticipantLookup({
   onSelect: (registrationId: string) => void;
   selected: QueueRegistration | null;
 }) {
-  const [passToken, setPassToken] = useState('VSMS-DEMO-QR-001');
+  const [passToken, setPassToken] = useState('abababababababababababababababababababababababababababababababab');
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
+  const [scannerOpen, setScannerOpen] = useState(false);
+
+  const applyResolved = useCallback((person: {
+    registrationId: string;
+    participantDisplayName: string;
+  }, source: string) => {
+    onSelect(person.registrationId);
+    setSuccess(`Loaded ${person.participantDisplayName} from ${source}.`);
+  }, [onSelect]);
 
   const resolvePass = async () => {
     if (!eventId || !passToken.trim()) return;
     setError(null);
     setSuccess(null);
     try {
-      const person = await screeningApi.resolve(eventId, { passToken: passToken.trim() });
-      onSelect(person.registrationId);
-      setSuccess(`Loaded ${person.participantDisplayName} from pass token.`);
+      const token = extractQrToken(passToken) || passToken.trim();
+      const person = await screeningApi.resolve(eventId, {
+        passToken: token,
+        qrToken: token,
+      });
+      applyResolved(person, 'pass / QR token');
     } catch (cause) {
       setError(getApiMessage(cause, 'Could not resolve that participant pass.'));
     }
   };
+
+  const onCameraScan = useCallback(async (raw: string) => {
+    if (!eventId) throw new Error('Event is not ready.');
+    const token = extractQrToken(raw);
+    if (!token) throw new Error('No QR token found in the scan.');
+    setError(null);
+    setSuccess(null);
+    setPassToken(token);
+    try {
+      const person = await screeningApi.resolve(eventId, {
+        passToken: token,
+        qrToken: token,
+      });
+      applyResolved(person, 'camera scan');
+    } catch (cause) {
+      const message = getApiMessage(cause, 'Could not resolve that participant pass.');
+      setError(message);
+      throw new Error(message);
+    }
+  }, [eventId, applyResolved]);
 
   return (
     <section className="detail-panel" style={{ marginBottom: 24 }}>
@@ -200,9 +255,16 @@ export function ParticipantLookup({
       <div className="va-resolve-row">
         <label>
           Pass token / QR value
-          <input value={passToken} onChange={(event) => setPassToken(event.target.value)} placeholder="VSMS-DEMO-QR-001" />
+          <input
+            value={passToken}
+            onChange={(event) => setPassToken(event.target.value)}
+            placeholder="VSMS-DEMO-QR-001 or QR hex token"
+          />
         </label>
         <button type="button" className="primary" onClick={() => void resolvePass()}>Load pass</button>
+        <button type="button" className="secondary" onClick={() => setScannerOpen(true)}>
+          Scan QR with camera
+        </button>
       </div>
       <label>
         Or choose from station queue
@@ -222,6 +284,11 @@ export function ParticipantLookup({
           {selected.passToken ? <> · pass <code>{selected.passToken}</code></> : null}
         </p>
       )}
+      <StationCameraScanner
+        open={scannerOpen}
+        onOpenChange={setScannerOpen}
+        onScan={onCameraScan}
+      />
     </section>
   );
 }

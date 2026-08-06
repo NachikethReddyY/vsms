@@ -23,7 +23,7 @@ export function OfflineSyncControl({ eventId }: { eventId: string }) {
   const disabled = working || (!status.downloaded && !online);
   const title = status.error
     ?? (hasAttention
-      ? 'One or more offline results need staff attention before they can be sent.'
+      ? 'One or more offline results need staff attention before they can be sent. Open the station, fix the flagged save, then sync again.'
       : status.downloaded
         ? 'Sync downloaded screening data now.'
         : 'Download your assigned station queues for temporary offline use.');
@@ -41,6 +41,12 @@ export function OfflineSyncControl({ eventId }: { eventId: string }) {
         {hasAttention ? <ExclamationTriangleIcon aria-hidden="true" /> : working || status.downloaded ? <ArrowPathIcon aria-hidden="true" /> : <ArrowDownTrayIcon aria-hidden="true" />}
         <span>{label}</span>
       </button>
+      {(status.error || hasAttention) && (
+        <p className="workspace-sync-hint" role="status">
+          {status.error
+            ?? 'Some offline saves conflicted (for example missing acknowledgement or an ended event). Fix on the station form, then sync again.'}
+        </p>
+      )}
       <span className="sr-only" aria-live="polite">{status.error ?? label}</span>
     </div>
   );

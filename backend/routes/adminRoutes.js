@@ -5,9 +5,11 @@ const router = express.Router();
 const adminController = require("../controllers/adminController");
 const requireAuthentication = require("../middlewares/requireAuthentication");
 const requireAnyRole = require("../middlewares/requireAnyRole");
+const requirePermission = require("../middlewares/requirePermission");
 const validate = require("../middlewares/validate");
 const {
   referralDeliveryMaintenanceBody,
+  auditLogListQuery,
   artifactCleanupListQuery,
   artifactCleanupParams,
   artifactCleanupActionBody,
@@ -16,7 +18,7 @@ const {
 router.use(requireAuthentication);
 router.use(requireAnyRole("ADMINISTRATOR"));
 
-router.get("/audit-logs", adminController.getAuditLogs);
+router.get("/audit-logs", requirePermission("audit:read"), validate({ query: auditLogListQuery }), adminController.getAuditLogs);
 router.post(
   "/maintenance/referral-deliveries",
   validate({ body: referralDeliveryMaintenanceBody }),
