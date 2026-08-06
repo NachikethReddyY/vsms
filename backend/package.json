@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "node server.js",
     "start": "node server.js",
-    "test": "jest",
+    "test": "node --test \"tests/**/*.test.js\"",
     "test:integration": "node .tests/prepare.js",
     "test:watch": "vitest .tests",
     "prisma:validate": "prisma validate",
@@ -55,6 +55,7 @@
   },
   "devDependencies": {
     "@redocly/cli": "^2.40.0",
+    "expect": "^30.4.1",
     "openapi-typescript": "^7.13.0",
     "supertest": "^7.2.2",
     "vitest": "^4.1.10"

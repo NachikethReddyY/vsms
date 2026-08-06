@@ -16,7 +16,7 @@ Object.assign(process.env, {
 const cognitoClient = require("../utils/cognitoClient");
 const cognitoJwt = require("../utils/cognitoJwt");
 const staff = require("../utils/staff");
-const audit = require("../utils/audit");
+const AuthAudit = require("../utils/AuthAudit");
 
 cognitoClient.exchangeAuthorizationCode = async (code, verifier) => {
     assert.equal(code, "authorization-code");
@@ -33,7 +33,7 @@ staff.syncLocalUser = async () => ({
     userRoles: [{ role: { roleName: "EVENT_MANAGER" } }],
 });
 staff.rolesFromCognitoGroups = () => ["EVENT_MANAGER"];
-audit.createAuthAuditLog = async () => {};
+AuthAudit.createAuthAuditLog = async () => {};
 
 const app = require("../app");
 

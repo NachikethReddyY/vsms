@@ -34,6 +34,8 @@ tags:
     description: Signed, encrypted clinical referral documents and delivery tracking
   - name: Provider Events
     description: Signature-authenticated delivery lifecycle callbacks from configured providers
+  - name: Queue
+    description: Virtual queue lifecycle and station transfers for in-progress events
 security:
   - bearerAuth: []
 paths:
@@ -1019,7 +1021,6 @@ paths:
         "401": { $ref: "#/components/responses/Unauthorized" }
         "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
-  paths:
   /api/v1/participants/{participantId}:
     parameters: 
       - $ref: "#/components/parameters/ParticipantId"
@@ -1028,7 +1029,7 @@ paths:
       operationId: getParticipant
       summary: Get a participant and emergency contacts
       security:
-        - BearerAuth: []
+        - bearerAuth: []
       responses:
         "200": 
           description: Participant detail
@@ -1044,7 +1045,7 @@ paths:
       operationId: updateParticipant
       summary: Update supplied participant fields
       security:
-        - BearerAuth: []
+        - bearerAuth: []
       requestBody: 
         required: true
         content: 
@@ -1311,6 +1312,21 @@ paths:
         "401": { $ref: "#/components/responses/Unauthorized" }
         "404": { $ref: "#/components/responses/NotFound" }
         "429": { $ref: "#/components/responses/RateLimited" }
+  /api/v1/qr/view/{registrationId}:
+    get:
+      tags: [QR Codes]
+      operationId: viewRegistrationQrSvg
+      summary: Render the active QR pass as SVG in the browser (authenticated)
+      description: Authenticated helper that returns the active pass for a registration as a raw SVG image, useful for embedding or quick in-browser inspection. Requires a REGISTRATION_OFFICER (or higher) role. The SVG is regenerated on every request so it always reflects the current active pass.
+      parameters: [{ $ref: "#/components/parameters/RegistrationId" }]
+      responses:
+        "200":
+          description: QR pass rendered as an SVG image
+          content:
+            image/svg+xml:
+              schema: { type: string, format: binary }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
   /api/v1/qr/verify:
     post:
       tags: [QR Codes]
@@ -1346,6 +1362,63 @@ paths:
         "404": { $ref: "#/components/responses/NotFound" }
         "409": { $ref: "#/components/responses/Conflict" }
         "429": { $ref: "#/components/responses/RateLimited" }
+  /api/v1/qr/public-status/{token}:
+    get:
+      tags: [QR Codes]
+      operationId: getPublicQrPassStatus
+      summary: Public pass-status lookup for the QR scan target (no PII)
+      description: Resolves the URL encoded in a scanned VSMS pass. Public and unauthenticated; returns only validity, event name, queue number, and expiry — never participant names or clinical data.
+      parameters: [{ $ref: "#/components/parameters/QrToken" }]
+      responses:
+        "200": { description: Pass status, content: { application/json: { schema: { $ref: "#/components/schemas/QrPublicStatusResponse" } } } }
+        "400": { $ref: "#/components/responses/ValidationFailed" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+  /api/v1/qr/dev-view/{registrationId}:
+    get:
+      tags: [QR Codes]
+      operationId: getDevQrSvg
+      summary: Render the active QR pass as raw SVG (development only)
+      description: Development-only helper that renders the QR pass SVG directly in the browser for quick visual checks. Returns 403 in production. No authentication required; useful for rapid manual inspection of a pass.
+      parameters: [{ $ref: "#/components/parameters/RegistrationId" }]
+      responses:
+        "200":
+          description: QR pass rendered as an SVG image
+          content:
+            image/svg+xml:
+              schema: { type: string, format: binary }
+        "400": { $ref: "#/components/responses/ValidationFailed" }
+        "403": { description: Not available in production }
+        "404": { $ref: "#/components/responses/NotFound" }
+  /api/v1/qr/dev-page/{registrationId}:
+    get:
+      tags: [QR Codes]
+      operationId: getDevQrPage
+      summary: Development QR preview page with live status poller
+      description: Development-only HTML page showing a large, LAN-targeted QR pass alongside participant/event info and a live pass-status poller. The QR encodes the dev-status page URL so it can be scanned by a phone camera on the same network. Returns 403 in production. No authentication required.
+      parameters: [{ $ref: "#/components/parameters/RegistrationId" }]
+      responses:
+        "200":
+          description: Interactive QR preview HTML page
+          content:
+            text/html:
+              schema: { type: string, format: binary }
+        "400": { $ref: "#/components/responses/ValidationFailed" }
+        "403": { description: Not available in production }
+        "404": { $ref: "#/components/responses/NotFound" }
+  /api/v1/qr/dev-status/{token}:
+    get:
+      tags: [QR Codes]
+      operationId: getDevQrStatusPage
+      summary: Phone-friendly pass status page (development QR scan target)
+      description: Development-only HTML page opened when a dev QR is scanned on a phone. It self-locates its own token from the URL and polls the public status endpoint to show VALID/INVALID. Returns 403 in production. No authentication required.
+      parameters: [{ $ref: "#/components/parameters/QrToken" }]
+      responses:
+        "200":
+          description: Mobile status HTML page
+          content:
+            text/html:
+              schema: { type: string, format: binary }
+        "403": { description: Not available in production }
   /api/v1/qr/participant/{token}:
     get:
       tags: [QR Codes]
@@ -1477,6 +1550,173 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/ArtifactCleanupTask" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "422": { $ref: "#/components/responses/ValidationFailed" }
+  /api/v1/queues/{eventId}:
+    get:
+      tags: [Queue]
+      operationId: getEventQueueStatus
+      summary: Event queue summary with per-station workload and next-up participant
+      parameters:
+        - name: eventId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        "200": { description: Event queue summary, content: { application/json: { schema: { $ref: "#/components/schemas/EventQueueStatusResponse" } } } }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "422": { $ref: "#/components/responses/ValidationFailed" }
+  /api/v1/queues/{eventId}/stations/{stationId}/join:
+    post:
+      tags: [Queue]
+      operationId: joinQueue
+      summary: Join a participant into a station queue
+      parameters:
+        - name: eventId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+        - name: stationId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/JoinQueueRequest" }
+      responses:
+        "201": { description: Participant joined the queue, content: { application/json: { schema: { $ref: "#/components/schemas/JoinQueueResponse" } } } }
+        "200": { description: Participant already in this station queue, content: { application/json: { schema: { $ref: "#/components/schemas/JoinQueueResponse" } } } }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "422": { $ref: "#/components/responses/ValidationFailed" }
+  /api/v1/queues/participant/{registrationId}:
+    get:
+      tags: [Queue]
+      operationId: getParticipantQueueStatus
+      summary: Participant queue status and movement history
+      parameters:
+        - name: registrationId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        "200": { description: Participant queue status, content: { application/json: { schema: { $ref: "#/components/schemas/ParticipantQueueStatusResponse" } } } }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "422": { $ref: "#/components/responses/ValidationFailed" }
+  /api/v1/queues/{queueId}/call:
+    patch:
+      tags: [Queue]
+      operationId: callQueueEntry
+      summary: Call the next waiting participant in a station queue
+      parameters:
+        - name: queueId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        "200": { description: Queue entry called, content: { application/json: { schema: { $ref: "#/components/schemas/QueueEntry" } } } }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "422": { $ref: "#/components/responses/ValidationFailed" }
+  /api/v1/queues/{queueId}/start:
+    patch:
+      tags: [Queue]
+      operationId: startQueueEntry
+      summary: Begin servicing a called participant
+      parameters:
+        - name: queueId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        "200": { description: Queue entry started, content: { application/json: { schema: { $ref: "#/components/schemas/QueueEntry" } } } }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "422": { $ref: "#/components/responses/ValidationFailed" }
+  /api/v1/queues/{queueId}/advance:
+    patch:
+      tags: [Queue]
+      operationId: advanceQueueEntry
+      summary: Transfer a participant to the next station and close the current queue entry
+      parameters:
+        - name: queueId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/AdvanceQueueRequest" }
+      responses:
+        "200": { description: Participant transferred, content: { application/json: { schema: { $ref: "#/components/schemas/AdvanceQueueResponse" } } } }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "422": { $ref: "#/components/responses/ValidationFailed" }
+  /api/v1/queues/{queueId}/complete:
+    patch:
+      tags: [Queue]
+      operationId: completeQueueEntry
+      summary: Complete the final queue station and mark the registration completed
+      parameters:
+        - name: queueId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        "200": { description: Queue entry completed, content: { application/json: { schema: { $ref: "#/components/schemas/QueueEntry" } } } }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "422": { $ref: "#/components/responses/ValidationFailed" }
+  /api/v1/queues/{queueId}/skip:
+    patch:
+      tags: [Queue]
+      operationId: skipQueueEntry
+      summary: Skip a waiting or called participant (does not advance them)
+      parameters:
+        - name: queueId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        "200": { description: Queue entry skipped, content: { application/json: { schema: { $ref: "#/components/schemas/QueueEntry" } } } }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "422": { $ref: "#/components/responses/ValidationFailed" }
+  /api/v1/queues/{queueId}:
+    delete:
+      tags: [Queue]
+      operationId: leaveQueue
+      summary: Remove a participant from the queue (cancels the entry)
+      parameters:
+        - name: queueId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        "200": { description: Queue entry cancelled, content: { application/json: { schema: { $ref: "#/components/schemas/QueueEntry" } } } }
         "401": { $ref: "#/components/responses/Unauthorized" }
         "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
@@ -3053,8 +3293,52 @@ components:
       additionalProperties: false
       required: [logs, authLogs]
       properties:
-        logs: { type: array, items: { type: object, additionalProperties: true } }
-        authLogs: { type: array, items: { type: object, additionalProperties: true } }
+        logs:
+          type: array
+          description: Reverse-chronological application audit records (max 100)
+          items:
+            type: object
+            additionalProperties: true
+            required: [id, action, outcome, createdAt]
+            properties:
+              id: { type: string, format: uuid }
+              userId: { type: string, format: uuid, nullable: true }
+              deviceId: { type: string, format: uuid, nullable: true }
+              action:
+                type: string
+                enum: [CREATED, UPDATED, PUBLISHED, STARTED, COMPLETED, CANCELLED, EVENT_DELETED, EVENT_REGISTRATION_CREATED, REGISTRATION_STATUS_CHANGED, DUPLICATE_REGISTRATION_BLOCKED, PARTICIPANT_CREATED, PARTICIPANT_UPDATED, EMERGENCY_CONTACT_CREATED, EMERGENCY_CONTACT_UPDATED, CONSENT_WITHDRAWN, SCREENING_RESULT_RECORDED, CLINICAL_REVIEW_RECORDED, REFERRAL_ISSUED, REFERRAL_REVISION_CREATED, REFERRAL_HANDOFF_ACKNOWLEDGED, REFERRAL_EMAIL_FAILED, REFERRAL_EMAIL_CONFIRMATION_PENDING, REFERRAL_EMAIL_RECONCILIATION_REQUIRED, REFERRAL_EMAIL_RETRY_AUTHORIZED, REFERRAL_DRAFT_CREATED, QR_GENERATED, QR_VERIFIED, QR_REVOKED, QR_REISSUED_REVOCATION, MANUAL_CHECKIN_PERFORMED, STAFF_ACCOUNT_CREATED, STAFF_ACCOUNT_UPDATED, STAFF_ASSIGNMENT_ADDED, STAFF_ASSIGNMENT_REMOVED, REPORT_VIEWED, SCREENING_SYNC_BATCH, ARTIFACT_CLEANUP_ESCALATED, ENCRYPTION_BACKFILL_APPLIED]
+              resource: { type: string, nullable: true }
+              entityName: { type: string, nullable: true }
+              entityId: { type: string, format: uuid, nullable: true }
+              outcome: { type: string, enum: [SUCCESS, FAILED, DENIED, BLOCKED] }
+              requestId: { type: string, format: uuid, nullable: true }
+              details: { type: object, nullable: true, additionalProperties: true }
+              oldValue: { type: object, nullable: true, additionalProperties: true }
+              newValue: { type: object, nullable: true, additionalProperties: true }
+              ipAddress: { type: string, nullable: true }
+              deviceName: { type: string, nullable: true }
+              createdAt: { type: string, format: date-time }
+              user: { $ref: "#/components/schemas/User" }
+        authLogs:
+          type: array
+          description: Reverse-chronological authentication audit records (max 100)
+          items:
+            type: object
+            additionalProperties: true
+            required: [id, eventType, outcome, occurredAt]
+            properties:
+              id: { type: string, format: uuid }
+              userId: { type: string, format: uuid, nullable: true }
+              deviceId: { type: string, format: uuid, nullable: true }
+              eventType: { type: string }
+              outcome: { type: string, enum: [SUCCESS, FAILED, DENIED, BLOCKED] }
+              failureCategory: { type: string, nullable: true }
+              identifierHash: { type: string, nullable: true }
+              ipAddress: { type: string, nullable: true }
+              userAgent: { type: string, nullable: true }
+              requestId: { type: string, format: uuid, nullable: true }
+              occurredAt: { type: string, format: date-time }
+              user: { $ref: "#/components/schemas/User" }
     QrCode:
       type: object
       additionalProperties: true
@@ -3077,7 +3361,23 @@ components:
         registrationId: { type: string, format: uuid }
         issuedAt: { type: string, format: date-time }
         expiresAt: { type: string, format: date-time }
-        qrImage: { type: string, description: Data URL containing the QR image }
+        qrImage: { type: string, description: "SVG data URL of the VSMS-branded QR image (center logo and wordmark overlay)" }
+    QrPublicStatusResponse:
+      type: object
+      additionalProperties: false
+      required: [success, data]
+      properties:
+        success: { type: boolean, enum: [true] }
+        data:
+          type: object
+          additionalProperties: false
+          required: [valid, eventName, currentQueueNumber, queueNumber, expiresAt]
+          properties:
+            valid: { type: boolean, description: Whether the pass is active and unexpired }
+            eventName: { type: string, nullable: true, description: "Only the event name; never participant data. Unset when the pass is invalid" }
+            currentQueueNumber: { type: integer, nullable: true, description: "Highest queue number already checked in for the event (now serving). Unset when the pass is invalid" }
+            queueNumber: { type: integer, nullable: true }
+            expiresAt: { type: string, format: date-time, nullable: true }
     QrMutationResponse:
       type: object
       additionalProperties: false
@@ -3107,7 +3407,7 @@ components:
           properties:
             qrId: { type: string, format: uuid }
             expiresAt: { type: string, format: date-time }
-            qrImage: { type: string, description: Data URL containing the QR image }
+            qrImage: { type: string, description: "SVG data URL of the VSMS-branded QR image (center logo and wordmark overlay)" }
     QrLookupParticipant:
       type: object
       additionalProperties: false
@@ -3252,6 +3552,111 @@ components:
       properties:
         station: { $ref: "#/components/schemas/ScreeningStation" }
         registrations: { type: array, items: { $ref: "#/components/schemas/ScreeningQueueItem" } }
+    QueueStatus:
+      type: string
+      enum: [WAITING, CALLED, IN_PROGRESS, COMPLETED, SKIPPED, CANCELLED]
+    QueueEntry:
+      type: object
+      additionalProperties: false
+      required: [id, registrationId, stationId, queueNumber, status]
+      properties:
+        id: { type: string, format: uuid }
+        registrationId: { type: string, format: uuid }
+        stationId: { type: string, format: uuid }
+        queueNumber: { type: integer }
+        status: { $ref: "#/components/schemas/QueueStatus" }
+        enteredAt: { type: string, format: date-time, nullable: true }
+        calledAt: { type: string, format: date-time, nullable: true }
+        startedAt: { type: string, format: date-time, nullable: true }
+        leftQueueAt: { type: string, format: date-time, nullable: true }
+        completedAt: { type: string, format: date-time, nullable: true }
+    QueueStationWorkload:
+      type: object
+      additionalProperties: false
+      required: [stationId, stationName, stationType, stationOrder, workload]
+      properties:
+        stationId: { type: string, format: uuid }
+        stationName: { type: string }
+        stationType: { type: string }
+        stationOrder: { type: integer }
+        workload:
+          type: object
+          additionalProperties: false
+          required: [WAITING, CALLED, IN_PROGRESS, COMPLETED, SKIPPED, CANCELLED]
+          properties:
+            WAITING: { type: integer }
+            CALLED: { type: integer }
+            IN_PROGRESS: { type: integer }
+            COMPLETED: { type: integer }
+            SKIPPED: { type: integer }
+            CANCELLED: { type: integer }
+        nextUp:
+          type: object
+          nullable: true
+          additionalProperties: false
+          required: [queueId, queueNumber, registrationId, participantDisplayName]
+          properties:
+            queueId: { type: string, format: uuid }
+            queueNumber: { type: integer }
+            registrationId: { type: string, format: uuid }
+            participantDisplayName: { type: string }
+    EventQueueStatusResponse:
+      type: object
+      additionalProperties: false
+      required: [event, stations]
+      properties:
+        event:
+          type: object
+          additionalProperties: false
+          required: [eventId, name, status, venue]
+          properties:
+            eventId: { type: string, format: uuid }
+            name: { type: string }
+            status: { type: string }
+            venue: { type: string, nullable: true }
+        stations: { type: array, items: { $ref: "#/components/schemas/QueueStationWorkload" } }
+    JoinQueueRequest:
+      type: object
+      additionalProperties: false
+      required: [registrationId]
+      properties:
+        registrationId: { type: string, format: uuid }
+    JoinQueueResponse:
+      type: object
+      additionalProperties: false
+      required: [queueEntry, created]
+      properties:
+        queueEntry: { $ref: "#/components/schemas/QueueEntry" }
+        created: { type: boolean }
+    ParticipantQueueStatusResponse:
+      type: object
+      additionalProperties: false
+      required: [registrationId, queueNumber, status, activeEntry, history]
+      properties:
+        registrationId: { type: string, format: uuid }
+        queueNumber: { type: integer, nullable: true }
+        status: { type: string }
+        activeEntry:
+          type: object
+          nullable: true
+          additionalProperties: true
+        history:
+          type: array
+          additionalProperties: true
+    AdvanceQueueRequest:
+      type: object
+      additionalProperties: false
+      required: [toStationId]
+      properties:
+        toStationId: { type: string, format: uuid }
+        reason: { type: string, maxLength: 100 }
+    AdvanceQueueResponse:
+      type: object
+      additionalProperties: false
+      required: [completed, nextEntry]
+      properties:
+        completed: { $ref: "#/components/schemas/QueueEntry" }
+        nextEntry: { $ref: "#/components/schemas/QueueEntry" }
     EyeReading:
       oneOf:
         - type: object

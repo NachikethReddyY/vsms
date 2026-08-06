@@ -60,8 +60,35 @@ jobs:
         run: pnpm exec prisma generate
         working-directory: backend
 
-      - name: Run backend unit tests
-        run: pnpm test
+      - name: Apply test database migrations
+        run: pnpm exec prisma migrate reset --force --skip-seed
+        working-directory: backend
+
+      - name: Run Node.js backend tests
+        shell: bash
+        run: |
+          find tests -maxdepth 1 -name '*.test.js' \
+            ! -name 'auth.integration.test.js' \
+            ! -name 'events.integration.test.js' \
+            ! -name 'locationService.test.js' \
+            ! -name 'qr.integration.test.js' \
+            ! -name 'reviewService.test.js' \
+            ! -name 'reviews.integration.test.js' \
+            ! -name 'sync.integration.test.js' \
+            -print0 | xargs -0 node --test
+        working-directory: backend
+
+      - name: Run database integration tests
+        shell: bash
+        run: >-
+          node --test
+          tests/auth.integration.test.js
+          tests/events.integration.test.js
+          tests/locationService.test.js
+          tests/qr.integration.test.js
+          tests/reviewService.test.js
+          tests/reviews.integration.test.js
+          tests/sync.integration.test.js
         working-directory: backend
 
       - name: Validate Prisma schema
@@ -74,10 +101,6 @@ jobs:
 
       - name: Verify generated API client
         run: pnpm run contracts:check
-        working-directory: backend
-
-      - name: Run database integration tests
-        run: pnpm run test:integration
         working-directory: backend
 
   frontend:

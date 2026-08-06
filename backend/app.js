@@ -25,6 +25,7 @@ const consentRoutes = require("./routes/consentRoutes");
 const emergencyContactRoutes = require("./routes/emergencyContactRoutes");
 const signatureRoutes = require("./routes/signatureRoutes");
 const providerEventRoutes = require("./routes/providerEventRoutes");
+const queueRoutes = require("./routes/queueRoutes");
 const { notFound, errorHandler } = require("./middlewares/errorHandler");
 const authenticate = require("./middlewares/authenticate");
 
@@ -151,6 +152,12 @@ app.use("/api/v1/emergency-contacts", emergencyContactRoutes);
 app.use("/api/v1/signatures", signatureRoutes);
 app.use("/api/v1/admin", adminRoutes);
 app.use("/api/v1/qr", mutationLimiter, qrRoutes);
+app.use(
+  "/api/v1/queues",
+  (req, res, next) =>
+    ["POST", "PATCH", "PUT", "DELETE"].includes(req.method) ? mutationLimiter(req, res, next) : next(),
+  queueRoutes
+);
 
 // Legacy API Route Aliases
 app.use("/api/users", userRoutes);
@@ -165,6 +172,12 @@ app.use(
 );
 app.use("/api/locations", locationRoutes);
 app.use("/api/qr", mutationLimiter, qrRoutes);
+app.use(
+  "/api/queues",
+  (req, res, next) =>
+    ["POST", "PATCH", "PUT", "DELETE"].includes(req.method) ? mutationLimiter(req, res, next) : next(),
+  queueRoutes
+);
 
 app.use(notFound);
 app.use(errorHandler);

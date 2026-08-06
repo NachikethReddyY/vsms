@@ -9,6 +9,10 @@ if (process.env.NODE_ENV === "production" && !process.env.VSMS_DEMO_PASSWORD) {
   throw new Error("VSMS_DEMO_PASSWORD is required for production seed execution");
 }
 
+// Valid 64-char hex token (matches the QR_TOKEN_PATTERN used by manual check-in)
+// so the seeded demo pass is demonstrable end-to-end.
+const DEMO_QR_TOKEN = "ab".repeat(32);
+
 const roleDefinitions = [
   ["ADMINISTRATOR", "Full administrative access", 1],
   ["EVENT_MANAGER", "Creates and manages events", 2],
@@ -528,7 +532,7 @@ async function ensureDemoRegistration(staff, participant, event, consent) {
     update: {
       registrationStatus: "SIGNED_UP",
       participantDisplayName: `${participant.firstName} ${participant.lastName}`,
-      passToken: "VSMS-DEMO-QR-001",
+      passToken: DEMO_QR_TOKEN,
     },
     create: {
       participantId: participant.id,
@@ -538,7 +542,7 @@ async function ensureDemoRegistration(staff, participant, event, consent) {
       participantDisplayName: `${participant.firstName} ${participant.lastName}`,
       queueNumber: 1,
       idempotencyKey,
-      passToken: "VSMS-DEMO-QR-001",
+      passToken: DEMO_QR_TOKEN,
     },
   });
   const history = await prisma.registrationStatusHistory.findFirst({
@@ -560,7 +564,7 @@ async function ensureDemoRegistration(staff, participant, event, consent) {
     data: { registrationId: registration.registrationId },
   });
 
-  const token = "VSMS-DEMO-QR-001";
+  const token = DEMO_QR_TOKEN;
   const existingQr = await prisma.qRCodePass.findFirst({
     where: { registrationId: registration.registrationId },
     select: { id: true },
@@ -746,6 +750,44 @@ async function seedSyncEvidence(staff, event, registration, stations) {
     seeded.push(syncAction);
   }
   return seeded;
+}
+
+async function seedQueueEntries(staff, event, registration, stations) {
+  if (event.status !== "IN_PROGRESS" || stations.length === 0) return null;
+
+  const firstStation = stations[0];
+  const existing = await prisma.queueEntry.findFirst({
+    where: { registrationId: registration.registrationId, stationId: firstStation.stationId },
+  });
+  if (existing) return existing;
+
+  const queueEntry = await prisma.queueEntry.create({
+    data: {
+      registrationId: registration.registrationId,
+      stationId: firstStation.stationId,
+      queueNumber: registration.queueNumber || 1,
+      status: "WAITING",
+      enteredAt: new Date(),
+    },
+  });
+  await prisma.auditLog.create({
+    data: {
+      userId: staff.id,
+      action: "QUEUE_JOINED",
+      entityName: "QueueEntry",
+      entityId: queueEntry.id,
+      outcome: "SUCCESS",
+      oldValue: null,
+      newValue: {
+        eventId: event.eventId,
+        stationId: firstStation.stationId,
+        registrationId: registration.registrationId,
+        queueNumber: queueEntry.queueNumber,
+        status: "WAITING",
+      },
+    },
+  });
+  return queueEntry;
 }
 
 async function seedDemoData(staff, reviewer, consentForm) {
@@ -940,6 +982,8 @@ async function seedDemoData(staff, reviewer, consentForm) {
 
   const syncEvidence = await seedSyncEvidence(staff, liveEvent, registration, liveStructure.stations);
 
+  const queueEntry = await seedQueueEntries(staff, liveEvent, registration, liveStructure.stations);
+
   const referralLifecycle = await seedReferralDeliveryLifecycle(staff, reviewer, completedEvent);
 
   return {
@@ -948,6 +992,7 @@ async function seedDemoData(staff, reviewer, consentForm) {
     aishaConsent,
     registration,
     qr,
+    queueEntry,
     syncEvidence,
     referralLifecycle,
   };

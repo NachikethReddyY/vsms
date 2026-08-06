@@ -38,6 +38,7 @@ exports.saveVisualAcuity = async (req, res) => {
     req.params.stationId,
     req.body,
     req.user,
+    req.context,
   );
   res.status(created ? 201 : 200).json(result);
 };
@@ -57,6 +58,7 @@ exports.saveRefraction = async (req, res) => {
     req.params.stationId,
     req.body,
     req.user,
+    req.context,
   );
   res.status(created ? 201 : 200).json(result);
 };
@@ -76,6 +78,7 @@ exports.saveColourVision = async (req, res) => {
     req.params.stationId,
     req.body,
     req.user,
+    req.context,
   );
   res.status(created ? 201 : 200).json(result);
 };
