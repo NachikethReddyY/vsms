@@ -14,6 +14,7 @@ export type CreateEvent = components['schemas']['CreateEventRequest'];
 export type UpdateEvent = components['schemas']['UpdateEventRequest'];
 export type EventDeletionRequest = components['schemas']['EventDeletionRequest'];
 export type EventDeletionResponse = components['schemas']['EventDeletionResponse'];
+export type EventDeletionPreview = components['schemas']['EventDeletionPreview'];
 export type AuditRecord = components['schemas']['EventAuditLog'];
 export type LocationResult = components['schemas']['LocationResult'];
 export type PublicEvent = components['schemas']['PublicEvent'];
@@ -53,6 +54,10 @@ export const eventApi = {
   },
   async delete(id: string, input: EventDeletionRequest) {
     const { data } = await apiClient.delete<EventDeletionResponse>(`/events/${id}`, { data: input });
+    return data;
+  },
+  async deletionPreview(id: string) {
+    const { data } = await apiClient.get<EventDeletionPreview>(`/events/${id}/deletion-preview`);
     return data;
   },
   async staffDirectory() {

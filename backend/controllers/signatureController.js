@@ -7,6 +7,7 @@ const { requireReviewerAccess } = require("../services/reviewService");
 const { MIME_EXTENSIONS, hasExpectedImageSignature, storeSignature, deleteSignature } = require("../utils/signatureStorage");
 
 exports.storeSignature = asyncHandler(async (req, res) => {
+    const eventUser = { ...req.auth.user, userId: req.auth.userId };
     const eventId = assertUuid(req.body?.eventId, "eventId");
     const targetId = assertUuid(req.body?.targetId, "targetId");
     const purpose = cleanString(req.body?.purpose, "purpose", { required: true, max: 20 }).toUpperCase();
@@ -14,14 +15,14 @@ exports.storeSignature = asyncHandler(async (req, res) => {
         await assertRegistrationAssignment(prisma, eventId, req.auth);
         await assertParticipantEventScope(prisma, targetId, eventId, req.auth.userId);
     } else if (purpose === "REFERRAL") {
-        await requireReviewerAccess(prisma, eventId, req.auth);
+        await requireReviewerAccess(prisma, eventId, eventUser);
         const referral = await prisma.referral.findFirst({
             where: { referralId: targetId, status: "DRAFT", review: { reviewedByUserId: req.auth.userId, registration: { eventId } } },
             select: { referralId: true },
         });
         if (!referral) throw validationError("Referral signature target is not available");
     } else if (purpose === "REVIEW_DECISION") {
-        await requireReviewerAccess(prisma, eventId, req.auth);
+        await requireReviewerAccess(prisma, eventId, eventUser);
         const registration = await prisma.eventRegistration.findFirst({
             where: {
                 registrationId: targetId,

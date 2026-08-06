@@ -9,7 +9,7 @@ process.env.DATABASE_URL ||= "postgresql://test:test@localhost:5432/vsms_test";
 const prisma = require("../../prisma/prismaClient");
 const eventService = require("../../services/eventService");
 
-const manager = { userId: crypto.randomUUID(), systemRole: "ADMIN" };
+const manager = { userId: crypto.randomUUID(), systemRole: "ADMIN", roles: ["ADMINISTRATOR"], status: "ACTIVE", approvalState: "APPROVED", accessState: "ENABLED" };
 const staffId = crypto.randomUUID();
 const eventId = crypto.randomUUID();
 const shiftId = crypto.randomUUID();
@@ -47,6 +47,7 @@ const eventRecord = (status = "DRAFT", version = 1, assignments = [], registrati
   eventDays: [],
   registrations,
   _count: { registrations: registrations.length },
+  memberships: [{ userId: manager.userId, roles: [{ role: "EVENT_MANAGER" }] }],
 });
 
 function installTransaction(t, current, updated, overrides = {}) {
@@ -246,6 +247,11 @@ test("event responses project operational staff to only their own planned or act
       { ...eventRecord().shifts[0], shiftId: crypto.randomUUID(), status: "COMPLETED", staffAssignments: [ownAssignment] },
     ],
     stations: [ownAssignment.station, otherAssignment.station],
+    memberships: [
+      { userId: manager.userId, roles: [{ role: "EVENT_MANAGER" }] },
+      { userId: staffId, roles: [{ role: "SUPPORT" }] },
+      { userId: otherStaffId, roles: [{ role: "EVENT_MANAGER" }] },
+    ],
   };
   current.shifts[0].staffAssignments = [otherAssignment];
 
@@ -269,6 +275,9 @@ test("event responses project operational staff to only their own planned or act
     userId: staffId,
     systemRole: "STAFF",
     roles: ["SUPPORT"],
+    status: "ACTIVE",
+    approvalState: "APPROVED",
+    accessState: "ENABLED",
   });
   assert.equal(supportResult.canManage, false);
   assert.equal(supportResult.shifts.length, 1);
@@ -292,20 +301,27 @@ test("event responses project operational staff to only their own planned or act
     userId: otherStaffId,
     systemRole: "EVENT_MANAGER",
     roles: ["EVENT_MANAGER"],
+    status: "ACTIVE",
+    approvalState: "APPROVED",
+    accessState: "ENABLED",
   });
   assert.equal(assignedManagerResult.canManage, true);
   assert.equal(assignedManagerResult.shifts[1].staffAssignments.length, 2);
 });
 
-function installDeletionTransaction(t, { claimCount = 1, crossEventReview = false } = {}) {
-  const originalFindFirst = prisma.event.findFirst;
+function installDeletionTransaction(t, { transactionVersion = 1, crossEventReview = false } = {}) {
+  const originalFindUnique = prisma.event.findUnique;
   const originalTransaction = prisma.$transaction;
+  const originalCleanupFindMany = prisma.artifactCleanupTask.findMany;
   const calls = [];
   const remove = (name) => ({ deleteMany: async (input) => { calls.push([name, input]); return { count: 1 }; } });
-  prisma.event.findFirst = async () => eventRecord("COMPLETED");
+  const current = eventRecord("COMPLETED");
+  prisma.event.findUnique = async () => current;
+  prisma.artifactCleanupTask.findMany = async () => [];
   prisma.$transaction = async (callback) => callback({
     event: {
-      updateMany: async (input) => { calls.push(["event.update", input]); return { count: claimCount }; },
+      findUnique: async () => ({ ...current, version: transactionVersion }),
+      updateMany: async (input) => { calls.push(["event.update", input]); return { count: 1 }; },
       deleteMany: async (input) => { calls.push(["event.delete", input]); return { count: 1 }; },
     },
     eventRegistration: { findMany: async () => [], ...remove("registrations") },
@@ -318,32 +334,52 @@ function installDeletionTransaction(t, { claimCount = 1, crossEventReview = fals
       ...remove("reviews"),
     },
     participantConsent: { findMany: async () => [], updateMany: async () => ({ count: 0 }), ...remove("consents") },
-    notificationDelivery: remove("deliveries"),
+    notificationDelivery: { count: async () => 0, ...remove("deliveries") },
     documentArtifact: { findMany: async () => [], findFirst: async () => null, ...remove("documents") },
     referral: { findMany: async () => [], ...remove("referrals") },
     signatureArtifact: { findMany: async () => [], ...remove("signatures") },
-    artifactCleanupTask: { createMany: async () => ({ count: 0 }) },
+    artifactCleanupTask: { count: async () => 0, createMany: async () => ({ count: 0 }) },
+    reportExportJob: { count: async () => 0 },
     registrationStatusHistory: remove("registrationHistory"),
-    screeningResult: remove("screeningResults"),
+    screeningResult: { findMany: async () => [], findFirst: async () => null, ...remove("screeningResults") },
     syncAction: remove("syncActions"),
     scanLog: remove("scanLogs"),
-    qRCodePass: remove("qrPasses"),
-    queueMovement: remove("queueMovements"),
-    queueEntry: remove("queueEntries"),
+    qRCodePass: { findMany: async () => [], ...remove("qrPasses") },
+    queueMovement: { findFirst: async () => null, ...remove("queueMovements") },
+    queueEntry: { findMany: async () => [], findFirst: async () => null, ...remove("queueEntries") },
     staffAssignment: remove("staffAssignments"),
     shift: remove("shifts"),
     eventStationAvailability: remove("stationAvailability"),
     eventDay: remove("eventDays"),
-    eventAuditLog: remove("eventAudit"),
+    eventAuditLog: { create: async (input) => { calls.push(["eventAudit", input]); return {}; } },
     auditLog: { create: async (input) => { calls.push(["ledger", input]); return {}; } },
     $queryRawUnsafe: async (...input) => { calls.push(["audit.deleteScope", input]); return [{ set_config: eventId }]; },
   });
   t.after(() => {
-    prisma.event.findFirst = originalFindFirst;
+    prisma.event.findUnique = originalFindUnique;
+    prisma.artifactCleanupTask.findMany = originalCleanupFindMany;
     prisma.$transaction = originalTransaction;
   });
   return calls;
 }
+
+const deletionToken = ({ crossEventReview = false } = {}) => {
+  const impact = {
+    eventId,
+    eventName: "Service test event",
+    status: "COMPLETED",
+    version: 1,
+    counts: { registrations: 0, queues: 0, screenings: 0, reviews: crossEventReview ? 1 : 0, files: 0, emails: 0, cleanup: 0, reports: 0 },
+    blockers: crossEventReview ? [{ code: "EVENT_DELETE_INTEGRITY_CONFLICT", message: "This event has cross-event records and cannot be deleted safely" }] : [],
+  };
+  return eventService.__deletionTest.signDeletionPreview({
+    eventId,
+    adminId: manager.userId,
+    version: 1,
+    impactDigest: eventService.__deletionTest.impactDigest(impact),
+    expiresAt: Date.now() + 60_000,
+  });
+};
 
 test("terminal event deletion removes event-owned records and preserves the admin audit ledger", async (t) => {
   const calls = installDeletionTransaction(t);
@@ -353,9 +389,10 @@ test("terminal event deletion removes event-owned records and preserves the admi
     version: 1,
     confirmationName: "Service test event",
     acknowledgePermanentDeletion: true,
+    previewToken: deletionToken(),
   }, administrator, crypto.randomUUID());
 
-  assert.deepEqual(result, { eventId, deleted: true });
+  assert.deepEqual(result, { eventId, deleted: true, cleanupState: "COMPLETED" });
   assert.deepEqual(calls.find(([name]) => name === "participants.clearOnboardingEvent")[1], {
     where: { onboardingEventId: eventId },
     data: { onboardingEventId: null },
@@ -372,12 +409,13 @@ test("terminal event deletion removes event-owned records and preserves the admi
   });
   const ledger = calls.find(([name]) => name === "ledger")[1].data;
   assert.equal(ledger.action, "EVENT_DELETED");
-  assert.deepEqual(ledger.details, { status: "COMPLETED", version: 1 });
+  assert.equal(ledger.details.status, "COMPLETED");
+  assert.equal(ledger.details.version, 1);
   assert.ok(calls.some(([name]) => name === "registrations"));
   assert.ok(calls.some(([name]) => name === "stations"));
-  assert.deepEqual(calls.find(([name]) => name === "syncActions")[1], { where: { eventId } });
+  assert.deepEqual(calls.find(([name]) => name === "syncActions")[1], { where: { OR: [{ eventId }] } });
   assert.ok(calls.findIndex(([name]) => name === "syncActions") < calls.findIndex(([name]) => name === "event.delete"));
-  assert.equal(calls.some(([name]) => name === "eventAudit"), false);
+  assert.equal(calls.some(([name]) => name === "eventAudit"), true);
   assert.equal(calls.some(([name]) => name === "audit.deleteScope"), false);
 });
 
@@ -398,13 +436,13 @@ test("event audit schema matches the retained-history migration", () => {
 
 test("terminal event deletion denies non-administrators and stale versions", async (t) => {
   await assert.rejects(
-    eventService.deleteEvent(eventId, { version: 1, confirmationName: "Service test event", acknowledgePermanentDeletion: true }, { ...manager, systemRole: "EVENT_MANAGER", roles: ["EVENT_MANAGER"] }, crypto.randomUUID()),
+    eventService.deleteEvent(eventId, { version: 1, confirmationName: "Service test event", acknowledgePermanentDeletion: true, previewToken: deletionToken() }, { ...manager, systemRole: "EVENT_MANAGER", roles: ["EVENT_MANAGER"] }, crypto.randomUUID()),
     (error) => error.code === "FORBIDDEN",
   );
 
-  const calls = installDeletionTransaction(t, { claimCount: 0 });
+  const calls = installDeletionTransaction(t, { transactionVersion: 2 });
   await assert.rejects(
-    eventService.deleteEvent(eventId, { version: 1, confirmationName: "Service test event", acknowledgePermanentDeletion: true }, { ...manager, roles: ["ADMINISTRATOR"] }, crypto.randomUUID()),
+    eventService.deleteEvent(eventId, { version: 1, confirmationName: "Service test event", acknowledgePermanentDeletion: true, previewToken: deletionToken() }, { ...manager, roles: ["ADMINISTRATOR"] }, crypto.randomUUID()),
     (error) => error.code === "STALE_EVENT_VERSION",
   );
   assert.equal(calls.some(([name]) => name === "event.delete"), false);
@@ -413,8 +451,8 @@ test("terminal event deletion denies non-administrators and stale versions", asy
 test("terminal event deletion rejects cross-event review references before deleting children", async (t) => {
   const calls = installDeletionTransaction(t, { crossEventReview: true });
   await assert.rejects(
-    eventService.deleteEvent(eventId, { version: 1, confirmationName: "Service test event", acknowledgePermanentDeletion: true }, { ...manager, roles: ["ADMINISTRATOR"] }, crypto.randomUUID()),
-    (error) => error.code === "EVENT_DELETE_INTEGRITY_CONFLICT",
+    eventService.deleteEvent(eventId, { version: 1, confirmationName: "Service test event", acknowledgePermanentDeletion: true, previewToken: deletionToken({ crossEventReview: true }) }, { ...manager, roles: ["ADMINISTRATOR"] }, crypto.randomUUID()),
+    (error) => error.code === "EVENT_DELETE_BLOCKED",
   );
   assert.equal(calls.some(([name]) => ["documents", "referrals", "registrations", "event.delete"].includes(name)), false);
 });
