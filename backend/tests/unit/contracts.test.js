@@ -191,7 +191,7 @@ test("authentication uses verified Cognito tokens and approved local role inters
 });
 
 test("registration resolve accepts passToken, qrToken, or registrationId", () => {
-    const { resolveQuery } = require("../schemas/screeningSchemas");
+    const { resolveQuery } = require("../../schemas/screeningSchemas");
     assert.doesNotThrow(() => resolveQuery.parse({ passToken: "VSMS-DEMO-QR-001" }));
     assert.doesNotThrow(() => resolveQuery.parse({
         qrToken: "a".repeat(64),
