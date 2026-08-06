@@ -10,7 +10,7 @@ import {
 } from "@heroicons/react/24/outline";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
-import apiClient, { getApiError } from "../utils/apiClient";
+import apiClient, { getApiError } from "../../utils/apiClient";
 import type {
   ConsentFormVersion,
   EmergencyContact,
@@ -19,9 +19,9 @@ import type {
   ParticipantSummary,
   Registration,
   RegistrationHistory,
-} from "../types";
-import { SignaturePad } from "../components/SignaturePad";
-import { AppShell, Field, FormErrorSummary, LoadingState, PrimaryButton, TextInput } from "../components/ui";
+} from "../../types";
+import { SignaturePad } from "../../components/SignaturePad";
+import { AppShell, Field, FormErrorSummary, LoadingState, PrimaryButton, TextInput } from "../../components/ui";
 
 interface Pagination {
   page: number;
@@ -1116,3 +1116,4 @@ export function RegistrationQrPage() {
     </AppShell>
   );
 }
+

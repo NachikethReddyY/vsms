@@ -9,3 +9,4 @@ test("participant registration restores an eligible event from the URL", () => {
   assert.match(source, /REGISTRATION_EVENT_STATUSES = new Set\(\["PUBLISHED", "IN_PROGRESS"\]\)/);
   assert.match(source, /registrationEvents\.some\(\(event\) => event\.eventId === requestedEventId\) \? requestedEventId/);
 });
+
