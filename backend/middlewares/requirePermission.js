@@ -1,4 +1,5 @@
 const { createAuthAuditLog } = require("../utils/audit");
+const { isApprovedAccount } = require("./requireApprovedAccount");
 
 /**
  * Permission-based authorization guard. Unlike requireAnyRole (which checks
@@ -11,7 +12,8 @@ const { createAuthAuditLog } = require("../utils/audit");
 function requirePermission(...requiredPermissions) {
   return async (req, res, next) => {
     const permissions = req.auth?.permissions || [];
-    const allowed = requiredPermissions.some((permission) => permissions.includes(permission));
+    const allowed = isApprovedAccount(req.auth?.user)
+      && requiredPermissions.some((permission) => permissions.includes(permission));
 
     if (!allowed) {
       await createAuthAuditLog({

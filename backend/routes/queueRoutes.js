@@ -9,8 +9,7 @@ const validate = require("../middlewares/validate");
 const asyncHandler = require("../utils/asyncHandler");
 
 const queueController = require("../controllers/queueController");
-
-const requireAuthentication = require("../middlewares/requireAuthentication");
+const authenticate = require("../middlewares/authenticate");
 const requireAnyRole = require("../middlewares/requireAnyRole");
 const checkIdempotency = require("../middlewares/idempotency");
 
@@ -18,18 +17,18 @@ const {
   eventParams,
   stationParams,
   queueEntryParams,
+  eventQueueEntryParams,
   participantParams,
+  eventParticipantParams,
   joinQueueBody,
   transferQueueBody,
+  advanceQueueBody,
   priorityQueueBody
 } = require("../schemas/queueSchemas");
 
 const router = express.Router();
 
-/**
- * Global Middleware: Enforces active JWT authentication across all queue endpoints.
- */
-router.use(requireAuthentication);
+router.use(authenticate);
 
 /**
  * @route   POST /events/:eventId/stations/:stationId/join
@@ -67,33 +66,21 @@ router.get(
  * @access  Staff Roles
  */
 router.get(
-  "/participant/:registrationId",
-  requireAnyRole("REGISTRATION_OFFICER", "SCREENER", "EVENT_MANAGER", "ADMINISTRATOR"),
-  validate({
-    params: participantParams
-  }),
-  asyncHandler(queueController.getParticipantQueueStatus)
+  "/events/:eventId/participants/:registrationId",
+  validate({ params: eventParticipantParams }),
+  asyncHandler(queueController.getParticipantQueueStatus),
 );
 
-/**
- * @route   GET /events/:eventId/stations/:stationId/next
- * @desc    Automatically fetches the next waiting participant in line
- * @access  Screener, Event Manager, Administrator
- */
-router.get(
-  "/events/:eventId/stations/:stationId/next",
-  requireAnyRole("SCREENER", "EVENT_MANAGER", "ADMINISTRATOR"),
-  validate({
-    params: stationParams
-  }),
-  asyncHandler(queueController.getNextQueueEntry)
-);
+// Compatibility alias: the service derives and authorizes the registration's event.
+router.get("/participant/:registrationId", validate({ params: participantParams }), asyncHandler(queueController.getParticipantQueueStatus));
 
-/**
- * @route   PATCH /entries/:queueId/call
- * @desc    Updates queue state to notify/call the participant to the desk
- * @access  Screener, Event Manager, Administrator
- */
+router.patch("/events/:eventId/entries/:queueId/call", validate({ params: eventQueueEntryParams }), asyncHandler(queueController.callQueueEntry));
+router.patch("/events/:eventId/entries/:queueId/start", validate({ params: eventQueueEntryParams }), asyncHandler(queueController.startQueueEntry));
+router.patch("/events/:eventId/entries/:queueId/advance", checkIdempotency, validate({ params: eventQueueEntryParams, body: advanceQueueBody }), asyncHandler(queueController.advanceQueueEntry));
+router.patch("/events/:eventId/entries/:queueId/complete", validate({ params: eventQueueEntryParams }), asyncHandler(queueController.completeQueueEntry));
+router.patch("/events/:eventId/entries/:queueId/skip", validate({ params: eventQueueEntryParams }), asyncHandler(queueController.skipQueueEntry));
+router.delete("/events/:eventId/entries/:queueId", validate({ params: eventQueueEntryParams }), asyncHandler(queueController.leaveQueue));
+
 router.patch(
   "/entries/:queueId/call",
   requireAnyRole("SCREENER", "EVENT_MANAGER", "ADMINISTRATOR"),

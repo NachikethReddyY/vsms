@@ -1,5 +1,6 @@
 const requireAuthentication = require("./requireAuthentication");
 const logger = require("../utils/logger/logger"); // Optional: for logging unexpected errors or missing roles
+const requireApprovedAccount = require("./requireApprovedAccount");
 
 /**
  * Maps high-level security roles to the internal system role structure.
@@ -15,12 +16,15 @@ const systemRoleFor = (roles = []) => {
 
 module.exports = (req, res, next) => requireAuthentication(req, res, (error) => {
   if (error) return next(error);
-  req.user = {
-    ...req.auth.user,
-    userId: req.auth.userId,
-    username: req.auth.user.username || req.auth.email,
-    systemRole: systemRoleFor(req.auth.roles),
-    roles: req.auth.roles,
-  };
-  return next();
+  return requireApprovedAccount(req, res, (approvalError) => {
+    if (approvalError) return next(approvalError);
+    req.user = {
+      ...req.auth.user,
+      userId: req.auth.userId,
+      username: req.auth.user.username || req.auth.email,
+      systemRole: systemRoleFor(req.auth.roles),
+      roles: req.auth.roles,
+    };
+    return next();
+  });
 });

@@ -11,7 +11,7 @@ const { stationTypeForTemplateKey } = require("../../services/stationTemplateMap
 const eventId = crypto.randomUUID();
 const stationA = crypto.randomUUID();
 const stationB = crypto.randomUUID();
-const user = { userId: crypto.randomUUID(), systemRole: "STAFF", roles: ["SCREENER"] };
+const user = { userId: crypto.randomUUID(), systemRole: "STAFF", roles: ["SCREENER"], status: "ACTIVE", approvalState: "APPROVED", accessState: "ENABLED" };
 
 function replace(t, target, key, value) {
   const original = target[key];
@@ -19,7 +19,12 @@ function replace(t, target, key, value) {
   t.after(() => { target[key] = original; });
 }
 
+function installMembership(t) {
+  replace(t, prisma.eventMembership, "findFirst", async () => ({ id: crypto.randomUUID(), eventId, userId: user.userId, status: "ACTIVE", roles: [{ role: "SCREENER" }] }));
+}
+
 test("screening is denied outside an in-progress event", async (t) => {
+  installMembership(t);
   let assignmentChecked = false;
   replace(t, prisma.event, "findUnique", async () => ({ eventId, name: "Draft", status: "DRAFT", venue: "Hall" }));
   replace(t, prisma.staffAssignment, "findFirst", async () => { assignmentChecked = true; return { id: "unexpected" }; });
@@ -28,10 +33,11 @@ test("screening is denied outside an in-progress event", async (t) => {
     screeningService.listStations(eventId, user),
     (error) => error.status === 409 && error.code === "EVENT_NOT_IN_PROGRESS",
   );
-  assert.equal(assignmentChecked, false);
+  assert.equal(assignmentChecked, true);
 });
 
 test("only a screener assigned to the requested station can read its queue", async (t) => {
+  installMembership(t);
   let assignmentWhere;
   replace(t, prisma.event, "findUnique", async () => ({ eventId, name: "Live", status: "IN_PROGRESS", venue: "Hall" }));
   replace(t, prisma.staffAssignment, "findFirst", async ({ where }) => {
@@ -43,7 +49,7 @@ test("only a screener assigned to the requested station can read its queue", asy
 
   await assert.rejects(
     screeningService.listQueue(eventId, stationB, user),
-    (error) => error.status === 403 && error.code === "FORBIDDEN",
+    (error) => error.status === 403 && error.code === "CURRENT_DUTY_REQUIRED",
   );
   assert.equal(assignmentWhere.assignmentRole, "SCREENER");
   assert.equal(assignmentWhere.stationId, stationB);
@@ -54,18 +60,20 @@ test("only a screener assigned to the requested station can read its queue", asy
   assert.equal(stationTypeForTemplateKey("EYE_HEALTH"), null);
 });
 
-test("an administrator remains denied even if a screener role is misconfigured", async (t) => {
+test("an administrator remains denied without a screener event membership", async (t) => {
   let eventChecked = false;
-  replace(t, prisma.event, "findUnique", async () => { eventChecked = true; return null; });
+  replace(t, prisma.eventMembership, "findFirst", async () => null);
+  replace(t, prisma.event, "findUnique", async () => { eventChecked = true; return { eventId, status: "IN_PROGRESS" }; });
 
   await assert.rejects(
     screeningService.listStations(eventId, { ...user, roles: ["ADMINISTRATOR", "SCREENER"] }),
-    (error) => error.status === 403 && error.code === "SCREENER_ROLE_REQUIRED",
+    (error) => error.status === 403 && error.code === "EVENT_ROLE_REQUIRED",
   );
-  assert.equal(eventChecked, false);
+  assert.equal(eventChecked, true);
 });
 
 test("assigned stations publish an offline expiry capped by the event and active shift", async (t) => {
+  installMembership(t);
   const eventEndsAt = new Date("2026-08-04T12:00:00.000Z");
   const laterShiftEnd = new Date("2026-08-04T14:00:00.000Z");
   const earlierShiftEnd = new Date("2026-08-04T11:00:00.000Z");

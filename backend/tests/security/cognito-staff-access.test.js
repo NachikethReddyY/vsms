@@ -31,6 +31,7 @@ class FakeCognitoClient {
       this.groups.clear();
       return {};
     }
+    if (name === "AdminDisableUserCommand") return {};
     if (name === "AdminListGroupsForUserCommand") {
       return { Groups: [...this.groups].map((GroupName) => ({ GroupName })) };
     }
@@ -42,6 +43,7 @@ class FakeCognitoClient {
       this.groups.delete(input.GroupName);
       return {};
     }
+    if (name === "AdminUserGlobalSignOutCommand") return {};
     throw new Error(`Unexpected command ${name}`);
   }
 }
@@ -51,6 +53,27 @@ const options = (client) => ({
   region: "ap-southeast-1",
   userPoolId: "ap-southeast-1_test",
   client,
+});
+
+test("administrator session revocation uses Cognito global sign-out without network access", async () => {
+  const client = new FakeCognitoClient();
+  const { revokeStaffSessions } = require("../../services/cognitoStaffAccessService");
+  const result = await revokeStaffSessions("person@example.com", options(client));
+  assert.deepEqual(result, { managed: true });
+  assert.deepEqual(client.calls.at(-1), ["AdminUserGlobalSignOutCommand", {
+    UserPoolId: "ap-southeast-1_test",
+    Username: "person@example.com",
+  }]);
+});
+
+test("deprovision disables the Cognito identity before global sign-out", async () => {
+  const client = new FakeCognitoClient();
+  const { disableAndRevokeStaff } = require("../../services/cognitoStaffAccessService");
+  await disableAndRevokeStaff("person@example.com", options(client));
+  assert.deepEqual(client.calls.slice(-2).map(([name]) => name), [
+    "AdminDisableUserCommand",
+    "AdminUserGlobalSignOutCommand",
+  ]);
 });
 
 test("Cognito staff synchronization normalizes existing groups and restores them on compensation", async () => {

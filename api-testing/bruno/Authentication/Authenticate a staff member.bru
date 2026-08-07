@@ -1,5 +1,5 @@
 meta {
-  name: Authenticate a staff member
+  name: Check Cognito managed login bootstrap
   type: http
   seq: 1
   tags: [
@@ -7,50 +7,42 @@ meta {
   ]
 }
 
-post {
-  url: {{baseUrl}}/auth/login
-  body: json
-  auth: inherit
+get {
+  url: {{baseUrl}}/auth/config-status
+  body: none
+  auth: none
 }
 
-body:json {
-  {
-    "identifier": "{{managerUsername}}",
-    "password": "{{managerPassword}}"
-  }
-}
+docs {
+  This collection uses the real Cognito managed login flow. There is no API password-login or POST /auth/login/token endpoint.
 
-script:post-response {
-  if (res.getStatus() === 200) {
-    bru.setVar("token", res.getBody().accessToken);
-    bru.setVar("csrfToken", res.getBody().csrfToken);
-  }
+  To acquire runnable browser-session cookies locally:
+  1. Open {{baseUrl}}/auth/authorize?returnTo=/dashboard in a browser.
+  2. Complete Cognito hosted UI sign-in and allow /auth/callback to set HttpOnly cookies.
+  3. Copy the resulting browser cookies into Bruno environment variables for API-only examples:
+     - refreshCookie = value of vsms_refresh
+     - username = value of vsms_username
+     - accessCookie = value of vsms_access, only needed for global logout
+     - csrfToken = current CSRF token value expected by the API
+
+  Requests such as refresh/logout intentionally send Cookie plus X-CSRF-Token/Origin headers to model the browser session. They do not expect tokens in JSON responses.
 }
 
 tests {
-  test("manager login succeeds without exposing refresh token", function() {
+  test("Cognito managed login configuration status is readable", function() {
     expect(res.getStatus()).to.equal(200);
-    expect(res.getBody().accessToken).to.be.a("string");
-    expect(res.getBody().refreshToken).to.equal(undefined);
-    expect(res.getBody().user.username).to.equal("manager");
-    expect(res.getBody().user.systemRole).to.equal("EVENT_MANAGER");
+    expect(res.getBody()).to.have.property("configured");
   });
 }
 
 example {
   name: 200 Response
-  description: Login succeeded; refresh and CSRF cookies are also set
+  description: Authentication configuration status; use /auth/authorize in a browser when configured
 
   request: {
-    url: {{baseUrl}}/auth/login
-    method: POST
-    mode: json
-    body:json: {
-      {
-        "email": "",
-        "password": ""
-      }
-    }
+    url: {{baseUrl}}/auth/config-status
+    method: GET
+    mode: none
   }
 
   response: {
@@ -67,156 +59,8 @@ example {
       type: json
       content: '''
         {
-          "accessToken": "",
-          "csrfToken": "",
-          "user": {
-            "userId": "",
-            "email": "",
-            "systemRole": "ADMIN",
-            "status": "ACTIVE",
-            "createdAt": ""
-          }
-        }
-      '''
-    }
-  }
-}
-
-example {
-  name: 401 Response
-  description: Authentication is absent, invalid, expired, revoked, or reused
-
-  request: {
-    url: {{baseUrl}}/auth/login
-    method: POST
-    mode: json
-    body:json: {
-      {
-        "email": "",
-        "password": ""
-      }
-    }
-  }
-
-  response: {
-    headers: {
-      Content-Type: application/json
-    }
-
-    status: {
-      code: 401
-      text: Unauthorized
-    }
-
-    body: {
-      type: json
-      content: '''
-        {
-          "type": "",
-          "title": "",
-          "status": 0,
-          "code": "",
-          "requestId": "",
-          "errors": [
-            {
-              "field": "",
-              "message": ""
-            }
-          ]
-        }
-      '''
-    }
-  }
-}
-
-example {
-  name: 422 Response
-  description: Request validation failed
-
-  request: {
-    url: {{baseUrl}}/auth/login
-    method: POST
-    mode: json
-    body:json: {
-      {
-        "email": "",
-        "password": ""
-      }
-    }
-  }
-
-  response: {
-    headers: {
-      Content-Type: application/json
-    }
-
-    status: {
-      code: 422
-      text: Unprocessable Entity
-    }
-
-    body: {
-      type: json
-      content: '''
-        {
-          "type": "",
-          "title": "",
-          "status": 0,
-          "code": "",
-          "requestId": "",
-          "errors": [
-            {
-              "field": "",
-              "message": ""
-            }
-          ]
-        }
-      '''
-    }
-  }
-}
-
-example {
-  name: 429 Response
-  description: Rate limit exceeded
-
-  request: {
-    url: {{baseUrl}}/auth/login
-    method: POST
-    mode: json
-    body:json: {
-      {
-        "email": "",
-        "password": ""
-      }
-    }
-  }
-
-  response: {
-    headers: {
-      Content-Type: application/json
-    }
-
-    status: {
-      code: 429
-      text: Too Many Requests
-    }
-
-    body: {
-      type: json
-      content: '''
-        {
-          "type": "",
-          "title": "",
-          "status": 0,
-          "code": "",
-          "requestId": "",
-          "errors": [
-            {
-              "field": "",
-              "message": ""
-            }
-          ]
+          "configured": true,
+          "authorizeUrl": "/auth/authorize"
         }
       '''
     }

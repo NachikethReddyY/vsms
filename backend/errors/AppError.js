@@ -4,8 +4,14 @@
  */
 
 class AppError extends Error {
-  constructor(message, statusCode = 500, code = "INTERNAL_ERROR", details = null) {
+  constructor(
+    statusCode = 500,
+    code = "INTERNAL_ERROR",
+    message = "An unexpected error occurred",
+    details = null
+  ) {
     super(message);
+    this.name = "AppError";
     this.statusCode = statusCode;
     this.status = statusCode;
     this.code = code;
@@ -16,25 +22,27 @@ class AppError extends Error {
 
 class ValidationError extends AppError {
   constructor(message = "Request validation failed", details = null) {
-    super(message, 422, "VALIDATION_FAILED", details);
+    super(422, "VALIDATION_FAILED", message, details);
+    this.name = "ValidationError";
   }
 }
 
 class NotFoundError extends AppError {
   constructor(message = "Resource not found") {
-    super(message, 404, "NOT_FOUND");
+    super(404, "NOT_FOUND", message);
+    this.name = "NotFoundError";
   }
 }
 
 class ConflictError extends AppError {
   constructor(message = "Request conflicts with current state") {
-    super(message, 409, "CONFLICT");
+    super(409, "CONFLICT", message);
+    this.name = "ConflictError";
   }
 }
 
-module.exports = {
-  AppError,
-  ValidationError,
-  NotFoundError,
-  ConflictError,
-};
+module.exports = AppError;
+module.exports.AppError = AppError;
+module.exports.ValidationError = ValidationError;
+module.exports.NotFoundError = NotFoundError;
+module.exports.ConflictError = ConflictError;

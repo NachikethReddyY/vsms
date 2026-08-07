@@ -58,8 +58,19 @@ const baseDb = (overrides = {}) => ({
     ...(overrides.station || {}),
   },
   staffAssignment: {
-    findFirst: async () => ({ id: uuid() }),
+    findFirst: async ({ where }) => (
+      where.assignmentRole === 'SCREENER' && where.stationId && where.stationId !== stationId
+        ? null
+        : { id: uuid(), stationId: where.stationId || null }
+    ),
     ...(overrides.staffAssignment || {}),
+  },
+  eventMembership: {
+    findFirst: async ({ where }) => {
+      const user = [operationalUser, screenerUser, registrationUser, supportUser, staffUser].find(({ userId }) => userId === where.userId);
+      const role = ['EVENT_MANAGER', 'REGISTRATION', 'SCREENER', 'SUPPORT'].find((candidate) => user?.roles.includes(candidate));
+      return role ? { id: uuid(), eventId, userId: user.userId, status: 'ACTIVE', roles: [{ role }], user } : null;
+    },
   },
   queueEntry: {
     findUnique: async () => queueEntry,
@@ -99,9 +110,12 @@ const baseTransaction = (overrides = {}) => ({
   },
 });
 
-const operationalUser = { userId: uuid(), roles: ['EVENT_MANAGER'] };
-const screenerUser = { userId: uuid(), roles: ['SCREENER'] };
-const staffUser = { userId: uuid(), roles: ['STAFF'] };
+const accountState = { status: 'ACTIVE', approvalState: 'APPROVED', accessState: 'ENABLED' };
+const operationalUser = { userId: uuid(), roles: ['EVENT_MANAGER'], ...accountState };
+const screenerUser = { userId: uuid(), roles: ['SCREENER'], ...accountState };
+const registrationUser = { userId: uuid(), roles: ['REGISTRATION'], ...accountState };
+const supportUser = { userId: uuid(), roles: ['SUPPORT'], ...accountState };
+const staffUser = { userId: uuid(), roles: ['STAFF'], ...accountState };
 
 test('queue join creates a WAITING entry and emits QUEUE_JOINED audit', async () => {
   audits.length = 0;
@@ -168,8 +182,29 @@ test('queue join rejects non-operational roles', async () => {
   const db = baseDb();
   await assert.rejects(
     queueService.joinQueue({ eventId, stationId, registrationId }, staffUser, context, db),
-    (error) => error.code === 'QUEUE_ROLE_REQUIRED' && error.status === 403,
+    (error) => error.code === 'EVENT_ROLE_REQUIRED' && error.status === 403,
   );
+});
+
+test('queue join limits a screener to the station in their current duty', async () => {
+  const db = baseDb();
+  await assert.rejects(
+    queueService.joinQueue({ eventId, stationId: targetStationId, registrationId }, screenerUser, context, db),
+    (error) => error.code === 'CURRENT_DUTY_REQUIRED' && error.status === 403,
+  );
+});
+
+test('registration and support duties may join any station in their event', async () => {
+  for (const user of [registrationUser, supportUser]) {
+    const result = await queueService.joinQueue(
+      { eventId, stationId: targetStationId, registrationId },
+      user,
+      context,
+      baseDb(),
+    );
+    assert.equal(result.created, true);
+    assert.equal(result.queueEntry.stationId, targetStationId);
+  }
 });
 
 test('callQueueEntry transitions WAITING to CALLED and emits QUEUE_CALLED audit', async () => {
@@ -410,11 +445,11 @@ test('station operations require an active screener assignment', async () => {
 
   await assert.rejects(
     queueService.callQueueEntry(queueId, screenerUser, context, db),
-    (error) => error.code === 'FORBIDDEN' && error.status === 403,
+    (error) => error.code === 'CURRENT_DUTY_REQUIRED' && error.status === 403,
   );
 });
 
-test('event managers and administrators bypass the screener assignment check', async () => {
+test('event managers may operate queues without a clinical duty', async () => {
   const db = baseDb({
     staffAssignment: {
       findFirst: async () => null,
