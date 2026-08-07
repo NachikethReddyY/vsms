@@ -26,10 +26,7 @@ exports.joinQueue = async (req, res, next) => {
       req.context
     );
 
-    return res.status(created ? 201 : 200).json({
-      status: "success",
-      data: { queueEntry, created }
-    });
+    return res.status(created ? 201 : 200).json({ queueEntry, created });
   } catch (error) {
     return next(error);
   }

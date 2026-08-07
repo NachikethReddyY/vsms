@@ -37,7 +37,7 @@ router.use(authenticate);
  */
 router.post(
   "/events/:eventId/stations/:stationId/join",
-  requireAnyRole("REGISTRATION_OFFICER", "EVENT_MANAGER", "ADMINISTRATOR"),
+  requireAnyRole("REGISTRATION_OFFICER", "SCREENER", "EVENT_MANAGER", "ADMINISTRATOR"),
   checkIdempotency,
   validate({
     params: stationParams,
