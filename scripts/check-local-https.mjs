@@ -47,7 +47,7 @@ assert.equal((await request('https://localhost:5173/')).status, 200)
 const health = await request('https://127.0.0.1:5050/health')
 assert.equal(health.status, 200)
 assert.match(health.headers['content-security-policy'], /frame-ancestors 'none'/)
-assert.equal(health.headers['permissions-policy'], 'camera=(), microphone=(), geolocation=()')
+assert.equal(health.headers['permissions-policy'], 'camera=(self), microphone=(), geolocation=()')
 assert.equal((await request('https://localhost:5173/api/v1/users')).status, 401)
 await Promise.all([
   rejectsPlainHttp('http://localhost:5173/'),
