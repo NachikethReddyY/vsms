@@ -130,6 +130,7 @@ const accessTokenFor = (user, roles) => {
       token_use: "access",
       client_id: process.env.COGNITO_APP_CLIENT_ID,
       username: user.username,
+      auth_time: Math.floor(Date.now() / 1000),
       "cognito:groups": applicationRoles.map((role) => COGNITO_GROUPS[role]),
     },
     privateKey,
