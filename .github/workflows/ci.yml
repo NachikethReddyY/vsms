@@ -131,7 +131,7 @@ jobs:
         working-directory: react-user-dashboard
 
       - name: Run frontend regression tests
-        run: pnpm run test:participants && pnpm run test:queue
+        run: pnpm run test:participants && pnpm run test:queue && pnpm run test:stage4
         working-directory: react-user-dashboard
 
       - name: Build frontend
