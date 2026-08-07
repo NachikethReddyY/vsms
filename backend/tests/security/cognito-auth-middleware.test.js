@@ -16,6 +16,11 @@ test("protected routes accept the Cognito access cookie", async (t) => {
   const jwk = { ...publicKey.export({ format: "jwk" }), kid: "test-key", use: "sig", alg: "RS256" };
   const issuer = "https://cognito-idp.ap-southeast-1.amazonaws.com/ap-southeast-1_test";
   const token = jwt.sign(
+    { token_use: "access", client_id: "test-client", auth_time: 1_700_000_000, "cognito:groups": ["EventManager"] },
+    privateKey,
+    { algorithm: "RS256", keyid: "test-key", issuer, subject: "cognito-user", expiresIn: "5m" },
+  );
+  const missingAuthTimeToken = jwt.sign(
     { token_use: "access", client_id: "test-client", "cognito:groups": ["EventManager"] },
     privateKey,
     { algorithm: "RS256", keyid: "test-key", issuer, subject: "cognito-user", expiresIn: "5m" },
@@ -26,14 +31,15 @@ test("protected routes accept the Cognito access cookie", async (t) => {
   t.after(() => { global.fetch = originalFetch; });
   const prisma = require("../../prisma/prismaClient");
   const originalFindUnique = prisma.user.findUnique;
+  const localUser = {
+    id: "local-user",
+    email: "manager@example.com",
+    status: "ACTIVE",
+    userRoles: [{ role: { roleName: "EVENT_MANAGER" } }],
+  };
   prisma.user.findUnique = async ({ where }) => {
     assert.deepEqual(where, { cognitoSub: "cognito-user" });
-    return {
-      id: "local-user",
-      email: "manager@example.com",
-      status: "ACTIVE",
-      userRoles: [{ role: { roleName: "EVENT_MANAGER" } }],
-    };
+    return localUser;
   };
   t.after(() => { prisma.user.findUnique = originalFindUnique; });
 
@@ -42,9 +48,20 @@ test("protected routes accept the Cognito access cookie", async (t) => {
   app.get("/protected", require("../../middlewares/requireAuthentication"), (req, res) => {
     res.json({ userId: req.auth.userId, roles: req.auth.roles });
   });
-  app.use((error, _req, res, _next) => res.status(error.statusCode || 500).json({ error: error.message }));
+  app.use((error, _req, res, _next) => res.status(error.status || error.statusCode || 500).json({ error: error.message }));
 
   const response = await request(app).get("/protected").set("Cookie", `vsms_access=${token}`);
   assert.equal(response.status, 200);
   assert.deepEqual(response.body, { userId: "local-user", roles: ["EVENT_MANAGER"] });
+
+  // A refreshed access token can have a recent iat while retaining the older
+  // Cognito auth_time of the session that the administrator revoked.
+  localUser.sessionInvalidBefore = new Date((1_700_000_000 + 100) * 1000);
+  const revoked = await request(app).get("/protected").set("Cookie", `vsms_access=${token}`);
+  assert.equal(revoked.status, 401);
+  assert.equal(revoked.body.error, "Session has been revoked");
+  localUser.sessionInvalidBefore = null;
+  const missingOrigin = await request(app).get("/protected").set("Cookie", `vsms_access=${missingAuthTimeToken}`);
+  assert.equal(missingOrigin.status, 401);
+  assert.equal(missingOrigin.body.error, "Session is invalid or expired");
 });

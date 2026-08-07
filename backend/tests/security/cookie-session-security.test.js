@@ -95,6 +95,7 @@ test("HttpOnly Cognito access cookies authenticate approved local staff", async 
   const token = jwt.sign({
     sub: "11111111-1111-4111-8111-111111111111",
     token_use: "access",
+    auth_time: Math.floor(Date.now() / 1000),
     client_id: "test-client",
     "cognito:groups": ["EventManager"],
   }, privateKey, { algorithm: "RS256", issuer, expiresIn: "5m", keyid: key.kid });
@@ -106,6 +107,7 @@ test("HttpOnly Cognito access cookies authenticate approved local staff", async 
   const rotatedToken = jwt.sign({
     sub: "11111111-1111-4111-8111-111111111111",
     token_use: "access",
+    auth_time: Math.floor(Date.now() / 1000),
     client_id: "test-client",
     "cognito:groups": ["EventManager"],
   }, rotatedPair.privateKey, { algorithm: "RS256", issuer, expiresIn: "5m", keyid: rotatedKey.kid });

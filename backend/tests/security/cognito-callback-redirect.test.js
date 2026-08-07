@@ -26,7 +26,7 @@ cognitoClient.exchangeAuthorizationCode = async (code, verifier) => {
 };
 cognitoJwt.verifyCognitoToken = async (_token, tokenUse) => tokenUse === "id"
     ? { sub: "cognito-user", email: "staff@example.com" }
-    : { sub: "cognito-user" };
+    : { sub: "cognito-user", auth_time: Math.floor(Date.now() / 1000) };
 staff.syncLocalUser = async () => ({
     id: "staff-id",
     email: "staff@example.com",
@@ -35,6 +35,8 @@ staff.syncLocalUser = async () => ({
 });
 staff.rolesFromCognitoGroups = () => ["EVENT_MANAGER"];
 AuthAudit.createAuthAuditLog = async () => {};
+const prisma = require("../../prisma/prismaClient");
+prisma.user.update = async () => ({});
 
 const app = require("../../app");
 

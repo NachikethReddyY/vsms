@@ -24,6 +24,7 @@ const event = {
 };
 
 const reportDb = (capturedWhere) => ({
+  eventMembership: { findFirst: async () => ({ id: crypto.randomUUID() }) },
   event: {
     count: async () => 1,
     findMany: async ({ where, select }) => {
@@ -76,7 +77,7 @@ const reportDb = (capturedWhere) => ({
 
 test("operational reports reject non-management roles before querying data", async () => {
   await assert.rejects(
-    getOperationalReport({}, { userId: crypto.randomUUID(), systemRole: "STAFF" }, {}),
+    getOperationalReport({}, { userId: crypto.randomUUID(), systemRole: "STAFF", status: "ACTIVE", approvalState: "APPROVED", accessState: "ENABLED" }, { eventMembership: { findFirst: async () => null } }),
     (error) => error.status === 403 && error.code === "REPORT_FORBIDDEN",
   );
 });
@@ -86,11 +87,11 @@ test("event-manager reports remain event scoped and return aggregate-only metric
   const capturedWhere = [];
   const report = await getOperationalReport(
     { from: "2026-08-01", to: "2026-08-31" },
-    { userId, systemRole: "EVENT_MANAGER" },
+    { userId, systemRole: "EVENT_MANAGER", status: "ACTIVE", approvalState: "APPROVED", accessState: "ENABLED" },
     reportDb(capturedWhere),
   );
 
-  assert.ok(capturedWhere.every((where) => where.OR.some((branch) => branch.createdByUserId === userId)));
+  assert.ok(capturedWhere.every((where) => where.memberships.some.userId === userId));
   assert.equal(report.summary.events, 1);
   assert.deepEqual(report.summary.registrations, { total: 2, checkedIn: 1, completed: 1, completionRate: 50 });
   assert.deepEqual(report.summary.queue, { waiting: 1, active: 0, completed: 1 });

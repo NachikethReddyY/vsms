@@ -8,6 +8,8 @@ export interface AppUser {
   department?: string | null;
   designation?: string | null;
   status?: string;
+  approvalState?: 'PENDING' | 'APPROVED' | 'REJECTED';
+  accessState?: 'ENABLED' | 'SUSPENDED' | 'DISABLED';
   roles: string[];
   systemRole?: "ADMIN" | "EVENT_MANAGER" | "STAFF";
 }

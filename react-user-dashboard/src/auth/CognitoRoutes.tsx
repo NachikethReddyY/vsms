@@ -1,8 +1,9 @@
-import { useEffect, useRef } from "react";
-import { useNavigate, useSearchParams } from "react-router-dom";
-import apiClient, { setSessionTokens } from "../utils/apiClient";
+import { useEffect, useRef, useState } from "react";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
+import apiClient, { getApiError, setSessionTokens } from "../utils/apiClient";
 import { getCognitoAuthorizeUrl } from "../utils/cognitoAuth";
 import { useAuth } from "./AuthProvider";
+import "../features/Stage4Pages.css";
 
 export function CognitoLoginRedirect({ returnTo }: { returnTo?: string }) {
   useEffect(() => {
@@ -17,6 +18,7 @@ export function CognitoCallback() {
   const [searchParams] = useSearchParams();
   const { setSession } = useAuth();
   const started = useRef(false);
+  const [failure, setFailure] = useState<string | null>(null);
 
   useEffect(() => {
     if (started.current) return;
@@ -24,7 +26,7 @@ export function CognitoCallback() {
     const code = searchParams.get("code");
     const state = searchParams.get("state");
     if (searchParams.has("error") || !code || !state) {
-      window.location.replace("/?auth=failed");
+      setFailure(searchParams.get("error_description") || "Cognito did not return a valid authorization response.");
       return;
     }
 
@@ -37,8 +39,12 @@ export function CognitoCallback() {
         });
         navigate(response.data.returnTo || "/events", { replace: true });
       })
-      .catch(() => window.location.replace("/?auth=failed"));
+      .catch((error) => setFailure(getApiError(error, "We could not finish sign-in. Please try again.")));
   }, [navigate, searchParams, setSession]);
 
-  return null;
+  if (failure) {
+    return <div className="stage4-page"><section className="stage4-hero"><div><h1>Sign-in failed</h1><p>{failure}</p></div><div className="stage4-actions"><Link className="stage4-button" to="/">Return home</Link><a className="stage4-button secondary" href={getCognitoAuthorizeUrl("/events")}>Try again</a></div></section></div>;
+  }
+
+  return <div className="stage4-page"><section className="stage4-hero"><div><h1>Finishing secure sign-in</h1><p>VSMS is validating your Cognito response and preparing your staff workspace.</p></div><span className="stage4-pill warn">Loading</span></section></div>;
 }
