@@ -132,9 +132,9 @@ const accessTokenFor = (user, roles) => {
   return jwt.sign(
     {
       token_use: "access",
-      auth_time: Math.floor(Date.now() / 1000),
       client_id: process.env.COGNITO_APP_CLIENT_ID,
       username: user.username,
+      auth_time: Math.floor(Date.now() / 1000),
       "cognito:groups": applicationRoles.map((role) => COGNITO_GROUPS[role]),
     },
     privateKey,
