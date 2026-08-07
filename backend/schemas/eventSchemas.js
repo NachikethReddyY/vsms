@@ -254,6 +254,7 @@ const stationUpdateBody = z.object({
   stationOrder: z.number().int().min(1).max(50).optional(),
   capacity: z.number().int().min(1).max(1000).optional(),
   isAvailable: z.boolean().optional(),
+  operationalStatus: z.enum(["AVAILABLE", "PAUSED", "OFFLINE"]).optional(),
 }).strict().refine((value) => Object.keys(value).some((key) => key !== "version"), {
   message: "At least one station field is required",
 });

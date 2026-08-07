@@ -11,6 +11,7 @@ const {
   queueEntryParams,
   participantParams,
   joinQueueBody,
+  queueHandoffBody,
   advanceQueueBody,
 } = require("../schemas/queueSchemas");
 
@@ -24,6 +25,19 @@ router.post(
   checkIdempotency,
   validate({ params: stationParams, body: joinQueueBody }),
   asyncHandler(queueController.joinQueue),
+);
+
+router.get(
+  "/events/:eventId/stations",
+  validate({ params: eventParams }),
+  asyncHandler(queueController.listRegistrationStations),
+);
+
+router.post(
+  "/events/:eventId/stations/:stationId/handoff",
+  checkIdempotency,
+  validate({ params: stationParams, body: queueHandoffBody }),
+  asyncHandler(queueController.createQueueHandoff),
 );
 
 router.get(

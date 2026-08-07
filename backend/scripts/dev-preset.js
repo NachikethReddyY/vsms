@@ -7,11 +7,19 @@ const PRESET_TOKEN = "cd".repeat(32);
 const PRESET_QR_ID = "cdcdcdcd-0000-4000-8000-000000000001";
 const PRESET_STAFF_EMAIL = "preset.admin@cryptix.local";
 
-const demoDate = (dayOffset) => {
-  const value = new Date();
-  value.setUTCHours(0, 0, 0, 0);
-  value.setUTCDate(value.getUTCDate() + dayOffset);
-  return value;
+const demoDate = (dayOffset, hour = 0, minute = 0) => {
+  // Events use Asia/Singapore; store the matching UTC instant in PostgreSQL.
+  const singaporeOffsetMs = 8 * 60 * 60 * 1000;
+  const singaporeNow = new Date(Date.now() + singaporeOffsetMs);
+  return new Date(Date.UTC(
+    singaporeNow.getUTCFullYear(),
+    singaporeNow.getUTCMonth(),
+    singaporeNow.getUTCDate() + dayOffset,
+    hour - 8,
+    minute,
+    0,
+    0,
+  ));
 };
 
 const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
@@ -46,7 +54,7 @@ async function upsertPresetEvent(staff) {
       venue: "Jurong Regional Library",
       status: "IN_PROGRESS",
       startsAt: demoDate(0),
-      endsAt: new Date(Date.now() + 8 * 60 * 60 * 1000),
+      endsAt: demoDate(0, 23, 59),
       capacity: 80,
       expectedAttendance: 60,
     },
@@ -59,7 +67,7 @@ async function upsertPresetEvent(staff) {
       postalCode: "609732",
       timezone: "Asia/Singapore",
       startsAt: demoDate(0),
-      endsAt: new Date(Date.now() + 8 * 60 * 60 * 1000),
+      endsAt: demoDate(0, 23, 59),
       capacity: 80,
       expectedAttendance: 60,
       status: "IN_PROGRESS",

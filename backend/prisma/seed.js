@@ -954,7 +954,7 @@ async function seedDemoData(staff, reviewer, consentForm) {
     venue: "Jurong Regional Library",
     status: "IN_PROGRESS",
     startsAt: demoDate(0, 0),
-    endsAt: demoDate(0, 23),
+    endsAt: demoDate(0, 23, 59),
     capacity: 80,
   });
   const completedEvent = await upsertDemoEvent(staff, {
