@@ -644,8 +644,29 @@ These logs assist administrators in monitoring system activity, investigating in
 ### 7.2 Backend Application Services & Lambda Functions
 ### 7.3 Offline Synchronization Worker Logic
 
-## 8. Testing Results
+# 8. Testing Results
+
+To ensure the reliability, security, and correctness of the VSMS application, the team implemented a structured testing approach covering functional validation, security verification, and system integration testing.
+
+All test cases were organised within a dedicated `tests` directory, where test files were separated according to their testing purpose. This structure improved test maintainability and allowed different system components to be validated independently.
+
+The testing directory was structured as follows:
+
+```text
+tests
+│
+├── integration
+├── security
+├── unit
+├── helpers.js
+└── qrHandoff.extract.test.js
+```
+
 ### 8.1 Automated Security Scanning (SAST/SCA/Secret Detection)
+Automated security scanning was performed throughout development to identify potential vulnerabilities within the application source code and dependencies.
+
+The team conducted:
+
 ### 8.2 Functional Validation & Exception Handling Reports
 #### 8.2.1 Core Registration Endpoint Validation (`POST /participants`)
 The participant registration process was tested to ensure proper request parsing, multi-table database transaction processing, and strict HTTP response security header enforcement.
@@ -692,6 +713,85 @@ As demonstrated in the response headers of Figure 8.1, the application layer suc
 ### 10.3 Application Build & Deployment Automation
 
 ## 11. Reflection & Appendices
-### 11.1 Group Reflection & Technical Lessons Learned
+
+This section presents our team's reflections and supporting appendices from the development of the secure web application. It highlights the experiences gained throughout the project, challenges encountered, technical knowledge acquired, and improvements identified for future development. Through this project, we gained practical experience in applying secure software engineering principles while balancing functionality, usability, and security requirements.
+
+The development process allowed us to understand that security should not be treated as a final stage of development, but rather as an integral part of the entire Software Development Life Cycle (SDLC). From initial system design and database modelling to implementation, testing, and validation, security considerations influenced many of our technical decisions.
+
+---
+
+## 11.1 Group Reflection & Technical Lessons Learned
+
+Throughout this project, our team gained valuable experience in designing and developing a secure web application. We encountered various challenges, including managing a complex database structure, integrating multiple application components, implementing authentication and authorization mechanisms, and ensuring that security requirements were properly addressed.
+
+One of the key lessons learned was the importance of proper planning before implementation. As the system consisted of multiple modules such as participant registration, screening workflows, user management, reporting, and security monitoring, early architectural planning was essential to prevent unnecessary redesign and integration difficulties.
+
+From a technical perspective, this project strengthened our understanding of secure coding practices, including input validation, role-based access control (RBAC), password security, API protection, logging, error handling, and vulnerability mitigation based on the OWASP Top 10. We also gained experience in performing security testing through methods such as static analysis, dependency scanning, functional validation, and security configuration checks.
+
+Working with technologies such as Node.js, Express, PostgreSQL, Prisma, and cloud-based services improved our understanding of developing scalable backend systems. We learned that building a secure application requires consideration across all layers, including frontend validation, backend enforcement, database integrity, and infrastructure configuration.
+
+The following table summarises our team's key achievements, technical lessons learned, and areas for future improvement:
+
+| Area | What We Did | What We Learned | What We Can Improve |
+|---|---|---|---|
+| **System Architecture & Design** | Designed the overall system architecture, component interactions, and application workflow to support different user roles and system functions. | A clear architecture helps ensure better maintainability, scalability, and easier integration between components. | Spend more time validating system design decisions earlier and create detailed architecture documentation before development begins. |
+| **Database Design & Modelling** | Created an Entity Relationship Diagram (ERD), designed database tables, established relationships, and implemented database operations using Prisma and PostgreSQL. | Database design has a significant impact on application performance, data consistency, and future expansion. | Conduct more database reviews earlier and confirm relationships before implementation to reduce schema changes later. |
+| **Authentication & Authorization** | Implemented authentication workflows, password protection, role-based access control (RBAC), and permission checks to restrict unauthorized access. | Authentication verifies identity while authorization ensures users can only perform permitted actions. Both are essential for application security. | Further improve authentication security by exploring stronger mechanisms such as multi-factor authentication and more secure session management approaches. |
+| **Secure Coding Practices** | Applied security measures such as input validation, parameterized queries, secure error handling, environment variable protection, and API validation. | Security controls should be incorporated during development rather than added after vulnerabilities are discovered. | Perform security reviews earlier and establish secure coding guidelines before implementation begins. |
+| **API Development** | Developed backend APIs for system operations and implemented middleware for validation, authentication, and security checks. | Well-designed APIs require consistent error handling, validation, documentation, and access control. | Improve API documentation and increase automated API testing coverage throughout development. |
+| **Security Testing & Validation** | Conducted security scans, dependency checks, functional testing, and validation of security-related features. | Testing helps identify vulnerabilities and ensures that security controls work as intended. | Integrate automated security testing earlier into the development workflow and perform more frequent security reviews. |
+| **Error Handling & Logging** | Implemented structured error handling and logging mechanisms to improve system monitoring and debugging. | Proper logging helps identify issues while maintaining accountability and system visibility. | Improve log management practices by defining clearer logging standards and monitoring strategies. |
+| **Team Collaboration** | Used version control, task delegation, documentation, and regular discussions to coordinate development activities. | Effective teamwork and communication are critical when developing a large-scale application. | Improve task estimation, conduct more frequent integration reviews, and resolve conflicts earlier during development. |
+| **Project Management** | Followed an Agile-inspired development approach with iterative improvements, sprint planning, and continuous feedback. | Breaking down complex requirements into smaller milestones improves productivity and progress tracking. | Allocate additional time for initial planning, risk analysis, and final system integration before submission. |
+
+Overall, this project provided our team with valuable practical experience in secure software development. While we successfully implemented important security controls and functional requirements, we also identified areas where our development process could be improved. The experience reinforced the importance of security awareness, effective collaboration, continuous testing, and careful planning when building reliable and secure applications.
+
+---
+
+## 11.2 Individual Reflection
+
+### Member 1 Reflection
+
+During this project, I gained a deeper understanding of secure software development and the importance of considering security throughout the development process. Working on the project exposed me to real-world challenges such as integrating multiple system components, debugging complex issues, and ensuring that implemented features followed security best practices.
+
+I improved my technical skills in backend development, database management, API implementation, and security validation. Through troubleshooting various issues, I learned that effective problem-solving requires analysing the interaction between different layers of the application rather than focusing only on individual components.
+
+Moving forward, I aim to improve my ability to plan technical solutions earlier, write more comprehensive documentation, and strengthen my understanding of advanced security concepts to develop more robust applications.
+
+### Member 2 Reflection
+
+This project provided valuable experience in applying theoretical security concepts into a practical application. I learned the importance of implementing security measures such as access control, input validation, and secure data handling to protect application resources.
+
+Working with team members also improved my communication and collaboration skills. I learned that effective coordination and sharing of knowledge are essential when working on a large software project with multiple interconnected features.
+
+In future projects, I hope to improve my testing approach by incorporating more automation and conducting security assessments earlier in the development process.
+
+### Member 3 Reflection
+
+Throughout the project, I gained a better understanding of the challenges involved in developing a complete secure application. The process of designing, implementing, and testing different features helped me understand how individual components contribute to the overall system.
+
+One important lesson learned was that security and functionality must be developed together. Adding security considerations early reduces potential issues and improves the overall quality of the application.
+
+For future projects, I would like to improve my technical planning skills, increase my familiarity with security tools, and contribute more actively during the initial design phase.
+
+---
+
+## 11.3 Appendices
+
+The appendices contain additional supporting materials and evidence collected throughout the project. These materials provide further details regarding the implementation process, testing procedures, and security validation performed.
+
+The appendices include:
+
+| Appendix | Description |
+|---|---|
+| **Appendix A: System Architecture Diagrams** | Contains component diagrams, system workflows, and architectural designs illustrating application structure and interactions. |
+| **Appendix B: Database Design Documentation** | Contains ERD diagrams, database schemas, and relationship mappings used during system development. |
+| **Appendix C: API Documentation** | Contains API endpoint details, request formats, response structures, and authentication requirements. |
+| **Appendix D: Security Testing Results** | Contains results from security scans, dependency analysis, vulnerability checks, and validation reports. |
+| **Appendix E: Functional Testing Evidence** | Contains test cases, screenshots, validation results, and exception handling verification. |
+| **Appendix F: Additional Implementation Evidence** | Contains additional screenshots, configuration details, and supporting materials referenced throughout the report. |
+
+These appendices provide additional evidence of the development process and demonstrate the team's effort in building a secure, functional, and maintainable web application.
+
 ### 11.2 References
 ### 11.3 Declaration of Academic Integrity
