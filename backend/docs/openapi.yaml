@@ -142,10 +142,10 @@ paths:
       tags: [Authentication]
       security: [{ refreshCookie: [] }]
       operationId: refreshSession
-      summary: Rotate a one-time refresh session
+      summary: Exchange the Cognito-backed refresh cookie for a renewed browser session
       parameters: [{ $ref: "#/components/parameters/CsrfToken" }]
       responses:
-        "200": { description: Session rotated, content: { application/json: { schema: { $ref: "#/components/schemas/AuthResponse" } } } }
+        "200": { description: Cognito refresh cookie exchanged and session cookies refreshed, content: { application/json: { schema: { $ref: "#/components/schemas/AuthResponse" } } } }
         "401": { $ref: "#/components/responses/Unauthorized" }
         "403": { $ref: "#/components/responses/Forbidden" }
         "429": { $ref: "#/components/responses/RateLimited" }

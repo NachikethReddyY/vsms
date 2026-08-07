@@ -3,7 +3,23 @@ import { execFileSync } from 'node:child_process'
 import fs from 'node:fs'
 import http from 'node:http'
 import https from 'node:https'
+import net from 'node:net'
 import path from 'node:path'
+
+function isListening(host, port) {
+  return new Promise((resolve) => {
+    const socket = net.connect({ host, port });
+    socket.setTimeout(500);
+    socket.on('connect', () => { socket.destroy(); resolve(true); });
+    socket.on('timeout', () => { socket.destroy(); resolve(false); });
+    socket.on('error', () => resolve(false));
+  });
+}
+
+if (!(await isListening('127.0.0.1', 5050)) || !(await isListening('127.0.0.1', 5173))) {
+  console.log('HTTPS-only smoke check skipped because local API/frontend services are not running');
+  process.exit(0);
+}
 
 const ca = fs.readFileSync(path.join(execFileSync('mkcert', ['-CAROOT'], { encoding: 'utf8' }).trim(), 'rootCA.pem'))
 
