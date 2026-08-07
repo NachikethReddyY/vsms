@@ -9804,6 +9804,9 @@ item:
                 "lastName": "",
                 "maskedContactNumber": "",
                 "maskedDateOfBirth": "",
+                "matchReasons": [
+                  ""
+                ],
                 "status": "ACTIVE"
               }
             ],
@@ -10069,6 +10072,144 @@ item:
           url: '{{baseUrl}}/participants/active-consent-form'
         status: Forbidden
         code: 403
+        header:
+          - key: Content-Type
+            value: application/json
+        body: |-
+          {
+            "type": "",
+            "title": "",
+            "status": 0,
+            "code": "",
+            "requestId": "00000000-0000-4000-8000-000000000000",
+            "errors": [
+              {
+                "field": "",
+                "message": ""
+              }
+            ]
+          }
+  - name: Find possible participant matches for the assigned registration event
+    description: >-
+      A name alone never produces a possible match. At least two of full name, date of birth, and contact number must
+      agree.
+    event: []
+    request:
+      method: POST
+      header:
+        - key: Content-Type
+          value: application/json
+          description: JSON request body
+          type: text
+      auth:
+        type: bearer
+        bearer:
+          - key: token
+            value: '{{token}}'
+            type: string
+      url:
+        raw: '{{baseUrl}}/participants/match'
+        host:
+          - '{{baseUrl}}'
+        path:
+          - participants
+          - match
+        query: []
+      body:
+        mode: raw
+        raw: |-
+          {
+            "firstName": "",
+            "lastName": "",
+            "dateOfBirth": "2026-08-07",
+            "contactNumber": ""
+          }
+        options:
+          raw:
+            language: json
+    response:
+      - name: 200 Response
+        originalRequest:
+          method: POST
+          header:
+            - key: Content-Type
+              value: application/json
+              description: JSON request body
+              type: text
+          url: '{{baseUrl}}/participants/match'
+        status: OK
+        code: 200
+        header:
+          - key: Content-Type
+            value: application/json
+        body: |-
+          {
+            "result": "NO_MATCH",
+            "matches": [
+              {
+                "participant": {
+                  "id": "00000000-0000-4000-8000-000000000000",
+                  "participantReference": "",
+                  "firstName": "",
+                  "lastName": "",
+                  "dateOfBirth": "2026-08-07",
+                  "maskedContactNumber": "",
+                  "preferredLanguage": ""
+                },
+                "matchReasons": [
+                  "Full name"
+                ],
+                "previousEvent": {
+                  "eventName": ""
+                },
+                "currentEventRegistration": {
+                  "id": "00000000-0000-4000-8000-000000000000",
+                  "queueNumber": 0,
+                  "status": "SIGNED_UP",
+                  "assignedBooth": ""
+                }
+              }
+            ]
+          }
+      - name: 400 Response
+        originalRequest:
+          method: POST
+          header:
+            - key: Content-Type
+              value: application/json
+              description: JSON request body
+              type: text
+          url: '{{baseUrl}}/participants/match'
+        status: Bad Request
+        code: 400
+        header:
+          - key: Content-Type
+            value: application/json
+        body: |-
+          {
+            "type": "",
+            "title": "",
+            "status": 0,
+            "code": "",
+            "requestId": "00000000-0000-4000-8000-000000000000",
+            "errors": [
+              {
+                "field": "",
+                "message": ""
+              }
+            ]
+          }
+      - name: 401 Response
+        originalRequest:
+          method: POST
+          header:
+            - key: Content-Type
+              value: application/json
+              description: JSON request body
+              type: text
+          url: '{{baseUrl}}/participants/match'
+        status: Unauthorized
+        code: 401
         header:
           - key: Content-Type
             value: application/json
