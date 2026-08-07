@@ -101,7 +101,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Rotate a one-time refresh session */
+        /** Exchange the Cognito-backed refresh cookie for a renewed browser session */
         post: operations["refreshSession"];
         delete?: never;
         options?: never;
@@ -4841,7 +4841,7 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description Session rotated */
+            /** @description Cognito refresh cookie exchanged and session cookies refreshed */
             200: {
                 headers: {
                     [name: string]: unknown;

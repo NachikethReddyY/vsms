@@ -1,5 +1,5 @@
 meta {
-  name: Rotate a one-time refresh session
+  name: Refresh Cognito-backed browser session
   type: http
   seq: 2
   tags: [
@@ -9,22 +9,26 @@ meta {
 }
 
 headers {
-  Origin: https://localhost:5173
+  Cookie: vsms_refresh={{refreshCookie}}; vsms_username={{username}}; vsms_csrf={{csrfToken}}
+  Origin: {{origin}}
   Sec-Fetch-Site: same-origin
   X-CSRF-Token: {{csrfToken}}
 }
 
 script:post-response {
   if (res.getStatus() === 200) {
-    bru.setVar("token", res.getBody().accessToken);
-    bru.setVar("csrfToken", res.getBody().csrfToken);
+    bru.setVar("sessionExpiresIn", res.getBody().sessionExpiresIn);
   }
 }
 
 tests {
-  test("refresh rotates the session", function() {
+  test("refresh exchanges the Cognito refresh cookie without exposing browser tokens", function() {
     expect(res.getStatus()).to.equal(200);
-    expect(res.getBody().accessToken).to.be.a("string");
+    expect(res.getBody().expiresIn).to.be.a("number");
+    expect(res.getBody().sessionExpiresIn).to.be.a("number");
+    expect(res.getBody().user).to.be.an("object");
+    expect(res.getBody().accessToken).to.equal(undefined);
+    expect(res.getBody().csrfToken).to.equal(undefined);
     expect(res.getBody().refreshToken).to.equal(undefined);
   });
 }
@@ -37,15 +41,16 @@ post {
 
 example {
   name: 200 Response
-  description: Session rotated and replacement cookies issued
+  description: Cognito refresh cookie exchanged and replacement auth cookies issued
 
   request: {
     url: {{baseUrl}}/auth/refresh
     method: POST
     mode: none
     headers: {
-      X-CSRF-Token:
-      vsms_refresh: {{apiKey}}
+      Cookie: vsms_refresh={{refreshCookie}}; vsms_username={{username}}; vsms_csrf={{csrfToken}}
+      X-CSRF-Token: {{csrfToken}}
+      Origin: {{origin}}
     }
   }
 
@@ -63,8 +68,8 @@ example {
       type: json
       content: '''
         {
-          "accessToken": "",
-          "csrfToken": "",
+          "expiresIn": 900,
+          "sessionExpiresIn": 3600,
           "user": {
             "userId": "",
             "email": "",
@@ -80,15 +85,16 @@ example {
 
 example {
   name: 401 Response
-  description: Authentication is absent, invalid, expired, revoked, or reused
+  description: Cognito refresh cookie is absent, invalid, expired, revoked, or rejected
 
   request: {
     url: {{baseUrl}}/auth/refresh
     method: POST
     mode: none
     headers: {
-      X-CSRF-Token:
-      vsms_refresh: {{apiKey}}
+      Cookie: vsms_refresh={{refreshCookie}}; vsms_username={{username}}; vsms_csrf={{csrfToken}}
+      X-CSRF-Token: {{csrfToken}}
+      Origin: {{origin}}
     }
   }
 
@@ -132,8 +138,9 @@ example {
     method: POST
     mode: none
     headers: {
-      X-CSRF-Token:
-      vsms_refresh: {{apiKey}}
+      Cookie: vsms_refresh={{refreshCookie}}; vsms_username={{username}}; vsms_csrf={{csrfToken}}
+      X-CSRF-Token: {{csrfToken}}
+      Origin: {{origin}}
     }
   }
 
@@ -177,8 +184,9 @@ example {
     method: POST
     mode: none
     headers: {
-      X-CSRF-Token:
-      vsms_refresh: {{apiKey}}
+      Cookie: vsms_refresh={{refreshCookie}}; vsms_username={{username}}; vsms_csrf={{csrfToken}}
+      X-CSRF-Token: {{csrfToken}}
+      Origin: {{origin}}
     }
   }
 
