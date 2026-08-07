@@ -1,6 +1,7 @@
 const { test, describe, before, after } = require("node:test");
 const { expect } = require("expect");
 const crypto = require("crypto");
+require("dotenv").config();
 
 let helpers;
 let fixture;
@@ -11,9 +12,6 @@ before(async () => {
   process.env.NODE_ENV = "test";
   process.env.LOCAL_HTTPS = "false";
   process.env.JWT_ACCESS_SECRET = "test-only-access-secret-with-at-least-thirty-two-characters";
-  const url = new URL(process.env.DATABASE_URL);
-  if (!url.pathname.endsWith("_test")) url.pathname = `${url.pathname}_test`;
-  process.env.DATABASE_URL = url.toString();
   helpers = require("../helpers");
   ({ processScreeningSync, requestFingerprint } = require("../../services/syncService"));
 
@@ -40,6 +38,14 @@ before(async () => {
       capacity: 10,
       status: "IN_PROGRESS",
       createdByUserId: screener.id,
+    },
+  });
+  const membership = await helpers.prisma.eventMembership.create({
+    data: {
+      eventId: event.eventId,
+      userId: screener.id,
+      addedById: screener.id,
+      roles: { create: { role: "SCREENER", assignedById: screener.id } },
     },
   });
   const shift = await helpers.prisma.shift.create({
@@ -102,7 +108,7 @@ before(async () => {
       checkedIn: true,
     },
   });
-  fixture = { screener, event, station, participant, registration };
+  fixture = { screener, event, station, participant, registration, membership };
 });
 
 after(async () => {
@@ -138,7 +144,7 @@ describe("screening sync API", () => {
     const push = (currentAction = action) => processScreeningSync(
       fixture.event.eventId,
       { clientBatchId: crypto.randomUUID(), actions: [currentAction] },
-      { userId: fixture.screener.id, systemRole: "STAFF", roles: ["SCREENER"] },
+      { userId: fixture.screener.id, systemRole: "STAFF", roles: ["SCREENER"], status: "ACTIVE", approvalState: "APPROVED", accessState: "ENABLED" },
       { requestId: crypto.randomUUID(), deviceId: null, deviceName: "integration", ipAddress: "127.0.0.1" },
     );
 
@@ -214,7 +220,7 @@ describe("screening sync API", () => {
     const reclaimed = await processScreeningSync(
       fixture.event.eventId,
       { clientBatchId: crypto.randomUUID(), actions: [staleAction] },
-      { userId: fixture.screener.id, systemRole: "STAFF", roles: ["SCREENER"] },
+      { userId: fixture.screener.id, systemRole: "STAFF", roles: ["SCREENER"], status: "ACTIVE", approvalState: "APPROVED", accessState: "ENABLED" },
       { requestId: crypto.randomUUID(), deviceId: null, deviceName: "integration", ipAddress: "127.0.0.1" },
       { processingLeaseMs: 1_000 },
     );

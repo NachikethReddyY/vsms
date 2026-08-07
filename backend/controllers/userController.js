@@ -1,17 +1,23 @@
 const userService = require("../services/userService");
 
+function splitProviderOperation(result) {
+  const { providerOperation, ...data } = result;
+  return { data, providerOperation };
+}
+
 // ==========================================
 // Create Staff User
 // POST /users
 // ==========================================
 exports.createUser = async (req, res, next) => {
   try {
-    const newUser = await userService.createUser(req.body, req.auth.userId, req.context);
+    const result = splitProviderOperation(await userService.createUser(req.body, req.auth.userId, req.context));
 
-    return res.status(201).json({
+    return res.status(result.providerOperation?.pending ? 202 : 201).json({
       success: true,
-      message: "Staff user created successfully",
-      data: newUser,
+      message: result.providerOperation?.pending ? "Staff user created; identity provider synchronization is pending" : "Staff user created successfully",
+      data: result.data,
+      ...(result.providerOperation ? { providerOperation: result.providerOperation } : {}),
     });
   } catch (error) {
     console.error("Create user error:", error);
@@ -65,12 +71,13 @@ exports.updateUser = async (req, res, next) => {
     const { id } = req.params;
     const userData = req.body;
 
-    const updatedUser = await userService.updateUser(id, userData, req.auth.userId, req.context);
+    const result = splitProviderOperation(await userService.updateUser(id, userData, req.auth.userId, req.context));
 
-    return res.status(200).json({
+    return res.status(result.providerOperation?.pending ? 202 : 200).json({
       success: true,
-      message: "User updated successfully",
-      data: updatedUser,
+      message: result.providerOperation?.pending ? "User updated; identity provider synchronization is pending" : "User updated successfully",
+      data: result.data,
+      ...(result.providerOperation ? { providerOperation: result.providerOperation } : {}),
     });
   } catch (error) {
     console.error("Update user error:", error);

@@ -11,7 +11,7 @@ const {
     validationError,
 } = require("../utils/validation");
 const { loadVerifiedSignature, consumeSignatureArtifact } = require("../utils/signatureStorage");
-const { assertParticipantEventScope } = require("../utils/participantEventScope");
+const { assertParticipantEventScope, participantEventScopeWhere } = require("../utils/participantEventScope");
 
 const OPEN_EVENT_STATUSES = ["PUBLISHED", "UPCOMING", "ONGOING", "IN_PROGRESS"];
 
@@ -228,7 +228,12 @@ function parseSearch(req) {
 }
 
 exports.searchParticipantsService = async (req) => {
-    const where = parseSearch(req);
+    const where = {
+        AND: [
+            parseSearch(req),
+            participantEventScopeWhere(req.registrationEventId, req.auth.userId),
+        ],
+    };
     const page = parsePositiveInt(req.query.page, 1, 10_000);
     const pageSize = parsePositiveInt(req.query.pageSize, 10, 50);
     const skip = (page - 1) * pageSize;
