@@ -1246,6 +1246,20 @@ paths:
         "401": { $ref: "#/components/responses/Unauthorized" }
         "403": { $ref: "#/components/responses/Forbidden" }
         "429": { $ref: "#/components/responses/RateLimited" }
+  /api/v1/participants/{participantId}/reuse:
+    post:
+      tags: [Participants]
+      operationId: reuseMatchedParticipant
+      summary: Attach an approved cross-event participant match to the assigned event
+      description: Requires an active registration assignment and explicit cross-event reuse permission. The participant is attached for intake only; no event registration or queue entry is created.
+      parameters: [{ $ref: "#/components/parameters/ParticipantId" }]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: "#/components/schemas/ParticipantMatchRequest" } } } }
+      responses:
+        "200": { description: Participant attached for current-event intake or an existing registration was found, content: { application/json: { schema: { $ref: "#/components/schemas/ParticipantReuseResponse" } } } }
+        "400": { $ref: "#/components/responses/ValidationFailed" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
   /api/v1/participants/{participantId}:
     parameters: 
       - $ref: "#/components/parameters/ParticipantId"
@@ -4174,6 +4188,14 @@ components:
             queueNumber: { type: integer, nullable: true }
             status: { type: string, enum: [SIGNED_UP, CHECKED_IN, COMPLETED, CANCELLED] }
             assignedBooth: { type: string, nullable: true }
+    ParticipantReuseResponse:
+      type: object
+      additionalProperties: false
+      required: [outcome]
+      properties:
+        outcome: { type: string, enum: [ATTACHED, ALREADY_REGISTERED] }
+        intakeId: { type: string, format: uuid }
+        registrationId: { type: string, format: uuid }
     EmergencyContactRequest:
       type: object
       additionalProperties: false

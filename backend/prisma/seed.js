@@ -25,6 +25,7 @@ const roleDefinitions = [
 const permissionNames = [
   "participants:read",
   "participants:write",
+  "participants:cross-event-reuse",
   "consents:record",
   "registrations:create",
   "registrations:read",

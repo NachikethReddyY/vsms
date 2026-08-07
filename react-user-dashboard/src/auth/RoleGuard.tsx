@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Navigate, Outlet, useParams } from "react-router-dom";
+import { Navigate, Outlet, useLocation, useParams } from "react-router-dom";
 import { getApiError } from "../utils/apiClient";
 import * as stage4Api from "../features/stage4Api";
 import { screeningApi, type StationType } from "../features/screening/screeningApi";
@@ -40,7 +40,10 @@ export function RoleGuard({ allowedRoles, deniedRoles = [] }: RoleGuardProps) {
 
 export function EventCapabilityGuard({ allowedRoles }: Pick<RoleGuardProps, "allowedRoles">) {
   const { session } = useAuth();
-  const { eventId = "" } = useParams();
+  const { eventId: routeEventId = "" } = useParams();
+  const location = useLocation();
+  // Participant pages preserve the selected event in the query string.
+  const eventId = routeEventId || new URLSearchParams(location.search).get("eventId") || "";
   const [state, setState] = useState<GuardState>("loading");
 
   useEffect(() => {

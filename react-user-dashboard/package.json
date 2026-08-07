@@ -8,7 +8,7 @@
     "dev": "vite",
     "build": "tsc -b && vite build",
     "lint": "eslint .",
-    "test": "pnpm run test:participants && pnpm run test:queue && pnpm run test:audit && pnpm run test:qr && pnpm run test:stage4 && pnpm run test:offline && node --test src/features/events/eventDisplayStatus.test.mjs && vitest run src/features/screening/qrHandoff.test.ts src/features/reviews/referralRecovery.test.ts src/utils/logout.test.ts",
+    "test": "pnpm run test:participants && pnpm run test:queue && pnpm run test:audit && pnpm run test:qr && pnpm run test:stage4 && pnpm run test:offline && vitest run src/features/events/eventDisplayStatus.test.mjs src/features/screening/qrHandoff.test.ts src/features/reviews/referralRecovery.test.ts src/utils/logout.test.ts",
     "test:participants": "node --test src/pages/participant/ParticipantPage.test.mjs",
     "test:queue": "node --test src/pages/QueuePages.test.mjs",
     "test:audit": "node --test src/pages/admin/SystemAuditDashboardPage.test.mjs",
