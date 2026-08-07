@@ -5,6 +5,9 @@ function participantEventScopeWhere(eventId, userId) {
         OR: [
             // Event registrations are the only durable, server-trusted event membership.
             { eventRegistrations: { some: { eventId } } },
+            // An authorized reuse decision creates a durable target-event intake
+            // before consent and the final registration are completed.
+            { eventIntakes: { some: { eventId } } },
             // Before registration, only the officer who created the participant for this
             // exact event may complete that one onboarding flow. Consent never creates scope.
             {

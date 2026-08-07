@@ -51,6 +51,7 @@ export default function EventRegistrationPage() {
   const [error, setError] = useState<string | null>(null);
   const [checking, setChecking] = useState(false);
   const [creating, setCreating] = useState(false);
+  const [reusing, setReusing] = useState(false);
   const [matches, setMatches] = useState<RegistrationMatch[]>([]);
   const [dialogView, setDialogView] = useState<DialogView>(null);
   const [selectedMatch, setSelectedMatch] = useState<RegistrationMatch | null>(null);
@@ -127,15 +128,37 @@ export default function EventRegistrationPage() {
     setDialogView("details");
   }
 
-  function selectExistingParticipant(match: RegistrationMatch) {
+  async function selectExistingParticipant(match: RegistrationMatch) {
     setSelectedMatch(match);
     if (match.currentEventRegistration) {
       setDialogView("registered");
       return;
     }
-    navigate(`/participants/${match.participant.id}/edit?eventId=${encodeURIComponent(eventId)}`, {
-      state: { registrationDraft: form },
-    });
+    setReusing(true);
+    setError(null);
+    try {
+      const { data } = await apiClient.post<{ outcome: "ATTACHED" | "ALREADY_REGISTERED"; registrationId?: string }>(
+        `/participants/${match.participant.id}/reuse`,
+        {
+          firstName: form.firstName.trim(),
+          lastName: form.lastName.trim(),
+          dateOfBirth: form.dateOfBirth,
+          contactNumber: form.contactNumber.trim(),
+        },
+        { headers: { "X-Event-Id": eventId } },
+      );
+      if (data.outcome === "ALREADY_REGISTERED") {
+        setDialogView("registered");
+        return;
+      }
+      navigate(`/participants/${match.participant.id}/edit?eventId=${encodeURIComponent(eventId)}`, {
+        state: { registrationDraft: form },
+      });
+    } catch (requestError: unknown) {
+      setError(getApiError(requestError, "Unable to attach this participant to the current event."));
+    } finally {
+      setReusing(false);
+    }
   }
 
   if (eventLoading) return <section className="participant-v2-page participant-v2-create"><p className="participant-v2-profile-loading">Loading event...</p></section>;
@@ -170,7 +193,7 @@ export default function EventRegistrationPage() {
         {dialogView === "match" ? <>
           <header><span><IdentificationIcon /></span><div><p>Participant match check</p><h2 id="participant-existing-title">Possible participant match found</h2></div></header>
           <p>These results matched at least two identity details. Choose the correct officer decision for each possible participant.</p>
-          <div className="participant-existing-list">{matches.map((match) => <article key={match.participant.id}><span className="participant-v2-avatar" aria-hidden="true">{initials(match)}</span><div><strong>{match.participant.firstName} {match.participant.lastName}</strong><p><IdentificationIcon /> {match.participant.participantReference}</p><p><CalendarDaysIcon /> {displayDate(match.participant.dateOfBirth)} <PhoneIcon /> {match.participant.maskedContactNumber}</p><p className="participant-existing-match-reasons"><b>Matched by:</b> {match.matchReasons.join(" + ")}</p><div className="participant-existing-actions"><button className="secondary" type="button" onClick={() => viewDetails(match)}>View details</button><button className="primary" type="button" onClick={() => selectExistingParticipant(match)}>{match.currentEventRegistration ? "View current registration" : "Use this participant"}</button></div></div></article>)}</div>
+          <div className="participant-existing-list">{matches.map((match) => <article key={match.participant.id}><span className="participant-v2-avatar" aria-hidden="true">{initials(match)}</span><div><strong>{match.participant.firstName} {match.participant.lastName}</strong><p><IdentificationIcon /> {match.participant.participantReference}</p><p><CalendarDaysIcon /> {displayDate(match.participant.dateOfBirth)} <PhoneIcon /> {match.participant.maskedContactNumber}</p><p className="participant-existing-match-reasons"><b>Matched by:</b> {match.matchReasons.join(" + ")}</p><div className="participant-existing-actions"><button className="secondary" type="button" onClick={() => viewDetails(match)}>View details</button><button className="primary" type="button" disabled={reusing} onClick={() => void selectExistingParticipant(match)}>{match.currentEventRegistration ? "View current registration" : reusing ? "Attaching participant..." : "Use this participant"}</button></div></div></article>)}</div>
           <section className="participant-existing-decision"><h3>Officer decision</h3><p>If every result is a different person, continue using the details already entered.</p></section>
           <footer className="participant-existing-footer"><button className="secondary" type="button" onClick={() => setDialogView(null)}>Close</button><button className="primary" type="button" disabled={creating} onClick={() => void registerNewParticipant()}>{creating ? "Creating participant..." : "Different person - register new participant"}</button></footer>
         </> : null}

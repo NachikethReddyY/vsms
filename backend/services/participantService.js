@@ -112,7 +112,15 @@ function participantMatchReasons(participant, criteria) {
     return reasons;
 }
 
+function assertCrossEventReusePermission(req) {
+    if (req.auth?.permissions?.includes("participants:cross-event-reuse")) return;
+    const error = new Error("Cross-event participant reuse is not authorized");
+    error.statusCode = 403;
+    throw error;
+}
+
 exports.matchParticipantsForRegistrationService = async (req) => {
+    assertCrossEventReusePermission(req);
     const criteria = parseParticipantMatch(req.body || {});
     const fullName = {
         AND: [
@@ -172,7 +180,7 @@ exports.matchParticipantsForRegistrationService = async (req) => {
         };
     });
 
-    return {
+    const response = {
         result: matches.length === 0
             ? "NO_MATCH"
             : matches.every((match) => match.currentEventRegistration)
@@ -180,6 +188,77 @@ exports.matchParticipantsForRegistrationService = async (req) => {
                 : "POSSIBLE_MATCH",
         matches,
     };
+    // Cross-event identity data is deliberately limited and every lookup is recorded.
+    await createAuditLog({
+        userId: req.auth.userId,
+        action: "PARTICIPANT_CROSS_EVENT_MATCH_CHECKED",
+        entityName: "Event",
+        entityId: req.registrationEventId,
+        newValue: { matchCount: matches.length, outcome: response.result },
+        context: req.context,
+    });
+    return response;
+};
+
+exports.reuseMatchedParticipantService = async (req) => {
+    assertCrossEventReusePermission(req);
+    const participantId = assertUuid(req.params.participantId, "participantId");
+    const criteria = parseParticipantMatch(req.body || {});
+    const eventId = req.registrationEventId;
+
+    return prisma.$transaction(async (tx) => {
+        const participant = await tx.participant.findUnique({ where: { id: participantId } });
+        if (!participant || participant.status !== "ACTIVE") {
+            const error = new Error("Active participant not found");
+            error.statusCode = 404;
+            throw error;
+        }
+
+        const matchReasons = participantMatchReasons(participant, criteria);
+        if (matchReasons.length < 2) {
+            const error = new Error("Participant is not an approved identity match");
+            error.statusCode = 403;
+            throw error;
+        }
+
+        const existingRegistration = await tx.eventRegistration.findUnique({
+            where: { participantId_eventId: { participantId, eventId } },
+            select: { registrationId: true },
+        });
+        if (existingRegistration) {
+            await createAuditLog({
+                userId: req.auth.userId,
+                action: "PARTICIPANT_REUSE_ALREADY_REGISTERED",
+                entityName: "EventRegistration",
+                entityId: existingRegistration.registrationId,
+                newValue: { participantId, eventId, matchReasonCount: matchReasons.length },
+                context: req.context,
+                client: tx,
+            });
+            return { outcome: "ALREADY_REGISTERED", registrationId: existingRegistration.registrationId };
+        }
+
+        const intake = await tx.participantEventIntake.upsert({
+            where: { participantId_eventId: { participantId, eventId } },
+            update: {},
+            create: {
+                participantId,
+                eventId,
+                attachedById: req.auth.userId,
+                reason: "REUSED_MATCH",
+            },
+        });
+        await createAuditLog({
+            userId: req.auth.userId,
+            action: "PARTICIPANT_REUSED_FOR_EVENT",
+            entityName: "ParticipantEventIntake",
+            entityId: intake.intakeId,
+            newValue: { participantId, eventId, matchReasonCount: matchReasons.length },
+            context: req.context,
+            client: tx,
+        });
+        return { outcome: "ATTACHED", intakeId: intake.intakeId };
+    });
 };
 
 function parseSearch(req) {

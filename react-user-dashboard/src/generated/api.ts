@@ -1169,6 +1169,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/participants/{participantId}/reuse": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Attach an approved cross-event participant match to the assigned event
+         * @description Requires an active registration assignment and explicit cross-event reuse permission. The participant is attached for intake only; no event registration or queue entry is created.
+         */
+        post: operations["reuseMatchedParticipant"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/participants/{participantId}": {
         parameters: {
             query?: never;
@@ -3803,6 +3823,14 @@ export interface components {
                 status: "SIGNED_UP" | "CHECKED_IN" | "COMPLETED" | "CANCELLED";
                 assignedBooth: string | null;
             } | null;
+        };
+        ParticipantReuseResponse: {
+            /** @enum {string} */
+            outcome: "ATTACHED" | "ALREADY_REGISTERED";
+            /** Format: uuid */
+            intakeId?: string;
+            /** Format: uuid */
+            registrationId?: string;
         };
         EmergencyContactRequest: {
             contactName: string;
@@ -6852,6 +6880,36 @@ export interface operations {
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
             429: components["responses"]["RateLimited"];
+        };
+    };
+    reuseMatchedParticipant: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                participantId: components["parameters"]["ParticipantId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ParticipantMatchRequest"];
+            };
+        };
+        responses: {
+            /** @description Participant attached for current-event intake or an existing registration was found */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ParticipantReuseResponse"];
+                };
+            };
+            400: components["responses"]["ValidationFailed"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
         };
     };
     getParticipant: {

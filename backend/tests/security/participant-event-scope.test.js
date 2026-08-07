@@ -14,7 +14,7 @@ function replace(t, target, key, value) {
   t.after(() => { target[key] = original; });
 }
 
-test("participant detail scope requires a registration or creator-owned onboarding record for the assigned event", async () => {
+test("participant detail scope requires a registration, event intake, or creator-owned onboarding record for the assigned event", async () => {
   const participantId = crypto.randomUUID();
   const eventId = crypto.randomUUID();
   const userId = crypto.randomUUID();
@@ -30,8 +30,9 @@ test("participant detail scope requires a registration or creator-owned onboardi
 
   assert.equal(await assertParticipantEventScope(db, participantId, eventId, userId), participantId);
   assert.equal(where.id, participantId);
-  assert.deepEqual(where.OR[0], { eventRegistrations: { some: { eventId } } });
-  assert.deepEqual(where.OR[1], {
+    assert.deepEqual(where.OR[0], { eventRegistrations: { some: { eventId } } });
+  assert.deepEqual(where.OR[1], { eventIntakes: { some: { eventId } } });
+  assert.deepEqual(where.OR[2], {
     AND: [
       { createdById: userId },
       { onboardingEventId: eventId },
@@ -66,7 +67,8 @@ test("participant search reuses registration or creator-owned onboarding scope a
   for (const where of captured) {
     const scope = where.AND[1];
     assert.deepEqual(scope.OR[0], { eventRegistrations: { some: { eventId } } });
-    assert.deepEqual(scope.OR[1], {
+    assert.deepEqual(scope.OR[1], { eventIntakes: { some: { eventId } } });
+    assert.deepEqual(scope.OR[2], {
       AND: [
         { createdById: userId },
         { onboardingEventId: eventId },
@@ -165,7 +167,7 @@ test("the creating officer can record consent during the bound pre-registration 
 
   assert.equal(consent.participantId, participantId);
   assert.equal(consentData.eventId, eventId);
-  assert.deepEqual(scopeWhere.OR[1], {
+  assert.deepEqual(scopeWhere.OR[2], {
     AND: [
       { createdById: userId },
       { onboardingEventId: eventId },

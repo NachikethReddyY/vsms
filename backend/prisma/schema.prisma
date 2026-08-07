@@ -362,6 +362,7 @@ model User {
   registrationChanges      RegistrationStatusHistory[]   @relation("RegistrationStatusChangedBy")
   participantsCreated      Participant[]                 @relation("ParticipantCreatedBy")
   participantsUpdated      Participant[]                 @relation("ParticipantUpdatedBy")
+  participantIntakes       ParticipantEventIntake[]      @relation("ParticipantIntakeAttachedBy")
   permissionsCreated       Permission[]                  @relation("PermissionCreatedBy")
   devices                  Device[]
   approvalDecisions        AccountApprovalDecision[]     @relation("ApprovalAccount")
@@ -555,6 +556,7 @@ model Participant {
   updatedAt            DateTime          @updatedAt @map("updated_at")
 
   eventRegistrations EventRegistration[]
+  eventIntakes       ParticipantEventIntake[]
   emergencyContacts  ParticipantEmergencyContact[]
   consents           ParticipantConsent[]
   createdBy          User                          @relation("ParticipantCreatedBy", fields: [createdById], references: [id], onDelete: Restrict, onUpdate: Cascade)
@@ -606,6 +608,7 @@ model Event {
   stations                Station[]
   eventDays               EventDay[]
   registrations           EventRegistration[]
+  participantIntakes      ParticipantEventIntake[]
   staffAssignments        StaffAssignment[]
   participantConsents     ParticipantConsent[]
   onboardingParticipants  Participant[]            @relation("ParticipantOnboardingEvent")
@@ -755,6 +758,24 @@ model EventStationAvailability {
   @@unique([eventStationId, eventDayId])
   @@index([eventDayId, isAvailable])
   @@map("event_station_availabilities")
+}
+
+model ParticipantEventIntake {
+  intakeId     String   @id @default(uuid()) @map("intake_id") @db.Uuid
+  participantId String  @map("participant_id") @db.Uuid
+  eventId      String   @map("event_id") @db.Uuid
+  attachedById String   @map("attached_by") @db.Uuid
+  reason       String   @default("REUSED_MATCH") @db.VarChar(40)
+  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  participant Participant @relation(fields: [participantId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  event       Event       @relation(fields: [eventId], references: [eventId], onDelete: Cascade, onUpdate: Cascade)
+  attachedBy  User        @relation("ParticipantIntakeAttachedBy", fields: [attachedById], references: [id], onDelete: Restrict, onUpdate: Cascade)
+
+  @@unique([participantId, eventId])
+  @@index([eventId, createdAt])
+  @@index([attachedById])
+  @@map("participant_event_intakes")
 }
 
 model EventRegistration {

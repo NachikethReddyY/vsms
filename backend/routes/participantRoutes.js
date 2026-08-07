@@ -15,7 +15,8 @@ router.use(requireRegistrationAssignment);
 
 router.get("/", requirePermission("participants:read"), rateLimit({ windowMs: 60_000, max: 30 }), participantController.searchParticipants);
 router.post("/", requirePermission("participants:write"), participantController.createParticipant);
-router.post("/match", requirePermission("participants:read"), rateLimit({ windowMs: 60_000, max: 30 }), participantController.matchParticipantsForRegistration);
+router.post("/match", requirePermission("participants:cross-event-reuse"), rateLimit({ windowMs: 60_000, max: 30 }), participantController.matchParticipantsForRegistration);
+router.post("/:participantId/reuse", requirePermission("participants:cross-event-reuse"), participantController.reuseMatchedParticipant);
 router.get("/active-consent-form", requirePermission("consents:record"), participantController.getActiveConsentForm);
 router.get("/:participantId", requirePermission("participants:read"), participantController.getParticipantById);
 router.patch("/:participantId", requirePermission("participants:write"), participantController.updateParticipant);
