@@ -185,6 +185,24 @@ exports.getAccount = async (userId) => {
           createdAt: true,
         },
       },
+      lifecycleEmails: {
+        orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+        take: 25,
+        select: {
+          id: true,
+          purpose: true,
+          provider: true,
+          templateVersion: true,
+          status: true,
+          attemptCount: true,
+          maxAttempts: true,
+          nextAttemptAt: true,
+          acceptedAt: true,
+          failedAt: true,
+          failureCode: true,
+          createdAt: true,
+        },
+      },
     },
   });
   if (!account) throw new AppError(404, "ACCOUNT_NOT_FOUND", "Account not found");
@@ -211,7 +229,7 @@ exports.decideApproval = async (userId, decision, reason, actorId, context, enqu
       deprovisionedAt: before.deprovisionedAt,
     });
     await protectAdministratorTransition(tx, before, actorId, { approvalState: decision, status: nextStatus });
-    await tx.accountApprovalDecision.create({
+    const approvalDecision = await tx.accountApprovalDecision.create({
       data: { userId, decision, decidedById: actorId, reason: reason || null },
     });
     const updated = await tx.user.update({
@@ -222,9 +240,14 @@ exports.decideApproval = async (userId, decision, reason, actorId, context, enqu
     await writeAudit(tx, actorId, userId, `ACCOUNT_${decision}`, {
       approvalState: before.approvalState,
     }, { approvalState: decision, reason: reason || null }, context);
+    await enqueue({
+      type: decision,
+      account: projectAccount(updated),
+      idempotencyKey: `ACCOUNT_DECISION:${approvalDecision?.id || `${userId}:${decision}:${updated.updatedAt?.getTime() || "CURRENT"}`}`,
+      db: tx,
+    });
     return updated;
   });
-  await enqueue({ type: decision, account: projectAccount(account) }).catch(() => {});
   return projectAccount(account);
 };
 
@@ -294,10 +317,15 @@ exports.changeAccess = async (userId, action, reason, actorId, context, options 
             status: nextStatus,
           },
         });
+    await enqueue({
+      type: action === "suspend" ? "SUSPENDED" : "REACTIVATED",
+      account: projectAccount(updated),
+      idempotencyKey: `ACCOUNT_ACCESS:${userId}:${updated.updatedAt.getTime()}`,
+      db: tx,
+    });
     return { account: updated, operation };
   });
   const providerOperation = await processAfterCommit(result.operation, options);
-  await enqueue({ type: action.toUpperCase(), account: projectAccount(result.account) }).catch(() => {});
   return { ...projectAccount(result.account), providerOperation };
 };
 
@@ -361,6 +389,12 @@ exports.deprovision = async (userId, reason, actorId, context, options = {}) => 
     await writeAudit(tx, actorId, userId, "ACCOUNT_DEPROVISIONED", {
       accessState: before.accessState,
     }, { accessState: "DISABLED", reason }, context);
+    await enqueue({
+      type: "DEPROVISIONED",
+      account: projectAccount(updated),
+      idempotencyKey: `ACCOUNT_DEPROVISIONED:${userId}:${now.getTime()}`,
+      db: tx,
+    });
     const operation = await enqueueProviderOperation(tx, {
       userId,
       operationType: "DISABLE_AND_SIGN_OUT",
@@ -369,13 +403,12 @@ exports.deprovision = async (userId, reason, actorId, context, options = {}) => 
     return { account: updated, operation };
   });
   const providerOperation = await processAfterCommit(result.operation, options);
-  await enqueue({ type: "DEPROVISIONED", account: projectAccount(result.account) }).catch(() => {});
   return { ...projectAccount(result.account), providerOperation };
 };
 
 exports.resendLifecycle = async (userId, actorId, context, enqueue = enqueueAccountLifecycle) => {
   const account = await findAccount(prisma, userId);
-  const result = await enqueue({ type: account.approvalState, account: projectAccount(account) });
+  const result = await enqueue({ account: projectAccount(account), force: true });
   await prisma.$transaction((tx) => writeAudit(tx, actorId, userId, "ACCOUNT_LIFECYCLE_RESEND_REQUESTED", null, {
     approvalState: account.approvalState,
     queued: Boolean(result?.queued),

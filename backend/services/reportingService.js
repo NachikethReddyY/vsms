@@ -1,6 +1,7 @@
 const prisma = require("../prisma/prismaClient");
 const AppError = require("../errors/AppError");
 const { assertOperationalAccount, requireEventManager } = require("./eventAuthorizationService");
+const { attended } = require("./attendanceDefinition");
 
 const EVENT_LIMIT = 100;
 
@@ -124,7 +125,7 @@ const getOperationalReport = async (query, user, db = prisma, now = new Date()) 
   const [registrations, queueEntries, referrals, deliveries, screeningResults, reviews] = await Promise.all([
     db.eventRegistration.findMany({
       where: { eventId: { in: eventIds } },
-      select: { registrationId: true, eventId: true, registrationStatus: true },
+      select: { registrationId: true, eventId: true, registrationStatus: true, checkedIn: true, checkedInAt: true },
     }),
     db.queueEntry.findMany({
       where: { registration: { eventId: { in: eventIds } } },
@@ -154,11 +155,13 @@ const getOperationalReport = async (query, user, db = prisma, now = new Date()) 
   for (const row of registrations) {
     const metrics = byEvent.get(row.eventId);
     if (!metrics) continue;
-    metrics.registrations.total += 1;
+    if (row.registrationStatus !== "CANCELLED") metrics.registrations.total += 1;
     if (row.registrationStatus === "SIGNED_UP") metrics.registrations.signedUp += 1;
-    else if (row.registrationStatus === "CHECKED_IN") metrics.registrations.checkedIn += 1;
     else if (row.registrationStatus === "COMPLETED") metrics.registrations.completed += 1;
     else if (row.registrationStatus === "CANCELLED") metrics.registrations.cancelled += 1;
+    const hasAttendanceFields = Object.prototype.hasOwnProperty.call(row, "checkedIn")
+      || Object.prototype.hasOwnProperty.call(row, "checkedInAt");
+    if (hasAttendanceFields ? attended(row) : row.registrationStatus === "CHECKED_IN") metrics.registrations.checkedIn += 1;
     entityEvent.set(row.registrationId, row.eventId);
   }
 

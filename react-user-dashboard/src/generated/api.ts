@@ -382,6 +382,81 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/events/{eventId}/analytics": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get aggregate analytics for a completed event
+         * @description Requires current active EVENT_MANAGER membership. Uses the canonical attendance definition, UTC half-open timestamp bounds, PostgreSQL continuous percentiles, and small-cell suppression for clinical groups. Participant identities and clinical record bodies are never returned.
+         */
+        get: operations["getCompletedEventAnalytics"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/events/{eventId}/report-exports": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List report export jobs with completed-event and current membership rechecked */
+        get: operations["listReportExportJobs"];
+        put?: never;
+        /** Queue an aggregate PDF or CSV report export */
+        post: operations["createReportExportJob"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/events/{eventId}/report-exports/{jobId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get report export job and artifact metadata with completed-event and current membership rechecked */
+        get: operations["getReportExportJob"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/events/{eventId}/report-exports/{jobId}/download": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Download a verified, unexpired report artifact
+         * @description Event completion and current EVENT_MANAGER membership are rechecked, then the opened-descriptor SHA-256 is verified before every audited download.
+         */
+        get: operations["downloadReportExportArtifact"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/events/{eventId}/attendees": {
         parameters: {
             query?: never;
@@ -1491,6 +1566,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/admin/maintenance/lifecycle-emails/{deliveryId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Resolve or explicitly requeue an ambiguous lifecycle SMTP send
+         * @description Ambiguous SMTP attempts are never retried automatically. Every manual outcome requires an audit reason.
+         */
+        post: operations["maintainLifecycleEmail"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/admin/audit-logs": {
         parameters: {
             query?: never;
@@ -2529,6 +2624,32 @@ export interface components {
         AccountDetail: components["schemas"]["Account"] & {
             approvalDecisions: components["schemas"]["AccountApprovalDecision"][];
             providerOperations: components["schemas"]["AccountProviderOperation"][];
+            lifecycleEmails: components["schemas"]["LifecycleEmailStatus"][];
+        };
+        LifecycleEmailStatus: {
+            /** Format: uuid */
+            id: string;
+            /** @enum {string} */
+            purpose: "SIGNUP_RECEIVED" | "APPROVED" | "REJECTED" | "SUSPENDED" | "REACTIVATED" | "EVENT_ASSIGNMENT" | "PASSWORD_CHANGED" | "DEPROVISIONED";
+            /** @enum {string} */
+            provider: "GOOGLE_WORKSPACE";
+            templateVersion: number;
+            /** @enum {string} */
+            status: "QUEUED" | "SENDING" | "SENT" | "FAILED" | "CANCELLED" | "RECONCILIATION_REQUIRED" | "ESCALATED";
+            attemptCount: number;
+            maxAttempts: number;
+            /** Format: date-time */
+            nextAttemptAt: string;
+            /**
+             * Format: date-time
+             * @description Google SMTP acceptance; this does not assert delivery.
+             */
+            acceptedAt?: string | null;
+            /** Format: date-time */
+            failedAt?: string | null;
+            failureCode?: string | null;
+            /** Format: date-time */
+            createdAt: string;
         };
         AccountListItem: components["schemas"]["AccountSummary"] & {
             _count: {
@@ -2564,6 +2685,13 @@ export interface components {
         };
         LifecycleNotificationResult: {
             queued: boolean;
+            /** Format: uuid */
+            deliveryId?: string;
+            /** @enum {string} */
+            status?: "QUEUED" | "SENDING" | "SENT" | "FAILED" | "CANCELLED";
+            duplicate?: boolean;
+            /** @enum {string} */
+            reason?: "UNSUPPORTED_PURPOSE" | "OUTBOX_UNAVAILABLE";
         };
         AccountProviderDrainRequest: {
             /** @default 25 */
@@ -3003,6 +3131,104 @@ export interface components {
             eventOptions: components["schemas"]["OperationalReportEventOption"][];
             truncated: boolean;
             eventOptionsTruncated: boolean;
+        };
+        AnalyticsColumn: {
+            key: string;
+            label: string;
+            /** @enum {string} */
+            type: "string" | "integer" | "number" | "boolean";
+        };
+        AnalyticsTable: {
+            /** @enum {string} */
+            id: "registrations" | "queue" | "stations" | "screening" | "reviews" | "referrals";
+            title: string;
+            columns: components["schemas"]["AnalyticsColumn"][];
+            rows: {
+                [key: string]: unknown;
+            }[];
+            /** @description True when the entire sensitive block is withheld to prevent small-cell reconstruction. */
+            suppressed?: boolean;
+        };
+        EventAnalytics: {
+            /** @enum {integer} */
+            schemaVersion: 1;
+            /** @enum {boolean} */
+            aggregateOnly: true;
+            /** Format: date-time */
+            generatedAt: string;
+            event: {
+                [key: string]: unknown;
+            };
+            timeBasis: {
+                [key: string]: unknown;
+            };
+            appliedFilters: {
+                [key: string]: unknown;
+            };
+            metricDefinitions: {
+                [key: string]: unknown;
+            }[];
+            smallCellSuppression: {
+                [key: string]: unknown;
+            };
+            tables: components["schemas"]["AnalyticsTable"][];
+            observations: string[];
+            dataCompleteness: {
+                [key: string]: unknown;
+            };
+        };
+        /** @enum {string} */
+        ReportExportJobStatus: "QUEUED" | "GENERATING" | "COMPLETED" | "FAILED" | "CANCELLED" | "EXPIRED";
+        CreateReportExportRequest: {
+            /** @enum {string} */
+            dataset: "OVERVIEW" | "OPERATIONS" | "CLINICAL" | "REFERRALS";
+            /** @enum {string} */
+            format: "PDF" | "CSV";
+            filters?: {
+                /** Format: date-time */
+                from?: string;
+                /** Format: date-time */
+                to?: string;
+            };
+        };
+        ReportArtifact: {
+            /** Format: uuid */
+            artifactId: string;
+            /** @enum {string} */
+            mimeType: "application/pdf" | "text/csv; charset=utf-8";
+            sizeBytes: number;
+            sha256: string;
+            /** Format: date-time */
+            expiresAt: string;
+        };
+        ReportExportJob: {
+            /** Format: uuid */
+            jobId: string;
+            /** Format: uuid */
+            eventId: string;
+            /** Format: uuid */
+            requestedById: string;
+            /** @enum {string} */
+            dataset: "OVERVIEW" | "OPERATIONS" | "CLINICAL" | "REFERRALS";
+            /** @enum {string} */
+            format: "PDF" | "CSV";
+            filters: {
+                [key: string]: unknown;
+            };
+            status: components["schemas"]["ReportExportJobStatus"];
+            attemptCount: number;
+            maxAttempts: number;
+            failureCode?: string | null;
+            /** Format: date-time */
+            requestedAt: string;
+            /** Format: date-time */
+            generatedAt?: string | null;
+            /** Format: date-time */
+            expiresAt: string;
+            artifact: components["schemas"]["ReportArtifact"] | null;
+        };
+        ReportExportJobList: {
+            jobs: components["schemas"]["ReportExportJob"][];
         };
         EventAuditLog: {
             /** Format: uuid */
@@ -5179,6 +5405,160 @@ export interface operations {
             429: components["responses"]["RateLimited"];
         };
     };
+    getCompletedEventAnalytics: {
+        parameters: {
+            query?: {
+                from?: string;
+                to?: string;
+            };
+            header?: never;
+            path: {
+                eventId: components["parameters"]["EventId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Table-friendly aggregate analytics */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EventAnalytics"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            422: components["responses"]["ValidationFailed"];
+            429: components["responses"]["RateLimited"];
+        };
+    };
+    listReportExportJobs: {
+        parameters: {
+            query?: {
+                status?: components["schemas"]["ReportExportJobStatus"];
+                limit?: number;
+            };
+            header?: never;
+            path: {
+                eventId: components["parameters"]["EventId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Aggregate report export jobs */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReportExportJobList"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    createReportExportJob: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                eventId: components["parameters"]["EventId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateReportExportRequest"];
+            };
+        };
+        responses: {
+            /** @description Export queued for durable worker processing */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReportExportJob"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            422: components["responses"]["ValidationFailed"];
+        };
+    };
+    getReportExportJob: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                eventId: components["parameters"]["EventId"];
+                jobId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Report export job */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReportExportJob"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    downloadReportExportArtifact: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                eventId: components["parameters"]["EventId"];
+                jobId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description PDF or CSV aggregate artifact */
+            200: {
+                headers: {
+                    Digest?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/pdf": string;
+                    "text/csv": string;
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            /** @description Artifact expired or unavailable */
+            410: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
     listEventAttendees: {
         parameters: {
             query?: {
@@ -7224,6 +7604,43 @@ export interface operations {
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
+        };
+    };
+    maintainLifecycleEmail: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                deliveryId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** @enum {string} */
+                    action: "REQUEUE" | "RESOLVE";
+                    reason: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Audited lifecycle reconciliation result */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        delivery?: components["schemas"]["LifecycleEmailStatus"];
+                    };
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            422: components["responses"]["ValidationFailed"];
         };
     };
     listAdministrativeAuditLogs: {

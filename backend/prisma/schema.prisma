@@ -103,6 +103,40 @@ enum ReportExportJobStatus {
   COMPLETED
   FAILED
   CANCELLED
+  EXPIRED
+}
+
+enum ReportExportFormat {
+  PDF
+  CSV
+}
+
+enum ReportDataset {
+  OVERVIEW
+  OPERATIONS
+  CLINICAL
+  REFERRALS
+}
+
+enum LifecycleEmailPurpose {
+  SIGNUP_RECEIVED
+  APPROVED
+  REJECTED
+  SUSPENDED
+  REACTIVATED
+  EVENT_ASSIGNMENT
+  PASSWORD_CHANGED
+  DEPROVISIONED
+}
+
+enum LifecycleEmailStatus {
+  QUEUED
+  SENDING
+  SENT
+  FAILED
+  CANCELLED
+  RECONCILIATION_REQUIRED
+  ESCALATED
 }
 
 enum ShiftStatus {
@@ -337,6 +371,8 @@ model User {
   membershipsRemoved       EventMembership[]             @relation("MembershipRemovedBy")
   membershipRolesAssigned  EventMembershipRole[]         @relation("MembershipRoleAssignedBy")
   providerOperations       AccountProviderOperation[]
+  reportExportJobs         ReportExportJob[]             @relation("ReportRequester")
+  lifecycleEmails          LifecycleEmailOutbox[]
   deprovisionedBy          User?                         @relation("AccountDeprovision", fields: [deprovisionedById], references: [id], onDelete: SetNull)
   deprovisionedAccounts    User[]                        @relation("AccountDeprovision")
 
@@ -626,16 +662,64 @@ model EventMembershipRole {
 }
 
 model ReportExportJob {
-  id        String                @id @default(uuid()) @map("report_export_job_id") @db.Uuid
-  eventId   String                @map("event_id") @db.Uuid
-  status    ReportExportJobStatus @default(QUEUED)
-  createdAt DateTime              @default(now()) @map("created_at") @db.Timestamptz(3)
-  updatedAt DateTime              @updatedAt @map("updated_at") @db.Timestamptz(3)
+  id                    String                @id @default(uuid()) @map("report_export_job_id") @db.Uuid
+  eventId               String                @map("event_id") @db.Uuid
+  requestedById         String                @map("requested_by") @db.Uuid
+  dataset               ReportDataset         @default(OVERVIEW)
+  format                ReportExportFormat    @default(PDF)
+  filterSnapshot        Json                  @default("{}") @map("filter_snapshot")
+  status                ReportExportJobStatus @default(QUEUED)
+  claimToken            String?               @map("claim_token") @db.Uuid
+  leaseExpiresAt        DateTime?             @map("lease_expires_at") @db.Timestamptz(3)
+  publicationStorageKey String?               @map("publication_storage_key") @db.VarChar(500)
+  publicationClaimToken String?               @map("publication_claim_token") @db.Uuid
+  attemptCount          Int                   @default(0) @map("attempt_count")
+  maxAttempts           Int                   @default(5) @map("max_attempts")
+  nextAttemptAt         DateTime              @default(now()) @map("next_attempt_at") @db.Timestamptz(3)
+  failureCode           String?               @map("failure_code") @db.VarChar(80)
+  requestedAt           DateTime              @default(now()) @map("requested_at") @db.Timestamptz(3)
+  generatedAt           DateTime?             @map("generated_at") @db.Timestamptz(3)
+  expiresAt             DateTime              @default(dbgenerated("(CURRENT_TIMESTAMP + '7 days'::interval)")) @map("expires_at") @db.Timestamptz(3)
+  createdAt             DateTime              @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt             DateTime              @updatedAt @map("updated_at") @db.Timestamptz(3)
 
-  event Event @relation(fields: [eventId], references: [eventId], onDelete: Cascade, onUpdate: Cascade)
+  event       Event           @relation(fields: [eventId], references: [eventId], onDelete: Cascade, onUpdate: Cascade)
+  requestedBy User            @relation("ReportRequester", fields: [requestedById], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  artifact    ReportArtifact?
 
-  @@index([eventId, status])
+  @@index([eventId, status, requestedAt])
+  @@index([status, nextAttemptAt, leaseExpiresAt])
+  @@index([publicationClaimToken])
+  @@index([requestedById, requestedAt])
   @@map("report_export_jobs")
+}
+
+model ReportArtifact {
+  id         String   @id @default(uuid()) @map("report_artifact_id") @db.Uuid
+  jobId      String   @unique @map("report_export_job_id") @db.Uuid
+  storageKey String   @unique @map("storage_key") @db.VarChar(500)
+  mimeType   String   @map("mime_type") @db.VarChar(100)
+  sizeBytes  BigInt   @map("size_bytes")
+  sha256     String   @db.Char(64)
+  expiresAt  DateTime @map("expires_at") @db.Timestamptz(3)
+  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  job ReportExportJob @relation(fields: [jobId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+
+  @@index([expiresAt])
+  @@map("report_artifacts")
+}
+
+model ReportArtifactBlob {
+  storageKey String   @id @map("storage_key") @db.VarChar(500)
+  contents   Bytes
+  sizeBytes  BigInt   @map("size_bytes")
+  sha256     String   @db.Char(64)
+  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt  DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  @@index([createdAt])
+  @@map("report_artifact_blobs")
 }
 
 model EventDay {
@@ -1151,6 +1235,36 @@ model NotificationDelivery {
   @@index([status, createdAt])
   @@index([handoffSecretExpiresAt])
   @@map("notification_deliveries")
+}
+
+// Non-clinical account and assignment mail remains separate from encrypted
+// SES referral deliveries. Metadata is template input, never an arbitrary body.
+model LifecycleEmailOutbox {
+  id                String                @id @default(uuid()) @map("lifecycle_email_id") @db.Uuid
+  userId            String                @map("user_id") @db.Uuid
+  purpose           LifecycleEmailPurpose
+  provider          String                @default("GOOGLE_WORKSPACE") @db.VarChar(40)
+  templateVersion   Int                   @default(1) @map("template_version")
+  metadata          Json                  @default("{}")
+  idempotencyKey    String                @unique @map("idempotency_key") @db.VarChar(180)
+  status            LifecycleEmailStatus  @default(QUEUED)
+  claimToken        String?               @map("claim_token") @db.Uuid
+  leaseExpiresAt    DateTime?             @map("lease_expires_at") @db.Timestamptz(3)
+  attemptCount      Int                   @default(0) @map("attempt_count")
+  maxAttempts       Int                   @default(5) @map("max_attempts")
+  nextAttemptAt     DateTime              @default(now()) @map("next_attempt_at") @db.Timestamptz(3)
+  providerMessageId String?               @map("provider_message_id") @db.VarChar(255)
+  failureCode       String?               @map("failure_code") @db.VarChar(80)
+  acceptedAt        DateTime?             @map("accepted_at") @db.Timestamptz(3)
+  failedAt          DateTime?             @map("failed_at") @db.Timestamptz(3)
+  createdAt         DateTime              @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt         DateTime              @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+
+  @@index([status, nextAttemptAt, leaseExpiresAt])
+  @@index([userId, createdAt])
+  @@map("lifecycle_email_outbox")
 }
 
 // Durable replay ledger for authenticated provider lifecycle events. Provider

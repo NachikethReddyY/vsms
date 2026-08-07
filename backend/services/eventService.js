@@ -1,5 +1,6 @@
 const prisma = require("../prisma/prismaClient");
 const crypto = require("crypto");
+const { Prisma } = require("@prisma/client");
 const AppError = require("../errors/AppError");
 const { encodeCursor, decodeCursor } = require("../utils/cursor");
 const {
@@ -14,6 +15,8 @@ const {
 const { createExportReceipt } = require("../utils/eventExportReceipt");
 const { resolveAuditContext } = require("../utils/audit");
 const env = require("../config/env");
+const { attendancePredicate, attendanceWhere } = require("./attendanceDefinition");
+const { enqueueAccountLifecycle } = require("./accountLifecycleNotificationService");
 const { eventVisibilityWhere } = require("./eventAuthorizationService");
 
 const EVENT_FIELDS = [
@@ -115,8 +118,8 @@ const eventInclude = {
   cancelledBy: { select: { id: true, username: true, fullName: true, email: true, sysRole: true, status: true } },
   registrations: {
     // Venue occupancy must be derived from an actual check-in, never from a signup.
-    where: { registrationStatus: "CHECKED_IN" },
-    select: { registrationId: true, registrationStatus: true },
+    where: attendancePredicate,
+    select: { registrationId: true, registrationStatus: true, checkedIn: true, checkedInAt: true },
   },
   memberships: {
     where: { status: "ACTIVE" },
@@ -145,7 +148,7 @@ const eventListInclude = {
   createdBy: { select: { id: true, username: true, fullName: true, email: true, sysRole: true, status: true } },
   cancelledBy: { select: { id: true, username: true, fullName: true, email: true, sysRole: true, status: true } },
   registrations: {
-    where: { registrationStatus: "CHECKED_IN" },
+    where: attendancePredicate,
     select: { registrationId: true },
   },
   _count: { select: { registrations: { where: { registrationStatus: { not: "CANCELLED" } } } } },
@@ -293,9 +296,7 @@ const toEventResponse = async (event, user, db = prisma, options = {}) => {
     // Detail queries include the status; list queries deliberately select only
     // already-checked-in registration ids. Treat the latter as that trusted
     // projection rather than accidentally reporting zero occupancy.
-    activeCapacityCount: registrations.filter(({ registrationStatus }) => (
-      registrationStatus === undefined || registrationStatus === "CHECKED_IN"
-    )).length,
+    activeCapacityCount: registrations.length,
     _count: { eventRegistrations: registrationCount },
     canManage: managerView,
   };
@@ -706,13 +707,20 @@ const createEvent = async (body, user, correlationId, rawIdempotencyKey, db = pr
       throw new AppError(422, "FIRST_MANAGER_NOT_ELIGIBLE", "The first event manager must have an approved and enabled account");
     }
     for (const userId of managerIds) {
-      await tx.eventMembership.create({
+      const membership = await tx.eventMembership.create({
         data: {
           eventId: created.eventId,
           userId,
           addedById: user.userId,
           roles: { create: { role: "EVENT_MANAGER", assignedById: user.userId } },
         },
+      });
+      await enqueueAccountLifecycle({
+        type: "EVENT_ASSIGNMENT",
+        account: { id: userId },
+        metadata: { eventId: created.eventId, eventName: created.name, roles: ["EVENT_MANAGER"] },
+        idempotencyKey: `EVENT_ASSIGNMENT:${membership.id}:INITIAL`,
+        db: tx,
       });
     }
 
@@ -728,6 +736,13 @@ const createEvent = async (body, user, correlationId, rawIdempotencyKey, db = pr
         where: { membershipId_role: { membershipId: membership.id, role: assignment.assignmentRole } },
         update: {},
         create: { membershipId: membership.id, role: assignment.assignmentRole, assignedById: user.userId },
+      });
+      await enqueueAccountLifecycle({
+        type: "EVENT_ASSIGNMENT",
+        account: { id: assignment.userId },
+        metadata: { eventId: created.eventId, eventName: created.name, roles: [assignment.assignmentRole] },
+        idempotencyKey: `EVENT_ASSIGNMENT:${membership.id}:ROLE:${assignment.assignmentRole}`,
+        db: tx,
       });
     }
 
@@ -1323,8 +1338,14 @@ const deletionImpact = async (tx, event, entityIds = null) => {
     tx.artifactCleanupTask.count({ where: { eventId: event.eventId } }),
     collectEventArtifactTasks(tx, event.eventId),
     tx.reportExportJob.count({ where: { eventId: event.eventId } }),
-    tx.reportExportJob.count({ where: { eventId: event.eventId, status: { in: ["QUEUED", "GENERATING"] } } }),
+    tx.$queryRaw ? tx.$queryRaw(Prisma.sql`
+      SELECT COUNT(*)::int AS count FROM report_export_jobs
+      WHERE event_id = ${event.eventId}::uuid
+        AND (status IN ('QUEUED', 'GENERATING')
+          OR (status = 'FAILED' AND attempt_count < max_attempts AND expires_at > CURRENT_TIMESTAMP))
+    `) : tx.reportExportJob.count({ where: { eventId: event.eventId, status: { in: ["QUEUED", "GENERATING"] } } }),
   ]);
+  const activeReportJobCount = Array.isArray(activeReportJobs) ? Number(activeReportJobs[0]?.count || 0) : Number(activeReportJobs || 0);
   const counts = {
     registrations: ids.registrations.length,
     queues: ids.queues.length,
@@ -1335,10 +1356,10 @@ const deletionImpact = async (tx, event, entityIds = null) => {
     cleanup,
     reports: reportCount,
   };
-  const blockers = [blocker, activeReportJobs ? {
+  const blockers = [blocker, activeReportJobCount ? {
     code: "ACTIVE_REPORT_JOBS",
     message: "Active report jobs must finish or be cancelled before deletion",
-    count: activeReportJobs,
+    count: activeReportJobCount,
   } : null].filter(Boolean);
   return {
     eventId: event.eventId,
@@ -1741,7 +1762,7 @@ const addStaffAssignment = async (eventId, shiftId, body, user, correlationId, d
     });
     if (conflict) throw scheduleConflictError();
 
-    await tx.staffAssignment.create({
+    const assignment = await tx.staffAssignment.create({
       data: {
         eventId,
         shiftId,
@@ -1753,6 +1774,13 @@ const addStaffAssignment = async (eventId, shiftId, body, user, correlationId, d
         assignmentStatus: "ASSIGNED",
         status: "ASSIGNED",
       },
+    });
+    await enqueueAccountLifecycle({
+      type: "EVENT_ASSIGNMENT",
+      account: { id: body.userId },
+      metadata: { eventId, eventName: current.name, roles: [body.assignmentRole] },
+      idempotencyKey: `EVENT_ASSIGNMENT:DUTY:${assignment.id}`,
+      db: tx,
     });
 
     const updated = await tx.event.findUniqueOrThrow({ where: { eventId }, include: eventInclude });
@@ -1918,7 +1946,7 @@ const metricsForEvent = async (event, db = prisma) => {
   const registrationWhere = { eventId: event.eventId };
   const [signupCount, checkedInCount, completedCount, cancelledCount, activeCount, screeningResultCount, flaggedResultCount, referralCount] = await Promise.all([
     db.eventRegistration.count({ where: { ...registrationWhere, registrationStatus: { not: "CANCELLED" } } }),
-    db.eventRegistration.count({ where: { ...registrationWhere, registrationStatus: { not: "CANCELLED" }, checkedIn: true } }),
+    db.eventRegistration.count({ where: attendanceWhere(event.eventId) }),
     db.eventRegistration.count({ where: { ...registrationWhere, registrationStatus: "COMPLETED" } }),
     db.eventRegistration.count({ where: { ...registrationWhere, registrationStatus: "CANCELLED" } }),
     db.eventRegistration.count({ where: { ...registrationWhere, registrationStatus: { in: ["SIGNED_UP", "CHECKED_IN"] } } }),

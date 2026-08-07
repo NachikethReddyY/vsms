@@ -201,17 +201,17 @@ test("draft event managers can save the complete edit-form planning payload", as
   assert.equal(result.canManage, true);
 });
 
-test("event responses count only checked-in registrations toward venue capacity", async (t) => {
+test("event responses count canonical attendance toward venue capacity", async (t) => {
   const current = eventRecord();
   const updated = eventRecord("PUBLISHED", 2, [], [
-    { registrationId: crypto.randomUUID(), registrationStatus: "SIGNED_UP" },
-    { registrationId: crypto.randomUUID(), registrationStatus: "CHECKED_IN" },
+    { registrationId: crypto.randomUUID(), registrationStatus: "CHECKED_IN", checkedIn: true },
+    { registrationId: crypto.randomUUID(), registrationStatus: "COMPLETED", checkedIn: true },
   ]);
   installTransaction(t, current, updated);
 
   const result = await eventService.transitionEvent(eventId, "publish", { version: 1 }, manager, crypto.randomUUID());
 
-  assert.equal(result.activeCapacityCount, 1);
+  assert.equal(result.activeCapacityCount, 2);
   assert.equal(result.signupCount, 2);
 });
 

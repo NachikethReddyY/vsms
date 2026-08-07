@@ -137,6 +137,26 @@ test("reactivate and deprovision serialize without reviving a deprovisioned acco
   assert.ok(saved.deprovisionedAt);
 });
 
+test("deprovision commits its lifecycle outbox with the account transition and rolls both back on enqueue failure", async () => {
+  const actor = await prisma.user.create({
+    data: { fullName: "Deprovision Outbox Actor", email: `${crypto.randomUUID()}@test.local`, approvalState: "APPROVED" },
+  });
+  const account = await prisma.user.create({
+    data: { fullName: "Deprovision Outbox Subject", email: `${crypto.randomUUID()}@test.local`, approvalState: "APPROVED", accessState: "ENABLED", status: "ACTIVE" },
+  });
+  await assert.rejects(accountService.deprovision(account.id, "Transaction test", actor.id, {}, {
+    enqueue: async () => { throw new Error("outbox insert failed"); },
+  }), /outbox insert failed/);
+  assert.equal((await prisma.user.findUniqueOrThrow({ where: { id: account.id } })).accessState, "ENABLED");
+  assert.equal(await prisma.lifecycleEmailOutbox.count({ where: { userId: account.id, purpose: "DEPROVISIONED" } }), 0);
+
+  await accountService.deprovision(account.id, "Transaction test", actor.id, {}, {
+    providerOverrides: { disableAndRevoke: async () => null },
+  });
+  assert.equal((await prisma.user.findUniqueOrThrow({ where: { id: account.id } })).accessState, "DISABLED");
+  assert.equal(await prisma.lifecycleEmailOutbox.count({ where: { userId: account.id, purpose: "DEPROVISIONED", status: "QUEUED" } }), 1);
+});
+
 test("provider failure is durable and repeating suspend retries the same operation", async () => {
   const actor = await prisma.user.create({
     data: { fullName: "Provider Actor", email: `${crypto.randomUUID()}@test.local`, approvalState: "APPROVED" },

@@ -16,6 +16,7 @@ const { timingSafeEqual } = require("../utils/security");
 const { syncLocalUser, rolesFromCognitoGroups, ALLOWED_ROLES } = require("../utils/staff");
 const prisma = require("../prisma/prismaClient");
 const { sessionValidity } = require("../utils/sessionValidity");
+const { enqueueAccountLifecycle } = require("../services/accountLifecycleNotificationService");
 const {
     ACCESS_COOKIE,
     REFRESH_COOKIE,
@@ -298,6 +299,12 @@ exports.changePassword = asyncHandler(async (req, res) => {
         outcome: "SUCCESS",
         identifier: req.auth.email,
         context: req.context,
+    });
+    await enqueueAccountLifecycle({
+        type: "PASSWORD_CHANGED",
+        account: { id: req.auth.userId },
+        metadata: { changedAt: new Date().toISOString() },
+        idempotencyKey: `PASSWORD_CHANGED:${req.auth.userId}:${req.context?.requestId || crypto.randomUUID()}`,
     });
     res.json({ message: "Password changed successfully." });
 });

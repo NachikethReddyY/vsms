@@ -26,6 +26,8 @@ const rejectionBody = z.object({ reason: z.string().trim().min(3).max(500) }).st
 const suspensionBody = z.object({ reason: z.string().trim().min(3).max(500) }).strict();
 const reactivationBody = z.object({ reason: optionalNullableText(500) }).strict();
 const deprovisionBody = z.object({ reason: z.string().trim().min(3).max(500) }).strict();
+const lifecycleEmailParams = z.object({ deliveryId: z.string().uuid() }).strict();
+const lifecycleEmailMaintenanceBody = z.object({ action: z.enum(["REQUEUE", "RESOLVE"]), reason: z.string().trim().min(3).max(500) }).strict();
 
 module.exports = {
   accountParams,
@@ -36,4 +38,6 @@ module.exports = {
   suspensionBody,
   reactivationBody,
   deprovisionBody,
+  lifecycleEmailParams,
+  lifecycleEmailMaintenanceBody,
 };
