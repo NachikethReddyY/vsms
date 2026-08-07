@@ -1,7 +1,8 @@
 const prisma = require("../prisma/prismaClient");
 const AppError = require("../errors/AppError");
+const { assertOperationalAccount, requireEventManager } = require("./eventAuthorizationService");
+const { attended } = require("./attendanceDefinition");
 
-const ACTIVE_ASSIGNMENT_STATUSES = ["ASSIGNED", "CONFIRMED"];
 const EVENT_LIMIT = 100;
 
 const dayString = (date) => date.toISOString().slice(0, 10);
@@ -20,26 +21,8 @@ const reportRange = (query, now = new Date()) => {
 };
 
 const reportVisibility = (user) => {
-  if (user.systemRole === "ADMIN") return {};
-  if (user.systemRole !== "EVENT_MANAGER") {
-    throw new AppError(403, "REPORT_FORBIDDEN", "Operational reports are available to administrators and event managers only");
-  }
   return {
-    OR: [
-      { createdByUserId: user.userId },
-      {
-        staffAssignments: {
-          some: {
-            userId: user.userId,
-            assignmentRole: "EVENT_MANAGER",
-            OR: [
-              { status: { in: ACTIVE_ASSIGNMENT_STATUSES } },
-              { assignmentStatus: { in: ACTIVE_ASSIGNMENT_STATUSES } },
-            ],
-          },
-        },
-      },
-    ],
+    memberships: { some: { userId: user.userId, status: "ACTIVE", roles: { some: { role: "EVENT_MANAGER" } } } },
   };
 };
 
@@ -90,6 +73,16 @@ const totalMetrics = (events) => {
 };
 
 const getOperationalReport = async (query, user, db = prisma, now = new Date()) => {
+  assertOperationalAccount(user);
+  if (query.eventId) {
+    await requireEventManager(query.eventId, user, { db });
+  } else {
+    const managerMembership = await db.eventMembership.findFirst({
+      where: { userId: user.userId, status: "ACTIVE", roles: { some: { role: "EVENT_MANAGER" } } },
+      select: { id: true },
+    });
+    if (!managerMembership) throw new AppError(403, "REPORT_FORBIDDEN", "An EVENT_MANAGER membership is required for event reports");
+  }
   const visibility = reportVisibility(user);
   const range = reportRange(query, now);
   const reportWhere = {
@@ -132,7 +125,7 @@ const getOperationalReport = async (query, user, db = prisma, now = new Date()) 
   const [registrations, queueEntries, referrals, deliveries, screeningResults, reviews] = await Promise.all([
     db.eventRegistration.findMany({
       where: { eventId: { in: eventIds } },
-      select: { registrationId: true, eventId: true, registrationStatus: true },
+      select: { registrationId: true, eventId: true, registrationStatus: true, checkedIn: true, checkedInAt: true },
     }),
     db.queueEntry.findMany({
       where: { registration: { eventId: { in: eventIds } } },
@@ -162,11 +155,13 @@ const getOperationalReport = async (query, user, db = prisma, now = new Date()) 
   for (const row of registrations) {
     const metrics = byEvent.get(row.eventId);
     if (!metrics) continue;
-    metrics.registrations.total += 1;
+    if (row.registrationStatus !== "CANCELLED") metrics.registrations.total += 1;
     if (row.registrationStatus === "SIGNED_UP") metrics.registrations.signedUp += 1;
-    else if (row.registrationStatus === "CHECKED_IN") metrics.registrations.checkedIn += 1;
     else if (row.registrationStatus === "COMPLETED") metrics.registrations.completed += 1;
     else if (row.registrationStatus === "CANCELLED") metrics.registrations.cancelled += 1;
+    const hasAttendanceFields = Object.prototype.hasOwnProperty.call(row, "checkedIn")
+      || Object.prototype.hasOwnProperty.call(row, "checkedInAt");
+    if (hasAttendanceFields ? attended(row) : row.registrationStatus === "CHECKED_IN") metrics.registrations.checkedIn += 1;
     entityEvent.set(row.registrationId, row.eventId);
   }
 

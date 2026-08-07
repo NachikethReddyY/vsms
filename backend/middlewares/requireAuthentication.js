@@ -5,6 +5,7 @@ const { verifyAccessToken } = require("../utils/tokens");
 const { verifyCognitoToken } = require("../utils/cognitoJwt");
 const { ACCESS_COOKIE } = require("../utils/httpCookies");
 const { rolesFromCognitoGroups } = require("../utils/staff");
+const { sessionValidity } = require("../utils/sessionValidity");
 
 module.exports = asyncHandler(async (req, _res, next) => {
   const match = /^Bearer ([A-Za-z0-9._~-]+)$/.exec(req.get("authorization") || "");
@@ -41,18 +42,19 @@ module.exports = asyncHandler(async (req, _res, next) => {
       },
     },
   });
-  if (!user || user.status !== "ACTIVE") {
+  if (!user || user.status === "DISABLED" || user.accessState === "DISABLED" || user.deprovisionedAt) {
     throw new AppError(401, "INVALID_SESSION", "Session is invalid or expired");
+  }
+  const validity = sessionValidity(user, payload, { allowLocalIatFallback: !cognitoToken });
+  if (!validity.valid) {
+    const code = validity.reason === "SESSION_REVOKED" ? "SESSION_REVOKED" : "INVALID_SESSION";
+    throw new AppError(401, code, code === "SESSION_REVOKED" ? "Session has been revoked" : "Session is invalid or expired");
   }
 
   const localRoles = user.userRoles.map(({ role }) => role.roleName);
   const roles = cognitoToken
     ? localRoles.filter((role) => rolesFromCognitoGroups(payload).includes(role))
     : localRoles;
-  if (roles.length === 0) {
-    throw new AppError(403, "FORBIDDEN", "Cognito group membership does not grant an application role");
-  }
-
   const effectiveRoles = new Set(roles);
   const permissions = [
     ...new Set(

@@ -264,7 +264,7 @@ const loadReferral = (eventId, referralId) => prisma.referral.findFirst({
 
 const assertReferralOwner = (referral, user) => {
   if (!referral) throw new AppError(404, "REFERRAL_NOT_FOUND", "Referral not found");
-  if (user.roles?.includes("ADMINISTRATOR") || !user.roles?.includes("REVIEWER") || referral.review.reviewedByUserId !== user.userId) throw new AppError(403, "REFERRAL_REVIEWER_REQUIRED", "Only the reviewer who recorded this decision can issue its referral");
+  if (referral.review.reviewedByUserId !== user.userId) throw new AppError(403, "REFERRAL_REVIEWER_REQUIRED", "Only the reviewer who recorded this decision can issue its referral");
 };
 
 const assertIssuable = (referral) => {
@@ -613,7 +613,7 @@ const getDocument = async (eventId, referralId, documentId, user) => {
   });
   if (!artifact) throw new AppError(404, "REFERRAL_DOCUMENT_NOT_FOUND", "Referral document not found");
   await requireReviewerAccess(prisma, eventId, user);
-  if (user.roles?.includes("ADMINISTRATOR") || artifact.referral.review.reviewedByUserId !== user.userId) throw new AppError(403, "REFERRAL_REVIEWER_REQUIRED", "Only the issuing reviewer can download this referral");
+  if (artifact.referral.review.reviewedByUserId !== user.userId) throw new AppError(403, "REFERRAL_REVIEWER_REQUIRED", "Only the issuing reviewer can download this referral");
   return { buffer: await readDocumentArtifact(artifact), filename: `vision-referral-${referralId.slice(0, 8)}.pdf` };
 };
 

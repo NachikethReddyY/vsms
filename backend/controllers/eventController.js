@@ -16,7 +16,9 @@ exports.publish = async (req, res) => res.json(await eventService.transitionEven
 exports.start = async (req, res) => res.json(await eventService.transitionEvent(req.params.eventId, "start", req.body, req.user, req.context));
 exports.complete = async (req, res) => res.json(await eventService.transitionEvent(req.params.eventId, "complete", req.body, req.user, req.context));
 exports.cancel = async (req, res) => res.json(await eventService.cancelEvent(req.params.eventId, req.body, req.user, req.context));
+exports.deletionPreview = async (req, res) => res.set("Cache-Control", "no-store").json(await eventService.previewEventDeletion(req.params.eventId, req.user));
 exports.remove = async (req, res) => res.json(await eventService.deleteEvent(req.params.eventId, req.body, req.user, req.context));
+exports.deletionCleanupStatus = async (req, res) => res.set("Cache-Control", "no-store").json(await eventService.getEventDeletionCleanupStatus(req.params.eventId, req.user));
 exports.staffDirectory = async (_req, res) => res.json(await eventService.listStaffDirectory());
 exports.stationTemplates = async (_req, res) => res.json(await eventService.listStationTemplates());
 exports.importStations = async (req, res) => res.status(201).json(await eventService.importStations(req.params.eventId, req.body, req.user, req.context));

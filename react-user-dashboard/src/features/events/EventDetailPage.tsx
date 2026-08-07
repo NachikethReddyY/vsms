@@ -228,10 +228,12 @@ export default function EventDetailPage() {
     setDeletePending(true);
     setDeleteError('');
     try {
+      const preview = await eventApi.deletionPreview(event.eventId);
       await eventApi.delete(event.eventId, {
         version: event.version,
         confirmationName: deleteConfirmation,
         acknowledgePermanentDeletion: true,
+        previewToken: preview.previewToken,
       });
       window.sessionStorage.removeItem('vsms_event_id');
       navigate('/events', { replace: true });
@@ -372,20 +374,21 @@ export default function EventDetailPage() {
 
   const terminal = event.status === 'COMPLETED' || event.status === 'CANCELLED';
   const canManage = event.canManage;
+  const canCreateEvent = user?.roles.includes('ADMINISTRATOR') ?? false;
   const canConfigureStations = canManage && ['DRAFT', 'PUBLISHED', 'IN_PROGRESS'].includes(event.status);
   const canEditStaffing = canManage && ['DRAFT', 'PUBLISHED', 'IN_PROGRESS'].includes(event.status);
   const availableTemplates = stationTemplates.filter((template) => !event.eventStations.some((station) => station.stationTemplateId === template.stationTemplateId));
   const canCancel = canManage && !terminal && (event.status !== 'IN_PROGRESS' || user?.systemRole === 'ADMIN');
   const isAdministrator = user?.roles.includes('ADMINISTRATOR') ?? false;
   const canPermanentlyDelete = terminal && user?.systemRole === 'ADMIN' && isAdministrator;
-  const canReview = !isAdministrator && user?.roles.includes('REVIEWER') && event.status === 'IN_PROGRESS' && event.shifts.some((shift) => (
+  const canReview = !isAdministrator && event.status === 'IN_PROGRESS' && event.shifts.some((shift) => (
     shift.status === 'ACTIVE' && shift.staffAssignments.some((assignment) => (
       assignment.assignmentRole === 'REVIEWER'
       && ['ASSIGNED', 'CONFIRMED'].includes(assignment.status)
       && assignment.user.userId === user?.userId
     ))
   ));
-  const assignedStationTypes = new Set(!isAdministrator && user?.roles.includes('SCREENER') ? event.shifts.flatMap((shift) => shift.staffAssignments.flatMap((assignment) => {
+  const assignedStationTypes = new Set(!isAdministrator ? event.shifts.flatMap((shift) => shift.staffAssignments.flatMap((assignment) => {
     if (shift.status !== 'ACTIVE'
       || assignment.assignmentRole !== 'SCREENER'
       || !['ASSIGNED', 'CONFIRMED'].includes(assignment.status)
@@ -398,7 +401,7 @@ export default function EventDetailPage() {
   const totalRequiredStaff = event.shifts.reduce((total, shift) => total + shift.requiredStaff, 0);
   const next = nextAction[event.status];
   const routeSection = location.pathname.split('/').filter(Boolean).pop();
-  const requestedView = routeSection && ['stations', 'staff', 'attendees', 'activity'].includes(routeSection) ? routeSection : 'overview';
+  const requestedView = routeSection && ['stations', 'staff', 'analytics', 'reports', 'attendees', 'activity'].includes(routeSection) ? routeSection : 'overview';
   const view = canManage ? requestedView : 'overview';
   const eventPath = `/events/${event.eventId}`;
 
@@ -423,7 +426,7 @@ export default function EventDetailPage() {
                 {canCancel && <button className="danger-button compact" type="button" disabled={pending} onClick={() => { setCancellationReason(''); setCancellationError(''); setCancelOpen(true); }}>Cancel event</button>}
               </div>
             </details> : <span className="event-status-readonly"><i className={`status-dot ${event.status.toLowerCase()}`} />{STATUS_LABEL[event.status]}</span>}
-            {terminal && canManage && <Link className="secondary compact" to="/events/new" state={{ duplicateFrom: event }}><DocumentDuplicateIcon />Duplicate event</Link>}
+            {terminal && canCreateEvent && <Link className="secondary compact" to="/events/new" state={{ duplicateFrom: event }}><DocumentDuplicateIcon />Duplicate event</Link>}
           </div>
         </div>
 
@@ -431,7 +434,7 @@ export default function EventDetailPage() {
           {assignedStationTypes.has('VISUAL_ACUITY') && <Link className="primary" to={`${eventPath}/stations/visual-acuity`}>Open Visual Acuity station</Link>}
           {assignedStationTypes.has('REFRACTION') && <Link className="primary" to={`${eventPath}/stations/refraction`}>Open Refraction station</Link>}
           {assignedStationTypes.has('COLOUR_VISION') && <Link className="primary" to={`${eventPath}/stations/colour-vision`}>Open Colour Vision station</Link>}
-          {user?.roles.includes('SCREENER') && <Link className="secondary" to="/qr-scanner">Scan QR → station</Link>}
+          {assignedStationTypes.size > 0 && <Link className="secondary" to="/qr-scanner">Scan QR → station</Link>}
           {canReview && <Link className="secondary" to={`${eventPath}/reviews`}><ClipboardDocumentCheckIcon />Open clinical review</Link>}
         </div>
       </div>
@@ -441,8 +444,11 @@ export default function EventDetailPage() {
       <Link className={view === 'overview' ? 'active' : undefined} to={eventPath}>Overview</Link>
       <Link className={view === 'stations' ? 'active' : undefined} to={`${eventPath}/stations`}>Stations</Link>
       <Link className={view === 'staff' ? 'active' : undefined} to={`${eventPath}/staff`}>Staff</Link>
+      <Link className={view === 'analytics' ? 'active' : undefined} to={`${eventPath}/analytics`}>Analytics</Link>
+      <Link className={view === 'reports' ? 'active' : undefined} to={`${eventPath}/reports`}>Reports</Link>
       <Link className={view === 'attendees' ? 'active' : undefined} to={`${eventPath}/attendees`}>Attendees</Link>
       <Link className={view === 'activity' ? 'active' : undefined} to={`${eventPath}/activity`}>Activity</Link>
+      {canPermanentlyDelete && <Link className="danger-link" to={`${eventPath}/delete`}>Delete event</Link>}
     </nav>}
 
     <AppToast message={notice} onDismiss={() => setNotice('')} />

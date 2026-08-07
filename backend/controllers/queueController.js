@@ -22,29 +22,29 @@ exports.getParticipantQueueStatus = async (req, res) => {
 };
 
 exports.callQueueEntry = async (req, res) => {
-  res.json(await queueService.callQueueEntry(req.params.queueId, req.user, req.context));
+  res.json(await queueService.callQueueEntry(req.params.queueId, req.user, req.context, undefined, req.params.eventId));
 };
 
 exports.startQueueEntry = async (req, res) => {
-  res.json(await queueService.startQueueEntry(req.params.queueId, req.user, req.context));
+  res.json(await queueService.startQueueEntry(req.params.queueId, req.user, req.context, undefined, req.params.eventId));
 };
 
 exports.advanceQueueEntry = async (req, res) => {
   res.json(await queueService.advanceQueueEntry(
-    { queueId: req.params.queueId, toStationId: req.body.toStationId, reason: req.body.reason },
+    { queueId: req.params.queueId, eventId: req.params.eventId, toStationId: req.body.toStationId, reason: req.body.reason },
     req.user,
     req.context,
   ));
 };
 
 exports.completeQueueEntry = async (req, res) => {
-  res.json(await queueService.completeQueueEntry(req.params.queueId, req.user, req.context));
+  res.json(await queueService.completeQueueEntry(req.params.queueId, req.user, req.context, undefined, req.params.eventId));
 };
 
 exports.skipQueueEntry = async (req, res) => {
-  res.json(await queueService.skipQueueEntry(req.params.queueId, req.user, req.context));
+  res.json(await queueService.skipQueueEntry(req.params.queueId, req.user, req.context, undefined, req.params.eventId));
 };
 
 exports.leaveQueue = async (req, res) => {
-  res.json(await queueService.leaveQueue(req.params.queueId, req.user, req.context));
+  res.json(await queueService.leaveQueue(req.params.queueId, req.user, req.context, undefined, req.params.eventId));
 };
