@@ -32,7 +32,7 @@ test("queued and generating report exports block permanent event deletion", asyn
     },
   });
   const jobs = await Promise.all(["QUEUED", "GENERATING"].map((status) => prisma.reportExportJob.create({
-    data: { eventId: event.eventId, status },
+    data: { eventId: event.eventId, requestedById: administrator.id, status },
   })));
   const blockedPreview = await request(app)
     .get(`/api/events/${event.eventId}/deletion-preview`)
@@ -54,7 +54,7 @@ test("queued and generating report exports block permanent event deletion", asyn
   expect(blockedDelete.body.code).toBe("EVENT_DELETE_BLOCKED");
 
   await prisma.reportExportJob.update({ where: { id: jobs[0].id }, data: { status: "COMPLETED" } });
-  await prisma.reportExportJob.update({ where: { id: jobs[1].id }, data: { status: "FAILED" } });
+  await prisma.reportExportJob.update({ where: { id: jobs[1].id }, data: { status: "FAILED", attemptCount: 5, maxAttempts: 5 } });
   const unblockedPreview = await request(app)
     .get(`/api/events/${event.eventId}/deletion-preview`)
     .set("Authorization", `Bearer ${token}`);

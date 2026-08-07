@@ -38,7 +38,7 @@ const requireEventRoles = async (eventId, user, roles, options = {}) => {
   assertOperationalAccount(user);
   const event = await db.event.findUnique({
     where: { eventId },
-    select: { eventId: true, name: true, status: true, version: true, startsAt: true, endsAt: true },
+    select: { eventId: true, name: true, status: true, version: true, startsAt: true, endsAt: true, timezone: true },
   });
   if (!event) throw new AppError(404, "EVENT_NOT_FOUND", "Event was not found");
 

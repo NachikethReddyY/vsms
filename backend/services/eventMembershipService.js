@@ -2,6 +2,7 @@ const prisma = require("../prisma/prismaClient");
 const AppError = require("../errors/AppError");
 const { createAuditLog } = require("../utils/audit");
 const { requireEventManager, actorId } = require("./eventAuthorizationService");
+const { enqueueAccountLifecycle } = require("./accountLifecycleNotificationService");
 
 const EVENT_ROLES = ["EVENT_MANAGER", "REGISTRATION", "SCREENER", "REVIEWER", "SUPPORT"];
 const ACTIVE_DUTIES = ["ASSIGNED", "CONFIRMED"];
@@ -146,6 +147,14 @@ const addMembership = async (eventId, input, user, context, db = prisma) => {
           include: memberInclude,
         });
     await audit(tx, user, existing ? "EVENT_MEMBERSHIP_REACTIVATED" : "EVENT_MEMBERSHIP_ADDED", membership, context, { roles: input.roles });
+    const event = await tx.event.findUniqueOrThrow({ where: { eventId }, select: { name: true } });
+    await enqueueAccountLifecycle({
+      type: "EVENT_ASSIGNMENT",
+      account: { id: membership.userId },
+      metadata: { eventId, eventName: event.name, roles: input.roles },
+      idempotencyKey: `EVENT_ASSIGNMENT:${membership.id}:${membership.addedAt.getTime()}`,
+      db: tx,
+    });
     return serialize(membership);
   });
 };
@@ -183,13 +192,21 @@ const addRole = async (eventId, membershipId, role, user, context, db = prisma) 
     await beginMembershipMutation(tx, eventId, user);
     const membership = await tx.eventMembership.findFirst({ where: { id: membershipId, eventId, status: "ACTIVE" } });
     if (!membership) throw new AppError(404, "MEMBERSHIP_NOT_FOUND", "Active event membership was not found");
-    await tx.eventMembershipRole.upsert({
+    const assignment = await tx.eventMembershipRole.upsert({
       where: { membershipId_role: { membershipId, role } },
       update: {},
       create: { membershipId, role, assignedById: actorId(user) },
     });
     const updated = await tx.eventMembership.findUniqueOrThrow({ where: { id: membershipId }, include: memberInclude });
     await audit(tx, user, "EVENT_MEMBERSHIP_ROLE_ASSIGNED", updated, context, { role });
+    const event = await tx.event.findUniqueOrThrow({ where: { eventId }, select: { name: true } });
+    await enqueueAccountLifecycle({
+      type: "EVENT_ASSIGNMENT",
+      account: { id: updated.userId },
+      metadata: { eventId, eventName: event.name, roles: [role] },
+      idempotencyKey: `EVENT_ASSIGNMENT:${assignment.id}:${assignment.assignedAt.getTime()}`,
+      db: tx,
+    });
     return serialize(updated);
   });
 };

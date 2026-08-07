@@ -32,6 +32,10 @@ const {
     membershipRemovalBody,
     membershipRoleBody,
     eligibleUsersQuery,
+    analyticsQuery,
+    reportExportBody,
+    reportJobParams,
+    reportJobListQuery,
 } = require("../schemas/eventSchemas");
 
 const router = express.Router();
@@ -81,6 +85,11 @@ router.get(
 
 // 3. Dynamic parameter routes come last
 router.get("/:eventId/metrics", reportingLimiter, validate({ params: eventParams }), requireEventManager, asyncHandler(eventController.metrics));
+router.get("/:eventId/analytics", reportingLimiter, validate({ params: eventParams, query: analyticsQuery }), requireEventManager, asyncHandler(reportingController.analytics));
+router.post("/:eventId/report-exports", reportingLimiter, validate({ params: eventParams, body: reportExportBody }), requireEventManager, asyncHandler(reportingController.createExport));
+router.get("/:eventId/report-exports", reportingLimiter, validate({ params: eventParams, query: reportJobListQuery }), requireEventManager, asyncHandler(reportingController.listExports));
+router.get("/:eventId/report-exports/:jobId", reportingLimiter, validate({ params: reportJobParams }), requireEventManager, asyncHandler(reportingController.exportDetail));
+router.get("/:eventId/report-exports/:jobId/download", reportingLimiter, validate({ params: reportJobParams }), requireEventManager, asyncHandler(reportingController.downloadExport));
 router.get("/:eventId/attendees", reportingLimiter, validate({ params: eventParams, query: attendeeQuery }), requireEventManager, asyncHandler(eventController.attendees));
 router.get("/:eventId/export", reportingLimiter, validate({ params: eventParams }), requireEventManager, asyncHandler(eventController.export));
 router.get("/:eventId/deletion-preview", requireSystemRole("ADMIN"), validate({ params: eventParams }), asyncHandler(eventController.deletionPreview));

@@ -246,6 +246,28 @@ const reportQuery = z.object({
   }
 });
 
+const analyticsQuery = z.object({
+  from: timestamp.optional(),
+  to: timestamp.optional(),
+}).strict().superRefine((value, ctx) => {
+  if (value.from && value.to && new Date(value.from) >= new Date(value.to)) {
+    ctx.addIssue({ code: "custom", path: ["to"], message: "Analytics to must be after from" });
+  }
+  if (value.from && value.to && new Date(value.to) - new Date(value.from) > 366 * 86400000) {
+    ctx.addIssue({ code: "custom", path: ["to"], message: "Analytics range cannot exceed 366 days" });
+  }
+});
+const reportExportBody = z.object({
+  dataset: z.enum(["OVERVIEW", "OPERATIONS", "CLINICAL", "REFERRALS"]),
+  format: z.enum(["PDF", "CSV"]),
+  filters: analyticsQuery.default({}),
+}).strict();
+const reportJobParams = z.object({ eventId: uuid, jobId: uuid }).strict();
+const reportJobListQuery = z.object({
+  status: z.enum(["QUEUED", "GENERATING", "COMPLETED", "FAILED", "CANCELLED", "EXPIRED"]).optional(),
+  limit: z.coerce.number().int().min(1).max(100).default(25),
+}).strict();
+
 const assignmentParams = z.object({ eventId: uuid, shiftId: uuid }).strict();
 const assignmentDeleteParams = z.object({ eventId: uuid, shiftId: uuid, assignmentId: uuid }).strict();
 const versionQuery = z.object({ version: z.coerce.number().int().positive() }).strict();
@@ -285,6 +307,10 @@ module.exports = {
   auditQuery,
   attendeeQuery,
   reportQuery,
+  analyticsQuery,
+  reportExportBody,
+  reportJobParams,
+  reportJobListQuery,
   assignmentParams,
   assignmentDeleteParams,
   versionQuery,

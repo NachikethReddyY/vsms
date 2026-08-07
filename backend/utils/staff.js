@@ -1,6 +1,8 @@
 const prisma = require("../prisma/prismaClient");
 const { APPLICATION_ROLES, normalizeApplicationRole, rolesFromCognitoGroups } = require("./roles");
 const eventAuthorization = require("../services/eventAuthorizationService");
+const env = require("../config/env");
+const { enqueueAccountLifecycle } = require("../services/accountLifecycleNotificationService");
 
 const ALLOWED_ROLES = APPLICATION_ROLES;
 
@@ -42,8 +44,7 @@ async function syncLocalUser(profile, { allowCreate = false } = {}) {
     }
 
     if (!user) {
-        user = await prisma.user.create({
-            data: {
+        const data = {
                 cognitoSub: profile.cognitoSub || null,
                 username: normalizedEmail,
                 fullName: profile.fullName || "Pending Staff",
@@ -55,8 +56,16 @@ async function syncLocalUser(profile, { allowCreate = false } = {}) {
                 sysRole: "STAFF",
                 approvalState: "PENDING",
                 accessState: "ENABLED",
-            },
-        });
+        };
+        if (env.lifecycleEmailEnabled) {
+            user = await prisma.$transaction(async (tx) => {
+                const created = await tx.user.create({ data });
+                await enqueueAccountLifecycle({ type: "SIGNUP_RECEIVED", account: created, idempotencyKey: `SIGNUP_RECEIVED:${created.id}`, db: tx });
+                return created;
+            });
+        } else {
+            user = await prisma.user.create({ data });
+        }
     } else {
         const update = {};
         if (profile.cognitoSub && !user.cognitoSub) update.cognitoSub = profile.cognitoSub;

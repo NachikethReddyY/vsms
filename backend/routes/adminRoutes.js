@@ -26,6 +26,8 @@ const {
   suspensionBody,
   reactivationBody,
   deprovisionBody,
+  lifecycleEmailParams,
+  lifecycleEmailMaintenanceBody,
 } = require("../schemas/accountSchemas");
 
 router.use(requireAuthentication);
@@ -40,6 +42,7 @@ router.post("/accounts/:accountId/reactivate", validate({ params: accountParams,
 router.post("/accounts/:accountId/revoke-sessions", validate({ params: accountParams }), accountController.revokeSessions);
 router.post("/accounts/:accountId/deprovision", validate({ params: accountParams, body: deprovisionBody }), accountController.deprovision);
 router.post("/accounts/:accountId/resend-lifecycle", validate({ params: accountParams }), accountController.resendLifecycle);
+router.post("/maintenance/lifecycle-emails/:deliveryId", validate({ params: lifecycleEmailParams, body: lifecycleEmailMaintenanceBody }), accountController.maintainLifecycleEmail);
 router.post(
   "/maintenance/account-provider-operations/drain",
   validate({ body: accountProviderDrainBody }),

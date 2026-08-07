@@ -1,5 +1,6 @@
 const asyncHandler = require("../middlewares/asyncHandler");
 const accountService = require("../services/accountService");
+const { maintainLifecycleEmail } = require("../services/accountLifecycleNotificationService");
 
 function sendAccountResult(res, result) {
   const { providerOperation, ...account } = result;
@@ -66,4 +67,10 @@ exports.deprovision = asyncHandler(async (req, res) => {
 
 exports.resendLifecycle = asyncHandler(async (req, res) => {
   res.json(await accountService.resendLifecycle(req.params.accountId, req.auth.userId, req.context));
+});
+
+exports.maintainLifecycleEmail = asyncHandler(async (req, res) => {
+  const delivery = await maintainLifecycleEmail(req.params.deliveryId, req.body.action, req.body.reason, req.auth.userId, req.context);
+  if (!delivery) return res.status(404).json({ code: "LIFECYCLE_EMAIL_NOT_FOUND", message: "Lifecycle email was not found" });
+  res.json({ delivery });
 });
