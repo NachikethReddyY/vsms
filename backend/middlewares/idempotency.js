@@ -3,7 +3,12 @@
  * Requires: ioredis (npm install ioredis)
  */
 const Redis = require("ioredis");
-const redis = new Redis(process.env.REDIS_URL || "redis://localhost:6379");
+const redis = new Redis(process.env.REDIS_URL || "redis://localhost:6379", {
+  lazyConnect: true,
+  enableOfflineQueue: false,
+  maxRetriesPerRequest: 1,
+  retryStrategy: (times) => (times > 3 ? null : Math.min(times * 100, 1000)),
+});
 
 const TTL_SECONDS = 600; // Cache responses for 10 minutes (600 seconds)
 
