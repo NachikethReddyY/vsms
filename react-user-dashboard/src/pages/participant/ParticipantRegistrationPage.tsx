@@ -1,5 +1,7 @@
 import {
   ArrowLeftIcon,
+  ArrowRightIcon,
+  BuildingOffice2Icon,
   CheckCircleIcon,
   ClipboardDocumentCheckIcon,
   ExclamationTriangleIcon,
@@ -29,6 +31,23 @@ type RegistrationReview = {
   latestConsent: ConsentRecord | null;
 };
 
+type RegistrationStation = {
+  stationId: string;
+  stationName: string;
+  stationType: string;
+  stationOrder: number;
+  status: "AVAILABLE" | "BUSY" | "PAUSED" | "OFFLINE";
+  activeQueueCount: number;
+  selectable: boolean;
+};
+
+type QueueHandoff = {
+  registrationId: string;
+  queueNumber: number;
+  nextStation: string;
+  assignedStation: { id: string; name: string; status: string };
+};
+
 const OPEN_EVENT_STATUSES = new Set(["PUBLISHED", "UPCOMING", "ONGOING", "IN_PROGRESS"]);
 
 function displayStatus(value: string) {
@@ -46,6 +65,11 @@ export default function ParticipantRegistrationPage() {
   const eventId = searchParams.get("eventId") ?? "";
   const profileLink = `/participants/${participantId}${eventId ? `?eventId=${encodeURIComponent(eventId)}` : ""}`;
   const [review, setReview] = useState<RegistrationReview | null>(null);
+  const [registrationId, setRegistrationId] = useState<string | null>(null);
+  const [stations, setStations] = useState<RegistrationStation[]>([]);
+  const [isLoadingStations, setIsLoadingStations] = useState(false);
+  const [selectedStationId, setSelectedStationId] = useState<string | null>(null);
+  const [handoff, setHandoff] = useState<QueueHandoff | null>(null);
   const [isLoading, setIsLoading] = useState(Boolean(eventId));
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showConfirmation, setShowConfirmation] = useState(false);
@@ -64,12 +88,15 @@ export default function ParticipantRegistrationPage() {
         const existingRegistration = (registrationsResponse.data.registrations ?? [])
           .find((registration: Registration) => registration.eventId === eventId) ?? null;
 
-        if (existingRegistration) {
-          navigate(`/participants/registrations/${existingRegistration.id}/qr?eventId=${encodeURIComponent(eventId)}`, { replace: true });
-          return;
-        }
-
         setReview(reviewResponse.data);
+        if (existingRegistration) {
+          if (existingRegistration.queueNumber != null) {
+            navigate(`/participants/registrations/${existingRegistration.id}/qr?eventId=${encodeURIComponent(eventId)}`, { replace: true });
+            return;
+          }
+          setRegistrationId(existingRegistration.id);
+          void loadStations();
+        }
       })
       .catch((requestError: unknown) => {
         if (active) setError(getApiError(requestError, "Unable to load registration requirements."));
@@ -95,6 +122,19 @@ export default function ParticipantRegistrationPage() {
   const missingRequirement = requirements.find((item) => !item.complete)?.label;
   const canRegister = Boolean(review && !missingRequirement && !isSubmitting);
 
+  async function loadStations() {
+    setIsLoadingStations(true);
+    setError(null);
+    try {
+      const response = await apiClient.get(`/queues/events/${eventId}/stations`);
+      setStations(response.data.stations ?? []);
+    } catch (requestError: unknown) {
+      setError(getApiError(requestError, "Unable to load the available stations."));
+    } finally {
+      setIsLoadingStations(false);
+    }
+  }
+
   async function createRegistration() {
     if (!canRegister) return;
     setIsSubmitting(true);
@@ -104,11 +144,31 @@ export default function ParticipantRegistrationPage() {
         headers: { "Idempotency-Key": idempotencyKey.current },
       });
       const registrationId = response.data.registration?.id ?? response.data.registrationId;
-      navigate(`/participants/registrations/${registrationId}/qr?eventId=${encodeURIComponent(eventId)}`);
+      setRegistrationId(registrationId);
+      setShowConfirmation(false);
+      await loadStations();
     } catch (requestError: unknown) {
       setError(getApiError(requestError, "Unable to create the event registration."));
     } finally {
       setIsSubmitting(false);
+    }
+  }
+
+  async function createQueueHandoff(station: RegistrationStation) {
+    if (!registrationId || !station.selectable || selectedStationId) return;
+    setSelectedStationId(station.stationId);
+    setError(null);
+    try {
+      const response = await apiClient.post(
+        `/queues/events/${eventId}/stations/${station.stationId}/handoff`,
+        { registrationId },
+        { headers: { "Idempotency-Key": crypto.randomUUID() } },
+      );
+      setHandoff(response.data);
+    } catch (requestError: unknown) {
+      setError(getApiError(requestError, "Unable to create the queue handoff. Please select a station again."));
+    } finally {
+      setSelectedStationId(null);
     }
   }
 
@@ -128,6 +188,50 @@ export default function ParticipantRegistrationPage() {
       <section className="participant-v2-page participant-v2-checkin participant-v2-registration">
         <Link className="participant-v2-back" to={profileLink}><ArrowLeftIcon /> Back to participant profile</Link>
         <p className="participant-v2-alert participant-v2-checkin-alert" role="alert">{error ?? "Registration details are unavailable."}</p>
+      </section>
+    );
+  }
+
+  if (handoff) {
+    return (
+      <section className="participant-v2-page participant-v2-checkin participant-v2-registration participant-handoff-complete" aria-labelledby="participant-handoff-title">
+        <header className="participant-v2-checkin-heading">
+          <span><CheckCircleIcon /></span>
+          <div><p>Registration complete</p><h1 id="participant-handoff-title">Registration and handoff completed</h1><small>The participant is assigned to their next station.</small></div>
+        </header>
+        <section className="participant-handoff-summary">
+          <div><span>Participant</span><strong>{review.participant.firstName} {review.participant.lastName}</strong></div>
+          <div><span>Event</span><strong>{review.event.eventName}</strong></div>
+          <div><span>Queue number</span><strong>Q-{String(handoff.queueNumber).padStart(3, "0")}</strong></div>
+          <div><span>Assigned station</span><strong>{handoff.assignedStation.name}</strong></div>
+        </section>
+        <div className="participant-handoff-actions">
+          <button className="secondary" type="button" onClick={() => navigate(`/events/${encodeURIComponent(eventId)}/register`)}>Register next participant</button>
+          <button className="secondary" type="button" onClick={() => navigate("/events")}>Return to dashboard</button>
+          <button className="primary" type="button" onClick={() => navigate(`/participants/registrations/${handoff.registrationId}/qr?eventId=${encodeURIComponent(eventId)}`)}>Open QR pass <ArrowRightIcon /></button>
+        </div>
+      </section>
+    );
+  }
+
+  if (registrationId) {
+    return (
+      <section className="participant-v2-page participant-v2-checkin participant-v2-registration participant-station-selection" aria-labelledby="station-selection-title">
+        <Link className="participant-v2-back" to={profileLink}><ArrowLeftIcon /> Back to participant profile</Link>
+        <header className="participant-v2-checkin-heading">
+          <span><BuildingOffice2Icon /></span>
+          <div><p>Registration complete</p><h1 id="station-selection-title">Select a station</h1><small>Choose where {review.participant.firstName} {review.participant.lastName} should go next.</small></div>
+        </header>
+        {error ? <p className="participant-v2-alert participant-v2-checkin-alert" role="alert">{error}</p> : null}
+        {isLoadingStations ? <p className="participant-v2-checkin-loading">Loading station availability...</p> : null}
+        {!isLoadingStations ? <section className="participant-station-grid" aria-label="Available stations">
+          {stations.map((station) => <article key={station.stationId} className={`participant-station-card ${station.status.toLowerCase()}`}>
+            <header><span>{station.stationOrder}</span><div><h2>{station.stationName}</h2><p>{station.stationType.replace(/_/g, " ")}</p></div><strong>{displayStatus(station.status)}</strong></header>
+            <p className="participant-station-queue">Active queue: <b>{station.activeQueueCount}</b></p>
+            <button className={station.selectable ? "primary" : "secondary"} type="button" disabled={!station.selectable || selectedStationId !== null} onClick={() => void createQueueHandoff(station)}>{selectedStationId === station.stationId ? "Assigning..." : station.selectable ? "Select station" : "Unavailable"}</button>
+          </article>)}
+          {!stations.length ? <p className="participant-v2-checkin-feedback">No stations are available for this event.</p> : null}
+        </section> : null}
       </section>
     );
   }
@@ -170,9 +274,9 @@ export default function ParticipantRegistrationPage() {
               <div><dt>Event</dt><dd>{review.event.eventName}</dd></div>
               <div><dt>Participant reference</dt><dd>{review.participant.participantReference}</dd></div>
             </dl>
-            <p className="participant-registration-dialog-note">This creates the event registration and opens the participant's secure QR pass.</p>
+            <p className="participant-registration-dialog-note">This creates the event registration, then lets you select the participant's next station.</p>
             {error ? <p className="participant-v2-alert participant-v2-checkin-alert" role="alert">{error}</p> : null}
-            <footer><button className="secondary" type="button" disabled={isSubmitting} onClick={() => setShowConfirmation(false)}>Cancel</button><button className="primary" type="button" disabled={isSubmitting} onClick={() => void createRegistration()}>{isSubmitting ? "Creating registration..." : "Confirm and open QR handoff"}</button></footer>
+            <footer><button className="secondary" type="button" disabled={isSubmitting} onClick={() => setShowConfirmation(false)}>Cancel</button><button className="primary" type="button" disabled={isSubmitting} onClick={() => void createRegistration()}>{isSubmitting ? "Creating registration..." : "Confirm and select station"}</button></footer>
           </section>
         </div>
       ) : null}

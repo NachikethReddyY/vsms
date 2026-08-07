@@ -28,5 +28,25 @@
 .participant-registration-dialog dd { margin:0; color:var(--ink); font-size:13px; font-weight:700; overflow-wrap:anywhere; }
 .participant-registration-dialog-note { color:var(--ink-2); font-size:13px; line-height:1.5; }
 .participant-registration-dialog footer { display:flex; justify-content:flex-end; flex-wrap:wrap; gap:8px; margin-top:21px; }
+.participant-station-grid { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:14px; }
+.participant-station-card { display:flex; min-height:220px; flex-direction:column; padding:19px; border:1px solid var(--hairline-strong); border-radius:15px; background:var(--surface); box-shadow:0 10px 28px rgba(17,38,55,.05); }
+.participant-station-card header { display:grid; grid-template-columns:32px minmax(0,1fr); gap:10px; align-items:start; }
+.participant-station-card header>span { display:grid; width:30px; height:30px; place-items:center; border-radius:9px; background:var(--accent-tint); color:var(--accent); font-size:12px; font-weight:800; }
+.participant-station-card h2,.participant-station-card p { margin:0; }
+.participant-station-card h2 { color:var(--ink); font-size:17px; letter-spacing:-.02em; }
+.participant-station-card header p { margin-top:2px; color:var(--muted); font-size:10px; font-weight:750; letter-spacing:.07em; text-transform:uppercase; }
+.participant-station-card header strong { grid-column:1/-1; justify-self:start; margin-top:8px; padding:4px 7px; border-radius:999px; background:var(--accent-tint); color:var(--accent); font-size:10px; letter-spacing:.06em; text-transform:uppercase; }
+.participant-station-queue { margin-top:18px !important; color:var(--ink-2); font-size:13px; }
+.participant-station-card button { width:100%; margin-top:auto; }
+.participant-station-card.busy header strong { background:#fff2cf; color:#9a5b00; }
+.participant-station-card.paused,.participant-station-card.offline { opacity:.68; background:var(--canvas-soft); }
+.participant-station-card.paused header strong,.participant-station-card.offline header strong { background:#edf0f2; color:#64707a; }
+.participant-handoff-complete { max-width:760px; }
+.participant-handoff-summary { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:1px; overflow:hidden; border:1px solid var(--hairline-strong); border-radius:16px; background:var(--hairline-strong); }
+.participant-handoff-summary>div { display:grid; gap:5px; min-height:91px; padding:18px 20px; background:var(--surface); }
+.participant-handoff-summary span { color:var(--muted); font-size:10px; font-weight:750; letter-spacing:.07em; text-transform:uppercase; }
+.participant-handoff-summary strong { color:var(--ink); font-size:15px; overflow-wrap:anywhere; }
+.participant-handoff-actions { display:flex; justify-content:flex-end; flex-wrap:wrap; gap:9px; margin-top:20px; }
+@media (max-width:800px) { .participant-station-grid { grid-template-columns:repeat(2,minmax(0,1fr)); } }
 @media (max-width:800px) { .participant-v2-registration .participant-v2-checkin-requirements>div { grid-template-columns:repeat(2,minmax(0,1fr)); }.participant-v2-registration .participant-v2-checkin-requirements article { grid-template-columns:22px minmax(0,1fr) auto; min-height:0; align-content:center; }.participant-v2-registration .participant-v2-checkin-requirements article strong { margin-top:0; } }
 @media (max-width:640px) { .participant-v2-registration .participant-v2-checkin-overview,.participant-v2-registration .participant-v2-checkin-requirements { padding-left:18px; padding-right:18px; }.participant-v2-registration .participant-v2-checkin-records,.participant-v2-registration .participant-v2-checkin-actions { margin-left:18px; margin-right:18px; }.participant-v2-registration .participant-v2-checkin-feedback { margin-left:18px; margin-right:18px; }.participant-v2-registration .participant-v2-checkin-requirements>div { grid-template-columns:1fr; }.participant-registration-dialog { padding:20px; }.participant-registration-dialog footer { display:grid; grid-template-columns:1fr; }.participant-registration-dialog footer>* { width:100%; } }
