@@ -90,7 +90,7 @@ export default function ParticipantConsentPage() {
     } finally {
       setIsLoading(false);
     }
-  }, [participantId]);
+  }, [eventId, participantId]);
 
   useEffect(() => { void loadConsentPage(); }, [loadConsentPage]);
 
