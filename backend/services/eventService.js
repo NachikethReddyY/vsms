@@ -1436,6 +1436,13 @@ const updateStation = async (eventId, eventStationId, body, user, correlationId,
       });
     }
 
+    if (body.operationalStatus !== undefined) {
+      await tx.station.update({
+        where: { stationId: eventStationId },
+        data: { operationalStatus: body.operationalStatus },
+      });
+    }
+
     // body.capacity accepted for OpenAPI/UI compatibility; Station has no capacity column (#30 MVP).
     const updated = await tx.event.findUniqueOrThrow({ where: { eventId }, include: eventInclude });
     await tx.auditLog.create({

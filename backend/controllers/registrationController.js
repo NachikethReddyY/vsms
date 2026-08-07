@@ -155,16 +155,10 @@ exports.createRegistration = asyncHandler(async (req, res) => {
                     throw error;
                 }
 
-                const aggregate = await tx.eventRegistration.aggregate({
-                    where: { eventId },
-                    _max: { queueNumber: true },
-                });
-                const queueNumber = (aggregate._max.queueNumber || 0) + 1;
                 const created = await tx.eventRegistration.create({
                     data: {
                         participantId,
                         eventId,
-                        queueNumber,
                         registrationStatus: "SIGNED_UP",
                         registeredBy: req.auth.userId,
                         idempotencyKey,
@@ -189,7 +183,7 @@ exports.createRegistration = asyncHandler(async (req, res) => {
                     action: "EVENT_REGISTRATION_CREATED",
                     entityName: "EventRegistration",
                     entityId: created.registrationId,
-                    newValue: { participantId, eventId, queueNumber, status: "SIGNED_UP" },
+                    newValue: { participantId, eventId, queueNumber: null, status: "SIGNED_UP" },
                     context: req.context,
                     client: tx,
                 });

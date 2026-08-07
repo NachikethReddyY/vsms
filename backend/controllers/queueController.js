@@ -13,6 +13,19 @@ exports.getEventQueueStatus = async (req, res) => {
   res.json(await queueService.getEventQueueStatus(req.params.eventId, req.user));
 };
 
+exports.listRegistrationStations = async (req, res) => {
+  res.json(await queueService.listRegistrationStations(req.params.eventId, req.user));
+};
+
+exports.createQueueHandoff = async (req, res) => {
+  const handoff = await queueService.createQueueHandoff(
+    { eventId: req.params.eventId, stationId: req.params.stationId, registrationId: req.body.registrationId },
+    req.user,
+    req.context,
+  );
+  res.status(handoff.created ? 201 : 200).json(handoff);
+};
+
 exports.getParticipantQueueStatus = async (req, res) => {
   res.json(await queueService.getParticipantQueueStatus(
     req.params.eventId,
