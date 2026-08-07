@@ -1,7 +1,7 @@
 openapi: 3.0.3
 info:
   title: VSMS Event Operations API
-  version: 2.4.0
+  version: 2.5.0
   description: Secure staff authentication, event operations, and clinical review workflows for VSMS.
   license:
     name: ISC
@@ -142,10 +142,10 @@ paths:
       tags: [Authentication]
       security: [{ refreshCookie: [] }]
       operationId: refreshSession
-      summary: Rotate a one-time refresh session
+      summary: Exchange the Cognito-backed refresh cookie for a renewed browser session
       parameters: [{ $ref: "#/components/parameters/CsrfToken" }]
       responses:
-        "200": { description: Session rotated, content: { application/json: { schema: { $ref: "#/components/schemas/AuthResponse" } } } }
+        "200": { description: Cognito refresh cookie exchanged and session cookies refreshed, content: { application/json: { schema: { $ref: "#/components/schemas/AuthResponse" } } } }
         "401": { $ref: "#/components/responses/Unauthorized" }
         "403": { $ref: "#/components/responses/Forbidden" }
         "429": { $ref: "#/components/responses/RateLimited" }
@@ -213,6 +213,29 @@ paths:
         "400": { $ref: "#/components/responses/ValidationFailed" }
         "401": { $ref: "#/components/responses/Unauthorized" }
         "503": { description: Cognito managed login is not configured }
+  /api/v1/account:
+    get:
+      tags: [Users]
+      operationId: getCurrentAccount
+      summary: Get the current account profile, lifecycle state, and event memberships
+      description: Available to pending, rejected, approved, and suspended sessions. Disabled or deprovisioned accounts cannot authenticate.
+      responses:
+        "200": { description: Current account, content: { application/json: { schema: { $ref: "#/components/schemas/AccountEnvelope" } } } }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+    patch:
+      tags: [Users]
+      operationId: updateCurrentAccount
+      summary: Update non-authoritative current-account profile fields
+      parameters: [{ $ref: "#/components/parameters/ConditionalCsrfToken" }]
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: "#/components/schemas/AccountProfileUpdateRequest" } } }
+      responses:
+        "200": { description: Updated account, content: { application/json: { schema: { $ref: "#/components/schemas/AccountEnvelope" } } } }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "422": { $ref: "#/components/responses/ValidationFailed" }
   /api/v1/users:
     get:
       tags: [Users]
@@ -238,20 +261,24 @@ paths:
             schema: { $ref: "#/components/schemas/CreateUserRequest" }
       responses:
         "201":
-          description: Staff user created
+          description: Staff user created and identity-provider synchronization completed
+          content: { application/json: { schema: { $ref: "#/components/schemas/UserMutationResponse" } } }
+        "202":
+          description: Staff user created; identity-provider synchronization remains queued or owned by another worker
           content: { application/json: { schema: { $ref: "#/components/schemas/UserMutationResponse" } } }
         "400": { $ref: "#/components/responses/ValidationFailed" }
         "401": { $ref: "#/components/responses/Unauthorized" }
         "403": { $ref: "#/components/responses/Forbidden" }
         "409": { $ref: "#/components/responses/Conflict" }
         "422": { $ref: "#/components/responses/ValidationFailed" }
-        "502": { description: Cognito access synchronization failed and the local account was not committed }
+        "502": { description: Local account committed; identity-provider operation escalated for administrator attention }
         "503": { description: Cognito staff synchronization is not configured }
   /api/v1/users/{id}:
     patch:
       tags: [Users]
       operationId: updateUser
-      summary: Update staff roles or active state across the application and Cognito (administrator only)
+      summary: Update authoritative staff profile fields or legacy roles (administrator only)
+      description: Lifecycle status is intentionally excluded. Use account approval, suspend, reactivate, or deprovision actions for state changes.
       parameters:
         - name: id
           in: path
@@ -264,13 +291,16 @@ paths:
             schema: { $ref: "#/components/schemas/UpdateUserRequest" }
       responses:
         "200":
-          description: Staff user updated
+          description: Staff user updated and identity-provider synchronization completed, or no provider work was required
+          content: { application/json: { schema: { $ref: "#/components/schemas/UserMutationResponse" } } }
+        "202":
+          description: Staff user updated; identity-provider synchronization remains queued or owned by another worker
           content: { application/json: { schema: { $ref: "#/components/schemas/UserMutationResponse" } } }
         "401": { $ref: "#/components/responses/Unauthorized" }
         "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
         "422": { $ref: "#/components/responses/ValidationFailed" }
-        "502": { description: Cognito access synchronization failed and local role changes were rolled back }
+        "502": { description: Local role changes committed; identity-provider operation escalated for administrator attention }
         "503": { description: Cognito staff synchronization is not configured }
   /api/v1/events:
     get:
@@ -367,8 +397,8 @@ paths:
     get:
       tags: [Events]
       operationId: getOperationalReport
-      summary: Report aggregate event operations for authorized management accounts
-      description: Administrator and event-manager reporting only. Event managers receive events they created or actively manage. The response intentionally excludes participant identity, clinical detail, delivery recipients, and synchronization payloads or error logs. Viewing a report is audited.
+      summary: Report aggregate event operations for active event-manager memberships
+      description: Requires an active EVENT_MANAGER membership. Reports include only events covered by that membership; platform administrator status and event creation do not grant implicit access. The response intentionally excludes participant identity, clinical detail, delivery recipients, and synchronization payloads or error logs. Viewing a report is audited.
       parameters:
         - name: eventId
           in: query
@@ -437,6 +467,7 @@ paths:
       tags: [Events]
       operationId: getEventMetrics
       summary: Get event operations metrics
+      description: Requires an active EVENT_MANAGER membership for this event. Platform administrator status and event creation do not grant implicit access.
       parameters: [{ $ref: "#/components/parameters/EventId" }]
       responses:
         "200": { description: Event metrics, content: { application/json: { schema: { $ref: "#/components/schemas/EventMetrics" } } } }
@@ -445,6 +476,88 @@ paths:
         "404": { $ref: "#/components/responses/NotFound" }
         "422": { $ref: "#/components/responses/ValidationFailed" }
         "429": { $ref: "#/components/responses/RateLimited" }
+  /api/v1/events/{eventId}/analytics:
+    get:
+      tags: [Events]
+      operationId: getCompletedEventAnalytics
+      summary: Get aggregate analytics for a completed event
+      description: Requires current active EVENT_MANAGER membership. Uses the canonical attendance definition, UTC half-open timestamp bounds, PostgreSQL continuous percentiles, and small-cell suppression for clinical groups. Participant identities and clinical record bodies are never returned.
+      parameters:
+        - $ref: "#/components/parameters/EventId"
+        - { name: from, in: query, schema: { type: string, format: date-time } }
+        - { name: to, in: query, schema: { type: string, format: date-time } }
+      responses:
+        "200": { description: Table-friendly aggregate analytics, content: { application/json: { schema: { $ref: "#/components/schemas/EventAnalytics" } } } }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "422": { $ref: "#/components/responses/ValidationFailed" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+  /api/v1/events/{eventId}/report-exports:
+    get:
+      tags: [Events]
+      operationId: listReportExportJobs
+      summary: List report export jobs with completed-event and current membership rechecked
+      parameters:
+        - $ref: "#/components/parameters/EventId"
+        - { name: status, in: query, schema: { $ref: "#/components/schemas/ReportExportJobStatus" } }
+        - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 100, default: 25 } }
+      responses:
+        "200": { description: Aggregate report export jobs, content: { application/json: { schema: { $ref: "#/components/schemas/ReportExportJobList" } } } }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    post:
+      tags: [Events]
+      operationId: createReportExportJob
+      summary: Queue an aggregate PDF or CSV report export
+      parameters: [{ $ref: "#/components/parameters/EventId" }]
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: "#/components/schemas/CreateReportExportRequest" } } }
+      responses:
+        "202": { description: Export queued for durable worker processing, content: { application/json: { schema: { $ref: "#/components/schemas/ReportExportJob" } } } }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "422": { $ref: "#/components/responses/ValidationFailed" }
+  /api/v1/events/{eventId}/report-exports/{jobId}:
+    get:
+      tags: [Events]
+      operationId: getReportExportJob
+      summary: Get report export job and artifact metadata with completed-event and current membership rechecked
+      parameters:
+        - $ref: "#/components/parameters/EventId"
+        - { name: jobId, in: path, required: true, schema: { type: string, format: uuid } }
+      responses:
+        "200": { description: Report export job, content: { application/json: { schema: { $ref: "#/components/schemas/ReportExportJob" } } } }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+  /api/v1/events/{eventId}/report-exports/{jobId}/download:
+    get:
+      tags: [Events]
+      operationId: downloadReportExportArtifact
+      summary: Download a verified, unexpired report artifact
+      description: Event completion and current EVENT_MANAGER membership are rechecked, then the opened-descriptor SHA-256 is verified before every audited download.
+      parameters:
+        - $ref: "#/components/parameters/EventId"
+        - { name: jobId, in: path, required: true, schema: { type: string, format: uuid } }
+      responses:
+        "200":
+          description: PDF or CSV aggregate artifact
+          headers:
+            Digest: { schema: { type: string } }
+          content:
+            application/pdf: { schema: { type: string, format: binary } }
+            text/csv: { schema: { type: string, format: binary } }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "410": { description: Artifact expired or unavailable, content: { application/json: { schema: { $ref: "#/components/schemas/Problem" } } } }
   /api/v1/events/{eventId}/attendees:
     get:
       tags: [Events]
@@ -522,7 +635,7 @@ paths:
       tags: [Events]
       operationId: deleteTerminalEvent
       summary: Permanently delete a completed or cancelled event
-      description: Administrator-only hard deletion. Event-owned operational records are removed; shared staff accounts, participants, templates, forms, and devices are retained.
+      description: Administrator-only hard deletion. Requires the exact event name, permanent-deletion acknowledgement, current version, and the unexpired signed token from the latest unchanged impact preview. Event-owned operational records are removed; shared staff accounts, participants, templates, forms, and devices are retained.
       requestBody:
         required: true
         content:
@@ -539,6 +652,31 @@ paths:
         "404": { $ref: "#/components/responses/NotFound" }
         "409": { $ref: "#/components/responses/Conflict" }
         "422": { $ref: "#/components/responses/ValidationFailed" }
+  /api/v1/events/{eventId}/deletion-preview:
+    get:
+      tags: [Events]
+      operationId: previewTerminalEventDeletion
+      summary: Preview permanent deletion impact and blockers
+      description: Platform administrator only. The signed token is bound to this administrator, event, event version, and exact impact digest, and expires after five minutes.
+      parameters: [{ $ref: "#/components/parameters/EventId" }]
+      responses:
+        "200": { description: Reviewed deletion impact and signed confirmation token, content: { application/json: { schema: { $ref: "#/components/schemas/EventDeletionPreview" } } } }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+  /api/v1/events/{eventId}/deletion-cleanup:
+    get:
+      tags: [Events]
+      operationId: getTerminalEventDeletionCleanup
+      summary: Read post-deletion artifact cleanup state
+      description: Platform administrator only. Available after the event row has been deleted because cleanup tasks and immutable deletion audit evidence are event-detached.
+      parameters: [{ $ref: "#/components/parameters/EventId" }]
+      responses:
+        "200": { description: Cleanup state and safe task metadata, content: { application/json: { schema: { $ref: "#/components/schemas/EventDeletionCleanupStatus" } } } }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
   /api/v1/events/{eventId}/registrations:
     parameters: [{ $ref: "#/components/parameters/EventId" }]
     get:
@@ -577,11 +715,85 @@ paths:
         "401": { $ref: "#/components/responses/Unauthorized" }
         "403": { $ref: "#/components/responses/Forbidden" }
         "409": { $ref: "#/components/responses/Conflict" }
+  /api/v1/events/{eventId}/memberships:
+    parameters: [{ $ref: "#/components/parameters/EventId" }]
+    get:
+      tags: [Event Memberships]
+      operationId: listEventMemberships
+      summary: List active and removed event memberships
+      description: Requires an active EVENT_MANAGER membership. Completed-event managers retain access without a current duty.
+      responses:
+        "200": { description: Membership roster, content: { application/json: { schema: { $ref: "#/components/schemas/EventMembershipListResponse" } } } }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    post:
+      tags: [Event Memberships]
+      operationId: addOrReactivateEventMembership
+      summary: Add or reactivate an approved eligible account
+      description: Membership is durable. Removing the final duty never removes this record.
+      requestBody: { required: true, content: { application/json: { schema: { $ref: "#/components/schemas/EventMembershipRequest" } } } }
+      responses:
+        "201": { description: Membership added or reactivated and audited, content: { application/json: { schema: { $ref: "#/components/schemas/EventMembershipDetail" } } } }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "422": { $ref: "#/components/responses/ValidationFailed" }
+  /api/v1/events/{eventId}/memberships/eligible-users:
+    get:
+      tags: [Event Memberships]
+      operationId: listEligibleEventMembers
+      summary: List approved and enabled accounts eligible for event membership
+      parameters:
+        - $ref: "#/components/parameters/EventId"
+        - { name: search, in: query, schema: { type: string, minLength: 2, maxLength: 150 } }
+        - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 200, default: 100 } }
+      responses:
+        "200": { description: Eligible accounts and event membership state, content: { application/json: { schema: { $ref: "#/components/schemas/EligibleEventUsersResponse" } } } }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+  /api/v1/events/{eventId}/memberships/{membershipId}:
+    delete:
+      tags: [Event Memberships]
+      operationId: removeEventMembership
+      summary: Remove a membership and cancel its current duties
+      parameters: [{ $ref: "#/components/parameters/EventId" }, { $ref: "#/components/parameters/MembershipId" }]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: "#/components/schemas/MembershipRemovalRequest" } } } }
+      responses:
+        "200": { description: Membership removed and audited, content: { application/json: { schema: { $ref: "#/components/schemas/EventMembershipDetail" } } } }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+  /api/v1/events/{eventId}/memberships/{membershipId}/roles:
+    post:
+      tags: [Event Memberships]
+      operationId: assignEventMembershipRole
+      summary: Assign one granular event role
+      parameters: [{ $ref: "#/components/parameters/EventId" }, { $ref: "#/components/parameters/MembershipId" }]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: "#/components/schemas/EventMembershipRoleRequest" } } } }
+      responses:
+        "201": { description: Role assigned and audited, content: { application/json: { schema: { $ref: "#/components/schemas/EventMembershipDetail" } } } }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+  /api/v1/events/{eventId}/memberships/{membershipId}/roles/{role}:
+    delete:
+      tags: [Event Memberships]
+      operationId: removeEventMembershipRole
+      summary: Remove a granular role after its current duties are removed
+      parameters:
+        - $ref: "#/components/parameters/EventId"
+        - $ref: "#/components/parameters/MembershipId"
+        - { name: role, in: path, required: true, schema: { $ref: "#/components/schemas/EventMembershipRoleType" } }
+      responses:
+        "200": { description: Role removed and audited, content: { application/json: { schema: { $ref: "#/components/schemas/EventMembershipDetail" } } } }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
   /api/v1/events/{eventId}/shifts/{shiftId}/assignments:
     post:
       tags: [Events]
       operationId: assignEventStaff
-      summary: Assign an active user to an event shift
+      summary: Schedule a duty for an active event member who already has the matching granular role
       parameters:
         - $ref: "#/components/parameters/EventId"
         - $ref: "#/components/parameters/ShiftId"
@@ -602,7 +814,7 @@ paths:
     delete:
       tags: [Events]
       operationId: removeEventStaffAssignment
-      summary: Remove a user from an event shift
+      summary: Remove a duty without removing the durable event membership
       parameters:
         - $ref: "#/components/parameters/EventId"
         - $ref: "#/components/parameters/ShiftId"
@@ -1281,6 +1493,161 @@ paths:
         "401": { $ref: "#/components/responses/Unauthorized" }
         "403": { $ref: "#/components/responses/Forbidden" }
         "429": { $ref: "#/components/responses/RateLimited" }
+  /api/v1/admin/accounts:
+    get:
+      tags: [Administration]
+      operationId: listAccounts
+      summary: Search and filter lifecycle accounts
+      parameters:
+        - { name: page, in: query, schema: { type: integer, minimum: 1, default: 1 } }
+        - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 100, default: 25 } }
+        - { name: search, in: query, schema: { type: string, minLength: 1, maxLength: 100 } }
+        - { name: approvalState, in: query, schema: { $ref: "#/components/schemas/AccountApprovalState" } }
+        - { name: accessState, in: query, schema: { $ref: "#/components/schemas/AccountAccessState" } }
+        - { name: professionalCategory, in: query, schema: { $ref: "#/components/schemas/ProfessionalCategory" } }
+        - { name: eventRole, in: query, schema: { $ref: "#/components/schemas/EventMembershipRoleType" } }
+      responses:
+        "200": { description: Paginated accounts and pending count, content: { application/json: { schema: { $ref: "#/components/schemas/AccountListResponse" } } } }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "422": { $ref: "#/components/responses/ValidationFailed" }
+  /api/v1/admin/accounts/{accountId}:
+    get:
+      tags: [Administration]
+      operationId: getAccountDetail
+      summary: Get an account with decisions, memberships, and provider operations
+      parameters: [{ $ref: "#/components/parameters/AccountId" }]
+      responses:
+        "200": { description: Account detail, content: { application/json: { schema: { $ref: "#/components/schemas/AccountDetailEnvelope" } } } }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+  /api/v1/admin/accounts/{accountId}/approve:
+    post:
+      tags: [Administration]
+      operationId: approveAccount
+      summary: Approve a pending account without assigning an operational role
+      parameters: [{ $ref: "#/components/parameters/AccountId" }]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: "#/components/schemas/OptionalAccountReasonRequest" } } } }
+      responses:
+        "200": { description: Approved account, content: { application/json: { schema: { $ref: "#/components/schemas/AccountEnvelope" } } } }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "422": { $ref: "#/components/responses/ValidationFailed" }
+  /api/v1/admin/accounts/{accountId}/reject:
+    post:
+      tags: [Administration]
+      operationId: rejectAccount
+      summary: Reject a pending or approved account with an immutable reason
+      parameters: [{ $ref: "#/components/parameters/AccountId" }]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: "#/components/schemas/RequiredAccountReasonRequest" } } } }
+      responses:
+        "200": { description: Rejected account, content: { application/json: { schema: { $ref: "#/components/schemas/AccountEnvelope" } } } }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "422": { $ref: "#/components/responses/ValidationFailed" }
+  /api/v1/admin/accounts/{accountId}/suspend:
+    post:
+      tags: [Administration]
+      operationId: suspendAccount
+      summary: Suspend an approved active account and enqueue global sign-out
+      parameters: [{ $ref: "#/components/parameters/AccountId" }]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: "#/components/schemas/RequiredAccountReasonRequest" } } } }
+      responses:
+        "200": { description: Suspended account with global sign-out completed, content: { application/json: { schema: { $ref: "#/components/schemas/AccountEnvelope" } } } }
+        "202": { description: Suspended account; global sign-out remains queued or owned by another worker, content: { application/json: { schema: { $ref: "#/components/schemas/AccountEnvelope" } } } }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "422": { $ref: "#/components/responses/ValidationFailed" }
+        "502": { description: Suspension committed; global sign-out escalated for administrator attention }
+  /api/v1/admin/accounts/{accountId}/reactivate:
+    post:
+      tags: [Administration]
+      operationId: reactivateAccount
+      summary: Reactivate an approved suspended or dormant inactive account
+      parameters: [{ $ref: "#/components/parameters/AccountId" }]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: "#/components/schemas/OptionalAccountReasonRequest" } } } }
+      responses:
+        "200": { description: Reactivated account with Cognito synchronization completed, content: { application/json: { schema: { $ref: "#/components/schemas/AccountEnvelope" } } } }
+        "202": { description: Reactivated account; Cognito synchronization remains queued or owned by another worker, content: { application/json: { schema: { $ref: "#/components/schemas/AccountEnvelope" } } } }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "422": { $ref: "#/components/responses/ValidationFailed" }
+        "502": { description: Reactivation committed; Cognito synchronization escalated for administrator attention }
+  /api/v1/admin/accounts/{accountId}/revoke-sessions:
+    post:
+      tags: [Administration]
+      operationId: revokeAccountSessions
+      summary: Invalidate sessions by Cognito auth_time and enqueue global sign-out
+      parameters: [{ $ref: "#/components/parameters/AccountId" }]
+      responses:
+        "200": { description: Account with updated invalid-before time and global sign-out completed, content: { application/json: { schema: { $ref: "#/components/schemas/AccountEnvelope" } } } }
+        "202": { description: Session cutoff committed; global sign-out remains queued or owned by another worker, content: { application/json: { schema: { $ref: "#/components/schemas/AccountEnvelope" } } } }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "502": { description: Session cutoff committed; global sign-out escalated for administrator attention }
+  /api/v1/admin/accounts/{accountId}/deprovision:
+    post:
+      tags: [Administration]
+      operationId: deprovisionAccount
+      summary: Soft-deprovision an account and enqueue Cognito disable plus global sign-out
+      parameters: [{ $ref: "#/components/parameters/AccountId" }]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: "#/components/schemas/RequiredAccountReasonRequest" } } } }
+      responses:
+        "200": { description: Deprovisioned account with Cognito disable and sign-out completed, content: { application/json: { schema: { $ref: "#/components/schemas/AccountEnvelope" } } } }
+        "202": { description: Deprovisioned account; Cognito disable or sign-out remains queued or owned by another worker, content: { application/json: { schema: { $ref: "#/components/schemas/AccountEnvelope" } } } }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "422": { $ref: "#/components/responses/ValidationFailed" }
+        "502": { description: Deprovision committed; Cognito disable or sign-out escalated for administrator attention }
+  /api/v1/admin/accounts/{accountId}/resend-lifecycle:
+    post:
+      tags: [Administration]
+      operationId: resendAccountLifecycleNotification
+      summary: Request resend through the optional account lifecycle notification seam
+      parameters: [{ $ref: "#/components/parameters/AccountId" }]
+      responses:
+        "200": { description: Enqueue result, content: { application/json: { schema: { $ref: "#/components/schemas/LifecycleNotificationResult" } } } }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+  /api/v1/admin/maintenance/lifecycle-emails/{deliveryId}:
+    post:
+      tags: [Administration]
+      operationId: maintainLifecycleEmail
+      summary: Resolve or explicitly requeue an ambiguous lifecycle SMTP send
+      description: Ambiguous SMTP attempts are never retried automatically. Every manual outcome requires an audit reason.
+      parameters: [{ name: deliveryId, in: path, required: true, schema: { type: string, format: uuid } }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [action, reason]
+              properties:
+                action: { type: string, enum: [REQUEUE, RESOLVE] }
+                reason: { type: string, minLength: 3, maxLength: 500 }
+      responses:
+        "200": { description: Audited lifecycle reconciliation result, content: { application/json: { schema: { type: object, properties: { delivery: { $ref: "#/components/schemas/LifecycleEmailStatus" } } } } } }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "422": { $ref: "#/components/responses/ValidationFailed" }
   /api/v1/admin/audit-logs:
     get:
       tags: [Administration]
@@ -1542,6 +1909,56 @@ paths:
               schema: { $ref: "#/components/schemas/QrRegistrationLookupResponse" }
         "401": { $ref: "#/components/responses/Unauthorized" }
         "404": { $ref: "#/components/responses/NotFound" }
+  /api/v1/admin/maintenance/account-provider-operations/drain:
+    post:
+      tags: [Administration]
+      operationId: drainAccountProviderOperations
+      summary: Process a bounded page of due account identity-provider operations
+      description: Recovers expired leases, respects per-account generation order and retry backoff, and escalates operations after the bounded attempt limit. Freshly owned operations are reported as pending rather than executed concurrently.
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: "#/components/schemas/AccountProviderDrainRequest" } } }
+      responses:
+        "200": { description: Audited drain summary, content: { application/json: { schema: { $ref: "#/components/schemas/AccountProviderDrainResponse" } } } }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "422": { $ref: "#/components/responses/ValidationFailed" }
+  /api/v1/admin/maintenance/account-provider-operations/{operationId}/requeue:
+    post:
+      tags: [Administration]
+      operationId: requeueAccountProviderOperation
+      summary: Requeue an escalated account identity-provider operation as a new ordered generation
+      description: Preserves the escalated source and its failure evidence as administratively handled. Requeue is rejected when a newer generation already supersedes the source.
+      parameters: [{ $ref: "#/components/parameters/AccountProviderOperationId" }]
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: "#/components/schemas/AccountProviderOperationMaintenanceRequest" } } }
+      responses:
+        "200": { description: Requeued provider operation completed, content: { application/json: { schema: { $ref: "#/components/schemas/AccountProviderOperationRequeueResponse" } } } }
+        "202": { description: Requeued provider operation remains queued or owned, content: { application/json: { schema: { $ref: "#/components/schemas/AccountProviderOperationRequeueResponse" } } } }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "422": { $ref: "#/components/responses/ValidationFailed" }
+        "502": { description: Requeued provider operation escalated again for administrator attention }
+  /api/v1/admin/maintenance/account-provider-operations/{operationId}/resolve:
+    post:
+      tags: [Administration]
+      operationId: resolveAccountProviderOperation
+      summary: Administratively resolve an escalated account identity-provider operation
+      description: Requires and durably stores a reason while preserving attempts, failure code, generation, and audit evidence.
+      parameters: [{ $ref: "#/components/parameters/AccountProviderOperationId" }]
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: "#/components/schemas/AccountProviderOperationMaintenanceRequest" } } }
+      responses:
+        "200": { description: Escalated provider operation resolved, content: { application/json: { schema: { $ref: "#/components/schemas/AccountProviderOperationResolveResponse" } } } }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "422": { $ref: "#/components/responses/ValidationFailed" }
   /api/v1/admin/maintenance/referral-deliveries:
     post:
       tags: [Referrals]
@@ -1657,12 +2074,13 @@ paths:
         "404": { $ref: "#/components/responses/NotFound" }
         "409": { $ref: "#/components/responses/Conflict" }
         "422": { $ref: "#/components/responses/ValidationFailed" }
-  /api/v1/queues/participant/{registrationId}:
+  /api/v1/queues/events/{eventId}/participants/{registrationId}:
     get:
       tags: [Queue]
       operationId: getParticipantQueueStatus
-      summary: Participant queue status and movement history
+      summary: Participant queue status and movement history in an explicit event scope
       parameters:
+        - $ref: "#/components/parameters/EventId"
         - name: registrationId
           in: path
           required: true
@@ -1673,6 +2091,61 @@ paths:
         "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
         "422": { $ref: "#/components/responses/ValidationFailed" }
+  /api/v1/queues/participant/{registrationId}:
+    get:
+      deprecated: true
+      tags: [Queue]
+      operationId: getParticipantQueueStatusCompatibility
+      summary: Compatibility lookup that derives the event from the registration
+      parameters: [{ $ref: "#/components/parameters/RegistrationId" }]
+      responses:
+        "200": { description: Participant queue status, content: { application/json: { schema: { $ref: "#/components/schemas/ParticipantQueueStatusResponse" } } } }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+  /api/v1/queues/events/{eventId}/entries/{queueId}/call:
+    patch:
+      tags: [Queue]
+      operationId: callEventQueueEntry
+      summary: Call an event-scoped queue entry
+      parameters: [{ $ref: "#/components/parameters/EventId" }, { $ref: "#/components/parameters/QueueId" }]
+      responses: { "200": { description: Queue entry called, content: { application/json: { schema: { $ref: "#/components/schemas/QueueEntry" } } } }, "403": { $ref: "#/components/responses/Forbidden" }, "404": { $ref: "#/components/responses/NotFound" }, "409": { $ref: "#/components/responses/Conflict" } }
+  /api/v1/queues/events/{eventId}/entries/{queueId}/start:
+    patch:
+      tags: [Queue]
+      operationId: startEventQueueEntry
+      summary: Start an event-scoped queue entry
+      parameters: [{ $ref: "#/components/parameters/EventId" }, { $ref: "#/components/parameters/QueueId" }]
+      responses: { "200": { description: Queue entry started, content: { application/json: { schema: { $ref: "#/components/schemas/QueueEntry" } } } }, "403": { $ref: "#/components/responses/Forbidden" }, "404": { $ref: "#/components/responses/NotFound" }, "409": { $ref: "#/components/responses/Conflict" } }
+  /api/v1/queues/events/{eventId}/entries/{queueId}/advance:
+    patch:
+      tags: [Queue]
+      operationId: advanceEventQueueEntry
+      summary: Advance an event-scoped queue entry
+      parameters: [{ $ref: "#/components/parameters/EventId" }, { $ref: "#/components/parameters/QueueId" }, { $ref: "#/components/parameters/IdempotencyKey" }]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: "#/components/schemas/AdvanceQueueRequest" } } } }
+      responses: { "200": { description: Participant transferred, content: { application/json: { schema: { $ref: "#/components/schemas/AdvanceQueueResponse" } } } }, "403": { $ref: "#/components/responses/Forbidden" }, "404": { $ref: "#/components/responses/NotFound" }, "409": { $ref: "#/components/responses/Conflict" } }
+  /api/v1/queues/events/{eventId}/entries/{queueId}/complete:
+    patch:
+      tags: [Queue]
+      operationId: completeEventQueueEntry
+      summary: Complete an event-scoped queue entry
+      parameters: [{ $ref: "#/components/parameters/EventId" }, { $ref: "#/components/parameters/QueueId" }]
+      responses: { "200": { description: Queue entry completed, content: { application/json: { schema: { $ref: "#/components/schemas/QueueEntry" } } } }, "403": { $ref: "#/components/responses/Forbidden" }, "404": { $ref: "#/components/responses/NotFound" }, "409": { $ref: "#/components/responses/Conflict" } }
+  /api/v1/queues/events/{eventId}/entries/{queueId}/skip:
+    patch:
+      tags: [Queue]
+      operationId: skipEventQueueEntry
+      summary: Skip an event-scoped queue entry
+      parameters: [{ $ref: "#/components/parameters/EventId" }, { $ref: "#/components/parameters/QueueId" }]
+      responses: { "200": { description: Queue entry skipped, content: { application/json: { schema: { $ref: "#/components/schemas/QueueEntry" } } } }, "403": { $ref: "#/components/responses/Forbidden" }, "404": { $ref: "#/components/responses/NotFound" }, "409": { $ref: "#/components/responses/Conflict" } }
+  /api/v1/queues/events/{eventId}/entries/{queueId}:
+    delete:
+      tags: [Queue]
+      operationId: leaveEventQueue
+      summary: Cancel an event-scoped queue entry
+      parameters: [{ $ref: "#/components/parameters/EventId" }, { $ref: "#/components/parameters/QueueId" }]
+      responses: { "200": { description: Queue entry cancelled, content: { application/json: { schema: { $ref: "#/components/schemas/QueueEntry" } } } }, "403": { $ref: "#/components/responses/Forbidden" }, "404": { $ref: "#/components/responses/NotFound" }, "409": { $ref: "#/components/responses/Conflict" } }
   /api/v1/queues/entries/{queueId}/call:
     patch:
       tags: [Queue]
@@ -1797,8 +2270,28 @@ components:
       name: vsms_access
       description: HttpOnly Cognito access token used for global session revocation
   parameters:
+    AccountId:
+      name: accountId
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+    AccountProviderOperationId:
+      name: operationId
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
     EventId:
       name: eventId
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+    MembershipId:
+      name: membershipId
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+    QueueId:
+      name: queueId
       in: path
       required: true
       schema: { type: string, format: uuid }
@@ -2149,22 +2642,392 @@ components:
         assignmentRole: { $ref: "#/components/schemas/StaffAssignmentRole" }
         stationTemplateId: { type: string, format: uuid, nullable: true }
         notes: { type: string, nullable: true, maxLength: 500 }
+    AccountApprovalState:
+      type: string
+      enum: [PENDING, APPROVED, REJECTED]
+    AccountAccessState:
+      type: string
+      enum: [ENABLED, SUSPENDED, DISABLED]
+    ProfessionalCategory:
+      type: string
+      enum: [STAFF, DOCTOR]
+    EventMembershipRoleType:
+      type: string
+      enum: [EVENT_MANAGER, REGISTRATION, SCREENER, REVIEWER, SUPPORT]
+    EventMembershipRequest:
+      type: object
+      additionalProperties: false
+      required: [userId, roles]
+      properties:
+        userId: { type: string, format: uuid }
+        roles:
+          type: array
+          minItems: 1
+          maxItems: 5
+          uniqueItems: true
+          items: { $ref: "#/components/schemas/EventMembershipRoleType" }
+    EventMembershipRoleRequest:
+      type: object
+      additionalProperties: false
+      required: [role]
+      properties: { role: { $ref: "#/components/schemas/EventMembershipRoleType" } }
+    MembershipRemovalRequest:
+      type: object
+      additionalProperties: false
+      required: [reason]
+      properties: { reason: { type: string, minLength: 3, maxLength: 500 } }
+    EventMemberUser:
+      type: object
+      additionalProperties: false
+      required: [id, fullName, email, approvalState, accessState, status]
+      properties:
+        id: { type: string, format: uuid }
+        fullName: { type: string }
+        email: { type: string, format: email }
+        approvalState: { $ref: "#/components/schemas/AccountApprovalState" }
+        accessState: { $ref: "#/components/schemas/AccountAccessState" }
+        status: { type: string, enum: [ACTIVE, INACTIVE, DISABLED, SUSPENDED] }
+        professionalCategory: { type: string, nullable: true, enum: [STAFF, DOCTOR] }
+    EventMembershipDetail:
+      type: object
+      additionalProperties: false
+      required: [membershipId, eventId, userId, status, addedAt, user, roles]
+      properties:
+        membershipId: { type: string, format: uuid }
+        eventId: { type: string, format: uuid }
+        userId: { type: string, format: uuid }
+        status: { type: string, enum: [ACTIVE, REMOVED] }
+        addedAt: { type: string, format: date-time }
+        removedAt: { type: string, format: date-time, nullable: true }
+        removalReason: { type: string, nullable: true, maxLength: 500 }
+        user: { $ref: "#/components/schemas/EventMemberUser" }
+        roles:
+          type: array
+          items:
+            type: object
+            additionalProperties: false
+            required: [id, role, assignedAt, assignedById]
+            properties:
+              id: { type: string, format: uuid }
+              role: { $ref: "#/components/schemas/EventMembershipRoleType" }
+              assignedAt: { type: string, format: date-time }
+              assignedById: { type: string, format: uuid }
+    EventMembershipListResponse:
+      type: object
+      additionalProperties: false
+      required: [memberships]
+      properties: { memberships: { type: array, items: { $ref: "#/components/schemas/EventMembershipDetail" } } }
+    EligibleEventUsersResponse:
+      type: object
+      additionalProperties: false
+      required: [users]
+      properties:
+        users:
+          type: array
+          items:
+            type: object
+            additionalProperties: true
+            required: [id, fullName, email, eventMemberships]
+            properties:
+              id: { type: string, format: uuid }
+              fullName: { type: string }
+              email: { type: string, format: email }
+              professionalCategory: { type: string, nullable: true, enum: [STAFF, DOCTOR] }
+              eventMemberships: { type: array, items: { type: object, additionalProperties: true } }
+    AccountProviderOperationStatus:
+      type: string
+      enum: [PENDING, PROCESSING, SUCCEEDED, FAILED, CANCELED, ESCALATED, RESOLVED]
+    AccountProviderOperationType:
+      type: string
+      enum: [SYNC_ACCESS, GLOBAL_SIGN_OUT, DISABLE_AND_SIGN_OUT]
+    EventMembershipRole:
+      type: object
+      additionalProperties: false
+      required: [role, assignedAt]
+      properties:
+        role: { $ref: "#/components/schemas/EventMembershipRoleType" }
+        assignedAt: { type: string, format: date-time }
+    AccountEventSummary:
+      type: object
+      additionalProperties: false
+      required: [eventId, name, status, startsAt, endsAt]
+      properties:
+        eventId: { type: string, format: uuid }
+        name: { type: string }
+        status: { $ref: "#/components/schemas/EventStatus" }
+        startsAt: { type: string, format: date-time }
+        endsAt: { type: string, format: date-time }
+    EventMembership:
+      type: object
+      additionalProperties: false
+      required: [id, eventId, userId, status, addedById, addedAt, event, roles]
+      properties:
+        id: { type: string, format: uuid }
+        eventId: { type: string, format: uuid }
+        userId: { type: string, format: uuid }
+        status: { type: string, enum: [ACTIVE, REMOVED] }
+        addedById: { type: string, format: uuid }
+        addedAt: { type: string, format: date-time }
+        removedById: { type: string, format: uuid, nullable: true }
+        removedAt: { type: string, format: date-time, nullable: true }
+        removalReason: { type: string, nullable: true, maxLength: 500 }
+        event: { $ref: "#/components/schemas/AccountEventSummary" }
+        roles: { type: array, items: { $ref: "#/components/schemas/EventMembershipRole" } }
+    AccountSummary:
+      type: object
+      additionalProperties: true
+      required: [id, fullName, email, approvalState, accessState, status, roles, createdAt, updatedAt]
+      properties:
+        id: { type: string, format: uuid }
+        fullName: { type: string, minLength: 1, maxLength: 100 }
+        email: { type: string, format: email }
+        contactNumber: { type: string, nullable: true, maxLength: 20 }
+        employeeNumber: { type: string, nullable: true, maxLength: 20 }
+        department: { type: string, nullable: true, maxLength: 100 }
+        designation: { type: string, nullable: true, maxLength: 100 }
+        professionalCategory:
+          type: string
+          nullable: true
+          enum: [STAFF, DOCTOR]
+        approvalState: { $ref: "#/components/schemas/AccountApprovalState" }
+        accessState: { $ref: "#/components/schemas/AccountAccessState" }
+        status: { type: string, enum: [ACTIVE, INACTIVE, DISABLED, SUSPENDED] }
+        lastLoginAt: { type: string, format: date-time, nullable: true }
+        sessionInvalidBefore: { type: string, format: date-time, nullable: true }
+        deprovisionedAt: { type: string, format: date-time, nullable: true }
+        deprovisionReason: { type: string, nullable: true, maxLength: 500 }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+        roles:
+          type: array
+          uniqueItems: true
+          items: { type: string, enum: [ADMINISTRATOR, EVENT_MANAGER, REGISTRATION_OFFICER, SCREENER, REVIEWER, SUPPORT] }
+    Account:
+      allOf:
+        - $ref: "#/components/schemas/AccountSummary"
+        - type: object
+          required: [eventMemberships]
+          properties:
+            eventMemberships: { type: array, items: { $ref: "#/components/schemas/EventMembership" } }
+    AccountApprovalDecision:
+      type: object
+      additionalProperties: false
+      required: [id, userId, decision, decidedById, decidedAt, decidedBy]
+      properties:
+        id: { type: string, format: uuid }
+        userId: { type: string, format: uuid }
+        decision: { type: string, enum: [APPROVED, REJECTED] }
+        decidedById: { type: string, format: uuid }
+        reason: { type: string, nullable: true, maxLength: 500 }
+        decidedAt: { type: string, format: date-time }
+        decidedBy:
+          type: object
+          additionalProperties: false
+          required: [id, fullName, email]
+          properties:
+            id: { type: string, format: uuid }
+            fullName: { type: string }
+            email: { type: string, format: email }
+    AccountProviderOperation:
+      type: object
+      additionalProperties: false
+      required: [id, operationType, status, generation, attemptCount, nextAttemptAt, createdAt]
+      properties:
+        id: { type: string, format: uuid }
+        operationType: { $ref: "#/components/schemas/AccountProviderOperationType" }
+        status: { $ref: "#/components/schemas/AccountProviderOperationStatus" }
+        generation: { type: integer, minimum: 1 }
+        attemptCount: { type: integer, minimum: 0, maximum: 5 }
+        nextAttemptAt: { type: string, format: date-time }
+        completedAt: { type: string, format: date-time, nullable: true }
+        lastErrorCode: { type: string, nullable: true, maxLength: 80 }
+        resolvedAt: { type: string, format: date-time, nullable: true }
+        resolutionReason: { type: string, nullable: true, maxLength: 500 }
+        createdAt: { type: string, format: date-time }
+    AccountDetail:
+      allOf:
+        - $ref: "#/components/schemas/Account"
+        - type: object
+          required: [approvalDecisions, providerOperations, lifecycleEmails]
+          properties:
+            approvalDecisions: { type: array, items: { $ref: "#/components/schemas/AccountApprovalDecision" } }
+            providerOperations: { type: array, maxItems: 25, items: { $ref: "#/components/schemas/AccountProviderOperation" } }
+            lifecycleEmails: { type: array, maxItems: 25, items: { $ref: "#/components/schemas/LifecycleEmailStatus" } }
+    LifecycleEmailStatus:
+      type: object
+      additionalProperties: false
+      required: [id, purpose, provider, templateVersion, status, attemptCount, maxAttempts, nextAttemptAt, createdAt]
+      properties:
+        id: { type: string, format: uuid }
+        purpose: { type: string, enum: [SIGNUP_RECEIVED, APPROVED, REJECTED, SUSPENDED, REACTIVATED, EVENT_ASSIGNMENT, PASSWORD_CHANGED, DEPROVISIONED] }
+        provider: { type: string, enum: [GOOGLE_WORKSPACE] }
+        templateVersion: { type: integer, minimum: 1 }
+        status: { type: string, enum: [QUEUED, SENDING, SENT, FAILED, CANCELLED, RECONCILIATION_REQUIRED, ESCALATED] }
+        attemptCount: { type: integer, minimum: 0 }
+        maxAttempts: { type: integer, minimum: 1, maximum: 20 }
+        nextAttemptAt: { type: string, format: date-time }
+        acceptedAt: { type: string, format: date-time, nullable: true, description: Google SMTP acceptance; this does not assert delivery. }
+        failedAt: { type: string, format: date-time, nullable: true }
+        failureCode: { type: string, nullable: true, maxLength: 80 }
+        createdAt: { type: string, format: date-time }
+    AccountListItem:
+      allOf:
+        - $ref: "#/components/schemas/AccountSummary"
+        - type: object
+          required: [_count]
+          properties:
+            _count:
+              type: object
+              additionalProperties: false
+              required: [eventMemberships]
+              properties: { eventMemberships: { type: integer, minimum: 0 } }
+    AccountEnvelope:
+      type: object
+      additionalProperties: false
+      required: [account]
+      properties:
+        account: { $ref: "#/components/schemas/Account" }
+        providerOperation: { $ref: "#/components/schemas/AccountProviderProcessingState" }
+    AccountDetailEnvelope:
+      type: object
+      additionalProperties: false
+      required: [account]
+      properties: { account: { $ref: "#/components/schemas/AccountDetail" } }
+    AccountListResponse:
+      type: object
+      additionalProperties: false
+      required: [items, page, limit, total, totalPages, pendingCount]
+      properties:
+        items: { type: array, items: { $ref: "#/components/schemas/AccountListItem" } }
+        page: { type: integer, minimum: 1 }
+        limit: { type: integer, minimum: 1, maximum: 100 }
+        total: { type: integer, minimum: 0 }
+        totalPages: { type: integer, minimum: 0 }
+        pendingCount: { type: integer, minimum: 0 }
+    AccountProfileUpdateRequest:
+      type: object
+      additionalProperties: false
+      minProperties: 1
+      properties:
+        fullName: { type: string, minLength: 1, maxLength: 100 }
+        contactNumber: { type: string, nullable: true, maxLength: 20 }
+        professionalCategory:
+          type: string
+          nullable: true
+          enum: [STAFF, DOCTOR]
+    OptionalAccountReasonRequest:
+      type: object
+      additionalProperties: false
+      properties: { reason: { type: string, nullable: true, maxLength: 500 } }
+    RequiredAccountReasonRequest:
+      type: object
+      additionalProperties: false
+      required: [reason]
+      properties: { reason: { type: string, minLength: 3, maxLength: 500 } }
+    LifecycleNotificationResult:
+      type: object
+      additionalProperties: false
+      required: [queued]
+      properties:
+        queued: { type: boolean }
+        deliveryId: { type: string, format: uuid }
+        status: { type: string, enum: [QUEUED, SENDING, SENT, FAILED, CANCELLED] }
+        duplicate: { type: boolean }
+        reason: { type: string, enum: [UNSUPPORTED_PURPOSE, OUTBOX_UNAVAILABLE] }
+    AccountProviderDrainRequest:
+      type: object
+      additionalProperties: false
+      properties: { limit: { type: integer, minimum: 1, maximum: 100, default: 25 } }
+    AccountProviderDrainItem:
+      type: object
+      additionalProperties: false
+      required: [id, status, pending]
+      properties:
+        id: { type: string, format: uuid }
+        status: { $ref: "#/components/schemas/AccountProviderOperationStatus" }
+        pending: { type: boolean }
+    AccountProviderDrainResponse:
+      type: object
+      additionalProperties: false
+      required: [attempted, succeeded, failed, pending, escalated, operations]
+      properties:
+        attempted: { type: integer, minimum: 0, maximum: 100 }
+        succeeded: { type: integer, minimum: 0, maximum: 100 }
+        failed: { type: integer, minimum: 0, maximum: 100 }
+        pending: { type: integer, minimum: 0, maximum: 100 }
+        escalated: { type: integer, minimum: 0, maximum: 100 }
+        operations: { type: array, maxItems: 100, items: { $ref: "#/components/schemas/AccountProviderDrainItem" } }
+    AccountProviderProcessingState:
+      type: object
+      additionalProperties: false
+      required: [id, operationType, generation, status, pending]
+      properties:
+        id: { type: string, format: uuid }
+        operationType: { $ref: "#/components/schemas/AccountProviderOperationType" }
+        generation: { type: integer, minimum: 1 }
+        status: { $ref: "#/components/schemas/AccountProviderOperationStatus" }
+        pending: { type: boolean }
+        reason: { type: string, enum: [OLDER_GENERATION_PENDING, LEASE_OWNED, BACKOFF, STALE_COMPLETION_REPAIRED, RETRY_QUEUED] }
+    AccountProviderOperationMaintenanceRequest:
+      type: object
+      additionalProperties: false
+      required: [reason]
+      properties:
+        reason: { type: string, minLength: 10, maxLength: 500 }
+    AccountProviderOperationMaintenanceItem:
+      type: object
+      additionalProperties: false
+      required: [id, userId, operationType, status, generation, attemptCount, nextAttemptAt, createdAt, updatedAt]
+      properties:
+        id: { type: string, format: uuid }
+        userId: { type: string, format: uuid }
+        operationType: { $ref: "#/components/schemas/AccountProviderOperationType" }
+        status: { $ref: "#/components/schemas/AccountProviderOperationStatus" }
+        generation: { type: integer, minimum: 1 }
+        attemptCount: { type: integer, minimum: 0 }
+        nextAttemptAt: { type: string, format: date-time }
+        completedAt: { type: string, format: date-time, nullable: true }
+        lastErrorCode: { type: string, nullable: true, maxLength: 80 }
+        resolvedAt: { type: string, format: date-time, nullable: true }
+        resolutionReason: { type: string, nullable: true, maxLength: 500 }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+    AccountProviderOperationRequeueResponse:
+      type: object
+      additionalProperties: false
+      required: [operation, requeuedOperation, providerOperation]
+      properties:
+        operation: { $ref: "#/components/schemas/AccountProviderOperationMaintenanceItem" }
+        requeuedOperation: { $ref: "#/components/schemas/AccountProviderOperationMaintenanceItem" }
+        providerOperation: { $ref: "#/components/schemas/AccountProviderProcessingState" }
+    AccountProviderOperationResolveResponse:
+      type: object
+      additionalProperties: false
+      required: [operation]
+      properties:
+        operation: { $ref: "#/components/schemas/AccountProviderOperationMaintenanceItem" }
     User:
       type: object
       additionalProperties: true
-      required: [id, email, fullName, employeeNumber, status]
+      required: [id, email, fullName, status]
       properties:
         id: { type: string, format: uuid }
         userId: { type: string, format: uuid }
         username: { type: string, minLength: 3, maxLength: 100 }
         email: { type: string, format: email }
         fullName: { type: string }
-        employeeNumber: { type: string }
+        employeeNumber: { type: string, nullable: true }
         contactNumber: { type: string, nullable: true }
         department: { type: string, nullable: true }
         designation: { type: string, nullable: true }
         systemRole: { $ref: "#/components/schemas/SystemRole" }
         status: { type: string, enum: [ACTIVE, INACTIVE, DISABLED, SUSPENDED] }
+        approvalState: { $ref: "#/components/schemas/AccountApprovalState" }
+        accessState: { $ref: "#/components/schemas/AccountAccessState" }
+        professionalCategory:
+          type: string
+          nullable: true
+          enum: [STAFF, DOCTOR]
         roles:
           type: array
           uniqueItems: true
@@ -2207,6 +3070,7 @@ components:
       additionalProperties: false
       required: [name, venue, timezone, startsAt, endsAt, capacity]
       properties:
+        firstManagerUserId: { type: string, format: uuid, description: Approved and enabled first manager; defaults to the administrator creating the event. The creator is always dual-written as an EVENT_MANAGER membership. }
         name: { type: string, minLength: 1, maxLength: 150 }
         description: { type: string, nullable: true, maxLength: 5000 }
         bannerKey: { $ref: "#/components/schemas/EventBannerKey" }
@@ -2270,18 +3134,76 @@ components:
     EventDeletionRequest:
       type: object
       additionalProperties: false
-      required: [version, confirmationName, acknowledgePermanentDeletion]
+      required: [version, confirmationName, acknowledgePermanentDeletion, previewToken]
       properties:
         version: { type: integer, minimum: 1 }
         confirmationName: { type: string, minLength: 1, maxLength: 150, description: Exact event name acknowledgement }
         acknowledgePermanentDeletion: { type: boolean, enum: [true] }
+        previewToken: { type: string, minLength: 32, maxLength: 4096, description: Unexpired token from the latest unchanged deletion preview }
     EventDeletionResponse:
       type: object
       additionalProperties: false
-      required: [eventId, deleted]
+      required: [eventId, deleted, cleanupState]
       properties:
         eventId: { type: string, format: uuid }
         deleted: { type: boolean, enum: [true] }
+        cleanupState: { type: string, enum: [QUEUED, COMPLETED, NEEDS_ATTENTION] }
+    EventDeletionCounts:
+      type: object
+      additionalProperties: false
+      required: [registrations, queues, screenings, reviews, files, emails, cleanup, reports]
+      properties:
+        registrations: { type: integer, minimum: 0 }
+        queues: { type: integer, minimum: 0 }
+        screenings: { type: integer, minimum: 0 }
+        reviews: { type: integer, minimum: 0 }
+        files: { type: integer, minimum: 0 }
+        emails: { type: integer, minimum: 0 }
+        cleanup: { type: integer, minimum: 0 }
+        reports: { type: integer, minimum: 0 }
+    EventDeletionPreview:
+      type: object
+      additionalProperties: false
+      required: [eventId, eventName, status, version, counts, blockers, impactDigest, previewExpiresAt, previewToken]
+      properties:
+        eventId: { type: string, format: uuid }
+        eventName: { type: string }
+        status: { type: string, enum: [COMPLETED, CANCELLED] }
+        version: { type: integer, minimum: 1 }
+        counts: { $ref: "#/components/schemas/EventDeletionCounts" }
+        blockers:
+          type: array
+          items:
+            type: object
+            additionalProperties: true
+            required: [code, message]
+            properties:
+              code: { type: string }
+              message: { type: string }
+              count: { type: integer, minimum: 1 }
+        impactDigest: { type: string, pattern: '^[a-f0-9]{64}$' }
+        previewExpiresAt: { type: string, format: date-time }
+        previewToken: { type: string }
+    EventDeletionCleanupStatus:
+      type: object
+      additionalProperties: false
+      required: [eventId, cleanupState, tasks]
+      properties:
+        eventId: { type: string, format: uuid }
+        cleanupState: { type: string, enum: [QUEUED, COMPLETED, NEEDS_ATTENTION] }
+        tasks:
+          type: array
+          items:
+            type: object
+            additionalProperties: false
+            required: [id, artifactType, status, attemptCount]
+            properties:
+              id: { type: string, format: uuid }
+              artifactType: { type: string }
+              status: { type: string, enum: [PENDING, PROCESSING, COMPLETED, FAILED, ESCALATED, RESOLVED] }
+              attemptCount: { type: integer, minimum: 0 }
+              lastError: { type: string, nullable: true }
+              completedAt: { type: string, format: date-time, nullable: true }
     Event:
       allOf:
         - $ref: "#/components/schemas/CreateEventRequest"
@@ -2534,6 +3456,91 @@ components:
           items: { $ref: "#/components/schemas/OperationalReportEventOption" }
         truncated: { type: boolean }
         eventOptionsTruncated: { type: boolean }
+    AnalyticsColumn:
+      type: object
+      additionalProperties: false
+      required: [key, label, type]
+      properties:
+        key: { type: string }
+        label: { type: string }
+        type: { type: string, enum: [string, integer, number, boolean] }
+    AnalyticsTable:
+      type: object
+      additionalProperties: false
+      required: [id, title, columns, rows]
+      properties:
+        id: { type: string, enum: [registrations, queue, stations, screening, reviews, referrals] }
+        title: { type: string }
+        columns: { type: array, items: { $ref: "#/components/schemas/AnalyticsColumn" } }
+        rows: { type: array, items: { type: object, additionalProperties: true } }
+        suppressed: { type: boolean, description: True when the entire sensitive block is withheld to prevent small-cell reconstruction. }
+    EventAnalytics:
+      type: object
+      additionalProperties: false
+      required: [schemaVersion, aggregateOnly, generatedAt, event, timeBasis, appliedFilters, metricDefinitions, smallCellSuppression, tables, observations, dataCompleteness]
+      properties:
+        schemaVersion: { type: integer, enum: [1] }
+        aggregateOnly: { type: boolean, enum: [true] }
+        generatedAt: { type: string, format: date-time }
+        event: { type: object, additionalProperties: true }
+        timeBasis: { type: object, additionalProperties: true }
+        appliedFilters: { type: object, additionalProperties: true }
+        metricDefinitions: { type: array, items: { type: object, additionalProperties: true } }
+        smallCellSuppression: { type: object, additionalProperties: true }
+        tables: { type: array, items: { $ref: "#/components/schemas/AnalyticsTable" } }
+        observations: { type: array, items: { type: string } }
+        dataCompleteness: { type: object, additionalProperties: true }
+    ReportExportJobStatus:
+      type: string
+      enum: [QUEUED, GENERATING, COMPLETED, FAILED, CANCELLED, EXPIRED]
+    CreateReportExportRequest:
+      type: object
+      additionalProperties: false
+      required: [dataset, format]
+      properties:
+        dataset: { type: string, enum: [OVERVIEW, OPERATIONS, CLINICAL, REFERRALS] }
+        format: { type: string, enum: [PDF, CSV] }
+        filters:
+          type: object
+          additionalProperties: false
+          properties:
+            from: { type: string, format: date-time }
+            to: { type: string, format: date-time }
+    ReportArtifact:
+      type: object
+      additionalProperties: false
+      required: [artifactId, mimeType, sizeBytes, sha256, expiresAt]
+      properties:
+        artifactId: { type: string, format: uuid }
+        mimeType: { type: string, enum: [application/pdf, "text/csv; charset=utf-8"] }
+        sizeBytes: { type: integer, minimum: 0 }
+        sha256: { type: string, pattern: "^[a-f0-9]{64}$" }
+        expiresAt: { type: string, format: date-time }
+    ReportExportJob:
+      type: object
+      additionalProperties: false
+      required: [jobId, eventId, requestedById, dataset, format, filters, status, attemptCount, maxAttempts, requestedAt, expiresAt, artifact]
+      properties:
+        jobId: { type: string, format: uuid }
+        eventId: { type: string, format: uuid }
+        requestedById: { type: string, format: uuid }
+        dataset: { type: string, enum: [OVERVIEW, OPERATIONS, CLINICAL, REFERRALS] }
+        format: { type: string, enum: [PDF, CSV] }
+        filters: { type: object, additionalProperties: true }
+        status: { $ref: "#/components/schemas/ReportExportJobStatus" }
+        attemptCount: { type: integer, minimum: 0 }
+        maxAttempts: { type: integer, minimum: 1, maximum: 20 }
+        failureCode: { type: string, nullable: true, maxLength: 80 }
+        requestedAt: { type: string, format: date-time }
+        generatedAt: { type: string, format: date-time, nullable: true }
+        expiresAt: { type: string, format: date-time }
+        artifact: { type: object, allOf: [{ $ref: "#/components/schemas/ReportArtifact" }], nullable: true }
+    ReportExportJobList:
+      type: object
+      additionalProperties: false
+      required: [jobs]
+      properties:
+        jobs: { type: array, maxItems: 100, items: { $ref: "#/components/schemas/ReportExportJob" } }
     EventAuditLog:
       type: object
       required: [eventAuditLogId, eventId, actorUserId, action, correlationId, createdAt]
@@ -2973,9 +3980,10 @@ components:
     AuthConfigStatus:
       type: object
       additionalProperties: false
-      required: [configured, supportedRoles, requestId]
+      required: [configured, publicSignupEnabled, supportedRoles, requestId]
       properties:
         configured: { type: boolean }
+        publicSignupEnabled: { type: boolean }
         supportedRoles: { type: array, items: { type: string } }
         requestId: { type: string, format: uuid }
     LogoutResponse:
@@ -2995,7 +4003,7 @@ components:
         employeeNumber: { type: string, minLength: 1, maxLength: 20 }
         department: { type: string, nullable: true, maxLength: 100 }
         designation: { type: string, nullable: true, maxLength: 100 }
-        status: { type: string, enum: [ACTIVE, INACTIVE], default: INACTIVE }
+        status: { type: string, enum: [ACTIVE, INACTIVE], default: INACTIVE, description: INACTIVE creates an approved dormant account that can later be activated only through the Reactivate action. }
         roles:
           type: array
           minItems: 1
@@ -3011,7 +4019,6 @@ components:
         employeeNumber: { type: string, minLength: 1, maxLength: 20 }
         department: { type: string, nullable: true, maxLength: 100 }
         designation: { type: string, nullable: true, maxLength: 100 }
-        status: { type: string, enum: [ACTIVE, INACTIVE] }
         roles:
           type: array
           minItems: 1
@@ -3033,6 +4040,7 @@ components:
         success: { type: boolean, enum: [true] }
         message: { type: string }
         data: { $ref: "#/components/schemas/User" }
+        providerOperation: { $ref: "#/components/schemas/AccountProviderProcessingState" }
     Pagination:
       type: object
       additionalProperties: false

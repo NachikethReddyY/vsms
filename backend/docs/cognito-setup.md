@@ -1,13 +1,13 @@
 # Cognito staff setup
 
-The application contains no local password authentication. Cognito verifies passwords, performs mandatory TOTP MFA, issues tokens, and supplies group claims. PostgreSQL stores only the approved local staff profile and application role.
+The application contains no local password authentication. Cognito verifies passwords, performs mandatory TOTP MFA, issues and rotates refresh tokens, revokes token families, and supplies group claims. PostgreSQL stores the approved local staff profile, application roles, account state, and audit evidence only. The backend refresh route calls Cognito with the HttpOnly refresh cookie; VSMS does not implement a separate local refresh-rotation family in development or production.
 
 ## Deploy the user pool
 
 The versioned CloudFormation template is at `infrastructure/cognito.yaml`. It creates:
 
 - an email-login staff user pool;
-- a public web app client with refresh flow and token revocation;
+- a public web app client with Cognito-managed refresh-token flow and token revocation;
 - a 12-character complexity policy;
 - verified-email account recovery;
 - mandatory software-token MFA;
@@ -50,7 +50,7 @@ pnpm provision-staff -- officer@example.com "Registration Officer" RO-001 REGIST
 
 Repeat with the Cognito group and local role required by the staff member. The supported pairs are `Admin` (or legacy `ADMIN`)/`ADMINISTRATOR`, `EventManager`/`EVENT_MANAGER`, `RegistrationOfficer`/`REGISTRATION_OFFICER`, `Screener`/`SCREENER`, `Reviewer`/`REVIEWER`, and `Support`/`SUPPORT`. Support accounts receive assigned event and shift visibility only; they cannot access participant data, registration, screening, clinical review, organisation accounts, or event deletion. Both the verified Cognito group and local role must match; an inactive local account or missing group receives `403`.
 
-Selecting Sign in redirects the browser to Cognito managed login. Cognito handles temporary-password changes, password recovery, and MFA before returning an authorization code to `/auth/callback`; the backend exchanges it with PKCE and stores tokens only in HttpOnly cookies.
+Selecting Sign in redirects the browser to Cognito managed login. Cognito handles temporary-password changes, password recovery, and MFA before returning an authorization code to `/auth/callback`; the backend exchanges it with PKCE and stores Cognito refresh tokens only in HttpOnly cookies. JavaScript receives session metadata only; access tokens, refresh tokens, and CSRF values are not returned in the refresh response. Refresh-token rotation remains Cognito-owned.
 
 ## Production settings
 

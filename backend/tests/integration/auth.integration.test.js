@@ -37,13 +37,13 @@ describe("Cognito authentication boundary", () => {
     expect(invalid.status).toBe(401);
     expect(invalid.body.code).toBe("INVALID_SESSION");
 
-    await helpers.prisma.user.update({ where: { id: manager.id }, data: { status: "INACTIVE" } });
-    const inactive = await request(app)
+    await helpers.prisma.user.update({ where: { id: manager.id }, data: { status: "DISABLED", accessState: "DISABLED" } });
+    const disabled = await request(app)
       .get("/api/v1/auth/me")
       .set("Authorization", `Bearer ${managerToken}`);
-    expect(inactive.status).toBe(401);
-    expect(inactive.body.code).toBe("INVALID_SESSION");
-    await helpers.prisma.user.update({ where: { id: manager.id }, data: { status: "ACTIVE" } });
+    expect(disabled.status).toBe(401);
+    expect(disabled.body.code).toBe("INVALID_SESSION");
+    await helpers.prisma.user.update({ where: { id: manager.id }, data: { status: "ACTIVE", accessState: "ENABLED" } });
   });
 
   test("cookie mutations require same-origin double-submit CSRF while bearer mutations bypass it", async () => {

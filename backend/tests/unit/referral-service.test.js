@@ -37,6 +37,21 @@ const replace = (t, target, key, value) => {
   t.after(() => { target[key] = original; });
 };
 
+const reviewerUser = (userId, roles = ["REVIEWER"]) => ({
+  userId,
+  roles,
+  status: "ACTIVE",
+  approvalState: "APPROVED",
+  accessState: "ENABLED",
+});
+
+const installReviewerMembership = (t, eventId, reviewerId) => replace(
+  t,
+  prisma.eventMembership,
+  "findFirst",
+  async () => ({ id: crypto.randomUUID(), eventId, userId: reviewerId, status: "ACTIVE", roles: [{ role: "REVIEWER" }] }),
+);
+
 const referralFixture = () => ({
   referralId: "11111111-1111-4111-8111-111111111111",
   reviewId: "22222222-2222-4222-8222-222222222222",
@@ -299,6 +314,7 @@ test("idempotent issuance replay returns the existing artifact and delivery", as
   referral.referralId = referralId;
   referral.status = "SENT";
   referral.review.reviewedByUserId = reviewerId;
+  installReviewerMembership(t, eventId, reviewerId);
   replace(t, prisma.referral, "findFirst", async () => referral);
   replace(t, prisma.event, "findUnique", async () => ({ eventId: crypto.randomUUID(), name: "Live", venue: "Hall", timezone: "Asia/Singapore", status: "IN_PROGRESS" }));
   replace(t, prisma.staffAssignment, "findFirst", async () => ({ id: crypto.randomUUID() }));
@@ -323,7 +339,7 @@ test("idempotent issuance replay returns the existing artifact and delivery", as
     eventId,
     referralId,
     input,
-    { userId: reviewerId, roles: ["REVIEWER"] },
+    reviewerUser(reviewerId),
   );
   assert.equal(result.documentId, documentId);
   assert.equal(result.status, "SENT");
@@ -484,6 +500,7 @@ test("acknowledging the secure handoff permanently clears its escrow", async (t)
   const referral = referralFixture();
   referral.status = "SENT";
   const reviewerId = referral.review.reviewedByUserId;
+  installReviewerMembership(t, eventId, reviewerId);
   const delivery = { id: crypto.randomUUID(), referralId: referral.referralId, userId: reviewerId, idempotencyKey: crypto.randomUUID(), handoffSecretAcknowledgedAt: null };
   let update;
   replace(t, prisma.referral, "findFirst", async () => referral);
@@ -494,7 +511,7 @@ test("acknowledging the secure handoff permanently clears its escrow", async (t)
     notificationDelivery: { updateMany: async (args) => { update = args; return { count: 1 }; } },
     auditLog: { create: async () => ({}) },
   }));
-  const result = await acknowledgeReferralHandoff(eventId, referral.referralId, { idempotencyKey: delivery.idempotencyKey }, { userId: reviewerId, roles: ["REVIEWER"] });
+  const result = await acknowledgeReferralHandoff(eventId, referral.referralId, { idempotencyKey: delivery.idempotencyKey }, reviewerUser(reviewerId));
   assert.ok(result.acknowledgedAt);
   assert.equal(update.data.handoffSecretCiphertext, null);
   assert.ok(update.data.handoffSecretAcknowledgedAt);
@@ -508,6 +525,7 @@ test("creates an immutable sequential referral revision for the issuing reviewer
   source.revisionNumber = 1;
   source.supersedesReferralId = null;
   source.review.reviewedByUserId = reviewerId;
+  installReviewerMembership(t, eventId, reviewerId);
   const input = {
     destinationName: "Community Eye Clinic",
     reason: "Updated destination requested after clinical review.",
@@ -532,7 +550,7 @@ test("creates an immutable sequential referral revision for the issuing reviewer
     },
     auditLog: { create: async ({ data }) => { audit = data; return data; } },
   }));
-  const result = await createReferralRevision(eventId, source.referralId, input, { userId: reviewerId, roles: ["REVIEWER"] }, "127.0.0.1");
+  const result = await createReferralRevision(eventId, source.referralId, input, reviewerUser(reviewerId), "127.0.0.1");
   assert.equal(result.revisionNumber, 2);
   assert.equal(result.supersedesReferralId, source.referralId);
   assert.equal(result.status, "DRAFT");
@@ -546,7 +564,7 @@ test("creates an immutable sequential referral revision for the issuing reviewer
   });
 });
 
-test("does not allow an administrator or another reviewer to revise a referral", async (t) => {
+test("does not allow another reviewer or an administrator without event reviewer membership to revise a referral", async (t) => {
   const source = referralFixture();
   source.status = "SENT";
   source.revisionNumber = 1;
@@ -562,8 +580,10 @@ test("does not allow an administrator or another reviewer to revise a referral",
     createReferralRevision(crypto.randomUUID(), source.referralId, input, { userId: crypto.randomUUID(), roles: ["REVIEWER"] }),
     (error) => error.status === 403 && error.code === "REFERRAL_REVIEWER_REQUIRED",
   );
+  replace(t, prisma.event, "findUnique", async ({ where }) => ({ eventId: where.eventId, status: "IN_PROGRESS" }));
+  replace(t, prisma.eventMembership, "findFirst", async () => null);
   await assert.rejects(
-    createReferralRevision(crypto.randomUUID(), source.referralId, input, { userId: source.review.reviewedByUserId, roles: ["ADMINISTRATOR", "REVIEWER"] }),
-    (error) => error.status === 403 && error.code === "REFERRAL_REVIEWER_REQUIRED",
+    createReferralRevision(crypto.randomUUID(), source.referralId, input, reviewerUser(source.review.reviewedByUserId, ["ADMINISTRATOR", "REVIEWER"])),
+    (error) => error.status === 403 && error.code === "EVENT_ROLE_REQUIRED",
   );
 });

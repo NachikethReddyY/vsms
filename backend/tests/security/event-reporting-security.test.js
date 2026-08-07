@@ -17,6 +17,7 @@ const assignedBy = "55555555-5555-4555-8555-555555555555";
 const startsAt = new Date("2026-08-01T01:00:00.000Z");
 const endsAt = new Date("2026-08-01T05:00:00.000Z");
 const assignedAt = new Date("2026-07-31T01:00:00.000Z");
+const approved = (userId, systemRole = "STAFF") => ({ userId, systemRole, status: "ACTIVE", approvalState: "APPROVED", accessState: "ENABLED" });
 
 const exportEvent = () => ({
   eventId,
@@ -105,7 +106,7 @@ test("event list counts registrations without cancelled rows", async () => {
     },
   };
 
-  const result = await eventService.listEvents({ limit: 25 }, { userId: managerId, systemRole: "ADMIN" }, db);
+  const result = await eventService.listEvents({ limit: 25 }, approved(managerId, "ADMIN"), db);
   assert.equal(result.events[0].signupCount, 2);
   assert.equal(result.events[0].activeCapacityCount, 1);
   assert.deepEqual(query.include._count.select.registrations, {
@@ -139,10 +140,11 @@ test("support staff roster projection omits contact metadata and assignment note
         station: null,
       }],
     }],
+    memberships: [{ userId: staffId, roles: [{ role: "SUPPORT" }] }],
   };
   const db = { event: { findMany: async () => [row] } };
 
-  const result = await eventService.listEvents({ limit: 25 }, { userId: staffId, systemRole: "STAFF" }, db);
+  const result = await eventService.listEvents({ limit: 25 }, approved(staffId), db);
   const assignment = result.events[0].shifts[0].staffAssignments[0];
 
   assert.deepEqual(assignment.user, { userId: staffId, username: "support" });
@@ -163,11 +165,12 @@ test("clinical event metrics require event management access", async () => {
       shiftId: "66666666-6666-4666-8666-666666666666",
       staffAssignments: [{ userId: staffId, assignmentRole: "SUPPORT", status: "ASSIGNED" }],
     }],
+    memberships: [{ userId: staffId, roles: [{ role: "SUPPORT" }] }],
   };
   const db = { event: { findFirst: async () => row } };
 
   await assert.rejects(
-    () => eventService.getEventMetrics(eventId, { userId: staffId, systemRole: "STAFF" }, db),
+    () => eventService.getEventMetrics(eventId, approved(staffId), db),
     (error) => error.status === 404,
   );
 });
@@ -211,6 +214,7 @@ test("assigned event managers can page through no-store attendee rows", async ()
     eventId,
     createdByUserId: staffId,
     shifts: [{ staffAssignments: [{ userId: managerId, assignmentRole: "EVENT_MANAGER", status: "ASSIGNED" }] }],
+    memberships: [{ userId: managerId, roles: [{ role: "EVENT_MANAGER" }] }],
   };
   const db = {
     event: { findFirst: async () => managerEvent },
@@ -223,14 +227,14 @@ test("assigned event managers can page through no-store attendee rows", async ()
     },
   };
 
-  const result = await eventService.listEventAttendees(eventId, {}, { userId: managerId, systemRole: "EVENT_MANAGER" }, db);
+  const result = await eventService.listEventAttendees(eventId, {}, approved(managerId, "EVENT_MANAGER"), db);
   assert.equal(result.attendees.length, 50);
   assert.equal(attendeeQuery.take, 51);
   assert.equal(typeof result.nextCursor, "string");
 
   db.event.findFirst = async () => null;
   await assert.rejects(
-    () => eventService.listEventAttendees(eventId, {}, { userId: managerId, systemRole: "EVENT_MANAGER" }, db),
+    () => eventService.listEventAttendees(eventId, {}, approved(managerId, "EVENT_MANAGER"), db),
     (error) => error.code === "EVENT_NOT_FOUND",
   );
 });
@@ -240,7 +244,7 @@ test("audit pagination uses the record id to avoid skipping timestamp ties", asy
   const auditId = "77777777-7777-4777-8777-777777777777";
   let auditQuery;
   const db = {
-    event: { findFirst: async () => ({ ...exportEvent(), shifts: [] }) },
+    event: { findFirst: async () => ({ ...exportEvent(), shifts: [], memberships: [{ userId: managerId, roles: [{ role: "EVENT_MANAGER" }] }] }) },
     auditLog: { findMany: async (input) => { auditQuery = input; return []; } },
   };
   const scope = `event-audit:${eventId}:50`;
@@ -248,7 +252,7 @@ test("audit pagination uses the record id to avoid skipping timestamp ties", asy
   await eventService.getAuditLog(eventId, {
     limit: 50,
     cursor: encodeCursor({ scope, createdAt, id: auditId }),
-  }, { userId: managerId, systemRole: "ADMIN" }, db);
+  }, approved(managerId, "ADMIN"), db);
 
   assert.deepEqual(auditQuery.where, {
     AND: [
