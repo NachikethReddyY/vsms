@@ -98,6 +98,8 @@ const ensureTestUser = async (requestedRole = "EVENT_MANAGER", label = requested
         fullName: `Test ${label}`,
         sysRole: systemRoleFor(applicationRole),
         status: "ACTIVE",
+        approvalState: "APPROVED",
+        accessState: "ENABLED",
         failedLoginAttempts: 0,
         lockedUntil: null,
       },
@@ -111,6 +113,8 @@ const ensureTestUser = async (requestedRole = "EVENT_MANAGER", label = requested
         employeeNumber: `T-${crypto.randomUUID().replaceAll("-", "").slice(0, 16)}`,
         sysRole: systemRoleFor(applicationRole),
         status: "ACTIVE",
+        approvalState: "APPROVED",
+        accessState: "ENABLED",
       },
     });
   await prisma.userRole.deleteMany({ where: { userId: user.id } });
