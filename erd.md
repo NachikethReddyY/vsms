@@ -99,7 +99,7 @@ erDiagram
 
 ## Issue #7 Prisma implementation
 
-The branch currently implements eleven physical tables. Names below match
+The original issue #7 branch implemented eleven physical tables. Names below match
 `schema.prisma`; mapped PostgreSQL names appear in parentheses.
 
 ```mermaid
@@ -166,15 +166,46 @@ contains rows. Before production deployment, a reviewed migration must:
    their canonical migrations; and
 5. back up, rehearse, and verify foreign-key and row-count invariants before cutover.
 
-## Prisma enumerations used by issue #7
+## Current access-platform Prisma implementation
 
-- `SystemRole`: `ADMIN`, `EVENT_MANAGER`, `STAFF`
-- `UserStatus`: `ACTIVE`, `DISABLED`
-- `EventStatus`: `DRAFT`, `PUBLISHED`, `IN_PROGRESS`, `COMPLETED`, `CANCELLED`
-- `EventAuditAction`: `CREATED`, `UPDATED`, `PUBLISHED`, `STARTED`, `COMPLETED`, `CANCELLED`
-- `ShiftStatus`: `PLANNED`, `ACTIVE`, `COMPLETED`, `CANCELLED`
-- `StaffAssignmentRole`: `EVENT_MANAGER`, `REGISTRATION`, `SCREENER`, `REVIEWER`, `SUPPORT`
-`StaffAssignmentStatus`: `ASSIGNED`, `CONFIRMED`, `COMPLETED`, `CANCELLED`
+The active access-platform schema now contains the full operational/access model needed by the current application. Legacy global role columns and compatibility tables are intentionally retained for data continuity; authorization is enforced through account state, Cognito group intersection, event memberships, membership roles, and duty/station assignments. Persisted legacy columns/tables should be removed only by a later, proven data migration.
 
-Other clinical, referral, notification, and sync enums are defined in
-`backend/prisma/schema.prisma` and remain unchanged by the event lifecycle work.
+```mermaid
+erDiagram
+  User ||--o{ AccountApprovalDecision : reviewed_by
+  User ||--o{ AccountProviderOperation : syncs
+  User ||--o{ UserCredential : authenticates_with
+  User ||--o{ RefreshSession : owns
+  Role ||--o{ RolePermission : grants
+  Permission ||--o{ RolePermission : included_in
+  User ||--o{ UserRole : legacy_global_role
+  Event ||--o{ EventMembership : scopes_access
+  User ||--o{ EventMembership : joins
+  EventMembership ||--o{ EventMembershipRole : grants_event_role
+  Event ||--o{ ReportExportJob : exports
+  ReportExportJob ||--o{ ReportArtifact : publishes
+  ReportArtifactBlob ||--o{ ReportArtifact : stores
+  Event ||--o{ EventRegistration : registers
+  Event ||--o{ Station : runs
+  EventRegistration ||--o{ QueueEntry : queues
+  EventRegistration ||--o{ ScreeningResult : produces
+  EventRegistration ||--o{ Review : reviewed_in
+  Review ||--o{ Referral : creates
+  User ||--o{ LifecycleEmailOutbox : receives
+  SyncAction ||--o{ SyncActionTransition : records
+```
+
+Key current table groups:
+
+| Area | Models | Notes |
+|---|---|---|
+| Account and auth | `User`, `UserCredential`, `RefreshSession`, `AccountApprovalDecision`, `AccountProviderOperation`, `AuthAuditLog`, `LoginHistory`, `SecurityIncident` | Cognito owns passwords/MFA/recovery/refresh rotation; local rows hold approval, access state, audit, and provider-sync evidence. |
+| Roles and permissions | `Role`, `Permission`, `RolePermission`, `UserRole`, `EventMembership`, `EventMembershipRole` | Operational access is event-scoped. Legacy global role storage remains for compatibility and audit until a later retirement migration. |
+| Events and staffing | `Event`, `EventDay`, `EventStationAvailability`, `Shift`, `Station`, `StationTemplate`, `StaffAssignment`, `EventAuditLog` | Membership grants event role; duties and station assignments narrow event-day work. |
+| Participant workflow | `Participant`, `ParticipantEmergencyContact`, `ConsentFormVersion`, `ParticipantConsent`, `SignatureArtifact`, `EventRegistration`, `RegistrationStatusHistory`, `QRCodePass`, `ScanLog`, `QueueEntry`, `QueueMovement`, `ScreeningResult`, `ScreeningRequestLedger`, `Review`, `Referral` | Registration, QR, queue, screening, clinical review, referral, and consent records are event-scoped. |
+| Reporting and messaging | `ReportExportJob`, `ReportArtifact`, `ReportArtifactBlob`, `ArtifactCleanupTask`, `DocumentArtifact`, `NotificationDelivery`, `LifecycleEmailOutbox`, `ProviderEventReceipt` | Completed-event analytics and exports use durable jobs/artifacts; lifecycle SMTP ambiguity is escalated for manual reconciliation instead of automatic resend. |
+| Offline/audit/device | `SyncAction`, `SyncActionTransition`, `AuditLog`, `Device` | Offline submissions and security-relevant state changes preserve immutable transition evidence. |
+
+## Prisma enumerations used by the current schema
+
+- Enumerations for account approval/access, provider operations, event membership roles, report-export jobs, lifecycle email, event lifecycle, staffing, registration, station, queue, screening, review, referral, notification, sync, incident, consent, signature, and auth outcomes are defined in `backend/prisma/schema.prisma`. Treat that file as the authoritative enum list.

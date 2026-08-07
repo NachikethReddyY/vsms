@@ -2,9 +2,11 @@ const {
   AdminAddUserToGroupCommand,
   AdminCreateUserCommand,
   AdminDeleteUserCommand,
+  AdminDisableUserCommand,
   AdminGetUserCommand,
   AdminListGroupsForUserCommand,
   AdminRemoveUserFromGroupCommand,
+  AdminUserGlobalSignOutCommand,
   CognitoIdentityProviderClient,
 } = require("@aws-sdk/client-cognito-identity-provider");
 
@@ -187,4 +189,45 @@ async function synchronizeStaffAccess({ email, roles, status }, overrides = {}) 
   };
 }
 
-module.exports = { GROUP_FOR_ROLE, synchronizeStaffAccess };
+async function revokeStaffSessions(email, overrides = {}) {
+  const configuration = settings(overrides);
+  if (configuration.mode === "local-only") return { managed: false };
+  const username = String(email).trim().toLowerCase();
+  try {
+    await configuration.client.send(new AdminUserGlobalSignOutCommand({
+      UserPoolId: configuration.userPoolId,
+      Username: username,
+    }));
+    return { managed: true };
+  } catch (error) {
+    if (error?.name === "UserNotFoundException") return { managed: true };
+    throw synchronizationError(error);
+  }
+}
+
+async function disableAndRevokeStaff(email, overrides = {}) {
+  const configuration = settings(overrides);
+  if (configuration.mode === "local-only") return { managed: false };
+  const username = String(email).trim().toLowerCase();
+  try {
+    await configuration.client.send(new AdminDisableUserCommand({
+      UserPoolId: configuration.userPoolId,
+      Username: username,
+    }));
+    await configuration.client.send(new AdminUserGlobalSignOutCommand({
+      UserPoolId: configuration.userPoolId,
+      Username: username,
+    }));
+    return { managed: true };
+  } catch (error) {
+    if (error?.name === "UserNotFoundException") return { managed: true };
+    throw synchronizationError(error);
+  }
+}
+
+module.exports = {
+  GROUP_FOR_ROLE,
+  synchronizeStaffAccess,
+  revokeStaffSessions,
+  disableAndRevokeStaff,
+};

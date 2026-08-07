@@ -1,9 +1,11 @@
 const { createAuthAuditLog } = require("../utils/audit");
+const { isApprovedAccount } = require("./requireApprovedAccount");
 
 function buildRoleGuard(allowedRoles, denyAdministrator) {
     return async (req, res, next) => {
         const roles = req.auth?.roles || [];
-        const allowed = (!denyAdministrator || !roles.includes("ADMINISTRATOR"))
+        const allowed = isApprovedAccount(req.auth?.user)
+            && (!denyAdministrator || !roles.includes("ADMINISTRATOR"))
             && allowedRoles.some((role) => roles.includes(role));
 
         if (!allowed) {

@@ -77,122 +77,32 @@ exports.getParticipantQueueStatus = async (req, res, next) => {
   }
 };
 
-/**
- * Automatically fetches the next waiting participant in line.
- * @route GET /api/v1/events/:eventId/stations/:stationId/next
- */
-exports.getNextQueueEntry = async (req, res, next) => {
-  try {
-    const { eventId, stationId } = req.params;
-    const nextEntry = await queueService.getNextQueueEntry(eventId, stationId, req.user);
-
-    return res.status(200).json({
-      status: "success",
-      data: nextEntry
-    });
-  } catch (error) {
-    return next(error);
-  }
+exports.callQueueEntry = async (req, res) => {
+  res.json(await queueService.callQueueEntry(req.params.queueId, req.user, req.context, undefined, req.params.eventId));
 };
 
-/**
- * Updates queue state to notify/call the participant to the desk.
- * @route PATCH /api/v1/entries/:queueId/call
- */
-exports.callQueueEntry = async (req, res, next) => {
-  try {
-    const { queueId } = req.params;
-    const updatedEntry = await queueService.callQueueEntry(queueId, req.user, req.context);
-
-    return res.status(200).json({
-      status: "success",
-      data: updatedEntry
-    });
-  } catch (error) {
-    return next(error);
-  }
+exports.startQueueEntry = async (req, res) => {
+  res.json(await queueService.startQueueEntry(req.params.queueId, req.user, req.context, undefined, req.params.eventId));
 };
 
-/**
- * Transitions queue status from called to active screening in-progress.
- * @route PATCH /api/v1/entries/:queueId/start
- */
-exports.startQueueEntry = async (req, res, next) => {
-  try {
-    const { queueId } = req.params;
-    const startedEntry = await queueService.startQueueEntry(queueId, req.user, req.context);
-
-    return res.status(200).json({
-      status: "success",
-      data: startedEntry
-    });
-  } catch (error) {
-    return next(error);
-  }
+exports.advanceQueueEntry = async (req, res) => {
+  res.json(await queueService.advanceQueueEntry(
+    { queueId: req.params.queueId, eventId: req.params.eventId, toStationId: req.body.toStationId, reason: req.body.reason },
+    req.user,
+    req.context,
+  ));
 };
 
-/**
- * Transfers a participant to a secondary screening station.
- * @route PATCH /api/v1/entries/:queueId/transfer
- */
-exports.transferQueueEntry = async (req, res, next) => {
-  try {
-    const { queueId } = req.params;
-    const { toStationId, reason } = req.body;
-
-    if (!toStationId) {
-      throw new ValidationError("Target destination station ID (toStationId) is required for transfer.");
-    }
-
-    const transferredEntry = await queueService.transferQueueEntry(
-      { queueId, toStationId, reason },
-      req.user,
-      req.context
-    );
-
-    return res.status(200).json({
-      status: "success",
-      data: transferredEntry
-    });
-  } catch (error) {
-    return next(error);
-  }
+exports.completeQueueEntry = async (req, res) => {
+  res.json(await queueService.completeQueueEntry(req.params.queueId, req.user, req.context, undefined, req.params.eventId));
 };
 
-/**
- * Marks the station entry as successfully completed.
- * @route PATCH /api/v1/entries/:queueId/complete
- */
-exports.completeQueueEntry = async (req, res, next) => {
-  try {
-    const { queueId } = req.params;
-    const completedEntry = await queueService.completeQueueEntry(queueId, req.user, req.context);
-
-    return res.status(200).json({
-      status: "success",
-      data: completedEntry
-    });
-  } catch (error) {
-    return next(error);
-  }
+exports.skipQueueEntry = async (req, res) => {
+  res.json(await queueService.skipQueueEntry(req.params.queueId, req.user, req.context, undefined, req.params.eventId));
 };
 
-/**
- * Skips an unresponsive participant and logs the exception.
- * @route PATCH /api/v1/entries/:queueId/skip
- */
-exports.skipQueueEntry = async (req, res, next) => {
-  try {
-    const { queueId } = req.params;
-    const skippedEntry = await queueService.skipQueueEntry(queueId, req.user, req.context);
-
-    return res.status(200).json({
-      status: "success",
-      data: skippedEntry
-    });
-  } catch (error) {
-    return next(error);
-  }
+exports.leaveQueue = async (req, res) => {
+  res.json(await queueService.leaveQueue(req.params.queueId, req.user, req.context, undefined, req.params.eventId));
 };
 
 /**

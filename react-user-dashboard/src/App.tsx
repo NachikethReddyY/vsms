@@ -1,6 +1,6 @@
 import { Navigate, Outlet, Route, Routes } from "react-router-dom";
 import { ProtectedRoute } from "./auth/ProtectedRoute";
-import { RoleGuard } from "./auth/RoleGuard";
+import { EventCapabilityGuard, RoleGuard, StationDutyGuard } from "./auth/RoleGuard";
 import { CognitoCallback } from "./auth/CognitoRoutes";
 import AppShell from "./components/AppShell";
 import LandingPage from "./components/LandingPage";
@@ -17,8 +17,20 @@ import QRScannerPage from "./features/screening/QRScannerPage";
 import RefractionStationPage from "./features/screening/RefractionStationPage";
 import VisualAcuityStationPage from "./features/screening/VisualAcuityStationPage";
 import { AuditLogsPage as RegistrationAuditLogsPage } from "./pages/AdminPages";
+import {
+  AccountStatePage,
+  AdminAccountsPage,
+  CreateAccountPage,
+  DutyEditorPage,
+  EventAnalyticsPage,
+  EventDeletionPage,
+  EventReportsPage,
+  EventStaffingPage,
+  ForbiddenPage,
+  NotFoundPage,
+  ProfilePage,
+} from "./features/Stage4Pages";
 import AccountSecurityPage from "./pages/AccountSecurityPage";
-import StaffAccountsPage from "./pages/StaffAccountsPage";
 import { QueuePage } from "./pages/QueuePages"; // Imported the QueuePage component
 import ParticipantStatusPage from "./pages/ParticipantStatusPage";
 import ParticipantV2ConsentPage from "./pages/ParticipantV2ConsentPage";
@@ -56,45 +68,60 @@ export default function App() {
     <Routes>
       <Route path="/" element={<LandingPage />} />
       <Route path="/auth/callback" element={<CognitoCallback />} />
+      <Route path="/create-account" element={<CreateAccountPage />} />
       <Route path="/e/:eventId" element={<PublicEventPage />} />
       <Route path="/participant-status/:token" element={<ParticipantStatusPage />} />
 
       <Route element={<ProtectedRoute />}>
         <Route path="/dashboard" element={<Navigate to="/events" replace />} />
-        <Route path="/events" element={<EventsPage />} />
 
         <Route element={<EventWorkspace />}>
+          <Route path="/events" element={<EventsPage />} />
+          <Route path="/account/state" element={<AccountStatePage />} />
+          <Route path="/account/profile" element={<ProfilePage />} />
           <Route path="/account/security" element={<AccountSecurityPage />} />
+          <Route path="/forbidden" element={<ForbiddenPage />} />
           <Route path="/events/:eventId" element={<EventDetailPage />} />
           <Route path="/settings" element={<SettingsPage />} />
 
-          <Route element={<RoleGuard allowedRoles={eventManagerRoles} />}>
+          <Route element={<EventCapabilityGuard allowedRoles={eventManagerRoles} />}>
             <Route path="/events/:eventId/overview" element={<EventDetailPage />} />
             <Route path="/events/:eventId/stations" element={<EventDetailPage />} />
-            <Route path="/events/:eventId/staff" element={<EventDetailPage />} />
+            <Route path="/events/:eventId/staff" element={<EventStaffingPage />} />
+            <Route path="/events/:eventId/staff/:membershipId/duties" element={<DutyEditorPage />} />
+            <Route path="/events/:eventId/analytics" element={<EventAnalyticsPage />} />
+            <Route path="/events/:eventId/reports" element={<EventReportsPage />} />
             <Route path="/events/:eventId/attendees" element={<EventDetailPage />} />
             <Route path="/events/:eventId/activity" element={<EventDetailPage />} />
           </Route>
 
-          <Route element={<RoleGuard allowedRoles={reviewerRoles} deniedRoles={adminRoles} />}>
+          <Route element={<EventCapabilityGuard allowedRoles={reviewerRoles} />}>
             <Route path="/events/:eventId/reviews" element={<ReviewWorkspacePage />} />
             <Route path="/events/:eventId/reviews/:registrationId" element={<ReviewWorkspacePage />} />
           </Route>
 
-          <Route element={<RoleGuard allowedRoles={screenerRoles} deniedRoles={adminRoles} />}>
-            <Route path="/events/:eventId/stations/visual-acuity" element={<VisualAcuityStationPage />} />
-            <Route path="/events/:eventId/stations/refraction" element={<RefractionStationPage />} />
-            <Route path="/events/:eventId/stations/colour-vision" element={<ColourVisionStationPage />} />
+          <Route element={<EventCapabilityGuard allowedRoles={screenerRoles} />}>
+            <Route element={<StationDutyGuard stationType="VISUAL_ACUITY" />}>
+              <Route path="/events/:eventId/stations/visual-acuity" element={<VisualAcuityStationPage />} />
+            </Route>
+            <Route element={<StationDutyGuard stationType="REFRACTION" />}>
+              <Route path="/events/:eventId/stations/refraction" element={<RefractionStationPage />} />
+            </Route>
+            <Route element={<StationDutyGuard stationType="COLOUR_VISION" />}>
+              <Route path="/events/:eventId/stations/colour-vision" element={<ColourVisionStationPage />} />
+            </Route>
             <Route path="/qr-scanner" element={<QRScannerPage />} />
           </Route>
 
           <Route element={<RoleGuard allowedRoles={eventManagerRoles} />}>
             <Route path="/reports" element={<ReportsPage />} />
-            <Route path="/events/new" element={<EventFormPage mode="create" />} />
+          </Route>
+
+          <Route element={<EventCapabilityGuard allowedRoles={eventManagerRoles} />}>
             <Route path="/events/:eventId/edit" element={<EventFormPage mode="edit" />} />
           </Route>
 
-          <Route element={<RoleGuard allowedRoles={registrationRoles} deniedRoles={adminRoles} />}>
+          <Route element={<EventCapabilityGuard allowedRoles={registrationRoles} />}>
             <Route path="/events/:eventId/queue" element={<QueuePage />} />
             <Route path="/events/qr-pass/:registrationId" element={<QRCodePage />} />
             <Route path="/qr-generator" element={<QRCodePage />} />
@@ -121,14 +148,16 @@ export default function App() {
           </Route>
 
           <Route element={<RoleGuard allowedRoles={adminRoles} />}>
-            <Route path="/staff" element={<StaffAccountsPage />} />
+            <Route path="/staff" element={<AdminAccountsPage />} />
+            <Route path="/events/new" element={<EventFormPage mode="create" />} />
+            <Route path="/events/:eventId/delete" element={<EventDeletionPage />} />
             <Route path="/admin/audit-logs" element={<RegistrationAuditLogsPage />} />
             <Route path="/admin/system-audit-logs" element={<Navigate to="/admin/audit-logs" replace />} />
           </Route>
         </Route>
       </Route>
 
-      <Route path="*" element={<Navigate to="/" replace />} />
+      <Route path="*" element={<NotFoundPage />} />
     </Routes>
   );
 }

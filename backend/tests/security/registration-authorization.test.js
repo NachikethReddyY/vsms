@@ -13,28 +13,36 @@ const {
 } = require("../../utils/staff");
 const { getEventIdForAccess } = require("../../services/qrService");
 
-test("registration requires a non-admin role and a current event assignment", async () => {
+const account = (userId, roles = []) => ({
+  userId,
+  roles,
+  user: { id: userId, status: "ACTIVE", approvalState: "APPROVED", accessState: "ENABLED" },
+});
+
+const authorizationDb = (eventId, userId, role, assignment) => ({
+  event: { findUnique: async () => ({ eventId, status: "IN_PROGRESS" }) },
+  eventMembership: { findFirst: async ({ where }) => where.userId === userId ? { id: crypto.randomUUID(), status: "ACTIVE", roles: [{ role }] } : null },
+  staffAssignment: { findFirst: assignment },
+});
+
+test("registration requires event membership and a current duty; platform admin has no bypass", async () => {
   const eventId = crypto.randomUUID();
   const userId = crypto.randomUUID();
   let assignmentChecked = false;
   let assignmentWhere;
-  const db = { staffAssignment: { findFirst: async ({ where }) => { assignmentChecked = true; assignmentWhere = where; return { id: crypto.randomUUID() }; } } };
+  const db = authorizationDb(eventId, userId, "REGISTRATION", async ({ where }) => { assignmentChecked = true; assignmentWhere = where; return { id: crypto.randomUUID() }; });
 
   await assert.rejects(
-    assertRegistrationAssignment(db, eventId, { userId, roles: ["ADMINISTRATOR", "REGISTRATION_OFFICER"] }),
-    (error) => error.statusCode === 403,
+    assertRegistrationAssignment(authorizationDb(eventId, crypto.randomUUID(), "REGISTRATION", async () => ({ id: crypto.randomUUID() })), eventId, account(userId, ["ADMINISTRATOR"])),
+    (error) => error.status === 403 && error.code === "EVENT_ROLE_REQUIRED",
   );
   assert.equal(assignmentChecked, false);
 
   await assert.doesNotReject(
-    assertRegistrationAssignment(db, eventId, { userId, roles: ["REGISTRATION_OFFICER"] }),
+    assertRegistrationAssignment(db, eventId, account(userId)),
   );
   assert.equal(assignmentWhere.eventId, eventId);
   assert.equal(assignmentWhere.shift.eventId, eventId);
-
-  await assert.doesNotReject(
-    assertRegistrationAssignment(db, null, { userId, roles: ["REGISTRATION_OFFICER"] }),
-  );
 });
 
 test("screener assignment is station-scoped when a station id is supplied", async () => {
@@ -43,6 +51,8 @@ test("screener assignment is station-scoped when a station id is supplied", asyn
   const userId = crypto.randomUUID();
   let assignmentWhere;
   const db = {
+    event: { findUnique: async () => ({ eventId, status: "IN_PROGRESS" }) },
+    eventMembership: { findFirst: async () => ({ id: crypto.randomUUID(), status: "ACTIVE", roles: [{ role: "SCREENER" }] }) },
     staffAssignment: {
       findFirst: async ({ where }) => {
         assignmentWhere = where;
@@ -52,7 +62,7 @@ test("screener assignment is station-scoped when a station id is supplied", asyn
   };
 
   await assert.doesNotReject(
-    assertScreenerAssignment(db, eventId, { userId, roles: ["SCREENER"] }, stationId),
+    assertScreenerAssignment(db, eventId, account(userId), stationId),
   );
   assert.equal(assignmentWhere.assignmentRole, "SCREENER");
   assert.equal(assignmentWhere.stationId, stationId);
@@ -61,8 +71,8 @@ test("screener assignment is station-scoped when a station id is supplied", asyn
   assert.ok(assignmentWhere.shift.endsAt);
 
   await assert.rejects(
-    assertScreenerAssignment(db, eventId, { userId, roles: ["SCREENER"] }, crypto.randomUUID()),
-    (error) => error.statusCode === 403,
+    assertScreenerAssignment(db, eventId, account(userId), crypto.randomUUID()),
+    (error) => error.status === 403,
   );
 });
 
@@ -70,6 +80,8 @@ test("QR verify accepts registration officers or screeners with active assignmen
   const eventId = crypto.randomUUID();
   const userId = crypto.randomUUID();
   const db = {
+    event: { findUnique: async () => ({ eventId, status: "IN_PROGRESS" }) },
+    eventMembership: { findFirst: async ({ where }) => ({ id: crypto.randomUUID(), status: "ACTIVE", roles: [{ role: where.userId.endsWith("0") ? "REGISTRATION" : "SCREENER" }] }) },
     staffAssignment: {
       findFirst: async ({ where }) => (
         where.assignmentRole === "SCREENER" || where.assignmentRole === "REGISTRATION"
@@ -80,27 +92,25 @@ test("QR verify accepts registration officers or screeners with active assignmen
   };
 
   await assert.doesNotReject(
-    assertQrVerifyAccess(db, eventId, { userId, roles: ["REGISTRATION_OFFICER"] }),
+    assertQrVerifyAccess(db, eventId, account(`${userId.slice(0, -1)}0`)),
   );
   await assert.doesNotReject(
-    assertQrVerifyAccess(db, eventId, { userId, roles: ["SCREENER"] }),
+    assertQrVerifyAccess(db, eventId, account(userId)),
   );
   await assert.rejects(
-    assertQrVerifyAccess(db, eventId, { userId, roles: ["REVIEWER"] }),
-    (error) => error.statusCode === 403,
+    assertQrVerifyAccess({ ...db, eventMembership: { findFirst: async () => null } }, eventId, account(userId)),
+    (error) => error.status === 403,
   );
   await assert.rejects(
-    assertQrVerifyAccess(db, eventId, { userId, roles: ["ADMINISTRATOR", "SCREENER"] }),
-    (error) => error.statusCode === 403,
+    assertQrVerifyAccess({ ...db, eventMembership: { findFirst: async () => null } }, eventId, account(userId, ["ADMINISTRATOR"])),
+    (error) => error.status === 403,
   );
 });
 
-test("QR verify route allows SCREENER while generation stays registration-officer only", () => {
+test("QR routes delegate event membership and duty authorization to controllers", () => {
   const source = fs.readFileSync(path.join(__dirname, "../../routes/qrRoutes.js"), "utf8");
-  assert.match(source, /\/verify[\s\S]*REGISTRATION_OFFICER[\s\S]*SCREENER/);
-  const officerOnlyGuard = 'router.use(requireAnyRole.operational("REGISTRATION_OFFICER"));';
-  assert.ok(source.includes(officerOnlyGuard));
-  assert.ok(source.indexOf('"/verify"') < source.indexOf(officerOnlyGuard));
+  assert.match(source, /"\/verify"[\s\S]*qrController\.verifyQR/);
+  assert.doesNotMatch(source, /requireAnyRole|REGISTRATION_OFFICER/);
 });
 
 test("QR access resolves the registration event and rejects event confusion", async () => {

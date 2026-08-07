@@ -1,7 +1,11 @@
+const crypto = require("node:crypto");
 const prisma = require("../prisma/prismaClient");
 const AppError = require("../errors/AppError");
 const { resolveAuditContext } = require("../utils/audit");
 const { synchronizeStaffAccess } = require("./cognitoStaffAccessService");
+const { assertAdministratorRemains, lockAccountTransition } = require("./adminSafety");
+const { enqueueProviderOperation, processProviderOperation, processProviderOperationForResponse } = require("./accountProviderOperationService");
+const { deriveLegacyStatus } = require("./accountState");
 
 const userSelect = {
   id: true,
@@ -12,6 +16,8 @@ const userSelect = {
   department: true,
   designation: true,
   status: true,
+  approvalState: true,
+  accessState: true,
   sysRole: true,
   createdAt: true,
   userRoles: { select: { role: { select: { id: true, roleName: true } } } },
@@ -29,7 +35,10 @@ const accountSnapshot = (user) => ({
 });
 
 const isActiveAdministrator = (user, roles = accountSnapshot(user).roles, status = user.status) =>
-  status === "ACTIVE" && roles.includes("ADMINISTRATOR");
+  status === "ACTIVE"
+  && (user.approvalState ?? "APPROVED") === "APPROVED"
+  && (user.accessState ?? "ENABLED") === "ENABLED"
+  && roles.includes("ADMINISTRATOR");
 
 async function rolesFor(tx, roleNames) {
   const roles = await tx.role.findMany({
@@ -50,15 +59,10 @@ async function assertAdminSafety(tx, current, nextRoles, nextStatus, actorId) {
   }
   if (!currentIsActiveAdmin || nextIsActiveAdmin) return;
 
-  const activeAdministratorCount = await tx.user.count({
-    where: {
-      status: "ACTIVE",
-      userRoles: { some: { role: { roleName: "ADMINISTRATOR" } } },
-    },
+  await assertAdministratorRemains(tx, {
+    currentIsAdministrator: currentIsActiveAdmin,
+    nextIsAdministrator: nextIsActiveAdmin,
   });
-  if (activeAdministratorCount <= 1) {
-    throw new AppError(422, "LAST_ADMIN_CHANGE_BLOCKED", "Keep at least one active administrator account");
-  }
 }
 
 async function writeAudit(tx, { actorId, action, accountId, before = null, after, context }) {
@@ -84,34 +88,60 @@ exports.getAllUsers = async () => {
   return users.map(projectUser);
 };
 
-async function compensateAndRethrow(synchronization, error) {
-  if (synchronization) await synchronization.compensate();
+function mapUniqueConflict(error) {
+  if (error?.code === "P2002") {
+    throw new AppError(409, "ACCOUNT_FIELD_CONFLICT", "An account already uses one of these unique fields");
+  }
   throw error;
 }
 
-exports.createUser = async (userData, actorId, context, accessProvider = synchronizeStaffAccess) => {
-  let synchronization;
+exports.createUser = async (
+  userData,
+  actorId,
+  context,
+  accessProvider = synchronizeStaffAccess,
+  operationProcessor = processProviderOperation,
+) => {
   try {
-    return await prisma.$transaction(async (tx) => {
-      const existing = await tx.user.findUnique({ where: { email: userData.email }, select: { id: true } });
-      if (existing) throw new AppError(409, "EMAIL_EXISTS", "Email already registered");
+    const result = await prisma.$transaction(async (tx) => {
+      const existing = await tx.user.findUnique({ where: { email: userData.email }, select: userSelect });
+      if (existing) {
+        const operation = await tx.accountProviderOperation.findFirst({
+          where: { userId: existing.id, operationType: "SYNC_ACCESS", status: { in: ["PENDING", "PROCESSING", "FAILED"] } },
+          orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+        });
+        const requestedRoles = [...userData.roles].sort();
+        const queuedRoles = [...(operation?.payload?.roles || [])].sort();
+        if (operation
+          && operation.payload?.status === deriveLegacyStatus({
+            approvalState: "APPROVED",
+            accessState: "ENABLED",
+            inactive: userData.status === "INACTIVE",
+          })
+          && requestedRoles.join("\0") === queuedRoles.join("\0")) {
+          return { user: existing, operation };
+        }
+        throw new AppError(409, "EMAIL_EXISTS", "Email already registered");
+      }
 
       const roles = await rolesFor(tx, userData.roles);
-      synchronization = await accessProvider({
-        email: userData.email,
-        roles: userData.roles,
-        status: userData.status,
+      const accessState = "ENABLED";
+      const status = deriveLegacyStatus({
+        approvalState: "APPROVED",
+        accessState,
+        inactive: userData.status === "INACTIVE",
       });
       const user = await tx.user.create({
         data: {
-          ...(synchronization.cognitoSub ? { cognitoSub: synchronization.cognitoSub } : {}),
           username: userData.email,
           fullName: userData.fullName,
           email: userData.email,
           employeeNumber: userData.employeeNumber,
           department: userData.department ?? null,
           designation: userData.designation ?? null,
-          status: userData.status,
+          status,
+          approvalState: "APPROVED",
+          accessState,
           sysRole: userData.roles.includes("ADMINISTRATOR") ? "ADMIN" : userData.roles.includes("EVENT_MANAGER") ? "EVENT_MANAGER" : "STAFF",
           userRoles: { create: roles.map((role) => ({ roleId: role.id, assignedById: actorId })) },
         },
@@ -124,39 +154,52 @@ exports.createUser = async (userData, actorId, context, accessProvider = synchro
         after: accountSnapshot(user),
         context,
       });
-      return projectUser(user);
+      const operation = await enqueueProviderOperation(tx, {
+        userId: user.id,
+        operationType: "SYNC_ACCESS",
+        idempotencyKey: `SYNC_ACCESS:${user.id}:${crypto.randomUUID()}`,
+        payload: { roles: userData.roles, status },
+      });
+      return { user, operation };
     });
+    const providerOperation = await processProviderOperationForResponse(result.operation, {
+      processor: operationProcessor,
+      synchronize: accessProvider,
+      force: true,
+    });
+    return { ...projectUser(result.user), providerOperation };
   } catch (error) {
-    return compensateAndRethrow(synchronization, error);
+    return mapUniqueConflict(error);
   }
 };
 
-exports.updateUser = async (userId, userData, actorId, context, accessProvider = synchronizeStaffAccess) => {
-  let synchronization;
+exports.updateUser = async (
+  userId,
+  userData,
+  actorId,
+  context,
+  accessProvider = synchronizeStaffAccess,
+  operationProcessor = processProviderOperation,
+) => {
   try {
-    return await prisma.$transaction(async (tx) => {
+    const result = await prisma.$transaction(async (tx) => {
+      await lockAccountTransition(tx, userId);
       const current = await tx.user.findUnique({ where: { id: userId }, select: userSelect });
       if (!current) throw new AppError(404, "USER_NOT_FOUND", "Staff account not found");
 
       const currentRoles = accountSnapshot(current).roles;
       const nextRoles = userData.roles || currentRoles;
-      const nextStatus = userData.status || current.status;
-      await assertAdminSafety(tx, current, nextRoles, nextStatus, actorId);
+      const rolesChanged = Boolean(userData.roles)
+        && [...nextRoles].sort().join("\0") !== [...currentRoles].sort().join("\0");
+      if (current.id === actorId && !isActiveAdministrator(current, nextRoles, current.status)) {
+        throw new AppError(422, "SELF_ADMIN_CHANGE_BLOCKED", "You cannot remove your own administrator access or deactivate your account");
+      }
 
       let requestedRoles = null;
       if (userData.roles) requestedRoles = await rolesFor(tx, userData.roles);
-      if (userData.roles || userData.status !== undefined) {
-        synchronization = await accessProvider({
-          email: current.email,
-          roles: nextRoles,
-          status: nextStatus,
-        });
-        if (current.cognitoSub && synchronization.cognitoSub && current.cognitoSub !== synchronization.cognitoSub) {
-          throw new AppError(409, "COGNITO_IDENTITY_MISMATCH", "The Cognito identity does not match this staff account");
-        }
-      }
+      await assertAdminSafety(tx, current, nextRoles, current.status, actorId);
 
-      if (requestedRoles) {
+      if (requestedRoles && rolesChanged) {
         const roleIds = requestedRoles.map(({ id }) => id);
         await tx.userRole.deleteMany({ where: { userId, roleId: { notIn: roleIds } } });
         await tx.userRole.createMany({
@@ -168,13 +211,11 @@ exports.updateUser = async (userId, userData, actorId, context, accessProvider =
       const updated = await tx.user.update({
         where: { id: userId },
         data: {
-          ...(!current.cognitoSub && synchronization?.cognitoSub ? { cognitoSub: synchronization.cognitoSub } : {}),
           ...(userData.fullName !== undefined ? { fullName: userData.fullName } : {}),
           ...(userData.employeeNumber !== undefined ? { employeeNumber: userData.employeeNumber } : {}),
           ...(userData.department !== undefined ? { department: userData.department } : {}),
           ...(userData.designation !== undefined ? { designation: userData.designation } : {}),
-          ...(userData.status !== undefined ? { status: userData.status } : {}),
-          ...(userData.roles ? { sysRole: nextRoles.includes("ADMINISTRATOR") ? "ADMIN" : nextRoles.includes("EVENT_MANAGER") ? "EVENT_MANAGER" : "STAFF" } : {}),
+          ...(rolesChanged ? { sysRole: nextRoles.includes("ADMINISTRATOR") ? "ADMIN" : nextRoles.includes("EVENT_MANAGER") ? "EVENT_MANAGER" : "STAFF" } : {}),
         },
         select: userSelect,
       });
@@ -186,9 +227,35 @@ exports.updateUser = async (userId, userData, actorId, context, accessProvider =
         after: accountSnapshot(updated),
         context,
       });
-      return projectUser(updated);
+      let operation = null;
+      if (userData.roles && !rolesChanged) {
+        operation = await tx.accountProviderOperation.findFirst({
+          where: { userId, operationType: "SYNC_ACCESS", status: { in: ["PENDING", "PROCESSING", "FAILED"] } },
+          orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+        });
+      } else if (rolesChanged) {
+        await tx.accountProviderOperation.updateMany({
+          where: { userId, operationType: "SYNC_ACCESS", status: { in: ["PENDING", "FAILED"] } },
+          data: { status: "CANCELED", completedAt: new Date() },
+        });
+        operation = await enqueueProviderOperation(tx, {
+          userId,
+          operationType: "SYNC_ACCESS",
+          idempotencyKey: `SYNC_ACCESS:${userId}:${crypto.randomUUID()}`,
+          payload: { roles: nextRoles, status: current.status },
+        });
+      }
+      return { user: updated, operation };
     });
+    const providerOperation = result.operation
+      ? await processProviderOperationForResponse(result.operation, {
+          processor: operationProcessor,
+          synchronize: accessProvider,
+          force: true,
+        })
+      : null;
+    return { ...projectUser(result.user), ...(providerOperation ? { providerOperation } : {}) };
   } catch (error) {
-    return compensateAndRethrow(synchronization, error);
+    return mapUniqueConflict(error);
   }
 };
