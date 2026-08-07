@@ -7347,7 +7347,7 @@
               "value": "application/json"
             }
           ],
-          "body": "{\n  \"participants\": [\n    {\n      \"id\": \"00000000-0000-4000-8000-000000000000\",\n      \"participantReference\": \"\",\n      \"firstName\": \"\",\n      \"lastName\": \"\",\n      \"maskedContactNumber\": \"\",\n      \"maskedDateOfBirth\": \"\",\n      \"status\": \"ACTIVE\"\n    }\n  ],\n  \"pagination\": {\n    \"page\": 1,\n    \"pageSize\": 1,\n    \"total\": 0,\n    \"totalPages\": 0\n  }\n}"
+          "body": "{\n  \"participants\": [\n    {\n      \"id\": \"00000000-0000-4000-8000-000000000000\",\n      \"participantReference\": \"\",\n      \"firstName\": \"\",\n      \"lastName\": \"\",\n      \"maskedContactNumber\": \"\",\n      \"maskedDateOfBirth\": \"\",\n      \"matchReasons\": [\n        \"\"\n      ],\n      \"status\": \"ACTIVE\"\n    }\n  ],\n  \"pagination\": {\n    \"page\": 1,\n    \"pageSize\": 1,\n    \"total\": 0,\n    \"totalPages\": 0\n  }\n}"
         },
         {
           "name": "400 Response",
@@ -7577,6 +7577,126 @@
           },
           "status": "Forbidden",
           "code": 403,
+          "header": [
+            {
+              "key": "Content-Type",
+              "value": "application/json"
+            }
+          ],
+          "body": "{\n  \"type\": \"\",\n  \"title\": \"\",\n  \"status\": 0,\n  \"code\": \"\",\n  \"requestId\": \"00000000-0000-4000-8000-000000000000\",\n  \"errors\": [\n    {\n      \"field\": \"\",\n      \"message\": \"\"\n    }\n  ]\n}"
+        }
+      ]
+    },
+    {
+      "name": "Find possible participant matches for the assigned registration event",
+      "description": "A name alone never produces a possible match. At least two of full name, date of birth, and contact number must agree.",
+      "event": [],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json",
+            "description": "JSON request body",
+            "type": "text"
+          }
+        ],
+        "auth": {
+          "type": "bearer",
+          "bearer": [
+            {
+              "key": "token",
+              "value": "{{token}}",
+              "type": "string"
+            }
+          ]
+        },
+        "url": {
+          "raw": "{{baseUrl}}/participants/match",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "participants",
+            "match"
+          ],
+          "query": []
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"firstName\": \"\",\n  \"lastName\": \"\",\n  \"dateOfBirth\": \"2026-08-07\",\n  \"contactNumber\": \"\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "response": [
+        {
+          "name": "200 Response",
+          "originalRequest": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "description": "JSON request body",
+                "type": "text"
+              }
+            ],
+            "url": "{{baseUrl}}/participants/match"
+          },
+          "status": "OK",
+          "code": 200,
+          "header": [
+            {
+              "key": "Content-Type",
+              "value": "application/json"
+            }
+          ],
+          "body": "{\n  \"result\": \"NO_MATCH\",\n  \"matches\": [\n    {\n      \"participant\": {\n        \"id\": \"00000000-0000-4000-8000-000000000000\",\n        \"participantReference\": \"\",\n        \"firstName\": \"\",\n        \"lastName\": \"\",\n        \"dateOfBirth\": \"2026-08-07\",\n        \"maskedContactNumber\": \"\",\n        \"preferredLanguage\": \"\"\n      },\n      \"matchReasons\": [\n        \"Full name\"\n      ],\n      \"previousEvent\": {\n        \"eventName\": \"\"\n      },\n      \"currentEventRegistration\": {\n        \"id\": \"00000000-0000-4000-8000-000000000000\",\n        \"queueNumber\": 0,\n        \"status\": \"SIGNED_UP\",\n        \"assignedBooth\": \"\"\n      }\n    }\n  ]\n}"
+        },
+        {
+          "name": "400 Response",
+          "originalRequest": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "description": "JSON request body",
+                "type": "text"
+              }
+            ],
+            "url": "{{baseUrl}}/participants/match"
+          },
+          "status": "Bad Request",
+          "code": 400,
+          "header": [
+            {
+              "key": "Content-Type",
+              "value": "application/json"
+            }
+          ],
+          "body": "{\n  \"type\": \"\",\n  \"title\": \"\",\n  \"status\": 0,\n  \"code\": \"\",\n  \"requestId\": \"00000000-0000-4000-8000-000000000000\",\n  \"errors\": [\n    {\n      \"field\": \"\",\n      \"message\": \"\"\n    }\n  ]\n}"
+        },
+        {
+          "name": "401 Response",
+          "originalRequest": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "description": "JSON request body",
+                "type": "text"
+              }
+            ],
+            "url": "{{baseUrl}}/participants/match"
+          },
+          "status": "Unauthorized",
+          "code": 401,
           "header": [
             {
               "key": "Content-Type",
