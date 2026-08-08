@@ -707,18 +707,18 @@ Every scanner is also runnable locally with a single command, which is how the f
 
 ```bash
 # Secret detection (full history; PRs only scan introduced commits in CI)
-docker run --rm -v "$PWD:/repo" -w /repo zricethezav/gitleaks:latest detect \
+docker run --rm -v "$PWD:/repo" -w /repo zricethezav/gitleaks:v8.30.1 detect \
   --source=/repo --config=/repo/.gitleaks.toml --redact --log-opts="HEAD"
 
 # SAST
-docker run --rm -v "$PWD:/src" -w /src returntocorp/semgrep semgrep scan \
+docker run --rm -v "$PWD:/src" -w /src returntocorp/semgrep:1.170.1 semgrep scan \
   --config p/security-audit --config p/owasp-top-ten --metrics off \
   --exclude node_modules --exclude secure-data --json --output semgrep-report.json \
   backend react-user-dashboard/src
 
 # SCA
 pnpm audit
-docker run --rm -v "$PWD:/src" -w /src ghcr.io/google/osv-scanner:latest scan \
+docker run --rm -v "$PWD:/src" -w /src ghcr.io/google/osv-scanner:v2.5.0 scan \
   --lockfile /src/backend/pnpm-lock.yaml \
   --lockfile /src/react-user-dashboard/pnpm-lock.yaml \
   --lockfile /src/pnpm-lock.yaml
