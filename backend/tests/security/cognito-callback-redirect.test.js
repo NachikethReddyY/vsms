@@ -54,6 +54,11 @@ test("authorize route creates a PKCE authorization URL and stores the protected 
     assert.ok(response.headers["set-cookie"].some((cookie) => cookie.startsWith("vsms_oauth_return_to=%2Fevents%3Fview%3Dupcoming")));
 });
 
+test("authorize forwards the sign-up hint to Cognito", async () => {
+    const response = await request(app).get("/api/v1/auth/authorize?screen_hint=signup");
+    assert.equal(new URL(response.headers.location).searchParams.get("screen_hint"), "signup");
+});
+
 test("callback returns the same-origin protected target after authorization-code exchange", async () => {
     const response = await request(app)
         .get("/api/v1/auth/callback?code=authorization-code&state=state")

@@ -139,18 +139,7 @@ if (require.main === module) {
     const HOST = env.HOST || "0.0.0.0";
     const PORT = env.PORT || 4000;
 
-    server.listen(PORT, HOST, () => {
-        const protocol = useHttps ? "https" : "http";
-
-        logger.info("server.started", {
-            protocol,
-            port: PORT,
-            environment: env.NODE_ENV,
-            tls: useHttps ? "TLS 1.3 Strict Enabled" : "Handled via Upstream Reverse Proxy"
-        });
-
-        console.log(`\x1b[32m✓ VSMS API Server Online (${protocol.toUpperCase()} on port ${PORT})\x1b[0m`);
-    });
+    server.listen(PORT, HOST);
 }
 
 module.exports = {
