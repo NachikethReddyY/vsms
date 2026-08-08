@@ -9,7 +9,7 @@ import {
   TicketIcon,
   UserIcon,
 } from "@heroicons/react/24/outline";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import type { ConsentFormVersion, EmergencyContact, EventSummary, Participant, Registration } from "../../types";
 import apiClient, { getApiError } from "../../utils/apiClient";
@@ -76,6 +76,19 @@ export default function ParticipantRegistrationPage() {
   const [error, setError] = useState<string | null>(null);
   const idempotencyKey = useRef(crypto.randomUUID());
 
+  const loadStations = useCallback(async () => {
+    setIsLoadingStations(true);
+    setError(null);
+    try {
+      const response = await apiClient.get(`/queues/events/${eventId}/stations`);
+      setStations(response.data.stations ?? []);
+    } catch (requestError: unknown) {
+      setError(getApiError(requestError, "Unable to load the available stations."));
+    } finally {
+      setIsLoadingStations(false);
+    }
+  }, [eventId]);
+
   useEffect(() => {
     if (!eventId) return;
     let active = true;
@@ -105,7 +118,7 @@ export default function ParticipantRegistrationPage() {
         if (active) setIsLoading(false);
       });
     return () => { active = false; };
-  }, [eventId, navigate, participantId]);
+  }, [eventId, loadStations, navigate, participantId]);
 
   const requirements = useMemo(() => {
     if (!review) return [];
@@ -121,19 +134,6 @@ export default function ParticipantRegistrationPage() {
 
   const missingRequirement = requirements.find((item) => !item.complete)?.label;
   const canRegister = Boolean(review && !missingRequirement && !isSubmitting);
-
-  async function loadStations() {
-    setIsLoadingStations(true);
-    setError(null);
-    try {
-      const response = await apiClient.get(`/queues/events/${eventId}/stations`);
-      setStations(response.data.stations ?? []);
-    } catch (requestError: unknown) {
-      setError(getApiError(requestError, "Unable to load the available stations."));
-    } finally {
-      setIsLoadingStations(false);
-    }
-  }
 
   async function createRegistration() {
     if (!canRegister) return;
