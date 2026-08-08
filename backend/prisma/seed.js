@@ -100,7 +100,7 @@ async function seedStaff(roles, passwordHash) {
   const email = String(process.env.SEED_STAFF_EMAIL || "seed.admin@cryptix.local").trim().toLowerCase();
   const user = await prisma.user.upsert({
     where: { email },
-    update: { status: "ACTIVE", sysRole: "ADMIN", approvalState: "APPROVED", accessState: "ENABLED" },
+    update: { status: "ACTIVE", sysRole: "ADMIN" },
     create: {
       username: email,
       fullName: process.env.SEED_STAFF_NAME || "Seed Administrator",
@@ -109,9 +109,6 @@ async function seedStaff(roles, passwordHash) {
       department: "Operations",
       designation: "Event Administrator",
       status: "ACTIVE",
-      approvalState: "APPROVED",
-      accessState: "ENABLED",
-      professionalCategory: "STAFF",
       sysRole: "ADMIN",
     },
   });
@@ -134,7 +131,7 @@ async function seedRegistrationOfficer(roles, staff, passwordHash) {
   const email = String(process.env.SEED_REGISTRATION_EMAIL || "registration@vsms.local").trim().toLowerCase();
   const officer = await prisma.user.upsert({
     where: { email },
-    update: { status: "ACTIVE", sysRole: "STAFF", approvalState: "APPROVED", accessState: "ENABLED" },
+    update: { status: "ACTIVE", sysRole: "STAFF" },
     create: {
       username: email,
       fullName: process.env.SEED_REGISTRATION_NAME || "Avery Lim",
@@ -143,9 +140,6 @@ async function seedRegistrationOfficer(roles, staff, passwordHash) {
       department: "Event Operations",
       designation: "Registration Officer",
       status: "ACTIVE",
-      approvalState: "APPROVED",
-      accessState: "ENABLED",
-      professionalCategory: "STAFF",
       sysRole: "STAFF",
     },
   });
@@ -166,7 +160,7 @@ async function seedReviewer(roles, staff, passwordHash) {
   const email = String(process.env.SEED_REVIEWER_EMAIL || "reviewer@vsms.local").trim().toLowerCase();
   const reviewer = await prisma.user.upsert({
     where: { email },
-    update: { status: "ACTIVE", sysRole: "STAFF", approvalState: "APPROVED", accessState: "ENABLED" },
+    update: { status: "ACTIVE", sysRole: "STAFF" },
     create: {
       username: email,
       fullName: process.env.SEED_REVIEWER_NAME || "Dr Samira Tan",
@@ -175,9 +169,6 @@ async function seedReviewer(roles, staff, passwordHash) {
       department: "Clinical Operations",
       designation: "Clinical Reviewer",
       status: "ACTIVE",
-      approvalState: "APPROVED",
-      accessState: "ENABLED",
-      professionalCategory: "DOCTOR",
       sysRole: "STAFF",
     },
   });
