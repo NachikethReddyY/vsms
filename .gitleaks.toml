@@ -1,0 +1,30 @@
+# VSMS gitleaks configuration
+#
+# Extends the default rule set and documents the only intentional matches that
+# resemble secrets but are not credentials. Everything else is scanned and any
+# genuine secret fails the workflow.
+
+title = "VSMS secret-scan configuration"
+
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Intentional placeholders, analytics column labels, and test fixtures"
+regexTarget = "match"
+
+# Literal (single-quoted) TOML strings so backslashes reach the regex engine
+# verbatim. Regexes target exact non-secret shapes, not whole files, so a real
+# secret introduced anywhere (including those files) is still reported.
+regexes = [
+  # .env.example values instruct developers to substitute real secrets.
+  'replace-with-[a-z0-9-]+',
+  # Analytics report definitions use `key: "<label>"` for column identifiers.
+  # Scoped to the exact column keys in backend/services/analyticsService.js so a
+  # genuine key-shaped secret anywhere else is still reported.
+  '\bkey\s*:\s*"(registered|attendance|attendanceRate|queueWaitP50|queueWaitP90|serviceP50|stationThroughput|clinicalDistribution|referralDelivery|completed|cancelled|waiting|active|skipped|waitP50Minutes|waitP90Minutes|serviceP50Minutes|serviceP90Minutes|stationName|stationType|category|count|suppressed|dimension)"',
+  # Referral signature test fixtures reference relative S3-style object keys.
+  'signatureObjectKey\s*:\s*"signatures/[a-z0-9/_-]+"',
+  # Idempotency keys are generated UUIDs, not credentials.
+  'idempotencyKey\s*:\s*crypto\.randomUUID\(\)',
+]

@@ -43,3 +43,7 @@ backend/certs/*.pem
 
 # Bruno reports can contain short-lived bearer tokens and response headers
 api-testing/results/
+
+# Local security-scan artifacts
+gitleaks-report.json
+semgrep-report.json

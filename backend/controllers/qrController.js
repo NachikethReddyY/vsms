@@ -7,6 +7,8 @@ const { renderBrandedQrSvg } = require("../utils/qrBranding");
 const { assertUuid } = require("../utils/validation");
 const { assertRegistrationAssignment, assertQrVerifyAccess } = require("../utils/staff");
 
+const escapeHtml = (value) => String(value ?? "").replace(/[&<>"']/g, (character) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[character]));
+
 async function assertQrAccess(req, selectors) {
     const eventId = await qrService.getEventIdForAccess(selectors);
     await assertRegistrationAssignment(prisma, eventId, req.auth);
@@ -331,7 +333,7 @@ exports.devPageQR = async (req, res, next) => {
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>VSMS QR Pass — ${displayName}</title>
+<title>VSMS QR Pass — ${escapeHtml(displayName)}</title>
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body {
@@ -379,11 +381,11 @@ exports.devPageQR = async (req, res, next) => {
 <body>
   <div class="card">
     <div class="qr-wrap">${scanQr}</div>
-    <h1>${displayName}</h1>
-    <div class="sub">${registration.event?.name || "Unknown event"}</div>
+    <h1>${escapeHtml(displayName)}</h1>
+    <div class="sub">${escapeHtml(registration.event?.name || "Unknown event")}</div>
     <div class="meta">
-      Queue number: <b>${registration.queueNumber ?? "—"}</b>
-      ${token ? `&nbsp;·&nbsp; Token: <code style="font-size:12px">${token.slice(0, 12)}…</code>` : ""}
+      Queue number: <b>${escapeHtml(registration.queueNumber ?? "—")}</b>
+      ${token ? `&nbsp;·&nbsp; Token: <code style="font-size:12px">${escapeHtml(token.slice(0, 12))}…</code>` : ""}
     </div>
     <div id="status" class="status pending">Checking pass status…</div>
     <div id="err" class="err"></div>
@@ -392,7 +394,7 @@ exports.devPageQR = async (req, res, next) => {
 <script>
   const statusEl = document.getElementById("status");
   const errEl = document.getElementById("err");
-  const statusUrl = ${statusUrl ? `"${statusUrl}"` : "null"};
+  const statusUrl = ${JSON.stringify(statusUrl)};
 
   async function check() {
     if (!statusUrl) {
