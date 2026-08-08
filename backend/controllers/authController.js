@@ -176,7 +176,7 @@ exports.authorize = asyncHandler(async (req, res) => {
         verifier,
         returnTo: normalizeReturnTo(req.query.returnTo),
     });
-    res.redirect(buildAuthorizationUrl({ state, codeChallenge }));
+    res.redirect(buildAuthorizationUrl({ state, codeChallenge, screenHint: req.query.screen_hint === "signup" ? "signup" : undefined }));
 });
 
 exports.callback = asyncHandler(async (req, res) => {

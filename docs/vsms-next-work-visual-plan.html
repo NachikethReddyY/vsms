@@ -1,0 +1,1175 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light dark">
+  <meta name="description" content="A visual, plain-language plan for VSMS signup, approvals, event roles, analytics, deletion, and email.">
+  <title>VSMS Next Work: Visual Plan</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --paper: #f5f7f9;
+      --surface: #ffffff;
+      --surface-2: #edf2f6;
+      --ink: #102033;
+      --muted: #536579;
+      --faint: #75869a;
+      --line: #cbd6e1;
+      --line-strong: #9aabba;
+      --accent: #1769aa;
+      --accent-soft: #e3f1fb;
+      --accent-ink: #0b4b7d;
+      --good: #18734b;
+      --good-soft: #e2f3e9;
+      --warn: #9a5b13;
+      --warn-soft: #fff0d6;
+      --danger: #a63c3c;
+      --danger-soft: #fde7e7;
+      --shadow: 0 24px 70px rgba(26, 49, 72, .1);
+      --radius: 16px;
+      --sans: ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      --mono: ui-monospace, "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+    }
+
+    @media (prefers-color-scheme: dark) {
+      :root {
+        color-scheme: dark;
+        --paper: #0d151e;
+        --surface: #131f2b;
+        --surface-2: #1a2937;
+        --ink: #edf5fb;
+        --muted: #aec0d0;
+        --faint: #8196a9;
+        --line: #314354;
+        --line-strong: #52697d;
+        --accent: #67b9f0;
+        --accent-soft: #17354a;
+        --accent-ink: #b9e3ff;
+        --good: #78d8aa;
+        --good-soft: #15392b;
+        --warn: #f3bf70;
+        --warn-soft: #432f16;
+        --danger: #ff9f9f;
+        --danger-soft: #482323;
+        --shadow: 0 24px 70px rgba(0, 0, 0, .26);
+      }
+    }
+
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body {
+      margin: 0;
+      background:
+        linear-gradient(90deg, transparent 49.92%, rgba(23, 105, 170, .04) 50%, transparent 50.08%),
+        var(--paper);
+      color: var(--ink);
+      font-family: var(--sans);
+      font-size: 16px;
+      line-height: 1.6;
+    }
+
+    a { color: inherit; text-underline-offset: .2em; }
+    button, summary { font: inherit; }
+    code { font-family: var(--mono); font-size: .9em; }
+    :focus-visible { outline: 3px solid var(--accent); outline-offset: 4px; }
+
+    .skip-link {
+      position: fixed;
+      top: 10px;
+      left: 10px;
+      z-index: 100;
+      padding: 10px 14px;
+      border-radius: 8px;
+      background: var(--ink);
+      color: var(--paper);
+      transform: translateY(-160%);
+    }
+    .skip-link:focus { transform: translateY(0); }
+
+    .top-rule { height: 6px; background: var(--accent); }
+    .shell { width: min(1180px, calc(100% - 40px)); margin-inline: auto; }
+
+    .masthead { padding: 28px 0 54px; }
+    .meta {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 20px;
+      padding-bottom: 28px;
+      color: var(--muted);
+      font-size: .78rem;
+      font-weight: 760;
+      letter-spacing: .08em;
+      text-transform: uppercase;
+    }
+    .meta strong { color: var(--accent); }
+    .hero {
+      display: grid;
+      grid-template-columns: minmax(0, 1.45fr) minmax(280px, .55fr);
+      gap: 56px;
+      align-items: end;
+    }
+    h1, h2, h3, p { margin-top: 0; }
+    h1 {
+      max-width: 900px;
+      margin-bottom: 22px;
+      font-size: clamp(2.8rem, 7vw, 6.7rem);
+      font-weight: 760;
+      letter-spacing: -.065em;
+      line-height: .92;
+    }
+    h1 span { color: var(--accent); }
+    .deck {
+      max-width: 720px;
+      margin-bottom: 0;
+      color: var(--muted);
+      font-size: clamp(1.02rem, 1.8vw, 1.22rem);
+    }
+    .hero-note {
+      padding: 22px 0 4px;
+      border-top: 3px solid var(--accent);
+    }
+    .hero-note strong { display: block; margin-bottom: 7px; font-size: 1.08rem; }
+    .hero-note p { margin: 0; color: var(--muted); font-size: .92rem; }
+
+    .jumpbar {
+      position: sticky;
+      top: 0;
+      z-index: 20;
+      border-block: 1px solid var(--line);
+      background: color-mix(in srgb, var(--paper) 92%, transparent);
+      backdrop-filter: blur(14px);
+    }
+    .jumpbar .shell {
+      display: flex;
+      gap: 7px;
+      overflow-x: auto;
+      padding-block: 11px;
+      scrollbar-width: thin;
+    }
+    .jumpbar a {
+      flex: 0 0 auto;
+      min-height: 42px;
+      padding: 9px 13px;
+      border: 1px solid transparent;
+      border-radius: 999px;
+      color: var(--muted);
+      font-size: .84rem;
+      font-weight: 700;
+      text-decoration: none;
+    }
+    .jumpbar a:hover { border-color: var(--line); color: var(--ink); }
+
+    main { padding: 58px 0 110px; }
+    section { margin-bottom: 96px; scroll-margin-top: 84px; }
+    h2 {
+      max-width: 900px;
+      margin-bottom: 16px;
+      font-size: clamp(2rem, 4.2vw, 4.2rem);
+      font-weight: 740;
+      letter-spacing: -.05em;
+      line-height: 1;
+    }
+    h3 { margin-bottom: 8px; font-size: 1.05rem; line-height: 1.25; }
+    .lead { max-width: 780px; color: var(--muted); font-size: 1.06rem; }
+    .section-number {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 38px;
+      height: 38px;
+      margin-bottom: 20px;
+      border: 1px solid var(--line-strong);
+      border-radius: 50%;
+      color: var(--accent);
+      font-family: var(--mono);
+      font-size: .78rem;
+      font-weight: 800;
+    }
+
+    .plain-callout {
+      display: grid;
+      grid-template-columns: 165px 1fr;
+      gap: 24px;
+      margin: 30px 0;
+      padding: 24px;
+      border-left: 5px solid var(--accent);
+      border-radius: 0 var(--radius) var(--radius) 0;
+      background: var(--surface);
+      box-shadow: var(--shadow);
+    }
+    .plain-callout strong { color: var(--accent); font-size: .82rem; letter-spacing: .06em; text-transform: uppercase; }
+    .plain-callout p { margin: 0; }
+
+    .concept-grid {
+      display: grid;
+      grid-template-columns: 1.05fr .95fr 1.05fr .95fr;
+      gap: 10px;
+      margin-top: 34px;
+    }
+    .concept {
+      min-height: 250px;
+      padding: 24px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: var(--surface);
+    }
+    .concept:nth-child(2), .concept:nth-child(4) { margin-top: 34px; }
+    .concept b {
+      display: block;
+      margin-bottom: 34px;
+      color: var(--accent);
+      font-family: var(--mono);
+      font-size: .78rem;
+    }
+    .concept h3 { font-size: 1.35rem; }
+    .concept p { margin: 0; color: var(--muted); font-size: .92rem; }
+
+    .equation {
+      display: grid;
+      grid-template-columns: repeat(7, auto);
+      gap: 10px;
+      align-items: center;
+      margin: 38px 0;
+      padding: 22px;
+      overflow-x: auto;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: var(--surface);
+    }
+    .equation-box {
+      min-width: 170px;
+      padding: 16px;
+      border-radius: 12px;
+      background: var(--surface-2);
+    }
+    .equation-box strong { display: block; }
+    .equation-box span { display: block; color: var(--muted); font-size: .8rem; }
+    .operator { color: var(--accent); font-family: var(--mono); font-size: 1.3rem; font-weight: 800; }
+
+    .compare {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 18px;
+      margin-top: 30px;
+    }
+    .compare-panel {
+      padding: 26px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: var(--surface);
+    }
+    .compare-panel.current { border-top: 5px solid var(--warn); }
+    .compare-panel.target { border-top: 5px solid var(--good); }
+    .compare-panel > span {
+      display: block;
+      margin-bottom: 18px;
+      color: var(--muted);
+      font-family: var(--mono);
+      font-size: .75rem;
+      font-weight: 800;
+      letter-spacing: .06em;
+      text-transform: uppercase;
+    }
+    .compare-panel ul { margin: 0; padding-left: 20px; color: var(--muted); }
+    .compare-panel li + li { margin-top: 9px; }
+
+    .role-board {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 18px;
+      margin-top: 34px;
+    }
+    .role {
+      position: relative;
+      overflow: hidden;
+      padding: 28px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: var(--surface);
+    }
+    .role::before {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 5px;
+      background: var(--accent);
+      content: "";
+    }
+    .role-wide { grid-column: 1 / -1; }
+    .role-head { display: flex; justify-content: space-between; gap: 16px; align-items: start; margin-bottom: 20px; }
+    .role-title { font-size: 1.45rem; font-weight: 760; letter-spacing: -.02em; }
+    .scope {
+      flex: 0 0 auto;
+      padding: 5px 9px;
+      border-radius: 999px;
+      background: var(--accent-soft);
+      color: var(--accent-ink);
+      font-size: .72rem;
+      font-weight: 800;
+      letter-spacing: .05em;
+      text-transform: uppercase;
+    }
+    .role ul { margin: 0; padding-left: 20px; color: var(--muted); }
+    .role li + li { margin-top: 7px; }
+    .role .not { margin-top: 20px; padding-top: 16px; border-top: 1px solid var(--line); color: var(--danger); font-size: .88rem; font-weight: 700; }
+    .role-chips { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 18px; }
+    .role-chip { padding: 7px 10px; border: 1px solid var(--line); border-radius: 8px; color: var(--muted); font-family: var(--mono); font-size: .76rem; }
+
+    .journey {
+      position: relative;
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 14px;
+      margin-top: 34px;
+    }
+    .journey::before {
+      position: absolute;
+      top: 28px;
+      left: 4%;
+      right: 4%;
+      height: 2px;
+      background: var(--line-strong);
+      content: "";
+    }
+    .journey-step { position: relative; padding-top: 54px; }
+    .journey-step::before {
+      position: absolute;
+      top: 17px;
+      left: 18px;
+      width: 22px;
+      height: 22px;
+      border: 5px solid var(--paper);
+      border-radius: 50%;
+      background: var(--accent);
+      box-shadow: 0 0 0 1px var(--line-strong);
+      content: "";
+    }
+    .journey-step article {
+      min-height: 190px;
+      padding: 20px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: var(--surface);
+    }
+    .journey-step b { color: var(--accent); font-family: var(--mono); font-size: .75rem; }
+    .journey-step h3 { margin-top: 14px; }
+    .journey-step p { margin: 0; color: var(--muted); font-size: .88rem; }
+    .journey-step.gate article { border-color: var(--warn); background: var(--warn-soft); }
+
+    .state-strip {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 10px;
+      margin-top: 24px;
+    }
+    .state {
+      padding: 18px;
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      background: var(--surface);
+    }
+    .state strong { display: block; margin-bottom: 6px; }
+    .state p { margin: 0; color: var(--muted); font-size: .88rem; }
+    .state.pending { border-color: var(--warn); }
+    .state.approved { border-color: var(--good); }
+    .state.assigned { border-color: var(--accent); }
+
+    .feature-map {
+      display: grid;
+      grid-template-columns: repeat(12, 1fr);
+      gap: 14px;
+      margin-top: 34px;
+    }
+    .feature {
+      grid-column: span 4;
+      min-height: 230px;
+      padding: 22px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: var(--surface);
+    }
+    .feature.large { grid-column: span 8; }
+    .feature.small { grid-column: span 4; }
+    .feature.tint { background: var(--accent-soft); }
+    .feature b { color: var(--accent); font-family: var(--mono); font-size: .72rem; }
+    .feature h3 { margin-top: 22px; font-size: 1.25rem; }
+    .feature p { color: var(--muted); font-size: .9rem; }
+    .feature ul { margin: 0; padding-left: 18px; color: var(--muted); font-size: .88rem; }
+    .feature li + li { margin-top: 5px; }
+
+    .pipeline {
+      display: grid;
+      grid-template-columns: repeat(5, minmax(150px, 1fr));
+      gap: 0;
+      margin: 34px 0;
+      overflow-x: auto;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: var(--surface);
+    }
+    .pipe-step {
+      position: relative;
+      min-height: 180px;
+      padding: 22px;
+      border-right: 1px solid var(--line);
+    }
+    .pipe-step:last-child { border-right: 0; }
+    .pipe-step:not(:last-child)::after {
+      position: absolute;
+      top: 24px;
+      right: -9px;
+      z-index: 2;
+      width: 18px;
+      height: 18px;
+      border-top: 1px solid var(--line);
+      border-right: 1px solid var(--line);
+      background: var(--surface);
+      content: "";
+      transform: rotate(45deg);
+    }
+    .pipe-step b { color: var(--accent); font-family: var(--mono); font-size: .73rem; }
+    .pipe-step strong { display: block; margin: 34px 0 7px; }
+    .pipe-step span { display: block; color: var(--muted); font-size: .84rem; }
+
+    .metrics {
+      display: grid;
+      grid-template-columns: repeat(6, 1fr);
+      gap: 8px;
+      margin-top: 24px;
+    }
+    .metric {
+      min-height: 132px;
+      padding: 16px;
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      background: var(--surface-2);
+    }
+    .metric strong { display: block; margin-bottom: 22px; color: var(--accent); font-family: var(--mono); font-size: .72rem; }
+    .metric span { font-size: .86rem; font-weight: 700; }
+
+    .provider-lanes {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 14px;
+      margin-top: 32px;
+    }
+    .provider {
+      padding: 24px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: var(--surface);
+    }
+    .provider .provider-name { display: block; margin-bottom: 30px; color: var(--accent); font-family: var(--mono); font-size: .75rem; font-weight: 800; }
+    .provider p { margin-bottom: 0; color: var(--muted); font-size: .88rem; }
+
+    .schema-groups {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin-top: 30px;
+    }
+    .schema-group {
+      padding: 24px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: var(--surface);
+    }
+    .schema-group h3 { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+    .schema-group h3 span { color: var(--accent); font-family: var(--mono); font-size: .7rem; font-weight: 800; }
+    .schema-group ul { margin: 16px 0 0; padding-left: 20px; color: var(--muted); }
+    .schema-group li + li { margin-top: 7px; }
+
+    .roadmap { margin-top: 36px; border-top: 1px solid var(--line); }
+    .roadmap-item {
+      display: grid;
+      grid-template-columns: 90px minmax(0, 1fr) 180px;
+      gap: 22px;
+      align-items: start;
+      padding: 24px 0;
+      border-bottom: 1px solid var(--line);
+    }
+    .roadmap-item > b { color: var(--accent); font-family: var(--mono); font-size: .78rem; }
+    .roadmap-item p { margin: 4px 0 0; color: var(--muted); font-size: .9rem; }
+    .roadmap-item .result { color: var(--good); font-size: .82rem; font-weight: 760; }
+
+    details {
+      margin-top: 18px;
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      background: var(--surface);
+    }
+    summary {
+      min-height: 50px;
+      padding: 13px 18px;
+      color: var(--accent);
+      cursor: pointer;
+      font-weight: 760;
+    }
+    details > div { padding: 0 18px 18px; color: var(--muted); }
+    details ul { margin-bottom: 0; }
+
+    .console {
+      margin-top: 30px;
+      overflow: hidden;
+      border: 1px solid var(--line-strong);
+      border-radius: var(--radius);
+      background: #0b1219;
+      color: #d9e7f2;
+      box-shadow: var(--shadow);
+    }
+    .console-bar { display: flex; gap: 7px; padding: 13px 16px; border-bottom: 1px solid #293b4b; }
+    .console-bar span { width: 10px; height: 10px; border-radius: 50%; background: #526779; }
+    .console pre { margin: 0; padding: 24px; overflow-x: auto; font-family: var(--mono); font-size: .84rem; line-height: 1.75; }
+    .console .ok { color: #82dba9; }
+    .console .info { color: #73c8ff; }
+    .console-notes {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 12px;
+      margin-top: 18px;
+    }
+    .console-note { padding: 18px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); }
+    .console-note b { display: block; margin-bottom: 5px; color: var(--accent); font-family: var(--mono); font-size: .75rem; }
+    .console-note p { margin: 0; color: var(--muted); font-size: .87rem; }
+
+    .decision-box {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      gap: 28px;
+      align-items: center;
+      padding: 30px;
+      border-radius: var(--radius);
+      background: var(--ink);
+      color: var(--paper);
+    }
+    .decision-box h2 { max-width: 740px; margin-bottom: 10px; font-size: clamp(1.8rem, 3.6vw, 3.4rem); }
+    .decision-box p { max-width: 720px; margin: 0; opacity: .8; }
+    .decision-mark {
+      display: grid;
+      place-items: center;
+      width: 120px;
+      aspect-ratio: 1;
+      border: 1px solid color-mix(in srgb, var(--paper) 35%, transparent);
+      border-radius: 50%;
+      color: var(--paper);
+      font-family: var(--mono);
+      font-size: .74rem;
+      font-weight: 800;
+      text-align: center;
+      text-transform: uppercase;
+    }
+
+    footer {
+      padding: 30px 0 60px;
+      border-top: 1px solid var(--line);
+      color: var(--faint);
+      font-size: .82rem;
+    }
+
+    @media (max-width: 980px) {
+      .hero { grid-template-columns: 1fr; gap: 32px; }
+      .hero-note { max-width: 650px; }
+      .concept-grid { grid-template-columns: repeat(2, 1fr); }
+      .concept:nth-child(2), .concept:nth-child(4) { margin-top: 0; }
+      .journey { grid-template-columns: repeat(2, 1fr); }
+      .journey::before { display: none; }
+      .journey-step { padding-top: 0; }
+      .journey-step::before { display: none; }
+      .feature, .feature.large, .feature.small { grid-column: span 6; }
+      .metrics { grid-template-columns: repeat(3, 1fr); }
+    }
+
+    @media (max-width: 700px) {
+      .shell { width: min(100% - 28px, 1180px); }
+      .masthead { padding-bottom: 38px; }
+      .meta { align-items: flex-start; flex-direction: column; gap: 6px; }
+      main { padding-top: 42px; }
+      section { margin-bottom: 72px; }
+      .plain-callout, .compare, .role-board, .state-strip, .provider-lanes, .schema-groups, .console-notes { grid-template-columns: 1fr; }
+      .concept-grid { grid-template-columns: 1fr; }
+      .concept { min-height: 0; }
+      .role-wide { grid-column: auto; }
+      .journey { grid-template-columns: 1fr; }
+      .feature, .feature.large, .feature.small { grid-column: 1 / -1; min-height: 0; }
+      .metrics { grid-template-columns: repeat(2, 1fr); }
+      .roadmap-item { grid-template-columns: 56px 1fr; gap: 14px; }
+      .roadmap-item .result { grid-column: 2; }
+      .decision-box { grid-template-columns: 1fr; }
+      .decision-mark { width: 96px; }
+    }
+
+    @media (max-width: 430px) {
+      .metrics { grid-template-columns: 1fr; }
+      .plain-callout { padding: 20px; }
+      .role-head { flex-direction: column; }
+      .console pre { padding: 18px; font-size: .76rem; }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      html { scroll-behavior: auto; }
+      *, *::before, *::after { transition-duration: .01ms !important; animation-duration: .01ms !important; }
+    }
+
+    @media print {
+      :root { color-scheme: light; }
+      body { background: #ffffff; color: #102033; }
+      .jumpbar, .skip-link { display: none; }
+      .shell { width: 100%; }
+      .masthead { padding-top: 12px; }
+      main { padding: 30px 0; }
+      section { break-inside: avoid; margin-bottom: 52px; }
+      .concept, .compare-panel, .role, .journey-step article, .state, .feature, .provider, .schema-group, details, .console-note { box-shadow: none; }
+      .console { break-inside: avoid; }
+    }
+  </style>
+</head>
+<body>
+  <a class="skip-link" href="#main">Skip to the plan</a>
+  <div class="top-rule"></div>
+
+  <header class="masthead shell">
+    <div class="meta">
+      <span><strong>VSMS</strong> next-work guide</span>
+      <span>Planning document / 6 August 2026</span>
+    </div>
+    <div class="hero">
+      <div>
+        <h1>What happens <span>next?</span></h1>
+        <p class="deck">A visual explanation of signup, approval, event roles, user administration, analytics, deletion, and application email.</p>
+      </div>
+      <aside class="hero-note" aria-label="Document status">
+        <strong>This is a plan, not an implementation.</strong>
+        <p>No application code or database tables have been changed. Database changes are listed for approval before implementation begins.</p>
+      </aside>
+    </div>
+  </header>
+
+  <nav class="jumpbar" aria-label="Document sections">
+    <div class="shell">
+      <a href="#big-idea">Big idea</a>
+      <a href="#today-target">Today vs target</a>
+      <a href="#roles">Roles</a>
+      <a href="#signup">Signup flow</a>
+      <a href="#screens">Screens</a>
+      <a href="#analytics">Analytics</a>
+      <a href="#deletion">Deletion</a>
+      <a href="#email">Email</a>
+      <a href="#database">Database</a>
+      <a href="#roadmap">Build order</a>
+      <a href="#console">Console</a>
+    </div>
+  </nav>
+
+  <main id="main" class="shell">
+    <section id="big-idea">
+      <span class="section-number">01</span>
+      <h2>Four separate decisions control access.</h2>
+      <p class="lead">The easiest way to understand the new design is to stop treating an account, an approval, a role, and a work shift as the same thing.</p>
+
+      <div class="concept-grid">
+        <article class="concept">
+          <b>01 / ACCOUNT</b>
+          <h3>Who are you?</h3>
+          <p>Email, name, profile, and Cognito identity. Creating an account does not give operational access.</p>
+        </article>
+        <article class="concept">
+          <b>02 / APPROVAL</b>
+          <h3>Are you trusted?</h3>
+          <p>An administrator approves or rejects the account. Approval allows login but does not assign an event job.</p>
+        </article>
+        <article class="concept">
+          <b>03 / EVENT ROLE</b>
+          <h3>What can you do here?</h3>
+          <p>A role is assigned for one event: manager, registration, screener, reviewer, or support.</p>
+        </article>
+        <article class="concept">
+          <b>04 / DUTY</b>
+          <h3>Where and when?</h3>
+          <p>A shift and station assignment narrows the event role to a specific time and work location.</p>
+        </article>
+      </div>
+
+      <div class="equation">
+        <div class="equation-box"><strong>Verified account</strong><span>Cognito identity</span></div>
+        <span class="operator">+</span>
+        <div class="equation-box"><strong>Approved</strong><span>Administrator decision</span></div>
+        <span class="operator">+</span>
+        <div class="equation-box"><strong>Event role</strong><span>Permission for this event</span></div>
+        <span class="operator">=</span>
+        <div class="equation-box"><strong>Operational access</strong><span>Only what is required</span></div>
+      </div>
+
+      <div class="plain-callout">
+        <strong>Plain language</strong>
+        <p>A person may have an approved account but no event work. They can view their profile and wait for an assignment. They cannot open queues, screening, reviews, or event reports until an event role is assigned.</p>
+      </div>
+    </section>
+
+    <section id="today-target">
+      <span class="section-number">02</span>
+      <h2>What exists today, and what must change.</h2>
+      <p class="lead">The current system already has secure Cognito sign-in, event assignments, reporting foundations, hard deletion, audit logs, and SES referral email. The problem is that account roles and event roles overlap.</p>
+
+      <div class="compare">
+        <article class="compare-panel current">
+          <span>Current system</span>
+          <h3>Global roles are required first</h3>
+          <ul>
+            <li>Public signup is disabled.</li>
+            <li>An administrator creates staff accounts.</li>
+            <li>Users receive global roles such as Screener or Reviewer.</li>
+            <li>The same user is then assigned again inside an event.</li>
+            <li>A role can unintentionally describe the person across every event.</li>
+            <li>The user profile is mostly read-only.</li>
+          </ul>
+        </article>
+        <article class="compare-panel target">
+          <span>Target system</span>
+          <h3>The event assignment grants the job</h3>
+          <ul>
+            <li>People can create their own account.</li>
+            <li>Every new account starts pending.</li>
+            <li>An administrator approves the identity only.</li>
+            <li>Operational roles are assigned separately for each event.</li>
+            <li>One person can do different work at different events.</li>
+            <li>The profile clearly shows approval, permissions, and assignments.</li>
+          </ul>
+        </article>
+      </div>
+
+      <details>
+        <summary>Why this requires a careful migration</summary>
+        <div>
+          <p>The current backend checks Cognito groups, database roles, a derived system role, event creator ownership, and staff assignments. Those checks cannot be removed in one deployment. The safe order is to add the new memberships, backfill them, compare old and new decisions, move every endpoint, and only then remove the old role paths.</p>
+        </div>
+      </details>
+    </section>
+
+    <section id="roles">
+      <span class="section-number">03</span>
+      <h2>Administrator and manager are different jobs.</h2>
+      <p class="lead">Administrator is a global platform responsibility. Event Manager is an operational responsibility limited to selected events.</p>
+
+      <div class="role-board">
+        <article class="role">
+          <div class="role-head">
+            <span class="role-title">Platform Administrator</span>
+            <span class="scope">Whole system</span>
+          </div>
+          <ul>
+            <li>Approve, reject, suspend, and reactivate accounts.</li>
+            <li>Revoke sessions and review platform audit history.</li>
+            <li>Create an event and appoint its first manager.</li>
+            <li>Permanently delete completed or cancelled events.</li>
+            <li>Protect the final active administrator account.</li>
+          </ul>
+          <p class="not">Does not automatically screen participants, review cases, operate queues, or read event analytics.</p>
+        </article>
+
+        <article class="role">
+          <div class="role-head">
+            <span class="role-title">Event Manager</span>
+            <span class="scope">Assigned events</span>
+          </div>
+          <ul>
+            <li>Manage the event schedule, stations, and assignments.</li>
+            <li>Assign approved users to event roles.</li>
+            <li>View event operations and completed-event analytics.</li>
+            <li>Generate permission-controlled PDF and CSV reports.</li>
+            <li>See only events they manage.</li>
+          </ul>
+          <p class="not">Cannot approve accounts, create platform administrators, or permanently delete events.</p>
+        </article>
+
+        <article class="role role-wide">
+          <div class="role-head">
+            <span class="role-title">Operational event roles</span>
+            <span class="scope">One event at a time</span>
+          </div>
+          <p class="lead">Use granular roles so a general Staff role does not accidentally grant both registration and screening access.</p>
+          <div class="role-chips">
+            <span class="role-chip">REGISTRATION</span>
+            <span class="role-chip">SCREENER</span>
+            <span class="role-chip">REVIEWER</span>
+            <span class="role-chip">SUPPORT</span>
+            <span class="role-chip">EVENT_MANAGER</span>
+          </div>
+        </article>
+      </div>
+
+      <div class="plain-callout">
+        <strong>Staff or doctor?</strong>
+        <p>Staff and Doctor may be profile categories, but they are not permissions. A doctor becomes a Reviewer only when assigned to that role for an event. Administrator must never be available as a signup choice.</p>
+      </div>
+    </section>
+
+    <section id="signup">
+      <span class="section-number">04</span>
+      <h2>The new user journey, step by step.</h2>
+      <p class="lead">Signup proves identity first. Approval establishes trust. Event assignment grants work.</p>
+
+      <div class="journey">
+        <div class="journey-step">
+          <article><b>STEP 01</b><h3>Create account</h3><p>The user chooses Create account and enters credentials through Cognito.</p></article>
+        </div>
+        <div class="journey-step">
+          <article><b>STEP 02</b><h3>Verify identity</h3><p>Cognito verifies email, password policy, and MFA. The application does not store the password.</p></article>
+        </div>
+        <div class="journey-step gate">
+          <article><b>STEP 03</b><h3>Pending approval</h3><p>The local account is created without roles. The user can complete a profile and view approval status only.</p></article>
+        </div>
+        <div class="journey-step">
+          <article><b>STEP 04</b><h3>Admin decision</h3><p>An administrator approves or rejects the account and the decision is permanently audited.</p></article>
+        </div>
+        <div class="journey-step">
+          <article><b>STEP 05</b><h3>Approved, no work</h3><p>The user can sign in and view a No event assignments page. There is still no operational access.</p></article>
+        </div>
+        <div class="journey-step">
+          <article><b>STEP 06</b><h3>Event role</h3><p>An event manager assigns the approved user to a role for one selected event.</p></article>
+        </div>
+        <div class="journey-step">
+          <article><b>STEP 07</b><h3>Shift and station</h3><p>Where needed, a duty narrows the role to a shift, station, and assignment state.</p></article>
+        </div>
+        <div class="journey-step">
+          <article><b>STEP 08</b><h3>Role-based workspace</h3><p>The user sees only the pages and API operations permitted for that event role.</p></article>
+        </div>
+      </div>
+
+      <div class="state-strip">
+        <article class="state pending"><strong>Pending</strong><p>Profile, status, logout. No operational pages.</p></article>
+        <article class="state approved"><strong>Approved</strong><p>Account accepted. May still have no event work.</p></article>
+        <article class="state assigned"><strong>Assigned</strong><p>Access only to permitted actions for the assigned event.</p></article>
+      </div>
+
+      <details>
+        <summary>What happens to sign-in, refresh, logout, and passwords?</summary>
+        <div>
+          <ul>
+            <li>Keep Cognito Hosted UI for sign-in, signup, verification, MFA, and password recovery.</li>
+            <li>Add visible callback loading and safe failure states.</li>
+            <li>Wire the existing idle-timeout utility into the application.</li>
+            <li>Complete local logout and Sign out everywhere.</li>
+            <li>Correct documentation that currently describes local one-time refresh rotation.</li>
+            <li>Use a server-side invalid-before time so an administrator can invalidate existing sessions.</li>
+          </ul>
+        </div>
+      </details>
+    </section>
+
+    <section id="screens">
+      <span class="section-number">05</span>
+      <h2>What users will actually see.</h2>
+      <p class="lead">These are the main page changes. Existing application patterns remain; this is not a full visual redesign.</p>
+
+      <div class="feature-map">
+        <article class="feature large tint">
+          <b>ACCOUNT EXPERIENCE</b>
+          <h3>Profile and access status</h3>
+          <p>The profile should explain the account in this order: current status, required next action, upcoming event work, then detailed permissions.</p>
+          <ul>
+            <li>Editable safe profile fields</li>
+            <li>Pending, approved, rejected, suspended, and disabled states</li>
+            <li>Event-by-event roles and assignments</li>
+            <li>Password, session, and Sign out everywhere controls</li>
+          </ul>
+        </article>
+        <article class="feature small">
+          <b>NO ASSIGNMENTS</b>
+          <h3>A useful empty state</h3>
+          <p>An approved user without event work sees a clear explanation instead of an access error or an empty event table.</p>
+        </article>
+        <article class="feature small">
+          <b>ADMIN LIST</b>
+          <h3>Find the right account</h3>
+          <ul>
+            <li>Server search and pagination</li>
+            <li>Approval and access filters</li>
+            <li>Professional category and event-role filters</li>
+            <li>Pending count and last login</li>
+          </ul>
+        </article>
+        <article class="feature large">
+          <b>ADMIN DETAIL</b>
+          <h3>Decide, audit, and deprovision</h3>
+          <ul>
+            <li>Approve or reject with a reason</li>
+            <li>Suspend or reactivate</li>
+            <li>Revoke sessions and resend lifecycle email</li>
+            <li>See event assignments and decision history</li>
+            <li>Deprovision active accounts without erasing historical audit evidence</li>
+          </ul>
+        </article>
+        <article class="feature large tint">
+          <b>EVENT STAFFING</b>
+          <h3>Membership first, duty second</h3>
+          <p>An event manager first adds an approved user to the event with a role. Shift and station scheduling follows. Removing the final duty does not silently erase event membership.</p>
+        </article>
+        <article class="feature small">
+          <b>FORBIDDEN</b>
+          <h3>Explain denied access</h3>
+          <p>Replace silent redirection with an explicit page describing why access is unavailable and what the user can do next.</p>
+        </article>
+      </div>
+    </section>
+
+    <section id="analytics">
+      <span class="section-number">06</span>
+      <h2>Completed events become understandable reports.</h2>
+      <p class="lead">The system already stores most of the operational timestamps and outcomes. The first job is to make the definitions consistent, especially attendance.</p>
+
+      <div class="metrics">
+        <article class="metric"><strong>01</strong><span>Registrations and attendance</span></article>
+        <article class="metric"><strong>02</strong><span>Queue wait and service time</span></article>
+        <article class="metric"><strong>03</strong><span>Station throughput</span></article>
+        <article class="metric"><strong>04</strong><span>Screening outcomes</span></article>
+        <article class="metric"><strong>05</strong><span>Review decisions</span></article>
+        <article class="metric"><strong>06</strong><span>Referrals and delivery</span></article>
+      </div>
+
+      <div class="pipeline">
+        <article class="pipe-step"><b>01</b><strong>Completed event</strong><span>Use consistent event time and attendance definitions.</span></article>
+        <article class="pipe-step"><b>02</b><strong>Aggregate data</strong><span>Calculate counts and percentiles in PostgreSQL.</span></article>
+        <article class="pipe-step"><b>03</b><strong>Charts and tables</strong><span>Every visual has an accessible data-table equivalent.</span></article>
+        <article class="pipe-step"><b>04</b><strong>PDF or CSV job</strong><span>Queue, generate, hash, and store the artifact.</span></article>
+        <article class="pipe-step"><b>05</b><strong>Audit download</strong><span>Recheck permission and record who downloaded what.</span></article>
+      </div>
+
+      <div class="plain-callout">
+        <strong>Privacy rule</strong>
+        <p>Reports should contain aggregate information by default, not participant names. Small clinical groups should be suppressed, with a recommended threshold of fewer than five records.</p>
+      </div>
+
+      <details>
+        <summary>What goes into the PDF and CSV?</summary>
+        <div>
+          <p><strong>PDF:</strong> event details, active filters, registration and attendance charts, queue and station charts, screening distributions, review and referral outcomes, generated time, metric definitions, a file hash, and deterministic written observations.</p>
+          <p><strong>CSV:</strong> an explicitly selected aggregate dataset with spreadsheet-formula protection. It must not silently include participant identities.</p>
+          <p><strong>Job states:</strong> Queued, Generating, Completed, Failed, and Expired. PostgreSQL stores claim leases, attempts, retry timing, filters, hashes, and requester details. Redis is not required.</p>
+        </div>
+      </details>
+    </section>
+
+    <section id="deletion">
+      <span class="section-number">07</span>
+      <h2>Deletion becomes a reviewed operation, not one button.</h2>
+      <p class="lead">The existing backend already performs a transactional hard delete for completed or cancelled events. The remaining work is impact visibility, two correctness fixes, and clearer cleanup status.</p>
+
+      <div class="pipeline">
+        <article class="pipe-step"><b>01</b><strong>Preview impact</strong><span>Count registrations, queues, screenings, reviews, files, emails, and reports.</span></article>
+        <article class="pipe-step"><b>02</b><strong>Show blockers</strong><span>Stop if cross-event references or active report jobs make deletion unsafe.</span></article>
+        <article class="pipe-step"><b>03</b><strong>Explicit confirmation</strong><span>Typed event name, acknowledgement, current version, short-lived preview token.</span></article>
+        <article class="pipe-step"><b>04</b><strong>Delete transaction</strong><span>Recheck impact, retain immutable audit, remove operational records.</span></article>
+        <article class="pipe-step"><b>05</b><strong>Cleanup status</strong><span>Remove files safely and show queued, completed, or needs-attention state.</span></article>
+      </div>
+
+      <div class="compare">
+        <article class="compare-panel current">
+          <span>Fix required</span>
+          <h3>Review-signature cleanup</h3>
+          <p>The cleanup service can request a review-decision-signature task, but the current database constraint does not allow that task type.</p>
+        </article>
+        <article class="compare-panel current">
+          <span>Fix required</span>
+          <h3>Older synchronization rows</h3>
+          <p>Rows with no event ID may still point to records from the deleted event. Cleanup must use collected entity IDs without touching unrelated rows.</p>
+        </article>
+      </div>
+
+      <div class="plain-callout">
+        <strong>What remains</strong>
+        <p>Operational event data is permanently deleted. Immutable audit evidence remains, including who deleted the event, the event snapshot, the reviewed impact, and the confirmation method.</p>
+      </div>
+    </section>
+
+    <section id="email">
+      <span class="section-number">08</span>
+      <h2>Email has three different responsibilities.</h2>
+      <p class="lead">Using one provider for every message would require replacing working security controls. The safer first release keeps each provider responsible for the job it already handles best.</p>
+
+      <div class="provider-lanes">
+        <article class="provider">
+          <span class="provider-name">COGNITO</span>
+          <h3>Identity email</h3>
+          <p>Email verification, password reset, MFA, and account-recovery messages remain with Cognito.</p>
+        </article>
+        <article class="provider">
+          <span class="provider-name">GOOGLE SMTP</span>
+          <h3>Application lifecycle</h3>
+          <p>Signup received, approved, rejected, suspended, reactivated, event assignment, and backend-observed password-change notices.</p>
+        </article>
+        <article class="provider">
+          <span class="provider-name">AWS SES</span>
+          <h3>Clinical referral</h3>
+          <p>Keep the existing encrypted referral attachment, delivery callbacks, bounce handling, and reconciliation flow.</p>
+        </article>
+      </div>
+
+      <div class="plain-callout">
+        <strong>Important limitation</strong>
+        <p>Google SMTP can confirm that Google accepted a message. That is a Sent state, not proof that the recipient received it. The interface must not claim Delivered unless a real delivery signal exists.</p>
+      </div>
+
+      <details>
+        <summary>How Google SMTP should be configured</summary>
+        <div>
+          <ul>
+            <li>Use Nodemailer with Google Workspace OAuth2, TLS validation, timeouts, and bounded retry.</li>
+            <li>Keep OAuth credentials and refresh tokens outside Git.</li>
+            <li>Use a verified, allowlisted sender.</li>
+            <li>Extend the current notification outbox rather than build a second delivery system.</li>
+            <li>Store template and safe metadata, not reset tokens or sensitive message bodies.</li>
+            <li>Do not call SMTP inside the account-approval database transaction.</li>
+          </ul>
+        </div>
+      </details>
+    </section>
+
+    <section id="database">
+      <span class="section-number">09</span>
+      <h2>Yes, database tables need to change.</h2>
+      <p class="lead">These changes have not been made. They must be reviewed before implementation because they affect authentication, authorization, reporting, and historical data.</p>
+
+      <div class="schema-groups">
+        <article class="schema-group">
+          <h3>Account state <span>CHANGE USER</span></h3>
+          <ul>
+            <li>Add approval state: Pending, Approved, Rejected.</li>
+            <li>Add access state: Enabled, Suspended, Disabled.</li>
+            <li>Add optional Staff or Doctor profile category.</li>
+            <li>Add session invalidation time.</li>
+            <li>Make employee number optional during signup.</li>
+          </ul>
+        </article>
+        <article class="schema-group">
+          <h3>Approval history <span>NEW TABLE</span></h3>
+          <ul>
+            <li>Account being decided.</li>
+            <li>Approve or reject decision.</li>
+            <li>Administrator who decided.</li>
+            <li>Reason and decision time.</li>
+            <li>Immutable audit behavior.</li>
+          </ul>
+        </article>
+        <article class="schema-group">
+          <h3>Event authorization <span>NEW TABLES</span></h3>
+          <ul>
+            <li>Event Membership connects a user to one event.</li>
+            <li>Event Membership Role stores granular event roles.</li>
+            <li>Staff Assignment becomes shift and station scheduling.</li>
+            <li>Remove global operational roles after safe backfill.</li>
+          </ul>
+        </article>
+        <article class="schema-group">
+          <h3>Report generation <span>NEW TABLES</span></h3>
+          <ul>
+            <li>Report Export Job stores status, filter snapshot, attempts, and requester.</li>
+            <li>Report Artifact stores file location, type, size, hash, and expiry.</li>
+            <li>Existing immutable audit log records generation and downloads.</li>
+          </ul>
+        </article>
+        <article class="schema-group">
+          <h3>Email delivery <span>EXTEND TABLE</span></h3>
+          <ul>
+            <li>Add email purpose and provider.</li>
+            <li>Add template name and version.</li>
+            <li>Add claim, retry, and next-attempt fields.</li>
+            <li>Keep referral-specific SES behavior isolated.</li>
+          </ul>
+        </article>
+        <article class="schema-group">
+          <h3>Cleanup and retirement <span>MIGRATIONS</span></h3>
+          <ul>
+            <li>Add Deleted event-audit action.</li>
+            <li>Add analytics indexes.</li>
+            <li>Fix cleanup-task constraint.</li>
+            <li>Retire unused local password and refresh-session tables after confirmation.</li>
+          </ul>
+        </article>
+      </div>
+
+      <div class="plain-callout">
+        <strong>Migration rule</strong>
+        <p>Do not delete the current role fields first. Add new tables, backfill existing users and event assignments, validate the result, move each API route, and remove the old fields only after old and new authorization decisions agree.</p>
+      </div>
+    </section>
+
+    <section id="roadmap">
+      <span class="section-number">10</span>
+      <h2>Build it in this order.</h2>
+      <p class="lead">Each stage leaves the system in a testable state. OpenAPI, generated frontend types, backend implementation, frontend behavior, and tests move together in every stage.</p>
+
+      <div class="roadmap">
+        <article class="roadmap-item"><b>01</b><div><h3>Safety first</h3><p>Fix the current final-administrator concurrency race and the two known event-deletion cleanup defects.</p></div><span class="result">Existing risks contained</span></article>
+        <article class="roadmap-item"><b>02</b><div><h3>Add and backfill the schema</h3><p>Create approval and event-membership structures, migrate current administrators, event creators, and assignments, then validate every row.</p></div><span class="result">New model ready</span></article>
+        <article class="roadmap-item"><b>03</b><div><h3>Signup and approval gate</h3><p>Enable verified self-registration, pending sessions, safe profile completion, approval decisions, and central approved-and-enabled enforcement.</p></div><span class="result">Accounts are controlled</span></article>
+        <article class="roadmap-item"><b>04</b><div><h3>Event-scoped authorization</h3><p>Move queue, registration, screening, review, event, participant, report, and sync APIs to event memberships and granular roles.</p></div><span class="result">Cross-event access blocked</span></article>
+        <article class="roadmap-item"><b>05</b><div><h3>Profile and administrator pages</h3><p>Build understandable account status, role display, search, filters, approval history, and safe account actions.</p></div><span class="result">People can use the model</span></article>
+        <article class="roadmap-item"><b>06</b><div><h3>Google lifecycle email</h3><p>Add the SMTP outbox path and honest Sent or Failed status without disturbing Cognito or SES responsibilities.</p></div><span class="result">Decisions are communicated</span></article>
+        <article class="roadmap-item"><b>07</b><div><h3>Analytics foundations</h3><p>Repair attendance consistency, define each metric, add bounded aggregate queries, and build accessible charts and tables.</p></div><span class="result">Completed events explainable</span></article>
+        <article class="roadmap-item"><b>08</b><div><h3>PDF and CSV jobs</h3><p>Add durable report generation, restart recovery, permission rechecks, artifact hashes, expiry, and audit records.</p></div><span class="result">Reports downloadable</span></article>
+        <article class="roadmap-item"><b>09</b><div><h3>Finish deletion experience</h3><p>Add impact preview, signed confirmation, cleanup visibility, and proof that deleted events disappear everywhere.</p></div><span class="result">Deletion is reviewable</span></article>
+        <article class="roadmap-item"><b>10</b><div><h3>Remove legacy paths</h3><p>Delete old operational groups, global role checks, local-password artifacts, stale contracts, and outdated documentation.</p></div><span class="result">One source of truth</span></article>
+      </div>
+
+      <details>
+        <summary>Why implementation cannot safely start with the screens</summary>
+        <div>
+          <p>The visual pages depend on a stable account state machine and event permission model. Building screens first would encode the current conflicting role system and create rework. The schema, transition rules, backfill, and endpoint authorization matrix must be approved first.</p>
+        </div>
+      </details>
+    </section>
+
+    <section id="console">
+      <span class="section-number">11</span>
+      <h2>Your console output is normal.</h2>
+      <p class="lead">The application prints several startup messages from different files. They all describe a successful startup.</p>
+
+      <div class="console">
+        <div class="console-bar" aria-hidden="true"><span></span><span></span><span></span></div>
+        <pre>$ node server.js
+
+Security checks:
+<span class="ok">OK  DATABASE_URL exists</span>
+<span class="ok">OK  JWT_ACCESS_SECRET strength valid</span>
+<span class="ok">OK  NODE_ENV configured</span>
+<span class="ok">OK  TLS certificates exist</span>
+<span class="ok">All security startup checks passed successfully.</span>
+
+<span class="info">[INFO] Server started successfully</span>
+  url: https://127.0.0.1:5050
+  environment: development
+  secureProtocol: TLS/HTTPS
+
+<span class="ok">OK  Server started and running on https://127.0.0.1:5050</span></pre>
+      </div>
+
+      <div class="console-notes">
+        <article class="console-note"><b>PACKAGE SCRIPT</b><p><code>pnpm run dev</code> runs <code>node server.js</code>, so the command is printed first.</p></article>
+        <article class="console-note"><b>SECURITY CHECK</b><p>Development startup verifies the database URL, secret strength, environment name, and local TLS certificate files.</p></article>
+        <article class="console-note"><b>STRUCTURED LOG</b><p>The custom logger prints the timestamp and context object, then also writes JSON to <code>backend/logs/combined.log</code>.</p></article>
+        <article class="console-note"><b>SECOND SUCCESS LINE</b><p><code>server.js</code> deliberately prints a separate green success message after the structured log. It is duplication, not an error.</p></article>
+      </div>
+    </section>
+
+    <section aria-labelledby="decision-title">
+      <div class="decision-box">
+        <div>
+          <h2 id="decision-title">The next approval is the data and role model.</h2>
+          <p>Before code changes begin, confirm the separation between Platform Administrator and event roles, the pending-account flow, safe user deprovisioning, and the listed database changes.</p>
+        </div>
+        <div class="decision-mark" aria-hidden="true">Plan<br>only</div>
+      </div>
+    </section>
+  </main>
+
+  <footer>
+    <div class="shell">
+      <p>Scope included: signup, authentication completion, profiles, event-scoped roles, administrator accounts, approvals, event analytics, PDF/CSV reports, event deletion, and Google SMTP.</p>
+      <p>Scope excluded: cloud deployment and Redis infrastructure. The separate Git-history and credential-rotation release prerequisite remains unchanged.</p>
+    </div>
+  </footer>
+</body>
+</html>

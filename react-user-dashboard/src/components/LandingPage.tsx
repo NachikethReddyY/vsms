@@ -193,6 +193,7 @@ export default function LandingPage() {
         </Link>
         <div className={styles['nav-actions']}>
           <ThemeToggle className={styles['theme-toggle']} />
+          <Link className={styles['nav-sign-in']} to="/create-account">Sign up</Link>
           <a className={styles['nav-sign-in']} href={getCognitoAuthorizeUrl()}>Sign in</a>
         </div>
       </header>
