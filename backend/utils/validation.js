@@ -60,7 +60,7 @@ function cleanDateOfBirth(value) {
 function maskNric(value) {
     const nric = String(value || "").replace(/[\s-]/g, "").toUpperCase();
     if (!NRIC_PATTERN.test(nric)) return null;
-    return `${nric[0]}•••${nric.slice(4, 8)}`;
+    return `•••••${nric.slice(-4)}`;
 }
 
 function cleanNric(value, { required = false } = {}) {
