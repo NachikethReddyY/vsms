@@ -29,7 +29,7 @@ test("valid participant payload is normalized", () => {
     assert.equal(value.gender, "M");
     assert.equal(value.email, "john@example.com");
     assert.equal(value.nric, "S1234567D");
-    assert.equal(value.nricMasked, "S•••4567");
+    assert.equal(value.nricMasked, "•••••567D");
     assert.equal(value.race, "Chinese");
     assert.equal(value.nationality, "Singaporean");
     assert.equal(value.addressStreet, "10 Example Road");

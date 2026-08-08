@@ -3617,7 +3617,7 @@ components:
         participantDisplayName: { type: string }
         queueNumber: { type: integer, nullable: true }
         registrationStatus: { type: string, enum: [SIGNED_UP, CHECKED_IN, COMPLETED, CANCELLED] }
-        maskedNric: { type: string, pattern: '^(?:[STFGM]•••[0-9]{4}|Not recorded)$' }
+        maskedNric: { type: string, pattern: '^(?:•••••[0-9]{3}[A-Z]|Not recorded)$' }
         dateOfBirth: { type: string, format: date }
         gender: { type: string, maxLength: 1 }
     ScreeningResultSummary:
@@ -4116,7 +4116,7 @@ components:
         dateOfBirth: { type: string, format: date-time }
         gender: { type: string, enum: [M, F, O, U] }
         contactNumber: { type: string }
-        nricMasked: { type: string, nullable: true, pattern: '^[STFGM]•••[0-9]{4}$', readOnly: true }
+        nricMasked: { type: string, nullable: true, pattern: '^•••••[0-9]{3}[A-Z]$', readOnly: true }
         email: { type: string, format: email, nullable: true }
         race: { type: string, nullable: true }
         nationality: { type: string, nullable: true }
