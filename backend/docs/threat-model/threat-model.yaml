@@ -1,0 +1,43 @@
+system:
+  name: VSMS
+  version: 1.0
+
+assets:
+  - name: Participant Data
+    type: personal_information
+    sensitivity: high
+
+  - name: Screening Result
+    type: medical_record
+    sensitivity: high
+
+  - name: QR Token
+    type: authentication
+    sensitivity: medium
+
+components:
+  - name: Frontend
+    technology: React
+
+  - name: Backend API
+    technology: Node Express
+
+  - name: Database
+    technology: PostgreSQL
+
+threats:
+  - id: T001
+    category: Spoofing
+    asset: User Account
+    risk: High
+    mitigation:
+      - MFA
+      - JWT Rotation
+
+  - id: T002
+    category: Injection
+    asset: Database
+    risk: Critical
+    mitigation:
+      - Prisma ORM
+      - Input Validation
