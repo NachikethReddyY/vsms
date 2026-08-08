@@ -85,7 +85,7 @@ export interface Registration {
   id: string;
   participantId: string;
   eventId: string;
-  queueNumber: number;
+  queueNumber: number | null;
   registrationStatus: string;
   registeredAt: string;
   participant: Pick<Participant, "id" | "participantReference" | "firstName" | "lastName" | "dateOfBirth">;

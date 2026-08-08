@@ -76,57 +76,63 @@ const loadQueueEntry = async (db, queueId) => {
 
 const joinQueue = async ({ eventId, stationId, registrationId }, user, context = null, db = prisma) => {
   await requireQueueManagement(db, eventId, user, stationId);
-  const station = await db.station.findFirst({ where: { stationId, eventId, isActive: true } });
-  if (!station) throw new AppError(404, "STATION_NOT_FOUND", "Station not found for this event");
 
-  return db.$transaction(async (tx) => {
-    const registration = await tx.eventRegistration.findFirst({ where: { registrationId, eventId } });
-    if (!registration) throw new AppError(404, "REGISTRATION_NOT_FOUND", "Registration not found for this event");
-    if (["COMPLETED", "CANCELLED"].includes(registration.registrationStatus)) {
-      throw new AppError(409, "REGISTRATION_NOT_QUEUEABLE", "Completed or cancelled registrations cannot join a queue");
+  for (let attempt = 0; attempt < 4; attempt += 1) {
+    try {
+      return await db.$transaction(async (tx) => {
+        const station = await tx.station.findFirst({ where: { stationId, eventId } });
+        if (!station) throw new AppError(404, "STATION_NOT_FOUND", "Station not found for this event");
+        assertStationSelectable(station);
+
+        const registration = await tx.eventRegistration.findFirst({ where: { registrationId, eventId } });
+        if (!registration) throw new AppError(404, "REGISTRATION_NOT_FOUND", "Registration not found for this event");
+        if (["COMPLETED", "CANCELLED"].includes(registration.registrationStatus)) {
+          throw new AppError(409, "REGISTRATION_NOT_QUEUEABLE", "Completed or cancelled registrations cannot join a queue");
+        }
+
+        const existing = await tx.queueEntry.findFirst({
+          where: { registrationId, status: { in: ACTIVE_QUEUE_STATUSES } },
+          orderBy: { enteredAt: "desc" },
+        });
+        if (existing) {
+          if (existing.stationId === stationId) return { queueEntry: existing, created: false };
+          throw new AppError(
+            409,
+            "ALREADY_IN_QUEUE",
+            "Registration is already in an active queue at another station",
+            { queueEntryId: existing.id, stationId: existing.stationId },
+          );
+        }
+
+        let queueNumber = registration.queueNumber;
+        if (queueNumber == null) {
+          const aggregate = await tx.eventRegistration.aggregate({ where: { eventId }, _max: { queueNumber: true } });
+          queueNumber = (aggregate._max.queueNumber || 0) + 1;
+          await tx.eventRegistration.update({ where: { registrationId }, data: { queueNumber } });
+        }
+
+        const queueEntry = await tx.queueEntry.create({
+          data: { registrationId, stationId, queueNumber, status: "WAITING" },
+        });
+        await createAuditLog({
+          userId: user.userId,
+          action: "QUEUE_JOINED",
+          entityName: "QueueEntry",
+          entityId: queueEntry.id,
+          newValue: { eventId, stationId, registrationId, queueNumber, status: "WAITING" },
+          context,
+          client: tx,
+        });
+        return { queueEntry, created: true };
+      }, { isolationLevel: "Serializable" });
+    } catch (error) {
+      const target = JSON.stringify(error.meta?.target || "");
+      if ((error.code === "P2034" || (error.code === "P2002" && target.includes("queue"))) && attempt < 3) continue;
+      throw error;
     }
+  }
 
-    const existing = await tx.queueEntry.findFirst({
-      where: { registrationId, status: { in: ACTIVE_QUEUE_STATUSES } },
-      orderBy: { enteredAt: "desc" },
-    });
-    if (existing) {
-      if (existing.stationId === stationId) {
-        return { queueEntry: existing, created: false };
-      }
-      throw new AppError(
-        409,
-        "ALREADY_IN_QUEUE",
-        "Registration is already in an active queue at another station",
-        { queueEntryId: existing.id, stationId: existing.stationId },
-      );
-    }
-
-    let queueNumber = registration.queueNumber;
-    if (queueNumber == null) {
-      const aggregate = await tx.eventRegistration.aggregate({ where: { eventId }, _max: { queueNumber: true } });
-      queueNumber = (aggregate._max.queueNumber || 0) + 1;
-    }
-
-    const queueEntry = await tx.queueEntry.create({
-      data: {
-        registrationId,
-        stationId,
-        queueNumber,
-        status: "WAITING",
-      },
-    });
-    await createAuditLog({
-      userId: user.userId,
-      action: "QUEUE_JOINED",
-      entityName: "QueueEntry",
-      entityId: queueEntry.id,
-      newValue: { eventId, stationId, registrationId, queueNumber, status: "WAITING" },
-      context,
-      client: tx,
-    });
-    return { queueEntry, created: true };
-  });
+  throw new AppError(409, "QUEUE_JOIN_CONFLICT", "Unable to reserve a queue position. Please try again.");
 };
 
 const listRegistrationStations = async (eventId, user, db = prisma) => {
@@ -163,7 +169,7 @@ const listRegistrationStations = async (eventId, user, db = prisma) => {
 };
 
 const createQueueHandoff = async ({ eventId, stationId, registrationId }, user, context = null, db = prisma) => {
-  await requireQueueManagement(db, eventId, user);
+  await requireQueueManagement(db, eventId, user, stationId);
 
   for (let attempt = 0; attempt < 4; attempt += 1) {
     try {

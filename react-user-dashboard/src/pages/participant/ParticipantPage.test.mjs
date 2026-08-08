@@ -3,6 +3,7 @@ import { readFile } from "node:fs/promises";
 import test from "node:test";
 
 const source = await readFile(new URL("./EventRegistrationPage.tsx", import.meta.url), "utf8");
+const registrationSource = await readFile(new URL("./ParticipantRegistrationPage.tsx", import.meta.url), "utf8");
 
 test("participant registration checks a full identity combination before creating a participant", () => {
   assert.match(source, /apiClient\.post<MatchResponse>\("\/participants\/match"/);
@@ -17,3 +18,7 @@ test("participant registration keeps entered non-sensitive details when continui
   assert.match(source, /match\.matchReasons\.includes\("NRIC \/ FIN"\)/);
 });
 
+test("pre-event registration opens the QR pass without starting an unavailable station handoff", () => {
+  assert.match(registrationSource, /existingRegistration\.queueNumber != null \|\| reviewResponse\.data\.event\.status !== "IN_PROGRESS"/);
+  assert.match(registrationSource, /if \(review\?\.event\.status !== "IN_PROGRESS"\) \{\s*navigate\(`\/participants\/registrations\/\$\{registrationId\}\/qr/);
+});

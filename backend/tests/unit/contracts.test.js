@@ -253,6 +253,13 @@ test("QR station handoff contract is documented", () => {
     assert.match(doc, /visual-acuity/);
 });
 
+test("registration queue handoff endpoints and station status are in OpenAPI", () => {
+    const openapi = read("docs/openapi.yaml");
+    assert.match(openapi, /\/api\/v1\/queues\/events\/\{eventId\}\/stations:/);
+    assert.match(openapi, /\/api\/v1\/queues\/events\/\{eventId\}\/stations\/\{stationId\}\/handoff:/);
+    assert.match(openapi, /operationalStatus: \{ \$ref: "#\/components\/schemas\/StationOperationalStatus" \}/);
+});
+
 test("seed creates VA / refraction / colour vision Station rows", () => {
     const seed = read("prisma/seed.js");
     assert.match(seed, /\["VISUAL_ACUITY"/);
