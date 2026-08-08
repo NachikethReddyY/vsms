@@ -55,6 +55,7 @@ const baseDb = (overrides = {}) => ({
       if (where.stationId === stationId) return station;
       return null;
     },
+    findMany: async () => [],
     ...(overrides.station || {}),
   },
   staffAssignment: {
@@ -82,6 +83,14 @@ const baseDb = (overrides = {}) => ({
 });
 
 const baseTransaction = (overrides = {}) => ({
+  station: {
+    findFirst: async ({ where }) => {
+      if (where.stationId === targetStationId) return targetStation;
+      if (where.stationId === stationId) return station;
+      return null;
+    },
+    ...(overrides.station || {}),
+  },
   eventRegistration: {
     findFirst: async () => registration,
     findUnique: async () => registration,
@@ -138,6 +147,48 @@ test('queue join creates a WAITING entry and emits QUEUE_JOINED audit', async ()
   assert.equal(audits[0].newValue.registrationId, registrationId);
 });
 
+test('queue join persists a newly allocated queue number on the registration', async () => {
+  let updatedQueueNumber = null;
+  const db = baseDb({
+    root: {
+      $transaction: async (callback) => callback(baseTransaction({
+        eventRegistration: {
+          findFirst: async () => ({ ...registration, queueNumber: null }),
+          update: async ({ data }) => {
+            updatedQueueNumber = data.queueNumber;
+            return { ...registration, ...data };
+          },
+        },
+      })),
+    },
+  });
+
+  const result = await queueService.joinQueue(
+    { eventId, stationId, registrationId },
+    operationalUser,
+    context,
+    db,
+  );
+
+  assert.equal(result.queueEntry.queueNumber, 10);
+  assert.equal(updatedQueueNumber, 10);
+});
+
+test('queue join rejects a paused station', async () => {
+  const db = baseDb({
+    root: {
+      $transaction: async (callback) => callback(baseTransaction({
+        station: { findFirst: async () => ({ ...station, operationalStatus: 'PAUSED' }) },
+      })),
+    },
+  });
+
+  await assert.rejects(
+    queueService.joinQueue({ eventId, stationId, registrationId }, operationalUser, context, db),
+    (error) => error.code === 'STATION_UNAVAILABLE',
+  );
+});
+
 test('queue join is idempotent when the participant is already active at the same station', async () => {
   audits.length = 0;
   const db = baseDb({
@@ -159,6 +210,89 @@ test('queue join is idempotent when the participant is already active at the sam
   assert.equal(result.created, false);
   assert.equal(result.queueEntry.id, queueId);
   assert.equal(audits.length, 0);
+});
+
+test('registration station list exposes derived availability and queue counts', async () => {
+  const pausedStation = { ...targetStation, operationalStatus: 'PAUSED' };
+  const db = baseDb({
+    station: { findMany: async () => [station, pausedStation] },
+    queueEntry: { findMany: async () => [{ stationId }] },
+  });
+
+  const result = await queueService.listRegistrationStations(eventId, operationalUser, db);
+
+  assert.equal(result.stations[0].status, 'BUSY');
+  assert.equal(result.stations[0].activeQueueCount, 1);
+  assert.equal(result.stations[0].selectable, true);
+  assert.equal(result.stations[1].status, 'PAUSED');
+  assert.equal(result.stations[1].selectable, false);
+});
+
+test('queue handoff allocates a queue number, creates the entry, and audits the assignment', async () => {
+  audits.length = 0;
+  const registrationWithoutQueue = {
+    ...registration,
+    queueNumber: null,
+    participant: { id: uuid(), participantReference: 'P-00001', firstName: 'Daniel', lastName: 'Tan' },
+    event: { eventId, name: event.name },
+  };
+  const db = baseDb({
+    root: {
+      $transaction: async (callback) => callback(baseTransaction({
+        eventRegistration: {
+          findFirst: async () => registrationWithoutQueue,
+          update: async ({ data }) => ({ ...registrationWithoutQueue, ...data }),
+        },
+      })),
+    },
+  });
+
+  const result = await queueService.createQueueHandoff(
+    { eventId, stationId, registrationId },
+    operationalUser,
+    context,
+    db,
+  );
+
+  assert.equal(result.created, true);
+  assert.equal(result.queueNumber, 10);
+  assert.equal(result.nextStation, station.stationName);
+  assert.equal(result.assignedStation.status, 'BUSY');
+  assert.equal(audits.at(-1).action, 'REGISTRATION_QUEUE_HANDOFF_CREATED');
+});
+
+test('queue handoff rejects a paused station before creating a queue entry', async () => {
+  const pausedStation = { ...station, operationalStatus: 'PAUSED' };
+  const registrationWithDetails = {
+    ...registration,
+    participant: { id: uuid(), participantReference: 'P-00002', firstName: 'Aisha', lastName: 'Lim' },
+    event: { eventId, name: event.name },
+  };
+  const db = baseDb({
+    root: {
+      $transaction: async (callback) => callback(baseTransaction({
+        station: { findFirst: async () => pausedStation },
+        eventRegistration: { findFirst: async () => registrationWithDetails },
+      })),
+    },
+  });
+
+  await assert.rejects(
+    queueService.createQueueHandoff({ eventId, stationId, registrationId }, operationalUser, context, db),
+    /no longer available/,
+  );
+});
+
+test('queue handoff limits a screener to the station in their current duty', async () => {
+  await assert.rejects(
+    queueService.createQueueHandoff(
+      { eventId, stationId: targetStationId, registrationId },
+      screenerUser,
+      context,
+      baseDb(),
+    ),
+    (error) => error.code === 'CURRENT_DUTY_REQUIRED' && error.status === 403,
+  );
 });
 
 test('queue join rejects a participant already active at another station', async () => {
