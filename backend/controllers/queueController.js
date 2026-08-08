@@ -7,71 +7,38 @@
 const queueService = require("../services/queueService");
 const { AppError, ValidationError } = require("../middlewares/errorHandler");
 
-/**
- * Enters a participant into a station's virtual queue.
- * @route POST /api/v1/events/:eventId/stations/:stationId/join
- */
-exports.joinQueue = async (req, res, next) => {
-  try {
-    const { eventId, stationId } = req.params;
-    const { registrationId } = req.body;
-
-    if (!registrationId) {
-      throw new ValidationError("Registration ID is required to join the queue.");
-    }
-
-    const { queueEntry, created } = await queueService.joinQueue(
-      { eventId, stationId, registrationId },
-      req.user,
-      req.context
-    );
-
-    return res.status(created ? 201 : 200).json({ queueEntry, created });
-  } catch (error) {
-    return next(error);
-  }
+exports.joinQueue = async (req, res) => {
+  const { queueEntry, created } = await queueService.joinQueue(
+    { eventId: req.params.eventId, stationId: req.params.stationId, registrationId: req.body.registrationId },
+    req.user,
+    req.context,
+  );
+  res.status(created ? 201 : 200).json({ queueEntry, created });
 };
 
-/**
- * Retrieves live event queue status and operational metrics.
- * @route GET /api/v1/events/:eventId
- */
-exports.getEventQueueStatus = async (req, res, next) => {
-  try {
-    const { eventId } = req.params;
-    const status = await queueService.getEventQueueStatus(eventId, req.user);
-
-    return res.status(200).json({
-      status: "success",
-      data: status
-    });
-  } catch (error) {
-    return next(error);
-  }
+exports.getEventQueueStatus = async (req, res) => {
+  res.json(await queueService.getEventQueueStatus(req.params.eventId, req.user));
 };
 
-/**
- * Tracks an individual participant's queue status and station history.
- * @route GET /api/v1/participant/:registrationId
- */
-exports.getParticipantQueueStatus = async (req, res, next) => {
-  try {
-    const { eventId } = req.query; // Optional fallback or params context
-    const { registrationId } = req.params;
+exports.listRegistrationStations = async (req, res) => {
+  res.json(await queueService.listRegistrationStations(req.params.eventId, req.user));
+};
 
-    const status = await queueService.getParticipantQueueStatus(
-      eventId || req.params.eventId,
-      registrationId,
-      req.user
-    );
+exports.createQueueHandoff = async (req, res) => {
+  const handoff = await queueService.createQueueHandoff(
+    { eventId: req.params.eventId, stationId: req.params.stationId, registrationId: req.body.registrationId },
+    req.user,
+    req.context,
+  );
+  res.status(handoff.created ? 201 : 200).json(handoff);
+};
 
-    return res.status(200).json({
-      status: "success",
-      data: status
-    });
-  } catch (error) {
-    return next(error);
-  }
+exports.getParticipantQueueStatus = async (req, res) => {
+  res.json(await queueService.getParticipantQueueStatus(
+    req.params.eventId,
+    req.params.registrationId,
+    req.user,
+  ));
 };
 
 exports.callQueueEntry = async (req, res) => {
@@ -87,7 +54,7 @@ exports.advanceQueueEntry = async (req, res) => {
     { queueId: req.params.queueId, eventId: req.params.eventId, toStationId: req.body.toStationId, reason: req.body.reason },
     req.user,
     req.context,
-  ));
+ ));
 };
 
 exports.completeQueueEntry = async (req, res) => {

@@ -175,6 +175,12 @@ enum StationType {
   EYE_HEALTH
 }
 
+enum StationOperationalStatus {
+  AVAILABLE
+  PAUSED
+  OFFLINE
+}
+
 enum QueueStatus {
   WAITING
   CALLED
@@ -860,6 +866,7 @@ model Station {
   stationType  StationType @map("station_type")
   stationOrder Int         @map("station_order")
   isActive     Boolean     @default(true) @map("is_active")
+  operationalStatus StationOperationalStatus @default(AVAILABLE) @map("operational_status")
   createdAt    DateTime    @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt    DateTime    @updatedAt @map("updated_at") @db.Timestamptz(3)
 
@@ -875,6 +882,7 @@ model Station {
   @@unique([eventId, stationType])
   @@unique([eventId, stationOrder])
   @@index([eventId, isActive, stationOrder])
+  @@index([eventId, operationalStatus, stationOrder])
   @@map("stations")
 }
 

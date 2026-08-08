@@ -6346,7 +6346,8 @@ item:
             "version": 1,
             "stationOrder": 1,
             "capacity": 1,
-            "isAvailable": true
+            "isAvailable": true,
+            "operationalStatus": "AVAILABLE"
           }
         options:
           raw:
@@ -16672,6 +16673,263 @@ item:
           url: '{{baseUrl}}/queues/events/{eventId}'
         status: Forbidden
         code: 403
+        header:
+          - key: Content-Type
+            value: application/json
+        body: |-
+          {
+            "type": "",
+            "title": "",
+            "status": 0,
+            "code": "",
+            "requestId": "00000000-0000-4000-8000-000000000000",
+            "errors": [
+              {
+                "field": "",
+                "message": ""
+              }
+            ]
+          }
+  - name: List station availability for participant registration handoff
+    description: ''
+    event: []
+    request:
+      method: GET
+      header: []
+      auth:
+        type: bearer
+        bearer:
+          - key: token
+            value: '{{token}}'
+            type: string
+      url:
+        raw: '{{baseUrl}}/queues/events/{eventId}/stations'
+        host:
+          - '{{baseUrl}}'
+        path:
+          - queues
+          - events
+          - '{eventId}'
+          - stations
+        query: []
+    response:
+      - name: 200 Response
+        originalRequest:
+          method: GET
+          header: []
+          url: '{{baseUrl}}/queues/events/{eventId}/stations'
+        status: OK
+        code: 200
+        header:
+          - key: Content-Type
+            value: application/json
+        body: |-
+          {
+            "event": {
+              "eventId": "00000000-0000-4000-8000-000000000000",
+              "name": "",
+              "status": "",
+              "venue": ""
+            },
+            "stations": [
+              {
+                "stationId": "00000000-0000-4000-8000-000000000000",
+                "stationName": "",
+                "stationType": "",
+                "stationOrder": 0,
+                "status": "AVAILABLE",
+                "activeQueueCount": 0,
+                "selectable": true
+              }
+            ]
+          }
+      - name: 401 Response
+        originalRequest:
+          method: GET
+          header: []
+          url: '{{baseUrl}}/queues/events/{eventId}/stations'
+        status: Unauthorized
+        code: 401
+        header:
+          - key: Content-Type
+            value: application/json
+        body: |-
+          {
+            "type": "",
+            "title": "",
+            "status": 0,
+            "code": "",
+            "requestId": "00000000-0000-4000-8000-000000000000",
+            "errors": [
+              {
+                "field": "",
+                "message": ""
+              }
+            ]
+          }
+      - name: 403 Response
+        originalRequest:
+          method: GET
+          header: []
+          url: '{{baseUrl}}/queues/events/{eventId}/stations'
+        status: Forbidden
+        code: 403
+        header:
+          - key: Content-Type
+            value: application/json
+        body: |-
+          {
+            "type": "",
+            "title": "",
+            "status": 0,
+            "code": "",
+            "requestId": "00000000-0000-4000-8000-000000000000",
+            "errors": [
+              {
+                "field": "",
+                "message": ""
+              }
+            ]
+          }
+  - name: Assign a registered participant to a station queue
+    description: ''
+    event: []
+    request:
+      method: POST
+      header:
+        - key: Content-Type
+          value: application/json
+          description: JSON request body
+          type: text
+        - key: Idempotency-Key
+          value: ''
+          description: ''
+          type: text
+      auth:
+        type: bearer
+        bearer:
+          - key: token
+            value: '{{token}}'
+            type: string
+      url:
+        raw: '{{baseUrl}}/queues/events/{eventId}/stations/{stationId}/handoff'
+        host:
+          - '{{baseUrl}}'
+        path:
+          - queues
+          - events
+          - '{eventId}'
+          - stations
+          - '{stationId}'
+          - handoff
+        query: []
+      body:
+        mode: raw
+        raw: |-
+          {
+            "registrationId": "00000000-0000-4000-8000-000000000000"
+          }
+        options:
+          raw:
+            language: json
+    response:
+      - name: 200 Response
+        originalRequest:
+          method: POST
+          header:
+            - key: Content-Type
+              value: application/json
+              description: JSON request body
+              type: text
+            - key: Idempotency-Key
+              value: ''
+              description: ''
+              type: text
+          url: '{{baseUrl}}/queues/events/{eventId}/stations/{stationId}/handoff'
+        status: OK
+        code: 200
+        header:
+          - key: Content-Type
+            value: application/json
+        body: |-
+          {
+            "created": true,
+            "registrationId": "00000000-0000-4000-8000-000000000000",
+            "queueEntryId": "00000000-0000-4000-8000-000000000000",
+            "participant": {
+              "id": "00000000-0000-4000-8000-000000000000",
+              "participantReference": "",
+              "name": ""
+            },
+            "event": {
+              "id": "00000000-0000-4000-8000-000000000000",
+              "name": ""
+            },
+            "queueNumber": 0,
+            "nextStation": "",
+            "assignedStation": {
+              "id": "00000000-0000-4000-8000-000000000000",
+              "name": "",
+              "status": "BUSY",
+              "statusBeforeHandoff": "AVAILABLE"
+            }
+          }
+      - name: 201 Response
+        originalRequest:
+          method: POST
+          header:
+            - key: Content-Type
+              value: application/json
+              description: JSON request body
+              type: text
+            - key: Idempotency-Key
+              value: ''
+              description: ''
+              type: text
+          url: '{{baseUrl}}/queues/events/{eventId}/stations/{stationId}/handoff'
+        status: Created
+        code: 201
+        header:
+          - key: Content-Type
+            value: application/json
+        body: |-
+          {
+            "created": true,
+            "registrationId": "00000000-0000-4000-8000-000000000000",
+            "queueEntryId": "00000000-0000-4000-8000-000000000000",
+            "participant": {
+              "id": "00000000-0000-4000-8000-000000000000",
+              "participantReference": "",
+              "name": ""
+            },
+            "event": {
+              "id": "00000000-0000-4000-8000-000000000000",
+              "name": ""
+            },
+            "queueNumber": 0,
+            "nextStation": "",
+            "assignedStation": {
+              "id": "00000000-0000-4000-8000-000000000000",
+              "name": "",
+              "status": "BUSY",
+              "statusBeforeHandoff": "AVAILABLE"
+            }
+          }
+      - name: 401 Response
+        originalRequest:
+          method: POST
+          header:
+            - key: Content-Type
+              value: application/json
+              description: JSON request body
+              type: text
+            - key: Idempotency-Key
+              value: ''
+              description: ''
+              type: text
+          url: '{{baseUrl}}/queues/events/{eventId}/stations/{stationId}/handoff'
+        status: Unauthorized
+        code: 401
         header:
           - key: Content-Type
             value: application/json

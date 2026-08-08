@@ -21,6 +21,7 @@ const {
   participantParams,
   eventParticipantParams,
   joinQueueBody,
+  queueHandoffBody,
   transferQueueBody,
   advanceQueueBody,
   priorityQueueBody
@@ -51,6 +52,19 @@ router.post(
  * @desc    Retrieves live event queue status and operational metrics
  * @access  Staff Roles
  */
+router.get(
+  "/events/:eventId/stations",
+  validate({ params: eventParams }),
+  asyncHandler(queueController.listRegistrationStations),
+);
+
+router.post(
+  "/events/:eventId/stations/:stationId/handoff",
+  checkIdempotency,
+  validate({ params: stationParams, body: queueHandoffBody }),
+  asyncHandler(queueController.createQueueHandoff),
+);
+
 router.get(
   "/events/:eventId",
   requireAnyRole("REGISTRATION_OFFICER", "SCREENER", "EVENT_MANAGER", "ADMINISTRATOR"),

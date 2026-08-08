@@ -2047,6 +2047,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/queues/events/{eventId}/stations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List station availability for participant registration handoff */
+        get: operations["listRegistrationStations"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/queues/events/{eventId}/stations/{stationId}/handoff": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Assign a registered participant to a station queue */
+        post: operations["createQueueHandoff"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/queues/events/{eventId}/stations/{stationId}/join": {
         parameters: {
             query?: never;
@@ -2417,6 +2451,7 @@ export interface components {
             stationOrder?: number;
             capacity?: number;
             isAvailable?: boolean;
+            operationalStatus?: components["schemas"]["StationOperationalStatus"];
         };
         StaffAssignmentRequest: components["schemas"]["ScreenerStaffAssignmentRequest"] | components["schemas"]["GeneralStaffAssignmentRequest"];
         ScreenerStaffAssignmentRequest: {
@@ -4343,6 +4378,8 @@ export interface components {
         };
         /** @enum {string} */
         QueueStatus: "WAITING" | "CALLED" | "IN_PROGRESS" | "COMPLETED" | "SKIPPED" | "CANCELLED";
+        /** @enum {string} */
+        StationOperationalStatus: "AVAILABLE" | "PAUSED" | "OFFLINE";
         QueueEntry: {
             /** Format: uuid */
             id: string;
@@ -4403,6 +4440,60 @@ export interface components {
         JoinQueueResponse: {
             queueEntry: components["schemas"]["QueueEntry"];
             created: boolean;
+        };
+        RegistrationStation: {
+            /** Format: uuid */
+            stationId: string;
+            stationName: string;
+            stationType: string;
+            stationOrder: number;
+            /** @enum {string} */
+            status: "AVAILABLE" | "BUSY" | "PAUSED" | "OFFLINE";
+            activeQueueCount: number;
+            selectable: boolean;
+        };
+        RegistrationStationListResponse: {
+            event: {
+                /** Format: uuid */
+                eventId: string;
+                name: string;
+                status: string;
+                venue: string | null;
+            };
+            stations: components["schemas"]["RegistrationStation"][];
+        };
+        QueueHandoffRequest: {
+            /** Format: uuid */
+            registrationId: string;
+        };
+        QueueHandoffResponse: {
+            created: boolean;
+            /** Format: uuid */
+            registrationId: string;
+            /** Format: uuid */
+            queueEntryId: string;
+            participant: {
+                /** Format: uuid */
+                id: string;
+                participantReference: string;
+                name: string;
+            };
+            event: {
+                /** Format: uuid */
+                id: string;
+                name: string;
+            };
+            queueNumber: number;
+            nextStation: string;
+            assignedStation: {
+                /** Format: uuid */
+                id: string;
+                name: string;
+                /** @enum {string} */
+                status: "BUSY";
+                /** @enum {string} */
+                statusBeforeHandoff: "AVAILABLE" | "BUSY";
+            };
         };
         ParticipantQueueStatusResponse: {
             /** Format: uuid */
@@ -8465,6 +8556,76 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["EventQueueStatusResponse"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            422: components["responses"]["ValidationFailed"];
+        };
+    };
+    listRegistrationStations: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                eventId: components["parameters"]["EventId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Registration handoff stations */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RegistrationStationListResponse"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            422: components["responses"]["ValidationFailed"];
+        };
+    };
+    createQueueHandoff: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                eventId: components["parameters"]["EventId"];
+                stationId: components["parameters"]["StationId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["QueueHandoffRequest"];
+            };
+        };
+        responses: {
+            /** @description Existing handoff returned */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["QueueHandoffResponse"];
+                };
+            };
+            /** @description Queue handoff created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["QueueHandoffResponse"];
                 };
             };
             401: components["responses"]["Unauthorized"];

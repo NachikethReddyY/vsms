@@ -22,6 +22,10 @@ const joinQueueBody = z.object({
   registrationId: z.string().uuid(),
 }).strict();
 
+const queueHandoffBody = z.object({
+  registrationId: z.string().uuid(),
+}).strict();
+
 const advanceQueueBody = z.object({
   toStationId: z.string().uuid(),
   reason: z.string().trim().min(1).max(100).optional(),
@@ -35,5 +39,6 @@ module.exports = {
   participantParams,
   eventParticipantParams,
   joinQueueBody,
+  queueHandoffBody,
   advanceQueueBody,
 };

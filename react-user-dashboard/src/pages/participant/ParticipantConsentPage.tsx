@@ -147,7 +147,7 @@ export default function ParticipantConsentPage() {
         consentFormVersionId: consentForm.id,
       });
       navigate(form.consentStatus === "ACCEPTED"
-        ? `/participants/${participantId}/check-in?eventId=${encodeURIComponent(eventId)}`
+        ? `/participants/${participantId}/register?eventId=${encodeURIComponent(eventId)}`
         : profileLink);
     } catch (requestError: unknown) {
       setError(getApiError(requestError, "Unable to record consent."));
@@ -191,7 +191,7 @@ export default function ParticipantConsentPage() {
               <div><dt>Recorded</dt><dd>{new Date(existingAcceptedConsent.createdAt).toLocaleString("en-SG")}</dd></div>
               <div><dt>Form version</dt><dd>{existingAcceptedConsent.consentFormVersion?.versionNumber ?? consentForm.versionNumber}</dd></div>
             </dl>
-            <div><Link className="secondary" to={profileLink}>Back to profile</Link><Link className="primary" to={`/participants/${participantId}/check-in?eventId=${encodeURIComponent(eventId)}`}>Continue to check-in</Link></div>
+            <div><Link className="secondary" to={profileLink}>Back to profile</Link><Link className="primary" to={`/participants/${participantId}/register?eventId=${encodeURIComponent(eventId)}`}>Continue to QR pass</Link></div>
           </div>
         </section>
       ) : null}
