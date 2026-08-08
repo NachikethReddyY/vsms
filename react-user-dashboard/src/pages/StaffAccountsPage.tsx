@@ -59,6 +59,8 @@ export default function StaffAccountsPage() {
   const [formError, setFormError] = useState('');
   const [saving, setSaving] = useState(false);
   const [notice, setNotice] = useState('');
+  const [reactivatingId, setReactivatingId] = useState<string | null>(null);
+  const [actionError, setActionError] = useState('');
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -112,7 +114,7 @@ export default function StaffAccountsPage() {
       employeeNumber: draft.employeeNumber,
       department: draft.department || null,
       designation: draft.designation || null,
-      status: draft.status,
+      ...(!editing ? { status: draft.status } : {}),
       roles: draft.roles,
     };
     try {
@@ -126,6 +128,19 @@ export default function StaffAccountsPage() {
       setFormError(getApiError(cause, 'Staff account could not be saved.'));
     } finally {
       setSaving(false);
+    }
+  };
+  const reactivate = async (member: AppUser) => {
+    setReactivatingId(member.id);
+    setActionError('');
+    try {
+      const response = await apiClient.post(`/admin/accounts/${member.id}/reactivate`, {});
+      await load();
+      setNotice(response.status === 202 ? 'Account reactivated. Identity-provider synchronization is pending.' : 'Account reactivated.');
+    } catch (cause) {
+      setActionError(getApiError(cause, `${member.fullName}'s account could not be reactivated.`));
+    } finally {
+      setReactivatingId(null);
     }
   };
   const activeCount = staff.filter((member) => member.status === 'ACTIVE').length;
@@ -143,19 +158,25 @@ export default function StaffAccountsPage() {
     </header>
 
     {error && <div className="alert error" role="alert"><span>{error}</span><button className="secondary compact" type="button" onClick={() => void load()}>Try again</button></div>}
+    {actionError && <div className="alert error" role="alert"><span>{actionError}</span></div>}
 
     <div className="staff-directory-layout">
       <section className="staff-directory" aria-label="Organisation staff accounts">
         {loading ? <div className="staff-loading" aria-live="polite" aria-label="Loading staff accounts"><span /><span /><span /><span /></div> : staff.length ? <div className="staff-table-shell">
           <table className="staff-table">
             <thead><tr><th scope="col">Person</th><th scope="col">Team</th><th scope="col">Application roles</th><th scope="col">Access</th><th scope="col"><span className="visually-hidden">Actions</span></th></tr></thead>
-            <tbody>{staff.map((member) => <tr key={member.id}>
+            <tbody>{staff.map((member) => {
+              const canReactivate = member.approvalState === 'APPROVED'
+                && member.accessState !== 'DISABLED'
+                && (member.status === 'INACTIVE' || member.status === 'SUSPENDED');
+              return <tr key={member.id}>
               <th scope="row"><div className="staff-person"><span className="staff-account-avatar" aria-hidden="true">{initial(member.fullName)}</span><span><strong>{member.fullName}</strong><small>{member.email}</small></span></div></th>
               <td><span className="staff-team">{member.designation || 'No designation'}<small>{member.department || 'No department'}</small></span></td>
               <td><div className="staff-role-list">{member.roles.length ? member.roles.map((role) => <span className="staff-role-chip" key={role}>{labelRole(role)}</span>) : <span className="staff-empty-role">No role assigned</span>}</div></td>
-              <td><span className={`staff-access ${member.status === 'ACTIVE' ? 'active' : 'inactive'}`}><i aria-hidden="true" />{member.status === 'ACTIVE' ? 'Active' : 'Inactive'}</span></td>
-              <td><button className="secondary compact staff-edit-button" type="button" onClick={() => openEdit(member)}><PencilSquareIcon aria-hidden="true" />Edit</button></td>
-            </tr>)}</tbody>
+              <td><span className={`staff-access ${member.status === 'ACTIVE' ? 'active' : 'inactive'}`}><i aria-hidden="true" />{member.status === 'ACTIVE' ? 'Active' : member.status === 'SUSPENDED' ? 'Suspended' : 'Inactive'}</span></td>
+              <td><div className="staff-row-actions">{canReactivate && <button className="secondary compact staff-reactivate-button" type="button" disabled={reactivatingId !== null} onClick={() => void reactivate(member)}><ArrowPathIcon aria-hidden="true" />{reactivatingId === member.id ? 'Reactivating…' : 'Reactivate'}</button>}<button className="secondary compact staff-edit-button" type="button" disabled={reactivatingId === member.id} onClick={() => openEdit(member)}><PencilSquareIcon aria-hidden="true" />Edit</button></div></td>
+            </tr>;
+            })}</tbody>
           </table>
         </div> : <div className="quiet-empty staff-empty"><UserGroupIcon aria-hidden="true" /><h2>No staff accounts yet</h2><p>Add a staff member to set their access before their first sign-in.</p><button className="secondary compact" type="button" onClick={openCreate}>Add staff member</button></div>}
         {!loading && <button className="secondary compact staff-refresh" type="button" onClick={() => void load()}><ArrowPathIcon aria-hidden="true" />Refresh list</button>}
@@ -171,7 +192,7 @@ export default function StaffAccountsPage() {
       open={dialogOpen}
       onOpenChange={closeDialog}
       title={editing ? `Edit ${editing.fullName}` : 'Add staff member'}
-      description={editing ? 'Change the staff profile, access state, and application roles. Sign-in groups stay synchronized with Cognito.' : 'Create the staff profile and Cognito sign-in identity. The colleague will receive the account invitation by email.'}
+      description={editing ? 'Change the staff profile and application roles. Lifecycle access changes use the dedicated account actions.' : 'Create the staff profile and Cognito sign-in identity. The colleague will receive the account invitation by email.'}
       dismissible={!saving}
       className="staff-account-dialog"
     >
@@ -184,7 +205,7 @@ export default function StaffAccountsPage() {
           <label className="app-dialog-field"><span>Department <small>Optional</small></span><input maxLength={100} value={draft.department} onChange={(event) => setDraft((current) => ({ ...current, department: event.target.value }))} /></label>
           <label className="app-dialog-field"><span>Designation <small>Optional</small></span><input maxLength={100} value={draft.designation} onChange={(event) => setDraft((current) => ({ ...current, designation: event.target.value }))} /></label>
         </div>
-        <label className="app-dialog-field"><span>Access status</span><select value={draft.status} onChange={(event) => setDraft((current) => ({ ...current, status: event.target.value as StaffDraft['status'] }))}><option value="ACTIVE">Active — sign-in roles synchronized with Cognito</option><option value="INACTIVE">Inactive — sign-in blocked and Cognito groups removed</option></select></label>
+        <label className="app-dialog-field"><span>Access status</span><select disabled={Boolean(editing)} value={draft.status} onChange={(event) => setDraft((current) => ({ ...current, status: event.target.value as StaffDraft['status'] }))}><option value="ACTIVE">Active — sign-in roles synchronized with Cognito</option><option value="INACTIVE">Inactive — use Reactivate when access is approved</option></select>{editing && <small className="app-dialog-help">Lifecycle status changes use the account approval and access actions.</small>}</label>
         <fieldset className="staff-role-selector"><legend>Application roles</legend><p>Select every role this person is approved to perform.</p><div>{ROLE_OPTIONS.map((role) => <label key={role.value}><input type="checkbox" checked={draft.roles.includes(role.value)} onChange={() => toggleRole(role.value)} /><span><strong>{role.label}</strong><small>{role.description}</small></span></label>)}</div></fieldset>
         <div className="app-dialog-actions"><button className="secondary" type="button" disabled={saving} onClick={() => closeDialog(false)}>Cancel</button><button className="primary" type="submit" disabled={saving}>{saving ? 'Saving…' : editing ? 'Save changes' : 'Create account'}</button></div>
       </form>

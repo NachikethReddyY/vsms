@@ -28,6 +28,7 @@ const { notFound, errorHandler } = require("./middlewares/errorHandler");
 
 // Route Modules
 const authRoutes = require("./routes/authRoutes");
+const accountRoutes = require("./routes/accountRoutes");
 const userRoutes = require("./routes/userRoutes");
 const eventRoutes = require("./routes/eventRoutes");
 const publicEventRoutes = require("./routes/publicEventRoutes");
@@ -254,6 +255,7 @@ if (!env.isProduction) {
 
 // Authentication & Public Routes
 app.use("/api/v1/auth", authRoutes);
+app.use("/api/v1/account", accountRoutes);
 app.use("/api/v1/public/events", publicEventRoutes);
 
 // Core Entity Routes

@@ -1,6 +1,7 @@
 const crypto = require("crypto");
 const prisma = require("../prisma/prismaClient");
 const AppError = require("../errors/AppError");
+const { requireEventRoleAndDuty } = require("./eventAuthorizationService");
 const qrService = require("./qrService");
 const { createAuditLog } = require("../utils/audit");
 const { resolveRegistrationByQrValue } = require("../utils/qrToken");
@@ -157,9 +158,7 @@ const evaluateColourVision = (resultData) => {
 };
 
 const assertCanScreen = async (eventId, user, stationId) => {
-  if (user.roles?.includes("ADMINISTRATOR") || !user.roles?.includes("SCREENER")) {
-    throw new AppError(403, "SCREENER_ROLE_REQUIRED", "A screener account role is required");
-  }
+  await requireEventRoleAndDuty(eventId, user, "SCREENER", { db: prisma, stationId });
   const event = await prisma.event.findUnique({
     where: { eventId },
     select: { eventId: true, name: true, status: true, venue: true, endsAt: true },
@@ -167,21 +166,6 @@ const assertCanScreen = async (eventId, user, stationId) => {
   if (!event) throw new AppError(404, "EVENT_NOT_FOUND", "Event not found");
   if (event.status !== "IN_PROGRESS") {
     throw new AppError(409, "EVENT_NOT_IN_PROGRESS", "Screening is available only while the event is in progress");
-  }
-  const now = new Date();
-  const assignment = await prisma.staffAssignment.findFirst({
-    where: {
-      eventId,
-      userId: user.userId,
-      status: { in: ["ASSIGNED", "CONFIRMED"] },
-      assignmentRole: "SCREENER",
-      ...(stationId ? { stationId } : {}),
-      shift: { eventId, status: "ACTIVE", startsAt: { lte: now }, endsAt: { gt: now } },
-    },
-    select: { id: true },
-  });
-  if (!assignment) {
-    throw new AppError(403, "FORBIDDEN", "You are not assigned to screen this event");
   }
   return event;
 };

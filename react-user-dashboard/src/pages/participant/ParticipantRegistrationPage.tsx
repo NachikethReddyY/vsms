@@ -246,7 +246,7 @@ export default function ParticipantRegistrationPage() {
       {error ? <p className="participant-v2-alert participant-v2-checkin-alert" role="alert">{error}</p> : null}
       <section className="participant-v2-checkin-card">
         <div className="participant-v2-checkin-overview">
-          <div><span>Event</span><h2>{review.event.eventName}</h2><p>{displayDate(review.event.eventDate)} Â· {review.event.location}</p></div>
+          <div><span>Event</span><h2>{review.event.eventName}</h2><p>{displayDate(review.event.eventDate)} - {review.event.location}</p></div>
           <div><span>Participant</span><h2>{review.participant.firstName} {review.participant.lastName}</h2><p>{review.participant.participantReference}</p></div>
         </div>
         <section className="participant-v2-checkin-requirements" aria-labelledby="participant-v2-registration-requirements-title">
@@ -254,8 +254,8 @@ export default function ParticipantRegistrationPage() {
           <div>{requirements.map((requirement) => <article key={requirement.label} className={requirement.complete ? "complete" : "missing"}><span>{requirement.complete ? <CheckCircleIcon /> : <ExclamationTriangleIcon />}</span><p>{requirement.label}</p><strong>{requirement.complete ? "Ready" : "Action needed"}</strong></article>)}</div>
         </section>
         <section className="participant-v2-checkin-records" aria-label="Participant registration records">
-          <article><PhoneIcon /><div><span>Emergency contact</span><strong>{review.emergencyContact ? `${review.emergencyContact.contactName} Â· ${review.emergencyContact.phoneNumber}` : "No active emergency contact"}</strong></div></article>
-          <article><ClipboardDocumentCheckIcon /><div><span>Consent</span><strong>{review.latestConsent ? `${displayStatus(review.latestConsent.consentStatus)} · Version ${review.latestConsent.consentFormVersion.versionNumber}` : "No consent recorded"}</strong></div></article>
+          <article><PhoneIcon /><div><span>Emergency contact</span><strong>{review.emergencyContact ? `${review.emergencyContact.contactName} - ${review.emergencyContact.phoneNumber}` : "No active emergency contact"}</strong></div></article>
+          <article><ClipboardDocumentCheckIcon /><div><span>Consent</span><strong>{review.latestConsent ? `${displayStatus(review.latestConsent.consentStatus)} - Version ${review.latestConsent.consentFormVersion.versionNumber}` : "No consent recorded"}</strong></div></article>
         </section>
         <footer className="participant-v2-checkin-actions">
           <Link className="secondary" to={profileLink}>Back to profile</Link>

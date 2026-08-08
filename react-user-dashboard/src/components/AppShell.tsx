@@ -5,20 +5,23 @@ import { useAuth } from '../auth/AuthProvider';
 import { ThemeToggle } from './MagicEffects';
 import ProfileMenu from './ProfileMenu';
 import { OfflineSyncControl } from '../features/screening/OfflineSyncControl';
+import { setupIdleTimer } from '../utils/idleTimer';
+import { logoutAndReturnHome } from '../utils/logout';
 import './EventsPage.css';
 
 const eventManagerRoles = new Set(['ADMINISTRATOR', 'EVENT_MANAGER']);
 const adminRoles = new Set(['ADMINISTRATOR']);
 
 export default function AppShell({ children }: { children: ReactNode }) {
-  const { session } = useAuth();
+  const { session, clearSession } = useAuth();
   const location = useLocation();
   const workspaceRef = useRef<HTMLElement>(null);
   const roles = session?.user.roles ?? [];
-  const canCreateEvent = roles.some((role) => eventManagerRoles.has(role));
-  const canManageStaff = roles.some((role) => adminRoles.has(role));
+  const canManageEvents = roles.some((role) => eventManagerRoles.has(role));
+  const canCreateEvent = roles.some((role) => adminRoles.has(role));
+  const canManageStaff = canCreateEvent;
   const canUseOfflineScreening = roles.includes('SCREENER') && !roles.includes('ADMINISTRATOR');
-  const eventManagementMatch = location.pathname.match(/^\/events\/([^/]+)(?:\/(overview|stations|staff|attendees|activity))?$/);
+  const eventManagementMatch = location.pathname.match(/^\/events\/([^/]+)(?:\/(overview|stations|staff|analytics|reports|attendees|activity))?$/);
   const stationWorkflowMatch = location.pathname.match(/^\/events\/([^/]+)\/stations\/(visual-acuity|refraction|colour-vision)$/);
   const eventDetailMatch = location.pathname.match(/^\/events\/([^/]+)$/);
   const offlineEventId = stationWorkflowMatch?.[1]
@@ -29,6 +32,10 @@ export default function AppShell({ children }: { children: ReactNode }) {
   useEffect(() => {
     workspaceRef.current?.scrollTo({ top: 0 });
   }, [location.pathname]);
+
+  useEffect(() => setupIdleTimer(() => {
+    void logoutAndReturnHome(clearSession);
+  }, 30), [clearSession]);
 
   return (
     <div className="events-workspace">
@@ -45,7 +52,7 @@ export default function AppShell({ children }: { children: ReactNode }) {
 
         <nav className="workspace-primary-nav" aria-label="Primary navigation">
           <NavLink to="/events" className={({ isActive }) => isActive ? 'active' : undefined}><CalendarDaysIcon aria-hidden="true" />Events</NavLink>
-          {canCreateEvent && <NavLink to="/reports" className={({ isActive }) => isActive ? 'active' : undefined}><ChartBarSquareIcon aria-hidden="true" />Reports</NavLink>}
+          {canManageEvents && <NavLink to="/reports" className={({ isActive }) => isActive ? 'active' : undefined}><ChartBarSquareIcon aria-hidden="true" />Reports</NavLink>}
           {canManageStaff && <NavLink to="/staff" className={({ isActive }) => isActive ? 'active' : undefined}><UserGroupIcon aria-hidden="true" />Staff</NavLink>}
         </nav>
 

@@ -1,0 +1,16 @@
+.vsms-phone-input {
+  display: flex;
+  min-height: 43px;
+  width: 100%;
+  border: 1px solid var(--hairline-strong, #c8cbd1);
+  border-radius: 9px;
+  background: var(--canvas-soft, #f8f8f6);
+  color: var(--ink, #172033);
+}
+
+.vsms-phone-input:focus-within { outline: 2px solid var(--accent, #2864ed); outline-offset: 1px; }
+.vsms-phone-input .PhoneInputCountry { margin: 0; padding: 0 10px 0 12px; border-right: 1px solid var(--hairline, #dcdad2); }
+.vsms-phone-input .PhoneInputCountrySelectArrow { color: var(--muted, #697386); }
+.vsms-phone-input .PhoneInputInput { min-width: 0; border: 0; border-radius: 0 9px 9px 0; padding: 0 12px; background: transparent; color: inherit; font: inherit; }
+.vsms-phone-input .PhoneInputInput:focus { outline: 0; }
+.vsms-phone-input .PhoneInputInput::placeholder { color: var(--muted, #697386); }

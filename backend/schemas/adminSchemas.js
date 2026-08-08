@@ -67,10 +67,23 @@ const artifactCleanupActionBody = z.object({
   resolutionNote: z.string().trim().min(10).max(500),
 }).strict();
 
+const accountProviderDrainBody = z.object({
+  limit: z.number().int().min(1).max(100).default(25),
+}).strict();
+
+const accountProviderOperationParams = z.object({ operationId: z.string().uuid() }).strict();
+
+const accountProviderOperationActionBody = z.object({
+  reason: z.string().trim().min(10).max(500),
+}).strict();
+
 module.exports = {
   referralDeliveryMaintenanceBody,
   auditLogListQuery,
   artifactCleanupListQuery,
   artifactCleanupParams,
   artifactCleanupActionBody,
+  accountProviderDrainBody,
+  accountProviderOperationParams,
+  accountProviderOperationActionBody,
 };

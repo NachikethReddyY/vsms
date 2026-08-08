@@ -27,6 +27,8 @@
     "audit:fix": "pnpm audit --fix",
     "provision-staff": "node prisma/provisionStaff.js",
     "dev:preset": "node scripts/dev-preset.js",
+    "worker:reports": "node scripts/report-worker.js",
+    "worker:lifecycle-email": "node scripts/lifecycle-email-worker.js",
     "deploy": "pnpm install && pnpm db:setup && pnpm start",
     "deploy:prod": "pnpm install --prod && pnpm db:setup && pnpm start",
     "ci": "pnpm prisma:validate && pnpm prisma:generate && pnpm test && pnpm openapi:lint"
@@ -55,7 +57,9 @@
     "express-rate-limit": "^8.6.1",
     "helmet": "^8.3.0",
     "html5-qrcode": "^2.3.8",
+    "ioredis": "^6.0.0",
     "jsonwebtoken": "^9.0.3",
+    "nodemailer": "^9.0.4",
     "pdfkit": "^0.19.1",
     "pg": "^8.16.0",
     "pino": "^10.3.1",
@@ -74,7 +78,9 @@
   },
   "devDependencies": {
     "@redocly/cli": "^2.40.0",
+    "brace-expansion": "^2.1.4",
     "expect": "^30.4.1",
+    "js-yaml": "^4.3.1",
     "openapi-typescript": "^7.13.0",
     "supertest": "^7.2.2"
   }

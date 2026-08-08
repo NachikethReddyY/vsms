@@ -15,6 +15,8 @@ const { createAuthAuditLog } = require("../utils/audit");
 const { timingSafeEqual } = require("../utils/security");
 const { syncLocalUser, rolesFromCognitoGroups, ALLOWED_ROLES } = require("../utils/staff");
 const prisma = require("../prisma/prismaClient");
+const { sessionValidity } = require("../utils/sessionValidity");
+const { enqueueAccountLifecycle } = require("../services/accountLifecycleNotificationService");
 const {
     ACCESS_COOKIE,
     REFRESH_COOKIE,
@@ -98,9 +100,22 @@ function publicUser(localUser, roles) {
         department: localUser.department,
         designation: localUser.designation,
         status: localUser.status,
+        approvalState: localUser.approvalState,
+        accessState: localUser.accessState,
+        professionalCategory: localUser.professionalCategory,
         roles,
         systemRole,
     };
+}
+
+function canUseLimitedSession(user) {
+    if (!user || user.deprovisionedAt) return false;
+    if (user.accessState !== undefined) return user.accessState !== "DISABLED";
+    return user.status === "ACTIVE";
+}
+
+function sessionWasRevoked(user, payload) {
+    return !sessionValidity(user, payload).valid;
 }
 
 async function finalizeSuccessfulLogin(authResult, username, context, res) {
@@ -108,10 +123,13 @@ async function finalizeSuccessfulLogin(authResult, username, context, res) {
         verifyCognitoToken(authResult.IdToken, "id"),
         verifyCognitoToken(authResult.AccessToken, "access"),
     ]);
-    const localUser = await syncLocalUser(extractProfileFromIdToken(idTokenPayload));
+    const emailVerified = idTokenPayload.email_verified === true || idTokenPayload.email_verified === "true";
+    const localUser = await syncLocalUser(extractProfileFromIdToken(idTokenPayload), {
+        allowCreate: env.publicSignupEnabled && emailVerified,
+    });
 
-    if (localUser.status !== "ACTIVE") {
-        const error = new Error("Local staff account is not active");
+    if (!canUseLimitedSession(localUser) || sessionWasRevoked(localUser, accessTokenPayload)) {
+        const error = new Error("Local staff account cannot use this session");
         error.statusCode = 403;
         throw error;
     }
@@ -119,12 +137,10 @@ async function finalizeSuccessfulLogin(authResult, username, context, res) {
     const localRoles = localUser.userRoles.map((entry) => entry.role.roleName);
     const cognitoRoles = rolesFromCognitoGroups(accessTokenPayload);
     const roles = localRoles.filter((role) => cognitoRoles.includes(role));
-    if (roles.length === 0) {
-        const error = new Error("Cognito group membership does not grant an application role");
-        error.statusCode = 403;
-        throw error;
-    }
 
+    const lastLoginAt = new Date();
+    await prisma.user.update({ where: { id: localUser.id }, data: { lastLoginAt } });
+    localUser.lastLoginAt = lastLoginAt;
     setAuthCookies(res, authResult, idTokenPayload.email || idTokenPayload["cognito:username"] || username);
     await createAuthAuditLog({
         userId: localUser.id,
@@ -144,6 +160,7 @@ async function finalizeSuccessfulLogin(authResult, username, context, res) {
 exports.configStatus = asyncHandler(async (req, res) => {
     res.json({
         configured: isCognitoConfigured(),
+        publicSignupEnabled: env.publicSignupEnabled,
         supportedRoles: ALLOWED_ROLES,
         requestId: req.context.requestId,
     });
@@ -210,8 +227,8 @@ exports.refresh = asyncHandler(async (req, res) => {
             cognitoSub: accessPayload.sub,
             email: username.includes("@") ? username : null,
         });
-        if (localUser.status !== "ACTIVE") {
-            const error = new Error("Local staff account is not active");
+        if (!canUseLimitedSession(localUser) || sessionWasRevoked(localUser, accessPayload)) {
+            const error = new Error("Local staff account cannot use this session");
             error.statusCode = 403;
             throw error;
         }
@@ -219,12 +236,6 @@ exports.refresh = asyncHandler(async (req, res) => {
         const localRoles = localUser.userRoles.map((entry) => entry.role.roleName);
         const cognitoRoles = rolesFromCognitoGroups(accessPayload);
         const roles = localRoles.filter((role) => cognitoRoles.includes(role));
-        if (roles.length === 0) {
-            const error = new Error("Cognito group membership does not grant an application role");
-            error.statusCode = 403;
-            throw error;
-        }
-
         setAuthCookies(res, { ...authResult, RefreshToken: refreshToken }, username);
         res.json({
             expiresIn: authResult.ExpiresIn,
@@ -288,6 +299,12 @@ exports.changePassword = asyncHandler(async (req, res) => {
         outcome: "SUCCESS",
         identifier: req.auth.email,
         context: req.context,
+    });
+    await enqueueAccountLifecycle({
+        type: "PASSWORD_CHANGED",
+        account: { id: req.auth.userId },
+        metadata: { changedAt: new Date().toISOString() },
+        idempotencyKey: `PASSWORD_CHANGED:${req.auth.userId}:${req.context?.requestId || crypto.randomUUID()}`,
     });
     res.json({ message: "Password changed successfully." });
 });

@@ -11,10 +11,12 @@ const stationParams = eventParams.extend({
 const queueEntryParams = z.object({
   queueId: z.string().uuid(),
 }).strict();
+const eventQueueEntryParams = eventParams.extend({ queueId: z.string().uuid() }).strict();
 
 const participantParams = z.object({
   registrationId: z.string().uuid(),
 }).strict();
+const eventParticipantParams = eventParams.extend({ registrationId: z.string().uuid() }).strict();
 
 const joinQueueBody = z.object({
   registrationId: z.string().uuid(),
@@ -33,7 +35,9 @@ module.exports = {
   eventParams,
   stationParams,
   queueEntryParams,
+  eventQueueEntryParams,
   participantParams,
+  eventParticipantParams,
   joinQueueBody,
   queueHandoffBody,
   advanceQueueBody,

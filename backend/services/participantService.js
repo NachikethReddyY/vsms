@@ -3,7 +3,9 @@ const prisma = require("../prisma/prismaClient");
 const { createAuditLog } = require("../utils/audit");
 const {
     assertUuid,
+    cleanNric,
     cleanString,
+    maskNric,
     parsePositiveInt,
     validateParticipantPayload,
     validateEmergencyContactPayload,
@@ -11,7 +13,7 @@ const {
     validationError,
 } = require("../utils/validation");
 const { loadVerifiedSignature, consumeSignatureArtifact } = require("../utils/signatureStorage");
-const { assertParticipantEventScope } = require("../utils/participantEventScope");
+const { assertParticipantEventScope, participantEventScopeWhere } = require("../utils/participantEventScope");
 
 const OPEN_EVENT_STATUSES = ["PUBLISHED", "UPCOMING", "ONGOING", "IN_PROGRESS"];
 
@@ -94,11 +96,12 @@ function parseParticipantMatch(payload) {
     const firstName = cleanString(payload.firstName, "firstName", { required: true, max: 100 });
     const lastName = cleanString(payload.lastName, "lastName", { required: true, max: 100 });
     const contactNumber = cleanString(payload.contactNumber, "contactNumber", { required: true, max: 30 });
+    const { nric } = cleanNric(payload.nric, { required: true });
     const dateOfBirth = cleanString(payload.dateOfBirth, "dateOfBirth", { required: true, max: 10 });
     const parsedDateOfBirth = new Date(`${dateOfBirth}T00:00:00.000Z`);
     if (Number.isNaN(parsedDateOfBirth.getTime())) throw validationError("dateOfBirth is invalid");
     if (parsedDateOfBirth > new Date()) throw validationError("dateOfBirth cannot be in the future");
-    return { firstName, lastName, contactNumber, dateOfBirth, parsedDateOfBirth };
+    return { firstName, lastName, contactNumber, nric, dateOfBirth, parsedDateOfBirth };
 }
 
 function participantMatchReasons(participant, criteria) {
@@ -109,10 +112,24 @@ function participantMatchReasons(participant, criteria) {
     }
     if (new Date(participant.dateOfBirth).toISOString().slice(0, 10) === criteria.dateOfBirth) reasons.push("Date of birth");
     if (participant.contactNumber === criteria.contactNumber) reasons.push("Contact number");
+    if (participant.nric === criteria.nric) reasons.push("NRIC / FIN");
     return reasons;
 }
 
+function participantPublicDetails(participant) {
+    const { nric, nricMasked, ...safeParticipant } = participant;
+    return { ...safeParticipant, nricMasked: maskNric(nric) || nricMasked };
+}
+
+function assertCrossEventReusePermission(req) {
+    if (req.auth?.permissions?.includes("participants:cross-event-reuse")) return;
+    const error = new Error("Cross-event participant reuse is not authorized");
+    error.statusCode = 403;
+    throw error;
+}
+
 exports.matchParticipantsForRegistrationService = async (req) => {
+    assertCrossEventReusePermission(req);
     const criteria = parseParticipantMatch(req.body || {});
     const fullName = {
         AND: [
@@ -124,6 +141,7 @@ exports.matchParticipantsForRegistrationService = async (req) => {
     const participants = await prisma.participant.findMany({
         where: {
             OR: [
+                { nric: criteria.nric },
                 { AND: [fullName, { dateOfBirth: criteria.parsedDateOfBirth }] },
                 { AND: [fullName, { contactNumber: criteria.contactNumber }] },
                 { AND: [{ dateOfBirth: criteria.parsedDateOfBirth }, { contactNumber: criteria.contactNumber }] },
@@ -172,7 +190,7 @@ exports.matchParticipantsForRegistrationService = async (req) => {
         };
     });
 
-    return {
+    const response = {
         result: matches.length === 0
             ? "NO_MATCH"
             : matches.every((match) => match.currentEventRegistration)
@@ -180,6 +198,77 @@ exports.matchParticipantsForRegistrationService = async (req) => {
                 : "POSSIBLE_MATCH",
         matches,
     };
+    // Cross-event identity data is deliberately limited and every lookup is recorded.
+    await createAuditLog({
+        userId: req.auth.userId,
+        action: "PARTICIPANT_CROSS_EVENT_MATCH_CHECKED",
+        entityName: "Event",
+        entityId: req.registrationEventId,
+        newValue: { matchCount: matches.length, outcome: response.result },
+        context: req.context,
+    });
+    return response;
+};
+
+exports.reuseMatchedParticipantService = async (req) => {
+    assertCrossEventReusePermission(req);
+    const participantId = assertUuid(req.params.participantId, "participantId");
+    const criteria = parseParticipantMatch(req.body || {});
+    const eventId = req.registrationEventId;
+
+    return prisma.$transaction(async (tx) => {
+        const participant = await tx.participant.findUnique({ where: { id: participantId } });
+        if (!participant || participant.status !== "ACTIVE") {
+            const error = new Error("Active participant not found");
+            error.statusCode = 404;
+            throw error;
+        }
+
+        const matchReasons = participantMatchReasons(participant, criteria);
+        if (matchReasons.length < 2 && !matchReasons.includes("NRIC / FIN")) {
+            const error = new Error("Participant is not an approved identity match");
+            error.statusCode = 403;
+            throw error;
+        }
+
+        const existingRegistration = await tx.eventRegistration.findUnique({
+            where: { participantId_eventId: { participantId, eventId } },
+            select: { registrationId: true },
+        });
+        if (existingRegistration) {
+            await createAuditLog({
+                userId: req.auth.userId,
+                action: "PARTICIPANT_REUSE_ALREADY_REGISTERED",
+                entityName: "EventRegistration",
+                entityId: existingRegistration.registrationId,
+                newValue: { participantId, eventId, matchReasonCount: matchReasons.length },
+                context: req.context,
+                client: tx,
+            });
+            return { outcome: "ALREADY_REGISTERED", registrationId: existingRegistration.registrationId };
+        }
+
+        const intake = await tx.participantEventIntake.upsert({
+            where: { participantId_eventId: { participantId, eventId } },
+            update: {},
+            create: {
+                participantId,
+                eventId,
+                attachedById: req.auth.userId,
+                reason: "REUSED_MATCH",
+            },
+        });
+        await createAuditLog({
+            userId: req.auth.userId,
+            action: "PARTICIPANT_REUSED_FOR_EVENT",
+            entityName: "ParticipantEventIntake",
+            entityId: intake.intakeId,
+            newValue: { participantId, eventId, matchReasonCount: matchReasons.length },
+            context: req.context,
+            client: tx,
+        });
+        return { outcome: "ATTACHED", intakeId: intake.intakeId };
+    });
 };
 
 function parseSearch(req) {
@@ -228,7 +317,12 @@ function parseSearch(req) {
 }
 
 exports.searchParticipantsService = async (req) => {
-    const where = parseSearch(req);
+    const where = {
+        AND: [
+            parseSearch(req),
+            participantEventScopeWhere(req.registrationEventId, req.auth.userId),
+        ],
+    };
     const page = parsePositiveInt(req.query.page, 1, 10_000);
     const pageSize = parsePositiveInt(req.query.pageSize, 10, 50);
     const skip = (page - 1) * pageSize;
@@ -296,7 +390,7 @@ exports.createParticipantService = async (req) => {
         }
     }
 
-    return participant;
+    return participantPublicDetails(participant);
 };
 
 exports.getParticipantByIdService = async (participantIdParam, eventId, userId) => {
@@ -312,7 +406,7 @@ exports.getParticipantByIdService = async (participantIdParam, eventId, userId) 
         error.statusCode = 404;
         throw error;
     }
-    return participant;
+    return participantPublicDetails(participant);
 };
 
 exports.updateParticipantService = async (req) => {
@@ -344,7 +438,7 @@ exports.updateParticipantService = async (req) => {
             client: tx,
         });
 
-        return updated;
+        return participantPublicDetails(updated);
     });
 };
 

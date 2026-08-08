@@ -9,14 +9,17 @@ meta {
 }
 
 headers {
-  Origin: https://localhost:5173
+  Cookie: vsms_csrf={{csrfToken}}
+  Origin: {{origin}}
   Sec-Fetch-Site: same-origin
   X-CSRF-Token: {{csrfToken}}
 }
 
 tests {
-  test("logout revokes the session", function() {
-    expect(res.getStatus()).to.equal(204);
+  test("logout clears the local browser session", function() {
+    expect(res.getStatus()).to.equal(200);
+    expect(res.getBody().message).to.equal("Logged out successfully");
+    expect(res.getBody().logoutUrl).to.be.a("string");
   });
 }
 
@@ -27,29 +30,38 @@ post {
 }
 
 example {
-  name: 204 Response
-  description: Session revoked
+  name: 200 Response
+  description: Local browser cookies cleared; Set-Cookie expires auth and CSRF cookies
 
   request: {
     url: {{baseUrl}}/auth/logout
     method: POST
     mode: none
     headers: {
-      X-CSRF-Token:
-      vsms_refresh: {{apiKey}}
+      Cookie: vsms_csrf={{csrfToken}}
+      X-CSRF-Token: {{csrfToken}}
+      Origin: {{origin}}
     }
   }
 
   response: {
+    headers: {
+      Content-Type: application/json
+      Set-Cookie: vsms_access=; Max-Age=0, vsms_refresh=; Max-Age=0, vsms_username=; Max-Age=0, vsms_csrf=; Max-Age=0
+    }
+
     status: {
-      code: 204
-      text: No Content
+      code: 200
+      text: OK
     }
 
     body: {
-      type: text
+      type: json
       content: '''
-
+        {
+          "message": "Logged out successfully",
+          "logoutUrl": "https://cognito.example.com/logout"
+        }
       '''
     }
   }
@@ -64,8 +76,9 @@ example {
     method: POST
     mode: none
     headers: {
-      X-CSRF-Token:
-      vsms_refresh: {{apiKey}}
+      Cookie: vsms_csrf={{csrfToken}}
+      X-CSRF-Token: {{csrfToken}}
+      Origin: {{origin}}
     }
   }
 

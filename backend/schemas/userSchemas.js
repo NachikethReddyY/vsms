@@ -31,7 +31,6 @@ const updateUserBody = z.object({
   department: optionalText(100),
   designation: optionalText(100),
   roles: roleList.optional(),
-  status: z.enum(["ACTIVE", "INACTIVE"]).optional(),
 }).strict().refine((value) => Object.keys(value).length > 0, {
   message: "At least one account field is required",
 });

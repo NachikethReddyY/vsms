@@ -1,6 +1,8 @@
-const crypto = require("crypto");
 const prisma = require("../prisma/prismaClient");
 const { APPLICATION_ROLES, normalizeApplicationRole, rolesFromCognitoGroups } = require("./roles");
+const eventAuthorization = require("../services/eventAuthorizationService");
+const env = require("../config/env");
+const { enqueueAccountLifecycle } = require("../services/accountLifecycleNotificationService");
 
 const ALLOWED_ROLES = APPLICATION_ROLES;
 
@@ -8,100 +10,21 @@ function normalizeRole(role) {
     return normalizeApplicationRole(role);
 }
 
-async function ensureRole(roleName) {
-    return prisma.role.upsert({
-        where: { roleName },
-        update: {},
-        create: {
-            roleName,
-            description: `${roleName} application role`,
-        },
-    });
-}
-
-function buildPendingEmployeeNumber(email) {
-    const suffix = crypto.createHash("sha256").update(email).digest("hex").slice(0, 12);
-    return `PENDING-${suffix}`;
-}
-
 async function assertRegistrationAssignment(db, eventId, auth) {
-    const roles = auth?.roles || [];
-    if (roles.includes("ADMINISTRATOR") || !roles.includes("REGISTRATION_OFFICER")) {
-        const error = new Error("A registration officer account role is required");
-        error.statusCode = 403;
-        throw error;
-    }
-    const now = new Date();
-    const assignment = await db.staffAssignment.findFirst({
-        where: {
-            ...(eventId ? { eventId } : {}),
-            userId: auth.userId,
-            assignmentRole: "REGISTRATION",
-            status: { in: ["ASSIGNED", "CONFIRMED"] },
-            shift: {
-                ...(eventId ? { eventId } : {}),
-                status: "ACTIVE",
-                startsAt: { lte: now },
-                endsAt: { gt: now },
-            },
-        },
-        select: { id: true },
-    });
-    if (!assignment) {
-        const error = new Error(eventId
-            ? "An active registration assignment is required for this event"
-            : "An active registration assignment is required");
-        error.statusCode = 403;
-        throw error;
-    }
+    return eventAuthorization.requireEventRoleAndDuty(eventId, auth?.user || auth, "REGISTRATION", { db });
 }
 
 async function assertScreenerAssignment(db, eventId, auth, stationId) {
-    const roles = auth?.roles || [];
-    if (roles.includes("ADMINISTRATOR") || !roles.includes("SCREENER")) {
-        const error = new Error("A screener account role is required");
-        error.statusCode = 403;
-        throw error;
-    }
-    const now = new Date();
-    const assignment = await db.staffAssignment.findFirst({
-        where: {
-            ...(eventId ? { eventId } : {}),
-            userId: auth.userId,
-            assignmentRole: "SCREENER",
-            status: { in: ["ASSIGNED", "CONFIRMED"] },
-            ...(stationId ? { stationId } : {}),
-            shift: {
-                ...(eventId ? { eventId } : {}),
-                status: "ACTIVE",
-                startsAt: { lte: now },
-                endsAt: { gt: now },
-            },
-        },
-        select: { id: true },
-    });
-    if (!assignment) {
-        const error = new Error(eventId
-            ? "An active screener assignment is required for this event"
-            : "An active screener assignment is required");
-        error.statusCode = 403;
-        throw error;
-    }
+    return eventAuthorization.requireEventRoleAndDuty(eventId, auth?.user || auth, "SCREENER", { db, stationId });
 }
 
 async function assertQrVerifyAccess(db, eventId, auth) {
-    const roles = auth?.roles || [];
-    if (roles.includes("REGISTRATION_OFFICER") && !roles.includes("ADMINISTRATOR")) {
-        await assertRegistrationAssignment(db, eventId, auth);
-        return;
+    const user = auth?.user || auth;
+    const membership = await eventAuthorization.requireEventRoles(eventId, user, ["REGISTRATION", "SCREENER"], { db });
+    if (membership.roles.has("REGISTRATION")) {
+        try { return await eventAuthorization.requireCurrentDuty(eventId, user, "REGISTRATION", { db }); } catch (_error) {}
     }
-    if (roles.includes("SCREENER") && !roles.includes("ADMINISTRATOR")) {
-        await assertScreenerAssignment(db, eventId, auth);
-        return;
-    }
-    const error = new Error("A registration officer or screener account role is required");
-    error.statusCode = 403;
-    throw error;
+    return eventAuthorization.requireCurrentDuty(eventId, user, "SCREENER", { db });
 }
 
 async function syncLocalUser(profile, { allowCreate = false } = {}) {
@@ -115,33 +38,34 @@ async function syncLocalUser(profile, { allowCreate = false } = {}) {
         : null;
 
     if (!user && !allowCreate) {
-        const error = new Error("No approved local staff profile exists for this Cognito account");
+        const error = new Error("No local staff profile exists for this Cognito account");
         error.statusCode = 403;
         throw error;
     }
 
     if (!user) {
-        user = await prisma.user.create({
-            data: {
+        const data = {
                 cognitoSub: profile.cognitoSub || null,
                 username: normalizedEmail,
                 fullName: profile.fullName || "Pending Staff",
                 email: normalizedEmail,
-                employeeNumber: profile.employeeNumber || buildPendingEmployeeNumber(normalizedEmail),
+                employeeNumber: profile.employeeNumber || null,
                 department: profile.department || null,
                 designation: profile.designation || null,
                 status: "INACTIVE",
                 sysRole: "STAFF",
-            },
-        });
-
-        const role = await ensureRole("REGISTRATION_OFFICER");
-        await prisma.userRole.create({
-            data: {
-                userId: user.id,
-                roleId: role.id,
-            },
-        });
+                approvalState: "PENDING",
+                accessState: "ENABLED",
+        };
+        if (env.lifecycleEmailEnabled) {
+            user = await prisma.$transaction(async (tx) => {
+                const created = await tx.user.create({ data });
+                await enqueueAccountLifecycle({ type: "SIGNUP_RECEIVED", account: created, idempotencyKey: `SIGNUP_RECEIVED:${created.id}`, db: tx });
+                return created;
+            });
+        } else {
+            user = await prisma.user.create({ data });
+        }
     } else {
         const update = {};
         if (profile.cognitoSub && !user.cognitoSub) update.cognitoSub = profile.cognitoSub;

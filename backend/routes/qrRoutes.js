@@ -4,17 +4,15 @@ const asyncHandler = require("../utils/asyncHandler");
 
 const qrController = require("../controllers/qrController");
 const authenticate = require("../middlewares/authenticate");
-const requireAnyRole = require("../middlewares/requireAnyRole");
+
+// Import your production-grade idempotency middleware
+const checkIdempotency = require("../middlewares/idempotency");
 
 // ==========================================
 // Public pass-status lookup for the QR scan target.
-// Intentionally mounted before auth: only non-sensitive
-// validity/queue/expiry data is returned, never names or PII.
+// (GET requests - Read-only, no idempotency needed)
 // ==========================================
 router.get("/public-status/:token", asyncHandler(qrController.getPublicStatus));
-
-// Public screener-handoff QR. Encodes only a station URL pre-loaded with the
-// registration reference; the station page itself stays role-guarded.
 router.get("/handoff/:token", asyncHandler(qrController.getStationHandoffQR));
 
 // ==========================================
@@ -30,7 +28,6 @@ router.get("/dev-status/:token", asyncHandler(qrController.devStatusQR));
 router.get(
   "/view/:registrationId",
   authenticate,
-  requireAnyRole.operational("REGISTRATION_OFFICER"),
   asyncHandler(qrController.viewQR)
 );
 
@@ -39,29 +36,27 @@ router.get(
 // ==========================================
 router.use(authenticate);
 
-// Station handoff: screeners verify passes; officers keep the same capability.
+// Station handoff verification: Protected by idempotency to prevent duplicate check-ins/scans
 router.post(
   "/verify",
-  requireAnyRole.operational("REGISTRATION_OFFICER", "SCREENER"),
-  asyncHandler(qrController.verifyQR),
+  checkIdempotency,
+  asyncHandler(qrController.verifyQR)
 );
 
-// Registration desk / QR management stays registration-officer only.
-router.use(requireAnyRole.operational("REGISTRATION_OFFICER"));
-
-// Generation & Reissuing
-router.post("/registrations/:registrationId", asyncHandler(qrController.generateRegistrationQR));
-router.post("/generate/:registrationId", asyncHandler(qrController.generateQR));
-router.post("/reissue/:registrationId", asyncHandler(qrController.reissueQR));
+// Registration desk / QR management: Generation, Reissuing, and Manual Check-ins
+// are fully protected against accidental double submission or network retries.
+router.post("/registrations/:registrationId", checkIdempotency, asyncHandler(qrController.generateRegistrationQR));
+router.post("/generate/:registrationId", checkIdempotency, asyncHandler(qrController.generateQR));
+router.post("/reissue/:registrationId", checkIdempotency, asyncHandler(qrController.reissueQR));
 
 // Attendance (desk)
-router.post("/manual-checkin", asyncHandler(qrController.manualCheckIn));
+router.post("/manual-checkin", checkIdempotency, asyncHandler(qrController.manualCheckIn));
 
-// Participant & History Lookup
+// Participant & History Lookup (GET request - read-only)
 router.get("/participant/:token", asyncHandler(qrController.getParticipantByQR));
 
 // Revocation & File Output
-router.put("/revoke/:qrId", asyncHandler(qrController.revokeQR));
+router.put("/revoke/:qrId", checkIdempotency, asyncHandler(qrController.revokeQR));
 router.get("/download/:qrId", asyncHandler(qrController.downloadQR));
 router.get("/print/:qrId", asyncHandler(qrController.printQR));
 router.get("/:token", asyncHandler(qrController.getRegistrationByQR));

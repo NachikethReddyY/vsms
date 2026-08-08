@@ -11,6 +11,14 @@ Parameters:
     Type: String
     Default: https://localhost:5173
     Description: Public frontend origin used for Cognito callbacks and logout
+  PublicSignupEnabled:
+    Type: String
+    Default: "false"
+    AllowedValues: ["true", "false"]
+    Description: Must match the backend PUBLIC_SIGNUP_ENABLED setting
+
+Conditions:
+  PublicSignupEnabledCondition: !Equals [!Ref PublicSignupEnabled, "true"]
 
 Resources:
   StaffUserPool:
@@ -37,7 +45,7 @@ Resources:
           RequireSymbols: true
           TemporaryPasswordValidityDays: 2
       AdminCreateUserConfig:
-        AllowAdminCreateUserOnly: true
+        AllowAdminCreateUserOnly: !If [PublicSignupEnabledCondition, false, true]
       UserPoolAddOns:
         AdvancedSecurityMode: ENFORCED
       UserAttributeUpdateSettings:

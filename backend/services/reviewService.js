@@ -4,9 +4,10 @@ const AppError = require("../errors/AppError");
 const { resolveRegistrationByQrValue } = require("../utils/qrToken");
 const { IMPORTABLE_TEMPLATE_KEYS } = require("./stationTemplateMapping");
 const { loadVerifiedSignature, consumeSignatureArtifact } = require("../utils/signatureStorage");
+const { requireEventRoleAndDuty } = require("./eventAuthorizationService");
+const { maskNric } = require("../utils/validation");
 
 const FLAG_RANK = { NORMAL: 0, REVIEW: 1, REFER: 2, URGENT: 3 };
-const ACTIVE_ASSIGNMENT_STATUSES = ["ASSIGNED", "CONFIRMED"];
 const SUPPORTED_SCREENING_TYPES = Object.values(IMPORTABLE_TEMPLATE_KEYS);
 
 const highestFlag = (results) => results.reduce(
@@ -57,9 +58,7 @@ const compareQueueItems = (left, right) => {
 };
 
 const requireReviewerAccess = async (db, eventId, user) => {
-  if (user.roles?.includes("ADMINISTRATOR") || !user.roles?.includes("REVIEWER")) {
-    throw new AppError(403, "REVIEWER_ROLE_REQUIRED", "A reviewer account role is required");
-  }
+  await requireEventRoleAndDuty(eventId, user, "REVIEWER", { db });
   const event = await db.event.findUnique({
     where: { eventId },
     select: { eventId: true, name: true, venue: true, timezone: true, status: true },
@@ -69,20 +68,6 @@ const requireReviewerAccess = async (db, eventId, user) => {
     throw new AppError(409, "EVENT_NOT_IN_PROGRESS", "Clinical review is available only while the event is in progress");
   }
 
-  const now = new Date();
-  const assignment = await db.staffAssignment.findFirst({
-    where: {
-      eventId,
-      userId: user.userId,
-      assignmentRole: "REVIEWER",
-      status: { in: ACTIVE_ASSIGNMENT_STATUSES },
-      shift: { eventId, status: "ACTIVE", startsAt: { lte: now }, endsAt: { gt: now } },
-    },
-    select: { id: true },
-  });
-  if (!assignment) {
-    throw new AppError(403, "REVIEWER_ASSIGNMENT_REQUIRED", "An active reviewer assignment is required");
-  }
   return event;
 };
 
@@ -278,7 +263,7 @@ const buildDetail = (event, stations, registration) => {
       participantDisplayName: displayName(registration),
       queueNumber: registration.queueNumber,
       registrationStatus: registration.registrationStatus,
-      maskedNric: registration.participant.nricMasked || `••••${String(registration.participant.nric || "").slice(-4)}`,
+      maskedNric: maskNric(registration.participant.nric) || registration.participant.nricMasked || "Not recorded",
       dateOfBirth: registration.participant.dateOfBirth.toISOString().slice(0, 10),
       gender: registration.participant.gender,
     },

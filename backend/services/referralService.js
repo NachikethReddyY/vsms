@@ -9,6 +9,7 @@ const AppError = require("../errors/AppError");
 const { encrypt, decrypt, encryptionContext } = require("../utils/cryptoUtils");
 const { loadVerifiedSignature, consumeSignatureArtifact, deleteSignature } = require("../utils/signatureStorage");
 const { requireReviewerAccess } = require("./reviewService");
+const { maskNric } = require("../utils/validation");
 
 const documentsRoot = () => path.resolve(
   process.env.REFERRAL_STORAGE_DIR || path.join(__dirname, "..", "secure-data", "documents"),
@@ -153,7 +154,7 @@ const generateReferralPdf = async ({ referral, signature, password, version, gen
 
   sectionTitle(doc, "Participant");
   line(doc, "Name", `${participant.firstName} ${participant.lastName}`.trim());
-  line(doc, "NRIC", participant.nricMasked || `••••${String(participant.nric).slice(-4)}`);
+  line(doc, "NRIC", maskNric(participant.nric) || participant.nricMasked || "Not recorded");
   line(doc, "Date of birth", participant.dateOfBirth.toISOString().slice(0, 10));
   doc.moveDown();
 
@@ -264,7 +265,7 @@ const loadReferral = (eventId, referralId) => prisma.referral.findFirst({
 
 const assertReferralOwner = (referral, user) => {
   if (!referral) throw new AppError(404, "REFERRAL_NOT_FOUND", "Referral not found");
-  if (user.roles?.includes("ADMINISTRATOR") || !user.roles?.includes("REVIEWER") || referral.review.reviewedByUserId !== user.userId) throw new AppError(403, "REFERRAL_REVIEWER_REQUIRED", "Only the reviewer who recorded this decision can issue its referral");
+  if (referral.review.reviewedByUserId !== user.userId) throw new AppError(403, "REFERRAL_REVIEWER_REQUIRED", "Only the reviewer who recorded this decision can issue its referral");
 };
 
 const assertIssuable = (referral) => {
@@ -613,7 +614,7 @@ const getDocument = async (eventId, referralId, documentId, user) => {
   });
   if (!artifact) throw new AppError(404, "REFERRAL_DOCUMENT_NOT_FOUND", "Referral document not found");
   await requireReviewerAccess(prisma, eventId, user);
-  if (user.roles?.includes("ADMINISTRATOR") || artifact.referral.review.reviewedByUserId !== user.userId) throw new AppError(403, "REFERRAL_REVIEWER_REQUIRED", "Only the issuing reviewer can download this referral");
+  if (artifact.referral.review.reviewedByUserId !== user.userId) throw new AppError(403, "REFERRAL_REVIEWER_REQUIRED", "Only the issuing reviewer can download this referral");
   return { buffer: await readDocumentArtifact(artifact), filename: `vision-referral-${referralId.slice(0, 8)}.pdf` };
 };
 

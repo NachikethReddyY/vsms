@@ -39,3 +39,29 @@
   .participant-v2-consent-signed { padding: 20px; }
   .participant-v2-consent-signed dl { grid-template-columns: 1fr; }
 }
+
+.participant-v2-consent-signature-action {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px;
+  border: 1px solid var(--hairline);
+  border-radius: 9px;
+  background: var(--canvas-soft);
+}
+
+.participant-v2-consent-signature-action strong { color: var(--ink-2); font-size: 12px; }
+.participant-v2-consent-signature-action .secondary,
+.participant-signature-dialog .secondary,
+.participant-signature-dialog .primary { min-height: 38px; border: 1px solid var(--hairline-strong); border-radius: 8px; padding: 0 12px; background: var(--surface); color: var(--ink); font: inherit; font-size: 12px; font-weight: 750; cursor: pointer; }
+.participant-signature-dialog .primary { border-color: var(--accent); background: var(--accent); color: #fff; }
+.participant-signature-dialog .primary:disabled { cursor: not-allowed; opacity: .5; }
+.participant-signature-dialog-backdrop { position: fixed; z-index: 60; inset: 0; display: grid; place-items: center; padding: 20px; background: rgba(20, 28, 42, .48); }
+.participant-signature-dialog { display: grid; gap: 16px; width: min(760px, 100%); max-height: calc(100vh - 40px); overflow: auto; padding: 22px; border: 1px solid var(--hairline-strong); border-radius: 14px; background: var(--surface); box-shadow: 0 22px 64px rgba(15, 23, 42, .25); }
+.participant-signature-dialog header,
+.participant-signature-dialog footer { display: flex; align-items: flex-start; justify-content: space-between; gap: 14px; }
+.participant-signature-dialog header span { display: block; color: var(--muted); font-size: 10px; font-weight: 750; letter-spacing: .07em; text-transform: uppercase; }
+.participant-signature-dialog h2 { margin: 4px 0 0; font-size: 20px; }
+.participant-signature-dialog p { margin: 5px 0 0; color: var(--muted); font-size: 12px; }
+.participant-signature-dialog footer { justify-content: flex-end; }
