@@ -1,0 +1,146 @@
+name: Security Scanning (SAST / SCA / Secret Detection)
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  schedule:
+    # Nightly dependency and secret posture check.
+    - cron: "0 3 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: security-scan-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  secret-detection:
+    name: Secret detection (gitleaks)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout with full history
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Compute commit range introduced by this event
+        id: range
+        run: |
+          case "${{ github.event_name }}" in
+            pull_request)
+              echo "value=${{ github.event.pull_request.base.sha }}..${{ github.event.pull_request.head.sha }}" >> "$GITHUB_OUTPUT"
+              ;;
+            push)
+              if [ "${{ github.event.before }}" != "0000000000000000000000000000000000000000" ]; then
+                echo "value=${{ github.event.before }}..HEAD" >> "$GITHUB_OUTPUT"
+              else
+                echo "value=-1" >> "$GITHUB_OUTPUT"
+              fi
+              ;;
+            *)
+              echo "value=-1" >> "$GITHUB_OUTPUT"
+              ;;
+          esac
+
+      - name: Scan introduced commits for secrets
+        run: |
+          docker run --rm -v "${PWD}:/repo" -w /repo zricethezav/gitleaks:latest \
+            detect \
+            --source=/repo \
+            --config=/repo/.gitleaks.toml \
+            --redact \
+            --log-opts="${{ steps.range.outputs.value }}"
+
+  sast:
+    name: Static application security testing (Semgrep)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Run Semgrep SAST scan
+        id: semgrep
+        run: |
+          set +e
+          docker run --rm -v "${PWD}:/src" -w /src returntocorp/semgrep \
+            semgrep scan \
+            --config p/security-audit \
+            --config p/owasp-top-ten \
+            --metrics off \
+            --timeout 30 \
+            --exclude node_modules \
+            --exclude secure-data \
+            --exclude "*.min.js" \
+            --json \
+            --output /src/semgrep-report.json \
+            backend \
+            react-user-dashboard/src
+          rc=$?
+          set -e
+          if [ "$rc" -gt 1 ]; then
+            echo "Semgrep failed to complete (exit $rc)"
+            exit "$rc"
+          fi
+          echo "Semgrep completed. Findings exit code was $rc (0=none, 1=findings present)."
+
+      - name: Gate on blocking (ERROR) findings
+        run: |
+          node -e "
+            const fs = require('fs');
+            const report = JSON.parse(fs.readFileSync('semgrep-report.json', 'utf8'));
+            const blocking = report.results.filter((f) => f.extra.severity === 'ERROR');
+            const advisory = report.results.filter((f) => f.extra.severity !== 'ERROR');
+            console.log('Blocking (ERROR) findings:', blocking.length);
+            console.log('Advisory (WARNING/INFO) findings:', advisory.length);
+            if (blocking.length) {
+              console.error('Blocking SAST findings must be fixed before merge.');
+              process.exit(1);
+            }
+          "
+
+      - name: Upload SAST report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: semgrep-sast-report
+          path: semgrep-report.json
+
+  sca:
+    name: Software composition analysis (pnpm audit + OSV)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 11.20.0
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Install backend dependencies (frozen-lockfile integrity check)
+        run: pnpm install --frozen-lockfile
+        working-directory: backend
+
+      - name: pnpm audit (backend)
+        run: pnpm audit
+        working-directory: backend
+
+      - name: pnpm audit (react-user-dashboard)
+        run: pnpm audit
+        working-directory: react-user-dashboard
+
+      - name: OSV-scanner (Google) — backend + frontend lockfiles
+        run: |
+          docker run --rm -v "${PWD}:/src" -w /src ghcr.io/google/osv-scanner:latest \
+            scan \
+            --lockfile /src/backend/pnpm-lock.yaml \
+            --lockfile /src/react-user-dashboard/pnpm-lock.yaml \
+            --lockfile /src/pnpm-lock.yaml

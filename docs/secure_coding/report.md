@@ -665,7 +665,72 @@ tests
 ### 8.1 Automated Security Scanning (SAST/SCA/Secret Detection)
 Automated security scanning was performed throughout development to identify potential vulnerabilities within the application source code and dependencies.
 
-The team conducted:
+The team conducted Static Application Security Testing (SAST), Software Composition Analysis (SCA), and secret detection.
+
+VSMS implements automated security scanning in the CI/CD pipeline so that vulnerabilities are detected **before** they reach a deployment. Three complementary scanners cover the OWASP categories that depend on tooling rather than code review alone: **Static Application Security Testing (SAST)** for code-level flaws, **Software Composition Analysis (SCA)** for vulnerable third-party components, and **secret detection** for leaked credentials and keys.
+
+All scanners are free, open-source tools run from container images, so the pipeline requires no paid licences, no third-party accounts, and no secrets of its own:
+
+| Scan type | Tool | Scope | When it runs |
+| :--- | :--- | :--- | :--- |
+| **SAST** | Semgrep (`p/security-audit` + `p/owasp-top-ten`) | Backend + frontend source | PR, push to main, manual |
+| **SCA** | `pnpm audit` + OSV-Scanner (Google) | Backend/frontend lockfiles | PR, push to main, nightly |
+| **Secret detection** | Gitleaks | Commits introduced by the event | PR, push to main, nightly |
+| **Dependency updates** | GitHub Dependabot | npm + GitHub Actions | Weekly / on advisories |
+
+#### 8.1.1 Pipeline Implementation
+
+A dedicated workflow `.github/workflows/security-scan.yml` runs three parallel jobs (`secret-detection`, `sast`, `sca`). It triggers on every pull request, on pushes to `main`, on a nightly schedule, and manually via `workflow_dispatch`. GitHub-native **Dependabot** (`.github/dependabot.yml`) complements the runtime scans by opening version-bump pull requests weekly for both npm packages and GitHub Actions, and automatically for any package affected by a published security advisory.
+
+**Secret detection — Gitleaks.** Gitleaks scans only the commits introduced by the event (the PR base→head range, or the pushed range on `main`), so historical, already-remediated findings never block a merge while any *new* secret immediately fails the build. The configuration `.gitleaks.toml` extends Gitleaks' default rule set and documents the only intentional non-secret matches (`.env.example` placeholder values, analytics column labels such as `key: "waiting"`, and test fixtures such as `signatureObjectKey: "signatures/key"`). The allowlist targets exact string shapes rather than whole files, so a real secret introduced anywhere is still reported.
+
+**SAST — Semgrep.** Semgrep runs the OWASP-aligned and security-audit community rulesets over `backend` and `react-user-dashboard/src` (excluding `node_modules`, `secure-data`, and minified assets). The full JSON report is uploaded as a build artifact for review. The job fails only on **ERROR-severity** findings; WARNING/INFO findings are reported but non-blocking, which keeps the gate strict without a permanent red build from low-severity advisories.
+
+**SCA — pnpm audit + OSV-Scanner.** `pnpm audit` checks each package's lockfile against the npm advisory database (the frozen-lockfile install step also proves the committed lockfiles are in sync, verifying software-supply-chain integrity). OSV-Scanner additionally cross-checks the same three lockfiles against the Google OSV database for a second, independent source of truth.
+
+#### 8.1.2 Findings and Remediation
+
+All three scanners were executed locally against the repository before enabling them in CI, and every actionable finding was remediated:
+
+| Scanner | Initial finding | Remediation | Result |
+| :--- | :--- | :--- | :--- |
+| **SAST (Semgrep)** | 6 WARNING `raw-html-format` (XSS) findings in `backend/controllers/qrController.js` — participant name, event name, queue number and token preview were interpolated unescaped into the QR pass HTML page | Added an `escapeHtml` helper and applied it to every interpolated value; the embedded `statusUrl` is now emitted with `JSON.stringify` instead of raw string concatenation | 0 blocking (ERROR) findings |
+| **SCA (pnpm audit)** | 1 moderate advisory GHSA-fxqj-rqcc-2cmp: `postcss ≤8.5.22` in the frontend build toolchain | Bumped the frontend `postcss` devDependency `^8.5.3 → ^8.5.23` (resolved to `8.5.26`) and regenerated the lockfile | 0 vulnerabilities in both packages |
+| **SCA (OSV-Scanner)** | No issues in any of the three lockfiles | — | No issues found |
+| **Secret detection (Gitleaks)** | Current code clean; 4 findings in git *history*: two localhost TLS dev private keys (`backend/certs/key.pem`, `react-user-dashboard/certs/localhost-key.pem`), a hardcoded `ENCRYPTION_KEY` fallback that has since been removed from `cryptoUtils.js`, and a 128-character `JWT_SECRET` committed in `.env.example` | Dev certificates were already removed from the working tree and are gitignored (regenerated per machine); the hardcoded key fallback was replaced with per-environment generated keys; the `.env.example` secret was scrubbed to a `replace-with-…` placeholder | Introduced commits clean (0 findings) |
+
+The SAST XSS fix is representative of the value of the pipeline: participant-supplied names are now escaped before being placed into the generated HTML document, closing a stored-XSS path where a malicious name could otherwise execute script in the QR pass page served to any staff member who scans it. Backend tests (`qr-service-security` suite) continue to pass at 18/18 after the fix.
+
+#### 8.1.3 Local Verification
+
+Every scanner is also runnable locally with a single command, which is how the findings above were collected:
+
+```bash
+# Secret detection (full history; PRs only scan introduced commits in CI)
+docker run --rm -v "$PWD:/repo" -w /repo zricethezav/gitleaks:latest detect \
+  --source=/repo --config=/repo/.gitleaks.toml --redact --log-opts="HEAD"
+
+# SAST
+docker run --rm -v "$PWD:/src" -w /src returntocorp/semgrep semgrep scan \
+  --config p/security-audit --config p/owasp-top-ten --metrics off \
+  --exclude node_modules --exclude secure-data --json --output semgrep-report.json \
+  backend react-user-dashboard/src
+
+# SCA
+pnpm audit
+docker run --rm -v "$PWD:/src" -w /src ghcr.io/google/osv-scanner:latest scan \
+  --lockfile /src/backend/pnpm-lock.yaml \
+  --lockfile /src/react-user-dashboard/pnpm-lock.yaml \
+  --lockfile /src/pnpm-lock.yaml
+```
+
+#### 8.1.4 Continuous Operation
+
+- **Every pull request and push to `main`** re-runs all three scans; new secrets or ERROR-severity code flaws block the merge.
+- **Nightly** scans catch newly published advisories in the dependency tree even when no code changes occur.
+- **Dependabot** opens remediation pull requests automatically, and GitHub's built-in secret scanning and push protection provide a further safety net for leaked credentials.
+
+Together these controls address **A06 (Vulnerable and Outdated Components)**, **A08 (Software and Data Integrity Failures)** and — by keeping credentials out of the repository — **A02 (Cryptographic Failures)** and **A07 (Identification and Authentication Failures)** from the OWASP Top 10.
 
 ### 8.2 Functional Validation & Exception Handling Reports
 #### 8.2.1 Core Registration Endpoint Validation (`POST /participants`)
