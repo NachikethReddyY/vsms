@@ -1,9 +1,11 @@
 import { ArrowLeftIcon, ClipboardDocumentCheckIcon } from "@heroicons/react/24/outline";
 import { useCallback, useEffect, useState, type Dispatch, type FormEvent, type SetStateAction } from "react";
 import { Link, useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom";
+import { PhoneInput } from "../../components/PhoneInput";
 import { Field, FormErrorSummary, LoadingState, TextInput } from "../../components/ui";
 import type { ConsentFormVersion, Participant, RegistrationHistory } from "../../types";
 import apiClient, { getApiError } from "../../utils/apiClient";
+import { isValidParticipantPhoneNumber } from "../../utils/phone";
 import "./ParticipantPage.css";
 
 type ParticipantFormState = {
@@ -39,7 +41,6 @@ const emptyParticipantForm: ParticipantFormState = {
   status: "ACTIVE",
 };
 
-const phonePattern = /^\+?[0-9][0-9\s-]{6,19}$/;
 const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 function displayStatus(value: string) {
@@ -49,7 +50,7 @@ function displayStatus(value: string) {
 function participantFormError(form: ParticipantFormState) {
   if (!form.firstName.trim() || !form.lastName.trim()) return "First name and last name are required.";
   if (!form.dateOfBirth) return "Date of birth is required.";
-  if (!phonePattern.test(form.contactNumber.trim())) return "Enter a valid contact number.";
+  if (!isValidParticipantPhoneNumber(form.contactNumber)) return "Enter a valid contact number.";
   if (form.email.trim() && !emailPattern.test(form.email.trim())) return "Enter a valid email address.";
   return null;
 }
@@ -72,7 +73,7 @@ function ParticipantDetailsForm({ form, setForm, onSubmit, submitting, error }: 
       <Field label="Last name"><TextInput value={form.lastName} onChange={(event) => update("lastName", event.target.value)} required /></Field>
       <Field label="Date of birth"><TextInput type="date" value={form.dateOfBirth} onChange={(event) => update("dateOfBirth", event.target.value)} required /></Field>
       <Field label="Gender"><select value={form.gender} onChange={(event) => update("gender", event.target.value)}><option value="U">Prefer not to say</option><option value="M">Male</option><option value="F">Female</option><option value="O">Other</option></select></Field>
-      <Field label="Contact number"><TextInput value={form.contactNumber} onChange={(event) => update("contactNumber", event.target.value)} required /></Field>
+      <Field label="Contact number"><PhoneInput value={form.contactNumber} onChange={(value) => update("contactNumber", value)} /></Field>
       <Field label="Email"><TextInput type="email" value={form.email} onChange={(event) => update("email", event.target.value)} /></Field>
       <Field label="Preferred language"><TextInput value={form.preferredLanguage} onChange={(event) => update("preferredLanguage", event.target.value)} /></Field>
       <Field label="Participant status"><select value={form.status} onChange={(event) => update("status", event.target.value)}><option value="ACTIVE">Active</option><option value="INACTIVE">Inactive</option><option value="DECEASED">Deceased</option></select></Field>
