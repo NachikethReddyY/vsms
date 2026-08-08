@@ -10,7 +10,9 @@ import {
 } from "@heroicons/react/24/outline";
 import { useEffect, useState, type FormEvent } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
+import { PhoneInput } from "../../components/PhoneInput";
 import apiClient, { getApiError } from "../../utils/apiClient";
+import { isValidParticipantPhoneNumber } from "../../utils/phone";
 import "./ParticipantPage.css";
 import "./ParticipantCreatePage.css";
 import "./EventRegistrationPage.css";
@@ -26,8 +28,6 @@ type RegistrationMatch = {
 };
 type MatchResponse = { result: "NO_MATCH" | "POSSIBLE_MATCH" | "ALREADY_REGISTERED"; matches: RegistrationMatch[] };
 type DialogView = "match" | "details" | "registered" | null;
-
-const phonePattern = /^\+?[0-9][0-9\s-]{6,19}$/;
 
 function initials(match: RegistrationMatch) {
   return `${match.participant.firstName[0] ?? ""}${match.participant.lastName[0] ?? ""}`.toUpperCase() || "P";
@@ -80,7 +80,7 @@ export default function EventRegistrationPage() {
     if (!form.firstName.trim() || !form.lastName.trim()) return "Enter the participant's full name to check for a match.";
     if (!form.dateOfBirth) return "Date of birth is required to check for a match.";
     if (form.dateOfBirth > latestDateOfBirth) return "Date of birth cannot be in the future.";
-    if (!phonePattern.test(form.contactNumber.trim())) return "Enter a valid contact number to check for a match.";
+    if (!isValidParticipantPhoneNumber(form.contactNumber)) return "Enter a valid contact number to check for a match.";
     return null;
   }
 
@@ -180,7 +180,7 @@ export default function EventRegistrationPage() {
             <label><span>Gender <b>*</b></span><select value={form.gender} onChange={(input) => update("gender", input.target.value)}><option value="U">Prefer not to say</option><option value="M">Male</option><option value="F">Female</option><option value="O">Other</option></select></label>
           </div></section>
           <section className="participant-v2-create-section"><header><h2>Contact and support</h2><p>These details are retained if you continue as a new participant.</p></header><div className="participant-v2-create-grid">
-            <label><span>Contact number <b>*</b></span><span className="participant-v2-create-input-icon"><PhoneIcon /><input value={form.contactNumber} onChange={(input) => update("contactNumber", input.target.value)} maxLength={30} autoComplete="tel" placeholder="e.g. +65 9123 4567" /></span></label>
+            <label><span>Contact number <b>*</b></span><PhoneInput value={form.contactNumber} onChange={(value) => update("contactNumber", value)} /></label>
             <label><span>Email <small>optional</small></span><span className="participant-v2-create-input-icon"><EnvelopeIcon /><input type="email" value={form.email} onChange={(input) => update("email", input.target.value)} maxLength={255} autoComplete="email" placeholder="name@example.com" /></span></label>
             <label><span>Preferred language</span><input value={form.preferredLanguage} onChange={(input) => update("preferredLanguage", input.target.value)} maxLength={50} /></label>
             <label className="participant-v2-create-notes"><span>Operational notes <small>optional</small></span><textarea value={form.accessibilityNotes} onChange={(input) => update("accessibilityNotes", input.target.value)} maxLength={1000} placeholder="Communication or access needs" /></label>

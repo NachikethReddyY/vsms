@@ -1,7 +1,9 @@
-import { ArrowLeftIcon, CalendarDaysIcon, EnvelopeIcon, ExclamationTriangleIcon, PhoneIcon, UserPlusIcon } from "@heroicons/react/24/outline";
+import { ArrowLeftIcon, CalendarDaysIcon, EnvelopeIcon, ExclamationTriangleIcon, UserPlusIcon } from "@heroicons/react/24/outline";
 import { useState, type FormEvent } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
+import { PhoneInput } from "../../components/PhoneInput";
 import apiClient, { getApiError } from "../../utils/apiClient";
+import { isValidParticipantPhoneNumber } from "../../utils/phone";
 import "./ParticipantPage.css";
 import "./ParticipantCreatePage.css";
 
@@ -16,7 +18,6 @@ type ParticipantForm = {
   accessibilityNotes: string;
 };
 
-const phonePattern = /^\+?[0-9][0-9\s-]{6,19}$/;
 const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 export default function ParticipantCreatePage() {
@@ -51,7 +52,7 @@ export default function ParticipantCreatePage() {
     if (!form.lastName.trim()) return "Last name is required.";
     if (!form.dateOfBirth) return "Date of birth is required.";
     if (form.dateOfBirth > new Date().toISOString().slice(0, 10)) return "Date of birth cannot be in the future.";
-    if (!phonePattern.test(form.contactNumber.trim())) return "Enter a valid contact number.";
+    if (!isValidParticipantPhoneNumber(form.contactNumber)) return "Enter a valid contact number.";
     if (form.email.trim() && !emailPattern.test(form.email.trim())) return "Enter a valid email address.";
     return null;
   }
@@ -114,7 +115,7 @@ export default function ParticipantCreatePage() {
           <section className="participant-v2-create-section">
             <header><h2>Contact and support</h2><p>These details can be updated from the participant profile.</p></header>
             <div className="participant-v2-create-grid">
-              <label><span>Contact number <b>*</b></span><span className="participant-v2-create-input-icon"><PhoneIcon /><input value={form.contactNumber} onChange={(event) => update("contactNumber", event.target.value)} maxLength={30} autoComplete="tel" placeholder="e.g. +65 9123 4567" /></span></label>
+              <label><span>Contact number <b>*</b></span><PhoneInput value={form.contactNumber} onChange={(value) => update("contactNumber", value)} /></label>
               <label><span>Email <small>optional</small></span><span className="participant-v2-create-input-icon"><EnvelopeIcon /><input type="email" value={form.email} onChange={(event) => update("email", event.target.value)} maxLength={255} autoComplete="email" placeholder="name@example.com" /></span></label>
               <label><span>Preferred language</span><input value={form.preferredLanguage} onChange={(event) => update("preferredLanguage", event.target.value)} maxLength={50} /></label>
               <label className="participant-v2-create-notes"><span>Accessibility notes <small>optional</small></span><textarea value={form.accessibilityNotes} onChange={(event) => update("accessibilityNotes", event.target.value)} maxLength={1000} placeholder="Communication or access needs" /></label>

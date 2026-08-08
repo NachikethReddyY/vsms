@@ -1,8 +1,10 @@
 import { ArrowLeftIcon, CheckCircleIcon, EnvelopeIcon, PencilSquareIcon, PhoneIcon, PlusIcon, StarIcon, TrashIcon } from "@heroicons/react/24/outline";
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
 import { Link, useParams, useSearchParams } from "react-router-dom";
+import { PhoneInput } from "../../components/PhoneInput";
 import type { EmergencyContact } from "../../types";
 import apiClient, { getApiError } from "../../utils/apiClient";
+import { isValidParticipantPhoneNumber } from "../../utils/phone";
 import "./ParticipantPage.css";
 import "./ParticipantEmergencyContactsPage.css";
 
@@ -24,13 +26,12 @@ const emptyContact: ContactForm = {
   status: "ACTIVE",
 };
 
-const phonePattern = /^\+?[0-9][0-9\s-]{6,19}$/;
 const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 function contactError(form: ContactForm) {
   if (!form.contactName.trim()) return "Contact name is required.";
   if (!form.relationship.trim()) return "Relationship to the participant is required.";
-  if (!phonePattern.test(form.phoneNumber.trim())) return "Enter a valid contact number.";
+  if (!isValidParticipantPhoneNumber(form.phoneNumber)) return "Enter a valid contact number.";
   if (form.email.trim() && !emailPattern.test(form.email.trim())) return "Enter a valid email address.";
   return null;
 }
@@ -188,7 +189,7 @@ export default function ParticipantEmergencyContactsPage() {
           <header><span>{editingId ? "Edit contact" : "New contact"}</span><h2>{editingId ? "Update emergency contact" : "Add emergency contact"}</h2><p>Mark one active contact as primary for faster staff reference.</p></header>
           <label>Full name<input value={form.contactName} maxLength={150} onChange={(event) => setForm({ ...form, contactName: event.target.value })} /></label>
           <label>Relationship<input value={form.relationship} maxLength={60} onChange={(event) => setForm({ ...form, relationship: event.target.value })} /></label>
-          <label>Contact number<input type="tel" value={form.phoneNumber} maxLength={30} onChange={(event) => setForm({ ...form, phoneNumber: event.target.value })} /></label>
+          <label>Contact number<PhoneInput value={form.phoneNumber} onChange={(value) => setForm({ ...form, phoneNumber: value })} /></label>
           <label>Email <small>optional</small><input type="email" value={form.email} maxLength={255} onChange={(event) => setForm({ ...form, email: event.target.value })} /></label>
           {editingId ? <label>Contact status<select value={form.status} onChange={(event) => setForm({ ...form, status: event.target.value as ContactForm["status"], isPrimary: event.target.value === "REMOVED" ? false : form.isPrimary })}><option value="ACTIVE">Active</option><option value="REMOVED">Removed</option></select></label> : null}
           <label className="participant-emergency-primary-toggle"><input type="checkbox" checked={form.isPrimary} disabled={form.status === "REMOVED"} onChange={(event) => setForm({ ...form, isPrimary: event.target.checked })} /><span><StarIcon /></span><div><strong>Primary contact</strong><small>Shown first to staff during registration and check-in.</small></div></label>
