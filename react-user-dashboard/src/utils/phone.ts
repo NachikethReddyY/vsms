@@ -11,3 +11,7 @@ export function isValidParticipantPhoneNumber(value: string) {
   const normalized = normalizeSingaporePhoneNumber(value);
   return Boolean(normalized && isValidPhoneNumber(normalized));
 }
+
+export function isValidParticipantNric(value: string) {
+  return /^[STFGM]\d{7}[A-Z]$/.test(value.trim().replace(/[\s-]/g, "").toUpperCase());
+}

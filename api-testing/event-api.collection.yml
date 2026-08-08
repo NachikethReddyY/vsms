@@ -9897,7 +9897,13 @@ item:
             "dateOfBirth": "2026-08-07",
             "gender": "M",
             "contactNumber": "",
+            "nric": "",
             "email": "",
+            "race": "",
+            "nationality": "",
+            "addressStreet": "",
+            "addressUnit": "",
+            "addressPostalCode": "",
             "preferredLanguage": "",
             "accessibilityNotes": "",
             "status": "ACTIVE"
@@ -9930,7 +9936,13 @@ item:
               "dateOfBirth": "2026-08-07T00:00:00.000Z",
               "gender": "M",
               "contactNumber": "",
+              "nricMasked": "",
               "email": "",
+              "race": "",
+              "nationality": "",
+              "addressStreet": "",
+              "addressUnit": "",
+              "addressPostalCode": "",
               "preferredLanguage": "",
               "accessibilityNotes": "",
               "status": "ACTIVE",
@@ -10091,8 +10103,8 @@ item:
           }
   - name: Find possible participant matches for the assigned registration event
     description: >-
-      A name alone never produces a possible match. At least two of full name, date of birth, and contact number must
-      agree.
+      A name alone never produces a possible match. An exact NRIC or FIN match is a strong match; otherwise at least two
+      of full name, date of birth, and contact number must agree.
     event: []
     request:
       method: POST
@@ -10122,7 +10134,8 @@ item:
             "firstName": "",
             "lastName": "",
             "dateOfBirth": "2026-08-07",
-            "contactNumber": ""
+            "contactNumber": "",
+            "nric": ""
           }
         options:
           raw:
@@ -10261,7 +10274,8 @@ item:
             "firstName": "",
             "lastName": "",
             "dateOfBirth": "2026-08-07",
-            "contactNumber": ""
+            "contactNumber": "",
+            "nric": ""
           }
         options:
           raw:
@@ -10384,7 +10398,13 @@ item:
               "dateOfBirth": "2026-08-07T00:00:00.000Z",
               "gender": "M",
               "contactNumber": "",
+              "nricMasked": "",
               "email": "",
+              "race": "",
+              "nationality": "",
+              "addressStreet": "",
+              "addressUnit": "",
+              "addressPostalCode": "",
               "preferredLanguage": "",
               "accessibilityNotes": "",
               "status": "ACTIVE",
@@ -10474,7 +10494,13 @@ item:
             "dateOfBirth": "2026-08-07",
             "gender": "M",
             "contactNumber": "",
+            "nric": "",
             "email": "",
+            "race": "",
+            "nationality": "",
+            "addressStreet": "",
+            "addressUnit": "",
+            "addressPostalCode": "",
             "preferredLanguage": "",
             "accessibilityNotes": "",
             "status": "ACTIVE"
@@ -10507,7 +10533,13 @@ item:
               "dateOfBirth": "2026-08-07T00:00:00.000Z",
               "gender": "M",
               "contactNumber": "",
+              "nricMasked": "",
               "email": "",
+              "race": "",
+              "nationality": "",
+              "addressStreet": "",
+              "addressUnit": "",
+              "addressPostalCode": "",
               "preferredLanguage": "",
               "accessibilityNotes": "",
               "status": "ACTIVE",
@@ -11561,7 +11593,13 @@ item:
               "dateOfBirth": "2026-08-07T00:00:00.000Z",
               "gender": "M",
               "contactNumber": "",
+              "nricMasked": "",
               "email": "",
+              "race": "",
+              "nationality": "",
+              "addressStreet": "",
+              "addressUnit": "",
+              "addressPostalCode": "",
               "preferredLanguage": "",
               "accessibilityNotes": "",
               "status": "ACTIVE",

@@ -16,7 +16,7 @@ function replace(t, target, key, value) {
 function request(participantId, eventId, userId) {
   return {
     params: { participantId },
-    body: { firstName: "John", lastName: "Tan", dateOfBirth: "2002-03-12", contactNumber: "81234567" },
+    body: { firstName: "John", lastName: "Tan", dateOfBirth: "2002-03-12", contactNumber: "81234567", nric: "S1234567A" },
     registrationEventId: eventId,
     auth: { userId, permissions: ["participants:cross-event-reuse"] },
     context: {},
@@ -30,7 +30,7 @@ test("a previous-event identity match is audited before the officer can reuse it
   let audit;
   replace(t, prisma.participant, "findMany", async () => [{
     id: participantId, participantReference: "VSMS-2026-000001", firstName: "John", lastName: "Tan",
-    dateOfBirth: new Date("2002-03-12T00:00:00.000Z"), contactNumber: "81234567", preferredLanguage: "English",
+    dateOfBirth: new Date("2002-03-12T00:00:00.000Z"), contactNumber: "81234567", nric: "S1234567A", preferredLanguage: "English",
     eventRegistrations: [{ eventId: priorEventId, event: { name: "Previous event" }, queueEntries: [] }],
   }]);
   replace(t, prisma.auditLog, "create", async ({ data }) => { audit = data; return { id: crypto.randomUUID() }; });
@@ -42,6 +42,29 @@ test("a previous-event identity match is audited before the officer can reuse it
   assert.deepEqual(audit.newValue, { matchCount: 1, outcome: "POSSIBLE_MATCH" });
 });
 
+test("an exact NRIC or FIN match is returned when the other entered details have changed", async (t) => {
+  const eventId = crypto.randomUUID();
+  const participantId = crypto.randomUUID();
+  let matchQuery;
+  replace(t, prisma.participant, "findMany", async ({ where }) => {
+    matchQuery = where;
+    return [{
+      id: participantId, participantReference: "VSMS-2026-000002", firstName: "Jonathan", lastName: "Tan",
+      dateOfBirth: new Date("2001-02-11T00:00:00.000Z"), contactNumber: "89998888", nric: "S1234567A", preferredLanguage: "English",
+      eventRegistrations: [],
+    }];
+  });
+  replace(t, prisma.auditLog, "create", async () => ({ id: crypto.randomUUID() }));
+
+  const result = await participantService.matchParticipantsForRegistrationService(
+    request(participantId, eventId, crypto.randomUUID()),
+  );
+
+  assert.deepEqual(matchQuery.OR[0], { nric: "S1234567A" });
+  assert.equal(result.result, "POSSIBLE_MATCH");
+  assert.deepEqual(result.matches[0].matchReasons, ["NRIC / FIN"]);
+});
+
 test("reusing a previous-event participant creates target-event intake access and an audit record", async (t) => {
   const participantId = crypto.randomUUID();
   const eventId = crypto.randomUUID();
@@ -50,7 +73,7 @@ test("reusing a previous-event participant creates target-event intake access an
   let intakeData;
   let audit;
   const tx = {
-    participant: { findUnique: async () => ({ id: participantId, status: "ACTIVE", firstName: "John", lastName: "Tan", dateOfBirth: new Date("2002-03-12T00:00:00.000Z"), contactNumber: "81234567" }) },
+    participant: { findUnique: async () => ({ id: participantId, status: "ACTIVE", firstName: "John", lastName: "Tan", dateOfBirth: new Date("2002-03-12T00:00:00.000Z"), contactNumber: "81234567", nric: "S1234567A" }) },
     eventRegistration: { findUnique: async () => null },
     participantEventIntake: { upsert: async ({ create }) => { intakeData = create; return { intakeId }; } },
     auditLog: { create: async ({ data }) => { audit = data; return { id: crypto.randomUUID() }; } },
@@ -70,7 +93,7 @@ test("current-event duplicates are returned without creating another intake", as
   const registrationId = crypto.randomUUID();
   let intakeCreated = false;
   const tx = {
-    participant: { findUnique: async () => ({ id: participantId, status: "ACTIVE", firstName: "John", lastName: "Tan", dateOfBirth: new Date("2002-03-12T00:00:00.000Z"), contactNumber: "81234567" }) },
+    participant: { findUnique: async () => ({ id: participantId, status: "ACTIVE", firstName: "John", lastName: "Tan", dateOfBirth: new Date("2002-03-12T00:00:00.000Z"), contactNumber: "81234567", nric: "S1234567A" }) },
     eventRegistration: { findUnique: async () => ({ registrationId }) },
     participantEventIntake: { upsert: async () => { intakeCreated = true; } },
     auditLog: { create: async () => ({ id: crypto.randomUUID() }) },

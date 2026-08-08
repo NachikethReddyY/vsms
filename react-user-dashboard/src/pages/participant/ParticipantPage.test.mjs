@@ -6,12 +6,14 @@ const source = await readFile(new URL("./EventRegistrationPage.tsx", import.meta
 
 test("participant registration checks a full identity combination before creating a participant", () => {
   assert.match(source, /apiClient\.post<MatchResponse>\("\/participants\/match"/);
-  assert.match(source, /firstName: form\.firstName\.trim\(\), lastName: form\.lastName\.trim\(\), dateOfBirth: form\.dateOfBirth, contactNumber: form\.contactNumber\.trim\(\)/);
+  assert.match(source, /firstName: form\.firstName\.trim\(\), lastName: form\.lastName\.trim\(\), dateOfBirth: form\.dateOfBirth, contactNumber: form\.contactNumber\.trim\(\), nric: form\.nric/);
   assert.match(source, /if \(data\.result === "NO_MATCH"\) \{\s*await registerNewParticipant\(\);/);
 });
 
-test("participant registration keeps entered details when continuing to the participant profile", () => {
+test("participant registration keeps entered non-sensitive details when continuing to the participant profile", () => {
   assert.match(source, /navigate\(`\/participants\/\$\{response\.data\.participant\.id\}\?eventId=\$\{encodeURIComponent\(eventId\)\}`\)/);
-  assert.match(source, /state: \{ registrationDraft: form \}/);
+  assert.match(source, /Object\.entries\(form\)\.filter\(\(\[field\]\) => field !== "nric"\)/);
+  assert.match(source, /state: \{ registrationDraft \}/);
+  assert.match(source, /match\.matchReasons\.includes\("NRIC \/ FIN"\)/);
 });
 

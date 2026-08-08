@@ -22,6 +22,15 @@ function displayDate(value: string) {
   return new Date(value).toLocaleDateString("en-SG", { day: "numeric", month: "short", year: "numeric" });
 }
 
+function displayGender(value: string) {
+  return ({ M: "Male", F: "Female", O: "Other", U: "Prefer not to say" } as Record<string, string>)[value] ?? value;
+}
+
+function displayAddress(participant: Participant) {
+  const street = [participant.addressStreet, participant.addressUnit].filter(Boolean).join(" ");
+  return [street, participant.addressPostalCode].filter(Boolean).join(", ") || "Not recorded";
+}
+
 type ConsentRecord = {
   id: string;
   consentStatus: string;
@@ -131,7 +140,12 @@ export default function ParticipantProfilePage() {
         <section className="participant-v2-profile-details" aria-label="Participant details">
           <div><span>Date of birth</span><strong>{displayDate(participant.dateOfBirth)}</strong></div>
           <div><span>Contact number</span><strong>{participant.contactNumber}</strong></div>
+          <div><span>NRIC / FIN</span><strong>{participant.nricMasked ?? "Not recorded"}</strong></div>
           <div><span>Email address</span><strong>{participant.email ?? "Not recorded"}</strong></div>
+          <div><span>Gender</span><strong>{displayGender(participant.gender)}</strong></div>
+          <div><span>Race</span><strong>{participant.race ?? "Not recorded"}</strong></div>
+          <div><span>Nationality</span><strong>{participant.nationality ?? "Not recorded"}</strong></div>
+          <div className="participant-v2-profile-address"><span>Address</span><strong>{displayAddress(participant)}</strong></div>
           <div><span>Accessibility notes</span><strong>{participant.accessibilityNotes ?? "None recorded"}</strong></div>
         </section>
 

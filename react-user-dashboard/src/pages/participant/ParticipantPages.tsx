@@ -14,7 +14,13 @@ type ParticipantFormState = {
   dateOfBirth: string;
   gender: string;
   contactNumber: string;
+  nric: string;
   email: string;
+  race: string;
+  nationality: string;
+  addressStreet: string;
+  addressUnit: string;
+  addressPostalCode: string;
   preferredLanguage: string;
   accessibilityNotes: string;
   status: string;
@@ -35,7 +41,13 @@ const emptyParticipantForm: ParticipantFormState = {
   dateOfBirth: "",
   gender: "U",
   contactNumber: "",
+  nric: "",
   email: "",
+  race: "",
+  nationality: "Singaporean",
+  addressStreet: "",
+  addressUnit: "",
+  addressPostalCode: "",
   preferredLanguage: "",
   accessibilityNotes: "",
   status: "ACTIVE",
@@ -74,7 +86,13 @@ function ParticipantDetailsForm({ form, setForm, onSubmit, submitting, error }: 
       <Field label="Date of birth"><TextInput type="date" value={form.dateOfBirth} onChange={(event) => update("dateOfBirth", event.target.value)} required /></Field>
       <Field label="Gender"><select value={form.gender} onChange={(event) => update("gender", event.target.value)}><option value="U">Prefer not to say</option><option value="M">Male</option><option value="F">Female</option><option value="O">Other</option></select></Field>
       <Field label="Contact number"><PhoneInput value={form.contactNumber} onChange={(value) => update("contactNumber", value)} /></Field>
+      <Field label="NRIC / FIN"><TextInput value={form.nric} onChange={(event) => update("nric", event.target.value)} autoComplete="off" spellCheck={false} placeholder="Leave blank to keep the recorded NRIC" /></Field>
       <Field label="Email"><TextInput type="email" value={form.email} onChange={(event) => update("email", event.target.value)} /></Field>
+      <Field label="Race"><TextInput value={form.race} onChange={(event) => update("race", event.target.value)} /></Field>
+      <Field label="Nationality"><TextInput value={form.nationality} onChange={(event) => update("nationality", event.target.value)} autoComplete="country-name" /></Field>
+      <Field label="Street address"><TextInput value={form.addressStreet} onChange={(event) => update("addressStreet", event.target.value)} autoComplete="street-address" /></Field>
+      <Field label="Unit number"><TextInput value={form.addressUnit} onChange={(event) => update("addressUnit", event.target.value)} autoComplete="address-line2" /></Field>
+      <Field label="Postal code"><TextInput value={form.addressPostalCode} onChange={(event) => update("addressPostalCode", event.target.value)} autoComplete="postal-code" /></Field>
       <Field label="Preferred language"><TextInput value={form.preferredLanguage} onChange={(event) => update("preferredLanguage", event.target.value)} /></Field>
       <Field label="Participant status"><select value={form.status} onChange={(event) => update("status", event.target.value)}><option value="ACTIVE">Active</option><option value="INACTIVE">Inactive</option><option value="DECEASED">Deceased</option></select></Field>
       <Field label="Accessibility notes"><textarea value={form.accessibilityNotes} onChange={(event) => update("accessibilityNotes", event.target.value)} /></Field>
@@ -114,7 +132,13 @@ export function ParticipantEditPage() {
           dateOfBirth: participant.dateOfBirth.slice(0, 10),
           gender: participant.gender,
           contactNumber: participant.contactNumber,
+          nric: "",
           email: participant.email ?? "",
+          race: participant.race ?? "",
+          nationality: participant.nationality ?? "",
+          addressStreet: participant.addressStreet ?? "",
+          addressUnit: participant.addressUnit ?? "",
+          addressPostalCode: participant.addressPostalCode ?? "",
           preferredLanguage: participant.preferredLanguage ?? "",
           accessibilityNotes: participant.accessibilityNotes ?? "",
           ...registrationDraft,
@@ -133,7 +157,8 @@ export function ParticipantEditPage() {
     setSubmitting(true);
     setError(null);
     try {
-      await apiClient.patch(`/participants/${participantId}`, form);
+      const { nric, ...participantUpdates } = form;
+      await apiClient.patch(`/participants/${participantId}`, nric.trim() ? form : participantUpdates);
       navigate(participantLink);
     } catch (requestError: unknown) {
       setError(getApiError(requestError, "Unable to update participant."));

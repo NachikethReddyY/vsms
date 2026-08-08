@@ -9,6 +9,7 @@ const AppError = require("../errors/AppError");
 const { encrypt, decrypt, encryptionContext } = require("../utils/cryptoUtils");
 const { loadVerifiedSignature, consumeSignatureArtifact, deleteSignature } = require("../utils/signatureStorage");
 const { requireReviewerAccess } = require("./reviewService");
+const { maskNric } = require("../utils/validation");
 
 const documentsRoot = () => path.resolve(
   process.env.REFERRAL_STORAGE_DIR || path.join(__dirname, "..", "secure-data", "documents"),
@@ -153,7 +154,7 @@ const generateReferralPdf = async ({ referral, signature, password, version, gen
 
   sectionTitle(doc, "Participant");
   line(doc, "Name", `${participant.firstName} ${participant.lastName}`.trim());
-  line(doc, "NRIC", participant.nricMasked || `••••${String(participant.nric).slice(-4)}`);
+  line(doc, "NRIC", maskNric(participant.nric) || participant.nricMasked || "Not recorded");
   line(doc, "Date of birth", participant.dateOfBirth.toISOString().slice(0, 10));
   doc.moveDown();
 
