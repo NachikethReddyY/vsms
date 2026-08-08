@@ -147,6 +147,48 @@ test('queue join creates a WAITING entry and emits QUEUE_JOINED audit', async ()
   assert.equal(audits[0].newValue.registrationId, registrationId);
 });
 
+test('queue join persists a newly allocated queue number on the registration', async () => {
+  let updatedQueueNumber = null;
+  const db = baseDb({
+    root: {
+      $transaction: async (callback) => callback(baseTransaction({
+        eventRegistration: {
+          findFirst: async () => ({ ...registration, queueNumber: null }),
+          update: async ({ data }) => {
+            updatedQueueNumber = data.queueNumber;
+            return { ...registration, ...data };
+          },
+        },
+      })),
+    },
+  });
+
+  const result = await queueService.joinQueue(
+    { eventId, stationId, registrationId },
+    operationalUser,
+    context,
+    db,
+  );
+
+  assert.equal(result.queueEntry.queueNumber, 10);
+  assert.equal(updatedQueueNumber, 10);
+});
+
+test('queue join rejects a paused station', async () => {
+  const db = baseDb({
+    root: {
+      $transaction: async (callback) => callback(baseTransaction({
+        station: { findFirst: async () => ({ ...station, operationalStatus: 'PAUSED' }) },
+      })),
+    },
+  });
+
+  await assert.rejects(
+    queueService.joinQueue({ eventId, stationId, registrationId }, operationalUser, context, db),
+    (error) => error.code === 'STATION_UNAVAILABLE',
+  );
+});
+
 test('queue join is idempotent when the participant is already active at the same station', async () => {
   audits.length = 0;
   const db = baseDb({
@@ -238,6 +280,18 @@ test('queue handoff rejects a paused station before creating a queue entry', asy
   await assert.rejects(
     queueService.createQueueHandoff({ eventId, stationId, registrationId }, operationalUser, context, db),
     /no longer available/,
+  );
+});
+
+test('queue handoff limits a screener to the station in their current duty', async () => {
+  await assert.rejects(
+    queueService.createQueueHandoff(
+      { eventId, stationId: targetStationId, registrationId },
+      screenerUser,
+      context,
+      baseDb(),
+    ),
+    (error) => error.code === 'CURRENT_DUTY_REQUIRED' && error.status === 403,
   );
 });
 

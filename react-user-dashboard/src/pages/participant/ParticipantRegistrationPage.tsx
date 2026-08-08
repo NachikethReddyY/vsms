@@ -103,7 +103,7 @@ export default function ParticipantRegistrationPage() {
 
         setReview(reviewResponse.data);
         if (existingRegistration) {
-          if (existingRegistration.queueNumber != null) {
+          if (existingRegistration.queueNumber != null || reviewResponse.data.event.status !== "IN_PROGRESS") {
             navigate(`/participants/registrations/${existingRegistration.id}/qr?eventId=${encodeURIComponent(eventId)}`, { replace: true });
             return;
           }
@@ -144,6 +144,10 @@ export default function ParticipantRegistrationPage() {
         headers: { "Idempotency-Key": idempotencyKey.current },
       });
       const registrationId = response.data.registration?.id ?? response.data.registrationId;
+      if (review?.event.status !== "IN_PROGRESS") {
+        navigate(`/participants/registrations/${registrationId}/qr?eventId=${encodeURIComponent(eventId)}`, { replace: true });
+        return;
+      }
       setRegistrationId(registrationId);
       setShowConfirmation(false);
       await loadStations();
@@ -261,7 +265,7 @@ export default function ParticipantRegistrationPage() {
           <Link className="secondary" to={profileLink}>Back to profile</Link>
           <button className="primary" type="button" disabled={!canRegister} onClick={() => setShowConfirmation(true)}>Confirm participant</button>
         </footer>
-        {!canRegister ? <p className="participant-v2-checkin-feedback" role="status">{missingRequirement ? `${missingRequirement} must be completed before registration.` : "Preparing registration..."}</p> : <p className="participant-v2-checkin-feedback ready"><UserIcon /> Queue number will be assigned after confirmation.</p>}
+        {!canRegister ? <p className="participant-v2-checkin-feedback" role="status">{missingRequirement ? `${missingRequirement} must be completed before registration.` : "Preparing registration..."}</p> : <p className="participant-v2-checkin-feedback ready"><UserIcon /> Queue number is assigned when the participant enters a station.</p>}
       </section>
       {showConfirmation ? (
         <div className="participant-registration-backdrop" role="presentation">
@@ -274,13 +278,12 @@ export default function ParticipantRegistrationPage() {
               <div><dt>Event</dt><dd>{review.event.eventName}</dd></div>
               <div><dt>Participant reference</dt><dd>{review.participant.participantReference}</dd></div>
             </dl>
-            <p className="participant-registration-dialog-note">This creates the event registration, then lets you select the participant's next station.</p>
+            <p className="participant-registration-dialog-note">{review.event.status === "IN_PROGRESS" ? "This creates the event registration, then lets you select the participant's next station." : "This creates the event registration and secure QR pass. A station is assigned when the event is in progress."}</p>
             {error ? <p className="participant-v2-alert participant-v2-checkin-alert" role="alert">{error}</p> : null}
-            <footer><button className="secondary" type="button" disabled={isSubmitting} onClick={() => setShowConfirmation(false)}>Cancel</button><button className="primary" type="button" disabled={isSubmitting} onClick={() => void createRegistration()}>{isSubmitting ? "Creating registration..." : "Confirm and select station"}</button></footer>
+            <footer><button className="secondary" type="button" disabled={isSubmitting} onClick={() => setShowConfirmation(false)}>Cancel</button><button className="primary" type="button" disabled={isSubmitting} onClick={() => void createRegistration()}>{isSubmitting ? "Creating registration..." : review.event.status === "IN_PROGRESS" ? "Confirm and select station" : "Confirm registration"}</button></footer>
           </section>
         </div>
       ) : null}
     </section>
   );
 }
-
