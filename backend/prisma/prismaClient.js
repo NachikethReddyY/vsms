@@ -12,13 +12,11 @@ const prisma = new PrismaClient({
 // Gracefully disconnect Prisma when the application exits
 process.on("SIGINT", async () => {
     await prisma.$disconnect();
-    console.log("Prisma Client disconnected.");
     process.exit(0);
 });
 
 process.on("SIGTERM", async () => {
     await prisma.$disconnect();
-    console.log("Prisma Client disconnected.");
     process.exit(0);
 });
 
