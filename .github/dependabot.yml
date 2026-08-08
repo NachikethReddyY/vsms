@@ -1,0 +1,30 @@
+# Dependabot automates dependency updates (SCA remediation).
+# Security-advisory alerts automatically open version bump PRs for any
+# vulnerable package; the weekly schedule keeps non-vulnerable dependencies
+# current so future advisories find fewer outdated packages.
+
+version: 2
+updates:
+  - package-ecosystem: "npm"
+    directory: "/backend"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "06:00"
+    open-pull-requests-limit: 5
+    versioning-strategy: increase-if-necessary
+
+  - package-ecosystem: "npm"
+    directory: "/react-user-dashboard"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "06:00"
+    open-pull-requests-limit: 5
+    versioning-strategy: increase-if-necessary
+
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 5
