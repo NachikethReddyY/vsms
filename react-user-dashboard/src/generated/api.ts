@@ -1149,6 +1149,46 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/participants/match": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Find possible participant matches for the assigned registration event
+         * @description A name alone never produces a possible match. An exact NRIC or FIN match is a strong match; otherwise at least two of full name, date of birth, and contact number must agree.
+         */
+        post: operations["matchParticipantsForRegistration"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/participants/{participantId}/reuse": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Attach an approved cross-event participant match to the assigned event
+         * @description Requires an active registration assignment and explicit cross-event reuse permission. The participant is attached for intake only; no event registration or queue entry is created.
+         */
+        post: operations["reuseMatchedParticipant"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/participants/{participantId}": {
         parameters: {
             query?: never;
@@ -3681,8 +3721,15 @@ export interface components {
             /** @enum {string} */
             gender: "M" | "F" | "O" | "U";
             contactNumber: string;
+            /** @description Required NRIC or FIN. It is never returned by this API. */
+            nric: string;
             /** Format: email */
             email?: string | null;
+            race?: string | null;
+            nationality?: string | null;
+            addressStreet?: string | null;
+            addressUnit?: string | null;
+            addressPostalCode?: string | null;
             preferredLanguage?: string | null;
             accessibilityNotes?: string | null;
             /** @enum {string} */
@@ -3696,8 +3743,15 @@ export interface components {
             /** @enum {string} */
             gender?: "M" | "F" | "O" | "U";
             contactNumber?: string;
+            /** @description Optional NRIC or FIN. It is never returned by this API. */
+            nric?: string | null;
             /** Format: email */
             email?: string | null;
+            race?: string | null;
+            nationality?: string | null;
+            addressStreet?: string | null;
+            addressUnit?: string | null;
+            addressPostalCode?: string | null;
             preferredLanguage?: string | null;
             accessibilityNotes?: string | null;
             /** @enum {string} */
@@ -3714,8 +3768,14 @@ export interface components {
             /** @enum {string} */
             gender: "M" | "F" | "O" | "U";
             contactNumber: string;
+            readonly nricMasked?: string | null;
             /** Format: email */
             email?: string | null;
+            race?: string | null;
+            nationality?: string | null;
+            addressStreet?: string | null;
+            addressUnit?: string | null;
+            addressPostalCode?: string | null;
             preferredLanguage?: string | null;
             accessibilityNotes?: string | null;
             /** @enum {string} */
@@ -3736,6 +3796,7 @@ export interface components {
             lastName: string;
             maskedContactNumber: string;
             maskedDateOfBirth: string;
+            matchReasons: string[];
             /** @enum {string} */
             status: "ACTIVE" | "INACTIVE" | "DECEASED";
         };
@@ -3745,6 +3806,53 @@ export interface components {
         ParticipantSearchResponse: {
             participants: components["schemas"]["ParticipantSummary"][];
             pagination: components["schemas"]["Pagination"];
+        };
+        ParticipantMatchRequest: {
+            firstName: string;
+            lastName: string;
+            /** Format: date */
+            dateOfBirth: string;
+            contactNumber: string;
+            /** @description Required NRIC or FIN used for duplicate matching. It is never returned by this API. */
+            nric: string;
+        };
+        ParticipantMatchResponse: {
+            /** @enum {string} */
+            result: "NO_MATCH" | "POSSIBLE_MATCH" | "ALREADY_REGISTERED";
+            matches: components["schemas"]["ParticipantMatch"][];
+        };
+        ParticipantMatch: {
+            participant: {
+                /** Format: uuid */
+                id: string;
+                participantReference: string;
+                firstName: string;
+                lastName: string;
+                /** Format: date */
+                dateOfBirth: string;
+                maskedContactNumber: string;
+                preferredLanguage: string | null;
+            };
+            matchReasons: ("Full name" | "Date of birth" | "Contact number")[];
+            previousEvent: {
+                eventName: string;
+            } | null;
+            currentEventRegistration: {
+                /** Format: uuid */
+                id: string;
+                queueNumber: number | null;
+                /** @enum {string} */
+                status: "SIGNED_UP" | "CHECKED_IN" | "COMPLETED" | "CANCELLED";
+                assignedBooth: string | null;
+            } | null;
+        };
+        ParticipantReuseResponse: {
+            /** @enum {string} */
+            outcome: "ATTACHED" | "ALREADY_REGISTERED";
+            /** Format: uuid */
+            intakeId?: string;
+            /** Format: uuid */
+            registrationId?: string;
         };
         EmergencyContactRequest: {
             contactName: string;
@@ -6763,6 +6871,64 @@ export interface operations {
                     "application/json": components["schemas"]["ConsentFormEnvelope"];
                 };
             };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    matchParticipantsForRegistration: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ParticipantMatchRequest"];
+            };
+        };
+        responses: {
+            /** @description Match outcome and limited identity data for officer review */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ParticipantMatchResponse"];
+                };
+            };
+            400: components["responses"]["ValidationFailed"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            429: components["responses"]["RateLimited"];
+        };
+    };
+    reuseMatchedParticipant: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                participantId: components["parameters"]["ParticipantId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ParticipantMatchRequest"];
+            };
+        };
+        responses: {
+            /** @description Participant attached for current-event intake or an existing registration was found */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ParticipantReuseResponse"];
+                };
+            };
+            400: components["responses"]["ValidationFailed"];
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];

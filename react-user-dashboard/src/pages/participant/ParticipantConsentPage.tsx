@@ -1,12 +1,14 @@
 import { ArrowLeftIcon, CheckCircleIcon, DocumentTextIcon, ExclamationTriangleIcon, PencilSquareIcon } from "@heroicons/react/24/outline";
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
-import { SignaturePad } from "../components/SignaturePad";
-import type { ConsentFormVersion, Participant } from "../types";
-import apiClient, { getApiError } from "../utils/apiClient";
-import "./ParticipantV2Page.css";
-import "./ParticipantV2ConsentPage.css";
-import "./ParticipantV2ConsentRefinement.css";
+import { PhoneInput } from "../../components/PhoneInput";
+import { SignaturePad } from "../../components/SignaturePad";
+import type { ConsentFormVersion, Participant } from "../../types";
+import apiClient, { getApiError } from "../../utils/apiClient";
+import { isValidParticipantPhoneNumber } from "../../utils/phone";
+import "./ParticipantPage.css";
+import "./ParticipantConsentPage.css";
+import "./ParticipantConsentRefinement.css";
 
 type ConsentFormState = {
   consentStatus: "ACCEPTED" | "DECLINED";
@@ -35,20 +37,34 @@ const emptyConsent: ConsentFormState = {
   guardianContactEmail: "",
 };
 
-export default function ParticipantV2ConsentPage() {
+type EventConsentRecord = {
+  id: string;
+  consentStatus: string;
+  signerName?: string | null;
+  createdAt: string;
+  eventId?: string;
+  consentFormVersion?: ConsentFormVersion;
+  event?: { id?: string; eventId?: string };
+  withdrawals?: Array<{ consentStatus: string }>;
+};
+
+export default function ParticipantConsentPage() {
   const navigate = useNavigate();
   const { participantId = "" } = useParams();
   const [searchParams] = useSearchParams();
   const eventId = searchParams.get("eventId") ?? "";
   const [participant, setParticipant] = useState<Participant | null>(null);
   const [consentForm, setConsentForm] = useState<ConsentFormVersion | null>(null);
+  const [existingAcceptedConsent, setExistingAcceptedConsent] = useState<EventConsentRecord | null>(null);
   const [form, setForm] = useState<ConsentFormState>(emptyConsent);
   const [signatureDataUrl, setSignatureDataUrl] = useState<string | null>(null);
+  const [signatureDraft, setSignatureDraft] = useState<string | null>(null);
+  const [signatureDialogOpen, setSignatureDialogOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const profileLink = `/participants-v2/${participantId}${eventId ? `?eventId=${encodeURIComponent(eventId)}` : ""}`;
+  const profileLink = `/participants/${participantId}${eventId ? `?eventId=${encodeURIComponent(eventId)}` : ""}`;
   const activeSigner = signerLabels[form.signerType];
   const requiresRepresentativeDetails = form.signerType !== "PARTICIPANT";
 
@@ -56,29 +72,38 @@ export default function ParticipantV2ConsentPage() {
     setIsLoading(true);
     setError(null);
     try {
-      const [participantResponse, formResponse] = await Promise.all([
-        apiClient.get(`/participants/${participantId}`),
-        apiClient.get("/participants/active-consent-form"),
+      const requestConfig = eventId ? { headers: { "X-Event-Id": eventId } } : undefined;
+      const [participantResponse, formResponse, consentsResponse] = await Promise.all([
+        apiClient.get(`/participants/${participantId}`, requestConfig),
+        apiClient.get("/participants/active-consent-form", requestConfig),
+        apiClient.get(`/participants/${participantId}/consents`, requestConfig),
       ]);
       setParticipant(participantResponse.data.participant);
       setConsentForm(formResponse.data.consentForm);
+      const signedConsent = (consentsResponse.data.consents ?? []).find((consent: EventConsentRecord) => {
+        const consentEventId = consent.eventId ?? consent.event?.id ?? consent.event?.eventId;
+        const withdrawn = consent.withdrawals?.some((withdrawal) => withdrawal.consentStatus === "WITHDRAWN");
+        return consentEventId === eventId && consent.consentStatus === "ACCEPTED" && !withdrawn;
+      }) ?? null;
+      setExistingAcceptedConsent(signedConsent);
     } catch (requestError: unknown) {
       setParticipant(null);
       setConsentForm(null);
+      setExistingAcceptedConsent(null);
       setError(getApiError(requestError, "Unable to load the consent form."));
     } finally {
       setIsLoading(false);
     }
-  }, [participantId]);
+  }, [eventId, participantId]);
 
   useEffect(() => { void loadConsentPage(); }, [loadConsentPage]);
 
   const missingRequirement = useMemo(() => {
-    if (!eventId) return "Choose an event in Participants V2 before recording consent.";
+    if (!eventId) return "Choose an event in Participants before recording consent.";
     if (!form.signerName.trim()) return `${activeSigner.name} is required.`;
     if (requiresRepresentativeDetails && !form.signerRelationship.trim()) return "Relationship to participant is required.";
     if (requiresRepresentativeDetails && !form.guardianContactName.trim()) return `${activeSigner.person} contact name is required.`;
-    if (requiresRepresentativeDetails && !form.guardianContactPhone.trim()) return `${activeSigner.person} contact phone is required.`;
+    if (requiresRepresentativeDetails && !isValidParticipantPhoneNumber(form.guardianContactPhone)) return `Enter a valid ${activeSigner.person.toLowerCase()} contact phone.`;
     if (form.consentStatus === "ACCEPTED" && !signatureDataUrl) return "Capture an electronic signature before recording accepted consent.";
     return null;
   }, [activeSigner.name, activeSigner.person, eventId, form, requiresRepresentativeDetails, signatureDataUrl]);
@@ -93,12 +118,16 @@ export default function ParticipantV2ConsentPage() {
   function chooseSigner(signerType: ConsentFormState["signerType"]) {
     setForm({ ...emptyConsent, signerType, consentStatus: form.consentStatus });
     setSignatureDataUrl(null);
+    setSignatureDraft(null);
+    setSignatureDialogOpen(false);
     setError(null);
   }
 
   function chooseDecision(consentStatus: ConsentFormState["consentStatus"]) {
     updateForm({ consentStatus });
     setSignatureDataUrl(null);
+    setSignatureDraft(null);
+    setSignatureDialogOpen(false);
   }
 
   async function submit(event: FormEvent<HTMLFormElement>) {
@@ -118,7 +147,7 @@ export default function ParticipantV2ConsentPage() {
         consentFormVersionId: consentForm.id,
       });
       navigate(form.consentStatus === "ACCEPTED"
-        ? `/events/${eventId}/participants/${participantId}/review`
+        ? `/participants/${participantId}/check-in?eventId=${encodeURIComponent(eventId)}`
         : profileLink);
     } catch (requestError: unknown) {
       setError(getApiError(requestError, "Unable to record consent."));
@@ -133,16 +162,15 @@ export default function ParticipantV2ConsentPage() {
       <header className="participant-v2-consent-heading">
         <span className="participant-v2-consent-icon"><DocumentTextIcon /></span>
         <div>
-          <p>Registration workspace · V2</p>
+          <p>Registration workspace</p>
           <h1 id="participant-v2-consent-title">Consent and signature</h1>
           <span>{participant ? `Record consent for ${participant.firstName} ${participant.lastName}.` : "Review the approved form and record the signer’s decision."}</span>
         </div>
         <span className="participant-v2-consent-security">Secure record</span>
       </header>
 
-      {!eventId ? <div className="participant-v2-consent-notice" role="alert"><ExclamationTriangleIcon /><div><strong>Event required</strong><p>Return to Participants V2, select an event, and open this participant again before recording consent.</p></div></div> : null}
+      {!eventId ? <div className="participant-v2-consent-notice" role="alert"><ExclamationTriangleIcon /><div><strong>Event required</strong><p>Return to Participants, select an event, and open this participant again before recording consent.</p></div></div> : null}
       {error ? <p className="participant-v2-alert participant-v2-consent-alert" role="alert">{error}</p> : null}
-
       {isLoading ? <div className="participant-v2-consent-loading">Loading the approved consent form...</div> : null}
       {!isLoading && !consentForm ? (
         <section className="participant-v2-consent-unavailable">
@@ -152,7 +180,23 @@ export default function ParticipantV2ConsentPage() {
         </section>
       ) : null}
 
-      {!isLoading && consentForm ? (
+      {!isLoading && consentForm && existingAcceptedConsent ? (
+        <section className="participant-v2-consent-signed" aria-label="Recorded consent">
+          <span><CheckCircleIcon /></span>
+          <div>
+            <p>Consent already signed</p>
+            <h2>This participant has accepted the current consent requirement for this event.</h2>
+            <dl>
+              <div><dt>Signed by</dt><dd>{existingAcceptedConsent.signerName || "Recorded signer"}</dd></div>
+              <div><dt>Recorded</dt><dd>{new Date(existingAcceptedConsent.createdAt).toLocaleString("en-SG")}</dd></div>
+              <div><dt>Form version</dt><dd>{existingAcceptedConsent.consentFormVersion?.versionNumber ?? consentForm.versionNumber}</dd></div>
+            </dl>
+            <div><Link className="secondary" to={profileLink}>Back to profile</Link><Link className="primary" to={`/participants/${participantId}/check-in?eventId=${encodeURIComponent(eventId)}`}>Continue to check-in</Link></div>
+          </div>
+        </section>
+      ) : null}
+
+      {!isLoading && consentForm && !existingAcceptedConsent ? (
         <form className="participant-v2-consent-layout" onSubmit={submit} noValidate>
           <section className="participant-v2-consent-document" aria-labelledby="consent-document-title">
             <div className="participant-v2-consent-document-title"><div><span>01 · Approved form</span><h2 id="consent-document-title">{consentForm.title}</h2><p>Read the current approved version before recording a decision.</p></div><strong>Version {consentForm.versionNumber}</strong></div>
@@ -183,13 +227,13 @@ export default function ParticipantV2ConsentPage() {
             {requiresRepresentativeDetails ? <div className="participant-v2-consent-representative-fields">
               <label className="participant-v2-consent-field">Relationship to participant<input value={form.signerRelationship} onChange={(event) => updateForm({ signerRelationship: event.target.value })} maxLength={60} /></label>
               <label className="participant-v2-consent-field">{activeSigner.person} contact name<input value={form.guardianContactName} onChange={(event) => updateForm({ guardianContactName: event.target.value })} maxLength={150} /></label>
-              <label className="participant-v2-consent-field">{activeSigner.person} contact phone<input type="tel" value={form.guardianContactPhone} onChange={(event) => updateForm({ guardianContactPhone: event.target.value })} maxLength={30} /></label>
+              <label className="participant-v2-consent-field">{activeSigner.person} contact phone<PhoneInput value={form.guardianContactPhone} onChange={(value) => updateForm({ guardianContactPhone: value })} /></label>
               <label className="participant-v2-consent-field">{activeSigner.person} contact email <small>optional</small><input type="email" value={form.guardianContactEmail} onChange={(event) => updateForm({ guardianContactEmail: event.target.value })} maxLength={255} /></label>
             </div> : null}
 
             {form.consentStatus === "ACCEPTED" ? <div className="participant-v2-consent-signature">
               <div><span>Electronic signature</span><p>{activeSigner.person} signs the approved form above.</p></div>
-              <SignaturePad key={`${form.signerType}-${form.consentStatus}`} onChange={setSignatureDataUrl} />
+              <div className="participant-v2-consent-signature-action"><strong>{signatureDataUrl ? "Signature captured" : "Signature required"}</strong><button className="secondary" type="button" onClick={() => { setSignatureDraft(null); setSignatureDialogOpen(true); }}>{signatureDataUrl ? "Replace signature" : "Capture signature"}</button></div>
             </div> : <div className="participant-v2-consent-decline"><ExclamationTriangleIcon /><p>Declining consent records the decision but does not create a registration.</p></div>}
 
             <div className="participant-v2-consent-review"><PencilSquareIcon /><p><strong>Review:</strong> {form.signerName || `${activeSigner.name} is required`} will {form.consentStatus.toLowerCase()} version {consentForm.versionNumber} as the {activeSigner.person.toLowerCase()} signer.</p></div>
@@ -201,6 +245,8 @@ export default function ParticipantV2ConsentPage() {
           </section>
         </form>
       ) : null}
+      {signatureDialogOpen ? <div className="participant-signature-dialog-backdrop" role="presentation"><section className="participant-signature-dialog" role="dialog" aria-modal="true" aria-labelledby="participant-signature-dialog-title"><header><div><span>Electronic signature</span><h2 id="participant-signature-dialog-title">Capture {activeSigner.person.toLowerCase()} signature</h2><p>Draw the signature, or use the keyboard option if needed.</p></div><button className="secondary" type="button" onClick={() => { setSignatureDraft(null); setSignatureDialogOpen(false); }}>Close</button></header><SignaturePad key={`${form.signerType}-${form.consentStatus}-${signatureDialogOpen}`} onChange={setSignatureDraft} /><footer><button className="secondary" type="button" onClick={() => { setSignatureDraft(null); setSignatureDialogOpen(false); }}>Cancel</button><button className="primary" type="button" disabled={!signatureDraft} onClick={() => { setSignatureDataUrl(signatureDraft); setSignatureDialogOpen(false); }}>Use signature</button></footer></section></div> : null}
     </section>
   );
 }
+

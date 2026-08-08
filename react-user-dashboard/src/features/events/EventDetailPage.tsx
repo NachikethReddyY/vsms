@@ -13,6 +13,7 @@ import {
   PhotoIcon,
   PencilSquareIcon,
   PlusIcon,
+  UserPlusIcon,
   TrashIcon,
   UserGroupIcon,
   XMarkIcon,
@@ -380,6 +381,9 @@ export default function EventDetailPage() {
   const availableTemplates = stationTemplates.filter((template) => !event.eventStations.some((station) => station.stationTemplateId === template.stationTemplateId));
   const canCancel = canManage && !terminal && (event.status !== 'IN_PROGRESS' || user?.systemRole === 'ADMIN');
   const isAdministrator = user?.roles.includes('ADMINISTRATOR') ?? false;
+  const canRegisterParticipants = isAdministrator
+    || user?.roles.includes('EVENT_MANAGER')
+    || user?.roles.includes('REGISTRATION_OFFICER');
   const canPermanentlyDelete = terminal && user?.systemRole === 'ADMIN' && isAdministrator;
   const canReview = !isAdministrator && event.status === 'IN_PROGRESS' && event.shifts.some((shift) => (
     shift.status === 'ACTIVE' && shift.staffAssignments.some((assignment) => (
@@ -431,6 +435,7 @@ export default function EventDetailPage() {
         </div>
 
         <div className="event-role-actions">
+          {canRegisterParticipants && <Link className="secondary" to={`${eventPath}/register`}><UserPlusIcon />Start registration</Link>}
           {assignedStationTypes.has('VISUAL_ACUITY') && <Link className="primary" to={`${eventPath}/stations/visual-acuity`}>Open Visual Acuity station</Link>}
           {assignedStationTypes.has('REFRACTION') && <Link className="primary" to={`${eventPath}/stations/refraction`}>Open Refraction station</Link>}
           {assignedStationTypes.has('COLOUR_VISION') && <Link className="primary" to={`${eventPath}/stations/colour-vision`}>Open Colour Vision station</Link>}

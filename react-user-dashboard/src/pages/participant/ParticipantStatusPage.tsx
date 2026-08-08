@@ -1,7 +1,7 @@
 import { CheckBadgeIcon, ClockIcon, ExclamationTriangleIcon, QrCodeIcon, XCircleIcon } from '@heroicons/react/24/outline';
 import { useEffect, useRef, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
-import apiClient, { getApiError as getApiMessage } from '../utils/apiClient';
+import apiClient, { getApiError as getApiMessage } from '../../utils/apiClient';
 import './ParticipantStatusPage.css';
 
 type PublicPassStatus = {
@@ -197,3 +197,4 @@ export default function ParticipantStatusPage() {
     </dialog>
   </main>;
 }
+

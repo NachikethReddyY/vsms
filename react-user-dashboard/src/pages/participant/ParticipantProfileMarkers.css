@@ -1,0 +1,5 @@
+.participant-v2-profile-summary article.missing { position:relative; padding-left:13px; background:color-mix(in srgb,var(--red) 4%,var(--surface)); }
+.participant-v2-profile-summary article.missing:before { position:absolute; top:18px; bottom:18px; left:0; width:3px; border-radius:999px; background:var(--red); content:""; }
+.participant-v2-profile-summary article.missing>svg { color:var(--red); }
+.participant-v2-profile-required { display:inline-flex!important; width:max-content; margin-top:5px; border:1px solid color-mix(in srgb,var(--red) 42%,var(--hairline)); border-radius:999px; padding:3px 7px; background:color-mix(in srgb,var(--red) 7%,var(--surface)); color:var(--red)!important; font-size:9px!important; font-weight:800!important; letter-spacing:.06em!important; text-transform:uppercase; }
+@media (max-width:640px) { .participant-v2-profile-summary article.missing { padding-left:12px; } }

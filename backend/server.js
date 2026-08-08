@@ -23,7 +23,7 @@ const runSecurityChecks = require("./utils/securityCheck");
 /**
  * ============================================================================
  * 1. GLOBAL PROCESS SECURITY HANDLERS (OWASP A09)
- * Catch unhandled exceptions or rejected promises to prevent memory leaks 
+ * Catch unhandled exceptions or rejected promises to prevent memory leaks
  * or unmonitored silent process failures.
  * ============================================================================
  */
@@ -46,7 +46,7 @@ process.on("unhandledRejection", (reason) => {
 /**
  * ============================================================================
  * 2. SECURITY CONFIGURATION VALIDATION (OWASP A05)
- * Runs pre-flight startup checks to ensure environment variables, file 
+ * Runs pre-flight startup checks to ensure environment variables, file
  * permissions, and keys are secure before opening ports.
  * ============================================================================
  */
@@ -73,11 +73,11 @@ if (useHttps) {
     const tlsOptions = {
         key: fs.readFileSync(path.resolve(__dirname, env.TLS_KEY_PATH)),
         cert: fs.readFileSync(path.resolve(__dirname, env.TLS_CERT_PATH)),
-        
+
         // Force modern TLS protocols exclusively (Disables vulnerable TLS 1.0, 1.1, 1.2)
         minVersion: "TLSv1.3",
         maxVersion: "TLSv1.3",
-        
+
         // Enforce server-preferred cipher suites order
         honorCipherOrder: true
     };
@@ -108,7 +108,7 @@ server.on("error", (error) => {
 /**
  * ============================================================================
  * 5. GRACEFUL SHUTDOWN HANDLING
- * Ensures ongoing database transactions and open HTTP connections are safely 
+ * Ensures ongoing database transactions and open HTTP connections are safely
  * completed before terminating the process.
  * ============================================================================
  */
