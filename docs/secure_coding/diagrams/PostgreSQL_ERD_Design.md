@@ -16,5 +16,6 @@ The following diagram illustrates the PostgreSQL database schema, including the 
 <!-- Insert PostgreSQL Database Design Image Here -->
 
 <img width="4378" height="2826" alt="Untitled" src="https://github.com/user-attachments/assets/90f2e0b1-5761-40f2-9ed3-44072a14a168" />
+Link: https://dbdiagram.io/d/68fb80f4357668b7327abe8d
 
 *Figure 1: PostgreSQL Database Design and Entity Relationships*
