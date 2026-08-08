@@ -41,6 +41,8 @@ export default function ParticipantEmergencyContactsPage() {
   const [searchParams] = useSearchParams();
   const eventId = searchParams.get("eventId") ?? "";
   const profileLink = `/participants/${participantId}${eventId ? `?eventId=${encodeURIComponent(eventId)}` : ""}`;
+  const emergencyContactsPath = `/participants/${participantId}/emergency-contacts`;
+  const eventRequestConfig = eventId ? { headers: { "X-Event-Id": eventId } } : undefined;
   const [contacts, setContacts] = useState<EmergencyContact[]>([]);
   const [form, setForm] = useState<ContactForm>(emptyContact);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -53,7 +55,7 @@ export default function ParticipantEmergencyContactsPage() {
   const loadContacts = useCallback(async () => {
     setIsLoading(true);
     try {
-      const response = await apiClient.get(`/participants/${participantId}/emergency-contacts`, {
+      const response = await apiClient.get(emergencyContactsPath, {
         headers: eventId ? { "X-Event-Id": eventId } : undefined,
       });
       setContacts(response.data.contacts ?? []);
@@ -62,7 +64,7 @@ export default function ParticipantEmergencyContactsPage() {
     } finally {
       setIsLoading(false);
     }
-  }, [eventId, participantId]);
+  }, [emergencyContactsPath, eventId]);
 
   useEffect(() => { void loadContacts(); }, [loadContacts]);
 
@@ -101,8 +103,8 @@ export default function ParticipantEmergencyContactsPage() {
     setError(null);
     setNotice(null);
     try {
-      if (editingId) await apiClient.patch(`/emergency-contacts/${editingId}`, form);
-      else await apiClient.post(`/participants/${participantId}/emergency-contacts`, form);
+      if (editingId) await apiClient.patch(`${emergencyContactsPath}/${editingId}`, form, eventRequestConfig);
+      else await apiClient.post(emergencyContactsPath, form, eventRequestConfig);
       await loadContacts();
       setNotice(editingId ? "Emergency contact updated." : "Emergency contact added.");
       setEditingId(null);
@@ -120,14 +122,14 @@ export default function ParticipantEmergencyContactsPage() {
     setError(null);
     setNotice(null);
     try {
-      await apiClient.patch(`/emergency-contacts/${contact.id}`, {
+      await apiClient.patch(`${emergencyContactsPath}/${contact.id}`, {
         contactName: contact.contactName,
         relationship: contact.relationship,
         phoneNumber: contact.phoneNumber,
         email: contact.email ?? "",
         isPrimary: true,
         status: "ACTIVE",
-      });
+      }, eventRequestConfig);
       await loadContacts();
       setNotice(`${contact.contactName} is now the primary emergency contact.`);
     } catch (requestError: unknown) {
@@ -143,14 +145,14 @@ export default function ParticipantEmergencyContactsPage() {
     setError(null);
     setNotice(null);
     try {
-      await apiClient.patch(`/emergency-contacts/${contact.id}`, {
+      await apiClient.patch(`${emergencyContactsPath}/${contact.id}`, {
         contactName: contact.contactName,
         relationship: contact.relationship,
         phoneNumber: contact.phoneNumber,
         email: contact.email ?? "",
         isPrimary: false,
         status: "REMOVED",
-      });
+      }, eventRequestConfig);
       await loadContacts();
       setNotice(`${contact.contactName} was removed from the active contacts.`);
     } catch (requestError: unknown) {
