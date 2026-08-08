@@ -15,10 +15,10 @@ function isCognitoConfigured() {
     return Boolean(config.region && config.userPoolId && config.clientId && config.domain && config.redirectUri && config.logoutUri);
 }
 
-function buildAuthorizationUrl({ state, codeChallenge }) {
+function buildAuthorizationUrl({ state, codeChallenge, screenHint }) {
     const { domain, clientId, redirectUri } = getCognitoConfig();
     const url = new URL(`${domain}/oauth2/authorize`);
-    url.search = new URLSearchParams({
+    const parameters = new URLSearchParams({
         response_type: "code",
         client_id: clientId,
         redirect_uri: redirectUri,
@@ -26,7 +26,9 @@ function buildAuthorizationUrl({ state, codeChallenge }) {
         state,
         code_challenge: codeChallenge,
         code_challenge_method: "S256",
-    }).toString();
+    });
+    if (screenHint === "signup") parameters.set("screen_hint", screenHint);
+    url.search = parameters.toString();
     return url.toString();
 }
 

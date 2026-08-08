@@ -102,18 +102,6 @@ const runSecurityChecks = () => {
     throw new Error("Critical security validation failed");
   }
 
-  /**
-   * Successful Startup Logging
-   */
-  if (isProduction) {
-    logger.info("Security validation completed successfully");
-  } else {
-    console.log("\nSecurity checks:");
-    checks.forEach((check) => {
-      console.log(`\x1b[32m✓ ${check.name}\x1b[0m`);
-    });
-    console.log("\x1b[32mAll security startup checks passed successfully.\x1b[0m\n");
-  }
 };
 
 module.exports = runSecurityChecks;
