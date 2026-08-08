@@ -8,361 +8,83 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-enum EventStatus {
-  DRAFT
-  PUBLISHED
-  IN_PROGRESS
-  COMPLETED
-  CANCELLED
-}
-
-enum SystemRole {
-  ADMIN
-  EVENT_MANAGER
-  STAFF
-}
-
-enum UserStatus {
-  ACTIVE
-  DISABLED
-  INACTIVE
-  SUSPENDED
-}
-
-enum EventAuditAction {
-  CREATED
-  UPDATED
-  PUBLISHED
-  STARTED
-  COMPLETED
-  CANCELLED
-  DELETED
-}
-
-enum ShiftStatus {
-  PLANNED
-  ACTIVE
-  COMPLETED
-  CANCELLED
-}
-
-enum StaffAssignmentRole {
-  EVENT_MANAGER
-  REGISTRATION
-  SCREENER
-  REVIEWER
-  SUPPORT
-}
-
-enum StaffAssignmentStatus {
-  ASSIGNED
-  CONFIRMED
-  COMPLETED
-  CANCELLED
-}
-
-enum EventRegistrationStatus {
-  SIGNED_UP
-  CHECKED_IN
-  COMPLETED
-  CANCELLED
-}
-
-enum StationType {
-  VISUAL_ACUITY
-  REFRACTION
-  COLOUR_VISION
-  EYE_HEALTH
-}
-
-enum QueueStatus {
-  WAITING
-  CALLED
-  IN_PROGRESS
-  COMPLETED
-  SKIPPED
-  CANCELLED
-}
-
-enum ScanResult {
-  SUCCESS
-  INVALID_QR
-  EXPIRED
-  ALREADY_CHECKED_IN
-  UNAUTHORIZED_STATION
-}
-
-enum OverallFlag {
-  NORMAL
-  REVIEW
-  REFER
-  URGENT
-}
-
-enum ReviewOutcome {
-  COMPLETE
-  MONITOR
-  REFER
-  URGENT_ESCALATION
-}
-
-enum ClinicalUrgency {
-  ROUTINE
-  PRIORITY
-  URGENT
-  EMERGENCY
-}
-
-enum ReferralStatus {
-  DRAFT
-  ISSUED
-  SENT
-  ACKNOWLEDGED
-  CANCELLED
-}
-
-enum DocumentType {
-  REFERRAL_PDF
-  CLINICAL_SUMMARY_PDF
-}
-
-enum NotificationChannel {
-  EMAIL
-}
-
-enum NotificationDeliveryStatus {
-  QUEUED
-  SENDING
-  DELIVERED
-  FAILED
-  BOUNCED
-  CANCELLED
-  SENT
-  RECONCILIATION_REQUIRED
-  COMPLAINT
-}
-
-enum SyncOperation {
-  CREATE
-  UPDATE
-  DELETE
-}
-
-enum SyncActionStatus {
-  PENDING
-  PROCESSING
-  APPLIED
-  CONFLICT
-  FAILED
-}
-
-enum IncidentSeverity {
-  LOW
-  MEDIUM
-  HIGH
-  CRITICAL
-}
-
-enum ParticipantStatus {
-  ACTIVE
-  INACTIVE
-  DECEASED
-}
-
-enum EmergencyContactStatus {
-  ACTIVE
-  REMOVED
-}
-
-enum ConsentStatus {
-  PENDING
-  ACCEPTED
-  DECLINED
-  WITHDRAWN
-}
-
-enum SignaturePurpose {
-  CONSENT
-  REFERRAL
-  REVIEW_DECISION
-}
-
-enum AuthOutcome {
-  SUCCESS
-  FAILED
-  DENIED
-}
-
-enum AccountAccessState {
-  ENABLED
-  SUSPENDED
-  DISABLED
-}
-
-enum AccountApprovalDecisionType {
-  APPROVED
-  REJECTED
-}
-
-enum AccountApprovalState {
-  PENDING
-  APPROVED
-  REJECTED
-}
-
-enum AccountProviderOperationStatus {
-  PENDING
-  PROCESSING
-  SUCCEEDED
-  FAILED
-  CANCELED
-  ESCALATED
-  RESOLVED
-}
-
-enum AccountProviderOperationType {
-  SYNC_ACCESS
-  GLOBAL_SIGN_OUT
-  DISABLE_AND_SIGN_OUT
-}
-
-enum EventMembershipStatus {
-  ACTIVE
-  REMOVED
-}
-
-enum EventRole {
-  EVENT_MANAGER
-  REGISTRATION
-  SCREENER
-  REVIEWER
-  SUPPORT
-}
-
-enum LifecycleEmailPurpose {
-  SIGNUP_RECEIVED
-  APPROVED
-  REJECTED
-  SUSPENDED
-  REACTIVATED
-  EVENT_ASSIGNMENT
-  PASSWORD_CHANGED
-  DEPROVISIONED
-}
-
-enum LifecycleEmailStatus {
-  QUEUED
-  SENDING
-  SENT
-  FAILED
-  CANCELLED
-  RECONCILIATION_REQUIRED
-  ESCALATED
-}
-
-enum ProfessionalCategory {
-  STAFF
-  DOCTOR
-}
-
-enum ReportDataset {
-  OVERVIEW
-  OPERATIONS
-  CLINICAL
-  REFERRALS
-}
-
-enum ReportExportFormat {
-  PDF
-  CSV
-}
-
-enum ReportExportJobStatus {
-  QUEUED
-  GENERATING
-  COMPLETED
-  FAILED
-  CANCELLED
-  EXPIRED
-}
-
 model User {
-  id                                String                        @id @default(uuid()) @map("user_id") @db.Uuid
-  username                          String?                       @unique @db.VarChar(100)
-  fullName                          String                        @map("full_name") @db.VarChar(100)
-  email                             String                        @unique @db.VarChar(255)
-  contactNumber                     String?                       @map("contact_number") @db.VarChar(20)
-  emergencyContact                  String?                       @map("emergency_contact") @db.VarChar(20)
-  dateOfBirth                       DateTime?                     @map("date_of_birth") @db.Date
-  gender                            String?                       @db.VarChar(1)
-  employeeNumber                    String?                       @unique @map("employee_number") @db.VarChar(20)
-  department                        String?                       @db.VarChar(100)
-  sysRole                           SystemRole                    @default(STAFF) @map("system_role")
-  designation                       String?                       @db.VarChar(100)
-  status                            UserStatus                    @default(ACTIVE)
-  failedLoginAttempts               Int                           @default(0) @map("failed_login_attempts")
-  lockedUntil                       DateTime?                     @map("locked_until") @db.Timestamptz(3)
-  lastLoginAt                       DateTime?                     @map("last_login_at") @db.Timestamptz(3)
-  consentConfirmation               Boolean                       @default(false) @map("consent_confirmation")
-  version                           Int                           @default(1)
-  createdAt                         DateTime                      @default(now()) @map("created_at") @db.Timestamptz(3)
-  updatedAt                         DateTime                      @updatedAt @map("updated_at") @db.Timestamptz(3)
-  cognitoSub                        String?                       @unique @map("cognito_sub") @db.Uuid
-  approvalState                     AccountApprovalState          @default(PENDING) @map("approval_state")
-  accessState                       AccountAccessState            @default(ENABLED) @map("access_state")
-  professionalCategory              ProfessionalCategory?         @map("professional_category")
-  sessionInvalidBefore              DateTime?                     @map("session_invalid_before") @db.Timestamptz(3)
-  deprovisionedAt                   DateTime?                     @map("deprovisioned_at") @db.Timestamptz(3)
-  deprovisionedById                 String?                       @map("deprovisioned_by") @db.Uuid
-  deprovisionReason                 String?                       @map("deprovision_reason") @db.VarChar(500)
-  providerStateGeneration           Int                           @default(0) @map("provider_state_generation")
-  accountApprovalDecisionsDecidedBy AccountApprovalDecision[]     @relation("AccountApprovalDecisionDecidedBy")
-  accountApprovalDecisions          AccountApprovalDecision[]     @relation("AccountApprovalDecisionUser")
-  accountProviderOperations         AccountProviderOperation[]
-  auditLogs                         AuditLog[]
-  authAuditLogs                     AuthAuditLog[]
-  consentVersionsCreated            ConsentFormVersion[]          @relation("ConsentFormVersionCreatedBy")
-  devices                           Device[]
-  documentArtifacts                 DocumentArtifact[]            @relation("DocumentGenerator")
-  eventAuditLogs                    EventAuditLog[]               @relation("EventAuditActor")
-  eventMembershipRolesAssigned      EventMembershipRole[]         @relation("EventMembershipRoleAssignedBy")
-  addedMemberships                  EventMembership[]             @relation("EventMembershipAddedBy")
-  removedMemberships                EventMembership[]             @relation("EventMembershipRemovedBy")
-  eventMemberships                  EventMembership[]             @relation("EventMembershipUser")
-  eventRegistrations                EventRegistration[]           @relation("RegisteredBy")
-  eventsCancelled                   Event[]                       @relation("EventCancelledBy")
-  eventsCreated                     Event[]                       @relation("EventCreatedBy")
-  lifecycleEmails                   LifecycleEmailOutbox[]
-  loginHistories                    LoginHistory[]
-  notificationDeliveries            NotificationDelivery[]
-  consentsRecorded                  ParticipantConsent[]          @relation("ConsentRecordedBy")
-  emergencyContactsCreated          ParticipantEmergencyContact[] @relation("EmergencyContactCreatedBy")
-  emergencyContactsUpdated          ParticipantEmergencyContact[] @relation("EmergencyContactUpdatedBy")
-  participantsCreated               Participant[]                 @relation("ParticipantCreatedBy")
-  participantsUpdated               Participant[]                 @relation("ParticipantUpdatedBy")
-  permissionsCreated                Permission[]                  @relation("PermissionCreatedBy")
-  revokedQRCodes                    QRCodePass[]
-  movedQueueEntries                 QueueMovement[]               @relation("MovedBy")
-  referrals                         Referral[]                    @relation("ReferralCreator")
-  refreshSessions                   RefreshSession[]
-  registrationChanges               RegistrationStatusHistory[]   @relation("RegistrationStatusChangedBy")
-  reportExportJobs                  ReportExportJob[]             @relation("ReportExportJobRequestedBy")
-  reviews                           Review[]                      @relation("ReviewReviewer")
-  reviewSignatures                  Review[]                      @relation("ReviewSignatureSigner")
-  scanLogs                          ScanLog[]
-  screeningRequestLedgers           ScreeningRequestLedger[]
-  screeningResults                  ScreeningResult[]             @relation("ScreeningRecorder")
-  resolvedIncidents                 SecurityIncident[]            @relation("ResolvedBy")
-  securityIncidents                 SecurityIncident[]            @relation("IncidentUser")
-  signatureArtifacts                SignatureArtifact[]           @relation("SignatureArtifactOwner")
-  assignedStaff                     StaffAssignment[]             @relation("AssignedBy")
-  staffAssignments                  StaffAssignment[]             @relation("AssignedUser")
-  syncActions                       SyncAction[]                  @relation("SyncActor")
-  credential                        UserCredential?
-  roleAssignmentsMade               UserRole[]                    @relation("UserRoleAssignedBy")
-  userRoles                         UserRole[]
-  deprovisionedByUser               User?                         @relation("UserDeprovisionedBy", fields: [deprovisionedById], references: [id])
-  deprovisionedUsers                User[]                        @relation("UserDeprovisionedBy")
+  id                                                                      String                        @id @default(uuid()) @map("user_id") @db.Uuid
+  username                                                                String?                       @unique @db.VarChar(100)
+  fullName                                                                String                        @map("full_name") @db.VarChar(100)
+  email                                                                   String                        @unique @db.VarChar(255)
+  contactNumber                                                           String?                       @map("contact_number") @db.VarChar(20)
+  emergencyContact                                                        String?                       @map("emergency_contact") @db.VarChar(20)
+  dateOfBirth                                                             DateTime?                     @map("date_of_birth") @db.Date
+  gender                                                                  String?                       @db.VarChar(1)
+  employeeNumber                                                          String?                       @unique @map("employee_number") @db.VarChar(20)
+  department                                                              String?                       @db.VarChar(100)
+  sysRole                                                                 SystemRole                    @default(STAFF) @map("system_role")
+  designation                                                             String?                       @db.VarChar(100)
+  status                                                                  UserStatus                    @default(ACTIVE)
+  failedLoginAttempts                                                     Int                           @default(0) @map("failed_login_attempts")
+  lockedUntil                                                             DateTime?                     @map("locked_until") @db.Timestamptz(3)
+  lastLoginAt                                                             DateTime?                     @map("last_login_at") @db.Timestamptz(3)
+  consentConfirmation                                                     Boolean                       @default(false) @map("consent_confirmation")
+  version                                                                 Int                           @default(1)
+  createdAt                                                               DateTime                      @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt                                                               DateTime                      @updatedAt @map("updated_at") @db.Timestamptz(3)
+  cognitoSub                                                              String?                       @unique @map("cognito_sub") @db.Uuid
+  approvalState                                                           AccountApprovalState          @default(PENDING) @map("approval_state")
+  accessState                                                             AccountAccessState            @default(ENABLED) @map("access_state")
+  professionalCategory                                                    ProfessionalCategory?         @map("professional_category")
+  sessionInvalidBefore                                                    DateTime?                     @map("session_invalid_before") @db.Timestamptz(3)
+  deprovisionedAt                                                         DateTime?                     @map("deprovisioned_at") @db.Timestamptz(3)
+  deprovisionedById                                                       String?                       @map("deprovisioned_by") @db.Uuid
+  deprovisionReason                                                       String?                       @map("deprovision_reason") @db.VarChar(500)
+  providerStateGeneration                                                 Int                           @default(0) @map("provider_state_generation")
+  accountApprovalDecisionsDecidedBy                                       AccountApprovalDecision[]     @relation("AccountApprovalDecisionDecidedBy")
+  accountApprovalDecisions                                                AccountApprovalDecision[]     @relation("AccountApprovalDecisionUser")
+  accountProviderOperations                                               AccountProviderOperation[]
+  auditLogs                                                               AuditLog[]
+  authAuditLogs                                                           AuthAuditLog[]
+  consentVersionsCreated                                                  ConsentFormVersion[]          @relation("ConsentFormVersionCreatedBy")
+  devices                                                                 Device[]
+  documentArtifacts                                                       DocumentArtifact[]            @relation("DocumentGenerator")
+  eventAuditLogs                                                          EventAuditLog[]               @relation("EventAuditActor")
+  eventMembershipRolesAssigned                                            EventMembershipRole[]         @relation("EventMembershipRoleAssignedBy")
+  addedMemberships                                                        EventMembership[]             @relation("EventMembershipAddedBy")
+  removedMemberships                                                      EventMembership[]             @relation("EventMembershipRemovedBy")
+  eventMemberships                                                        EventMembership[]             @relation("EventMembershipUser")
+  eventRegistrations                                                      EventRegistration[]           @relation("RegisteredBy")
+  eventsCancelled                                                         Event[]                       @relation("EventCancelledBy")
+  eventsCreated                                                           Event[]                       @relation("EventCreatedBy")
+  lifecycleEmails                                                         LifecycleEmailOutbox[]
+  loginHistories                                                          LoginHistory[]
+  notificationDeliveries                                                  NotificationDelivery[]
+  consentsRecorded                                                        ParticipantConsent[]          @relation("ConsentRecordedBy")
+  emergencyContactsCreated                                                ParticipantEmergencyContact[] @relation("EmergencyContactCreatedBy")
+  emergencyContactsUpdated                                                ParticipantEmergencyContact[] @relation("EmergencyContactUpdatedBy")
+  participantsCreated                                                     Participant[]                 @relation("ParticipantCreatedBy")
+  participantsUpdated                                                     Participant[]                 @relation("ParticipantUpdatedBy")
+  permissionsCreated                                                      Permission[]                  @relation("PermissionCreatedBy")
+  revokedQRCodes                                                          QRCodePass[]
+  movedQueueEntries                                                       QueueMovement[]               @relation("MovedBy")
+  referrals                                                               Referral[]                    @relation("ReferralCreator")
+  refreshSessions                                                         RefreshSession[]
+  registrationChanges                                                     RegistrationStatusHistory[]   @relation("RegistrationStatusChangedBy")
+  reportExportJobs                                                        ReportExportJob[]             @relation("ReportExportJobRequestedBy")
+  reviews                                                                 Review[]                      @relation("ReviewReviewer")
+  reviewSignatures                                                        Review[]                      @relation("ReviewSignatureSigner")
+  scanLogs                                                                ScanLog[]
+  screeningRequestLedgers                                                 ScreeningRequestLedger[]
+  screeningResults                                                        ScreeningResult[]             @relation("ScreeningRecorder")
+  resolvedIncidents                                                       SecurityIncident[]            @relation("ResolvedBy")
+  securityIncidents                                                       SecurityIncident[]            @relation("IncidentUser")
+  signatureArtifacts                                                      SignatureArtifact[]           @relation("SignatureArtifactOwner")
+  assignedStaff                                                           StaffAssignment[]             @relation("AssignedBy")
+  staffAssignments                                                        StaffAssignment[]             @relation("AssignedUser")
+  syncActions                                                             SyncAction[]                  @relation("SyncActor")
+  credential                                                              UserCredential?
+  roleAssignmentsMade                                                     UserRole[]                    @relation("UserRoleAssignedBy")
+  userRoles                                                               UserRole[]
+  deprovisionedByUser                                                     User?                         @relation("UserDeprovisionedBy", fields: [deprovisionedById], references: [id])
+  deprovisionedUsers                                                      User[]                        @relation("UserDeprovisionedBy")
 
   @@index([status, department])
   @@index([email])
@@ -1287,14 +1009,14 @@ model RegistrationStatusHistory {
 
 /// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
 model AccountApprovalDecision {
-  id          String                      @id @default(uuid()) @map("approval_decision_id") @db.Uuid
-  userId      String                      @map("user_id") @db.Uuid
-  decision    AccountApprovalDecisionType
-  decidedById String                      @map("decided_by") @db.Uuid
-  reason      String?                     @map("reason") @db.VarChar(500)
-  decidedAt   DateTime                    @default(now()) @map("decided_at") @db.Timestamptz(3)
-  decidedBy   User                        @relation("AccountApprovalDecisionDecidedBy", fields: [decidedById], references: [id])
-  user        User                        @relation("AccountApprovalDecisionUser", fields: [userId], references: [id])
+  id            String                       @id @default(uuid()) @map("approval_decision_id") @db.Uuid
+  userId        String                       @map("user_id") @db.Uuid
+  decision      AccountApprovalDecisionType
+  decidedById   String                       @map("decided_by") @db.Uuid
+  reason        String?                      @map("reason") @db.VarChar(500)
+  decidedAt     DateTime                     @default(now()) @map("decided_at") @db.Timestamptz(3)
+  decidedBy     User                         @relation("AccountApprovalDecisionDecidedBy", fields: [decidedById], references: [id])
+  user          User                         @relation("AccountApprovalDecisionUser", fields: [userId], references: [id])
 
   @@index([decidedById, decidedAt])
   @@index([userId, decidedAt])
@@ -1302,24 +1024,24 @@ model AccountApprovalDecision {
 }
 
 model AccountProviderOperation {
-  id               String                         @id @default(uuid()) @map("provider_operation_id") @db.Uuid
-  userId           String                         @map("user_id") @db.Uuid
-  operationType    AccountProviderOperationType   @map("operation_type")
-  status           AccountProviderOperationStatus @default(PENDING)
-  idempotencyKey   String                         @unique @map("idempotency_key") @db.VarChar(150)
-  payload          Json                           @default("{}")
-  attemptCount     Int                            @default(0) @map("attempt_count")
-  nextAttemptAt    DateTime                       @default(now()) @map("next_attempt_at") @db.Timestamptz(3)
-  claimedAt        DateTime?                      @map("claimed_at") @db.Timestamptz(3)
-  completedAt      DateTime?                      @map("completed_at") @db.Timestamptz(3)
-  lastErrorCode    String?                        @map("last_error_code") @db.VarChar(80)
-  createdAt        DateTime                       @default(now()) @map("created_at") @db.Timestamptz(3)
-  updatedAt        DateTime                       @updatedAt @map("updated_at") @db.Timestamptz(3)
-  generation       Int
-  claimToken       String?                        @map("claim_token") @db.Uuid
-  resolvedAt       DateTime?                      @map("resolved_at") @db.Timestamptz(3)
-  resolutionReason String?                        @map("resolution_reason") @db.VarChar(500)
-  user             User                           @relation(fields: [userId], references: [id])
+  id            String                         @id @default(uuid()) @map("provider_operation_id") @db.Uuid
+  userId        String                         @map("user_id") @db.Uuid
+  operationType AccountProviderOperationType   @map("operation_type")
+  status        AccountProviderOperationStatus @default(PENDING)
+  idempotencyKey String                        @unique @map("idempotency_key") @db.VarChar(150)
+  payload       Json                           @default("{}")
+  attemptCount  Int                            @default(0) @map("attempt_count")
+  nextAttemptAt DateTime                       @default(now()) @map("next_attempt_at") @db.Timestamptz(3)
+  claimedAt     DateTime?                      @map("claimed_at") @db.Timestamptz(3)
+  completedAt   DateTime?                      @map("completed_at") @db.Timestamptz(3)
+  lastErrorCode String?                        @map("last_error_code") @db.VarChar(80)
+  createdAt     DateTime                       @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt     DateTime                       @updatedAt @map("updated_at") @db.Timestamptz(3)
+  generation    Int
+  claimToken    String?                        @map("claim_token") @db.Uuid
+  resolvedAt    DateTime?                      @map("resolved_at") @db.Timestamptz(3)
+  resolutionReason String?                     @map("resolution_reason") @db.VarChar(500)
+  user          User                           @relation(fields: [userId], references: [id])
 
   @@unique([userId, generation])
   @@index([status, nextAttemptAt])
@@ -1328,13 +1050,13 @@ model AccountProviderOperation {
 }
 
 model EventMembershipRole {
-  id           String          @id @default(uuid()) @map("event_membership_role_id") @db.Uuid
-  membershipId String          @map("event_membership_id") @db.Uuid
-  role         EventRole
-  assignedById String          @map("assigned_by") @db.Uuid
-  assignedAt   DateTime        @default(now()) @map("assigned_at") @db.Timestamptz(3)
-  assignedBy   User            @relation("EventMembershipRoleAssignedBy", fields: [assignedById], references: [id])
-  membership   EventMembership @relation(fields: [membershipId], references: [id], onDelete: Cascade)
+  id                String          @id @default(uuid()) @map("event_membership_role_id") @db.Uuid
+  membershipId      String          @map("event_membership_id") @db.Uuid
+  role              EventRole
+  assignedById      String          @map("assigned_by") @db.Uuid
+  assignedAt        DateTime        @default(now()) @map("assigned_at") @db.Timestamptz(3)
+  assignedBy        User            @relation("EventMembershipRoleAssignedBy", fields: [assignedById], references: [id])
+  membership        EventMembership @relation(fields: [membershipId], references: [id], onDelete: Cascade)
 
   @@unique([membershipId, role])
   @@index([assignedById])
@@ -1409,15 +1131,15 @@ model ReportArtifactBlob {
 
 /// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
 model ReportArtifact {
-  id         String          @id @default(uuid()) @map("report_artifact_id") @db.Uuid
-  jobId      String          @unique @map("report_export_job_id") @db.Uuid
-  storageKey String          @unique @map("storage_key") @db.VarChar(500)
-  mimeType   String          @map("mime_type") @db.VarChar(100)
-  sizeBytes  BigInt          @map("size_bytes")
-  sha256     String          @db.Char(64)
-  expiresAt  DateTime        @map("expires_at") @db.Timestamptz(3)
-  createdAt  DateTime        @default(now()) @map("created_at") @db.Timestamptz(3)
-  job        ReportExportJob @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  id             String           @id @default(uuid()) @map("report_artifact_id") @db.Uuid
+  jobId          String           @unique @map("report_export_job_id") @db.Uuid
+  storageKey     String           @unique @map("storage_key") @db.VarChar(500)
+  mimeType       String           @map("mime_type") @db.VarChar(100)
+  sizeBytes      BigInt           @map("size_bytes")
+  sha256         String           @db.Char(64)
+  expiresAt      DateTime         @map("expires_at") @db.Timestamptz(3)
+  createdAt      DateTime         @default(now()) @map("created_at") @db.Timestamptz(3)
+  job            ReportExportJob  @relation(fields: [jobId], references: [id], onDelete: Cascade)
 
   @@index([expiresAt])
   @@map("report_artifacts")
@@ -1425,33 +1147,311 @@ model ReportArtifact {
 
 /// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
 model ReportExportJob {
-  id                    String                @id @default(uuid()) @map("report_export_job_id") @db.Uuid
-  eventId               String                @map("event_id") @db.Uuid
-  status                ReportExportJobStatus @default(QUEUED)
-  createdAt             DateTime              @default(now()) @map("created_at") @db.Timestamptz(3)
-  updatedAt             DateTime              @updatedAt @map("updated_at") @db.Timestamptz(3)
-  requestedById         String                @map("requested_by") @db.Uuid
-  dataset               ReportDataset         @default(OVERVIEW)
-  format                ReportExportFormat    @default(PDF)
-  filterSnapshot        Json                  @default("{}") @map("filter_snapshot")
-  claimToken            String?               @map("claim_token") @db.Uuid
-  leaseExpiresAt        DateTime?             @map("lease_expires_at") @db.Timestamptz(3)
-  attemptCount          Int                   @default(0) @map("attempt_count")
-  maxAttempts           Int                   @default(5) @map("max_attempts")
-  nextAttemptAt         DateTime              @default(now()) @map("next_attempt_at") @db.Timestamptz(3)
-  failureCode           String?               @map("failure_code") @db.VarChar(80)
-  requestedAt           DateTime              @default(now()) @map("requested_at") @db.Timestamptz(3)
-  generatedAt           DateTime?             @map("generated_at") @db.Timestamptz(3)
-  expiresAt             DateTime              @default(dbgenerated("(CURRENT_TIMESTAMP + '7 days'::interval)")) @map("expires_at") @db.Timestamptz(3)
-  publicationStorageKey String?               @map("publication_storage_key") @db.VarChar(500)
-  publicationClaimToken String?               @map("publication_claim_token") @db.Uuid
-  artifact              ReportArtifact?
-  event                 Event                 @relation(fields: [eventId], references: [eventId], onDelete: Cascade)
-  requestedBy           User                  @relation("ReportExportJobRequestedBy", fields: [requestedById], references: [id])
+  id                     String                @id @default(uuid()) @map("report_export_job_id") @db.Uuid
+  eventId                String                @map("event_id") @db.Uuid
+  status                 ReportExportJobStatus @default(QUEUED)
+  createdAt              DateTime              @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt              DateTime              @updatedAt @map("updated_at") @db.Timestamptz(3)
+  requestedById          String                @map("requested_by") @db.Uuid
+  dataset                ReportDataset         @default(OVERVIEW)
+  format                 ReportExportFormat    @default(PDF)
+  filterSnapshot         Json                  @map("filter_snapshot") @default("{}")
+  claimToken             String?               @map("claim_token") @db.Uuid
+  leaseExpiresAt         DateTime?             @map("lease_expires_at") @db.Timestamptz(3)
+  attemptCount           Int                   @default(0) @map("attempt_count")
+  maxAttempts            Int                   @default(5) @map("max_attempts")
+  nextAttemptAt          DateTime              @default(now()) @map("next_attempt_at") @db.Timestamptz(3)
+  failureCode            String?               @map("failure_code") @db.VarChar(80)
+  requestedAt            DateTime              @default(now()) @map("requested_at") @db.Timestamptz(3)
+  generatedAt            DateTime?             @map("generated_at") @db.Timestamptz(3)
+  expiresAt              DateTime              @default(dbgenerated("(CURRENT_TIMESTAMP + '7 days'::interval)")) @map("expires_at") @db.Timestamptz(3)
+  publicationStorageKey  String?               @map("publication_storage_key") @db.VarChar(500)
+  publicationClaimToken  String?               @map("publication_claim_token") @db.Uuid
+  artifact               ReportArtifact?
+  event                  Event                 @relation(fields: [eventId], references: [eventId], onDelete: Cascade)
+  requestedBy            User                  @relation("ReportExportJobRequestedBy", fields: [requestedById], references: [id])
 
   @@index([eventId, status, requestedAt])
   @@index([publicationClaimToken])
   @@index([requestedById, requestedAt])
   @@index([status, nextAttemptAt, leaseExpiresAt])
   @@map("report_export_jobs")
+}
+
+enum EventStatus {
+  DRAFT
+  PUBLISHED
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
+
+enum SystemRole {
+  ADMIN
+  EVENT_MANAGER
+  STAFF
+}
+
+enum UserStatus {
+  ACTIVE
+  DISABLED
+  INACTIVE
+  SUSPENDED
+}
+
+enum EventAuditAction {
+  CREATED
+  UPDATED
+  PUBLISHED
+  STARTED
+  COMPLETED
+  CANCELLED
+  DELETED
+}
+
+enum ShiftStatus {
+  PLANNED
+  ACTIVE
+  COMPLETED
+  CANCELLED
+}
+
+enum StaffAssignmentRole {
+  EVENT_MANAGER
+  REGISTRATION
+  SCREENER
+  REVIEWER
+  SUPPORT
+}
+
+enum StaffAssignmentStatus {
+  ASSIGNED
+  CONFIRMED
+  COMPLETED
+  CANCELLED
+}
+
+enum EventRegistrationStatus {
+  SIGNED_UP
+  CHECKED_IN
+  COMPLETED
+  CANCELLED
+}
+
+enum StationType {
+  VISUAL_ACUITY
+  REFRACTION
+  COLOUR_VISION
+  EYE_HEALTH
+}
+
+enum QueueStatus {
+  WAITING
+  CALLED
+  IN_PROGRESS
+  COMPLETED
+  SKIPPED
+  CANCELLED
+}
+
+enum ScanResult {
+  SUCCESS
+  INVALID_QR
+  EXPIRED
+  ALREADY_CHECKED_IN
+  UNAUTHORIZED_STATION
+}
+
+enum OverallFlag {
+  NORMAL
+  REVIEW
+  REFER
+  URGENT
+}
+
+enum ReviewOutcome {
+  COMPLETE
+  MONITOR
+  REFER
+  URGENT_ESCALATION
+}
+
+enum ClinicalUrgency {
+  ROUTINE
+  PRIORITY
+  URGENT
+  EMERGENCY
+}
+
+enum ReferralStatus {
+  DRAFT
+  ISSUED
+  SENT
+  ACKNOWLEDGED
+  CANCELLED
+}
+
+enum DocumentType {
+  REFERRAL_PDF
+  CLINICAL_SUMMARY_PDF
+}
+
+enum NotificationChannel {
+  EMAIL
+}
+
+enum NotificationDeliveryStatus {
+  QUEUED
+  SENDING
+  DELIVERED
+  FAILED
+  BOUNCED
+  CANCELLED
+  SENT
+  RECONCILIATION_REQUIRED
+  COMPLAINT
+}
+
+enum SyncOperation {
+  CREATE
+  UPDATE
+  DELETE
+}
+
+enum SyncActionStatus {
+  PENDING
+  PROCESSING
+  APPLIED
+  CONFLICT
+  FAILED
+}
+
+enum IncidentSeverity {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+enum ParticipantStatus {
+  ACTIVE
+  INACTIVE
+  DECEASED
+}
+
+enum EmergencyContactStatus {
+  ACTIVE
+  REMOVED
+}
+
+enum ConsentStatus {
+  PENDING
+  ACCEPTED
+  DECLINED
+  WITHDRAWN
+}
+
+enum SignaturePurpose {
+  CONSENT
+  REFERRAL
+  REVIEW_DECISION
+}
+
+enum AuthOutcome {
+  SUCCESS
+  FAILED
+  DENIED
+}
+
+enum AccountAccessState {
+  ENABLED
+  SUSPENDED
+  DISABLED
+}
+
+enum AccountApprovalDecisionType {
+  APPROVED
+  REJECTED
+}
+
+enum AccountApprovalState {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum AccountProviderOperationStatus {
+  PENDING
+  PROCESSING
+  SUCCEEDED
+  FAILED
+  CANCELED
+  ESCALATED
+  RESOLVED
+}
+
+enum AccountProviderOperationType {
+  SYNC_ACCESS
+  GLOBAL_SIGN_OUT
+  DISABLE_AND_SIGN_OUT
+}
+
+enum EventMembershipStatus {
+  ACTIVE
+  REMOVED
+}
+
+enum EventRole {
+  EVENT_MANAGER
+  REGISTRATION
+  SCREENER
+  REVIEWER
+  SUPPORT
+}
+
+enum LifecycleEmailPurpose {
+  SIGNUP_RECEIVED
+  APPROVED
+  REJECTED
+  SUSPENDED
+  REACTIVATED
+  EVENT_ASSIGNMENT
+  PASSWORD_CHANGED
+  DEPROVISIONED
+}
+
+enum LifecycleEmailStatus {
+  QUEUED
+  SENDING
+  SENT
+  FAILED
+  CANCELLED
+  RECONCILIATION_REQUIRED
+  ESCALATED
+}
+
+enum ProfessionalCategory {
+  STAFF
+  DOCTOR
+}
+
+enum ReportDataset {
+  OVERVIEW
+  OPERATIONS
+  CLINICAL
+  REFERRALS
+}
+
+enum ReportExportFormat {
+  PDF
+  CSV
+}
+
+enum ReportExportJobStatus {
+  QUEUED
+  GENERATING
+  COMPLETED
+  FAILED
+  CANCELLED
+  EXPIRED
 }
