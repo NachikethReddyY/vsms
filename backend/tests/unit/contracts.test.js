@@ -83,6 +83,24 @@ test("API routes expose the required versioned contracts", () => {
     assert.doesNotMatch(auth, /"\/login"|"\/signup"/);
 });
 
+test("account contracts allow composed runtime fields and document provider maintenance", () => {
+    const document = YAML.parse(read("docs/openapi.yaml"));
+    const schemas = document.components.schemas;
+    const adminRoutes = read("routes/adminRoutes.js");
+
+    assert.equal(schemas.AccountSummary.additionalProperties, true);
+    assert.ok(schemas.Account.allOf.some(({ $ref }) => $ref === "#/components/schemas/AccountSummary"));
+    assert.ok(schemas.AccountDetail.allOf.some(({ $ref }) => $ref === "#/components/schemas/Account"));
+    assert.ok(schemas.AccountListItem.allOf.some(({ $ref }) => $ref === "#/components/schemas/AccountSummary"));
+    assert.ok(schemas.AccountProviderOperationStatus.enum.includes("RESOLVED"));
+    assert.ok(document.paths["/api/v1/admin/maintenance/account-provider-operations/{operationId}/requeue"]);
+    assert.ok(document.paths["/api/v1/admin/maintenance/account-provider-operations/{operationId}/resolve"]);
+    assert.match(adminRoutes, /account-provider-operations\/:operationId\/requeue/);
+    assert.match(adminRoutes, /account-provider-operations\/:operationId\/resolve/);
+    assert.ok(document.paths["/api/v1/admin/accounts/{accountId}/reactivate"].post.responses["202"]);
+    assert.ok(document.paths["/api/v1/users"].post.responses["202"]);
+});
+
 test("registration transaction creates registration, history and audit together", () => {
     const controller = read("controllers/registrationController.js");
     const transactionBody = controller.slice(controller.indexOf("prisma.$transaction"));

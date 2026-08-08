@@ -23,7 +23,10 @@ after(async () => helpers.prisma.$disconnect());
 function buildMiniApp(auth) {
   const mini = express();
   mini.use((req, _res, next) => {
-    req.auth = auth;
+    req.auth = {
+      user: { status: "ACTIVE", approvalState: "APPROVED", accessState: "ENABLED" },
+      ...auth,
+    };
     next();
   });
   mini.get("/sensitive", requirePermission("registrations:read"), (_req, res) => res.status(200).json({ ok: true }));

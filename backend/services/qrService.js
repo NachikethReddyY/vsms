@@ -1,6 +1,7 @@
 const QRCode = require("qrcode");
 const crypto = require("crypto");
 const prisma = require("../prisma/prismaClient");
+const { attendanceWhere } = require("./attendanceDefinition");
 const env = require("../config/env");
 const { decrypt, encrypt, encryptionContext } = require("../utils/cryptoUtils");
 const { renderBrandedQrSvg } = require("../utils/qrBranding");
@@ -382,7 +383,7 @@ exports.getPublicStatus = async (token, db = prisma) => {
     }
 
     const currentQueueNumber = (await db.eventRegistration.aggregate({
-        where: { eventId: qr.registration.eventId, checkedIn: true },
+        where: attendanceWhere(qr.registration.eventId),
         _max: { queueNumber: true },
     }))._max.queueNumber ?? null;
 

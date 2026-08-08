@@ -10,7 +10,7 @@ const screeningService = require("../../services/screeningService");
 const eventId = crypto.randomUUID();
 const stationId = crypto.randomUUID();
 const registrationId = crypto.randomUUID();
-const user = { userId: crypto.randomUUID(), systemRole: "STAFF", roles: ["SCREENER"] };
+const user = { userId: crypto.randomUUID(), systemRole: "STAFF", roles: ["SCREENER"], status: "ACTIVE", approvalState: "APPROVED", accessState: "ENABLED" };
 
 const body = {
   registrationId,
@@ -30,6 +30,17 @@ function replace(t, target, key, value) {
   t.after(() => { target[key] = original; });
 }
 
+function installAuthorizationMock(t, authorizedUser = user) {
+  replace(t, prisma.eventMembership, "findFirst", async ({ where }) => ({
+    id: crypto.randomUUID(),
+    eventId: where.eventId,
+    userId: where.userId,
+    status: "ACTIVE",
+    roles: [{ role: "SCREENER" }],
+    user: authorizedUser,
+  }));
+}
+
 const fingerprintFor = (request) => screeningService.screeningRequestFingerprint({
   eventId: request.eventId,
   stationId: request.stationId,
@@ -39,6 +50,10 @@ const fingerprintFor = (request) => screeningService.screeningRequestFingerprint
 });
 
 function installReplayMocks(t, getCurrent, existing, counters = {}) {
+  replace(t, prisma.eventMembership, "findFirst", async () => {
+    const current = getCurrent();
+    return { id: crypto.randomUUID(), eventId: current.eventId, userId: current.user.userId, status: "ACTIVE", roles: [{ role: "SCREENER" }], user: current.user };
+  });
   replace(t, prisma.event, "findUnique", async ({ where }) => ({ eventId: where.eventId, name: "Live", status: "IN_PROGRESS", venue: "Hall" }));
   replace(t, prisma.staffAssignment, "findFirst", async ({ where }) => {
     const current = getCurrent();
@@ -114,6 +129,7 @@ test("screening idempotency rejects cross-scope or payload key reuse", async (t)
 });
 
 test("screening idempotency race recovery enforces the same replay match", async (t) => {
+  installAuthorizationMock(t);
   const original = { eventId, stationId, body, user };
   const replayingUser = { ...user, userId: crypto.randomUUID() };
   const existing = {
@@ -144,6 +160,7 @@ test("screening idempotency race recovery enforces the same replay match", async
 });
 
 test("same-request serializable race returns the committed immutable receipt", async (t) => {
+  installAuthorizationMock(t);
   const original = { eventId, stationId, body, user };
   const snapshot = { resultId: crypto.randomUUID(), resultData: body.resultData, version: 1 };
   const receipt = {
@@ -170,6 +187,7 @@ test("same-request serializable race returns the committed immutable receipt", a
 });
 
 test("screening idempotency stores a canonical fingerprint", async (t) => {
+  installAuthorizationMock(t);
   const request = { eventId, stationId, body, user };
   let saved;
   let receipt;
@@ -216,6 +234,7 @@ test("screening idempotency stores a canonical fingerprint", async (t) => {
 });
 
 test("delayed K1 replay returns its immutable result without replacing K2", async (t) => {
+  installAuthorizationMock(t);
   const ledgers = new Map();
   let currentResult = null;
 

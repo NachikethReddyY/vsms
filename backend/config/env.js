@@ -76,6 +76,20 @@ const schema = z.object({
     "must contain only Amazon SNS topic ARNs",
   )),
   AWS_REGION: z.string().min(1).default("us-east-1"),
+  LIFECYCLE_EMAIL_ENABLED: z.enum(["true", "false"]).default("false"),
+  LIFECYCLE_EMAIL_FROM: optionalEnv(z.string().email()),
+  LIFECYCLE_EMAIL_ALLOWED_SENDERS: optionalEnv(z.string().min(1)),
+  GOOGLE_WORKSPACE_USER: optionalEnv(z.string().email()),
+  GOOGLE_WORKSPACE_CLIENT_ID: optionalEnv(z.string().min(1)),
+  GOOGLE_WORKSPACE_CLIENT_SECRET: optionalEnv(z.string().min(1)),
+  GOOGLE_WORKSPACE_REFRESH_TOKEN: optionalEnv(z.string().min(1)),
+  LIFECYCLE_EMAIL_CONNECTION_TIMEOUT_MS: z.coerce.number().int().min(1000).max(60000).default(10000),
+  LIFECYCLE_EMAIL_SOCKET_TIMEOUT_MS: z.coerce.number().int().min(1000).max(120000).default(30000),
+  LIFECYCLE_EMAIL_WORKER_POLL_MS: z.coerce.number().int().min(250).max(60000).default(5000),
+  REPORT_STORAGE_DIR: optionalEnv(z.string().min(1)),
+  REPORT_ARTIFACT_EXPIRY_HOURS: z.coerce.number().int().min(1).max(8760).default(168),
+  REPORT_WORKER_POLL_MS: z.coerce.number().int().min(250).max(60000).default(5000),
+  ANALYTICS_SMALL_CELL_THRESHOLD: z.coerce.number().int().min(2).max(20).default(5),
 });
 
 const parsed = schema.safeParse(process.env);
@@ -105,6 +119,12 @@ if (values.ENCRYPTION_KEYRING_JSON) {
 if (Boolean(values.ENCRYPTION_ACTIVE_KEY_ID) !== Boolean(encryptionKeyring)) throw new Error("ENCRYPTION_ACTIVE_KEY_ID and ENCRYPTION_KEYRING_JSON must be configured together");
 if (values.ENCRYPTION_ACTIVE_KEY_ID && !encryptionKeyring[values.ENCRYPTION_ACTIVE_KEY_ID]) throw new Error("ENCRYPTION_ACTIVE_KEY_ID must identify a key in ENCRYPTION_KEYRING_JSON");
 if (values.NODE_ENV === "production" && (!values.ENCRYPTION_ACTIVE_KEY_ID || !encryptionKeyring)) throw new Error("Versioned encryption keyring configuration is required in production");
+const lifecycleEmailEnabled = values.LIFECYCLE_EMAIL_ENABLED === "true";
+const lifecycleRequired = ["LIFECYCLE_EMAIL_FROM", "LIFECYCLE_EMAIL_ALLOWED_SENDERS", "GOOGLE_WORKSPACE_USER", "GOOGLE_WORKSPACE_CLIENT_ID", "GOOGLE_WORKSPACE_CLIENT_SECRET", "GOOGLE_WORKSPACE_REFRESH_TOKEN"];
+if (lifecycleEmailEnabled && lifecycleRequired.some((key) => !values[key])) throw new Error("Google Workspace lifecycle email configuration is incomplete");
+const lifecycleAllowedSenders = (values.LIFECYCLE_EMAIL_ALLOWED_SENDERS || "").split(",").map((value) => value.trim().toLowerCase()).filter(Boolean);
+if (lifecycleEmailEnabled && !lifecycleAllowedSenders.includes(values.LIFECYCLE_EMAIL_FROM.toLowerCase())) throw new Error("LIFECYCLE_EMAIL_FROM must be in LIFECYCLE_EMAIL_ALLOWED_SENDERS");
+if (lifecycleEmailEnabled && values.GOOGLE_WORKSPACE_USER.toLowerCase() !== values.LIFECYCLE_EMAIL_FROM.toLowerCase()) throw new Error("Google Workspace user must match the verified lifecycle sender");
 
 const ephemeralAccessSecret = crypto.randomBytes(48).toString("base64url");
 
@@ -125,4 +145,6 @@ module.exports = Object.freeze({
   encryptionActiveKeyId: values.ENCRYPTION_ACTIVE_KEY_ID || null,
   encryptionKeyring,
   sesSnsTopicArns: (values.SES_SNS_TOPIC_ARNS || "").split(",").map((topic) => topic.trim()).filter(Boolean),
+  lifecycleEmailEnabled,
+  lifecycleAllowedSenders,
 });

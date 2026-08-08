@@ -1,10 +1,9 @@
 const prisma = require("../prisma/prismaClient");
 const AppError = require("../errors/AppError");
 const { createAuditLog } = require("../utils/audit");
+const { requireQueueAccess } = require("./eventAuthorizationService");
 
-const QUEUE_OPERATIONAL_ROLES = ["REGISTRATION_OFFICER", "SCREENER", "EVENT_MANAGER", "ADMINISTRATOR"];
 const ACTIVE_QUEUE_STATUSES = ["WAITING", "CALLED", "IN_PROGRESS"];
-const ACTIVE_ASSIGNMENT_STATUSES = ["ASSIGNED", "CONFIRMED"];
 
 const stationStatus = (station, activeQueueCount = 0) => {
   if (!station.isActive || station.operationalStatus === "OFFLINE") return "OFFLINE";
@@ -43,9 +42,8 @@ const handoffResponse = ({ registration, station, queueEntry, created, stationSt
   },
 });
 
-const requireQueueManagement = async (db, eventId, user) => {
-  const operational = (user.roles || []).some((role) => QUEUE_OPERATIONAL_ROLES.includes(role));
-  if (!operational) throw new AppError(403, "QUEUE_ROLE_REQUIRED", "An operational role is required to manage queues");
+const requireQueueManagement = async (db, eventId, user, stationId = null) => {
+  await requireQueueAccess(eventId, user, { db, stationId });
   const event = await db.event.findUnique({
     where: { eventId },
     select: { eventId: true, name: true, status: true, venue: true },
@@ -58,36 +56,10 @@ const requireQueueManagement = async (db, eventId, user) => {
 };
 
 const requireQueueStationOperation = async (db, eventId, stationId, user) => {
-  if ((user.roles || []).includes("ADMINISTRATOR") || (user.roles || []).includes("EVENT_MANAGER")) {
-    const event = await requireQueueManagement(db, eventId, user);
-    const station = await db.station.findFirst({ where: { stationId, eventId, isActive: true } });
-    if (!station) throw new AppError(404, "STATION_NOT_FOUND", "Station not found for this event");
-    return { event, station };
-  }
-
-  if ((user.roles || []).includes("SCREENER")) {
-    await requireQueueManagement(db, eventId, user);
-    const station = await db.station.findFirst({ where: { stationId, eventId, isActive: true } });
-    if (!station) throw new AppError(404, "STATION_NOT_FOUND", "Station not found for this event");
-    const now = new Date();
-    const assignment = await db.staffAssignment.findFirst({
-      where: {
-        eventId,
-        userId: user.userId,
-        assignmentRole: "SCREENER",
-        status: { in: ACTIVE_ASSIGNMENT_STATUSES },
-        stationId,
-        shift: { eventId, status: "ACTIVE", startsAt: { lte: now }, endsAt: { gt: now } },
-      },
-      select: { id: true },
-    });
-    if (!assignment) {
-      throw new AppError(403, "FORBIDDEN", "You are not assigned to operate this station queue");
-    }
-    return { event: station, station };
-  }
-
-  throw new AppError(403, "QUEUE_ROLE_REQUIRED", "Screener, event manager, or administrator access is required");
+  const authorization = await requireQueueAccess(eventId, user, { db, stationId });
+  const station = await db.station.findFirst({ where: { stationId, eventId, isActive: true } });
+  if (!station) throw new AppError(404, "STATION_NOT_FOUND", "Station not found for this event");
+  return { event: authorization.event, station };
 };
 
 const loadQueueEntry = async (db, queueId) => {
@@ -103,7 +75,7 @@ const loadQueueEntry = async (db, queueId) => {
 };
 
 const joinQueue = async ({ eventId, stationId, registrationId }, user, context = null, db = prisma) => {
-  await requireQueueManagement(db, eventId, user);
+  await requireQueueManagement(db, eventId, user, stationId);
   const station = await db.station.findFirst({ where: { stationId, eventId, isActive: true } });
   if (!station) throw new AppError(404, "STATION_NOT_FOUND", "Station not found for this event");
 
@@ -298,6 +270,11 @@ const getEventQueueStatus = async (eventId, user, db = prisma) => {
 };
 
 const getParticipantQueueStatus = async (eventId, registrationId, user, db = prisma) => {
+  if (!eventId) {
+    const scoped = await db.eventRegistration.findUnique({ where: { registrationId }, select: { eventId: true } });
+    if (!scoped) throw new AppError(404, "REGISTRATION_NOT_FOUND", "Registration not found");
+    eventId = scoped.eventId;
+  }
   await requireQueueManagement(db, eventId, user);
   const registration = await db.eventRegistration.findFirst({ where: { registrationId, eventId } });
   if (!registration) throw new AppError(404, "REGISTRATION_NOT_FOUND", "Registration not found for this event");
@@ -321,8 +298,9 @@ const getParticipantQueueStatus = async (eventId, registrationId, user, db = pri
   };
 };
 
-const callQueueEntry = async (queueId, user, context = null, db = prisma) => {
+const callQueueEntry = async (queueId, user, context = null, db = prisma, expectedEventId = null) => {
   const entry = await loadQueueEntry(db, queueId);
+  if (expectedEventId && entry.registration.eventId !== expectedEventId) throw new AppError(404, "QUEUE_ENTRY_NOT_FOUND", "Queue entry not found for this event");
   await requireQueueStationOperation(db, entry.registration.eventId, entry.stationId, user);
 
   return db.$transaction(async (tx) => {
@@ -349,8 +327,9 @@ const callQueueEntry = async (queueId, user, context = null, db = prisma) => {
   });
 };
 
-const startQueueEntry = async (queueId, user, context = null, db = prisma) => {
+const startQueueEntry = async (queueId, user, context = null, db = prisma, expectedEventId = null) => {
   const entry = await loadQueueEntry(db, queueId);
+  if (expectedEventId && entry.registration.eventId !== expectedEventId) throw new AppError(404, "QUEUE_ENTRY_NOT_FOUND", "Queue entry not found for this event");
   await requireQueueStationOperation(db, entry.registration.eventId, entry.stationId, user);
 
   return db.$transaction(async (tx) => {
@@ -377,8 +356,9 @@ const startQueueEntry = async (queueId, user, context = null, db = prisma) => {
   });
 };
 
-const advanceQueueEntry = async ({ queueId, toStationId, reason = "STATION_TRANSFER" }, user, context = null, db = prisma) => {
+const advanceQueueEntry = async ({ queueId, toStationId, reason = "STATION_TRANSFER", eventId = null }, user, context = null, db = prisma) => {
   const entry = await loadQueueEntry(db, queueId);
+  if (eventId && entry.registration.eventId !== eventId) throw new AppError(404, "QUEUE_ENTRY_NOT_FOUND", "Queue entry not found for this event");
   await requireQueueStationOperation(db, entry.registration.eventId, entry.stationId, user);
   const targetStation = await db.station.findFirst({
     where: { stationId: toStationId, eventId: entry.registration.eventId, isActive: true },
@@ -427,8 +407,9 @@ const advanceQueueEntry = async ({ queueId, toStationId, reason = "STATION_TRANS
   });
 };
 
-const completeQueueEntry = async (queueId, user, context = null, db = prisma) => {
+const completeQueueEntry = async (queueId, user, context = null, db = prisma, expectedEventId = null) => {
   const entry = await loadQueueEntry(db, queueId);
+  if (expectedEventId && entry.registration.eventId !== expectedEventId) throw new AppError(404, "QUEUE_ENTRY_NOT_FOUND", "Queue entry not found for this event");
   await requireQueueStationOperation(db, entry.registration.eventId, entry.stationId, user);
 
   return db.$transaction(async (tx) => {
@@ -473,8 +454,9 @@ const completeQueueEntry = async (queueId, user, context = null, db = prisma) =>
   });
 };
 
-const skipQueueEntry = async (queueId, user, context = null, db = prisma) => {
+const skipQueueEntry = async (queueId, user, context = null, db = prisma, expectedEventId = null) => {
   const entry = await loadQueueEntry(db, queueId);
+  if (expectedEventId && entry.registration.eventId !== expectedEventId) throw new AppError(404, "QUEUE_ENTRY_NOT_FOUND", "Queue entry not found for this event");
   await requireQueueStationOperation(db, entry.registration.eventId, entry.stationId, user);
 
   return db.$transaction(async (tx) => {
@@ -501,8 +483,9 @@ const skipQueueEntry = async (queueId, user, context = null, db = prisma) => {
   });
 };
 
-const leaveQueue = async (queueId, user, context = null, db = prisma) => {
+const leaveQueue = async (queueId, user, context = null, db = prisma, expectedEventId = null) => {
   const entry = await loadQueueEntry(db, queueId);
+  if (expectedEventId && entry.registration.eventId !== expectedEventId) throw new AppError(404, "QUEUE_ENTRY_NOT_FOUND", "Queue entry not found for this event");
   await requireQueueStationOperation(db, entry.registration.eventId, entry.stationId, user);
 
   return db.$transaction(async (tx) => {

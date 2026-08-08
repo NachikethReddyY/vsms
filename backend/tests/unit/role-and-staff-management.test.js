@@ -7,6 +7,7 @@ process.env.DATABASE_URL ||= "postgresql://test:test@localhost:5432/vsms_test";
 const prisma = require("../../prisma/prismaClient");
 const userService = require("../../services/userService");
 const { rolesFromCognitoGroups } = require("../../utils/roles");
+const { updateUserBody } = require("../../schemas/userSchemas");
 
 const syncedAccess = (overrides = {}) => async () => ({
   managed: true,
@@ -41,9 +42,10 @@ test("legacy ADMIN Cognito group grants the canonical administrator application 
   );
 });
 
-test("staff management blocks self-demotion and self-deactivation", async (t) => {
+test("staff management blocks self-demotion and rejects lifecycle fields", async (t) => {
   const current = administrator();
   useTransaction(t, {
+    $executeRaw: async () => {},
     user: { findUnique: async () => current },
   });
 
@@ -51,42 +53,47 @@ test("staff management blocks self-demotion and self-deactivation", async (t) =>
     userService.updateUser(current.id, { roles: ["EVENT_MANAGER"] }, current.id, {}),
     (error) => error.code === "SELF_ADMIN_CHANGE_BLOCKED",
   );
-  await assert.rejects(
-    userService.updateUser(current.id, { status: "INACTIVE" }, current.id, {}),
-    (error) => error.code === "SELF_ADMIN_CHANGE_BLOCKED",
-  );
+  assert.equal(updateUserBody.safeParse({ status: "INACTIVE" }).success, false);
 });
 
 test("staff management keeps one active administrator", async (t) => {
   const current = administrator();
+  const calls = [];
   useTransaction(t, {
+    $executeRaw: async () => { calls.push("lock"); },
     user: {
       findUnique: async () => current,
-      count: async () => 1,
+      count: async () => { calls.push("count"); return 1; },
     },
+    role: { findMany: async () => [{ id: crypto.randomUUID(), roleName: "REVIEWER" }] },
   });
 
   await assert.rejects(
-    userService.updateUser(current.id, { status: "INACTIVE" }, crypto.randomUUID(), {}),
+    userService.updateUser(current.id, { roles: ["REVIEWER"] }, crypto.randomUUID(), {}, syncedAccess()),
     (error) => error.code === "LAST_ADMIN_CHANGE_BLOCKED",
   );
+  assert.deepEqual(calls, ["lock", "lock", "count"]);
 });
 
-test("staff management records an audited role and status update", async (t) => {
+test("staff management locks, commits, and only then synchronizes Cognito roles", async (t) => {
   const current = administrator();
   const reviewerRoleId = crypto.randomUUID();
   const updated = {
     ...current,
-    status: "INACTIVE",
+    status: "ACTIVE",
     sysRole: "STAFF",
     userRoles: [{ role: { id: reviewerRoleId, roleName: "REVIEWER" } }],
   };
   const calls = [];
   useTransaction(t, {
+    $executeRaw: async () => { calls.push(["admin.lock"]); },
     user: {
       findUnique: async () => current,
       count: async () => 2,
-      update: async (input) => { calls.push(["user.update", input]); return updated; },
+      update: async (input) => {
+        calls.push(["user.update", input]);
+        return input.select?.providerStateGeneration ? { providerStateGeneration: 1 } : updated;
+      },
     },
     role: { findMany: async () => [{ id: reviewerRoleId, roleName: "REVIEWER" }] },
     userRole: {
@@ -94,19 +101,31 @@ test("staff management records an audited role and status update", async (t) => 
       createMany: async (input) => { calls.push(["userRole.createMany", input]); },
     },
     auditLog: { create: async (input) => { calls.push(["auditLog.create", input]); } },
+    accountProviderOperation: {
+      updateMany: async () => {},
+      findUnique: async () => null,
+      create: async () => ({ id: "provider-operation", generation: 1 }),
+    },
   });
 
+  const provider = async () => {
+    calls.push(["cognito.sync"]);
+    return { managed: true, cognitoSub: null, compensate: async () => {} };
+  };
   const result = await userService.updateUser(current.id, {
     roles: ["REVIEWER"],
-    status: "INACTIVE",
-  }, crypto.randomUUID(), { requestId: crypto.randomUUID() }, syncedAccess());
+  }, crypto.randomUUID(), { requestId: crypto.randomUUID() }, provider, async (_id, options) => {
+    assert.equal(options.synchronize, provider);
+    calls.push(["cognito.sync"]);
+  });
 
   assert.deepEqual(result.roles, ["REVIEWER"]);
-  assert.equal(result.status, "INACTIVE");
+  assert.equal(result.status, "ACTIVE");
+  assert.ok(calls.findIndex(([name]) => name === "user.update") < calls.findIndex(([name]) => name === "cognito.sync"));
   assert.equal(calls.find(([name]) => name === "auditLog.create")[1].data.action, "STAFF_ACCOUNT_UPDATED");
 });
 
-test("staff creation synchronizes Cognito before committing the local account", async (t) => {
+test("staff creation commits an outbox operation before synchronizing Cognito", async (t) => {
   const actorId = crypto.randomUUID();
   const roleId = crypto.randomUUID();
   const cognitoSub = crypto.randomUUID();
@@ -125,12 +144,18 @@ test("staff creation synchronizes Cognito before committing the local account", 
     userRoles: [{ role: { id: roleId, roleName: "SUPPORT" } }],
   };
   useTransaction(t, {
+    $executeRaw: async () => ({}),
     user: {
       findUnique: async () => null,
       create: async (input) => { calls.push(["user.create", input]); return created; },
+      update: async () => ({ providerStateGeneration: 1 }),
     },
     role: { findMany: async () => [{ id: roleId, roleName: "SUPPORT" }] },
     auditLog: { create: async (input) => { calls.push(["auditLog.create", input]); } },
+    accountProviderOperation: {
+      findUnique: async () => null,
+      create: async (input) => { calls.push(["providerOperation.create", input]); return { id: "provider-operation", generation: 1 }; },
+    },
   });
   const provider = async (input) => {
     calls.push(["cognito.sync", input]);
@@ -145,44 +170,59 @@ test("staff creation synchronizes Cognito before committing the local account", 
     designation: null,
     status: "ACTIVE",
     roles: ["SUPPORT"],
-  }, actorId, {}, provider);
+  }, actorId, {}, provider, async (_id, options) => {
+    assert.equal(options.synchronize, provider);
+    calls.push(["cognito.sync"]);
+  });
 
-  assert.deepEqual(calls[0], ["cognito.sync", { email: created.email, roles: ["SUPPORT"], status: "ACTIVE" }]);
-  assert.equal(calls.find(([name]) => name === "user.create")[1].data.cognitoSub, cognitoSub);
+  assert.ok(calls.findIndex(([name]) => name === "providerOperation.create") < calls.findIndex(([name]) => name === "cognito.sync"));
+  assert.equal(calls.find(([name]) => name === "user.create")[1].data.cognitoSub, undefined);
   assert.equal(calls.some(([name]) => name === "cognito.compensate"), false);
   assert.deepEqual(result.roles, ["SUPPORT"]);
   assert.equal(result.cognitoSub, undefined);
 });
 
-test("staff role updates do not mutate local roles when Cognito synchronization fails", async (t) => {
+test("staff role updates remain committed when post-commit provider processing fails", async (t) => {
   const current = administrator();
   const calls = [];
   useTransaction(t, {
+    $executeRaw: async () => ({}),
     user: {
       findUnique: async () => current,
       count: async () => 2,
-      update: async () => { calls.push(["user.update"]); return current; },
+      update: async (input) => {
+        calls.push(["user.update"]);
+        return input.select?.providerStateGeneration ? { providerStateGeneration: 1 } : current;
+      },
     },
     role: { findMany: async () => [{ id: crypto.randomUUID(), roleName: "REVIEWER" }] },
     userRole: {
       deleteMany: async () => { calls.push(["userRole.deleteMany"]); },
       createMany: async () => { calls.push(["userRole.createMany"]); },
     },
+    auditLog: { create: async () => { calls.push(["auditLog.create"]); } },
+    accountProviderOperation: {
+      updateMany: async () => {},
+      findUnique: async () => null,
+      create: async () => ({ id: "provider-operation", generation: 1 }),
+    },
   });
 
   await assert.rejects(
-    userService.updateUser(current.id, { roles: ["REVIEWER"] }, crypto.randomUUID(), {}, async () => {
+    userService.updateUser(current.id, { roles: ["REVIEWER"] }, crypto.randomUUID(), {}, syncedAccess(), async () => {
       throw new Error("Cognito unavailable");
     }),
     /Cognito unavailable/,
   );
-  assert.deepEqual(calls, []);
+  assert.ok(calls.some(([name]) => name === "user.update"));
+  assert.ok(calls.some(([name]) => name === "auditLog.create"));
 });
 
-test("staff role updates compensate Cognito when the local transaction fails", async (t) => {
+test("staff role updates never call Cognito when the database transaction fails", async (t) => {
   const current = administrator();
-  let compensated = 0;
+  let providerCalls = 0;
   useTransaction(t, {
+    $executeRaw: async () => ({}),
     user: {
       findUnique: async () => current,
       count: async () => 2,
@@ -196,10 +236,26 @@ test("staff role updates compensate Cognito when the local transaction fails", a
   });
 
   await assert.rejects(
-    userService.updateUser(current.id, { roles: ["REVIEWER"] }, crypto.randomUUID(), {}, syncedAccess({
-      compensate: async () => { compensated += 1; },
-    })),
+    userService.updateUser(current.id, { roles: ["REVIEWER"] }, crypto.randomUUID(), {}, syncedAccess(), async () => {
+      providerCalls += 1;
+    }),
     /Database write failed/,
   );
-  assert.equal(compensated, 1);
+  assert.equal(providerCalls, 0);
+});
+
+test("authoritative unique-field conflicts return an account conflict", async (t) => {
+  const current = administrator();
+  useTransaction(t, {
+    $executeRaw: async () => {},
+    user: {
+      findUnique: async () => current,
+      update: async () => { throw Object.assign(new Error("duplicate"), { code: "P2002" }); },
+    },
+  });
+
+  await assert.rejects(
+    userService.updateUser(current.id, { employeeNumber: "DUPLICATE" }, current.id, {}),
+    (error) => error.status === 409 && error.code === "ACCOUNT_FIELD_CONFLICT",
+  );
 });

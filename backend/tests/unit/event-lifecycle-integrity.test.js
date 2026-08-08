@@ -6,7 +6,7 @@ const { createEventBody } = require("../../schemas/eventSchemas");
 const eventId = "11111111-1111-4111-8111-111111111111";
 const userId = "22222222-2222-4222-8222-222222222222";
 const requestId = "33333333-3333-4333-8333-333333333333";
-const user = { userId, systemRole: "EVENT_MANAGER" };
+const user = { userId, systemRole: "ADMIN", roles: ["ADMINISTRATOR"], status: "ACTIVE", approvalState: "APPROVED", accessState: "ENABLED" };
 
 function eventRecord(status, version, shifts = []) {
   return {
@@ -29,6 +29,7 @@ function eventRecord(status, version, shifts = []) {
     shifts,
     registrations: [],
     _count: { registrations: 0 },
+    memberships: [{ userId, roles: [{ role: "EVENT_MANAGER" }] }],
   };
 }
 
@@ -158,6 +159,8 @@ test("event creation persists the selected event days", async () => {
     station: { findMany: async () => [] },
     shift: { findMany: async () => [] },
     staffAssignment: { findMany: async () => [] },
+    user: { count: async () => 1 },
+    eventMembership: { create: async () => ({ id: "77777777-7777-4777-8777-777777777777" }) },
     stationTemplate: { findMany: async () => [] },
     eventAuditLog: { create: async () => ({}) },
     auditLog: { create: async () => ({}) },

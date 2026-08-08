@@ -7,6 +7,7 @@ const PARTICIPANT_STATUSES = new Set(["ACTIVE", "INACTIVE", "DECEASED"]);
 const CONTACT_STATUSES = new Set(["ACTIVE", "REMOVED"]);
 const CONSENT_STATUSES = new Set(["ACCEPTED", "DECLINED"]);
 const SIGNER_TYPES = new Set(["PARTICIPANT", "PARENT", "GUARDIAN", "AUTHORISED_REPRESENTATIVE"]);
+const NRIC_PATTERN = /^[STFGM]\d{7}[A-Z]$/;
 
 function validationError(message, details = null) {
     const error = new Error(message);
@@ -56,6 +57,20 @@ function cleanDateOfBirth(value) {
     return date;
 }
 
+function maskNric(value) {
+    const nric = String(value || "").replace(/[\s-]/g, "").toUpperCase();
+    if (!NRIC_PATTERN.test(nric)) return null;
+    return `•••••${nric.slice(-4)}`;
+}
+
+function cleanNric(value, { required = false } = {}) {
+    const raw = cleanString(value, "nric", { required, max: 16 });
+    if (!raw) return { nric: null, nricMasked: null };
+    const nric = raw.replace(/[\s-]/g, "").toUpperCase();
+    if (!NRIC_PATTERN.test(nric)) throw validationError("nric must be a valid NRIC or FIN");
+    return { nric, nricMasked: maskNric(nric) };
+}
+
 function validateParticipantPayload(payload, { partial = false } = {}) {
     const result = {};
     const has = (field) => Object.prototype.hasOwnProperty.call(payload, field);
@@ -71,7 +86,13 @@ function validateParticipantPayload(payload, { partial = false } = {}) {
     }
 
     if (!partial || has("contactNumber")) result.contactNumber = cleanPhone(payload.contactNumber, "contactNumber", true);
+    if (!partial || has("nric")) Object.assign(result, cleanNric(payload.nric, { required: true }));
     if (has("email")) result.email = cleanEmail(payload.email);
+    if (has("race")) result.race = cleanString(payload.race, "race", { max: 50 });
+    if (has("nationality")) result.nationality = cleanString(payload.nationality, "nationality", { max: 50 });
+    if (has("addressStreet")) result.addressStreet = cleanString(payload.addressStreet, "addressStreet", { max: 255 });
+    if (has("addressUnit")) result.addressUnit = cleanString(payload.addressUnit, "addressUnit", { max: 20 });
+    if (has("addressPostalCode")) result.addressPostalCode = cleanString(payload.addressPostalCode, "addressPostalCode", { max: 10 });
     if (has("preferredLanguage")) result.preferredLanguage = cleanString(payload.preferredLanguage, "preferredLanguage", { max: 50 });
     if (has("accessibilityNotes")) result.accessibilityNotes = cleanString(payload.accessibilityNotes, "accessibilityNotes", { max: 1000 });
 
@@ -155,6 +176,8 @@ function validateIdempotencyKey(value) {
 module.exports = {
     assertUuid,
     cleanString,
+    cleanNric,
+    maskNric,
     parsePositiveInt,
     validateParticipantPayload,
     validateEmergencyContactPayload,

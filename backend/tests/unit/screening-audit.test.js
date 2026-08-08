@@ -10,7 +10,7 @@ const screeningService = require("../../services/screeningService");
 const eventId = crypto.randomUUID();
 const stationId = crypto.randomUUID();
 const registrationId = crypto.randomUUID();
-const user = { userId: crypto.randomUUID(), systemRole: "STAFF", roles: ["SCREENER"] };
+const user = { userId: crypto.randomUUID(), systemRole: "STAFF", roles: ["SCREENER"], status: "ACTIVE", approvalState: "APPROVED", accessState: "ENABLED" };
 const context = {
   requestId: crypto.randomUUID(),
   deviceId: null,
@@ -38,6 +38,7 @@ function replace(t, target, key, value) {
 }
 
 function installSuccessMocks(t, audits) {
+  replace(t, prisma.eventMembership, "findFirst", async () => ({ id: crypto.randomUUID(), eventId, userId: user.userId, status: "ACTIVE", roles: [{ role: "SCREENER" }], user }));
   replace(t, prisma.event, "findUnique", async () => ({ eventId, name: "Live", status: "IN_PROGRESS", venue: "Hall" }));
   replace(t, prisma.staffAssignment, "findFirst", async () => ({ id: crypto.randomUUID() }));
   replace(t, prisma.station, "findFirst", async ({ where }) => ({ ...where, stationName: "Visual Acuity" }));
@@ -92,6 +93,7 @@ test("screening audit is not emitted on an idempotent replay", async (t) => {
     }),
     resultSnapshot: { resultId: crypto.randomUUID(), resultData: body.resultData, version: 1 },
   };
+  replace(t, prisma.eventMembership, "findFirst", async () => ({ id: crypto.randomUUID(), eventId, userId: user.userId, status: "ACTIVE", roles: [{ role: "SCREENER" }], user }));
   replace(t, prisma.event, "findUnique", async () => ({ eventId, name: "Live", status: "IN_PROGRESS", venue: "Hall" }));
   replace(t, prisma.staffAssignment, "findFirst", async () => ({ id: crypto.randomUUID() }));
   replace(t, prisma.station, "findFirst", async ({ where }) => ({ ...where, stationName: "Visual Acuity" }));

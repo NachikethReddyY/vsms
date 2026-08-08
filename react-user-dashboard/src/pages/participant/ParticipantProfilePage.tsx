@@ -12,6 +12,14 @@ import "./ParticipantPage.css";
 import "./ParticipantProfilePage.css";
 import "./ParticipantProfileMarkers.css";
 
+function displayGender(value: string) {
+  return ({ M: "Male", F: "Female", O: "Other", U: "Prefer not to say" } as Record<string, string>)[value] ?? value;
+}
+
+function displayAddress(participant: Participant) {
+  const street = [participant.addressStreet, participant.addressUnit].filter(Boolean).join(" ");
+  return [street, participant.addressPostalCode].filter(Boolean).join(", ") || "Not recorded";
+}
 type ConsentRecord = {
   id: string;
   consentStatus: string;
@@ -90,8 +98,22 @@ export default function ParticipantProfilePage() {
         <dl className="participant-v2-profile-facts"><div><dt>Participant reference</dt><dd>{participant.participantReference}</dd></div><div><dt>Registrations</dt><dd>{registrations.length}</dd></div><div><dt>Preferred language</dt><dd>{participant.preferredLanguage ?? "Not recorded"}</dd></div></dl>
       </header>
       <section className="participant-v2-profile-card" aria-label="Participant profile">
-        <div className="participant-v2-profile-actions"><Link className="secondary" to={`/participants/${participantId}/edit${eventId ? `?eventId=${encodeURIComponent(eventId)}` : ""}`}>Edit participant details</Link><Link className="primary" to={eventId ? qrLink : backLink}>{eventId ? (registrationForEvent ? "View QR pass" : "Register for event") : "Choose an event"} <ArrowRightIcon /></Link></div>
-        <section className="participant-v2-profile-details" aria-label="Participant details"><div><span>Date of birth</span><strong>{displayDate(participant.dateOfBirth)}</strong></div><div><span>Contact number</span><strong>{participant.contactNumber}</strong></div><div><span>Email address</span><strong>{participant.email ?? "Not recorded"}</strong></div><div><span>Accessibility notes</span><strong>{participant.accessibilityNotes ?? "None recorded"}</strong></div></section>
+        <div className="participant-v2-profile-actions">
+          <Link className="secondary" to={`/participants/${participantId}/edit${eventId ? `?eventId=${encodeURIComponent(eventId)}` : ""}`}>Edit participant details</Link>
+          <Link className="primary" to={eventId ? qrLink : backLink}>{eventId ? (registrationForEvent ? "View QR pass" : "Register for event") : "Choose an event"} <ArrowRightIcon /></Link>
+        </div>
+
+        <section className="participant-v2-profile-details" aria-label="Participant details">
+          <div><span>Date of birth</span><strong>{displayDate(participant.dateOfBirth)}</strong></div>
+          <div><span>Contact number</span><strong>{participant.contactNumber}</strong></div>
+          <div><span>NRIC / FIN</span><strong>{participant.nricMasked ?? "Not recorded"}</strong></div>
+          <div><span>Email address</span><strong>{participant.email ?? "Not recorded"}</strong></div>
+          <div><span>Gender</span><strong>{displayGender(participant.gender)}</strong></div>
+          <div><span>Race</span><strong>{participant.race ?? "Not recorded"}</strong></div>
+          <div><span>Nationality</span><strong>{participant.nationality ?? "Not recorded"}</strong></div>
+          <div className="participant-v2-profile-address"><span>Address</span><strong>{displayAddress(participant)}</strong></div>
+          <div><span>Accessibility notes</span><strong>{participant.accessibilityNotes ?? "None recorded"}</strong></div>
+        </section>
         <div className="participant-v2-profile-summary">
           <article className={primaryContact ? "complete" : "missing"}><PhoneIcon /><div><span>Emergency contact</span>{!primaryContact ? <em className="participant-v2-profile-required">Required</em> : null}<h2>{primaryContact ? primaryContact.contactName : "Not recorded"}</h2><p>{primaryContact ? `${primaryContact.relationship} - ${primaryContact.phoneNumber}` : "Add a primary emergency contact before completing registration."}</p><Link to={`/participants/${participantId}/emergency-contacts${eventId ? `?eventId=${encodeURIComponent(eventId)}` : ""}`}>{primaryContact ? "Manage contacts" : "Add emergency contact"} <ArrowRightIcon /></Link></div></article>
           <article className={consentMissing ? "missing" : "complete"}><ClipboardDocumentCheckIcon /><div><span>Consent status</span>{consentMissing ? <em className="participant-v2-profile-required">Required</em> : null}<h2 className={`participant-v2-consent-status ${consentStatusClass}`}>{consentStatus}</h2><p>{!eventId ? "Select an event to see the consent record for that event." : consentWithdrawn ? "This consent was withdrawn. A new consent record is required before this participant can be registered for the selected event." : latestEventConsent ? `Version ${latestEventConsent.consentFormVersion.versionNumber} recorded ${displayDate(latestEventConsent.createdAt)}.` : "Consent is required before this participant can be registered for the selected event."}</p>{eventId ? consentMissing ? <Link to={`/participants/${participantId}/consent?eventId=${encodeURIComponent(eventId)}`}>Record consent <ArrowRightIcon /></Link> : <Link to={`/participants/${participantId}/consents?eventId=${encodeURIComponent(eventId)}`}>View consent history <ArrowRightIcon /></Link> : <Link to={backLink}>Choose an event <ArrowRightIcon /></Link>}</div></article>

@@ -1,7 +1,9 @@
-import { ArrowLeftIcon, CalendarDaysIcon, EnvelopeIcon, ExclamationTriangleIcon, PhoneIcon, UserPlusIcon } from "@heroicons/react/24/outline";
+import { ArrowLeftIcon, CalendarDaysIcon, EnvelopeIcon, ExclamationTriangleIcon, UserPlusIcon } from "@heroicons/react/24/outline";
 import { useState, type FormEvent } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
+import { PhoneInput } from "../../components/PhoneInput";
 import apiClient, { getApiError } from "../../utils/apiClient";
+import { isValidParticipantNric, isValidParticipantPhoneNumber } from "../../utils/phone";
 import "./ParticipantPage.css";
 import "./ParticipantCreatePage.css";
 
@@ -11,12 +13,17 @@ type ParticipantForm = {
   dateOfBirth: string;
   gender: string;
   contactNumber: string;
+  nric: string;
   email: string;
+  race: string;
+  nationality: string;
+  addressStreet: string;
+  addressUnit: string;
+  addressPostalCode: string;
   preferredLanguage: string;
   accessibilityNotes: string;
 };
 
-const phonePattern = /^\+?[0-9][0-9\s-]{6,19}$/;
 const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 export default function ParticipantCreatePage() {
@@ -32,7 +39,13 @@ export default function ParticipantCreatePage() {
     dateOfBirth: searchParams.get("dateOfBirth") ?? "",
     gender: searchParams.get("gender") ?? "U",
     contactNumber: searchParams.get("contactNumber") ?? "",
+    nric: "",
     email: searchParams.get("email") ?? "",
+    race: "",
+    nationality: "Singaporean",
+    addressStreet: "",
+    addressUnit: "",
+    addressPostalCode: "",
     preferredLanguage: searchParams.get("preferredLanguage") ?? "English",
     accessibilityNotes: searchParams.get("accessibilityNotes") ?? "",
   });
@@ -51,7 +64,8 @@ export default function ParticipantCreatePage() {
     if (!form.lastName.trim()) return "Last name is required.";
     if (!form.dateOfBirth) return "Date of birth is required.";
     if (form.dateOfBirth > new Date().toISOString().slice(0, 10)) return "Date of birth cannot be in the future.";
-    if (!phonePattern.test(form.contactNumber.trim())) return "Enter a valid contact number.";
+    if (!isValidParticipantPhoneNumber(form.contactNumber)) return "Enter a valid contact number.";
+    if (!isValidParticipantNric(form.nric)) return "Enter a valid NRIC or FIN.";
     if (form.email.trim() && !emailPattern.test(form.email.trim())) return "Enter a valid email address.";
     return null;
   }
@@ -109,15 +123,26 @@ export default function ParticipantCreatePage() {
               <label><span>Last name <b>*</b></span><input value={form.lastName} onChange={(event) => update("lastName", event.target.value)} maxLength={100} autoComplete="family-name" /></label>
               <label><span>Date of birth <b>*</b></span><span className="participant-v2-create-input-icon"><CalendarDaysIcon /><input type="date" value={form.dateOfBirth} max={latestDateOfBirth} onChange={(event) => update("dateOfBirth", event.target.value)} /></span></label>
               <label><span>Gender <b>*</b></span><select value={form.gender} onChange={(event) => update("gender", event.target.value)}><option value="U">Prefer not to say</option><option value="M">Male</option><option value="F">Female</option><option value="O">Other</option></select></label>
+              <label><span>NRIC / FIN <b>*</b></span><input value={form.nric} onChange={(event) => update("nric", event.target.value)} maxLength={16} autoComplete="off" spellCheck={false} placeholder="S1234567A" /></label>
             </div>
           </section>
           <section className="participant-v2-create-section">
             <header><h2>Contact and support</h2><p>These details can be updated from the participant profile.</p></header>
             <div className="participant-v2-create-grid">
-              <label><span>Contact number <b>*</b></span><span className="participant-v2-create-input-icon"><PhoneIcon /><input value={form.contactNumber} onChange={(event) => update("contactNumber", event.target.value)} maxLength={30} autoComplete="tel" placeholder="e.g. +65 9123 4567" /></span></label>
+              <label><span>Contact number <b>*</b></span><PhoneInput value={form.contactNumber} onChange={(value) => update("contactNumber", value)} /></label>
               <label><span>Email <small>optional</small></span><span className="participant-v2-create-input-icon"><EnvelopeIcon /><input type="email" value={form.email} onChange={(event) => update("email", event.target.value)} maxLength={255} autoComplete="email" placeholder="name@example.com" /></span></label>
               <label><span>Preferred language</span><input value={form.preferredLanguage} onChange={(event) => update("preferredLanguage", event.target.value)} maxLength={50} /></label>
               <label className="participant-v2-create-notes"><span>Accessibility notes <small>optional</small></span><textarea value={form.accessibilityNotes} onChange={(event) => update("accessibilityNotes", event.target.value)} maxLength={1000} placeholder="Communication or access needs" /></label>
+            </div>
+          </section>
+          <section className="participant-v2-create-section">
+            <header><h2>Additional details</h2><p>Optional identity and address information for the participant profile.</p></header>
+            <div className="participant-v2-create-grid">
+              <label><span>Race <small>optional</small></span><input value={form.race} onChange={(event) => update("race", event.target.value)} maxLength={50} /></label>
+              <label><span>Nationality <small>optional</small></span><input value={form.nationality} onChange={(event) => update("nationality", event.target.value)} maxLength={50} autoComplete="country-name" /></label>
+              <label className="participant-v2-create-address"><span>Street address <small>optional</small></span><input value={form.addressStreet} onChange={(event) => update("addressStreet", event.target.value)} maxLength={255} autoComplete="street-address" /></label>
+              <label><span>Unit number <small>optional</small></span><input value={form.addressUnit} onChange={(event) => update("addressUnit", event.target.value)} maxLength={20} autoComplete="address-line2" placeholder="#01-01" /></label>
+              <label><span>Postal code <small>optional</small></span><input value={form.addressPostalCode} onChange={(event) => update("addressPostalCode", event.target.value)} maxLength={10} autoComplete="postal-code" /></label>
             </div>
           </section>
           <footer className="participant-v2-create-actions"><p><ExclamationTriangleIcon /> Continue only when the match check returned no existing participant.</p><div><Link className="secondary" to={searchLink}>Cancel</Link><button className="primary" type="submit" disabled={submitting}>{submitting ? "Saving participant..." : "Save participant details"}</button></div></footer>

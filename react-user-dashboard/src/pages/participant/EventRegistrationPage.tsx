@@ -10,13 +10,15 @@ import {
 } from "@heroicons/react/24/outline";
 import { useEffect, useState, type FormEvent } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
+import { PhoneInput } from "../../components/PhoneInput";
 import apiClient, { getApiError } from "../../utils/apiClient";
+import { isValidParticipantNric, isValidParticipantPhoneNumber } from "../../utils/phone";
 import "./ParticipantPage.css";
 import "./ParticipantCreatePage.css";
 import "./EventRegistrationPage.css";
 
 type EventSummary = { id: string; eventName: string; location?: string; eventDate?: string };
-type ParticipantForm = { firstName: string; lastName: string; dateOfBirth: string; gender: string; contactNumber: string; email: string; preferredLanguage: string; accessibilityNotes: string };
+type ParticipantForm = { firstName: string; lastName: string; dateOfBirth: string; gender: string; contactNumber: string; nric: string; email: string; race: string; nationality: string; addressStreet: string; addressUnit: string; addressPostalCode: string; preferredLanguage: string; accessibilityNotes: string };
 type CurrentRegistration = { id: string; queueNumber: number | null; status: string; assignedBooth: string | null };
 type RegistrationMatch = {
   participant: { id: string; participantReference: string; firstName: string; lastName: string; dateOfBirth: string; maskedContactNumber: string; preferredLanguage: string | null };
@@ -26,8 +28,6 @@ type RegistrationMatch = {
 };
 type MatchResponse = { result: "NO_MATCH" | "POSSIBLE_MATCH" | "ALREADY_REGISTERED"; matches: RegistrationMatch[] };
 type DialogView = "match" | "details" | "registered" | null;
-
-const phonePattern = /^\+?[0-9][0-9\s-]{6,19}$/;
 
 function initials(match: RegistrationMatch) {
   return `${match.participant.firstName[0] ?? ""}${match.participant.lastName[0] ?? ""}`.toUpperCase() || "P";
@@ -47,10 +47,11 @@ export default function EventRegistrationPage() {
   const [event, setEvent] = useState<EventSummary | null>(null);
   const [eventLoading, setEventLoading] = useState(true);
   const [eventError, setEventError] = useState<string | null>(null);
-  const [form, setForm] = useState<ParticipantForm>({ firstName: "", lastName: "", dateOfBirth: "", gender: "U", contactNumber: "", email: "", preferredLanguage: "English", accessibilityNotes: "" });
+  const [form, setForm] = useState<ParticipantForm>({ firstName: "", lastName: "", dateOfBirth: "", gender: "U", contactNumber: "", nric: "", email: "", race: "", nationality: "Singaporean", addressStreet: "", addressUnit: "", addressPostalCode: "", preferredLanguage: "English", accessibilityNotes: "" });
   const [error, setError] = useState<string | null>(null);
   const [checking, setChecking] = useState(false);
   const [creating, setCreating] = useState(false);
+  const [reusing, setReusing] = useState(false);
   const [matches, setMatches] = useState<RegistrationMatch[]>([]);
   const [dialogView, setDialogView] = useState<DialogView>(null);
   const [selectedMatch, setSelectedMatch] = useState<RegistrationMatch | null>(null);
@@ -79,7 +80,8 @@ export default function EventRegistrationPage() {
     if (!form.firstName.trim() || !form.lastName.trim()) return "Enter the participant's full name to check for a match.";
     if (!form.dateOfBirth) return "Date of birth is required to check for a match.";
     if (form.dateOfBirth > latestDateOfBirth) return "Date of birth cannot be in the future.";
-    if (!phonePattern.test(form.contactNumber.trim())) return "Enter a valid contact number to check for a match.";
+    if (!isValidParticipantPhoneNumber(form.contactNumber)) return "Enter a valid contact number to check for a match.";
+    if (!isValidParticipantNric(form.nric)) return "Enter a valid NRIC or FIN to check for a match.";
     return null;
   }
 
@@ -91,7 +93,7 @@ export default function EventRegistrationPage() {
     setError(null);
     try {
       const { data } = await apiClient.post<MatchResponse>("/participants/match", {
-        firstName: form.firstName.trim(), lastName: form.lastName.trim(), dateOfBirth: form.dateOfBirth, contactNumber: form.contactNumber.trim(),
+        firstName: form.firstName.trim(), lastName: form.lastName.trim(), dateOfBirth: form.dateOfBirth, contactNumber: form.contactNumber.trim(), nric: form.nric,
       }, { headers: { "X-Event-Id": eventId } });
       setMatches(data.matches);
       if (data.result === "NO_MATCH") {
@@ -127,15 +129,39 @@ export default function EventRegistrationPage() {
     setDialogView("details");
   }
 
-  function selectExistingParticipant(match: RegistrationMatch) {
+  async function selectExistingParticipant(match: RegistrationMatch) {
     setSelectedMatch(match);
     if (match.currentEventRegistration) {
       setDialogView("registered");
       return;
     }
-    navigate(`/participants/${match.participant.id}/edit?eventId=${encodeURIComponent(eventId)}`, {
-      state: { registrationDraft: form },
-    });
+    setReusing(true);
+    setError(null);
+    try {
+      const { data } = await apiClient.post<{ outcome: "ATTACHED" | "ALREADY_REGISTERED"; registrationId?: string }>(
+        `/participants/${match.participant.id}/reuse`,
+        {
+          firstName: form.firstName.trim(),
+          lastName: form.lastName.trim(),
+          dateOfBirth: form.dateOfBirth,
+          contactNumber: form.contactNumber.trim(),
+          nric: form.nric,
+        },
+        { headers: { "X-Event-Id": eventId } },
+      );
+      if (data.outcome === "ALREADY_REGISTERED") {
+        setDialogView("registered");
+        return;
+      }
+      const registrationDraft = Object.fromEntries(Object.entries(form).filter(([field]) => field !== "nric"));
+      navigate(`/participants/${match.participant.id}/edit?eventId=${encodeURIComponent(eventId)}`, {
+        state: { registrationDraft },
+      });
+    } catch (requestError: unknown) {
+      setError(getApiError(requestError, "Unable to attach this participant to the current event."));
+    } finally {
+      setReusing(false);
+    }
   }
 
   if (eventLoading) return <section className="participant-v2-page participant-v2-create"><p className="participant-v2-profile-loading">Loading event...</p></section>;
@@ -155,12 +181,20 @@ export default function EventRegistrationPage() {
             <label><span>Last name <b>*</b></span><input value={form.lastName} onChange={(input) => update("lastName", input.target.value)} maxLength={100} autoComplete="family-name" /></label>
             <label><span>Date of birth <b>*</b></span><span className="participant-v2-create-input-icon"><CalendarDaysIcon /><input type="date" value={form.dateOfBirth} max={latestDateOfBirth} onChange={(input) => update("dateOfBirth", input.target.value)} /></span></label>
             <label><span>Gender <b>*</b></span><select value={form.gender} onChange={(input) => update("gender", input.target.value)}><option value="U">Prefer not to say</option><option value="M">Male</option><option value="F">Female</option><option value="O">Other</option></select></label>
+            <label><span>NRIC / FIN <b>*</b></span><input value={form.nric} onChange={(input) => update("nric", input.target.value)} maxLength={16} autoComplete="off" spellCheck={false} placeholder="S1234567A" /></label>
           </div></section>
           <section className="participant-v2-create-section"><header><h2>Contact and support</h2><p>These details are retained if you continue as a new participant.</p></header><div className="participant-v2-create-grid">
-            <label><span>Contact number <b>*</b></span><span className="participant-v2-create-input-icon"><PhoneIcon /><input value={form.contactNumber} onChange={(input) => update("contactNumber", input.target.value)} maxLength={30} autoComplete="tel" placeholder="e.g. +65 9123 4567" /></span></label>
+            <label><span>Contact number <b>*</b></span><PhoneInput value={form.contactNumber} onChange={(value) => update("contactNumber", value)} /></label>
             <label><span>Email <small>optional</small></span><span className="participant-v2-create-input-icon"><EnvelopeIcon /><input type="email" value={form.email} onChange={(input) => update("email", input.target.value)} maxLength={255} autoComplete="email" placeholder="name@example.com" /></span></label>
             <label><span>Preferred language</span><input value={form.preferredLanguage} onChange={(input) => update("preferredLanguage", input.target.value)} maxLength={50} /></label>
             <label className="participant-v2-create-notes"><span>Operational notes <small>optional</small></span><textarea value={form.accessibilityNotes} onChange={(input) => update("accessibilityNotes", input.target.value)} maxLength={1000} placeholder="Communication or access needs" /></label>
+          </div></section>
+          <section className="participant-v2-create-section"><header><h2>Additional details</h2><p>Optional identity and address information for the participant profile.</p></header><div className="participant-v2-create-grid">
+            <label><span>Race <small>optional</small></span><input value={form.race} onChange={(input) => update("race", input.target.value)} maxLength={50} /></label>
+            <label><span>Nationality <small>optional</small></span><input value={form.nationality} onChange={(input) => update("nationality", input.target.value)} maxLength={50} autoComplete="country-name" /></label>
+            <label className="participant-v2-create-address"><span>Street address <small>optional</small></span><input value={form.addressStreet} onChange={(input) => update("addressStreet", input.target.value)} maxLength={255} autoComplete="street-address" /></label>
+            <label><span>Unit number <small>optional</small></span><input value={form.addressUnit} onChange={(input) => update("addressUnit", input.target.value)} maxLength={20} autoComplete="address-line2" placeholder="#01-01" /></label>
+            <label><span>Postal code <small>optional</small></span><input value={form.addressPostalCode} onChange={(input) => update("addressPostalCode", input.target.value)} maxLength={10} autoComplete="postal-code" /></label>
           </div></section>
           <footer className="participant-v2-create-actions"><p><ExclamationTriangleIcon /> The system checks for possible duplicates before opening the participant profile. A name by itself is never treated as a duplicate.</p><div><Link className="secondary" to={`/events/${eventId}`}>Cancel</Link><button className="primary" type="submit" disabled={checking || creating}>{checking ? "Checking participants..." : creating ? "Creating participant..." : "Register participant"}</button></div></footer>
         </form>
@@ -169,8 +203,8 @@ export default function EventRegistrationPage() {
       {dialogView ? <div className="participant-existing-backdrop" role="presentation"><section className="participant-existing-dialog" role="dialog" aria-modal="true" aria-labelledby="participant-existing-title">
         {dialogView === "match" ? <>
           <header><span><IdentificationIcon /></span><div><p>Participant match check</p><h2 id="participant-existing-title">Possible participant match found</h2></div></header>
-          <p>These results matched at least two identity details. Choose the correct officer decision for each possible participant.</p>
-          <div className="participant-existing-list">{matches.map((match) => <article key={match.participant.id}><span className="participant-v2-avatar" aria-hidden="true">{initials(match)}</span><div><strong>{match.participant.firstName} {match.participant.lastName}</strong><p><IdentificationIcon /> {match.participant.participantReference}</p><p><CalendarDaysIcon /> {displayDate(match.participant.dateOfBirth)} <PhoneIcon /> {match.participant.maskedContactNumber}</p><p className="participant-existing-match-reasons"><b>Matched by:</b> {match.matchReasons.join(" + ")}</p><div className="participant-existing-actions"><button className="secondary" type="button" onClick={() => viewDetails(match)}>View details</button><button className="primary" type="button" onClick={() => selectExistingParticipant(match)}>{match.currentEventRegistration ? "View current registration" : "Use this participant"}</button></div></div></article>)}</div>
+          <p>{matches.some((match) => match.matchReasons.includes("NRIC / FIN")) ? "An NRIC or FIN matches an existing participant. Verify the limited details before choosing an officer decision." : "These results matched at least two identity details. Choose the correct officer decision for each possible participant."}</p>
+          <div className="participant-existing-list">{matches.map((match) => <article key={match.participant.id}><span className="participant-v2-avatar" aria-hidden="true">{initials(match)}</span><div><strong>{match.participant.firstName} {match.participant.lastName}</strong><p><IdentificationIcon /> {match.participant.participantReference}</p><p><CalendarDaysIcon /> {displayDate(match.participant.dateOfBirth)} <PhoneIcon /> {match.participant.maskedContactNumber}</p><p className="participant-existing-match-reasons"><b>Matched by:</b> {match.matchReasons.join(" + ")}</p><div className="participant-existing-actions"><button className="secondary" type="button" onClick={() => viewDetails(match)}>View details</button><button className="primary" type="button" disabled={reusing} onClick={() => void selectExistingParticipant(match)}>{match.currentEventRegistration ? "View current registration" : reusing ? "Attaching participant..." : "Use this participant"}</button></div></div></article>)}</div>
           <section className="participant-existing-decision"><h3>Officer decision</h3><p>If every result is a different person, continue using the details already entered.</p></section>
           <footer className="participant-existing-footer"><button className="secondary" type="button" onClick={() => setDialogView(null)}>Close</button><button className="primary" type="button" disabled={creating} onClick={() => void registerNewParticipant()}>{creating ? "Creating participant..." : "Different person - register new participant"}</button></footer>
         </> : null}

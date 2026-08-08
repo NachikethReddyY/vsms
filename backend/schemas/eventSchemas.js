@@ -142,6 +142,7 @@ const validateEventRange = (value, ctx) => {
 
 const createEventBody = z.object({
   ...eventFields,
+  firstManagerUserId: uuid.optional(),
   eventDays: z.array(eventDayInput).min(1).max(31).optional(),
   stations: z.array(eventStationInput).max(50).optional(),
   shifts: z.array(shiftInput).max(50).default([]),
@@ -193,6 +194,21 @@ const deleteEventBody = z.object({
   // Deliberately do not trim: this must be an exact acknowledgement of the event name.
   confirmationName: z.string().min(1).max(150),
   acknowledgePermanentDeletion: z.literal(true),
+  previewToken: z.string().min(32).max(4096),
+}).strict();
+
+const membershipRole = z.enum(["EVENT_MANAGER", "REGISTRATION", "SCREENER", "REVIEWER", "SUPPORT"]);
+const membershipParams = z.object({ eventId: uuid, membershipId: uuid }).strict();
+const membershipRoleParams = z.object({ eventId: uuid, membershipId: uuid, role: membershipRole }).strict();
+const membershipBody = z.object({
+  userId: uuid,
+  roles: z.array(membershipRole).min(1).max(5).refine((roles) => new Set(roles).size === roles.length, "Roles must be unique"),
+}).strict();
+const membershipRemovalBody = z.object({ reason: z.string().trim().min(3).max(500) }).strict();
+const membershipRoleBody = z.object({ role: membershipRole }).strict();
+const eligibleUsersQuery = z.object({
+  search: z.string().trim().min(2).max(150).optional(),
+  limit: z.coerce.number().int().min(1).max(200).default(100),
 }).strict();
 
 const eventParams = z.object({ eventId: uuid }).strict();
@@ -229,6 +245,28 @@ const reportQuery = z.object({
     ctx.addIssue({ code: "custom", path: ["to"], message: "Report date range cannot exceed 366 days" });
   }
 });
+
+const analyticsQuery = z.object({
+  from: timestamp.optional(),
+  to: timestamp.optional(),
+}).strict().superRefine((value, ctx) => {
+  if (value.from && value.to && new Date(value.from) >= new Date(value.to)) {
+    ctx.addIssue({ code: "custom", path: ["to"], message: "Analytics to must be after from" });
+  }
+  if (value.from && value.to && new Date(value.to) - new Date(value.from) > 366 * 86400000) {
+    ctx.addIssue({ code: "custom", path: ["to"], message: "Analytics range cannot exceed 366 days" });
+  }
+});
+const reportExportBody = z.object({
+  dataset: z.enum(["OVERVIEW", "OPERATIONS", "CLINICAL", "REFERRALS"]),
+  format: z.enum(["PDF", "CSV"]),
+  filters: analyticsQuery.default({}),
+}).strict();
+const reportJobParams = z.object({ eventId: uuid, jobId: uuid }).strict();
+const reportJobListQuery = z.object({
+  status: z.enum(["QUEUED", "GENERATING", "COMPLETED", "FAILED", "CANCELLED", "EXPIRED"]).optional(),
+  limit: z.coerce.number().int().min(1).max(100).default(25),
+}).strict();
 
 const assignmentParams = z.object({ eventId: uuid, shiftId: uuid }).strict();
 const assignmentDeleteParams = z.object({ eventId: uuid, shiftId: uuid, assignmentId: uuid }).strict();
@@ -270,6 +308,10 @@ module.exports = {
   auditQuery,
   attendeeQuery,
   reportQuery,
+  analyticsQuery,
+  reportExportBody,
+  reportJobParams,
+  reportJobListQuery,
   assignmentParams,
   assignmentDeleteParams,
   versionQuery,
@@ -277,4 +319,10 @@ module.exports = {
   stationParams,
   stationImportBody,
   stationUpdateBody,
+  membershipParams,
+  membershipRoleParams,
+  membershipBody,
+  membershipRemovalBody,
+  membershipRoleBody,
+  eligibleUsersQuery,
 };

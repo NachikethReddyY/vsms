@@ -9,7 +9,8 @@
     The diagram below maps out the high-level boundary between the users (Member A - Enquiry System, Member B - Admin System), the Java Swing application modules, and the serialized file storage layer for CA2.
   </p>
   
-  ![System Context Diagram](images/system-context-diagram.png)
+ <img width="1152" height="697" alt="Context Diagram drawio" src="https://github.com/user-attachments/assets/fe81f41e-ca44-40fb-8756-87479a899e81" />
+
   
   <p style="color: #6d6a64; font-size: 0.82rem; margin-top: 12px; margin-bottom: 0;">
     <em>Note: Ensure that your exported image file is placed inside an <code>images/</code> directory in your repository root, or update the file path above to match where your image is saved.</em>

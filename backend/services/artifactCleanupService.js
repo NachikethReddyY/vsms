@@ -3,12 +3,14 @@ const path = require("path");
 const prisma = require("../prisma/prismaClient");
 const AppError = require("../errors/AppError");
 const { deleteEventSignature, signatureMetadata } = require("../utils/signatureStorage");
+const { artifactPath, deleteArtifact } = require("./reportArtifactStorage");
 
 const TYPES = Object.freeze({
   CONSENT_SIGNATURE: "CONSENT_SIGNATURE",
   REFERRAL_SIGNATURE: "REFERRAL_SIGNATURE",
   REVIEW_DECISION_SIGNATURE: "REVIEW_DECISION_SIGNATURE",
   REFERRAL_DOCUMENT: "REFERRAL_DOCUMENT",
+  REPORT_EXPORT: "REPORT_EXPORT",
 });
 const DOCUMENT_KEY = /^documents\/([a-f0-9]{8}-[a-f0-9]{4}-[1-5][a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}\.pdf)$/;
 const MAX_ATTEMPTS = 10;
@@ -49,7 +51,7 @@ const uniqueTasks = (eventId, entries) => [...new Map(entries.map((entry) => [
 ])).values()];
 
 const collectEventArtifactTasks = async (tx, eventId) => {
-  const [consents, referrals, signatures, documents] = await Promise.all([
+  const [consents, referrals, signatures, documents, reports] = await Promise.all([
     tx.participantConsent.findMany({
       where: { eventId, signatureObjectKey: { not: null } },
       select: { signatureObjectKey: true },
@@ -66,6 +68,9 @@ const collectEventArtifactTasks = async (tx, eventId) => {
       where: { review: { registration: { eventId } } },
       select: { storageKey: true },
     }),
+    tx.reportArtifact
+      ? tx.reportArtifact.findMany({ where: { job: { eventId } }, select: { storageKey: true } })
+      : Promise.resolve([]),
   ]);
 
   const entries = [
@@ -80,13 +85,16 @@ const collectEventArtifactTasks = async (tx, eventId) => {
       storageKey: signatureObjectKey,
     })),
     ...documents.map(({ storageKey }) => ({ artifactType: TYPES.REFERRAL_DOCUMENT, storageKey })),
+    ...reports.map(({ storageKey }) => ({ artifactType: TYPES.REPORT_EXPORT, storageKey })),
   ];
 
   for (const entry of entries) {
     if ([TYPES.CONSENT_SIGNATURE, TYPES.REFERRAL_SIGNATURE, TYPES.REVIEW_DECISION_SIGNATURE].includes(entry.artifactType)) {
       signatureMetadata(entry.storageKey, eventId);
-    } else {
+    } else if (entry.artifactType === TYPES.REFERRAL_DOCUMENT) {
       documentPathForKey(entry.storageKey);
+    } else {
+      artifactPath(entry.storageKey);
     }
   }
 
@@ -121,6 +129,7 @@ const removeTaskArtifact = async (task) => {
   if (task.artifactType === TYPES.REFERRAL_DOCUMENT) {
     return deleteRegularFile(documentPathForKey(task.storageKey));
   }
+  if (task.artifactType === TYPES.REPORT_EXPORT) return deleteArtifact(task.storageKey);
   throw new AppError(422, "UNKNOWN_ARTIFACT_TYPE", "Cleanup artifact type is invalid");
 };
 
