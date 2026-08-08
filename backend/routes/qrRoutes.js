@@ -43,7 +43,7 @@ router.post(
   asyncHandler(qrController.verifyQR)
 );
 
-// Registration desk / QR management: Generation, Reissuing, and Manual Check-ins 
+// Registration desk / QR management: Generation, Reissuing, and Manual Check-ins
 // are fully protected against accidental double submission or network retries.
 router.post("/registrations/:registrationId", checkIdempotency, asyncHandler(qrController.generateRegistrationQR));
 router.post("/generate/:registrationId", checkIdempotency, asyncHandler(qrController.generateQR));

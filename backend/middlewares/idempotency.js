@@ -44,7 +44,7 @@ module.exports = async function checkIdempotency(req, res, next) {
         // 3. Set a lock ("PROCESSING") with a short TTL to prevent race conditions
         // NX option ensures it only sets if the key doesn't already exist
         const lockAcquired = await redis.set(redisKey, JSON.stringify({ status: "PROCESSING" }), "EX", 30, "NX");
-        
+
         if (!lockAcquired) {
             return res.status(409).json({
                 success: false,
@@ -71,7 +71,7 @@ module.exports = async function checkIdempotency(req, res, next) {
 
         next();
     } catch (redisError) {
-        // Fail-safe: If Redis goes down, log the error and let the request pass through 
+        // Fail-safe: If Redis goes down, log the error and let the request pass through
         // rather than completely breaking your user API endpoints.
         console.error("Idempotency Middleware Redis Error:", redisError);
         next();

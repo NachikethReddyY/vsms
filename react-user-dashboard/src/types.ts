@@ -50,7 +50,13 @@ export interface Participant {
   dateOfBirth: string;
   gender: string;
   contactNumber: string;
+  nricMasked: string | null;
   email: string | null;
+  race: string | null;
+  nationality: string | null;
+  addressStreet: string | null;
+  addressUnit: string | null;
+  addressPostalCode: string | null;
   preferredLanguage: string | null;
   accessibilityNotes: string | null;
   status: string;

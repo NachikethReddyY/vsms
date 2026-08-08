@@ -1,0 +1,19 @@
+.participant-v2-registration { max-width:980px; }
+.participant-v2-registration .participant-v2-checkin-heading { align-items:flex-start; margin-bottom:22px; }
+.participant-v2-registration .participant-v2-checkin-heading>span { width:54px; height:54px; border-radius:14px; }
+.participant-v2-registration .participant-v2-checkin-card { padding:0; overflow:hidden; border-radius:16px; }
+.participant-v2-registration .participant-v2-checkin-overview { position:relative; padding:24px 26px; background:var(--canvas-soft); }
+.participant-v2-registration .participant-v2-checkin-overview:before { position:absolute; top:0; left:0; width:4px; height:100%; background:var(--accent); content:""; }
+.participant-v2-registration .participant-v2-checkin-overview>div { padding:0 20px 0 0; }
+.participant-v2-registration .participant-v2-checkin-overview>div+div { padding:0 0 0 20px; }
+.participant-v2-registration .participant-v2-checkin-requirements { margin:0; padding:24px 26px 0; }
+.participant-v2-registration .participant-v2-checkin-requirements>div { grid-template-columns:repeat(4,minmax(0,1fr)); }
+.participant-v2-registration .participant-v2-checkin-requirements article { grid-template-columns:1fr; gap:6px; min-height:104px; align-content:start; }
+.participant-v2-registration .participant-v2-checkin-requirements article>span { width:24px; height:24px; }
+.participant-v2-registration .participant-v2-checkin-requirements article strong { margin-top:auto; }
+.participant-v2-registration .participant-v2-checkin-records { margin:16px 26px 0; }
+.participant-v2-registration .participant-v2-checkin-actions { margin:23px 26px 0; padding-bottom:21px; }
+.participant-v2-registration .participant-v2-checkin-feedback { margin:10px 26px 0; padding-bottom:21px; }
+.participant-v2-registration .participant-v2-checkin-success { max-width:680px; border-color:color-mix(in srgb,var(--accent) 24%,var(--hairline)); }
+@media (max-width:800px) { .participant-v2-registration .participant-v2-checkin-requirements>div { grid-template-columns:repeat(2,minmax(0,1fr)); }.participant-v2-registration .participant-v2-checkin-requirements article { grid-template-columns:22px minmax(0,1fr) auto; min-height:0; align-content:center; }.participant-v2-registration .participant-v2-checkin-requirements article strong { margin-top:0; } }
+@media (max-width:640px) { .participant-v2-registration .participant-v2-checkin-overview,.participant-v2-registration .participant-v2-checkin-requirements { padding-left:18px; padding-right:18px; }.participant-v2-registration .participant-v2-checkin-records,.participant-v2-registration .participant-v2-checkin-actions { margin-left:18px; margin-right:18px; }.participant-v2-registration .participant-v2-checkin-feedback { margin-left:18px; margin-right:18px; }.participant-v2-registration .participant-v2-checkin-requirements>div { grid-template-columns:1fr; } }

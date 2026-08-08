@@ -5,6 +5,7 @@ const { resolveRegistrationByQrValue } = require("../utils/qrToken");
 const { IMPORTABLE_TEMPLATE_KEYS } = require("./stationTemplateMapping");
 const { loadVerifiedSignature, consumeSignatureArtifact } = require("../utils/signatureStorage");
 const { requireEventRoleAndDuty } = require("./eventAuthorizationService");
+const { maskNric } = require("../utils/validation");
 
 const FLAG_RANK = { NORMAL: 0, REVIEW: 1, REFER: 2, URGENT: 3 };
 const SUPPORTED_SCREENING_TYPES = Object.values(IMPORTABLE_TEMPLATE_KEYS);
@@ -262,7 +263,7 @@ const buildDetail = (event, stations, registration) => {
       participantDisplayName: displayName(registration),
       queueNumber: registration.queueNumber,
       registrationStatus: registration.registrationStatus,
-      maskedNric: registration.participant.nricMasked || `••••${String(registration.participant.nric || "").slice(-4)}`,
+      maskedNric: maskNric(registration.participant.nric) || registration.participant.nricMasked || "Not recorded",
       dateOfBirth: registration.participant.dateOfBirth.toISOString().slice(0, 10),
       gender: registration.participant.gender,
     },

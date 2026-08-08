@@ -1,4 +1,4 @@
-import { Navigate, Outlet, Route, Routes } from "react-router-dom";
+import { Navigate, Outlet, Route, Routes, useLocation, useParams } from "react-router-dom";
 import { ProtectedRoute } from "./auth/ProtectedRoute";
 import { EventCapabilityGuard, RoleGuard, StationDutyGuard } from "./auth/RoleGuard";
 import { CognitoCallback } from "./auth/CognitoRoutes";
@@ -32,26 +32,20 @@ import {
 } from "./features/Stage4Pages";
 import AccountSecurityPage from "./pages/AccountSecurityPage";
 import { QueuePage } from "./pages/QueuePages"; // Imported the QueuePage component
-import ParticipantStatusPage from "./pages/ParticipantStatusPage";
-import ParticipantV2ConsentPage from "./pages/ParticipantV2ConsentPage";
-import ParticipantV2Page from "./pages/ParticipantV2Page";
-import ParticipantV2ProfilePage from "./pages/ParticipantV2ProfilePage";
+import EventRegistrationPage from "./pages/participant/EventRegistrationPage";
+import ParticipantCheckInPage from "./pages/participant/ParticipantCheckInPage";
+import ParticipantConsentPage from "./pages/participant/ParticipantConsentPage";
+import ParticipantCreatePage from "./pages/participant/ParticipantCreatePage";
+import ParticipantEmergencyContactsPage from "./pages/participant/ParticipantEmergencyContactsPage";
+import ParticipantProfilePage from "./pages/participant/ParticipantProfilePage";
+import ParticipantQrPage from "./pages/participant/ParticipantQrPage";
+import ParticipantRegistrationPage from "./pages/participant/ParticipantRegistrationPage";
+import ParticipantStatusPage from "./pages/participant/ParticipantStatusPage";
 import {
-  ConsentPage,
-  EmergencyContactsPage,
-  EventRegistrationStartPage,
-  EventRegistrationsPage,
   ParticipantConsentsPage,
-  ParticipantCreatePage,
-  ParticipantDetailPage,
   ParticipantEditPage,
-  ParticipantHistoryPage,
-  ParticipantSearchPage,
-  RegistrationConfirmationPage,
   RegistrationHistoryPage,
-  RegistrationQrPage,
-  RegistrationReviewPage,
-} from './pages/ParticipantPages';
+} from './pages/participant/ParticipantPages';
 
 const adminRoles = ["ADMINISTRATOR"];
 const eventManagerRoles = ["ADMINISTRATOR", "EVENT_MANAGER"];
@@ -61,6 +55,34 @@ const reviewerRoles = ["REVIEWER"];
 
 function EventWorkspace() {
   return <AppShell><Outlet /></AppShell>;
+}
+
+function LegacySearchRedirect() {
+  const location = useLocation();
+  const eventId = new URLSearchParams(location.search).get("eventId");
+  return <Navigate to={eventId ? `/events/${encodeURIComponent(eventId)}/register` : "/events"} replace />;
+}
+
+function LegacyEventRegistrationRedirect() {
+  const { eventId = "" } = useParams();
+  return <Navigate to={`/events/${eventId}`} replace />;
+}
+
+function LegacyParticipantStepRedirect({ step }: { step: "consent" | "register" }) {
+  const { eventId = "", participantId = "" } = useParams();
+  return <Navigate to={`/participants/${participantId}/${step}?eventId=${encodeURIComponent(eventId)}`} replace />;
+}
+
+function LegacyParticipantHistoryRedirect() {
+  const { participantId = "" } = useParams();
+  const location = useLocation();
+  return <Navigate to={`/participants/${participantId}${location.search}`} replace />;
+}
+
+function LegacyRegistrationRedirect({ destination }: { destination: "history" | "qr" | "search" }) {
+  const { registrationId = "" } = useParams();
+  if (destination === "search") return <Navigate to="/events" replace />;
+  return <Navigate to={`/participants/registrations/${registrationId}/${destination}`} replace />;
 }
 
 export default function App() {
@@ -125,26 +147,29 @@ export default function App() {
             <Route path="/events/:eventId/queue" element={<QueuePage />} />
             <Route path="/events/qr-pass/:registrationId" element={<QRCodePage />} />
             <Route path="/qr-generator" element={<QRCodePage />} />
-            <Route path="/participants" element={<Navigate to="/participants/search" replace />} />
-            <Route path="/participants/search" element={<ParticipantSearchPage />} />
-            <Route path="/participants-v2" element={<ParticipantV2Page />} />
-            <Route path="/participants-v2/:participantId" element={<ParticipantV2ProfilePage />} />
-            <Route path="/participants-v2/:participantId/consent" element={<ParticipantV2ConsentPage />} />
+            <Route path="/participants" element={<Navigate to="/events" replace />} />
             <Route path="/participants/new" element={<ParticipantCreatePage />} />
-            <Route path="/participants/:participantId" element={<ParticipantDetailPage />} />
             <Route path="/participants/:participantId/edit" element={<ParticipantEditPage />} />
-            <Route path="/participants/:participantId/history" element={<ParticipantHistoryPage />} />
             <Route path="/participants/:participantId/consents" element={<ParticipantConsentsPage />} />
-            <Route path="/participants/:participantId/emergency-contacts" element={<EmergencyContactsPage />} />
-            <Route path="/events/:eventId/register" element={<EventRegistrationStartPage />} />
-            <Route path="/events/:eventId/registrations" element={<EventRegistrationsPage />} />
-            <Route path="/events/:eventId/participants/:participantId/consent" element={<ConsentPage />} />
-            <Route path="/events/:eventId/participants/:participantId/review" element={<RegistrationReviewPage />} />
-            <Route path="/registrations/:registrationId/review" element={<RegistrationReviewPage />} />
-            <Route path="/registrations/:registrationId/consent" element={<ConsentPage />} />
-            <Route path="/registrations/:registrationId/confirmation" element={<RegistrationConfirmationPage />} />
-            <Route path="/registrations/:registrationId/history" element={<RegistrationHistoryPage />} />
-            <Route path="/registrations/:registrationId/qr" element={<RegistrationQrPage />} />
+            <Route path="/participants/:participantId/emergency-contacts" element={<ParticipantEmergencyContactsPage />} />
+            <Route path="/participants/:participantId/register" element={<ParticipantRegistrationPage />} />
+            <Route path="/participants/:participantId/consent" element={<ParticipantConsentPage />} />
+            <Route path="/participants/:participantId/check-in" element={<ParticipantCheckInPage />} />
+            <Route path="/participants/registrations/:registrationId/history" element={<RegistrationHistoryPage />} />
+            <Route path="/participants/registrations/:registrationId/qr" element={<ParticipantQrPage />} />
+            <Route path="/participants/:participantId/history" element={<LegacyParticipantHistoryRedirect />} />
+            <Route path="/participants/:participantId" element={<ParticipantProfilePage />} />
+
+            <Route path="/participants/search" element={<LegacySearchRedirect />} />
+            <Route path="/events/:eventId/register" element={<EventRegistrationPage />} />
+            <Route path="/events/:eventId/registrations" element={<LegacyEventRegistrationRedirect />} />
+            <Route path="/events/:eventId/participants/:participantId/consent" element={<LegacyParticipantStepRedirect step="consent" />} />
+            <Route path="/events/:eventId/participants/:participantId/review" element={<LegacyParticipantStepRedirect step="register" />} />
+            <Route path="/registrations/:registrationId/review" element={<LegacyRegistrationRedirect destination="search" />} />
+            <Route path="/registrations/:registrationId/consent" element={<LegacyRegistrationRedirect destination="search" />} />
+            <Route path="/registrations/:registrationId/confirmation" element={<LegacyRegistrationRedirect destination="search" />} />
+            <Route path="/registrations/:registrationId/history" element={<LegacyRegistrationRedirect destination="history" />} />
+            <Route path="/registrations/:registrationId/qr" element={<LegacyRegistrationRedirect destination="qr" />} />
           </Route>
 
           <Route element={<RoleGuard allowedRoles={adminRoles} />}>

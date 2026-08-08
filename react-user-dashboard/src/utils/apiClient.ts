@@ -77,7 +77,9 @@ apiClient.interceptors.request.use((config) => {
   config.headers["X-Device-Id"] = getDeviceId();
   config.headers["X-Device-Name"] = "VSMS staff web";
   const eventId = logoutStarted ? null : getEventContext();
-  if (eventId) config.headers["X-Event-Id"] = eventId;
+  // Page-specific requests may deliberately supply their own event context.
+  // Do not replace that value with an older event saved in session storage.
+  if (eventId && !config.headers["X-Event-Id"]) config.headers["X-Event-Id"] = eventId;
 
   if (accessToken) config.headers.Authorization = `Bearer ${accessToken}`;
   const requestCsrfToken = getCsrfToken();

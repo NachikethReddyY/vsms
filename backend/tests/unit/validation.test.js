@@ -14,7 +14,13 @@ test("valid participant payload is normalized", () => {
         dateOfBirth: "1980-03-14",
         gender: "m",
         contactNumber: "+65 9123 4567",
+        nric: "s123-4567d",
         email: "JOHN@example.com",
+        race: "  Chinese ",
+        nationality: " Singaporean ",
+        addressStreet: "  10 Example Road ",
+        addressUnit: " #03-12 ",
+        addressPostalCode: " 123456 ",
         preferredLanguage: "English",
         accessibilityNotes: "",
         status: "active",
@@ -22,6 +28,13 @@ test("valid participant payload is normalized", () => {
     assert.equal(value.firstName, "John");
     assert.equal(value.gender, "M");
     assert.equal(value.email, "john@example.com");
+    assert.equal(value.nric, "S1234567D");
+    assert.equal(value.nricMasked, "•••••567D");
+    assert.equal(value.race, "Chinese");
+    assert.equal(value.nationality, "Singaporean");
+    assert.equal(value.addressStreet, "10 Example Road");
+    assert.equal(value.addressUnit, "#03-12");
+    assert.equal(value.addressPostalCode, "123456");
     assert.equal(value.accessibilityNotes, null);
     assert.equal(value.status, "ACTIVE");
 });
@@ -33,10 +46,13 @@ test("participant rejects future DOB, invalid email, phone, enum and missing nam
         dateOfBirth: "1980-03-14",
         gender: "M",
         contactNumber: "+6591234567",
+        nric: "S1234567D",
     };
     assert.throws(() => validateParticipantPayload({ ...base, dateOfBirth: "2999-01-01" }), /future/);
     assert.throws(() => validateParticipantPayload({ ...base, email: "not-an-email" }), /email is invalid/);
     assert.throws(() => validateParticipantPayload({ ...base, contactNumber: "abc" }), /contactNumber is invalid/);
+    assert.throws(() => validateParticipantPayload({ ...base, nric: "" }), /nric is required/);
+    assert.throws(() => validateParticipantPayload({ ...base, nric: "not-an-nric" }), /nric must be a valid NRIC or FIN/);
     assert.throws(() => validateParticipantPayload({ ...base, gender: "X" }), /gender/);
     assert.throws(() => validateParticipantPayload({ ...base, firstName: " " }), /firstName is required/);
 });

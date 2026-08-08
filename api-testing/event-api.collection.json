@@ -7347,7 +7347,7 @@
               "value": "application/json"
             }
           ],
-          "body": "{\n  \"participants\": [\n    {\n      \"id\": \"00000000-0000-4000-8000-000000000000\",\n      \"participantReference\": \"\",\n      \"firstName\": \"\",\n      \"lastName\": \"\",\n      \"maskedContactNumber\": \"\",\n      \"maskedDateOfBirth\": \"\",\n      \"status\": \"ACTIVE\"\n    }\n  ],\n  \"pagination\": {\n    \"page\": 1,\n    \"pageSize\": 1,\n    \"total\": 0,\n    \"totalPages\": 0\n  }\n}"
+          "body": "{\n  \"participants\": [\n    {\n      \"id\": \"00000000-0000-4000-8000-000000000000\",\n      \"participantReference\": \"\",\n      \"firstName\": \"\",\n      \"lastName\": \"\",\n      \"maskedContactNumber\": \"\",\n      \"maskedDateOfBirth\": \"\",\n      \"matchReasons\": [\n        \"\"\n      ],\n      \"status\": \"ACTIVE\"\n    }\n  ],\n  \"pagination\": {\n    \"page\": 1,\n    \"pageSize\": 1,\n    \"total\": 0,\n    \"totalPages\": 0\n  }\n}"
         },
         {
           "name": "400 Response",
@@ -7421,7 +7421,7 @@
         },
         "body": {
           "mode": "raw",
-          "raw": "{\n  \"firstName\": \"\",\n  \"lastName\": \"\",\n  \"dateOfBirth\": \"2026-08-07\",\n  \"gender\": \"M\",\n  \"contactNumber\": \"\",\n  \"email\": \"\",\n  \"preferredLanguage\": \"\",\n  \"accessibilityNotes\": \"\",\n  \"status\": \"ACTIVE\"\n}",
+          "raw": "{\n  \"firstName\": \"\",\n  \"lastName\": \"\",\n  \"dateOfBirth\": \"2026-08-07\",\n  \"gender\": \"M\",\n  \"contactNumber\": \"\",\n  \"nric\": \"\",\n  \"email\": \"\",\n  \"race\": \"\",\n  \"nationality\": \"\",\n  \"addressStreet\": \"\",\n  \"addressUnit\": \"\",\n  \"addressPostalCode\": \"\",\n  \"preferredLanguage\": \"\",\n  \"accessibilityNotes\": \"\",\n  \"status\": \"ACTIVE\"\n}",
           "options": {
             "raw": {
               "language": "json"
@@ -7452,7 +7452,7 @@
               "value": "application/json"
             }
           ],
-          "body": "{\n  \"participant\": {\n    \"id\": \"00000000-0000-4000-8000-000000000000\",\n    \"participantReference\": \"\",\n    \"firstName\": \"\",\n    \"lastName\": \"\",\n    \"dateOfBirth\": \"2026-08-07T00:00:00.000Z\",\n    \"gender\": \"M\",\n    \"contactNumber\": \"\",\n    \"email\": \"\",\n    \"preferredLanguage\": \"\",\n    \"accessibilityNotes\": \"\",\n    \"status\": \"ACTIVE\",\n    \"version\": 1,\n    \"createdAt\": \"2026-08-07T00:00:00.000Z\",\n    \"updatedAt\": \"2026-08-07T00:00:00.000Z\"\n  }\n}"
+          "body": "{\n  \"participant\": {\n    \"id\": \"00000000-0000-4000-8000-000000000000\",\n    \"participantReference\": \"\",\n    \"firstName\": \"\",\n    \"lastName\": \"\",\n    \"dateOfBirth\": \"2026-08-07T00:00:00.000Z\",\n    \"gender\": \"M\",\n    \"contactNumber\": \"\",\n    \"nricMasked\": \"\",\n    \"email\": \"\",\n    \"race\": \"\",\n    \"nationality\": \"\",\n    \"addressStreet\": \"\",\n    \"addressUnit\": \"\",\n    \"addressPostalCode\": \"\",\n    \"preferredLanguage\": \"\",\n    \"accessibilityNotes\": \"\",\n    \"status\": \"ACTIVE\",\n    \"version\": 1,\n    \"createdAt\": \"2026-08-07T00:00:00.000Z\",\n    \"updatedAt\": \"2026-08-07T00:00:00.000Z\"\n  }\n}"
         },
         {
           "name": "400 Response",
@@ -7588,6 +7588,247 @@
       ]
     },
     {
+      "name": "Find possible participant matches for the assigned registration event",
+      "description": "A name alone never produces a possible match. An exact NRIC or FIN match is a strong match; otherwise at least two of full name, date of birth, and contact number must agree.",
+      "event": [],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json",
+            "description": "JSON request body",
+            "type": "text"
+          }
+        ],
+        "auth": {
+          "type": "bearer",
+          "bearer": [
+            {
+              "key": "token",
+              "value": "{{token}}",
+              "type": "string"
+            }
+          ]
+        },
+        "url": {
+          "raw": "{{baseUrl}}/participants/match",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "participants",
+            "match"
+          ],
+          "query": []
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"firstName\": \"\",\n  \"lastName\": \"\",\n  \"dateOfBirth\": \"2026-08-07\",\n  \"contactNumber\": \"\",\n  \"nric\": \"\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "response": [
+        {
+          "name": "200 Response",
+          "originalRequest": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "description": "JSON request body",
+                "type": "text"
+              }
+            ],
+            "url": "{{baseUrl}}/participants/match"
+          },
+          "status": "OK",
+          "code": 200,
+          "header": [
+            {
+              "key": "Content-Type",
+              "value": "application/json"
+            }
+          ],
+          "body": "{\n  \"result\": \"NO_MATCH\",\n  \"matches\": [\n    {\n      \"participant\": {\n        \"id\": \"00000000-0000-4000-8000-000000000000\",\n        \"participantReference\": \"\",\n        \"firstName\": \"\",\n        \"lastName\": \"\",\n        \"dateOfBirth\": \"2026-08-07\",\n        \"maskedContactNumber\": \"\",\n        \"preferredLanguage\": \"\"\n      },\n      \"matchReasons\": [\n        \"Full name\"\n      ],\n      \"previousEvent\": {\n        \"eventName\": \"\"\n      },\n      \"currentEventRegistration\": {\n        \"id\": \"00000000-0000-4000-8000-000000000000\",\n        \"queueNumber\": 0,\n        \"status\": \"SIGNED_UP\",\n        \"assignedBooth\": \"\"\n      }\n    }\n  ]\n}"
+        },
+        {
+          "name": "400 Response",
+          "originalRequest": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "description": "JSON request body",
+                "type": "text"
+              }
+            ],
+            "url": "{{baseUrl}}/participants/match"
+          },
+          "status": "Bad Request",
+          "code": 400,
+          "header": [
+            {
+              "key": "Content-Type",
+              "value": "application/json"
+            }
+          ],
+          "body": "{\n  \"type\": \"\",\n  \"title\": \"\",\n  \"status\": 0,\n  \"code\": \"\",\n  \"requestId\": \"00000000-0000-4000-8000-000000000000\",\n  \"errors\": [\n    {\n      \"field\": \"\",\n      \"message\": \"\"\n    }\n  ]\n}"
+        },
+        {
+          "name": "401 Response",
+          "originalRequest": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "description": "JSON request body",
+                "type": "text"
+              }
+            ],
+            "url": "{{baseUrl}}/participants/match"
+          },
+          "status": "Unauthorized",
+          "code": 401,
+          "header": [
+            {
+              "key": "Content-Type",
+              "value": "application/json"
+            }
+          ],
+          "body": "{\n  \"type\": \"\",\n  \"title\": \"\",\n  \"status\": 0,\n  \"code\": \"\",\n  \"requestId\": \"00000000-0000-4000-8000-000000000000\",\n  \"errors\": [\n    {\n      \"field\": \"\",\n      \"message\": \"\"\n    }\n  ]\n}"
+        }
+      ]
+    },
+    {
+      "name": "Attach an approved cross-event participant match to the assigned event",
+      "description": "Requires an active registration assignment and explicit cross-event reuse permission. The participant is attached for intake only; no event registration or queue entry is created.",
+      "event": [],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json",
+            "description": "JSON request body",
+            "type": "text"
+          }
+        ],
+        "auth": {
+          "type": "bearer",
+          "bearer": [
+            {
+              "key": "token",
+              "value": "{{token}}",
+              "type": "string"
+            }
+          ]
+        },
+        "url": {
+          "raw": "{{baseUrl}}/participants/{participantId}/reuse",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "participants",
+            "{participantId}",
+            "reuse"
+          ],
+          "query": []
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"firstName\": \"\",\n  \"lastName\": \"\",\n  \"dateOfBirth\": \"2026-08-07\",\n  \"contactNumber\": \"\",\n  \"nric\": \"\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "response": [
+        {
+          "name": "200 Response",
+          "originalRequest": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "description": "JSON request body",
+                "type": "text"
+              }
+            ],
+            "url": "{{baseUrl}}/participants/{participantId}/reuse"
+          },
+          "status": "OK",
+          "code": 200,
+          "header": [
+            {
+              "key": "Content-Type",
+              "value": "application/json"
+            }
+          ],
+          "body": "{\n  \"outcome\": \"ATTACHED\",\n  \"intakeId\": \"00000000-0000-4000-8000-000000000000\",\n  \"registrationId\": \"00000000-0000-4000-8000-000000000000\"\n}"
+        },
+        {
+          "name": "400 Response",
+          "originalRequest": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "description": "JSON request body",
+                "type": "text"
+              }
+            ],
+            "url": "{{baseUrl}}/participants/{participantId}/reuse"
+          },
+          "status": "Bad Request",
+          "code": 400,
+          "header": [
+            {
+              "key": "Content-Type",
+              "value": "application/json"
+            }
+          ],
+          "body": "{\n  \"type\": \"\",\n  \"title\": \"\",\n  \"status\": 0,\n  \"code\": \"\",\n  \"requestId\": \"00000000-0000-4000-8000-000000000000\",\n  \"errors\": [\n    {\n      \"field\": \"\",\n      \"message\": \"\"\n    }\n  ]\n}"
+        },
+        {
+          "name": "401 Response",
+          "originalRequest": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "description": "JSON request body",
+                "type": "text"
+              }
+            ],
+            "url": "{{baseUrl}}/participants/{participantId}/reuse"
+          },
+          "status": "Unauthorized",
+          "code": 401,
+          "header": [
+            {
+              "key": "Content-Type",
+              "value": "application/json"
+            }
+          ],
+          "body": "{\n  \"type\": \"\",\n  \"title\": \"\",\n  \"status\": 0,\n  \"code\": \"\",\n  \"requestId\": \"00000000-0000-4000-8000-000000000000\",\n  \"errors\": [\n    {\n      \"field\": \"\",\n      \"message\": \"\"\n    }\n  ]\n}"
+        }
+      ]
+    },
+    {
       "name": "Get a participant and emergency contacts",
       "description": "",
       "event": [],
@@ -7632,7 +7873,7 @@
               "value": "application/json"
             }
           ],
-          "body": "{\n  \"participant\": {\n    \"id\": \"00000000-0000-4000-8000-000000000000\",\n    \"participantReference\": \"\",\n    \"firstName\": \"\",\n    \"lastName\": \"\",\n    \"dateOfBirth\": \"2026-08-07T00:00:00.000Z\",\n    \"gender\": \"M\",\n    \"contactNumber\": \"\",\n    \"email\": \"\",\n    \"preferredLanguage\": \"\",\n    \"accessibilityNotes\": \"\",\n    \"status\": \"ACTIVE\",\n    \"version\": 1,\n    \"createdAt\": \"2026-08-07T00:00:00.000Z\",\n    \"updatedAt\": \"2026-08-07T00:00:00.000Z\"\n  }\n}"
+          "body": "{\n  \"participant\": {\n    \"id\": \"00000000-0000-4000-8000-000000000000\",\n    \"participantReference\": \"\",\n    \"firstName\": \"\",\n    \"lastName\": \"\",\n    \"dateOfBirth\": \"2026-08-07T00:00:00.000Z\",\n    \"gender\": \"M\",\n    \"contactNumber\": \"\",\n    \"nricMasked\": \"\",\n    \"email\": \"\",\n    \"race\": \"\",\n    \"nationality\": \"\",\n    \"addressStreet\": \"\",\n    \"addressUnit\": \"\",\n    \"addressPostalCode\": \"\",\n    \"preferredLanguage\": \"\",\n    \"accessibilityNotes\": \"\",\n    \"status\": \"ACTIVE\",\n    \"version\": 1,\n    \"createdAt\": \"2026-08-07T00:00:00.000Z\",\n    \"updatedAt\": \"2026-08-07T00:00:00.000Z\"\n  }\n}"
         },
         {
           "name": "401 Response",
@@ -7707,7 +7948,7 @@
         },
         "body": {
           "mode": "raw",
-          "raw": "{\n  \"firstName\": \"\",\n  \"lastName\": \"\",\n  \"dateOfBirth\": \"2026-08-07\",\n  \"gender\": \"M\",\n  \"contactNumber\": \"\",\n  \"email\": \"\",\n  \"preferredLanguage\": \"\",\n  \"accessibilityNotes\": \"\",\n  \"status\": \"ACTIVE\"\n}",
+          "raw": "{\n  \"firstName\": \"\",\n  \"lastName\": \"\",\n  \"dateOfBirth\": \"2026-08-07\",\n  \"gender\": \"M\",\n  \"contactNumber\": \"\",\n  \"nric\": \"\",\n  \"email\": \"\",\n  \"race\": \"\",\n  \"nationality\": \"\",\n  \"addressStreet\": \"\",\n  \"addressUnit\": \"\",\n  \"addressPostalCode\": \"\",\n  \"preferredLanguage\": \"\",\n  \"accessibilityNotes\": \"\",\n  \"status\": \"ACTIVE\"\n}",
           "options": {
             "raw": {
               "language": "json"
@@ -7738,7 +7979,7 @@
               "value": "application/json"
             }
           ],
-          "body": "{\n  \"participant\": {\n    \"id\": \"00000000-0000-4000-8000-000000000000\",\n    \"participantReference\": \"\",\n    \"firstName\": \"\",\n    \"lastName\": \"\",\n    \"dateOfBirth\": \"2026-08-07T00:00:00.000Z\",\n    \"gender\": \"M\",\n    \"contactNumber\": \"\",\n    \"email\": \"\",\n    \"preferredLanguage\": \"\",\n    \"accessibilityNotes\": \"\",\n    \"status\": \"ACTIVE\",\n    \"version\": 1,\n    \"createdAt\": \"2026-08-07T00:00:00.000Z\",\n    \"updatedAt\": \"2026-08-07T00:00:00.000Z\"\n  }\n}"
+          "body": "{\n  \"participant\": {\n    \"id\": \"00000000-0000-4000-8000-000000000000\",\n    \"participantReference\": \"\",\n    \"firstName\": \"\",\n    \"lastName\": \"\",\n    \"dateOfBirth\": \"2026-08-07T00:00:00.000Z\",\n    \"gender\": \"M\",\n    \"contactNumber\": \"\",\n    \"nricMasked\": \"\",\n    \"email\": \"\",\n    \"race\": \"\",\n    \"nationality\": \"\",\n    \"addressStreet\": \"\",\n    \"addressUnit\": \"\",\n    \"addressPostalCode\": \"\",\n    \"preferredLanguage\": \"\",\n    \"accessibilityNotes\": \"\",\n    \"status\": \"ACTIVE\",\n    \"version\": 1,\n    \"createdAt\": \"2026-08-07T00:00:00.000Z\",\n    \"updatedAt\": \"2026-08-07T00:00:00.000Z\"\n  }\n}"
         },
         {
           "name": "400 Response",
@@ -8700,7 +8941,7 @@
               "value": "application/json"
             }
           ],
-          "body": "{\n  \"participant\": {\n    \"id\": \"00000000-0000-4000-8000-000000000000\",\n    \"participantReference\": \"\",\n    \"firstName\": \"\",\n    \"lastName\": \"\",\n    \"dateOfBirth\": \"2026-08-07T00:00:00.000Z\",\n    \"gender\": \"M\",\n    \"contactNumber\": \"\",\n    \"email\": \"\",\n    \"preferredLanguage\": \"\",\n    \"accessibilityNotes\": \"\",\n    \"status\": \"ACTIVE\",\n    \"version\": 1,\n    \"createdAt\": \"2026-08-07T00:00:00.000Z\",\n    \"updatedAt\": \"2026-08-07T00:00:00.000Z\"\n  },\n  \"event\": {\n    \"firstManagerUserId\": \"00000000-0000-4000-8000-000000000000\",\n    \"name\": \"\",\n    \"description\": \"\",\n    \"bannerKey\": \"COMMUNITY_SCREENING\",\n    \"artworkDataUrl\": \"\",\n    \"venue\": \"\",\n    \"address\": \"\",\n    \"postalCode\": \"\",\n    \"latitude\": 1.13,\n    \"longitude\": 103.59,\n    \"locationProvider\": \"ONEMAP\",\n    \"locationReference\": \"\",\n    \"timezone\": \"Asia/Singapore\",\n    \"startsAt\": \"2026-08-07T00:00:00.000Z\",\n    \"endsAt\": \"2026-08-07T00:00:00.000Z\",\n    \"capacity\": 1,\n    \"expectedAttendance\": 1,\n    \"eventDays\": [\n      {\n        \"eventDayId\": \"00000000-0000-4000-8000-000000000000\"\n      }\n    ],\n    \"stations\": [\n      {\n        \"eventStationId\": \"00000000-0000-4000-8000-000000000000\",\n        \"stationTemplateId\": \"00000000-0000-4000-8000-000000000000\",\n        \"stationOrder\": 1,\n        \"capacity\": 1,\n        \"isAvailable\": true,\n        \"availabilities\": [\n          {\n            \"date\": \"2026-08-07\",\n            \"isAvailable\": true,\n            \"startsAt\": \"2026-08-07T00:00:00.000Z\",\n            \"endsAt\": \"2026-08-07T00:00:00.000Z\",\n            \"capacity\": 1\n          }\n        ]\n      }\n    ],\n    \"shifts\": [\n      {\n        \"shiftId\": \"00000000-0000-4000-8000-000000000000\",\n        \"status\": \"PLANNED\",\n        \"staffAssignments\": [\n          {\n            \"staffAssignmentId\": \"00000000-0000-4000-8000-000000000000\",\n            \"assignmentRole\": {},\n            \"status\": \"ASSIGNED\",\n            \"notes\": \"\",\n            \"eventStation\": {\n              \"eventStationId\": \"00000000-0000-4000-8000-000000000000\",\n              \"stationTemplateId\": \"00000000-0000-4000-8000-000000000000\",\n              \"name\": \"\",\n              \"stationOrder\": 1\n            },\n            \"user\": {\n              \"userId\": \"00000000-0000-4000-8000-000000000000\",\n              \"username\": \"\"\n            }\n          }\n        ]\n      }\n    ],\n    \"eventId\": \"00000000-0000-4000-8000-000000000000\",\n    \"status\": \"DRAFT\",\n    \"version\": 1,\n    \"cancelledAt\": \"2026-08-07T00:00:00.000Z\",\n    \"cancellationReason\": \"\",\n    \"createdAt\": \"2026-08-07T00:00:00.000Z\",\n    \"updatedAt\": \"2026-08-07T00:00:00.000Z\",\n    \"eventStations\": [\n      {\n        \"eventStationId\": \"00000000-0000-4000-8000-000000000000\",\n        \"stationTemplateId\": \"00000000-0000-4000-8000-000000000000\",\n        \"templateVersion\": 1,\n        \"name\": \"\",\n        \"stationType\": \"VISUAL_ACUITY\",\n        \"description\": \"\",\n        \"stationOrder\": 1,\n        \"capacity\": 1,\n        \"isAvailable\": true,\n        \"availabilities\": [\n          {\n            \"eventStationAvailabilityId\": \"00000000-0000-4000-8000-000000000000\",\n            \"isAvailable\": true,\n            \"startsAt\": \"2026-08-07T00:00:00.000Z\",\n            \"endsAt\": \"2026-08-07T00:00:00.000Z\",\n            \"capacity\": 1,\n            \"eventDay\": {\n              \"eventDayId\": \"00000000-0000-4000-8000-000000000000\",\n              \"date\": \"2026-08-07\"\n            }\n          }\n        ]\n      }\n    ],\n    \"signupCount\": 0,\n    \"activeCapacityCount\": 0,\n    \"canManage\": true,\n    \"createdBy\": {\n      \"id\": \"00000000-0000-4000-8000-000000000000\",\n      \"userId\": \"00000000-0000-4000-8000-000000000000\",\n      \"username\": \"\",\n      \"email\": \"\",\n      \"fullName\": \"\",\n      \"employeeNumber\": \"\",\n      \"contactNumber\": \"\",\n      \"department\": \"\",\n      \"designation\": \"\",\n      \"systemRole\": \"ADMIN\",\n      \"status\": \"ACTIVE\",\n      \"approvalState\": \"PENDING\",\n      \"accessState\": \"ENABLED\",\n      \"professionalCategory\": \"STAFF\",\n      \"roles\": [\n        \"ADMINISTRATOR\"\n      ],\n      \"createdAt\": \"2026-08-07T00:00:00.000Z\"\n    },\n    \"cancelledBy\": {}\n  },\n  \"emergencyContact\": {\n    \"id\": \"00000000-0000-4000-8000-000000000000\",\n    \"participantId\": \"00000000-0000-4000-8000-000000000000\",\n    \"contactName\": \"\",\n    \"relationship\": \"\",\n    \"phoneNumber\": \"\",\n    \"email\": \"\",\n    \"isPrimary\": true,\n    \"status\": \"ACTIVE\",\n    \"createdAt\": \"2026-08-07T00:00:00.000Z\",\n    \"updatedAt\": \"2026-08-07T00:00:00.000Z\"\n  },\n  \"latestConsent\": {\n    \"id\": \"00000000-0000-4000-8000-000000000000\",\n    \"participantId\": \"00000000-0000-4000-8000-000000000000\",\n    \"eventId\": \"00000000-0000-4000-8000-000000000000\",\n    \"registrationId\": \"00000000-0000-4000-8000-000000000000\",\n    \"withdrawalOfId\": \"00000000-0000-4000-8000-000000000000\",\n    \"consentFormVersionId\": \"00000000-0000-4000-8000-000000000000\",\n    \"consentStatus\": \"PENDING\",\n    \"signerType\": \"\",\n    \"signerName\": \"\",\n    \"recordedById\": \"00000000-0000-4000-8000-000000000000\",\n    \"signedAt\": \"2026-08-07T00:00:00.000Z\",\n    \"withdrawnAt\": \"2026-08-07T00:00:00.000Z\",\n    \"withdrawalReason\": \"\",\n    \"createdAt\": \"2026-08-07T00:00:00.000Z\"\n  }\n}"
+          "body": "{\n  \"participant\": {\n    \"id\": \"00000000-0000-4000-8000-000000000000\",\n    \"participantReference\": \"\",\n    \"firstName\": \"\",\n    \"lastName\": \"\",\n    \"dateOfBirth\": \"2026-08-07T00:00:00.000Z\",\n    \"gender\": \"M\",\n    \"contactNumber\": \"\",\n    \"nricMasked\": \"\",\n    \"email\": \"\",\n    \"race\": \"\",\n    \"nationality\": \"\",\n    \"addressStreet\": \"\",\n    \"addressUnit\": \"\",\n    \"addressPostalCode\": \"\",\n    \"preferredLanguage\": \"\",\n    \"accessibilityNotes\": \"\",\n    \"status\": \"ACTIVE\",\n    \"version\": 1,\n    \"createdAt\": \"2026-08-07T00:00:00.000Z\",\n    \"updatedAt\": \"2026-08-07T00:00:00.000Z\"\n  },\n  \"event\": {\n    \"firstManagerUserId\": \"00000000-0000-4000-8000-000000000000\",\n    \"name\": \"\",\n    \"description\": \"\",\n    \"bannerKey\": \"COMMUNITY_SCREENING\",\n    \"artworkDataUrl\": \"\",\n    \"venue\": \"\",\n    \"address\": \"\",\n    \"postalCode\": \"\",\n    \"latitude\": 1.13,\n    \"longitude\": 103.59,\n    \"locationProvider\": \"ONEMAP\",\n    \"locationReference\": \"\",\n    \"timezone\": \"Asia/Singapore\",\n    \"startsAt\": \"2026-08-07T00:00:00.000Z\",\n    \"endsAt\": \"2026-08-07T00:00:00.000Z\",\n    \"capacity\": 1,\n    \"expectedAttendance\": 1,\n    \"eventDays\": [\n      {\n        \"eventDayId\": \"00000000-0000-4000-8000-000000000000\"\n      }\n    ],\n    \"stations\": [\n      {\n        \"eventStationId\": \"00000000-0000-4000-8000-000000000000\",\n        \"stationTemplateId\": \"00000000-0000-4000-8000-000000000000\",\n        \"stationOrder\": 1,\n        \"capacity\": 1,\n        \"isAvailable\": true,\n        \"availabilities\": [\n          {\n            \"date\": \"2026-08-07\",\n            \"isAvailable\": true,\n            \"startsAt\": \"2026-08-07T00:00:00.000Z\",\n            \"endsAt\": \"2026-08-07T00:00:00.000Z\",\n            \"capacity\": 1\n          }\n        ]\n      }\n    ],\n    \"shifts\": [\n      {\n        \"shiftId\": \"00000000-0000-4000-8000-000000000000\",\n        \"status\": \"PLANNED\",\n        \"staffAssignments\": [\n          {\n            \"staffAssignmentId\": \"00000000-0000-4000-8000-000000000000\",\n            \"assignmentRole\": {},\n            \"status\": \"ASSIGNED\",\n            \"notes\": \"\",\n            \"eventStation\": {\n              \"eventStationId\": \"00000000-0000-4000-8000-000000000000\",\n              \"stationTemplateId\": \"00000000-0000-4000-8000-000000000000\",\n              \"name\": \"\",\n              \"stationOrder\": 1\n            },\n            \"user\": {\n              \"userId\": \"00000000-0000-4000-8000-000000000000\",\n              \"username\": \"\"\n            }\n          }\n        ]\n      }\n    ],\n    \"eventId\": \"00000000-0000-4000-8000-000000000000\",\n    \"status\": \"DRAFT\",\n    \"version\": 1,\n    \"cancelledAt\": \"2026-08-07T00:00:00.000Z\",\n    \"cancellationReason\": \"\",\n    \"createdAt\": \"2026-08-07T00:00:00.000Z\",\n    \"updatedAt\": \"2026-08-07T00:00:00.000Z\",\n    \"eventStations\": [\n      {\n        \"eventStationId\": \"00000000-0000-4000-8000-000000000000\",\n        \"stationTemplateId\": \"00000000-0000-4000-8000-000000000000\",\n        \"templateVersion\": 1,\n        \"name\": \"\",\n        \"stationType\": \"VISUAL_ACUITY\",\n        \"description\": \"\",\n        \"stationOrder\": 1,\n        \"capacity\": 1,\n        \"isAvailable\": true,\n        \"availabilities\": [\n          {\n            \"eventStationAvailabilityId\": \"00000000-0000-4000-8000-000000000000\",\n            \"isAvailable\": true,\n            \"startsAt\": \"2026-08-07T00:00:00.000Z\",\n            \"endsAt\": \"2026-08-07T00:00:00.000Z\",\n            \"capacity\": 1,\n            \"eventDay\": {\n              \"eventDayId\": \"00000000-0000-4000-8000-000000000000\",\n              \"date\": \"2026-08-07\"\n            }\n          }\n        ]\n      }\n    ],\n    \"signupCount\": 0,\n    \"activeCapacityCount\": 0,\n    \"canManage\": true,\n    \"createdBy\": {\n      \"id\": \"00000000-0000-4000-8000-000000000000\",\n      \"userId\": \"00000000-0000-4000-8000-000000000000\",\n      \"username\": \"\",\n      \"email\": \"\",\n      \"fullName\": \"\",\n      \"employeeNumber\": \"\",\n      \"contactNumber\": \"\",\n      \"department\": \"\",\n      \"designation\": \"\",\n      \"systemRole\": \"ADMIN\",\n      \"status\": \"ACTIVE\",\n      \"approvalState\": \"PENDING\",\n      \"accessState\": \"ENABLED\",\n      \"professionalCategory\": \"STAFF\",\n      \"roles\": [\n        \"ADMINISTRATOR\"\n      ],\n      \"createdAt\": \"2026-08-07T00:00:00.000Z\"\n    },\n    \"cancelledBy\": {}\n  },\n  \"emergencyContact\": {\n    \"id\": \"00000000-0000-4000-8000-000000000000\",\n    \"participantId\": \"00000000-0000-4000-8000-000000000000\",\n    \"contactName\": \"\",\n    \"relationship\": \"\",\n    \"phoneNumber\": \"\",\n    \"email\": \"\",\n    \"isPrimary\": true,\n    \"status\": \"ACTIVE\",\n    \"createdAt\": \"2026-08-07T00:00:00.000Z\",\n    \"updatedAt\": \"2026-08-07T00:00:00.000Z\"\n  },\n  \"latestConsent\": {\n    \"id\": \"00000000-0000-4000-8000-000000000000\",\n    \"participantId\": \"00000000-0000-4000-8000-000000000000\",\n    \"eventId\": \"00000000-0000-4000-8000-000000000000\",\n    \"registrationId\": \"00000000-0000-4000-8000-000000000000\",\n    \"withdrawalOfId\": \"00000000-0000-4000-8000-000000000000\",\n    \"consentFormVersionId\": \"00000000-0000-4000-8000-000000000000\",\n    \"consentStatus\": \"PENDING\",\n    \"signerType\": \"\",\n    \"signerName\": \"\",\n    \"recordedById\": \"00000000-0000-4000-8000-000000000000\",\n    \"signedAt\": \"2026-08-07T00:00:00.000Z\",\n    \"withdrawnAt\": \"2026-08-07T00:00:00.000Z\",\n    \"withdrawalReason\": \"\",\n    \"createdAt\": \"2026-08-07T00:00:00.000Z\"\n  }\n}"
         },
         {
           "name": "401 Response",

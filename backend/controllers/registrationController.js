@@ -8,6 +8,7 @@ const {
     validateIdempotencyKey,
 } = require("../utils/validation");
 const { assertRegistrationAssignment } = require("../utils/staff");
+const { assertParticipantEventScope } = require("../utils/participantEventScope");
 
 const OPEN_EVENT_STATUSES = ["PUBLISHED", "UPCOMING", "ONGOING", "IN_PROGRESS"];
 const REGISTRATION_STATUSES = new Set([
@@ -116,6 +117,7 @@ exports.createRegistration = asyncHandler(async (req, res) => {
     for (let attempt = 0; attempt < 4; attempt += 1) {
         try {
             registration = await prisma.$transaction(async (tx) => {
+                await assertParticipantEventScope(tx, participantId, eventId, req.auth.userId);
                 const [participant, event, acceptedConsent, activeContact] = await Promise.all([
                     tx.participant.findUnique({ where: { id: participantId } }),
                     tx.event.findUnique({ where: { eventId } }),
