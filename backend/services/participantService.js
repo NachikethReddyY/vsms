@@ -3,7 +3,9 @@ const prisma = require("../prisma/prismaClient");
 const { createAuditLog } = require("../utils/audit");
 const {
     assertUuid,
+    cleanNric,
     cleanString,
+    maskNric,
     parsePositiveInt,
     validateParticipantPayload,
     validateEmergencyContactPayload,
@@ -94,11 +96,12 @@ function parseParticipantMatch(payload) {
     const firstName = cleanString(payload.firstName, "firstName", { required: true, max: 100 });
     const lastName = cleanString(payload.lastName, "lastName", { required: true, max: 100 });
     const contactNumber = cleanString(payload.contactNumber, "contactNumber", { required: true, max: 30 });
+    const { nric } = cleanNric(payload.nric, { required: true });
     const dateOfBirth = cleanString(payload.dateOfBirth, "dateOfBirth", { required: true, max: 10 });
     const parsedDateOfBirth = new Date(`${dateOfBirth}T00:00:00.000Z`);
     if (Number.isNaN(parsedDateOfBirth.getTime())) throw validationError("dateOfBirth is invalid");
     if (parsedDateOfBirth > new Date()) throw validationError("dateOfBirth cannot be in the future");
-    return { firstName, lastName, contactNumber, dateOfBirth, parsedDateOfBirth };
+    return { firstName, lastName, contactNumber, nric, dateOfBirth, parsedDateOfBirth };
 }
 
 function participantMatchReasons(participant, criteria) {
@@ -109,7 +112,13 @@ function participantMatchReasons(participant, criteria) {
     }
     if (new Date(participant.dateOfBirth).toISOString().slice(0, 10) === criteria.dateOfBirth) reasons.push("Date of birth");
     if (participant.contactNumber === criteria.contactNumber) reasons.push("Contact number");
+    if (participant.nric === criteria.nric) reasons.push("NRIC / FIN");
     return reasons;
+}
+
+function participantPublicDetails(participant) {
+    const { nric, nricMasked, ...safeParticipant } = participant;
+    return { ...safeParticipant, nricMasked: maskNric(nric) || nricMasked };
 }
 
 function assertCrossEventReusePermission(req) {
@@ -132,6 +141,7 @@ exports.matchParticipantsForRegistrationService = async (req) => {
     const participants = await prisma.participant.findMany({
         where: {
             OR: [
+                { nric: criteria.nric },
                 { AND: [fullName, { dateOfBirth: criteria.parsedDateOfBirth }] },
                 { AND: [fullName, { contactNumber: criteria.contactNumber }] },
                 { AND: [{ dateOfBirth: criteria.parsedDateOfBirth }, { contactNumber: criteria.contactNumber }] },
@@ -215,7 +225,7 @@ exports.reuseMatchedParticipantService = async (req) => {
         }
 
         const matchReasons = participantMatchReasons(participant, criteria);
-        if (matchReasons.length < 2) {
+        if (matchReasons.length < 2 && !matchReasons.includes("NRIC / FIN")) {
             const error = new Error("Participant is not an approved identity match");
             error.statusCode = 403;
             throw error;
@@ -380,7 +390,7 @@ exports.createParticipantService = async (req) => {
         }
     }
 
-    return participant;
+    return participantPublicDetails(participant);
 };
 
 exports.getParticipantByIdService = async (participantIdParam, eventId, userId) => {
@@ -396,7 +406,7 @@ exports.getParticipantByIdService = async (participantIdParam, eventId, userId) 
         error.statusCode = 404;
         throw error;
     }
-    return participant;
+    return participantPublicDetails(participant);
 };
 
 exports.updateParticipantService = async (req) => {
@@ -428,7 +438,7 @@ exports.updateParticipantService = async (req) => {
             client: tx,
         });
 
-        return updated;
+        return participantPublicDetails(updated);
     });
 };
 

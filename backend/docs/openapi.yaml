@@ -1238,7 +1238,7 @@ paths:
       tags: [Participants]
       operationId: matchParticipantsForRegistration
       summary: Find possible participant matches for the assigned registration event
-      description: A name alone never produces a possible match. At least two of full name, date of birth, and contact number must agree.
+      description: A name alone never produces a possible match. An exact NRIC or FIN match is a strong match; otherwise at least two of full name, date of birth, and contact number must agree.
       requestBody: { required: true, content: { application/json: { schema: { $ref: "#/components/schemas/ParticipantMatchRequest" } } } }
       responses:
         "200": { description: Match outcome and limited identity data for officer review, content: { application/json: { schema: { $ref: "#/components/schemas/ParticipantMatchResponse" } } } }
@@ -3617,7 +3617,7 @@ components:
         participantDisplayName: { type: string }
         queueNumber: { type: integer, nullable: true }
         registrationStatus: { type: string, enum: [SIGNED_UP, CHECKED_IN, COMPLETED, CANCELLED] }
-        maskedNric: { type: string, pattern: '^••••.{1,4}$' }
+        maskedNric: { type: string, pattern: '^(?:[STFGM]•••[0-9]{4}|Not recorded)$' }
         dateOfBirth: { type: string, format: date }
         gender: { type: string, maxLength: 1 }
     ScreeningResultSummary:
@@ -4067,14 +4067,20 @@ components:
     ParticipantRequest:
       type: object
       additionalProperties: false
-      required: [firstName, lastName, dateOfBirth, gender, contactNumber]
+      required: [firstName, lastName, dateOfBirth, gender, contactNumber, nric]
       properties:
         firstName: { type: string, minLength: 1, maxLength: 100 }
         lastName: { type: string, minLength: 1, maxLength: 100 }
         dateOfBirth: { type: string, format: date }
         gender: { type: string, enum: [M, F, O, U] }
         contactNumber: { type: string, minLength: 7, maxLength: 30 }
+        nric: { type: string, pattern: '^[STFGM][0-9]{7}[A-Z]$', writeOnly: true, description: Required NRIC or FIN. It is never returned by this API. }
         email: { type: string, format: email, nullable: true }
+        race: { type: string, maxLength: 50, nullable: true }
+        nationality: { type: string, maxLength: 50, nullable: true }
+        addressStreet: { type: string, maxLength: 255, nullable: true }
+        addressUnit: { type: string, maxLength: 20, nullable: true }
+        addressPostalCode: { type: string, maxLength: 10, nullable: true }
         preferredLanguage: { type: string, maxLength: 50, nullable: true }
         accessibilityNotes: { type: string, maxLength: 1000, nullable: true }
         status: { type: string, enum: [ACTIVE, INACTIVE, DECEASED] }
@@ -4088,7 +4094,13 @@ components:
         dateOfBirth: { type: string, format: date }
         gender: { type: string, enum: [M, F, O, U] }
         contactNumber: { type: string, minLength: 7, maxLength: 30 }
+        nric: { type: string, pattern: '^[STFGM][0-9]{7}[A-Z]$', writeOnly: true, nullable: true, description: Optional NRIC or FIN. It is never returned by this API. }
         email: { type: string, format: email, nullable: true }
+        race: { type: string, maxLength: 50, nullable: true }
+        nationality: { type: string, maxLength: 50, nullable: true }
+        addressStreet: { type: string, maxLength: 255, nullable: true }
+        addressUnit: { type: string, maxLength: 20, nullable: true }
+        addressPostalCode: { type: string, maxLength: 10, nullable: true }
         preferredLanguage: { type: string, maxLength: 50, nullable: true }
         accessibilityNotes: { type: string, maxLength: 1000, nullable: true }
         status: { type: string, enum: [ACTIVE, INACTIVE, DECEASED] }
@@ -4104,7 +4116,13 @@ components:
         dateOfBirth: { type: string, format: date-time }
         gender: { type: string, enum: [M, F, O, U] }
         contactNumber: { type: string }
+        nricMasked: { type: string, nullable: true, pattern: '^[STFGM]•••[0-9]{4}$', readOnly: true }
         email: { type: string, format: email, nullable: true }
+        race: { type: string, nullable: true }
+        nationality: { type: string, nullable: true }
+        addressStreet: { type: string, nullable: true }
+        addressUnit: { type: string, nullable: true }
+        addressPostalCode: { type: string, nullable: true }
         preferredLanguage: { type: string, nullable: true }
         accessibilityNotes: { type: string, nullable: true }
         status: { type: string, enum: [ACTIVE, INACTIVE, DECEASED] }
@@ -4141,12 +4159,13 @@ components:
     ParticipantMatchRequest:
       type: object
       additionalProperties: false
-      required: [firstName, lastName, dateOfBirth, contactNumber]
+      required: [firstName, lastName, dateOfBirth, contactNumber, nric]
       properties:
         firstName: { type: string, minLength: 1, maxLength: 100 }
         lastName: { type: string, minLength: 1, maxLength: 100 }
         dateOfBirth: { type: string, format: date }
         contactNumber: { type: string, minLength: 7, maxLength: 30 }
+        nric: { type: string, pattern: '^[STFGM][0-9]{7}[A-Z]$', writeOnly: true, description: Required NRIC or FIN used for duplicate matching. It is never returned by this API. }
     ParticipantMatchResponse:
       type: object
       additionalProperties: false

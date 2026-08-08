@@ -1160,7 +1160,7 @@ export interface paths {
         put?: never;
         /**
          * Find possible participant matches for the assigned registration event
-         * @description A name alone never produces a possible match. At least two of full name, date of birth, and contact number must agree.
+         * @description A name alone never produces a possible match. An exact NRIC or FIN match is a strong match; otherwise at least two of full name, date of birth, and contact number must agree.
          */
         post: operations["matchParticipantsForRegistration"];
         delete?: never;
@@ -3721,8 +3721,15 @@ export interface components {
             /** @enum {string} */
             gender: "M" | "F" | "O" | "U";
             contactNumber: string;
+            /** @description Required NRIC or FIN. It is never returned by this API. */
+            nric: string;
             /** Format: email */
             email?: string | null;
+            race?: string | null;
+            nationality?: string | null;
+            addressStreet?: string | null;
+            addressUnit?: string | null;
+            addressPostalCode?: string | null;
             preferredLanguage?: string | null;
             accessibilityNotes?: string | null;
             /** @enum {string} */
@@ -3736,8 +3743,15 @@ export interface components {
             /** @enum {string} */
             gender?: "M" | "F" | "O" | "U";
             contactNumber?: string;
+            /** @description Optional NRIC or FIN. It is never returned by this API. */
+            nric?: string | null;
             /** Format: email */
             email?: string | null;
+            race?: string | null;
+            nationality?: string | null;
+            addressStreet?: string | null;
+            addressUnit?: string | null;
+            addressPostalCode?: string | null;
             preferredLanguage?: string | null;
             accessibilityNotes?: string | null;
             /** @enum {string} */
@@ -3754,8 +3768,14 @@ export interface components {
             /** @enum {string} */
             gender: "M" | "F" | "O" | "U";
             contactNumber: string;
+            readonly nricMasked?: string | null;
             /** Format: email */
             email?: string | null;
+            race?: string | null;
+            nationality?: string | null;
+            addressStreet?: string | null;
+            addressUnit?: string | null;
+            addressPostalCode?: string | null;
             preferredLanguage?: string | null;
             accessibilityNotes?: string | null;
             /** @enum {string} */
@@ -3793,6 +3813,8 @@ export interface components {
             /** Format: date */
             dateOfBirth: string;
             contactNumber: string;
+            /** @description Required NRIC or FIN used for duplicate matching. It is never returned by this API. */
+            nric: string;
         };
         ParticipantMatchResponse: {
             /** @enum {string} */
