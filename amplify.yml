@@ -1,0 +1,21 @@
+version: 1
+applications:
+  - appRoot: react-user-dashboard
+    frontend:
+      phases:
+        preBuild:
+          commands:
+            - nvm install 22
+            - corepack enable
+            - corepack prepare pnpm@11.20.0 --activate
+            - pnpm install --frozen-lockfile
+        build:
+          commands:
+            - pnpm build
+      artifacts:
+        baseDirectory: dist
+        files:
+          - "**/*"
+      cache:
+        paths:
+          - node_modules/**/*
