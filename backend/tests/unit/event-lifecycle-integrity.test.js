@@ -47,6 +47,7 @@ function transactionDb(current, updated, handlers = {}) {
     device: { findFirst: handlers.device || (async () => null) },
     eventAuditLog: { create: handlers.eventAudit || (async () => ({})) },
     auditLog: { create: handlers.audit || (async () => ({})) },
+    domainEvent: { create: handlers.domainEvent || (async () => ({})) },
     ...handlers.tx,
   };
   return {

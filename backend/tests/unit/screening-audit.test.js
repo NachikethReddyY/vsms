@@ -57,6 +57,7 @@ function installSuccessMocks(t, audits) {
         return { ...data, id: crypto.randomUUID() };
       },
     },
+    domainEvent: { create: async ({ data }) => ({ ...data, domainEventId: crypto.randomUUID() }) },
   }));
 }
 
