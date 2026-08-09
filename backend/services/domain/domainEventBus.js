@@ -60,21 +60,28 @@ function registerHandler(type, handler) {
     throw new TypeError("Domain event handler must be registered for a non-empty event type");
   }
   if (typeof handler !== "function") throw new TypeError("Domain event handler must be a function");
+  const ids = [];
   for (const eventType of Array.isArray(type) ? type : [type]) {
     if (!handlers.has(eventType)) handlers.set(eventType, []);
-    const entry = { id: `${eventType}:${handlers.get(eventType).length}`, handler };
-    handlers.get(eventType).push(entry);
+    const id = `${eventType}:${handlers.get(eventType).length}`;
+    handlers.get(eventType).push({ id, handler });
+    ids.push(id);
   }
-  return type;
+  return Array.isArray(type) ? ids : ids[0];
 }
 
 function unregisterHandler(handle) {
+  const handles = Array.isArray(handle) ? handle : [handle];
+  let removed = 0;
   for (const [eventType, entries] of handlers) {
+    const before = entries.length;
     for (let index = entries.length - 1; index >= 0; index -= 1) {
-      if (entries[index].id === handle) entries.splice(index, 1);
+      if (handles.includes(entries[index].id)) entries.splice(index, 1);
     }
     if (!entries.length) handlers.delete(eventType);
+    removed += before - entries.length;
   }
+  return removed > 0;
 }
 
 function resetHandlers() {
@@ -196,7 +203,7 @@ async function dispatchEvent(row, overrides = {}) {
         context: {
           db: client,
           logger,
-          emit: (input) => emit({ client: prisma, ...input }),
+          emit: (input) => emit({ client: overrides.prisma || prisma, ...input }),
         },
       });
     } catch (error) {

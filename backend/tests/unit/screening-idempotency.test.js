@@ -206,6 +206,7 @@ test("screening idempotency stores a canonical fingerprint", async (t) => {
       create: async ({ data }) => { receipt = data; return data; },
     },
     auditLog: { create: async ({ data }) => data },
+    domainEvent: { create: async ({ data }) => data },
     eventRegistration: { findFirst: async () => ({ registrationId, registrationStatus: "CHECKED_IN" }) },
   }));
 
@@ -268,6 +269,7 @@ test("delayed K1 replay returns its immutable result without replacing K2", asyn
     },
     eventRegistration: { findFirst: async () => ({ registrationId, registrationStatus: "CHECKED_IN" }) },
     auditLog: { create: async ({ data }) => data },
+    domainEvent: { create: async ({ data }) => data },
   }));
 
   const k1 = { ...body, idempotencyKey: "screening-K1" };

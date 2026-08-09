@@ -69,6 +69,7 @@ function installTransaction(t, current, updated, overrides = {}) {
     stationTemplate: { findMany: async () => [] },
     eventAuditLog: { create: async () => ({}) },
     auditLog: { create: async () => ({}) },
+    domainEvent: { create: async () => ({}) },
     $executeRawUnsafe: async () => 1,
     ...overrides,
   });
