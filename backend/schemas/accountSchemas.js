@@ -1,4 +1,5 @@
 const { z } = require("zod");
+const { roleList } = require("./userSchemas");
 
 const optionalNullableText = (max) => z.string().trim().max(max).nullable().optional();
 const accountParams = z.object({ accountId: z.string().uuid() }).strict();
@@ -21,7 +22,7 @@ const accountListQuery = z.object({
   eventRole: z.enum(["EVENT_MANAGER", "REGISTRATION", "SCREENER", "REVIEWER", "SUPPORT"]).optional(),
 }).strict();
 
-const approvalBody = z.object({ reason: optionalNullableText(500) }).strict();
+const approvalBody = z.object({ reason: optionalNullableText(500), roles: roleList }).strict();
 const rejectionBody = z.object({ reason: z.string().trim().min(3).max(500) }).strict();
 const suspensionBody = z.object({ reason: z.string().trim().min(3).max(500) }).strict();
 const reactivationBody = z.object({ reason: optionalNullableText(500) }).strict();

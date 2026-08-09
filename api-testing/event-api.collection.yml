@@ -12930,7 +12930,7 @@ item:
               }
             ]
           }
-  - name: Approve a pending account without assigning an operational role
+  - name: Approve a pending account, assign application roles, and synchronize Cognito groups
     description: ''
     event: []
     request:
@@ -12960,7 +12960,10 @@ item:
         mode: raw
         raw: |-
           {
-            "reason": ""
+            "reason": "",
+            "roles": [
+              "ADMINISTRATOR"
+            ]
           }
         options:
           raw:
@@ -13039,6 +13042,79 @@ item:
               "reason": "OLDER_GENERATION_PENDING"
             }
           }
+      - name: 202 Response
+        originalRequest:
+          method: POST
+          header:
+            - key: Content-Type
+              value: application/json
+              description: JSON request body
+              type: text
+          url: '{{baseUrl}}/admin/accounts/{accountId}/approve'
+        status: Accepted
+        code: 202
+        header:
+          - key: Content-Type
+            value: application/json
+        body: |-
+          {
+            "account": {
+              "id": "00000000-0000-4000-8000-000000000000",
+              "fullName": "",
+              "email": "",
+              "contactNumber": "",
+              "employeeNumber": "",
+              "department": "",
+              "designation": "",
+              "professionalCategory": "STAFF",
+              "approvalState": "PENDING",
+              "accessState": "ENABLED",
+              "status": "ACTIVE",
+              "lastLoginAt": "2026-08-07T00:00:00.000Z",
+              "sessionInvalidBefore": "2026-08-07T00:00:00.000Z",
+              "deprovisionedAt": "2026-08-07T00:00:00.000Z",
+              "deprovisionReason": "",
+              "createdAt": "2026-08-07T00:00:00.000Z",
+              "updatedAt": "2026-08-07T00:00:00.000Z",
+              "roles": [
+                "ADMINISTRATOR"
+              ],
+              "eventMemberships": [
+                {
+                  "id": "00000000-0000-4000-8000-000000000000",
+                  "eventId": "00000000-0000-4000-8000-000000000000",
+                  "userId": "00000000-0000-4000-8000-000000000000",
+                  "status": "ACTIVE",
+                  "addedById": "00000000-0000-4000-8000-000000000000",
+                  "addedAt": "2026-08-07T00:00:00.000Z",
+                  "removedById": "00000000-0000-4000-8000-000000000000",
+                  "removedAt": "2026-08-07T00:00:00.000Z",
+                  "removalReason": "",
+                  "event": {
+                    "eventId": "00000000-0000-4000-8000-000000000000",
+                    "name": "",
+                    "status": "DRAFT",
+                    "startsAt": "2026-08-07T00:00:00.000Z",
+                    "endsAt": "2026-08-07T00:00:00.000Z"
+                  },
+                  "roles": [
+                    {
+                      "role": "EVENT_MANAGER",
+                      "assignedAt": "2026-08-07T00:00:00.000Z"
+                    }
+                  ]
+                }
+              ]
+            },
+            "providerOperation": {
+              "id": "00000000-0000-4000-8000-000000000000",
+              "operationType": "SYNC_ACCESS",
+              "generation": 1,
+              "status": "PENDING",
+              "pending": true,
+              "reason": "OLDER_GENERATION_PENDING"
+            }
+          }
       - name: 401 Response
         originalRequest:
           method: POST
@@ -13050,34 +13126,6 @@ item:
           url: '{{baseUrl}}/admin/accounts/{accountId}/approve'
         status: Unauthorized
         code: 401
-        header:
-          - key: Content-Type
-            value: application/json
-        body: |-
-          {
-            "type": "",
-            "title": "",
-            "status": 0,
-            "code": "",
-            "requestId": "00000000-0000-4000-8000-000000000000",
-            "errors": [
-              {
-                "field": "",
-                "message": ""
-              }
-            ]
-          }
-      - name: 403 Response
-        originalRequest:
-          method: POST
-          header:
-            - key: Content-Type
-              value: application/json
-              description: JSON request body
-              type: text
-          url: '{{baseUrl}}/admin/accounts/{accountId}/approve'
-        status: Forbidden
-        code: 403
         header:
           - key: Content-Type
             value: application/json

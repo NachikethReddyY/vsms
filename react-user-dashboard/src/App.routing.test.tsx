@@ -28,6 +28,10 @@ vi.mock('./features/screening/RefractionStationPage', () => ({ default: () => <p
 vi.mock('./features/screening/VisualAcuityStationPage', () => ({ default: () => <p>Visual acuity station</p> }));
 vi.mock('./features/screening/OfflineSyncControl', () => ({ OfflineSyncControl: () => <span>Offline sync</span> }));
 vi.mock('./pages/AdminPages', () => ({ AuditLogsPage: () => <p>Audit logs</p> }));
+vi.mock('./pages/StaffAccountsPage', () => ({
+  default: () => <p>Staff directory</p>,
+  ROLE_OPTIONS: [{ value: 'REVIEWER', label: 'Reviewer / doctor' }],
+}));
 vi.mock('./pages/AccountSecurityPage', () => ({ default: () => <p>Security</p> }));
 vi.mock('./pages/QueuePages', () => ({ QueuePage: () => <p>Queue</p> }));
 vi.mock('./pages/ParticipantStatusPage', () => ({ default: () => <p>Participant status</p> }));
@@ -104,5 +108,11 @@ describe('App route and navigation topology', () => {
   it('renders admin deletion route for authorized administrators', async () => {
     renderPath('/events/event-1/delete');
     expect(await screen.findByText('Permanent deletion')).toBeTruthy();
+  });
+
+  it('consolidates staff invitations and lifecycle administration on /staff', async () => {
+    renderPath('/staff');
+    expect(await screen.findByText('Staff directory')).toBeTruthy();
+    expect(await screen.findByText('Account administration')).toBeTruthy();
   });
 });

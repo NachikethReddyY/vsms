@@ -21,13 +21,14 @@ const unwrap = <T>(value: T | { data: T }) => (value && typeof value === 'object
 export const jobId = (job: ReportJob) => job.jobId || job.reportExportJobId || job.id || '';
 
 export async function getCurrentAccount() { return (await apiClient.get('/account')).data as { account?: AccountProfile } | AccountProfile; }
+export async function getAuthConfig() { return (await apiClient.get('/auth/config-status')).data as { configured: boolean; publicSignupEnabled: boolean }; }
 export async function updateCurrentAccount(payload: Pick<AccountProfile, 'fullName' | 'contactNumber' | 'professionalCategory'>) { return (await apiClient.patch('/account', payload)).data; }
 function compactParams(params: Record<string, unknown>) {
   return Object.fromEntries(Object.entries(params).filter(([, value]) => value !== undefined && value !== null && (typeof value !== 'string' || value.trim() !== '')));
 }
 export async function listAdminAccounts(params: Record<string, unknown>) { const { q, pageSize, ...rest } = params; return (await apiClient.get('/admin/accounts', { params: compactParams({ ...rest, search: q || rest.search, limit: pageSize || rest.limit }) })).data as Page<AdminAccount>; }
 export async function getAdminAccount(id: string) { return (await apiClient.get('/admin/accounts/' + id)).data as { account?: AdminAccount } | AdminAccount; }
-export async function decideAccount(id: string, action: string, reason?: string) { const route = action === 'revoke-session' ? 'revoke-sessions' : action === 'resend-notification' ? 'resend-lifecycle' : action; const bodyNeeded = ['approve','reject','suspend','reactivate','deprovision'].includes(route); return (await apiClient.post('/admin/accounts/' + id + '/' + route, bodyNeeded ? { reason } : undefined)).data; }
+export async function decideAccount(id: string, action: string, reason?: string, roles?: string[]) { const route = action === 'revoke-session' ? 'revoke-sessions' : action === 'resend-notification' ? 'resend-lifecycle' : action; const bodyNeeded = ['approve','reject','suspend','reactivate','deprovision'].includes(route); return (await apiClient.post('/admin/accounts/' + id + '/' + route, bodyNeeded ? { reason, ...(route === 'approve' ? { roles } : {}) } : undefined)).data; }
 export async function listMemberships(eventId: string) { return (await apiClient.get('/events/' + eventId + '/memberships')).data as Page<MembershipRow> | MembershipRow[]; }
 export async function getEvent(eventId: string) { return (await apiClient.get('/events/' + eventId)).data as EventDetail; }
 export async function assignShiftStaff(eventId: string, shiftId: string, payload: { version: number; userId: string; assignmentRole: string; eventStationId?: string | null }) { return (await apiClient.post('/events/' + eventId + '/shifts/' + shiftId + '/assignments', payload)).data as EventDetail; }
