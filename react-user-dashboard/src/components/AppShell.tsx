@@ -65,6 +65,34 @@ export default function AppShell({ children }: { children: ReactNode }) {
         </div>
       </header>
 
+      <header className="workspace-mobile-header">
+        <Link className="workspace-mobile-brand" to="/events" aria-label="VSMS events">
+          <svg viewBox="0 0 32 32" fill="none" aria-hidden="true">
+            <path d="M9 7H6v6M23 7h3v6M9 25H6v-6M23 25h3v-6" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+            <path d="M9 21c3.6 0 3.8-10 7.3-10 2.4 0 2.8 5.3 6.7 5.3" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+            <circle cx="9" cy="21" r="2" fill="currentColor" />
+            <circle cx="16.3" cy="11" r="2" fill="currentColor" />
+            <circle cx="23" cy="16.3" r="2" fill="currentColor" />
+          </svg>
+        </Link>
+        <div className="workspace-mobile-status">
+          {canUseOfflineScreening && offlineEventId && <OfflineSyncControl eventId={offlineEventId} />}
+        </div>
+        <ProfileMenu triggerClassName="workspace-mobile-profile" compact />
+      </header>
+
+      <nav className="workspace-mobile-dock" aria-label="Mobile navigation">
+        <NavLink to="/events" aria-label="Events"><CalendarDaysIcon aria-hidden="true" /></NavLink>
+        {canManageEvents && <NavLink to="/reports" aria-label="Reports"><ChartBarSquareIcon aria-hidden="true" /></NavLink>}
+        {canManageStaff && <NavLink to="/staff" aria-label="Staff"><UserGroupIcon aria-hidden="true" /></NavLink>}
+        <ThemeToggle className="workspace-mobile-action" />
+        {canCreateEvent && eventEditPath
+          ? <Link to={eventEditPath} aria-label="Edit event"><PencilSquareIcon aria-hidden="true" /></Link>
+          : canCreateEvent && location.pathname !== '/events/new'
+            ? <Link to="/events/new" aria-label="Create event"><PlusIcon aria-hidden="true" /></Link>
+            : null}
+      </nav>
+
       <main className="workspace-main" id="main-content" ref={workspaceRef}>{children}</main>
     </div>
   );
