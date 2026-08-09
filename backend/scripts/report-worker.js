@@ -1,7 +1,7 @@
 const prisma = require("../prisma/prismaClient");
 const logger = require("../utils/logger/logger");
-const { expireReportArtifacts, processNextReportJob } = require("../services/reportExportService");
-const { processArtifactCleanupTasks } = require("../services/artifactCleanupService");
+const { expireReportArtifacts, processNextReportJob } = require("../services/reporting/reportExportService");
+const { processArtifactCleanupTasks } = require("../services/platform/artifactCleanupService");
 
 const once = process.argv.includes("--once");
 const pollMs = Math.min(Math.max(Number(process.env.REPORT_WORKER_POLL_MS || 5000), 250), 60000);

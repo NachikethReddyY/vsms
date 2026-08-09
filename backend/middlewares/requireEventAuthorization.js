@@ -1,5 +1,5 @@
 const asyncHandler = require("./asyncHandler");
-const authorization = require("../services/eventAuthorizationService");
+const authorization = require("../services/event/eventAuthorizationService");
 
 const eventIdFrom = (req) => req.params.eventId || req.body?.eventId || req.query?.eventId;
 

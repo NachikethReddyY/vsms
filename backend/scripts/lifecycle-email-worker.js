@@ -1,7 +1,7 @@
 const prisma = require("../prisma/prismaClient");
 const env = require("../config/env");
 const logger = require("../utils/logger/logger");
-const { processNextLifecycleEmail, reconcileStaleLifecycleEmails } = require("../services/accountLifecycleNotificationService");
+const { processNextLifecycleEmail, reconcileStaleLifecycleEmails } = require("../services/account/accountLifecycleNotificationService");
 
 const once = process.argv.includes("--once");
 const pollMs = env.LIFECYCLE_EMAIL_WORKER_POLL_MS;

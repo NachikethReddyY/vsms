@@ -16,7 +16,7 @@ const { timingSafeEqual } = require("../utils/security");
 const { syncLocalUser, rolesFromCognitoGroups, ALLOWED_ROLES } = require("../utils/staff");
 const prisma = require("../prisma/prismaClient");
 const { sessionValidity } = require("../utils/sessionValidity");
-const { enqueueAccountLifecycle } = require("../services/accountLifecycleNotificationService");
+const { enqueueAccountLifecycle } = require("../services/account/accountLifecycleNotificationService");
 const {
     ACCESS_COOKIE,
     REFRESH_COOKIE,

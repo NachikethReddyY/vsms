@@ -3,7 +3,7 @@ const prisma = require("../prisma/prismaClient");
 const { assertUuid, cleanString, validationError } = require("../utils/validation");
 const { assertRegistrationAssignment } = require("../utils/staff");
 const { assertParticipantEventScope } = require("../utils/participantEventScope");
-const { requireReviewerAccess } = require("../services/reviewService");
+const { requireReviewerAccess } = require("../services/screening/reviewService");
 const { MIME_EXTENSIONS, hasExpectedImageSignature, storeSignature, deleteSignature } = require("../utils/signatureStorage");
 
 exports.storeSignature = asyncHandler(async (req, res) => {

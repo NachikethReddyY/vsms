@@ -7,7 +7,7 @@ const path = require("node:path");
 process.env.DATABASE_URL ||= "postgresql://test:test@localhost:5432/vsms_test";
 
 const prisma = require("../../prisma/prismaClient");
-const eventService = require("../../services/eventService");
+const eventService = require("../../services/event/eventService");
 
 const manager = { userId: crypto.randomUUID(), systemRole: "ADMIN", roles: ["ADMINISTRATOR"], status: "ACTIVE", approvalState: "APPROVED", accessState: "ENABLED" };
 const staffId = crypto.randomUUID();
@@ -69,6 +69,7 @@ function installTransaction(t, current, updated, overrides = {}) {
     stationTemplate: { findMany: async () => [] },
     eventAuditLog: { create: async () => ({}) },
     auditLog: { create: async () => ({}) },
+    domainEvent: { create: async () => ({}) },
     $executeRawUnsafe: async () => 1,
     ...overrides,
   });

@@ -1,13 +1,13 @@
 const QRCode = require("qrcode");
 const crypto = require("crypto");
-const prisma = require("../prisma/prismaClient");
-const { attendanceWhere } = require("./attendanceDefinition");
-const env = require("../config/env");
-const { decrypt, encrypt, encryptionContext } = require("../utils/cryptoUtils");
-const { renderBrandedQrSvg } = require("../utils/qrBranding");
-const { assertUuid } = require("../utils/validation");
-const { hashToken, QR_TOKEN_PATTERN } = require("../utils/qrToken");
-const AppError = require("../errors/AppError");
+const prisma = require("../../prisma/prismaClient");
+const { attendanceWhere } = require("../event/attendanceDefinition");
+const env = require("../../config/env");
+const { decrypt, encrypt, encryptionContext } = require("../../utils/cryptoUtils");
+const { renderBrandedQrSvg } = require("../../utils/qrBranding");
+const { assertUuid } = require("../../utils/validation");
+const { hashToken, QR_TOKEN_PATTERN } = require("../../utils/qrToken");
+const AppError = require("../../errors/AppError");
 
 function buildQRTargetUrl(token) {
     return `${env.publicAppOrigin}/participant-status/${encodeURIComponent(token)}`;

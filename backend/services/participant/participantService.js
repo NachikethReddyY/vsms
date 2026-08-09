@@ -1,6 +1,6 @@
 const crypto = require("crypto");
-const prisma = require("../prisma/prismaClient");
-const { createAuditLog } = require("../utils/audit");
+const prisma = require("../../prisma/prismaClient");
+const { createAuditLog } = require("../../utils/audit");
 const {
     assertUuid,
     cleanNric,
@@ -11,9 +11,9 @@ const {
     validateEmergencyContactPayload,
     validateConsentPayload,
     validationError,
-} = require("../utils/validation");
-const { loadVerifiedSignature, consumeSignatureArtifact } = require("../utils/signatureStorage");
-const { assertParticipantEventScope, participantEventScopeWhere } = require("../utils/participantEventScope");
+} = require("../../utils/validation");
+const { loadVerifiedSignature, consumeSignatureArtifact } = require("../../utils/signatureStorage");
+const { assertParticipantEventScope, participantEventScopeWhere } = require("../../utils/participantEventScope");
 
 const OPEN_EVENT_STATUSES = ["PUBLISHED", "UPCOMING", "ONGOING", "IN_PROGRESS"];
 

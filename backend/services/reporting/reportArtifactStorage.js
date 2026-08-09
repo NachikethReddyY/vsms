@@ -1,6 +1,6 @@
 const crypto = require("node:crypto");
-const AppError = require("../errors/AppError");
-const prisma = require("../prisma/prismaClient");
+const AppError = require("../../errors/AppError");
+const prisma = require("../../prisma/prismaClient");
 
 const UUID = "[a-f0-9]{8}-[a-f0-9]{4}-[1-5][a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}";
 const LEGACY_KEY_PATTERN = new RegExp(`^${UUID}/${UUID}\\.(pdf|csv)$`);

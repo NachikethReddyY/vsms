@@ -4,7 +4,7 @@ const test = require("node:test");
 process.env.DATABASE_URL ||= "postgresql://test:test@localhost:5432/vsms_test";
 
 const eventController = require("../../controllers/eventController");
-const eventService = require("../../services/eventService");
+const eventService = require("../../services/event/eventService");
 const env = require("../../config/env");
 const { createExportReceipt } = require("../../utils/eventExportReceipt");
 const { encodeCursor } = require("../../utils/cursor");

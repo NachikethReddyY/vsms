@@ -1,4 +1,4 @@
-const AppError = require("../errors/AppError");
+const AppError = require("../../errors/AppError");
 
 const FINAL_ADMIN_LOCK_KEY = 868493827451n;
 

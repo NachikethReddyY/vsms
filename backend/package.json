@@ -29,6 +29,7 @@
     "dev:preset": "node scripts/dev-preset.js",
     "worker:reports": "node scripts/report-worker.js",
     "worker:lifecycle-email": "node scripts/lifecycle-email-worker.js",
+    "worker:domain-event": "node scripts/domain-event-worker.js",
     "deploy": "pnpm install && pnpm db:setup && pnpm start",
     "deploy:prod": "pnpm install --prod && pnpm db:setup && pnpm start",
     "ci": "pnpm prisma:validate && pnpm prisma:generate && pnpm test && pnpm openapi:lint"

@@ -1,11 +1,11 @@
 const crypto = require("crypto");
-const prisma = require("../prisma/prismaClient");
-const AppError = require("../errors/AppError");
-const { resolveRegistrationByQrValue } = require("../utils/qrToken");
-const { IMPORTABLE_TEMPLATE_KEYS } = require("./stationTemplateMapping");
-const { loadVerifiedSignature, consumeSignatureArtifact } = require("../utils/signatureStorage");
-const { requireEventRoleAndDuty } = require("./eventAuthorizationService");
-const { maskNric } = require("../utils/validation");
+const prisma = require("../../prisma/prismaClient");
+const AppError = require("../../errors/AppError");
+const { resolveRegistrationByQrValue } = require("../../utils/qrToken");
+const { IMPORTABLE_TEMPLATE_KEYS } = require("../event/stationTemplateMapping");
+const { loadVerifiedSignature, consumeSignatureArtifact } = require("../../utils/signatureStorage");
+const { requireEventRoleAndDuty } = require("../event/eventAuthorizationService");
+const { maskNric } = require("../../utils/validation");
 
 const FLAG_RANK = { NORMAL: 0, REVIEW: 1, REFER: 2, URGENT: 3 };
 const SUPPORTED_SCREENING_TYPES = Object.values(IMPORTABLE_TEMPLATE_KEYS);

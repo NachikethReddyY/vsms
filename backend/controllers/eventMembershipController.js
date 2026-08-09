@@ -1,4 +1,4 @@
-const service = require("../services/eventMembershipService");
+const service = require("../services/event/eventMembershipService");
 
 exports.list = async (req, res) => res.json(await service.listMemberships(req.params.eventId, req.user));
 exports.eligible = async (req, res) => res.json(await service.listEligibleUsers(req.params.eventId, req.query, req.user));

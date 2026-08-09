@@ -1,7 +1,7 @@
 const crypto = require("node:crypto");
 const { SNSClient, ConfirmSubscriptionCommand } = require("@aws-sdk/client-sns");
-const AppError = require("../errors/AppError");
-const env = require("../config/env");
+const AppError = require("../../errors/AppError");
+const env = require("../../config/env");
 
 const MAX_CERTIFICATE_BYTES = 64 * 1024;
 const certificateCache = new Map();

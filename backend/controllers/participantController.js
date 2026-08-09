@@ -1,5 +1,5 @@
 const asyncHandler = require("../middlewares/asyncHandler");
-const participantService = require("../services/participantService");
+const participantService = require("../services/participant/participantService");
 
 exports.searchParticipants = asyncHandler(async (req, res) => {
     const result = await participantService.searchParticipantsService(req);

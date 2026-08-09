@@ -5,7 +5,7 @@ const test = require("node:test");
 process.env.DATABASE_URL ||= "postgresql://test:test@localhost:5432/vsms_test";
 
 const { encrypt, encryptionContext } = require("../../utils/cryptoUtils");
-const qrService = require("../../services/qrService");
+const qrService = require("../../services/participant/qrService");
 
 const eventId = "11111111-1111-4111-8111-111111111111";
 const registrationId = "22222222-2222-4222-8222-222222222222";

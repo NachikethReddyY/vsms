@@ -1,4 +1,4 @@
-const userService = require("../services/userService");
+const userService = require("../services/account/userService");
 
 function splitProviderOperation(result) {
   const { providerOperation, ...data } = result;
