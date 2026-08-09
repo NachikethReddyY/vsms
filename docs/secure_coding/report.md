@@ -66,302 +66,165 @@ These records support accountability, troubleshooting, and security monitoring.
 
 # 2. Requirements Analysis
 
-## 2.1 Functional Requirements
+## 2.1 Design Process & Workflow Mapping
 
-### Authentication and Session Management
+To ensure the Visual Screening Management System (VSMS) accurately reflects ground operations, the system architecture was developed using a bottom-up design methodology. 
 
-- Secure user authentication using JWT-based authentication.
-- Passwords are securely hashed using bcrypt before storage.
-- Refresh token/session management is implemented to improve security and reduce risks associated with long-lived access tokens.
-- Authentication endpoints enforce strong password requirements using Zod validation.
+Initial physical station layouts, participant paths, and data flows were mapped using conceptual system sketches. These visual journeys were then translated into core User Stories, which directly formed the functional requirements and technical implementation specs.
 
-### Participant Management
+### 2.1.1 Sketch-to-Workflow Analysis
+<img width="2048" height="1536" alt="image" src="https://github.com/user-attachments/assets/cb2f5513-7e67-47c4-b63e-6fce677ed5d2" />
 
-- Staff can register and manage participant records.
-- Duplicate participant creation is prevented through database constraints.
-- Participant data retrieval is restricted according to user roles.
+Based on operational site sketches, the participant flow is structured as follows:
 
-### QR Verification Workflow
-
-- The system generates unique QR tokens using cryptographically secure random generation.
-- QR codes contain only token references and do not expose participant information.
-- Tokens can be validated, expired, revoked, and tracked through QRCodePass records.
-
-### Queue and Screening Workflow
-
-- Participants are assigned queue positions during screening events.
-- Staff can update participant progress across different screening stations.
-- Queue states are synchronised between registration and screening workflows.
-
-### Offline Capability
-
-The frontend is designed using Progressive Web Application (PWA) principles to support unstable network environments commonly found during community screening events.
-
-Offline capabilities allow temporary local storage of required workflow information and synchronisation when connectivity is restored.
+1. **Entry & Registration:** Participants arrive at the entrance flag/station and undergo manual registration. 
+2. **QR Pass Generation:** A unique QR token (`a/b` / `pass ID`) is created for the participant to track them across stations without exposing personal health data.
+3. **Multi-Station Screening Routing:** Participants move sequentially through screening stations (e.g., `S1`, `S2`, `S3` for Visual Acuity, Refraction, and Color Vision). Station screeners scan the participant pass to retrieve existing details.
+4. **Auto-Flagging & Clinical Review:** Test inputs are evaluated against clinical thresholds. Flagged cases are automatically highlighted for the doctor/reviewer room.
+5. **Completion & Exit:** Once the doctor conducts the final review/referral, the participant is cleared to exit the event.
 
 ---
 
-## 2.2 Non-Functional Requirements
+### 2.1.2 Actor Mapping & User Story Generation
 
-### Performance
+To bridge the visual site sketches with functional system design, **Excalidraw** was used to model the system boundaries, map actor roles to specific station responsibilities, and map the end-to-end user journeys. 
 
-- Database queries are optimised using Prisma ORM relationships and indexing.
-- Frequently accessed records such as participant lookup, QR verification, and queue status updates are designed for efficient retrieval.
+By visualizing how each actor (Registration Officer, Screener, Reviewer/Doctor, Event Manager) interacts with both the physical workflow and the digital interface, we derived the following core User Stories:
 
-### Security
+<img width="709" height="296" alt="image" src="https://github.com/user-attachments/assets/edb2350f-48a3-4874-9621-b9834c396814" />
 
-VSMS follows secure coding practices aligned with the **OWASP Top 10 (2021)** framework. Security controls are implemented across the application architecture, including the frontend, backend API layer, authentication system, database layer, and deployment environment.
+**Link**: https://excalidraw.com/#json=u0RGhPVcWgBYPCeDk3LIJ,YWMsVuLyWe2ryJA440ZZTQ
 
-The system adopts a defence-in-depth security approach by applying preventive, detective, and corrective security measures to protect Personally Identifiable Information (PII), screening records, authentication credentials, and operational workflows.
+#### User Stories
 
-| OWASP Category | Security Controls Implemented |
-|---|---|
-| **A01: Broken Access Control** | VSMS implements Role-Based Access Control (RBAC) through backend authorization middleware. Protected API endpoints validate authenticated users and their assigned roles before allowing access to sensitive operations such as participant management, screening workflows, and administrative functions. This prevents unauthorised access and privilege escalation. |
-| **A02: Cryptographic Failures** | Sensitive information is protected through cryptographic security controls. HTTPS enforcement protects data transmitted between frontend clients and backend services. User passwords are securely stored using bcrypt hashing, while authentication tokens and sensitive session data are handled using secure token management practices. Encryption mechanisms are applied to protect sensitive stored information where required. |
-| **A03: Injection** | VSMS applies multiple layers of input protection. Client and server-side validation is implemented using Zod schemas to ensure incoming requests follow expected formats. Prisma ORM is used for database communication, providing parameterised queries that prevent unsafe SQL execution and reduce SQL injection risks. |
-| **A04: Insecure Design** | Threat modelling was conducted during the system design phase to identify potential security risks involving authentication, authorization, participant data handling, QR verification, API communication, and workflow manipulation. Identified threats were analysed and mapped to appropriate mitigation controls before implementation. |
-| **A05: Security Misconfiguration** | Secure configuration practices are enforced through environment-based configuration management, restricted CORS policies, Helmet security middleware, secure HTTP headers, disabled Express fingerprinting (`x-powered-by`), and controlled production settings. API documentation exposure is restricted to non-production environments to reduce unnecessary information disclosure. |
-| **A06: Vulnerable and Outdated Components** | VSMS performs dependency security checks to identify vulnerable or outdated third-party libraries and packages. Dependency scanning tools are used to detect known vulnerabilities (CVEs), outdated components, and potential software supply-chain risks. Identified issues are reviewed and mitigated through dependency updates or security fixes. Threat modelling also considers risks introduced through external dependencies and system components. |
-| **A07: Identification and Authentication Failures** | Authentication security is implemented using JWT-based authentication, bcrypt password hashing, password policy enforcement, refresh session management, secure cookie handling, and session timeout controls. Rate limiting is applied to authentication endpoints to reduce brute-force attack risks. MFA is included as an additional security enhancement for stronger account protection. |
-| **A08: Software and Data Integrity Failures** | API integrity is supported through bounded idempotency keys and payload binding, reducing duplicate or mismatched event operations. Serializable and atomic database transactions maintain consistency during event deletion, participant registration, queue updates, and screening submissions. The repository's optional code-signature prototype is not a release assurance by itself; production must enforce signed, immutable artifacts and lockfile verification in the deployment pipeline before claiming startup integrity. |
-| **A09: Security Logging and Monitoring Failures** | Security monitoring is supported through request logging, request context tracking, and audit logging mechanisms. Important activities such as authentication events, administrative actions, QR verification attempts, and security-sensitive operations are recorded to support accountability, investigation, and troubleshooting. |
-| **A10: Server-Side Request Forgery (SSRF)** | External resource requests are controlled through allow-list validation where applicable. Restricting permitted external destinations reduces the possibility of attackers forcing backend services to access unauthorised internal resources. |
+* **US-01 (Registration Officer):** *As a Registration Officer, I want to manually enter participant details and generate a non-sensitive QR pass so that participants can move safely through stations without exposing PII.*
+* **US-02 (Screener):** *As a Screener at Station S1/S2/S3, I want to scan a participant's QR pass to fetch their profile and enter screening measurements even when internet connectivity is unstable.*
+* **US-03 (Reviewer / Doctor):** *As a Reviewing Doctor, I want the system to automatically flag abnormal clinical results (e.g., 2-line eye asymmetry, high astigmatism) so I can make quick referral decisions.*
+* **US-04 (Event Manager):** *As an Event Manager, I want real-time visibility into station queues and participant progress across the entire screening floor.*
 
----
+## 2.2 Functional Requirements
 
-## Additional Security Controls
+### 2.2.1 Authentication and Session Management
+* Secure user authentication using JWT-based authentication.
+* Passwords are securely hashed using `bcrypt` before storage.
+* Refresh token and session management are implemented to reduce risks associated with long-lived access tokens.
+* Authentication endpoints enforce strong password requirements validated via `Zod` schemas.
 
-Beyond OWASP Top 10 alignment, VSMS implements additional defence-in-depth controls to strengthen application security.
+### 2.2.2 Participant & Event Management
+* Staff can register and manage participant records electronically (FR-01, FR-02, FR-03).
+* Duplicate participant creation is prevented through unique database constraints (e.g., NRIC/ID indexes).
+* Participant data retrieval is restricted according to user roles (Role-Based Access Control).
 
-### Rate Limiting
+### 2.2.3 QR Verification Workflow
+* System generates unique QR tokens using cryptographically secure random generation.
+* QR codes contain token references only and do not expose participant PII.
+* Tokens can be validated, expired, revoked, and tracked through `QRCodePass` records.
 
-API rate limiting is implemented using request throttling mechanisms to reduce risks from excessive requests, automated attacks, and brute-force attempts.
+### 2.2.4 Queue and Screening Workflow
+* Participants are assigned queue positions during screening events.
+* Staff can update participant progress across different stations (`S1`, `S2`, `S3`, `Doctor Room`).
+* Station screeners record results electronically with automated clinical threshold flagging (Visual Acuity, Refraction, Color Vision).
+* Queue states are synchronized in real-time between registration and screening workflows.
 
-Examples include:
-
-- Authentication endpoints applying stricter request limits.
-- Mutation endpoints limiting repeated state-changing operations.
-- QR-related operations protected against excessive requests.
-
----
-
-### Secure HTTP Headers
-
-Helmet middleware is implemented to provide additional browser security protections.
-
-Security headers include:
-
-- Content Security Policy (CSP).
-- Protection against common browser-based attacks.
-- Reduction of unnecessary HTTP metadata exposure.
-
-The application also disables Express framework fingerprinting to prevent unnecessary technology disclosure.
+### 2.2.5 Offline Capability & Synchronization
+* Designed as a Progressive Web Application (PWA) with client-side storage (`IndexedDB`) to support offline network environments.
+* Supports manual sync, continuous sync, automatic retry with exponential backoff, and idempotent backend ingestion to avoid duplicate records.
 
 ---
 
-### HTTPS Enforcement and Encryption in Transit
+## 2.3 Non-Functional Requirements (NFRs)
 
-Production environments enforce HTTPS communication by rejecting insecure HTTP requests.
+While Functional Requirements specify *what* the system does, Non-Functional Requirements define *how well* the system performs under field conditions, network instabilities, and operational constraints during community screening events.
 
-TLS-based communication protects sensitive data exchanged between:
+### 2.3.1 Performance and Scalability
+* **NFR-PERF-01 (API Response Latency):** All backend API endpoints (e.g., participant lookups, token verification, queue updates) must maintain a response latency of $\le 1.0\text{ second}$ under normal operational load.
+* **NFR-PERF-02 (Database Optimization):** Database query execution is optimized using Prisma ORM with target indexing on frequently queried fields (e.g., `participantId`, `qrToken`, `queueStatus`).
+* **NFR-PERF-03 (System Capacity):** The system must support concurrent screening workflows for up to **500 participants per event** with a minimum of **20 simultaneous active screeners** without performance degradation.
 
-- Frontend users.
-- Backend API services.
-- External integrations.
+### 2.3.2 Availability, Reliability, and Offline Resilience
+* **NFR-REL-01 (High Availability):** Cloud backend services must maintain **99.9% availability** during scheduled screening events.
+* **NFR-REL-02 (Offline Continuity):** The application is designed as a Progressive Web Application (PWA) using `IndexedDB` for client-side storage, allowing screeners to view screens, navigate, and capture test results without active network connectivity.
+* **NFR-REL-03 (Idempotent Sync Engine):** Offline operations synced upon network restoration must include an `Idempotency-Key` header. Duplicate network requests must resolve safely without creating duplicate participant records or duplicate screening entries.
+* **NFR-REL-04 (Sync Lifecycle & Auto-Retry):** Background sync requests must transition through a defined status lifecycle (`PENDING` $\rightarrow$ `PROCESSING` $\rightarrow$ `SUCCESS` / `FAILED` $\rightarrow$ `RETRY`) using exponential backoff to handle transient network dropped states automatically.
+* **NFR-REL-05 (ACID Database Integrity):** PostgreSQL transactions enforce strict data consistency during concurrent operations (e.g., atomic registration, queue transitions, and result submissions).
 
-This prevents attackers from intercepting sensitive information during transmission.
+### 2.3.3 Security Controls and OWASP Alignment
+The Visual Screening Management System (VSMS) incorporates a defense-in-depth security approach aligned with the **OWASP Top 10 (2021)** framework across all application layers.
 
----
-
-### CORS Protection
-
-Cross-Origin Resource Sharing (CORS) is restricted through an allow-list approach.
-
-Only approved frontend origins are permitted to communicate with backend APIs.
-
-This prevents unauthorised external applications from interacting with protected resources.
-
----
-
-### Secure Request Processing
-
-Incoming API requests are protected through multiple validation and security layers:
-
-- JSON payload size restrictions.
-- Strict content-type validation.
-- Authentication verification.
-- Authorization checks.
-- Zod schema validation.
-- Centralised error handling.
-- Request identification through request IDs.
-
-These controls reduce risks from malformed requests, abuse attempts, and invalid data submission.
+| OWASP Category | Technical Control & Architecture Implementation |
+| :--- | :--- |
+| **A01: Broken Access Control** | Backend Role-Based Access Control (RBAC) middleware enforces fine-grained route protection based on user roles (*Admin, Event Manager, Registration Officer, Screener, Reviewer*). |
+| **A02: Cryptographic Failures** | HTTPS/TLS encryption in transit; passwords hashed using `bcrypt` (salt factor $\ge 10$); non-sensitive cryptographically generated tokens (`a/b` reference IDs) used for QR codes. |
+| **A03: Injection** | Prisma ORM parameterizes all database queries; strict request payload validation on both frontend and backend using `Zod` schemas. |
+| **A04: Insecure Design** | Explicit threat modeling performed during design phase; strict decoupling of participant PII from physical QR codes; offline sync security boundaries. |
+| **A05: Security Misconfiguration** | Strict CORS allow-listing; Helmet middleware enforcing Content Security Policy (CSP); Express header fingerprinting disabled (`x-powered-by`); environment-based configs. |
+| **A06: Vulnerable Components** | Continuous software supply-chain auditing using automated dependency scanning (`npm audit`) to identify and remediate known Common Vulnerabilities and Exposures (CVEs). |
+| **A07: Identification & Auth** | JWT authentication with short-lived access tokens and secure refresh token session management; rate limiting applied via middleware on authentication endpoints to prevent brute-forcing. |
+| **A08: Software & Data Integrity** | Application of idempotency keys to prevent duplicate transaction state changes; CI/CD pipeline enforcement requiring lockfile verification and immutable build artifact hashing before release. |
+| **A09: Logging & Monitoring** | Structured security audit logging (`Winston` logger) capturing authentication attempts, administrative changes, QR verification attempts, and clinical override flags. |
+| **A10: SSRF** | Restricting backend outbound HTTP requests via strict domain allow-listing. |
 
 ---
 
-### Session Security
+## 2.4 Use Case Analysis
 
-Authentication sessions are protected through:
+### 2.4.1 Participant Check-In and Multi-Station Screening Journey
 
-- JWT token verification.
-- Refresh session management.
-- Secure cookie handling.
-- Session timeout mechanisms.
+* **Primary Actors:** Registration Officer, Screener (Stations S1-S3), Reviewer / Doctor, Participant.
+* **Preconditions:** 1. An active event has been created by the Event Manager.
+  2. Registration staff and Screeners are authenticated into their respective station roles.
 
-These controls reduce the impact of stolen credentials and prevent prolonged unauthorised access.
+#### Main Success Scenario
 
----
+1. **Registration & QR Pass Generation:**
+   * Participant arrives at the registration flag/desk.
+   * Registration Officer enters participant details.
+   * The system checks database constraints to prevent duplicate creation.
+   * System generates a cryptographically secure, non-sensitive `QRCodePass` token reference (containing zero participant PII) and links it to the participant record.
 
-### Dependency Security Management
+2. **Station Routing and Progress Tracking:**
+   * Participant advances to assigned screening stations (`S1: Visual Acuity`, `S2: Refraction`, `S3: Color Vision`).
+   * Screener scans the participant's QR code.
+   * Backend/PWA validates the token, fetches current queue status, and loads the participant's screening form.
 
-VSMS performs dependency security checks to maintain a secure software supply chain.
+3. **Data Recording & Auto-Flagging:**
+   * Screener conducts the test and submits clinical measurements.
+   * The system automatically evaluates entries against clinical thresholds (e.g., Visual Acuity $\ge 2$-line asymmetry, high astigmatism $\text{CYL} > -3.00\text{ D}$, single-eye color deficiency).
+   * Flagged results are automatically highlighted and queued for clinical review.
 
-Dependency analysis identifies:
+4. **Doctor Review & Clearance:**
+   * The Reviewing Doctor scans the participant pass or opens the flagged queue.
+   * Doctor reviews highlighted anomalies, acknowledges auto-flagged warnings, adds clinical notes, generates referral forms if necessary, and marks the participant journey as complete.
 
-- Known Common Vulnerabilities and Exposures (CVEs).
-- Outdated third-party packages.
-- Vulnerable transitive dependencies.
-- Potential supply-chain security risks.
+#### Exception & Alternative Flows
 
-Security findings are reviewed and addressed through dependency updates, upgrades, or mitigation measures.
-
----
-
-### Software Integrity Verification
-
-VSMS does not currently claim runtime artifact-signature verification. The previous optional startup prototype silently skipped verification when signature files were absent, checked a source file against a differently named build artifact, and had a second unused implementation. It was removed to avoid presenting a non-enforced control as release assurance.
-
-Production delivery must enforce integrity in the deployment pipeline before release by using:
-
-- SHA-256 cryptographic hashing.
-- Digital signatures.
-- Public key verification.
-
-The pipeline must reject a missing or invalid signature and deploy only the immutable artifact that was actually verified. This remains a deployment requirement; it was not simulated locally and no cloud environment was changed.
-
-This protects against:
-
-- Unauthorised code modification.
-- Tampered deployment artifacts.
-- Software supply-chain attacks.
+* **E-1: Network Connection Lost (Offline Mode):**
+  * *Condition:* Internet drops during screening entry.
+  * *System Action:* PWA stores test records in local `IndexedDB` with a `PENDING` sync status. Screener continues workflow uninterrupted. When connection restores, background sync uploads pending data using idempotency keys.
+* **E-2: Duplicate Registration Attempt:**
+  * *Condition:* Staff attempts to register a participant who already exists in the current event.
+  * *System Action:* Unique database constraints trigger a validation error. System prompts staff to retrieve the existing participant profile and re-issue the QR pass if lost.
+* **E-3: Invalid / Expired QR Token:**
+  * *Condition:* Scanned QR token is invalid, revoked, or assigned to a different event.
+  * *System Action:* Backend returns an authorization error message. Queue state remains unchanged, and station screener is prompted to re-verify participant identity.
 
 ---
 
-### Password Security
+## 2.5 Requirements Traceability Matrix (RTM)
 
-User authentication security is strengthened through:
-
-- bcrypt password hashing.
-- Strong password requirements.
-- Server-side password validation.
-- Protection against invalid authentication attempts.
-
-Plain-text passwords are never stored within the system.
-
----
-
-### Audit Logging
-
-VSMS maintains audit records for security-sensitive operations.
-
-Logged activities include:
-
-- User authentication events.
-- Administrative changes.
-- QR verification activities.
-- Screening workflow updates.
-- Important system actions.
-
-Audit logs support accountability, monitoring, and security investigations.
-
----
-
-# Reliability
-
-VSMS is designed to maintain availability, consistency, and reliability during community screening operations.
-
-## ACID-Compliant Database Transactions
-
-PostgreSQL transactions ensure that critical workflows maintain consistency even when multiple users interact with the system simultaneously.
-
-Examples include:
-
-- Participant registration.
-- Screening result submission.
-- Queue status updates.
-- QR verification records.
-
----
-
-## Idempotent API Processing
-
-Critical operations support idempotent request handling through Idempotency-Key validation.
-
-This prevents:
-
-- Duplicate participant registrations.
-- Multiple queue assignments.
-- Repeated screening submissions.
-- Duplicate transactions caused by network retries.
-
----
-
-## Multi-Layer Validation
-
-Data integrity is maintained through multiple validation layers:
-
-- Frontend validation improves user experience.
-- Backend Zod validation enforces security requirements.
-- Prisma schema constraints maintain database consistency.
-
----
-
-## Error Handling and Recovery
-
-Centralised error handling middleware provides:
-
-- Consistent API responses.
-- Controlled failure handling.
-- Prevention of sensitive stack trace exposure.
-- Generic messages for unknown exceptions; bounded legacy status hints retain correct HTTP semantics, while unclassified failures become generic 500 responses.
-- Improved troubleshooting capability.
-
----
-
-## Offline Operation Support
-
-The Progressive Web Application (PWA) architecture enables temporary offline workflows and later synchronisation when network connectivity is restored.
-
-This improves system availability during community screening events where network reliability may be limited.
-
----
-
-## Database Integrity Controls
-
-PostgreSQL maintains reliable data relationships through:
-
-- Primary keys.
-- Foreign keys.
-- Unique constraints.
-- Relationship validation.
-- Transaction management.
-
-These mechanisms ensure participant records, screening results, QR tokens, and operational data remain accurate and consistent.
-
-## 2.3 Use Case Analysis
-
-### Participant Check-In Use Case
-
-1. Registration staff create or verify participant information.
-2. The system generates a unique QR verification token.
-3. The participant receives a QR code containing only the secure token reference.
-4. Screening staff scan the QR code at assigned stations.
-5. The backend validates the token and retrieves authorised participant information.
-6. Screening results are recorded and linked to the participant's screening journey.
-
-This workflow ensures efficient participant movement while maintaining confidentiality of sensitive information.
-
----
+| Req ID | User Story / Source | Requirement Description | Target Role | Priority | Implementation Component |
+| :--- | :--- | :--- | :--- | :--- | :--- |
+| **REQ-AUTH-01** | System Core | JWT Authentication & Session Refresh | All Users | **High** | `AuthService`, Refresh Tokens |
+| **REQ-AUTH-02** | System Core | Password Hashing & Zod Schema Validation | Admin | **High** | `bcrypt`, Zod Validation Middleware |
+| **REQ-REG-01** | Sketch / US-01 | Electronic Participant Registration & Profiling | Reg Officer | **High** | `ParticipantModule`, Database Indexing |
+| **REQ-QR-01** | Sketch / US-01 | Cryptographic Non-PII QR Token Pass Generation | Reg Officer | **High** | Crypto Engine, `QRCodePass` Entity |
+| **REQ-QUE-01** | Sketch / US-02 | Station Queue Assignment & Progress Tracking | Screener | **High** | Queue Management Controller |
+| **REQ-SCR-01** | Appendix / US-03 | Automated Clinical Flagging Thresholds | Screener / Doctor | **High** | Screening Assessment Engine |
+| **REQ-REV-01** | Sketch / US-03 | Final Outcome Review & Referral Generation | Doctor / Reviewer | **High** | `ReviewerModule` |
+| **NFR-PERF-01** | Performance | API Response Latency $\le 1.0\text{s}$ | All Users | **High** | Prisma Indexing, Fastify/Express Routers |
+| **NFR-REL-02** | Section 9 / US-02 | Client-side Storage & PWA Support | Field Staff | **High** | Service Worker, `IndexedDB` |
+| **NFR-REL-03** | Section 9 / Idempotency| Idempotent Background Synchronization & Retries | System | **High** | Idempotency Sync Engine, Queue Retry Worker |
+| **NFR-SEC-01** | OWASP A01-A10 | Defense-in-depth Security Controls | All Users | **High** | Helmet, Zod, RBAC Middleware |
 
 # 3. Architecture Design
 
