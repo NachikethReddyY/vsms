@@ -940,6 +940,8 @@ model QueueEntry {
   stationId      String      @map("station_id") @db.Uuid
   queueNumber    Int         @map("queue_number")
   status         QueueStatus @default(WAITING)
+  isPriority     Boolean     @default(false) @map("is_priority")
+  priorityNotes  String?     @map("priority_notes") @db.VarChar(255)
   enteredAt      DateTime    @default(now()) @map("entered_at")
   calledAt       DateTime?   @map("called_at")
   startedAt      DateTime?   @map("started_at")

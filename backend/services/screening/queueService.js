@@ -268,7 +268,25 @@ const getEventQueueStatus = async (eventId, user, db = prisma) => {
         queueNumber: entry.queueNumber,
         registrationId: entry.registrationId,
         participantDisplayName: entry.registration.participantDisplayName || "Unnamed participant",
+        isPriority: entry.isPriority,
       };
+    }
+  }
+
+  for (const bucket of byStation.values()) {
+    if (bucket.nextUp) {
+      const priorityWaiting = entries
+        .filter((entry) => entry.stationId === bucket.stationId && entry.status === "WAITING" && entry.isPriority)
+        .sort((a, b) => a.queueNumber - b.queueNumber)[0];
+      if (priorityWaiting && priorityWaiting.queueNumber !== bucket.nextUp.queueNumber) {
+        bucket.nextUp = {
+          queueId: priorityWaiting.id,
+          queueNumber: priorityWaiting.queueNumber,
+          registrationId: priorityWaiting.registrationId,
+          participantDisplayName: priorityWaiting.registration.participantDisplayName || "Unnamed participant",
+          isPriority: true,
+        };
+      }
     }
   }
 
@@ -388,6 +406,8 @@ const advanceQueueEntry = async ({ queueId, toStationId, reason = "STATION_TRANS
         stationId: toStationId,
         queueNumber: current.queueNumber,
         status: "WAITING",
+        isPriority: current.isPriority || false,
+        priorityNotes: current.priorityNotes,
       },
     });
     await tx.queueMovement.create({
@@ -518,6 +538,106 @@ const leaveQueue = async (queueId, user, context = null, db = prisma, expectedEv
   });
 };
 
+const updatePriority = async ({ queueId, isPriority, notes = null }, user, context = null, db = prisma) => {
+  const entry = await loadQueueEntry(db, queueId);
+  await requireQueueStationOperation(db, entry.registration.eventId, entry.stationId, user);
+
+  return db.$transaction(async (tx) => {
+    const current = await tx.queueEntry.findUnique({ where: { id: queueId } });
+    if (!current) throw new AppError(404, "QUEUE_ENTRY_NOT_FOUND", "Queue entry not found");
+    if (current.status === "COMPLETED" || current.status === "CANCELLED" || current.status === "SKIPPED") {
+      throw new AppError(409, "INVALID_QUEUE_STATE", "Priority cannot be changed on a closed queue entry", { status: current.status });
+    }
+    const updated = await tx.queueEntry.update({
+      where: { id: queueId },
+      data: { isPriority, priorityNotes: notes },
+    });
+    await createAuditLog({
+      userId: user.userId,
+      action: "QUEUE_PRIORITY_UPDATED",
+      entityName: "QueueEntry",
+      entityId: queueId,
+      oldValue: { isPriority: current.isPriority, priorityNotes: current.priorityNotes },
+      newValue: { isPriority, priorityNotes: notes },
+      context,
+      client: tx,
+    });
+    return updated;
+  });
+};
+
+const getStationWorkload = async (eventId, user, db = prisma) => {
+  const event = await requireQueueManagement(db, eventId, user);
+  const [stations, entries] = await Promise.all([
+    db.station.findMany({
+      where: { eventId, isActive: true },
+      orderBy: [{ stationOrder: "asc" }, { stationId: "asc" }],
+    }),
+    db.queueEntry.findMany({
+      where: { station: { eventId } },
+      select: {
+        id: true,
+        stationId: true,
+        queueNumber: true,
+        status: true,
+        isPriority: true,
+        enteredAt: true,
+        completedAt: true,
+        registrationId: true,
+      },
+      orderBy: [{ enteredAt: "asc" }, { id: "asc" }],
+    }),
+  ]);
+
+  const byStation = new Map(stations.map((station) => [station.stationId, {
+    stationId: station.stationId,
+    stationName: station.stationName,
+    stationType: station.stationType,
+    stationOrder: station.stationOrder,
+    workload: { WAITING: 0, CALLED: 0, IN_PROGRESS: 0, COMPLETED: 0, SKIPPED: 0, CANCELLED: 0 },
+    activeQueueCount: 0,
+    priorityCount: 0,
+    completedToday: 0,
+    nextUp: null,
+    avgWaitMinutes: 0,
+  }]));
+
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  for (const entry of entries) {
+    const bucket = byStation.get(entry.stationId);
+    if (!bucket) continue;
+    bucket.workload[entry.status] += 1;
+    if (["WAITING", "CALLED", "IN_PROGRESS"].includes(entry.status)) {
+      bucket.activeQueueCount += 1;
+      if (entry.isPriority) bucket.priorityCount += 1;
+    }
+    if (entry.status === "COMPLETED" && entry.completedAt && entry.completedAt >= today) {
+      bucket.completedToday += 1;
+    }
+    if (entry.status === "WAITING" && !bucket.nextUp) {
+      bucket.nextUp = {
+        queueId: entry.id,
+        queueNumber: entry.queueNumber,
+        registrationId: entry.registrationId,
+        isPriority: entry.isPriority,
+      };
+    }
+  }
+
+  for (const bucket of byStation.values()) {
+    if (bucket.activeQueueCount > 0) {
+      const waitSum = entries
+        .filter((entry) => entry.stationId === bucket.stationId && ["WAITING", "CALLED", "IN_PROGRESS"].includes(entry.status))
+        .reduce((sum, entry) => sum + Math.max(0, Date.now() - new Date(entry.enteredAt).getTime()), 0);
+      bucket.avgWaitMinutes = Math.round(waitSum / bucket.activeQueueCount / 60000);
+    }
+  }
+
+  return { event, stations: [...byStation.values()] };
+};
+
 module.exports = {
   joinQueue,
   listRegistrationStations,
@@ -530,4 +650,6 @@ module.exports = {
   completeQueueEntry,
   skipQueueEntry,
   leaveQueue,
+  updatePriority,
+  getStationWorkload,
 };

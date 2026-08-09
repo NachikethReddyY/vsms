@@ -356,8 +356,10 @@ exports.getPublicStatus = async (token, db = prisma) => {
             isActive: true,
             registration: {
                 select: {
+                    registrationId: true,
                     eventId: true,
                     queueNumber: true,
+                    registrationStatus: true,
                     event: { select: { name: true } },
                 },
             },
@@ -378,20 +380,116 @@ exports.getPublicStatus = async (token, db = prisma) => {
             eventName: null,
             currentQueueNumber: null,
             queueNumber: null,
+            registrationStatus: null,
+            queueState: null,
+            stations: [],
+            transfers: [],
             expiresAt: qr?.expiresAt ?? null,
         };
     }
 
+    const eventId = qr.registration.eventId;
+    const registrationId = qr.registration.registrationId;
+
     const currentQueueNumber = (await db.eventRegistration.aggregate({
-        where: attendanceWhere(qr.registration.eventId),
+        where: attendanceWhere(eventId),
         _max: { queueNumber: true },
     }))._max.queueNumber ?? null;
+
+    const [activeEntry, stations, transfers] = await Promise.all([
+        db.queueEntry.findFirst({
+            where: { registrationId, status: { in: ["WAITING", "CALLED", "IN_PROGRESS"] } },
+            orderBy: [{ enteredAt: "desc" }, { id: "desc" }],
+            include: { station: { select: { stationId: true, stationName: true, stationType: true } } },
+        }),
+        db.station.findMany({
+            where: { eventId, isActive: true },
+            orderBy: [{ stationOrder: "asc" }, { stationId: "asc" }],
+        }),
+        db.queueMovement.findMany({
+            where: { registrationId },
+            orderBy: [{ movementTime: "asc" }, { id: "asc" }],
+            include: {
+                fromStation: { select: { stationName: true } },
+                toStation: { select: { stationName: true } },
+            },
+        }),
+    ]);
+
+    const entries = await db.queueEntry.findMany({
+        where: { station: { eventId } },
+        select: {
+            stationId: true,
+            queueNumber: true,
+            status: true,
+            isPriority: true,
+            enteredAt: true,
+            calledAt: true,
+            startedAt: true,
+            completedAt: true,
+        },
+    });
+
+    const byStation = new Map(stations.map((station) => [station.stationId, {
+        stationId: station.stationId,
+        stationName: station.stationName,
+        stationType: station.stationType,
+        workload: { WAITING: 0, CALLED: 0, IN_PROGRESS: 0, COMPLETED: 0, SKIPPED: 0, CANCELLED: 0 },
+        nextUpQueueNumber: null,
+    }]));
+    for (const entry of entries) {
+        const bucket = byStation.get(entry.stationId);
+        if (!bucket) continue;
+        bucket.workload[entry.status] += 1;
+        if (entry.status === "WAITING" && bucket.nextUpQueueNumber == null) {
+            bucket.nextUpQueueNumber = entry.queueNumber;
+        }
+    }
+
+    const queueState = activeEntry
+        ? {
+            status: activeEntry.status,
+            queueNumber: activeEntry.queueNumber,
+            isPriority: activeEntry.isPriority || false,
+            station: {
+                id: activeEntry.station.stationId,
+                name: activeEntry.station.stationName,
+                type: activeEntry.station.stationType,
+            },
+            enteredAt: activeEntry.enteredAt,
+            calledAt: activeEntry.calledAt,
+            startedAt: activeEntry.startedAt,
+            completedAt: activeEntry.completedAt,
+        }
+        : null;
+
+    const registeredNumber = qr.registration.queueNumber;
+    const aheadAtStation = activeEntry
+        ? entries.filter((entry) => (
+            entry.stationId === activeEntry.stationId
+            && entry.status === "WAITING"
+            && entry.queueNumber < activeEntry.queueNumber
+        )).length
+        : null;
 
     return {
         valid: true,
         eventName: qr.registration.event.name,
         currentQueueNumber,
-        queueNumber: qr.registration.queueNumber,
+        queueNumber: registeredNumber,
+        registrationStatus: qr.registration.registrationStatus,
+        queueState,
+        aheadAtStation,
+        stations: [...byStation.values()].map((station) => ({
+            ...station,
+            nextUp: station.nextUpQueueNumber != null ? { queueNumber: station.nextUpQueueNumber } : null,
+            nextUpQueueNumber: undefined,
+        })),
+        transfers: transfers.map((movement) => ({
+            fromStation: movement.fromStation.stationName,
+            toStation: movement.toStation.stationName,
+            at: movement.movementTime,
+        })),
         expiresAt: qr.expiresAt,
     };
 };

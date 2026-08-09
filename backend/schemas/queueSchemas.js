@@ -31,6 +31,11 @@ const advanceQueueBody = z.object({
   reason: z.string().trim().min(1).max(100).optional(),
 }).strict();
 
+const priorityQueueBody = z.object({
+  isPriority: z.boolean(),
+  notes: z.string().trim().max(255).optional(),
+}).strict();
+
 module.exports = {
   eventParams,
   stationParams,
@@ -40,5 +45,7 @@ module.exports = {
   eventParticipantParams,
   joinQueueBody,
   queueHandoffBody,
+  transferQueueBody: advanceQueueBody,
   advanceQueueBody,
+  priorityQueueBody,
 };

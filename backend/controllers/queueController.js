@@ -114,22 +114,3 @@ exports.getStationWorkload = async (req, res, next) => {
     return next(error);
   }
 };
-
-/**
- * Removes a participant from the queue entirely (cancellation/dropout).
- * @route DELETE /api/v1/entries/:queueId
- */
-exports.leaveQueue = async (req, res, next) => {
-  try {
-    const { queueId } = req.params;
-    const removedEntry = await queueService.leaveQueue(queueId, req.user, req.context);
-
-    return res.status(200).json({
-      status: "success",
-      message: "Participant successfully removed from queue.",
-      data: removedEntry
-    });
-  } catch (error) {
-    return next(error);
-  }
-};

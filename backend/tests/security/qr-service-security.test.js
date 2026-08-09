@@ -586,12 +586,22 @@ test("public pass status reveals no PII and reports expired or revoked passes as
         return {
           expiresAt: new Date(Date.now() + 60_000),
           isActive: true,
-          registration: { eventId: "event-1", queueNumber: 42, event: { name: "Community Vision Screening" } },
+          registration: { registrationId: "registration-1", eventId: "event-1", queueNumber: 42, registrationStatus: "CHECKED_IN", event: { name: "Community Vision Screening" } },
         };
       },
     },
     eventRegistration: {
       aggregate: async () => ({ _max: { queueNumber: 99 } }),
+    },
+    queueEntry: {
+      findFirst: async () => null,
+      findMany: async () => [],
+    },
+    station: {
+      findMany: async () => [],
+    },
+    queueMovement: {
+      findMany: async () => [],
     },
   };
 
@@ -599,7 +609,7 @@ test("public pass status reveals no PII and reports expired or revoked passes as
   assert.equal(valid.valid, true);
   assert.equal(valid.eventName, "Community Vision Screening");
   assert.equal(valid.queueNumber, 42);
-  assert.deepEqual(Object.keys(valid).sort(), ["currentQueueNumber", "eventName", "expiresAt", "queueNumber", "valid"]);
+  assert.deepEqual(Object.keys(valid).sort(), ["aheadAtStation", "currentQueueNumber", "eventName", "expiresAt", "queueNumber", "queueState", "registrationStatus", "stations", "transfers", "valid"]);
   assert.equal(where.tokenHash, tokenHash(token));
 
   const revokedDb = {
