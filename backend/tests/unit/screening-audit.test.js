@@ -5,7 +5,7 @@ const crypto = require("node:crypto");
 process.env.DATABASE_URL ||= "postgresql://test:test@localhost:5432/vsms_test";
 
 const prisma = require("../../prisma/prismaClient");
-const screeningService = require("../../services/screeningService");
+const screeningService = require("../../services/screening/screeningService");
 
 const eventId = crypto.randomUUID();
 const stationId = crypto.randomUUID();
@@ -57,6 +57,7 @@ function installSuccessMocks(t, audits) {
         return { ...data, id: crypto.randomUUID() };
       },
     },
+    domainEvent: { create: async ({ data }) => ({ ...data, domainEventId: crypto.randomUUID() }) },
   }));
 }
 

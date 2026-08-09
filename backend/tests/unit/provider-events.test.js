@@ -8,11 +8,11 @@ const {
   validateAwsSnsUrl,
   verifySnsMessage,
   confirmSnsSubscription,
-} = require("../../services/snsMessageService");
+} = require("../../services/platform/snsMessageService");
 const {
   parseSesEvent,
   recordProviderEvent,
-} = require("../../services/sesProviderEventService");
+} = require("../../services/platform/sesProviderEventService");
 
 const TOPIC_ARN = "arn:aws:sns:us-east-1:123456789012:vsms-ses-events";
 const CERT_URL = "https://sns.us-east-1.amazonaws.com/SimpleNotificationService-test.pem";

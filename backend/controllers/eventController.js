@@ -1,4 +1,4 @@
-const eventService = require("../services/eventService");
+const eventService = require("../services/event/eventService");
 
 exports.list = async (req, res) => res.json(await eventService.listEvents(req.query, req.user));
 exports.listActive = async (req, res) => res.json(await eventService.listActiveEvents(req.user));

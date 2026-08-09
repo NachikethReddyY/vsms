@@ -776,6 +776,8 @@ async function seedQueueEntries(staff, event, registration, stations) {
       stationId: firstStation.stationId,
       queueNumber: registration.queueNumber || 1,
       status: "WAITING",
+      isPriority: true,
+      priorityNotes: "Seeded urgent follow-up required after screening",
       enteredAt: new Date(),
     },
   });
@@ -796,6 +798,30 @@ async function seedQueueEntries(staff, event, registration, stations) {
       },
     },
   });
+
+  const fromStation = stations[1];
+  if (fromStation) {
+    await prisma.queueMovement.create({
+      data: {
+        registrationId: registration.registrationId,
+        fromStationId: fromStation.stationId,
+        toStationId: firstStation.stationId,
+        movedBy: staff.id,
+        movementReason: "Seeded station transfer demonstration",
+      },
+    });
+    await prisma.auditLog.create({
+      data: {
+        userId: staff.id,
+        action: "QUEUE_PRIORITY_UPDATED",
+        entityName: "QueueEntry",
+        entityId: queueEntry.id,
+        outcome: "SUCCESS",
+        oldValue: { isPriority: false, priorityNotes: null },
+        newValue: { isPriority: true, priorityNotes: queueEntry.priorityNotes },
+      },
+    });
+  }
   return queueEntry;
 }
 

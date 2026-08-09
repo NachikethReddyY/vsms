@@ -2322,6 +2322,40 @@ export interface paths {
         patch: operations["skipQueueEntry"];
         trace?: never;
     };
+    "/api/v1/queues/entries/{queueId}/priority": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Elevate or clear the urgent/priority flag on an active queue entry */
+        patch: operations["updateQueueEntryPriority"];
+        trace?: never;
+    };
+    "/api/v1/queues/events/{eventId}/workload": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Station workload overview with priority load and average wait time */
+        get: operations["getStationWorkload"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/queues/entries/{queueId}": {
         parameters: {
             query?: never;
@@ -4226,6 +4260,53 @@ export interface components {
                 /** @description Highest queue number already checked in for the event (now serving). Unset when the pass is invalid */
                 currentQueueNumber: number | null;
                 queueNumber: number | null;
+                registrationStatus: components["schemas"]["RegistrationStatus"];
+                queueState: {
+                    /** @description Participant's own live queue state (waiting/called/in-progress) */
+                    status: components["schemas"]["QueueStatus"];
+                    queueNumber: number;
+                    isPriority: boolean;
+                    station: {
+                        /** Format: uuid */
+                        id: string;
+                        name: string;
+                        type: string;
+                    };
+                    /** Format: date-time */
+                    enteredAt?: string | null;
+                    /** Format: date-time */
+                    calledAt?: string | null;
+                    /** Format: date-time */
+                    startedAt?: string | null;
+                    /** Format: date-time */
+                    completedAt?: string | null;
+                } | null;
+                /** @description Number of WAITING participants ahead of this pass at its current station */
+                aheadAtStation: number | null;
+                stations: {
+                    /** Format: uuid */
+                    stationId: string;
+                    stationName: string;
+                    stationType: string;
+                    workload: {
+                        WAITING: number;
+                        CALLED: number;
+                        IN_PROGRESS: number;
+                        COMPLETED: number;
+                        SKIPPED: number;
+                        CANCELLED: number;
+                    };
+                    nextUp: {
+                        queueNumber: number;
+                    } | null;
+                }[];
+                /** @description Station-transfer trail for this pass (no participant data) */
+                transfers: {
+                    fromStation: string;
+                    toStation: string;
+                    /** Format: date-time */
+                    at: string;
+                }[];
                 /** Format: date-time */
                 expiresAt: string | null;
             };
@@ -4393,6 +4474,13 @@ export interface components {
             stationId: string;
             queueNumber: number;
             status: components["schemas"]["QueueStatus"];
+            /**
+             * @description Urgent/priority handling flag surfaced to next-up calling
+             * @default false
+             */
+            isPriority: boolean;
+            /** @description Optional reason recorded when the entry is marked urgent */
+            priorityNotes?: string | null;
             /** Format: date-time */
             enteredAt?: string | null;
             /** Format: date-time */
@@ -4403,6 +4491,49 @@ export interface components {
             leftQueueAt?: string | null;
             /** Format: date-time */
             completedAt?: string | null;
+        };
+        PriorityQueueRequest: {
+            /** @description Whether the queue entry is treated as urgent/priority */
+            isPriority: boolean;
+            /** @description Optional reason for the priority assignment */
+            notes?: string;
+        };
+        StationWorkload: {
+            /** Format: uuid */
+            stationId: string;
+            stationName: string;
+            stationType: string;
+            stationOrder: number;
+            workload: {
+                WAITING: number;
+                CALLED: number;
+                IN_PROGRESS: number;
+                COMPLETED: number;
+                SKIPPED: number;
+                CANCELLED: number;
+            };
+            activeQueueCount: number;
+            priorityCount: number;
+            completedToday: number;
+            nextUp: {
+                /** Format: uuid */
+                queueId: string;
+                queueNumber: number;
+                /** Format: uuid */
+                registrationId: string;
+                isPriority: boolean;
+            } | null;
+            avgWaitMinutes: number;
+        };
+        StationWorkloadResponse: {
+            event: {
+                /** Format: uuid */
+                eventId: string;
+                name: string;
+                status: string;
+                venue: string | null;
+            };
+            stations: components["schemas"]["StationWorkload"][];
         };
         QueueStationWorkload: {
             /** Format: uuid */
@@ -4425,6 +4556,8 @@ export interface components {
                 /** Format: uuid */
                 registrationId: string;
                 participantDisplayName: string;
+                /** @default false */
+                isPriority: boolean;
             } | null;
         };
         EventQueueStatusResponse: {
@@ -9040,6 +9173,64 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["QueueEntry"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            422: components["responses"]["ValidationFailed"];
+        };
+    };
+    updateQueueEntryPriority: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                queueId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PriorityQueueRequest"];
+            };
+        };
+        responses: {
+            /** @description Queue entry priority updated */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["QueueEntry"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            422: components["responses"]["ValidationFailed"];
+        };
+    };
+    getStationWorkload: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                eventId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Station workload summary */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StationWorkloadResponse"];
                 };
             };
             401: components["responses"]["Unauthorized"];

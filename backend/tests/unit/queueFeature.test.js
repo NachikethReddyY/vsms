@@ -2,7 +2,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const crypto = require('node:crypto');
 
-const queueService = require('../../services/queueService');
+const queueService = require('../../services/screening/queueService');
 
 const uuid = () => crypto.randomUUID();
 const eventId = uuid();
@@ -592,4 +592,109 @@ test('event managers may operate queues without a clinical duty', async () => {
 
   const called = await queueService.callQueueEntry(queueId, operationalUser, context, db);
   assert.equal(called.status, 'CALLED');
+});
+
+test('updatePriority marks an active entry urgent and emits QUEUE_PRIORITY_UPDATED audit', async () => {
+  audits.length = 0;
+  const db = baseDb({
+    root: {
+      $transaction: async (callback) => callback(baseTransaction({
+        queueEntry: {
+          findUnique: async () => ({ ...queueEntry, isPriority: false, priorityNotes: null }),
+          update: async ({ data }) => ({ ...queueEntry, ...data }),
+        },
+      })),
+    },
+  });
+
+  const result = await queueService.updatePriority(
+    { queueId, isPriority: true, notes: 'Urgent medical review required' },
+    operationalUser,
+    context,
+    db,
+  );
+
+  assert.equal(result.isPriority, true);
+  assert.equal(result.priorityNotes, 'Urgent medical review required');
+  assert.equal(audits.length, 1);
+  assert.equal(audits[0].action, 'QUEUE_PRIORITY_UPDATED');
+  assert.deepEqual(audits[0].oldValue, { isPriority: false, priorityNotes: null });
+  assert.deepEqual(audits[0].newValue, { isPriority: true, priorityNotes: 'Urgent medical review required' });
+});
+
+test('updatePriority rejects changing priority on a closed entry', async () => {
+  const db = baseDb({
+    root: {
+      $transaction: async (callback) => callback(baseTransaction({
+        queueEntry: {
+          findUnique: async () => ({ ...queueEntry, status: 'COMPLETED' }),
+        },
+      })),
+    },
+  });
+
+  await assert.rejects(
+    queueService.updatePriority({ queueId, isPriority: true }, operationalUser, context, db),
+    (error) => error.code === 'INVALID_QUEUE_STATE',
+  );
+});
+
+test('getStationWorkload reports active load, priority count, and average wait', async () => {
+  const now = Date.now();
+  const db = baseDb({
+    root: {
+      station: {
+        findMany: async () => [station, targetStation],
+      },
+      queueEntry: {
+        findMany: async () => [
+          { ...queueEntry, id: uuid(), stationId, queueNumber: 7, status: 'WAITING', isPriority: false, enteredAt: new Date(now - 2 * 60000), completedAt: null, registrationId },
+          { ...queueEntry, id: uuid(), stationId, queueNumber: 8, status: 'CALLED', isPriority: true, enteredAt: new Date(now - 6 * 60000), completedAt: null, registrationId },
+          { ...queueEntry, id: uuid(), stationId: targetStationId, queueNumber: 5, status: 'IN_PROGRESS', isPriority: false, enteredAt: new Date(now - 60000), completedAt: null, registrationId },
+          { ...queueEntry, id: uuid(), stationId: targetStationId, queueNumber: 4, status: 'COMPLETED', isPriority: false, enteredAt: new Date(now - 60 * 60000), completedAt: new Date(), registrationId },
+        ],
+      },
+    },
+  });
+
+  const result = await queueService.getStationWorkload(eventId, operationalUser, db);
+
+  assert.equal(result.event.eventId, eventId);
+  assert.equal(result.stations.length, 2);
+  const va = result.stations.find((s) => s.stationId === stationId);
+  assert.equal(va.workload.WAITING, 1);
+  assert.equal(va.workload.CALLED, 1);
+  assert.equal(va.activeQueueCount, 2);
+  assert.equal(va.priorityCount, 1);
+  assert.equal(va.nextUp.queueNumber, 7);
+  assert.equal(va.completedToday, 0);
+  assert.ok(va.avgWaitMinutes >= 4, `expected avg wait >= 4, got ${va.avgWaitMinutes}`);
+
+  const refraction = result.stations.find((s) => s.stationId === targetStationId);
+  assert.equal(refraction.workload.IN_PROGRESS, 1);
+  assert.equal(refraction.activeQueueCount, 1);
+  assert.equal(refraction.completedToday, 1);
+});
+
+test('getEventQueueStatus pulls a priority waiting entry to next-up', async () => {
+  const db = baseDb({
+    root: {
+      station: {
+        findMany: async () => [station],
+      },
+      queueEntry: {
+        findMany: async () => [
+          { ...queueEntry, id: uuid(), stationId, queueNumber: 9, status: 'WAITING', isPriority: true, registration: { participantDisplayName: 'Urgent Case' } },
+          { ...queueEntry, id: uuid(), stationId, queueNumber: 7, status: 'WAITING', isPriority: false, registration: { participantDisplayName: 'Daniel Tan' } },
+        ],
+      },
+    },
+  });
+
+  const result = await queueService.getEventQueueStatus(eventId, operationalUser, db);
+
+  const va = result.stations.find((s) => s.stationId === stationId);
+  assert.equal(va.nextUp.queueNumber, 9);
+  assert.equal(va.nextUp.isPriority, true);
+  assert.equal(va.nextUp.participantDisplayName, 'Urgent Case');
 });

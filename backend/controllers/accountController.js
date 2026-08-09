@@ -1,6 +1,6 @@
 const asyncHandler = require("../middlewares/asyncHandler");
-const accountService = require("../services/accountService");
-const { maintainLifecycleEmail } = require("../services/accountLifecycleNotificationService");
+const accountService = require("../services/account/accountService");
+const { maintainLifecycleEmail } = require("../services/account/accountLifecycleNotificationService");
 
 function sendAccountResult(res, result) {
   const { providerOperation, ...account } = result;

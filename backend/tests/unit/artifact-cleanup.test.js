@@ -16,7 +16,7 @@ const {
   maintainArtifactCleanupTask,
   processArtifactCleanupTasks,
   removeTaskArtifact,
-} = require("../../services/artifactCleanupService");
+} = require("../../services/platform/artifactCleanupService");
 
 const png = () => {
   const buffer = Buffer.alloc(128);

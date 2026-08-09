@@ -5,7 +5,7 @@ const test = require("node:test");
 process.env.DATABASE_URL ||= "postgresql://test:test@localhost:5432/vsms_test";
 
 const { encrypt, encryptionContext } = require("../../utils/cryptoUtils");
-const qrService = require("../../services/qrService");
+const qrService = require("../../services/participant/qrService");
 
 const eventId = "11111111-1111-4111-8111-111111111111";
 const registrationId = "22222222-2222-4222-8222-222222222222";
@@ -586,12 +586,22 @@ test("public pass status reveals no PII and reports expired or revoked passes as
         return {
           expiresAt: new Date(Date.now() + 60_000),
           isActive: true,
-          registration: { eventId: "event-1", queueNumber: 42, event: { name: "Community Vision Screening" } },
+          registration: { registrationId: "registration-1", eventId: "event-1", queueNumber: 42, registrationStatus: "CHECKED_IN", event: { name: "Community Vision Screening" } },
         };
       },
     },
     eventRegistration: {
       aggregate: async () => ({ _max: { queueNumber: 99 } }),
+    },
+    queueEntry: {
+      findFirst: async () => null,
+      findMany: async () => [],
+    },
+    station: {
+      findMany: async () => [],
+    },
+    queueMovement: {
+      findMany: async () => [],
     },
   };
 
@@ -599,7 +609,7 @@ test("public pass status reveals no PII and reports expired or revoked passes as
   assert.equal(valid.valid, true);
   assert.equal(valid.eventName, "Community Vision Screening");
   assert.equal(valid.queueNumber, 42);
-  assert.deepEqual(Object.keys(valid).sort(), ["currentQueueNumber", "eventName", "expiresAt", "queueNumber", "valid"]);
+  assert.deepEqual(Object.keys(valid).sort(), ["aheadAtStation", "currentQueueNumber", "eventName", "expiresAt", "queueNumber", "queueState", "registrationStatus", "stations", "transfers", "valid"]);
   assert.equal(where.tokenHash, tokenHash(token));
 
   const revokedDb = {

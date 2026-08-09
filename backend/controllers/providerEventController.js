@@ -1,4 +1,4 @@
-const sesProviderEventService = require("../services/sesProviderEventService");
+const sesProviderEventService = require("../services/platform/sesProviderEventService");
 
 exports.ingestSesEvent = async (req, res) => {
   const result = await sesProviderEventService.ingestSesProviderEvent(

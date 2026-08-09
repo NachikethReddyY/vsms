@@ -6,11 +6,11 @@ const { after, before, test } = require("node:test");
 const reportRoot = path.join(__dirname, "../../secure-data", `vsms-reports-${crypto.randomUUID()}`);
 process.env.REPORT_STORAGE_DIR = reportRoot;
 const prisma = require("../../prisma/prismaClient");
-const { getCompletedEventAnalytics } = require("../../services/analyticsService");
-const { createReportJob, downloadReportArtifact, processClaimedJob, claimNextReportJob, recoverExpiredReportJobs } = require("../../services/reportExportService");
-const { processArtifactCleanupTasks } = require("../../services/artifactCleanupService");
-const { readArtifact, stagingStorageKey, storageKey, writeArtifact } = require("../../services/reportArtifactStorage");
-const { maintainLifecycleEmail, processClaimedLifecycleEmail, reconcileStaleLifecycleEmails } = require("../../services/accountLifecycleNotificationService");
+const { getCompletedEventAnalytics } = require("../../services/reporting/analyticsService");
+const { createReportJob, downloadReportArtifact, processClaimedJob, claimNextReportJob, recoverExpiredReportJobs } = require("../../services/reporting/reportExportService");
+const { processArtifactCleanupTasks } = require("../../services/platform/artifactCleanupService");
+const { readArtifact, stagingStorageKey, storageKey, writeArtifact } = require("../../services/reporting/reportArtifactStorage");
+const { maintainLifecycleEmail, processClaimedLifecycleEmail, reconcileStaleLifecycleEmails } = require("../../services/account/accountLifecycleNotificationService");
 
 let event;
 let manager;
