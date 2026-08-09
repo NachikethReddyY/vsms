@@ -92,7 +92,7 @@ test("concurrent approve and reject transitions serialize to a coherent rejected
   });
 
   const outcomes = await Promise.allSettled([
-    accountService.decideApproval(account.id, "APPROVED", null, actor.id, {}),
+    accountService.decideApproval(account.id, "APPROVED", null, actor.id, {}, undefined, { roles: ["SUPPORT"] }),
     accountService.decideApproval(account.id, "REJECTED", "Concurrent rejection", actor.id, {}),
   ]);
   const saved = await prisma.user.findUniqueOrThrow({ where: { id: account.id } });

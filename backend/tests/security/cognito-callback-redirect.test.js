@@ -11,6 +11,7 @@ Object.assign(process.env, {
     COGNITO_REDIRECT_URI: "https://localhost:5173/auth/callback",
     COGNITO_LOGOUT_URI: "https://localhost:5173",
     PUBLIC_APP_ORIGIN: "https://localhost:5173",
+    PUBLIC_SIGNUP_ENABLED: "true",
     AUTH_RATE_LIMIT: "100",
 });
 

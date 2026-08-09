@@ -40,16 +40,19 @@ describe('Stage 4 API contract wrappers', () => {
   });
 
   it('maps admin action routes and required reason bodies exactly', async () => {
+    await api.decideAccount('user-1', 'approve', undefined, ['REVIEWER']);
     await api.decideAccount('user-1', 'revoke-session');
     await api.decideAccount('user-1', 'resend-notification');
     await api.decideAccount('user-1', 'deprovision', 'Left the organization');
     expect(calls.map((c) => c.url)).toEqual([
+      '/admin/accounts/user-1/approve',
       '/admin/accounts/user-1/revoke-sessions',
       '/admin/accounts/user-1/resend-lifecycle',
       '/admin/accounts/user-1/deprovision',
     ]);
-    expect(calls[0].data).toBeUndefined();
-    expect(calls[2].data).toEqual({ reason: 'Left the organization' });
+    expect(calls[0].data).toEqual({ reason: undefined, roles: ['REVIEWER'] });
+    expect(calls[1].data).toBeUndefined();
+    expect(calls[3].data).toEqual({ reason: 'Left the organization' });
   });
 
   it('creates, polls, and downloads report exports using dataset envelopes and job ids', async () => {

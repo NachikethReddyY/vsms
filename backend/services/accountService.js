@@ -209,11 +209,11 @@ exports.getAccount = async (userId) => {
   return projectAccount(account);
 };
 
-exports.decideApproval = async (userId, decision, reason, actorId, context, enqueue = enqueueAccountLifecycle) => {
+exports.decideApproval = async (userId, decision, reason, actorId, context, enqueue = enqueueAccountLifecycle, options = {}) => {
   if (decision === "REJECTED" && !String(reason || "").trim()) {
     throw new AppError(422, "REJECTION_REASON_REQUIRED", "A rejection reason is required");
   }
-  const account = await prisma.$transaction(async (tx) => {
+  const result = await prisma.$transaction(async (tx) => {
     await lockAccountTransition(tx, userId);
     const before = await findAccount(tx, userId);
     if (before.deprovisionedAt) throw new AppError(409, "ACCOUNT_DEPROVISIONED", "A disabled account cannot be approved or rejected");
@@ -222,6 +222,24 @@ exports.decideApproval = async (userId, decision, reason, actorId, context, enqu
       : ["PENDING", "APPROVED"].includes(before.approvalState);
     if (!allowed) {
       throw new AppError(409, "INVALID_APPROVAL_TRANSITION", `Account cannot transition from ${before.approvalState.toLowerCase()} to ${decision.toLowerCase()}`);
+    }
+    let assignedRoles = before.userRoles.map(({ role }) => role.roleName);
+    if (decision === "APPROVED") {
+      assignedRoles = options.roles;
+      if (!Array.isArray(assignedRoles) || assignedRoles.length === 0) {
+        throw new AppError(422, "ACCOUNT_ROLES_REQUIRED", "At least one account role is required for approval");
+      }
+      const roles = await tx.role.findMany({
+        where: { roleName: { in: assignedRoles } },
+        select: { id: true, roleName: true },
+      });
+      if (roles.length !== assignedRoles.length) {
+        throw new AppError(422, "ROLE_NOT_AVAILABLE", "One or more account roles are unavailable");
+      }
+      await tx.userRole.deleteMany({ where: { userId } });
+      await tx.userRole.createMany({
+        data: roles.map(({ id }) => ({ userId, roleId: id, assignedById: actorId })),
+      });
     }
     const nextStatus = deriveLegacyStatus({
       approvalState: decision,
@@ -234,21 +252,36 @@ exports.decideApproval = async (userId, decision, reason, actorId, context, enqu
     });
     const updated = await tx.user.update({
       where: { id: userId },
-      data: { approvalState: decision, status: nextStatus },
+      data: {
+        approvalState: decision,
+        status: nextStatus,
+        ...(decision === "APPROVED" ? {
+          sysRole: assignedRoles.includes("ADMINISTRATOR") ? "ADMIN" : assignedRoles.includes("EVENT_MANAGER") ? "EVENT_MANAGER" : "STAFF",
+        } : {}),
+      },
       select: accountSelect,
     });
     await writeAudit(tx, actorId, userId, `ACCOUNT_${decision}`, {
       approvalState: before.approvalState,
-    }, { approvalState: decision, reason: reason || null }, context);
+    }, { approvalState: decision, reason: reason || null, ...(decision === "APPROVED" ? { roles: assignedRoles } : {}) }, context);
     await enqueue({
       type: decision,
       account: projectAccount(updated),
       idempotencyKey: `ACCOUNT_DECISION:${approvalDecision?.id || `${userId}:${decision}:${updated.updatedAt?.getTime() || "CURRENT"}`}`,
       db: tx,
     });
-    return updated;
+    const operation = decision === "APPROVED"
+      ? await enqueueProviderOperation(tx, {
+          userId,
+          operationType: "SYNC_ACCESS",
+          idempotencyKey: `SYNC_ACCESS:${userId}:APPROVE:${approvalDecision.id}`,
+          payload: { roles: assignedRoles, status: nextStatus },
+        })
+      : null;
+    return { account: updated, operation };
   });
-  return projectAccount(account);
+  const providerOperation = await processAfterCommit(result.operation, options);
+  return { ...projectAccount(result.account), ...(providerOperation ? { providerOperation } : {}) };
 };
 
 exports.changeAccess = async (userId, action, reason, actorId, context, options = {}) => {

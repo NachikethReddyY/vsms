@@ -6,7 +6,7 @@ import type { AppUser } from '../types';
 import apiClient, { getApiError } from '../utils/apiClient';
 import './StaffAccountsPage.css';
 
-const ROLE_OPTIONS = [
+export const ROLE_OPTIONS = [
   { value: 'ADMINISTRATOR', label: 'Administrator', description: 'Manage organisation accounts and all administrative controls.' },
   { value: 'EVENT_MANAGER', label: 'Event manager', description: 'Manage events they create or are assigned to.' },
   { value: 'REGISTRATION_OFFICER', label: 'Registration officer', description: 'Register participants only during an assigned active shift.' },

@@ -19,7 +19,6 @@ import VisualAcuityStationPage from "./features/screening/VisualAcuityStationPag
 import { AuditLogsPage as RegistrationAuditLogsPage } from "./pages/AdminPages";
 import {
   AccountStatePage,
-  AdminAccountsPage,
   CreateAccountPage,
   DutyEditorPage,
   EventAnalyticsPage,
@@ -29,6 +28,7 @@ import {
   ForbiddenPage,
   NotFoundPage,
   ProfilePage,
+  StaffAdministrationPage,
 } from "./features/Stage4Pages";
 import AccountSecurityPage from "./pages/AccountSecurityPage";
 import { QueuePage } from "./pages/QueuePages"; // Imported the QueuePage component
@@ -173,7 +173,7 @@ export default function App() {
           </Route>
 
           <Route element={<RoleGuard allowedRoles={adminRoles} />}>
-            <Route path="/staff" element={<AdminAccountsPage />} />
+            <Route path="/staff" element={<StaffAdministrationPage />} />
             <Route path="/events/new" element={<EventFormPage mode="create" />} />
             <Route path="/events/:eventId/delete" element={<EventDeletionPage />} />
             <Route path="/admin/audit-logs" element={<RegistrationAuditLogsPage />} />

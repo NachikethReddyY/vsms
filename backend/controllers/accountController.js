@@ -27,10 +27,10 @@ exports.detail = asyncHandler(async (req, res) => {
 });
 
 exports.approve = asyncHandler(async (req, res) => {
-  const account = await accountService.decideApproval(
-    req.params.accountId, "APPROVED", req.body.reason, req.auth.userId, req.context,
+  const result = await accountService.decideApproval(
+    req.params.accountId, "APPROVED", req.body.reason, req.auth.userId, req.context, undefined, { roles: req.body.roles },
   );
-  res.json({ account });
+  sendAccountResult(res, result);
 });
 
 exports.reject = asyncHandler(async (req, res) => {

@@ -1496,7 +1496,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Approve a pending account without assigning an operational role */
+        /** Approve a pending account, assign application roles, and synchronize Cognito groups */
         post: operations["approveAccount"];
         delete?: never;
         options?: never;
@@ -2754,6 +2754,10 @@ export interface components {
         };
         OptionalAccountReasonRequest: {
             reason?: string | null;
+        };
+        AccountApprovalRequest: {
+            reason?: string | null;
+            roles: ("ADMINISTRATOR" | "EVENT_MANAGER" | "REGISTRATION_OFFICER" | "SCREENER" | "REVIEWER" | "SUPPORT")[];
         };
         RequiredAccountReasonRequest: {
             reason: string;
@@ -7604,12 +7608,21 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["OptionalAccountReasonRequest"];
+                "application/json": components["schemas"]["AccountApprovalRequest"];
             };
         };
         responses: {
-            /** @description Approved account */
+            /** @description Approved account with Cognito group synchronization completed */
             200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AccountEnvelope"];
+                };
+            };
+            /** @description Approved account; Cognito group synchronization remains queued or owned by another worker */
+            202: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -7622,6 +7635,13 @@ export interface operations {
             404: components["responses"]["NotFound"];
             409: components["responses"]["Conflict"];
             422: components["responses"]["ValidationFailed"];
+            /** @description Approval committed; Cognito group synchronization escalated for administrator attention */
+            502: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
         };
     };
     rejectAccount: {

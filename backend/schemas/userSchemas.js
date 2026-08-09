@@ -37,4 +37,4 @@ const updateUserBody = z.object({
 
 const userParams = z.object({ id: z.string().uuid() }).strict();
 
-module.exports = { createUserBody, updateUserBody, userParams };
+module.exports = { createUserBody, updateUserBody, userParams, roleList };
