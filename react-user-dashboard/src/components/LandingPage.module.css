@@ -211,36 +211,6 @@
       transition: opacity 180ms ease, transform 220ms var(--ease-out);
     }
 
-    .theme-toggle :global(.sun) {
-      opacity: 1;
-      transform: rotate(0) scale(1);
-    }
-
-    .theme-toggle :global(.moon) {
-      opacity: 0;
-      transform: rotate(-28deg) scale(0.78);
-    }
-
-    :global(html[data-theme="dark"]) .theme-toggle :global(.sun) {
-      opacity: 1;
-      transform: rotate(0) scale(1);
-    }
-
-    :global(html[data-theme="dark"]) .theme-toggle :global(.moon) {
-      opacity: 0;
-      transform: rotate(-28deg) scale(0.78);
-    }
-
-    :global(html[data-theme="light"]) .theme-toggle :global(.sun) {
-      opacity: 0;
-      transform: rotate(28deg) scale(0.78);
-    }
-
-    :global(html[data-theme="light"]) .theme-toggle :global(.moon) {
-      opacity: 1;
-      transform: rotate(0) scale(1);
-    }
-
     .landing-page .nav-sign-in {
       padding: 0 18px;
       background: #f5f5f2;
@@ -391,12 +361,25 @@
     }
 
     .service-intro {
+      position: relative;
+      isolation: isolate;
       display: grid;
       grid-template-columns: minmax(0, 0.8fr) minmax(420px, 1.2fr);
       gap: clamp(52px, 9vw, 132px);
       align-items: start;
       padding: 112px 0 98px;
-      border-bottom: 1px solid var(--line);
+      border-bottom: 1px solid #000;
+      color: #f6f6f3;
+    }
+
+    .service-intro::before {
+      position: absolute;
+      inset: 0 50%;
+      z-index: -1;
+      width: 100vw;
+      transform: translateX(-50%);
+      background: #000;
+      content: "";
     }
 
     .service-intro h2,
@@ -412,21 +395,9 @@
     .service-intro p {
       max-width: 680px;
       margin: 3px 0 0;
-      color: var(--ink-2);
+      color: #b3b7bf;
       font-size: clamp(18px, 2vw, 22px);
       line-height: 1.5;
-    }
-
-    :global(html[data-theme="light"]) .service-intro {
-      border-bottom-color: rgba(241, 242, 243, 0.14);
-      background: #0b0b0d;
-      box-shadow: 0 0 0 100vmax #0b0b0d;
-      clip-path: inset(0 -100vmax);
-      color: #f1f2f3;
-    }
-
-    :global(html[data-theme="light"]) .service-intro p {
-      color: #b3b7bf;
     }
 
     .workflow {
