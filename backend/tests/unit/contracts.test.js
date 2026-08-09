@@ -134,14 +134,14 @@ test("event audit log rows are retained after hard delete and remain immutable",
 });
 
 test("event service exposes list functions after merge resolution", () => {
-    const eventService = require("../../services/eventService");
+    const eventService = require("../../services/event/eventService");
     assert.equal(typeof eventService.listEvents, "function");
     assert.equal(typeof eventService.listActiveEvents, "function");
     assert.equal(typeof eventService.listStationTemplates, "function");
 });
 
 test("listStationTemplates reads active StationTemplate rows", () => {
-    const source = read("services/eventService.js");
+    const source = read("services/event/eventService.js");
     const listFn = source.slice(source.indexOf("const listStationTemplates"));
     const end = listFn.indexOf("\nconst importStations");
     const body = end === -1 ? listFn : listFn.slice(0, end);
@@ -154,7 +154,7 @@ test("listStationTemplates reads active StationTemplate rows", () => {
 });
 
 test("importStations and updateStation use Prisma Station not EventStation", () => {
-    const source = read("services/eventService.js");
+    const source = read("services/event/eventService.js");
     assert.match(source, /const importStations = async/);
     assert.match(source, /const updateStation = async/);
     assert.doesNotMatch(source, /STATION_TEMPLATES_NOT_AVAILABLE/);
@@ -171,7 +171,7 @@ test("importStations and updateStation use Prisma Station not EventStation", () 
 });
 
 test("station template mapping only imports screening StationTypes", () => {
-    const mapping = require("../../services/stationTemplateMapping");
+    const mapping = require("../../services/event/stationTemplateMapping");
     assert.equal(mapping.stationTypeForTemplateKey("VISUAL_ACUITY"), "VISUAL_ACUITY");
     assert.equal(mapping.stationTypeForTemplateKey("REFRACTION"), "REFRACTION");
     assert.equal(mapping.stationTypeForTemplateKey("COLOUR_VISION"), "COLOUR_VISION");
@@ -190,14 +190,14 @@ test("station template mapping only imports screening StationTypes", () => {
 });
 
 test("participant search matches any supplied identifier", () => {
-    const service = read("services/participantService.js");
+    const service = read("services/participant/participantService.js");
     const controller = read("controllers/participantController.js");
     assert.match(service, /return\s+\{\s*OR:\s*clauses\s*\}/);
     assert.match(controller, /searchParticipantsService/);
 });
 
 test("registration match requires at least two participant identifiers", () => {
-    const service = read("services/participantService.js");
+    const service = read("services/participant/participantService.js");
     const routes = read("routes/participantRoutes.js");
     const document = YAML.parse(read("docs/openapi.yaml"));
     const response = document.components.schemas.ParticipantMatchResponse;
@@ -232,7 +232,7 @@ test("registration resolve accepts passToken, qrToken, or registrationId", () =>
 });
 
 test("resolveParticipant looks up QRCodePass when passToken is not on registration", () => {
-    const source = read("services/screeningService.js");
+    const source = read("services/screening/screeningService.js");
     const fn = source.slice(source.indexOf("const resolveParticipant"));
     const body = fn.slice(0, fn.indexOf("\nconst previewStationResult"));
     assert.match(body, /resolveRegistrationByQrValue/);

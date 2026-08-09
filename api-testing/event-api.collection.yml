@@ -15142,6 +15142,47 @@ item:
               "eventName": "",
               "currentQueueNumber": 0,
               "queueNumber": 0,
+              "registrationStatus": "SIGNED_UP",
+              "queueState": {
+                "status": "WAITING",
+                "queueNumber": 0,
+                "isPriority": true,
+                "station": {
+                  "id": "00000000-0000-4000-8000-000000000000",
+                  "name": "",
+                  "type": ""
+                },
+                "enteredAt": "2026-08-07T00:00:00.000Z",
+                "calledAt": "2026-08-07T00:00:00.000Z",
+                "startedAt": "2026-08-07T00:00:00.000Z",
+                "completedAt": "2026-08-07T00:00:00.000Z"
+              },
+              "aheadAtStation": 0,
+              "stations": [
+                {
+                  "stationId": "00000000-0000-4000-8000-000000000000",
+                  "stationName": "",
+                  "stationType": "",
+                  "workload": {
+                    "WAITING": 0,
+                    "CALLED": 0,
+                    "IN_PROGRESS": 0,
+                    "COMPLETED": 0,
+                    "SKIPPED": 0,
+                    "CANCELLED": 0
+                  },
+                  "nextUp": {
+                    "queueNumber": 0
+                  }
+                }
+              ],
+              "transfers": [
+                {
+                  "fromStation": "",
+                  "toStation": "",
+                  "at": "2026-08-07T00:00:00.000Z"
+                }
+              ],
               "expiresAt": "2026-08-07T00:00:00.000Z"
             }
           }
@@ -16685,7 +16726,8 @@ item:
                   "queueId": "00000000-0000-4000-8000-000000000000",
                   "queueNumber": 0,
                   "registrationId": "00000000-0000-4000-8000-000000000000",
-                  "participantDisplayName": ""
+                  "participantDisplayName": "",
+                  "isPriority": false
                 }
               }
             ]
@@ -17055,6 +17097,8 @@ item:
               "stationId": "00000000-0000-4000-8000-000000000000",
               "queueNumber": 0,
               "status": "WAITING",
+              "isPriority": false,
+              "priorityNotes": "",
               "enteredAt": "2026-08-07T00:00:00.000Z",
               "calledAt": "2026-08-07T00:00:00.000Z",
               "startedAt": "2026-08-07T00:00:00.000Z",
@@ -17085,6 +17129,8 @@ item:
               "stationId": "00000000-0000-4000-8000-000000000000",
               "queueNumber": 0,
               "status": "WAITING",
+              "isPriority": false,
+              "priorityNotes": "",
               "enteredAt": "2026-08-07T00:00:00.000Z",
               "calledAt": "2026-08-07T00:00:00.000Z",
               "startedAt": "2026-08-07T00:00:00.000Z",
@@ -17345,6 +17391,8 @@ item:
             "stationId": "00000000-0000-4000-8000-000000000000",
             "queueNumber": 0,
             "status": "WAITING",
+            "isPriority": false,
+            "priorityNotes": "",
             "enteredAt": "2026-08-07T00:00:00.000Z",
             "calledAt": "2026-08-07T00:00:00.000Z",
             "startedAt": "2026-08-07T00:00:00.000Z",
@@ -17441,6 +17489,8 @@ item:
             "stationId": "00000000-0000-4000-8000-000000000000",
             "queueNumber": 0,
             "status": "WAITING",
+            "isPriority": false,
+            "priorityNotes": "",
             "enteredAt": "2026-08-07T00:00:00.000Z",
             "calledAt": "2026-08-07T00:00:00.000Z",
             "startedAt": "2026-08-07T00:00:00.000Z",
@@ -17564,6 +17614,8 @@ item:
               "stationId": "00000000-0000-4000-8000-000000000000",
               "queueNumber": 0,
               "status": "WAITING",
+              "isPriority": false,
+              "priorityNotes": "",
               "enteredAt": "2026-08-07T00:00:00.000Z",
               "calledAt": "2026-08-07T00:00:00.000Z",
               "startedAt": "2026-08-07T00:00:00.000Z",
@@ -17678,6 +17730,8 @@ item:
             "stationId": "00000000-0000-4000-8000-000000000000",
             "queueNumber": 0,
             "status": "WAITING",
+            "isPriority": false,
+            "priorityNotes": "",
             "enteredAt": "2026-08-07T00:00:00.000Z",
             "calledAt": "2026-08-07T00:00:00.000Z",
             "startedAt": "2026-08-07T00:00:00.000Z",
@@ -17774,6 +17828,8 @@ item:
             "stationId": "00000000-0000-4000-8000-000000000000",
             "queueNumber": 0,
             "status": "WAITING",
+            "isPriority": false,
+            "priorityNotes": "",
             "enteredAt": "2026-08-07T00:00:00.000Z",
             "calledAt": "2026-08-07T00:00:00.000Z",
             "startedAt": "2026-08-07T00:00:00.000Z",
@@ -17869,6 +17925,8 @@ item:
             "stationId": "00000000-0000-4000-8000-000000000000",
             "queueNumber": 0,
             "status": "WAITING",
+            "isPriority": false,
+            "priorityNotes": "",
             "enteredAt": "2026-08-07T00:00:00.000Z",
             "calledAt": "2026-08-07T00:00:00.000Z",
             "startedAt": "2026-08-07T00:00:00.000Z",
@@ -17963,6 +18021,8 @@ item:
             "stationId": "00000000-0000-4000-8000-000000000000",
             "queueNumber": 0,
             "status": "WAITING",
+            "isPriority": false,
+            "priorityNotes": "",
             "enteredAt": "2026-08-07T00:00:00.000Z",
             "calledAt": "2026-08-07T00:00:00.000Z",
             "startedAt": "2026-08-07T00:00:00.000Z",
@@ -18057,6 +18117,8 @@ item:
             "stationId": "00000000-0000-4000-8000-000000000000",
             "queueNumber": 0,
             "status": "WAITING",
+            "isPriority": false,
+            "priorityNotes": "",
             "enteredAt": "2026-08-07T00:00:00.000Z",
             "calledAt": "2026-08-07T00:00:00.000Z",
             "startedAt": "2026-08-07T00:00:00.000Z",
@@ -18170,6 +18232,8 @@ item:
               "stationId": "00000000-0000-4000-8000-000000000000",
               "queueNumber": 0,
               "status": "WAITING",
+              "isPriority": false,
+              "priorityNotes": "",
               "enteredAt": "2026-08-07T00:00:00.000Z",
               "calledAt": "2026-08-07T00:00:00.000Z",
               "startedAt": "2026-08-07T00:00:00.000Z",
@@ -18274,6 +18338,8 @@ item:
             "stationId": "00000000-0000-4000-8000-000000000000",
             "queueNumber": 0,
             "status": "WAITING",
+            "isPriority": false,
+            "priorityNotes": "",
             "enteredAt": "2026-08-07T00:00:00.000Z",
             "calledAt": "2026-08-07T00:00:00.000Z",
             "startedAt": "2026-08-07T00:00:00.000Z",
@@ -18368,6 +18434,8 @@ item:
             "stationId": "00000000-0000-4000-8000-000000000000",
             "queueNumber": 0,
             "status": "WAITING",
+            "isPriority": false,
+            "priorityNotes": "",
             "enteredAt": "2026-08-07T00:00:00.000Z",
             "calledAt": "2026-08-07T00:00:00.000Z",
             "startedAt": "2026-08-07T00:00:00.000Z",
@@ -18403,6 +18471,244 @@ item:
           method: PATCH
           header: []
           url: '{{baseUrl}}/queues/entries/{queueId}/skip'
+        status: Forbidden
+        code: 403
+        header:
+          - key: Content-Type
+            value: application/json
+        body: |-
+          {
+            "type": "",
+            "title": "",
+            "status": 0,
+            "code": "",
+            "requestId": "00000000-0000-4000-8000-000000000000",
+            "errors": [
+              {
+                "field": "",
+                "message": ""
+              }
+            ]
+          }
+  - name: Elevate or clear the urgent/priority flag on an active queue entry
+    description: ''
+    event: []
+    request:
+      method: PATCH
+      header:
+        - key: Content-Type
+          value: application/json
+          description: JSON request body
+          type: text
+      auth:
+        type: bearer
+        bearer:
+          - key: token
+            value: '{{token}}'
+            type: string
+      url:
+        raw: '{{baseUrl}}/queues/entries/{queueId}/priority'
+        host:
+          - '{{baseUrl}}'
+        path:
+          - queues
+          - entries
+          - '{queueId}'
+          - priority
+        query: []
+      body:
+        mode: raw
+        raw: |-
+          {
+            "isPriority": true,
+            "notes": ""
+          }
+        options:
+          raw:
+            language: json
+    response:
+      - name: 200 Response
+        originalRequest:
+          method: PATCH
+          header:
+            - key: Content-Type
+              value: application/json
+              description: JSON request body
+              type: text
+          url: '{{baseUrl}}/queues/entries/{queueId}/priority'
+        status: OK
+        code: 200
+        header:
+          - key: Content-Type
+            value: application/json
+        body: |-
+          {
+            "id": "00000000-0000-4000-8000-000000000000",
+            "registrationId": "00000000-0000-4000-8000-000000000000",
+            "stationId": "00000000-0000-4000-8000-000000000000",
+            "queueNumber": 0,
+            "status": "WAITING",
+            "isPriority": false,
+            "priorityNotes": "",
+            "enteredAt": "2026-08-07T00:00:00.000Z",
+            "calledAt": "2026-08-07T00:00:00.000Z",
+            "startedAt": "2026-08-07T00:00:00.000Z",
+            "leftQueueAt": "2026-08-07T00:00:00.000Z",
+            "completedAt": "2026-08-07T00:00:00.000Z"
+          }
+      - name: 401 Response
+        originalRequest:
+          method: PATCH
+          header:
+            - key: Content-Type
+              value: application/json
+              description: JSON request body
+              type: text
+          url: '{{baseUrl}}/queues/entries/{queueId}/priority'
+        status: Unauthorized
+        code: 401
+        header:
+          - key: Content-Type
+            value: application/json
+        body: |-
+          {
+            "type": "",
+            "title": "",
+            "status": 0,
+            "code": "",
+            "requestId": "00000000-0000-4000-8000-000000000000",
+            "errors": [
+              {
+                "field": "",
+                "message": ""
+              }
+            ]
+          }
+      - name: 403 Response
+        originalRequest:
+          method: PATCH
+          header:
+            - key: Content-Type
+              value: application/json
+              description: JSON request body
+              type: text
+          url: '{{baseUrl}}/queues/entries/{queueId}/priority'
+        status: Forbidden
+        code: 403
+        header:
+          - key: Content-Type
+            value: application/json
+        body: |-
+          {
+            "type": "",
+            "title": "",
+            "status": 0,
+            "code": "",
+            "requestId": "00000000-0000-4000-8000-000000000000",
+            "errors": [
+              {
+                "field": "",
+                "message": ""
+              }
+            ]
+          }
+  - name: Station workload overview with priority load and average wait time
+    description: ''
+    event: []
+    request:
+      method: GET
+      header: []
+      auth:
+        type: bearer
+        bearer:
+          - key: token
+            value: '{{token}}'
+            type: string
+      url:
+        raw: '{{baseUrl}}/queues/events/{eventId}/workload'
+        host:
+          - '{{baseUrl}}'
+        path:
+          - queues
+          - events
+          - '{eventId}'
+          - workload
+        query: []
+    response:
+      - name: 200 Response
+        originalRequest:
+          method: GET
+          header: []
+          url: '{{baseUrl}}/queues/events/{eventId}/workload'
+        status: OK
+        code: 200
+        header:
+          - key: Content-Type
+            value: application/json
+        body: |-
+          {
+            "event": {
+              "eventId": "00000000-0000-4000-8000-000000000000",
+              "name": "",
+              "status": "",
+              "venue": ""
+            },
+            "stations": [
+              {
+                "stationId": "00000000-0000-4000-8000-000000000000",
+                "stationName": "",
+                "stationType": "",
+                "stationOrder": 0,
+                "workload": {
+                  "WAITING": 0,
+                  "CALLED": 0,
+                  "IN_PROGRESS": 0,
+                  "COMPLETED": 0,
+                  "SKIPPED": 0,
+                  "CANCELLED": 0
+                },
+                "activeQueueCount": 0,
+                "priorityCount": 0,
+                "completedToday": 0,
+                "nextUp": {
+                  "queueId": "00000000-0000-4000-8000-000000000000",
+                  "queueNumber": 0,
+                  "registrationId": "00000000-0000-4000-8000-000000000000",
+                  "isPriority": true
+                },
+                "avgWaitMinutes": 0
+              }
+            ]
+          }
+      - name: 401 Response
+        originalRequest:
+          method: GET
+          header: []
+          url: '{{baseUrl}}/queues/events/{eventId}/workload'
+        status: Unauthorized
+        code: 401
+        header:
+          - key: Content-Type
+            value: application/json
+        body: |-
+          {
+            "type": "",
+            "title": "",
+            "status": 0,
+            "code": "",
+            "requestId": "00000000-0000-4000-8000-000000000000",
+            "errors": [
+              {
+                "field": "",
+                "message": ""
+              }
+            ]
+          }
+      - name: 403 Response
+        originalRequest:
+          method: GET
+          header: []
+          url: '{{baseUrl}}/queues/events/{eventId}/workload'
         status: Forbidden
         code: 403
         header:
@@ -18461,6 +18767,8 @@ item:
             "stationId": "00000000-0000-4000-8000-000000000000",
             "queueNumber": 0,
             "status": "WAITING",
+            "isPriority": false,
+            "priorityNotes": "",
             "enteredAt": "2026-08-07T00:00:00.000Z",
             "calledAt": "2026-08-07T00:00:00.000Z",
             "startedAt": "2026-08-07T00:00:00.000Z",

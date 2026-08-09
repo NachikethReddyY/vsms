@@ -5,7 +5,7 @@ const crypto = require("node:crypto");
 process.env.DATABASE_URL ||= "postgresql://test:test@localhost:5432/vsms_test";
 
 const prisma = require("../../prisma/prismaClient");
-const screeningService = require("../../services/screeningService");
+const screeningService = require("../../services/screening/screeningService");
 
 const eventId = crypto.randomUUID();
 const stationId = crypto.randomUUID();
@@ -206,6 +206,7 @@ test("screening idempotency stores a canonical fingerprint", async (t) => {
       create: async ({ data }) => { receipt = data; return data; },
     },
     auditLog: { create: async ({ data }) => data },
+    domainEvent: { create: async ({ data }) => data },
     eventRegistration: { findFirst: async () => ({ registrationId, registrationStatus: "CHECKED_IN" }) },
   }));
 
@@ -268,6 +269,7 @@ test("delayed K1 replay returns its immutable result without replacing K2", asyn
     },
     eventRegistration: { findFirst: async () => ({ registrationId, registrationStatus: "CHECKED_IN" }) },
     auditLog: { create: async ({ data }) => data },
+    domainEvent: { create: async ({ data }) => data },
   }));
 
   const k1 = { ...body, idempotencyKey: "screening-K1" };

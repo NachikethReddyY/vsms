@@ -2287,6 +2287,45 @@ paths:
         "404": { $ref: "#/components/responses/NotFound" }
         "409": { $ref: "#/components/responses/Conflict" }
         "422": { $ref: "#/components/responses/ValidationFailed" }
+  /api/v1/queues/entries/{queueId}/priority:
+    patch:
+      tags: [Queue]
+      operationId: updateQueueEntryPriority
+      summary: Elevate or clear the urgent/priority flag on an active queue entry
+      parameters:
+        - name: queueId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/PriorityQueueRequest" }
+      responses:
+        "200": { description: Queue entry priority updated, content: { application/json: { schema: { $ref: "#/components/schemas/QueueEntry" } } } }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "422": { $ref: "#/components/responses/ValidationFailed" }
+  /api/v1/queues/events/{eventId}/workload:
+    get:
+      tags: [Queue]
+      operationId: getStationWorkload
+      summary: Station workload overview with priority load and average wait time
+      parameters:
+        - name: eventId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        "200": { description: Station workload summary, content: { application/json: { schema: { $ref: "#/components/schemas/StationWorkloadResponse" } } } }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "422": { $ref: "#/components/responses/ValidationFailed" }
   /api/v1/queues/entries/{queueId}:
     delete:
       tags: [Queue]
@@ -4592,12 +4631,74 @@ components:
         data:
           type: object
           additionalProperties: false
-          required: [valid, eventName, currentQueueNumber, queueNumber, expiresAt]
+          required: [valid, eventName, currentQueueNumber, queueNumber, registrationStatus, queueState, aheadAtStation, stations, transfers, expiresAt]
           properties:
             valid: { type: boolean, description: Whether the pass is active and unexpired }
             eventName: { type: string, nullable: true, description: "Only the event name; never participant data. Unset when the pass is invalid" }
             currentQueueNumber: { type: integer, nullable: true, description: "Highest queue number already checked in for the event (now serving). Unset when the pass is invalid" }
             queueNumber: { type: integer, nullable: true }
+            registrationStatus: { $ref: "#/components/schemas/RegistrationStatus" }
+            queueState:
+              type: object
+              nullable: true
+              additionalProperties: false
+              required: [status, queueNumber, isPriority, station]
+              properties:
+                status: { $ref: "#/components/schemas/QueueStatus", description: "Participant's own live queue state (waiting/called/in-progress)" }
+                queueNumber: { type: integer }
+                isPriority: { type: boolean }
+                station:
+                  type: object
+                  additionalProperties: false
+                  required: [id, name, type]
+                  properties:
+                    id: { type: string, format: uuid }
+                    name: { type: string }
+                    type: { type: string }
+                enteredAt: { type: string, format: date-time, nullable: true }
+                calledAt: { type: string, format: date-time, nullable: true }
+                startedAt: { type: string, format: date-time, nullable: true }
+                completedAt: { type: string, format: date-time, nullable: true }
+            aheadAtStation: { type: integer, nullable: true, description: "Number of WAITING participants ahead of this pass at its current station" }
+            stations:
+              type: array
+              items:
+                type: object
+                additionalProperties: false
+                required: [stationId, stationName, stationType, workload, nextUp]
+                properties:
+                  stationId: { type: string, format: uuid }
+                  stationName: { type: string }
+                  stationType: { type: string }
+                  workload:
+                    type: object
+                    additionalProperties: false
+                    required: [WAITING, CALLED, IN_PROGRESS, COMPLETED, SKIPPED, CANCELLED]
+                    properties:
+                      WAITING: { type: integer }
+                      CALLED: { type: integer }
+                      IN_PROGRESS: { type: integer }
+                      COMPLETED: { type: integer }
+                      SKIPPED: { type: integer }
+                      CANCELLED: { type: integer }
+                  nextUp:
+                    type: object
+                    nullable: true
+                    additionalProperties: false
+                    required: [queueNumber]
+                    properties:
+                      queueNumber: { type: integer }
+            transfers:
+              type: array
+              description: "Station-transfer trail for this pass (no participant data)"
+              items:
+                type: object
+                additionalProperties: false
+                required: [fromStation, toStation, at]
+                properties:
+                  fromStation: { type: string }
+                  toStation: { type: string }
+                  at: { type: string, format: date-time }
             expiresAt: { type: string, format: date-time, nullable: true }
     QrMutationResponse:
       type: object
@@ -4789,11 +4890,69 @@ components:
         stationId: { type: string, format: uuid }
         queueNumber: { type: integer }
         status: { $ref: "#/components/schemas/QueueStatus" }
+        isPriority: { type: boolean, default: false, description: "Urgent/priority handling flag surfaced to next-up calling" }
+        priorityNotes: { type: string, nullable: true, description: "Optional reason recorded when the entry is marked urgent" }
         enteredAt: { type: string, format: date-time, nullable: true }
         calledAt: { type: string, format: date-time, nullable: true }
         startedAt: { type: string, format: date-time, nullable: true }
         leftQueueAt: { type: string, format: date-time, nullable: true }
         completedAt: { type: string, format: date-time, nullable: true }
+    PriorityQueueRequest:
+      type: object
+      additionalProperties: false
+      required: [isPriority]
+      properties:
+        isPriority: { type: boolean, description: "Whether the queue entry is treated as urgent/priority" }
+        notes: { type: string, maxLength: 255, description: "Optional reason for the priority assignment" }
+    StationWorkload:
+      type: object
+      additionalProperties: false
+      required: [stationId, stationName, stationType, stationOrder, workload, activeQueueCount, priorityCount, completedToday, nextUp, avgWaitMinutes]
+      properties:
+        stationId: { type: string, format: uuid }
+        stationName: { type: string }
+        stationType: { type: string }
+        stationOrder: { type: integer }
+        workload:
+          type: object
+          additionalProperties: false
+          required: [WAITING, CALLED, IN_PROGRESS, COMPLETED, SKIPPED, CANCELLED]
+          properties:
+            WAITING: { type: integer }
+            CALLED: { type: integer }
+            IN_PROGRESS: { type: integer }
+            COMPLETED: { type: integer }
+            SKIPPED: { type: integer }
+            CANCELLED: { type: integer }
+        activeQueueCount: { type: integer, minimum: 0 }
+        priorityCount: { type: integer, minimum: 0 }
+        completedToday: { type: integer, minimum: 0 }
+        nextUp:
+          type: object
+          nullable: true
+          additionalProperties: false
+          required: [queueId, queueNumber, registrationId, isPriority]
+          properties:
+            queueId: { type: string, format: uuid }
+            queueNumber: { type: integer }
+            registrationId: { type: string, format: uuid }
+            isPriority: { type: boolean }
+        avgWaitMinutes: { type: integer, minimum: 0 }
+    StationWorkloadResponse:
+      type: object
+      additionalProperties: false
+      required: [event, stations]
+      properties:
+        event:
+          type: object
+          additionalProperties: false
+          required: [eventId, name, status, venue]
+          properties:
+            eventId: { type: string, format: uuid }
+            name: { type: string }
+            status: { type: string }
+            venue: { type: string, nullable: true }
+        stations: { type: array, items: { $ref: "#/components/schemas/StationWorkload" } }
     QueueStationWorkload:
       type: object
       additionalProperties: false
@@ -4824,6 +4983,7 @@ components:
             queueNumber: { type: integer }
             registrationId: { type: string, format: uuid }
             participantDisplayName: { type: string }
+            isPriority: { type: boolean, default: false }
     EventQueueStatusResponse:
       type: object
       additionalProperties: false

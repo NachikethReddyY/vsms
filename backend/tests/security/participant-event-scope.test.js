@@ -5,7 +5,7 @@ const crypto = require("node:crypto");
 process.env.DATABASE_URL ||= "postgresql://test:test@localhost:5432/vsms_test";
 
 const prisma = require("../../prisma/prismaClient");
-const participantService = require("../../services/participantService");
+const participantService = require("../../services/participant/participantService");
 const { assertParticipantEventScope } = require("../../utils/participantEventScope");
 
 function replace(t, target, key, value) {

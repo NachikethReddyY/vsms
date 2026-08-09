@@ -1,6 +1,6 @@
 const { test, describe } = require("node:test");
 const { expect } = require("expect");
-const { compareQueueItems, contextVersion, reviewReadiness } = require("../../services/reviewService");
+const { compareQueueItems, contextVersion, reviewReadiness } = require("../../services/screening/reviewService");
 const { reviewDecisionBody } = require("../../schemas/screeningSchemas");
 
 const stations = [

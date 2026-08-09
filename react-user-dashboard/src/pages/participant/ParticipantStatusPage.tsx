@@ -1,16 +1,11 @@
-import { CheckBadgeIcon, ClockIcon, ExclamationTriangleIcon, QrCodeIcon, XCircleIcon } from '@heroicons/react/24/outline';
+import { CheckBadgeIcon, ClockIcon, ExclamationTriangleIcon, QrCodeIcon, XCircleIcon, BoltIcon, ArrowRightIcon, QueueListIcon } from '@heroicons/react/24/outline';
 import { useEffect, useRef, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import apiClient, { getApiError as getApiMessage } from '../../utils/apiClient';
+import type { components } from '../../generated/api';
 import './ParticipantStatusPage.css';
 
-type PublicPassStatus = {
-  valid: boolean;
-  eventName: string | null;
-  currentQueueNumber: number | null;
-  queueNumber: number | null;
-  expiresAt: string | null;
-};
+type PublicPassStatus = components['schemas']['QrPublicStatusResponse']['data'];
 
 type HandoffStation = {
   type: string;
@@ -27,6 +22,26 @@ const POLL_MS = 5000;
 
 const formatExpiry = (value: string) =>
   new Intl.DateTimeFormat(undefined, { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(value));
+
+const QUEUE_STATE_LABEL: Record<string, { label: string; tone: 'waiting' | 'called' | 'inprogress' | 'done' }> = {
+  WAITING: { label: 'You are in the queue', tone: 'waiting' },
+  CALLED: { label: 'Your number is called', tone: 'called' },
+  IN_PROGRESS: { label: 'Being screened now', tone: 'inprogress' },
+  COMPLETED: { label: 'Screening completed', tone: 'done' },
+};
+
+const STATION_TYPE_LABEL: Record<string, string> = {
+  VISUAL_ACUITY: 'Visual Acuity',
+  REFRACTION: 'Refraction',
+  COLOUR_VISION: 'Colour Vision',
+  EYE_HEALTH: 'Eye Health',
+};
+
+const workloadRows = (station: PublicPassStatus['stations'][number]) => [
+  ['Waiting', station.workload.WAITING],
+  ['Called', station.workload.CALLED],
+  ['In progress', station.workload.IN_PROGRESS],
+] as const;
 
 export default function ParticipantStatusPage() {
   const { token = '' } = useParams();
@@ -108,10 +123,17 @@ export default function ParticipantStatusPage() {
       <p>Verifying this pass with the event system…</p>
     </section>;
   } else if (status.valid) {
+    const queueState = status.queueState;
+    const stateMeta = queueState ? QUEUE_STATE_LABEL[queueState.status] : null;
+    const stationLabel = queueState?.station ? STATION_TYPE_LABEL[queueState.station.type] || queueState.station.name : null;
     content = <section className="ps-state ps-state-valid" aria-live="polite">
       <CheckBadgeIcon aria-hidden="true" />
       <span className="ps-badge">Valid pass</span>
       <h1>{status.eventName ?? 'Event pass'}</h1>
+
+      {queueState?.isPriority && (
+        <span className="ps-badge ps-badge-urgent"><BoltIcon aria-hidden="true" />Priority — urgent handling</span>
+      )}
 
       <div className="ps-queue-stack">
         <div className="ps-queue-cell ps-queue-now">
@@ -126,10 +148,60 @@ export default function ParticipantStatusPage() {
         </div>
       </div>
 
+      {queueState && stateMeta && (
+        <div className={`ps-state-card ps-state-tone-${stateMeta.tone}`}>
+          <div className="ps-state-card-head">
+            <span className="ps-state-dot" aria-hidden="true" />
+            <strong>{stateMeta.label}</strong>
+          </div>
+          {stationLabel && <p className="ps-state-card-sub">Go to <b>{stationLabel}</b> station{queueState.queueNumber != null ? ` · queue #${queueState.queueNumber}` : ''}</p>}
+          {queueState.status === 'WAITING' && status.aheadAtStation != null && status.aheadAtStation > 0 && (
+            <p className="ps-state-card-sub">{status.aheadAtStation} {status.aheadAtStation === 1 ? 'person' : 'people'} ahead at this station.</p>
+          )}
+        </div>
+      )}
+
+      {status.stations.some((station) => station.workload.WAITING > 0 || station.workload.CALLED > 0 || station.workload.IN_PROGRESS > 0) && (
+        <div className="ps-stations">
+          <h2><QueueListIcon aria-hidden="true" />Station workload</h2>
+          {status.stations.map((station) => (
+            <div key={station.stationId} className={`ps-station ${queueState?.station?.id === station.stationId ? 'ps-station-current' : ''}`}>
+              <div className="ps-station-name">{station.stationName}</div>
+              <div className="ps-station-row">
+                {workloadRows(station).map(([label, count]) => (
+                  <span key={label} className="ps-station-metric">
+                    <b>{count}</b> {label.toLowerCase()}
+                  </span>
+                ))}
+                {station.nextUp?.queueNumber != null && (
+                  <span className="ps-station-nextup">Next up #<b>{station.nextUp.queueNumber}</b></span>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {status.transfers.length > 0 && (
+        <div className="ps-transfers">
+          <h2><ArrowRightIcon aria-hidden="true" />Your station journey</h2>
+          <ol className="ps-transfer-list">
+            {status.transfers.map((transfer, index) => (
+              <li key={`${transfer.fromStation}-${transfer.toStation}-${index}`}>
+                <span>{transfer.fromStation}</span>
+                <ArrowRightIcon aria-hidden="true" />
+                <span>{transfer.toStation}</span>
+              </li>
+            ))}
+          </ol>
+        </div>
+      )}
+
       <p className="ps-live-note"><ClockIcon aria-hidden="true" />Updates automatically every few seconds.</p>
 
       <dl className="ps-facts">
         {status.expiresAt ? <div><dt>Expires</dt><dd>{formatExpiry(status.expiresAt)}</dd></div> : null}
+        {status.registrationStatus ? <div><dt>Status</dt><dd>{String(status.registrationStatus).replace(/_/g, ' ').toLowerCase()}</dd></div> : null}
       </dl>
 
       <div className="ps-handoff">

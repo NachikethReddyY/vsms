@@ -5,7 +5,7 @@ const crypto = require("node:crypto");
 process.env.DATABASE_URL ||= "postgresql://test:test@localhost:5432/vsms_test";
 
 const { reportQuery } = require("../../schemas/eventSchemas");
-const { getOperationalReport } = require("../../services/reportingService");
+const { getOperationalReport } = require("../../services/reporting/reportingService");
 
 const eventId = crypto.randomUUID();
 const registrationId = crypto.randomUUID();

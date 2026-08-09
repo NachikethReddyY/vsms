@@ -2,7 +2,7 @@ const { test, after } = require("node:test");
 const { expect } = require("expect");
 const crypto = require("node:crypto");
 const helpers = require("../helpers");
-const qrService = require("../../services/qrService");
+const qrService = require("../../services/participant/qrService");
 const { decrypt, encryptionContext } = require("../../utils/cryptoUtils");
 
 const createGate = () => {

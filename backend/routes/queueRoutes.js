@@ -131,7 +131,7 @@ router.patch(
     params: queueEntryParams,
     body: transferQueueBody
   }),
-  asyncHandler(queueController.transferQueueEntry)
+  asyncHandler(queueController.advanceQueueEntry)
 );
 
 /**

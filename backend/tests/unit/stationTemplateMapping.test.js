@@ -6,7 +6,7 @@ const {
   stationTypeForTemplateKey,
   isImportableTemplateKey,
   classifyTemplates,
-} = require("../../services/stationTemplateMapping");
+} = require("../../services/event/stationTemplateMapping");
 
 test("importable keys match StationType enum", () => {
   assert.deepEqual(Object.keys(IMPORTABLE_TEMPLATE_KEYS).sort(), [

@@ -11,7 +11,7 @@ const {
   assertScreenerAssignment,
   assertQrVerifyAccess,
 } = require("../../utils/staff");
-const { getEventIdForAccess } = require("../../services/qrService");
+const { getEventIdForAccess } = require("../../services/participant/qrService");
 
 const account = (userId, roles = []) => ({
   userId,
