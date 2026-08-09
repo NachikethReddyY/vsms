@@ -157,4 +157,9 @@ export function getApiError(error: unknown, fallback: string) {
   return fallback;
 }
 
+export function getApiErrorCode(error: unknown) {
+  if (axios.isAxiosError<{ code?: string }>(error)) return error.response?.data?.code ?? null;
+  return null;
+}
+
 export default apiClient;

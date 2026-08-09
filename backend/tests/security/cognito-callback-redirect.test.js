@@ -19,6 +19,9 @@ const cognitoClient = require("../../utils/cognitoClient");
 const cognitoJwt = require("../../utils/cognitoJwt");
 const staff = require("../../utils/staff");
 const AuthAudit = require("../../utils/audit");
+const { AppError } = require("../../errors/AppError");
+
+let localUserMode = "active";
 
 cognitoClient.exchangeAuthorizationCode = async (code, verifier) => {
     assert.equal(code, "authorization-code");
@@ -28,12 +31,16 @@ cognitoClient.exchangeAuthorizationCode = async (code, verifier) => {
 cognitoJwt.verifyCognitoToken = async (_token, tokenUse) => tokenUse === "id"
     ? { sub: "cognito-user", email: "staff@example.com" }
     : { sub: "cognito-user", auth_time: Math.floor(Date.now() / 1000) };
-staff.syncLocalUser = async () => ({
-    id: "staff-id",
-    email: "staff@example.com",
-    status: "ACTIVE",
-    userRoles: [{ role: { roleName: "EVENT_MANAGER" } }],
-});
+staff.syncLocalUser = async () => {
+    if (localUserMode === "missing") throw new AppError(403, "LOCAL_PROFILE_NOT_FOUND", "Access denied");
+    return {
+        id: "staff-id",
+        email: "staff@example.com",
+        status: "ACTIVE",
+        accessState: localUserMode === "blocked" ? "DISABLED" : "ENABLED",
+        userRoles: [{ role: { roleName: "EVENT_MANAGER" } }],
+    };
+};
 staff.rolesFromCognitoGroups = () => ["EVENT_MANAGER"];
 AuthAudit.createAuthAuditLog = async () => {};
 const prisma = require("../../prisma/prismaClient");
@@ -67,6 +74,26 @@ test("callback returns the same-origin protected target after authorization-code
 
     assert.equal(response.status, 200);
     assert.equal(response.body.returnTo, "/events?view=upcoming");
+});
+
+test("callback distinguishes a missing local profile from another blocked account state", async () => {
+    try {
+        localUserMode = "missing";
+        const missing = await request(app)
+            .get("/api/v1/auth/callback?code=authorization-code&state=state")
+            .set("Cookie", "vsms_oauth_state=state; vsms_oauth_verifier=verifier");
+        assert.equal(missing.status, 403);
+        assert.equal(missing.body.code, "LOCAL_PROFILE_NOT_FOUND");
+
+        localUserMode = "blocked";
+        const blocked = await request(app)
+            .get("/api/v1/auth/callback?code=authorization-code&state=state")
+            .set("Cookie", "vsms_oauth_state=state; vsms_oauth_verifier=verifier");
+        assert.equal(blocked.status, 403);
+        assert.equal(blocked.body.code, "ACCOUNT_SESSION_BLOCKED");
+    } finally {
+        localUserMode = "active";
+    }
 });
 
 for (const returnTo of ["/", "https://untrusted.example/events", "https://localhost:5173//untrusted", "/auth/callback", "/api/v1/auth/authorize"]) {
