@@ -41,3 +41,15 @@ it('does not mislabel another blocked account state as a missing profile', async
   expect(await screen.findByText('Access denied')).toBeTruthy();
   expect(screen.queryByText(/Cognito identity was verified/i)).toBeNull();
 });
+
+it('starts a new authorization flow when the callback state cannot be verified', async () => {
+  apiState.code = 'REQUEST_FAILED';
+  render(
+    <MemoryRouter initialEntries={['/auth/callback?code=code&state=state']}>
+      <Routes><Route path="/auth/callback" element={<CognitoCallback />} /></Routes>
+    </MemoryRouter>,
+  );
+
+  expect(await screen.findByText(/sign-in request could not be verified/i)).toBeTruthy();
+  expect(screen.getByRole('link', { name: 'Start a new sign-in' }).getAttribute('href')).toBe('/api/v1/auth/authorize');
+});
