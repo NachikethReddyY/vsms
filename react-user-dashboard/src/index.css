@@ -56,9 +56,6 @@ svg { width:20px; height:20px; stroke-width:1.7; flex:none; }
 .profile-menu-panel svg { width:17px; height:17px; }
 .theme-toggle { position:relative; overflow:hidden; flex:none; color:var(--ink-2); }
 .theme-icon { position:absolute; transition:transform 220ms var(--ease-out),opacity 160ms ease-out; }
-.theme-icon.moon { opacity:0; transform:rotate(-45deg) scale(.6); }
-[data-theme="dark"] .theme-icon.sun { opacity:0; transform:rotate(45deg) scale(.6); }
-[data-theme="dark"] .theme-icon.moon { opacity:1; transform:rotate(0) scale(1); }
 .icon-button { width:44px; height:44px; display:grid; place-items:center; border:0; border-radius:8px; background:transparent; cursor:pointer; }
 .icon-button:hover { background:var(--surface-2); }
 .page-frame { max-width:1400px; min-height:100%; margin:0 auto; padding:40px clamp(24px,4vw,64px) 64px; }.page-frame.narrow { max-width:1240px; }
