@@ -14,7 +14,7 @@ const { syncLocalUser } = require("../../utils/staff");
 const accountService = require("../../services/accountService");
 const requireApprovedAccount = require("../../middlewares/requireApprovedAccount");
 const { sessionValidity } = require("../../utils/sessionValidity");
-const { profileUpdateBody, accountListQuery } = require("../../schemas/accountSchemas");
+const { profileUpdateBody, accountListQuery, approvalBody } = require("../../schemas/accountSchemas");
 
 function patch(t, target, property, value) {
   const original = target[property];
@@ -153,6 +153,71 @@ test("rejection writes an immutable decision record and account audit in one tra
   assert.equal(calls[1][1].action, "ACCOUNT_REJECTED");
 });
 
+test("approval assigns roles and queues Cognito synchronization in the same transaction", async (t) => {
+  const actorId = crypto.randomUUID();
+  const accountId = crypto.randomUUID();
+  const roleId = crypto.randomUUID();
+  const operationId = crypto.randomUUID();
+  const calls = [];
+  let assigned = [];
+  const account = {
+    id: accountId,
+    fullName: "Pending Person",
+    email: "pending@example.com",
+    status: "INACTIVE",
+    approvalState: "PENDING",
+    accessState: "ENABLED",
+    deprovisionedAt: null,
+    userRoles: [],
+    eventMemberships: [],
+  };
+  const tx = {
+    $executeRaw: async () => {},
+    role: { findMany: async () => [{ id: roleId, roleName: "REVIEWER" }] },
+    userRole: {
+      deleteMany: async () => { assigned = []; },
+      createMany: async ({ data }) => { assigned = data; calls.push(["roles", data]); },
+    },
+    user: {
+      findUnique: async () => account,
+      update: async ({ data }) => data.providerStateGeneration
+        ? { providerStateGeneration: 1 }
+        : { ...account, ...data, userRoles: assigned.map(() => ({ role: { roleName: "REVIEWER" } })), updatedAt: new Date() },
+    },
+    accountApprovalDecision: {
+      create: async ({ data }) => ({ id: crypto.randomUUID(), ...data }),
+    },
+    accountProviderOperation: {
+      findUnique: async () => null,
+      create: async ({ data }) => ({ id: operationId, generation: 1, status: "PENDING", ...data }),
+    },
+    auditLog: { create: async ({ data }) => { calls.push(["audit", data]); } },
+  };
+  patch(t, prisma, "$transaction", async (callback) => callback(tx));
+
+  const result = await accountService.decideApproval(
+    accountId,
+    "APPROVED",
+    null,
+    actorId,
+    {},
+    async () => ({ queued: false }),
+    {
+      roles: ["REVIEWER"],
+      processProviderOperation: async () => ({
+        operation: { id: operationId, operationType: "SYNC_ACCESS", generation: 1, status: "SUCCEEDED" },
+        pending: false,
+      }),
+    },
+  );
+
+  assert.equal(result.approvalState, "APPROVED");
+  assert.deepEqual(result.roles, ["REVIEWER"]);
+  assert.equal(result.providerOperation.status, "SUCCEEDED");
+  assert.equal(calls[0][0], "roles");
+  assert.deepEqual(calls.find(([name]) => name === "audit")[1].newValue.roles, ["REVIEWER"]);
+});
+
 test("Cognito revocation uses auth_time even when refreshed-token iat is newer than the cutoff", () => {
   const cutoff = new Date("2026-08-06T10:00:00.000Z");
   const payload = {
@@ -184,6 +249,8 @@ test("self-service profile rejects employment fields and account filters are str
   assert.equal(accountListQuery.safeParse({ limit: "101" }).success, false);
   assert.equal(accountListQuery.safeParse({ approvalState: "UNKNOWN" }).success, false);
   assert.equal(accountListQuery.safeParse({ unexpected: "value" }).success, false);
+  assert.equal(approvalBody.safeParse({}).success, false);
+  assert.equal(approvalBody.safeParse({ roles: ["REVIEWER"] }).success, true);
 });
 
 test("new lifecycle API locks the account before protecting the final administrator", async (t) => {

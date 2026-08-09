@@ -1540,16 +1540,18 @@ paths:
     post:
       tags: [Administration]
       operationId: approveAccount
-      summary: Approve a pending account without assigning an operational role
+      summary: Approve a pending account, assign application roles, and synchronize Cognito groups
       parameters: [{ $ref: "#/components/parameters/AccountId" }]
-      requestBody: { required: true, content: { application/json: { schema: { $ref: "#/components/schemas/OptionalAccountReasonRequest" } } } }
+      requestBody: { required: true, content: { application/json: { schema: { $ref: "#/components/schemas/AccountApprovalRequest" } } } }
       responses:
-        "200": { description: Approved account, content: { application/json: { schema: { $ref: "#/components/schemas/AccountEnvelope" } } } }
+        "200": { description: Approved account with Cognito group synchronization completed, content: { application/json: { schema: { $ref: "#/components/schemas/AccountEnvelope" } } } }
+        "202": { description: Approved account; Cognito group synchronization remains queued or owned by another worker, content: { application/json: { schema: { $ref: "#/components/schemas/AccountEnvelope" } } } }
         "401": { $ref: "#/components/responses/Unauthorized" }
         "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
         "409": { $ref: "#/components/responses/Conflict" }
         "422": { $ref: "#/components/responses/ValidationFailed" }
+        "502": { description: Approval committed; Cognito group synchronization escalated for administrator attention }
   /api/v1/admin/accounts/{accountId}/reject:
     post:
       tags: [Administration]
@@ -2969,6 +2971,18 @@ components:
       type: object
       additionalProperties: false
       properties: { reason: { type: string, nullable: true, maxLength: 500 } }
+    AccountApprovalRequest:
+      type: object
+      additionalProperties: false
+      required: [roles]
+      properties:
+        reason: { type: string, nullable: true, maxLength: 500 }
+        roles:
+          type: array
+          minItems: 1
+          maxItems: 6
+          uniqueItems: true
+          items: { type: string, enum: [ADMINISTRATOR, EVENT_MANAGER, REGISTRATION_OFFICER, SCREENER, REVIEWER, SUPPORT] }
     RequiredAccountReasonRequest:
       type: object
       additionalProperties: false
