@@ -2,7 +2,7 @@ const test = require("node:test");
 const assert = require("node:assert/strict");
 const crypto = require("node:crypto");
 
-const { __deletionTest } = require("../../services/eventService");
+const { __deletionTest } = require("../../services/event/eventService");
 
 const eventId = crypto.randomUUID();
 const adminId = crypto.randomUUID();

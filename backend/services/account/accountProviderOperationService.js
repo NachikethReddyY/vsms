@@ -1,7 +1,7 @@
 const crypto = require("node:crypto");
-const prisma = require("../prisma/prismaClient");
-const AppError = require("../errors/AppError");
-const { resolveAuditContext } = require("../utils/audit");
+const prisma = require("../../prisma/prismaClient");
+const AppError = require("../../errors/AppError");
+const { resolveAuditContext } = require("../../utils/audit");
 const { lockAccountTransition } = require("./adminSafety");
 const {
   synchronizeStaffAccess,

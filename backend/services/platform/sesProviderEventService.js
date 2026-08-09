@@ -1,6 +1,6 @@
 const crypto = require("node:crypto");
-const prisma = require("../prisma/prismaClient");
-const AppError = require("../errors/AppError");
+const prisma = require("../../prisma/prismaClient");
+const AppError = require("../../errors/AppError");
 const { verifySnsMessage, confirmSnsSubscription } = require("./snsMessageService");
 
 const providerMessageHash = (messageId) => crypto.createHash("sha256").update(messageId).digest("hex");

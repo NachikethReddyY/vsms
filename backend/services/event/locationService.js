@@ -1,5 +1,5 @@
-const env = require("../config/env");
-const AppError = require("../errors/AppError");
+const env = require("../../config/env");
+const AppError = require("../../errors/AppError");
 
 let cachedToken = null;
 let tokenExpiresAt = 0;

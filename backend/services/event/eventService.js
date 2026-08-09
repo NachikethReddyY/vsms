@@ -1,8 +1,8 @@
-const prisma = require("../prisma/prismaClient");
+const prisma = require("../../prisma/prismaClient");
 const crypto = require("crypto");
 const { Prisma } = require("@prisma/client");
-const AppError = require("../errors/AppError");
-const { encodeCursor, decodeCursor } = require("../utils/cursor");
+const AppError = require("../../errors/AppError");
+const { encodeCursor, decodeCursor } = require("../../utils/cursor");
 const {
   classifyTemplates,
   stationTypeForTemplateKey,
@@ -11,12 +11,13 @@ const {
   enqueueEventArtifactCleanup,
   processArtifactCleanupTasks,
   collectEventArtifactTasks,
-} = require("./artifactCleanupService");
-const { createExportReceipt } = require("../utils/eventExportReceipt");
-const { resolveAuditContext } = require("../utils/audit");
-const env = require("../config/env");
+} = require("../platform/artifactCleanupService");
+const { createExportReceipt } = require("../../utils/eventExportReceipt");
+const { resolveAuditContext } = require("../../utils/audit");
+const env = require("../../config/env");
 const { attendancePredicate, attendanceWhere } = require("./attendanceDefinition");
-const { enqueueAccountLifecycle } = require("./accountLifecycleNotificationService");
+const { enqueueAccountLifecycle } = require("../account/accountLifecycleNotificationService");
+const domainEventBus = require("../domain/domainEventBus");
 const { eventVisibilityWhere } = require("./eventAuthorizationService");
 
 const EVENT_FIELDS = [
@@ -1104,6 +1105,20 @@ const transitionEvent = async (eventId, command, body, user, correlationId, db =
         correlationId: requestIdFor(correlationId),
       },
     });
+    await domainEventBus.emit({
+      client: tx,
+      type: "EVENT_TRANSITIONED",
+      aggregateType: "Event",
+      aggregateId: eventId,
+      correlationId: requestIdFor(correlationId),
+      actorUserId: user.userId,
+      payload: {
+        fromStatus: transition.from,
+        toStatus: transition.to,
+        command,
+        version: updated.version,
+      },
+    });
 
     return toEventResponse(updated, user, tx);
   });
@@ -1171,6 +1186,20 @@ const cancelEvent = async (eventId, body, user, correlationId, db = prisma) => {
         beforeSnapshot: snapshot(current),
         afterSnapshot: snapshot(updated),
         correlationId: requestIdFor(correlationId),
+      },
+    });
+    await domainEventBus.emit({
+      client: tx,
+      type: "EVENT_TRANSITIONED",
+      aggregateType: "Event",
+      aggregateId: eventId,
+      correlationId: requestIdFor(correlationId),
+      actorUserId: user.userId,
+      payload: {
+        command: "cancel",
+        fromStatus: current.status,
+        toStatus: updated.status,
+        version: updated.version,
       },
     });
 

@@ -7,7 +7,7 @@ const {
   VA_RULE_VERSION,
   REF_RULE_VERSION,
   CV_RULE_VERSION,
-} = require("../../services/screeningService");
+} = require("../../services/screening/screeningService");
 const {
   saveRefractionBody,
   saveColourVisionBody,

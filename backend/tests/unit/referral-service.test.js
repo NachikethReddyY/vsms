@@ -21,7 +21,7 @@ const {
   referralRevisionFingerprint,
   PDF_COLORS,
   resultSummary,
-} = require("../../services/referralService");
+} = require("../../services/screening/referralService");
 const {
   encrypt,
   decrypt,

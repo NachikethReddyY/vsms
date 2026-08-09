@@ -15,8 +15,8 @@ const requireApprovedAccount = require("../../middlewares/requireApprovedAccount
 const accountRoutes = require("../../routes/accountRoutes");
 const adminRoutes = require("../../routes/adminRoutes");
 const userRoutes = require("../../routes/userRoutes");
-const accountService = require("../../services/accountService");
-const userService = require("../../services/userService");
+const accountService = require("../../services/account/accountService");
+const userService = require("../../services/account/userService");
 
 function appFor(user) {
   const originalFindUnique = prisma.user.findUnique;

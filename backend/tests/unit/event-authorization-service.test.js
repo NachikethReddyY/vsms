@@ -2,7 +2,7 @@ const test = require("node:test");
 const assert = require("node:assert/strict");
 const crypto = require("node:crypto");
 
-const authorization = require("../../services/eventAuthorizationService");
+const authorization = require("../../services/event/eventAuthorizationService");
 
 const eventA = crypto.randomUUID();
 const eventB = crypto.randomUUID();

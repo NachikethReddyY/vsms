@@ -2,7 +2,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const crypto = require('node:crypto');
 
-const queueService = require('../../services/queueService');
+const queueService = require('../../services/screening/queueService');
 
 const uuid = () => crypto.randomUUID();
 const eventId = uuid();

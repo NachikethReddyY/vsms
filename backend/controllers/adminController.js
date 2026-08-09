@@ -1,14 +1,14 @@
 const prisma = require("../prisma/prismaClient");
 const asyncHandler = require("../middlewares/asyncHandler");
-const referralService = require("../services/referralService");
+const referralService = require("../services/screening/referralService");
 const {
     processArtifactCleanupTasks,
     listArtifactCleanupTasks,
     maintainArtifactCleanupTask,
-} = require("../services/artifactCleanupService");
+} = require("../services/platform/artifactCleanupService");
 const { encodeCursor, decodeCursor } = require("../utils/cursor");
 const { createAuditLog } = require("../utils/audit");
-const { drainDueProviderOperations, maintainProviderOperation } = require("../services/accountProviderOperationService");
+const { drainDueProviderOperations, maintainProviderOperation } = require("../services/account/accountProviderOperationService");
 
 // Keyset cursor pagination so reads stay O(page) and bounded even when the
 // audit tables grow to tens of thousands of rows. Both audit tables share the

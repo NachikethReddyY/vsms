@@ -1,7 +1,7 @@
-const prisma = require("../prisma/prismaClient");
-const AppError = require("../errors/AppError");
-const { assertOperationalAccount, requireEventManager } = require("./eventAuthorizationService");
-const { attended } = require("./attendanceDefinition");
+const prisma = require("../../prisma/prismaClient");
+const AppError = require("../../errors/AppError");
+const { assertOperationalAccount, requireEventManager } = require("../event/eventAuthorizationService");
+const { attended } = require("../event/attendanceDefinition");
 
 const EVENT_LIMIT = 100;
 

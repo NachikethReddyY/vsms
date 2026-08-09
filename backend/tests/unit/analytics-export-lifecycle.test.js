@@ -7,11 +7,11 @@ const test = require("node:test");
 process.env.NODE_ENV = "test";
 process.env.DATABASE_URL ||= "postgresql://test:test@localhost:5432/vsms_test";
 
-const { attended, attendanceWhere } = require("../../services/attendanceDefinition");
-const { aggregateRows, resolveBounds, suppressClinicalRows, suppressSensitiveBlock } = require("../../services/analyticsService");
-const { protectSpreadsheetCell, renderCsv } = require("../../services/reportRenderer");
-const { claimNextReportJob, renewReportLease } = require("../../services/reportExportService");
-const { artifactPath, cleanupReportArtifactBlobs, publishArtifact, readArtifact, stagingStorageKey, storageKey, writeArtifact } = require("../../services/reportArtifactStorage");
+const { attended, attendanceWhere } = require("../../services/event/attendanceDefinition");
+const { aggregateRows, resolveBounds, suppressClinicalRows, suppressSensitiveBlock } = require("../../services/reporting/analyticsService");
+const { protectSpreadsheetCell, renderCsv } = require("../../services/reporting/reportRenderer");
+const { claimNextReportJob, renewReportLease } = require("../../services/reporting/reportExportService");
+const { artifactPath, cleanupReportArtifactBlobs, publishArtifact, readArtifact, stagingStorageKey, storageKey, writeArtifact } = require("../../services/reporting/reportArtifactStorage");
 const {
   maintainLifecycleEmail,
   processClaimedLifecycleEmail,
@@ -19,7 +19,7 @@ const {
   renderTemplate,
   safeMetadata,
   lifecyclePurposeForAccount,
-} = require("../../services/accountLifecycleNotificationService");
+} = require("../../services/account/accountLifecycleNotificationService");
 
 function createArtifactBlobDb() {
   const blobs = new Map();
