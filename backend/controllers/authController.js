@@ -1,4 +1,5 @@
 const crypto = require("crypto");
+const { AppError } = require("../errors/AppError");
 const env = require("../config/env");
 const asyncHandler = require("../middlewares/asyncHandler");
 const {
@@ -129,9 +130,7 @@ async function finalizeSuccessfulLogin(authResult, username, context, res) {
     });
 
     if (!canUseLimitedSession(localUser) || sessionWasRevoked(localUser, accessTokenPayload)) {
-        const error = new Error("Local staff account cannot use this session");
-        error.statusCode = 403;
-        throw error;
+        throw new AppError(403, "ACCOUNT_SESSION_BLOCKED", "Access denied");
     }
 
     const localRoles = localUser.userRoles.map((entry) => entry.role.roleName);
@@ -228,9 +227,7 @@ exports.refresh = asyncHandler(async (req, res) => {
             email: username.includes("@") ? username : null,
         });
         if (!canUseLimitedSession(localUser) || sessionWasRevoked(localUser, accessPayload)) {
-            const error = new Error("Local staff account cannot use this session");
-            error.statusCode = 403;
-            throw error;
+            throw new AppError(403, "ACCOUNT_SESSION_BLOCKED", "Access denied");
         }
 
         const localRoles = localUser.userRoles.map((entry) => entry.role.roleName);

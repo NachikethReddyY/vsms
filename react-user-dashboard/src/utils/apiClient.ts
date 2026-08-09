@@ -71,7 +71,7 @@ const commonHeaders = {
 };
 
 const apiClient = axios.create({ baseURL, withCredentials: true, headers: commonHeaders });
-const refreshClient = axios.create({ baseURL, withCredentials: true, headers: commonHeaders });
+const refreshClient = axios.create({ baseURL, withCredentials: true, headers: commonHeaders, timeout: 10_000 });
 
 apiClient.interceptors.request.use((config) => {
   config.headers["X-Device-Id"] = getDeviceId();
@@ -155,6 +155,11 @@ export function getApiError(error: unknown, fallback: string) {
     return error.response?.data?.error ?? error.response?.data?.message ?? fallback;
   }
   return fallback;
+}
+
+export function getApiErrorCode(error: unknown) {
+  if (axios.isAxiosError<{ code?: string }>(error)) return error.response?.data?.code ?? null;
+  return null;
 }
 
 export default apiClient;

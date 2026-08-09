@@ -1,4 +1,5 @@
 const prisma = require("../prisma/prismaClient");
+const { AppError } = require("../errors/AppError");
 const { APPLICATION_ROLES, normalizeApplicationRole, rolesFromCognitoGroups } = require("./roles");
 const eventAuthorization = require("../services/event/eventAuthorizationService");
 const env = require("../config/env");
@@ -38,9 +39,7 @@ async function syncLocalUser(profile, { allowCreate = false } = {}) {
         : null;
 
     if (!user && !allowCreate) {
-        const error = new Error("No local staff profile exists for this Cognito account");
-        error.statusCode = 403;
-        throw error;
+        throw new AppError(403, "LOCAL_PROFILE_NOT_FOUND", "Access denied");
     }
 
     if (!user) {

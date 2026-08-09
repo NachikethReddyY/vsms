@@ -1,4 +1,4 @@
-import { ChartBarSquareIcon, MagnifyingGlassIcon, MapPinIcon, PlusIcon, TicketIcon, UserGroupIcon, UsersIcon } from '@heroicons/react/24/outline';
+import { MagnifyingGlassIcon, MapPinIcon, PlusIcon, UsersIcon } from '@heroicons/react/24/outline';
 import { SegmentedControl } from '@astryxdesign/core';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
@@ -7,10 +7,7 @@ import { eventApi, type EventRecord, type EventStatus } from '../features/events
 import { useAuth } from '../auth/AuthProvider';
 import { getApiError as getApiMessage } from '../utils/apiClient';
 import { Button } from './ui/button';
-import { Dock, DockIcon } from './ui/dock';
-import { ThemeToggle } from './MagicEffects';
 import './EventsPage.css';
-import ProfileMenu from './ProfileMenu';
 
 type EventItem = {
   eventId: string;
@@ -77,15 +74,12 @@ export default function EventsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [query, setQuery] = useState('');
-  const [searchOpen, setSearchOpen] = useState(false);
   const [period, setPeriod] = useState<'upcoming' | 'past'>('upcoming');
   const [now, setNow] = useState(() => new Date());
   const { session } = useAuth();
   const user = session?.user;
   const navigate = useNavigate();
-  const canViewReports = user?.roles.some((role) => ['ADMINISTRATOR', 'EVENT_MANAGER'].includes(role)) ?? false;
   const canCreate = user?.roles.includes('ADMINISTRATOR') ?? false;
-  const canManageStaff = canCreate;
   const loadEvents = useCallback(async () => {
     setLoading(true);
     setError('');
@@ -104,23 +98,6 @@ export default function EventsPage() {
     const clock = window.setInterval(() => setNow(new Date()), 60000);
     return () => window.clearInterval(clock);
   }, []);
-  useEffect(() => {
-    if (!searchOpen) return;
-    const closeOverlay = (event: KeyboardEvent) => {
-      if (event.key !== 'Escape') return;
-      setSearchOpen(false);
-      setQuery('');
-      requestAnimationFrame(() => document.getElementById('event-search-button')?.focus());
-    };
-    window.addEventListener('keydown', closeOverlay);
-    return () => window.removeEventListener('keydown', closeOverlay);
-  }, [searchOpen]);
-  const localTime = new Intl.DateTimeFormat('en-SG', {
-    hour: 'numeric',
-    minute: '2-digit',
-    hour12: true,
-    timeZone: 'Asia/Singapore',
-  }).format(now).toUpperCase();
   const visibleEvents = useMemo(
     () => events.map((event) => toEventItem(event, now))
       .filter((event) => period === 'past' ? ['COMPLETED', 'CANCELLED'].includes(event.statusKey) : !['COMPLETED', 'CANCELLED'].includes(event.statusKey))
@@ -130,92 +107,6 @@ export default function EventsPage() {
 
   return (
     <div className="events-page vsms-landing-system">
-      <header className="events-site-nav">
-        <Link className="events-site-brand" to="/" aria-label="VSMS landing page">
-          <span className="events-brand-mark" aria-hidden="true">
-            <svg viewBox="0 0 32 32" fill="none">
-              <path d="M9 7H6v6M23 7h3v6M9 25H6v-6M23 25h3v-6" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
-              <path d="M9 21c3.6 0 3.8-10 7.3-10 2.4 0 2.8 5.3 6.7 5.3" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-              <circle cx="9" cy="21" r="2" fill="currentColor" />
-              <circle cx="16.3" cy="11" r="2" fill="currentColor" />
-              <circle cx="23" cy="16.3" r="2" fill="currentColor" />
-            </svg>
-          </span>
-        </Link>
-
-        <nav className="events-header-nav" aria-label="Primary navigation">
-          <a href="#events-register" aria-current="page"><TicketIcon aria-hidden="true" />Events</a>
-          {canViewReports && <Link to="/reports"><ChartBarSquareIcon aria-hidden="true" />Reports</Link>}
-          {canManageStaff && <Link to="/staff"><UserGroupIcon aria-hidden="true" />Staff</Link>}
-        </nav>
-
-        <div className={`events-header-actions ${searchOpen ? 'searching' : ''}`}>
-          {canCreate && <Button className="events-header-create" onClick={() => navigate('/events/new')}><PlusIcon aria-hidden="true" />New event</Button>}
-          <time className="events-local-time" dateTime={now.toISOString()}>{localTime}</time>
-          {searchOpen && (
-            <label className="events-header-search">
-              <MagnifyingGlassIcon aria-hidden="true" />
-              <span className="sr-only">Search events</span>
-              <input id="desktop-event-search"
-                autoFocus
-                type="search"
-                value={query}
-                onChange={(event) => setQuery(event.target.value)}
-                placeholder="Search events"
-              />
-            </label>
-          )}
-          <Button id="event-search-button" className="events-header-icon" variant="ghost" size="icon" aria-label={searchOpen ? 'Close search' : 'Search events'} aria-expanded={searchOpen} aria-controls="desktop-event-search" onClick={() => {
-              setSearchOpen((open) => !open);
-              if (searchOpen) setQuery('');
-            }}>
-            <MagnifyingGlassIcon aria-hidden="true" />
-          </Button>
-          <ThemeToggle className="events-header-icon events-theme-toggle" />
-          <ProfileMenu triggerClassName="events-profile-action" compact />
-        </div>
-      </header>
-
-      <div className="events-mobile-header">
-        <Link className="events-mobile-brand" to="/" aria-label="VSMS home">
-          <svg viewBox="0 0 32 32" fill="none" aria-hidden="true">
-            <path d="M9 7H6v6M23 7h3v6M9 25H6v-6M23 25h3v-6" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
-            <path d="M9 21c3.6 0 3.8-10 7.3-10 2.4 0 2.8 5.3 6.7 5.3" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-            <circle cx="9" cy="21" r="2" fill="currentColor" />
-            <circle cx="16.3" cy="11" r="2" fill="currentColor" />
-            <circle cx="23" cy="16.3" r="2" fill="currentColor" />
-          </svg>
-        </Link>
-        <div className="events-mobile-actions">
-          <ProfileMenu triggerClassName="events-mobile-profile" compact />
-        </div>
-      </div>
-
-      {searchOpen && (
-        <label className="events-mobile-search">
-          <MagnifyingGlassIcon aria-hidden="true" />
-          <span className="sr-only">Search events</span>
-          <input autoFocus type="search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search events" />
-        </label>
-      )}
-      <nav className="events-mobile-dock" aria-label="Mobile navigation">
-        <Dock iconSize={44} iconMagnification={52} iconDistance={100} disableMagnification direction="middle">
-          <DockIcon>
-            <a className="events-dock-action active" href="#events-register" aria-label="Events" aria-current="page"><TicketIcon aria-hidden="true" /></a>
-          </DockIcon>
-          {canViewReports && <DockIcon><Link className="events-dock-action" to="/reports" aria-label="Operational reports"><ChartBarSquareIcon aria-hidden="true" /></Link></DockIcon>}
-          {canManageStaff && <DockIcon><Link className="events-dock-action" to="/staff" aria-label="Staff accounts"><UserGroupIcon aria-hidden="true" /></Link></DockIcon>}
-          <DockIcon>
-            <button className={`events-dock-action ${searchOpen ? 'active' : ''}`} type="button" aria-label={searchOpen ? 'Close search' : 'Search events'} aria-expanded={searchOpen} onClick={() => {
-              setSearchOpen((open) => !open);
-              if (searchOpen) setQuery('');
-            }}><MagnifyingGlassIcon aria-hidden="true" /></button>
-          </DockIcon>
-          <DockIcon><ThemeToggle className="events-dock-action events-mobile-theme" /></DockIcon>
-          {canCreate && <DockIcon><Link className="events-dock-action" to="/events/new" aria-label="Create event"><PlusIcon aria-hidden="true" /></Link></DockIcon>}
-        </Dock>
-      </nav>
-
       <main className="events-main">
         <section className="events-register-intro">
           <h1><span>Events</span><span>Your Events</span></h1>
@@ -224,6 +115,12 @@ export default function EventsPage() {
             <button type="button" role="radio" data-value="past" aria-checked={period === 'past'} tabIndex={period === 'past' ? 0 : -1} onClick={() => setPeriod('past')}>Past</button>
           </SegmentedControl>
         </section>
+
+        <label className="events-list-search">
+          <MagnifyingGlassIcon aria-hidden="true" />
+          <span className="sr-only">Search events</span>
+          <input type="search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search events or venues" />
+        </label>
 
         {error ? (
           <section className="events-empty-state" role="alert">
