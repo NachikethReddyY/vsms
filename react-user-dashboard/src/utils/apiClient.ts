@@ -71,7 +71,7 @@ const commonHeaders = {
 };
 
 const apiClient = axios.create({ baseURL, withCredentials: true, headers: commonHeaders });
-const refreshClient = axios.create({ baseURL, withCredentials: true, headers: commonHeaders });
+const refreshClient = axios.create({ baseURL, withCredentials: true, headers: commonHeaders, timeout: 10_000 });
 
 apiClient.interceptors.request.use((config) => {
   config.headers["X-Device-Id"] = getDeviceId();
