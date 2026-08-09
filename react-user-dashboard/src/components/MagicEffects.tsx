@@ -62,8 +62,9 @@ export function ThemeToggle({ className = '', ...props }: ThemeToggleProps) {
 
   return (
     <button {...props} ref={buttonRef} type="button" className={`icon-button theme-toggle ${className}`.trim()} onClick={toggle} aria-pressed={theme === 'light'} aria-label={`Switch to ${theme === 'dark' ? 'light' : 'dark'} theme`}>
-      <SunIcon className="theme-icon sun" aria-hidden="true" />
-      <MoonIcon className="theme-icon moon" aria-hidden="true" />
+      {theme === 'dark'
+        ? <SunIcon className="theme-icon" aria-hidden="true" />
+        : <MoonIcon className="theme-icon" aria-hidden="true" />}
     </button>
   );
 }
