@@ -9943,7 +9943,7 @@
       ]
     },
     {
-      "name": "Approve a pending account without assigning an operational role",
+      "name": "Approve a pending account, assign application roles, and synchronize Cognito groups",
       "description": "",
       "event": [],
       "request": {
@@ -9981,7 +9981,7 @@
         },
         "body": {
           "mode": "raw",
-          "raw": "{\n  \"reason\": \"\"\n}",
+          "raw": "{\n  \"reason\": \"\",\n  \"roles\": [\n    \"ADMINISTRATOR\"\n  ]\n}",
           "options": {
             "raw": {
               "language": "json"
@@ -10015,6 +10015,30 @@
           "body": "{\n  \"account\": {\n    \"id\": \"00000000-0000-4000-8000-000000000000\",\n    \"fullName\": \"\",\n    \"email\": \"\",\n    \"contactNumber\": \"\",\n    \"employeeNumber\": \"\",\n    \"department\": \"\",\n    \"designation\": \"\",\n    \"professionalCategory\": \"STAFF\",\n    \"approvalState\": \"PENDING\",\n    \"accessState\": \"ENABLED\",\n    \"status\": \"ACTIVE\",\n    \"lastLoginAt\": \"2026-08-07T00:00:00.000Z\",\n    \"sessionInvalidBefore\": \"2026-08-07T00:00:00.000Z\",\n    \"deprovisionedAt\": \"2026-08-07T00:00:00.000Z\",\n    \"deprovisionReason\": \"\",\n    \"createdAt\": \"2026-08-07T00:00:00.000Z\",\n    \"updatedAt\": \"2026-08-07T00:00:00.000Z\",\n    \"roles\": [\n      \"ADMINISTRATOR\"\n    ],\n    \"eventMemberships\": [\n      {\n        \"id\": \"00000000-0000-4000-8000-000000000000\",\n        \"eventId\": \"00000000-0000-4000-8000-000000000000\",\n        \"userId\": \"00000000-0000-4000-8000-000000000000\",\n        \"status\": \"ACTIVE\",\n        \"addedById\": \"00000000-0000-4000-8000-000000000000\",\n        \"addedAt\": \"2026-08-07T00:00:00.000Z\",\n        \"removedById\": \"00000000-0000-4000-8000-000000000000\",\n        \"removedAt\": \"2026-08-07T00:00:00.000Z\",\n        \"removalReason\": \"\",\n        \"event\": {\n          \"eventId\": \"00000000-0000-4000-8000-000000000000\",\n          \"name\": \"\",\n          \"status\": \"DRAFT\",\n          \"startsAt\": \"2026-08-07T00:00:00.000Z\",\n          \"endsAt\": \"2026-08-07T00:00:00.000Z\"\n        },\n        \"roles\": [\n          {\n            \"role\": \"EVENT_MANAGER\",\n            \"assignedAt\": \"2026-08-07T00:00:00.000Z\"\n          }\n        ]\n      }\n    ]\n  },\n  \"providerOperation\": {\n    \"id\": \"00000000-0000-4000-8000-000000000000\",\n    \"operationType\": \"SYNC_ACCESS\",\n    \"generation\": 1,\n    \"status\": \"PENDING\",\n    \"pending\": true,\n    \"reason\": \"OLDER_GENERATION_PENDING\"\n  }\n}"
         },
         {
+          "name": "202 Response",
+          "originalRequest": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "description": "JSON request body",
+                "type": "text"
+              }
+            ],
+            "url": "{{baseUrl}}/admin/accounts/{accountId}/approve"
+          },
+          "status": "Accepted",
+          "code": 202,
+          "header": [
+            {
+              "key": "Content-Type",
+              "value": "application/json"
+            }
+          ],
+          "body": "{\n  \"account\": {\n    \"id\": \"00000000-0000-4000-8000-000000000000\",\n    \"fullName\": \"\",\n    \"email\": \"\",\n    \"contactNumber\": \"\",\n    \"employeeNumber\": \"\",\n    \"department\": \"\",\n    \"designation\": \"\",\n    \"professionalCategory\": \"STAFF\",\n    \"approvalState\": \"PENDING\",\n    \"accessState\": \"ENABLED\",\n    \"status\": \"ACTIVE\",\n    \"lastLoginAt\": \"2026-08-07T00:00:00.000Z\",\n    \"sessionInvalidBefore\": \"2026-08-07T00:00:00.000Z\",\n    \"deprovisionedAt\": \"2026-08-07T00:00:00.000Z\",\n    \"deprovisionReason\": \"\",\n    \"createdAt\": \"2026-08-07T00:00:00.000Z\",\n    \"updatedAt\": \"2026-08-07T00:00:00.000Z\",\n    \"roles\": [\n      \"ADMINISTRATOR\"\n    ],\n    \"eventMemberships\": [\n      {\n        \"id\": \"00000000-0000-4000-8000-000000000000\",\n        \"eventId\": \"00000000-0000-4000-8000-000000000000\",\n        \"userId\": \"00000000-0000-4000-8000-000000000000\",\n        \"status\": \"ACTIVE\",\n        \"addedById\": \"00000000-0000-4000-8000-000000000000\",\n        \"addedAt\": \"2026-08-07T00:00:00.000Z\",\n        \"removedById\": \"00000000-0000-4000-8000-000000000000\",\n        \"removedAt\": \"2026-08-07T00:00:00.000Z\",\n        \"removalReason\": \"\",\n        \"event\": {\n          \"eventId\": \"00000000-0000-4000-8000-000000000000\",\n          \"name\": \"\",\n          \"status\": \"DRAFT\",\n          \"startsAt\": \"2026-08-07T00:00:00.000Z\",\n          \"endsAt\": \"2026-08-07T00:00:00.000Z\"\n        },\n        \"roles\": [\n          {\n            \"role\": \"EVENT_MANAGER\",\n            \"assignedAt\": \"2026-08-07T00:00:00.000Z\"\n          }\n        ]\n      }\n    ]\n  },\n  \"providerOperation\": {\n    \"id\": \"00000000-0000-4000-8000-000000000000\",\n    \"operationType\": \"SYNC_ACCESS\",\n    \"generation\": 1,\n    \"status\": \"PENDING\",\n    \"pending\": true,\n    \"reason\": \"OLDER_GENERATION_PENDING\"\n  }\n}"
+        },
+        {
           "name": "401 Response",
           "originalRequest": {
             "method": "POST",
@@ -10030,30 +10054,6 @@
           },
           "status": "Unauthorized",
           "code": 401,
-          "header": [
-            {
-              "key": "Content-Type",
-              "value": "application/json"
-            }
-          ],
-          "body": "{\n  \"type\": \"\",\n  \"title\": \"\",\n  \"status\": 0,\n  \"code\": \"\",\n  \"requestId\": \"00000000-0000-4000-8000-000000000000\",\n  \"errors\": [\n    {\n      \"field\": \"\",\n      \"message\": \"\"\n    }\n  ]\n}"
-        },
-        {
-          "name": "403 Response",
-          "originalRequest": {
-            "method": "POST",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json",
-                "description": "JSON request body",
-                "type": "text"
-              }
-            ],
-            "url": "{{baseUrl}}/admin/accounts/{accountId}/approve"
-          },
-          "status": "Forbidden",
-          "code": 403,
           "header": [
             {
               "key": "Content-Type",

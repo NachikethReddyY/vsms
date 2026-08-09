@@ -3,6 +3,7 @@ import { Link, Navigate } from 'react-router-dom';
 import { useAuth } from '../auth/AuthProvider';
 import { ThemeToggle } from './MagicEffects';
 import { getCognitoAuthorizeUrl } from '../utils/cognitoAuth';
+import apiClient from '../utils/apiClient';
 import styles from './LandingPage.module.css';
 
 const workflowSteps = [
@@ -134,12 +135,21 @@ function OutlineIcon({ children }: { children: ReactNode }) {
 export default function LandingPage() {
   const { isAuthenticated } = useAuth();
   const workflowRef = useRef<HTMLElement>(null);
+  const [publicSignupEnabled, setPublicSignupEnabled] = useState(false);
   const [motionReady] = useState(
     () => typeof window !== 'undefined'
       && !window.matchMedia('(prefers-reduced-motion: reduce)').matches
       && 'IntersectionObserver' in window,
   );
   const [workflowVisible, setWorkflowVisible] = useState(!motionReady);
+
+  useEffect(() => {
+    let active = true;
+    void apiClient.get('/auth/config-status').then(({ data }) => {
+      if (active) setPublicSignupEnabled(data.publicSignupEnabled === true);
+    }).catch(() => {});
+    return () => { active = false; };
+  }, []);
 
   useEffect(() => {
     const workflow = workflowRef.current;
@@ -193,7 +203,7 @@ export default function LandingPage() {
         </Link>
         <div className={styles['nav-actions']}>
           <ThemeToggle className={styles['theme-toggle']} />
-          <Link className={styles['nav-sign-in']} to="/create-account">Sign up</Link>
+          {publicSignupEnabled && <Link className={styles['nav-sign-in']} to="/create-account">Sign up</Link>}
           <a className={styles['nav-sign-in']} href={getCognitoAuthorizeUrl()}>Sign in</a>
         </div>
       </header>
