@@ -2,15 +2,15 @@ const assert = require("node:assert/strict");
 const crypto = require("node:crypto");
 const test = require("node:test");
 const prisma = require("../../prisma/prismaClient");
-const { lockAccountTransition, lockFinalAdministratorTransition } = require("../../services/adminSafety");
-const accountService = require("../../services/accountService");
-const userService = require("../../services/userService");
+const { lockAccountTransition, lockFinalAdministratorTransition } = require("../../services/account/adminSafety");
+const accountService = require("../../services/account/accountService");
+const userService = require("../../services/account/userService");
 const {
   enqueueProviderOperation,
   processProviderOperation,
   maintainProviderOperation,
   drainDueProviderOperations,
-} = require("../../services/accountProviderOperationService");
+} = require("../../services/account/accountProviderOperationService");
 
 test("final-administrator advisory lock serializes concurrent transactions", async () => {
   let releaseFirst;

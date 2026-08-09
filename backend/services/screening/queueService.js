@@ -1,7 +1,7 @@
-const prisma = require("../prisma/prismaClient");
-const AppError = require("../errors/AppError");
-const { createAuditLog } = require("../utils/audit");
-const { requireQueueAccess } = require("./eventAuthorizationService");
+const prisma = require("../../prisma/prismaClient");
+const AppError = require("../../errors/AppError");
+const { createAuditLog } = require("../../utils/audit");
+const { requireQueueAccess } = require("../event/eventAuthorizationService");
 
 const ACTIVE_QUEUE_STATUSES = ["WAITING", "CALLED", "IN_PROGRESS"];
 

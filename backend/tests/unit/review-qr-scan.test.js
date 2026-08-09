@@ -1,7 +1,7 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 
-const { resolveScannedRegistration } = require('../../services/reviewService');
+const { resolveScannedRegistration } = require('../../services/screening/reviewService');
 const { hashToken } = require('../../utils/qrToken');
 
 const urlToken = 'b'.repeat(64);

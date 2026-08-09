@@ -1,9 +1,9 @@
 const crypto = require("node:crypto");
 const { Prisma } = require("@prisma/client");
-const prisma = require("../prisma/prismaClient");
-const AppError = require("../errors/AppError");
-const { createAuditLog } = require("../utils/audit");
-const { requireEventManager } = require("./eventAuthorizationService");
+const prisma = require("../../prisma/prismaClient");
+const AppError = require("../../errors/AppError");
+const { createAuditLog } = require("../../utils/audit");
+const { requireEventManager } = require("../event/eventAuthorizationService");
 const { getCompletedEventAnalytics, resolveBounds } = require("./analyticsService");
 const artifactStorage = require("./reportArtifactStorage");
 const { renderReport } = require("./reportRenderer");

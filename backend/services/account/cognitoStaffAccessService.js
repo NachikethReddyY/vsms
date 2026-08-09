@@ -10,9 +10,9 @@ const {
   CognitoIdentityProviderClient,
 } = require("@aws-sdk/client-cognito-identity-provider");
 
-const AppError = require("../errors/AppError");
-const env = require("../config/env");
-const { normalizeApplicationRole } = require("../utils/roles");
+const AppError = require("../../errors/AppError");
+const env = require("../../config/env");
+const { normalizeApplicationRole } = require("../../utils/roles");
 
 const GROUP_FOR_ROLE = Object.freeze({
   ADMINISTRATOR: "Admin",

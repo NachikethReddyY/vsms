@@ -1,8 +1,8 @@
 const { Prisma } = require("@prisma/client");
-const prisma = require("../prisma/prismaClient");
-const AppError = require("../errors/AppError");
-const { requireEventManager } = require("./eventAuthorizationService");
-const { ATTENDANCE_DEFINITION } = require("./attendanceDefinition");
+const prisma = require("../../prisma/prismaClient");
+const AppError = require("../../errors/AppError");
+const { requireEventManager } = require("../event/eventAuthorizationService");
+const { ATTENDANCE_DEFINITION } = require("../event/attendanceDefinition");
 
 const DEFAULT_SMALL_CELL_THRESHOLD = 5;
 const MAX_RANGE_MS = 366 * 24 * 60 * 60 * 1000;

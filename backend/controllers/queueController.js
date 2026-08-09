@@ -4,7 +4,7 @@
  * @description Handles HTTP requests for virtual queue operations, status tracking, station transitions, priority adjustments, and workload monitoring with robust error boundaries.
  */
 
-const queueService = require("../services/queueService");
+const queueService = require("../services/screening/queueService");
 const { AppError, ValidationError } = require("../middlewares/errorHandler");
 
 exports.joinQueue = async (req, res) => {

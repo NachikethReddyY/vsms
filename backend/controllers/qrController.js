@@ -1,4 +1,4 @@
-const qrService = require("../services/qrService");
+const qrService = require("../services/participant/qrService");
 const prisma = require("../prisma/prismaClient");
 const env = require("../config/env");
 const { decrypt } = require("../utils/cryptoUtils");

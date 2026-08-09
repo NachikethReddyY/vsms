@@ -1,7 +1,7 @@
 const crypto = require("crypto");
-const prisma = require("../prisma/prismaClient");
+const prisma = require("../../prisma/prismaClient");
 const screeningService = require("./screeningService");
-const { createAuditLog } = require("../utils/audit");
+const { createAuditLog } = require("../../utils/audit");
 
 const HANDLERS = {
   VISUAL_ACUITY: "saveVisualAcuity",

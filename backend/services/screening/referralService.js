@@ -3,13 +3,14 @@ const fs = require("fs/promises");
 const path = require("path");
 const PDFDocument = require("pdfkit");
 const { SESv2Client, SendEmailCommand } = require("@aws-sdk/client-sesv2");
-const prisma = require("../prisma/prismaClient");
-const env = require("../config/env");
-const AppError = require("../errors/AppError");
-const { encrypt, decrypt, encryptionContext } = require("../utils/cryptoUtils");
-const { loadVerifiedSignature, consumeSignatureArtifact, deleteSignature } = require("../utils/signatureStorage");
+const prisma = require("../../prisma/prismaClient");
+const env = require("../../config/env");
+const AppError = require("../../errors/AppError");
+const domainEventBus = require("../domain/domainEventBus");
+const { encrypt, decrypt, encryptionContext } = require("../../utils/cryptoUtils");
+const { loadVerifiedSignature, consumeSignatureArtifact, deleteSignature } = require("../../utils/signatureStorage");
 const { requireReviewerAccess } = require("./reviewService");
-const { maskNric } = require("../utils/validation");
+const { maskNric } = require("../../utils/validation");
 
 const documentsRoot = () => path.resolve(
   process.env.REFERRAL_STORAGE_DIR || path.join(__dirname, "..", "secure-data", "documents"),
@@ -570,6 +571,20 @@ const issueReferral = async (eventId, referralId, input, user, ipAddress) => {
         details: { eventId, reviewId: referral.reviewId, documentId, version, signedPayloadHash },
         ipAddress: String(ipAddress || "").slice(0, 45) || null,
       } });
+      await domainEventBus.emit({
+        client: tx,
+        type: "REFERRAL_ISSUED",
+        aggregateType: "Referral",
+        aggregateId: referralId,
+        actorUserId: user.userId,
+        payload: {
+          eventId,
+          reviewId: referral.reviewId,
+          documentId,
+          version,
+          referralStatus: "ISSUED",
+        },
+      });
       return queued;
     });
   } catch (error) {

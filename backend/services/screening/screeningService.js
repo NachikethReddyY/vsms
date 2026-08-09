@@ -1,10 +1,11 @@
 const crypto = require("crypto");
-const prisma = require("../prisma/prismaClient");
-const AppError = require("../errors/AppError");
-const { requireEventRoleAndDuty } = require("./eventAuthorizationService");
-const qrService = require("./qrService");
-const { createAuditLog } = require("../utils/audit");
-const { resolveRegistrationByQrValue } = require("../utils/qrToken");
+const prisma = require("../../prisma/prismaClient");
+const AppError = require("../../errors/AppError");
+const { requireEventRoleAndDuty } = require("../event/eventAuthorizationService");
+const qrService = require("../participant/qrService");
+const domainEventBus = require("../domain/domainEventBus");
+const { createAuditLog } = require("../../utils/audit");
+const { resolveRegistrationByQrValue } = require("../../utils/qrToken");
 
 const VA_RULE_VERSION = "VSMS-VA-1.0";
 const REF_RULE_VERSION = "VSMS-REF-1.0";
@@ -411,6 +412,24 @@ const saveStationResult = async ({
         },
         context,
         client: tx,
+      });
+      await domainEventBus.emit({
+        client: tx,
+        type: "SCREENING_RESULT_RECORDED",
+        aggregateType: "ScreeningResult",
+        aggregateId: result.resultId,
+        correlationId: context?.requestId,
+        actorUserId: user.userId,
+        payload: {
+          eventId,
+          registrationId: body.registrationId,
+          stationId,
+          stationType,
+          overallFlag: evaluation.overallFlag,
+          isFlagged: evaluation.isFlagged,
+          ruleVersion,
+          version: result.version,
+        },
       });
       return { result: responseResult, created: true };
     }, { isolationLevel: "Serializable" });

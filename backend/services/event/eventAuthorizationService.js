@@ -1,6 +1,6 @@
-const prisma = require("../prisma/prismaClient");
-const AppError = require("../errors/AppError");
-const { isApprovedAccount } = require("../middlewares/requireApprovedAccount");
+const prisma = require("../../prisma/prismaClient");
+const AppError = require("../../errors/AppError");
+const { isApprovedAccount } = require("../../middlewares/requireApprovedAccount");
 
 const ACTIVE_ASSIGNMENT_STATUSES = ["ASSIGNED", "CONFIRMED"];
 

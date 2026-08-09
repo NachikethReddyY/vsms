@@ -4,7 +4,7 @@ const test = require("node:test");
 
 process.env.DATABASE_URL ||= "postgresql://test:test@localhost:5432/vsms_test";
 
-const { synchronizeStaffAccess } = require("../../services/cognitoStaffAccessService");
+const { synchronizeStaffAccess } = require("../../services/account/cognitoStaffAccessService");
 
 class FakeCognitoClient {
   constructor({ exists = true, groups = [] } = {}) {
@@ -57,7 +57,7 @@ const options = (client) => ({
 
 test("administrator session revocation uses Cognito global sign-out without network access", async () => {
   const client = new FakeCognitoClient();
-  const { revokeStaffSessions } = require("../../services/cognitoStaffAccessService");
+  const { revokeStaffSessions } = require("../../services/account/cognitoStaffAccessService");
   const result = await revokeStaffSessions("person@example.com", options(client));
   assert.deepEqual(result, { managed: true });
   assert.deepEqual(client.calls.at(-1), ["AdminUserGlobalSignOutCommand", {
@@ -68,7 +68,7 @@ test("administrator session revocation uses Cognito global sign-out without netw
 
 test("deprovision disables the Cognito identity before global sign-out", async () => {
   const client = new FakeCognitoClient();
-  const { disableAndRevokeStaff } = require("../../services/cognitoStaffAccessService");
+  const { disableAndRevokeStaff } = require("../../services/account/cognitoStaffAccessService");
   await disableAndRevokeStaff("person@example.com", options(client));
   assert.deepEqual(client.calls.slice(-2).map(([name]) => name), [
     "AdminDisableUserCommand",

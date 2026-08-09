@@ -1,8 +1,8 @@
-const prisma = require("../prisma/prismaClient");
-const AppError = require("../errors/AppError");
-const { createAuditLog } = require("../utils/audit");
+const prisma = require("../../prisma/prismaClient");
+const AppError = require("../../errors/AppError");
+const { createAuditLog } = require("../../utils/audit");
 const { requireEventManager, actorId } = require("./eventAuthorizationService");
-const { enqueueAccountLifecycle } = require("./accountLifecycleNotificationService");
+const { enqueueAccountLifecycle } = require("../account/accountLifecycleNotificationService");
 
 const EVENT_ROLES = ["EVENT_MANAGER", "REGISTRATION", "SCREENER", "REVIEWER", "SUPPORT"];
 const ACTIVE_DUTIES = ["ASSIGNED", "CONFIRMED"];

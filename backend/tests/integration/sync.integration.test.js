@@ -13,7 +13,7 @@ before(async () => {
   process.env.LOCAL_HTTPS = "false";
   process.env.JWT_ACCESS_SECRET = "test-only-access-secret-with-at-least-thirty-two-characters";
   helpers = require("../helpers");
-  ({ processScreeningSync, requestFingerprint } = require("../../services/syncService"));
+  ({ processScreeningSync, requestFingerprint } = require("../../services/screening/syncService"));
 
   const screener = await helpers.ensureTestUser("STAFF");
   const role = await helpers.prisma.role.upsert({

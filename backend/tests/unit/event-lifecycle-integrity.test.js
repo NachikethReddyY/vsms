@@ -1,6 +1,6 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
-const eventService = require("../../services/eventService");
+const eventService = require("../../services/event/eventService");
 const { createEventBody } = require("../../schemas/eventSchemas");
 
 const eventId = "11111111-1111-4111-8111-111111111111";

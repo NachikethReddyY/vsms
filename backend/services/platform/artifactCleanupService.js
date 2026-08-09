@@ -1,9 +1,9 @@
 const fs = require("fs/promises");
 const path = require("path");
-const prisma = require("../prisma/prismaClient");
-const AppError = require("../errors/AppError");
-const { deleteEventSignature, signatureMetadata } = require("../utils/signatureStorage");
-const { artifactPath, deleteArtifact } = require("./reportArtifactStorage");
+const prisma = require("../../prisma/prismaClient");
+const AppError = require("../../errors/AppError");
+const { deleteEventSignature, signatureMetadata } = require("../../utils/signatureStorage");
+const { artifactPath, deleteArtifact } = require("../reporting/reportArtifactStorage");
 
 const TYPES = Object.freeze({
   CONSENT_SIGNATURE: "CONSENT_SIGNATURE",
