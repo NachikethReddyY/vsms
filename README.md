@@ -100,5 +100,6 @@ The Bruno collection is in `api-testing/bruno`. Select its `Local` environment a
 
 - [Event implementation report](docs/event-details-implementation-report.md)
 - [Event delivery plan](design/event-details-plan.md)
+- [Live acceptance kit](docs/live-acceptance.md)
 - [Entity relationship model](erd.md)
 - [OpenAPI contract](backend/docs/openapi.yaml)

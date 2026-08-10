@@ -46,6 +46,10 @@ backend/certs/*.pem
 # Bruno reports can contain short-lived bearer tokens and response headers
 api-testing/results/
 
+# Locally retained acceptance evidence; publish only sanitized, reviewed copies.
+evidence/
+backend/evidence/
+
 # Local security-scan artifacts
 gitleaks-report.json
 semgrep-report.json
