@@ -7,9 +7,24 @@ const { execFileSync } = require("node:child_process");
 const ROOT = path.resolve(__dirname, "..");
 const ARCHIVE_PREFIX = "vsms-submission/";
 const DEFAULT_OUTPUT = path.join(ROOT, ".submission", "vsms-submission.zip");
+const SOURCE_ONLY_NOTICE =
+  "Source-only archive: it contains repository source and editable documentation only. It does not create or include a database backup, a completed academic declaration/signature, presentation slides, or a final combined submission package.";
 const HUMAN_TEMPLATES = new Set([
   "docs/ai-transcripts/DECLARATION_TEMPLATE.md",
   "docs/ai-transcripts/EXTERNAL_AI_CHAT_LINKS.md",
+]);
+const SOURCE_BRIEF_FILES = new Set([
+  "docs/images/vsms documents/AY2627s1 ST0528 DBSP Project2 Brief v1.pdf",
+  "docs/images/vsms documents/DBSP SCP - Project 2 Common Project Specification V1 (2).docx",
+  "docs/images/vsms documents/SCP Project2AY2627S1 Deliverables V1 (1).docx",
+  "docs/images/vsms documents/VSMS Backend Practical Guide.docx",
+]);
+const EXCLUDED_DRAFT_DOCUMENTS = new Set([
+  "docs/design-preview.html",
+  "docs/logs.md",
+  "docs/progress-report-2026-08-03-to-2026-08-05.html",
+  "docs/secure_coding/diagrams/draft.md",
+  "docs/vsms-next-work-visual-plan.html",
 ]);
 const REQUIRED_FILES = [
   "README.md",
@@ -20,11 +35,28 @@ const REQUIRED_FILES = [
   "backend/docs/openapi.yaml",
   "react-user-dashboard/package.json",
   "react-user-dashboard/pnpm-lock.yaml",
+  ...SOURCE_BRIEF_FILES,
+  "docs/vsms-client-brief.md",
+  "docs/vsms-participant-flow.md",
+  "docs/vsms-project-2-guide.html",
+  "docs/vsms-project-2-work-split.md",
   "docs/secure_coding/report.md",
   "docs/secure_coding/api-requirement-map.md",
   "docs/secure_coding/demo-outline.md",
+  "docs/secure_coding/diagrams/ComponentDiagram.md",
+  "docs/secure_coding/diagrams/ContextDiagram.md",
+  "docs/secure_coding/diagrams/OfflineSynchronization.md",
+  "docs/secure_coding/diagrams/PostgreSQL_ERD_Design.md",
+  "docs/secure_coding/diagrams/RelationalAccessComparison.md",
+  "docs/secure_coding/diagrams/SecureApiDesign.md",
+  "docs/secure_coding/diagrams/SecurityArchitecture.md",
+  "docs/secure_coding/diagrams/SequenceDiagram.md",
+  "docs/secure_coding/diagrams/UseCaseDiagram.md",
+  "docs/secure_coding/diagrams/deploymentDiagram.md",
   "docs/ai-transcripts/DECLARATION_TEMPLATE.md",
   "docs/ai-transcripts/EXTERNAL_AI_CHAT_LINKS.md",
+  "scripts/check-submission-package.cjs",
+  "scripts/package-submission.cjs",
 ];
 
 function normalized(value) {
@@ -35,8 +67,9 @@ function shouldInclude(file) {
   const name = normalized(file).replace(/^\.\//, "");
   const base = name.split("/").pop();
   if (HUMAN_TEMPLATES.has(name)) return true;
+  if (EXCLUDED_DRAFT_DOCUMENTS.has(name)) return false;
   if (name.startsWith("docs/ai-transcripts/")) return false;
-  if (name.startsWith("docs/images/")) return false;
+  if (name.startsWith("docs/images/")) return SOURCE_BRIEF_FILES.has(name);
   if (name === "amplify.yml" || base === "bun.lock") return false;
   if (/(^|\/)\.(?:git|agents|codex|claude|impeccable)(?:\/|$)/.test(name)) return false;
   if (/(^|\/)node_modules(?:\/|$)/.test(name)) return false;
@@ -115,14 +148,18 @@ function createArchive(output = DEFAULT_OUTPUT) {
 
 if (require.main === module) {
   const result = createArchive(process.argv[2] || DEFAULT_OUTPUT);
-  console.log(`Created ${result.destination} (${result.fileCount} source files)`);
+  console.log(SOURCE_ONLY_NOTICE);
+  console.log(`Created source-only archive ${result.destination} (${result.fileCount} source files)`);
 }
 
 module.exports = {
   ARCHIVE_PREFIX,
   DEFAULT_OUTPUT,
+  EXCLUDED_DRAFT_DOCUMENTS,
   HUMAN_TEMPLATES,
   REQUIRED_FILES,
+  SOURCE_BRIEF_FILES,
+  SOURCE_ONLY_NOTICE,
   shouldInclude,
   validateEntryNames,
   createArchive,

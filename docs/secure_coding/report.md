@@ -48,12 +48,30 @@ The canonical implementation sources are:
 | Database | `backend/prisma/schema.prisma`, `backend/prisma/migrations/` | PostgreSQL provider, relational models, constraints, indexes and migration-owned objects |
 | SQL evidence | `backend/stored_procedures.sql` | A separate stored-procedure/function draft; not proof that those objects are installed or called by the current Prisma path |
 | Auth/config | `backend/config/env.js`, `backend/utils/cognitoClient.js`, `infrastructure/cognito.yaml` | Cognito integration/configuration boundary and fail-closed environment validation |
-| Logging | `backend/utils/logger/logger.js`, `backend/package.json` | Current logger implementation and declared logging dependencies |
+| Logging | #103 evidence commit `9c56c02`: `backend/utils/logger/logger.js`, `backend/middlewares/httpLogger.js`, `backend/app.js`, and `backend/tests/unit/http-logging.test.js` | Pino redaction and correlated HTTP completion logging in the intended implementation state |
 | Tests | `backend/tests/`, `react-user-dashboard/src/**/*.test.*`, package scripts | Runnable local checks; not cloud or rehearsal evidence |
 
 `docs/vsms-client-brief.md` describes project requirements and alternatives.
 Reference material is not treated as proof that an alternative architecture
 was implemented.
+
+### #103 and #105 integration alignment
+
+The repository contains verified sibling implementation evidence for the
+intended final state, but this issue97 worktree does not merge those commits:
+
+- **#103 (`9c56c02`):** `pino` is the structured logger, `pino-http` supplies
+  correlated HTTP completion logging, `backend/app.js` mounts that middleware
+  after request context, and the unit test checks redaction and route/status
+  fields.
+- **#105 (`f23a6c8`):** the request boundary is versioned route and middleware
+  → controller → service → Prisma Client → PostgreSQL; controllers map HTTP
+  input/output and services own domain decisions, Prisma access and
+  transactions. There is no repository layer.
+
+The report and diagram sources below describe those intended boundaries. The
+final combined source branch must include and verify #103/#105 before this
+issue97 source-only archive is treated as the complete runtime source.
 
 ## 3. Implemented architecture
 
@@ -67,7 +85,7 @@ Browser React/Vite dashboard
 Node.js + Express API
   ├─ auth, CSRF, rate limits, request context and validation middleware
   ├─ route → controller → service modules
-  ├─ in-process workers for report/domain/provider tasks
+  ├─ separate Node worker processes launched from `backend/scripts/`
   └─ Prisma client
         │ DATABASE_URL
         ▼
@@ -83,7 +101,9 @@ configured; the API still owns local account state and event authorization.
 ### Runtime and deployment boundary
 
 - **Express:** `backend/app.js` mounts the API and middleware; `backend/server.js`
-  owns startup, TLS-aware local transport, graceful shutdown and workers.
+  owns startup, TLS-aware local transport and graceful shutdown. Worker
+  scripts under `backend/scripts/` are separate Node processes operated
+  alongside the Express process; they are not in-process Express workers.
 - **EC2 target:** use the backend start/deploy scripts on a controlled EC2
   host. Production still needs an operator-managed HTTPS reverse proxy,
   firewall/security-group policy, process supervision, backups and monitoring.
@@ -91,12 +111,11 @@ configured; the API still owns local account state and event authorization.
 - **PostgreSQL:** Prisma declares `provider = "postgresql"`; migrations are
   the runtime schema authority. `backend/db/init.sql` intentionally refuses
   to create the old incompatible schema.
-- **Logging:** the current runtime logger is
-  `backend/utils/logger/logger.js`, which writes structured JSON lines to
-  ignored local log files and falls back to console output. `pino` and
-  `pino-http` are declared in `backend/package.json`, but no current runtime
-  import wires them into Express. This report therefore records Pino as a
-  declared dependency, not as an implemented request logger.
+- **Logging (#103 target state):** `backend/utils/logger/logger.js` uses Pino
+  with redaction, and `backend/middlewares/httpLogger.js` uses `pino-http` for
+  correlated HTTP completion records. `backend/app.js` mounts it after
+  request context. The behavior is evidenced by #103 commit `9c56c02` and its
+  unit test; the final combined branch still has to include that commit.
 - **Identity:** Cognito integration is present in code and infrastructure
   configuration, but a live user pool or provider result is not claimed.
 
@@ -110,11 +129,11 @@ configured; the API still owns local account state and event authorization.
 | Implemented | Participant, consent, QR and registration flows | `backend/services/participant/`, participant/registration/QR routes |
 | Implemented | Visual acuity, refraction and colour-vision save paths | `screeningService.js`, corresponding OpenAPI operations and frontend station pages |
 | Implemented | Review, referral and aggregate report/export source paths | `reviewService.js`, `referralService.js`, `services/reporting/` |
-| Implemented | Transactional outbox and local workers | `domainEventBus.js`, `scripts/domain-event-worker.js`, report/lifecycle workers |
+| Implemented | Transactional outbox and separate Node worker processes | `domainEventBus.js`, `scripts/domain-event-worker.js`, `scripts/report-worker.js`, and `scripts/lifecycle-email-worker.js`; each is a standalone entry point over shared PostgreSQL state |
 | Implemented | Scoped offline screening pack | `backend/docs/offline-screening-28.md`, `offlineSync.ts`; no service worker |
 | Config-dependent | Cognito staff identity and provider synchronization | Cognito client/config and provider-operation services; environment/provider evidence required |
 | Config-dependent | OneMap, SES/SNS and Redis integrations | Provider adapters and environment settings exist; external delivery/availability is not claimed |
-| Planned | Pino/Pino HTTP wiring | Dependencies are declared but not imported by the current runtime logger |
+| Implemented in #103 target state | Pino/Pino HTTP structured and correlated logging | `9c56c02` replaces the logger, mounts `httpLogger`, and adds redaction/completion-log tests; final combined branch inclusion remains unverified here |
 | Planned | Installable PWA shell/service worker | `backend/docs/offline-screening-28.md` explicitly records this gap |
 | Deferred | Eye-health station capture and offline path | The enum exists, but the current sync handler and frontend offline path support only three station types |
 | Deferred | Participant self-service offline, full sync-centre UI and broader offline coverage | Explicitly out of scope in the offline implementation note |
@@ -243,6 +262,18 @@ pnpm check:submission-package
 No performance benchmark, live EC2 observation, external provider result or
 demo rehearsal is inferred from these commands.
 
+`pnpm package:submission` is a deterministic source-only archive of the
+current committed repository. It does not merge #103/#105, create or include
+the PostgreSQL database backup, complete the declaration/signature, create
+presentation slides, or assemble the final combined package. The inclusion
+check keeps the supplied project brief/guide files and the editable Mermaid
+sources. It excludes only explicitly identified non-source material: the
+incomplete diagram instructions, the dated progress log, the historical Week
+0 log, the non-product UI preview, and the document explicitly labelled a
+next-work plan; visual/reference assets and copied/generated packages under
+`docs/images/` remain out unless they are one of the four supplied brief/guide
+files.
+
 ## 8. 15-minute demo outline
 
 The evidence-driven, unrehearsed run sheet is in
@@ -269,6 +300,8 @@ These items intentionally remain open:
 | Official declaration, name, date and signature | Use `docs/ai-transcripts/DECLARATION_TEMPLATE.md`; no signature is supplied here |
 | External AI/chat links, if required by the course | Use `docs/ai-transcripts/EXTERNAL_AI_CHAT_LINKS.md`; do not invent links |
 | Lecturer/course-specific report formatting or manual report template | Apply manually to this source; no unverified template is claimed |
+| PostgreSQL database backup | Supply separately from an authorized environment; the source-only packager neither creates nor includes it |
+| Presentation slides and final combined submission package | Assemble manually according to the course process; the repository script is not that package |
 | Lucidchart/Draw.io editable links or exported figures | The repository supplies editable Mermaid sources; add any official manual artifact only if a human has it |
 | EC2, PostgreSQL, Cognito and HTTPS deployment screenshots/results | Collect manually from the authorized environment; none are claimed here |
 | Demo rehearsal result and timings | Rehearse manually; this document is an outline only |

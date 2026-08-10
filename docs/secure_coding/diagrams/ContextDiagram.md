@@ -1,8 +1,9 @@
 # VSMS context diagram
 
-This source shows the current repository boundary: browser client, Express
-API, PostgreSQL and Cognito. It does not show proposed alternatives or a live
-deployment.
+This source retains the browser roles, offline storage, configured providers
+and EC2 target while exposing the #105 request boundary inside the Express
+process: versioned route and middleware → Controller → Service → Prisma. It
+does not show proposed alternatives or a live deployment.
 
 ```mermaid
 flowchart LR
@@ -13,7 +14,15 @@ flowchart LR
     reviewer[Reviewer]
 
     client[React/Vite dashboard<br/>browser + encrypted IndexedDB]
-    api[Node.js Express API<br/>EC2 deployment target]
+    subgraph api[Node.js Express API process<br/>EC2 deployment target]
+        middleware[Request context, security,<br/>auth, authorization and validation]
+        routes[Versioned routes]
+        controllers[Controllers]
+        services[Domain Services]
+        prisma[Prisma Client]
+        middleware --> routes --> controllers --> services --> prisma
+    end
+    workers[Separate Node worker processes<br/>backend/scripts/*.js]
     db[(PostgreSQL<br/>Prisma schema and migrations)]
     cognito[Cognito<br/>authorization-code + PKCE]
     onemap[OneMap<br/>optional configured provider]
@@ -27,9 +36,10 @@ flowchart LR
     client -->|HTTPS API requests| api
     client -->|login redirect/callback| cognito
     api -->|token exchange/JWKS| cognito
-    api -->|Prisma transactions and queries| db
-    api -.->|configured location lookup| onemap
-    api -.->|configured notification delivery| providers
+    prisma -->|transactions and queries| db
+    workers -->|job/outbox access| prisma
+    services -.->|configured location lookup| onemap
+    services -.->|configured notification delivery| providers
 ```
 
 ## Evidence

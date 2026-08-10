@@ -2,7 +2,8 @@
 
 This is the repository-supported target topology. The EC2 node and reverse
 proxy are deployment targets/prerequisites; this repository contains no live
-instance, security-group or certificate evidence.
+instance, security-group or certificate evidence. The Express request path
+follows the #105 route → Controller → Service → Prisma boundary.
 
 ```mermaid
 flowchart LR
@@ -10,11 +11,15 @@ flowchart LR
     proxy[Operator-managed HTTPS<br/>reverse proxy / TLS boundary]
 
     subgraph ec2[EC2 host — deployment target]
-        api[Node.js Express API]
-        workers[Optional backend worker processes]
-        prisma[Prisma client]
-        api --> prisma
-        workers --> prisma
+        api[Node.js Express API process]
+        middleware[Request context, security,<br/>auth, authorization and validation]
+        routes[Versioned routes]
+        controllers[Controllers]
+        services[Domain Services]
+        workers[Separate Node worker processes<br/>backend/scripts/*.js]
+        prisma[Prisma Client]
+        api --> middleware --> routes --> controllers --> services --> prisma
+        workers -->|claim/process jobs and outbox rows| prisma
     end
 
     postgres[(PostgreSQL<br/>DATABASE_URL target)]

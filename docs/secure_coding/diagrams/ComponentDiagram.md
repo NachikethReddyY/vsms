@@ -1,8 +1,10 @@
 # VSMS component diagram
 
-The component boundaries follow the current folder structure and request
-path. Workers are backend processes over the same PostgreSQL state, not
-separate serverless services.
+The component boundaries retain the browser/offline, Express, provider and
+worker detail from this report while following the #105 request boundary:
+versioned route and middleware → Controller → Service → Prisma. There is no
+repository layer. Worker scripts are separate Node processes over the same
+PostgreSQL state, not in-process Express workers or serverless services.
 
 ```mermaid
 flowchart LR
@@ -16,15 +18,15 @@ flowchart LR
         offline --> indexed
     end
 
-    subgraph express[Node.js Express API]
+    subgraph express[Node.js Express API process]
         middleware[Security, auth, CSRF,<br/>rate-limit and validation middleware]
         routes[Versioned REST routes]
         controllers[Controllers]
-        services[Domain services]
-        workers[In-process workers<br/>reports, lifecycle, domain events]
+        services[Domain Services]
         middleware --> routes --> controllers --> services
-        workers --> services
     end
+
+    workers[Separate Node worker processes<br/>backend/scripts/*.js<br/>reports, lifecycle, domain events]
 
     prisma[Prisma client]
     postgres[(PostgreSQL)]
@@ -33,6 +35,7 @@ flowchart LR
     apiClient -->|HTTPS| middleware
     offline -->|sync screening batch| middleware
     services --> prisma --> postgres
+    workers -->|claim/process jobs and outbox rows| prisma
     middleware -->|authorize/callback/JWKS| cognito
 ```
 

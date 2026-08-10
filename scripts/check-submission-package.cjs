@@ -2,7 +2,14 @@
 
 const assert = require("node:assert/strict");
 const fs = require("node:fs");
-const { archiveNames, ARCHIVE_PREFIX, REQUIRED_FILES, shouldInclude, validateEntryNames } = (() => {
+const {
+  archiveNames,
+  ARCHIVE_PREFIX,
+  REQUIRED_FILES,
+  SOURCE_ONLY_NOTICE,
+  shouldInclude,
+  validateEntryNames,
+} = (() => {
   const packageScript = require("./package-submission.cjs");
   return {
     ...packageScript,
@@ -22,12 +29,21 @@ const cases = [
   ["react-user-dashboard/certs/localhost-key.pem", false],
   ["backend/backups/test.sql", false],
   ["docs/images/private.zip", false],
+  ["docs/images/vsms documents/VSMS Backend Practical Guide.docx", true],
+  ["docs/images/vsms documents/lambda - Copy (1).js", false],
   ["docs/ai-transcripts/2026-chat.md", false],
   ["docs/ai-transcripts/DECLARATION_TEMPLATE.md", true],
+  ["docs/design-preview.html", false],
+  ["docs/logs.md", false],
+  ["docs/secure_coding/diagrams/draft.md", false],
+  ["docs/vsms-next-work-visual-plan.html", false],
   ["docs/secure_coding/report.md", true],
 ];
 
 for (const [file, expected] of cases) assert.equal(shouldInclude(file), expected, file);
+for (const phrase of ["source-only", "database backup", "declaration", "slides", "final combined submission package"]) {
+  assert.match(SOURCE_ONLY_NOTICE, new RegExp(phrase, "i"), phrase);
+}
 
 const safeNames = REQUIRED_FILES.map((file) => `${ARCHIVE_PREFIX}${file}`);
 assert.equal(validateEntryNames(safeNames).length, safeNames.length);

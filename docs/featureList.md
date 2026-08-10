@@ -40,8 +40,7 @@ measured performance.
 - [x] PostgreSQL foreign keys, unique constraints, indexes and migration-backed audit immutability guards.
 - [x] Structured local logging through `backend/utils/logger/logger.js`.
 - [~] Cognito, OneMap, SES/SNS and Redis integrations; provider/configuration evidence is environment-dependent.
-- [~] `pino` and `pino-http` are declared dependencies, but are not wired into the current runtime logger.
-- [ ] Pino request logging integration.
+- [~] Pino and pino-http structured request/completion logging is implemented in the intended #103 state (`9c56c02`); this issue97 worktree does not merge that sibling commit, so final combined-branch inclusion remains to verify.
 - [ ] EC2 live deployment evidence, reverse-proxy evidence, backups, monitoring and restore evidence.
 - [ ] Production artifact-signature enforcement; no runtime signature claim is made.
 
@@ -66,3 +65,4 @@ measured performance.
 - [?] Add only verified external AI/chat links to `docs/ai-transcripts/EXTERNAL_AI_CHAT_LINKS.md`.
 - [?] Supply any required manual Lucidchart/Draw.io export or link; Mermaid sources in `docs/secure_coding/diagrams/` are the repository-side editable source.
 - [?] Collect authorized EC2/PostgreSQL/Cognito/HTTPS screenshots and rehearse the demo; no such evidence is claimed here.
+- [?] Assemble the final submission package manually; the repository packager is source-only and does not create the database backup, declaration/signature, presentation slides, or final combined package.
