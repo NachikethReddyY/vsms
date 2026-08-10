@@ -1,0 +1,82 @@
+{
+  "schemaVersion": 1,
+  "dataset": {
+    "seedScript": "prisma/seed.js",
+    "resetScript": "scripts/reset-acceptance-demo.js",
+    "anchorVariable": "VSMS_DEMO_ANCHOR_DATE",
+    "syntheticMarkers": ["Synthetic", "TEST-NRIC", "example.test", "SYNTHETIC_ACCEPTANCE_ONLY"],
+    "liveEvent": "VSMS Synthetic Active Event"
+  },
+  "evidence": {
+    "requiredForPassedScenario": ["capturedAt", "sanitizedScreenshot", "requestIds", "httpStatuses", "rowCounts"],
+    "requiredPerRun": ["migration.revision", "migration.checkedAt", "service.revision", "service.status", "service.checkedAt"],
+    "prohibited": ["passwords", "MFA codes", "cookies", "authorization headers", "access tokens", "refresh tokens", "QR bearer values", "real participant data"]
+  },
+  "scenarios": [
+    {
+      "id": "local-acceptance-kit",
+      "proofLevel": "AUTOMATED_LOCAL",
+      "title": "Fixture and evidence-contract checks",
+      "expected": "The seed contract, scenario catalogue, local-only reset guard, and evidence validator pass without a network call."
+    },
+    {
+      "id": "managed-auth-session",
+      "proofLevel": "LIVE_BROWSER_COGNITO",
+      "title": "Invitation, password, MFA, local role, and session",
+      "expected": "An invited synthetic account completes the managed password and MFA flow; its approved local role is intersected with its provider group and the session is restored."
+    },
+    {
+      "id": "event-duty-boundary",
+      "proofLevel": "LIVE_BROWSER_COGNITO",
+      "title": "Allowed event duty and denied cross-event access",
+      "expected": "A synthetic registration/reviewer account works only in its assigned active event and duty; the same account receives a denied response for a second event."
+    },
+    {
+      "id": "account-lifecycle-boundary",
+      "proofLevel": "LIVE_BROWSER_COGNITO",
+      "title": "Suspended, revoked-session, and deprovisioned access",
+      "expected": "After each lifecycle action, the prior browser session is rejected and the account cannot regain event access."
+    },
+    {
+      "id": "registration-consent-qr-checkin",
+      "proofLevel": "LIVE_BROWSER",
+      "title": "Registration through consent, QR, and check-in",
+      "expected": "Synthetic Charlie is registered with consent, a QR pass is issued, and check-in changes the expected registration and queue counts."
+    },
+    {
+      "id": "queue-transfer-and-three-stations",
+      "proofLevel": "LIVE_BROWSER",
+      "title": "Queues, transfers, visual acuity, refraction, and colour vision",
+      "expected": "The synthetic fixture moves through each implemented station, retains its registration, and presents the review queue."
+    },
+    {
+      "id": "eye-health-fourth-station",
+      "proofLevel": "DEPENDENCY_BLOCKED",
+      "title": "Eye health as the fourth station",
+      "expected": "Do not mark passed: the Station Library deliberately keeps EYE_HEALTH catalog-only and there is no eye-health capture route/page."
+    },
+    {
+      "id": "review-referral",
+      "proofLevel": "LIVE_BROWSER",
+      "title": "Clinical review and referral",
+      "expected": "A reviewer with an active event duty records a synthetic decision, creates a referral, and captures only masked recipient evidence."
+    },
+    {
+      "id": "offline-reconnect",
+      "proofLevel": "LIVE_BROWSER",
+      "title": "Offline save and reconnect",
+      "expected": "A downloaded assigned station saves a synthetic result offline, reconnects, and records exactly one applied sync action."
+    },
+    {
+      "id": "dashboard-and-export",
+      "proofLevel": "LIVE_BROWSER",
+      "title": "Dashboard and export",
+      "expected": "Dashboard counts match sanitized row counts and an authorized event export/report completes without exposing participant details."
+    }
+  ],
+  "blockers": [
+    "Managed invitation, password, MFA, provider-group intersection, and lifecycle revocation require an approved live deployment and Cognito test accounts.",
+    "Station Library maps EYE_HEALTH as non-importable and the dashboard has no eye-health capture page, so the required fourth-station browser path is not implemented.",
+    "Offline browser proof depends on an active assigned station, persistent browser storage, and a deliberate connection interruption; unit coverage is not a live reconnect result."
+  ]
+}
