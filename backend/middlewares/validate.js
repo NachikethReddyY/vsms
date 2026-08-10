@@ -29,11 +29,6 @@ const validate = (schemas) => (req, _res, next) => {
         message: issue.message,
       }));
 
-      // Optional: Clean conditional console logging for development vs production
-      if (process.env.NODE_ENV !== "production") {
-        console.warn("Validation Warning:", JSON.stringify(formattedErrors, null, 2));
-      }
-
       return next(
         new AppError(422, "VALIDATION_ERROR", "Request validation failed", formattedErrors)
       );

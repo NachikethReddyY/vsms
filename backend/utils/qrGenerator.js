@@ -1,5 +1,6 @@
 const QRCode = require("qrcode");
 const crypto = require("crypto");
+const logger = require("./logger/logger");
 
 /**
  * Generates a branded and secure QR code for a participant.
@@ -41,30 +42,14 @@ async function generateBrandedQR(participantId, customOptions = {}) {
             token,
             qrImage
         };
-    } catch (error) {
-        console.error("Failed to generate branded QR code:", error);
+    } catch {
+        logger.error("qr_generation.failed", {
+            event: "qr_generation.failed",
+            code: "QR_GENERATION_FAILED",
+        });
         throw new Error("QR Code generation failed");
     }
 }
-
-// Example usage implementation block
-async function run() {
-    try {
-        const result = await generateBrandedQR("user_98765", {
-            darkColor: "#4F46E5",  // Indigo brand color
-            lightColor: "#F3F4F6", // Light gray background
-            width: 400             // Output resolution width
-        });
-
-        console.log("Generated Token:", result.token);
-        console.log("Data URL Ready for <img src='...'>:", result.qrImage);
-    } catch (err) {
-        console.error(err);
-    }
-}
-
-// Uncomment the line below if you want to execute it directly via Node.js
-// run();
 
 module.exports = {
     generateBrandedQR
