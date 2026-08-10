@@ -21,18 +21,19 @@ jobs:
       postgres:
         image: postgres:16-alpine
         env:
-          POSTGRES_DB: vsms_test
-          POSTGRES_USER: vsms
+          POSTGRES_DB: postgres
+          POSTGRES_USER: postgres
           POSTGRES_PASSWORD: vsms-ci-password
         ports:
           - 5432:5432
         options: >-
-          --health-cmd "pg_isready -U vsms -d vsms_test"
+          --health-cmd "pg_isready -U postgres -d postgres"
           --health-interval 10s
           --health-timeout 5s
           --health-retries 5
     env:
-      DATABASE_URL: postgresql://vsms:vsms-ci-password@127.0.0.1:5432/vsms_test
+      DATABASE_URL: postgresql://vsms_test:vsms-ci-password@127.0.0.1:5432/vsms_test
+      VSMS_TEST_DATABASE_RESET_ACKNOWLEDGEMENT: I_UNDERSTAND_THIS_RESETS_A_TEST_DATABASE
       NODE_ENV: test
       LOCAL_HTTPS: "false"
       JWT_ACCESS_SECRET: ci-only-access-secret-with-at-least-thirty-two-characters
@@ -56,12 +57,18 @@ jobs:
         run: pnpm install --frozen-lockfile
         working-directory: backend
 
-      - name: Generate Prisma client
-        run: pnpm exec prisma generate
-        working-directory: backend
+      - name: Create least-privilege test database
+        run: |
+          docker exec -i -e PGPASSWORD=vsms-ci-password ${{ job.services.postgres.id }} psql -U postgres -d postgres -v ON_ERROR_STOP=1 <<'SQL'
+          CREATE ROLE vsms_test LOGIN PASSWORD 'vsms-ci-password' NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION;
+          CREATE DATABASE vsms_test OWNER vsms_test;
+          REVOKE ALL ON DATABASE vsms_test FROM PUBLIC;
+          GRANT CONNECT, TEMPORARY ON DATABASE vsms_test TO vsms_test;
+          SQL
+          docker exec -e PGPASSWORD=vsms-ci-password ${{ job.services.postgres.id }} psql -U vsms_test -d vsms_test -v ON_ERROR_STOP=1 -c "SELECT rolname, rolsuper, rolcreatedb, rolcreaterole FROM pg_roles WHERE rolname = current_user"
 
-      - name: Apply test database migrations
-        run: pnpm exec prisma migrate reset --force --skip-seed
+      - name: Prepare isolated test database
+        run: pnpm run db:test:prepare
         working-directory: backend
 
       - name: Run backend unit and security tests
@@ -134,18 +141,19 @@ jobs:
       postgres:
         image: postgres:16-alpine
         env:
-          POSTGRES_DB: vsms_test
-          POSTGRES_USER: vsms
+          POSTGRES_DB: postgres
+          POSTGRES_USER: postgres
           POSTGRES_PASSWORD: vsms-ci-password
         ports:
           - 5432:5432
         options: >-
-          --health-cmd "pg_isready -U vsms -d vsms_test"
+          --health-cmd "pg_isready -U postgres -d postgres"
           --health-interval 10s
           --health-timeout 5s
           --health-retries 5
     env:
-      DATABASE_URL: postgresql://vsms:vsms-ci-password@127.0.0.1:5432/vsms_test
+      DATABASE_URL: postgresql://vsms_test:vsms-ci-password@127.0.0.1:5432/vsms_test
+      VSMS_TEST_DATABASE_RESET_ACKNOWLEDGEMENT: I_UNDERSTAND_THIS_RESETS_A_TEST_DATABASE
       NODE_ENV: development
       LOCAL_HTTPS: "true"
       HOST: 127.0.0.1
@@ -189,8 +197,18 @@ jobs:
         run: pnpm install --frozen-lockfile
         working-directory: react-user-dashboard
 
-      - name: Apply test database migrations
-        run: pnpm exec prisma migrate reset --force --skip-seed
+      - name: Create least-privilege test database
+        run: |
+          docker exec -i -e PGPASSWORD=vsms-ci-password ${{ job.services.postgres.id }} psql -U postgres -d postgres -v ON_ERROR_STOP=1 <<'SQL'
+          CREATE ROLE vsms_test LOGIN PASSWORD 'vsms-ci-password' NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION;
+          CREATE DATABASE vsms_test OWNER vsms_test;
+          REVOKE ALL ON DATABASE vsms_test FROM PUBLIC;
+          GRANT CONNECT, TEMPORARY ON DATABASE vsms_test TO vsms_test;
+          SQL
+          docker exec -e PGPASSWORD=vsms-ci-password ${{ job.services.postgres.id }} psql -U vsms_test -d vsms_test -v ON_ERROR_STOP=1 -c "SELECT rolname, rolsuper, rolcreatedb, rolcreaterole FROM pg_roles WHERE rolname = current_user"
+
+      - name: Prepare isolated test database
+        run: pnpm run db:test:prepare
         working-directory: backend
 
       - name: Start HTTPS API and frontend services
