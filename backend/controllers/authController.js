@@ -1,5 +1,4 @@
 const crypto = require("crypto");
-const { AppError } = require("../errors/AppError");
 const env = require("../config/env");
 const asyncHandler = require("../middlewares/asyncHandler");
 const {
@@ -13,9 +12,8 @@ const {
 } = require("../utils/cognitoClient");
 const { verifyCognitoToken } = require("../utils/cognitoJwt");
 const { timingSafeEqual } = require("../utils/security");
-const { rolesFromCognitoGroups, ALLOWED_ROLES } = require("../utils/staff");
+const { ALLOWED_ROLES } = require("../utils/staff");
 const accountService = require("../services/account/accountService");
-const { sessionValidity } = require("../utils/sessionValidity");
 const {
     ACCESS_COOKIE,
     REFRESH_COOKIE,
@@ -72,17 +70,6 @@ function normalizeReturnTo(value) {
 
 exports.normalizeReturnTo = normalizeReturnTo;
 
-function extractProfileFromIdToken(payload) {
-    return {
-        cognitoSub: payload.sub,
-        email: payload.email || payload["cognito:username"],
-        fullName: payload.name || payload.given_name || null,
-        employeeNumber: payload["custom:employee_number"] || null,
-        department: payload["custom:department"] || null,
-        designation: payload["custom:designation"] || null,
-    };
-}
-
 function publicUser(localUser, roles) {
     const systemRole = roles.includes("ADMINISTRATOR")
         ? "ADMIN"
@@ -107,44 +94,17 @@ function publicUser(localUser, roles) {
     };
 }
 
-function canUseLimitedSession(user) {
-    if (!user || user.deprovisionedAt) return false;
-    if (user.accessState !== undefined) return user.accessState !== "DISABLED";
-    return user.status === "ACTIVE";
-}
-
-function sessionWasRevoked(user, payload) {
-    return !sessionValidity(user, payload).valid;
-}
-
 async function finalizeSuccessfulLogin(authResult, username, context, res) {
     const [idTokenPayload, accessTokenPayload] = await Promise.all([
         verifyCognitoToken(authResult.IdToken, "id"),
         verifyCognitoToken(authResult.AccessToken, "access"),
     ]);
-    const emailVerified = idTokenPayload.email_verified === true || idTokenPayload.email_verified === "true";
-    const localUser = await accountService.syncCognitoUser(extractProfileFromIdToken(idTokenPayload), {
-        allowCreate: env.publicSignupEnabled && emailVerified,
-    });
-
-    if (!canUseLimitedSession(localUser) || sessionWasRevoked(localUser, accessTokenPayload)) {
-        throw new AppError(403, "ACCOUNT_SESSION_BLOCKED", "Access denied");
-    }
-
-    const localRoles = localUser.userRoles.map((entry) => entry.role.roleName);
-    const cognitoRoles = rolesFromCognitoGroups(accessTokenPayload);
-    const roles = localRoles.filter((role) => cognitoRoles.includes(role));
-
-    const lastLoginAt = await accountService.recordSuccessfulLogin(localUser.id);
-    localUser.lastLoginAt = lastLoginAt;
-    setAuthCookies(res, authResult, idTokenPayload.email || idTokenPayload["cognito:username"] || username);
-    await accountService.recordAuthAudit({
-        userId: localUser.id,
-        eventType: "LOGIN_SUCCESS",
-        outcome: "SUCCESS",
-        identifier: localUser.email,
+    const { localUser, roles } = await accountService.establishCognitoLoginSession({
+        idTokenPayload,
+        accessTokenPayload,
         context,
     });
+    setAuthCookies(res, authResult, idTokenPayload.email || idTokenPayload["cognito:username"] || username);
 
     return {
         expiresIn: authResult.ExpiresIn,
@@ -219,17 +179,10 @@ exports.refresh = asyncHandler(async (req, res) => {
         const response = await refreshSession({ email: username, refreshToken });
         const authResult = response.AuthenticationResult;
         const accessPayload = await verifyCognitoToken(authResult.AccessToken, "access");
-        const localUser = await accountService.syncCognitoUser({
-            cognitoSub: accessPayload.sub,
-            email: username.includes("@") ? username : null,
+        const { localUser, roles } = await accountService.establishCognitoRefreshSession({
+            accessTokenPayload: accessPayload,
+            username,
         });
-        if (!canUseLimitedSession(localUser) || sessionWasRevoked(localUser, accessPayload)) {
-            throw new AppError(403, "ACCOUNT_SESSION_BLOCKED", "Access denied");
-        }
-
-        const localRoles = localUser.userRoles.map((entry) => entry.role.roleName);
-        const cognitoRoles = rolesFromCognitoGroups(accessPayload);
-        const roles = localRoles.filter((role) => cognitoRoles.includes(role));
         setAuthCookies(res, { ...authResult, RefreshToken: refreshToken }, username);
         res.json({
             expiresIn: authResult.ExpiresIn,

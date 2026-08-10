@@ -8,6 +8,8 @@ const { assertAdministratorRemains, lockAccountTransition } = require("./adminSa
 const { deriveLegacyStatus } = require("./accountState");
 const { enqueueProviderOperation, processProviderOperationForResponse } = require("./accountProviderOperationService");
 const { enqueueAccountLifecycle } = require("./accountLifecycleNotificationService");
+const { rolesFromCognitoGroups } = require("../../utils/roles");
+const { sessionValidity } = require("../../utils/sessionValidity");
 
 const summarySelect = {
   id: true,
@@ -103,6 +105,33 @@ async function protectAdministratorTransition(tx, account, actorId, overrides) {
   await assertAdministratorRemains(tx, { currentIsAdministrator, nextIsAdministrator });
 }
 
+function profileFromIdToken(payload) {
+  return {
+    cognitoSub: payload.sub,
+    email: payload.email || payload["cognito:username"],
+    fullName: payload.name || payload.given_name || null,
+    employeeNumber: payload["custom:employee_number"] || null,
+    department: payload["custom:department"] || null,
+    designation: payload["custom:designation"] || null,
+  };
+}
+
+function canUseLimitedSession(user) {
+  if (!user || user.deprovisionedAt) return false;
+  if (user.accessState !== undefined) return user.accessState !== "DISABLED";
+  return user.status === "ACTIVE";
+}
+
+async function establishCognitoSession(profile, accessTokenPayload, allowCreate) {
+  const localUser = await exports.syncCognitoUser(profile, { allowCreate });
+  if (!canUseLimitedSession(localUser) || !sessionValidity(localUser, accessTokenPayload).valid) {
+    throw new AppError(403, "ACCOUNT_SESSION_BLOCKED", "Access denied");
+  }
+  const localRoles = localUser.userRoles.map((entry) => entry.role.roleName);
+  const cognitoRoles = rolesFromCognitoGroups(accessTokenPayload);
+  return { localUser, roles: localRoles.filter((role) => cognitoRoles.includes(role)) };
+}
+
 exports.getCurrentAccount = async (userId) => projectAccount(await findAccount(prisma, userId));
 
 exports.syncCognitoUser = async (profile, { allowCreate = false } = {}) => {
@@ -166,6 +195,29 @@ exports.recordSuccessfulLogin = async (userId, lastLoginAt = new Date()) => {
 };
 
 exports.recordAuthAudit = (entry) => audit.createAuthAuditLog(entry);
+
+exports.establishCognitoLoginSession = async ({ idTokenPayload, accessTokenPayload, context }) => {
+  const emailVerified = idTokenPayload.email_verified === true || idTokenPayload.email_verified === "true";
+  const session = await establishCognitoSession(
+    profileFromIdToken(idTokenPayload),
+    accessTokenPayload,
+    env.publicSignupEnabled && emailVerified,
+  );
+  session.localUser.lastLoginAt = await exports.recordSuccessfulLogin(session.localUser.id);
+  await exports.recordAuthAudit({
+    userId: session.localUser.id,
+    eventType: "LOGIN_SUCCESS",
+    outcome: "SUCCESS",
+    identifier: session.localUser.email,
+    context,
+  });
+  return session;
+};
+
+exports.establishCognitoRefreshSession = ({ accessTokenPayload, username }) => establishCognitoSession({
+  cognitoSub: accessTokenPayload.sub,
+  email: username.includes("@") ? username : null,
+}, accessTokenPayload, false);
 
 exports.recordPasswordChange = async ({ userId, email, context, changedAt = new Date() }) => {
   await exports.recordAuthAudit({

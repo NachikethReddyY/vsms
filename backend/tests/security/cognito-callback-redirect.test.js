@@ -17,7 +17,6 @@ Object.assign(process.env, {
 
 const cognitoClient = require("../../utils/cognitoClient");
 const cognitoJwt = require("../../utils/cognitoJwt");
-const staff = require("../../utils/staff");
 const accountService = require("../../services/account/accountService");
 const AuthAudit = require("../../utils/audit");
 const { AppError } = require("../../errors/AppError");
@@ -42,10 +41,7 @@ accountService.syncCognitoUser = async () => {
         userRoles: [{ role: { roleName: "EVENT_MANAGER" } }],
     };
 };
-staff.rolesFromCognitoGroups = () => ["EVENT_MANAGER"];
 AuthAudit.createAuthAuditLog = async () => {};
-const prisma = require("../../prisma/prismaClient");
-prisma.user.update = async () => ({});
 accountService.recordSuccessfulLogin = async () => new Date();
 
 const app = require("../../app");
