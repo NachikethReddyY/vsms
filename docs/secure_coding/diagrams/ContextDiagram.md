@@ -1,7 +1,7 @@
 # VSMS context diagram
 
 This source retains the browser roles, offline storage, configured providers
-and EC2 target while exposing the #105 request boundary inside the Express
+and EC2 target while exposing the current request boundary inside the Express
 process: versioned route and middleware → Controller → Service → Prisma. It
 does not show proposed alternatives or a live deployment.
 
@@ -50,3 +50,6 @@ flowchart LR
 - Cognito: `backend/utils/cognitoClient.js` and `infrastructure/cognito.yaml`.
 - Optional providers are shown as dotted edges because repository source does
   not prove external availability or delivery.
+- The repository has no infrastructure definition proving API Gateway,
+  ECS/Lambda, WAF, S3/CloudFront, DynamoDB, Secrets Manager or CloudWatch as
+  deployed components.

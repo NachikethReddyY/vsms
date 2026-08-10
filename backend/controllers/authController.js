@@ -1,5 +1,4 @@
 const crypto = require("crypto");
-const { AppError } = require("../errors/AppError");
 const env = require("../config/env");
 const asyncHandler = require("../middlewares/asyncHandler");
 const {
@@ -12,12 +11,9 @@ const {
     globalSignOut,
 } = require("../utils/cognitoClient");
 const { verifyCognitoToken } = require("../utils/cognitoJwt");
-const { createAuthAuditLog } = require("../utils/audit");
 const { timingSafeEqual } = require("../utils/security");
-const { syncLocalUser, rolesFromCognitoGroups, ALLOWED_ROLES } = require("../utils/staff");
-const prisma = require("../prisma/prismaClient");
-const { sessionValidity } = require("../utils/sessionValidity");
-const { enqueueAccountLifecycle } = require("../services/account/accountLifecycleNotificationService");
+const { ALLOWED_ROLES } = require("../utils/staff");
+const accountService = require("../services/account/accountService");
 const {
     ACCESS_COOKIE,
     REFRESH_COOKIE,
@@ -74,17 +70,6 @@ function normalizeReturnTo(value) {
 
 exports.normalizeReturnTo = normalizeReturnTo;
 
-function extractProfileFromIdToken(payload) {
-    return {
-        cognitoSub: payload.sub,
-        email: payload.email || payload["cognito:username"],
-        fullName: payload.name || payload.given_name || null,
-        employeeNumber: payload["custom:employee_number"] || null,
-        department: payload["custom:department"] || null,
-        designation: payload["custom:designation"] || null,
-    };
-}
-
 function publicUser(localUser, roles) {
     const systemRole = roles.includes("ADMINISTRATOR")
         ? "ADMIN"
@@ -109,45 +94,17 @@ function publicUser(localUser, roles) {
     };
 }
 
-function canUseLimitedSession(user) {
-    if (!user || user.deprovisionedAt) return false;
-    if (user.accessState !== undefined) return user.accessState !== "DISABLED";
-    return user.status === "ACTIVE";
-}
-
-function sessionWasRevoked(user, payload) {
-    return !sessionValidity(user, payload).valid;
-}
-
 async function finalizeSuccessfulLogin(authResult, username, context, res) {
     const [idTokenPayload, accessTokenPayload] = await Promise.all([
         verifyCognitoToken(authResult.IdToken, "id"),
         verifyCognitoToken(authResult.AccessToken, "access"),
     ]);
-    const emailVerified = idTokenPayload.email_verified === true || idTokenPayload.email_verified === "true";
-    const localUser = await syncLocalUser(extractProfileFromIdToken(idTokenPayload), {
-        allowCreate: env.publicSignupEnabled && emailVerified,
-    });
-
-    if (!canUseLimitedSession(localUser) || sessionWasRevoked(localUser, accessTokenPayload)) {
-        throw new AppError(403, "ACCOUNT_SESSION_BLOCKED", "Access denied");
-    }
-
-    const localRoles = localUser.userRoles.map((entry) => entry.role.roleName);
-    const cognitoRoles = rolesFromCognitoGroups(accessTokenPayload);
-    const roles = localRoles.filter((role) => cognitoRoles.includes(role));
-
-    const lastLoginAt = new Date();
-    await prisma.user.update({ where: { id: localUser.id }, data: { lastLoginAt } });
-    localUser.lastLoginAt = lastLoginAt;
-    setAuthCookies(res, authResult, idTokenPayload.email || idTokenPayload["cognito:username"] || username);
-    await createAuthAuditLog({
-        userId: localUser.id,
-        eventType: "LOGIN_SUCCESS",
-        outcome: "SUCCESS",
-        identifier: localUser.email,
+    const { localUser, roles } = await accountService.establishCognitoLoginSession({
+        idTokenPayload,
+        accessTokenPayload,
         context,
     });
+    setAuthCookies(res, authResult, idTokenPayload.email || idTokenPayload["cognito:username"] || username);
 
     return {
         expiresIn: authResult.ExpiresIn,
@@ -197,7 +154,7 @@ exports.callback = asyncHandler(async (req, res) => {
         res.json({ ...payload, returnTo });
     } catch (error) {
         clearOAuthCookies(res);
-        await createAuthAuditLog({
+        await accountService.recordAuthAudit({
             eventType: "LOGIN_FAILED",
             outcome: "FAILED",
             failureCategory: error.name || "OAUTH_CALLBACK_FAILED",
@@ -222,17 +179,10 @@ exports.refresh = asyncHandler(async (req, res) => {
         const response = await refreshSession({ email: username, refreshToken });
         const authResult = response.AuthenticationResult;
         const accessPayload = await verifyCognitoToken(authResult.AccessToken, "access");
-        const localUser = await syncLocalUser({
-            cognitoSub: accessPayload.sub,
-            email: username.includes("@") ? username : null,
+        const { localUser, roles } = await accountService.establishCognitoRefreshSession({
+            accessTokenPayload: accessPayload,
+            username,
         });
-        if (!canUseLimitedSession(localUser) || sessionWasRevoked(localUser, accessPayload)) {
-            throw new AppError(403, "ACCOUNT_SESSION_BLOCKED", "Access denied");
-        }
-
-        const localRoles = localUser.userRoles.map((entry) => entry.role.roleName);
-        const cognitoRoles = rolesFromCognitoGroups(accessPayload);
-        const roles = localRoles.filter((role) => cognitoRoles.includes(role));
         setAuthCookies(res, { ...authResult, RefreshToken: refreshToken }, username);
         res.json({
             expiresIn: authResult.ExpiresIn,
@@ -241,7 +191,7 @@ exports.refresh = asyncHandler(async (req, res) => {
         });
     } catch (error) {
         clearAuthCookies(res);
-        await createAuthAuditLog({
+        await accountService.recordAuthAudit({
             eventType: "TOKEN_REFRESH_FAILED",
             outcome: "FAILED",
             failureCategory: error.name || "TOKEN_REFRESH_FAILED",
@@ -290,18 +240,10 @@ exports.changePassword = asyncHandler(async (req, res) => {
         oldPassword: req.body.oldPassword,
         newPassword: req.body.newPassword,
     });
-    await createAuthAuditLog({
+    await accountService.recordPasswordChange({
         userId: req.auth.userId,
-        eventType: "PASSWORD_CHANGE_SUCCESS",
-        outcome: "SUCCESS",
-        identifier: req.auth.email,
+        email: req.auth.email,
         context: req.context,
-    });
-    await enqueueAccountLifecycle({
-        type: "PASSWORD_CHANGED",
-        account: { id: req.auth.userId },
-        metadata: { changedAt: new Date().toISOString() },
-        idempotencyKey: `PASSWORD_CHANGED:${req.auth.userId}:${req.context?.requestId || crypto.randomUUID()}`,
     });
     res.json({ message: "Password changed successfully." });
 });

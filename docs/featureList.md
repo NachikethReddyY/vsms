@@ -40,7 +40,7 @@ measured performance.
 - [x] PostgreSQL foreign keys, unique constraints, indexes and migration-backed audit immutability guards.
 - [x] Structured local logging through `backend/utils/logger/logger.js`.
 - [~] Cognito, OneMap, SES/SNS and Redis integrations; provider/configuration evidence is environment-dependent.
-- [~] Pino and pino-http structured request/completion logging is implemented in the intended #103 state (`9c56c02`); this issue97 worktree does not merge that sibling commit, so final combined-branch inclusion remains to verify.
+- [x] Pino and pino-http structured request/completion logging through `backend/utils/logger/logger.js`, `backend/middlewares/httpLogger.js`, and `backend/app.js`.
 - [ ] EC2 live deployment evidence, reverse-proxy evidence, backups, monitoring and restore evidence.
 - [ ] Production artifact-signature enforcement; no runtime signature claim is made.
 

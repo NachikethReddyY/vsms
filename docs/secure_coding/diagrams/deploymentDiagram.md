@@ -3,7 +3,7 @@
 This is the repository-supported target topology. The EC2 node and reverse
 proxy are deployment targets/prerequisites; this repository contains no live
 instance, security-group or certificate evidence. The Express request path
-follows the #105 route → Controller → Service → Prisma boundary.
+follows the current route → Controller → Service → Prisma boundary.
 
 ```mermaid
 flowchart LR
@@ -41,5 +41,7 @@ flowchart LR
   supervision and recovery are operational work outside the repository.
 - The browser offline pack is an application feature, not a service-worker
   cache. A hard refresh while offline is not claimed to work.
+- `backend/docker-compose.yml` provides local Redis support for rate limiting;
+  it is not proof of a deployed shared Redis service.
 - No serverless, static object-storage, or managed secret-store node is shown
   because none is verified as the current deployment architecture.

@@ -48,30 +48,20 @@ The canonical implementation sources are:
 | Database | `backend/prisma/schema.prisma`, `backend/prisma/migrations/` | PostgreSQL provider, relational models, constraints, indexes and migration-owned objects |
 | SQL evidence | `backend/stored_procedures.sql` | A separate stored-procedure/function draft; not proof that those objects are installed or called by the current Prisma path |
 | Auth/config | `backend/config/env.js`, `backend/utils/cognitoClient.js`, `infrastructure/cognito.yaml` | Cognito integration/configuration boundary and fail-closed environment validation |
-| Logging | #103 evidence commit `9c56c02`: `backend/utils/logger/logger.js`, `backend/middlewares/httpLogger.js`, `backend/app.js`, and `backend/tests/unit/http-logging.test.js` | Pino redaction and correlated HTTP completion logging in the intended implementation state |
+| Logging | `backend/utils/logger/logger.js`, `backend/middlewares/httpLogger.js`, `backend/app.js`, and `backend/tests/unit/http-logging.test.js` | Pino redaction and correlated HTTP completion logging |
 | Tests | `backend/tests/`, `react-user-dashboard/src/**/*.test.*`, package scripts | Runnable local checks; not cloud or rehearsal evidence |
 
 `docs/vsms-client-brief.md` describes project requirements and alternatives.
 Reference material is not treated as proof that an alternative architecture
 was implemented.
 
-### #103 and #105 integration alignment
-
-The repository contains verified sibling implementation evidence for the
-intended final state, but this issue97 worktree does not merge those commits:
-
-- **#103 (`9c56c02`):** `pino` is the structured logger, `pino-http` supplies
-  correlated HTTP completion logging, `backend/app.js` mounts that middleware
-  after request context, and the unit test checks redaction and route/status
-  fields.
-- **#105 (`f23a6c8`):** the request boundary is versioned route and middleware
-  → controller → service → Prisma Client → PostgreSQL; controllers map HTTP
-  input/output and services own domain decisions, Prisma access and
-  transactions. There is no repository layer.
-
-The report and diagram sources below describe those intended boundaries. The
-final combined source branch must include and verify #103/#105 before this
-issue97 source-only archive is treated as the complete runtime source.
+The combined repository uses Pino for structured logging, `pino-http` for
+correlated HTTP completion records, and the request boundary
+versioned route and middleware → controller → service → Prisma Client →
+PostgreSQL. Controllers map HTTP input/output; services own domain decisions,
+authorization-sensitive checks, Prisma access and transactions. There is no
+repository layer; `backend/docs/request-architecture.md` records the same
+boundary.
 
 ## 3. Implemented architecture
 
@@ -111,11 +101,11 @@ configured; the API still owns local account state and event authorization.
 - **PostgreSQL:** Prisma declares `provider = "postgresql"`; migrations are
   the runtime schema authority. `backend/db/init.sql` intentionally refuses
   to create the old incompatible schema.
-- **Logging (#103 target state):** `backend/utils/logger/logger.js` uses Pino
+- **Logging:** `backend/utils/logger/logger.js` uses Pino
   with redaction, and `backend/middlewares/httpLogger.js` uses `pino-http` for
   correlated HTTP completion records. `backend/app.js` mounts it after
-  request context. The behavior is evidenced by #103 commit `9c56c02` and its
-  unit test; the final combined branch still has to include that commit.
+  request context, and `backend/tests/unit/http-logging.test.js` checks
+  redaction, correlation and completion fields.
 - **Identity:** Cognito integration is present in code and infrastructure
   configuration, but a live user pool or provider result is not claimed.
 
@@ -133,7 +123,7 @@ configured; the API still owns local account state and event authorization.
 | Implemented | Scoped offline screening pack | `backend/docs/offline-screening-28.md`, `offlineSync.ts`; no service worker |
 | Config-dependent | Cognito staff identity and provider synchronization | Cognito client/config and provider-operation services; environment/provider evidence required |
 | Config-dependent | OneMap, SES/SNS and Redis integrations | Provider adapters and environment settings exist; external delivery/availability is not claimed |
-| Implemented in #103 target state | Pino/Pino HTTP structured and correlated logging | `9c56c02` replaces the logger, mounts `httpLogger`, and adds redaction/completion-log tests; final combined branch inclusion remains unverified here |
+| Implemented | Pino/Pino HTTP structured and correlated logging | `backend/utils/logger/logger.js`, `backend/middlewares/httpLogger.js`, `backend/app.js`, and the HTTP logging tests |
 | Planned | Installable PWA shell/service worker | `backend/docs/offline-screening-28.md` explicitly records this gap |
 | Deferred | Eye-health station capture and offline path | The enum exists, but the current sync handler and frontend offline path support only three station types |
 | Deferred | Participant self-service offline, full sync-centre UI and broader offline coverage | Explicitly out of scope in the offline implementation note |
@@ -263,9 +253,9 @@ No performance benchmark, live EC2 observation, external provider result or
 demo rehearsal is inferred from these commands.
 
 `pnpm package:submission` is a deterministic source-only archive of the
-current committed repository. It does not merge #103/#105, create or include
-the PostgreSQL database backup, complete the declaration/signature, create
-presentation slides, or assemble the final combined package. The inclusion
+current committed repository. It does not create or include the PostgreSQL
+database backup, complete the declaration/signature, create presentation
+slides, or assemble the final combined package. The inclusion
 check keeps the supplied project brief/guide files and the editable Mermaid
 sources. It excludes only explicitly identified non-source material: the
 incomplete diagram instructions, the dated progress log, the historical Week

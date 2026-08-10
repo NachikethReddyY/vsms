@@ -6,13 +6,11 @@ The operation names and paths below are taken from
 links identify the current route/controller/service evidence. The status is a
 repository status, not a live endpoint result.
 
-For the #105 request-boundary state, the inclusion path is **versioned route
-and middleware → controller → service → Prisma Client → PostgreSQL**. The
-controller maps HTTP input/output; the service owns domain decisions,
-authorization-sensitive checks, transactions and Prisma access. The detailed
-`backend/docs/request-architecture.md` and `docs/api-contract-mapping.md`
-files are supplied by #105; this issue97 worktree records their boundary here
-and in the Mermaid sources without merging those sibling changes.
+The inclusion path is **versioned route and middleware → controller → service
+→ Prisma Client → PostgreSQL**. The controller maps HTTP input/output; the
+service owns domain decisions, authorization-sensitive checks, transactions
+and Prisma access. The detailed `backend/docs/request-architecture.md` and
+`docs/api-contract-mapping.md` files record the same current boundary.
 
 ## Core requirements
 

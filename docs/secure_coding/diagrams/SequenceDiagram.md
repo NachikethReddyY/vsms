@@ -114,3 +114,5 @@ sequenceDiagram
 Evidence: `backend/routes/authRoutes.js`, `SynchronizationRoutes.js`,
 `services/screening/syncService.js`, `services/screening/screeningService.js`,
 and `react-user-dashboard/src/features/screening/offlineSync.ts`.
+The normal online path is also recorded in `backend/docs/request-architecture.md`;
+controllers map HTTP responses and services own Prisma transactions.

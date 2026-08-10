@@ -1,7 +1,7 @@
 # VSMS component diagram
 
 The component boundaries retain the browser/offline, Express, provider and
-worker detail from this report while following the #105 request boundary:
+worker detail from this report while following the current request boundary:
 versioned route and middleware → Controller → Service → Prisma. There is no
 repository layer. Worker scripts are separate Node processes over the same
 PostgreSQL state, not in-process Express workers or serverless services.
@@ -36,7 +36,7 @@ flowchart LR
     offline -->|sync screening batch| middleware
     services --> prisma --> postgres
     workers -->|claim/process jobs and outbox rows| prisma
-    middleware -->|authorize/callback/JWKS| cognito
+    controllers -->|authorize, callback, token exchange| cognito
 ```
 
 ## Evidence
@@ -46,3 +46,7 @@ flowchart LR
   `backend/controllers/`, `backend/services/`.
 - Worker entry points: `backend/scripts/`.
 - Persistence: `backend/prisma/prismaClient.js` and the Prisma schema.
+- `backend/docs/request-architecture.md` records the same controller/service
+  boundary and confirms that Prisma is the data-access boundary.
+- Configured provider callbacks and delivery are application seams; no cloud
+  infrastructure topology is inferred from this component view.
