@@ -19,6 +19,7 @@ const YAML = require("yaml");
 // Environment Configuration & Error Handling
 const env = require("./config/env");
 const AppError = require("./errors/AppError");
+const logger = require("./utils/logger/logger");
 
 // Custom Middlewares
 const requestContext = require("./middlewares/requestContext");
@@ -244,8 +245,11 @@ if (!env.isProduction) {
         })
       );
     }
-  } catch (err) {
-    console.error("Swagger loading failed:", err.message);
+  } catch {
+    logger.error("swagger.load_failed", {
+      event: "swagger.load_failed",
+      code: "SWAGGER_LOAD_FAILED",
+    });
   }
 }
 

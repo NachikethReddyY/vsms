@@ -40,6 +40,7 @@ const logger = pino({
       "errorMessage",
       "reason",
       "message",
+      "stack",
     ],
     censor: "[REDACTED]",
   },

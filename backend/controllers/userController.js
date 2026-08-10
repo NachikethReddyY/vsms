@@ -20,7 +20,6 @@ exports.createUser = async (req, res, next) => {
       ...(result.providerOperation ? { providerOperation: result.providerOperation } : {}),
     });
   } catch (error) {
-    console.error("Create user error:", error);
     next(error);
   }
 };
@@ -38,7 +37,6 @@ exports.getUsers = async (req, res, next) => {
       data: users,
     });
   } catch (error) {
-    console.error("Get users error:", error);
     next(error);
   }
 };
@@ -57,7 +55,6 @@ exports.getUserById = async (req, res, next) => {
       data: user,
     });
   } catch (error) {
-    console.error("Get user by ID error:", error);
     next(error);
   }
 };
@@ -80,7 +77,6 @@ exports.updateUser = async (req, res, next) => {
       ...(result.providerOperation ? { providerOperation: result.providerOperation } : {}),
     });
   } catch (error) {
-    console.error("Update user error:", error);
     next(error);
   }
 };
