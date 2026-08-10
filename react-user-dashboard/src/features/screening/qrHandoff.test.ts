@@ -7,6 +7,7 @@ describe('QR station handoff', () => {
       'VISUAL_ACUITY',
       'REFRACTION',
       'COLOUR_VISION',
+      'EYE_HEALTH',
     ]);
     expect(stationHandoffUrl('event-1', 'registration/1', 'REFRACTION')).toBe(
       '/events/event-1/stations/refraction?registrationId=registration%2F1',

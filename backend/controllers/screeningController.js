@@ -92,6 +92,26 @@ exports.previewColourVision = async (req, res) => {
   ));
 };
 
+exports.saveEyeHealth = async (req, res) => {
+  const { result, created } = await screeningService.saveEyeHealth(
+    req.params.eventId,
+    req.params.stationId,
+    req.body,
+    req.user,
+    req.context,
+  );
+  res.status(created ? 201 : 200).json(result);
+};
+
+exports.previewEyeHealth = async (req, res) => {
+  res.json(await screeningService.previewEyeHealth(
+    req.params.eventId,
+    req.params.stationId,
+    req.body,
+    req.user,
+  ));
+};
+
 exports.listReviews = async (req, res) => {
   res.json(await reviewService.listQueue(req.params.eventId, req.user));
 };

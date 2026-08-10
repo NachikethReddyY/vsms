@@ -10,6 +10,7 @@ const { resolveRegistrationByQrValue } = require("../../utils/qrToken");
 const VA_RULE_VERSION = "VSMS-VA-1.0";
 const REF_RULE_VERSION = "VSMS-REF-1.0";
 const CV_RULE_VERSION = "VSMS-CV-1.0";
+const EH_RULE_VERSION = "VSMS-EH-1.0";
 const FLAG_RANK = { NORMAL: 0, REVIEW: 1, REFER: 2, URGENT: 3 };
 
 const canonicalJson = (value) => {
@@ -154,6 +155,44 @@ const evaluateColourVision = (resultData) => {
     flagSummary: reasons.length
       ? reasons.map((item) => item.reason).join("; ")
       : `Ishihara OD ${resultData.odCorrect}/${resultData.platesPresented} / OS ${resultData.osCorrect}/${resultData.platesPresented}`,
+    reasons,
+  };
+};
+
+const evaluateEyeHealth = (resultData) => {
+  const reasons = [];
+  if (resultData.cataractRisk === "PRESENT" || resultData.glaucomaRisk === "PRESENT") {
+    reasons.push({
+      flag: "REFER",
+      reason: `Eye-health risk present (cataract ${resultData.cataractRisk}, glaucoma ${resultData.glaucomaRisk})`,
+    });
+  }
+  if (resultData.cataractRisk === "SUSPECTED" || resultData.glaucomaRisk === "SUSPECTED") {
+    reasons.push({
+      flag: "REVIEW",
+      reason: `Suspected eye-health risk (cataract ${resultData.cataractRisk}, glaucoma ${resultData.glaucomaRisk})`,
+    });
+  }
+  if (resultData.symptomsNoted) {
+    reasons.push({
+      flag: "REVIEW",
+      reason: resultData.symptomSummary
+        ? `Symptoms noted: ${resultData.symptomSummary}`
+        : "Participant-reported symptoms noted",
+    });
+  }
+
+  const overallFlag = worstFlag(reasons);
+  const summaryParts = [
+    `Cataract ${resultData.cataractRisk}`,
+    `Glaucoma ${resultData.glaucomaRisk}`,
+    resultData.symptomsNoted ? "Symptoms noted" : "No symptoms",
+  ];
+  return {
+    ruleVersion: EH_RULE_VERSION,
+    overallFlag,
+    isFlagged: overallFlag !== "NORMAL",
+    flagSummary: reasons.length ? reasons.map((item) => item.reason).join("; ") : summaryParts.join(" / "),
     reasons,
   };
 };
@@ -499,11 +538,28 @@ const saveColourVision = (eventId, stationId, body, user, context) => saveStatio
   context,
 });
 
+const previewEyeHealth = (eventId, stationId, body, user) => previewStationResult(
+  eventId, stationId, "EYE_HEALTH", "Eye health", evaluateEyeHealth, body, user,
+);
+
+const saveEyeHealth = (eventId, stationId, body, user, context) => saveStationResult({
+  eventId,
+  stationId,
+  stationType: "EYE_HEALTH",
+  label: "Eye health",
+  ruleVersion: EH_RULE_VERSION,
+  evaluate: evaluateEyeHealth,
+  body,
+  user,
+  context,
+});
+
 const ensureDemoStations = async (eventId) => {
   const desired = [
     { stationName: "Visual Acuity", stationType: "VISUAL_ACUITY", stationOrder: 1 },
     { stationName: "Refraction", stationType: "REFRACTION", stationOrder: 2 },
     { stationName: "Colour Vision", stationType: "COLOUR_VISION", stationOrder: 3 },
+    { stationName: "Eye Health", stationType: "EYE_HEALTH", stationOrder: 4 },
   ];
   const existing = await prisma.station.findMany({
     where: { eventId },
@@ -533,6 +589,7 @@ module.exports = {
   VA_RULE_VERSION,
   REF_RULE_VERSION,
   CV_RULE_VERSION,
+  EH_RULE_VERSION,
   listStations,
   listQueue,
   resolveParticipant,
@@ -543,9 +600,12 @@ module.exports = {
   saveRefraction,
   previewColourVision,
   saveColourVision,
+  previewEyeHealth,
+  saveEyeHealth,
   ensureDemoStations,
   evaluateVisualAcuity,
   evaluateRefraction,
   evaluateColourVision,
+  evaluateEyeHealth,
   screeningRequestFingerprint,
 };

@@ -23,6 +23,7 @@ vi.mock('./features/events/PublicEventPage', () => ({ default: () => <p>Public e
 vi.mock('./features/reviews/ReviewWorkspacePage', () => ({ default: () => <p>Reviews page</p> }));
 vi.mock('./features/reports/ReportsPage', () => ({ default: () => <p>Global reports page</p> }));
 vi.mock('./features/screening/ColourVisionStationPage', () => ({ default: () => <p>Colour vision station</p> }));
+vi.mock('./features/screening/EyeHealthStationPage', () => ({ default: () => <p>Eye health station</p> }));
 vi.mock('./features/screening/QRScannerPage', () => ({ default: () => <p>QR scanner</p> }));
 vi.mock('./features/screening/RefractionStationPage', () => ({ default: () => <p>Refraction station</p> }));
 vi.mock('./features/screening/VisualAcuityStationPage', () => ({ default: () => <p>Visual acuity station</p> }));
@@ -32,6 +33,7 @@ vi.mock('./pages/StaffAccountsPage', () => ({
   default: () => <p>Staff directory</p>,
   ROLE_OPTIONS: [{ value: 'REVIEWER', label: 'Reviewer / doctor' }],
 }));
+vi.mock('./pages/StationLibraryPage', () => ({ default: () => <p>Station library</p> }));
 vi.mock('./pages/AccountSecurityPage', () => ({ default: () => <p>Security</p> }));
 vi.mock('./pages/QueuePages', () => ({ QueuePage: () => <p>Queue</p> }));
 vi.mock('./pages/ParticipantStatusPage', () => ({ default: () => <p>Participant status</p> }));

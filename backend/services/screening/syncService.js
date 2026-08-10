@@ -7,6 +7,7 @@ const HANDLERS = {
   VISUAL_ACUITY: "saveVisualAcuity",
   REFRACTION: "saveRefraction",
   COLOUR_VISION: "saveColourVision",
+  EYE_HEALTH: "saveEyeHealth",
 };
 
 const SAFE_CONFLICT_CODES = new Set([

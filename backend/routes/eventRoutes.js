@@ -25,6 +25,9 @@ const {
     stationParams,
     stationImportBody,
     stationUpdateBody,
+    stationTemplateParams,
+    createStationTemplateBody,
+    updateStationTemplateBody,
     reportQuery,
     membershipParams,
     membershipRoleParams,
@@ -54,7 +57,10 @@ router.use((_req, res, next) => {
 
 // 1. Static routes MUST come first so they are not captured by dynamic parameters like /:eventId
 router.get("/staff-directory", requireSystemRole("ADMIN"), asyncHandler(eventController.staffDirectory));
+router.get("/station-templates/library", requireSystemRole("ADMIN"), asyncHandler(eventController.stationTemplateLibrary));
 router.get("/station-templates", asyncHandler(eventController.stationTemplates));
+router.post("/station-templates", requireSystemRole("ADMIN"), validate({ body: createStationTemplateBody }), asyncHandler(eventController.createStationTemplate));
+router.patch("/station-templates/items/:stationTemplateId", requireSystemRole("ADMIN"), validate({ params: stationTemplateParams, body: updateStationTemplateBody }), asyncHandler(eventController.updateStationTemplate));
 router.get("/active", asyncHandler(eventController.listActive));
 router.get(
   "/reports/operations",

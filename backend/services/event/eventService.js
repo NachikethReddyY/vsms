@@ -1586,9 +1586,7 @@ const listStaffDirectory = async () => {
   }));
 };
 
-// Read-only catalog for the events UI / OpenAPI StationTemplate DTO (#23).
-// Import/update map templateKey → StationType per #30 (catalog keys include
-// REGISTRATION / CLINICAL_REVIEW which are not StationType and are rejected on import).
+// Import picker: active templates that map to a screening StationType.
 const listStationTemplates = async () => {
   const templates = await prisma.stationTemplate.findMany({
     where: { active: true },
@@ -1599,10 +1597,74 @@ const listStationTemplates = async () => {
       name: true,
       description: true,
       defaultCapacity: true,
+      active: true,
     },
     orderBy: { name: "asc" },
   });
   return templates.filter((template) => stationTypeForTemplateKey(template.templateKey));
+};
+
+const serializeStationTemplate = (template) => ({
+  stationTemplateId: template.stationTemplateId,
+  templateKey: template.templateKey,
+  version: template.version,
+  name: template.name,
+  description: template.description,
+  defaultCapacity: template.defaultCapacity,
+  active: template.active,
+});
+
+/** Admin catalog: all templates including inactive / non-importable (#23). */
+const listStationTemplateLibrary = async () => {
+  const templates = await prisma.stationTemplate.findMany({
+    select: {
+      stationTemplateId: true,
+      templateKey: true,
+      version: true,
+      name: true,
+      description: true,
+      defaultCapacity: true,
+      active: true,
+    },
+    orderBy: [{ active: "desc" }, { name: "asc" }],
+  });
+  return templates.map(serializeStationTemplate);
+};
+
+const createStationTemplate = async (body) => {
+  try {
+    const template = await prisma.stationTemplate.create({
+      data: {
+        templateKey: body.templateKey,
+        name: body.name,
+        description: body.description ?? null,
+        defaultCapacity: body.defaultCapacity,
+        active: body.active,
+      },
+    });
+    return serializeStationTemplate(template);
+  } catch (error) {
+    if (error?.code === "P2002") {
+      throw new AppError(409, "STATION_TEMPLATE_KEY_EXISTS", "A station template with this key already exists");
+    }
+    throw error;
+  }
+};
+
+const updateStationTemplate = async (stationTemplateId, body) => {
+  const existing = await prisma.stationTemplate.findUnique({ where: { stationTemplateId } });
+  if (!existing) throw new AppError(404, "STATION_TEMPLATE_NOT_FOUND", "Station template not found");
+  const template = await prisma.stationTemplate.update({
+    where: { stationTemplateId },
+    data: {
+      ...(body.name !== undefined ? { name: body.name } : {}),
+      ...(body.description !== undefined ? { description: body.description } : {}),
+      ...(body.defaultCapacity !== undefined ? { defaultCapacity: body.defaultCapacity } : {}),
+      ...(body.active !== undefined ? { active: body.active } : {}),
+      version: { increment: 1 },
+    },
+  });
+  return serializeStationTemplate(template);
 };
 
 const importStations = async (eventId, body, user, correlationId, db = prisma) => {
@@ -2164,6 +2226,9 @@ module.exports = {
   getEventDeletionCleanupStatus,
   listStaffDirectory,
   listStationTemplates,
+  listStationTemplateLibrary,
+  createStationTemplate,
+  updateStationTemplate,
   importStations,
   updateStation,
   addStaffAssignment,

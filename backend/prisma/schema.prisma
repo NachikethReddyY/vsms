@@ -1092,6 +1092,8 @@ model Review {
   urgency               ClinicalUrgency
   clinicalSummary       String          @map("clinical_summary")
   recommendations       String?
+  /// Reviewer-only Station D observations (Option B). Not a screener-station ScreeningResult.
+  eyeHealthObservations Json?           @map("eye_health_observations")
   signatureObjectKey    String?         @unique @map("signature_object_key") @db.VarChar(500)
   signatureSha256       String?         @map("signature_sha256") @db.Char(64)
   signatureMimeType     String?         @map("signature_mime_type") @db.VarChar(100)

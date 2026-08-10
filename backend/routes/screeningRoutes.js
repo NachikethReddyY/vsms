@@ -13,6 +13,8 @@ const {
   saveRefractionBody,
   previewColourVisionBody,
   saveColourVisionBody,
+  previewEyeHealthBody,
+  saveEyeHealthBody,
   reviewParams,
   reviewScanBody,
   reviewDecisionBody,
@@ -92,6 +94,18 @@ router.post(
   "/:eventId/stations/:stationId/colour-vision",
   validate({ params: stationParams, body: saveColourVisionBody }),
   asyncHandler(screeningController.saveColourVision),
+);
+
+router.post(
+  "/:eventId/stations/:stationId/eye-health/preview",
+  validate({ params: stationParams, body: previewEyeHealthBody }),
+  asyncHandler(screeningController.previewEyeHealth),
+);
+
+router.post(
+  "/:eventId/stations/:stationId/eye-health",
+  validate({ params: stationParams, body: saveEyeHealthBody }),
+  asyncHandler(screeningController.saveEyeHealth),
 );
 
 router.get(

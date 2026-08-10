@@ -256,14 +256,17 @@ test("handoff QR encodes a station URL pre-loaded with the registration, exposin
 test("handoff QR target URL resolves to the selected station pre-loaded with the registration", async () => {
   const url = qrService.buildStationHandoffUrl(eventId, registrationId, "REFRACTION");
   assert.match(url, new RegExp(`^https?://[^/]+/events/${eventId}/stations/refraction\\?registrationId=${registrationId}$`));
-  assert.equal(qrService.buildStationHandoffUrl(eventId, registrationId, "EYE_HEALTH"), null);
+  assert.match(
+    qrService.buildStationHandoffUrl(eventId, registrationId, "EYE_HEALTH"),
+    new RegExp(`^https?://[^/]+/events/${eventId}/stations/eye-health\\?registrationId=${registrationId}$`),
+  );
   assert.equal(qrService.buildStationHandoffUrl(eventId, registrationId, "VISUAL_ACUITY").includes("visual-acuity"), true);
   assert.equal(qrService.buildStationHandoffUrl(eventId, registrationId, "COLOUR_VISION").includes("colour-vision"), true);
 });
 
 test("handoff QR rejects an unsupported station type and an inactive pass", async () => {
   await assert.rejects(
-    qrService.getStationHandoffQR("a".repeat(64), "EYE_HEALTH"),
+    qrService.getStationHandoffQR("a".repeat(64), "REGISTRATION"),
     (error) => error.code === "STATION_UNSUPPORTED" && error.status === 400,
   );
   await assert.rejects(

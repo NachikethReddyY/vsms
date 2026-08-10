@@ -352,6 +352,7 @@ async function seedEventStructure(event, staff) {
     ["VISUAL_ACUITY", "Visual acuity", 1],
     ["REFRACTION", "Refraction", 2],
     ["COLOUR_VISION", "Colour vision", 3],
+    ["EYE_HEALTH", "Eye health", 4],
   ];
   const stations = [];
   for (const [stationType, stationName, stationOrder] of stationDefinitions) {

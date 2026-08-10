@@ -190,18 +190,18 @@ An autorefractor normally returns measurements; it is not the retinal photograph
 - [National Eye Institute: Refractive Errors](https://www.nei.nih.gov/eye-health-information/eye-conditions-and-diseases/refractive-errors)
 - [HealthHub Singapore: Diabetic Retinal Photography](https://www.healthhub.sg/support-and-tools/screening/diabetic-retinal-photography)
 
-## 7. Station D: Clinical Review & Eye Health — proposed direction
+## 7. Station D: Clinical Review & Eye Health — Option B (implemented direction)
 
-Keep the formal eye-health and review/referral requirements, but run them together at a clinician-led booth. The screen is a **Clinical Review Workspace**, not a generic dashboard.
+Keep the formal review/referral requirements at a clinician-led booth. **Eye health is a screener station** (`EYE_HEALTH`) with offline capture; clinicians may still add optional eye-health notes on the immutable clinical review decision (`Review.eyeHealthObservations`). The screen is a **Clinical Review Workspace**, not a generic dashboard.
 
 ```text
 Participant enters Station D / Clinical Review queue
 → clinician scans QR
 → one participant summary opens
-→ clinician reviews Station A–C results and preliminary flags
-→ clinician records approved eye-health observations and optional device/image findings
+→ clinician reviews Station A–D results and preliminary flags
+→ clinician may add optional eye-health observations (cataract/glaucoma risk, symptoms, notes, optional device findings)
 → clinician decides: complete / monitor / refer / urgent escalation
-→ system generates a clinical summary report
+→ system stores one signed review (and optional draft referral)
 ```
 
 ### Clinical Review Workspace
@@ -211,11 +211,10 @@ Participant enters Station D / Clinical Review queue
 - Visual Acuity: OD, OS, correction/pinhole status, flag
 - Refraction: glasses status and machine readings per eye
 - Colour Vision: test kit, per-eye score, and flag
-- Eye-health observations and device results approved by the client
-- Image attachments only if the Eye Health process actually captures images
+- Eye-health observations captured by the reviewer (not a Station A–C screener form)
+- Image attachments only if a later product decision adds imaging (out of Option B MVP)
 - Clinician notes, decision, urgency, referral destination, and follow-up instructions
 - Clinician identity, review time, report version, and audit trail
-
 ### Report output
 
 Generate one clinician-friendly **PDF clinical screening summary** for download/printing. It is a handover summary, not a diagnosis or prescription.

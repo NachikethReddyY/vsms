@@ -16,6 +16,7 @@ const HANDOFF_STATIONS: HandoffStation[] = [
   { type: 'VISUAL_ACUITY', label: 'Visual Acuity' },
   { type: 'REFRACTION', label: 'Refraction' },
   { type: 'COLOUR_VISION', label: 'Colour Vision' },
+  { type: 'EYE_HEALTH', label: 'Eye Health' },
 ];
 
 const POLL_MS = 5000;

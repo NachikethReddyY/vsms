@@ -177,6 +177,7 @@ const loadRegistration = async (db, eventId, registrationId, stations) => {
           urgency: true,
           clinicalSummary: true,
           recommendations: true,
+          eyeHealthObservations: true,
           signatureSha256: true,
           signedPayloadHash: true,
           signedAt: true,
@@ -214,6 +215,18 @@ const loadRegistration = async (db, eventId, registrationId, stations) => {
   });
 };
 
+const normalizeEyeHealthObservations = (value) => {
+  if (!value) return null;
+  return {
+    cataractRisk: value.cataractRisk,
+    glaucomaRisk: value.glaucomaRisk,
+    symptomsNoted: value.symptomsNoted,
+    symptomSummary: value.symptomsNoted ? (value.symptomSummary || null) : null,
+    observations: value.observations,
+    deviceFindings: value.deviceFindings ? value.deviceFindings : null,
+  };
+};
+
 const serializeReview = (review) => review ? {
   reviewId: review.reviewId,
   version: review.version,
@@ -221,6 +234,7 @@ const serializeReview = (review) => review ? {
   urgency: review.urgency,
   clinicalSummary: review.clinicalSummary,
   recommendations: review.recommendations,
+  eyeHealthObservations: review.eyeHealthObservations || null,
   reviewedAt: review.reviewedAt,
   reviewedByName: review.reviewer.fullName,
   signatureSignerName: review.signatureSigner?.fullName || review.reviewer.fullName,
@@ -300,7 +314,7 @@ const decisionUrgency = (decision) => {
   return "ROUTINE";
 };
 
-const reviewSignedPayloadHash = ({ eventId, registrationId, reviewId, userId, decision, urgency, signedAt }) => crypto
+const reviewSignedPayloadHash = ({ eventId, registrationId, reviewId, userId, decision, urgency, eyeHealthObservations, signedAt }) => crypto
   .createHash("sha256")
   .update(JSON.stringify({
     eventId,
@@ -313,6 +327,7 @@ const reviewSignedPayloadHash = ({ eventId, registrationId, reviewId, userId, de
     contextVersion: decision.contextVersion,
     clinicalSummary: decision.clinicalSummary,
     recommendations: decision.recommendations || null,
+    eyeHealthObservations,
     referral: decision.referral || null,
     signatureSha256: decision.signatureSha256.toLowerCase(),
     signedAt: signedAt.toISOString(),
@@ -330,6 +345,7 @@ const recordDecision = async (eventId, registrationId, decision, user, ipAddress
   const reviewId = crypto.randomUUID();
   const signedAt = new Date();
   const urgency = decisionUrgency(decision);
+  const eyeHealthObservations = normalizeEyeHealthObservations(decision.eyeHealthObservations);
   const signedPayloadHash = reviewSignedPayloadHash({
     eventId,
     registrationId,
@@ -337,6 +353,7 @@ const recordDecision = async (eventId, registrationId, decision, user, ipAddress
     userId,
     decision,
     urgency,
+    eyeHealthObservations,
     signedAt,
   });
   try {
@@ -377,6 +394,7 @@ const recordDecision = async (eventId, registrationId, decision, user, ipAddress
           urgency,
           clinicalSummary: decision.clinicalSummary,
           recommendations: decision.recommendations || null,
+          eyeHealthObservations,
           signatureObjectKey: signature.signatureObjectKey,
           signatureSha256: signature.signatureSha256.toLowerCase(),
           signatureMimeType: signature.signatureMimeType,
@@ -413,6 +431,7 @@ const recordDecision = async (eventId, registrationId, decision, user, ipAddress
         reviewId: review.reviewId,
         outcome: review.outcome,
         urgency: review.urgency,
+        eyeHealthRecorded: true,
         signaturePurpose: "REVIEW_DECISION",
         signatureSha256: review.signatureSha256,
         signedPayloadHash: review.signedPayloadHash,
@@ -448,6 +467,7 @@ const recordDecision = async (eventId, registrationId, decision, user, ipAddress
           urgency: review.urgency,
           clinicalSummary: review.clinicalSummary,
           recommendations: review.recommendations,
+          eyeHealthObservations: review.eyeHealthObservations,
           signatureSignerName: user.fullName || null,
           signatureSha256: review.signatureSha256,
           signedPayloadHash: review.signedPayloadHash,

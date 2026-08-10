@@ -1,6 +1,7 @@
 import apiClient from '../../utils/apiClient';
 import type {
   ColourVisionResultData,
+  EyeHealthResultData,
   EyeReading,
   FlagEvaluation,
   OverallFlag,
@@ -15,11 +16,11 @@ import type {
 const DATABASE_NAME = 'vsms-screening-offline';
 const DATABASE_VERSION = 1;
 const KEY_ID = 'screening-cache-key';
-const SUPPORTED_STATIONS = new Set<StationType>(['VISUAL_ACUITY', 'REFRACTION', 'COLOUR_VISION']);
+const SUPPORTED_STATIONS = new Set<StationType>(['VISUAL_ACUITY', 'REFRACTION', 'COLOUR_VISION', 'EYE_HEALTH']);
 const OFFLINE_SYNC_EVENT = 'vsms-offline-sync';
 let cryptoKeyPromise: Promise<CryptoKey> | null = null;
 
-type ScreeningPath = 'visual-acuity' | 'refraction' | 'colour-vision';
+type ScreeningPath = 'visual-acuity' | 'refraction' | 'colour-vision' | 'eye-health';
 type OfflineMutationStatus = 'pending' | 'conflict';
 
 type OfflineStation = Station & { offlineAccessExpiresAt: string };
@@ -35,7 +36,7 @@ type OfflineMutation = {
   clientActionId: string;
   stationId: string;
   path: ScreeningPath;
-  body: ScreeningSavePayload<VisualAcuityResultData | RefractionResultData | ColourVisionResultData>;
+  body: ScreeningSavePayload<VisualAcuityResultData | RefractionResultData | ColourVisionResultData | EyeHealthResultData>;
 };
 
 type ScreeningSyncActionResult = {
@@ -414,9 +415,47 @@ function evaluateColourVision(resultData: ColourVisionResultData): FlagEvaluatio
   };
 }
 
-export function evaluateOfflineStation(path: ScreeningPath, resultData: VisualAcuityResultData | RefractionResultData | ColourVisionResultData): FlagEvaluation {
+function evaluateEyeHealth(resultData: EyeHealthResultData): FlagEvaluation {
+  const reasons: Array<{ flag: OverallFlag; reason: string }> = [];
+  if (resultData.cataractRisk === 'PRESENT' || resultData.glaucomaRisk === 'PRESENT') {
+    reasons.push({
+      flag: 'REFER',
+      reason: `Eye-health risk present (cataract ${resultData.cataractRisk}, glaucoma ${resultData.glaucomaRisk})`,
+    });
+  }
+  if (resultData.cataractRisk === 'SUSPECTED' || resultData.glaucomaRisk === 'SUSPECTED') {
+    reasons.push({
+      flag: 'REVIEW',
+      reason: `Suspected eye-health risk (cataract ${resultData.cataractRisk}, glaucoma ${resultData.glaucomaRisk})`,
+    });
+  }
+  if (resultData.symptomsNoted) {
+    reasons.push({
+      flag: 'REVIEW',
+      reason: resultData.symptomSummary
+        ? `Symptoms noted: ${resultData.symptomSummary}`
+        : 'Participant-reported symptoms noted',
+    });
+  }
+  const overallFlag = worstFlag(reasons);
+  const summary = [
+    `Cataract ${resultData.cataractRisk}`,
+    `Glaucoma ${resultData.glaucomaRisk}`,
+    resultData.symptomsNoted ? 'Symptoms noted' : 'No symptoms',
+  ].join(' / ');
+  return {
+    ruleVersion: 'VSMS-EH-1.0',
+    overallFlag,
+    isFlagged: overallFlag !== 'NORMAL',
+    flagSummary: reasons.length ? reasons.map((item) => item.reason).join('; ') : summary,
+    reasons,
+  };
+}
+
+export function evaluateOfflineStation(path: ScreeningPath, resultData: VisualAcuityResultData | RefractionResultData | ColourVisionResultData | EyeHealthResultData): FlagEvaluation {
   if (path === 'visual-acuity') return evaluateVisualAcuity(resultData as VisualAcuityResultData);
   if (path === 'refraction') return evaluateRefraction(resultData as RefractionResultData);
+  if (path === 'eye-health') return evaluateEyeHealth(resultData as EyeHealthResultData);
   return evaluateColourVision(resultData as ColourVisionResultData);
 }
 
@@ -425,7 +464,7 @@ export async function queueOfflineStationSave(
   eventId: string,
   stationId: string,
   path: ScreeningPath,
-  body: ScreeningSavePayload<VisualAcuityResultData | RefractionResultData | ColourVisionResultData>,
+  body: ScreeningSavePayload<VisualAcuityResultData | RefractionResultData | ColourVisionResultData | EyeHealthResultData>,
 ): Promise<FlagEvaluation> {
   const snapshot = await loadSnapshot(ownerId, eventId);
   const station = snapshot?.stations.find((item) => item.stationId === stationId);
@@ -505,7 +544,11 @@ export async function syncOfflineEvent(ownerId: string, eventId: string): Promis
         stationId: mutation.stationId,
         stationType: mutation.path === 'visual-acuity'
           ? 'VISUAL_ACUITY'
-          : mutation.path === 'refraction' ? 'REFRACTION' : 'COLOUR_VISION',
+          : mutation.path === 'refraction'
+            ? 'REFRACTION'
+            : mutation.path === 'eye-health'
+              ? 'EYE_HEALTH'
+              : 'COLOUR_VISION',
         payload: mutation.body,
       })));
       const recordByAction = new Map(batch.map((item) => [item.mutation.clientActionId, item.record]));

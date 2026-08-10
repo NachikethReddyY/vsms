@@ -67,6 +67,17 @@ export type ColourVisionResultData = {
   osCorrect: number;
 };
 
+export type EyeHealthRisk = 'NONE' | 'SUSPECTED' | 'PRESENT' | 'NOT_ASSESSED';
+
+export type EyeHealthResultData = {
+  cataractRisk: EyeHealthRisk;
+  glaucomaRisk: EyeHealthRisk;
+  symptomsNoted: boolean;
+  symptomSummary?: string;
+  observations: string;
+  deviceFindings?: string | null;
+};
+
 export type FlagEvaluation = {
   ruleVersion: string;
   overallFlag: OverallFlag;
@@ -96,9 +107,9 @@ export type ScreeningSaveResponse<T> = {
 
 export type VisualAcuityPayload = ScreeningSavePayload<VisualAcuityResultData>;
 
-type ScreeningPath = 'visual-acuity' | 'refraction' | 'colour-vision';
+type ScreeningPath = 'visual-acuity' | 'refraction' | 'colour-vision' | 'eye-health';
 
-async function previewStation<T extends VisualAcuityResultData | RefractionResultData | ColourVisionResultData>(
+async function previewStation<T extends VisualAcuityResultData | RefractionResultData | ColourVisionResultData | EyeHealthResultData>(
   eventId: string,
   stationId: string,
   path: ScreeningPath,
@@ -116,7 +127,7 @@ async function previewStation<T extends VisualAcuityResultData | RefractionResul
   }
 }
 
-async function saveStation<T extends VisualAcuityResultData | RefractionResultData | ColourVisionResultData>(
+async function saveStation<T extends VisualAcuityResultData | RefractionResultData | ColourVisionResultData | EyeHealthResultData>(
   eventId: string,
   stationId: string,
   path: ScreeningPath,
@@ -206,6 +217,14 @@ export const screeningApi = {
 
   saveColourVision(eventId: string, stationId: string, body: ScreeningSavePayload<ColourVisionResultData>) {
     return saveStation(eventId, stationId, 'colour-vision', body);
+  },
+
+  previewEyeHealth(eventId: string, stationId: string, resultData: EyeHealthResultData) {
+    return previewStation(eventId, stationId, 'eye-health', resultData);
+  },
+
+  saveEyeHealth(eventId: string, stationId: string, body: ScreeningSavePayload<EyeHealthResultData>) {
+    return saveStation(eventId, stationId, 'eye-health', body);
   },
 };
 

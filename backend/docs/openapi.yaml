@@ -383,6 +383,7 @@ paths:
       tags: [Events]
       operationId: listStationTemplates
       summary: List active reusable station templates
+      description: Returns active templates that can be imported as screening stations.
       responses:
         "200":
           description: Active station templates available for import
@@ -393,6 +394,64 @@ paths:
                 items: { $ref: "#/components/schemas/StationTemplate" }
         "401": { $ref: "#/components/responses/Unauthorized" }
         "403": { $ref: "#/components/responses/Forbidden" }
+    post:
+      tags: [Events]
+      operationId: createStationTemplate
+      summary: Create a reusable station template
+      description: Administrator only. Soft-managed catalog entry for event station import.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CreateStationTemplateRequest" }
+      responses:
+        "201":
+          description: Station template created
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/StationTemplate" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "422": { $ref: "#/components/responses/ValidationFailed" }
+  /api/v1/events/station-templates/library:
+    get:
+      tags: [Events]
+      operationId: listStationTemplateLibrary
+      summary: List all station templates for administrators
+      description: Includes inactive and non-importable catalog templates.
+      responses:
+        "200":
+          description: Full station template library
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/StationTemplate" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+  /api/v1/events/station-templates/items/{stationTemplateId}:
+    patch:
+      tags: [Events]
+      operationId: updateStationTemplate
+      summary: Update or deactivate a station template
+      parameters:
+        - $ref: "#/components/parameters/StationTemplateId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/UpdateStationTemplateRequest" }
+      responses:
+        "200":
+          description: Station template updated
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/StationTemplate" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "422": { $ref: "#/components/responses/ValidationFailed" }
   /api/v1/events/reports/operations:
     get:
       tags: [Events]
@@ -1026,6 +1085,22 @@ paths:
       summary: Save or idempotently replay a colour-vision result
       parameters: [{ $ref: "#/components/parameters/EventId" }, { $ref: "#/components/parameters/StationId" }]
       requestBody: { required: true, content: { application/json: { schema: { $ref: "#/components/schemas/ColourVisionSaveRequest" } } } }
+      responses: { "200": { $ref: "#/components/responses/ScreeningSaved" }, "201": { $ref: "#/components/responses/ScreeningSaved" }, "401": { $ref: "#/components/responses/Unauthorized" }, "403": { $ref: "#/components/responses/Forbidden" }, "404": { $ref: "#/components/responses/NotFound" }, "409": { $ref: "#/components/responses/Conflict" }, "422": { $ref: "#/components/responses/ValidationFailed" } }
+  /api/v1/events/{eventId}/stations/{stationId}/eye-health/preview:
+    post:
+      tags: [Screening]
+      operationId: previewEyeHealth
+      summary: Evaluate an eye-health result without saving it
+      parameters: [{ $ref: "#/components/parameters/EventId" }, { $ref: "#/components/parameters/StationId" }]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: "#/components/schemas/EyeHealthPreviewRequest" } } } }
+      responses: { "200": { $ref: "#/components/responses/ScreeningPreview" }, "401": { $ref: "#/components/responses/Unauthorized" }, "403": { $ref: "#/components/responses/Forbidden" }, "404": { $ref: "#/components/responses/NotFound" }, "422": { $ref: "#/components/responses/ValidationFailed" } }
+  /api/v1/events/{eventId}/stations/{stationId}/eye-health:
+    post:
+      tags: [Screening]
+      operationId: saveEyeHealth
+      summary: Save or idempotently replay an eye-health result
+      parameters: [{ $ref: "#/components/parameters/EventId" }, { $ref: "#/components/parameters/StationId" }]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: "#/components/schemas/EyeHealthSaveRequest" } } } }
       responses: { "200": { $ref: "#/components/responses/ScreeningSaved" }, "201": { $ref: "#/components/responses/ScreeningSaved" }, "401": { $ref: "#/components/responses/Unauthorized" }, "403": { $ref: "#/components/responses/Forbidden" }, "404": { $ref: "#/components/responses/NotFound" }, "409": { $ref: "#/components/responses/Conflict" }, "422": { $ref: "#/components/responses/ValidationFailed" } }
   /api/v1/events/{eventId}/reviews:
     get:
@@ -2375,6 +2450,11 @@ components:
       in: path
       required: true
       schema: { type: string, format: uuid }
+    StationTemplateId:
+      name: stationTemplateId
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
     MembershipId:
       name: membershipId
       in: path
@@ -2562,7 +2642,7 @@ components:
     StationTemplate:
       type: object
       additionalProperties: false
-      required: [stationTemplateId, templateKey, version, name, defaultCapacity]
+      required: [stationTemplateId, templateKey, version, name, defaultCapacity, active]
       properties:
         stationTemplateId: { type: string, format: uuid }
         templateKey: { type: string, maxLength: 80 }
@@ -2570,6 +2650,26 @@ components:
         name: { type: string, maxLength: 120 }
         description: { type: string, nullable: true }
         defaultCapacity: { type: integer, minimum: 1, maximum: 1000 }
+        active: { type: boolean }
+    CreateStationTemplateRequest:
+      type: object
+      additionalProperties: false
+      required: [templateKey, name]
+      properties:
+        templateKey: { type: string, enum: [REGISTRATION, VISUAL_ACUITY, REFRACTION, COLOUR_VISION, EYE_HEALTH, CLINICAL_REVIEW] }
+        name: { type: string, minLength: 2, maxLength: 100 }
+        description: { type: string, maxLength: 500, nullable: true }
+        defaultCapacity: { type: integer, minimum: 1, maximum: 1000, default: 3 }
+        active: { type: boolean, default: true }
+    UpdateStationTemplateRequest:
+      type: object
+      additionalProperties: false
+      minProperties: 1
+      properties:
+        name: { type: string, minLength: 2, maxLength: 100 }
+        description: { type: string, maxLength: 500, nullable: true }
+        defaultCapacity: { type: integer, minimum: 1, maximum: 1000 }
+        active: { type: boolean }
     EventStation:
       type: object
       additionalProperties: false
@@ -2579,7 +2679,7 @@ components:
         stationTemplateId: { type: string, format: uuid }
         templateVersion: { type: integer, minimum: 1 }
         name: { type: string, maxLength: 120 }
-        stationType: { type: string, enum: [VISUAL_ACUITY, REFRACTION, COLOUR_VISION] }
+        stationType: { type: string, enum: [VISUAL_ACUITY, REFRACTION, COLOUR_VISION, EYE_HEALTH] }
         description: { type: string, nullable: true }
         stationOrder: { type: integer, minimum: 1, maximum: 50 }
         capacity: { type: integer, minimum: 1, maximum: 1000 }
@@ -3942,10 +4042,24 @@ components:
       properties:
         action: { type: string, enum: [REQUEUE, RESOLVE] }
         resolutionNote: { type: string, minLength: 10, maxLength: 500 }
+    EyeHealthRiskAssessment:
+      type: string
+      enum: [NONE, SUSPECTED, PRESENT, NOT_ASSESSED]
+    EyeHealthObservations:
+      type: object
+      additionalProperties: false
+      required: [cataractRisk, glaucomaRisk, symptomsNoted, observations]
+      properties:
+        cataractRisk: { $ref: "#/components/schemas/EyeHealthRiskAssessment" }
+        glaucomaRisk: { $ref: "#/components/schemas/EyeHealthRiskAssessment" }
+        symptomsNoted: { type: boolean }
+        symptomSummary: { type: string, minLength: 3, maxLength: 500 }
+        observations: { type: string, minLength: 1, maxLength: 2000 }
+        deviceFindings: { type: string, maxLength: 2000, nullable: true }
     ExistingReview:
       type: object
       additionalProperties: false
-      required: [reviewId, version, outcome, urgency, clinicalSummary, recommendations, reviewedAt, reviewedByName, signatureSignerName, signatureSha256, signedPayloadHash, signedAt, referral]
+      required: [reviewId, version, outcome, urgency, clinicalSummary, recommendations, eyeHealthObservations, reviewedAt, reviewedByName, signatureSignerName, signatureSha256, signedPayloadHash, signedAt, referral]
       properties:
         reviewId: { type: string, format: uuid }
         version: { type: integer, enum: [1] }
@@ -3953,6 +4067,10 @@ components:
         urgency: { $ref: "#/components/schemas/ClinicalUrgency" }
         clinicalSummary: { type: string }
         recommendations: { type: string, nullable: true }
+        eyeHealthObservations:
+          type: object
+          nullable: true
+          allOf: [{ $ref: "#/components/schemas/EyeHealthObservations" }]
         reviewedAt: { type: string, format: date-time }
         reviewedByName: { type: string }
         signatureSignerName: { type: string }
@@ -3995,6 +4113,7 @@ components:
         confirmed: { type: boolean, enum: [true] }
         clinicalSummary: { type: string, minLength: 10, maxLength: 2000 }
         recommendations: { type: string, maxLength: 2000 }
+        eyeHealthObservations: { $ref: "#/components/schemas/EyeHealthObservations" }
         signatureObjectKey: { type: string, pattern: '^signatures/[a-f0-9-]{36}/review-decision-[a-f0-9-]{36}-[a-f0-9-]{36}\\.(png|jpg)$' }
         signatureSha256: { type: string, pattern: '^[a-fA-F0-9]{64}$' }
         signatureMimeType: { type: string, enum: [image/png, image/jpeg] }
@@ -4008,6 +4127,7 @@ components:
         confirmed: { type: boolean, enum: [true] }
         clinicalSummary: { type: string, minLength: 10, maxLength: 2000 }
         recommendations: { type: string, maxLength: 2000 }
+        eyeHealthObservations: { $ref: "#/components/schemas/EyeHealthObservations" }
         signatureObjectKey: { type: string, pattern: '^signatures/[a-f0-9-]{36}/review-decision-[a-f0-9-]{36}-[a-f0-9-]{36}\\.(png|jpg)$' }
         signatureSha256: { type: string, pattern: '^[a-fA-F0-9]{64}$' }
         signatureMimeType: { type: string, enum: [image/png, image/jpeg] }
@@ -4021,6 +4141,7 @@ components:
         confirmed: { type: boolean, enum: [true] }
         clinicalSummary: { type: string, minLength: 10, maxLength: 2000 }
         recommendations: { type: string, maxLength: 2000 }
+        eyeHealthObservations: { $ref: "#/components/schemas/EyeHealthObservations" }
         urgency: { type: string, enum: [ROUTINE, PRIORITY, URGENT] }
         referral: { $ref: "#/components/schemas/ReferralDecisionInput" }
         signatureObjectKey: { type: string, pattern: '^signatures/[a-f0-9-]{36}/review-decision-[a-f0-9-]{36}-[a-f0-9-]{36}\\.(png|jpg)$' }
@@ -4036,6 +4157,7 @@ components:
         confirmed: { type: boolean, enum: [true] }
         clinicalSummary: { type: string, minLength: 10, maxLength: 2000 }
         recommendations: { type: string, maxLength: 2000 }
+        eyeHealthObservations: { $ref: "#/components/schemas/EyeHealthObservations" }
         referral: { $ref: "#/components/schemas/ReferralDecisionInput" }
         signatureObjectKey: { type: string, pattern: '^signatures/[a-f0-9-]{36}/review-decision-[a-f0-9-]{36}-[a-f0-9-]{36}\\.(png|jpg)$' }
         signatureSha256: { type: string, pattern: '^[a-fA-F0-9]{64}$' }
@@ -4056,7 +4178,7 @@ components:
     RecordedReview:
       type: object
       additionalProperties: false
-      required: [reviewId, version, outcome, urgency, clinicalSummary, recommendations, signatureSignerName, signatureSha256, signedPayloadHash, signedAt, reviewedAt]
+      required: [reviewId, version, outcome, urgency, clinicalSummary, recommendations, eyeHealthObservations, signatureSignerName, signatureSha256, signedPayloadHash, signedAt, reviewedAt]
       properties:
         reviewId: { type: string, format: uuid }
         version: { type: integer, enum: [1] }
@@ -4064,6 +4186,7 @@ components:
         urgency: { $ref: "#/components/schemas/ClinicalUrgency" }
         clinicalSummary: { type: string }
         recommendations: { type: string, nullable: true }
+        eyeHealthObservations: { $ref: "#/components/schemas/EyeHealthObservations" }
         signatureSignerName: { type: string, nullable: true }
         signatureSha256: { type: string, pattern: '^[a-f0-9]{64}$' }
         signedPayloadHash: { type: string, pattern: '^[a-f0-9]{64}$' }
@@ -5208,6 +5331,20 @@ components:
         idempotencyKey: { type: string, minLength: 8, maxLength: 64 }
         acknowledged: { type: boolean }
         resultData: { $ref: "#/components/schemas/ColourVisionResultData" }
+    EyeHealthPreviewRequest:
+      type: object
+      additionalProperties: false
+      required: [resultData]
+      properties: { resultData: { $ref: "#/components/schemas/EyeHealthObservations" } }
+    EyeHealthSaveRequest:
+      type: object
+      additionalProperties: false
+      required: [registrationId, idempotencyKey, acknowledged, resultData]
+      properties:
+        registrationId: { type: string, format: uuid }
+        idempotencyKey: { type: string, minLength: 8, maxLength: 64 }
+        acknowledged: { type: boolean }
+        resultData: { $ref: "#/components/schemas/EyeHealthObservations" }
     ScreeningSyncAction:
       oneOf:
         - type: object
@@ -5234,6 +5371,14 @@ components:
             stationId: { type: string, format: uuid }
             stationType: { type: string, enum: [COLOUR_VISION] }
             payload: { $ref: "#/components/schemas/ColourVisionSaveRequest" }
+        - type: object
+          additionalProperties: false
+          required: [clientActionId, stationId, stationType, payload]
+          properties:
+            clientActionId: { type: string, format: uuid }
+            stationId: { type: string, format: uuid }
+            stationType: { type: string, enum: [EYE_HEALTH] }
+            payload: { $ref: "#/components/schemas/EyeHealthSaveRequest" }
       discriminator: { propertyName: stationType }
     ScreeningSyncRequest:
       type: object
@@ -5290,7 +5435,7 @@ components:
         stationId: { type: string, format: uuid }
         eventId: { type: string, format: uuid }
         stationName: { type: string }
-        stationType: { type: string, enum: [VISUAL_ACUITY, REFRACTION, COLOUR_VISION] }
+        stationType: { type: string, enum: [VISUAL_ACUITY, REFRACTION, COLOUR_VISION, EYE_HEALTH] }
         stationOrder: { type: integer }
         isActive: { type: boolean }
         offlineAccessExpiresAt: { type: string, format: date-time, nullable: true }
