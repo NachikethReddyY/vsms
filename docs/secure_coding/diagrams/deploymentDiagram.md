@@ -1,35 +1,47 @@
-# Deployment Architecture Documentation
-<img width="1412" height="242" alt="DeploymentDiagram drawio (2)" src="https://github.com/user-attachments/assets/5213e7d1-8efd-4aa3-956d-b54249223a5e" />
+# VSMS deployment diagram
 
-## Overview
-This document outlines the multi-tier secure cloud architecture and edge runtime model for the Visual Screening Management System (VSMS). The design guarantees high availability, secure boundary isolation, and robust offline synchronization capabilities.
+This is the repository-supported target topology. The EC2 node and reverse
+proxy are deployment targets/prerequisites; this repository contains no live
+instance, security-group or certificate evidence. The Express request path
+follows the current route → Controller → Service → Prisma boundary.
 
-## 1. High-Level Topology & Architecture Overview
-The system architecture is structured across four logical tiers, establishing a left-to-right secure boundary progression from the client edge to persistent cloud storage.
+```mermaid
+flowchart LR
+    tablet[Staff tablet/browser<br/>React/Vite dashboard<br/>encrypted IndexedDB]
+    proxy[Operator-managed HTTPS<br/>reverse proxy / TLS boundary]
 
+    subgraph ec2[EC2 host — deployment target]
+        api[Node.js Express API process]
+        middleware[Request context, security,<br/>auth, authorization and validation]
+        routes[Versioned routes]
+        controllers[Controllers]
+        services[Domain Services]
+        workers[Separate Node worker processes<br/>backend/scripts/*.js]
+        prisma[Prisma Client]
+        api --> middleware --> routes --> controllers --> services --> prisma
+        workers -->|claim/process jobs and outbox rows| prisma
+    end
 
+    postgres[(PostgreSQL<br/>DATABASE_URL target)]
+    cognito[Cognito<br/>external identity boundary]
+    onemap[OneMap / SES / SNS<br/>only when configured]
 
-* **Client Edge (PWA Tier):** Runs locally on field tablets, enabling fully functional offline screening operations. It houses the React Single Page Application (SPA), a local `IndexedDB` browser store, and an `Offline Queue Manager` to handle background synchronization logic.
-* **API Gateway & Security Tier:** Acts as the secure perimeter for inbound traffic. It enforces **TLS 1.3 / HTTP** and leverages **AWS WAF** for threat protection alongside **AWS Cognito** for identity verification, JWT issuing, and Multi-Factor Authentication (MFA).
-* **Compute Tier:** Processes backend business logic via containerized application services on **AWS ECS (Fargate Express API)** and scale-to-zero serverless functions on **AWS Lambda**.
-* **Data & Secrets Tier:** Provides durable state management and secure configuration. Database persistence is handled via **DynamoDB / PostgreSQL**, asset hosting via **Amazon S3**, and environment variable or credential injection via **AWS Secrets Manager**.
+    tablet -->|HTTPS| proxy --> api
+    tablet -->|Cognito redirect| cognito
+    api -->|token exchange/JWKS| cognito
+    prisma -->|SQL| postgres
+    api -.-> onemap
+```
 
----
+## Deployment limits
 
-## 2. Infrastructure & Deployment Implementation
-
-| Layer | Component | Hosting Target / Service | Security & Operational Role |
-| :--- | :--- | :--- | :--- |
-| **Edge** | Field PWA Client | Amazon S3 / CloudFront | Static asset caching, offline execution via service workers. |
-| **Gateway** | API Routing & Auth | AWS API Gateway & Cognito | Rate limiting, endpoint routing, token validation, and MFA. |
-| **Compute** | Core Services | AWS ECS (Fargate) & Lambda | Express API execution, asynchronous background queue workers. |
-| **Data** | Persistence & Secrets | RDS / DynamoDB & Secrets Manager | Encrypted data at rest, secure credential and secret retrieval. |
-
----
-
-## 3. Offline Synchronization & Resiliency Flow
-To ensure uninterrupted field performance during intermittent or total network loss, the architecture implements a local-first queue synchronization pattern:
-
-1. **Local Capture:** All user entries, screening results, and registration records write directly to the local browser `IndexedDB` storage.
-2. **Queue Management:** The `Offline Queue Manager` tracks synchronization states (`PENDING`, `SUCCESS`, `FAILED`) and packages un-synced transactions.
-3. **Batch Reconciliation:** When connectivity is restored, requests are securely transmitted to the backend via idempotent batch sync endpoints, avoiding record duplication and automatically updating the operational dashboard.estored, requests are securely transmitted to the backend via idempotent batch sync endpoints, avoiding record duplication and automatically updating the operational dashboard.
+- `backend/server.js` can start the API; `README.md` documents production
+  environment and reverse-proxy prerequisites.
+- PostgreSQL provisioning, network policy, backups, monitoring, process
+  supervision and recovery are operational work outside the repository.
+- The browser offline pack is an application feature, not a service-worker
+  cache. A hard refresh while offline is not claimed to work.
+- `backend/docker-compose.yml` provides local Redis support for rate limiting;
+  it is not proof of a deployed shared Redis service.
+- No serverless, static object-storage, or managed secret-store node is shown
+  because none is verified as the current deployment architecture.

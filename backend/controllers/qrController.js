@@ -1,24 +1,15 @@
 const qrService = require("../services/participant/qrService");
-const prisma = require("../prisma/prismaClient");
 const env = require("../config/env");
-const { decrypt } = require("../utils/cryptoUtils");
-const { encryptionContext } = require("../utils/cryptoUtils");
-const { renderBrandedQrSvg } = require("../utils/qrBranding");
 const { assertUuid } = require("../utils/validation");
-const { assertRegistrationAssignment, assertQrVerifyAccess } = require("../utils/staff");
 
 const escapeHtml = (value) => String(value ?? "").replace(/[&<>"']/g, (character) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[character]));
 
 async function assertQrAccess(req, selectors) {
-    const eventId = await qrService.getEventIdForAccess(selectors);
-    await assertRegistrationAssignment(prisma, eventId, req.auth);
-    return eventId;
+    return qrService.assertRegistrationAccess(selectors, req.auth);
 }
 
 async function assertVerifyAccess(req, selectors) {
-    const eventId = await qrService.getEventIdForAccess(selectors);
-    await assertQrVerifyAccess(prisma, eventId, req.auth);
-    return eventId;
+    return qrService.assertVerificationAccess(selectors, req.auth);
 }
 
 // Registration-module compatibility endpoint
@@ -81,7 +72,7 @@ exports.verifyQR = async (req, res, next) => {
         const userId = req.auth.userId;
         await assertVerifyAccess(req, { token, eventId });
 
-        const result = await qrService.verifyQR(token, eventId, userId, prisma, { ipAddress: req.ip });
+        const result = await qrService.verifyQR(token, eventId, userId, undefined, { ipAddress: req.ip });
 
         return res.status(200).json({
             success: true,
@@ -153,7 +144,7 @@ exports.revokeQR = async (req, res, next) => {
         const revokedBy = req.auth.userId;
         await assertQrAccess(req, { qrId });
 
-        const qr = await qrService.revokeQR(qrId, revokedReason, revokedBy, prisma, { ipAddress: req.ip });
+        const qr = await qrService.revokeQR(qrId, revokedReason, revokedBy, undefined, { ipAddress: req.ip });
 
         return res.status(200).json({
             success: true,
@@ -175,7 +166,7 @@ exports.reissueQR = async (req, res, next) => {
         const userId = req.auth.userId;
         await assertQrAccess(req, { registrationId });
 
-        const qr = await qrService.reissueQR(registrationId, userId, prisma, { ipAddress: req.ip });
+        const qr = await qrService.reissueQR(registrationId, userId, undefined, { ipAddress: req.ip });
         const { token: _token, ...safeQr } = qr;
 
         return res.status(201).json({
@@ -287,53 +278,17 @@ exports.devPageQR = async (req, res, next) => {
         }
         const registrationId = assertUuid(req.params.registrationId, "registrationId");
 
-        const registration = await prisma.eventRegistration.findUnique({
-            where: { registrationId },
-            include: {
-                participant: { select: { firstName: true, lastName: true, nricMasked: true } },
-                event: { select: { eventId: true, name: true } },
-            },
-        });
-        if (!registration) {
+        const pageData = await qrService.getDevPageData(registrationId, { ipAddress: req.ip });
+        if (!pageData) {
             return res.status(404).send("<h1>Registration not found</h1>");
         }
-
-        const qr = await qrService.generateRegistrationQR(registrationId, null, { ipAddress: req.ip });
-        const svgBase64 = qr.qrImage.split(",")[1];
-        const svg = Buffer.from(svgBase64, "base64").toString("utf8");
-
-        const activePass = await prisma.qRCodePass.findFirst({
-            where: { registrationId, isActive: true },
-            orderBy: { issuedAt: "desc" },
-        });
-        let token = null;
-        if (activePass) {
-            try {
-                token = decrypt(activePass.tokenCiphertext, encryptionContext("QRCodePass", activePass.id, "token"));
-            } catch { /* token display is best-effort */ }
-        }
-
-        let scanQr = svg;
-        let statusUrl = null;
-        if (token) {
-            const target = `${env.publicAppOrigin}/participant-status/${encodeURIComponent(token)}`;
-            scanQr = await renderBrandedQrSvg(target, { width: 420 });
-            const scanSvgBase64 = scanQr.split(",")[1];
-            scanQr = Buffer.from(scanSvgBase64, "base64").toString("utf8");
-            statusUrl = `/api/v1/qr/public-status/${encodeURIComponent(token)}`;
-        }
-
-        const displayName = [
-            registration.participant?.firstName,
-            registration.participant?.lastName,
-        ].filter(Boolean).join(" ") || "—";
 
         const page = `<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>VSMS QR Pass — ${escapeHtml(displayName)}</title>
+<title>VSMS QR Pass — ${escapeHtml(pageData.displayName)}</title>
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body {
@@ -380,12 +335,12 @@ exports.devPageQR = async (req, res, next) => {
 </head>
 <body>
   <div class="card">
-    <div class="qr-wrap">${scanQr}</div>
-    <h1>${escapeHtml(displayName)}</h1>
-    <div class="sub">${escapeHtml(registration.event?.name || "Unknown event")}</div>
+    <div class="qr-wrap">${pageData.scanQr}</div>
+    <h1>${escapeHtml(pageData.displayName)}</h1>
+    <div class="sub">${escapeHtml(pageData.eventName)}</div>
     <div class="meta">
-      Queue number: <b>${escapeHtml(registration.queueNumber ?? "—")}</b>
-      ${token ? `&nbsp;·&nbsp; Token: <code style="font-size:12px">${escapeHtml(token.slice(0, 12))}…</code>` : ""}
+      Queue number: <b>${escapeHtml(pageData.queueNumber ?? "—")}</b>
+      ${pageData.tokenPreview ? `&nbsp;·&nbsp; Token: <code style="font-size:12px">${escapeHtml(pageData.tokenPreview)}</code>` : ""}
     </div>
     <div id="status" class="status pending">Checking pass status…</div>
     <div id="err" class="err"></div>
@@ -394,7 +349,7 @@ exports.devPageQR = async (req, res, next) => {
 <script>
   const statusEl = document.getElementById("status");
   const errEl = document.getElementById("err");
-  const statusUrl = ${JSON.stringify(statusUrl)};
+  const statusUrl = ${JSON.stringify(pageData.statusUrl)};
 
   async function check() {
     if (!statusUrl) {

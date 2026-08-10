@@ -5,6 +5,8 @@ const crypto = require("node:crypto");
 process.env.DATABASE_URL ||= "postgresql://test:test@localhost:5432/vsms_test";
 
 const bus = require("../../services/domain/domainEventBus");
+const { registerDomainEventHandlers } = require("../../services/domain/domainEventHandlers");
+const requestContext = require("../../middlewares/requestContext");
 
 const uuid = () => crypto.randomUUID();
 const makeEvent = (overrides = {}) => ({
@@ -32,6 +34,7 @@ const makeEvent = (overrides = {}) => ({
 // dispatch, fail, create) updates the in-memory row so findUniqueOrThrow and
 // findMany always see the latest state.
 function fakeClient(rows = []) {
+  const auditRows = [];
   const client = {
     domainEvent: {
       create: async ({ data }) => {
@@ -91,8 +94,14 @@ function fakeClient(rows = []) {
         return { count: 1 };
       },
     },
+    auditLog: {
+      create: async ({ data }) => {
+        auditRows.push(data);
+        return data;
+      },
+    },
   };
-  return { client, rows };
+  return { client, rows, auditRows };
 }
 
 const tick = (ms) => new Date(Date.now() + ms);
@@ -119,6 +128,73 @@ test("emit persists a row through the provided client", async () => {
   assert.equal(row.type, "REFERRAL_ISSUED");
   assert.equal(row.status, "PENDING");
   assert.equal(row.payload.version, 3);
+});
+
+test("request context correlation reaches worker logs and domain-event audit rows", async () => {
+  const requestId = uuid();
+  const secret = "clinical payload must not be logged";
+  const { client, auditRows } = fakeClient();
+  const workerLogs = [];
+  const workerLogger = {
+    info: (message, fields) => workerLogs.push({ level: "info", message, fields }),
+    warn: (message, fields) => workerLogs.push({ level: "warn", message, fields }),
+  };
+  registerDomainEventHandlers(bus);
+  const responseHeaders = {};
+  const request = {
+    ip: "127.0.0.1",
+    get: (name) => name === "x-request-id" ? requestId : "",
+  };
+  requestContext(request, { setHeader: (name, value) => { responseHeaders[name] = value; } }, () => {});
+  assert.equal(request.context.requestId, requestId);
+  assert.equal(responseHeaders["x-request-id"], requestId);
+
+  const row = await bus.emit({
+    client,
+    type: "EVENT_TRANSITIONED",
+    aggregateType: "Event",
+    aggregateId: uuid(),
+    context: request.context,
+    payload: { fromStatus: "DRAFT", toStatus: "PUBLISHED", command: "publish", secret },
+  });
+  const result = await bus.dispatchEvent(row, { prisma: client, logger: workerLogger });
+
+  assert.equal(row.correlationId, requestId);
+  assert.equal(result.event.correlationId, requestId);
+  assert.equal(workerLogs.length, 1);
+  assert.equal(workerLogs[0].message, "domain_event.dispatched");
+  assert.equal(workerLogs[0].fields.requestId, requestId);
+  assert.equal(workerLogs[0].fields.payload, undefined);
+  assert.equal(JSON.stringify(workerLogs).includes(secret), false);
+  assert.equal(auditRows.length, 1);
+  assert.equal(auditRows[0].requestId, requestId);
+});
+
+test("worker failure logs correlate safely without handler payload or message", async () => {
+  const requestId = uuid();
+  const secret = "identity payload must not be logged";
+  const rows = [makeEvent({ correlationId: requestId, payload: { secret } })];
+  const { client } = fakeClient(rows);
+  const workerLogs = [];
+  const workerLogger = {
+    info: (message, fields) => workerLogs.push({ level: "info", message, fields }),
+    warn: (message, fields) => workerLogs.push({ level: "warn", message, fields }),
+  };
+  bus.registerHandler(rows[0].type, async () => {
+    const error = new Error(secret);
+    error.code = "SAFE_FAILURE";
+    throw error;
+  });
+
+  const result = await bus.dispatchEvent(rows[0], { prisma: client, logger: workerLogger });
+
+  assert.equal(result.event.status, "FAILED");
+  assert.equal(workerLogs.length, 1);
+  assert.equal(workerLogs[0].message, "domain_event.handler_failed");
+  assert.equal(workerLogs[0].fields.requestId, requestId);
+  assert.equal(workerLogs[0].fields.message, undefined);
+  assert.equal(workerLogs[0].fields.payload, undefined);
+  assert.equal(JSON.stringify(workerLogs).includes(secret), false);
 });
 
 test("claim rejects events that are not claimable", async () => {
@@ -206,6 +282,7 @@ test("processing a batch returns a per-event summary", async () => {
   assert.equal(summary.retried, 0);
   assert.equal(summary.deadLettered, 0);
   assert.equal(summary.events[0].status, "DISPATCHED");
+  assert.equal(summary.events[0].correlationId, rows[0].correlationId);
   assert.equal(rows[0].attemptCount, 1);
 });
 

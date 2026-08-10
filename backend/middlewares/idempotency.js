@@ -3,6 +3,7 @@
  * Requires: ioredis (npm install ioredis)
  */
 const Redis = require("ioredis");
+const logger = require("../utils/logger/logger");
 const redis = new Redis(process.env.REDIS_URL || "redis://localhost:6379", {
   lazyConnect: true,
   enableOfflineQueue: false,
@@ -70,10 +71,13 @@ module.exports = async function checkIdempotency(req, res, next) {
         };
 
         next();
-    } catch (redisError) {
+    } catch {
         // Fail-safe: If Redis goes down, log the error and let the request pass through
         // rather than completely breaking your user API endpoints.
-        console.error("Idempotency Middleware Redis Error:", redisError);
+        logger.warn("idempotency.redis_error", {
+            event: "idempotency.redis_error",
+            code: "IDEMPOTENCY_REDIS_UNAVAILABLE",
+        });
         next();
     }
 };

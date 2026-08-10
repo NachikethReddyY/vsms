@@ -83,6 +83,21 @@ test("API routes expose the required versioned contracts", () => {
     assert.doesNotMatch(auth, /"\/login"|"\/signup"/);
 });
 
+test("school API map records the actual Cognito, PATCH, and event-scoped contract", () => {
+    const document = YAML.parse(read("docs/openapi.yaml"));
+    const map = fs.readFileSync(path.resolve(backendRoot, "../docs/api-contract-mapping.md"), "utf8");
+    assert.ok(document.paths["/api/v1/auth/authorize"].get);
+    assert.ok(document.paths["/api/v1/events/{eventId}"].patch);
+    assert.ok(document.paths["/api/v1/participants/{participantId}"].patch);
+    assert.ok(document.paths["/api/v1/events/{eventId}/stations/{stationId}/visual-acuity"].post);
+    assert.ok(document.paths["/api/v1/events/{eventId}/sync/screening"].post);
+    assert.equal(document.paths["/api/v1/screenings/eye-health"], undefined);
+    assert.match(map, /Cognito authorization-code \+ PKCE/);
+    assert.match(map, /`PATCH \/api\/v1\/events\/\{eventId\}`/);
+    assert.match(map, /`POST \/api\/v1\/events\/\{eventId\}\/sync\/screening`/);
+    assert.match(map, /Eye-health result capture is the only required API row without a local equivalent/);
+});
+
 test("account contracts allow composed runtime fields and document provider maintenance", () => {
     const document = YAML.parse(read("docs/openapi.yaml"));
     const schemas = document.components.schemas;
@@ -101,14 +116,17 @@ test("account contracts allow composed runtime fields and document provider main
     assert.ok(document.paths["/api/v1/users"].post.responses["202"]);
 });
 
-test("registration transaction creates registration, history and audit together", () => {
+test("registration service creates registration, history and audit together", () => {
     const controller = read("controllers/registrationController.js");
-    const transactionBody = controller.slice(controller.indexOf("prisma.$transaction"));
+    const service = read("services/participant/registrationService.js");
+    const transactionBody = service.slice(service.indexOf("db.$transaction"));
     assert.match(transactionBody, /eventRegistration\.create/);
     assert.match(transactionBody, /registrationStatusHistory\.create/);
     assert.match(transactionBody, /createAuditLog/);
     assert.match(transactionBody, /isolationLevel:\s*"Serializable"/);
-    assert.match(controller, /DUPLICATE_REGISTRATION_BLOCKED/);
+    assert.match(service, /DUPLICATE_REGISTRATION_BLOCKED/);
+    assert.match(controller, /registrationService\.createRegistration/);
+    assert.doesNotMatch(controller, /prisma/);
 });
 
 test("migration preserves history and enforces one active primary contact", () => {

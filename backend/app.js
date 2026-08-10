@@ -19,9 +19,11 @@ const YAML = require("yaml");
 // Environment Configuration & Error Handling
 const env = require("./config/env");
 const AppError = require("./errors/AppError");
+const logger = require("./utils/logger/logger");
 
 // Custom Middlewares
 const requestContext = require("./middlewares/requestContext");
+const httpLogger = require("./middlewares/httpLogger");
 const csrf = require("./middlewares/csrf");
 const authenticate = require("./middlewares/authenticate");
 const { notFound, errorHandler } = require("./middlewares/errorHandler");
@@ -61,6 +63,7 @@ app.disable("x-powered-by");
 
 // Attach baseline tracking context to incoming requests
 app.use(requestContext);
+app.use(httpLogger);
 
 /**
  * ============================================================================
@@ -187,7 +190,7 @@ app.use(cookieParser());
 // JSON Body Parser with strict payload size limits
 app.use(
   express.json({
-    limit: "256kb",
+    limit: env.requestBodyLimit,
     strict: true,
     type: "application/json"
   })
@@ -242,8 +245,11 @@ if (!env.isProduction) {
         })
       );
     }
-  } catch (err) {
-    console.error("Swagger loading failed:", err.message);
+  } catch {
+    logger.error("swagger.load_failed", {
+      event: "swagger.load_failed",
+      code: "SWAGGER_LOAD_FAILED",
+    });
   }
 }
 

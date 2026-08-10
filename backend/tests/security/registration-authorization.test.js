@@ -11,7 +11,12 @@ const {
   assertScreenerAssignment,
   assertQrVerifyAccess,
 } = require("../../utils/staff");
-const { getEventIdForAccess } = require("../../services/participant/qrService");
+const {
+  getEventIdForAccess,
+  assertRegistrationAccess,
+  assertVerificationAccess,
+} = require("../../services/participant/qrService");
+const { authorizeSignatureTarget } = require("../../services/participant/signatureService");
 
 const account = (userId, roles = []) => ({
   userId,
@@ -127,4 +132,38 @@ test("QR access resolves the registration event and rejects event confusion", as
     getEventIdForAccess({ token: "test-token", eventId: otherEventId }, db),
     (error) => error.status === 400 && error.code === "QR_EVENT_MISMATCH",
   );
+});
+
+test("QR service keeps registration and verification authorization event-scoped", async () => {
+  const eventId = crypto.randomUUID();
+  const userId = crypto.randomUUID();
+  const db = {
+    eventRegistration: { findUnique: async () => ({ eventId }) },
+    qRCodePass: { findFirst: async () => ({ registration: { eventId } }) },
+    event: { findUnique: async () => ({ eventId, status: "IN_PROGRESS" }) },
+    eventMembership: { findFirst: async () => ({ id: crypto.randomUUID(), status: "ACTIVE", roles: [{ role: "REGISTRATION" }] }) },
+    staffAssignment: { findFirst: async () => ({ id: crypto.randomUUID() }) },
+  };
+
+  await assert.doesNotReject(assertRegistrationAccess({ registrationId: crypto.randomUUID() }, account(userId), db));
+  await assert.doesNotReject(assertVerificationAccess({ token: "a".repeat(64) }, account(userId), db));
+});
+
+test("signature target authorization keeps registration duty and participant event scope", async () => {
+  const eventId = crypto.randomUUID();
+  const participantId = crypto.randomUUID();
+  const userId = crypto.randomUUID();
+  const db = {
+    event: { findUnique: async () => ({ eventId, status: "IN_PROGRESS" }) },
+    eventMembership: { findFirst: async () => ({ id: crypto.randomUUID(), status: "ACTIVE", roles: [{ role: "REGISTRATION" }] }) },
+    staffAssignment: { findFirst: async () => ({ id: crypto.randomUUID() }) },
+    participant: { findFirst: async () => ({ id: participantId }) },
+  };
+
+  await assert.doesNotReject(authorizeSignatureTarget({
+    eventId,
+    targetId: participantId,
+    purpose: "CONSENT",
+    auth: account(userId),
+  }, db));
 });

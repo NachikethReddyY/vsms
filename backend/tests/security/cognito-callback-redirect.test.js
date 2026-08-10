@@ -17,7 +17,7 @@ Object.assign(process.env, {
 
 const cognitoClient = require("../../utils/cognitoClient");
 const cognitoJwt = require("../../utils/cognitoJwt");
-const staff = require("../../utils/staff");
+const accountService = require("../../services/account/accountService");
 const AuthAudit = require("../../utils/audit");
 const { AppError } = require("../../errors/AppError");
 
@@ -31,7 +31,7 @@ cognitoClient.exchangeAuthorizationCode = async (code, verifier) => {
 cognitoJwt.verifyCognitoToken = async (_token, tokenUse) => tokenUse === "id"
     ? { sub: "cognito-user", email: "staff@example.com" }
     : { sub: "cognito-user", auth_time: Math.floor(Date.now() / 1000) };
-staff.syncLocalUser = async () => {
+accountService.syncCognitoUser = async () => {
     if (localUserMode === "missing") throw new AppError(403, "LOCAL_PROFILE_NOT_FOUND", "Access denied");
     return {
         id: "staff-id",
@@ -41,10 +41,8 @@ staff.syncLocalUser = async () => {
         userRoles: [{ role: { roleName: "EVENT_MANAGER" } }],
     };
 };
-staff.rolesFromCognitoGroups = () => ["EVENT_MANAGER"];
 AuthAudit.createAuthAuditLog = async () => {};
-const prisma = require("../../prisma/prismaClient");
-prisma.user.update = async () => ({});
+accountService.recordSuccessfulLogin = async () => new Date();
 
 const app = require("../../app");
 
