@@ -12,12 +12,10 @@ const {
     globalSignOut,
 } = require("../utils/cognitoClient");
 const { verifyCognitoToken } = require("../utils/cognitoJwt");
-const { createAuthAuditLog } = require("../utils/audit");
 const { timingSafeEqual } = require("../utils/security");
-const { syncLocalUser, rolesFromCognitoGroups, ALLOWED_ROLES } = require("../utils/staff");
-const prisma = require("../prisma/prismaClient");
+const { rolesFromCognitoGroups, ALLOWED_ROLES } = require("../utils/staff");
+const accountService = require("../services/account/accountService");
 const { sessionValidity } = require("../utils/sessionValidity");
-const { enqueueAccountLifecycle } = require("../services/account/accountLifecycleNotificationService");
 const {
     ACCESS_COOKIE,
     REFRESH_COOKIE,
@@ -125,7 +123,7 @@ async function finalizeSuccessfulLogin(authResult, username, context, res) {
         verifyCognitoToken(authResult.AccessToken, "access"),
     ]);
     const emailVerified = idTokenPayload.email_verified === true || idTokenPayload.email_verified === "true";
-    const localUser = await syncLocalUser(extractProfileFromIdToken(idTokenPayload), {
+    const localUser = await accountService.syncCognitoUser(extractProfileFromIdToken(idTokenPayload), {
         allowCreate: env.publicSignupEnabled && emailVerified,
     });
 
@@ -137,11 +135,10 @@ async function finalizeSuccessfulLogin(authResult, username, context, res) {
     const cognitoRoles = rolesFromCognitoGroups(accessTokenPayload);
     const roles = localRoles.filter((role) => cognitoRoles.includes(role));
 
-    const lastLoginAt = new Date();
-    await prisma.user.update({ where: { id: localUser.id }, data: { lastLoginAt } });
+    const lastLoginAt = await accountService.recordSuccessfulLogin(localUser.id);
     localUser.lastLoginAt = lastLoginAt;
     setAuthCookies(res, authResult, idTokenPayload.email || idTokenPayload["cognito:username"] || username);
-    await createAuthAuditLog({
+    await accountService.recordAuthAudit({
         userId: localUser.id,
         eventType: "LOGIN_SUCCESS",
         outcome: "SUCCESS",
@@ -197,7 +194,7 @@ exports.callback = asyncHandler(async (req, res) => {
         res.json({ ...payload, returnTo });
     } catch (error) {
         clearOAuthCookies(res);
-        await createAuthAuditLog({
+        await accountService.recordAuthAudit({
             eventType: "LOGIN_FAILED",
             outcome: "FAILED",
             failureCategory: error.name || "OAUTH_CALLBACK_FAILED",
@@ -222,7 +219,7 @@ exports.refresh = asyncHandler(async (req, res) => {
         const response = await refreshSession({ email: username, refreshToken });
         const authResult = response.AuthenticationResult;
         const accessPayload = await verifyCognitoToken(authResult.AccessToken, "access");
-        const localUser = await syncLocalUser({
+        const localUser = await accountService.syncCognitoUser({
             cognitoSub: accessPayload.sub,
             email: username.includes("@") ? username : null,
         });
@@ -241,7 +238,7 @@ exports.refresh = asyncHandler(async (req, res) => {
         });
     } catch (error) {
         clearAuthCookies(res);
-        await createAuthAuditLog({
+        await accountService.recordAuthAudit({
             eventType: "TOKEN_REFRESH_FAILED",
             outcome: "FAILED",
             failureCategory: error.name || "TOKEN_REFRESH_FAILED",
@@ -290,18 +287,10 @@ exports.changePassword = asyncHandler(async (req, res) => {
         oldPassword: req.body.oldPassword,
         newPassword: req.body.newPassword,
     });
-    await createAuthAuditLog({
+    await accountService.recordPasswordChange({
         userId: req.auth.userId,
-        eventType: "PASSWORD_CHANGE_SUCCESS",
-        outcome: "SUCCESS",
-        identifier: req.auth.email,
+        email: req.auth.email,
         context: req.context,
-    });
-    await enqueueAccountLifecycle({
-        type: "PASSWORD_CHANGED",
-        account: { id: req.auth.userId },
-        metadata: { changedAt: new Date().toISOString() },
-        idempotencyKey: `PASSWORD_CHANGED:${req.auth.userId}:${req.context?.requestId || crypto.randomUUID()}`,
     });
     res.json({ message: "Password changed successfully." });
 });

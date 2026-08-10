@@ -1,19 +1,18 @@
-## Component Diagram (Draft 1)
+# VSMS component diagram
 
-This is the first draft of the component diagram for the **Visual Screening Management System (VSMS)**. It illustrates the core components of the application and their interactions. The diagram serves as the foundation for the system architecture and will be refined as additional features and implementation details are incorporated.
+This diagram reflects the repository implementation, not a proposed cloud deployment. The API has no repository layer: Prisma is the data-access client used by domain services.
 
-### Draft 1
+```mermaid
+flowchart LR
+  Web[React dashboard / browser] -->|HTTPS API request| Express[Express application]
+  Express --> MW[Request context, security, CSRF, auth, authorization, validation]
+  MW --> Routes[Versioned route modules]
+  Routes --> Controllers[Controllers]
+  Controllers --> Services[Domain services]
+  Services --> Prisma[Prisma Client]
+  Prisma --> DB[(PostgreSQL)]
+  Services -. configured managed login / identity sync .-> Cognito[Amazon Cognito]
+  Services -. configured provider callbacks / delivery .-> Providers[Configured external providers]
+```
 
-<img width="392" height="732" alt="VSMS Component Diagram - Draft 1" src="https://github.com/user-attachments/assets/ba608d59-785a-452e-b96e-8a02742c2e01" />
-
-**Key Components Included:**
-- Frontend web application
-- Backend API services
-- Authentication and authorization
-- Database layer
-- Reporting module
-- Notification services
-- Queue and participant management
-- Screening workflow components
-
-> **Note:** This is the initial draft of the component diagram. The architecture will be updated throughout development to reflect new modules, refined component interactions, and implementation improvements.
+Controllers handle HTTP input and response mapping. Services own business rules, authorization-sensitive resource decisions, audit writes, and transactions. `backend/docs/request-architecture.md` records the concrete boundary and examples.
