@@ -73,7 +73,7 @@ Configure the Cognito region, user pool, app client, hosted domain, redirect URI
 
 ### Integration database
 
-Integration tests use only `backend/.env.test` (or an explicitly exported `DATABASE_URL`), never `backend/.env`. The runner parses the URL and refuses to reset a database unless its name ends in `_test`; it never derives a test database from a development or production URL.
+Integration tests use only `backend/.env.test` (or an explicitly exported `DATABASE_URL`), never `backend/.env`. The runner parses the URL and refuses to reset a database unless its name ends in `_test`; it never derives a test database from a development or production URL. It also requires `VSMS_TEST_DATABASE_RESET_ACKNOWLEDGEMENT=I_UNDERSTAND_THIS_RESETS_A_TEST_DATABASE` before it invokes Prisma.
 
 Current schema revision: `backend/prisma/schema.prisma` with migration `20260810000000_add_domain_event_outbox`. This revision is recorded here without connection details.
 

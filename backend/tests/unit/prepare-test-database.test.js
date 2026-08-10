@@ -1,7 +1,7 @@
 const assert = require("node:assert/strict");
 const test = require("node:test");
 
-const { testDatabaseName } = require("../../scripts/prepare-test-database");
+const { assertResetAcknowledgement, resetAcknowledgement, testDatabaseName } = require("../../scripts/prepare-test-database");
 
 test("integration database preparation accepts only parsed PostgreSQL _test database names", () => {
   assert.equal(
@@ -20,4 +20,10 @@ test("integration database preparation accepts only parsed PostgreSQL _test data
   ]) {
     assert.throws(() => testDatabaseName(databaseUrl), /Integration database setup refused/);
   }
+});
+
+test("integration database preparation requires an exact reset acknowledgement", () => {
+  assert.throws(() => assertResetAcknowledgement(), /Integration database setup refused/);
+  assert.throws(() => assertResetAcknowledgement("reset-vsms_test"), /Integration database setup refused/);
+  assert.doesNotThrow(() => assertResetAcknowledgement(resetAcknowledgement));
 });

@@ -5,6 +5,7 @@ const dotenv = require("dotenv");
 const backendRoot = path.resolve(__dirname, "..");
 const pnpmCommand = process.platform === "win32" ? "pnpm.cmd" : "pnpm";
 const integrationTestArgs = ["--test", "tests/integration/*.test.js", "tests/security/rateLimit.test.js", "tests/security/rbac.test.js"];
+const resetAcknowledgement = "I_UNDERSTAND_THIS_RESETS_A_TEST_DATABASE";
 
 const testDatabaseName = (databaseUrl) => {
   let parsed;
@@ -34,11 +35,18 @@ const testDatabaseName = (databaseUrl) => {
   return databaseName;
 };
 
+const assertResetAcknowledgement = (value) => {
+  if (value !== resetAcknowledgement) {
+    throw new Error("Integration database setup refused: set VSMS_TEST_DATABASE_RESET_ACKNOWLEDGEMENT to the required exact acknowledgement.");
+  }
+};
+
 const run = (command, args) => execFileSync(command, args, { cwd: backendRoot, stdio: "inherit" });
 
 const prepareTestDatabase = () => {
   dotenv.config({ path: path.join(backendRoot, ".env.test") });
   const databaseName = testDatabaseName(process.env.DATABASE_URL);
+  assertResetAcknowledgement(process.env.VSMS_TEST_DATABASE_RESET_ACKNOWLEDGEMENT);
   console.log(`Preparing isolated integration database ${databaseName}.`);
   run(pnpmCommand, ["prisma:generate"]);
   run(pnpmCommand, ["exec", "prisma", "migrate", "reset", "--force", "--skip-seed"]);
@@ -49,4 +57,4 @@ if (require.main === module) {
   if (process.argv.includes("--run-tests")) run(process.execPath, integrationTestArgs);
 }
 
-module.exports = { prepareTestDatabase, testDatabaseName };
+module.exports = { assertResetAcknowledgement, prepareTestDatabase, resetAcknowledgement, testDatabaseName };

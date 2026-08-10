@@ -33,6 +33,7 @@ jobs:
           --health-retries 5
     env:
       DATABASE_URL: postgresql://vsms_test:vsms-ci-password@127.0.0.1:5432/vsms_test
+      VSMS_TEST_DATABASE_RESET_ACKNOWLEDGEMENT: I_UNDERSTAND_THIS_RESETS_A_TEST_DATABASE
       NODE_ENV: test
       LOCAL_HTTPS: "false"
       JWT_ACCESS_SECRET: ci-only-access-secret-with-at-least-thirty-two-characters
@@ -152,6 +153,7 @@ jobs:
           --health-retries 5
     env:
       DATABASE_URL: postgresql://vsms_test:vsms-ci-password@127.0.0.1:5432/vsms_test
+      VSMS_TEST_DATABASE_RESET_ACKNOWLEDGEMENT: I_UNDERSTAND_THIS_RESETS_A_TEST_DATABASE
       NODE_ENV: development
       LOCAL_HTTPS: "true"
       HOST: 127.0.0.1
