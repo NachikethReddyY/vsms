@@ -2508,7 +2508,7 @@ item:
             ]
           }
   - name: List active reusable station templates
-    description: ''
+    description: Returns active templates that can be imported as screening stations.
     event: []
     request:
       method: GET
@@ -2546,7 +2546,8 @@ item:
               "version": 1,
               "name": "",
               "description": "",
-              "defaultCapacity": 1
+              "defaultCapacity": 1,
+              "active": true
             }
           ]
       - name: 401 Response
@@ -2578,6 +2579,335 @@ item:
           method: GET
           header: []
           url: '{{baseUrl}}/events/station-templates'
+        status: Forbidden
+        code: 403
+        header:
+          - key: Content-Type
+            value: application/json
+        body: |-
+          {
+            "type": "",
+            "title": "",
+            "status": 0,
+            "code": "",
+            "requestId": "00000000-0000-4000-8000-000000000000",
+            "errors": [
+              {
+                "field": "",
+                "message": ""
+              }
+            ]
+          }
+  - name: Create a reusable station template
+    description: Administrator only. Soft-managed catalog entry for event station import.
+    event: []
+    request:
+      method: POST
+      header:
+        - key: Content-Type
+          value: application/json
+          description: JSON request body
+          type: text
+      auth:
+        type: bearer
+        bearer:
+          - key: token
+            value: '{{token}}'
+            type: string
+      url:
+        raw: '{{baseUrl}}/events/station-templates'
+        host:
+          - '{{baseUrl}}'
+        path:
+          - events
+          - station-templates
+        query: []
+      body:
+        mode: raw
+        raw: |-
+          {
+            "templateKey": "REGISTRATION",
+            "name": "",
+            "description": "",
+            "defaultCapacity": 3,
+            "active": true
+          }
+        options:
+          raw:
+            language: json
+    response:
+      - name: 201 Response
+        originalRequest:
+          method: POST
+          header:
+            - key: Content-Type
+              value: application/json
+              description: JSON request body
+              type: text
+          url: '{{baseUrl}}/events/station-templates'
+        status: Created
+        code: 201
+        header:
+          - key: Content-Type
+            value: application/json
+        body: |-
+          {
+            "stationTemplateId": "00000000-0000-4000-8000-000000000000",
+            "templateKey": "",
+            "version": 1,
+            "name": "",
+            "description": "",
+            "defaultCapacity": 1,
+            "active": true
+          }
+      - name: 401 Response
+        originalRequest:
+          method: POST
+          header:
+            - key: Content-Type
+              value: application/json
+              description: JSON request body
+              type: text
+          url: '{{baseUrl}}/events/station-templates'
+        status: Unauthorized
+        code: 401
+        header:
+          - key: Content-Type
+            value: application/json
+        body: |-
+          {
+            "type": "",
+            "title": "",
+            "status": 0,
+            "code": "",
+            "requestId": "00000000-0000-4000-8000-000000000000",
+            "errors": [
+              {
+                "field": "",
+                "message": ""
+              }
+            ]
+          }
+      - name: 403 Response
+        originalRequest:
+          method: POST
+          header:
+            - key: Content-Type
+              value: application/json
+              description: JSON request body
+              type: text
+          url: '{{baseUrl}}/events/station-templates'
+        status: Forbidden
+        code: 403
+        header:
+          - key: Content-Type
+            value: application/json
+        body: |-
+          {
+            "type": "",
+            "title": "",
+            "status": 0,
+            "code": "",
+            "requestId": "00000000-0000-4000-8000-000000000000",
+            "errors": [
+              {
+                "field": "",
+                "message": ""
+              }
+            ]
+          }
+  - name: List all station templates for administrators
+    description: Includes inactive and non-importable catalog templates.
+    event: []
+    request:
+      method: GET
+      header: []
+      auth:
+        type: bearer
+        bearer:
+          - key: token
+            value: '{{token}}'
+            type: string
+      url:
+        raw: '{{baseUrl}}/events/station-templates/library'
+        host:
+          - '{{baseUrl}}'
+        path:
+          - events
+          - station-templates
+          - library
+        query: []
+    response:
+      - name: 200 Response
+        originalRequest:
+          method: GET
+          header: []
+          url: '{{baseUrl}}/events/station-templates/library'
+        status: OK
+        code: 200
+        header:
+          - key: Content-Type
+            value: application/json
+        body: |-
+          [
+            {
+              "stationTemplateId": "00000000-0000-4000-8000-000000000000",
+              "templateKey": "",
+              "version": 1,
+              "name": "",
+              "description": "",
+              "defaultCapacity": 1,
+              "active": true
+            }
+          ]
+      - name: 401 Response
+        originalRequest:
+          method: GET
+          header: []
+          url: '{{baseUrl}}/events/station-templates/library'
+        status: Unauthorized
+        code: 401
+        header:
+          - key: Content-Type
+            value: application/json
+        body: |-
+          {
+            "type": "",
+            "title": "",
+            "status": 0,
+            "code": "",
+            "requestId": "00000000-0000-4000-8000-000000000000",
+            "errors": [
+              {
+                "field": "",
+                "message": ""
+              }
+            ]
+          }
+      - name: 403 Response
+        originalRequest:
+          method: GET
+          header: []
+          url: '{{baseUrl}}/events/station-templates/library'
+        status: Forbidden
+        code: 403
+        header:
+          - key: Content-Type
+            value: application/json
+        body: |-
+          {
+            "type": "",
+            "title": "",
+            "status": 0,
+            "code": "",
+            "requestId": "00000000-0000-4000-8000-000000000000",
+            "errors": [
+              {
+                "field": "",
+                "message": ""
+              }
+            ]
+          }
+  - name: Update or deactivate a station template
+    description: ''
+    event: []
+    request:
+      method: PATCH
+      header:
+        - key: Content-Type
+          value: application/json
+          description: JSON request body
+          type: text
+      auth:
+        type: bearer
+        bearer:
+          - key: token
+            value: '{{token}}'
+            type: string
+      url:
+        raw: '{{baseUrl}}/events/station-templates/items/{stationTemplateId}'
+        host:
+          - '{{baseUrl}}'
+        path:
+          - events
+          - station-templates
+          - items
+          - '{stationTemplateId}'
+        query: []
+      body:
+        mode: raw
+        raw: |-
+          {
+            "name": "",
+            "description": "",
+            "defaultCapacity": 1,
+            "active": true
+          }
+        options:
+          raw:
+            language: json
+    response:
+      - name: 200 Response
+        originalRequest:
+          method: PATCH
+          header:
+            - key: Content-Type
+              value: application/json
+              description: JSON request body
+              type: text
+          url: '{{baseUrl}}/events/station-templates/items/{stationTemplateId}'
+        status: OK
+        code: 200
+        header:
+          - key: Content-Type
+            value: application/json
+        body: |-
+          {
+            "stationTemplateId": "00000000-0000-4000-8000-000000000000",
+            "templateKey": "",
+            "version": 1,
+            "name": "",
+            "description": "",
+            "defaultCapacity": 1,
+            "active": true
+          }
+      - name: 401 Response
+        originalRequest:
+          method: PATCH
+          header:
+            - key: Content-Type
+              value: application/json
+              description: JSON request body
+              type: text
+          url: '{{baseUrl}}/events/station-templates/items/{stationTemplateId}'
+        status: Unauthorized
+        code: 401
+        header:
+          - key: Content-Type
+            value: application/json
+        body: |-
+          {
+            "type": "",
+            "title": "",
+            "status": 0,
+            "code": "",
+            "requestId": "00000000-0000-4000-8000-000000000000",
+            "errors": [
+              {
+                "field": "",
+                "message": ""
+              }
+            ]
+          }
+      - name: 403 Response
+        originalRequest:
+          method: PATCH
+          header:
+            - key: Content-Type
+              value: application/json
+              description: JSON request body
+              type: text
+          url: '{{baseUrl}}/events/station-templates/items/{stationTemplateId}'
         status: Forbidden
         code: 403
         header:
@@ -8739,6 +9069,295 @@ item:
               }
             ]
           }
+  - name: Evaluate an eye-health result without saving it
+    description: ''
+    event: []
+    request:
+      method: POST
+      header:
+        - key: Content-Type
+          value: application/json
+          description: JSON request body
+          type: text
+      auth:
+        type: bearer
+        bearer:
+          - key: token
+            value: '{{token}}'
+            type: string
+      url:
+        raw: '{{baseUrl}}/events/{eventId}/stations/{stationId}/eye-health/preview'
+        host:
+          - '{{baseUrl}}'
+        path:
+          - events
+          - '{eventId}'
+          - stations
+          - '{stationId}'
+          - eye-health
+          - preview
+        query: []
+      body:
+        mode: raw
+        raw: |-
+          {
+            "resultData": {
+              "cataractRisk": "NONE",
+              "glaucomaRisk": {},
+              "symptomsNoted": true,
+              "symptomSummary": "",
+              "observations": "",
+              "deviceFindings": ""
+            }
+          }
+        options:
+          raw:
+            language: json
+    response:
+      - name: 200 Response
+        originalRequest:
+          method: POST
+          header:
+            - key: Content-Type
+              value: application/json
+              description: JSON request body
+              type: text
+          url: '{{baseUrl}}/events/{eventId}/stations/{stationId}/eye-health/preview'
+        status: OK
+        code: 200
+        header:
+          - key: Content-Type
+            value: application/json
+        body: |-
+          {
+            "ruleVersion": "",
+            "overallFlag": "NORMAL",
+            "isFlagged": true,
+            "flagSummary": "",
+            "reasons": [
+              {
+                "flag": {},
+                "reason": ""
+              }
+            ]
+          }
+      - name: 401 Response
+        originalRequest:
+          method: POST
+          header:
+            - key: Content-Type
+              value: application/json
+              description: JSON request body
+              type: text
+          url: '{{baseUrl}}/events/{eventId}/stations/{stationId}/eye-health/preview'
+        status: Unauthorized
+        code: 401
+        header:
+          - key: Content-Type
+            value: application/json
+        body: |-
+          {
+            "type": "",
+            "title": "",
+            "status": 0,
+            "code": "",
+            "requestId": "00000000-0000-4000-8000-000000000000",
+            "errors": [
+              {
+                "field": "",
+                "message": ""
+              }
+            ]
+          }
+      - name: 403 Response
+        originalRequest:
+          method: POST
+          header:
+            - key: Content-Type
+              value: application/json
+              description: JSON request body
+              type: text
+          url: '{{baseUrl}}/events/{eventId}/stations/{stationId}/eye-health/preview'
+        status: Forbidden
+        code: 403
+        header:
+          - key: Content-Type
+            value: application/json
+        body: |-
+          {
+            "type": "",
+            "title": "",
+            "status": 0,
+            "code": "",
+            "requestId": "00000000-0000-4000-8000-000000000000",
+            "errors": [
+              {
+                "field": "",
+                "message": ""
+              }
+            ]
+          }
+  - name: Save or idempotently replay an eye-health result
+    description: ''
+    event: []
+    request:
+      method: POST
+      header:
+        - key: Content-Type
+          value: application/json
+          description: JSON request body
+          type: text
+      auth:
+        type: bearer
+        bearer:
+          - key: token
+            value: '{{token}}'
+            type: string
+      url:
+        raw: '{{baseUrl}}/events/{eventId}/stations/{stationId}/eye-health'
+        host:
+          - '{{baseUrl}}'
+        path:
+          - events
+          - '{eventId}'
+          - stations
+          - '{stationId}'
+          - eye-health
+        query: []
+      body:
+        mode: raw
+        raw: |-
+          {
+            "registrationId": "00000000-0000-4000-8000-000000000000",
+            "idempotencyKey": "",
+            "acknowledged": true,
+            "resultData": {
+              "cataractRisk": "NONE",
+              "glaucomaRisk": {},
+              "symptomsNoted": true,
+              "symptomSummary": "",
+              "observations": "",
+              "deviceFindings": ""
+            }
+          }
+        options:
+          raw:
+            language: json
+    response:
+      - name: 200 Response
+        originalRequest:
+          method: POST
+          header:
+            - key: Content-Type
+              value: application/json
+              description: JSON request body
+              type: text
+          url: '{{baseUrl}}/events/{eventId}/stations/{stationId}/eye-health'
+        status: OK
+        code: 200
+        header:
+          - key: Content-Type
+            value: application/json
+        body: |-
+          {
+            "resultId": "00000000-0000-4000-8000-000000000000",
+            "registrationId": "00000000-0000-4000-8000-000000000000",
+            "stationId": "00000000-0000-4000-8000-000000000000",
+            "screeningType": "",
+            "resultData": {},
+            "overallFlag": "NORMAL",
+            "isFlagged": true,
+            "flagSummary": "",
+            "ruleVersion": "",
+            "acknowledgedAt": "2026-08-07T00:00:00.000Z",
+            "idempotencyKey": "",
+            "version": 1,
+            "evaluation": {
+              "ruleVersion": "",
+              "overallFlag": {},
+              "isFlagged": true,
+              "flagSummary": "",
+              "reasons": [
+                {
+                  "flag": {},
+                  "reason": ""
+                }
+              ]
+            },
+            "createdAt": "2026-08-07T00:00:00.000Z",
+            "updatedAt": "2026-08-07T00:00:00.000Z"
+          }
+      - name: 201 Response
+        originalRequest:
+          method: POST
+          header:
+            - key: Content-Type
+              value: application/json
+              description: JSON request body
+              type: text
+          url: '{{baseUrl}}/events/{eventId}/stations/{stationId}/eye-health'
+        status: Created
+        code: 201
+        header:
+          - key: Content-Type
+            value: application/json
+        body: |-
+          {
+            "resultId": "00000000-0000-4000-8000-000000000000",
+            "registrationId": "00000000-0000-4000-8000-000000000000",
+            "stationId": "00000000-0000-4000-8000-000000000000",
+            "screeningType": "",
+            "resultData": {},
+            "overallFlag": "NORMAL",
+            "isFlagged": true,
+            "flagSummary": "",
+            "ruleVersion": "",
+            "acknowledgedAt": "2026-08-07T00:00:00.000Z",
+            "idempotencyKey": "",
+            "version": 1,
+            "evaluation": {
+              "ruleVersion": "",
+              "overallFlag": {},
+              "isFlagged": true,
+              "flagSummary": "",
+              "reasons": [
+                {
+                  "flag": {},
+                  "reason": ""
+                }
+              ]
+            },
+            "createdAt": "2026-08-07T00:00:00.000Z",
+            "updatedAt": "2026-08-07T00:00:00.000Z"
+          }
+      - name: 401 Response
+        originalRequest:
+          method: POST
+          header:
+            - key: Content-Type
+              value: application/json
+              description: JSON request body
+              type: text
+          url: '{{baseUrl}}/events/{eventId}/stations/{stationId}/eye-health'
+        status: Unauthorized
+        code: 401
+        header:
+          - key: Content-Type
+            value: application/json
+        body: |-
+          {
+            "type": "",
+            "title": "",
+            "status": 0,
+            "code": "",
+            "requestId": "00000000-0000-4000-8000-000000000000",
+            "errors": [
+              {
+                "field": "",
+                "message": ""
+              }
+            ]
+          }
   - name: List registrations currently actionable by an assigned reviewer
     description: ''
     event: []
@@ -8927,6 +9546,14 @@ item:
               "urgency": "ROUTINE",
               "clinicalSummary": "",
               "recommendations": "",
+              "eyeHealthObservations": {
+                "cataractRisk": "NONE",
+                "glaucomaRisk": {},
+                "symptomsNoted": true,
+                "symptomSummary": "",
+                "observations": "",
+                "deviceFindings": ""
+              },
               "reviewedAt": "2026-08-07T00:00:00.000Z",
               "reviewedByName": "",
               "signatureSignerName": "",
@@ -9046,6 +9673,14 @@ item:
             "confirmed": true,
             "clinicalSummary": "",
             "recommendations": "",
+            "eyeHealthObservations": {
+              "cataractRisk": "NONE",
+              "glaucomaRisk": {},
+              "symptomsNoted": true,
+              "symptomSummary": "",
+              "observations": "",
+              "deviceFindings": ""
+            },
             "signatureObjectKey": "",
             "signatureSha256": "",
             "signatureMimeType": "image/png"
@@ -9078,6 +9713,14 @@ item:
               "urgency": "ROUTINE",
               "clinicalSummary": "",
               "recommendations": "",
+              "eyeHealthObservations": {
+                "cataractRisk": "NONE",
+                "glaucomaRisk": {},
+                "symptomsNoted": true,
+                "symptomSummary": "",
+                "observations": "",
+                "deviceFindings": ""
+              },
               "signatureSignerName": "",
               "signatureSha256": "",
               "signedPayloadHash": "",

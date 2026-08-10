@@ -1973,7 +1973,7 @@
     },
     {
       "name": "List active reusable station templates",
-      "description": "",
+      "description": "Returns active templates that can be imported as screening stations.",
       "event": [],
       "request": {
         "method": "GET",
@@ -2016,7 +2016,7 @@
               "value": "application/json"
             }
           ],
-          "body": "[\n  {\n    \"stationTemplateId\": \"00000000-0000-4000-8000-000000000000\",\n    \"templateKey\": \"\",\n    \"version\": 1,\n    \"name\": \"\",\n    \"description\": \"\",\n    \"defaultCapacity\": 1\n  }\n]"
+          "body": "[\n  {\n    \"stationTemplateId\": \"00000000-0000-4000-8000-000000000000\",\n    \"templateKey\": \"\",\n    \"version\": 1,\n    \"name\": \"\",\n    \"description\": \"\",\n    \"defaultCapacity\": 1,\n    \"active\": true\n  }\n]"
         },
         {
           "name": "401 Response",
@@ -2041,6 +2041,332 @@
             "method": "GET",
             "header": [],
             "url": "{{baseUrl}}/events/station-templates"
+          },
+          "status": "Forbidden",
+          "code": 403,
+          "header": [
+            {
+              "key": "Content-Type",
+              "value": "application/json"
+            }
+          ],
+          "body": "{\n  \"type\": \"\",\n  \"title\": \"\",\n  \"status\": 0,\n  \"code\": \"\",\n  \"requestId\": \"00000000-0000-4000-8000-000000000000\",\n  \"errors\": [\n    {\n      \"field\": \"\",\n      \"message\": \"\"\n    }\n  ]\n}"
+        }
+      ]
+    },
+    {
+      "name": "Create a reusable station template",
+      "description": "Administrator only. Soft-managed catalog entry for event station import.",
+      "event": [],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json",
+            "description": "JSON request body",
+            "type": "text"
+          }
+        ],
+        "auth": {
+          "type": "bearer",
+          "bearer": [
+            {
+              "key": "token",
+              "value": "{{token}}",
+              "type": "string"
+            }
+          ]
+        },
+        "url": {
+          "raw": "{{baseUrl}}/events/station-templates",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "events",
+            "station-templates"
+          ],
+          "query": []
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"templateKey\": \"REGISTRATION\",\n  \"name\": \"\",\n  \"description\": \"\",\n  \"defaultCapacity\": 3,\n  \"active\": true\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "response": [
+        {
+          "name": "201 Response",
+          "originalRequest": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "description": "JSON request body",
+                "type": "text"
+              }
+            ],
+            "url": "{{baseUrl}}/events/station-templates"
+          },
+          "status": "Created",
+          "code": 201,
+          "header": [
+            {
+              "key": "Content-Type",
+              "value": "application/json"
+            }
+          ],
+          "body": "{\n  \"stationTemplateId\": \"00000000-0000-4000-8000-000000000000\",\n  \"templateKey\": \"\",\n  \"version\": 1,\n  \"name\": \"\",\n  \"description\": \"\",\n  \"defaultCapacity\": 1,\n  \"active\": true\n}"
+        },
+        {
+          "name": "401 Response",
+          "originalRequest": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "description": "JSON request body",
+                "type": "text"
+              }
+            ],
+            "url": "{{baseUrl}}/events/station-templates"
+          },
+          "status": "Unauthorized",
+          "code": 401,
+          "header": [
+            {
+              "key": "Content-Type",
+              "value": "application/json"
+            }
+          ],
+          "body": "{\n  \"type\": \"\",\n  \"title\": \"\",\n  \"status\": 0,\n  \"code\": \"\",\n  \"requestId\": \"00000000-0000-4000-8000-000000000000\",\n  \"errors\": [\n    {\n      \"field\": \"\",\n      \"message\": \"\"\n    }\n  ]\n}"
+        },
+        {
+          "name": "403 Response",
+          "originalRequest": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "description": "JSON request body",
+                "type": "text"
+              }
+            ],
+            "url": "{{baseUrl}}/events/station-templates"
+          },
+          "status": "Forbidden",
+          "code": 403,
+          "header": [
+            {
+              "key": "Content-Type",
+              "value": "application/json"
+            }
+          ],
+          "body": "{\n  \"type\": \"\",\n  \"title\": \"\",\n  \"status\": 0,\n  \"code\": \"\",\n  \"requestId\": \"00000000-0000-4000-8000-000000000000\",\n  \"errors\": [\n    {\n      \"field\": \"\",\n      \"message\": \"\"\n    }\n  ]\n}"
+        }
+      ]
+    },
+    {
+      "name": "List all station templates for administrators",
+      "description": "Includes inactive and non-importable catalog templates.",
+      "event": [],
+      "request": {
+        "method": "GET",
+        "header": [],
+        "auth": {
+          "type": "bearer",
+          "bearer": [
+            {
+              "key": "token",
+              "value": "{{token}}",
+              "type": "string"
+            }
+          ]
+        },
+        "url": {
+          "raw": "{{baseUrl}}/events/station-templates/library",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "events",
+            "station-templates",
+            "library"
+          ],
+          "query": []
+        }
+      },
+      "response": [
+        {
+          "name": "200 Response",
+          "originalRequest": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/events/station-templates/library"
+          },
+          "status": "OK",
+          "code": 200,
+          "header": [
+            {
+              "key": "Content-Type",
+              "value": "application/json"
+            }
+          ],
+          "body": "[\n  {\n    \"stationTemplateId\": \"00000000-0000-4000-8000-000000000000\",\n    \"templateKey\": \"\",\n    \"version\": 1,\n    \"name\": \"\",\n    \"description\": \"\",\n    \"defaultCapacity\": 1,\n    \"active\": true\n  }\n]"
+        },
+        {
+          "name": "401 Response",
+          "originalRequest": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/events/station-templates/library"
+          },
+          "status": "Unauthorized",
+          "code": 401,
+          "header": [
+            {
+              "key": "Content-Type",
+              "value": "application/json"
+            }
+          ],
+          "body": "{\n  \"type\": \"\",\n  \"title\": \"\",\n  \"status\": 0,\n  \"code\": \"\",\n  \"requestId\": \"00000000-0000-4000-8000-000000000000\",\n  \"errors\": [\n    {\n      \"field\": \"\",\n      \"message\": \"\"\n    }\n  ]\n}"
+        },
+        {
+          "name": "403 Response",
+          "originalRequest": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/events/station-templates/library"
+          },
+          "status": "Forbidden",
+          "code": 403,
+          "header": [
+            {
+              "key": "Content-Type",
+              "value": "application/json"
+            }
+          ],
+          "body": "{\n  \"type\": \"\",\n  \"title\": \"\",\n  \"status\": 0,\n  \"code\": \"\",\n  \"requestId\": \"00000000-0000-4000-8000-000000000000\",\n  \"errors\": [\n    {\n      \"field\": \"\",\n      \"message\": \"\"\n    }\n  ]\n}"
+        }
+      ]
+    },
+    {
+      "name": "Update or deactivate a station template",
+      "description": "",
+      "event": [],
+      "request": {
+        "method": "PATCH",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json",
+            "description": "JSON request body",
+            "type": "text"
+          }
+        ],
+        "auth": {
+          "type": "bearer",
+          "bearer": [
+            {
+              "key": "token",
+              "value": "{{token}}",
+              "type": "string"
+            }
+          ]
+        },
+        "url": {
+          "raw": "{{baseUrl}}/events/station-templates/items/{stationTemplateId}",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "events",
+            "station-templates",
+            "items",
+            "{stationTemplateId}"
+          ],
+          "query": []
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"name\": \"\",\n  \"description\": \"\",\n  \"defaultCapacity\": 1,\n  \"active\": true\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "response": [
+        {
+          "name": "200 Response",
+          "originalRequest": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "description": "JSON request body",
+                "type": "text"
+              }
+            ],
+            "url": "{{baseUrl}}/events/station-templates/items/{stationTemplateId}"
+          },
+          "status": "OK",
+          "code": 200,
+          "header": [
+            {
+              "key": "Content-Type",
+              "value": "application/json"
+            }
+          ],
+          "body": "{\n  \"stationTemplateId\": \"00000000-0000-4000-8000-000000000000\",\n  \"templateKey\": \"\",\n  \"version\": 1,\n  \"name\": \"\",\n  \"description\": \"\",\n  \"defaultCapacity\": 1,\n  \"active\": true\n}"
+        },
+        {
+          "name": "401 Response",
+          "originalRequest": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "description": "JSON request body",
+                "type": "text"
+              }
+            ],
+            "url": "{{baseUrl}}/events/station-templates/items/{stationTemplateId}"
+          },
+          "status": "Unauthorized",
+          "code": 401,
+          "header": [
+            {
+              "key": "Content-Type",
+              "value": "application/json"
+            }
+          ],
+          "body": "{\n  \"type\": \"\",\n  \"title\": \"\",\n  \"status\": 0,\n  \"code\": \"\",\n  \"requestId\": \"00000000-0000-4000-8000-000000000000\",\n  \"errors\": [\n    {\n      \"field\": \"\",\n      \"message\": \"\"\n    }\n  ]\n}"
+        },
+        {
+          "name": "403 Response",
+          "originalRequest": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "description": "JSON request body",
+                "type": "text"
+              }
+            ],
+            "url": "{{baseUrl}}/events/station-templates/items/{stationTemplateId}"
           },
           "status": "Forbidden",
           "code": 403,
@@ -6421,6 +6747,253 @@
       ]
     },
     {
+      "name": "Evaluate an eye-health result without saving it",
+      "description": "",
+      "event": [],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json",
+            "description": "JSON request body",
+            "type": "text"
+          }
+        ],
+        "auth": {
+          "type": "bearer",
+          "bearer": [
+            {
+              "key": "token",
+              "value": "{{token}}",
+              "type": "string"
+            }
+          ]
+        },
+        "url": {
+          "raw": "{{baseUrl}}/events/{eventId}/stations/{stationId}/eye-health/preview",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "events",
+            "{eventId}",
+            "stations",
+            "{stationId}",
+            "eye-health",
+            "preview"
+          ],
+          "query": []
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"resultData\": {\n    \"cataractRisk\": \"NONE\",\n    \"glaucomaRisk\": {},\n    \"symptomsNoted\": true,\n    \"symptomSummary\": \"\",\n    \"observations\": \"\",\n    \"deviceFindings\": \"\"\n  }\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "response": [
+        {
+          "name": "200 Response",
+          "originalRequest": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "description": "JSON request body",
+                "type": "text"
+              }
+            ],
+            "url": "{{baseUrl}}/events/{eventId}/stations/{stationId}/eye-health/preview"
+          },
+          "status": "OK",
+          "code": 200,
+          "header": [
+            {
+              "key": "Content-Type",
+              "value": "application/json"
+            }
+          ],
+          "body": "{\n  \"ruleVersion\": \"\",\n  \"overallFlag\": \"NORMAL\",\n  \"isFlagged\": true,\n  \"flagSummary\": \"\",\n  \"reasons\": [\n    {\n      \"flag\": {},\n      \"reason\": \"\"\n    }\n  ]\n}"
+        },
+        {
+          "name": "401 Response",
+          "originalRequest": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "description": "JSON request body",
+                "type": "text"
+              }
+            ],
+            "url": "{{baseUrl}}/events/{eventId}/stations/{stationId}/eye-health/preview"
+          },
+          "status": "Unauthorized",
+          "code": 401,
+          "header": [
+            {
+              "key": "Content-Type",
+              "value": "application/json"
+            }
+          ],
+          "body": "{\n  \"type\": \"\",\n  \"title\": \"\",\n  \"status\": 0,\n  \"code\": \"\",\n  \"requestId\": \"00000000-0000-4000-8000-000000000000\",\n  \"errors\": [\n    {\n      \"field\": \"\",\n      \"message\": \"\"\n    }\n  ]\n}"
+        },
+        {
+          "name": "403 Response",
+          "originalRequest": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "description": "JSON request body",
+                "type": "text"
+              }
+            ],
+            "url": "{{baseUrl}}/events/{eventId}/stations/{stationId}/eye-health/preview"
+          },
+          "status": "Forbidden",
+          "code": 403,
+          "header": [
+            {
+              "key": "Content-Type",
+              "value": "application/json"
+            }
+          ],
+          "body": "{\n  \"type\": \"\",\n  \"title\": \"\",\n  \"status\": 0,\n  \"code\": \"\",\n  \"requestId\": \"00000000-0000-4000-8000-000000000000\",\n  \"errors\": [\n    {\n      \"field\": \"\",\n      \"message\": \"\"\n    }\n  ]\n}"
+        }
+      ]
+    },
+    {
+      "name": "Save or idempotently replay an eye-health result",
+      "description": "",
+      "event": [],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json",
+            "description": "JSON request body",
+            "type": "text"
+          }
+        ],
+        "auth": {
+          "type": "bearer",
+          "bearer": [
+            {
+              "key": "token",
+              "value": "{{token}}",
+              "type": "string"
+            }
+          ]
+        },
+        "url": {
+          "raw": "{{baseUrl}}/events/{eventId}/stations/{stationId}/eye-health",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "events",
+            "{eventId}",
+            "stations",
+            "{stationId}",
+            "eye-health"
+          ],
+          "query": []
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"registrationId\": \"00000000-0000-4000-8000-000000000000\",\n  \"idempotencyKey\": \"\",\n  \"acknowledged\": true,\n  \"resultData\": {\n    \"cataractRisk\": \"NONE\",\n    \"glaucomaRisk\": {},\n    \"symptomsNoted\": true,\n    \"symptomSummary\": \"\",\n    \"observations\": \"\",\n    \"deviceFindings\": \"\"\n  }\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "response": [
+        {
+          "name": "200 Response",
+          "originalRequest": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "description": "JSON request body",
+                "type": "text"
+              }
+            ],
+            "url": "{{baseUrl}}/events/{eventId}/stations/{stationId}/eye-health"
+          },
+          "status": "OK",
+          "code": 200,
+          "header": [
+            {
+              "key": "Content-Type",
+              "value": "application/json"
+            }
+          ],
+          "body": "{\n  \"resultId\": \"00000000-0000-4000-8000-000000000000\",\n  \"registrationId\": \"00000000-0000-4000-8000-000000000000\",\n  \"stationId\": \"00000000-0000-4000-8000-000000000000\",\n  \"screeningType\": \"\",\n  \"resultData\": {},\n  \"overallFlag\": \"NORMAL\",\n  \"isFlagged\": true,\n  \"flagSummary\": \"\",\n  \"ruleVersion\": \"\",\n  \"acknowledgedAt\": \"2026-08-07T00:00:00.000Z\",\n  \"idempotencyKey\": \"\",\n  \"version\": 1,\n  \"evaluation\": {\n    \"ruleVersion\": \"\",\n    \"overallFlag\": {},\n    \"isFlagged\": true,\n    \"flagSummary\": \"\",\n    \"reasons\": [\n      {\n        \"flag\": {},\n        \"reason\": \"\"\n      }\n    ]\n  },\n  \"createdAt\": \"2026-08-07T00:00:00.000Z\",\n  \"updatedAt\": \"2026-08-07T00:00:00.000Z\"\n}"
+        },
+        {
+          "name": "201 Response",
+          "originalRequest": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "description": "JSON request body",
+                "type": "text"
+              }
+            ],
+            "url": "{{baseUrl}}/events/{eventId}/stations/{stationId}/eye-health"
+          },
+          "status": "Created",
+          "code": 201,
+          "header": [
+            {
+              "key": "Content-Type",
+              "value": "application/json"
+            }
+          ],
+          "body": "{\n  \"resultId\": \"00000000-0000-4000-8000-000000000000\",\n  \"registrationId\": \"00000000-0000-4000-8000-000000000000\",\n  \"stationId\": \"00000000-0000-4000-8000-000000000000\",\n  \"screeningType\": \"\",\n  \"resultData\": {},\n  \"overallFlag\": \"NORMAL\",\n  \"isFlagged\": true,\n  \"flagSummary\": \"\",\n  \"ruleVersion\": \"\",\n  \"acknowledgedAt\": \"2026-08-07T00:00:00.000Z\",\n  \"idempotencyKey\": \"\",\n  \"version\": 1,\n  \"evaluation\": {\n    \"ruleVersion\": \"\",\n    \"overallFlag\": {},\n    \"isFlagged\": true,\n    \"flagSummary\": \"\",\n    \"reasons\": [\n      {\n        \"flag\": {},\n        \"reason\": \"\"\n      }\n    ]\n  },\n  \"createdAt\": \"2026-08-07T00:00:00.000Z\",\n  \"updatedAt\": \"2026-08-07T00:00:00.000Z\"\n}"
+        },
+        {
+          "name": "401 Response",
+          "originalRequest": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "description": "JSON request body",
+                "type": "text"
+              }
+            ],
+            "url": "{{baseUrl}}/events/{eventId}/stations/{stationId}/eye-health"
+          },
+          "status": "Unauthorized",
+          "code": 401,
+          "header": [
+            {
+              "key": "Content-Type",
+              "value": "application/json"
+            }
+          ],
+          "body": "{\n  \"type\": \"\",\n  \"title\": \"\",\n  \"status\": 0,\n  \"code\": \"\",\n  \"requestId\": \"00000000-0000-4000-8000-000000000000\",\n  \"errors\": [\n    {\n      \"field\": \"\",\n      \"message\": \"\"\n    }\n  ]\n}"
+        }
+      ]
+    },
+    {
       "name": "List registrations currently actionable by an assigned reviewer",
       "description": "",
       "event": [],
@@ -6551,7 +7124,7 @@
               "value": "application/json"
             }
           ],
-          "body": "{\n  \"event\": {\n    \"eventId\": \"00000000-0000-4000-8000-000000000000\",\n    \"name\": \"\",\n    \"venue\": \"\",\n    \"timezone\": \"\",\n    \"status\": \"IN_PROGRESS\"\n  },\n  \"participant\": {\n    \"registrationId\": \"00000000-0000-4000-8000-000000000000\",\n    \"participantDisplayName\": \"\",\n    \"queueNumber\": 0,\n    \"registrationStatus\": \"SIGNED_UP\",\n    \"maskedNric\": \"\",\n    \"dateOfBirth\": \"2026-08-07\",\n    \"gender\": \"\"\n  },\n  \"stations\": [\n    {\n      \"stationId\": \"00000000-0000-4000-8000-000000000000\",\n      \"stationName\": \"\",\n      \"stationType\": \"VISUAL_ACUITY\",\n      \"stationOrder\": 1,\n      \"result\": {\n        \"resultId\": \"00000000-0000-4000-8000-000000000000\",\n        \"stationId\": \"00000000-0000-4000-8000-000000000000\",\n        \"screeningType\": \"VISUAL_ACUITY\",\n        \"resultData\": {},\n        \"overallFlag\": \"NORMAL\",\n        \"isFlagged\": true,\n        \"flagSummary\": \"\",\n        \"ruleVersion\": \"\",\n        \"createdAt\": \"2026-08-07T00:00:00.000Z\",\n        \"updatedAt\": \"2026-08-07T00:00:00.000Z\"\n      }\n    }\n  ],\n  \"readiness\": {\n    \"ready\": true,\n    \"readyReason\": \"SCREENING_COMPLETE\",\n    \"completedStationCount\": 0,\n    \"totalStationCount\": 0,\n    \"highestFlag\": {}\n  },\n  \"existingReview\": {\n    \"reviewId\": \"00000000-0000-4000-8000-000000000000\",\n    \"version\": 1,\n    \"outcome\": \"COMPLETE\",\n    \"urgency\": \"ROUTINE\",\n    \"clinicalSummary\": \"\",\n    \"recommendations\": \"\",\n    \"reviewedAt\": \"2026-08-07T00:00:00.000Z\",\n    \"reviewedByName\": \"\",\n    \"signatureSignerName\": \"\",\n    \"signatureSha256\": \"\",\n    \"signedPayloadHash\": \"\",\n    \"signedAt\": \"2026-08-07T00:00:00.000Z\",\n    \"referral\": {\n      \"referralId\": \"00000000-0000-4000-8000-000000000000\",\n      \"revisionNumber\": 1,\n      \"supersedesReferralId\": \"00000000-0000-4000-8000-000000000000\",\n      \"destinationName\": \"\",\n      \"reason\": \"\",\n      \"instructions\": \"\",\n      \"urgency\": {},\n      \"status\": \"DRAFT\",\n      \"signedAt\": \"2026-08-07T00:00:00.000Z\",\n      \"document\": {\n        \"documentId\": \"00000000-0000-4000-8000-000000000000\",\n        \"version\": 1,\n        \"generatedAt\": \"2026-08-07T00:00:00.000Z\"\n      },\n      \"delivery\": {\n        \"deliveryId\": \"00000000-0000-4000-8000-000000000000\",\n        \"status\": \"QUEUED\",\n        \"recipient\": \"\",\n        \"providerMessageId\": \"\",\n        \"attemptCount\": 0,\n        \"failureReason\": \"\",\n        \"sentAt\": \"2026-08-07T00:00:00.000Z\",\n        \"deliveredAt\": \"2026-08-07T00:00:00.000Z\"\n      }\n    }\n  },\n  \"contextVersion\": \"\"\n}"
+          "body": "{\n  \"event\": {\n    \"eventId\": \"00000000-0000-4000-8000-000000000000\",\n    \"name\": \"\",\n    \"venue\": \"\",\n    \"timezone\": \"\",\n    \"status\": \"IN_PROGRESS\"\n  },\n  \"participant\": {\n    \"registrationId\": \"00000000-0000-4000-8000-000000000000\",\n    \"participantDisplayName\": \"\",\n    \"queueNumber\": 0,\n    \"registrationStatus\": \"SIGNED_UP\",\n    \"maskedNric\": \"\",\n    \"dateOfBirth\": \"2026-08-07\",\n    \"gender\": \"\"\n  },\n  \"stations\": [\n    {\n      \"stationId\": \"00000000-0000-4000-8000-000000000000\",\n      \"stationName\": \"\",\n      \"stationType\": \"VISUAL_ACUITY\",\n      \"stationOrder\": 1,\n      \"result\": {\n        \"resultId\": \"00000000-0000-4000-8000-000000000000\",\n        \"stationId\": \"00000000-0000-4000-8000-000000000000\",\n        \"screeningType\": \"VISUAL_ACUITY\",\n        \"resultData\": {},\n        \"overallFlag\": \"NORMAL\",\n        \"isFlagged\": true,\n        \"flagSummary\": \"\",\n        \"ruleVersion\": \"\",\n        \"createdAt\": \"2026-08-07T00:00:00.000Z\",\n        \"updatedAt\": \"2026-08-07T00:00:00.000Z\"\n      }\n    }\n  ],\n  \"readiness\": {\n    \"ready\": true,\n    \"readyReason\": \"SCREENING_COMPLETE\",\n    \"completedStationCount\": 0,\n    \"totalStationCount\": 0,\n    \"highestFlag\": {}\n  },\n  \"existingReview\": {\n    \"reviewId\": \"00000000-0000-4000-8000-000000000000\",\n    \"version\": 1,\n    \"outcome\": \"COMPLETE\",\n    \"urgency\": \"ROUTINE\",\n    \"clinicalSummary\": \"\",\n    \"recommendations\": \"\",\n    \"eyeHealthObservations\": {\n      \"cataractRisk\": \"NONE\",\n      \"glaucomaRisk\": {},\n      \"symptomsNoted\": true,\n      \"symptomSummary\": \"\",\n      \"observations\": \"\",\n      \"deviceFindings\": \"\"\n    },\n    \"reviewedAt\": \"2026-08-07T00:00:00.000Z\",\n    \"reviewedByName\": \"\",\n    \"signatureSignerName\": \"\",\n    \"signatureSha256\": \"\",\n    \"signedPayloadHash\": \"\",\n    \"signedAt\": \"2026-08-07T00:00:00.000Z\",\n    \"referral\": {\n      \"referralId\": \"00000000-0000-4000-8000-000000000000\",\n      \"revisionNumber\": 1,\n      \"supersedesReferralId\": \"00000000-0000-4000-8000-000000000000\",\n      \"destinationName\": \"\",\n      \"reason\": \"\",\n      \"instructions\": \"\",\n      \"urgency\": {},\n      \"status\": \"DRAFT\",\n      \"signedAt\": \"2026-08-07T00:00:00.000Z\",\n      \"document\": {\n        \"documentId\": \"00000000-0000-4000-8000-000000000000\",\n        \"version\": 1,\n        \"generatedAt\": \"2026-08-07T00:00:00.000Z\"\n      },\n      \"delivery\": {\n        \"deliveryId\": \"00000000-0000-4000-8000-000000000000\",\n        \"status\": \"QUEUED\",\n        \"recipient\": \"\",\n        \"providerMessageId\": \"\",\n        \"attemptCount\": 0,\n        \"failureReason\": \"\",\n        \"sentAt\": \"2026-08-07T00:00:00.000Z\",\n        \"deliveredAt\": \"2026-08-07T00:00:00.000Z\"\n      }\n    }\n  },\n  \"contextVersion\": \"\"\n}"
         },
         {
           "name": "401 Response",
@@ -6629,7 +7202,7 @@
         },
         "body": {
           "mode": "raw",
-          "raw": "{\n  \"outcome\": \"COMPLETE\",\n  \"contextVersion\": \"\",\n  \"confirmed\": true,\n  \"clinicalSummary\": \"\",\n  \"recommendations\": \"\",\n  \"signatureObjectKey\": \"\",\n  \"signatureSha256\": \"\",\n  \"signatureMimeType\": \"image/png\"\n}",
+          "raw": "{\n  \"outcome\": \"COMPLETE\",\n  \"contextVersion\": \"\",\n  \"confirmed\": true,\n  \"clinicalSummary\": \"\",\n  \"recommendations\": \"\",\n  \"eyeHealthObservations\": {\n    \"cataractRisk\": \"NONE\",\n    \"glaucomaRisk\": {},\n    \"symptomsNoted\": true,\n    \"symptomSummary\": \"\",\n    \"observations\": \"\",\n    \"deviceFindings\": \"\"\n  },\n  \"signatureObjectKey\": \"\",\n  \"signatureSha256\": \"\",\n  \"signatureMimeType\": \"image/png\"\n}",
           "options": {
             "raw": {
               "language": "json"
@@ -6660,7 +7233,7 @@
               "value": "application/json"
             }
           ],
-          "body": "{\n  \"registrationStatus\": \"COMPLETED\",\n  \"review\": {\n    \"reviewId\": \"00000000-0000-4000-8000-000000000000\",\n    \"version\": 1,\n    \"outcome\": \"COMPLETE\",\n    \"urgency\": \"ROUTINE\",\n    \"clinicalSummary\": \"\",\n    \"recommendations\": \"\",\n    \"signatureSignerName\": \"\",\n    \"signatureSha256\": \"\",\n    \"signedPayloadHash\": \"\",\n    \"signedAt\": \"2026-08-07T00:00:00.000Z\",\n    \"reviewedAt\": \"2026-08-07T00:00:00.000Z\"\n  },\n  \"referral\": {\n    \"referralId\": \"00000000-0000-4000-8000-000000000000\",\n    \"revisionNumber\": 1,\n    \"supersedesReferralId\": \"00000000-0000-4000-8000-000000000000\",\n    \"destinationName\": \"\",\n    \"reason\": \"\",\n    \"instructions\": \"\",\n    \"urgency\": {},\n    \"status\": \"DRAFT\",\n    \"signedAt\": \"2026-08-07T00:00:00.000Z\",\n    \"document\": {\n      \"documentId\": \"00000000-0000-4000-8000-000000000000\",\n      \"version\": 1,\n      \"generatedAt\": \"2026-08-07T00:00:00.000Z\"\n    },\n    \"delivery\": {\n      \"deliveryId\": \"00000000-0000-4000-8000-000000000000\",\n      \"status\": \"QUEUED\",\n      \"recipient\": \"\",\n      \"providerMessageId\": \"\",\n      \"attemptCount\": 0,\n      \"failureReason\": \"\",\n      \"sentAt\": \"2026-08-07T00:00:00.000Z\",\n      \"deliveredAt\": \"2026-08-07T00:00:00.000Z\"\n    }\n  }\n}"
+          "body": "{\n  \"registrationStatus\": \"COMPLETED\",\n  \"review\": {\n    \"reviewId\": \"00000000-0000-4000-8000-000000000000\",\n    \"version\": 1,\n    \"outcome\": \"COMPLETE\",\n    \"urgency\": \"ROUTINE\",\n    \"clinicalSummary\": \"\",\n    \"recommendations\": \"\",\n    \"eyeHealthObservations\": {\n      \"cataractRisk\": \"NONE\",\n      \"glaucomaRisk\": {},\n      \"symptomsNoted\": true,\n      \"symptomSummary\": \"\",\n      \"observations\": \"\",\n      \"deviceFindings\": \"\"\n    },\n    \"signatureSignerName\": \"\",\n    \"signatureSha256\": \"\",\n    \"signedPayloadHash\": \"\",\n    \"signedAt\": \"2026-08-07T00:00:00.000Z\",\n    \"reviewedAt\": \"2026-08-07T00:00:00.000Z\"\n  },\n  \"referral\": {\n    \"referralId\": \"00000000-0000-4000-8000-000000000000\",\n    \"revisionNumber\": 1,\n    \"supersedesReferralId\": \"00000000-0000-4000-8000-000000000000\",\n    \"destinationName\": \"\",\n    \"reason\": \"\",\n    \"instructions\": \"\",\n    \"urgency\": {},\n    \"status\": \"DRAFT\",\n    \"signedAt\": \"2026-08-07T00:00:00.000Z\",\n    \"document\": {\n      \"documentId\": \"00000000-0000-4000-8000-000000000000\",\n      \"version\": 1,\n      \"generatedAt\": \"2026-08-07T00:00:00.000Z\"\n    },\n    \"delivery\": {\n      \"deliveryId\": \"00000000-0000-4000-8000-000000000000\",\n      \"status\": \"QUEUED\",\n      \"recipient\": \"\",\n      \"providerMessageId\": \"\",\n      \"attemptCount\": 0,\n      \"failureReason\": \"\",\n      \"sentAt\": \"2026-08-07T00:00:00.000Z\",\n      \"deliveredAt\": \"2026-08-07T00:00:00.000Z\"\n    }\n  }\n}"
         },
         {
           "name": "401 Response",
