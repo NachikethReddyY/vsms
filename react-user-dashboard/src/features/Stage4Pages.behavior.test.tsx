@@ -18,7 +18,7 @@ const eventData = {
 
 vi.mock('../auth/AuthProvider', () => ({ useAuth: () => ({ isAuthenticated: true, isBootstrapping: false, session: { user: authUser, expiresAt: Date.now() + 100000 }, clearSession: vi.fn() }) }));
 vi.mock('../utils/logout', () => ({ logoutAndReturnHome: vi.fn() }));
-vi.mock('../features/screening/screeningApi', () => ({ screeningApi: { listStations: vi.fn(async () => ({ event: { eventId: 'event-1', name: 'Clinic Day', status: 'ACTIVE', venue: 'Hall' }, stations: stationMode === 'allow' ? [{ stationId: 'station-1', eventId: 'event-1', stationName: 'VA', stationType: 'VISUAL_ACUITY', stationOrder: 1, isActive: true }] : [] })) } }));
+vi.mock('../features/screening/screeningApi', () => ({ screeningApi: { listStations: vi.fn(async () => ({ event: { eventId: 'event-1', name: 'Clinic Day', status: 'ACTIVE', venue: 'Hall' }, stations: stationMode === 'allow' ? [{ stationId: 'station-1', eventId: 'event-1', stationName: 'VA', stationType: 'VISUAL_ACUITY', stationOrder: 1, isActive: true }, { stationId: 'station-eh', eventId: 'event-1', stationName: 'Eye Health', stationType: 'EYE_HEALTH', stationOrder: 4, isActive: true }] : [] })) } }));
 vi.mock('./stage4Api', async () => {
   const actual = await vi.importActual<typeof import('./stage4Api')>('./stage4Api');
   return {
@@ -98,6 +98,16 @@ describe('Stage 4 rendered route behavior', () => {
     cleanup(); stationMode = 'allow';
     render(<MemoryRouter initialEntries={["/events/event-1/stations/visual-acuity"]}><Routes><Route element={<StationDutyGuard stationType="VISUAL_ACUITY" />}><Route path="/events/:eventId/stations/visual-acuity" element={<p>VA station</p>} /></Route><Route path="/forbidden" element={<p>Forbidden page</p>} /></Routes></MemoryRouter>);
     expect(await screen.findByText('VA station')).toBeTruthy();
+  });
+
+  it('requires current station duty for eye-health stations', async () => {
+    const { StationDutyGuard } = await import('../auth/RoleGuard');
+    stationMode = 'deny';
+    render(<MemoryRouter initialEntries={["/events/event-1/stations/eye-health"]}><Routes><Route element={<StationDutyGuard stationType="EYE_HEALTH" />}><Route path="/events/:eventId/stations/eye-health" element={<p>Eye health station</p>} /></Route><Route path="/forbidden" element={<p>Forbidden page</p>} /></Routes></MemoryRouter>);
+    expect(await screen.findByText('Forbidden page')).toBeTruthy();
+    cleanup(); stationMode = 'allow';
+    render(<MemoryRouter initialEntries={["/events/event-1/stations/eye-health"]}><Routes><Route element={<StationDutyGuard stationType="EYE_HEALTH" />}><Route path="/events/:eventId/stations/eye-health" element={<p>Eye health station</p>} /></Route><Route path="/forbidden" element={<p>Forbidden page</p>} /></Routes></MemoryRouter>);
+    expect(await screen.findByText('Eye health station')).toBeTruthy();
   });
 
   it('renders profile eventMemberships exact field and profile failure', async () => {

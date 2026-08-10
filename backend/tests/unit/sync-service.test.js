@@ -125,6 +125,16 @@ const createScreening = ({ save } = {}) => ({
       resultData: { clinical: "not persisted in sync ledger" },
     },
   })),
+  saveEyeHealth: save || (async () => ({
+    created: true,
+    result: {
+      resultId: crypto.randomUUID(),
+      overallFlag: "NORMAL",
+      isFlagged: false,
+      evaluation: { ruleVersion: "VSMS-EH-1.0", reasons: [] },
+      resultData: { clinical: "not persisted in sync ledger" },
+    },
+  })),
 });
 
 const invoke = (body, {
@@ -433,4 +443,66 @@ test("sync schema rejects participant identifiers and profile fields", () => {
   unsafe.payload.passToken = "secret";
   unsafe.payload.nric = "S1234567A";
   assert.equal(screeningSyncBody.safeParse({ clientBatchId: crypto.randomUUID(), actions: [unsafe] }).success, false);
+});
+
+test("eye-health sync actions apply through the dedicated handler and stay idempotent", async () => {
+  const db = createDb();
+  let saves = 0;
+  const screening = createScreening({
+    save: async () => {
+      saves += 1;
+      return {
+        created: saves === 1,
+        result: {
+          resultId: crypto.randomUUID(),
+          overallFlag: "REVIEW",
+          isFlagged: true,
+          ruleVersion: "VSMS-EH-1.0",
+        },
+      };
+    },
+  });
+  const eyeAction = action({
+    stationType: "EYE_HEALTH",
+    payload: {
+      registrationId,
+      idempotencyKey: crypto.randomUUID(),
+      acknowledged: true,
+      resultData: {
+        cataractRisk: "SUSPECTED",
+        glaucomaRisk: "NONE",
+        symptomsNoted: false,
+        observations: "Lens opacity suspected OD.",
+      },
+    },
+  });
+
+  const first = invoke({ clientBatchId: crypto.randomUUID(), actions: [eyeAction] }, { db, screening });
+  const firstResponse = await first.promise;
+  assert.equal(firstResponse.actions[0].status, "APPLIED");
+  assert.deepEqual(db.rows[0].payload, { schemaVersion: 1, stationType: "EYE_HEALTH" });
+  assert.equal(saves, 1);
+
+  const replay = invoke({ clientBatchId: crypto.randomUUID(), actions: [eyeAction] }, { db, screening });
+  const replayResponse = await replay.promise;
+  assert.equal(replayResponse.actions[0].status, "APPLIED");
+  assert.equal(saves, 1);
+
+  const mismatched = action({
+    clientActionId: eyeAction.clientActionId,
+    stationType: "EYE_HEALTH",
+    payload: {
+      ...eyeAction.payload,
+      resultData: {
+        cataractRisk: "PRESENT",
+        glaucomaRisk: "NONE",
+        symptomsNoted: false,
+        observations: "Different payload reuse.",
+      },
+    },
+  });
+  const conflict = invoke({ clientBatchId: crypto.randomUUID(), actions: [mismatched] }, { db, screening });
+  const conflictResponse = await conflict.promise;
+  assert.equal(conflictResponse.actions[0].status, "CONFLICT");
+  assert.equal(saves, 1);
 });
