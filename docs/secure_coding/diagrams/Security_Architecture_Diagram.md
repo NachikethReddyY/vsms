@@ -10,4 +10,5 @@ The initial security architecture was generated using ChatGPT as a baseline refe
 
 The team recreated and adapted the architecture using draw.io and Markdown to understand and apply the architectural concepts to the VSMS system.
 
-![Replicated security architecture](./images/drawio-security-architecture.png)
+<img width="1762" height="1572" alt="SecurityArchitecture drawio" src="https://github.com/user-attachments/assets/e6ba1de5-6f75-4f5c-9e92-f029fe9007fe" />
+
