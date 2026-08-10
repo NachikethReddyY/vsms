@@ -1,13 +1,47 @@
-# Repository-evidenced runtime and deployment boundary
+# VSMS deployment diagram
 
-The repository contains an Express API, Prisma schema/migrations for PostgreSQL, a React client, and local Redis compose support for rate limiting. It does not contain an infrastructure definition or deployment record proving a cloud topology.
+This is the repository-supported target topology. The EC2 node and reverse
+proxy are deployment targets/prerequisites; this repository contains no live
+instance, security-group or certificate evidence. The Express request path
+follows the current route → Controller → Service → Prisma boundary.
 
 ```mermaid
 flowchart LR
-  Client[Browser / React client] --> API[Express API process]
-  API --> PG[(PostgreSQL via DATABASE_URL)]
-  API -. optional shared rate-limit store .-> Redis[Redis]
-  API -. only when configured .-> Cognito[Amazon Cognito]
+    tablet[Staff tablet/browser<br/>React/Vite dashboard<br/>encrypted IndexedDB]
+    proxy[Operator-managed HTTPS<br/>reverse proxy / TLS boundary]
+
+    subgraph ec2[EC2 host — deployment target]
+        api[Node.js Express API process]
+        middleware[Request context, security,<br/>auth, authorization and validation]
+        routes[Versioned routes]
+        controllers[Controllers]
+        services[Domain Services]
+        workers[Separate Node worker processes<br/>backend/scripts/*.js]
+        prisma[Prisma Client]
+        api --> middleware --> routes --> controllers --> services --> prisma
+        workers -->|claim/process jobs and outbox rows| prisma
+    end
+
+    postgres[(PostgreSQL<br/>DATABASE_URL target)]
+    cognito[Cognito<br/>external identity boundary]
+    onemap[OneMap / SES / SNS<br/>only when configured]
+
+    tablet -->|HTTPS| proxy --> api
+    tablet -->|Cognito redirect| cognito
+    api -->|token exchange/JWKS| cognito
+    prisma -->|SQL| postgres
+    api -.-> onemap
 ```
 
-`backend/docker-compose.yml` defines only local Redis support. PostgreSQL, Cognito, and any mail/provider services are configured externally; their deployed instances, regions, availability characteristics, and secrets management are outside the local evidence. Production TLS enforcement and CORS restrictions are application configuration, not proof of a deployed gateway or WAF.
+## Deployment limits
+
+- `backend/server.js` can start the API; `README.md` documents production
+  environment and reverse-proxy prerequisites.
+- PostgreSQL provisioning, network policy, backups, monitoring, process
+  supervision and recovery are operational work outside the repository.
+- The browser offline pack is an application feature, not a service-worker
+  cache. A hard refresh while offline is not claimed to work.
+- `backend/docker-compose.yml` provides local Redis support for rate limiting;
+  it is not proof of a deployed shared Redis service.
+- No serverless, static object-storage, or managed secret-store node is shown
+  because none is verified as the current deployment architecture.

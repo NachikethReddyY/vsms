@@ -69,7 +69,7 @@ Cross-folder imports go up one level (e.g. `../event/eventAuthorizationService`)
 ### `domain/`
 | File | Responsibility |
 | --- | --- |
-| `domainEventBus.js` | Transactional outbox + in-process handler registry. Producers call `emit()` in the same transaction; worker claims and dispatches with retry/backoff/dead-letter. |
+| `domainEventBus.js` | Transactional outbox + handler registry used inside the separate Node worker process. Producers call `emit()` in the same transaction; the worker claims and dispatches with retry/backoff/dead-letter. |
 | `domainEventHandlers/index.js` | Handlers subscribed by event type (e.g. `SCREENING_FLAGGED` fan-out, audit observers). |
 
 ### `platform/`
