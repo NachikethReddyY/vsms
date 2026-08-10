@@ -35,6 +35,12 @@
     "worker:reports": "node scripts/report-worker.js",
     "worker:lifecycle-email": "node scripts/lifecycle-email-worker.js",
     "worker:domain-event": "node scripts/domain-event-worker.js",
+    "perf:check": "node scripts/performance-runner.js --check --config performance/isolated-500.json",
+    "perf:prepare": "node scripts/prepare-performance-fixture.js",
+    "perf:token": "node scripts/performance-test-token.js",
+    "perf:run": "node scripts/performance-runner.js --config performance/isolated-500.json",
+    "backup:postgres": "sh scripts/backup-postgres.sh",
+    "restore:postgres:test": "sh scripts/restore-postgres-test.sh",
     "deploy": "pnpm install && pnpm db:setup && pnpm start",
     "deploy:prod": "pnpm install --prod && pnpm db:setup && pnpm start",
     "ci": "pnpm prisma:validate && pnpm prisma:generate && pnpm test && pnpm openapi:lint"
