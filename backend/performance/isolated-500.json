@@ -1,0 +1,9 @@
+{
+  "target": "vsms_test",
+  "baseUrl": "http://127.0.0.1:5050",
+  "fixtureFile": "/tmp/vsms-performance-fixture.json",
+  "participantCount": 500,
+  "concurrency": 10,
+  "readSampleSize": 10,
+  "authorizationEnv": "PERF_AUTHORIZATION"
+}
