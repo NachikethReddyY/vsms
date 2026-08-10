@@ -11,7 +11,9 @@
     "test": "pnpm --dir backend test",
     "check": "pnpm --dir backend prisma:validate && pnpm --dir backend openapi:lint && pnpm --dir backend contracts:check && pnpm check:api-collection && pnpm --dir react-user-dashboard lint && pnpm --dir react-user-dashboard build",
     "check:api-collection": "node scripts/check-api-collection.cjs",
-    "check:https": "node scripts/check-local-https.mjs"
+    "check:https": "node scripts/check-local-https.mjs",
+    "check:submission-package": "node scripts/check-submission-package.cjs",
+    "package:submission": "node scripts/package-submission.cjs"
   },
   "repository": {
     "type": "git",

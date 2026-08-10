@@ -49,3 +49,6 @@ api-testing/results/
 # Local security-scan artifacts
 gitleaks-report.json
 semgrep-report.json
+
+# Locally generated submission archive
+.submission/

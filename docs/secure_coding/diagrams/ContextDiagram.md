@@ -1,23 +1,42 @@
-## System Architecture & Design
+# VSMS context diagram
 
-<p class="eyebrow" style="color: #d8ff5a; font-size: 0.74rem; font-weight: 800; letter-spacing: 0.14em; text-transform: uppercase; margin-bottom: 10px;">01 — Architecture Overview</p>
+This source shows the current repository boundary: browser client, Express
+API, PostgreSQL and Cognito. It does not show proposed alternatives or a live
+deployment.
 
-### System Context Diagram
+```mermaid
+flowchart LR
+    admin[Administrator]
+    manager[Event manager]
+    registration[Registration officer]
+    screener[Screener]
+    reviewer[Reviewer]
 
-<div style="background: #191a1a; border: 1px solid rgba(244,240,232,0.14); padding: 20px; margin: 20px 0;">
-  <p style="color: #aaa49a; font-size: 0.92rem; margin-bottom: 16px;">
-    The diagram below maps out the high-level boundary between the users (Member A - Enquiry System, Member B - Admin System), the Java Swing application modules, and the serialized file storage layer for CA2.
-  </p>
-  
- <img width="1152" height="697" alt="Context Diagram drawio" src="https://github.com/user-attachments/assets/fe81f41e-ca44-40fb-8756-87479a899e81" />
+    client[React/Vite dashboard<br/>browser + encrypted IndexedDB]
+    api[Node.js Express API<br/>EC2 deployment target]
+    db[(PostgreSQL<br/>Prisma schema and migrations)]
+    cognito[Cognito<br/>authorization-code + PKCE]
+    onemap[OneMap<br/>optional configured provider]
+    providers[SES/SNS<br/>optional configured providers]
 
-  
-  <p style="color: #6d6a64; font-size: 0.82rem; margin-top: 12px; margin-bottom: 0;">
-    <em>Note: Ensure that your exported image file is placed inside an <code>images/</code> directory in your repository root, or update the file path above to match where your image is saved.</em>
-  </p>
-</div>
+    admin --> client
+    manager --> client
+    registration --> client
+    screener --> client
+    reviewer --> client
+    client -->|HTTPS API requests| api
+    client -->|login redirect/callback| cognito
+    api -->|token exchange/JWKS| cognito
+    api -->|Prisma transactions and queries| db
+    api -.->|configured location lookup| onemap
+    api -.->|configured notification delivery| providers
+```
 
-### Repository Structure & Preview Tips
+## Evidence
 
-- **Folder Structure:** Create an `images` folder in your repository root and place your exported draw.io diagram inside it as `system-context-diagram.png`.
-- **Live Preview:** You can preview how it renders directly in GitHub's web editor by clicking the **"Preview"** tab in your `README.md` before committing.
+- Client: `react-user-dashboard/src/` and `vite.config.ts`.
+- API: `backend/app.js`, `backend/server.js`, `backend/routes/`.
+- Database: `backend/prisma/schema.prisma` and `backend/prisma/migrations/`.
+- Cognito: `backend/utils/cognitoClient.js` and `infrastructure/cognito.yaml`.
+- Optional providers are shown as dotted edges because repository source does
+  not prove external availability or delivery.

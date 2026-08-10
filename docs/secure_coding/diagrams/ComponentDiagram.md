@@ -1,19 +1,45 @@
-## Component Diagram (Draft 1)
+# VSMS component diagram
 
-This is the first draft of the component diagram for the **Visual Screening Management System (VSMS)**. It illustrates the core components of the application and their interactions. The diagram serves as the foundation for the system architecture and will be refined as additional features and implementation details are incorporated.
+The component boundaries follow the current folder structure and request
+path. Workers are backend processes over the same PostgreSQL state, not
+separate serverless services.
 
-### Draft 1
+```mermaid
+flowchart LR
+    subgraph browser[Browser client]
+        shell[React/Vite route shell]
+        apiClient[API client + session state]
+        offline[Offline sync provider]
+        indexed[(Encrypted IndexedDB)]
+        shell --> apiClient
+        shell --> offline
+        offline --> indexed
+    end
 
-<img width="392" height="732" alt="VSMS Component Diagram - Draft 1" src="https://github.com/user-attachments/assets/ba608d59-785a-452e-b96e-8a02742c2e01" />
+    subgraph express[Node.js Express API]
+        middleware[Security, auth, CSRF,<br/>rate-limit and validation middleware]
+        routes[Versioned REST routes]
+        controllers[Controllers]
+        services[Domain services]
+        workers[In-process workers<br/>reports, lifecycle, domain events]
+        middleware --> routes --> controllers --> services
+        workers --> services
+    end
 
-**Key Components Included:**
-- Frontend web application
-- Backend API services
-- Authentication and authorization
-- Database layer
-- Reporting module
-- Notification services
-- Queue and participant management
-- Screening workflow components
+    prisma[Prisma client]
+    postgres[(PostgreSQL)]
+    cognito[Cognito provider]
 
-> **Note:** This is the initial draft of the component diagram. The architecture will be updated throughout development to reflect new modules, refined component interactions, and implementation improvements.
+    apiClient -->|HTTPS| middleware
+    offline -->|sync screening batch| middleware
+    services --> prisma --> postgres
+    middleware -->|authorize/callback/JWKS| cognito
+```
+
+## Evidence
+
+- Browser feature modules: `react-user-dashboard/src/features/`.
+- API composition: `backend/app.js`, `backend/routes/`,
+  `backend/controllers/`, `backend/services/`.
+- Worker entry points: `backend/scripts/`.
+- Persistence: `backend/prisma/prismaClient.js` and the Prisma schema.
