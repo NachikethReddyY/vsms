@@ -378,7 +378,7 @@ export default function EventDetailPage() {
   const canCreateEvent = user?.roles.includes('ADMINISTRATOR') ?? false;
   const canConfigureStations = canManage && ['DRAFT', 'PUBLISHED', 'IN_PROGRESS'].includes(event.status);
   const canEditStaffing = canManage && ['DRAFT', 'PUBLISHED', 'IN_PROGRESS'].includes(event.status);
-  const availableTemplates = stationTemplates.filter((template) => !event.eventStations.some((station) => station.stationTemplateId === template.stationTemplateId));
+  const availableTemplates = stationTemplates.filter((template) => !event.eventStations.some((station) => station.stationType === template.stationType));
   const canCancel = canManage && !terminal && (event.status !== 'IN_PROGRESS' || user?.systemRole === 'ADMIN');
   const isAdministrator = user?.roles.includes('ADMINISTRATOR') ?? false;
   const canRegisterParticipants = isAdministrator

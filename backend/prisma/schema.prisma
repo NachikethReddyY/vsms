@@ -869,17 +869,19 @@ model Shift {
 }
 
 model Station {
-  stationId    String      @id @default(uuid()) @map("station_id") @db.Uuid
-  eventId      String      @map("event_id") @db.Uuid
-  stationName  String      @map("station_name") @db.VarChar(100)
-  stationType  StationType @map("station_type")
-  stationOrder Int         @map("station_order")
-  isActive     Boolean     @default(true) @map("is_active")
+  stationId         String      @id @default(uuid()) @map("station_id") @db.Uuid
+  eventId           String      @map("event_id") @db.Uuid
+  stationTemplateId String?     @map("station_template_id") @db.Uuid
+  stationName       String      @map("station_name") @db.VarChar(100)
+  stationType       StationType @map("station_type")
+  stationOrder      Int         @map("station_order")
+  isActive          Boolean     @default(true) @map("is_active")
   operationalStatus StationOperationalStatus @default(AVAILABLE) @map("operational_status")
-  createdAt    DateTime    @default(now()) @map("created_at") @db.Timestamptz(3)
-  updatedAt    DateTime    @updatedAt @map("updated_at") @db.Timestamptz(3)
+  createdAt         DateTime    @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt         DateTime    @updatedAt @map("updated_at") @db.Timestamptz(3)
 
   event                   Event                    @relation(fields: [eventId], references: [eventId], onDelete: Cascade, onUpdate: Cascade)
+  stationTemplate         StationTemplate?         @relation(fields: [stationTemplateId], references: [stationTemplateId], onDelete: SetNull, onUpdate: Cascade)
   staffAssignments        StaffAssignment[]
   queueEntries            QueueEntry[]
   scanLogs                ScanLog[]
@@ -892,12 +894,14 @@ model Station {
   @@unique([eventId, stationOrder])
   @@index([eventId, isActive, stationOrder])
   @@index([eventId, operationalStatus, stationOrder])
+  @@index([stationTemplateId])
   @@map("stations")
 }
 
 model StationTemplate {
   stationTemplateId String   @id @default(uuid()) @map("station_template_id") @db.Uuid
   templateKey       String   @unique @map("template_key") @db.VarChar(50)
+  stationType       StationType? @map("station_type")
   version           Int      @default(1)
   name              String   @db.VarChar(100)
   description       String?
@@ -905,7 +909,9 @@ model StationTemplate {
   active            Boolean  @default(true)
   createdAt         DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt         DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+  stations          Station[]
 
+  @@index([stationType, active])
   @@map("station_templates")
 }
 

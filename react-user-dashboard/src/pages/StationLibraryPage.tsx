@@ -5,20 +5,19 @@ import { AppToast } from '../components/AppToast';
 import apiClient, { getApiError } from '../utils/apiClient';
 import './StationLibraryPage.css';
 
-export const TEMPLATE_KEY_OPTIONS = [
-  { value: 'REGISTRATION', label: 'Registration' },
+export const STATION_TYPE_OPTIONS = [
   { value: 'VISUAL_ACUITY', label: 'Visual acuity' },
   { value: 'REFRACTION', label: 'Refraction' },
   { value: 'COLOUR_VISION', label: 'Colour vision' },
   { value: 'EYE_HEALTH', label: 'Eye health' },
-  { value: 'CLINICAL_REVIEW', label: 'Clinical review' },
 ] as const;
 
-type TemplateKey = typeof TEMPLATE_KEY_OPTIONS[number]['value'];
+type StationType = typeof STATION_TYPE_OPTIONS[number]['value'];
 
 type StationTemplateRecord = {
   stationTemplateId: string;
   templateKey: string;
+  stationType: StationType | null;
   version: number;
   name: string;
   description?: string | null;
@@ -27,7 +26,7 @@ type StationTemplateRecord = {
 };
 
 type CreateDraft = {
-  templateKey: TemplateKey;
+  stationType: StationType;
   name: string;
   description: string;
   defaultCapacity: number;
@@ -41,7 +40,7 @@ type EditDraft = {
 };
 
 const emptyCreateDraft = (): CreateDraft => ({
-  templateKey: 'VISUAL_ACUITY',
+  stationType: 'VISUAL_ACUITY',
   name: '',
   description: '',
   defaultCapacity: 3,
@@ -54,8 +53,8 @@ const toEditDraft = (template: StationTemplateRecord): EditDraft => ({
   active: template.active,
 });
 
-const labelTemplateKey = (key: string) =>
-  TEMPLATE_KEY_OPTIONS.find((item) => item.value === key)?.label ?? key.replace(/_/g, ' ');
+const labelStationType = (stationType: StationType | null) =>
+  STATION_TYPE_OPTIONS.find((item) => item.value === stationType)?.label ?? 'Legacy catalog only';
 
 function sortTemplates(templates: StationTemplateRecord[]) {
   return [...templates].sort((left, right) => {
@@ -118,7 +117,7 @@ export default function StationLibraryPage() {
     setFormError('');
     try {
       const { data } = await apiClient.post<StationTemplateRecord>('/events/station-templates', {
-        templateKey: createDraft.templateKey,
+        stationType: createDraft.stationType,
         name: createDraft.name,
         description: createDraft.description || null,
         defaultCapacity: createDraft.defaultCapacity,
@@ -177,9 +176,9 @@ export default function StationLibraryPage() {
     <section className="station-library-body" aria-label="Station template library">
       {loading ? <div className="station-library-loading" aria-live="polite" aria-label="Loading station templates"><span /><span /><span /><span /></div> : templates.length ? <div className="station-library-table-shell">
         <table className="station-library-table">
-          <thead><tr><th scope="col">Key</th><th scope="col">Name</th><th scope="col">Capacity</th><th scope="col">Status</th><th scope="col"><span className="visually-hidden">Actions</span></th></tr></thead>
+          <thead><tr><th scope="col">Station type</th><th scope="col">Name</th><th scope="col">Capacity</th><th scope="col">Status</th><th scope="col"><span className="visually-hidden">Actions</span></th></tr></thead>
           <tbody>{templates.map((template) => <tr key={template.stationTemplateId}>
-            <th scope="row"><span className="station-library-key">{labelTemplateKey(template.templateKey)}<small>v{template.version}</small></span></th>
+            <th scope="row"><span className="station-library-key">{labelStationType(template.stationType)}<small>v{template.version}</small></span></th>
             <td><span className="station-library-name">{template.name}<small>{template.description || 'No description.'}</small></span></td>
             <td><span className="station-library-capacity">{template.defaultCapacity}</span></td>
             <td><span className={`station-library-access ${template.active ? 'active' : 'inactive'}`}><i aria-hidden="true" />{template.active ? 'Active' : 'Inactive'}</span></td>
@@ -194,16 +193,16 @@ export default function StationLibraryPage() {
       open={dialogMode === 'create'}
       onOpenChange={closeDialog}
       title="Add station template"
-      description="Create a reusable catalog entry. Each template key can exist only once."
+      description="Create a reusable screening-station catalog entry."
       dismissible={!saving}
       className="station-library-dialog"
     >
       <form className="app-dialog-form station-library-form" onSubmit={submitCreate} noValidate>
         {formError && <p className="app-dialog-error" role="alert">{formError}</p>}
         <label className="app-dialog-field">
-          <span>Template key</span>
-          <select required value={createDraft.templateKey} onChange={(event) => setCreateDraft((current) => ({ ...current, templateKey: event.target.value as TemplateKey }))}>
-            {TEMPLATE_KEY_OPTIONS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+          <span>Station type</span>
+          <select required value={createDraft.stationType} onChange={(event) => setCreateDraft((current) => ({ ...current, stationType: event.target.value as StationType }))}>
+            {STATION_TYPE_OPTIONS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
           </select>
         </label>
         <label className="app-dialog-field"><span>Name</span><input required minLength={2} maxLength={100} value={createDraft.name} onChange={(event) => setCreateDraft((current) => ({ ...current, name: event.target.value }))} /></label>
@@ -223,7 +222,7 @@ export default function StationLibraryPage() {
     >
       {editDraft && <form className="app-dialog-form station-library-form" onSubmit={submitEdit} noValidate>
         {formError && <p className="app-dialog-error" role="alert">{formError}</p>}
-        <label className="app-dialog-field"><span>Template key</span><input disabled value={labelTemplateKey(editing?.templateKey ?? '')} /></label>
+        <label className="app-dialog-field"><span>Station type</span><input disabled value={labelStationType(editing?.stationType ?? null)} /></label>
         <label className="app-dialog-field"><span>Name</span><input required minLength={2} maxLength={100} value={editDraft.name} onChange={(event) => setEditDraft((current) => current ? { ...current, name: event.target.value } : current)} /></label>
         <label className="app-dialog-field"><span>Description <small>Optional</small></span><textarea maxLength={500} rows={3} value={editDraft.description} onChange={(event) => setEditDraft((current) => current ? { ...current, description: event.target.value } : current)} /></label>
         <label className="app-dialog-field"><span>Default capacity</span><input required type="number" min={1} max={1000} value={editDraft.defaultCapacity} onChange={(event) => setEditDraft((current) => current ? { ...current, defaultCapacity: Number(event.target.value) } : current)} /></label>

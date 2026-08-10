@@ -1,26 +1,19 @@
-/**
- * StationTemplate.templateKey → Station.stationType mapping (#30 / #24).
- * Only screening flows with implemented capture APIs are importable.
- */
+const SUPPORTED_SCREENING_STATION_TYPES = Object.freeze([
+  "VISUAL_ACUITY",
+  "REFRACTION",
+  "COLOUR_VISION",
+  "EYE_HEALTH",
+]);
 
-const IMPORTABLE_TEMPLATE_KEYS = Object.freeze({
-  VISUAL_ACUITY: "VISUAL_ACUITY",
-  REFRACTION: "REFRACTION",
-  COLOUR_VISION: "COLOUR_VISION",
-  EYE_HEALTH: "EYE_HEALTH",
-});
-
-const NON_IMPORTABLE_TEMPLATE_KEYS = Object.freeze(["REGISTRATION", "CLINICAL_REVIEW"]);
-
-const stationTypeForTemplateKey = (templateKey) => IMPORTABLE_TEMPLATE_KEYS[templateKey] || null;
-
-const isImportableTemplateKey = (templateKey) => Boolean(stationTypeForTemplateKey(templateKey));
+const stationTypeForTemplate = (template) => (
+  SUPPORTED_SCREENING_STATION_TYPES.includes(template?.stationType) ? template.stationType : null
+);
 
 const classifyTemplates = (templates) => {
   const importable = [];
   const skipped = [];
   for (const template of templates) {
-    const stationType = stationTypeForTemplateKey(template.templateKey);
+    const stationType = stationTypeForTemplate(template);
     if (stationType) {
       importable.push({ template, stationType });
     } else {
@@ -31,9 +24,7 @@ const classifyTemplates = (templates) => {
 };
 
 module.exports = {
-  IMPORTABLE_TEMPLATE_KEYS,
-  NON_IMPORTABLE_TEMPLATE_KEYS,
-  stationTypeForTemplateKey,
-  isImportableTemplateKey,
+  SUPPORTED_SCREENING_STATION_TYPES,
+  stationTypeForTemplate,
   classifyTemplates,
 };

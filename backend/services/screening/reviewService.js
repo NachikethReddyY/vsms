@@ -2,13 +2,13 @@ const crypto = require("crypto");
 const prisma = require("../../prisma/prismaClient");
 const AppError = require("../../errors/AppError");
 const { resolveRegistrationByQrValue } = require("../../utils/qrToken");
-const { IMPORTABLE_TEMPLATE_KEYS } = require("../event/stationTemplateMapping");
+const { SUPPORTED_SCREENING_STATION_TYPES } = require("../event/stationTemplateMapping");
 const { loadVerifiedSignature, consumeSignatureArtifact } = require("../../utils/signatureStorage");
 const { requireEventRoleAndDuty } = require("../event/eventAuthorizationService");
 const { maskNric } = require("../../utils/validation");
 
 const FLAG_RANK = { NORMAL: 0, REVIEW: 1, REFER: 2, URGENT: 3 };
-const SUPPORTED_SCREENING_TYPES = Object.values(IMPORTABLE_TEMPLATE_KEYS);
+const SUPPORTED_SCREENING_TYPES = SUPPORTED_SCREENING_STATION_TYPES;
 
 const highestFlag = (results) => results.reduce(
   (highest, result) => FLAG_RANK[result.overallFlag] > FLAG_RANK[highest] ? result.overallFlag : highest,
@@ -431,7 +431,7 @@ const recordDecision = async (eventId, registrationId, decision, user, ipAddress
         reviewId: review.reviewId,
         outcome: review.outcome,
         urgency: review.urgency,
-        eyeHealthRecorded: true,
+        eyeHealthRecorded: Boolean(eyeHealthObservations),
         signaturePurpose: "REVIEW_DECISION",
         signatureSha256: review.signatureSha256,
         signedPayloadHash: review.signedPayloadHash,

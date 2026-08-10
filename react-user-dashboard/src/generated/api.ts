@@ -2484,6 +2484,8 @@ export interface components {
             /** Format: uuid */
             stationTemplateId: string;
             templateKey: string;
+            /** @enum {string|null} */
+            stationType: "VISUAL_ACUITY" | "REFRACTION" | "COLOUR_VISION" | "EYE_HEALTH" | null;
             version: number;
             name: string;
             description?: string | null;
@@ -2492,7 +2494,7 @@ export interface components {
         };
         CreateStationTemplateRequest: {
             /** @enum {string} */
-            templateKey: "REGISTRATION" | "VISUAL_ACUITY" | "REFRACTION" | "COLOUR_VISION" | "EYE_HEALTH" | "CLINICAL_REVIEW";
+            stationType: "VISUAL_ACUITY" | "REFRACTION" | "COLOUR_VISION" | "EYE_HEALTH";
             name: string;
             description?: string | null;
             /** @default 3 */
@@ -3830,7 +3832,7 @@ export interface components {
             urgency: components["schemas"]["ClinicalUrgency"];
             clinicalSummary: string;
             recommendations: string | null;
-            eyeHealthObservations: components["schemas"]["EyeHealthObservations"];
+            eyeHealthObservations: components["schemas"]["EyeHealthObservations"] | null;
             signatureSignerName: string | null;
             signatureSha256: string;
             signedPayloadHash: string;

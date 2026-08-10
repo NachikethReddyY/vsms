@@ -274,11 +274,14 @@ describe("clinical review API", () => {
     const detail = await request(app).get(`/api/events/${eventId}/reviews/${registrations.Concurrent}`).set(auth(reviewerToken));
     const signatures = await Promise.all([uploadDecisionSignature(registrations.Concurrent), uploadDecisionSignature(registrations.Concurrent)]);
     const decide = (signature) => request(app).post(`/api/events/${eventId}/reviews/${registrations.Concurrent}/decision`).set(auth(reviewerToken)).send({
-      outcome: "MONITOR", contextVersion: detail.body.contextVersion, confirmed: true, clinicalSummary: "Monitor and repeat screening if symptoms change.", eyeHealthObservations: eyeHealthObservations(), ...signature,
+      outcome: "MONITOR", contextVersion: detail.body.contextVersion, confirmed: true, clinicalSummary: "Monitor and repeat screening if symptoms change.", ...signature,
     });
     const responses = await Promise.all(signatures.map(decide));
     expect(responses.map((response) => response.status).sort()).toEqual([201, 409]);
     expect(await prisma.review.count({ where: { registrationId: registrations.Concurrent } })).toBe(1);
+    const audit = (await prisma.auditLog.findMany({ where: { userId: testUsers.reviewer.id, action: "CLINICAL_REVIEW_RECORDED" } }))
+      .find((entry) => entry.details.registrationId === registrations.Concurrent);
+    expect(audit.details.eyeHealthRecorded).toBe(false);
   });
 
   test("stale context returns 409 without a decision", async () => {

@@ -6,7 +6,7 @@ process.env.DATABASE_URL ||= "postgresql://test:test@localhost:5432/vsms_test";
 
 const prisma = require("../../prisma/prismaClient");
 const screeningService = require("../../services/screening/screeningService");
-const { stationTypeForTemplateKey } = require("../../services/event/stationTemplateMapping");
+const { stationTypeForTemplate } = require("../../services/event/stationTemplateMapping");
 
 const eventId = crypto.randomUUID();
 const stationA = crypto.randomUUID();
@@ -57,7 +57,7 @@ test("only a screener assigned to the requested station can read its queue", asy
 
   const queue = await screeningService.listQueue(eventId, stationA, user);
   assert.deepEqual(queue.registrations, []);
-  assert.equal(stationTypeForTemplateKey("EYE_HEALTH"), "EYE_HEALTH");
+  assert.equal(stationTypeForTemplate({ templateKey: "opaque", stationType: "EYE_HEALTH" }), "EYE_HEALTH");
 });
 
 test("an administrator remains denied without a screener event membership", async (t) => {

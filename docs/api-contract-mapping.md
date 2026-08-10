@@ -19,7 +19,7 @@ This is a local-evidence map from the required surface in [the client brief](vsm
 | `POST /api/v1/screenings/visual-acuity` | `POST /api/v1/events/{eventId}/stations/{stationId}/visual-acuity` (`saveVisualAcuity`). | Authenticated approved account; service requires the caller's active screener duty for the event/station. | Equivalent — explicit event and station scope prevents cross-event/station writes. |
 | `POST /api/v1/screenings/refraction` | `POST /api/v1/events/{eventId}/stations/{stationId}/refraction` (`saveRefraction`). | Authenticated approved account; active screener duty for the event/station. | Equivalent — event-scoped deviation. |
 | `POST /api/v1/screenings/colour-vision` | `POST /api/v1/events/{eventId}/stations/{stationId}/colour-vision` (`saveColourVision`). | Authenticated approved account; active screener duty for the event/station. | Equivalent — event-scoped deviation. |
-| `POST /api/v1/screenings/eye-health` | No save route is present. Station-template documentation lists `EYE_HEALTH` as a station type, but `screeningRoutes.js` exposes save/preview routes only for visual acuity, refraction, and colour vision. | Not applicable. | Missing. |
+| `POST /api/v1/screenings/eye-health` | `POST /api/v1/events/{eventId}/stations/{stationId}/eye-health` (`saveEyeHealth`). | Authenticated approved account; active screener duty for the event/station. | Equivalent — event-scoped deviation. |
 | `POST /api/v1/sync/batch` | `POST /api/v1/events/{eventId}/sync/screening` (`syncScreeningBatch`). | Authenticated approved account; sync service validates event/station access, tracks client action IDs, and records outcomes. | Equivalent — the batch is explicitly event-scoped. |
 
 ## Required functional behavior
@@ -30,7 +30,7 @@ This is a local-evidence map from the required surface in [the client brief](vsm
 | Admin manage users, roles, events, stations, and staff assignment | `/api/v1/users`, `/api/v1/admin/accounts/*`, event membership/role/assignment routes. | User/admin routes require application administrator; event staffing requires event-manager authorization. | Exact. |
 | Participant registration, update, search, unique ID | Participant CRUD/search, `/api/v1/events/{eventId}/registrations`, and database uniqueness constraints. | Registration officer permission and event scope; registration service owns duplicate/idempotency checks. | Exact, with PATCH instead of required PUT. |
 | Queue status, transfer, station workload, completion tracking | `/api/v1/queues/events/{eventId}`, event-scoped queue-entry commands, and `/api/v1/queues/events/{eventId}/workload`. | Authenticated route/service checks with event scope; queue transitions are service-owned. | Exact. |
-| Capture visual acuity, refraction, colour vision, and eye health | Three event/station save routes above; no eye-health save route. | Active station-duty authorization for implemented screening saves. | Partial — eye health is missing. |
+| Capture visual acuity, refraction, colour vision, and eye health | Event/station save routes exist for all four screening types. | Active station-duty authorization for screening saves. | Exact behavior, event-scoped. |
 | Automatically flag results and require screener acknowledgement | Implemented visual-acuity/refraction/colour-vision services evaluate rules, return flags, and reject a flagged save without `acknowledged: true`. | Active screener duty; the acknowledgement is bound to the result write, not a separate endpoint. | Exact behavior, event-scoped. |
 | Reviewer checks results/flags and creates referrals | `/api/v1/events/{eventId}/reviews*` and `/api/v1/events/{eventId}/referrals/{referralId}/issue`. | Reviewer event role and active duty; review/referral service checks. | Exact, event-scoped. |
 | Dashboard for active event, queues, completion, sync health, outcomes/referrals | Active events, event metrics, operational report, queue status/workload, completed-event analytics, referral/review data, and event-scoped sync receipts. | Authenticated users are constrained by route/service event roles. | Equivalent — dashboard composes these resources; there is no single required “dashboard” API. |
@@ -51,7 +51,3 @@ Events, participants, current accounts, users, stations, and queue entries use P
 ### Event-scoped screening and sync
 
 Screening saves and sync batches include `{eventId}` and, where applicable, `{stationId}` in the path. This is stricter than the brief's flat routes: it gives authorization middleware and services a server-trusted scope before the write, prevents a token or registration from being used across events, and supports active-duty checks. The OpenAPI paths and mounted `screeningRoutes.js` use the same event-scoped forms.
-
-### Known gap
-
-Eye-health result capture is the only required API row without a local equivalent. The documentation does not treat the station template as proof of an implemented capture API.

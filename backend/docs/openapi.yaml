@@ -2642,10 +2642,14 @@ components:
     StationTemplate:
       type: object
       additionalProperties: false
-      required: [stationTemplateId, templateKey, version, name, defaultCapacity, active]
+      required: [stationTemplateId, templateKey, stationType, version, name, defaultCapacity, active]
       properties:
         stationTemplateId: { type: string, format: uuid }
         templateKey: { type: string, maxLength: 80 }
+        stationType:
+          type: string
+          nullable: true
+          enum: [VISUAL_ACUITY, REFRACTION, COLOUR_VISION, EYE_HEALTH]
         version: { type: integer, minimum: 1 }
         name: { type: string, maxLength: 120 }
         description: { type: string, nullable: true }
@@ -2654,9 +2658,9 @@ components:
     CreateStationTemplateRequest:
       type: object
       additionalProperties: false
-      required: [templateKey, name]
+      required: [stationType, name]
       properties:
-        templateKey: { type: string, enum: [REGISTRATION, VISUAL_ACUITY, REFRACTION, COLOUR_VISION, EYE_HEALTH, CLINICAL_REVIEW] }
+        stationType: { type: string, enum: [VISUAL_ACUITY, REFRACTION, COLOUR_VISION, EYE_HEALTH] }
         name: { type: string, minLength: 2, maxLength: 100 }
         description: { type: string, maxLength: 500, nullable: true }
         defaultCapacity: { type: integer, minimum: 1, maximum: 1000, default: 3 }
@@ -4186,7 +4190,10 @@ components:
         urgency: { $ref: "#/components/schemas/ClinicalUrgency" }
         clinicalSummary: { type: string }
         recommendations: { type: string, nullable: true }
-        eyeHealthObservations: { $ref: "#/components/schemas/EyeHealthObservations" }
+        eyeHealthObservations:
+          type: object
+          nullable: true
+          allOf: [{ $ref: "#/components/schemas/EyeHealthObservations" }]
         signatureSignerName: { type: string, nullable: true }
         signatureSha256: { type: string, pattern: '^[a-f0-9]{64}$' }
         signedPayloadHash: { type: string, pattern: '^[a-f0-9]{64}$' }

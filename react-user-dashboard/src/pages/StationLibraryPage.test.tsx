@@ -24,7 +24,8 @@ import StationLibraryPage from './StationLibraryPage';
 
 const template = {
   stationTemplateId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
-  templateKey: 'VISUAL_ACUITY',
+  templateKey: '11111111-1111-4111-8111-111111111111',
+  stationType: 'VISUAL_ACUITY',
   version: 1,
   name: 'Visual acuity booth',
   description: 'Snellen chart',
@@ -111,7 +112,8 @@ describe('StationLibraryPage', () => {
       data: {
         ...template,
         stationTemplateId: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
-        templateKey: 'EYE_HEALTH',
+        templateKey: '22222222-2222-4222-8222-222222222222',
+        stationType: 'EYE_HEALTH',
         name: 'Eye health booth',
       },
     });
@@ -119,12 +121,12 @@ describe('StationLibraryPage', () => {
     await screen.findByRole('heading', { name: /No station templates yet/i });
     await openCreateFromEmpty();
     const dialog = await screen.findByRole('dialog', { name: /Add station template/i });
-    await userEvent.selectOptions(within(dialog).getByLabelText(/Template key/i), 'EYE_HEALTH');
+    await userEvent.selectOptions(within(dialog).getByLabelText(/Station type/i), 'EYE_HEALTH');
     await userEvent.clear(within(dialog).getByLabelText(/^Name$/i));
     await userEvent.type(within(dialog).getByLabelText(/^Name$/i), 'Eye health booth');
     await userEvent.click(within(dialog).getByRole('button', { name: /Create template/i }));
     await waitFor(() => expect(post).toHaveBeenCalledWith('/events/station-templates', expect.objectContaining({
-      templateKey: 'EYE_HEALTH',
+      stationType: 'EYE_HEALTH',
       name: 'Eye health booth',
     })));
     expect(await within(library()).findByText('Eye health booth')).toBeTruthy();
@@ -132,13 +134,13 @@ describe('StationLibraryPage', () => {
 
   it('surfaces create API errors inside the dialog', async () => {
     get.mockResolvedValueOnce({ data: [] });
-    post.mockRejectedValueOnce(new Error('A station template with this key already exists'));
+    post.mockRejectedValueOnce(new Error('Station template could not be created'));
     renderPage();
     await screen.findByRole('heading', { name: /No station templates yet/i });
     await openCreateFromEmpty();
     const dialog = await screen.findByRole('dialog', { name: /Add station template/i });
     await userEvent.type(within(dialog).getByLabelText(/^Name$/i), 'Duplicate');
     await userEvent.click(within(dialog).getByRole('button', { name: /Create template/i }));
-    expect(await within(dialog).findByText(/already exists/i)).toBeTruthy();
+    expect(await within(dialog).findByText(/could not be created/i)).toBeTruthy();
   });
 });

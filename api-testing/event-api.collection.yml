@@ -2543,6 +2543,7 @@ item:
             {
               "stationTemplateId": "00000000-0000-4000-8000-000000000000",
               "templateKey": "",
+              "stationType": "VISUAL_ACUITY",
               "version": 1,
               "name": "",
               "description": "",
@@ -2626,7 +2627,7 @@ item:
         mode: raw
         raw: |-
           {
-            "templateKey": "REGISTRATION",
+            "stationType": "VISUAL_ACUITY",
             "name": "",
             "description": "",
             "defaultCapacity": 3,
@@ -2654,6 +2655,7 @@ item:
           {
             "stationTemplateId": "00000000-0000-4000-8000-000000000000",
             "templateKey": "",
+            "stationType": "VISUAL_ACUITY",
             "version": 1,
             "name": "",
             "description": "",
@@ -2753,6 +2755,7 @@ item:
             {
               "stationTemplateId": "00000000-0000-4000-8000-000000000000",
               "templateKey": "",
+              "stationType": "VISUAL_ACUITY",
               "version": 1,
               "name": "",
               "description": "",
@@ -2865,6 +2868,7 @@ item:
           {
             "stationTemplateId": "00000000-0000-4000-8000-000000000000",
             "templateKey": "",
+            "stationType": "VISUAL_ACUITY",
             "version": 1,
             "name": "",
             "description": "",

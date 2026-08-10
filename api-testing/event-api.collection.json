@@ -2016,7 +2016,7 @@
               "value": "application/json"
             }
           ],
-          "body": "[\n  {\n    \"stationTemplateId\": \"00000000-0000-4000-8000-000000000000\",\n    \"templateKey\": \"\",\n    \"version\": 1,\n    \"name\": \"\",\n    \"description\": \"\",\n    \"defaultCapacity\": 1,\n    \"active\": true\n  }\n]"
+          "body": "[\n  {\n    \"stationTemplateId\": \"00000000-0000-4000-8000-000000000000\",\n    \"templateKey\": \"\",\n    \"stationType\": \"VISUAL_ACUITY\",\n    \"version\": 1,\n    \"name\": \"\",\n    \"description\": \"\",\n    \"defaultCapacity\": 1,\n    \"active\": true\n  }\n]"
         },
         {
           "name": "401 Response",
@@ -2091,7 +2091,7 @@
         },
         "body": {
           "mode": "raw",
-          "raw": "{\n  \"templateKey\": \"REGISTRATION\",\n  \"name\": \"\",\n  \"description\": \"\",\n  \"defaultCapacity\": 3,\n  \"active\": true\n}",
+          "raw": "{\n  \"stationType\": \"VISUAL_ACUITY\",\n  \"name\": \"\",\n  \"description\": \"\",\n  \"defaultCapacity\": 3,\n  \"active\": true\n}",
           "options": {
             "raw": {
               "language": "json"
@@ -2122,7 +2122,7 @@
               "value": "application/json"
             }
           ],
-          "body": "{\n  \"stationTemplateId\": \"00000000-0000-4000-8000-000000000000\",\n  \"templateKey\": \"\",\n  \"version\": 1,\n  \"name\": \"\",\n  \"description\": \"\",\n  \"defaultCapacity\": 1,\n  \"active\": true\n}"
+          "body": "{\n  \"stationTemplateId\": \"00000000-0000-4000-8000-000000000000\",\n  \"templateKey\": \"\",\n  \"stationType\": \"VISUAL_ACUITY\",\n  \"version\": 1,\n  \"name\": \"\",\n  \"description\": \"\",\n  \"defaultCapacity\": 1,\n  \"active\": true\n}"
         },
         {
           "name": "401 Response",
@@ -2220,7 +2220,7 @@
               "value": "application/json"
             }
           ],
-          "body": "[\n  {\n    \"stationTemplateId\": \"00000000-0000-4000-8000-000000000000\",\n    \"templateKey\": \"\",\n    \"version\": 1,\n    \"name\": \"\",\n    \"description\": \"\",\n    \"defaultCapacity\": 1,\n    \"active\": true\n  }\n]"
+          "body": "[\n  {\n    \"stationTemplateId\": \"00000000-0000-4000-8000-000000000000\",\n    \"templateKey\": \"\",\n    \"stationType\": \"VISUAL_ACUITY\",\n    \"version\": 1,\n    \"name\": \"\",\n    \"description\": \"\",\n    \"defaultCapacity\": 1,\n    \"active\": true\n  }\n]"
         },
         {
           "name": "401 Response",
@@ -2328,7 +2328,7 @@
               "value": "application/json"
             }
           ],
-          "body": "{\n  \"stationTemplateId\": \"00000000-0000-4000-8000-000000000000\",\n  \"templateKey\": \"\",\n  \"version\": 1,\n  \"name\": \"\",\n  \"description\": \"\",\n  \"defaultCapacity\": 1,\n  \"active\": true\n}"
+          "body": "{\n  \"stationTemplateId\": \"00000000-0000-4000-8000-000000000000\",\n  \"templateKey\": \"\",\n  \"stationType\": \"VISUAL_ACUITY\",\n  \"version\": 1,\n  \"name\": \"\",\n  \"description\": \"\",\n  \"defaultCapacity\": 1,\n  \"active\": true\n}"
         },
         {
           "name": "401 Response",

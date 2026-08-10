@@ -1,4 +1,4 @@
-import { FormEvent, useEffect, useMemo, useState } from 'react';
+import { FormEvent, useEffect, useMemo, useRef, useState } from 'react';
 import { useParams, useSearchParams } from 'react-router-dom';
 import { getApiError as getApiMessage } from '../../utils/apiClient';
 import {
@@ -47,6 +47,7 @@ export default function EyeHealthStationPage() {
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [savedRegistrationId, setSavedRegistrationId] = useState<string | null>(null);
+  const participantRequestGeneration = useRef(0);
 
   const selected = useMemo(
     () => queue.find((row) => row.registrationId === selectedId) || null,
@@ -65,7 +66,29 @@ export default function EyeHealthStationPage() {
   useEffect(() => {
     setAcknowledged(false);
     setEvaluation(null);
-  }, [cataractRisk, glaucomaRisk, symptomsNoted, symptomSummary, observations, deviceFindings, selectedId]);
+  }, [cataractRisk, glaucomaRisk, symptomsNoted, symptomSummary, observations, deviceFindings]);
+
+  useEffect(() => {
+    setCataractRisk('NOT_ASSESSED');
+    setGlaucomaRisk('NOT_ASSESSED');
+    setSymptomsNoted(false);
+    setSymptomSummary('');
+    setObservations('');
+    setDeviceFindings('');
+    setEvaluation(null);
+    setAcknowledged(false);
+    setError(null);
+    setSuccess(null);
+    setSavedRegistrationId(null);
+  }, [selectedId]);
+
+  const selectParticipant = (registrationId: string) => {
+    if (registrationId === selectedId) return;
+    participantRequestGeneration.current += 1;
+    setPreviewPending(false);
+    setPending(false);
+    setSelectedId(registrationId);
+  };
 
   const load = async () => {
     if (!eventId) return;
@@ -76,7 +99,7 @@ export default function EyeHealthStationPage() {
       setStation(context.station);
       setEventStations(context.stations);
       setQueue(context.queue);
-      if (!selectedId && context.nextSelectedId) setSelectedId(context.nextSelectedId);
+      if (!selectedId && context.nextSelectedId) selectParticipant(context.nextSelectedId);
     } catch (cause) {
       setError(getApiMessage(cause, 'Could not load the Eye Health station.'));
     }
@@ -99,16 +122,20 @@ export default function EyeHealthStationPage() {
     }
     setPreviewPending(true);
     setError(null);
+    const generation = participantRequestGeneration.current;
     try {
       const next = await screeningApi.previewEyeHealth(eventId, station.stationId, resultData);
+      if (generation !== participantRequestGeneration.current) return null;
       setEvaluation(next);
       if (!next.isFlagged) setAcknowledged(false);
       return next;
     } catch (cause) {
-      setError(getApiMessage(cause, 'Could not evaluate screening flags.'));
+      if (generation === participantRequestGeneration.current) {
+        setError(getApiMessage(cause, 'Could not evaluate screening flags.'));
+      }
       return null;
     } finally {
-      setPreviewPending(false);
+      if (generation === participantRequestGeneration.current) setPreviewPending(false);
     }
   };
 
@@ -126,33 +153,39 @@ export default function EyeHealthStationPage() {
     setPending(true);
     setError(null);
     setSuccess(null);
+    const generation = participantRequestGeneration.current;
+    const registrationId = selected.registrationId;
     try {
       const preview = evaluation ?? await runPreview();
       if (!preview) return;
+      if (generation !== participantRequestGeneration.current) return;
       if (preview.isFlagged && !acknowledged) {
         setError('This result is flagged. Review the flag and tick acknowledgement before saving.');
         return;
       }
 
       const saved = await screeningApi.saveEyeHealth(eventId, station.stationId, {
-        registrationId: selected.registrationId,
+        registrationId,
         idempotencyKey: newIdempotencyKey(),
         acknowledged: preview.isFlagged ? acknowledged : false,
         resultData,
       });
+      if (generation !== participantRequestGeneration.current) return;
       setSuccess(saved.queued
         ? 'Saved offline. It will sync when connected.'
         : saved.isFlagged
           ? `Saved with ${saved.overallFlag} flag (${saved.ruleVersion ?? preview.ruleVersion}): ${saved.flagSummary}`
           : `Saved Eye Health result (${saved.overallFlag}, ${saved.ruleVersion ?? preview.ruleVersion}).`);
-      setSavedRegistrationId(selected.registrationId);
+      setSavedRegistrationId(registrationId);
       setEvaluation(null);
       setAcknowledged(false);
       await load();
     } catch (cause) {
-      setError(getApiMessage(cause, 'Could not save the Eye Health result.'));
+      if (generation === participantRequestGeneration.current) {
+        setError(getApiMessage(cause, 'Could not save the Eye Health result.'));
+      }
     } finally {
-      setPending(false);
+      if (generation === participantRequestGeneration.current) setPending(false);
     }
   };
 
@@ -193,7 +226,7 @@ export default function EyeHealthStationPage() {
         eventId={eventId}
         queue={queue}
         selectedId={selectedId}
-        onSelect={setSelectedId}
+        onSelect={selectParticipant}
         selected={selected}
       />
 

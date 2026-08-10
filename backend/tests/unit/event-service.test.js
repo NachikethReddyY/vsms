@@ -28,6 +28,58 @@ const assertForbiddenEventKeysAbsent = (value) => {
   }
 };
 
+test("station template mutations generate opaque keys and audit atomically", async () => {
+  const audits = [];
+  const transactionClient = {
+    stationTemplate: {
+      create: async ({ data }) => ({
+        ...data,
+        stationTemplateId: crypto.randomUUID(),
+        version: 1,
+      }),
+      findUnique: async () => ({
+        stationTemplateId: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+        templateKey: "opaque-existing-key",
+        stationType: "EYE_HEALTH",
+        version: 1,
+        name: "Eye health booth",
+        description: null,
+        defaultCapacity: 2,
+        active: true,
+      }),
+      update: async ({ data }) => ({
+        stationTemplateId: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+        templateKey: "opaque-existing-key",
+        stationType: "EYE_HEALTH",
+        version: 2,
+        name: data.name ?? "Eye health booth",
+        description: null,
+        defaultCapacity: 2,
+        active: data.active ?? true,
+      }),
+    },
+    auditLog: { create: async ({ data }) => { audits.push(data); return data; } },
+  };
+  const db = { $transaction: async (callback) => callback(transactionClient) };
+  const context = { requestId: crypto.randomUUID(), ipAddress: "127.0.0.1", deviceName: "Test" };
+  const body = { stationType: "EYE_HEALTH", name: "Eye health booth", defaultCapacity: 2, active: true };
+
+  const first = await eventService.createStationTemplate(body, manager, context, db);
+  const second = await eventService.createStationTemplate({ ...body, name: "Second eye health booth" }, manager, context, db);
+  await eventService.updateStationTemplate(first.stationTemplateId, { name: "Updated eye health booth" }, manager, context, db);
+  await eventService.updateStationTemplate(first.stationTemplateId, { active: false }, manager, context, db);
+
+  assert.notEqual(first.templateKey, second.templateKey);
+  assert.equal(first.stationType, "EYE_HEALTH");
+  assert.deepEqual(audits.map(({ action }) => action), [
+    "STATION_TEMPLATE_CREATED",
+    "STATION_TEMPLATE_CREATED",
+    "STATION_TEMPLATE_UPDATED",
+    "STATION_TEMPLATE_DEACTIVATED",
+  ]);
+  assert.ok(audits.every((audit) => audit.userId === manager.userId && audit.requestId === context.requestId));
+});
+
 const eventRecord = (status = "DRAFT", version = 1, assignments = [], registrations = []) => ({
   eventId,
   name: "Service test event",
@@ -262,6 +314,7 @@ test("event responses project operational staff to only their own planned or act
   prisma.stationTemplate.findMany = async () => [{
     stationTemplateId: templateId,
     templateKey: "VISUAL_ACUITY",
+    stationType: "VISUAL_ACUITY",
     version: 1,
     name: "Visual acuity",
     description: null,

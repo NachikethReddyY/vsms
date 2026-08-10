@@ -1,5 +1,5 @@
 /* @vitest-environment jsdom */
-import { cleanup, render, screen, waitFor } from '@testing-library/react';
+import { act, cleanup, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -36,14 +36,18 @@ vi.mock('./StationShared', () => ({
   ParticipantLookup: ({
     selectedId,
     onSelect,
+    queue,
   }: {
     selectedId: string;
     onSelect: (id: string) => void;
     queue: Array<{ registrationId: string; participantDisplayName: string }>;
   }) => (
-    <button type="button" onClick={() => onSelect(selectedId || '44444444-4444-4444-8444-444444444444')}>
-      Select participant
-    </button>
+    <label>
+      Participant
+      <select value={selectedId} onChange={(event) => onSelect(event.target.value)}>
+        {queue.map((row) => <option key={row.registrationId} value={row.registrationId}>{row.participantDisplayName}</option>)}
+      </select>
+    </label>
   ),
   StationHandoffLinks: () => <div>Handoff links</div>,
   StationPageFrame: ({
@@ -103,6 +107,12 @@ const registration = {
   passToken: null,
   existingResult: null,
 };
+const secondRegistration = {
+  ...registration,
+  registrationId: '55555555-5555-4555-8555-555555555555',
+  participantDisplayName: 'Grace Hopper',
+  queueNumber: 8,
+};
 
 beforeEach(() => {
   loadStationContext.mockReset();
@@ -112,7 +122,7 @@ beforeEach(() => {
     eventName: 'Vision Day',
     station,
     stations: [station],
-    queue: [registration],
+    queue: [registration, secondRegistration],
     nextSelectedId: registration.registrationId,
   });
 });
@@ -209,5 +219,91 @@ describe('EyeHealthStationPage', () => {
     await userEvent.click(screen.getByRole('button', { name: /Save flagged result/i }));
     await waitFor(() => expect(saveEyeHealth).toHaveBeenCalled());
     expect(await screen.findByText(/Saved with REVIEW flag/i)).toBeTruthy();
+  });
+
+  it('clears participant-specific fields, flags, acknowledgement, and success when the participant changes', async () => {
+    previewEyeHealth.mockResolvedValue({
+      overallFlag: 'REFER',
+      isFlagged: true,
+      flagSummary: 'Clinical risk present',
+      ruleVersion: 'VSMS-EH-1.0',
+      reasons: [{ flag: 'REFER', reason: 'Clinical risk present' }],
+    });
+    saveEyeHealth.mockResolvedValue({
+      overallFlag: 'REFER',
+      isFlagged: true,
+      flagSummary: 'Clinical risk present',
+      ruleVersion: 'VSMS-EH-1.0',
+      queued: false,
+    });
+    renderPage();
+    await screen.findByRole('heading', { name: 'Eye Health' });
+    await userEvent.selectOptions(screen.getByLabelText(/Cataract risk/i), 'PRESENT');
+    await userEvent.selectOptions(screen.getByLabelText(/Glaucoma risk/i), 'SUSPECTED');
+    await userEvent.click(screen.getByLabelText(/Symptoms noted/i));
+    await userEvent.type(screen.getByLabelText(/Symptom summary/i), 'Blurred vision');
+    await userEvent.type(screen.getByLabelText(/^Observations/i), 'Lens opacity observed.');
+    await userEvent.type(screen.getByLabelText(/Device findings/i), 'Imaging finding.');
+    await userEvent.click(screen.getByRole('button', { name: /Check automatic flags/i }));
+    await userEvent.click(await screen.findByLabelText(/I acknowledge/i));
+    await userEvent.click(screen.getByRole('button', { name: /Save flagged result/i }));
+    expect(await screen.findByText(/Saved with REFER flag/i)).toBeTruthy();
+
+    await userEvent.click(screen.getByRole('button', { name: /Check automatic flags/i }));
+    await userEvent.click(await screen.findByLabelText(/I acknowledge/i));
+    await userEvent.selectOptions(screen.getByLabelText(/^Participant$/i), secondRegistration.registrationId);
+
+    expect((screen.getByLabelText(/Cataract risk/i) as HTMLSelectElement).value).toBe('NOT_ASSESSED');
+    expect((screen.getByLabelText(/Glaucoma risk/i) as HTMLSelectElement).value).toBe('NOT_ASSESSED');
+    expect((screen.getByLabelText(/Symptoms noted/i) as HTMLInputElement).checked).toBe(false);
+    expect(screen.queryByLabelText(/Symptom summary/i)).toBeNull();
+    expect((screen.getByLabelText(/^Observations/i) as HTMLTextAreaElement).value).toBe('');
+    expect((screen.getByLabelText(/Device findings/i) as HTMLTextAreaElement).value).toBe('');
+    expect(screen.queryByText(/Clinical risk present/i)).toBeNull();
+    expect(screen.queryByLabelText(/I acknowledge/i)).toBeNull();
+    expect(screen.queryByText(/Saved with REFER flag/i)).toBeNull();
+    expect((screen.getByRole('button', { name: /Save Eye Health result/i }) as HTMLButtonElement).disabled).toBe(true);
+  });
+
+  it('ignores a late save response after the participant changes', async () => {
+    previewEyeHealth.mockResolvedValue({
+      overallFlag: 'REFER',
+      isFlagged: true,
+      flagSummary: 'Participant A flag',
+      ruleVersion: 'VSMS-EH-1.0',
+      reasons: [{ flag: 'REFER', reason: 'Participant A flag' }],
+    });
+    let resolveSave!: (value: {
+      overallFlag: string;
+      isFlagged: boolean;
+      flagSummary: string;
+      ruleVersion: string;
+      queued: boolean;
+    }) => void;
+    saveEyeHealth.mockReturnValueOnce(new Promise((resolve) => { resolveSave = resolve; }));
+    renderPage();
+    await screen.findByRole('heading', { name: 'Eye Health' });
+    await userEvent.type(screen.getByLabelText(/^Observations/i), 'Participant A observation.');
+    await userEvent.click(screen.getByRole('button', { name: /Check automatic flags/i }));
+    await userEvent.click(await screen.findByLabelText(/I acknowledge/i));
+    await userEvent.click(screen.getByRole('button', { name: /Save flagged result/i }));
+    await waitFor(() => expect(saveEyeHealth).toHaveBeenCalled());
+
+    await userEvent.selectOptions(screen.getByLabelText(/^Participant$/i), secondRegistration.registrationId);
+    expect(screen.queryByText(/Participant A flag/i)).toBeNull();
+    expect(screen.queryByText(/Saving…/i)).toBeNull();
+
+    await act(async () => resolveSave({
+      overallFlag: 'REFER',
+      isFlagged: true,
+      flagSummary: 'Participant A flag',
+      ruleVersion: 'VSMS-EH-1.0',
+      queued: false,
+    }));
+
+    expect(saveEyeHealth.mock.calls[0][2].registrationId).toBe(registration.registrationId);
+    expect(screen.queryByText(/Participant A flag/i)).toBeNull();
+    expect(screen.queryByText(/Saved with REFER flag/i)).toBeNull();
+    expect(loadStationContext).toHaveBeenCalledTimes(1);
   });
 });

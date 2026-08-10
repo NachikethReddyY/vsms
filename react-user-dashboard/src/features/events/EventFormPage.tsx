@@ -411,6 +411,12 @@ export default function EventFormPage({ mode }: { mode: 'create' | 'edit' }) {
   };
 
   const selectTemplates = (ids: string[]) => {
+    const stationTypes = ids.map((id) => templates.find((template) => template.stationTemplateId === id)?.stationType);
+    if (new Set(stationTypes).size !== stationTypes.length) {
+      setFormError('Choose only one template for each screening station type.');
+      return;
+    }
+    setFormError('');
     setValues((current) => {
       const stations = ids.map((stationTemplateId, index) => {
         const saved = current.stations.find((station) => station.stationTemplateId === stationTemplateId);
