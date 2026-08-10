@@ -45,6 +45,7 @@ async function auditScreeningFlag({ event, context }) {
   await context.db.auditLog.create({
     data: {
       userId: event.actorUserId,
+      requestId: event.correlationId,
       action: "SCREENING_FLAG_EVENT_DISPATCHED",
       resource: "DomainEvent",
       entityName: "ScreeningResult",
@@ -68,6 +69,7 @@ async function auditEventTransition({ event, context }) {
   await context.db.auditLog.create({
     data: {
       userId: event.actorUserId,
+      requestId: event.correlationId,
       action: "EVENT_TRANSITION_EVENT_DISPATCHED",
       resource: "DomainEvent",
       entityName: "Event",
@@ -90,6 +92,7 @@ async function auditReferralIssued({ event, context }) {
   await context.db.auditLog.create({
     data: {
       userId: event.actorUserId,
+      requestId: event.correlationId,
       action: "REFERRAL_ISSUE_EVENT_DISPATCHED",
       resource: "DomainEvent",
       entityName: "Referral",

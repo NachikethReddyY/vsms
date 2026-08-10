@@ -1,7 +1,47 @@
-## Use Case Diagram
+# VSMS use-case diagram
 
-The following Use Case Diagram illustrates the functional requirements and interactions between the system and its external actors.
+The use cases are limited to paths represented in the current OpenAPI contract
+and frontend route structure.
 
-![Use Case Diagram](https://github.com/user-attachments/assets/047de3df-ccb1-47d2-860c-c273bc3b4ea5)
+```mermaid
+flowchart LR
+    admin[Administrator]
+    manager[Event manager]
+    registration[Registration officer]
+    screener[Screener]
+    reviewer[Reviewer]
 
-**Figure 1: Use Case Diagram for the System**
+    subgraph vsms[VSMS]
+        account((Manage accounts and access))
+        event((Create and operate events))
+        participant((Register and update participants))
+        queue((Manage station queues))
+        screening((Record screening results and flags))
+        offline((Save and synchronize supported offline results))
+        review((Review results and issue referrals))
+        report((View metrics and export aggregate reports))
+        audit((Audit sensitive actions))
+    end
+
+    admin --> account
+    admin --> event
+    admin --> report
+    manager --> event
+    manager --> queue
+    manager --> report
+    registration --> participant
+    registration --> queue
+    screener --> queue
+    screener --> screening
+    screener --> offline
+    reviewer --> review
+    account -.-> audit
+    event -.-> audit
+    participant -.-> audit
+    queue -.-> audit
+    screening -.-> audit
+    review -.-> audit
+```
+
+The diagram does not imply that every role can access every event. Event
+membership, role and active duty checks are enforced by the backend.

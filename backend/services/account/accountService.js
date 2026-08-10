@@ -1,11 +1,15 @@
 const crypto = require("node:crypto");
 const prisma = require("../../prisma/prismaClient");
+const env = require("../../config/env");
 const AppError = require("../../errors/AppError");
-const { resolveAuditContext } = require("../../utils/audit");
+const audit = require("../../utils/audit");
+const { resolveAuditContext } = audit;
 const { assertAdministratorRemains, lockAccountTransition } = require("./adminSafety");
 const { deriveLegacyStatus } = require("./accountState");
 const { enqueueProviderOperation, processProviderOperationForResponse } = require("./accountProviderOperationService");
 const { enqueueAccountLifecycle } = require("./accountLifecycleNotificationService");
+const { rolesFromCognitoGroups } = require("../../utils/roles");
+const { sessionValidity } = require("../../utils/sessionValidity");
 
 const summarySelect = {
   id: true,
@@ -101,7 +105,135 @@ async function protectAdministratorTransition(tx, account, actorId, overrides) {
   await assertAdministratorRemains(tx, { currentIsAdministrator, nextIsAdministrator });
 }
 
+function profileFromIdToken(payload) {
+  return {
+    cognitoSub: payload.sub,
+    email: payload.email || payload["cognito:username"],
+    fullName: payload.name || payload.given_name || null,
+    employeeNumber: payload["custom:employee_number"] || null,
+    department: payload["custom:department"] || null,
+    designation: payload["custom:designation"] || null,
+  };
+}
+
+function canUseLimitedSession(user) {
+  if (!user || user.deprovisionedAt) return false;
+  if (user.accessState !== undefined) return user.accessState !== "DISABLED";
+  return user.status === "ACTIVE";
+}
+
+async function establishCognitoSession(profile, accessTokenPayload, allowCreate) {
+  const localUser = await exports.syncCognitoUser(profile, { allowCreate });
+  if (!canUseLimitedSession(localUser) || !sessionValidity(localUser, accessTokenPayload).valid) {
+    throw new AppError(403, "ACCOUNT_SESSION_BLOCKED", "Access denied");
+  }
+  const localRoles = localUser.userRoles.map((entry) => entry.role.roleName);
+  const cognitoRoles = rolesFromCognitoGroups(accessTokenPayload);
+  return { localUser, roles: localRoles.filter((role) => cognitoRoles.includes(role)) };
+}
+
 exports.getCurrentAccount = async (userId) => projectAccount(await findAccount(prisma, userId));
+
+exports.syncCognitoUser = async (profile, { allowCreate = false } = {}) => {
+  const normalizedEmail = String(profile.email || "").trim().toLowerCase();
+  const identityMatches = [];
+  if (profile.cognitoSub) identityMatches.push({ cognitoSub: profile.cognitoSub });
+  if (normalizedEmail) identityMatches.push({ email: normalizedEmail });
+
+  let user = identityMatches.length
+    ? await prisma.user.findFirst({ where: { OR: identityMatches } })
+    : null;
+
+  if (!user && !allowCreate) {
+    throw new AppError(403, "LOCAL_PROFILE_NOT_FOUND", "Access denied");
+  }
+
+  if (!user) {
+    const data = {
+      cognitoSub: profile.cognitoSub || null,
+      username: normalizedEmail,
+      fullName: profile.fullName || "Pending Staff",
+      email: normalizedEmail,
+      employeeNumber: profile.employeeNumber || null,
+      department: profile.department || null,
+      designation: profile.designation || null,
+      status: "INACTIVE",
+      sysRole: "STAFF",
+      approvalState: "PENDING",
+      accessState: "ENABLED",
+    };
+    if (env.lifecycleEmailEnabled) {
+      user = await prisma.$transaction(async (tx) => {
+        const created = await tx.user.create({ data });
+        await enqueueAccountLifecycle({ type: "SIGNUP_RECEIVED", account: created, idempotencyKey: `SIGNUP_RECEIVED:${created.id}`, db: tx });
+        return created;
+      });
+    } else {
+      user = await prisma.user.create({ data });
+    }
+  } else {
+    const update = {};
+    if (profile.cognitoSub && !user.cognitoSub) update.cognitoSub = profile.cognitoSub;
+    if (profile.fullName) update.fullName = profile.fullName;
+    if (profile.employeeNumber) update.employeeNumber = profile.employeeNumber;
+    if (profile.department !== undefined) update.department = profile.department || null;
+    if (profile.designation !== undefined) update.designation = profile.designation || null;
+    if (Object.keys(update).length > 0) {
+      user = await prisma.user.update({ where: { id: user.id }, data: update });
+    }
+  }
+
+  return prisma.user.findUnique({
+    where: { id: user.id },
+    include: { userRoles: { include: { role: true } } },
+  });
+};
+
+exports.recordSuccessfulLogin = async (userId, lastLoginAt = new Date()) => {
+  await prisma.user.update({ where: { id: userId }, data: { lastLoginAt } });
+  return lastLoginAt;
+};
+
+exports.recordAuthAudit = (entry) => audit.createAuthAuditLog(entry);
+
+exports.establishCognitoLoginSession = async ({ idTokenPayload, accessTokenPayload, context }) => {
+  const emailVerified = idTokenPayload.email_verified === true || idTokenPayload.email_verified === "true";
+  const session = await establishCognitoSession(
+    profileFromIdToken(idTokenPayload),
+    accessTokenPayload,
+    env.publicSignupEnabled && emailVerified,
+  );
+  session.localUser.lastLoginAt = await exports.recordSuccessfulLogin(session.localUser.id);
+  await exports.recordAuthAudit({
+    userId: session.localUser.id,
+    eventType: "LOGIN_SUCCESS",
+    outcome: "SUCCESS",
+    identifier: session.localUser.email,
+    context,
+  });
+  return session;
+};
+
+exports.establishCognitoRefreshSession = ({ accessTokenPayload, username }) => establishCognitoSession({
+  cognitoSub: accessTokenPayload.sub,
+  email: username.includes("@") ? username : null,
+}, accessTokenPayload, false);
+
+exports.recordPasswordChange = async ({ userId, email, context, changedAt = new Date() }) => {
+  await exports.recordAuthAudit({
+    userId,
+    eventType: "PASSWORD_CHANGE_SUCCESS",
+    outcome: "SUCCESS",
+    identifier: email,
+    context,
+  });
+  await enqueueAccountLifecycle({
+    type: "PASSWORD_CHANGED",
+    account: { id: userId },
+    metadata: { changedAt: changedAt.toISOString() },
+    idempotencyKey: `PASSWORD_CHANGED:${userId}:${context?.requestId || crypto.randomUUID()}`,
+  });
+};
 
 exports.updateCurrentAccount = async (userId, data, context) => prisma.$transaction(async (tx) => {
   await lockAccountTransition(tx, userId);

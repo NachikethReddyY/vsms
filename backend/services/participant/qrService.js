@@ -7,6 +7,7 @@ const { decrypt, encrypt, encryptionContext } = require("../../utils/cryptoUtils
 const { renderBrandedQrSvg } = require("../../utils/qrBranding");
 const { assertUuid } = require("../../utils/validation");
 const { hashToken, QR_TOKEN_PATTERN } = require("../../utils/qrToken");
+const { assertRegistrationAssignment, assertQrVerifyAccess } = require("../../utils/staff");
 const AppError = require("../../errors/AppError");
 
 function buildQRTargetUrl(token) {
@@ -167,6 +168,18 @@ exports.getEventIdForAccess = async ({ eventId, registrationId, qrId, token }, d
     if (!resolvedEventId) throw new AppError(404, "REGISTRATION_NOT_FOUND", "Registration event was not found.");
     if (eventId && resolvedEventId !== eventId) throw new AppError(400, "QR_EVENT_MISMATCH", "QR Code is not valid for this specific event.");
     return resolvedEventId;
+};
+
+exports.assertRegistrationAccess = async (selectors, auth, db = prisma) => {
+    const eventId = await exports.getEventIdForAccess(selectors, db);
+    await assertRegistrationAssignment(db, eventId, auth);
+    return eventId;
+};
+
+exports.assertVerificationAccess = async (selectors, auth, db = prisma) => {
+    const eventId = await exports.getEventIdForAccess(selectors, db);
+    await assertQrVerifyAccess(db, eventId, auth);
+    return eventId;
 };
 
 /**
@@ -725,6 +738,43 @@ exports.renderActivePassForRegistration = async (registrationId, db = prisma) =>
         }),
         participantDisplayName: displayName,
         queueNumber: registration.queueNumber,
+    };
+};
+
+exports.getDevPageData = async (registrationId, auditContext = {}, db = prisma) => {
+    const registration = await db.eventRegistration.findUnique({
+        where: { registrationId },
+        include: {
+            participant: { select: { firstName: true, lastName: true } },
+            event: { select: { name: true } },
+        },
+    });
+    if (!registration) return null;
+
+    const qr = await exports.generateRegistrationQR(registrationId, null, auditContext);
+    let scanQr = Buffer.from(qr.qrImage.split(",")[1], "base64").toString("utf8");
+    const activePass = await db.qRCodePass.findFirst({
+        where: { registrationId, isActive: true },
+        orderBy: { issuedAt: "desc" },
+    });
+    let token = null;
+    if (activePass) {
+        try {
+            token = decrypt(activePass.tokenCiphertext, qrTokenContext(activePass.id));
+        } catch { /* token display is best-effort */ }
+    }
+    if (token) {
+        const branded = await renderBrandedQrSvg(buildQRTargetUrl(token), { width: 420 });
+        scanQr = Buffer.from(branded.split(",")[1], "base64").toString("utf8");
+    }
+
+    return {
+        displayName: [registration.participant?.firstName, registration.participant?.lastName].filter(Boolean).join(" ") || "—",
+        eventName: registration.event?.name || "Unknown event",
+        queueNumber: registration.queueNumber,
+        tokenPreview: token ? `${token.slice(0, 12)}…` : null,
+        scanQr,
+        statusUrl: token ? `/api/v1/qr/public-status/${encodeURIComponent(token)}` : null,
     };
 };
 

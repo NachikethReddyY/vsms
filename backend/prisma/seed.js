@@ -9,6 +9,13 @@ if (process.env.NODE_ENV === "production" && !process.env.VSMS_DEMO_PASSWORD) {
   throw new Error("VSMS_DEMO_PASSWORD is required for production seed execution");
 }
 
+const DEMO_ANCHOR_DATE = process.env.VSMS_DEMO_ANCHOR_DATE || "2026-08-10";
+if (!/^\d{4}-\d{2}-\d{2}$/.test(DEMO_ANCHOR_DATE) || Number.isNaN(Date.parse(`${DEMO_ANCHOR_DATE}T00:00:00.000Z`))) {
+  throw new Error("VSMS_DEMO_ANCHOR_DATE must be an ISO date (YYYY-MM-DD)");
+}
+const DEMO_NOW = new Date(`${DEMO_ANCHOR_DATE}T00:00:00.000Z`);
+const demoTimestamp = () => new Date(DEMO_NOW);
+
 // Valid 64-char hex token (matches the QR_TOKEN_PATTERN used by manual check-in)
 // so the seeded demo pass is demonstrable end-to-end.
 const DEMO_QR_TOKEN = "ab".repeat(32);
@@ -97,19 +104,21 @@ async function seedRoles() {
 }
 
 async function seedStaff(roles, passwordHash) {
-  const email = String(process.env.SEED_STAFF_EMAIL || "seed.admin@cryptix.local").trim().toLowerCase();
+  const email = String(process.env.SEED_STAFF_EMAIL || "synthetic.admin@example.test").trim().toLowerCase();
   const user = await prisma.user.upsert({
     where: { email },
-    update: { status: "ACTIVE", sysRole: "ADMIN" },
+    update: { status: "ACTIVE", sysRole: "ADMIN", approvalState: "APPROVED", accessState: "ENABLED", deprovisionedAt: null },
     create: {
       username: email,
-      fullName: process.env.SEED_STAFF_NAME || "Seed Administrator",
+      fullName: process.env.SEED_STAFF_NAME || "Synthetic Administrator",
       email,
-      employeeNumber: process.env.SEED_STAFF_EMPLOYEE_NUMBER || "SEED-ADMIN-001",
+      employeeNumber: process.env.SEED_STAFF_EMPLOYEE_NUMBER || "SYNTH-ADMIN-001",
       department: "Operations",
       designation: "Event Administrator",
       status: "ACTIVE",
       sysRole: "ADMIN",
+      approvalState: "APPROVED",
+      accessState: "ENABLED",
     },
   });
   await prisma.userCredential.upsert({
@@ -128,19 +137,21 @@ async function seedStaff(roles, passwordHash) {
 }
 
 async function seedRegistrationOfficer(roles, staff, passwordHash) {
-  const email = String(process.env.SEED_REGISTRATION_EMAIL || "registration@vsms.local").trim().toLowerCase();
+  const email = String(process.env.SEED_REGISTRATION_EMAIL || "synthetic.registration@example.test").trim().toLowerCase();
   const officer = await prisma.user.upsert({
     where: { email },
-    update: { status: "ACTIVE", sysRole: "STAFF" },
+    update: { status: "ACTIVE", sysRole: "STAFF", approvalState: "APPROVED", accessState: "ENABLED", deprovisionedAt: null },
     create: {
       username: email,
-      fullName: process.env.SEED_REGISTRATION_NAME || "Avery Lim",
+      fullName: process.env.SEED_REGISTRATION_NAME || "Synthetic Registration Officer",
       email,
-      employeeNumber: process.env.SEED_REGISTRATION_EMPLOYEE_NUMBER || "SEED-REG-001",
+      employeeNumber: process.env.SEED_REGISTRATION_EMPLOYEE_NUMBER || "SYNTH-REG-001",
       department: "Event Operations",
       designation: "Registration Officer",
       status: "ACTIVE",
       sysRole: "STAFF",
+      approvalState: "APPROVED",
+      accessState: "ENABLED",
     },
   });
   await prisma.userCredential.upsert({
@@ -157,19 +168,21 @@ async function seedRegistrationOfficer(roles, staff, passwordHash) {
 }
 
 async function seedReviewer(roles, staff, passwordHash) {
-  const email = String(process.env.SEED_REVIEWER_EMAIL || "reviewer@vsms.local").trim().toLowerCase();
+  const email = String(process.env.SEED_REVIEWER_EMAIL || "synthetic.reviewer@example.test").trim().toLowerCase();
   const reviewer = await prisma.user.upsert({
     where: { email },
-    update: { status: "ACTIVE", sysRole: "STAFF" },
+    update: { status: "ACTIVE", sysRole: "STAFF", approvalState: "APPROVED", accessState: "ENABLED", deprovisionedAt: null },
     create: {
       username: email,
-      fullName: process.env.SEED_REVIEWER_NAME || "Dr Samira Tan",
+      fullName: process.env.SEED_REVIEWER_NAME || "Synthetic Reviewer",
       email,
-      employeeNumber: process.env.SEED_REVIEWER_EMPLOYEE_NUMBER || "SEED-REVIEWER-001",
+      employeeNumber: process.env.SEED_REVIEWER_EMPLOYEE_NUMBER || "SYNTH-REVIEWER-001",
       department: "Clinical Operations",
       designation: "Clinical Reviewer",
       status: "ACTIVE",
       sysRole: "STAFF",
+      approvalState: "APPROVED",
+      accessState: "ENABLED",
     },
   });
   await prisma.userCredential.upsert({
@@ -264,7 +277,7 @@ function demoDate(dayOffset, hour, minute = 0) {
   // Demo events are configured for Asia/Singapore. Derive the calendar date
   // there, then return the equivalent UTC instant for storage in PostgreSQL.
   const singaporeOffsetMs = 8 * 60 * 60 * 1000;
-  const singaporeNow = new Date(Date.now() + singaporeOffsetMs);
+  const singaporeNow = new Date(DEMO_NOW.getTime() + singaporeOffsetMs);
   return new Date(Date.UTC(
     singaporeNow.getUTCFullYear(),
     singaporeNow.getUTCMonth(),
@@ -321,7 +334,23 @@ async function upsertDemoEvent(staff, {
   });
 }
 
-async function seedEventStructure(event, staff) {
+async function ensureDemoMembership(event, user, roles, staff) {
+  const membership = await prisma.eventMembership.upsert({
+    where: { eventId_userId: { eventId: event.eventId, userId: user.id } },
+    update: { status: "ACTIVE", addedById: staff.id, removedById: null, removedAt: null, removalReason: null },
+    create: { eventId: event.eventId, userId: user.id, addedById: staff.id },
+  });
+  for (const role of roles) {
+    await prisma.eventMembershipRole.upsert({
+      where: { membershipId_role: { membershipId: membership.id, role } },
+      update: { assignedById: staff.id },
+      create: { membershipId: membership.id, role, assignedById: staff.id },
+    });
+  }
+  return membership;
+}
+
+async function seedEventStructure(event, staff, registrationOfficer) {
   const shiftStartsAt = event.startsAt;
   const shiftEndsAt = event.endsAt;
   const existingShift = await prisma.shift.findFirst({
@@ -371,14 +400,7 @@ async function seedEventStructure(event, staff) {
   await prisma.staffAssignment.deleteMany({
     where: { eventId: event.eventId, userId: staff.id, assignmentRole: "REGISTRATION" },
   });
-  const registrationOfficers = await prisma.user.findMany({
-    where: {
-      status: "ACTIVE",
-      userRoles: { some: { role: { roleName: "REGISTRATION_OFFICER" } } },
-    },
-    select: { id: true },
-  });
-  for (const officer of registrationOfficers) {
+  for (const officer of [registrationOfficer]) {
     const assignment = await prisma.staffAssignment.findFirst({
       where: {
         eventId: event.eventId,
@@ -510,8 +532,8 @@ async function ensureAcceptedConsent(staff, participant, event, consentForm, sig
     signatureSha256,
     signatureMimeType: "image/png",
     recordedById: staff.id,
-    signedAt: new Date(),
-    decisionAt: new Date(),
+    signedAt: demoTimestamp(),
+    decisionAt: demoTimestamp(),
   };
   const consent = existing
     ? await prisma.participantConsent.update({ where: { id: existing.id }, data })
@@ -578,13 +600,14 @@ async function ensureDemoRegistration(staff, participant, event, consent) {
     where: { registrationId: registration.registrationId },
     select: { id: true },
   });
-  const qrId = existingQr?.id || crypto.randomUUID();
+  const qrId = existingQr?.id || "70000000-0000-4000-8000-000000000001";
   const qrData = {
     registrationId: registration.registrationId,
     tokenHash: crypto.createHash("sha256").update(token).digest("hex"),
     tokenCiphertext: encrypt(token, encryptionContext("QRCodePass", qrId, "token")),
     tokenEncryptionVersion: 2,
     expiresAt: demoDate(30, 23, 59),
+    issuedAt: demoTimestamp(),
     isActive: true,
     revokedAt: null,
     revokedBy: null,
@@ -607,22 +630,22 @@ async function ensureDemoRegistration(staff, participant, event, consent) {
 async function seedReferralDeliveryLifecycle(staff, reviewer, event) {
   const participant = await upsertDemoParticipant(staff, {
     participantReference: "VSMS-DEMO-REFERRAL",
-    nric: "S1000005E",
-    firstName: "Referral",
-    lastName: "Example",
+    nric: "TEST-NRIC-0005",
+    firstName: "Synthetic",
+    lastName: "Referral",
     dateOfBirth: "1980-01-01",
     contactNumber: "+65 8000 0005",
     email: "referral.example@example.test",
   });
   const registration = await prisma.eventRegistration.upsert({
     where: { participantId_eventId: { participantId: participant.id, eventId: event.eventId } },
-    update: { registrationStatus: "COMPLETED", participantDisplayName: "Referral Example" },
+    update: { registrationStatus: "COMPLETED", participantDisplayName: "Synthetic Referral" },
     create: {
       participantId: participant.id,
       eventId: event.eventId,
       registeredBy: staff.id,
       registrationStatus: "COMPLETED",
-      participantDisplayName: "Referral Example",
+      participantDisplayName: "Synthetic Referral",
       queueNumber: 99,
       idempotencyKey: "seed-referral-lifecycle-registration",
     },
@@ -656,12 +679,12 @@ async function seedReferralDeliveryLifecycle(staff, reviewer, event) {
       instructions: "Do not use this record for clinical care.",
       urgency: "ROUTINE",
       status: "SENT",
-      referredAt: new Date(),
+      referredAt: demoTimestamp(),
     },
   });
   const delivery = await prisma.notificationDelivery.upsert({
     where: { id: "73000000-0000-4000-8000-000000000001" },
-    update: { status: "DELIVERED", deliveredAt: new Date() },
+    update: { status: "DELIVERED", deliveredAt: demoTimestamp() },
     create: {
       id: "73000000-0000-4000-8000-000000000001",
       userId: reviewer.id,
@@ -673,8 +696,8 @@ async function seedReferralDeliveryLifecycle(staff, reviewer, event) {
       body: "Synthetic lifecycle record; no recipient or clinical content.",
       providerMessageId: "seed-ses-delivered-message",
       attemptCount: 1,
-      sentAt: new Date(),
-      deliveredAt: new Date(),
+      sentAt: demoTimestamp(),
+      deliveredAt: demoTimestamp(),
     },
   });
   await prisma.providerEventReceipt.upsert({
@@ -720,7 +743,7 @@ async function seedSyncEvidence(staff, event, registration, stations) {
       status: definition.status,
       retryCount: 0,
       version: definition.status === "PENDING" ? 0 : definition.status === "PROCESSING" ? 1 : 2,
-      processingStartedAt: definition.status === "PROCESSING" ? new Date() : null,
+      processingStartedAt: definition.status === "PROCESSING" ? demoTimestamp() : null,
       errorCode: definition.errorCode,
       ...(definition.status === "APPLIED" ? {
         responseSnapshot: {
@@ -778,7 +801,7 @@ async function seedQueueEntries(staff, event, registration, stations) {
       status: "WAITING",
       isPriority: true,
       priorityNotes: "Seeded urgent follow-up required after screening",
-      enteredAt: new Date(),
+      enteredAt: demoTimestamp(),
     },
   });
   await prisma.auditLog.create({
@@ -808,6 +831,7 @@ async function seedQueueEntries(staff, event, registration, stations) {
         toStationId: firstStation.stationId,
         movedBy: staff.id,
         movementReason: "Seeded station transfer demonstration",
+        movementTime: demoTimestamp(),
       },
     });
     await prisma.auditLog.create({
@@ -965,11 +989,11 @@ async function seedDomainAuditEvidence({ staff, reviewer, liveEvent, completedEv
   return records.length;
 }
 
-async function seedDemoData(staff, reviewer, consentForm) {
+async function seedDemoData(staff, registrationOfficer, reviewer, consentForm) {
   const upcomingEvent = await upsertDemoEvent(staff, {
     key: "seed-demo-tampines",
-    name: "Community Eye Screening - Tampines",
-    venue: "Our Tampines Hub",
+    name: "VSMS Synthetic Upcoming Event",
+    venue: "Synthetic Venue One",
     status: "PUBLISHED",
     startsAt: demoDate(2, 1),
     endsAt: demoDate(2, 9),
@@ -977,8 +1001,8 @@ async function seedDemoData(staff, reviewer, consentForm) {
   });
   const liveEvent = await upsertDemoEvent(staff, {
     key: "seed-demo-jurong-live",
-    name: "Vision Screening - Jurong Live",
-    venue: "Jurong Regional Library",
+    name: "VSMS Synthetic Active Event",
+    venue: "Synthetic Venue Two",
     status: "IN_PROGRESS",
     startsAt: demoDate(0, 0),
     endsAt: demoDate(0, 23, 59),
@@ -986,17 +1010,23 @@ async function seedDemoData(staff, reviewer, consentForm) {
   });
   const completedEvent = await upsertDemoEvent(staff, {
     key: "seed-demo-woodlands-complete",
-    name: "Community Eye Screening - Woodlands",
-    venue: "Woodlands Community Club",
+    name: "VSMS Synthetic Completed Event",
+    venue: "Synthetic Venue Three",
     status: "COMPLETED",
     startsAt: demoDate(-14, 1),
     endsAt: demoDate(-14, 9),
     capacity: 100,
   });
   const [, liveStructure] = await Promise.all([
-    seedEventStructure(upcomingEvent, staff),
-    seedEventStructure(liveEvent, staff),
-    seedEventStructure(completedEvent, staff),
+    seedEventStructure(upcomingEvent, staff, registrationOfficer),
+    seedEventStructure(liveEvent, staff, registrationOfficer),
+    seedEventStructure(completedEvent, staff, registrationOfficer),
+  ]);
+
+  await Promise.all([
+    ...[upcomingEvent, liveEvent, completedEvent].map((event) => ensureDemoMembership(event, staff, ["EVENT_MANAGER"], staff)),
+    ensureDemoMembership(liveEvent, registrationOfficer, ["REGISTRATION"], staff),
+    ensureDemoMembership(liveEvent, reviewer, ["REVIEWER"], staff),
   ]);
 
   const reviewerAssignment = await prisma.staffAssignment.findFirst({
@@ -1029,59 +1059,59 @@ async function seedDemoData(staff, reviewer, consentForm) {
 
   const aisha = await upsertDemoParticipant(staff, {
     participantReference: "VSMS-DEMO-000001",
-    nric: "S1000001A",
-    firstName: "Aisha",
-    lastName: "Rahman",
-    dateOfBirth: "1988-04-12",
-    contactNumber: "+65 8123 4567",
-    email: "aisha.rahman@example.test",
-    accessibilityNotes: "Prefers large-print instructions.",
+    nric: "TEST-NRIC-0001",
+    firstName: "Synthetic",
+    lastName: "Alpha",
+    dateOfBirth: "1970-01-01",
+    contactNumber: "+65 8000 0001",
+    email: "synthetic.alpha@example.test",
+    accessibilityNotes: "Synthetic fixture: large-print instructions.",
   });
   const daniel = await upsertDemoParticipant(staff, {
     participantReference: "VSMS-DEMO-000002",
-    nric: "S1000002B",
-    firstName: "Daniel",
-    lastName: "Tan",
-    dateOfBirth: "1975-09-23",
-    contactNumber: "+65 8234 5678",
-    email: "daniel.tan@example.test",
+    nric: "TEST-NRIC-0002",
+    firstName: "Synthetic",
+    lastName: "Bravo",
+    dateOfBirth: "1971-02-02",
+    contactNumber: "+65 8000 0002",
+    email: "synthetic.bravo@example.test",
   });
   const priya = await upsertDemoParticipant(staff, {
     participantReference: "VSMS-DEMO-000003",
-    nric: "S1000003C",
-    firstName: "Priya",
-    lastName: "Nair",
-    dateOfBirth: "1992-02-18",
-    contactNumber: "+65 8345 6789",
-    email: "priya.nair@example.test",
+    nric: "TEST-NRIC-0003",
+    firstName: "Synthetic",
+    lastName: "Charlie",
+    dateOfBirth: "1972-03-03",
+    contactNumber: "+65 8000 0003",
+    email: "synthetic.charlie@example.test",
   });
   const marcus = await upsertDemoParticipant(staff, {
     participantReference: "VSMS-DEMO-000004",
-    nric: "S1000004D",
-    firstName: "Marcus",
-    lastName: "Lim",
-    dateOfBirth: "1983-11-05",
-    contactNumber: "+65 8456 7890",
-    email: "marcus.lim@example.test",
+    nric: "TEST-NRIC-0004",
+    firstName: "Synthetic",
+    lastName: "Delta",
+    dateOfBirth: "1973-04-04",
+    contactNumber: "+65 8000 0004",
+    email: "synthetic.delta@example.test",
   });
 
   await ensureDemoContact(staff, aisha, {
-    contactName: "Nur Rahman",
-    relationship: "Sister",
-    phoneNumber: "+65 9123 4001",
-    email: "nur.rahman@example.test",
+    contactName: "Synthetic Contact Alpha",
+    relationship: "Fixture contact",
+    phoneNumber: "+65 8000 0101",
+    email: "synthetic.contact.alpha@example.test",
   });
   await ensureDemoContact(staff, daniel, {
-    contactName: "Grace Tan",
-    relationship: "Spouse",
-    phoneNumber: "+65 9123 4002",
-    email: "grace.tan@example.test",
+    contactName: "Synthetic Contact Bravo",
+    relationship: "Fixture contact",
+    phoneNumber: "+65 8000 0102",
+    email: "synthetic.contact.bravo@example.test",
   });
   await ensureDemoContact(staff, priya, {
-    contactName: "Arun Nair",
-    relationship: "Brother",
-    phoneNumber: "+65 9123 4003",
-    email: "arun.nair@example.test",
+    contactName: "Synthetic Contact Charlie",
+    relationship: "Fixture contact",
+    phoneNumber: "+65 8000 0103",
+    email: "synthetic.contact.charlie@example.test",
   });
 
   const aishaConsent = await ensureAcceptedConsent(
@@ -1089,14 +1119,14 @@ async function seedDemoData(staff, reviewer, consentForm) {
     aisha,
     upcomingEvent,
     consentForm,
-    "Aisha Rahman"
+    "Synthetic Alpha"
   );
   const danielConsent = await ensureAcceptedConsent(
     staff,
     daniel,
     liveEvent,
     consentForm,
-    "Daniel Tan"
+    "Synthetic Bravo"
   );
   const { registration, qr } = await ensureDemoRegistration(
     staff,
@@ -1108,13 +1138,14 @@ async function seedDemoData(staff, reviewer, consentForm) {
   for (const station of liveStructure.stations) {
     const seedByType = {
       VISUAL_ACUITY: {
-        resultData: { od: { kind: "FRACTION", denominator: 18 }, os: { kind: "FRACTION", denominator: 24 }, chartDistanceMetres: 6, withUsualDistanceGlasses: true },
+        resultData: { fixture: "SYNTHETIC_ACCEPTANCE_ONLY", od: { kind: "FRACTION", denominator: 18 }, os: { kind: "FRACTION", denominator: 24 }, chartDistanceMetres: 6, withUsualDistanceGlasses: true },
         overallFlag: "REFER",
         flagSummary: "Reduced visual acuity in both eyes",
         ruleVersion: "VSMS-VA-1.0",
       },
       REFRACTION: {
         resultData: {
+          fixture: "SYNTHETIC_ACCEPTANCE_ONLY",
           measurementStatus: "COMPLETED",
           wearsDistanceGlasses: true,
           od: { sphere: -1.25, cylinder: -0.50, axis: 90 },
@@ -1126,14 +1157,14 @@ async function seedDemoData(staff, reviewer, consentForm) {
         ruleVersion: "VSMS-REF-1.0",
       },
       COLOUR_VISION: {
-        resultData: { testKit: "ISHIHARA", platesPresented: 11, odCorrect: 11, osCorrect: 2 },
+        resultData: { fixture: "SYNTHETIC_ACCEPTANCE_ONLY", testKit: "ISHIHARA", platesPresented: 11, odCorrect: 11, osCorrect: 2 },
         overallFlag: "URGENT",
         flagSummary: "Critical colour-vision asymmetry OD 11/11 vs OS 2/11",
         ruleVersion: "VSMS-CV-1.0",
       },
     };
     const seeded = seedByType[station.stationType] || {
-      resultData: { notes: "Seed placeholder" },
+      resultData: { fixture: "SYNTHETIC_ACCEPTANCE_ONLY", notes: "Synthetic fixture placeholder" },
       overallFlag: "REVIEW",
       flagSummary: "Seeded review flag",
       ruleVersion: "VSMS-SEED-1.0",
@@ -1188,24 +1219,24 @@ async function main() {
   const passwordHash = await bcrypt.hash(DEMO_PASSWORD, 12);
   const roles = await seedRoles();
   const staff = await seedStaff(roles, passwordHash);
-  await seedRegistrationOfficer(roles, staff, passwordHash);
+  const registrationOfficer = await seedRegistrationOfficer(roles, staff, passwordHash);
   const reviewer = await seedReviewer(roles, staff, passwordHash);
   await seedPermissions(roles, staff);
   await seedStationTemplates();
   const consentForm = await seedConsentForm(staff);
-  const demo = await seedDemoData(staff, reviewer, consentForm);
+  const demo = await seedDemoData(staff, registrationOfficer, reviewer, consentForm);
   console.log(`Seeded roles, permissions, station templates, consent form, staff profile, and demonstration data for ${staff.email}.`);
   console.log(`Upcoming event: ${demo.events.upcomingEvent.name} (${demo.events.upcomingEvent.eventId})`);
   console.log(`Live event: ${demo.events.liveEvent.name} (${demo.events.liveEvent.eventId})`);
-  console.log(`Ready participant: ${demo.participants.aisha.participantReference} - Aisha Rahman`);
-  console.log(`Needs consent: ${demo.participants.priya.participantReference} - Priya Nair`);
-  console.log(`Needs emergency contact: ${demo.participants.marcus.participantReference} - Marcus Lim`);
-  console.log(`Registered participant: ${demo.participants.daniel.participantReference} - Daniel Tan`);
+  console.log(`Ready participant: ${demo.participants.aisha.participantReference} - Synthetic Alpha`);
+  console.log(`Needs consent: ${demo.participants.priya.participantReference} - Synthetic Charlie`);
+  console.log(`Needs emergency contact: ${demo.participants.marcus.participantReference} - Synthetic Delta`);
+  console.log(`Registered participant: ${demo.participants.daniel.participantReference} - Synthetic Bravo`);
   console.log(`Reviewer profile: ${reviewer.email} (local role: REVIEWER)`);
   console.log(`Registration ID: ${demo.registration.registrationId}`);
   console.log(`Demo QR pass: ${demo.qr.id}`);
   console.log(`Audit evidence records: ${demo.auditEvidenceCount}`);
-  console.log(`Demo QR token: VSMS-DEMO-QR-001`);
+  console.log("Synthetic QR pass created (do not copy the bearer value into evidence).");
   console.log(`Synthetic referral delivery: ${demo.referralLifecycle.delivery.status} (${demo.referralLifecycle.delivery.id})`);
   const liveStations = await prisma.station.findMany({
     where: { eventId: demo.events.liveEvent.eventId, isActive: true },
