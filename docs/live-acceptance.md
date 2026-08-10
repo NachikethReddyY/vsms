@@ -9,7 +9,7 @@ Use only a disposable local PostgreSQL database named `vsms_demo` or `vsms_accep
 ```bash
 export DATABASE_URL='postgresql://postgres:postgres@localhost:5432/vsms_demo'
 export VSMS_DEMO_ANCHOR_DATE='2026-08-10'
-pnpm --dir backend acceptance:reset
+VSMS_ACCEPTANCE_RESET_ACK='RESET_LOCAL_VSMS_DEMO' pnpm --dir backend acceptance:reset
 pnpm --dir backend acceptance:check
 ```
 
@@ -17,7 +17,7 @@ pnpm --dir backend acceptance:check
 
 The seed creates only synthetic identities (`Synthetic …`, `TEST-NRIC-…`, `example.test`) and marks screening payloads `SYNTHETIC_ACCEPTANCE_ONLY`. It gives the synthetic administrator event-manager memberships, the synthetic registration officer a live-event registration membership/duty, and the synthetic reviewer a live-event reviewer membership/duty. It also includes consent, registration, QR, check-in-ready queue, transfer, review/referral, and sync-state data.
 
-Do not use `acceptance:reset` against an approved live environment. It is intentionally local-only; deployment migrations use the normal deployment procedure.
+Do not use `acceptance:reset` against an approved live environment. It is intentionally local-only and requires the exact command-scoped acknowledgement above; deployment migrations use the normal deployment procedure.
 
 ## 2. Prepare and retain evidence
 
@@ -34,6 +34,8 @@ For every passed scenario, record an ISO timestamp, a path to a sanitized screen
 - the migration revision and its timestamp;
 - the deployed service revision, `/health` status, and timestamp;
 - the approved environment label.
+
+A passed scenario cannot contain a 5xx HTTP status. A `DEPENDENCY_BLOCKED` scenario can be recorded as blocked or failed, but never passed.
 
 Do not retain passwords, MFA values, cookies, authorization headers, access or refresh tokens, QR bearer values, unmasked participant details, real emails, NRICs, phone numbers, or raw exports. The validator rejects sensitive field names and common secret/PII-looking values, but it cannot inspect a screenshot: redact the pixels before saving it. Use synthetic fixture labels and aggregate counts in screenshots.
 

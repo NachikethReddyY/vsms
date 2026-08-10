@@ -1,6 +1,13 @@
 const { spawnSync } = require("node:child_process");
 
 const localHosts = new Set(["localhost", "127.0.0.1", "::1"]);
+const RESET_ACKNOWLEDGEMENT = "RESET_LOCAL_VSMS_DEMO";
+
+const assertResetAcknowledgement = (acknowledgement) => {
+  if (acknowledgement !== RESET_ACKNOWLEDGEMENT) {
+    throw new Error(`Set VSMS_ACCEPTANCE_RESET_ACK=${RESET_ACKNOWLEDGEMENT} to reset the local demo database`);
+  }
+};
 
 const assertLocalDemoDatabase = (databaseUrl) => {
   if (!databaseUrl) throw new Error("DATABASE_URL is required");
@@ -14,6 +21,7 @@ const assertLocalDemoDatabase = (databaseUrl) => {
 
 const main = () => {
   const target = assertLocalDemoDatabase(process.env.DATABASE_URL);
+  assertResetAcknowledgement(process.env.VSMS_ACCEPTANCE_RESET_ACK);
   console.log(`Resetting local acceptance database ${target.host}/${target.database}.`);
   const result = spawnSync("pnpm", ["exec", "prisma", "migrate", "reset", "--force"], {
     cwd: __dirname + "/..",
@@ -33,4 +41,4 @@ if (require.main === module) {
   }
 }
 
-module.exports = { assertLocalDemoDatabase };
+module.exports = { assertLocalDemoDatabase, assertResetAcknowledgement, RESET_ACKNOWLEDGEMENT };

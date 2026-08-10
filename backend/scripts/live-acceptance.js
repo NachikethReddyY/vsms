@@ -90,6 +90,7 @@ const assertCapture = (capture, allowIncomplete) => {
   assert.match(capture.sanitizedScreenshot?.path || "", /\S/, `${capture.scenarioId} needs a screenshot path`);
   assert.ok(Array.isArray(capture.requestIds) && capture.requestIds.length > 0, `${capture.scenarioId} needs request IDs`);
   assert.ok(Array.isArray(capture.httpStatuses) && capture.httpStatuses.length > 0, `${capture.scenarioId} needs HTTP statuses`);
+  assert.ok(capture.httpStatuses.every((status) => Number.isInteger(status) && status >= 100 && status < 500), `${capture.scenarioId} passed HTTP evidence must not include a 5xx status`);
   assert.ok(capture.rowCounts && typeof capture.rowCounts === "object" && Object.keys(capture.rowCounts).length > 0, `${capture.scenarioId} needs row counts`);
 };
 
@@ -104,6 +105,7 @@ const assertEvidence = (evidence, kit, { allowIncomplete = false } = {}) => {
     const scenario = scenarios.get(capture.scenarioId);
     assert.ok(scenario, `unknown scenario: ${capture.scenarioId}`);
     assert.equal(capture.proofLevel, scenario.proofLevel, `${capture.scenarioId} proof level changed`);
+    assert.ok(scenario.proofLevel !== "DEPENDENCY_BLOCKED" || capture.status !== "PASSED", `${capture.scenarioId} is dependency-blocked and must not validate as PASSED`);
     assertCapture(capture, allowIncomplete);
     hasPassed ||= capture.status === "PASSED";
     scenarios.delete(capture.scenarioId);

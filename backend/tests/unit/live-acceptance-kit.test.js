@@ -1,11 +1,11 @@
 const assert = require("node:assert/strict");
-const { execFileSync } = require("node:child_process");
+const { execFileSync, spawnSync } = require("node:child_process");
 const fs = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
 const test = require("node:test");
 const { assertEvidence, assertKit, loadKit, newEvidence } = require("../../scripts/live-acceptance");
-const { assertLocalDemoDatabase } = require("../../scripts/reset-acceptance-demo");
+const { assertLocalDemoDatabase, assertResetAcknowledgement, RESET_ACKNOWLEDGEMENT } = require("../../scripts/reset-acceptance-demo");
 
 test("live acceptance kit produces an incomplete, secret-free evidence template", () => {
   const kit = loadKit();
@@ -57,6 +57,18 @@ test("passed evidence requires run metadata and sanitized capture metadata", () 
     }
   }
   assert.doesNotThrow(() => assertEvidence(evidence, kit));
+  const dependency = evidence.captures.find((capture) => capture.proofLevel === "DEPENDENCY_BLOCKED");
+  dependency.status = "PASSED";
+  dependency.sanitizedScreenshot = { path: "screenshots/dependency.png", sanitized: true };
+  dependency.requestIds = ["11111111-1111-4111-8111-111111111111"];
+  dependency.httpStatuses = [200];
+  dependency.rowCounts = { syntheticRows: 1 };
+  assert.throws(() => assertEvidence(evidence, kit), /must not validate as PASSED/);
+  dependency.status = "BLOCKED";
+  const passed = evidence.captures.find((capture) => capture.status === "PASSED");
+  passed.httpStatuses = [503];
+  assert.throws(() => assertEvidence(evidence, kit), /must not include a 5xx status/);
+  passed.httpStatuses = [200];
   evidence.run.service.revision = null;
   assert.throws(() => assertEvidence(evidence, kit), /service revision/);
 });
@@ -68,4 +80,12 @@ test("acceptance reset rejects every non-local or non-demo database", () => {
   });
   assert.throws(() => assertLocalDemoDatabase("postgresql://user:pass@example.com:5432/vsms_demo"), /Refusing reset/);
   assert.throws(() => assertLocalDemoDatabase("postgresql://user:pass@localhost:5432/vsms"), /Refusing reset/);
+  assert.doesNotThrow(() => assertResetAcknowledgement(RESET_ACKNOWLEDGEMENT));
+  assert.throws(() => assertResetAcknowledgement("reset_local_vsms_demo"), /VSMS_ACCEPTANCE_RESET_ACK/);
+  const reset = spawnSync(process.execPath, [path.resolve(__dirname, "../../scripts/reset-acceptance-demo.js")], {
+    env: { ...process.env, DATABASE_URL: "postgresql://user:pass@localhost:5432/vsms_demo", VSMS_ACCEPTANCE_RESET_ACK: "wrong" },
+    encoding: "utf8",
+  });
+  assert.equal(reset.status, 1);
+  assert.match(reset.stderr, /VSMS_ACCEPTANCE_RESET_ACK/);
 });
