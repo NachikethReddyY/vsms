@@ -1,6 +1,8 @@
 #!/bin/sh
 set -eu
 
+RESTORE_CONFIRMATION='RESTORE_ISOLATED_TEST_DATABASE'
+
 fail() {
   printf '%s\n' "$1" >&2
   exit 1
@@ -10,6 +12,7 @@ fail() {
 command -v pg_restore >/dev/null 2>&1 || fail "pg_restore is required"
 command -v psql >/dev/null 2>&1 || fail "psql is required"
 [ -n "${RESTORE_DATABASE_URL:-}" ] || fail "RESTORE_DATABASE_URL is required"
+[ "${RESTORE_CONFIRM:-}" = "$RESTORE_CONFIRMATION" ] || fail "Set RESTORE_CONFIRM=$RESTORE_CONFIRMATION before restoring"
 backup_file=$1
 manifest_file="$backup_file.counts.tsv"
 
@@ -34,7 +37,7 @@ target_database=$(psql "$RESTORE_DATABASE_URL" -Atq -v ON_ERROR_STOP=1 -c 'SELEC
 case "$target_database" in *_test) ;; *) fail "Restore target must end in _test" ;; esac
 
 started_epoch=$(date +%s)
-pg_restore --dbname="$RESTORE_DATABASE_URL" --clean --if-exists --no-owner --no-privileges --exit-on-error "$backup_file"
+pg_restore --dbname="$RESTORE_DATABASE_URL" --clean --if-exists --no-owner --no-privileges --exit-on-error --single-transaction "$backup_file"
 
 while IFS='	' read -r table_name expected_count; do
   actual_count=$(psql "$RESTORE_DATABASE_URL" -Atq -v ON_ERROR_STOP=1 -c "SELECT count(*) FROM public.\"${table_name}\"")

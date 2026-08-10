@@ -6,6 +6,10 @@ fail() {
   exit 1
 }
 
+path_exists() {
+  [ -e "$1" ] || [ -L "$1" ]
+}
+
 command -v pg_dump >/dev/null 2>&1 || fail "pg_dump is required"
 command -v psql >/dev/null 2>&1 || fail "psql is required"
 [ -n "${DATABASE_URL:-}" ] || fail "DATABASE_URL is required"
@@ -22,6 +26,8 @@ database_name=$(psql "$DATABASE_URL" -Atq -v ON_ERROR_STOP=1 -c 'SELECT current_
 timestamp=$(date -u +%Y%m%dT%H%M%SZ)
 backup_file="$VSMS_BACKUP_DIR/vsms-${database_name}-${timestamp}.dump"
 manifest_file="$backup_file.counts.tsv"
+path_exists "$backup_file" && fail "Refusing to overwrite existing backup: $backup_file"
+path_exists "$manifest_file" && fail "Refusing to overwrite existing manifest: $manifest_file"
 started_epoch=$(date +%s)
 
 if ! pg_dump --dbname="$DATABASE_URL" --format=custom --no-owner --no-privileges --file="$backup_file"; then

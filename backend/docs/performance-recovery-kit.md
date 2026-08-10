@@ -40,7 +40,7 @@ VSMS_LOAD_TEST_ACKNOWLEDGEMENT=SYNTHETIC_LOAD_TEST \
   pnpm --dir backend perf:run
 ```
 
-The runner refuses to write until it sees the explicit acknowledgement, a target label ending in `_test`, a credential-free base URL, a valid fixture, and a bearer token. Remote authorized non-production targets additionally require `VSMS_LOAD_TEST_REMOTE_NONPRODUCTION=YES`; change the checked-in target label and base URL only to another isolated target ending in `_test`. It never treats this opt-in as proof that a target is authorized.
+The runner refuses to write until it sees the explicit acknowledgement, a target label ending in `_test`, a credential-free base URL, a valid fixture, and a bearer token. It refuses proxy environment variables so the evaluated URL cannot be silently forwarded. Remote authorized non-production targets additionally require `VSMS_LOAD_TEST_REMOTE_NONPRODUCTION=YES`; change the checked-in target label and base URL only to another isolated target ending in `_test`. It never treats this opt-in as proof that a target is authorized.
 
 The fixture script refuses to overwrite an existing fixture and only creates synthetic records in a `_test` database. It intentionally does not clean them up automatically: keeping the event makes the measured operations and evidence reproducible. Dispose of the isolated database under the environment owner's retention policy when the evidence is no longer needed.
 
@@ -60,10 +60,11 @@ Restore only into an isolated database whose actual and URL-selected names end i
 
 ```sh
 export RESTORE_DATABASE_URL='postgresql://restore-user:password@db-host:5432/vsms_restore_test'
+export RESTORE_CONFIRM=RESTORE_ISOLATED_TEST_DATABASE
 pnpm --dir backend restore:postgres:test /absolute/secure/backups/vsms-vsms-20260810T000000Z.dump
 ```
 
-The dump and its `.counts.tsv` manifest must remain together. A successful command is restore evidence only for that specific backup, target, and time; record its JSON or terminal output alongside the authorized change record. No backup or restore has been executed by this change.
+The dump and its `.counts.tsv` manifest must remain together. Restore requires the exact confirmation above, uses one `pg_restore --single-transaction` transaction, and rolls it back on restore failure. Backup refuses an existing timestamped dump or manifest rather than overwriting it. A successful command is restore evidence only for that specific backup, target, and time; record its JSON or terminal output alongside the authorized change record. No backup or restore has been executed by this change.
 
 ## Observe and decide
 

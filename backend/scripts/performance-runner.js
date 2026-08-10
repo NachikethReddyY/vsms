@@ -8,6 +8,7 @@ const { performance } = require("perf_hooks");
 
 const ACKNOWLEDGEMENT = "SYNTHETIC_LOAD_TEST";
 const LOCAL_HOSTS = new Set(["127.0.0.1", "localhost", "::1"]);
+const PROXY_ENVIRONMENT_VARIABLES = ["ALL_PROXY", "HTTP_PROXY", "HTTPS_PROXY", "all_proxy", "http_proxy", "https_proxy"];
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const BACKEND_ROOT = path.resolve(__dirname, "..");
 
@@ -55,6 +56,9 @@ function assertConfig(config) {
   }
   if (!/^https?:$/.test(baseUrl.protocol) || baseUrl.username || baseUrl.password || baseUrl.pathname !== "/" || baseUrl.search || baseUrl.hash) {
     fail("config.baseUrl must be a credential-free HTTP(S) origin");
+  }
+  if (PROXY_ENVIRONMENT_VARIABLES.some((name) => process.env[name])) {
+    fail("Forward proxy environment variables are not supported for load tests");
   }
   if (!LOCAL_HOSTS.has(baseUrl.hostname.toLowerCase()) && process.env.VSMS_LOAD_TEST_REMOTE_NONPRODUCTION !== "YES") {
     fail("Remote load tests require VSMS_LOAD_TEST_REMOTE_NONPRODUCTION=YES");
