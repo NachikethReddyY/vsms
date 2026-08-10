@@ -22,6 +22,7 @@ const AppError = require("./errors/AppError");
 
 // Custom Middlewares
 const requestContext = require("./middlewares/requestContext");
+const httpLogger = require("./middlewares/httpLogger");
 const csrf = require("./middlewares/csrf");
 const authenticate = require("./middlewares/authenticate");
 const { notFound, errorHandler } = require("./middlewares/errorHandler");
@@ -61,6 +62,7 @@ app.disable("x-powered-by");
 
 // Attach baseline tracking context to incoming requests
 app.use(requestContext);
+app.use(httpLogger);
 
 /**
  * ============================================================================

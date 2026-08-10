@@ -103,7 +103,8 @@ async function emit({
   type,
   aggregateType,
   aggregateId,
-  correlationId = crypto.randomUUID(),
+  context,
+  correlationId,
   actorUserId = null,
   payload = {},
 }) {
@@ -115,7 +116,7 @@ async function emit({
       type,
       aggregateType,
       aggregateId,
-      correlationId: correlationId || crypto.randomUUID(),
+      correlationId: correlationId || context?.requestId || crypto.randomUUID(),
       actorUserId,
       payload: sanitizePayload(payload),
     },
@@ -186,35 +187,39 @@ async function freshEvent(client, claim) {
  */
 async function dispatchEvent(row, overrides = {}) {
   const client = overrides.prisma || prisma;
+  const eventLogger = overrides.logger || logger;
   const claim = await claimEvent(client, row, overrides);
   if (!claim.claimToken) return claim;
 
   const matches = handlersFor(row.type);
   if (matches.length === 0) {
     await markDispatched(client, claim, overrides, "NO_HANDLERS");
-    return { event: await freshEvent(client, claim), accepted: true, pending: false, reason: "NO_HANDLERS" };
+    const updated = await freshEvent(client, claim);
+    eventLogger.info("domain_event.dispatched", {
+      eventId: updated.id,
+      type: updated.type,
+      requestId: updated.correlationId,
+      status: updated.status,
+      reason: "NO_HANDLERS",
+    });
+    return { event: updated, accepted: true, pending: false, reason: "NO_HANDLERS" };
   }
 
   let failureCode = null;
+  let failureHandler = null;
   for (const entry of matches) {
     try {
       await entry.handler({
         event: claim.event,
         context: {
           db: client,
-          logger,
+          logger: eventLogger,
           emit: (input) => emit({ client: overrides.prisma || prisma, ...input }),
         },
       });
     } catch (error) {
       failureCode = safeErrorCode(error);
-      logger.warn("domain_event.handler_failed", {
-        eventId: claim.event.id,
-        type: claim.event.type,
-        handler: entry.id,
-        code: failureCode,
-        message: error?.message,
-      });
+      failureHandler = entry.id;
       break;
     }
   }
@@ -222,6 +227,14 @@ async function dispatchEvent(row, overrides = {}) {
   if (failureCode) {
     await markFailed(client, claim, overrides, failureCode);
     const updated = await freshEvent(client, claim);
+    eventLogger.warn("domain_event.handler_failed", {
+      eventId: updated.id,
+      type: updated.type,
+      requestId: updated.correlationId,
+      handler: failureHandler,
+      code: failureCode,
+      status: updated.status,
+    });
     return {
       event: updated,
       accepted: true,
@@ -231,7 +244,14 @@ async function dispatchEvent(row, overrides = {}) {
   }
 
   await markDispatched(client, claim, overrides);
-  return { event: await freshEvent(client, claim), accepted: true, pending: false };
+  const updated = await freshEvent(client, claim);
+  eventLogger.info("domain_event.dispatched", {
+    eventId: updated.id,
+    type: updated.type,
+    requestId: updated.correlationId,
+    status: updated.status,
+  });
+  return { event: updated, accepted: true, pending: false };
 }
 
 /**
@@ -268,7 +288,13 @@ async function processNextDomainEvents({ limit = 25 } = {}, overrides = {}) {
     else if (result.reason === "DEAD_LETTER") summary.deadLettered += 1;
     else if (status === "DISPATCHED") summary.dispatched += 1;
     else summary.skipped += 1;
-    summary.events.push({ id: candidate.id, type: candidate.type, status: status || "PROCESSING", reason: result.reason || null });
+    summary.events.push({
+      id: candidate.id,
+      type: candidate.type,
+      correlationId: result.event?.correlationId || candidate.correlationId,
+      status: status || "PROCESSING",
+      reason: result.reason || null,
+    });
   }
   return summary;
 }
