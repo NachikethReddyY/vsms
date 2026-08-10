@@ -90,12 +90,17 @@ test("school API map records the actual Cognito, PATCH, and event-scoped contrac
     assert.ok(document.paths["/api/v1/events/{eventId}"].patch);
     assert.ok(document.paths["/api/v1/participants/{participantId}"].patch);
     assert.ok(document.paths["/api/v1/events/{eventId}/stations/{stationId}/visual-acuity"].post);
+    assert.ok(document.paths["/api/v1/events/{eventId}/stations/{stationId}/eye-health"].post);
     assert.ok(document.paths["/api/v1/events/{eventId}/sync/screening"].post);
-    assert.equal(document.paths["/api/v1/screenings/eye-health"], undefined);
     assert.match(map, /Cognito authorization-code \+ PKCE/);
     assert.match(map, /`PATCH \/api\/v1\/events\/\{eventId\}`/);
     assert.match(map, /`POST \/api\/v1\/events\/\{eventId\}\/sync\/screening`/);
-    assert.match(map, /Eye-health result capture is the only required API row without a local equivalent/);
+    assert.match(map, /`POST \/api\/v1\/events\/\{eventId\}\/stations\/\{stationId\}\/eye-health`/);
+});
+
+test("recorded reviews expose optional eye-health observations as nullable", () => {
+    const document = YAML.parse(read("docs/openapi.yaml"));
+    assert.equal(document.components.schemas.RecordedReview.properties.eyeHealthObservations.nullable, true);
 });
 
 test("account contracts allow composed runtime fields and document provider maintenance", () => {
@@ -166,7 +171,7 @@ test("listStationTemplates reads active StationTemplate rows", () => {
     assert.match(body, /stationTemplate\.findMany/);
     assert.match(body, /active:\s*true/);
     assert.match(body, /stationTemplateId:\s*true/);
-    assert.match(body, /templateKey:\s*true/);
+    assert.match(body, /stationType:\s*true/);
     assert.match(body, /defaultCapacity:\s*true/);
     assert.doesNotMatch(body, /return\s+\[\];/);
 });
@@ -181,30 +186,26 @@ test("importStations and updateStation use Prisma Station not EventStation", () 
     const importBody = importFn.slice(0, importFn.indexOf("\nconst updateStation"));
     assert.match(importBody, /tx\.station\.(create|update|upsert)/);
     assert.match(importBody, /STATION_TEMPLATE_NOT_IMPORTABLE/);
-    assert.match(importBody, /classifyTemplates|stationTypeForTemplateKey/);
+    assert.match(importBody, /classifyTemplates|stationTypeForTemplate/);
     const updateFn = source.slice(source.indexOf("const updateStation = async"));
     const updateBody = updateFn.slice(0, updateFn.indexOf("\nconst addStaffAssignment"));
     assert.match(updateBody, /tx\.station\.update/);
     assert.match(updateBody, /isActive:\s*body\.isAvailable/);
 });
 
-test("station template mapping only imports screening StationTypes", () => {
+test("station template mapping imports the explicit screening stationType", () => {
     const mapping = require("../../services/event/stationTemplateMapping");
-    assert.equal(mapping.stationTypeForTemplateKey("VISUAL_ACUITY"), "VISUAL_ACUITY");
-    assert.equal(mapping.stationTypeForTemplateKey("REFRACTION"), "REFRACTION");
-    assert.equal(mapping.stationTypeForTemplateKey("COLOUR_VISION"), "COLOUR_VISION");
-    assert.equal(mapping.stationTypeForTemplateKey("EYE_HEALTH"), null);
-    assert.equal(mapping.stationTypeForTemplateKey("REGISTRATION"), null);
-    assert.equal(mapping.stationTypeForTemplateKey("CLINICAL_REVIEW"), null);
+    assert.equal(mapping.stationTypeForTemplate({ templateKey: "opaque", stationType: "VISUAL_ACUITY" }), "VISUAL_ACUITY");
+    assert.equal(mapping.stationTypeForTemplate({ templateKey: "VISUAL_ACUITY", stationType: null }), null);
 
     const { importable, skipped } = mapping.classifyTemplates([
-        { templateKey: "REGISTRATION", name: "Registration" },
-        { templateKey: "VISUAL_ACUITY", name: "Visual acuity" },
-        { templateKey: "CLINICAL_REVIEW", name: "Clinical review" },
-        { templateKey: "EYE_HEALTH", name: "Eye health" },
+        { templateKey: "REGISTRATION", stationType: null, name: "Registration" },
+        { templateKey: "opaque-1", stationType: "VISUAL_ACUITY", name: "Visual acuity" },
+        { templateKey: "CLINICAL_REVIEW", stationType: null, name: "Clinical review" },
+        { templateKey: "opaque-2", stationType: "EYE_HEALTH", name: "Eye health" },
     ]);
-    assert.deepEqual(importable.map(({ stationType }) => stationType), ["VISUAL_ACUITY"]);
-    assert.deepEqual(skipped.map((template) => template.templateKey), ["REGISTRATION", "CLINICAL_REVIEW", "EYE_HEALTH"]);
+    assert.deepEqual(importable.map(({ stationType }) => stationType), ["VISUAL_ACUITY", "EYE_HEALTH"]);
+    assert.deepEqual(skipped.map((template) => template.templateKey), ["REGISTRATION", "CLINICAL_REVIEW"]);
 });
 
 test("participant search matches any supplied identifier", () => {

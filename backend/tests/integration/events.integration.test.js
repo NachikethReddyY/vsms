@@ -22,9 +22,10 @@ before(async () => {
   administrator = await helpers.ensureTestUser("ADMINISTRATOR", "event-administrator");
   defaultStationTemplate = await helpers.prisma.stationTemplate.upsert({
     where: { templateKey: "VISUAL_ACUITY" },
-    update: { active: true, name: "Visual acuity", defaultCapacity: 12 },
+    update: { active: true, stationType: "VISUAL_ACUITY", name: "Visual acuity", defaultCapacity: 12 },
     create: {
       templateKey: "VISUAL_ACUITY",
+      stationType: "VISUAL_ACUITY",
       version: 1,
       name: "Visual acuity",
       description: "Default integration-test station.",
@@ -73,13 +74,50 @@ const newEvent = () => {
 };
 
 describe("event lifecycle", () => {
+  test("administrator creates reusable templates of one type and changes are request-audited", async () => {
+    const firstRequestId = crypto.randomUUID();
+    const secondRequestId = crypto.randomUUID();
+    const createTemplate = (name, requestId) => request(app)
+      .post("/api/events/station-templates")
+      .set("Authorization", `Bearer ${adminToken}`)
+      .set("X-Request-Id", requestId)
+      .send({ stationType: "EYE_HEALTH", name, defaultCapacity: 2 });
+
+    const first = await createTemplate(`Eye health ${crypto.randomUUID()}`, firstRequestId);
+    const second = await createTemplate(`Eye health ${crypto.randomUUID()}`, secondRequestId);
+    expect(first.status).toBe(201);
+    expect(second.status).toBe(201);
+    expect(first.body.stationType).toBe("EYE_HEALTH");
+    expect(first.body.templateKey).toMatch(/^[a-f0-9-]{36}$/);
+    expect(second.body.templateKey).not.toBe(first.body.templateKey);
+
+    const deactivateRequestId = crypto.randomUUID();
+    const deactivated = await request(app)
+      .patch(`/api/events/station-templates/items/${first.body.stationTemplateId}`)
+      .set("Authorization", `Bearer ${adminToken}`)
+      .set("X-Request-Id", deactivateRequestId)
+      .send({ name: "Updated eye health template", active: false });
+    expect(deactivated.status).toBe(200);
+    expect(deactivated.body.name).toBe("Updated eye health template");
+    expect(deactivated.body.active).toBe(false);
+
+    const audits = await helpers.prisma.auditLog.findMany({
+      where: { entityName: "StationTemplate", entityId: first.body.stationTemplateId },
+      orderBy: { createdAt: "asc" },
+    });
+    expect(audits.map((audit) => audit.action)).toEqual(["STATION_TEMPLATE_CREATED", "STATION_TEMPLATE_DEACTIVATED"]);
+    expect(audits[0]).toEqual(expect.objectContaining({ userId: administrator.id, requestId: firstRequestId }));
+    expect(audits[1]).toEqual(expect.objectContaining({ userId: administrator.id, requestId: deactivateRequestId }));
+  });
+
   test("manager atomically creates a multi-day station and staffing plan", async () => {
     const staff = await createUser("SCREENER");
     const template = await helpers.prisma.stationTemplate.upsert({
       where: { templateKey: "VISUAL_ACUITY" },
-      update: { active: true, name: "Clinical screening", defaultCapacity: 12 },
+      update: { active: true, stationType: "VISUAL_ACUITY", name: "Clinical screening", defaultCapacity: 12 },
       create: {
         templateKey: "VISUAL_ACUITY",
+        stationType: "VISUAL_ACUITY",
         version: 1,
         name: "Clinical screening",
         description: "Multi-day wizard test station.",
@@ -440,9 +478,10 @@ describe("event lifecycle", () => {
 
     const templates = await Promise.all(["VISUAL_ACUITY", "REFRACTION"].map((templateKey, index) => helpers.prisma.stationTemplate.upsert({
       where: { templateKey },
-      update: { active: true, name: `Integration ${templateKey}`, defaultCapacity: index + 2 },
+      update: { active: true, stationType: templateKey, name: `Integration ${templateKey}`, defaultCapacity: index + 2 },
       create: {
         templateKey,
+        stationType: templateKey,
         version: 1,
         name: `Integration ${templateKey}`,
         description: `Template ${templateKey}`,
@@ -462,6 +501,21 @@ describe("event lifecycle", () => {
         active: true,
       },
     });
+    const duplicateRefraction = await helpers.prisma.stationTemplate.create({
+      data: {
+        templateKey: crypto.randomUUID(),
+        stationType: "REFRACTION",
+        name: "Alternative refraction",
+        defaultCapacity: 2,
+      },
+    });
+
+    const duplicateTypes = await request(app)
+      .post(`/api/events/${created.body.eventId}/stations/import`)
+      .set("Authorization", `Bearer ${managerToken}`)
+      .send({ version: created.body.version, stationTemplateIds: [templates[1].stationTemplateId, duplicateRefraction.stationTemplateId] });
+    expect(duplicateTypes.status).toBe(422);
+    expect(duplicateTypes.body.code).toBe("DUPLICATE_STATION_TYPE");
 
     const skipped = await request(app)
       .post(`/api/events/${created.body.eventId}/stations/import`)
@@ -480,14 +534,13 @@ describe("event lifecycle", () => {
       .set("X-Request-Id", importRequestId)
       .set("X-Device-Id", device.id)
       .set("X-Device-Name", "Station planning tablet")
-      .send({ version: created.body.version, stationTemplateIds: templates.map((template) => template.stationTemplateId) });
+      .send({ version: created.body.version, stationTemplateIds: [duplicateRefraction.stationTemplateId] });
     expect(imported.status).toBe(201);
     expect(imported.body.eventStations).toHaveLength(2);
-    expect(imported.body.eventStations[0]).toEqual(expect.objectContaining({
-      name: templates[0].name,
-      capacity: templates[0].defaultCapacity,
-      stationOrder: 1,
-      stationTemplateId: templates[0].stationTemplateId,
+    expect(imported.body.eventStations).toContainEqual(expect.objectContaining({
+      stationTemplateId: duplicateRefraction.stationTemplateId,
+      name: duplicateRefraction.name,
+      capacity: duplicateRefraction.defaultCapacity,
     }));
     const importAudit = await helpers.prisma.auditLog.findFirstOrThrow({
       where: { entityName: "Event", entityId: created.body.eventId, action: "UPDATED", requestId: importRequestId },
@@ -505,6 +558,11 @@ describe("event lifecycle", () => {
       .send({ version: imported.body.version, stationTemplateIds: [templates[0].stationTemplateId] });
     expect(reimported.status).toBe(201);
     expect(reimported.body.eventStations).toHaveLength(2);
+    expect(reimported.body.eventStations).toContainEqual(expect.objectContaining({
+      stationTemplateId: duplicateRefraction.stationTemplateId,
+      name: duplicateRefraction.name,
+      capacity: duplicateRefraction.defaultCapacity,
+    }));
 
     const secondStation = imported.body.eventStations[1];
     const stationRequestId = crypto.randomUUID();

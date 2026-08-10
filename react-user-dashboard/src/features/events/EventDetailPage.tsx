@@ -378,7 +378,7 @@ export default function EventDetailPage() {
   const canCreateEvent = user?.roles.includes('ADMINISTRATOR') ?? false;
   const canConfigureStations = canManage && ['DRAFT', 'PUBLISHED', 'IN_PROGRESS'].includes(event.status);
   const canEditStaffing = canManage && ['DRAFT', 'PUBLISHED', 'IN_PROGRESS'].includes(event.status);
-  const availableTemplates = stationTemplates.filter((template) => !event.eventStations.some((station) => station.stationTemplateId === template.stationTemplateId));
+  const availableTemplates = stationTemplates.filter((template) => !event.eventStations.some((station) => station.stationType === template.stationType));
   const canCancel = canManage && !terminal && (event.status !== 'IN_PROGRESS' || user?.systemRole === 'ADMIN');
   const isAdministrator = user?.roles.includes('ADMINISTRATOR') ?? false;
   const canRegisterParticipants = isAdministrator
@@ -439,6 +439,7 @@ export default function EventDetailPage() {
           {assignedStationTypes.has('VISUAL_ACUITY') && <Link className="primary" to={`${eventPath}/stations/visual-acuity`}>Open Visual Acuity station</Link>}
           {assignedStationTypes.has('REFRACTION') && <Link className="primary" to={`${eventPath}/stations/refraction`}>Open Refraction station</Link>}
           {assignedStationTypes.has('COLOUR_VISION') && <Link className="primary" to={`${eventPath}/stations/colour-vision`}>Open Colour Vision station</Link>}
+          {assignedStationTypes.has('EYE_HEALTH') && <Link className="primary" to={`${eventPath}/stations/eye-health`}>Open Eye Health station</Link>}
           {assignedStationTypes.size > 0 && <Link className="secondary" to="/qr-scanner">Scan QR → station</Link>}
           {canReview && <Link className="secondary" to={`${eventPath}/reviews`}><ClipboardDocumentCheckIcon />Open clinical review</Link>}
         </div>

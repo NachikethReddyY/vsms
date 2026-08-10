@@ -44,7 +44,7 @@ VISUAL_ACUITY | REFRACTION | COLOUR_VISION | EYE_HEALTH
 | `REFRACTION` | Refraction | 3 |
 | `COLOUR_VISION` | Colour vision | 3 |
 
-Demo event seeding creates **runtime** `Station` rows only for VA / Refraction / Colour Vision (not Registration, Clinical Review, or Eye Health). Screening’s `ensureDemoStations` matches that VA/REF/CV set. `EYE_HEALTH` is a valid `StationType` and appears in review tests, but is not auto-created by demo helpers today.
+Demo event seeding creates **runtime** `Station` rows for VA / Refraction / Colour Vision / Eye Health (not Registration or Clinical Review). Screening’s `ensureDemoStations` matches that VA/REF/CV/EH set.
 
 QR scan → station handoff (token-only QR; `eventId` + `registrationId` after verify) is documented in [`qr-station-handoff.md`](./qr-station-handoff.md).
 
@@ -77,15 +77,16 @@ Keep this as a **backend constant** (or seed-maintained map) used by import — 
 | `VISUAL_ACUITY` | `VISUAL_ACUITY` | **Yes** |
 | `REFRACTION` | `REFRACTION` | **Yes** |
 | `COLOUR_VISION` | `COLOUR_VISION` | **Yes** |
-| `EYE_HEALTH` | `EYE_HEALTH` | **Yes** |
+| `EYE_HEALTH` | `EYE_HEALTH` | **Yes** (screener station with offline sync; review observations optional addendum) |
 | `REGISTRATION` | — | **No** |
 | `CLINICAL_REVIEW` | — | **No** |
 
-**Why exclude Registration & Clinical Review**
+**Why exclude Registration and Clinical Review**
 
-- They are **not** values of `StationType`, and `Station.stationType` is required.
+- Registration and Clinical Review are **not** values of `StationType`, and `Station.stationType` is required.
 - Registration is a **workflow / role** (`StaffAssignmentRole.REGISTRATION`, check-in / consent / QR), not a screening station. Seed assigns registration officers with `stationId: null`.
 - Clinical review is the **`Review`** domain (outcomes, referrals), not `ScreeningResult` / queue-at-station.
+- **Eye Health (Option B):** catalog template + `StationType` enum remain for reference, but the template is **non-importable**. Reviewers capture `Review.eyeHealthObservations` on the clinical decision API/UI. There is no screener station page, save route, or offline sync action for eye health.
 
 Import should **422** (or skip with a clear error) if the client includes those template IDs in `stationTemplateIds`.
 
@@ -127,7 +128,7 @@ Idempotency: honor `@@unique([eventId, stationType])` — re-import of the same 
 
 **Screening owners**
 
-4. Is `EYE_HEALTH` in scope for import now (enum + template exist; UI/API may still be incomplete)?
+4. ~~Is `EYE_HEALTH` in scope for import now?~~ **Decided:** importable screener station; clinicians may still add optional eye-health notes on review decisions.
 5. Should `stationName` stay editable after import without changing `stationType`?
 
 **Auth / staffing owners**
@@ -144,7 +145,7 @@ Idempotency: honor `@@unique([eventId, stationType])` — re-import of the same 
 ## 6. Thumbs-up checklist
 
 - [ ] Canonical runtime table is `Station` (no new `EventStation` table).
-- [ ] Only VA / REFRACTION / COLOUR_VISION / EYE_HEALTH import as `Station`.
+- [ ] Only VA / REFRACTION / COLOUR_VISION / EYE_HEALTH import as `Station` (review eye-health observations remain optional addendum).
 - [ ] REGISTRATION + CLINICAL_REVIEW stay catalog-only (not screening stations).
 - [ ] Import sets `stationType`, `stationName`, `stationOrder`, `isActive`; capacity via availability or deferred.
 - [ ] Availability: `event_station_id` means `station_id`; day rows optional for #24 MVP.

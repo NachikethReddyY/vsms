@@ -21,6 +21,9 @@ exports.remove = async (req, res) => res.json(await eventService.deleteEvent(req
 exports.deletionCleanupStatus = async (req, res) => res.set("Cache-Control", "no-store").json(await eventService.getEventDeletionCleanupStatus(req.params.eventId, req.user));
 exports.staffDirectory = async (_req, res) => res.json(await eventService.listStaffDirectory());
 exports.stationTemplates = async (_req, res) => res.json(await eventService.listStationTemplates());
+exports.stationTemplateLibrary = async (_req, res) => res.json(await eventService.listStationTemplateLibrary());
+exports.createStationTemplate = async (req, res) => res.status(201).json(await eventService.createStationTemplate(req.body, req.user, req.context));
+exports.updateStationTemplate = async (req, res) => res.json(await eventService.updateStationTemplate(req.params.stationTemplateId, req.body, req.user, req.context));
 exports.importStations = async (req, res) => res.status(201).json(await eventService.importStations(req.params.eventId, req.body, req.user, req.context));
 exports.updateStation = async (req, res) => res.json(await eventService.updateStation(req.params.eventId, req.params.eventStationId, req.body, req.user, req.context));
 exports.addAssignment = async (req, res) => res.status(201).json(await eventService.addStaffAssignment(req.params.eventId, req.params.shiftId, req.body, req.user, req.context));

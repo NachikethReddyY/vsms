@@ -37,6 +37,8 @@ import {
 } from './referralRecovery';
 import './ReviewWorkspacePage.css';
 
+type EyeHealthRisk = 'NONE' | 'SUSPECTED' | 'PRESENT' | 'NOT_ASSESSED';
+
 type FormState = {
   outcome: ReviewOutcome;
   clinicalSummary: string;
@@ -45,6 +47,12 @@ type FormState = {
   destinationName: string;
   reason: string;
   instructions: string;
+  cataractRisk: EyeHealthRisk;
+  glaucomaRisk: EyeHealthRisk;
+  symptomsNoted: boolean;
+  symptomSummary: string;
+  eyeHealthObservations: string;
+  deviceFindings: string;
   confirmed: boolean;
 };
 
@@ -56,8 +64,23 @@ const EMPTY_FORM: FormState = {
   destinationName: '',
   reason: '',
   instructions: '',
+  cataractRisk: 'NOT_ASSESSED',
+  glaucomaRisk: 'NOT_ASSESSED',
+  symptomsNoted: false,
+  symptomSummary: '',
+  eyeHealthObservations: '',
+  deviceFindings: '',
   confirmed: false,
 };
+
+const EYE_HEALTH_RISKS: { value: EyeHealthRisk; label: string }[] = [
+  { value: 'NOT_ASSESSED', label: 'Not assessed' },
+  { value: 'NONE', label: 'None' },
+  { value: 'SUSPECTED', label: 'Suspected' },
+  { value: 'PRESENT', label: 'Present' },
+];
+
+const riskLabel = (value: EyeHealthRisk) => EYE_HEALTH_RISKS.find((risk) => risk.value === value)?.label ?? value;
 
 const OUTCOMES: { value: ReviewOutcome; label: string; description: string }[] = [
   { value: 'COMPLETE', label: 'Complete', description: 'No clinical follow-up required.' },
@@ -141,6 +164,24 @@ function ResultData({ station }: { station: ReviewDetailResponse['stations'][num
       <div><dt>Plates presented</dt><dd>{displayValue(data.platesPresented)}</dd></div>
       <div><dt>Right eye (OD)</dt><dd>{displayValue(data.odCorrect)} / {displayValue(data.platesPresented)}</dd></div>
       <div><dt>Left eye (OS)</dt><dd>{displayValue(data.osCorrect)} / {displayValue(data.platesPresented)}</dd></div>
+    </dl>;
+  }
+  if (station.stationType === 'EYE_HEALTH') {
+    const eyeHealth = data as typeof data & {
+      cataractRisk?: EyeHealthRisk;
+      glaucomaRisk?: EyeHealthRisk;
+      symptomsNoted?: boolean;
+      symptomSummary?: string;
+      observations?: string;
+      deviceFindings?: string | null;
+    };
+    return <dl className="visual-acuity-result">
+      <div><dt>Cataract risk</dt><dd>{riskLabel(eyeHealth.cataractRisk ?? 'NOT_ASSESSED')}</dd></div>
+      <div><dt>Glaucoma risk</dt><dd>{riskLabel(eyeHealth.glaucomaRisk ?? 'NOT_ASSESSED')}</dd></div>
+      <div><dt>Symptoms noted</dt><dd>{eyeHealth.symptomsNoted ? 'Yes' : 'No'}</dd></div>
+      {eyeHealth.symptomsNoted && eyeHealth.symptomSummary && <div className="wide"><dt>Symptom summary</dt><dd>{eyeHealth.symptomSummary}</dd></div>}
+      <div className="wide"><dt>Observations</dt><dd>{displayValue(eyeHealth.observations)}</dd></div>
+      {eyeHealth.deviceFindings && <div className="wide"><dt>Device findings</dt><dd>{eyeHealth.deviceFindings}</dd></div>}
     </dl>;
   }
   return <dl className="result-data-fallback">
@@ -460,6 +501,7 @@ function ReferralIssuance({ eventId, referral, onRevised }: { eventId: string; r
 }
 
 function ReviewedDecision({ eventId, review, onReferralRevised }: { eventId: string; review: NonNullable<ReviewDetailResponse['existingReview']>; onReferralRevised: () => Promise<void> }) {
+  const eyeHealth = review.eyeHealthObservations;
   return <section className="reviewed-decision" aria-labelledby="recorded-decision-title">
     <div className="reviewed-heading"><ShieldCheckIcon /><div><h3 id="recorded-decision-title">Decision recorded</h3><p>This clinical review is immutable and read-only.</p></div></div>
     <dl className="reviewed-fields">
@@ -472,6 +514,17 @@ function ReviewedDecision({ eventId, review, onReferralRevised }: { eventId: str
       <div className="wide"><dt>Clinical summary</dt><dd>{review.clinicalSummary}</dd></div>
       {review.recommendations && <div className="wide"><dt>Recommendations</dt><dd>{review.recommendations}</dd></div>}
     </dl>
+    {eyeHealth && <div className="recorded-eye-health" aria-label="Eye health observations">
+      <strong>Eye health observations</strong>
+      <dl className="reviewed-fields">
+        <div><dt>Cataract risk</dt><dd>{riskLabel(eyeHealth.cataractRisk)}</dd></div>
+        <div><dt>Glaucoma risk</dt><dd>{riskLabel(eyeHealth.glaucomaRisk)}</dd></div>
+        <div><dt>Symptoms noted</dt><dd>{eyeHealth.symptomsNoted ? 'Yes' : 'No'}</dd></div>
+        {eyeHealth.symptomsNoted && eyeHealth.symptomSummary && <div className="wide"><dt>Symptom summary</dt><dd>{eyeHealth.symptomSummary}</dd></div>}
+        <div className="wide"><dt>Observations</dt><dd>{eyeHealth.observations}</dd></div>
+        {eyeHealth.deviceFindings && <div className="wide"><dt>Device findings</dt><dd>{eyeHealth.deviceFindings}</dd></div>}
+      </dl>
+    </div>}
     {review.referral && <div className="recorded-referral">
       <strong>Referral · {review.referral.urgency}</strong>
       <span>{review.referral.destinationName}</span>
@@ -646,6 +699,12 @@ export default function ReviewWorkspacePage() {
     const summaryLength = form.clinicalSummary.trim().length;
     if (summaryLength < 10 || summaryLength > 2000) errors.push('Clinical summary must contain 10 to 2,000 characters.');
     if (form.recommendations.trim().length > 2000) errors.push('Recommendations cannot exceed 2,000 characters.');
+    if (form.eyeHealthObservations.trim().length > 2000) errors.push('Eye health observations cannot exceed 2,000 characters.');
+    if (form.symptomsNoted) {
+      const symptomLength = form.symptomSummary.trim().length;
+      if (symptomLength < 3 || symptomLength > 500) errors.push('Symptom summary must contain 3 to 500 characters when symptoms are noted.');
+    }
+    if (form.deviceFindings.trim().length > 2000) errors.push('Device findings cannot exceed 2,000 characters.');
     if (form.outcome === 'REFER' || form.outcome === 'URGENT_ESCALATION') {
       if (form.destinationName.trim().length < 2 || form.destinationName.trim().length > 200) errors.push('Referral destination must contain 2 to 200 characters.');
       if (form.reason.trim().length < 10 || form.reason.trim().length > 2000) errors.push('Referral reason must contain 10 to 2,000 characters.');
@@ -659,10 +718,24 @@ export default function ReviewWorkspacePage() {
   };
 
   const decisionRequest = (signature: SignatureResponse): ReviewDecisionRequest => {
+    const hasReviewerEyeHealth = form.eyeHealthObservations.trim()
+      || form.symptomsNoted
+      || form.cataractRisk !== 'NOT_ASSESSED'
+      || form.glaucomaRisk !== 'NOT_ASSESSED'
+      || form.deviceFindings.trim();
+    const eyeHealthObservations = hasReviewerEyeHealth ? {
+      cataractRisk: form.cataractRisk,
+      glaucomaRisk: form.glaucomaRisk,
+      symptomsNoted: form.symptomsNoted,
+      observations: form.eyeHealthObservations.trim() || 'No additional reviewer observations recorded.',
+      ...(form.symptomsNoted ? { symptomSummary: form.symptomSummary.trim() } : {}),
+      ...(form.deviceFindings.trim() ? { deviceFindings: form.deviceFindings.trim() } : {}),
+    } : undefined;
     const common = {
       contextVersion: detail!.contextVersion,
       confirmed: true as const,
       clinicalSummary: form.clinicalSummary.trim(),
+      ...(eyeHealthObservations ? { eyeHealthObservations } : {}),
       ...(form.recommendations.trim() ? { recommendations: form.recommendations.trim() } : {}),
       ...signature,
     };
@@ -852,6 +925,16 @@ export default function ReviewWorkspacePage() {
 
             <label className="review-field"><span>Clinical summary <small>{form.clinicalSummary.length}/2,000</small></span><textarea required minLength={10} maxLength={2000} rows={6} value={form.clinicalSummary} onChange={(event) => updateForm('clinicalSummary', event.target.value)} placeholder="Summarise clinically relevant findings and your assessment." /></label>
             <label className="review-field"><span>Recommendations <em>Optional</em> <small>{form.recommendations.length}/2,000</small></span><textarea maxLength={2000} rows={4} value={form.recommendations} onChange={(event) => updateForm('recommendations', event.target.value)} placeholder="Advice, monitoring guidance, or next steps." /></label>
+
+            <fieldset className="eye-health-fields"><legend>Eye health observations <em>Optional</em></legend>
+              <p>Optional clinician addendum. Primary eye-health capture happens at the Eye Health screener station.</p>
+              <label className="review-field"><span>Cataract risk</span><select value={form.cataractRisk} onChange={(event) => updateForm('cataractRisk', event.target.value as EyeHealthRisk)}>{EYE_HEALTH_RISKS.map((risk) => <option key={risk.value} value={risk.value}>{risk.label}</option>)}</select></label>
+              <label className="review-field"><span>Glaucoma risk</span><select value={form.glaucomaRisk} onChange={(event) => updateForm('glaucomaRisk', event.target.value as EyeHealthRisk)}>{EYE_HEALTH_RISKS.map((risk) => <option key={risk.value} value={risk.value}>{risk.label}</option>)}</select></label>
+              <label className="decision-confirm eye-health-symptoms"><input type="checkbox" checked={form.symptomsNoted} onChange={(event) => updateForm('symptomsNoted', event.target.checked)} /><span><strong>Symptoms noted</strong><small>Record participant-reported symptoms when present.</small></span></label>
+              {form.symptomsNoted && <label className="review-field"><span>Symptom summary <small>{form.symptomSummary.length}/500</small></span><textarea required minLength={3} maxLength={500} rows={3} value={form.symptomSummary} onChange={(event) => updateForm('symptomSummary', event.target.value)} placeholder="Brief symptom description." /></label>}
+              <label className="review-field"><span>Observations <em>Optional</em> <small>{form.eyeHealthObservations.length}/2,000</small></span><textarea minLength={1} maxLength={2000} rows={4} value={form.eyeHealthObservations} onChange={(event) => updateForm('eyeHealthObservations', event.target.value)} placeholder="Anterior segment, media, fundus, or other clinical observations." /></label>
+              <label className="review-field"><span>Device findings <em>Optional</em> <small>{form.deviceFindings.length}/2,000</small></span><textarea maxLength={2000} rows={3} value={form.deviceFindings} onChange={(event) => updateForm('deviceFindings', event.target.value)} placeholder="Autorefractor notes, tonometry, imaging findings, or similar." /></label>
+            </fieldset>
 
             <fieldset className="outcome-options"><legend>Final decision</legend><div>{OUTCOMES.map((outcome) => <label className={`outcome-option outcome-${outcome.value.toLowerCase()} ${form.outcome === outcome.value ? 'selected' : ''}`} key={outcome.value}><input type="radio" name="outcome" value={outcome.value} checked={form.outcome === outcome.value} onChange={() => updateForm('outcome', outcome.value)} /><span><strong>{outcome.label}</strong><small>{outcome.description}</small></span></label>)}</div></fieldset>
 

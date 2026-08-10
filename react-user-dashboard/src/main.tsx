@@ -1,6 +1,7 @@
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import { BrowserRouter } from 'react-router-dom'
+import { registerSW } from 'virtual:pwa-register'
 import './index.css'
 import App from './App.tsx'
 import { AuthProvider } from './auth/AuthProvider.tsx'
@@ -13,6 +14,8 @@ const preferredTheme = savedTheme === 'light' || savedTheme === 'dark'
   : window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'
 document.documentElement.dataset.theme = preferredTheme
 document.documentElement.style.colorScheme = preferredTheme
+
+registerSW({ immediate: true })
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>

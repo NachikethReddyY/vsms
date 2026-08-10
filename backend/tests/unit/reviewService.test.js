@@ -59,10 +59,17 @@ describe("clinical review context and request contract", () => {
   });
 
   test("referral fields are accepted only for referral outcomes", () => {
+    const eyeHealthObservations = {
+      cataractRisk: "NOT_ASSESSED",
+      glaucomaRisk: "NONE",
+      symptomsNoted: false,
+      observations: "Anterior segment quiet; no media opacity noted.",
+    };
     const common = {
       contextVersion: "a".repeat(64),
       confirmed: true,
       clinicalSummary: "Clear clinical summary",
+      eyeHealthObservations,
       signatureObjectKey: "signatures/10000000-0000-4000-8000-000000000001/review-decision-10000000-0000-4000-8000-000000000002-10000000-0000-4000-8000-000000000003.png",
       signatureSha256: "b".repeat(64),
       signatureMimeType: "image/png",
@@ -72,5 +79,37 @@ describe("clinical review context and request contract", () => {
     expect(reviewDecisionBody.safeParse({ ...common, outcome: "REFER", urgency: "PRIORITY" }).success).toBe(false);
     expect(reviewDecisionBody.safeParse({ ...common, outcome: "REFER", urgency: "PRIORITY", referral: { destinationName: "Eye clinic", reason: "Follow-up is required" } }).success).toBe(true);
     expect(reviewDecisionBody.safeParse({ ...common, outcome: "URGENT_ESCALATION", urgency: "URGENT", referral: { destinationName: "Emergency", reason: "Immediate assessment" } }).success).toBe(false);
+  });
+
+  test("eye-health observations are optional and symptoms need a summary when provided", () => {
+    const common = {
+      contextVersion: "a".repeat(64),
+      confirmed: true,
+      clinicalSummary: "Clear clinical summary",
+      signatureObjectKey: "signatures/10000000-0000-4000-8000-000000000001/review-decision-10000000-0000-4000-8000-000000000002-10000000-0000-4000-8000-000000000003.png",
+      signatureSha256: "b".repeat(64),
+      signatureMimeType: "image/png",
+      outcome: "COMPLETE",
+    };
+    expect(reviewDecisionBody.safeParse(common).success).toBe(true);
+    expect(reviewDecisionBody.safeParse({
+      ...common,
+      eyeHealthObservations: {
+        cataractRisk: "SUSPECTED",
+        glaucomaRisk: "NONE",
+        symptomsNoted: true,
+        observations: "Lens opacity suspected OD.",
+      },
+    }).success).toBe(false);
+    expect(reviewDecisionBody.safeParse({
+      ...common,
+      eyeHealthObservations: {
+        cataractRisk: "SUSPECTED",
+        glaucomaRisk: "NONE",
+        symptomsNoted: true,
+        symptomSummary: "Blurry vision",
+        observations: "Lens opacity suspected OD.",
+      },
+    }).success).toBe(true);
   });
 });

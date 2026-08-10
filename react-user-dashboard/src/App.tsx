@@ -13,6 +13,7 @@ import PublicEventPage from "./features/events/PublicEventPage";
 import ReviewWorkspacePage from "./features/reviews/ReviewWorkspacePage";
 import ReportsPage from "./features/reports/ReportsPage";
 import ColourVisionStationPage from "./features/screening/ColourVisionStationPage";
+import EyeHealthStationPage from "./features/screening/EyeHealthStationPage";
 import QRScannerPage from "./features/screening/QRScannerPage";
 import RefractionStationPage from "./features/screening/RefractionStationPage";
 import VisualAcuityStationPage from "./features/screening/VisualAcuityStationPage";
@@ -31,6 +32,7 @@ import {
   StaffAdministrationPage,
 } from "./features/Stage4Pages";
 import AccountSecurityPage from "./pages/AccountSecurityPage";
+import StationLibraryPage from "./pages/StationLibraryPage";
 import { QueuePage } from "./pages/QueuePages"; // Imported the QueuePage component
 import EventRegistrationPage from "./pages/participant/EventRegistrationPage";
 import ParticipantCheckInPage from "./pages/participant/ParticipantCheckInPage";
@@ -132,6 +134,9 @@ export default function App() {
             <Route element={<StationDutyGuard stationType="COLOUR_VISION" />}>
               <Route path="/events/:eventId/stations/colour-vision" element={<ColourVisionStationPage />} />
             </Route>
+            <Route element={<StationDutyGuard stationType="EYE_HEALTH" />}>
+              <Route path="/events/:eventId/stations/eye-health" element={<EyeHealthStationPage />} />
+            </Route>
             <Route path="/qr-scanner" element={<QRScannerPage />} />
           </Route>
 
@@ -174,6 +179,7 @@ export default function App() {
 
           <Route element={<RoleGuard allowedRoles={adminRoles} />}>
             <Route path="/staff" element={<StaffAdministrationPage />} />
+            <Route path="/admin/station-templates" element={<StationLibraryPage />} />
             <Route path="/events/new" element={<EventFormPage mode="create" />} />
             <Route path="/events/:eventId/delete" element={<EventDeletionPage />} />
             <Route path="/admin/audit-logs" element={<RegistrationAuditLogsPage />} />

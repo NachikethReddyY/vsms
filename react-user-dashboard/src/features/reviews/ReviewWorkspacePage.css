@@ -382,8 +382,8 @@
 .review-field input:focus, .review-field textarea:focus, .review-field select:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-tint); background: var(--surface); }
 .review-field input::placeholder, .review-field textarea::placeholder { color: var(--muted); opacity: 1; }
 
-.outcome-options, .referral-fields { margin: 26px 0 0; padding: 0; border: 0; }
-.outcome-options legend, .referral-fields legend { margin-bottom: 10px; font-size: 13px; font-weight: 700; }
+.outcome-options, .referral-fields, .eye-health-fields { margin: 26px 0 0; padding: 0; border: 0; }
+.outcome-options legend, .referral-fields legend, .eye-health-fields legend { margin-bottom: 10px; font-size: 13px; font-weight: 700; }
 .outcome-options > div { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
 .outcome-option {
   min-height: 74px;
@@ -405,15 +405,25 @@
 .outcome-option small { margin-top: 2px; color: var(--muted); font-size: 10px; line-height: 15px; }
 .outcome-option.outcome-urgent_escalation.selected { border-color: var(--red); background: color-mix(in srgb, var(--red) 7%, var(--surface)); }
 
-.referral-fields {
+.referral-fields, .eye-health-fields {
   padding: 18px;
   border: 1px solid var(--hairline);
   border-radius: 10px;
   background: var(--canvas-soft);
 }
 
-.referral-fields > p { margin: -5px 0 0; color: var(--muted); font-size: 11px; line-height: 17px; }
-.referral-fields .review-field input, .referral-fields .review-field textarea, .referral-fields .review-field select { background: var(--surface); }
+.referral-fields > p, .eye-health-fields > p { margin: -5px 0 0; color: var(--muted); font-size: 11px; line-height: 17px; }
+.referral-fields .review-field input, .referral-fields .review-field textarea, .referral-fields .review-field select,
+.eye-health-fields .review-field input, .eye-health-fields .review-field textarea, .eye-health-fields .review-field select { background: var(--surface); }
+.eye-health-symptoms { margin-top: 16px; }
+.recorded-eye-health {
+  margin-top: 18px;
+  padding: 16px;
+  border: 1px solid var(--hairline);
+  border-radius: 10px;
+  background: var(--canvas-soft);
+}
+.recorded-eye-health > strong { display: block; margin-bottom: 10px; font-size: 13px; }
 .emergency-urgency {
   min-height: 50px;
   display: flex;
@@ -597,7 +607,7 @@
   .review-participant-facts > div + div { padding-left: 0; border-top: 1px solid var(--hairline); border-left: 0; }
   .review-section-heading { align-items: flex-start; flex-direction: column; gap: 7px; }
   .outcome-options > div { grid-template-columns: 1fr; }
-  .referral-fields { padding: 14px; }
+  .referral-fields, .eye-health-fields { padding: 14px; }
   .reviewed-fields { grid-template-columns: 1fr; }
   .reviewed-fields > div.wide { grid-column: auto; }
   .decision-actions .primary { width: 100%; }

@@ -2,11 +2,13 @@
 
 Staff tablets must keep working when the venue Wi‑Fi drops. VSMS treats offline as a **temporary, authenticated screener cache** — not a second clinical database.
 
+The dashboard is an **installable PWA**: a service worker precaches the SPA shell after an online visit so staff can reopen the app without a fresh download. Screening payloads and queue snapshots still live in encrypted IndexedDB until sync.
+
 ## Staff flow
 
 1. While online: open the live event or a station page → offline pack **downloads automatically** (nav shows “Preparing offline” → “Offline ready”).
 2. Disconnect: station forms still load from the encrypted local snapshot.
-3. Save VA / Refraction / Colour Vision → queued locally (`Saved offline…`).
+3. Save VA / Refraction / Colour Vision / Eye Health → queued locally (`Saved offline…`).
 4. Reconnect: auto-sync (or tap sync) → `POST /api/v1/events/{eventId}/sync/screening`.
 5. Conflicts stay local until staff fixes the cause (ack required, event ended, etc.).
 
@@ -34,11 +36,9 @@ Clinical bodies travel only in the authenticated sync request body, then land in
 | At-rest on device | IndexedDB payload encrypted with AES-GCM; key non-extractable; records bound to `ownerId`. |
 | Least data offline | Pass tokens stripped from downloaded queues; expired packs purged (`offlineAccessExpiresAt`). |
 | Session hygiene | Logout / user switch clears offline stores. |
-| No service-worker PWA yet | App shell must already be loaded; hard refresh while offline loses the SPA until online again. |
+| Installable app shell | Service worker precaches the SPA shell so staff can reopen VSMS after a prior online visit; clinical offline data remains in encrypted IndexedDB. |
 
 ## Out of scope for this slice
 
 - Participant self-service offline
 - Full Sync Centre conflict-resolution UI
-- Eye-health station offline path
-- Service worker / installable PWA

@@ -23,6 +23,14 @@ const signatureDataUrl = () => {
 
 const auth = (token) => ({ Authorization: `Bearer ${token}` });
 
+const eyeHealthObservations = (overrides = {}) => ({
+  cataractRisk: "NOT_ASSESSED",
+  glaucomaRisk: "NONE",
+  symptomsNoted: false,
+  observations: "No anterior-segment or media concern noted on review.",
+  ...overrides,
+});
+
 const createRegistration = async (label, queueNumber, resultFlags) => {
   const participant = await prisma.participant.create({
     data: {
@@ -200,7 +208,7 @@ describe("clinical review API", () => {
     const signature = await uploadDecisionSignature(registrations.Normal);
     decisionSignatures.set(registrations.Normal, signature);
     const response = await request(app).post(`/api/events/${eventId}/reviews/${registrations.Normal}/decision`).set(auth(reviewerToken)).send({
-      outcome: "COMPLETE", contextVersion: detail.body.contextVersion, confirmed: true, clinicalSummary: "Screening is within expected limits.", ...signature,
+      outcome: "COMPLETE", contextVersion: detail.body.contextVersion, confirmed: true, clinicalSummary: "Screening is within expected limits.", eyeHealthObservations: eyeHealthObservations(), ...signature,
     });
     expect(response.status).toBe(201);
     expect(await prisma.review.count({ where: { registrationId: registrations.Normal } })).toBe(1);
@@ -211,12 +219,19 @@ describe("clinical review API", () => {
     expect(JSON.stringify(audits)).not.toContain("TEST-");
     expect(JSON.stringify(audits)).not.toContain("Screening is within expected limits");
     expect(audits[0].details.signaturePurpose).toBe("REVIEW_DECISION");
+    expect(audits[0].details.eyeHealthRecorded).toBe(true);
     expect(audits[0].details.signatureSha256).toBe(signature.signatureSha256);
     const review = await prisma.review.findFirstOrThrow({ where: { registrationId: registrations.Normal } });
     expect(review.signatureSignerUserId).toBe(testUsers.reviewer.id);
     expect(review.signatureObjectKey).toBe(signature.signatureObjectKey);
     expect(review.signedPayloadHash).toMatch(/^[a-f0-9]{64}$/);
     expect(review.signedAt).toBeInstanceOf(Date);
+    expect(review.eyeHealthObservations).toMatchObject({
+      cataractRisk: "NOT_ASSESSED",
+      glaucomaRisk: "NONE",
+      symptomsNoted: false,
+      observations: "No anterior-segment or media concern noted on review.",
+    });
     expect((await prisma.signatureArtifact.findUnique({ where: { signatureObjectKey: signature.signatureObjectKey } })).consumedAt).toBeInstanceOf(Date);
   });
 
@@ -235,6 +250,7 @@ describe("clinical review API", () => {
         contextVersion: detail.body.contextVersion,
         confirmed: true,
         clinicalSummary: "Findings require a documented referral.",
+        eyeHealthObservations: eyeHealthObservations({ cataractRisk: "SUSPECTED", symptomsNoted: true, symptomSummary: "Blurred near vision" }),
         referral: { destinationName: "Test Eye Centre", reason: "Specialist assessment is recommended." },
         ...signature,
       });
@@ -250,7 +266,7 @@ describe("clinical review API", () => {
 
   test("duplicate and concurrent decisions return 409 without duplicate records", async () => {
     const duplicate = await request(app).post(`/api/events/${eventId}/reviews/${registrations.Normal}/decision`).set(auth(reviewerToken)).send({
-      outcome: "COMPLETE", contextVersion: "a".repeat(64), confirmed: true, clinicalSummary: "Duplicate decision attempt.", ...decisionSignatures.get(registrations.Normal),
+      outcome: "COMPLETE", contextVersion: "a".repeat(64), confirmed: true, clinicalSummary: "Duplicate decision attempt.", eyeHealthObservations: eyeHealthObservations(), ...decisionSignatures.get(registrations.Normal),
     });
     expect(duplicate.status).toBe(409);
     expect(duplicate.body.code).toBe("REVIEW_ALREADY_RECORDED");
@@ -263,6 +279,9 @@ describe("clinical review API", () => {
     const responses = await Promise.all(signatures.map(decide));
     expect(responses.map((response) => response.status).sort()).toEqual([201, 409]);
     expect(await prisma.review.count({ where: { registrationId: registrations.Concurrent } })).toBe(1);
+    const audit = (await prisma.auditLog.findMany({ where: { userId: testUsers.reviewer.id, action: "CLINICAL_REVIEW_RECORDED" } }))
+      .find((entry) => entry.details.registrationId === registrations.Concurrent);
+    expect(audit.details.eyeHealthRecorded).toBe(false);
   });
 
   test("stale context returns 409 without a decision", async () => {
@@ -273,7 +292,7 @@ describe("clinical review API", () => {
       data: { resultData: { changed: true } },
     });
     const response = await request(app).post(`/api/events/${eventId}/reviews/${registrations.Stale}/decision`).set(auth(reviewerToken)).send({
-      outcome: "COMPLETE", contextVersion: detail.body.contextVersion, confirmed: true, clinicalSummary: "This context is deliberately stale.", ...signature,
+      outcome: "COMPLETE", contextVersion: detail.body.contextVersion, confirmed: true, clinicalSummary: "This context is deliberately stale.", eyeHealthObservations: eyeHealthObservations(), ...signature,
     });
     expect(response.status).toBe(409);
     expect(response.body.code).toBe("SCREENING_RESULTS_CHANGED");
@@ -285,10 +304,10 @@ describe("clinical review API", () => {
     const detail = await request(app).get(`/api/events/${eventId}/reviews/${registrations.Stale}`).set(auth(reviewerToken));
     const signature = await uploadDecisionSignature(registrations.Stale);
     const extra = await request(app).post(`/api/events/${eventId}/reviews/${registrations.Stale}/decision`).set(auth(reviewerToken)).send({
-      outcome: "COMPLETE", contextVersion: detail.body.contextVersion, confirmed: true, clinicalSummary: "Valid summary, invalid extra referral.", referral: { destinationName: "Clinic", reason: "Not permitted here" }, ...signature,
+      outcome: "COMPLETE", contextVersion: detail.body.contextVersion, confirmed: true, clinicalSummary: "Valid summary, invalid extra referral.", eyeHealthObservations: eyeHealthObservations(), referral: { destinationName: "Clinic", reason: "Not permitted here" }, ...signature,
     });
     const missing = await request(app).post(`/api/events/${eventId}/reviews/${registrations.Stale}/decision`).set(auth(reviewerToken)).send({
-      outcome: "REFER", urgency: "ROUTINE", contextVersion: detail.body.contextVersion, confirmed: true, clinicalSummary: "Referral fields are intentionally missing.", ...signature,
+      outcome: "REFER", urgency: "ROUTINE", contextVersion: detail.body.contextVersion, confirmed: true, clinicalSummary: "Referral fields are intentionally missing.", eyeHealthObservations: eyeHealthObservations(), ...signature,
     });
     expect(extra.status).toBe(422);
     expect(missing.status).toBe(422);
@@ -303,6 +322,7 @@ describe("clinical review API", () => {
       contextVersion: detail.body.contextVersion,
       confirmed: true,
       clinicalSummary: "This signature belongs to a different registration.",
+      eyeHealthObservations: eyeHealthObservations(),
       ...sourceSignature,
     });
     expect(response.status).toBe(409);

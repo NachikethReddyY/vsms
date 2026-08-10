@@ -51,6 +51,7 @@ const stationTemplates = [
   {
     stationTemplateId: "60000000-0000-4000-8000-000000000002",
     templateKey: "VISUAL_ACUITY",
+    stationType: "VISUAL_ACUITY",
     version: 1,
     name: "Visual acuity",
     description: "Capture controlled distance and near-vision measurements.",
@@ -59,6 +60,7 @@ const stationTemplates = [
   {
     stationTemplateId: "60000000-0000-4000-8000-000000000003",
     templateKey: "EYE_HEALTH",
+    stationType: "EYE_HEALTH",
     version: 1,
     name: "Eye health",
     description: "Record eye-health observations and screening flags.",
@@ -75,6 +77,7 @@ const stationTemplates = [
   {
     stationTemplateId: "60000000-0000-4000-8000-000000000005",
     templateKey: "REFRACTION",
+    stationType: "REFRACTION",
     version: 1,
     name: "Refraction",
     description: "Capture autorefractor SPH/CYL/Axis readings for both eyes.",
@@ -83,6 +86,7 @@ const stationTemplates = [
   {
     stationTemplateId: "60000000-0000-4000-8000-000000000006",
     templateKey: "COLOUR_VISION",
+    stationType: "COLOUR_VISION",
     version: 1,
     name: "Colour vision",
     description: "Record Ishihara plate scores for each eye.",
@@ -381,6 +385,7 @@ async function seedEventStructure(event, staff, registrationOfficer) {
     ["VISUAL_ACUITY", "Visual acuity", 1],
     ["REFRACTION", "Refraction", 2],
     ["COLOUR_VISION", "Colour vision", 3],
+    ["EYE_HEALTH", "Eye health", 4],
   ];
   const stations = [];
   for (const [stationType, stationName, stationOrder] of stationDefinitions) {

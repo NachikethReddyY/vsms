@@ -5,6 +5,7 @@ export const STATION_PATH_SLUG: Partial<Record<StationType, string>> = {
   VISUAL_ACUITY: 'visual-acuity',
   REFRACTION: 'refraction',
   COLOUR_VISION: 'colour-vision',
+  EYE_HEALTH: 'eye-health',
 };
 
 export const STATION_LABEL: Record<StationType, string> = {

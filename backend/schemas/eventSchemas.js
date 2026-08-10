@@ -297,6 +297,29 @@ const stationUpdateBody = z.object({
   message: "At least one station field is required",
 });
 
+const SCREENING_STATION_TYPES = [
+  "VISUAL_ACUITY",
+  "REFRACTION",
+  "COLOUR_VISION",
+  "EYE_HEALTH",
+];
+const stationTemplateParams = z.object({ stationTemplateId: uuid }).strict();
+const createStationTemplateBody = z.object({
+  stationType: z.enum(SCREENING_STATION_TYPES),
+  name: z.string().trim().min(2).max(100),
+  description: z.string().trim().max(500).nullable().optional(),
+  defaultCapacity: z.number().int().min(1).max(1000).default(3),
+  active: z.boolean().default(true),
+}).strict();
+const updateStationTemplateBody = z.object({
+  name: z.string().trim().min(2).max(100).optional(),
+  description: z.string().trim().max(500).nullable().optional(),
+  defaultCapacity: z.number().int().min(1).max(1000).optional(),
+  active: z.boolean().optional(),
+}).strict().refine((value) => Object.keys(value).length > 0, {
+  message: "At least one template field is required",
+});
+
 module.exports = {
   createEventBody,
   updateEventBody,
@@ -319,6 +342,9 @@ module.exports = {
   stationParams,
   stationImportBody,
   stationUpdateBody,
+  stationTemplateParams,
+  createStationTemplateBody,
+  updateStationTemplateBody,
   membershipParams,
   membershipRoleParams,
   membershipBody,

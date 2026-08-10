@@ -295,14 +295,58 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** List active reusable station templates */
+        /**
+         * List active reusable station templates
+         * @description Returns active templates that can be imported as screening stations.
+         */
         get: operations["listStationTemplates"];
+        put?: never;
+        /**
+         * Create a reusable station template
+         * @description Administrator only. Soft-managed catalog entry for event station import.
+         */
+        post: operations["createStationTemplate"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/events/station-templates/library": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List all station templates for administrators
+         * @description Includes inactive and non-importable catalog templates.
+         */
+        get: operations["listStationTemplateLibrary"];
         put?: never;
         post?: never;
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
+        trace?: never;
+    };
+    "/api/v1/events/station-templates/items/{stationTemplateId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Update or deactivate a station template */
+        patch: operations["updateStationTemplate"];
         trace?: never;
     };
     "/api/v1/events/reports/operations": {
@@ -972,6 +1016,40 @@ export interface paths {
         put?: never;
         /** Save or idempotently replay a colour-vision result */
         post: operations["saveColourVision"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/events/{eventId}/stations/{stationId}/eye-health/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Evaluate an eye-health result without saving it */
+        post: operations["previewEyeHealth"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/events/{eventId}/stations/{stationId}/eye-health": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Save or idempotently replay an eye-health result */
+        post: operations["saveEyeHealth"];
         delete?: never;
         options?: never;
         head?: never;
@@ -2406,10 +2484,29 @@ export interface components {
             /** Format: uuid */
             stationTemplateId: string;
             templateKey: string;
+            /** @enum {string|null} */
+            stationType: "VISUAL_ACUITY" | "REFRACTION" | "COLOUR_VISION" | "EYE_HEALTH" | null;
             version: number;
             name: string;
             description?: string | null;
             defaultCapacity: number;
+            active: boolean;
+        };
+        CreateStationTemplateRequest: {
+            /** @enum {string} */
+            stationType: "VISUAL_ACUITY" | "REFRACTION" | "COLOUR_VISION" | "EYE_HEALTH";
+            name: string;
+            description?: string | null;
+            /** @default 3 */
+            defaultCapacity: number;
+            /** @default true */
+            active: boolean;
+        };
+        UpdateStationTemplateRequest: {
+            name?: string;
+            description?: string | null;
+            defaultCapacity?: number;
+            active?: boolean;
         };
         EventStation: {
             /** Format: uuid */
@@ -2419,7 +2516,7 @@ export interface components {
             templateVersion: number;
             name: string;
             /** @enum {string} */
-            stationType: "VISUAL_ACUITY" | "REFRACTION" | "COLOUR_VISION";
+            stationType: "VISUAL_ACUITY" | "REFRACTION" | "COLOUR_VISION" | "EYE_HEALTH";
             description?: string | null;
             stationOrder: number;
             capacity: number;
@@ -3610,6 +3707,16 @@ export interface components {
             action: "REQUEUE" | "RESOLVE";
             resolutionNote: string;
         };
+        /** @enum {string} */
+        EyeHealthRiskAssessment: "NONE" | "SUSPECTED" | "PRESENT" | "NOT_ASSESSED";
+        EyeHealthObservations: {
+            cataractRisk: components["schemas"]["EyeHealthRiskAssessment"];
+            glaucomaRisk: components["schemas"]["EyeHealthRiskAssessment"];
+            symptomsNoted: boolean;
+            symptomSummary?: string;
+            observations: string;
+            deviceFindings?: string | null;
+        };
         ExistingReview: {
             /** Format: uuid */
             reviewId: string;
@@ -3619,6 +3726,7 @@ export interface components {
             urgency: components["schemas"]["ClinicalUrgency"];
             clinicalSummary: string;
             recommendations: string | null;
+            eyeHealthObservations: components["schemas"]["EyeHealthObservations"] | null;
             /** Format: date-time */
             reviewedAt: string;
             reviewedByName: string;
@@ -3653,6 +3761,7 @@ export interface components {
             confirmed: true;
             clinicalSummary: string;
             recommendations?: string;
+            eyeHealthObservations?: components["schemas"]["EyeHealthObservations"];
             signatureObjectKey: string;
             signatureSha256: string;
             /** @enum {string} */
@@ -3669,6 +3778,7 @@ export interface components {
             confirmed: true;
             clinicalSummary: string;
             recommendations?: string;
+            eyeHealthObservations?: components["schemas"]["EyeHealthObservations"];
             signatureObjectKey: string;
             signatureSha256: string;
             /** @enum {string} */
@@ -3685,6 +3795,7 @@ export interface components {
             confirmed: true;
             clinicalSummary: string;
             recommendations?: string;
+            eyeHealthObservations?: components["schemas"]["EyeHealthObservations"];
             /** @enum {string} */
             urgency: "ROUTINE" | "PRIORITY" | "URGENT";
             referral: components["schemas"]["ReferralDecisionInput"];
@@ -3704,6 +3815,7 @@ export interface components {
             confirmed: true;
             clinicalSummary: string;
             recommendations?: string;
+            eyeHealthObservations?: components["schemas"]["EyeHealthObservations"];
             referral: components["schemas"]["ReferralDecisionInput"];
             signatureObjectKey: string;
             signatureSha256: string;
@@ -3720,6 +3832,7 @@ export interface components {
             urgency: components["schemas"]["ClinicalUrgency"];
             clinicalSummary: string;
             recommendations: string | null;
+            eyeHealthObservations: components["schemas"]["EyeHealthObservations"] | null;
             signatureSignerName: string | null;
             signatureSha256: string;
             signedPayloadHash: string;
@@ -4723,6 +4836,16 @@ export interface components {
             acknowledged: boolean;
             resultData: components["schemas"]["ColourVisionResultData"];
         };
+        EyeHealthPreviewRequest: {
+            resultData: components["schemas"]["EyeHealthObservations"];
+        };
+        EyeHealthSaveRequest: {
+            /** Format: uuid */
+            registrationId: string;
+            idempotencyKey: string;
+            acknowledged: boolean;
+            resultData: components["schemas"]["EyeHealthObservations"];
+        };
         ScreeningSyncAction: {
             /** Format: uuid */
             clientActionId: string;
@@ -4747,6 +4870,14 @@ export interface components {
             /** @enum {string} */
             stationType: "COLOUR_VISION";
             payload: components["schemas"]["ColourVisionSaveRequest"];
+        } | {
+            /** Format: uuid */
+            clientActionId: string;
+            /** Format: uuid */
+            stationId: string;
+            /** @enum {string} */
+            stationType: "EYE_HEALTH";
+            payload: components["schemas"]["EyeHealthSaveRequest"];
         };
         ScreeningSyncRequest: {
             /** Format: uuid */
@@ -4793,7 +4924,7 @@ export interface components {
             eventId: string;
             stationName: string;
             /** @enum {string} */
-            stationType: "VISUAL_ACUITY" | "REFRACTION" | "COLOUR_VISION";
+            stationType: "VISUAL_ACUITY" | "REFRACTION" | "COLOUR_VISION" | "EYE_HEALTH";
             stationOrder: number;
             isActive: boolean;
             /** Format: date-time */
@@ -4975,6 +5106,7 @@ export interface components {
         AccountId: string;
         AccountProviderOperationId: string;
         EventId: string;
+        StationTemplateId: string;
         MembershipId: string;
         QueueId: string;
         ShiftId: string;
@@ -5620,6 +5752,86 @@ export interface operations {
             };
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
+        };
+    };
+    createStationTemplate: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateStationTemplateRequest"];
+            };
+        };
+        responses: {
+            /** @description Station template created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StationTemplate"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            409: components["responses"]["Conflict"];
+            422: components["responses"]["ValidationFailed"];
+        };
+    };
+    listStationTemplateLibrary: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Full station template library */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StationTemplate"][];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+        };
+    };
+    updateStationTemplate: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                stationTemplateId: components["parameters"]["StationTemplateId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateStationTemplateRequest"];
+            };
+        };
+        responses: {
+            /** @description Station template updated */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StationTemplate"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            422: components["responses"]["ValidationFailed"];
         };
     };
     getOperationalReport: {
@@ -6776,6 +6988,54 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": components["schemas"]["ColourVisionSaveRequest"];
+            };
+        };
+        responses: {
+            200: components["responses"]["ScreeningSaved"];
+            201: components["responses"]["ScreeningSaved"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            422: components["responses"]["ValidationFailed"];
+        };
+    };
+    previewEyeHealth: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                eventId: components["parameters"]["EventId"];
+                stationId: components["parameters"]["StationId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["EyeHealthPreviewRequest"];
+            };
+        };
+        responses: {
+            200: components["responses"]["ScreeningPreview"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            422: components["responses"]["ValidationFailed"];
+        };
+    };
+    saveEyeHealth: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                eventId: components["parameters"]["EventId"];
+                stationId: components["parameters"]["StationId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["EyeHealthSaveRequest"];
             };
         };
         responses: {

@@ -1,41 +1,35 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
 const {
-  IMPORTABLE_TEMPLATE_KEYS,
-  NON_IMPORTABLE_TEMPLATE_KEYS,
-  stationTypeForTemplateKey,
-  isImportableTemplateKey,
+  SUPPORTED_SCREENING_STATION_TYPES,
+  stationTypeForTemplate,
   classifyTemplates,
 } = require("../../services/event/stationTemplateMapping");
 
-test("importable keys match StationType enum", () => {
-  assert.deepEqual(Object.keys(IMPORTABLE_TEMPLATE_KEYS).sort(), [
+test("supported screening station types match StationType enum", () => {
+  assert.deepEqual([...SUPPORTED_SCREENING_STATION_TYPES].sort(), [
     "COLOUR_VISION",
+    "EYE_HEALTH",
     "REFRACTION",
     "VISUAL_ACUITY",
   ]);
-  for (const [key, stationType] of Object.entries(IMPORTABLE_TEMPLATE_KEYS)) {
-    assert.equal(key, stationType);
-    assert.equal(stationTypeForTemplateKey(key), stationType);
-    assert.equal(isImportableTemplateKey(key), true);
+  for (const stationType of SUPPORTED_SCREENING_STATION_TYPES) {
+    assert.equal(stationTypeForTemplate({ templateKey: "opaque", stationType }), stationType);
   }
 });
 
-test("templates without implemented capture flows stay catalog-only", () => {
-  assert.deepEqual([...NON_IMPORTABLE_TEMPLATE_KEYS].sort(), ["CLINICAL_REVIEW", "EYE_HEALTH", "REGISTRATION"]);
-  for (const key of NON_IMPORTABLE_TEMPLATE_KEYS) {
-    assert.equal(stationTypeForTemplateKey(key), null);
-    assert.equal(isImportableTemplateKey(key), false);
-  }
+test("legacy templates without stationType stay catalog-only", () => {
+  assert.equal(stationTypeForTemplate({ templateKey: "REGISTRATION", stationType: null }), null);
+  assert.equal(stationTypeForTemplate({ templateKey: "CLINICAL_REVIEW" }), null);
 });
 
 test("classifyTemplates separates importable and skipped templates", () => {
   const templates = [
-    { templateKey: "REGISTRATION", stationTemplateId: "1" },
-    { templateKey: "VISUAL_ACUITY", stationTemplateId: "2" },
-    { templateKey: "CLINICAL_REVIEW", stationTemplateId: "3" },
-    { templateKey: "REFRACTION", stationTemplateId: "4" },
-    { templateKey: "UNKNOWN_KEY", stationTemplateId: "5" },
+    { templateKey: "REGISTRATION", stationType: null, stationTemplateId: "1" },
+    { templateKey: "opaque-1", stationType: "VISUAL_ACUITY", stationTemplateId: "2" },
+    { templateKey: "CLINICAL_REVIEW", stationType: null, stationTemplateId: "3" },
+    { templateKey: "opaque-2", stationType: "REFRACTION", stationTemplateId: "4" },
+    { templateKey: "UNKNOWN_KEY", stationType: null, stationTemplateId: "5" },
   ];
   const { importable, skipped } = classifyTemplates(templates);
   assert.deepEqual(

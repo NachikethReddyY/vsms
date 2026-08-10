@@ -514,6 +514,7 @@ const STATION_HANDOFF_SLUGS = {
     VISUAL_ACUITY: "visual-acuity",
     REFRACTION: "refraction",
     COLOUR_VISION: "colour-vision",
+    EYE_HEALTH: "eye-health",
 };
 
 function buildStationHandoffUrl(eventId, registrationId, stationType) {

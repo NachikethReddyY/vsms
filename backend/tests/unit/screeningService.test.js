@@ -4,15 +4,19 @@ const {
   evaluateVisualAcuity,
   evaluateRefraction,
   evaluateColourVision,
+  evaluateEyeHealth,
   VA_RULE_VERSION,
   REF_RULE_VERSION,
   CV_RULE_VERSION,
+  EH_RULE_VERSION,
 } = require("../../services/screening/screeningService");
 const {
   saveRefractionBody,
   saveColourVisionBody,
+  saveEyeHealthBody,
   previewRefractionBody,
   previewColourVisionBody,
+  previewEyeHealthBody,
 } = require("../../schemas/screeningSchemas");
 
 test("visual acuity rule version and normal reading", () => {
@@ -81,6 +85,42 @@ test("colour vision flags bilateral fail as review and asymmetry as urgent", () 
   assert.equal(asymmetric.overallFlag, "URGENT");
 });
 
+test("eye health flags present risk as refer and suspected or symptoms as review", () => {
+  const normal = evaluateEyeHealth({
+    cataractRisk: "NONE",
+    glaucomaRisk: "NOT_ASSESSED",
+    symptomsNoted: false,
+    observations: "Anterior segment quiet.",
+  });
+  assert.equal(normal.ruleVersion, EH_RULE_VERSION);
+  assert.equal(normal.overallFlag, "NORMAL");
+
+  const suspected = evaluateEyeHealth({
+    cataractRisk: "SUSPECTED",
+    glaucomaRisk: "NONE",
+    symptomsNoted: false,
+    observations: "Lens opacity suspected OD.",
+  });
+  assert.equal(suspected.overallFlag, "REVIEW");
+
+  const present = evaluateEyeHealth({
+    cataractRisk: "PRESENT",
+    glaucomaRisk: "NONE",
+    symptomsNoted: false,
+    observations: "Dense cataract OD.",
+  });
+  assert.equal(present.overallFlag, "REFER");
+
+  const symptoms = evaluateEyeHealth({
+    cataractRisk: "NONE",
+    glaucomaRisk: "NONE",
+    symptomsNoted: true,
+    symptomSummary: "Halos at night",
+    observations: "Participant reports halos.",
+  });
+  assert.equal(symptoms.overallFlag, "REVIEW");
+});
+
 test("refraction and colour vision schemas accept valid save bodies", () => {
   const refraction = saveRefractionBody.parse({
     registrationId: "11111111-1111-4111-8111-111111111111",
@@ -107,6 +147,28 @@ test("refraction and colour vision schemas accept valid save bodies", () => {
     },
   });
   assert.equal(colour.resultData.testKit, "ISHIHARA");
+
+  const eyeHealth = saveEyeHealthBody.parse({
+    registrationId: "11111111-1111-4111-8111-111111111111",
+    idempotencyKey: "abcdef12",
+    acknowledged: false,
+    resultData: {
+      cataractRisk: "NONE",
+      glaucomaRisk: "NOT_ASSESSED",
+      symptomsNoted: false,
+      observations: "Anterior segment quiet.",
+    },
+  });
+  assert.equal(eyeHealth.resultData.cataractRisk, "NONE");
+
+  assert.throws(() => previewEyeHealthBody.parse({
+    resultData: {
+      cataractRisk: "SUSPECTED",
+      glaucomaRisk: "NONE",
+      symptomsNoted: true,
+      observations: "Symptoms noted without summary.",
+    },
+  }));
 
   assert.throws(() => previewRefractionBody.parse({
     resultData: {

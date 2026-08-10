@@ -5,7 +5,7 @@ const AppError = require("../../errors/AppError");
 const { encodeCursor, decodeCursor } = require("../../utils/cursor");
 const {
   classifyTemplates,
-  stationTypeForTemplateKey,
+  stationTypeForTemplate,
 } = require("./stationTemplateMapping");
 const {
   enqueueEventArtifactCleanup,
@@ -13,7 +13,7 @@ const {
   collectEventArtifactTasks,
 } = require("../platform/artifactCleanupService");
 const { createExportReceipt } = require("../../utils/eventExportReceipt");
-const { resolveAuditContext } = require("../../utils/audit");
+const { createAuditLog, resolveAuditContext } = require("../../utils/audit");
 const env = require("../../config/env");
 const { attendancePredicate, attendanceWhere } = require("./attendanceDefinition");
 const { enqueueAccountLifecycle } = require("../account/accountLifecycleNotificationService");
@@ -100,7 +100,7 @@ const eventInclude = {
           status: true,
           notes: true,
           assignedUser: { select: { id: true, username: true, fullName: true, email: true } },
-          station: { select: { stationId: true, stationName: true, stationOrder: true, stationType: true } },
+          station: { select: { stationId: true, stationTemplateId: true, stationName: true, stationOrder: true, stationType: true } },
         },
       },
     },
@@ -109,6 +109,7 @@ const eventInclude = {
     orderBy: { stationOrder: "asc" },
     select: {
       stationId: true,
+      stationTemplateId: true,
       stationName: true,
       stationType: true,
       stationOrder: true,
@@ -173,22 +174,27 @@ const assignmentUser = (value) => value ? {
   username: value.username || value.fullName || "Staff member",
 } : null;
 
-const loadTemplatesByStationType = async (db = prisma) => {
-  if (!db.stationTemplate?.findMany) return new Map();
-  const templates = await db.stationTemplate.findMany({ where: { active: true } });
+const loadStationTemplates = async (db = prisma) => {
+  if (!db.stationTemplate?.findMany) return { byId: new Map(), byType: new Map() };
+  const templates = await db.stationTemplate.findMany({ orderBy: { stationTemplateId: "asc" } });
+  const byId = new Map(templates.map((template) => [template.stationTemplateId, template]));
   const byType = new Map();
   for (const template of templates) {
-    const stationType = stationTypeForTemplateKey(template.templateKey);
-    if (stationType) byType.set(stationType, template);
+    const stationType = stationTypeForTemplate(template);
+    if (stationType && (!byType.has(stationType) || template.templateKey === stationType)) byType.set(stationType, template);
   }
-  return byType;
+  return { byId, byType };
 };
 
-const mapStationDto = (station, event, templatesByType) => {
-  const template = templatesByType.get(station.stationType);
+const templateForStation = (station, templates) => station.stationTemplateId
+  ? templates.byId.get(station.stationTemplateId)
+  : templates.byType.get(station.stationType);
+
+const mapStationDto = (station, event, templates) => {
+  const template = templateForStation(station, templates);
   return {
     eventStationId: station.stationId,
-    // OpenAPI EventStation DTO: id is Station.stationId; template id resolved via #30 mapping.
+    // Null links are legacy rows; templateForStation resolves their stable type fallback.
     stationTemplateId: template?.stationTemplateId || station.stationId,
     templateVersion: template?.version || 1,
     name: station.stationName,
@@ -204,7 +210,7 @@ const mapStationDto = (station, event, templatesByType) => {
 
 const toEventResponse = async (event, user, db = prisma, options = {}) => {
   const { _count = {}, registrations = [], stations = [] } = event;
-  const templatesByType = await loadTemplatesByStationType(db);
+  const templates = await loadStationTemplates(db);
   const managerView = user ? canManage(event, user) : false;
   const fullShifts = (event.shifts || []).map((shift) => ({
     shiftId: shift.shiftId,
@@ -214,7 +220,7 @@ const toEventResponse = async (event, user, db = prisma, options = {}) => {
     requiredStaff: shift.requiredStaff,
     status: shift.status,
     staffAssignments: (shift.staffAssignments || []).map(({ assignedUser, station, ...assignment }) => {
-      const template = station ? templatesByType.get(station.stationType) : null;
+      const template = station ? templateForStation(station, templates) : null;
       return {
         staffAssignmentId: assignment.id,
         assignmentRole: assignment.assignmentRole,
@@ -249,7 +255,7 @@ const toEventResponse = async (event, user, db = prisma, options = {}) => {
   )));
   const eventStations = stations
     .filter((station) => !visibleStationIds || visibleStationIds.has(station.stationId))
-    .map((station) => mapStationDto(station, event, templatesByType));
+    .map((station) => mapStationDto(station, event, templates));
   const registrationCount = _count.registrations || 0;
 
   const response = {
@@ -479,6 +485,10 @@ const requireTemplates = async (tx, stations) => {
   if (templates.length !== ids.length) {
     throw new AppError(422, "STATION_TEMPLATE_NOT_AVAILABLE", "One or more station templates are unavailable");
   }
+  const stationTypes = templates.map(stationTypeForTemplate).filter(Boolean);
+  if (new Set(stationTypes).size !== stationTypes.length) {
+    throw new AppError(422, "DUPLICATE_STATION_TYPE", "Choose only one template for each screening station type");
+  }
   return new Map(templates.map((template) => [template.stationTemplateId, template]));
 };
 
@@ -558,12 +568,12 @@ const createEventStations = async (tx, eventId, stations, daysByDate, templatesB
 
   for (const input of stations || []) {
     const template = templatesById.get(input.stationTemplateId);
-    const stationType = stationTypeForTemplateKey(template.templateKey);
+    const stationType = stationTypeForTemplate(template);
     if (!stationType) {
       throw new AppError(
         422,
         "STATION_TEMPLATE_NOT_IMPORTABLE",
-        `${template.templateKey} cannot be imported as a Station (not a screening StationType)`,
+        `${template.name} cannot be imported as a screening station`,
       );
     }
 
@@ -573,6 +583,7 @@ const createEventStations = async (tx, eventId, stations, daysByDate, templatesB
         where: { stationId: station.stationId },
         data: {
           stationName: template.name,
+          stationTemplateId: template.stationTemplateId,
           stationOrder: input.stationOrder,
           isActive: input.isAvailable !== false,
         },
@@ -587,6 +598,7 @@ const createEventStations = async (tx, eventId, stations, daysByDate, templatesB
       station = await tx.station.create({
         data: {
           eventId,
+          stationTemplateId: template.stationTemplateId,
           stationType,
           stationName: template.name,
           stationOrder,
@@ -985,10 +997,10 @@ return db.$transaction(async (tx) => {
   }
 
   let stationsByTemplate = new Map();
-  const templatesByType = await loadTemplatesByStationType(tx);
+  const templates = await loadStationTemplates(tx);
   const existingStations = await tx.station.findMany({ where: { eventId } });
   for (const station of existingStations) {
-    const template = templatesByType.get(station.stationType);
+    const template = templateForStation(station, templates);
     if (template) stationsByTemplate.set(template.stationTemplateId, station);
   }
 
@@ -1006,7 +1018,7 @@ return db.$transaction(async (tx) => {
             isAvailable: station.isActive,
             startsAt: station.isActive ? day.startsAt : null,
             endsAt: station.isActive ? day.endsAt : null,
-            capacity: templatesByType.get(station.stationType)?.defaultCapacity || current.capacity,
+            capacity: templateForStation(station, templates)?.defaultCapacity || current.capacity,
           },
         });
       }
@@ -1586,24 +1598,113 @@ const listStaffDirectory = async () => {
   }));
 };
 
-// Read-only catalog for the events UI / OpenAPI StationTemplate DTO (#23).
-// Import/update map templateKey → StationType per #30 (catalog keys include
-// REGISTRATION / CLINICAL_REVIEW which are not StationType and are rejected on import).
+// Import picker: active templates that map to a screening StationType.
 const listStationTemplates = async () => {
   const templates = await prisma.stationTemplate.findMany({
-    where: { active: true },
+    where: { active: true, stationType: { not: null } },
     select: {
       stationTemplateId: true,
       templateKey: true,
+      stationType: true,
       version: true,
       name: true,
       description: true,
       defaultCapacity: true,
+      active: true,
     },
     orderBy: { name: "asc" },
   });
-  return templates.filter((template) => stationTypeForTemplateKey(template.templateKey));
+  return templates;
 };
+
+const serializeStationTemplate = (template) => ({
+  stationTemplateId: template.stationTemplateId,
+  templateKey: template.templateKey,
+  stationType: template.stationType,
+  version: template.version,
+  name: template.name,
+  description: template.description,
+  defaultCapacity: template.defaultCapacity,
+  active: template.active,
+});
+
+/** Admin catalog: all templates including inactive / non-importable (#23). */
+const listStationTemplateLibrary = async () => {
+  const templates = await prisma.stationTemplate.findMany({
+    select: {
+      stationTemplateId: true,
+      templateKey: true,
+      stationType: true,
+      version: true,
+      name: true,
+      description: true,
+      defaultCapacity: true,
+      active: true,
+    },
+    orderBy: [{ active: "desc" }, { name: "asc" }],
+  });
+  return templates.map(serializeStationTemplate);
+};
+
+const createStationTemplate = async (body, user, context, db = prisma) => {
+  try {
+    return await db.$transaction(async (tx) => {
+      const template = await tx.stationTemplate.create({
+        data: {
+          templateKey: crypto.randomUUID(),
+          stationType: body.stationType,
+          name: body.name,
+          description: body.description ?? null,
+          defaultCapacity: body.defaultCapacity,
+          active: body.active,
+        },
+      });
+      const serialized = serializeStationTemplate(template);
+      await createAuditLog({
+        userId: user.userId,
+        action: "STATION_TEMPLATE_CREATED",
+        entityName: "StationTemplate",
+        entityId: template.stationTemplateId,
+        newValue: serialized,
+        context,
+        client: tx,
+      });
+      return serialized;
+    });
+  } catch (error) {
+    if (error?.code === "P2002") {
+      throw new AppError(409, "STATION_TEMPLATE_KEY_EXISTS", "Could not allocate a unique station template key");
+    }
+    throw error;
+  }
+};
+
+const updateStationTemplate = async (stationTemplateId, body, user, context, db = prisma) => db.$transaction(async (tx) => {
+  const existing = await tx.stationTemplate.findUnique({ where: { stationTemplateId } });
+  if (!existing) throw new AppError(404, "STATION_TEMPLATE_NOT_FOUND", "Station template not found");
+  const template = await tx.stationTemplate.update({
+    where: { stationTemplateId },
+    data: {
+      ...(body.name !== undefined ? { name: body.name } : {}),
+      ...(body.description !== undefined ? { description: body.description } : {}),
+      ...(body.defaultCapacity !== undefined ? { defaultCapacity: body.defaultCapacity } : {}),
+      ...(body.active !== undefined ? { active: body.active } : {}),
+      version: { increment: 1 },
+    },
+  });
+  const serialized = serializeStationTemplate(template);
+  await createAuditLog({
+    userId: user.userId,
+    action: existing.active && body.active === false ? "STATION_TEMPLATE_DEACTIVATED" : "STATION_TEMPLATE_UPDATED",
+    entityName: "StationTemplate",
+    entityId: stationTemplateId,
+    oldValue: serializeStationTemplate(existing),
+    newValue: serialized,
+    context,
+    client: tx,
+  });
+  return serialized;
+});
 
 const importStations = async (eventId, body, user, correlationId, db = prisma) => {
   const current = await requireEvent(eventId, user, true, db);
@@ -1619,12 +1720,15 @@ const importStations = async (eventId, body, user, correlationId, db = prisma) =
   const orderedTemplates = body.stationTemplateIds.map((id) => templates.find((template) => template.stationTemplateId === id));
   const { importable, skipped } = classifyTemplates(orderedTemplates);
   if (skipped.length > 0) {
-    const keys = skipped.map((template) => template.templateKey).join(", ");
+    const names = skipped.map((template) => template.name).join(", ");
     throw new AppError(
       422,
       "STATION_TEMPLATE_NOT_IMPORTABLE",
-      `These templates are not screening stations and cannot be imported: ${keys}`,
+      `These templates are not screening stations and cannot be imported: ${names}`,
     );
+  }
+  if (new Set(importable.map(({ stationType }) => stationType)).size !== importable.length) {
+    throw new AppError(422, "DUPLICATE_STATION_TYPE", "Choose only one template for each screening station type");
   }
 
   const existingStations = current.stations || [];
@@ -1645,6 +1749,7 @@ const importStations = async (eventId, body, user, correlationId, db = prisma) =
           where: { stationId: existing.stationId },
           data: {
             stationName: template.name,
+            stationTemplateId: template.stationTemplateId,
             isActive: true,
           },
         });
@@ -1653,6 +1758,7 @@ const importStations = async (eventId, body, user, correlationId, db = prisma) =
         const created = await tx.station.create({
           data: {
             eventId,
+            stationTemplateId: template.stationTemplateId,
             stationType,
             stationName: template.name,
             stationOrder: nextOrder,
@@ -2164,6 +2270,9 @@ module.exports = {
   getEventDeletionCleanupStatus,
   listStaffDirectory,
   listStationTemplates,
+  listStationTemplateLibrary,
+  createStationTemplate,
+  updateStationTemplate,
   importStations,
   updateStation,
   addStaffAssignment,

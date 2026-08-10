@@ -59,11 +59,31 @@ const referral = z.object({
   reason: z.string().trim().min(10).max(2000),
   instructions: z.string().trim().max(2000).optional(),
 }).strict();
+
+/** Shared eye-health capture shape (screener station + optional review addendum). */
+const eyeHealthObservations = z.object({
+  cataractRisk: z.enum(["NONE", "SUSPECTED", "PRESENT", "NOT_ASSESSED"]),
+  glaucomaRisk: z.enum(["NONE", "SUSPECTED", "PRESENT", "NOT_ASSESSED"]),
+  symptomsNoted: z.boolean(),
+  symptomSummary: z.string().trim().max(500).optional(),
+  observations: z.string().trim().min(1).max(2000),
+  deviceFindings: z.string().trim().max(2000).optional().nullable(),
+}).strict().superRefine((value, ctx) => {
+  if (value.symptomsNoted && !(value.symptomSummary && value.symptomSummary.trim().length >= 3)) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: "Symptom summary is required when symptoms are noted",
+      path: ["symptomSummary"],
+    });
+  }
+});
+
 const commonDecision = {
   contextVersion,
   confirmed: z.literal(true),
   clinicalSummary,
   recommendations,
+  eyeHealthObservations: eyeHealthObservations.optional(),
   signatureObjectKey: z.string().regex(/^signatures\/[a-f0-9-]{36}\/review-decision-[a-f0-9-]{36}-[a-f0-9-]{36}\.(png|jpg)$/),
   signatureSha256: z.string().regex(/^[a-f0-9]{64}$/i),
   signatureMimeType: z.enum(["image/png", "image/jpeg"]),
@@ -177,6 +197,19 @@ const saveColourVisionBody = z.object({
   resultData: colourVisionResultData,
 });
 
+const eyeHealthResultData = eyeHealthObservations;
+
+const previewEyeHealthBody = z.object({
+  resultData: eyeHealthResultData,
+});
+
+const saveEyeHealthBody = z.object({
+  registrationId: z.string().uuid(),
+  idempotencyKey: z.string().min(8).max(64),
+  acknowledged: z.boolean(),
+  resultData: eyeHealthResultData,
+});
+
 const screeningSyncAction = z.discriminatedUnion("stationType", [
   z.object({
     clientActionId: z.string().uuid(),
@@ -195,6 +228,12 @@ const screeningSyncAction = z.discriminatedUnion("stationType", [
     stationId: z.string().uuid(),
     stationType: z.literal("COLOUR_VISION"),
     payload: saveColourVisionBody.strict(),
+  }).strict(),
+  z.object({
+    clientActionId: z.string().uuid(),
+    stationId: z.string().uuid(),
+    stationType: z.literal("EYE_HEALTH"),
+    payload: saveEyeHealthBody.strict(),
   }).strict(),
 ]);
 
@@ -222,5 +261,8 @@ module.exports = {
   saveRefractionBody,
   previewColourVisionBody,
   saveColourVisionBody,
+  eyeHealthResultData,
+  previewEyeHealthBody,
+  saveEyeHealthBody,
   screeningSyncBody,
 };
