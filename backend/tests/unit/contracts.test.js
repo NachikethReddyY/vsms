@@ -175,7 +175,7 @@ test("station template mapping only imports screening StationTypes", () => {
     assert.equal(mapping.stationTypeForTemplateKey("VISUAL_ACUITY"), "VISUAL_ACUITY");
     assert.equal(mapping.stationTypeForTemplateKey("REFRACTION"), "REFRACTION");
     assert.equal(mapping.stationTypeForTemplateKey("COLOUR_VISION"), "COLOUR_VISION");
-    assert.equal(mapping.stationTypeForTemplateKey("EYE_HEALTH"), null);
+    assert.equal(mapping.stationTypeForTemplateKey("EYE_HEALTH"), "EYE_HEALTH");
     assert.equal(mapping.stationTypeForTemplateKey("REGISTRATION"), null);
     assert.equal(mapping.stationTypeForTemplateKey("CLINICAL_REVIEW"), null);
 
@@ -185,8 +185,8 @@ test("station template mapping only imports screening StationTypes", () => {
         { templateKey: "CLINICAL_REVIEW", name: "Clinical review" },
         { templateKey: "EYE_HEALTH", name: "Eye health" },
     ]);
-    assert.deepEqual(importable.map(({ stationType }) => stationType), ["VISUAL_ACUITY"]);
-    assert.deepEqual(skipped.map((template) => template.templateKey), ["REGISTRATION", "CLINICAL_REVIEW", "EYE_HEALTH"]);
+    assert.deepEqual(importable.map(({ stationType }) => stationType), ["VISUAL_ACUITY", "EYE_HEALTH"]);
+    assert.deepEqual(skipped.map((template) => template.templateKey), ["REGISTRATION", "CLINICAL_REVIEW"]);
 });
 
 test("participant search matches any supplied identifier", () => {
