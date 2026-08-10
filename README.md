@@ -71,7 +71,20 @@ Configure the Cognito region, user pool, app client, hosted domain, redirect URI
 
 ## Verification
 
-The backend test command derives a database name ending in `_test`, applies all migrations there, and refuses to prepare any other database.
+### Integration database
+
+Integration tests use only `backend/.env.test` (or an explicitly exported `DATABASE_URL`), never `backend/.env`. The runner parses the URL and refuses to reset a database unless its name ends in `_test`; it never derives a test database from a development or production URL. It also requires `VSMS_TEST_DATABASE_RESET_ACKNOWLEDGEMENT=I_UNDERSTAND_THIS_RESETS_A_TEST_DATABASE` before it invokes Prisma.
+
+Current schema revision: `backend/prisma/schema.prisma` with migration `20260810000000_add_domain_event_outbox`. This revision is recorded here without connection details.
+
+Create the disposable local database with its isolated role and loopback-only port:
+
+```bash
+cp backend/.env.test.example backend/.env.test
+docker compose --env-file backend/.env.test -f backend/docker-compose.test.yml up -d
+```
+
+The container contains no development or production database. Its `vsms_test` role owns only `vsms_test`, is demoted from server-wide administration after initialization, and Prisma resets only that disposable database. Use a unique local password in `.env.test`; do not reuse a development or production credential. CI supplies the same `vsms_test` database URL directly.
 
 ```bash
 pnpm --dir backend prisma:validate
@@ -100,5 +113,6 @@ The Bruno collection is in `api-testing/bruno`. Select its `Local` environment a
 
 - [Event implementation report](docs/event-details-implementation-report.md)
 - [Event delivery plan](design/event-details-plan.md)
+- [Live acceptance kit](docs/live-acceptance.md)
 - [Entity relationship model](erd.md)
 - [OpenAPI contract](backend/docs/openapi.yaml)
