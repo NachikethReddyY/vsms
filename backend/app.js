@@ -189,7 +189,7 @@ app.use(cookieParser());
 // JSON Body Parser with strict payload size limits
 app.use(
   express.json({
-    limit: "256kb",
+    limit: env.requestBodyLimit,
     strict: true,
     type: "application/json"
   })

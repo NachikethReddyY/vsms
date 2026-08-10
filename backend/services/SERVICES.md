@@ -10,8 +10,8 @@ Cross-folder imports go up one level (e.g. `../event/eventAuthorizationService`)
 | --- | --- | --- |
 | `services/event/` | Event lifecycle, authorization, membership, venues | `eventService.js`, `eventAuthorizationService.js`, `eventMembershipService.js`, `attendanceDefinition.js`, `stationTemplateMapping.js`, `locationService.js` |
 | `services/screening/` | Screening, review, referral, queue, offline sync | `screeningService.js`, `syncService.js`, `reviewService.js`, `referralService.js`, `queueService.js` |
-| `services/participant/` | Participant registration and QR identity | `participantService.js`, `qrService.js` |
-| `services/account/` | Accounts, auth, staff access, lifecycle ops | `accountService.js`, `accountState.js`, `accountLifecycleNotificationService.js`, `accountProviderOperationService.js`, `userService.js`, `cognitoStaffAccessService.js`, `adminSafety.js` |
+| `services/participant/` | Participant registration, registration lifecycle, signature artifacts, and QR identity | `participantService.js`, `registrationService.js`, `signatureService.js`, `qrService.js` |
+| `services/account/` | Accounts, auth, staff access, lifecycle ops, and administrator maintenance | `accountService.js`, `adminService.js`, `accountState.js`, `accountLifecycleNotificationService.js`, `accountProviderOperationService.js`, `userService.js`, `cognitoStaffAccessService.js`, `adminSafety.js` |
 | `services/reporting/` | Reports, exports, analytics, artifact storage | `reportingService.js`, `reportExportService.js`, `reportRenderer.js`, `reportArtifactStorage.js`, `analyticsService.js` |
 | `services/domain/` | Domain event bus (outbox) and its handlers | `domainEventBus.js`, `domainEventHandlers/` |
 | `services/platform/` | Cross-cutting background jobs and provider events | `artifactCleanupService.js`, `sesProviderEventService.js`, `snsMessageService.js` |
@@ -41,12 +41,15 @@ Cross-folder imports go up one level (e.g. `../event/eventAuthorizationService`)
 | File | Responsibility |
 | --- | --- |
 | `participantService.js` | Participant registration and consent flows. |
-| `qrService.js` | QR token issue/rotation, registration resolution. |
+| `registrationService.js` | Event registration lifecycle, event-duty checks, duplicate/idempotency handling, and registration history. |
+| `signatureService.js` | Signature-target authorization and signature-artifact persistence. |
+| `qrService.js` | QR token issue/rotation, event-scoped QR authorization, and registration resolution. |
 
 ### `account/`
 | File | Responsibility |
 | --- | --- |
-| `accountService.js` | User accounts, approval lifecycle, provider operation dispatch. |
+| `accountService.js` | User accounts, Cognito-to-local account synchronization, approval lifecycle, provider operation dispatch. |
+| `adminService.js` | Administrator audit-log reads and maintenance-operation orchestration. |
 | `accountState.js` | Account state enums/derived status. |
 | `accountLifecycleNotificationService.js` | Account lifecycle event notifications. |
 | `accountProviderOperationService.js` | Provider (Cognito) operation ordering/retry. |
@@ -77,6 +80,8 @@ Cross-folder imports go up one level (e.g. `../event/eventAuthorizationService`)
 | `snsMessageService.js` | SNS notification outbound handling. |
 
 ## Conventions
+- Controllers do not query Prisma. They validate/map HTTP input and responses; services own Prisma reads, writes, and transaction boundaries.
+- Prisma is the data-access boundary for PostgreSQL. Do not add a repository layer unless a second persistence implementation creates a concrete need.
 - One aggregate/flow per service file; keep files under ~800 lines where possible
   (split helpers into a sibling module if it grows).
 - Emit domain events via `domainEventBus.emit({ client: tx, type, aggregateType, aggregateId, correlationId, actorUserId, payload })` **inside** the same `prisma.$transaction` that mutates state.

@@ -116,3 +116,5 @@ The Bruno collection is in `api-testing/bruno`. Select its `Local` environment a
 - [Live acceptance kit](docs/live-acceptance.md)
 - [Entity relationship model](erd.md)
 - [OpenAPI contract](backend/docs/openapi.yaml)
+- [Backend request architecture](backend/docs/request-architecture.md)
+- [School API/behavior contract map](docs/api-contract-mapping.md)
