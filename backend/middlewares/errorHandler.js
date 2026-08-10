@@ -51,19 +51,14 @@ const errorHandler = (error, req, res, _next) => {
         ? error.message
         : fallbackMessage(status);
 
-    logger[status >= 500 ? "error" : "warn"](
-        "http.request.failed",
-        {
-            requestId: req.requestId,
-            method: req.method,
-            path: req.path,
-            statusCode: status,
-            code,
-            errorMessage: error.message,
-            ...(req.user?.userId ? { userId: req.user.userId } : {}),
-            ...(status === 500 && error.stack ? { stack: error.stack } : {})
-        }
-    );
+    const requestId = req.requestId || req.context?.requestId;
+    res.err = error;
+    (req.log || logger)[status >= 500 ? "error" : "warn"]({
+        event: "application.error",
+        ...(!req.log && requestId ? { requestId } : {}),
+        status,
+        code,
+    }, "application.error");
 
     res.status(status).json({
         type: `https://vsms.local/problems/${code.toLowerCase().replaceAll("_", "-")}`,

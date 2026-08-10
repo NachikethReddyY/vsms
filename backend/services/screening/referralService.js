@@ -483,7 +483,7 @@ const resumeQueuedDelivery = async (eventId, referralId, deliveryId, user, ipAdd
   return deliveryWithDocument(delivery.id);
 };
 
-const issueReferral = async (eventId, referralId, input, user, ipAddress) => {
+const issueReferral = async (eventId, referralId, input, user, ipAddress, context) => {
   const referral = await loadReferral(eventId, referralId);
   assertReferralOwner(referral, user);
   await requireReviewerAccess(prisma, eventId, user);
@@ -569,6 +569,7 @@ const issueReferral = async (eventId, referralId, input, user, ipAddress) => {
         entityName: "Referral",
         entityId: referralId,
         details: { eventId, reviewId: referral.reviewId, documentId, version, signedPayloadHash },
+        requestId: context?.requestId || null,
         ipAddress: String(ipAddress || "").slice(0, 45) || null,
       } });
       await domainEventBus.emit({
@@ -576,6 +577,8 @@ const issueReferral = async (eventId, referralId, input, user, ipAddress) => {
         type: "REFERRAL_ISSUED",
         aggregateType: "Referral",
         aggregateId: referralId,
+        context,
+        correlationId: context?.requestId,
         actorUserId: user.userId,
         payload: {
           eventId,
