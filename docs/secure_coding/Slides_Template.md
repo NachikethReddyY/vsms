@@ -27,7 +27,7 @@ The 15-minute demonstration will showcase the complete Visual Screening Manageme
 
 ### Visual
 
-Use six feature cards representing the main demonstration areas:
+Use seven feature cards representing the main demonstration areas:
 
 - 🔐 Login
 - 👤 Registration
@@ -75,3 +75,23 @@ Authentication
 Role Identification
   ↓
 Role-Specific Dashboard
+```
+
+# Slide 3 — Participant Registration
+
+### Title
+
+**02 — Participant Registration**
+
+### Visual
+
+Use a screenshot of the participant registration form.
+
+### Key Points
+
+- Input validation
+- Required-field validation
+- Data integrity
+- Duplicate prevention
+- Secure API request
+
