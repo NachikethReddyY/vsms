@@ -40,37 +40,40 @@ test("station template mutations generate opaque keys and audit atomically", asy
       findUnique: async () => ({
         stationTemplateId: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
         templateKey: "opaque-existing-key",
-        stationType: "EYE_HEALTH",
+        stationType: "VISUAL_ACUITY",
         version: 1,
-        name: "Eye health booth",
+        name: "Visual acuity booth",
         description: null,
-        defaultCapacity: 2,
+        defaultCapacity: 4,
         active: true,
+        fieldSchema: [{ key: "od", label: "OD", type: "text", required: true }],
       }),
       update: async ({ data }) => ({
         stationTemplateId: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
         templateKey: "opaque-existing-key",
-        stationType: "EYE_HEALTH",
+        stationType: "VISUAL_ACUITY",
         version: 2,
-        name: data.name ?? "Eye health booth",
+        name: data.name ?? "Visual acuity booth",
         description: null,
-        defaultCapacity: 2,
+        defaultCapacity: 4,
         active: data.active ?? true,
+        fieldSchema: [{ key: "od", label: "OD", type: "text", required: true }],
       }),
     },
     auditLog: { create: async ({ data }) => { audits.push(data); return data; } },
   };
   const db = { $transaction: async (callback) => callback(transactionClient) };
   const context = { requestId: crypto.randomUUID(), ipAddress: "127.0.0.1", deviceName: "Test" };
-  const body = { stationType: "EYE_HEALTH", name: "Eye health booth", defaultCapacity: 2, active: true };
+  const body = { stationType: "VISUAL_ACUITY", name: "Visual acuity booth", defaultCapacity: 4, active: true };
 
   const first = await eventService.createStationTemplate(body, manager, context, db);
-  const second = await eventService.createStationTemplate({ ...body, name: "Second eye health booth" }, manager, context, db);
-  await eventService.updateStationTemplate(first.stationTemplateId, { name: "Updated eye health booth" }, manager, context, db);
+  const second = await eventService.createStationTemplate({ ...body, name: "Second visual acuity booth" }, manager, context, db);
+  await eventService.updateStationTemplate(first.stationTemplateId, { name: "Updated visual acuity booth" }, manager, context, db);
   await eventService.updateStationTemplate(first.stationTemplateId, { active: false }, manager, context, db);
 
   assert.notEqual(first.templateKey, second.templateKey);
-  assert.equal(first.stationType, "EYE_HEALTH");
+  assert.equal(first.stationType, "VISUAL_ACUITY");
+  assert.ok(Array.isArray(first.fieldSchema) && first.fieldSchema.length > 0);
   assert.deepEqual(audits.map(({ action }) => action), [
     "STATION_TEMPLATE_CREATED",
     "STATION_TEMPLATE_CREATED",
