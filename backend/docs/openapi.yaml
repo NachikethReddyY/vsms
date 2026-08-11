@@ -4515,7 +4515,7 @@ components:
         signatureObjectKey: { type: string, maxLength: 500, nullable: true }
         signatureSha256: { type: string, pattern: '^[a-fA-F0-9]{64}$', nullable: true }
         signatureMimeType: { type: string, enum: [image/png, image/jpeg], nullable: true }
-      description: Accepted consent requires signature metadata; non-participant signers also require guardian contact and relationship fields.
+      description: Accepted consent requires signature metadata; non-participant signers require their relationship to the participant. Optional contact fields are retained only for legacy records.
     ConsentWithEventRequest:
       allOf:
         - $ref: "#/components/schemas/ConsentRequest"
