@@ -40,6 +40,7 @@ const replace = (t, target, key, value) => {
 const reviewerUser = (userId, roles = ["REVIEWER"]) => ({
   userId,
   roles,
+  professionalCategory: "DOCTOR",
   status: "ACTIVE",
   approvalState: "APPROVED",
   accessState: "ENABLED",
@@ -49,7 +50,14 @@ const installReviewerMembership = (t, eventId, reviewerId) => replace(
   t,
   prisma.eventMembership,
   "findFirst",
-  async () => ({ id: crypto.randomUUID(), eventId, userId: reviewerId, status: "ACTIVE", roles: [{ role: "REVIEWER" }] }),
+  async () => ({
+    id: crypto.randomUUID(),
+    eventId,
+    userId: reviewerId,
+    status: "ACTIVE",
+    roles: [{ role: "REVIEWER" }],
+    user: { professionalCategory: "DOCTOR" },
+  }),
 );
 
 const referralFixture = () => ({

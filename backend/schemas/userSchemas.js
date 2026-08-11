@@ -21,6 +21,7 @@ const createUserBody = z.object({
   employeeNumber: z.string().trim().min(1).max(20),
   department: optionalText(100),
   designation: optionalText(100),
+  professionalCategory: z.enum(["STAFF", "DOCTOR"]).default("STAFF"),
   roles: roleList,
   status: z.enum(["ACTIVE", "INACTIVE"]).default("INACTIVE"),
 }).strict();
@@ -30,6 +31,7 @@ const updateUserBody = z.object({
   employeeNumber: z.string().trim().min(1).max(20).optional(),
   department: optionalText(100),
   designation: optionalText(100),
+  professionalCategory: z.enum(["STAFF", "DOCTOR"]).optional(),
   roles: roleList.optional(),
 }).strict().refine((value) => Object.keys(value).length > 0, {
   message: "At least one account field is required",

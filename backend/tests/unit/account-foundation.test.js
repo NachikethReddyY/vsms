@@ -244,7 +244,8 @@ test("self-service profile rejects employment fields and account filters are str
   for (const field of ["employeeNumber", "department", "designation", "approvalState", "accessState"]) {
     assert.equal(profileUpdateBody.safeParse({ [field]: "changed" }).success, false);
   }
-  assert.equal(profileUpdateBody.safeParse({ fullName: "Safe Name", professionalCategory: "STAFF" }).success, true);
+  assert.equal(profileUpdateBody.safeParse({ fullName: "Safe Name" }).success, true);
+  assert.equal(profileUpdateBody.safeParse({ professionalCategory: "DOCTOR" }).success, false);
   assert.equal(accountListQuery.safeParse({ page: "0" }).success, false);
   assert.equal(accountListQuery.safeParse({ limit: "101" }).success, false);
   assert.equal(accountListQuery.safeParse({ approvalState: "UNKNOWN" }).success, false);

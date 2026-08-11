@@ -7,7 +7,6 @@ const accountParams = z.object({ accountId: z.string().uuid() }).strict();
 const profileUpdateBody = z.object({
   fullName: z.string().trim().min(1).max(100).optional(),
   contactNumber: optionalNullableText(20),
-  professionalCategory: z.enum(["STAFF", "DOCTOR"]).nullable().optional(),
 }).strict().refine((value) => Object.keys(value).length > 0, {
   message: "At least one profile field is required",
 });

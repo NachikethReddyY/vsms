@@ -5,6 +5,16 @@ const { isApprovedAccount } = require("../../middlewares/requireApprovedAccount"
 const ACTIVE_ASSIGNMENT_STATUSES = ["ASSIGNED", "CONFIRMED"];
 
 const actorId = (user) => user?.userId || user?.id;
+const isAdministrator = (user) => user?.systemRole === "ADMIN" || user?.roles?.includes("ADMINISTRATOR");
+const assertRoleEligibility = (user, roles = []) => {
+  const applicationRoles = user?.roles ?? user?.userRoles?.map(({ role }) => role.roleName) ?? [];
+  if (roles.includes("EVENT_MANAGER") && !applicationRoles.includes("EVENT_MANAGER")) {
+    throw new AppError(422, "EVENT_MANAGER_ACCOUNT_REQUIRED", "Event management can only be assigned to an event manager account");
+  }
+  if (roles.includes("REVIEWER") && user?.professionalCategory !== "DOCTOR") {
+    throw new AppError(422, "DOCTOR_REQUIRED", "Clinical review can only be assigned to a doctor account");
+  }
+};
 
 const assertOperationalAccount = (user) => {
   if (!isApprovedAccount(user)) {
@@ -42,6 +52,10 @@ const requireEventRoles = async (eventId, user, roles, options = {}) => {
   });
   if (!event) throw new AppError(404, "EVENT_NOT_FOUND", "Event was not found");
 
+  if (options.allowAdministrator && isAdministrator(user)) {
+    return { event, membership: null, roles: new Set(roles) };
+  }
+
   const membership = await getActiveMembership(db, eventId, actorId(user));
   const granted = new Set(membership?.roles.map(({ role }) => role) || []);
   if (!membership || !roles.some((role) => granted.has(role))) {
@@ -75,6 +89,9 @@ const requireCurrentDuty = async (eventId, user, role, options = {}) => {
 
 const requireEventRoleAndDuty = async (eventId, user, role, options = {}) => {
   const authorization = await requireEventRoles(eventId, user, [role], options);
+  if (role === "REVIEWER" && authorization.membership.user.professionalCategory !== "DOCTOR") {
+    throw new AppError(403, "DOCTOR_REQUIRED", "Clinical review requires a doctor account");
+  }
   const duty = await requireCurrentDuty(eventId, user, role, options);
   return { ...authorization, duty };
 };
@@ -83,7 +100,7 @@ const requireEventManager = (eventId, user, options = {}) => requireEventRoles(
   eventId,
   user,
   ["EVENT_MANAGER"],
-  options,
+  { ...options, allowAdministrator: true },
 );
 
 const requireQueueAccess = async (eventId, user, options = {}) => {
@@ -112,6 +129,7 @@ const requireQueueAccess = async (eventId, user, options = {}) => {
 
 const eventVisibilityWhere = (user, roles = null) => {
   assertOperationalAccount(user);
+  if (isAdministrator(user)) return {};
   return {
     memberships: {
       some: {
@@ -126,7 +144,9 @@ const eventVisibilityWhere = (user, roles = null) => {
 module.exports = {
   ACTIVE_ASSIGNMENT_STATUSES,
   actorId,
+  assertRoleEligibility,
   assertOperationalAccount,
+  isAdministrator,
   eventVisibilityWhere,
   getActiveMembership,
   requireCurrentDuty,

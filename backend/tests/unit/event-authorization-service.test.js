@@ -33,13 +33,13 @@ function dbWith({ memberships = [], duty = null, eventStatus = "IN_PROGRESS" } =
   };
 }
 
-const membership = (eventId, roles) => ({
+const membership = (eventId, roles, professionalCategory = "STAFF") => ({
   id: crypto.randomUUID(),
   eventId,
   userId,
   status: "ACTIVE",
   roles: roles.map((role) => ({ id: crypto.randomUUID(), role, assignedAt: new Date() })),
-  user: approvedUser,
+  user: { ...approvedUser, professionalCategory },
 });
 
 test("event roles are scoped independently across two events", async () => {
@@ -52,8 +52,9 @@ test("event roles are scoped independently across two events", async () => {
   );
 });
 
-test("platform administrator has no operational access without membership", async () => {
+test("platform administrator can manage events but cannot operate clinical queues without membership", async () => {
   const administrator = { ...approvedUser, roles: ["ADMINISTRATOR"], systemRole: "ADMIN" };
+  await authorization.requireEventManager(eventA, administrator, { db: dbWith() });
   await assert.rejects(
     authorization.requireQueueAccess(eventA, administrator, { db: dbWith() }),
     (error) => error.code === "EVENT_ROLE_REQUIRED",
@@ -74,6 +75,17 @@ test("clinical role requires both durable membership and current station duty", 
   );
   db.staffAssignment.findFirst = async () => ({ id: crypto.randomUUID(), assignmentRole: "SCREENER" });
   await authorization.requireEventRoleAndDuty(eventA, approvedUser, "SCREENER", { db });
+});
+
+test("legacy reviewer membership cannot bypass doctor account eligibility", async () => {
+  const duty = { id: crypto.randomUUID(), assignmentRole: "REVIEWER" };
+  await assert.rejects(
+    authorization.requireEventRoleAndDuty(eventA, approvedUser, "REVIEWER", { db: dbWith({ memberships: [membership(eventA, ["REVIEWER"])], duty }) }),
+    (error) => error.code === "DOCTOR_REQUIRED",
+  );
+  await authorization.requireEventRoleAndDuty(eventA, approvedUser, "REVIEWER", {
+    db: dbWith({ memberships: [membership(eventA, ["REVIEWER"], "DOCTOR")], duty }),
+  });
 });
 
 test("pending and suspended accounts are rejected before event membership", async () => {

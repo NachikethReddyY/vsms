@@ -31,6 +31,8 @@ vi.mock('./stage4Api', async () => {
     listMemberships: vi.fn(async () => ({ memberships: [{ id: 'member-1', userId: 'user-1', status: 'ACTIVE', roles: membershipRoles, account: { id: 'user-1', userId: 'user-1', fullName: 'Asha Rao' } }] })),
     listEligibleUsers: vi.fn(async () => ({ users: [{ id: 'user-2', fullName: 'Ben Tan', email: 'ben@example.test', eventMemberships: [] }] })),
     addMembership: vi.fn(async (...args: unknown[]) => { calls.push({ name: 'addMembership', args }); return {}; }),
+    addMembershipRole: vi.fn(async (...args: unknown[]) => { calls.push({ name: 'addMembershipRole', args }); return {}; }),
+    removeMembershipRole: vi.fn(async (...args: unknown[]) => { calls.push({ name: 'removeMembershipRole', args }); return {}; }),
     removeMembership: vi.fn(async (...args: unknown[]) => { calls.push({ name: 'removeMembership', args }); return {}; }),
     getEvent: vi.fn(async () => { if (eventMode === '403') throw new Error('403 forbidden'); if (eventMode === '404') throw new Error('404 not found'); return eventData; }),
     assignShiftStaff: vi.fn(async (...args: unknown[]) => { calls.push({ name: 'assignShiftStaff', args }); return eventData; }),
@@ -75,7 +77,7 @@ describe('Stage 4 rendered route behavior', () => {
     render(<MemoryRouter initialEntries={["/events"]}><Routes><Route element={<ProtectedRoute />}><Route path="/events" element={<p>Events</p>} /><Route path="/account/state" element={<pages.AccountStatePage />} /></Route></Routes></MemoryRouter>);
     expect(await screen.findByText(/No event assignment yet/i)).toBeTruthy();
     render(<MemoryRouter initialEntries={["/account/profile"]}><Routes><Route element={<ProtectedRoute />}><Route path="/account/profile" element={<pages.ProfilePage />} /></Route></Routes></MemoryRouter>);
-    expect(await screen.findByText('Safe profile')).toBeTruthy();
+    expect(await screen.findByRole('heading', { name: 'Profile and access' })).toBeTruthy();
   });
 
 
@@ -154,28 +156,22 @@ describe('Stage 4 rendered route behavior', () => {
     expect(calls.find(c => c.name === 'deleteEventPermanently')?.args[1]).toEqual({ previewToken: 'preview-token', version: 7, confirmationName: 'Clinic Day', acknowledgePermanentDeletion: true });
   });
 
-  it('assigns a shift duty through the real assignment endpoint while showing memberships separately', async () => {
+  it('assigns approved people and event-specific roles without changing account types', async () => {
     const user = userEvent.setup();
     renderRoute('/events/event-1/staff', <pages.EventStaffingPage />);
-    expect(await screen.findByRole('table', { name: /durable event memberships/i })).toBeTruthy();
-    await user.selectOptions(await screen.findByLabelText(/member for morning/i), 'user-1');
-    await user.click(screen.getByRole('button', { name: /assign shift duty/i }));
-    await waitFor(() => expect(calls.some(c => c.name === 'assignShiftStaff')).toBe(true));
-    await user.click(screen.getByRole('button', { name: /remove duty/i }));
-    expect(calls.find(c => c.name === 'assignShiftStaff')?.args).toEqual(['event-1', 'shift-1', { version: 3, userId: 'user-1', assignmentRole: 'REGISTRATION', eventStationId: null }]);
-    expect(calls.some(c => c.name === 'removeShiftAssignment')).toBe(true);
+    await user.selectOptions(await screen.findByLabelText(/eligible account/i), 'user-2');
+    await user.click(screen.getByLabelText(/screener/i));
+    await user.click(screen.getByRole('button', { name: /assign to event/i }));
+    await waitFor(() => expect(calls.some(c => c.name === 'addMembership')).toBe(true));
+    expect(calls.find(c => c.name === 'addMembership')?.args).toEqual(['event-1', 'user-2', ['REGISTRATION', 'SCREENER']]);
   });
 
-
-
-  it('derives SCREENER duty assignment with required station instead of submitting REGISTRATION', async () => {
-    const user = userEvent.setup(); membershipRoles = [{ role: 'SCREENER' }];
+  it('edits roles on an existing event assignment', async () => {
+    const user = userEvent.setup();
     renderRoute('/events/event-1/staff', <pages.EventStaffingPage />);
-    await user.selectOptions(await screen.findByLabelText(/member for morning/i), 'user-1');
-    await user.selectOptions(screen.getByLabelText(/station for morning/i), 'station-1');
-    await user.click(screen.getByRole('button', { name: /assign shift duty/i }));
-    await waitFor(() => expect(calls.some(c => c.name === 'assignShiftStaff')).toBe(true));
-    expect(calls.find(c => c.name === 'assignShiftStaff')?.args).toEqual(['event-1', 'shift-1', { version: 3, userId: 'user-1', assignmentRole: 'SCREENER', eventStationId: 'station-1' }]);
+    await user.selectOptions(await screen.findByLabelText(/add another role/i), 'SUPPORT');
+    await waitFor(() => expect(calls.some(c => c.name === 'addMembershipRole')).toBe(true));
+    expect(calls.find(c => c.name === 'addMembershipRole')?.args).toEqual(['event-1', 'member-1', 'SUPPORT']);
   });
 
   it('renders analytics as structured accessible tables with chart parity', async () => {

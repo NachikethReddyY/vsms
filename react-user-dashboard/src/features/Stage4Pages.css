@@ -78,8 +78,50 @@
 .stage4-link-button { min-height: 0 !important; padding: 2px !important; border: 0 !important; border-radius: 4px !important; background: transparent !important; color: var(--accent-strong) !important; font: inherit; font-weight: 750; text-align: left; text-decoration: underline; cursor: pointer; }
 .stage4-link-button:focus-visible { outline: 3px solid var(--accent-tint); outline-offset: 2px; }
 
+.event-staffing-header { display:flex; align-items:flex-end; justify-content:space-between; gap:24px; padding-bottom:24px; border-bottom:1px solid var(--hairline); }
+.event-staffing-header h1 { margin:4px 0 0; font-size:34px; letter-spacing:-.035em; }
+.event-staffing-header p:not(.eyebrow) { max-width:68ch; margin:8px 0 0; color:var(--ink-2); line-height:21px; }
+.event-staffing-refresh { width:40px; padding:0!important; }
+.event-staffing-refresh svg { width:18px; }
+.event-staffing-assign { display:grid; grid-template-columns:minmax(0,.65fr) minmax(320px,1fr); gap:18px; margin-top:24px; }
+.event-staffing-assign>button { align-self:end; justify-self:end; }
+.event-staffing-assign>button svg { width:18px; }
+.event-staffing-person-picker { display:grid; grid-template-columns:1fr 1.25fr; gap:10px; }
+.event-staffing-person-picker label,.event-team-add-role { display:grid; gap:6px; color:var(--ink-2); font-size:12px; font-weight:700; }
+.event-staffing-person-picker input,.event-staffing-person-picker select,.event-team-add-role select { min-height:42px; padding:8px 10px; border:1px solid var(--hairline-strong); border-radius:8px; outline:0; background:var(--surface); color:var(--ink); }
+.event-role-picker { grid-column:1/-1; margin:0; padding:0; border:0; }
+.event-role-picker legend { margin-bottom:8px; color:var(--ink-2); font-size:12px; font-weight:700; }
+.event-role-picker>div { display:flex; flex-wrap:wrap; gap:8px; }
+.event-role-picker label { min-height:40px; display:flex; align-items:center; gap:8px; padding:0 12px; border:1px solid var(--hairline-strong); border-radius:999px; background:var(--canvas-soft); color:var(--ink-2); cursor:pointer; }
+.event-role-picker label:has(input:checked) { border-color:var(--accent); background:var(--accent-tint); color:var(--ink); }
+.event-role-picker input { width:15px; height:15px; accent-color:var(--accent); }
+.event-team { margin-top:34px; }
+.event-team-heading { display:flex; align-items:end; justify-content:space-between; margin-bottom:14px; }
+.event-team-heading h2,.event-team-heading p { margin:0; }
+.event-team-heading h2 { font-size:22px; }
+.event-team-heading p { margin-top:4px; color:var(--muted); font-size:12px; }
+.event-team-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:14px; }
+.event-team-card { padding:16px; border:1px solid var(--hairline); border-radius:12px; background:var(--surface); }
+.event-team-card>header { display:grid; grid-template-columns:40px minmax(0,1fr) auto; align-items:center; gap:11px; }
+.event-team-avatar { width:40px; height:40px; display:grid; place-items:center; border-radius:10px; background:var(--accent-tint); color:var(--accent); }
+.event-team-avatar svg { width:20px; }
+.event-team-card h3,.event-team-card p { margin:0; }
+.event-team-card h3 { font-size:14px; }
+.event-team-card p { margin-top:2px; overflow:hidden; color:var(--muted); font-size:11px; text-overflow:ellipsis; white-space:nowrap; }
+.event-team-remove { min-height:36px!important; }
+.event-team-roles { display:flex; flex-wrap:wrap; gap:7px; margin-top:14px; }
+.event-team-roles>span { min-height:30px; display:inline-flex; align-items:center; gap:5px; padding:0 4px 0 10px; border:1px solid var(--hairline-strong); border-radius:999px; color:var(--ink-2); font-size:11px; font-weight:700; }
+.event-team-roles button { width:24px!important; min-height:24px!important; padding:0!important; border:0!important; border-radius:50%!important; background:transparent!important; color:var(--muted)!important; }
+.event-team-roles button svg { width:14px; }
+.event-team-add-role { margin-top:14px; }
+.event-staffing-page .quiet-empty { min-height:220px; display:grid; place-items:center; align-content:center; gap:7px; border:1px dashed var(--hairline-strong); border-radius:12px; color:var(--muted); text-align:center; }
+.event-staffing-page .quiet-empty svg { width:30px; }
+.event-staffing-page .quiet-empty h2,.event-staffing-page .quiet-empty p { margin:0; }
+
 @media (max-width: 900px) {
   .stage4-form.stage4-grid { grid-template-columns: repeat(2,minmax(0,1fr)); }
+  .event-staffing-assign { grid-template-columns:1fr; }
+  .event-staffing-assign>button { justify-self:stretch; }
 }
 
 @media (max-width: 720px) {
@@ -89,4 +131,7 @@
   .stage4-actions { width: 100%; }
   .stage4-form.stage4-grid { grid-template-columns: 1fr; }
   .stage4-button,.stage4-page button { width: 100%; }
+  .event-staffing-header { align-items:flex-start; flex-direction:column; }
+  .event-staffing-person-picker,.event-team-grid { grid-template-columns:1fr; }
+  .event-staffing-refresh,.event-team-remove,.event-team-roles button { width:40px; }
 }
