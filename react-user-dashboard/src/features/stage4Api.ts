@@ -22,7 +22,7 @@ export const jobId = (job: ReportJob) => job.jobId || job.reportExportJobId || j
 
 export async function getCurrentAccount() { return (await apiClient.get('/account')).data as { account?: AccountProfile } | AccountProfile; }
 export async function getAuthConfig() { return (await apiClient.get('/auth/config-status')).data as { configured: boolean; publicSignupEnabled: boolean }; }
-export async function updateCurrentAccount(payload: Pick<AccountProfile, 'fullName' | 'contactNumber' | 'professionalCategory'>) { return (await apiClient.patch('/account', payload)).data; }
+export async function updateCurrentAccount(payload: Pick<AccountProfile, 'fullName' | 'contactNumber'>) { return (await apiClient.patch('/account', payload)).data; }
 function compactParams(params: Record<string, unknown>) {
   return Object.fromEntries(Object.entries(params).filter(([, value]) => value !== undefined && value !== null && (typeof value !== 'string' || value.trim() !== '')));
 }

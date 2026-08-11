@@ -74,7 +74,7 @@ function library() {
 }
 
 function openCreateFromEmpty() {
-  return userEvent.click(within(library()).getByRole('button', { name: /Add template/i }));
+  return userEvent.click(screen.getByRole('button', { name: /Add template/i }));
 }
 
 describe('StationLibraryPage', () => {

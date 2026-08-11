@@ -11,7 +11,6 @@ import {
   UsersIcon,
 } from '@heroicons/react/24/outline';
 import { Avatar } from '@astryxdesign/core/Avatar';
-import type { DateRange } from '@astryxdesign/core/DateRangeInput';
 import { MultiSelector } from '@astryxdesign/core/MultiSelector';
 import { Toolbar } from '@astryxdesign/core/Toolbar';
 import { Typeahead } from '@astryxdesign/core/Typeahead';
@@ -32,7 +31,7 @@ import {
 } from './eventApi';
 import { EVENT_BANNERS, getEventBanner } from './eventBanners';
 import { createCroppedArtwork } from './cropImage';
-import { EventDateRangePicker, EventTimePicker, type EventTimeValue } from './EventSchedulePicker';
+import { EventDateRangePicker, EventTimePicker, type EventDateRange, type EventTimeValue } from './EventSchedulePicker';
 
 type TimeValue = EventTimeValue;
 type DayForm = { eventDayId?: string; date: string; startsAt: TimeValue; endsAt: TimeValue };
@@ -91,7 +90,7 @@ const formSchema = z.object({
   description: z.string().trim().max(5000),
   venue: z.string().trim().min(2, 'Enter a venue name').max(255),
   address: z.string().trim().max(500),
-  postalCode: z.string().refine((value) => !value || /^\d{6}$/.test(value), 'Use a 6-digit Singapore postal code'),
+  postalCode: z.string().regex(/^\d{6}$/, 'Use a 6-digit Singapore postal code'),
   capacity: z.coerce.number().int().min(1, 'Enter concurrent venue capacity').max(100000),
   expectedAttendance: z.coerce.number().int().min(1, 'Enter expected total attendance').max(1000000),
   eventDays: z.array(z.object({
@@ -176,8 +175,8 @@ const localParts = (iso: string) => {
   return { date, time: asTime(time) };
 };
 const toInstant = (date: string, time: string) => new Date(`${date}T${time}:00+08:00`).toISOString();
-const countDays = (range: DateRange) => Math.round((Date.parse(`${range.end}T00:00:00Z`) - Date.parse(`${range.start}T00:00:00Z`)) / 86400000) + 1;
-const expandRange = (range: DateRange) => Array.from({ length: countDays(range) }, (_, index) => {
+const countDays = (range: EventDateRange) => Math.round((Date.parse(`${range.end}T00:00:00Z`) - Date.parse(`${range.start}T00:00:00Z`)) / 86400000) + 1;
+const expandRange = (range: EventDateRange) => Array.from({ length: countDays(range) }, (_, index) => {
   const date = new Date(`${range.start}T00:00:00Z`);
   date.setUTCDate(date.getUTCDate() + index);
   return date.toISOString().slice(0, 10);
@@ -246,12 +245,12 @@ export default function EventFormPage({ mode }: { mode: 'create' | 'edit' }) {
   const navigate = useNavigate();
   const location = useLocation();
   const [searchParams, setSearchParams] = useSearchParams();
-  const step = Math.min(3, Math.max(1, Number(searchParams.get('step')) || 1));
+  const step = mode === 'create' ? 1 : Math.min(3, Math.max(1, Number(searchParams.get('step')) || 1));
   const duplicateFrom = mode === 'create' ? (location.state as { duplicateFrom?: EventRecord } | null)?.duplicateFrom : undefined;
   const isDuplicate = Boolean(duplicateFrom);
   const [existing, setExisting] = useState<EventRecord | null>(null);
   const [values, setValues] = useState<FormValues>(blankValues);
-  const [dateRange, setDateRange] = useState<DateRange | null>(null);
+  const [dateRange, setDateRange] = useState<EventDateRange | null>(null);
   const [activeDay, setActiveDay] = useState('');
   const [templates, setTemplates] = useState<StationTemplate[]>([]);
   const [staff, setStaff] = useState<StaffDirectoryEntry[]>([]);
@@ -277,7 +276,7 @@ export default function EventFormPage({ mode }: { mode: 'create' | 'edit' }) {
     setValues(hydrated);
     const start = hydrated.eventDays[0]?.date;
     const end = hydrated.eventDays[hydrated.eventDays.length - 1]?.date;
-    setDateRange(start && end ? { start, end } as DateRange : null);
+    setDateRange(start && end ? { start, end } : null);
     setActiveDay(start || '');
     if (hydrated.locationProvider === 'ONEMAP' && hydrated.latitude != null && hydrated.longitude != null) {
       const result: LocationResult = {
@@ -295,13 +294,14 @@ export default function EventFormPage({ mode }: { mode: 'create' | 'edit' }) {
   };
 
   useEffect(() => {
+    if (mode !== 'edit') return;
     Promise.all([eventApi.stationTemplates(), eventApi.staffDirectory()])
       .then(([stationTemplates, directory]) => {
         setTemplates(stationTemplates);
         setStaff(directory);
       })
       .catch((error) => setFormError(getApiMessage(error, 'Planning resources could not be loaded.')));
-  }, []);
+  }, [mode]);
 
   useEffect(() => {
     if (duplicateFrom) {
@@ -368,7 +368,7 @@ export default function EventFormPage({ mode }: { mode: 'create' | 'edit' }) {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
-  const setRange = (range: DateRange | null) => {
+  const setRange = (range: EventDateRange | null) => {
     setFieldErrors((current) => ({ ...current, eventDays: '' }));
     if (range && countDays(range) > 31) {
       setFieldErrors((current) => ({ ...current, eventDays: 'Choose 31 days or fewer' }));
@@ -539,6 +539,7 @@ export default function EventFormPage({ mode }: { mode: 'create' | 'edit' }) {
     const errors: Record<string, string> = {};
     if (values.name.trim().length < 3) errors.name = 'Use at least 3 characters';
     if (values.venue.trim().length < 2) errors.venue = 'Enter a venue name';
+    if (!/^\d{6}$/.test(values.postalCode)) errors.postalCode = 'Use a 6-digit Singapore postal code';
     if (values.eventDays.length === 0) errors.eventDays = 'Choose event dates';
     if (Number(values.capacity) < 1) errors.capacity = 'Enter concurrent venue capacity';
     if (Number(values.expectedAttendance) < 1) errors.expectedAttendance = 'Enter expected total attendance';
@@ -553,7 +554,7 @@ export default function EventFormPage({ mode }: { mode: 'create' | 'edit' }) {
 
   const submit = async (event: FormEvent) => {
     event.preventDefault();
-    if (step < 3) return nextStep();
+    if (mode === 'edit' && step < 3) return nextStep();
     setFormError('');
     setConflict(false);
     const parsed = formSchema.safeParse(values);
@@ -590,7 +591,7 @@ export default function EventFormPage({ mode }: { mode: 'create' | 'edit' }) {
         startsAt: toInstant(day.date, day.startsAt),
         endsAt: toInstant(day.date, day.endsAt),
       })),
-      stations: values.stations.map((station) => ({
+      stations: mode === 'create' ? [] : values.stations.map((station) => ({
         ...(station.eventStationId ? { eventStationId: station.eventStationId } : {}),
         stationTemplateId: station.stationTemplateId,
         stationOrder: station.stationOrder,
@@ -604,7 +605,7 @@ export default function EventFormPage({ mode }: { mode: 'create' | 'edit' }) {
           capacity: Number(entry.capacity),
         })),
       })),
-      shifts: values.shifts.map((shift) => ({
+      shifts: mode === 'create' ? [] : values.shifts.map((shift) => ({
         ...(shift.shiftId ? { shiftId: shift.shiftId } : {}),
         name: shift.name.trim(),
         startsAt: toInstant(shift.date, shift.startsAt),
@@ -658,15 +659,15 @@ export default function EventFormPage({ mode }: { mode: 'create' | 'edit' }) {
           label="Event form actions"
           size="lg"
           dividers={['bottom']}
-          startContent={<div className="event-form-toolbar-title"><strong>{isDuplicate ? `Duplicate ${duplicateFrom?.name}` : mode === 'create' ? 'Create event' : `Edit ${existing?.name}`}</strong><span>Step {step} of 3 · {readyCount} of {readiness.length} checks ready</span></div>}
+          startContent={<div className="event-form-toolbar-title"><strong>{isDuplicate ? `Duplicate ${duplicateFrom?.name}` : mode === 'create' ? 'Create event' : `Edit ${existing?.name}`}</strong><span>{mode === 'create' ? 'Details only · saved as a draft' : `Step ${step} of 3 · ${readyCount} of ${readiness.length} checks ready`}</span></div>}
           endContent={<div className="event-form-toolbar-actions">
             <Link className="secondary" to={duplicateFrom ? `/events/${duplicateFrom.eventId}` : existing ? `/events/${existing.eventId}` : '/events'}>Cancel</Link>
-            {step > 1 && <button className="secondary" type="button" onClick={() => setStep(step - 1)}><ArrowLeftIcon />Back</button>}
-            <button className="primary" type="submit" disabled={saving}>{saving ? 'Saving…' : step < 3 ? <>Continue<ArrowRightIcon /></> : isDuplicate ? 'Create duplicate' : mode === 'create' ? 'Create draft' : 'Save plan'}</button>
+            {mode === 'edit' && step > 1 && <button className="secondary" type="button" onClick={() => setStep(step - 1)}><ArrowLeftIcon />Back</button>}
+            <button className="primary" type="submit" disabled={saving}>{saving ? 'Saving…' : mode === 'create' ? 'Create draft' : step < 3 ? <>Continue<ArrowRightIcon /></> : 'Save plan'}</button>
           </div>}
         />
 
-        <nav className="wizard-steps" aria-label="Event creation progress">
+        {mode === 'edit' && <nav className="wizard-steps" aria-label="Event editing progress">
           {[
             ['Details', 'Location, dates and capacity'],
             ['Stations', 'Booths and daily availability'],
@@ -677,10 +678,10 @@ export default function EventFormPage({ mode }: { mode: 'create' | 'edit' }) {
               <span>{step > number ? <CheckIcon /> : number}</span><strong>{title}<small>{description}</small></strong>
             </button>;
           })}
-        </nav>
+        </nav>}
 
         {step === 1 && <div className="wizard-panel">
-          <header className="wizard-panel-heading"><p className="eyebrow">Step 1</p><h1>Event details</h1><p>Set the public identity, Singapore location, operating dates and attendance model.</p></header>
+          <header className="wizard-panel-heading">{mode === 'edit' && <p className="eyebrow">Step 1</p>}<h1>Event details</h1><p>Set the public identity, Singapore location, operating dates and attendance model. New events remain drafts until you publish them.</p></header>
 
           <section className="event-artwork-section wizard-artwork" aria-labelledby="event-artwork-title">
             <div className="event-artwork-heading"><div><h2 id="event-artwork-title">Event artwork</h2><p>Choose the image staff will recognize.</p></div><strong>{selectedBanner.label}</strong></div>
@@ -741,7 +742,7 @@ export default function EventFormPage({ mode }: { mode: 'create' | 'edit' }) {
                   <div className="location-details-heading"><strong>Venue details</strong><span>Review these fields before continuing.</span></div>
                   <div className="form-grid compact">
                     <Field label="Venue name" error={fieldErrors.venue}><input value={values.venue} onChange={(event) => setValues((current) => ({ ...current, venue: event.target.value }))} aria-invalid={Boolean(fieldErrors.venue)} placeholder="Our Tampines Hub" /></Field>
-                    <Field label="Postal code" error={fieldErrors.postalCode}><input inputMode="numeric" maxLength={6} value={values.postalCode} onChange={(event) => setValues((current) => ({ ...current, postalCode: event.target.value.replace(/\D/g, '') }))} placeholder="529684" /></Field>
+                    <Field label="Postal code" error={fieldErrors.postalCode}><input required inputMode="numeric" autoComplete="postal-code" maxLength={6} value={values.postalCode} onChange={(event) => setValues((current) => ({ ...current, postalCode: event.target.value.replace(/\D/g, '') }))} aria-invalid={Boolean(fieldErrors.postalCode)} placeholder="529684" /></Field>
                     <Field wide label="Address" hint="Editable after selection"><input value={values.address} onChange={(event) => setValues((current) => ({ ...current, address: event.target.value, locationProvider: current.latitude == null ? 'MANUAL' : current.locationProvider }))} placeholder="1 Tampines Walk, Singapore 528523" /></Field>
                   </div>
                   <div className="timezone-lock"><ClockIcon /><span><strong>Asia/Singapore</strong><small>UTC+08:00 · automatically set from the Singapore location</small></span></div>
@@ -770,9 +771,10 @@ export default function EventFormPage({ mode }: { mode: 'create' | 'edit' }) {
               <Field label="Concurrent venue capacity" hint="Maximum people the venue can hold at one time" error={fieldErrors.capacity}><input type="number" min="1" max="100000" value={values.capacity} onChange={(event) => setValues((current) => ({ ...current, capacity: event.target.value ? Number(event.target.value) : '' }))} placeholder="500" /></Field>
             </div></fieldset>
           </div>
+          {mode === 'create' && <div className="event-form-bottom-actions"><Link className="secondary" to="/events">Cancel</Link><button className="primary" type="submit" disabled={saving}>{saving ? 'Creating draft…' : 'Create draft'}</button></div>}
         </div>}
 
-        {step === 2 && <div className="wizard-panel">
+        {mode === 'edit' && step === 2 && <div className="wizard-panel">
           <header className="wizard-panel-heading"><p className="eyebrow">Step 2</p><h1>Stations and booths</h1><p>Build from the shared template pool, then set availability, hours and live capacity for each day.</p></header>
           <MultiSelector
             label="Station template pool"
@@ -810,7 +812,7 @@ export default function EventFormPage({ mode }: { mode: 'create' | 'edit' }) {
           </>}
         </div>}
 
-        {step === 3 && <div className="wizard-panel">
+        {mode === 'edit' && step === 3 && <div className="wizard-panel">
           <header className="wizard-panel-heading"><p className="eyebrow">Step 3</p><h1>Shifts and people</h1><p>Create coverage windows, assign staff, choose their station and leave precise instructions.</p></header>
           <div className={`staffing-summary ${concurrentAssigned < requiredHeadcount ? 'warning' : 'ready'}`}><UsersIcon /><span><strong>{concurrentAssigned} assigned / {requiredHeadcount} required</strong><small>{concurrentAssigned < requiredHeadcount ? `${requiredHeadcount - concurrentAssigned} more assignment${requiredHeadcount - concurrentAssigned === 1 ? '' : 's'} recommended before publishing.` : 'Required headcount is covered.'}</small></span></div>
           <div className="shift-plan-list">

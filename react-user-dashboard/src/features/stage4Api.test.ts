@@ -17,9 +17,9 @@ beforeEach(() => { calls.length = 0; vi.stubGlobal('URL', { createObjectURL: vi.
 
 describe('Stage 4 API contract wrappers', () => {
   it('sends only strict account profile fields accepted by the backend schema', async () => {
-    await api.updateCurrentAccount({ fullName: 'Asha Rao', contactNumber: '+1555123456', professionalCategory: 'DOCTOR' });
+    await api.updateCurrentAccount({ fullName: 'Asha Rao', contactNumber: '+1555123456' });
     expect(calls[0]).toMatchObject({ method: 'patch', url: '/account' });
-    expect(calls[0].data).toEqual({ fullName: 'Asha Rao', contactNumber: '+1555123456', professionalCategory: 'DOCTOR' });
+    expect(calls[0].data).toEqual({ fullName: 'Asha Rao', contactNumber: '+1555123456' });
     expect(JSON.stringify(calls[0].data)).not.toMatch(/department|designation|phoneNumber/);
   });
 

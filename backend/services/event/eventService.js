@@ -18,7 +18,7 @@ const env = require("../../config/env");
 const { attendancePredicate, attendanceWhere } = require("./attendanceDefinition");
 const { enqueueAccountLifecycle } = require("../account/accountLifecycleNotificationService");
 const domainEventBus = require("../domain/domainEventBus");
-const { eventVisibilityWhere } = require("./eventAuthorizationService");
+const { assertRoleEligibility, eventVisibilityWhere, isAdministrator } = require("./eventAuthorizationService");
 
 const EVENT_FIELDS = [
   "name", "description", "bannerKey", "artworkDataUrl", "venue", "address", "postalCode",
@@ -326,8 +326,8 @@ const loadEventWithAssignment = (eventId, user, db = prisma) =>
     include: eventInclude,
   });
 
-const canManage = (event, user) =>
-  (event.memberships || []).some((membership) => (
+const canManage = (event, user) => isAdministrator(user)
+  || (event.memberships || []).some((membership) => (
     membership.userId === user.userId
     && membership.roles.some(({ role }) => role === "EVENT_MANAGER")
   ));
@@ -512,6 +512,8 @@ const assertAssignmentSchedulesAvailable = async (tx, eventId, shifts) => {
     },
     select: {
       id: true,
+      professionalCategory: true,
+      userRoles: { select: { role: { select: { roleName: true } } } },
       eventMemberships: {
         where: { eventId, status: "ACTIVE" },
         select: { roles: { select: { role: true } } },
@@ -530,6 +532,9 @@ const assertAssignmentSchedulesAvailable = async (tx, eventId, shifts) => {
     return !roles?.has(assignmentRole);
   })) {
     throw new AppError(422, "STAFF_ROLE_MISMATCH", "A selected staff member does not hold the required account role");
+  }
+  for (const schedule of schedules) {
+    assertRoleEligibility(activeUsers.find(({ id }) => id === schedule.userId), [schedule.assignmentRole]);
   }
   const byUser = new Map();
   for (const schedule of schedules) byUser.set(schedule.userId, [...(byUser.get(schedule.userId) || []), schedule]);
@@ -1878,9 +1883,14 @@ const addStaffAssignment = async (eventId, shiftId, body, user, correlationId, d
           some: { eventId, status: "ACTIVE", roles: { some: { role: body.assignmentRole } } },
         },
       },
-      select: { id: true },
+      select: {
+        id: true,
+        professionalCategory: true,
+        userRoles: { select: { role: { select: { roleName: true } } } },
+      },
     });
     if (!activeUser) throw new AppError(422, "STAFF_NOT_AVAILABLE", "The selected staff member is unavailable");
+    assertRoleEligibility(activeUser, [body.assignmentRole]);
 
     // Same shift + different station is allowed (VA / refraction / colour vision).
     // Conflict only when another overlapping shift already has this person, or this

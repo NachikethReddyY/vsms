@@ -325,10 +325,10 @@ describe("event lifecycle", () => {
     const roleAdded = await request(app)
       .post(`/api/events/${created.body.eventId}/memberships/${added.body.membershipId}/roles`)
       .set("Authorization", `Bearer ${managerToken}`)
-      .send({ role: "REVIEWER" });
+      .send({ role: "REGISTRATION" });
     expect(roleAdded.status).toBe(201);
     const roleRemoved = await request(app)
-      .delete(`/api/events/${created.body.eventId}/memberships/${added.body.membershipId}/roles/REVIEWER`)
+      .delete(`/api/events/${created.body.eventId}/memberships/${added.body.membershipId}/roles/REGISTRATION`)
       .set("Authorization", `Bearer ${managerToken}`);
     expect(roleRemoved.status).toBe(200);
     expect(roleRemoved.body.roles.map(({ role }) => role)).toEqual(["SUPPORT"]);

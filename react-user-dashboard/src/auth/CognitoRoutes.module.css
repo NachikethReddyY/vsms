@@ -7,6 +7,8 @@
   --auth-navy: #172233;
   --auth-blue: #315a8c;
   --auth-orange: #b84d25;
+  --auth-action: #172233;
+  --auth-action-ink: #ffffff;
   min-width: 320px;
   min-height: 100dvh;
   overflow-x: hidden;
@@ -14,6 +16,18 @@
   color: var(--auth-ink);
   font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   -webkit-font-smoothing: antialiased;
+}
+
+:global([data-theme="dark"]) .page {
+  --auth-canvas: #0b0b0d;
+  --auth-surface: #101011;
+  --auth-ink: #f1f2f3;
+  --auth-muted: #b3b7bf;
+  --auth-line: rgba(241, 242, 243, 0.16);
+  --auth-blue: #8eacd1;
+  --auth-orange: #f08a55;
+  --auth-action: #f7f7f5;
+  --auth-action-ink: #0b0b0d;
 }
 
 .page * { box-sizing: border-box; }
@@ -71,6 +85,9 @@
 .brandCopy { display: grid; gap: 1px; }
 .brandCopy strong { font-size: 15px; font-weight: 700; letter-spacing: -0.01em; }
 .brandCopy small { color: var(--auth-muted); font-size: 10px; letter-spacing: 0.025em; }
+.headerActions { display: flex; align-items: center; gap: 12px; }
+.themeToggle { color: var(--auth-muted); }
+.themeToggle:hover { background: color-mix(in srgb, var(--auth-ink) 7%, transparent); color: var(--auth-ink); }
 .headerLabel { color: var(--auth-muted); font-size: 12px; font-weight: 650; }
 
 .main {
@@ -108,13 +125,13 @@
   stroke-linecap: round;
 }
 
-.statusMark.error { background: rgba(184, 77, 37, 0.1); color: var(--auth-orange); }
-.statusMark.loading { background: rgba(49, 90, 140, 0.1); color: var(--auth-blue); }
+.statusMark.error { background: color-mix(in srgb, var(--auth-orange) 12%, transparent); color: var(--auth-orange); }
+.statusMark.loading { background: color-mix(in srgb, var(--auth-blue) 12%, transparent); color: var(--auth-blue); }
 
 .statusMark.loading > span {
   width: 18px;
   height: 18px;
-  border: 2px solid rgba(49, 90, 140, 0.22);
+  border: 2px solid color-mix(in srgb, var(--auth-blue) 24%, transparent);
   border-top-color: var(--auth-blue);
   border-radius: 50%;
   animation: spin 800ms linear infinite;
@@ -172,10 +189,10 @@
   transition: background-color 160ms ease, border-color 160ms ease, color 160ms ease, transform 120ms ease;
 }
 
-.primaryAction { background: var(--auth-navy); color: #ffffff !important; }
+.primaryAction { background: var(--auth-action); color: var(--auth-action-ink) !important; }
 .secondaryAction { border-color: var(--auth-line); background: var(--auth-surface); color: var(--auth-ink); }
-.primaryAction:hover { background: var(--auth-blue); }
-.secondaryAction:hover { border-color: rgba(23, 25, 28, 0.3); background: var(--auth-canvas); }
+.primaryAction:hover { background: color-mix(in srgb, var(--auth-action) 88%, var(--auth-blue)); }
+.secondaryAction:hover { border-color: color-mix(in srgb, var(--auth-ink) 30%, transparent); background: var(--auth-canvas); }
 .primaryAction:active, .secondaryAction:active { transform: scale(0.98); }
 .footnote { margin: 20px 0 0; color: var(--auth-muted); font-size: 11px; }
 
@@ -219,6 +236,8 @@
   .headerInner, .main { width: calc(100% - 32px); }
   .headerInner { min-height: 64px; }
   .brandCopy small { display: none; }
+  .headerActions { gap: 4px; }
+  .headerLabel { display: none; }
   .main { padding: 88px 0 30px; }
   .layout { grid-template-columns: 1fr; }
   .content { padding: 20px 0; }

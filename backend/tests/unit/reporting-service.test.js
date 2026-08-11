@@ -105,6 +105,18 @@ test("event-manager reports remain event scoped and return aggregate-only metric
   }
 });
 
+test("administrators can report across every event without an event-manager membership", async () => {
+  const capturedWhere = [];
+  const report = await getOperationalReport(
+    { from: "2026-08-01", to: "2026-08-31" },
+    { userId: crypto.randomUUID(), systemRole: "ADMIN", roles: ["ADMINISTRATOR"], status: "ACTIVE", approvalState: "APPROVED", accessState: "ENABLED" },
+    reportDb(capturedWhere),
+  );
+
+  assert.ok(capturedWhere.every((where) => !where.memberships));
+  assert.equal(report.summary.events, 1);
+});
+
 test("report filters reject reversed and unbounded date ranges", () => {
   assert.equal(reportQuery.safeParse({ from: "2026-09-01", to: "2026-08-01" }).success, false);
   assert.equal(reportQuery.safeParse({ from: "2025-01-01", to: "2026-08-01" }).success, false);

@@ -1132,7 +1132,7 @@
         },
         "body": {
           "mode": "raw",
-          "raw": "{\n  \"fullName\": \"\",\n  \"contactNumber\": \"\",\n  \"professionalCategory\": \"STAFF\"\n}",
+          "raw": "{\n  \"fullName\": \"\",\n  \"contactNumber\": \"\"\n}",
           "options": {
             "raw": {
               "language": "json"
@@ -1369,7 +1369,7 @@
         },
         "body": {
           "mode": "raw",
-          "raw": "{\n  \"fullName\": \"\",\n  \"email\": \"\",\n  \"employeeNumber\": \"\",\n  \"department\": \"\",\n  \"designation\": \"\",\n  \"status\": \"INACTIVE\",\n  \"roles\": [\n    \"ADMINISTRATOR\"\n  ]\n}",
+          "raw": "{\n  \"fullName\": \"\",\n  \"email\": \"\",\n  \"employeeNumber\": \"\",\n  \"department\": \"\",\n  \"designation\": \"\",\n  \"professionalCategory\": \"STAFF\",\n  \"status\": \"INACTIVE\",\n  \"roles\": [\n    \"ADMINISTRATOR\"\n  ]\n}",
           "options": {
             "raw": {
               "language": "json"
@@ -1489,7 +1489,7 @@
         },
         "body": {
           "mode": "raw",
-          "raw": "{\n  \"fullName\": \"\",\n  \"employeeNumber\": \"\",\n  \"department\": \"\",\n  \"designation\": \"\",\n  \"roles\": [\n    \"ADMINISTRATOR\"\n  ]\n}",
+          "raw": "{\n  \"fullName\": \"\",\n  \"employeeNumber\": \"\",\n  \"department\": \"\",\n  \"designation\": \"\",\n  \"professionalCategory\": \"STAFF\",\n  \"roles\": [\n    \"ADMINISTRATOR\"\n  ]\n}",
           "options": {
             "raw": {
               "language": "json"
