@@ -42,7 +42,7 @@ vi.mock('./stage4Api', async () => {
     createReportJob: vi.fn(async (...args: unknown[]) => { calls.push({ name: 'createReportJob', args }); return { jobId: 'job-2', status: 'QUEUED' }; }),
     getReportJob: vi.fn(async (...args: unknown[]) => { calls.push({ name: 'getReportJob', args }); return { jobId: 'job-2', status: 'COMPLETED' }; }),
     downloadReportBlob: vi.fn(async (...args: unknown[]) => { calls.push({ name: 'downloadReportBlob', args }); return {}; }),
-    getDeletionPreview: vi.fn(async () => ({ previewToken: 'preview-token', blockers: [], version: 7, event: { name: 'Clinic Day', version: 7 }, impactDigest: '2 artifacts' })),
+    getDeletionPreview: vi.fn(async () => ({ previewToken: 'preview-token', blockers: [], version: 7, eventName: 'Clinic Day', counts: { participants: 2, registrations: 2 }, impactDigest: '2 artifacts' })),
     getDeletionCleanup: vi.fn(async (...args: unknown[]) => { calls.push({ name: 'getDeletionCleanup', args }); return { eventId: 'event-1', cleanupState: 'COMPLETED', tasks: [{ id: 't1', artifactType: 'REPORT', status: 'COMPLETED', attemptCount: 1, completedAt: '2026-08-07T00:00:00.000Z' }] }; }),
     deleteEventPermanently: vi.fn(async (...args: unknown[]) => { calls.push({ name: 'deleteEventPermanently', args }); return { cleanupState: 'QUEUED' }; }),
   };
@@ -52,7 +52,11 @@ const pages = await import('./Stage4Pages');
 const { EventCapabilityGuard } = await import('../auth/RoleGuard');
 const { ProtectedRoute } = await import('../auth/ProtectedRoute');
 
-beforeEach(() => { calls.length = 0; eventMode = 'ok'; accountMode = 'ok'; membershipRoles = [{ role: 'REGISTRATION' }]; stationMode = 'allow'; authUser = { approvalState: 'APPROVED', accessState: 'ENABLED', roles: [], eventMemberships: [{ id: 'm1', eventId: 'event-1', status: 'ACTIVE', roles: [{ role: 'EVENT_MANAGER' }] }] }; vi.useRealTimers(); });
+beforeEach(() => {
+  calls.length = 0; eventMode = 'ok'; accountMode = 'ok'; membershipRoles = [{ role: 'REGISTRATION' }]; stationMode = 'allow'; authUser = { approvalState: 'APPROVED', accessState: 'ENABLED', roles: [], eventMemberships: [{ id: 'm1', eventId: 'event-1', status: 'ACTIVE', roles: [{ role: 'EVENT_MANAGER' }] }] }; vi.useRealTimers();
+  HTMLDialogElement.prototype.showModal = function showModal() { this.setAttribute('open', ''); };
+  HTMLDialogElement.prototype.close = function close() { this.removeAttribute('open'); };
+});
 afterEach(() => { cleanup(); vi.restoreAllMocks(); vi.useRealTimers(); });
 
 function renderRoute(path: string, element: React.ReactNode) { render(<MemoryRouter initialEntries={[path]}><Routes><Route path={path.replace('event-1', ':eventId')} element={element} /></Routes></MemoryRouter>); }
@@ -159,9 +163,10 @@ describe('Stage 4 rendered route behavior', () => {
   it('assigns approved people and event-specific roles without changing account types', async () => {
     const user = userEvent.setup();
     renderRoute('/events/event-1/staff', <pages.EventStaffingPage />);
-    await user.selectOptions(await screen.findByLabelText(/eligible account/i), 'user-2');
+    await user.click(await screen.findByRole('button', { name: /add staff/i }));
+    await user.click(screen.getByLabelText(/ben tan/i));
     await user.click(screen.getByLabelText(/screener/i));
-    await user.click(screen.getByRole('button', { name: /assign to event/i }));
+    await user.click(screen.getByRole('button', { name: /add to event/i }));
     await waitFor(() => expect(calls.some(c => c.name === 'addMembership')).toBe(true));
     expect(calls.find(c => c.name === 'addMembership')?.args).toEqual(['event-1', 'user-2', ['REGISTRATION', 'SCREENER']]);
   });
