@@ -5,6 +5,9 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 
 const { get, post, patch } = vi.hoisted(() => ({ get: vi.fn(), post: vi.fn(), patch: vi.fn() }));
 
+vi.mock('../auth/AuthProvider', () => ({
+  useAuth: () => ({ session: { user: { id: 'admin-1', userId: 'admin-1' } } }),
+}));
 vi.mock('../utils/apiClient', () => ({
   default: { get, post, patch },
   getApiError: (_cause: unknown, fallback: string) => fallback,
@@ -103,4 +106,20 @@ it('keeps list controls at the top and discloses role guidance in a dialog', asy
 
   await userEvent.click(refresh);
   await waitFor(() => expect(get).toHaveBeenCalledTimes(2));
+});
+
+it('removes staff access through the audited deprovision endpoint', async () => {
+  const member = { id: 'staff-1', fullName: 'Alex Tan', email: 'alex@example.com', status: 'ACTIVE', approvalState: 'APPROVED', accessState: 'ENABLED', roles: ['SUPPORT'] };
+  get.mockResolvedValue({ data: { success: true, data: [member] } });
+  post.mockResolvedValue({ status: 200, data: {} });
+  render(<StaffAccountsPage />);
+  expect(await screen.findByText('Alex Tan')).toBeTruthy();
+
+  await userEvent.click(screen.getByRole('button', { name: 'Remove' }));
+  const dialog = await screen.findByRole('dialog', { name: "Remove Alex Tan's access?" });
+  await userEvent.type(within(dialog).getByLabelText('Reason'), 'Left the organisation');
+  await userEvent.click(within(dialog).getByRole('button', { name: 'Remove access' }));
+
+  await waitFor(() => expect(post).toHaveBeenCalledWith('/admin/accounts/staff-1/deprovision', { reason: 'Left the organisation' }));
+  expect(await screen.findByText('Account access removed.')).toBeTruthy();
 });

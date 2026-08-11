@@ -1,6 +1,6 @@
 import { ArrowPathIcon, MagnifyingGlassIcon, PlusIcon, UserGroupIcon, XMarkIcon } from '@heroicons/react/24/outline';
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
-import { Link, useParams } from 'react-router-dom';
+import { useParams } from 'react-router-dom';
 import { AppDialog } from '../components/AppDialog';
 import { getApiError } from '../utils/apiClient';
 import * as api from './stage4Api';
@@ -137,7 +137,7 @@ export default function EventStaffingPage() {
   return <div className="stage4-page event-staffing-page">
     <header className="event-staffing-header">
       <div><h1>People and roles</h1><p>Find approved staff, assign their event roles, and manage the active team.</p></div>
-      <div className="stage4-actions"><Link className="stage4-button secondary" to={`/events/${eventId}`}>Event detail</Link><button className="secondary event-staffing-refresh" type="button" aria-label="Refresh event team" title="Refresh event team" disabled={loading} onClick={() => void load()}><ArrowPathIcon className={loading ? 'is-spinning' : ''} /></button><button type="button" onClick={() => { setAccountId(''); setRoles(['REGISTRATION']); setSearch(''); setAddOpen(true); }}><PlusIcon />Add staff</button></div>
+      <div className="stage4-actions"><button className="secondary event-staffing-refresh" type="button" aria-label="Refresh event team" title="Refresh event team" disabled={loading} onClick={() => void load()}><ArrowPathIcon className={loading ? 'is-spinning' : ''} /></button><button type="button" onClick={() => { setAccountId(''); setRoles(['REGISTRATION']); setSearch(''); setAddOpen(true); }}><PlusIcon />Add staff</button></div>
     </header>
 
     {notice && <div className="stage4-alert good" role="status">{notice}</div>}
