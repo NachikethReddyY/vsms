@@ -109,6 +109,7 @@ export default defineConfig(({ command, mode }) => {
         },
         workbox: {
           navigateFallback: 'index.html',
+          navigateFallbackDenylist: [/^\/api\//i],
           runtimeCaching: [
             {
               urlPattern: /^\/api\/v1\/.*/i,
