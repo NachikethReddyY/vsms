@@ -46,11 +46,11 @@ vi.mock('./pages/ParticipantPages', () => ({
 vi.mock('./auth/CognitoRoutes', () => ({ CognitoCallback: () => <p>Callback</p> }));
 vi.mock('./features/stage4Api', async () => {
   const actual = await vi.importActual<typeof import('./features/stage4Api')>('./features/stage4Api');
-  return { ...actual, getCurrentAccount: vi.fn(async () => ({ account: { id: 'user-1', approvalState: 'APPROVED', accessState: 'ENABLED', eventMemberships: [{ id: 'm1', eventId: 'event-1', status: 'ACTIVE', roles: [{ role: 'EVENT_MANAGER' }] }] } })), getEvent: vi.fn(async () => ({ eventId: 'event-1', canManage: true })), getAnalytics: vi.fn(async () => ({ schemaVersion: 1, aggregateOnly: true, generatedAt: '2026-08-07T00:00:00.000Z', timeBasis: { interval: 'event' }, appliedFilters: {}, smallCellSuppression: { rule: 'n<5' }, dataCompleteness: { registrations: 'complete' }, metricDefinitions: [], tables: [], observations: [] })), listReportJobs: vi.fn(async () => ({ jobs: [] })), getDeletionPreview: vi.fn(async () => ({ previewToken: 'preview-token', blockers: [], version: 7, event: { name: 'Clinic Day', version: 7 }, impactDigest: '2 artifacts' })), getDeletionCleanup: vi.fn(async () => ({ eventId: 'event-1', cleanupState: 'COMPLETED', tasks: [] })) };
+  return { ...actual, getCurrentAccount: vi.fn(async () => ({ account: { id: 'user-1', approvalState: 'APPROVED', accessState: 'ENABLED', eventMemberships: [{ id: 'm1', eventId: 'event-1', status: 'ACTIVE', roles: [{ role: 'EVENT_MANAGER' }] }] } })), getEvent: vi.fn(async () => ({ eventId: 'event-1', canManage: true })), getAnalytics: vi.fn(async () => ({ schemaVersion: 1, aggregateOnly: true, generatedAt: '2026-08-07T00:00:00.000Z', timeBasis: { interval: 'event' }, appliedFilters: {}, smallCellSuppression: { rule: 'n<5' }, dataCompleteness: { registrations: 'complete' }, metricDefinitions: [], tables: [], observations: [] })), listReportJobs: vi.fn(async () => ({ jobs: [] })), getDeletionPreview: vi.fn(async () => ({ previewToken: 'preview-token', blockers: [], version: 7, eventName: 'Clinic Day', counts: { participants: 2, registrations: 2 }, impactDigest: '2 artifacts' })), getDeletionCleanup: vi.fn(async () => ({ eventId: 'event-1', cleanupState: 'COMPLETED', tasks: [] })) };
 });
 vi.mock('./features/events/eventApi', async () => {
   const actual = await vi.importActual<typeof import('./features/events/eventApi')>('./features/events/eventApi');
-  return { ...actual, eventApi: { get: vi.fn(async () => fullEvent), audit: vi.fn(async () => ({ auditLogs: [] })), metrics: vi.fn(async () => ({ signupCount: 0, checkedInCount: 0, attendanceRatePercent: 0, activeCount: 0, capacity: 100, screeningResultCount: 0, flaggedResultCount: 0, referralCount: 0 })) } };
+  return { ...actual, eventApi: { get: vi.fn(async () => fullEvent), audit: vi.fn(async () => ({ auditLogs: [] })), metrics: vi.fn(async () => ({ signupCount: 0, checkedInCount: 0, completedCount: 0, cancelledCount: 0, attendanceRatePercent: 0, activeCount: 0, capacity: 100, screeningResultCount: 0, flaggedResultCount: 0, referralCount: 0 })) } };
 });
 
 const App = (await import('./App')).default;
@@ -109,7 +109,7 @@ describe('App route and navigation topology', () => {
 
   it('renders admin deletion route for authorized administrators', async () => {
     renderPath('/events/event-1/delete');
-    expect(await screen.findByText('Permanent deletion')).toBeTruthy();
+    expect(await screen.findByRole('heading', { name: 'Delete event permanently' })).toBeTruthy();
   });
 
   it('consolidates staff invitations and lifecycle administration on /staff', async () => {
