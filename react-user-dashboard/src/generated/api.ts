@@ -549,8 +549,8 @@ export interface paths {
         put?: never;
         post?: never;
         /**
-         * Permanently delete a completed or cancelled event
-         * @description Administrator-only hard deletion. Requires the exact event name, permanent-deletion acknowledgement, current version, and the unexpired signed token from the latest unchanged impact preview. Event-owned operational records are removed; shared staff accounts, participants, templates, forms, and devices are retained.
+         * Permanently delete a draft, completed, or cancelled event
+         * @description Administrator-only hard deletion. Requires the exact event name, permanent-deletion acknowledgement, current version, and the unexpired signed token from the latest unchanged impact preview. Event-owned operational records and participant profiles created for only this event are removed; participant profiles reused by another event, staff accounts, templates, forms, and devices are retained.
          */
         delete: operations["deleteTerminalEvent"];
         options?: never;
@@ -3097,6 +3097,8 @@ export interface components {
             cleanupState: "QUEUED" | "COMPLETED" | "NEEDS_ATTENTION";
         };
         EventDeletionCounts: {
+            /** @description Participant profiles created for only this event that will be deleted */
+            participants: number;
             registrations: number;
             queues: number;
             screenings: number;
@@ -3111,7 +3113,7 @@ export interface components {
             eventId: string;
             eventName: string;
             /** @enum {string} */
-            status: "COMPLETED" | "CANCELLED";
+            status: "DRAFT" | "COMPLETED" | "CANCELLED";
             version: number;
             counts: components["schemas"]["EventDeletionCounts"];
             blockers: ({
@@ -3861,7 +3863,8 @@ export interface components {
             fullName: string;
             /** Format: email */
             email: string;
-            employeeNumber: string;
+            /** @description Generated automatically when omitted. */
+            employeeNumber?: string;
             department?: string | null;
             designation?: string | null;
             /** @enum {string} */

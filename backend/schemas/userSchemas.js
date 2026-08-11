@@ -18,7 +18,7 @@ const optionalText = (max) => z.string().trim().max(max).nullable().optional();
 const createUserBody = z.object({
   fullName: z.string().trim().min(1).max(100),
   email: z.string().trim().toLowerCase().email().max(255),
-  employeeNumber: z.string().trim().min(1).max(20),
+  employeeNumber: z.string().trim().min(1).max(20).optional(),
   department: optionalText(100),
   designation: optionalText(100),
   professionalCategory: z.enum(["STAFF", "DOCTOR"]).default("STAFF"),

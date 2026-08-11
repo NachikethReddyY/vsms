@@ -4656,11 +4656,12 @@ item:
               }
             ]
           }
-  - name: Permanently delete a completed or cancelled event
+  - name: Permanently delete a draft, completed, or cancelled event
     description: >-
       Administrator-only hard deletion. Requires the exact event name, permanent-deletion acknowledgement, current
       version, and the unexpired signed token from the latest unchanged impact preview. Event-owned operational records
-      are removed; shared staff accounts, participants, templates, forms, and devices are retained.
+      and participant profiles created for only this event are removed; participant profiles reused by another event,
+      staff accounts, templates, forms, and devices are retained.
     event: []
     request:
       method: DELETE
@@ -4810,9 +4811,10 @@ item:
           {
             "eventId": "00000000-0000-4000-8000-000000000000",
             "eventName": "",
-            "status": "COMPLETED",
+            "status": "DRAFT",
             "version": 1,
             "counts": {
+              "participants": 0,
               "registrations": 0,
               "queues": 0,
               "screenings": 0,

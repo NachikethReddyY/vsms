@@ -41,6 +41,8 @@ const isActiveAdministrator = (user, roles = accountSnapshot(user).roles, status
   && (user.accessState ?? "ENABLED") === "ENABLED"
   && roles.includes("ADMINISTRATOR");
 
+const generateEmployeeNumber = () => `STF-${crypto.randomUUID().replaceAll("-", "").slice(0, 16).toUpperCase()}`;
+
 async function rolesFor(tx, roleNames) {
   const roles = await tx.role.findMany({
     where: { roleName: { in: roleNames } },
@@ -137,7 +139,7 @@ exports.createUser = async (
           username: userData.email,
           fullName: userData.fullName,
           email: userData.email,
-          employeeNumber: userData.employeeNumber,
+          employeeNumber: userData.employeeNumber || generateEmployeeNumber(),
           department: userData.department ?? null,
           designation: userData.designation ?? null,
           professionalCategory: userData.professionalCategory,

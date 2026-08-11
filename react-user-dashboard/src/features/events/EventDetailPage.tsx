@@ -12,13 +12,14 @@ import {
   PhotoIcon,
   PencilSquareIcon,
   PlusIcon,
+  PrinterIcon,
   UserPlusIcon,
   TrashIcon,
   UserGroupIcon,
   XMarkIcon,
 } from '@heroicons/react/24/outline';
 import { useEffect, useMemo, useRef, useState, type ChangeEvent, type FormEvent } from 'react';
-import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
+import { Link, useLocation, useParams } from 'react-router-dom';
 import { useAuth } from '../../auth/AuthProvider';
 import { AppDialog } from '../../components/AppDialog';
 import { AppToast } from '../../components/AppToast';
@@ -26,6 +27,7 @@ import { getApiError as getApiMessage } from '../../utils/apiClient';
 import { getDisplayName } from '../../utils/identity';
 import { eventApi, formatEventDate, STATUS_LABEL, type AuditRecord, type EventAttendee, type EventMetrics, type EventRecord, type EventStatus, type StaffAssignmentRole, type StaffDirectoryEntry, type StationTemplate } from './eventApi';
 import { EVENT_BANNERS, getEventArtwork, type EventBannerKey } from './eventBanners';
+import { managementPercent } from './eventReport';
 
 type AssignmentDraft = { userId: string; assignmentRole: StaffAssignmentRole; eventStationId: string };
 const emptyAssignment: AssignmentDraft = { userId: '', assignmentRole: 'SUPPORT', eventStationId: '' };
@@ -75,7 +77,6 @@ export default function EventDetailPage() {
   const { session } = useAuth();
   const user = session?.user;
   const location = useLocation();
-  const navigate = useNavigate();
   const [event, setEvent] = useState<EventRecord | null>(null);
   const [audit, setAudit] = useState<AuditRecord[]>([]);
   const [metrics, setMetrics] = useState<EventMetrics | null>(null);
@@ -88,7 +89,6 @@ export default function EventDetailPage() {
   const [attendeeError, setAttendeeError] = useState('');
   const [attendeeSearch, setAttendeeSearch] = useState('');
   const [attendeeStatus, setAttendeeStatus] = useState<EventAttendee['registrationStatus'] | ''>('');
-  const [exportPending, setExportPending] = useState(false);
   const [loading, setLoading] = useState(true);
   const [pending, setPending] = useState(false);
   const [bannerPending, setBannerPending] = useState(false);
@@ -112,12 +112,6 @@ export default function EventDetailPage() {
   const [auditLoading, setAuditLoading] = useState(false);
   const [auditError, setAuditError] = useState('');
   const fileInput = useRef<HTMLInputElement>(null);
-  const deleteDialog = useRef<HTMLDialogElement>(null);
-  const [deleteOpen, setDeleteOpen] = useState(false);
-  const [deleteConfirmation, setDeleteConfirmation] = useState('');
-  const [deleteAcknowledged, setDeleteAcknowledged] = useState(false);
-  const [deletePending, setDeletePending] = useState(false);
-  const [deleteError, setDeleteError] = useState('');
   const [statusConfirmOpen, setStatusConfirmOpen] = useState(false);
   const [cancelOpen, setCancelOpen] = useState(false);
   const [cancellationReason, setCancellationReason] = useState('');
@@ -156,23 +150,6 @@ export default function EventDetailPage() {
     finally { setAttendeeLoading(false); }
   };
 
-  const downloadEventExport = async () => {
-    if (!event) return;
-    setExportPending(true); setError('');
-    try {
-      const payload = await eventApi.exportEvent(event.eventId);
-      const file = new Blob([JSON.stringify(payload.export, null, 2)], { type: 'application/json' });
-      const url = URL.createObjectURL(file);
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = `${event.name.replace(/[^a-z0-9]+/gi, '-').replace(/^-|-$/g, '').toLowerCase() || 'event'}-export.json`;
-      document.body.append(link); link.click(); link.remove();
-      setTimeout(() => URL.revokeObjectURL(url), 0);
-      setNotice('Event export downloaded.');
-    } catch (cause) { setError(getApiMessage(cause, 'The event export could not be generated.')); }
-    finally { setExportPending(false); }
-  };
-
   const load = async () => {
     setLoading(true); setError('');
     try {
@@ -182,12 +159,6 @@ export default function EventDetailPage() {
     finally { setLoading(false); }
   };
   useEffect(() => { void load(); }, [eventId]); // eslint-disable-line react-hooks/exhaustive-deps
-  useEffect(() => {
-    const dialog = deleteDialog.current;
-    if (!dialog) return;
-    if (deleteOpen && !dialog.open) dialog.showModal();
-    if (!deleteOpen && dialog.open) dialog.close();
-  }, [deleteOpen]);
   useEffect(() => {
     if (event?.canManage && location.pathname.endsWith('/attendees')) void loadAttendees();
   // The attendee query is explicitly initiated by its form or pagination controls.
@@ -213,35 +184,6 @@ export default function EventDetailPage() {
     try { const updated = await eventApi.cancel(event.eventId, event.version, reason); setEvent(updated); setCancelOpen(false); setCancellationReason(''); setCancellationError(''); setNotice('Event cancelled and reason recorded.'); void refreshAudit(event.eventId); }
     catch (cause) { setError(getApiMessage(cause, 'The event could not be cancelled.')); }
     finally { setPending(false); }
-  };
-
-  const closeDeleteDialog = () => {
-    setDeleteOpen(false);
-    setDeleteConfirmation('');
-    setDeleteAcknowledged(false);
-    setDeleteError('');
-  };
-
-  const deleteEvent = async (submitEvent: FormEvent<HTMLFormElement>) => {
-    submitEvent.preventDefault();
-    if (!event || deleteConfirmation !== event.name || !deleteAcknowledged) return;
-    setDeletePending(true);
-    setDeleteError('');
-    try {
-      const preview = await eventApi.deletionPreview(event.eventId);
-      await eventApi.delete(event.eventId, {
-        version: event.version,
-        confirmationName: deleteConfirmation,
-        acknowledgePermanentDeletion: true,
-        previewToken: preview.previewToken,
-      });
-      window.sessionStorage.removeItem('vsms_event_id');
-      navigate('/events', { replace: true });
-    } catch (cause) {
-      setDeleteError(getApiMessage(cause, 'The event could not be permanently deleted. Refresh and try again.'));
-    } finally {
-      setDeletePending(false);
-    }
   };
 
   const saveBanner = async () => {
@@ -387,7 +329,7 @@ export default function EventDetailPage() {
       && assignment.user.userId === user?.userId
     ))
   ));
-  const canPermanentlyDelete = terminal && user?.systemRole === 'ADMIN' && isAdministrator;
+  const canPermanentlyDelete = ['DRAFT', 'COMPLETED', 'CANCELLED'].includes(event.status) && user?.systemRole === 'ADMIN' && isAdministrator;
   const canReview = !isAdministrator && event.status === 'IN_PROGRESS' && event.shifts.some((shift) => (
     shift.status === 'ACTIVE' && shift.staffAssignments.some((assignment) => (
       assignment.assignmentRole === 'REVIEWER'
@@ -406,11 +348,18 @@ export default function EventDetailPage() {
   })) : []);
   const activeStage = lifecycleStages.findIndex((stage) => stage.status === event.status);
   const totalRequiredStaff = event.shifts.reduce((total, shift) => total + shift.requiredStaff, 0);
+  const totalAssignedStaff = event.shifts.reduce((total, shift) => total + shift.staffAssignments.length, 0);
   const next = nextAction[event.status];
   const routeSection = location.pathname.split('/').filter(Boolean).pop();
   const requestedView = routeSection && ['stations', 'staff', 'analytics', 'reports', 'attendees', 'activity'].includes(routeSection) ? routeSection : 'overview';
   const view = canManage ? requestedView : 'overview';
   const eventPath = `/events/${event.eventId}`;
+  const managementMeasures = metrics ? [
+    { label: 'Attendance', value: metrics.attendanceRatePercent, detail: `${metrics.checkedInCount.toLocaleString()} of ${metrics.signupCount.toLocaleString()} registrations checked in` },
+    { label: 'Visit completion', value: managementPercent(metrics.completedCount, metrics.signupCount), detail: `${metrics.completedCount.toLocaleString()} completed visits` },
+    { label: 'Live capacity use', value: managementPercent(metrics.activeCount, metrics.capacity), detail: `${metrics.activeCount.toLocaleString()} of ${metrics.capacity.toLocaleString()} places in use` },
+    { label: 'Staffing coverage', value: managementPercent(totalAssignedStaff, totalRequiredStaff), detail: `${totalAssignedStaff.toLocaleString()} of ${totalRequiredStaff.toLocaleString()} planned positions filled` },
+  ] : [];
 
   return <div className="page-frame detail-page">
     <div className="detail-topline"><Link className="event-detail-back" to="/events"><ArrowLeftIcon />Back to events</Link><span className="event-record-reference">Event record / {event.eventId.slice(0, 8)}</span></div>
@@ -474,7 +423,7 @@ export default function EventDetailPage() {
     </section>}
 
     {view === 'overview' && <div className="event-view">
-      <div className="event-view-heading"><h2>Overview</h2><div>{canManage && <button className="secondary compact" type="button" disabled={exportPending} onClick={() => void downloadEventExport()}>{exportPending ? 'Preparing export…' : 'Download export'}</button>}{canManage && !terminal && <Link className="secondary compact" to={`${eventPath}/edit`}><PencilSquareIcon />Edit overview</Link>}</div></div>
+      <div className="event-view-heading"><div><h2>Overview</h2><p>Key details and operational performance for this event.</p></div><div className="event-view-actions">{canManage && metrics && <button className="secondary compact event-print-button" type="button" onClick={() => window.print()}><PrinterIcon />Print / save PDF</button>}{canManage && !terminal && <Link className="secondary compact" to={`${eventPath}/edit`}><PencilSquareIcon />Edit overview</Link>}</div></div>
       <section className="event-metric-grid" aria-label="Event overview">
         <div className="event-info-row"><CalendarDaysIcon /><div><small>Date and time</small><strong>{dateParts.weekday}, {dateParts.month} {dateParts.day}, {dateParts.year}</strong><span>{formatTime(event.startsAt, event.timezone)} to {formatTime(event.endsAt, event.timezone)}, {eventDuration(event.startsAt, event.endsAt)}</span></div></div>
         <div className="event-info-row"><MapPinIcon /><div><small>Venue</small><strong>{event.venue}</strong><span>{event.address || 'Address entered manually'}{event.postalCode ? ` · Singapore ${event.postalCode}` : ''} · {event.timezone}</span></div></div>
@@ -490,14 +439,33 @@ export default function EventDetailPage() {
           <div className="event-info-row"><ClipboardDocumentCheckIcon /><div><small>Clinical results</small><strong>{metrics.screeningResultCount.toLocaleString()}</strong><span>{metrics.flaggedResultCount.toLocaleString()} flagged · {metrics.referralCount.toLocaleString()} referrals</span></div></div>
         </>}
       </section>}
+      {canManage && metrics && <section className="management-report" aria-labelledby="management-report-title">
+        <header className="management-report-heading">
+          <div><h2 id="management-report-title">Management report — {event.name}</h2><p>Aggregate operational data only. Participant identity and clinical detail are excluded.</p></div>
+          <dl><div><dt>Status</dt><dd>{STATUS_LABEL[event.status]}</dd></div><div><dt>Event date</dt><dd>{dateParts.month} {dateParts.day}, {dateParts.year}</dd></div><div><dt>Venue</dt><dd>{event.venue}</dd></div></dl>
+        </header>
+        <div className="management-chart-grid" aria-label="Management performance charts">
+          {managementMeasures.map((measure) => <article key={measure.label}>
+            <div><h3>{measure.label}</h3><strong>{measure.value}%</strong></div>
+            <progress max="100" value={measure.value} aria-label={`${measure.label}: ${measure.value}%`} />
+            <p>{measure.detail}</p>
+          </article>)}
+        </div>
+        <div className="management-outcomes">
+          <div><span>Screening results</span><strong>{metrics.screeningResultCount.toLocaleString()}</strong></div>
+          <div><span>Flagged results</span><strong>{metrics.flaggedResultCount.toLocaleString()}</strong></div>
+          <div><span>Referrals</span><strong>{metrics.referralCount.toLocaleString()}</strong></div>
+          <div><span>Cancelled registrations</span><strong>{metrics.cancelledCount.toLocaleString()}</strong></div>
+        </div>
+      </section>}
       <section className="lifecycle" aria-labelledby="lifecycle-title">
         <div className="lifecycle-heading"><h2 id="lifecycle-title">Event lifecycle</h2><span>{event.status === 'CANCELLED' ? 'Cancelled before completion' : `${STATUS_LABEL[event.status]} stage`}</span></div>
         <ol className={event.status === 'CANCELLED' ? 'is-cancelled' : ''}>{lifecycleStages.map((stage, index) => <li className={index < activeStage ? 'complete' : index === activeStage ? 'current' : ''} key={stage.status}><i>{index < activeStage ? <CheckIcon /> : null}</i><span>{stage.label}</span></li>)}</ol>
       </section>
       {event.status === 'CANCELLED' && <section className="cancellation"><strong>Cancellation reason</strong><p>{event.cancellationReason}</p></section>}
       {canPermanentlyDelete && <section className="event-danger-zone" aria-labelledby="event-danger-zone-title">
-        <div><h2 id="event-danger-zone-title">Danger zone</h2><p>This completed event can be permanently deleted. Its event-owned operational records will be removed; shared accounts and participant profiles will remain.</p></div>
-        <button className="danger-button compact" type="button" onClick={() => setDeleteOpen(true)}><TrashIcon />Delete event</button>
+        <div><h2 id="event-danger-zone-title">Danger zone</h2><p>Permanently delete this event, its operational records, and participant profiles created only for this event. Profiles reused by another event are preserved.</p></div>
+        <Link className="danger-button compact" to={`${eventPath}/delete`}><TrashIcon />Review deletion</Link>
       </section>}
     </div>}
 
@@ -547,10 +515,10 @@ export default function EventDetailPage() {
 
     {view === 'attendees' && <section className="event-view" aria-labelledby="attendees-title">
       <div className="event-view-heading"><div><h2 id="attendees-title">Attendees</h2><p>{attendeeTotal.toLocaleString()} matching registrations</p></div></div>
-      <form className="station-template-panel" onSubmit={(submitEvent) => { submitEvent.preventDefault(); void loadAttendees(); }}>
-        <label><span>Search attendee</span><input value={attendeeSearch} onChange={(change) => setAttendeeSearch(change.target.value)} placeholder="Name or participant reference" /></label>
-        <label><span>Status</span><select value={attendeeStatus} onChange={(change) => setAttendeeStatus(change.target.value as EventAttendee['registrationStatus'] | '')}><option value="">All statuses</option><option value="SIGNED_UP">Signed up</option><option value="CHECKED_IN">Checked in</option><option value="COMPLETED">Completed</option><option value="CANCELLED">Cancelled</option></select></label>
-        <button className="secondary compact" type="submit" disabled={attendeeLoading}>{attendeeLoading ? 'Loading…' : 'Apply filters'}</button>
+      <form className="event-attendee-filters" onSubmit={(submitEvent) => { submitEvent.preventDefault(); void loadAttendees(); }}>
+        <label><span>Search attendee</span><input type="search" value={attendeeSearch} onChange={(change) => setAttendeeSearch(change.target.value)} placeholder="Name or participant reference" /></label>
+        <label><span>Registration status</span><select value={attendeeStatus} onChange={(change) => setAttendeeStatus(change.target.value as EventAttendee['registrationStatus'] | '')}><option value="">All statuses</option><option value="SIGNED_UP">Signed up</option><option value="CHECKED_IN">Checked in</option><option value="COMPLETED">Completed</option><option value="CANCELLED">Cancelled</option></select></label>
+        <button className="primary compact" type="submit" disabled={attendeeLoading}>{attendeeLoading ? 'Loading…' : 'Apply filters'}</button>
       </form>
       {attendeeError && <div className="inline-retry" role="alert"><p>{attendeeError}</p><button className="secondary compact" type="button" onClick={() => void loadAttendees()}>Retry</button></div>}
       {!attendeeError && !attendeeLoading && attendees.length === 0 ? <p className="quiet-empty">No attendees match these filters.</p> : <div className="station-table">{attendees.map((attendee) => <article className="station-record" key={attendee.registrationId}><div className="station-record-copy"><strong>{attendee.participantDisplayName || attendee.participantReference}</strong><span>{attendee.participantReference} · {attendee.registrationStatus.toLowerCase().replace('_', ' ')}</span><small>{attendee.checkedInAt ? `Checked in ${formatEventDate(attendee.checkedInAt, event.timezone)}` : `Registered ${formatEventDate(attendee.createdAt, event.timezone)}`}</small></div><strong className="station-capacity-readonly">{attendee.queueNumber ? `#${attendee.queueNumber}` : '—'}</strong></article>)}</div>}
@@ -591,16 +559,5 @@ export default function EventDetailPage() {
         <div className="app-dialog-actions"><button className="secondary" type="button" disabled={pending} onClick={() => { setCancelOpen(false); setCancellationReason(''); setCancellationError(''); }}>Keep event</button><button className="danger-button" type="submit" disabled={pending}>{pending ? 'Cancelling…' : 'Cancel event'}</button></div>
       </form>
     </AppDialog>
-    <dialog className="event-delete-dialog" ref={deleteDialog} aria-labelledby="event-delete-title" onClose={() => setDeleteOpen(false)}>
-      <form method="dialog" onSubmit={(submitEvent) => void deleteEvent(submitEvent)}>
-        <div className="event-delete-dialog-heading"><div><span>Permanent deletion</span><h2 id="event-delete-title">Delete {event.name}?</h2></div><button className="icon-button" type="button" onClick={closeDeleteDialog} aria-label="Close delete event confirmation"><XMarkIcon /></button></div>
-        <p>This cannot be undone. Type the event name and acknowledge the deletion to continue.</p>
-        <label><span>Event name</span><input value={deleteConfirmation} autoFocus onChange={(change) => setDeleteConfirmation(change.target.value)} aria-describedby="event-delete-name-help" /></label>
-        <small id="event-delete-name-help">Type <strong>{event.name}</strong> exactly.</small>
-        <label className="event-delete-acknowledgement"><input type="checkbox" checked={deleteAcknowledged} onChange={(change) => setDeleteAcknowledged(change.target.checked)} /><span>I understand that this permanently deletes this event’s operational records.</span></label>
-        {deleteError && <p className="event-delete-error" role="alert">{deleteError}</p>}
-        <div className="event-delete-dialog-actions"><button className="secondary" type="button" onClick={closeDeleteDialog}>Cancel</button><button className="danger-button" type="submit" disabled={deletePending || deleteConfirmation !== event.name || !deleteAcknowledged}>{deletePending ? 'Deleting…' : 'Permanently delete'}</button></div>
-      </form>
-    </dialog>
   </div>;
 }
