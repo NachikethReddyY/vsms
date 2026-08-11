@@ -489,8 +489,17 @@ async function ensureDemoContact(staff, participant, {
   phoneNumber,
   email,
 }) {
-  const existing = await prisma.participantEmergencyContact.findFirst({
+  const activeExisting = await prisma.participantEmergencyContact.findFirst({
+    where: {
+      participantId: participant.id,
+      isPrimary: true,
+      status: "ACTIVE",
+    },
+    orderBy: { updatedAt: "desc" },
+  });
+  const existing = activeExisting || await prisma.participantEmergencyContact.findFirst({
     where: { participantId: participant.id },
+    orderBy: { updatedAt: "desc" },
   });
   const data = {
     contactName,
@@ -509,6 +518,7 @@ async function ensureDemoContact(staff, participant, {
   }
   return prisma.participantEmergencyContact.create({
     data: {
+      id: crypto.randomUUID(),
       ...data,
       participantId: participant.id,
       createdById: staff.id,
@@ -1009,8 +1019,9 @@ async function seedDemoData(staff, registrationOfficer, reviewer, consentForm) {
     name: "VSMS Synthetic Active Event",
     venue: "Synthetic Venue Two",
     status: "IN_PROGRESS",
-    startsAt: demoDate(0, 0),
-    endsAt: demoDate(0, 23, 59),
+    // Keep the active fixture on the current Singapore calendar day.
+    startsAt: demoDate(1, 0),
+    endsAt: demoDate(1, 23, 59),
     capacity: 80,
   });
   const completedEvent = await upsertDemoEvent(staff, {
