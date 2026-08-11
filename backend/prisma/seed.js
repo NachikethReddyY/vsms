@@ -39,6 +39,8 @@ const permissionNames = [
   "audit:read",
 ];
 
+const { SYSTEM_FIELD_SCHEMAS, CUSTOM_OD_NOTES_SCHEMA } = require("../schemas/dynamicStationSchema");
+
 const stationTemplates = [
   {
     stationTemplateId: "60000000-0000-4000-8000-000000000001",
@@ -47,6 +49,7 @@ const stationTemplates = [
     name: "Registration",
     description: "Confirm the participant record, consent, and QR pass.",
     defaultCapacity: 3,
+    fieldSchema: null,
   },
   {
     stationTemplateId: "60000000-0000-4000-8000-000000000002",
@@ -56,15 +59,16 @@ const stationTemplates = [
     name: "Visual acuity",
     description: "Capture controlled distance and near-vision measurements.",
     defaultCapacity: 4,
+    fieldSchema: SYSTEM_FIELD_SCHEMAS.VISUAL_ACUITY,
   },
   {
     stationTemplateId: "60000000-0000-4000-8000-000000000003",
     templateKey: "EYE_HEALTH",
-    stationType: "EYE_HEALTH",
     version: 1,
     name: "Eye health",
-    description: "Record eye-health observations and screening flags.",
+    description: "Catalog reference for clinician review observations. Not a screener station — doctors record eye-health notes during clinical review from other station results.",
     defaultCapacity: 2,
+    fieldSchema: null,
   },
   {
     stationTemplateId: "60000000-0000-4000-8000-000000000004",
@@ -73,6 +77,7 @@ const stationTemplates = [
     name: "Clinical review",
     description: "Review screening outcomes and decide the safe next step.",
     defaultCapacity: 2,
+    fieldSchema: null,
   },
   {
     stationTemplateId: "60000000-0000-4000-8000-000000000005",
@@ -82,6 +87,7 @@ const stationTemplates = [
     name: "Refraction",
     description: "Capture autorefractor SPH/CYL/Axis readings for both eyes.",
     defaultCapacity: 3,
+    fieldSchema: SYSTEM_FIELD_SCHEMAS.REFRACTION,
   },
   {
     stationTemplateId: "60000000-0000-4000-8000-000000000006",
@@ -91,6 +97,17 @@ const stationTemplates = [
     name: "Colour vision",
     description: "Record Ishihara plate scores for each eye.",
     defaultCapacity: 3,
+    fieldSchema: SYSTEM_FIELD_SCHEMAS.COLOUR_VISION,
+  },
+  {
+    stationTemplateId: "60000000-0000-4000-8000-000000000007",
+    templateKey: "CUSTOM_OD_NOTES",
+    stationType: "CUSTOM",
+    version: 1,
+    name: "OD-only notes",
+    description: "Example customizable station: right-eye observations only.",
+    defaultCapacity: 2,
+    fieldSchema: CUSTOM_OD_NOTES_SCHEMA,
   },
 ];
 
@@ -241,10 +258,15 @@ async function seedPermissions(roles, staff) {
 
 async function seedStationTemplates() {
   for (const template of stationTemplates) {
+    const data = {
+      ...template,
+      stationType: template.stationType ?? null,
+      active: true,
+    };
     await prisma.stationTemplate.upsert({
       where: { stationTemplateId: template.stationTemplateId },
-      update: { ...template, active: true },
-      create: template,
+      update: data,
+      create: data,
     });
   }
 }
@@ -385,22 +407,42 @@ async function seedEventStructure(event, staff, registrationOfficer) {
     ["VISUAL_ACUITY", "Visual acuity", 1],
     ["REFRACTION", "Refraction", 2],
     ["COLOUR_VISION", "Colour vision", 3],
-    ["EYE_HEALTH", "Eye health", 4],
   ];
   const stations = [];
   for (const [stationType, stationName, stationOrder] of stationDefinitions) {
-    stations.push(await prisma.station.upsert({
-      where: { eventId_stationType: { eventId: event.eventId, stationType } },
-      update: { stationName, stationOrder, isActive: true },
-      create: {
-        eventId: event.eventId,
-        stationType,
-        stationName,
-        stationOrder,
-        isActive: true,
-      },
-    }));
+    const fieldSchema = SYSTEM_FIELD_SCHEMAS[stationType] || null;
+    const existing = await prisma.station.findFirst({
+      where: { eventId: event.eventId, stationType },
+    });
+    stations.push(existing
+      ? await prisma.station.update({
+        where: { stationId: existing.stationId },
+        data: {
+          stationName,
+          stationOrder,
+          isActive: true,
+          fieldSchemaSnapshot: fieldSchema,
+          schemaVersion: 1,
+        },
+      })
+      : await prisma.station.create({
+        data: {
+          eventId: event.eventId,
+          stationType,
+          stationName,
+          stationOrder,
+          isActive: true,
+          fieldSchemaSnapshot: fieldSchema,
+          schemaVersion: 1,
+        },
+      }));
   }
+  // Eye health is clinician-review only — deactivate any leftover screener stations.
+  await prisma.station.updateMany({
+    where: { eventId: event.eventId, stationType: "EYE_HEALTH", isActive: true },
+    data: { isActive: false },
+  });
+
 
   await prisma.staffAssignment.deleteMany({
     where: { eventId: event.eventId, userId: staff.id, assignmentRole: "REGISTRATION" },

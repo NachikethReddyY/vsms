@@ -1,6 +1,7 @@
 import apiClient from '../../utils/apiClient';
 import type {
   ColourVisionResultData,
+  DynamicResultData,
   EyeHealthResultData,
   EyeReading,
   FlagEvaluation,
@@ -16,11 +17,11 @@ import type {
 const DATABASE_NAME = 'vsms-screening-offline';
 const DATABASE_VERSION = 1;
 const KEY_ID = 'screening-cache-key';
-const SUPPORTED_STATIONS = new Set<StationType>(['VISUAL_ACUITY', 'REFRACTION', 'COLOUR_VISION', 'EYE_HEALTH']);
+const SUPPORTED_STATIONS = new Set<StationType>(['VISUAL_ACUITY', 'REFRACTION', 'COLOUR_VISION', 'EYE_HEALTH', 'CUSTOM']);
 const OFFLINE_SYNC_EVENT = 'vsms-offline-sync';
 let cryptoKeyPromise: Promise<CryptoKey> | null = null;
 
-type ScreeningPath = 'visual-acuity' | 'refraction' | 'colour-vision' | 'eye-health';
+type ScreeningPath = 'visual-acuity' | 'refraction' | 'colour-vision' | 'eye-health' | 'dynamic';
 type OfflineMutationStatus = 'pending' | 'conflict';
 
 type OfflineStation = Station & { offlineAccessExpiresAt: string };
@@ -36,7 +37,7 @@ type OfflineMutation = {
   clientActionId: string;
   stationId: string;
   path: ScreeningPath;
-  body: ScreeningSavePayload<VisualAcuityResultData | RefractionResultData | ColourVisionResultData | EyeHealthResultData>;
+  body: ScreeningSavePayload<VisualAcuityResultData | RefractionResultData | ColourVisionResultData | EyeHealthResultData | DynamicResultData>;
 };
 
 type ScreeningSyncActionResult = {
@@ -226,6 +227,8 @@ function toOfflineStation(station: Station): OfflineStation | null {
     stationType: station.stationType,
     stationOrder: station.stationOrder,
     isActive: station.isActive,
+    fieldSchemaSnapshot: station.fieldSchemaSnapshot,
+    schemaVersion: station.schemaVersion,
     offlineAccessExpiresAt: station.offlineAccessExpiresAt,
   };
 }
@@ -316,10 +319,11 @@ export async function getOfflineStationContext(
   ownerId: string,
   eventId: string,
   stationType: StationType,
+  stationId?: string,
 ): Promise<OfflineStationContext | null> {
   const snapshot = await loadSnapshot(ownerId, eventId);
   if (!snapshot) return null;
-  const station = snapshot.stations.find((item) => item.stationType === stationType);
+  const station = snapshot.stations.find((item) => item.stationType === stationType && (!stationId || item.stationId === stationId));
   if (!station || isExpired(station.offlineAccessExpiresAt)) {
     await purgeEvent(ownerId, eventId);
     return null;
@@ -452,7 +456,14 @@ function evaluateEyeHealth(resultData: EyeHealthResultData): FlagEvaluation {
   };
 }
 
-export function evaluateOfflineStation(path: ScreeningPath, resultData: VisualAcuityResultData | RefractionResultData | ColourVisionResultData | EyeHealthResultData): FlagEvaluation {
+export function evaluateOfflineStation(path: ScreeningPath, resultData: VisualAcuityResultData | RefractionResultData | ColourVisionResultData | EyeHealthResultData | DynamicResultData): FlagEvaluation {
+  if (path === 'dynamic') return {
+    ruleVersion: 'TEMPLATE-SCHEMA-1.0',
+    overallFlag: 'NORMAL',
+    isFlagged: false,
+    flagSummary: 'Custom station result recorded.',
+    reasons: [],
+  };
   if (path === 'visual-acuity') return evaluateVisualAcuity(resultData as VisualAcuityResultData);
   if (path === 'refraction') return evaluateRefraction(resultData as RefractionResultData);
   if (path === 'eye-health') return evaluateEyeHealth(resultData as EyeHealthResultData);
@@ -464,7 +475,7 @@ export async function queueOfflineStationSave(
   eventId: string,
   stationId: string,
   path: ScreeningPath,
-  body: ScreeningSavePayload<VisualAcuityResultData | RefractionResultData | ColourVisionResultData | EyeHealthResultData>,
+  body: ScreeningSavePayload<VisualAcuityResultData | RefractionResultData | ColourVisionResultData | EyeHealthResultData | DynamicResultData>,
 ): Promise<FlagEvaluation> {
   const snapshot = await loadSnapshot(ownerId, eventId);
   const station = snapshot?.stations.find((item) => item.stationId === stationId);
@@ -542,7 +553,9 @@ export async function syncOfflineEvent(ownerId: string, eventId: string): Promis
       const response = await requestScreeningSync(eventId, batch.map(({ mutation }) => ({
         clientActionId: mutation.clientActionId,
         stationId: mutation.stationId,
-        stationType: mutation.path === 'visual-acuity'
+        stationType: mutation.path === 'dynamic'
+          ? 'CUSTOM'
+          : mutation.path === 'visual-acuity'
           ? 'VISUAL_ACUITY'
           : mutation.path === 'refraction'
             ? 'REFRACTION'

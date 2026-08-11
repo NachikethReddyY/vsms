@@ -13,6 +13,7 @@ import PublicEventPage from "./features/events/PublicEventPage";
 import ReviewWorkspacePage from "./features/reviews/ReviewWorkspacePage";
 import ReportsPage from "./features/reports/ReportsPage";
 import ColourVisionStationPage from "./features/screening/ColourVisionStationPage";
+import DynamicStationPage from "./features/screening/DynamicStationPage";
 import EyeHealthStationPage from "./features/screening/EyeHealthStationPage";
 import QRScannerPage from "./features/screening/QRScannerPage";
 import RefractionStationPage from "./features/screening/RefractionStationPage";
@@ -136,6 +137,9 @@ export default function App() {
             </Route>
             <Route element={<StationDutyGuard stationType="EYE_HEALTH" />}>
               <Route path="/events/:eventId/stations/eye-health" element={<EyeHealthStationPage />} />
+            </Route>
+            <Route element={<StationDutyGuard stationType="CUSTOM" />}>
+              <Route path="/events/:eventId/stations/custom/:stationId" element={<DynamicStationPage />} />
             </Route>
             <Route path="/qr-scanner" element={<QRScannerPage />} />
           </Route>

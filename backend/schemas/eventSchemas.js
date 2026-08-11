@@ -302,20 +302,34 @@ const SCREENING_STATION_TYPES = [
   "REFRACTION",
   "COLOUR_VISION",
   "EYE_HEALTH",
+  "CUSTOM",
 ];
 const stationTemplateParams = z.object({ stationTemplateId: uuid }).strict();
+const fieldSchemaValue = z.array(z.object({
+  key: z.string().trim().min(1).max(64),
+  label: z.string().trim().min(1).max(100),
+  type: z.enum(["text", "number", "select", "boolean", "eye-pair"]),
+  required: z.boolean().optional(),
+  options: z.array(z.string()).optional(),
+  min: z.number().optional(),
+  max: z.number().optional(),
+  unit: z.string().optional(),
+  eyes: z.enum(["OD", "OS", "BOTH"]).optional(),
+}).passthrough()).min(1).max(40).optional();
 const createStationTemplateBody = z.object({
   stationType: z.enum(SCREENING_STATION_TYPES),
   name: z.string().trim().min(2).max(100),
   description: z.string().trim().max(500).nullable().optional(),
   defaultCapacity: z.number().int().min(1).max(1000).default(3),
   active: z.boolean().default(true),
+  fieldSchema: fieldSchemaValue,
 }).strict();
 const updateStationTemplateBody = z.object({
   name: z.string().trim().min(2).max(100).optional(),
   description: z.string().trim().max(500).nullable().optional(),
   defaultCapacity: z.number().int().min(1).max(1000).optional(),
   active: z.boolean().optional(),
+  fieldSchema: fieldSchemaValue,
 }).strict().refine((value) => Object.keys(value).length > 0, {
   message: "At least one template field is required",
 });

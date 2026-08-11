@@ -28,6 +28,7 @@ import { getDisplayName } from '../../utils/identity';
 import { eventApi, formatEventDate, STATUS_LABEL, type AuditRecord, type EventAttendee, type EventMetrics, type EventRecord, type EventStatus, type StaffAssignmentRole, type StaffDirectoryEntry, type StationTemplate } from './eventApi';
 import { EVENT_BANNERS, getEventArtwork, type EventBannerKey } from './eventBanners';
 import { managementPercent } from './eventReport';
+import { customStationPath } from '../screening/stationConfig';
 
 type AssignmentDraft = { userId: string; assignmentRole: StaffAssignmentRole; eventStationId: string };
 const emptyAssignment: AssignmentDraft = { userId: '', assignmentRole: 'SUPPORT', eventStationId: '' };
@@ -337,15 +338,17 @@ export default function EventDetailPage() {
       && assignment.user.userId === user?.userId
     ))
   ));
-  const assignedStationTypes = new Set(!isAdministrator ? event.shifts.flatMap((shift) => shift.staffAssignments.flatMap((assignment) => {
+  const assignedStationCandidates = !isAdministrator ? event.shifts.flatMap((shift) => shift.staffAssignments.flatMap((assignment) => {
     if (shift.status !== 'ACTIVE'
       || assignment.assignmentRole !== 'SCREENER'
       || !['ASSIGNED', 'CONFIRMED'].includes(assignment.status)
       || assignment.user.userId !== user?.userId
       || !assignment.eventStation) return [];
     const station = event.eventStations.find((candidate) => candidate.eventStationId === assignment.eventStation?.eventStationId);
-    return station ? [station.stationType] : [];
-  })) : []);
+    return station ? [station] : [];
+  })) : [];
+  const assignedStations = [...new Map(assignedStationCandidates.map((station) => [station.eventStationId, station])).values()];
+  const assignedStationTypes = new Set(assignedStations.map((station) => station.stationType));
   const activeStage = lifecycleStages.findIndex((stage) => stage.status === event.status);
   const totalRequiredStaff = event.shifts.reduce((total, shift) => total + shift.requiredStaff, 0);
   const totalAssignedStaff = event.shifts.reduce((total, shift) => total + shift.staffAssignments.length, 0);
@@ -391,7 +394,8 @@ export default function EventDetailPage() {
           {assignedStationTypes.has('VISUAL_ACUITY') && <Link className="primary" to={`${eventPath}/stations/visual-acuity`}>Open Visual Acuity station</Link>}
           {assignedStationTypes.has('REFRACTION') && <Link className="primary" to={`${eventPath}/stations/refraction`}>Open Refraction station</Link>}
           {assignedStationTypes.has('COLOUR_VISION') && <Link className="primary" to={`${eventPath}/stations/colour-vision`}>Open Colour Vision station</Link>}
-          {assignedStationTypes.has('EYE_HEALTH') && <Link className="primary" to={`${eventPath}/stations/eye-health`}>Open Eye Health station</Link>}
+          {assignedStationTypes.has('EYE_HEALTH') && <p className="quiet-empty">Eye health is captured during clinical review, not as a screener station.</p>}
+          {assignedStations.filter((station) => station.stationType === 'CUSTOM').map((station) => <Link className="primary" key={station.eventStationId} to={customStationPath(event.eventId, station.eventStationId)}>Open {station.name}</Link>)}
           {assignedStationTypes.size > 0 && <Link className="secondary" to="/qr-scanner">Scan QR → station</Link>}
           {canReview && <Link className="secondary" to={`${eventPath}/reviews`}><ClipboardDocumentCheckIcon />Open clinical review</Link>}
         </div>

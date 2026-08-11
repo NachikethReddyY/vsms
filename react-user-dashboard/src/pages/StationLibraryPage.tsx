@@ -2,27 +2,32 @@ import { ArrowPathIcon, PencilSquareIcon, PlusIcon, Squares2X2Icon } from '@hero
 import { useCallback, useEffect, useState, type FormEvent } from 'react';
 import { AppDialog } from '../components/AppDialog';
 import { AppToast } from '../components/AppToast';
+import { emptyField, validateFieldSchema, type DynamicFieldValues, type FieldSchema } from '../features/screening/fieldSchema';
+import { StationFieldBuilder, StationFieldRenderer } from '../features/screening/StationFieldRenderer';
 import apiClient, { getApiError } from '../utils/apiClient';
 import './StationLibraryPage.css';
 
+/** Creatable screening station types. Eye health is clinician-review only. */
 export const STATION_TYPE_OPTIONS = [
   { value: 'VISUAL_ACUITY', label: 'Visual acuity' },
   { value: 'REFRACTION', label: 'Refraction' },
   { value: 'COLOUR_VISION', label: 'Colour vision' },
-  { value: 'EYE_HEALTH', label: 'Eye health' },
+  { value: 'CUSTOM', label: 'Custom' },
 ] as const;
 
 type StationType = typeof STATION_TYPE_OPTIONS[number]['value'];
+type CatalogStationType = StationType | 'EYE_HEALTH';
 
 type StationTemplateRecord = {
   stationTemplateId: string;
   templateKey: string;
-  stationType: StationType | null;
+  stationType: CatalogStationType | null;
   version: number;
   name: string;
   description?: string | null;
   defaultCapacity: number;
   active: boolean;
+  fieldSchema: FieldSchema | null;
 };
 
 type CreateDraft = {
@@ -30,6 +35,7 @@ type CreateDraft = {
   name: string;
   description: string;
   defaultCapacity: number;
+  fieldSchema: FieldSchema;
 };
 
 type EditDraft = {
@@ -37,13 +43,33 @@ type EditDraft = {
   description: string;
   defaultCapacity: number;
   active: boolean;
+  fieldSchema: FieldSchema;
 };
 
-const emptyCreateDraft = (): CreateDraft => ({
+/** Prefer the seeded/system template for a type so create/edit previews use DB fieldSchema. */
+function fieldSchemaFromLibrary(templates: StationTemplateRecord[], stationType: StationType): FieldSchema {
+  if (stationType === 'CUSTOM') return [emptyField()];
+  const preferred = templates.find((template) => (
+    template.stationType === stationType
+    && template.templateKey === stationType
+    && Array.isArray(template.fieldSchema)
+    && template.fieldSchema.length > 0
+  ));
+  if (preferred?.fieldSchema) return preferred.fieldSchema;
+  const anyMatch = templates.find((template) => (
+    template.stationType === stationType
+    && Array.isArray(template.fieldSchema)
+    && template.fieldSchema.length > 0
+  ));
+  return anyMatch?.fieldSchema ?? [];
+}
+
+const emptyCreateDraft = (templates: StationTemplateRecord[] = []): CreateDraft => ({
   stationType: 'VISUAL_ACUITY',
   name: '',
   description: '',
   defaultCapacity: 3,
+  fieldSchema: fieldSchemaFromLibrary(templates, 'VISUAL_ACUITY'),
 });
 
 const toEditDraft = (template: StationTemplateRecord): EditDraft => ({
@@ -51,16 +77,43 @@ const toEditDraft = (template: StationTemplateRecord): EditDraft => ({
   description: template.description ?? '',
   defaultCapacity: template.defaultCapacity,
   active: template.active,
+  fieldSchema: template.fieldSchema ?? [],
 });
 
-const labelStationType = (stationType: StationType | null) =>
-  STATION_TYPE_OPTIONS.find((item) => item.value === stationType)?.label ?? 'Legacy catalog only';
+const labelStationType = (stationType: CatalogStationType | null) => {
+  if (stationType === 'EYE_HEALTH') return 'Eye health (review only)';
+  return STATION_TYPE_OPTIONS.find((item) => item.value === stationType)?.label ?? 'Legacy catalog only';
+};
 
 function sortTemplates(templates: StationTemplateRecord[]) {
   return [...templates].sort((left, right) => {
     if (left.active !== right.active) return left.active ? -1 : 1;
     return left.name.localeCompare(right.name, undefined, { sensitivity: 'base' });
   });
+}
+
+function SchemaPreview({
+  fieldSchema,
+  values,
+  onValuesChange,
+  onSchemaChange,
+  disabled,
+}: {
+  fieldSchema: FieldSchema;
+  values: DynamicFieldValues;
+  onValuesChange: (key: string, value: unknown) => void;
+  onSchemaChange: (fieldSchema: FieldSchema) => void;
+  disabled?: boolean;
+}) {
+  return <>
+    <StationFieldBuilder fieldSchema={fieldSchema} onChange={onSchemaChange} disabled={disabled} />
+    <section className="station-field-preview">
+      <h3>Preview</h3>
+      {fieldSchema.length
+        ? <StationFieldRenderer fieldSchema={fieldSchema} values={values} onChange={onValuesChange} disabled={disabled} />
+        : <p className="station-library-schema-note">Add fields above to preview the station form.</p>}
+    </section>
+  </>;
 }
 
 export default function StationLibraryPage() {
@@ -74,6 +127,7 @@ export default function StationLibraryPage() {
   const [formError, setFormError] = useState('');
   const [saving, setSaving] = useState(false);
   const [notice, setNotice] = useState('');
+  const [previewValues, setPreviewValues] = useState<DynamicFieldValues>({});
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -92,9 +146,10 @@ export default function StationLibraryPage() {
 
   const openCreate = () => {
     setEditing(null);
-    setCreateDraft(emptyCreateDraft());
+    setCreateDraft(emptyCreateDraft(templates));
     setEditDraft(null);
     setFormError('');
+    setPreviewValues({});
     setDialogMode('create');
   };
 
@@ -102,6 +157,7 @@ export default function StationLibraryPage() {
     setEditing(template);
     setEditDraft(toEditDraft(template));
     setFormError('');
+    setPreviewValues({});
     setDialogMode('edit');
   };
 
@@ -113,6 +169,15 @@ export default function StationLibraryPage() {
 
   const submitCreate = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
+    if (!createDraft.fieldSchema.length) {
+      setFormError('Add at least one form field for this station.');
+      return;
+    }
+    const schemaErrors = validateFieldSchema(createDraft.fieldSchema);
+    if (schemaErrors.length) {
+      setFormError(schemaErrors[0]);
+      return;
+    }
     setSaving(true);
     setFormError('');
     try {
@@ -121,6 +186,7 @@ export default function StationLibraryPage() {
         name: createDraft.name,
         description: createDraft.description || null,
         defaultCapacity: createDraft.defaultCapacity,
+        fieldSchema: createDraft.fieldSchema,
       });
       setTemplates((current) => sortTemplates([...current, data]));
       setDialogMode(null);
@@ -135,6 +201,16 @@ export default function StationLibraryPage() {
   const submitEdit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (!editing || !editDraft) return;
+    const supportsFields = Boolean(editing.stationType) || editDraft.fieldSchema.length > 0;
+    if (supportsFields && !editDraft.fieldSchema.length) {
+      setFormError('Add at least one form field for this station.');
+      return;
+    }
+    const schemaErrors = editDraft.fieldSchema.length ? validateFieldSchema(editDraft.fieldSchema) : [];
+    if (schemaErrors.length) {
+      setFormError(schemaErrors[0]);
+      return;
+    }
     setSaving(true);
     setFormError('');
     try {
@@ -145,6 +221,7 @@ export default function StationLibraryPage() {
           description: editDraft.description || null,
           defaultCapacity: editDraft.defaultCapacity,
           active: editDraft.active,
+          ...(editDraft.fieldSchema.length ? { fieldSchema: editDraft.fieldSchema } : {}),
         },
       );
       setTemplates((current) => sortTemplates(current.map((item) => item.stationTemplateId === data.stationTemplateId ? data : item)));
@@ -158,6 +235,9 @@ export default function StationLibraryPage() {
   };
 
   const activeCount = templates.filter((template) => template.active).length;
+  const updatePreviewValue = (key: string, value: unknown) => {
+    setPreviewValues((current) => ({ ...current, [key]: value }));
+  };
 
   return <div className="page-frame station-library-page">
     <header className="station-library-header">
@@ -178,7 +258,7 @@ export default function StationLibraryPage() {
       {loading ? <div className="station-library-loading" aria-live="polite" aria-label="Loading station templates"><span /><span /><span /><span /></div> : templates.length ? <div className="station-library-grid">{templates.map((template) => <article className="station-library-card" key={template.stationTemplateId}>
         <header><span className="station-library-card-icon"><Squares2X2Icon aria-hidden="true" /></span><span className={`station-library-access ${template.active ? 'active' : 'inactive'}`}><i aria-hidden="true" />{template.active ? 'Active' : 'Inactive'}</span></header>
         <div><p className="station-library-key">{labelStationType(template.stationType)} · v{template.version}</p><h2>{template.name}</h2><p>{template.description || 'No description.'}</p></div>
-        <footer><span><strong>{template.defaultCapacity}</strong> default capacity</span><button className="secondary compact station-library-edit-button" type="button" onClick={() => openEdit(template)}><PencilSquareIcon aria-hidden="true" />Edit</button></footer>
+        <footer><span><strong>{template.defaultCapacity}</strong> capacity · v{template.version} · {template.fieldSchema?.length ?? 0} fields</span><button className="secondary compact station-library-edit-button" type="button" onClick={() => openEdit(template)}><PencilSquareIcon aria-hidden="true" />Edit</button></footer>
       </article>)}</div> : <div className="quiet-empty station-library-empty"><Squares2X2Icon aria-hidden="true" /><h2>No station templates yet</h2><p>Default station templates have not been installed. Run the database migrations, then refresh this page.</p></div>}
     </section>
 
@@ -194,13 +274,28 @@ export default function StationLibraryPage() {
         {formError && <p className="app-dialog-error" role="alert">{formError}</p>}
         <label className="app-dialog-field">
           <span>Station type</span>
-          <select required value={createDraft.stationType} onChange={(event) => setCreateDraft((current) => ({ ...current, stationType: event.target.value as StationType }))}>
+          <select required value={createDraft.stationType} onChange={(event) => {
+            const stationType = event.target.value as StationType;
+            setCreateDraft((current) => ({
+              ...current,
+              stationType,
+              fieldSchema: fieldSchemaFromLibrary(templates, stationType),
+            }));
+            setPreviewValues({});
+          }}>
             {STATION_TYPE_OPTIONS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
           </select>
         </label>
         <label className="app-dialog-field"><span>Name</span><input required minLength={2} maxLength={100} value={createDraft.name} onChange={(event) => setCreateDraft((current) => ({ ...current, name: event.target.value }))} /></label>
         <label className="app-dialog-field"><span>Description <small>Optional</small></span><textarea maxLength={500} rows={3} value={createDraft.description} onChange={(event) => setCreateDraft((current) => ({ ...current, description: event.target.value }))} /></label>
         <label className="app-dialog-field"><span>Default capacity</span><input required type="number" min={1} max={1000} value={createDraft.defaultCapacity} onChange={(event) => setCreateDraft((current) => ({ ...current, defaultCapacity: Number(event.target.value) }))} /></label>
+        <SchemaPreview
+          fieldSchema={createDraft.fieldSchema}
+          values={previewValues}
+          onValuesChange={updatePreviewValue}
+          onSchemaChange={(fieldSchema) => { setCreateDraft((current) => ({ ...current, fieldSchema })); setPreviewValues({}); }}
+          disabled={saving}
+        />
         <div className="app-dialog-actions"><button className="secondary" type="button" disabled={saving} onClick={() => closeDialog(false)}>Cancel</button><button className="primary" type="submit" disabled={saving}>{saving ? 'Saving…' : 'Create template'}</button></div>
       </form>
     </AppDialog>
@@ -219,6 +314,13 @@ export default function StationLibraryPage() {
         <label className="app-dialog-field"><span>Name</span><input required minLength={2} maxLength={100} value={editDraft.name} onChange={(event) => setEditDraft((current) => current ? { ...current, name: event.target.value } : current)} /></label>
         <label className="app-dialog-field"><span>Description <small>Optional</small></span><textarea maxLength={500} rows={3} value={editDraft.description} onChange={(event) => setEditDraft((current) => current ? { ...current, description: event.target.value } : current)} /></label>
         <label className="app-dialog-field"><span>Default capacity</span><input required type="number" min={1} max={1000} value={editDraft.defaultCapacity} onChange={(event) => setEditDraft((current) => current ? { ...current, defaultCapacity: Number(event.target.value) } : current)} /></label>
+        <SchemaPreview
+          fieldSchema={editDraft.fieldSchema}
+          values={previewValues}
+          onValuesChange={updatePreviewValue}
+          onSchemaChange={(fieldSchema) => { setEditDraft((current) => current ? { ...current, fieldSchema } : current); setPreviewValues({}); }}
+          disabled={saving}
+        />
         <label className="station-library-active-toggle">
           <input type="checkbox" checked={editDraft.active} onChange={(event) => setEditDraft((current) => current ? { ...current, active: event.target.checked } : current)} />
           <span><strong>{editDraft.active ? 'Active' : 'Inactive'}</strong><small>{editDraft.active ? 'Available for event import pickers.' : 'Hidden from import pickers until reactivated.'}</small></span>

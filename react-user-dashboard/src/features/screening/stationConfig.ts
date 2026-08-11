@@ -13,7 +13,13 @@ export const STATION_LABEL: Record<StationType, string> = {
   REFRACTION: 'Refraction',
   COLOUR_VISION: 'Colour Vision',
   EYE_HEALTH: 'Eye Health',
+  CUSTOM: 'Custom Station',
 };
+
+export function customStationPath(eventId: string, stationId: string, registrationId?: string | null): string {
+  const base = `/events/${eventId}/stations/custom/${stationId}`;
+  return registrationId ? `${base}?registrationId=${encodeURIComponent(registrationId)}` : base;
+}
 
 export function stationPath(
   eventId: string,

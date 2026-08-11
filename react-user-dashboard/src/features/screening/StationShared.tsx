@@ -14,7 +14,7 @@ import {
 } from './screeningApi';
 import { extractQrToken } from './qrHandoff';
 import { getOfflineStationContext, isNetworkError } from './offlineSync';
-import { STATION_LABEL, STATION_PATH_SLUG, stationPath } from './stationConfig';
+import { customStationPath, STATION_LABEL, STATION_PATH_SLUG, stationPath } from './stationConfig';
 import { StationCameraScanner } from './StationCameraScanner';
 import './StationCameraScanner.css';
 
@@ -50,17 +50,27 @@ export function nextStationTypes(
 export function StationHandoffLinks({
   eventId,
   currentStationType,
+  currentStationId,
   registrationId,
   stations,
 }: {
   eventId: string;
   currentStationType: StationType;
+  currentStationId?: string;
   registrationId?: string | null;
   stations?: Station[];
 }) {
-  const next = nextStationTypes(currentStationType, stations);
+  const orderedStations = stations
+    ? [...stations].filter((item) => item.isActive).sort((left, right) => left.stationOrder - right.stationOrder)
+    : [];
+  const currentIndex = orderedStations.findIndex((item) => item.stationType === currentStationType && (!currentStationId || item.stationId === currentStationId));
+  const nextStations = currentIndex >= 0
+    ? orderedStations.slice(currentIndex + 1).filter((item) => item.stationType === 'CUSTOM' || Boolean(STATION_PATH_SLUG[item.stationType]))
+    : [];
+  const fallbackTypes = nextStations.length ? [] : nextStationTypes(currentStationType, stations);
+  const next = nextStations.length ? nextStations.map((item) => item.stationType) : fallbackTypes;
   const isLastScreeningStation = next.length === 0;
-  const nextLabel = next[0] ? STATION_LABEL[next[0]] : null;
+  const nextLabel = nextStations[0]?.stationName ?? (next[0] ? STATION_LABEL[next[0]] : null);
   const [passImage, setPassImage] = useState<string | null>(null);
   const [passName, setPassName] = useState<string | null>(null);
   const [passQueue, setPassQueue] = useState<number | null>(null);
@@ -113,16 +123,18 @@ export function StationHandoffLinks({
       )}
 
       <div className="action-cluster" style={{ paddingTop: 0 }}>
-        {next.map((type, index) => {
-          const href = stationPath(eventId, type, registrationId);
+        {(nextStations.length ? nextStations : fallbackTypes.map((stationType) => ({ stationType, stationId: '', stationName: STATION_LABEL[stationType] }))).map((nextStation, index) => {
+          const href = nextStation.stationType === 'CUSTOM'
+            ? customStationPath(eventId, nextStation.stationId, registrationId)
+            : stationPath(eventId, nextStation.stationType, registrationId);
           if (!href) return null;
           return (
             <Link
-              key={type}
+              key={nextStation.stationId || nextStation.stationType}
               className={index === 0 ? 'primary' : 'secondary'}
               to={href}
             >
-              {index === 0 ? 'Open next station tablet: ' : ''}{STATION_LABEL[type]}
+              {index === 0 ? 'Open next station tablet: ' : ''}{nextStation.stationName}
             </Link>
           );
         })}
@@ -161,7 +173,7 @@ export function FlagBanner({
           <small>Rule {evaluation.ruleVersion}</small>
         </div>
       </div>
-      <p>{evaluation.flagSummary}</p>
+      {evaluation.flagSummary && <p>{evaluation.flagSummary}</p>}
       {evaluation.reasons.length > 0 && (
         <ul>
           {evaluation.reasons.map((item) => (

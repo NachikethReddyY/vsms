@@ -8,6 +8,7 @@ const HANDLERS = {
   REFRACTION: "saveRefraction",
   COLOUR_VISION: "saveColourVision",
   EYE_HEALTH: "saveEyeHealth",
+  CUSTOM: "saveDynamic",
 };
 
 const SAFE_CONFLICT_CODES = new Set([
@@ -16,12 +17,15 @@ const SAFE_CONFLICT_CODES = new Set([
   "EVENT_NOT_IN_PROGRESS",
   "FORBIDDEN",
   "IDEMPOTENCY_KEY_REUSED",
+  "INVALID_FIELD_SCHEMA",
+  "INVALID_RESULT_DATA",
   "REGISTRATION_NOT_FOUND",
   "REGISTRATION_NOT_SCREENABLE",
   "SCREENER_ROLE_REQUIRED",
   "SCREENING_WRITE_CONFLICT",
   "SHIFT_NOT_ACTIVE",
   "STATION_NOT_FOUND",
+  "STATION_SCHEMA_MISSING",
 ]);
 
 const canonicalJson = (value) => {
@@ -265,6 +269,8 @@ const sanitizeStation = (station) => ({
   stationType: station.stationType,
   stationOrder: station.stationOrder,
   isActive: station.isActive,
+  fieldSchemaSnapshot: station.fieldSchemaSnapshot || null,
+  schemaVersion: station.schemaVersion ?? null,
   offlineAccessExpiresAt: station.offlineAccessExpiresAt || null,
 });
 

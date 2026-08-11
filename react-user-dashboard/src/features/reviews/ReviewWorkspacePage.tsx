@@ -130,6 +130,20 @@ function FlagBadge({ flag }: { flag: OverallFlag }) {
   return <span className={`review-flag flag-${flag.toLowerCase()}`}>{meta.icon}{meta.label}</span>;
 }
 
+function GenericResultData({ data }: { data: Record<string, unknown> }) {
+  return <dl className="result-data-fallback">
+    {Object.entries(data).map(([key, value]) => {
+      const eyePair = value && typeof value === 'object' && !Array.isArray(value)
+        ? value as Record<string, unknown>
+        : null;
+      const displayed = eyePair && ('od' in eyePair || 'os' in eyePair)
+        ? `OD: ${displayValue(eyePair.od)} · OS: ${displayValue(eyePair.os)}`
+        : displayValue(value);
+      return <div key={key}><dt>{prettyKey(key)}</dt><dd>{displayed}</dd></div>;
+    })}
+  </dl>;
+}
+
 function ResultData({ station }: { station: ReviewDetailResponse['stations'][number] }) {
   const data = station.result?.resultData;
   if (!data) return <p className="review-missing-result">Awaiting result</p>;
@@ -184,9 +198,7 @@ function ResultData({ station }: { station: ReviewDetailResponse['stations'][num
       {eyeHealth.deviceFindings && <div className="wide"><dt>Device findings</dt><dd>{eyeHealth.deviceFindings}</dd></div>}
     </dl>;
   }
-  return <dl className="result-data-fallback">
-    {Object.entries(data).map(([key, value]) => <div key={key}><dt>{prettyKey(key)}</dt><dd>{displayValue(value)}</dd></div>)}
-  </dl>;
+  return <GenericResultData data={data} />;
 }
 
 function ParticipantReport({ detail }: { detail: ReviewDetailResponse }) {
@@ -927,7 +939,7 @@ export default function ReviewWorkspacePage() {
             <label className="review-field"><span>Recommendations <em>Optional</em> <small>{form.recommendations.length}/2,000</small></span><textarea maxLength={2000} rows={4} value={form.recommendations} onChange={(event) => updateForm('recommendations', event.target.value)} placeholder="Advice, monitoring guidance, or next steps." /></label>
 
             <fieldset className="eye-health-fields"><legend>Eye health observations <em>Optional</em></legend>
-              <p>Optional clinician addendum. Primary eye-health capture happens at the Eye Health screener station.</p>
+              <p>Clinician eye-health assessment based on screening results from other stations.</p>
               <label className="review-field"><span>Cataract risk</span><select value={form.cataractRisk} onChange={(event) => updateForm('cataractRisk', event.target.value as EyeHealthRisk)}>{EYE_HEALTH_RISKS.map((risk) => <option key={risk.value} value={risk.value}>{risk.label}</option>)}</select></label>
               <label className="review-field"><span>Glaucoma risk</span><select value={form.glaucomaRisk} onChange={(event) => updateForm('glaucomaRisk', event.target.value as EyeHealthRisk)}>{EYE_HEALTH_RISKS.map((risk) => <option key={risk.value} value={risk.value}>{risk.label}</option>)}</select></label>
               <label className="decision-confirm eye-health-symptoms"><input type="checkbox" checked={form.symptomsNoted} onChange={(event) => updateForm('symptomsNoted', event.target.checked)} /><span><strong>Symptoms noted</strong><small>Record participant-reported symptoms when present.</small></span></label>

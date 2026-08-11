@@ -97,7 +97,7 @@ export function EventCapabilityGuard({ allowedRoles }: Pick<RoleGuardProps, "all
 
 
 export function StationDutyGuard({ stationType }: { stationType: StationType }) {
-  const { eventId = "" } = useParams();
+  const { eventId = "", stationId = "" } = useParams();
   const [state, setState] = useState<GuardState>("loading");
 
   useEffect(() => {
@@ -110,7 +110,11 @@ export function StationDutyGuard({ stationType }: { stationType: StationType }) 
       try {
         const result = await screeningApi.listStations(eventId);
         if (!alive) return;
-        setState(result.stations.some((station) => station.stationType === stationType && station.isActive !== false) ? "allowed" : "forbidden");
+        setState(result.stations.some((station) => (
+          station.stationType === stationType
+          && station.isActive !== false
+          && (stationType !== "CUSTOM" || !stationId || station.stationId === stationId)
+        )) ? "allowed" : "forbidden");
       } catch (error) {
         if (!alive) return;
         setState(isNotFound(error) ? "not-found" : "forbidden");
@@ -119,7 +123,7 @@ export function StationDutyGuard({ stationType }: { stationType: StationType }) 
     setState("loading");
     void check();
     return () => { alive = false; };
-  }, [eventId, stationType]);
+  }, [eventId, stationId, stationType]);
 
   if (state === "loading") return <div role="status" aria-live="polite">Checking station duty…</div>;
   if (state === "not-found") return <Navigate to="/not-found" replace />;

@@ -1843,6 +1843,22 @@ item:
                     "stationOrder": 1,
                     "capacity": 1,
                     "isAvailable": true,
+                    "fieldSchemaSnapshot": [
+                      {
+                        "key": "",
+                        "label": "",
+                        "type": "text",
+                        "required": true,
+                        "options": [
+                          ""
+                        ],
+                        "min": 0,
+                        "max": 0,
+                        "unit": "",
+                        "eyes": "OD"
+                      }
+                    ],
+                    "schemaVersion": 1,
                     "availabilities": [
                       {
                         "eventStationAvailabilityId": "00000000-0000-4000-8000-000000000000",
@@ -2133,6 +2149,22 @@ item:
                 "stationOrder": 1,
                 "capacity": 1,
                 "isAvailable": true,
+                "fieldSchemaSnapshot": [
+                  {
+                    "key": "",
+                    "label": "",
+                    "type": "text",
+                    "required": true,
+                    "options": [
+                      ""
+                    ],
+                    "min": 0,
+                    "max": 0,
+                    "unit": "",
+                    "eyes": "OD"
+                  }
+                ],
+                "schemaVersion": 1,
                 "availabilities": [
                   {
                     "eventStationAvailabilityId": "00000000-0000-4000-8000-000000000000",
@@ -2353,6 +2385,22 @@ item:
                   "stationOrder": 1,
                   "capacity": 1,
                   "isAvailable": true,
+                  "fieldSchemaSnapshot": [
+                    {
+                      "key": "",
+                      "label": "",
+                      "type": "text",
+                      "required": true,
+                      "options": [
+                        ""
+                      ],
+                      "min": 0,
+                      "max": 0,
+                      "unit": "",
+                      "eyes": "OD"
+                    }
+                  ],
+                  "schemaVersion": 1,
                   "availabilities": [
                     {
                       "eventStationAvailabilityId": "00000000-0000-4000-8000-000000000000",
@@ -2549,7 +2597,22 @@ item:
               "name": "",
               "description": "",
               "defaultCapacity": 1,
-              "active": true
+              "active": true,
+              "fieldSchema": [
+                {
+                  "key": "",
+                  "label": "",
+                  "type": "text",
+                  "required": true,
+                  "options": [
+                    ""
+                  ],
+                  "min": 0,
+                  "max": 0,
+                  "unit": "",
+                  "eyes": "OD"
+                }
+              ]
             }
           ]
       - name: 401 Response
@@ -2632,7 +2695,22 @@ item:
             "name": "",
             "description": "",
             "defaultCapacity": 3,
-            "active": true
+            "active": true,
+            "fieldSchema": [
+              {
+                "key": "",
+                "label": "",
+                "type": "text",
+                "required": true,
+                "options": [
+                  ""
+                ],
+                "min": 0,
+                "max": 0,
+                "unit": "",
+                "eyes": "OD"
+              }
+            ]
           }
         options:
           raw:
@@ -2661,7 +2739,22 @@ item:
             "name": "",
             "description": "",
             "defaultCapacity": 1,
-            "active": true
+            "active": true,
+            "fieldSchema": [
+              {
+                "key": "",
+                "label": "",
+                "type": "text",
+                "required": true,
+                "options": [
+                  ""
+                ],
+                "min": 0,
+                "max": 0,
+                "unit": "",
+                "eyes": "OD"
+              }
+            ]
           }
       - name: 401 Response
         originalRequest:
@@ -2761,7 +2854,22 @@ item:
               "name": "",
               "description": "",
               "defaultCapacity": 1,
-              "active": true
+              "active": true,
+              "fieldSchema": [
+                {
+                  "key": "",
+                  "label": "",
+                  "type": "text",
+                  "required": true,
+                  "options": [
+                    ""
+                  ],
+                  "min": 0,
+                  "max": 0,
+                  "unit": "",
+                  "eyes": "OD"
+                }
+              ]
             }
           ]
       - name: 401 Response
@@ -2845,7 +2953,22 @@ item:
             "name": "",
             "description": "",
             "defaultCapacity": 1,
-            "active": true
+            "active": true,
+            "fieldSchema": [
+              {
+                "key": "",
+                "label": "",
+                "type": "text",
+                "required": true,
+                "options": [
+                  ""
+                ],
+                "min": 0,
+                "max": 0,
+                "unit": "",
+                "eyes": "OD"
+              }
+            ]
           }
         options:
           raw:
@@ -2874,7 +2997,22 @@ item:
             "name": "",
             "description": "",
             "defaultCapacity": 1,
-            "active": true
+            "active": true,
+            "fieldSchema": [
+              {
+                "key": "",
+                "label": "",
+                "type": "text",
+                "required": true,
+                "options": [
+                  ""
+                ],
+                "min": 0,
+                "max": 0,
+                "unit": "",
+                "eyes": "OD"
+              }
+            ]
           }
       - name: 401 Response
         originalRequest:
@@ -4280,6 +4418,22 @@ item:
                 "stationOrder": 1,
                 "capacity": 1,
                 "isAvailable": true,
+                "fieldSchemaSnapshot": [
+                  {
+                    "key": "",
+                    "label": "",
+                    "type": "text",
+                    "required": true,
+                    "options": [
+                      ""
+                    ],
+                    "min": 0,
+                    "max": 0,
+                    "unit": "",
+                    "eyes": "OD"
+                  }
+                ],
+                "schemaVersion": 1,
                 "availabilities": [
                   {
                     "eventStationAvailabilityId": "00000000-0000-4000-8000-000000000000",
@@ -4560,6 +4714,22 @@ item:
                 "stationOrder": 1,
                 "capacity": 1,
                 "isAvailable": true,
+                "fieldSchemaSnapshot": [
+                  {
+                    "key": "",
+                    "label": "",
+                    "type": "text",
+                    "required": true,
+                    "options": [
+                      ""
+                    ],
+                    "min": 0,
+                    "max": 0,
+                    "unit": "",
+                    "eyes": "OD"
+                  }
+                ],
+                "schemaVersion": 1,
                 "availabilities": [
                   {
                     "eventStationAvailabilityId": "00000000-0000-4000-8000-000000000000",
@@ -6108,6 +6278,22 @@ item:
                 "stationOrder": 1,
                 "capacity": 1,
                 "isAvailable": true,
+                "fieldSchemaSnapshot": [
+                  {
+                    "key": "",
+                    "label": "",
+                    "type": "text",
+                    "required": true,
+                    "options": [
+                      ""
+                    ],
+                    "min": 0,
+                    "max": 0,
+                    "unit": "",
+                    "eyes": "OD"
+                  }
+                ],
+                "schemaVersion": 1,
                 "availabilities": [
                   {
                     "eventStationAvailabilityId": "00000000-0000-4000-8000-000000000000",
@@ -6327,6 +6513,22 @@ item:
                 "stationOrder": 1,
                 "capacity": 1,
                 "isAvailable": true,
+                "fieldSchemaSnapshot": [
+                  {
+                    "key": "",
+                    "label": "",
+                    "type": "text",
+                    "required": true,
+                    "options": [
+                      ""
+                    ],
+                    "min": 0,
+                    "max": 0,
+                    "unit": "",
+                    "eyes": "OD"
+                  }
+                ],
+                "schemaVersion": 1,
                 "availabilities": [
                   {
                     "eventStationAvailabilityId": "00000000-0000-4000-8000-000000000000",
@@ -6554,6 +6756,22 @@ item:
                 "stationOrder": 1,
                 "capacity": 1,
                 "isAvailable": true,
+                "fieldSchemaSnapshot": [
+                  {
+                    "key": "",
+                    "label": "",
+                    "type": "text",
+                    "required": true,
+                    "options": [
+                      ""
+                    ],
+                    "min": 0,
+                    "max": 0,
+                    "unit": "",
+                    "eyes": "OD"
+                  }
+                ],
+                "schemaVersion": 1,
                 "availabilities": [
                   {
                     "eventStationAvailabilityId": "00000000-0000-4000-8000-000000000000",
@@ -6788,6 +7006,22 @@ item:
                 "stationOrder": 1,
                 "capacity": 1,
                 "isAvailable": true,
+                "fieldSchemaSnapshot": [
+                  {
+                    "key": "",
+                    "label": "",
+                    "type": "text",
+                    "required": true,
+                    "options": [
+                      ""
+                    ],
+                    "min": 0,
+                    "max": 0,
+                    "unit": "",
+                    "eyes": "OD"
+                  }
+                ],
+                "schemaVersion": 1,
                 "availabilities": [
                   {
                     "eventStationAvailabilityId": "00000000-0000-4000-8000-000000000000",
@@ -7000,6 +7234,22 @@ item:
                 "stationOrder": 1,
                 "capacity": 1,
                 "isAvailable": true,
+                "fieldSchemaSnapshot": [
+                  {
+                    "key": "",
+                    "label": "",
+                    "type": "text",
+                    "required": true,
+                    "options": [
+                      ""
+                    ],
+                    "min": 0,
+                    "max": 0,
+                    "unit": "",
+                    "eyes": "OD"
+                  }
+                ],
+                "schemaVersion": 1,
                 "availabilities": [
                   {
                     "eventStationAvailabilityId": "00000000-0000-4000-8000-000000000000",
@@ -7204,6 +7454,22 @@ item:
                 "stationOrder": 1,
                 "capacity": 1,
                 "isAvailable": true,
+                "fieldSchemaSnapshot": [
+                  {
+                    "key": "",
+                    "label": "",
+                    "type": "text",
+                    "required": true,
+                    "options": [
+                      ""
+                    ],
+                    "min": 0,
+                    "max": 0,
+                    "unit": "",
+                    "eyes": "OD"
+                  }
+                ],
+                "schemaVersion": 1,
                 "availabilities": [
                   {
                     "eventStationAvailabilityId": "00000000-0000-4000-8000-000000000000",
@@ -7408,6 +7674,22 @@ item:
                 "stationOrder": 1,
                 "capacity": 1,
                 "isAvailable": true,
+                "fieldSchemaSnapshot": [
+                  {
+                    "key": "",
+                    "label": "",
+                    "type": "text",
+                    "required": true,
+                    "options": [
+                      ""
+                    ],
+                    "min": 0,
+                    "max": 0,
+                    "unit": "",
+                    "eyes": "OD"
+                  }
+                ],
+                "schemaVersion": 1,
                 "availabilities": [
                   {
                     "eventStationAvailabilityId": "00000000-0000-4000-8000-000000000000",
@@ -7630,6 +7912,22 @@ item:
                 "stationOrder": 1,
                 "capacity": 1,
                 "isAvailable": true,
+                "fieldSchemaSnapshot": [
+                  {
+                    "key": "",
+                    "label": "",
+                    "type": "text",
+                    "required": true,
+                    "options": [
+                      ""
+                    ],
+                    "min": 0,
+                    "max": 0,
+                    "unit": "",
+                    "eyes": "OD"
+                  }
+                ],
+                "schemaVersion": 1,
                 "availabilities": [
                   {
                     "eventStationAvailabilityId": "00000000-0000-4000-8000-000000000000",
@@ -7931,6 +8229,22 @@ item:
                   "stationType": "VISUAL_ACUITY",
                   "stationOrder": 0,
                   "isActive": true,
+                  "fieldSchemaSnapshot": [
+                    {
+                      "key": "",
+                      "label": "",
+                      "type": "text",
+                      "required": true,
+                      "options": [
+                        ""
+                      ],
+                      "min": 0,
+                      "max": 0,
+                      "unit": "",
+                      "eyes": "OD"
+                    }
+                  ],
+                  "schemaVersion": 1,
                   "offlineAccessExpiresAt": "2026-08-07T00:00:00.000Z",
                   "registrations": [
                     {
@@ -9365,6 +9679,281 @@ item:
               }
             ]
           }
+  - name: Evaluate a custom/dynamic station result without saving it
+    description: ''
+    event: []
+    request:
+      method: POST
+      header:
+        - key: Content-Type
+          value: application/json
+          description: JSON request body
+          type: text
+      auth:
+        type: bearer
+        bearer:
+          - key: token
+            value: '{{token}}'
+            type: string
+      url:
+        raw: '{{baseUrl}}/events/{eventId}/stations/{stationId}/dynamic/preview'
+        host:
+          - '{{baseUrl}}'
+        path:
+          - events
+          - '{eventId}'
+          - stations
+          - '{stationId}'
+          - dynamic
+          - preview
+        query: []
+      body:
+        mode: raw
+        raw: |-
+          {
+            "resultData": {}
+          }
+        options:
+          raw:
+            language: json
+    response:
+      - name: 200 Response
+        originalRequest:
+          method: POST
+          header:
+            - key: Content-Type
+              value: application/json
+              description: JSON request body
+              type: text
+          url: '{{baseUrl}}/events/{eventId}/stations/{stationId}/dynamic/preview'
+        status: OK
+        code: 200
+        header:
+          - key: Content-Type
+            value: application/json
+        body: |-
+          {
+            "ruleVersion": "",
+            "overallFlag": "NORMAL",
+            "isFlagged": true,
+            "flagSummary": "",
+            "reasons": [
+              {
+                "flag": {},
+                "reason": ""
+              }
+            ]
+          }
+      - name: 401 Response
+        originalRequest:
+          method: POST
+          header:
+            - key: Content-Type
+              value: application/json
+              description: JSON request body
+              type: text
+          url: '{{baseUrl}}/events/{eventId}/stations/{stationId}/dynamic/preview'
+        status: Unauthorized
+        code: 401
+        header:
+          - key: Content-Type
+            value: application/json
+        body: |-
+          {
+            "type": "",
+            "title": "",
+            "status": 0,
+            "code": "",
+            "requestId": "00000000-0000-4000-8000-000000000000",
+            "errors": [
+              {
+                "field": "",
+                "message": ""
+              }
+            ]
+          }
+      - name: 403 Response
+        originalRequest:
+          method: POST
+          header:
+            - key: Content-Type
+              value: application/json
+              description: JSON request body
+              type: text
+          url: '{{baseUrl}}/events/{eventId}/stations/{stationId}/dynamic/preview'
+        status: Forbidden
+        code: 403
+        header:
+          - key: Content-Type
+            value: application/json
+        body: |-
+          {
+            "type": "",
+            "title": "",
+            "status": 0,
+            "code": "",
+            "requestId": "00000000-0000-4000-8000-000000000000",
+            "errors": [
+              {
+                "field": "",
+                "message": ""
+              }
+            ]
+          }
+  - name: Save or idempotently replay a custom/dynamic station result
+    description: ''
+    event: []
+    request:
+      method: POST
+      header:
+        - key: Content-Type
+          value: application/json
+          description: JSON request body
+          type: text
+      auth:
+        type: bearer
+        bearer:
+          - key: token
+            value: '{{token}}'
+            type: string
+      url:
+        raw: '{{baseUrl}}/events/{eventId}/stations/{stationId}/dynamic'
+        host:
+          - '{{baseUrl}}'
+        path:
+          - events
+          - '{eventId}'
+          - stations
+          - '{stationId}'
+          - dynamic
+        query: []
+      body:
+        mode: raw
+        raw: |-
+          {
+            "registrationId": "00000000-0000-4000-8000-000000000000",
+            "idempotencyKey": "",
+            "acknowledged": true,
+            "resultData": {}
+          }
+        options:
+          raw:
+            language: json
+    response:
+      - name: 200 Response
+        originalRequest:
+          method: POST
+          header:
+            - key: Content-Type
+              value: application/json
+              description: JSON request body
+              type: text
+          url: '{{baseUrl}}/events/{eventId}/stations/{stationId}/dynamic'
+        status: OK
+        code: 200
+        header:
+          - key: Content-Type
+            value: application/json
+        body: |-
+          {
+            "resultId": "00000000-0000-4000-8000-000000000000",
+            "registrationId": "00000000-0000-4000-8000-000000000000",
+            "stationId": "00000000-0000-4000-8000-000000000000",
+            "screeningType": "",
+            "resultData": {},
+            "overallFlag": "NORMAL",
+            "isFlagged": true,
+            "flagSummary": "",
+            "ruleVersion": "",
+            "acknowledgedAt": "2026-08-07T00:00:00.000Z",
+            "idempotencyKey": "",
+            "version": 1,
+            "evaluation": {
+              "ruleVersion": "",
+              "overallFlag": {},
+              "isFlagged": true,
+              "flagSummary": "",
+              "reasons": [
+                {
+                  "flag": {},
+                  "reason": ""
+                }
+              ]
+            },
+            "createdAt": "2026-08-07T00:00:00.000Z",
+            "updatedAt": "2026-08-07T00:00:00.000Z"
+          }
+      - name: 201 Response
+        originalRequest:
+          method: POST
+          header:
+            - key: Content-Type
+              value: application/json
+              description: JSON request body
+              type: text
+          url: '{{baseUrl}}/events/{eventId}/stations/{stationId}/dynamic'
+        status: Created
+        code: 201
+        header:
+          - key: Content-Type
+            value: application/json
+        body: |-
+          {
+            "resultId": "00000000-0000-4000-8000-000000000000",
+            "registrationId": "00000000-0000-4000-8000-000000000000",
+            "stationId": "00000000-0000-4000-8000-000000000000",
+            "screeningType": "",
+            "resultData": {},
+            "overallFlag": "NORMAL",
+            "isFlagged": true,
+            "flagSummary": "",
+            "ruleVersion": "",
+            "acknowledgedAt": "2026-08-07T00:00:00.000Z",
+            "idempotencyKey": "",
+            "version": 1,
+            "evaluation": {
+              "ruleVersion": "",
+              "overallFlag": {},
+              "isFlagged": true,
+              "flagSummary": "",
+              "reasons": [
+                {
+                  "flag": {},
+                  "reason": ""
+                }
+              ]
+            },
+            "createdAt": "2026-08-07T00:00:00.000Z",
+            "updatedAt": "2026-08-07T00:00:00.000Z"
+          }
+      - name: 401 Response
+        originalRequest:
+          method: POST
+          header:
+            - key: Content-Type
+              value: application/json
+              description: JSON request body
+              type: text
+          url: '{{baseUrl}}/events/{eventId}/stations/{stationId}/dynamic'
+        status: Unauthorized
+        code: 401
+        header:
+          - key: Content-Type
+            value: application/json
+        body: |-
+          {
+            "type": "",
+            "title": "",
+            "status": 0,
+            "code": "",
+            "requestId": "00000000-0000-4000-8000-000000000000",
+            "errors": [
+              {
+                "field": "",
+                "message": ""
+              }
+            ]
+          }
   - name: List registrations currently actionable by an assigned reviewer
     description: ''
     event: []
@@ -9530,6 +10119,7 @@ item:
                   "stationId": "00000000-0000-4000-8000-000000000000",
                   "screeningType": "VISUAL_ACUITY",
                   "resultData": {},
+                  "schemaVersion": 1,
                   "overallFlag": "NORMAL",
                   "isFlagged": true,
                   "flagSummary": "",
@@ -12341,6 +12931,22 @@ item:
                   "stationOrder": 1,
                   "capacity": 1,
                   "isAvailable": true,
+                  "fieldSchemaSnapshot": [
+                    {
+                      "key": "",
+                      "label": "",
+                      "type": "text",
+                      "required": true,
+                      "options": [
+                        ""
+                      ],
+                      "min": 0,
+                      "max": 0,
+                      "unit": "",
+                      "eyes": "OD"
+                    }
+                  ],
+                  "schemaVersion": 1,
                   "availabilities": [
                     {
                       "eventStationAvailabilityId": "00000000-0000-4000-8000-000000000000",

@@ -6,6 +6,10 @@ const qrService = require("../participant/qrService");
 const domainEventBus = require("../domain/domainEventBus");
 const { createAuditLog } = require("../../utils/audit");
 const { resolveRegistrationByQrValue } = require("../../utils/qrToken");
+const {
+  validateResultAgainstSchema,
+  evaluateDynamicResult,
+} = require("../../schemas/dynamicStationSchema");
 
 const VA_RULE_VERSION = "VSMS-VA-1.0";
 const REF_RULE_VERSION = "VSMS-REF-1.0";
@@ -356,6 +360,7 @@ const saveStationResult = async ({
   body,
   user,
   context = null,
+  schemaVersion,
 }) => {
   await assertCanScreen(eventId, user, stationId);
   await assertStation(eventId, stationId, stationType, label);
@@ -384,6 +389,7 @@ const saveStationResult = async ({
       }
 
       const evaluation = evaluate(body.resultData);
+      const persistedRuleVersion = ruleVersion || evaluation.ruleVersion;
       if (evaluation.isFlagged && body.acknowledged !== true) {
         throw new AppError(
           400,
@@ -400,7 +406,8 @@ const saveStationResult = async ({
         overallFlag: evaluation.overallFlag,
         isFlagged: evaluation.isFlagged,
         flagSummary: evaluation.flagSummary,
-        ruleVersion,
+        ruleVersion: persistedRuleVersion,
+        ...(schemaVersion !== undefined ? { schemaVersion } : {}),
         acknowledgedAt: evaluation.isFlagged ? new Date() : null,
         idempotencyKey: body.idempotencyKey,
         requestFingerprint: fingerprint,
@@ -466,7 +473,7 @@ const saveStationResult = async ({
           stationType,
           overallFlag: evaluation.overallFlag,
           isFlagged: evaluation.isFlagged,
-          ruleVersion,
+          ruleVersion: persistedRuleVersion,
           version: result.version,
         },
       });
@@ -554,6 +561,51 @@ const saveEyeHealth = (eventId, stationId, body, user, context) => saveStationRe
   context,
 });
 
+const loadDynamicStation = async (eventId, stationId, user) => {
+  await assertCanScreen(eventId, user, stationId);
+  const station = await prisma.station.findFirst({
+    where: { eventId, stationId, isActive: true },
+  });
+  if (!station) throw new AppError(404, "STATION_NOT_FOUND", "Station not found");
+  if (station.stationType === "CUSTOM" && !station.fieldSchemaSnapshot) {
+    throw new AppError(
+      409,
+      "STATION_SCHEMA_MISSING",
+      "Custom station does not have a field schema snapshot",
+    );
+  }
+  return station;
+};
+
+const validateDynamicBody = (station, body) => ({
+  ...body,
+  resultData: station.fieldSchemaSnapshot
+    ? validateResultAgainstSchema(station.fieldSchemaSnapshot, body.resultData)
+    : body.resultData,
+});
+
+const previewDynamic = async (eventId, stationId, body, user) => {
+  const station = await loadDynamicStation(eventId, stationId, user);
+  validateDynamicBody(station, body);
+  return evaluateDynamicResult();
+};
+
+const saveDynamic = async (eventId, stationId, body, user, context) => {
+  const station = await loadDynamicStation(eventId, stationId, user);
+  const validatedBody = validateDynamicBody(station, body);
+  return saveStationResult({
+    eventId,
+    stationId,
+    stationType: station.stationType,
+    label: station.stationName,
+    evaluate: evaluateDynamicResult,
+    body: validatedBody,
+    user,
+    context,
+    schemaVersion: station.schemaVersion,
+  });
+};
+
 const ensureDemoStations = async (eventId) => {
   const desired = [
     { stationName: "Visual Acuity", stationType: "VISUAL_ACUITY", stationOrder: 1 },
@@ -602,6 +654,8 @@ module.exports = {
   saveColourVision,
   previewEyeHealth,
   saveEyeHealth,
+  previewDynamic,
+  saveDynamic,
   ensureDemoStations,
   evaluateVisualAcuity,
   evaluateRefraction,

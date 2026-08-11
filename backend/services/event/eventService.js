@@ -1,12 +1,16 @@
 const prisma = require("../../prisma/prismaClient");
 const crypto = require("crypto");
 const { Prisma } = require("@prisma/client");
-const AppError = require("../../errors/AppError");
-const { encodeCursor, decodeCursor } = require("../../utils/cursor");
 const {
   classifyTemplates,
   stationTypeForTemplate,
+  assertImportableBatch,
+  findExistingStation,
+  CLINICAL_ONE_PER_EVENT_TYPES,
 } = require("./stationTemplateMapping");
+const { parseFieldSchema } = require("../../schemas/dynamicStationSchema");
+const AppError = require("../../errors/AppError");
+const { encodeCursor, decodeCursor } = require("../../utils/cursor");
 const {
   enqueueEventArtifactCleanup,
   processArtifactCleanupTasks,
@@ -204,6 +208,8 @@ const mapStationDto = (station, event, templates) => {
     // Capacity is not on Station (#30); expose template default until availability is wired.
     capacity: template?.defaultCapacity || event.capacity,
     isAvailable: station.isActive,
+    fieldSchemaSnapshot: station.fieldSchemaSnapshot ?? template?.fieldSchema ?? null,
+    schemaVersion: station.schemaVersion ?? template?.version ?? null,
     availabilities: [],
   };
 };
@@ -566,6 +572,25 @@ const createEventDays = async (tx, eventId, days) => {
   return new Map(created.map((day) => [day.date.toISOString().slice(0, 10), day]));
 };
 
+const stationSchemaFields = (template) => {
+  if (template.stationType === "CUSTOM" || (Array.isArray(template.fieldSchema) && template.fieldSchema.length > 0)) {
+    const fieldSchema = parseFieldSchema(template.fieldSchema);
+    return {
+      fieldSchemaSnapshot: fieldSchema,
+      schemaVersion: template.version || 1,
+    };
+  }
+  if (template.fieldSchema == null) {
+    return { fieldSchemaSnapshot: null, schemaVersion: template.version || 1 };
+  }
+  try {
+    const fieldSchema = parseFieldSchema(template.fieldSchema);
+    return { fieldSchemaSnapshot: fieldSchema, schemaVersion: template.version || 1 };
+  } catch {
+    return { fieldSchemaSnapshot: null, schemaVersion: template.version || 1 };
+  }
+};
+
 const createEventStations = async (tx, eventId, stations, daysByDate, templatesById) => {
   const stationsByTemplate = new Map();
   const existing = await tx.station.findMany({ where: { eventId }, orderBy: { stationOrder: "asc" } });
@@ -582,7 +607,11 @@ const createEventStations = async (tx, eventId, stations, daysByDate, templatesB
       );
     }
 
-    let station = existing.find((row) => row.stationType === stationType);
+    const schemaFields = stationSchemaFields(template);
+    let station = findExistingStation(existing, {
+      stationType,
+      stationTemplateId: template.stationTemplateId,
+    });
     if (station) {
       station = await tx.station.update({
         where: { stationId: station.stationId },
@@ -591,11 +620,15 @@ const createEventStations = async (tx, eventId, stations, daysByDate, templatesB
           stationTemplateId: template.stationTemplateId,
           stationOrder: input.stationOrder,
           isActive: input.isAvailable !== false,
+          ...schemaFields,
         },
       });
     } else {
+      if (CLINICAL_ONE_PER_EVENT_TYPES.includes(stationType)
+        && existing.some((row) => row.stationType === stationType)) {
+        throw new AppError(422, "DUPLICATE_STATION_TYPE", "Choose only one template for each screening station type");
+      }
       nextOrder = Math.max(nextOrder + 1, input.stationOrder || nextOrder + 1);
-      // Prefer requested order when free; otherwise append.
       const orderTaken = existing.some((row) => row.stationOrder === input.stationOrder)
         || [...stationsByTemplate.values()].some((row) => row.stationOrder === input.stationOrder);
       const stationOrder = orderTaken ? nextOrder : (input.stationOrder || nextOrder);
@@ -608,13 +641,13 @@ const createEventStations = async (tx, eventId, stations, daysByDate, templatesB
           stationName: template.name,
           stationOrder,
           isActive: input.isAvailable !== false,
+          ...schemaFields,
         },
       });
       existing.push(station);
     }
     stationsByTemplate.set(input.stationTemplateId, station);
 
-    // Day-level capacity rows optional; create when the wizard supplies availabilities.
     if (input.availabilities?.length) {
       await tx.eventStationAvailability.deleteMany({ where: { eventStationId: station.stationId } });
       for (const availability of input.availabilities) {
@@ -1631,7 +1664,7 @@ const listStaffDirectory = async () => {
 
 // Import picker: active templates that map to a screening StationType.
 const listStationTemplates = async () => {
-  const templates = await prisma.stationTemplate.findMany({
+  const templates = await hydrateSystemFieldSchemas(await prisma.stationTemplate.findMany({
     where: { active: true, stationType: { not: null } },
     select: {
       stationTemplateId: true,
@@ -1642,10 +1675,13 @@ const listStationTemplates = async () => {
       description: true,
       defaultCapacity: true,
       active: true,
+      fieldSchema: true,
     },
     orderBy: { name: "asc" },
-  });
-  return templates;
+  }));
+  return templates
+    .filter((template) => stationTypeForTemplate(template))
+    .map(serializeStationTemplate);
 };
 
 const serializeStationTemplate = (template) => ({
@@ -1657,11 +1693,43 @@ const serializeStationTemplate = (template) => ({
   description: template.description,
   defaultCapacity: template.defaultCapacity,
   active: template.active,
+  fieldSchema: template.fieldSchema ?? null,
 });
+
+/** Persist missing system field schemas so library previews always reflect the DB. */
+const hydrateSystemFieldSchemas = async (templates, db = prisma) => {
+  const { SYSTEM_FIELD_SCHEMAS } = require("../../schemas/dynamicStationSchema");
+  const next = [];
+  for (const template of templates) {
+    const systemSchema = template.stationType ? SYSTEM_FIELD_SCHEMAS[template.stationType] : null;
+    const missing = (!template.fieldSchema || (Array.isArray(template.fieldSchema) && template.fieldSchema.length === 0))
+      && systemSchema;
+    if (!missing) {
+      next.push(template);
+      continue;
+    }
+    next.push(await db.stationTemplate.update({
+      where: { stationTemplateId: template.stationTemplateId },
+      data: { fieldSchema: systemSchema },
+      select: {
+        stationTemplateId: true,
+        templateKey: true,
+        stationType: true,
+        version: true,
+        name: true,
+        description: true,
+        defaultCapacity: true,
+        active: true,
+        fieldSchema: true,
+      },
+    }));
+  }
+  return next;
+};
 
 /** Admin catalog: all templates including inactive / non-importable (#23). */
 const listStationTemplateLibrary = async () => {
-  const templates = await prisma.stationTemplate.findMany({
+  const templates = await hydrateSystemFieldSchemas(await prisma.stationTemplate.findMany({
     select: {
       stationTemplateId: true,
       templateKey: true,
@@ -1671,13 +1739,34 @@ const listStationTemplateLibrary = async () => {
       description: true,
       defaultCapacity: true,
       active: true,
+      fieldSchema: true,
     },
     orderBy: [{ active: "desc" }, { name: "asc" }],
-  });
+  }));
   return templates.map(serializeStationTemplate);
 };
 
 const createStationTemplate = async (body, user, context, db = prisma) => {
+  if (body.stationType === "EYE_HEALTH") {
+    throw new AppError(
+      422,
+      "STATION_TYPE_NOT_IMPORTABLE",
+      "Eye health is recorded during clinical review, not as a screening station template",
+    );
+  }
+  const { SYSTEM_FIELD_SCHEMAS } = require("../../schemas/dynamicStationSchema");
+  let fieldSchema = body.fieldSchema;
+  try {
+    if (body.stationType === "CUSTOM") {
+      fieldSchema = parseFieldSchema(fieldSchema);
+    } else if (fieldSchema !== undefined) {
+      fieldSchema = parseFieldSchema(fieldSchema);
+    } else if (SYSTEM_FIELD_SCHEMAS[body.stationType]) {
+      fieldSchema = SYSTEM_FIELD_SCHEMAS[body.stationType];
+    }
+  } catch (error) {
+    throw new AppError(422, "INVALID_FIELD_SCHEMA", error.message);
+  }
   try {
     return await db.$transaction(async (tx) => {
       const template = await tx.stationTemplate.create({
@@ -1688,6 +1777,7 @@ const createStationTemplate = async (body, user, context, db = prisma) => {
           description: body.description ?? null,
           defaultCapacity: body.defaultCapacity,
           active: body.active,
+          ...(fieldSchema !== undefined ? { fieldSchema } : {}),
         },
       });
       const serialized = serializeStationTemplate(template);
@@ -1713,6 +1803,14 @@ const createStationTemplate = async (body, user, context, db = prisma) => {
 const updateStationTemplate = async (stationTemplateId, body, user, context, db = prisma) => db.$transaction(async (tx) => {
   const existing = await tx.stationTemplate.findUnique({ where: { stationTemplateId } });
   if (!existing) throw new AppError(404, "STATION_TEMPLATE_NOT_FOUND", "Station template not found");
+  let fieldSchema;
+  if (body.fieldSchema !== undefined) {
+    try {
+      fieldSchema = parseFieldSchema(body.fieldSchema);
+    } catch (error) {
+      throw new AppError(422, "INVALID_FIELD_SCHEMA", error.message);
+    }
+  }
   const template = await tx.stationTemplate.update({
     where: { stationTemplateId },
     data: {
@@ -1720,6 +1818,7 @@ const updateStationTemplate = async (stationTemplateId, body, user, context, db 
       ...(body.description !== undefined ? { description: body.description } : {}),
       ...(body.defaultCapacity !== undefined ? { defaultCapacity: body.defaultCapacity } : {}),
       ...(body.active !== undefined ? { active: body.active } : {}),
+      ...(fieldSchema !== undefined ? { fieldSchema } : {}),
       version: { increment: 1 },
     },
   });
@@ -1758,14 +1857,18 @@ const importStations = async (eventId, body, user, correlationId, db = prisma) =
       `These templates are not screening stations and cannot be imported: ${names}`,
     );
   }
-  if (new Set(importable.map(({ stationType }) => stationType)).size !== importable.length) {
-    throw new AppError(422, "DUPLICATE_STATION_TYPE", "Choose only one template for each screening station type");
+  try {
+    assertImportableBatch(importable);
+  } catch (error) {
+    throw new AppError(422, error.code || "DUPLICATE_STATION_TYPE", error.message);
   }
 
   const existingStations = current.stations || [];
-  const existingTypes = new Set(existingStations.map((station) => station.stationType));
-  const newTypes = importable.filter(({ stationType }) => !existingTypes.has(stationType));
-  if (existingStations.length + newTypes.length > 50) {
+  const newCount = importable.filter(({ template, stationType }) => !findExistingStation(existingStations, {
+    stationType,
+    stationTemplateId: template.stationTemplateId,
+  })).length;
+  if (existingStations.length + newCount > 50) {
     throw new AppError(422, "STATION_LIMIT_EXCEEDED", "An event can have at most 50 stations");
   }
 
@@ -1774,7 +1877,11 @@ const importStations = async (eventId, body, user, correlationId, db = prisma) =
 
     let nextOrder = existingStations.reduce((max, station) => Math.max(max, station.stationOrder), 0);
     for (const { template, stationType } of importable) {
-      const existing = existingStations.find((station) => station.stationType === stationType);
+      const schemaFields = stationSchemaFields(template);
+      const existing = findExistingStation(existingStations, {
+        stationType,
+        stationTemplateId: template.stationTemplateId,
+      });
       if (existing) {
         await tx.station.update({
           where: { stationId: existing.stationId },
@@ -1782,9 +1889,14 @@ const importStations = async (eventId, body, user, correlationId, db = prisma) =
             stationName: template.name,
             stationTemplateId: template.stationTemplateId,
             isActive: true,
+            ...schemaFields,
           },
         });
       } else {
+        if (CLINICAL_ONE_PER_EVENT_TYPES.includes(stationType)
+          && existingStations.some((station) => station.stationType === stationType)) {
+          throw new AppError(422, "DUPLICATE_STATION_TYPE", "Choose only one template for each screening station type");
+        }
         nextOrder += 1;
         const created = await tx.station.create({
           data: {
@@ -1794,6 +1906,7 @@ const importStations = async (eventId, body, user, correlationId, db = prisma) =
             stationName: template.name,
             stationOrder: nextOrder,
             isActive: true,
+            ...schemaFields,
           },
         });
         existingStations.push(created);
