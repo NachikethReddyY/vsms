@@ -1113,8 +1113,7 @@ item:
         raw: |-
           {
             "fullName": "",
-            "contactNumber": "",
-            "professionalCategory": "STAFF"
+            "contactNumber": ""
           }
         options:
           raw:
@@ -1415,6 +1414,7 @@ item:
             "employeeNumber": "",
             "department": "",
             "designation": "",
+            "professionalCategory": "STAFF",
             "status": "INACTIVE",
             "roles": [
               "ADMINISTRATOR"
@@ -1580,6 +1580,7 @@ item:
             "employeeNumber": "",
             "department": "",
             "designation": "",
+            "professionalCategory": "STAFF",
             "roles": [
               "ADMINISTRATOR"
             ]

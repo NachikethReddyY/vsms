@@ -2880,8 +2880,6 @@ export interface components {
         AccountProfileUpdateRequest: {
             fullName?: string;
             contactNumber?: string | null;
-            /** @enum {string|null} */
-            professionalCategory?: "STAFF" | "DOCTOR" | null;
         };
         OptionalAccountReasonRequest: {
             reason?: string | null;
@@ -3866,6 +3864,8 @@ export interface components {
             employeeNumber: string;
             department?: string | null;
             designation?: string | null;
+            /** @enum {string} */
+            professionalCategory?: "STAFF" | "DOCTOR";
             /**
              * @description INACTIVE creates an approved dormant account that can later be activated only through the Reactivate action.
              * @default INACTIVE
@@ -3879,6 +3879,8 @@ export interface components {
             employeeNumber?: string;
             department?: string | null;
             designation?: string | null;
+            /** @enum {string} */
+            professionalCategory?: "STAFF" | "DOCTOR";
             roles?: ("ADMINISTRATOR" | "EVENT_MANAGER" | "REGISTRATION_OFFICER" | "SCREENER" | "REVIEWER" | "SUPPORT")[];
         };
         UserListResponse: {

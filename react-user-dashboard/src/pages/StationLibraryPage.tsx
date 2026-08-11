@@ -167,6 +167,7 @@ export default function StationLibraryPage() {
       </div>
       <div className="station-library-actions">
         <span className="station-library-count"><Squares2X2Icon aria-hidden="true" />{activeCount} active / {templates.length} total</span>
+        <button className="secondary compact station-library-refresh" type="button" disabled={loading} onClick={() => void load()} aria-label="Refresh station list" title="Refresh station list"><ArrowPathIcon className={loading ? 'is-spinning' : ''} aria-hidden="true" /></button>
         <button className="primary" type="button" onClick={openCreate}><PlusIcon aria-hidden="true" />Add template</button>
       </div>
     </header>
@@ -174,19 +175,11 @@ export default function StationLibraryPage() {
     {error && <div className="alert error" role="alert"><span>{error}</span><button className="secondary compact" type="button" onClick={() => void load()}>Try again</button></div>}
 
     <section className="station-library-body" aria-label="Station template library">
-      {loading ? <div className="station-library-loading" aria-live="polite" aria-label="Loading station templates"><span /><span /><span /><span /></div> : templates.length ? <div className="station-library-table-shell">
-        <table className="station-library-table">
-          <thead><tr><th scope="col">Station type</th><th scope="col">Name</th><th scope="col">Capacity</th><th scope="col">Status</th><th scope="col"><span className="visually-hidden">Actions</span></th></tr></thead>
-          <tbody>{templates.map((template) => <tr key={template.stationTemplateId}>
-            <th scope="row"><span className="station-library-key">{labelStationType(template.stationType)}<small>v{template.version}</small></span></th>
-            <td><span className="station-library-name">{template.name}<small>{template.description || 'No description.'}</small></span></td>
-            <td><span className="station-library-capacity">{template.defaultCapacity}</span></td>
-            <td><span className={`station-library-access ${template.active ? 'active' : 'inactive'}`}><i aria-hidden="true" />{template.active ? 'Active' : 'Inactive'}</span></td>
-            <td><div className="station-library-row-actions"><button className="secondary compact station-library-edit-button" type="button" onClick={() => openEdit(template)}><PencilSquareIcon aria-hidden="true" />Edit</button></div></td>
-          </tr>)}</tbody>
-        </table>
-      </div> : <div className="quiet-empty station-library-empty"><Squares2X2Icon aria-hidden="true" /><h2>No station templates yet</h2><p>Create a template so event managers can import it into screening events.</p><button className="secondary compact" type="button" onClick={openCreate}>Add template</button></div>}
-      {!loading && <button className="secondary compact station-library-refresh" type="button" onClick={() => void load()}><ArrowPathIcon aria-hidden="true" />Refresh list</button>}
+      {loading ? <div className="station-library-loading" aria-live="polite" aria-label="Loading station templates"><span /><span /><span /><span /></div> : templates.length ? <div className="station-library-grid">{templates.map((template) => <article className="station-library-card" key={template.stationTemplateId}>
+        <header><span className="station-library-card-icon"><Squares2X2Icon aria-hidden="true" /></span><span className={`station-library-access ${template.active ? 'active' : 'inactive'}`}><i aria-hidden="true" />{template.active ? 'Active' : 'Inactive'}</span></header>
+        <div><p className="station-library-key">{labelStationType(template.stationType)} · v{template.version}</p><h2>{template.name}</h2><p>{template.description || 'No description.'}</p></div>
+        <footer><span><strong>{template.defaultCapacity}</strong> default capacity</span><button className="secondary compact station-library-edit-button" type="button" onClick={() => openEdit(template)}><PencilSquareIcon aria-hidden="true" />Edit</button></footer>
+      </article>)}</div> : <div className="quiet-empty station-library-empty"><Squares2X2Icon aria-hidden="true" /><h2>No station templates yet</h2><p>Default station templates have not been installed. Run the database migrations, then refresh this page.</p></div>}
     </section>
 
     <AppDialog

@@ -10,7 +10,7 @@ const qrUrl = `https://app.example.com/participant-status/${urlToken}`;
 test('review QR scan is scoped to the active reviewer event', async () => {
   const db = {
     event: { findUnique: async () => ({ eventId: 'event-1', status: 'IN_PROGRESS' }) },
-    eventMembership: { findFirst: async () => ({ id: 'membership-1', status: 'ACTIVE', roles: [{ role: 'REVIEWER' }] }) },
+    eventMembership: { findFirst: async () => ({ id: 'membership-1', status: 'ACTIVE', roles: [{ role: 'REVIEWER' }], user: { professionalCategory: 'DOCTOR' } }) },
     staffAssignment: { findFirst: async () => ({ id: 'assignment-1' }) },
     qRCodePass: {
       findFirst: async ({ where }) =>
@@ -24,7 +24,7 @@ test('review QR scan is scoped to the active reviewer event', async () => {
         : null,
     },
   };
-  const user = { userId: 'reviewer-1', roles: ['REVIEWER'], status: 'ACTIVE', approvalState: 'APPROVED', accessState: 'ENABLED' };
+  const user = { userId: 'reviewer-1', roles: ['REVIEWER'], professionalCategory: 'DOCTOR', status: 'ACTIVE', approvalState: 'APPROVED', accessState: 'ENABLED' };
 
   assert.deepEqual(await resolveScannedRegistration('event-1', 'valid-token', user, db), { registrationId: 'registration-1' });
   await assert.rejects(
@@ -36,7 +36,7 @@ test('review QR scan is scoped to the active reviewer event', async () => {
 test('review QR scan resolves a scanned participant-status URL', async () => {
   const db = {
     event: { findUnique: async () => ({ eventId: 'event-1', status: 'IN_PROGRESS' }) },
-    eventMembership: { findFirst: async () => ({ id: 'membership-1', status: 'ACTIVE', roles: [{ role: 'REVIEWER' }] }) },
+    eventMembership: { findFirst: async () => ({ id: 'membership-1', status: 'ACTIVE', roles: [{ role: 'REVIEWER' }], user: { professionalCategory: 'DOCTOR' } }) },
     staffAssignment: { findFirst: async () => ({ id: 'assignment-1' }) },
     qRCodePass: {
       findFirst: async ({ where }) =>
@@ -46,7 +46,7 @@ test('review QR scan resolves a scanned participant-status URL', async () => {
     },
     eventRegistration: { findFirst: async () => null },
   };
-  const user = { userId: 'reviewer-1', roles: ['REVIEWER'], status: 'ACTIVE', approvalState: 'APPROVED', accessState: 'ENABLED' };
+  const user = { userId: 'reviewer-1', roles: ['REVIEWER'], professionalCategory: 'DOCTOR', status: 'ACTIVE', approvalState: 'APPROVED', accessState: 'ENABLED' };
 
   assert.deepEqual(await resolveScannedRegistration('event-1', qrUrl, user, db), { registrationId: 'registration-1' });
   assert.deepEqual(await resolveScannedRegistration('event-1', urlToken, user, db), { registrationId: 'registration-1' });

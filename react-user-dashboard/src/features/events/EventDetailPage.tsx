@@ -4,7 +4,6 @@ import {
   CalendarDaysIcon,
   CheckIcon,
   ChevronDownIcon,
-  ChevronUpIcon,
   ClipboardDocumentListIcon,
   ClipboardDocumentCheckIcon,
   ClockIcon,
@@ -337,7 +336,7 @@ export default function EventDetailPage() {
     setStationPending(stationTemplateId); setError('');
     try {
       setEvent(await eventApi.importStations(event.eventId, event.version, [stationTemplateId]));
-      setNotice('Station imported into the event route.');
+      setNotice('Station added to this event.');
       void refreshAudit(event.eventId);
     } catch (cause) { setError(getApiMessage(cause, 'The station could not be imported.')); }
     finally { setStationPending(''); }
@@ -381,9 +380,13 @@ export default function EventDetailPage() {
   const availableTemplates = stationTemplates.filter((template) => !event.eventStations.some((station) => station.stationType === template.stationType));
   const canCancel = canManage && !terminal && (event.status !== 'IN_PROGRESS' || user?.systemRole === 'ADMIN');
   const isAdministrator = user?.roles.includes('ADMINISTRATOR') ?? false;
-  const canRegisterParticipants = isAdministrator
-    || user?.roles.includes('EVENT_MANAGER')
-    || user?.roles.includes('REGISTRATION_OFFICER');
+  const canRegisterParticipants = !isAdministrator && event.status === 'IN_PROGRESS' && event.shifts.some((shift) => (
+    shift.status === 'ACTIVE' && shift.staffAssignments.some((assignment) => (
+      assignment.assignmentRole === 'REGISTRATION'
+      && ['ASSIGNED', 'CONFIRMED'].includes(assignment.status)
+      && assignment.user.userId === user?.userId
+    ))
+  ));
   const canPermanentlyDelete = terminal && user?.systemRole === 'ADMIN' && isAdministrator;
   const canReview = !isAdministrator && event.status === 'IN_PROGRESS' && event.shifts.some((shift) => (
     shift.status === 'ACTIVE' && shift.staffAssignments.some((assignment) => (
@@ -504,17 +507,12 @@ export default function EventDetailPage() {
             {canConfigureStations && <button className="secondary compact" type="button" aria-expanded={stationPanelOpen} aria-controls="station-template-panel" onClick={() => void openStationTemplates()}><PlusIcon />Import station</button>}
           </div>
           {stationPanelOpen && <div className="station-template-panel" id="station-template-panel" aria-live="polite">
-            <div><strong>Station templates</strong><span>Importing creates an event-owned copy. Changes here will not alter the reusable template.</span></div>
+            <div><strong>Add one station</strong><span>Choose the station this event needs. Daily availability is configured independently.</span></div>
             {stationLoading ? <p>Loading station templates…</p> : stationTemplatesError ? <div className="inline-retry" role="alert"><p>{stationTemplatesError}</p><button className="secondary compact" type="button" onClick={() => void loadStationTemplates()}>Retry</button></div> : stationTemplatesLoaded && availableTemplates.length === 0 ? <p>All active station templates are already in this event.</p> : <ul>{availableTemplates.map((template) => <li key={template.stationTemplateId}><span><strong>{template.name}</strong><small>{template.description || 'No template description.'} · Default capacity {template.defaultCapacity}</small></span><button className="secondary compact" type="button" disabled={!!stationPending} onClick={() => void importStation(template.stationTemplateId)}>{stationPending === template.stationTemplateId ? 'Importing…' : 'Import'}</button></li>)}</ul>}
           </div>}
-          {event.eventStations.length === 0 ? <p className="quiet-empty">{canConfigureStations ? 'No stations imported yet. Import a template to build the screening route.' : 'No stations are configured for this event.'}</p> : <div className="station-table">{event.eventStations.map((station, index) => <article className={`station-record ${station.isAvailable ? '' : 'is-unavailable'}`} key={station.eventStationId}>
-            <div className="station-order"><strong>{station.stationOrder}</strong><span>Route order</span></div>
+          {event.eventStations.length === 0 ? <p className="quiet-empty">{canConfigureStations ? 'No stations added yet. Import the first station this event needs.' : 'No stations are configured for this event.'}</p> : <div className="station-table">{event.eventStations.map((station) => <article className={`station-record ${station.isAvailable ? '' : 'is-unavailable'}`} key={station.eventStationId}>
             <div className="station-record-copy"><strong>{station.name}</strong><span>{station.description || 'No station instructions.'}</span><small>Template v{station.templateVersion}</small><div className="station-day-list">{(station.availabilities.length ? station.availabilities : event.eventDays.map((day) => ({ eventStationAvailabilityId: `${station.eventStationId}-${day.eventDayId}`, eventDay: day, isAvailable: station.isAvailable, capacity: station.capacity }))).map((availability) => <span className={availability.isAvailable ? 'is-available' : 'is-unavailable'} key={availability.eventStationAvailabilityId}>{formatEventDate(availability.eventDay.date, event.timezone, false)} · {availability.isAvailable ? `${availability.capacity} places` : 'Unavailable'}</span>)}</div></div>
             {canConfigureStations ? <div className="station-controls">
-              <div className="station-reorder" aria-label={`Change ${station.name} route order`}>
-                <button className="icon-button" type="button" aria-label={`Move ${station.name} earlier`} disabled={index === 0 || !!stationPending} onClick={() => void updateStation(station.eventStationId, { stationOrder: station.stationOrder - 1 })}><ChevronUpIcon /></button>
-                <button className="icon-button" type="button" aria-label={`Move ${station.name} later`} disabled={index === event.eventStations.length - 1 || !!stationPending} onClick={() => void updateStation(station.eventStationId, { stationOrder: station.stationOrder + 1 })}><ChevronDownIcon /></button>
-              </div>
               <form className="station-capacity" noValidate onSubmit={(submitEvent) => saveStationCapacity(submitEvent, station.eventStationId)}>
                 <label><span>Capacity</span><input key={`${station.eventStationId}-${station.capacity}`} name="capacity" type="number" min="1" max="1000" step="1" required defaultValue={station.capacity} aria-label={`${station.name} capacity`} aria-invalid={!!capacityErrors[station.eventStationId]} aria-describedby={capacityErrors[station.eventStationId] ? `capacity-error-${station.eventStationId}` : undefined} onInput={() => setCapacityErrors((current) => ({ ...current, [station.eventStationId]: '' }))} />{capacityErrors[station.eventStationId] && <span className="field-error" id={`capacity-error-${station.eventStationId}`} role="alert">{capacityErrors[station.eventStationId]}</span>}</label>
                 <button className="secondary compact" type="submit" disabled={!!stationPending}>{stationPending === station.eventStationId ? 'Saving…' : 'Save'}</button>

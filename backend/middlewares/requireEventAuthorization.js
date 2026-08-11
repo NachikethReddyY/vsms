@@ -4,7 +4,12 @@ const authorization = require("../services/event/eventAuthorizationService");
 const eventIdFrom = (req) => req.params.eventId || req.body?.eventId || req.query?.eventId;
 
 const requireEventRoles = (...roles) => asyncHandler(async (req, _res, next) => {
-  req.eventAuthorization = await authorization.requireEventRoles(eventIdFrom(req), req.user || req.auth?.user, roles);
+  req.eventAuthorization = await authorization.requireEventRoles(
+    eventIdFrom(req),
+    req.user || req.auth?.user,
+    roles,
+    { allowAdministrator: true },
+  );
   next();
 });
 

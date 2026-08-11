@@ -1,7 +1,7 @@
 const prisma = require("../../prisma/prismaClient");
 const AppError = require("../../errors/AppError");
 const { createAuditLog } = require("../../utils/audit");
-const { requireEventManager, actorId } = require("./eventAuthorizationService");
+const { assertRoleEligibility, requireEventManager, actorId } = require("./eventAuthorizationService");
 const { enqueueAccountLifecycle } = require("../account/accountLifecycleNotificationService");
 
 const EVENT_ROLES = ["EVENT_MANAGER", "REGISTRATION", "SCREENER", "REVIEWER", "SUPPORT"];
@@ -17,9 +17,16 @@ const memberInclude = {
       accessState: true,
       status: true,
       professionalCategory: true,
+      userRoles: { select: { role: { select: { roleName: true } } } },
     },
   },
   roles: { orderBy: { role: "asc" }, select: { id: true, role: true, assignedAt: true, assignedById: true } },
+};
+
+const serializeUser = (user) => {
+  if (!user) return user;
+  const { userRoles = [], ...profile } = user;
+  return { ...profile, roles: userRoles.map(({ role }) => role.roleName) };
 };
 
 const serialize = (membership) => ({
@@ -30,7 +37,7 @@ const serialize = (membership) => ({
   addedAt: membership.addedAt,
   removedAt: membership.removedAt,
   removalReason: membership.removalReason,
-  user: membership.user,
+  user: serializeUser(membership.user),
   roles: membership.roles,
 });
 
@@ -44,7 +51,7 @@ const audit = (tx, user, action, membership, context, details = {}) => createAud
   client: tx,
 });
 
-const requireEligibleUser = async (tx, userId) => {
+const requireEligibleUser = async (tx, userId, roles = []) => {
   const user = await tx.user.findFirst({
     where: {
       id: userId,
@@ -53,9 +60,15 @@ const requireEligibleUser = async (tx, userId) => {
       accessState: "ENABLED",
       deprovisionedAt: null,
     },
-    select: { id: true },
+    select: {
+      id: true,
+      professionalCategory: true,
+      userRoles: { select: { role: { select: { roleName: true } } } },
+    },
   });
   if (!user) throw new AppError(422, "MEMBER_NOT_ELIGIBLE", "Only an approved and enabled account can join an event");
+  assertRoleEligibility(user, roles);
+  return user;
 };
 
 // All event membership mutations take this lock first, then authorize the
@@ -99,6 +112,7 @@ const listEligibleUsers = async (eventId, query, user, db = prisma) => {
       fullName: true,
       email: true,
       professionalCategory: true,
+      userRoles: { select: { role: { select: { roleName: true } } } },
       eventMemberships: {
         where: { eventId },
         select: { id: true, status: true, roles: { select: { role: true } } },
@@ -107,13 +121,13 @@ const listEligibleUsers = async (eventId, query, user, db = prisma) => {
     orderBy: [{ fullName: "asc" }, { id: "asc" }],
     take: query.limit || 100,
   });
-  return { users };
+  return { users: users.map(serializeUser) };
 };
 
 const addMembership = async (eventId, input, user, context, db = prisma) => {
   return db.$transaction(async (tx) => {
     await beginMembershipMutation(tx, eventId, user);
-    await requireEligibleUser(tx, input.userId);
+    await requireEligibleUser(tx, input.userId, input.roles);
     const existing = await tx.eventMembership.findUnique({
       where: { eventId_userId: { eventId, userId: input.userId } },
       include: memberInclude,
@@ -192,6 +206,7 @@ const addRole = async (eventId, membershipId, role, user, context, db = prisma) 
     await beginMembershipMutation(tx, eventId, user);
     const membership = await tx.eventMembership.findFirst({ where: { id: membershipId, eventId, status: "ACTIVE" } });
     if (!membership) throw new AppError(404, "MEMBERSHIP_NOT_FOUND", "Active event membership was not found");
+    await requireEligibleUser(tx, membership.userId, [role]);
     const assignment = await tx.eventMembershipRole.upsert({
       where: { membershipId_role: { membershipId, role } },
       update: {},
@@ -241,6 +256,7 @@ const removeRole = async (eventId, membershipId, role, user, context, db = prism
 module.exports = {
   EVENT_MEMBERSHIP_LOCK_NAMESPACE,
   EVENT_ROLES,
+  assertRoleEligibility,
   addMembership,
   addRole,
   listEligibleUsers,

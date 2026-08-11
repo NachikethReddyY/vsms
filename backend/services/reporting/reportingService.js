@@ -1,6 +1,6 @@
 const prisma = require("../../prisma/prismaClient");
 const AppError = require("../../errors/AppError");
-const { assertOperationalAccount, requireEventManager } = require("../event/eventAuthorizationService");
+const { assertOperationalAccount, eventVisibilityWhere, isAdministrator, requireEventManager } = require("../event/eventAuthorizationService");
 const { attended } = require("../event/attendanceDefinition");
 
 const EVENT_LIMIT = 100;
@@ -20,11 +20,7 @@ const reportRange = (query, now = new Date()) => {
   return { from, to, startsAt, endsBefore };
 };
 
-const reportVisibility = (user) => {
-  return {
-    memberships: { some: { userId: user.userId, status: "ACTIVE", roles: { some: { role: "EVENT_MANAGER" } } } },
-  };
-};
+const reportVisibility = (user) => eventVisibilityWhere(user, ["EVENT_MANAGER"]);
 
 const emptyEventMetrics = (event) => ({
   eventId: event.eventId,
@@ -76,7 +72,7 @@ const getOperationalReport = async (query, user, db = prisma, now = new Date()) 
   assertOperationalAccount(user);
   if (query.eventId) {
     await requireEventManager(query.eventId, user, { db });
-  } else {
+  } else if (!isAdministrator(user)) {
     const managerMembership = await db.eventMembership.findFirst({
       where: { userId: user.userId, status: "ACTIVE", roles: { some: { role: "EVENT_MANAGER" } } },
       select: { id: true },

@@ -4,9 +4,11 @@ import {
   CheckCircleIcon,
   ClockIcon,
   ExclamationTriangleIcon,
+  FunnelIcon,
 } from '@heroicons/react/24/outline';
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react';
 import { Button } from '../../components/ui/button';
+import { useAuth } from '../../auth/AuthProvider';
 import { getApiError as getApiMessage } from '../../utils/apiClient';
 import { reportApi, type OperationalReport, type ReportFilters } from './reportApi';
 import './ReportsPage.css';
@@ -34,12 +36,15 @@ const formatDate = (value: string, timezone: string) => new Intl.DateTimeFormat(
 const eventStatus = (status: string) => status.toLowerCase().replace(/_/g, ' ').replace(/^\w/, (letter) => letter.toUpperCase());
 
 export default function ReportsPage() {
+  const { session } = useAuth();
+  const isAdministrator = session?.user.roles.includes('ADMINISTRATOR') ?? false;
   const [draft, setDraft] = useState<ReportFilters>(() => defaultFilters());
   const [filters, setFilters] = useState<ReportFilters>(() => defaultFilters());
   const [report, setReport] = useState<OperationalReport | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [validationError, setValidationError] = useState('');
+  const [filtersOpen, setFiltersOpen] = useState(false);
 
   const loadReport = useCallback(async (nextFilters: ReportFilters, signal?: AbortSignal) => {
     setLoading(true);
@@ -88,16 +93,17 @@ export default function ReportsPage() {
           <h1>Operational reports</h1>
           <p>Aggregate event health for planning and follow-up. Participant identity and clinical detail are never included.</p>
         </div>
-        <Button className="reports-refresh" variant="ghost" disabled={loading} onClick={() => void loadReport(filters)}>
-          <ArrowPathIcon aria-hidden="true" />{loading ? 'Refreshing' : 'Refresh'}
-        </Button>
+        <div className="reports-heading-actions">
+          <Button className="reports-icon-action" variant="ghost" aria-label="Filter reports" title="Filter reports" aria-expanded={filtersOpen} onClick={() => setFiltersOpen((open) => !open)}><FunnelIcon aria-hidden="true" /></Button>
+          <Button className="reports-icon-action" variant="ghost" aria-label="Refresh reports" title="Refresh reports" disabled={loading} onClick={() => void loadReport(filters)}><ArrowPathIcon className={loading ? 'is-spinning' : ''} aria-hidden="true" /></Button>
+        </div>
       </header>
 
-      <form className="reports-filters" onSubmit={submit} aria-describedby={validationError ? 'report-filter-error' : undefined}>
+      {filtersOpen && <form className="reports-filters" onSubmit={submit} aria-describedby={validationError ? 'report-filter-error' : undefined}>
         <label>
           <span>Event</span>
           <select value={draft.eventId || ''} onChange={(event) => setDraft((current) => ({ ...current, eventId: event.target.value || undefined }))}>
-            <option value="">All authorized events</option>
+            <option value="">{isAdministrator ? 'All organization events' : 'All assigned events'}</option>
             {(report?.eventOptions || []).map((event) => (
               <option key={event.eventId} value={event.eventId}>{event.name} · {eventStatus(event.status)}</option>
             ))}
@@ -113,17 +119,17 @@ export default function ReportsPage() {
         </label>
         <Button type="submit" disabled={loading}>Apply filters</Button>
         {validationError && <p id="report-filter-error" className="reports-filter-error" role="alert">{validationError}</p>}
-      </form>
+      </form>}
 
       <p className="reports-scope">
         <CalendarDaysIcon aria-hidden="true" />
-        {selectedLabel ? `${selectedLabel}, ` : 'Authorized events, '}{filters.from} to {filters.to}
+        {selectedLabel ? `${selectedLabel}, ` : isAdministrator ? 'All organization events, ' : 'Assigned events, '}{filters.from} to {filters.to}
       </p>
 
       {error ? (
         <section className="reports-state reports-error" role="alert">
           <ExclamationTriangleIcon aria-hidden="true" />
-          <div><h2>Reports could not be loaded</h2><p>{error}</p></div>
+          <div><h2>Report unavailable</h2><p>{error}</p></div>
           <Button variant="ghost" onClick={() => void loadReport(filters)}>Try again</Button>
         </section>
       ) : loading && !report ? (
@@ -189,7 +195,7 @@ export default function ReportsPage() {
           ) : (
             <section className="reports-state reports-empty" aria-live="polite">
               <ClockIcon aria-hidden="true" />
-              <div><h2>No events match these filters</h2><p>Choose another event or widen the event-date range. Only events you are authorized to manage are included.</p></div>
+              <div><h2>No reports yet</h2><p>No event data matches this date range. Choose another event or widen the dates.</p></div>
             </section>
           )}
 

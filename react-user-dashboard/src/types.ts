@@ -7,6 +7,7 @@ export interface AppUser {
   employeeNumber?: string;
   department?: string | null;
   designation?: string | null;
+  professionalCategory?: "STAFF" | "DOCTOR" | null;
   status?: string;
   approvalState?: 'PENDING' | 'APPROVED' | 'REJECTED';
   accessState?: 'ENABLED' | 'SUSPENDED' | 'DISABLED';

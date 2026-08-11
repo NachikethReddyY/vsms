@@ -3106,10 +3106,6 @@ components:
       properties:
         fullName: { type: string, minLength: 1, maxLength: 100 }
         contactNumber: { type: string, nullable: true, maxLength: 20 }
-        professionalCategory:
-          type: string
-          nullable: true
-          enum: [STAFF, DOCTOR]
     OptionalAccountReasonRequest:
       type: object
       additionalProperties: false
@@ -4236,6 +4232,7 @@ components:
         employeeNumber: { type: string, minLength: 1, maxLength: 20 }
         department: { type: string, nullable: true, maxLength: 100 }
         designation: { type: string, nullable: true, maxLength: 100 }
+        professionalCategory: { type: string, enum: [STAFF, DOCTOR] }
         status: { type: string, enum: [ACTIVE, INACTIVE], default: INACTIVE, description: INACTIVE creates an approved dormant account that can later be activated only through the Reactivate action. }
         roles:
           type: array
@@ -4252,6 +4249,7 @@ components:
         employeeNumber: { type: string, minLength: 1, maxLength: 20 }
         department: { type: string, nullable: true, maxLength: 100 }
         designation: { type: string, nullable: true, maxLength: 100 }
+        professionalCategory: { type: string, enum: [STAFF, DOCTOR] }
         roles:
           type: array
           minItems: 1

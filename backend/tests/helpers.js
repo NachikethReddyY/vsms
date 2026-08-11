@@ -57,25 +57,24 @@ const TEST_PERMISSIONS = [
 ];
 
 const grantRolePermissions = async (roleName, roleId) => {
-  for (const permissionName of TEST_PERMISSIONS) {
-    if (roleName !== "ADMINISTRATOR" && permissionName === "audit:read") continue;
-    const permission = await prisma.permission.upsert({
-      where: { permissionName },
-      update: {},
-      create: { permissionName, description: `Allows ${permissionName}` },
-    });
-    await prisma.rolePermission.upsert({
-      where: { roleId_permissionId: { roleId, permissionId: permission.id } },
-      update: {},
-      create: { roleId, permissionId: permission.id },
-    });
-  }
+  const permissionNames = TEST_PERMISSIONS.filter((permissionName) => roleName === "ADMINISTRATOR" || permissionName !== "audit:read");
+  await prisma.permission.createMany({
+    data: permissionNames.map((permissionName) => ({ permissionName, description: `Allows ${permissionName}` })),
+    skipDuplicates: true,
+  });
+  const permissions = await prisma.permission.findMany({
+    where: { permissionName: { in: permissionNames } },
+    select: { id: true },
+  });
+  const rolePermissions = permissions.map(({ id: permissionId }) => ({ roleId, permissionId }));
+  await prisma.rolePermission.createMany({ data: rolePermissions, skipDuplicates: true });
 };
 
 const applicationRoleFor = (role) => ROLE_ALIASES[role] || role;
 const systemRoleFor = (role) => role === "ADMINISTRATOR"
   ? "ADMIN"
   : role === "EVENT_MANAGER" ? "EVENT_MANAGER" : "STAFF";
+const professionalCategoryFor = (role) => role === "REVIEWER" ? "DOCTOR" : "STAFF";
 
 const ensureTestUser = async (requestedRole = "EVENT_MANAGER", label = requestedRole) => {
   const applicationRole = applicationRoleFor(requestedRole);
@@ -97,6 +96,7 @@ const ensureTestUser = async (requestedRole = "EVENT_MANAGER", label = requested
         username: `test-${slug}`,
         fullName: `Test ${label}`,
         sysRole: systemRoleFor(applicationRole),
+        professionalCategory: professionalCategoryFor(applicationRole),
         status: "ACTIVE",
         approvalState: "APPROVED",
         accessState: "ENABLED",
@@ -112,6 +112,7 @@ const ensureTestUser = async (requestedRole = "EVENT_MANAGER", label = requested
         fullName: `Test ${label}`,
         employeeNumber: `T-${crypto.randomUUID().replaceAll("-", "").slice(0, 16)}`,
         sysRole: systemRoleFor(applicationRole),
+        professionalCategory: professionalCategoryFor(applicationRole),
         status: "ACTIVE",
         approvalState: "APPROVED",
         accessState: "ENABLED",
