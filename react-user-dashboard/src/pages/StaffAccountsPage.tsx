@@ -1,4 +1,4 @@
-import { ArrowPathIcon, PencilSquareIcon, PlusIcon, UserGroupIcon } from '@heroicons/react/24/outline';
+import { ArrowPathIcon, EyeIcon, PencilSquareIcon, PlusIcon, UserGroupIcon } from '@heroicons/react/24/outline';
 import { useCallback, useEffect, useState, type FormEvent } from 'react';
 import { AppDialog } from '../components/AppDialog';
 import { AppToast } from '../components/AppToast';
@@ -54,6 +54,7 @@ export default function StaffAccountsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [roleGuideOpen, setRoleGuideOpen] = useState(false);
   const [editing, setEditing] = useState<AppUser | null>(null);
   const [draft, setDraft] = useState<StaffDraft>(emptyDraft);
   const [formError, setFormError] = useState('');
@@ -153,6 +154,8 @@ export default function StaffAccountsPage() {
       </div>
       <div className="staff-accounts-actions">
         <span className="staff-count"><UserGroupIcon aria-hidden="true" />{activeCount} active / {staff.length} total</span>
+        <button className="secondary compact staff-guide-button" type="button" onClick={() => setRoleGuideOpen(true)} aria-haspopup="dialog"><EyeIcon aria-hidden="true" />Role access</button>
+        <button className="secondary compact staff-refresh" type="button" disabled={loading} onClick={() => void load()}><ArrowPathIcon aria-hidden="true" />{loading ? 'Refreshing…' : 'Refresh list'}</button>
         <button className="primary" type="button" onClick={openCreate}><PlusIcon aria-hidden="true" />Add staff member</button>
       </div>
     </header>
@@ -160,9 +163,8 @@ export default function StaffAccountsPage() {
     {error && <div className="alert error" role="alert"><span>{error}</span><button className="secondary compact" type="button" onClick={() => void load()}>Try again</button></div>}
     {actionError && <div className="alert error" role="alert"><span>{actionError}</span></div>}
 
-    <div className="staff-directory-layout">
-      <section className="staff-directory" aria-label="Organisation staff accounts">
-        {loading ? <div className="staff-loading" aria-live="polite" aria-label="Loading staff accounts"><span /><span /><span /><span /></div> : staff.length ? <div className="staff-table-shell">
+    <section className="staff-directory" aria-label="Organisation staff accounts">
+      {loading ? <div className="staff-loading" aria-live="polite" aria-label="Loading staff accounts"><span /><span /><span /><span /></div> : staff.length ? <div className="staff-table-shell">
           <table className="staff-table">
             <thead><tr><th scope="col">Person</th><th scope="col">Team</th><th scope="col">Application roles</th><th scope="col">Access</th><th scope="col"><span className="visually-hidden">Actions</span></th></tr></thead>
             <tbody>{staff.map((member) => {
@@ -178,15 +180,18 @@ export default function StaffAccountsPage() {
             </tr>;
             })}</tbody>
           </table>
-        </div> : <div className="quiet-empty staff-empty"><UserGroupIcon aria-hidden="true" /><h2>No staff accounts yet</h2><p>Add a staff member to set their access before their first sign-in.</p><button className="secondary compact" type="button" onClick={openCreate}>Add staff member</button></div>}
-        {!loading && <button className="secondary compact staff-refresh" type="button" onClick={() => void load()}><ArrowPathIcon aria-hidden="true" />Refresh list</button>}
-      </section>
+      </div> : <div className="quiet-empty staff-empty"><UserGroupIcon aria-hidden="true" /><h2>No staff accounts yet</h2><p>Add a staff member to set their access before their first sign-in.</p><button className="secondary compact" type="button" onClick={openCreate}>Add staff member</button></div>}
+    </section>
 
-      <aside className="staff-role-guide" aria-labelledby="staff-role-guide-title">
-        <h2 id="staff-role-guide-title">Role access</h2>
-        <dl>{ROLE_OPTIONS.map((role) => <div key={role.value}><dt>{role.label}</dt><dd>{role.description}</dd></div>)}</dl>
-      </aside>
-    </div>
+    <AppDialog
+      open={roleGuideOpen}
+      onOpenChange={setRoleGuideOpen}
+      title="Role access"
+      description="What each organisation-wide role can do. Event and shift assignments may narrow this access further."
+      className="staff-role-guide-dialog"
+    >
+      <dl className="staff-role-guide-list">{ROLE_OPTIONS.map((role) => <div key={role.value}><dt>{role.label}</dt><dd>{role.description}</dd></div>)}</dl>
+    </AppDialog>
 
     <AppDialog
       open={dialogOpen}

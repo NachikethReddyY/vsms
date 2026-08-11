@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import apiClient, { getApiError, getApiErrorCode, setSessionTokens } from "../utils/apiClient";
 import { getCognitoAuthorizeUrl } from "../utils/cognitoAuth";
+import { ThemeToggle } from "../components/MagicEffects";
 import { useAuth } from "./AuthProvider";
 import styles from "./CognitoRoutes.module.css";
 
@@ -69,7 +70,10 @@ export function CognitoCallback() {
               <small>Vision Screening Management System</small>
             </span>
           </Link>
-          <span className={styles.headerLabel}>Staff sign-in</span>
+          <div className={styles.headerActions}>
+            <ThemeToggle className={styles.themeToggle} />
+            <span className={styles.headerLabel}>Staff sign-in</span>
+          </div>
         </div>
       </header>
 
