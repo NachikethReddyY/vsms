@@ -549,7 +549,7 @@ export interface paths {
         put?: never;
         post?: never;
         /**
-         * Permanently delete a draft, completed, or cancelled event
+         * Permanently delete any event that is not ongoing
          * @description Administrator-only hard deletion. Requires the exact event name, permanent-deletion acknowledgement, current version, and the unexpired signed token from the latest unchanged impact preview. Event-owned operational records and participant profiles created for only this event are removed; participant profiles reused by another event, staff accounts, templates, forms, and devices are retained.
          */
         delete: operations["deleteTerminalEvent"];

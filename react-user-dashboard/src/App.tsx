@@ -105,18 +105,24 @@ export default function App() {
           <Route path="/account/profile" element={<ProfilePage />} />
           <Route path="/account/security" element={<AccountSecurityPage />} />
           <Route path="/forbidden" element={<ForbiddenPage />} />
-          <Route path="/events/:eventId" element={<EventDetailPage />} />
+          <Route path="/events/:eventId" element={<EventDetailPage />}>
+            <Route element={<EventCapabilityGuard allowedRoles={eventManagerRoles} />}>
+              <Route path="overview" />
+              <Route path="stations" />
+              <Route path="staff" element={<EventStaffingPage />} />
+              <Route path="analytics" element={<EventAnalyticsPage />} />
+              <Route path="reports" element={<EventReportsPage />} />
+              <Route path="attendees" />
+              <Route path="activity" />
+            </Route>
+            <Route element={<RoleGuard allowedRoles={adminRoles} />}>
+              <Route path="delete" element={<EventDeletionPage />} />
+            </Route>
+          </Route>
           <Route path="/settings" element={<SettingsPage />} />
 
           <Route element={<EventCapabilityGuard allowedRoles={eventManagerRoles} />}>
-            <Route path="/events/:eventId/overview" element={<EventDetailPage />} />
-            <Route path="/events/:eventId/stations" element={<EventDetailPage />} />
-            <Route path="/events/:eventId/staff" element={<EventStaffingPage />} />
             <Route path="/events/:eventId/staff/:membershipId/duties" element={<DutyEditorPage />} />
-            <Route path="/events/:eventId/analytics" element={<EventAnalyticsPage />} />
-            <Route path="/events/:eventId/reports" element={<EventReportsPage />} />
-            <Route path="/events/:eventId/attendees" element={<EventDetailPage />} />
-            <Route path="/events/:eventId/activity" element={<EventDetailPage />} />
           </Route>
 
           <Route element={<EventCapabilityGuard allowedRoles={reviewerRoles} />}>
@@ -181,7 +187,6 @@ export default function App() {
             <Route path="/staff" element={<StaffAdministrationPage />} />
             <Route path="/admin/station-templates" element={<StationLibraryPage />} />
             <Route path="/events/new" element={<EventFormPage mode="create" />} />
-            <Route path="/events/:eventId/delete" element={<EventDeletionPage />} />
             <Route path="/admin/audit-logs" element={<RegistrationAuditLogsPage />} />
             <Route path="/admin/system-audit-logs" element={<Navigate to="/admin/audit-logs" replace />} />
           </Route>

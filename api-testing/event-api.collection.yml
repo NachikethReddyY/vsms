@@ -4656,7 +4656,7 @@ item:
               }
             ]
           }
-  - name: Permanently delete a draft, completed, or cancelled event
+  - name: Permanently delete any event that is not ongoing
     description: >-
       Administrator-only hard deletion. Requires the exact event name, permanent-deletion acknowledgement, current
       version, and the unexpired signed token from the latest unchanged impact preview. Event-owned operational records

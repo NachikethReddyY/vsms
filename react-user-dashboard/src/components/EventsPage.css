@@ -506,6 +506,7 @@ html[data-theme="light"] .events-workspace {
 .events-workspace .alert.error { border-color:color-mix(in srgb,var(--status-cancelled) 50%,var(--line)); background:color-mix(in srgb,var(--status-cancelled) 10%,var(--surface)); color:var(--ink); }
 .events-workspace .event-hero-banner-picker { margin:0 0 30px; border-color:var(--line-strong); background:var(--surface); }
 .events-workspace .event-view { min-width:0; }
+.events-workspace .detail-page > .stage4-page { max-width:none; margin:0; padding:0 0 64px; }
 .events-workspace .event-view-heading,
 .events-workspace .section-title {
   display:flex;

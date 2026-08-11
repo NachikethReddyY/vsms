@@ -1434,13 +1434,17 @@ const assertDeletionAdministrator = (user) => {
   }
 };
 
+const assertEventDeletable = (event) => {
+  if (event.status === "IN_PROGRESS") {
+    throw new AppError(409, "EVENT_NOT_TERMINAL", "An ongoing event cannot be permanently deleted");
+  }
+};
+
 const previewEventDeletion = async (eventId, user, db = prisma, now = new Date()) => {
   assertDeletionAdministrator(user);
   const event = await db.event.findUnique({ where: { eventId }, select: { eventId: true, name: true, status: true, version: true } });
   if (!event) throw new AppError(404, "EVENT_NOT_FOUND", "Event was not found");
-  if (!["DRAFT", "COMPLETED", "CANCELLED"].includes(event.status)) {
-    throw new AppError(409, "EVENT_NOT_TERMINAL", "Only draft, completed, or cancelled events can be permanently deleted");
-  }
+  assertEventDeletable(event);
   const impact = await deletionImpact(db, event);
   const digest = impactDigest(impact);
   const expiresAt = new Date(now.getTime() + 5 * 60_000);
@@ -1476,9 +1480,7 @@ const deleteEvent = async (eventId, body, user, correlationId, db = prisma) => {
   const claims = verifyDeletionPreview(body.previewToken, eventId, user.userId, body.version);
   const current = await db.event.findUnique({ where: { eventId }, include: eventInclude });
   if (!current) throw new AppError(404, "EVENT_NOT_FOUND", "Event was not found");
-  if (!["DRAFT", "COMPLETED", "CANCELLED"].includes(current.status)) {
-    throw new AppError(409, "EVENT_NOT_TERMINAL", "Only draft, completed, or cancelled events can be permanently deleted");
-  }
+  assertEventDeletable(current);
   if (body.confirmationName !== current.name) {
     throw new AppError(422, "EVENT_DELETE_CONFIRMATION_MISMATCH", "Type the event name exactly to confirm permanent deletion");
   }
