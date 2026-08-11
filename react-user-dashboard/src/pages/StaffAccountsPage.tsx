@@ -17,7 +17,6 @@ type ApplicationRole = typeof ROLE_OPTIONS[number]['value'];
 type StaffDraft = {
   fullName: string;
   email: string;
-  employeeNumber: string;
   department: string;
   designation: string;
   status: 'ACTIVE' | 'INACTIVE';
@@ -25,7 +24,7 @@ type StaffDraft = {
 };
 
 const emptyDraft = (): StaffDraft => ({
-  fullName: '', email: '', employeeNumber: '', department: '', designation: '', status: 'INACTIVE', role: 'SUPPORT',
+  fullName: '', email: '', department: '', designation: '', status: 'INACTIVE', role: 'SUPPORT',
 });
 
 const labelRole = (role: string) => ROLE_OPTIONS.find((item) => item.value === role)?.label ?? role.replace(/_/g, ' ');
@@ -38,7 +37,6 @@ function toDraft(member: AppUser): StaffDraft {
   return {
     fullName: member.fullName,
     email: member.email,
-    employeeNumber: member.employeeNumber ?? '',
     department: member.department ?? '',
     designation: member.designation ?? '',
     status: member.status === 'ACTIVE' ? 'ACTIVE' : 'INACTIVE',
@@ -102,11 +100,10 @@ export default function StaffAccountsPage() {
     setFormError('');
     const accountTypeChanged = !editing || accountTypeFor(editing) !== draft.role;
     const payload = {
-      fullName: draft.fullName,
-      ...(editing ? {} : { email: draft.email }),
-      employeeNumber: draft.employeeNumber,
-      department: draft.department || null,
-      designation: draft.designation || null,
+      fullName: draft.fullName.trim(),
+      ...(editing ? {} : { email: draft.email.trim() }),
+      department: draft.department.trim() || null,
+      designation: draft.designation.trim() || null,
       ...(!editing ? { status: draft.status } : {}),
       ...(accountTypeChanged ? {
         roles: [draft.role],
@@ -192,21 +189,25 @@ export default function StaffAccountsPage() {
       open={dialogOpen}
       onOpenChange={closeDialog}
       title={editing ? `Edit ${editing.fullName}` : 'Add staff member'}
-      description={editing ? 'Change the staff profile and application roles. Lifecycle access changes use the dedicated account actions.' : 'Create the staff profile and Cognito sign-in identity. The colleague will receive the account invitation by email.'}
+      description={editing ? 'Update this person’s profile and account type. Use the account actions in the staff list to change access.' : 'Create a staff profile and send an email invitation. An employee number is generated automatically.'}
       dismissible={!saving}
       className="staff-account-dialog"
     >
-      <form className="app-dialog-form staff-account-form" onSubmit={submit} noValidate>
+      <form className="app-dialog-form staff-account-form" onSubmit={submit}>
+        <div className="staff-account-fields">
         {formError && <p className="app-dialog-error" role="alert">{formError}</p>}
         <label className="app-dialog-field"><span>Full name</span><input required autoComplete="name" value={draft.fullName} onChange={(event) => setDraft((current) => ({ ...current, fullName: event.target.value }))} /></label>
+        <label className="app-dialog-field"><span>Work email</span><input required type="email" autoComplete="email" disabled={Boolean(editing)} value={draft.email} onChange={(event) => setDraft((current) => ({ ...current, email: event.target.value }))} />{editing && <small className="app-dialog-help">Email is managed by the sign-in provider and cannot be changed here.</small>}</label>
         <div className="staff-account-form-grid">
-          <label className="app-dialog-field"><span>Email</span><input required type="email" autoComplete="email" disabled={Boolean(editing)} value={draft.email} onChange={(event) => setDraft((current) => ({ ...current, email: event.target.value }))} />{editing && <small className="app-dialog-help">Email is managed by Cognito and cannot be changed here.</small>}</label>
-          <label className="app-dialog-field"><span>Employee number</span><input required maxLength={20} value={draft.employeeNumber} onChange={(event) => setDraft((current) => ({ ...current, employeeNumber: event.target.value }))} /></label>
           <label className="app-dialog-field"><span>Department <small>Optional</small></span><input maxLength={100} value={draft.department} onChange={(event) => setDraft((current) => ({ ...current, department: event.target.value }))} /></label>
           <label className="app-dialog-field"><span>Designation <small>Optional</small></span><input maxLength={100} value={draft.designation} onChange={(event) => setDraft((current) => ({ ...current, designation: event.target.value }))} /></label>
         </div>
-        <label className="app-dialog-field"><span>Access status</span><select disabled={Boolean(editing)} value={draft.status} onChange={(event) => setDraft((current) => ({ ...current, status: event.target.value as StaffDraft['status'] }))}><option value="ACTIVE">Active — sign-in roles synchronized with Cognito</option><option value="INACTIVE">Inactive — use Reactivate when access is approved</option></select>{editing && <small className="app-dialog-help">Lifecycle status changes use the account approval and access actions.</small>}</label>
+        {!editing && <fieldset className="staff-access-selector"><legend>Initial access</legend><div>
+          <label><input type="radio" name="accessStatus" checked={draft.status === 'ACTIVE'} onChange={() => setDraft((current) => ({ ...current, status: 'ACTIVE' }))} /><span><strong>Active now</strong><small>Send the invitation and allow VSMS access immediately.</small></span></label>
+          <label><input type="radio" name="accessStatus" checked={draft.status === 'INACTIVE'} onChange={() => setDraft((current) => ({ ...current, status: 'INACTIVE' }))} /><span><strong>Activate later</strong><small>Send the invitation, but block VSMS access until an administrator reactivates the account.</small></span></label>
+        </div></fieldset>}
         <fieldset className="staff-role-selector"><legend>Account type</legend><p>Choose the person’s organization-wide account type. Event duties are assigned inside each event.</p><div>{ROLE_OPTIONS.map((role) => <label key={role.value}><input type="radio" name="accountType" checked={draft.role === role.value} onChange={() => setDraft((current) => ({ ...current, role: role.value }))} /><span><strong>{role.label}</strong><small>{role.description}</small></span></label>)}</div></fieldset>
+        </div>
         <div className="app-dialog-actions"><button className="secondary" type="button" disabled={saving} onClick={() => closeDialog(false)}>Cancel</button><button className="primary" type="submit" disabled={saving}>{saving ? 'Saving…' : editing ? 'Save changes' : 'Create account'}</button></div>
       </form>
     </AppDialog>

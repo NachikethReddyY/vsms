@@ -3617,8 +3617,8 @@
       ]
     },
     {
-      "name": "Permanently delete a completed or cancelled event",
-      "description": "Administrator-only hard deletion. Requires the exact event name, permanent-deletion acknowledgement, current version, and the unexpired signed token from the latest unchanged impact preview. Event-owned operational records are removed; shared staff accounts, participants, templates, forms, and devices are retained.",
+      "name": "Permanently delete a draft, completed, or cancelled event",
+      "description": "Administrator-only hard deletion. Requires the exact event name, permanent-deletion acknowledgement, current version, and the unexpired signed token from the latest unchanged impact preview. Event-owned operational records and participant profiles created for only this event are removed; participant profiles reused by another event, staff accounts, templates, forms, and devices are retained.",
       "event": [],
       "request": {
         "method": "DELETE",
@@ -3782,7 +3782,7 @@
               "value": "application/json"
             }
           ],
-          "body": "{\n  \"eventId\": \"00000000-0000-4000-8000-000000000000\",\n  \"eventName\": \"\",\n  \"status\": \"COMPLETED\",\n  \"version\": 1,\n  \"counts\": {\n    \"registrations\": 0,\n    \"queues\": 0,\n    \"screenings\": 0,\n    \"reviews\": 0,\n    \"files\": 0,\n    \"emails\": 0,\n    \"cleanup\": 0,\n    \"reports\": 0\n  },\n  \"blockers\": [\n    {\n      \"code\": \"\",\n      \"message\": \"\",\n      \"count\": 1\n    }\n  ],\n  \"impactDigest\": \"\",\n  \"previewExpiresAt\": \"2026-08-07T00:00:00.000Z\",\n  \"previewToken\": \"\"\n}"
+          "body": "{\n  \"eventId\": \"00000000-0000-4000-8000-000000000000\",\n  \"eventName\": \"\",\n  \"status\": \"DRAFT\",\n  \"version\": 1,\n  \"counts\": {\n    \"participants\": 0,\n    \"registrations\": 0,\n    \"queues\": 0,\n    \"screenings\": 0,\n    \"reviews\": 0,\n    \"files\": 0,\n    \"emails\": 0,\n    \"cleanup\": 0,\n    \"reports\": 0\n  },\n  \"blockers\": [\n    {\n      \"code\": \"\",\n      \"message\": \"\",\n      \"count\": 1\n    }\n  ],\n  \"impactDigest\": \"\",\n  \"previewExpiresAt\": \"2026-08-07T00:00:00.000Z\",\n  \"previewToken\": \"\"\n}"
         },
         {
           "name": "401 Response",
