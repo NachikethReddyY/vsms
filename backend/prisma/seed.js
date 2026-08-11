@@ -490,7 +490,7 @@ async function ensureDemoContact(staff, participant, {
   email,
 }) {
   const existing = await prisma.participantEmergencyContact.findFirst({
-    where: { participantId: participant.id, contactName },
+    where: { participantId: participant.id },
   });
   const data = {
     contactName,
