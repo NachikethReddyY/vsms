@@ -12,7 +12,7 @@ const registrationId = uuid();
 const queueId = uuid();
 
 const event = { eventId, name: 'Jurong Live', status: 'IN_PROGRESS', venue: 'Jurong Regional Library' };
-const station = { stationId, eventId, stationName: 'Visual Acuity', stationType: 'VISUAL_ACUITY', isActive: true };
+const station = { stationId, eventId, stationName: 'Visual Acuity', stationType: 'VISUAL_ACUITY', isActive: true, stationTemplate: { defaultCapacity: 4 } };
 const targetStation = { stationId: targetStationId, eventId, stationName: 'Refraction', stationType: 'REFRACTION', isActive: true };
 const registration = {
   registrationId,
@@ -223,6 +223,8 @@ test('registration station list exposes derived availability and queue counts', 
 
   assert.equal(result.stations[0].status, 'BUSY');
   assert.equal(result.stations[0].activeQueueCount, 1);
+  assert.equal(result.stations[0].capacity, 4);
+  assert.equal(result.stations[0].occupancyPercent, 25);
   assert.equal(result.stations[0].selectable, true);
   assert.equal(result.stations[1].status, 'PAUSED');
   assert.equal(result.stations[1].selectable, false);

@@ -13,6 +13,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import type { ConsentFormVersion, EmergencyContact, EventSummary, Participant, Registration } from "../../types";
 import apiClient, { getApiError } from "../../utils/apiClient";
+import { LiveStationHandoffPicker, type LiveStationHandoffStation } from "../../components/qr/LiveStationHandoffPicker";
 import "./ParticipantPage.css";
 import "./ParticipantCheckInPage.css";
 import "./ParticipantRegistrationPage.css";
@@ -31,15 +32,7 @@ type RegistrationReview = {
   latestConsent: ConsentRecord | null;
 };
 
-type RegistrationStation = {
-  stationId: string;
-  stationName: string;
-  stationType: string;
-  stationOrder: number;
-  status: "AVAILABLE" | "BUSY" | "PAUSED" | "OFFLINE";
-  activeQueueCount: number;
-  selectable: boolean;
-};
+type RegistrationStation = LiveStationHandoffStation;
 
 type QueueHandoff = {
   registrationId: string;
@@ -228,14 +221,12 @@ export default function ParticipantRegistrationPage() {
         </header>
         {error ? <p className="participant-v2-alert participant-v2-checkin-alert" role="alert">{error}</p> : null}
         {isLoadingStations ? <p className="participant-v2-checkin-loading">Loading station availability...</p> : null}
-        {!isLoadingStations ? <section className="participant-station-grid" aria-label="Available stations">
-          {stations.map((station) => <article key={station.stationId} className={`participant-station-card ${station.status.toLowerCase()}`}>
-            <header><span>{station.stationOrder}</span><div><h2>{station.stationName}</h2><p>{station.stationType.replace(/_/g, " ")}</p></div><strong>{displayStatus(station.status)}</strong></header>
-            <p className="participant-station-queue">Active queue: <b>{station.activeQueueCount}</b></p>
-            <button className={station.selectable ? "primary" : "secondary"} type="button" disabled={!station.selectable || selectedStationId !== null} onClick={() => void createQueueHandoff(station)}>{selectedStationId === station.stationId ? "Assigning..." : station.selectable ? "Select station" : "Unavailable"}</button>
-          </article>)}
-          {!stations.length ? <p className="participant-v2-checkin-feedback">No stations are available for this event.</p> : null}
-        </section> : null}
+        {!isLoadingStations ? <LiveStationHandoffPicker
+          stations={stations}
+          pendingStationId={selectedStationId}
+          onSelect={(station) => void createQueueHandoff(station)}
+          actionLabel="Assign participant"
+        /> : null}
       </section>
     );
   }

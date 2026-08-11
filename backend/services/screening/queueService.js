@@ -5,6 +5,9 @@ const { requireQueueAccess } = require("../event/eventAuthorizationService");
 
 const ACTIVE_QUEUE_STATUSES = ["WAITING", "CALLED", "IN_PROGRESS"];
 
+const stationCapacity = (station) => Math.max(1, Number(station.stationTemplate?.defaultCapacity) || 1);
+const occupancyPercent = (activeQueueCount, capacity) => Math.round((activeQueueCount / capacity) * 100);
+
 const stationStatus = (station, activeQueueCount = 0) => {
   if (!station.isActive || station.operationalStatus === "OFFLINE") return "OFFLINE";
   if (station.operationalStatus === "PAUSED") return "PAUSED";
@@ -141,6 +144,7 @@ const listRegistrationStations = async (eventId, user, db = prisma) => {
     db.station.findMany({
       where: { eventId },
       orderBy: [{ stationOrder: "asc" }, { stationId: "asc" }],
+      include: { stationTemplate: { select: { defaultCapacity: true } } },
     }),
     db.queueEntry.findMany({
       where: { station: { eventId }, status: { in: ACTIVE_QUEUE_STATUSES } },
@@ -155,6 +159,7 @@ const listRegistrationStations = async (eventId, user, db = prisma) => {
     stations: stations.map((station) => {
       const activeQueueCount = activeCounts.get(station.stationId) || 0;
       const status = stationStatus(station, activeQueueCount);
+      const capacity = stationCapacity(station);
       return {
         stationId: station.stationId,
         stationName: station.stationName,
@@ -162,6 +167,8 @@ const listRegistrationStations = async (eventId, user, db = prisma) => {
         stationOrder: station.stationOrder,
         status,
         activeQueueCount,
+        capacity,
+        occupancyPercent: occupancyPercent(activeQueueCount, capacity),
         selectable: status === "AVAILABLE" || status === "BUSY",
       };
     }),

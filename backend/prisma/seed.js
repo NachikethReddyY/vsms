@@ -293,6 +293,20 @@ function demoDate(dayOffset, hour, minute = 0) {
   ));
 }
 
+function singaporeToday(hour, minute = 0) {
+  const singaporeOffsetMs = 8 * 60 * 60 * 1000;
+  const singaporeNow = new Date(Date.now() + singaporeOffsetMs);
+  return new Date(Date.UTC(
+    singaporeNow.getUTCFullYear(),
+    singaporeNow.getUTCMonth(),
+    singaporeNow.getUTCDate(),
+    hour - 8,
+    minute,
+    0,
+    0,
+  ));
+}
+
 async function upsertDemoEvent(staff, {
   key,
   name,
@@ -1019,10 +1033,19 @@ async function seedDemoData(staff, registrationOfficer, reviewer, consentForm) {
     name: "VSMS Synthetic Active Event",
     venue: "Synthetic Venue Two",
     status: "IN_PROGRESS",
-    // Keep the active fixture on the current Singapore calendar day.
-    startsAt: demoDate(1, 0),
-    endsAt: demoDate(1, 23, 59),
+    // Keep the active fixture available for the full current Singapore day.
+    startsAt: singaporeToday(0),
+    endsAt: singaporeToday(23, 59),
     capacity: 80,
+  });
+  const qrHandoffEvent = await upsertDemoEvent(staff, {
+    key: "seed-demo-mike-qr-handoff-live",
+    name: "VSMS Mike Franco QR Handoff Event",
+    venue: "Synthetic Venue QR Handoff",
+    status: "IN_PROGRESS",
+    startsAt: singaporeToday(0),
+    endsAt: singaporeToday(23, 59),
+    capacity: 60,
   });
   const completedEvent = await upsertDemoEvent(staff, {
     key: "seed-demo-woodlands-complete",
@@ -1036,6 +1059,7 @@ async function seedDemoData(staff, registrationOfficer, reviewer, consentForm) {
   const [, liveStructure] = await Promise.all([
     seedEventStructure(upcomingEvent, staff, registrationOfficer),
     seedEventStructure(liveEvent, staff, registrationOfficer),
+    seedEventStructure(qrHandoffEvent, staff, registrationOfficer),
     seedEventStructure(completedEvent, staff, registrationOfficer),
   ]);
 
@@ -1219,7 +1243,7 @@ async function seedDemoData(staff, registrationOfficer, reviewer, consentForm) {
   });
 
   return {
-    events: { upcomingEvent, liveEvent, completedEvent },
+    events: { upcomingEvent, liveEvent, qrHandoffEvent, completedEvent },
     participants: { aisha, daniel, priya, marcus },
     aishaConsent,
     registration,
@@ -1244,6 +1268,7 @@ async function main() {
   console.log(`Seeded roles, permissions, station templates, consent form, staff profile, and demonstration data for ${staff.email}.`);
   console.log(`Upcoming event: ${demo.events.upcomingEvent.name} (${demo.events.upcomingEvent.eventId})`);
   console.log(`Live event: ${demo.events.liveEvent.name} (${demo.events.liveEvent.eventId})`);
+  console.log(`QR handoff event: ${demo.events.qrHandoffEvent.name} (${demo.events.qrHandoffEvent.eventId})`);
   console.log(`Ready participant: ${demo.participants.aisha.participantReference} - Synthetic Alpha`);
   console.log(`Needs consent: ${demo.participants.priya.participantReference} - Synthetic Charlie`);
   console.log(`Needs emergency contact: ${demo.participants.marcus.participantReference} - Synthetic Delta`);

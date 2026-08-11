@@ -4793,11 +4793,17 @@ components:
               items:
                 type: object
                 additionalProperties: false
-                required: [stationId, stationName, stationType, workload, nextUp]
+                required: [stationId, stationName, stationType, stationOrder, status, activeQueueCount, capacity, occupancyPercent, selectable, workload, nextUp]
                 properties:
                   stationId: { type: string, format: uuid }
                   stationName: { type: string }
                   stationType: { type: string }
+                  stationOrder: { type: integer }
+                  status: { type: string, enum: [AVAILABLE, BUSY, PAUSED, OFFLINE] }
+                  activeQueueCount: { type: integer, minimum: 0 }
+                  capacity: { type: integer, minimum: 1 }
+                  occupancyPercent: { type: integer, minimum: 0, description: "Active queue entries as a percentage of station capacity; may exceed 100 when overloaded" }
+                  selectable: { type: boolean, description: "Busy stations remain selectable; paused and offline stations do not" }
                   workload:
                     type: object
                     additionalProperties: false
@@ -5143,7 +5149,7 @@ components:
     RegistrationStation:
       type: object
       additionalProperties: false
-      required: [stationId, stationName, stationType, stationOrder, status, activeQueueCount, selectable]
+      required: [stationId, stationName, stationType, stationOrder, status, activeQueueCount, capacity, occupancyPercent, selectable]
       properties:
         stationId: { type: string, format: uuid }
         stationName: { type: string }
@@ -5151,6 +5157,8 @@ components:
         stationOrder: { type: integer }
         status: { type: string, enum: [AVAILABLE, BUSY, PAUSED, OFFLINE] }
         activeQueueCount: { type: integer, minimum: 0 }
+        capacity: { type: integer, minimum: 1 }
+        occupancyPercent: { type: integer, minimum: 0, description: "Active queue entries as a percentage of station capacity; may exceed 100 when overloaded" }
         selectable: { type: boolean }
     RegistrationStationListResponse:
       type: object

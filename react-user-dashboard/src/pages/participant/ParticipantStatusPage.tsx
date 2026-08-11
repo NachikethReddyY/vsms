@@ -3,21 +3,10 @@ import { useEffect, useRef, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import apiClient, { getApiError as getApiMessage } from '../../utils/apiClient';
 import type { components } from '../../generated/api';
+import { LiveStationHandoffPicker, type LiveStationHandoffStation } from '../../components/qr/LiveStationHandoffPicker';
 import './ParticipantStatusPage.css';
 
 type PublicPassStatus = components['schemas']['QrPublicStatusResponse']['data'];
-
-type HandoffStation = {
-  type: string;
-  label: string;
-};
-
-const HANDOFF_STATIONS: HandoffStation[] = [
-  { type: 'VISUAL_ACUITY', label: 'Visual Acuity' },
-  { type: 'REFRACTION', label: 'Refraction' },
-  { type: 'COLOUR_VISION', label: 'Colour Vision' },
-  { type: 'EYE_HEALTH', label: 'Eye Health' },
-];
 
 const POLL_MS = 5000;
 
@@ -51,7 +40,7 @@ export default function ParticipantStatusPage() {
   const [loading, setLoading] = useState(true);
 
   const [handoffOpen, setHandoffOpen] = useState(false);
-  const [handoffLoading, setHandoffLoading] = useState(false);
+  const [handoffStationId, setHandoffStationId] = useState<string | null>(null);
   const [handoffError, setHandoffError] = useState('');
   const [handoffQr, setHandoffQr] = useState('');
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -90,22 +79,22 @@ export default function ParticipantStatusPage() {
 
   const closeHandoff = () => {
     setHandoffOpen(false);
-    setHandoffLoading(false);
+    setHandoffStationId(null);
     setHandoffError('');
     setHandoffQr('');
   };
 
-  const showHandoff = async (station: HandoffStation) => {
-    setHandoffLoading(true);
+  const showHandoff = async (station: LiveStationHandoffStation) => {
+    setHandoffStationId(station.stationId);
     setHandoffError('');
     setHandoffQr('');
     try {
-      const { data } = await apiClient.get<{ success: boolean; data: { qrImage: string } }>(`/qr/handoff/${encodeURIComponent(token)}?station=${encodeURIComponent(station.type)}`);
+      const { data } = await apiClient.get<{ success: boolean; data: { qrImage: string } }>(`/qr/handoff/${encodeURIComponent(token)}?station=${encodeURIComponent(station.stationType)}`);
       setHandoffQr(data.data.qrImage);
     } catch (cause) {
       setHandoffError(getApiMessage(cause, 'This screener pass could not be created.'));
     } finally {
-      setHandoffLoading(false);
+      setHandoffStationId(null);
     }
   };
 
@@ -240,26 +229,20 @@ export default function ParticipantStatusPage() {
       aria-labelledby="ps-handoff-title"
       onClose={() => {
         setHandoffOpen(false);
-        setHandoffLoading(false);
+        setHandoffStationId(null);
       }}
     >
       <button type="button" className="ps-handoff-close" aria-label="Close" onClick={closeHandoff}>✕</button>
       <h2 id="ps-handoff-title">Screener pass</h2>
       <p className="ps-handoff-lead">Pick the station you are heading to next. The screener scans the pass to open your screening record directly.</p>
-      <div className="ps-handoff-stations">
-        {HANDOFF_STATIONS.map((station) => (
-          <button
-            key={station.type}
-            type="button"
-            className="ps-handoff-station"
-            disabled={handoffLoading}
-            onClick={() => void showHandoff(station)}
-          >
-            {station.label}
-          </button>
-        ))}
-      </div>
-      {handoffLoading && <p className="ps-handoff-state" role="status">Creating screener pass…</p>}
+      <LiveStationHandoffPicker
+        stations={status?.stations ?? []}
+        pendingStationId={handoffStationId}
+        onSelect={(station) => void showHandoff(station)}
+        actionLabel="Create screener pass"
+        emptyMessage="No live screening stations are configured for this event."
+      />
+      {handoffStationId && <p className="ps-handoff-state" role="status">Creating screener pass…</p>}
       {handoffError && <p className="ps-handoff-state ps-handoff-error" role="alert">{handoffError}</p>}
       {handoffQr && (
         <div className="ps-handoff-qr">

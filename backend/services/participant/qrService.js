@@ -20,6 +20,14 @@ const activeQrWhere = (selector = {}, now = new Date()) => ({
     expiresAt: { gt: now },
 });
 
+const stationCapacity = (station) => Math.max(1, Number(station.stationTemplate?.defaultCapacity) || 1);
+const stationOccupancyPercent = (activeQueueCount, capacity) => Math.round((activeQueueCount / capacity) * 100);
+const publicStationStatus = (station, activeQueueCount) => {
+    if (!station.isActive || station.operationalStatus === "OFFLINE") return "OFFLINE";
+    if (station.operationalStatus === "PAUSED") return "PAUSED";
+    return activeQueueCount > 0 ? "BUSY" : "AVAILABLE";
+};
+
 const tokenSelector = (token) => ({ tokenHash: hashToken(token) });
 
 const qrTokenContext = (qrId) => encryptionContext("QRCodePass", qrId, "token");
@@ -418,6 +426,7 @@ exports.getPublicStatus = async (token, db = prisma) => {
         db.station.findMany({
             where: { eventId, isActive: true },
             orderBy: [{ stationOrder: "asc" }, { stationId: "asc" }],
+            include: { stationTemplate: { select: { defaultCapacity: true } } },
         }),
         db.queueMovement.findMany({
             where: { registrationId },
@@ -485,6 +494,23 @@ exports.getPublicStatus = async (token, db = prisma) => {
         )).length
         : null;
 
+    const liveStations = [...byStation.values()].map((station) => {
+        const source = stations.find((item) => item.stationId === station.stationId);
+        const activeQueueCount = station.workload.WAITING + station.workload.CALLED + station.workload.IN_PROGRESS;
+        const capacity = stationCapacity(source || {});
+        const status = publicStationStatus(source || {}, activeQueueCount);
+        return {
+            ...station,
+            status,
+            activeQueueCount,
+            capacity,
+            occupancyPercent: stationOccupancyPercent(activeQueueCount, capacity),
+            selectable: status === "AVAILABLE" || status === "BUSY",
+            nextUp: station.nextUpQueueNumber != null ? { queueNumber: station.nextUpQueueNumber } : null,
+            nextUpQueueNumber: undefined,
+        };
+    });
+
     return {
         valid: true,
         eventName: qr.registration.event.name,
@@ -493,11 +519,7 @@ exports.getPublicStatus = async (token, db = prisma) => {
         registrationStatus: qr.registration.registrationStatus,
         queueState,
         aheadAtStation,
-        stations: [...byStation.values()].map((station) => ({
-            ...station,
-            nextUp: station.nextUpQueueNumber != null ? { queueNumber: station.nextUpQueueNumber } : null,
-            nextUpQueueNumber: undefined,
-        })),
+        stations: liveStations,
         transfers: transfers.map((movement) => ({
             fromStation: movement.fromStation.stationName,
             toStation: movement.toStation.stationName,
