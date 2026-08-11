@@ -264,7 +264,7 @@ describe("two-event route authorization matrix", () => {
     expect(compatibilityDenied.status).toBe(403);
   });
 
-  test("platform administrators receive no implicit operational or analytics access", async () => {
+  test("platform administrators receive management analytics but no implicit operational access", async () => {
     const requests = [
       request(app).get(`/api/v1/events/${fixture.eventA.eventId}/registrations`).set(auth(fixture.admin)),
       request(app).get("/api/v1/participants?name=MatrixScope").set(auth(fixture.admin)).set("X-Event-Id", fixture.eventA.eventId),
@@ -275,7 +275,7 @@ describe("two-event route authorization matrix", () => {
       request(app).get(`/api/v1/events/reports/operations?eventId=${fixture.eventA.eventId}`).set(auth(fixture.admin)),
     ];
     const responses = await Promise.all(requests);
-    expect(responses.map(({ status }) => status)).toEqual(new Array(requests.length).fill(403));
+    expect(responses.map(({ status }) => status)).toEqual([403, 403, 403, 403, 403, 200, 200]);
   });
 
   test("a completed event manager retains membership-only analytics access after duties complete", async () => {
