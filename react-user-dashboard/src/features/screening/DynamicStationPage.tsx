@@ -7,7 +7,7 @@ import { validateFieldValues } from './fieldSchema';
 import { getOfflineStationContext, isNetworkError } from './offlineSync';
 import { screeningApi, newIdempotencyKey, type FlagEvaluation, type QueueRegistration, type Station, type StationType } from './screeningApi';
 import { StationFieldRenderer } from './StationFieldRenderer';
-import { FlagBanner, ParticipantLookup, StationHandoffLinks, StationPageFrame } from './StationShared';
+import { FlagBanner, ParticipantLookup, RouteProgressionNotice, StationPageFrame } from './StationShared';
 import { STATION_LABEL } from './stationConfig';
 
 const SCHEMA_DRIVEN_TYPES = new Set<StationType>(['CUSTOM', 'VISUAL_ACUITY', 'REFRACTION', 'COLOUR_VISION']);
@@ -183,7 +183,7 @@ export default function DynamicStationPage({ stationType }: { stationType?: Stat
     instructions={<p>Complete all required fields marked with an asterisk. This template uses the field schema captured when it was added to the event.</p>}
     error={error}
     success={success}
-    handoff={<StationHandoffLinks eventId={eventId} currentStationType={resolvedType} currentStationId={station?.stationId || routeStationId} registrationId={savedRegistrationId || selectedId} stations={eventStations} />}
+    handoff={<RouteProgressionNotice eventId={eventId} queued={Boolean(success?.startsWith('Pending sync'))} />}
   >
     <ParticipantLookup eventId={eventId} currentStationId={station?.stationId ?? ''} queue={queue} selectedId={selectedId} onSelect={selectParticipant} selected={selected} />
     <form className="detail-panel va-form" onSubmit={(event) => void submit(event)} noValidate>
