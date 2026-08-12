@@ -549,8 +549,8 @@ export interface paths {
         put?: never;
         post?: never;
         /**
-         * Permanently delete a completed or cancelled event
-         * @description Administrator-only hard deletion. Requires the exact event name, permanent-deletion acknowledgement, current version, and the unexpired signed token from the latest unchanged impact preview. Event-owned operational records are removed; shared staff accounts, participants, templates, forms, and devices are retained.
+         * Permanently delete a draft, completed, or cancelled event
+         * @description Administrator-only hard deletion. Requires the exact event name, permanent-deletion acknowledgement, current version, and the unexpired signed token from the latest unchanged impact preview. Event-owned operational records and participant profiles created for only this event are removed; participant profiles reused by another event, staff accounts, templates, forms, and devices are retained.
          */
         delete: operations["deleteTerminalEvent"];
         options?: never;
@@ -2115,7 +2115,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Event queue summary with per-station workload and next-up participant */
+        /** Event queue summary with per-station workload, priority-aware next-up participant, and ordered entries */
         get: operations["getEventQueueStatus"];
         put?: never;
         post?: never;
@@ -2415,6 +2415,26 @@ export interface paths {
         head?: never;
         /** Elevate or clear the urgent/priority flag on an active queue entry */
         patch: operations["updateQueueEntryPriority"];
+        trace?: never;
+    };
+    "/api/v1/queues/events/{eventId}/entries/{queueId}/priority": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Elevate or clear the urgent/priority flag on an active event-scoped queue entry
+         * @description Requires a reason when elevating an entry to priority. Emits a QUEUE_PRIORITY_UPDATED audit event.
+         */
+        patch: operations["updateEventQueueEntryPriority"];
         trace?: never;
     };
     "/api/v1/queues/events/{eventId}/workload": {
@@ -3097,6 +3117,8 @@ export interface components {
             cleanupState: "QUEUED" | "COMPLETED" | "NEEDS_ATTENTION";
         };
         EventDeletionCounts: {
+            /** @description Participant profiles created for only this event that will be deleted */
+            participants: number;
             registrations: number;
             queues: number;
             screenings: number;
@@ -3111,7 +3133,7 @@ export interface components {
             eventId: string;
             eventName: string;
             /** @enum {string} */
-            status: "COMPLETED" | "CANCELLED";
+            status: "DRAFT" | "COMPLETED" | "CANCELLED";
             version: number;
             counts: components["schemas"]["EventDeletionCounts"];
             blockers: ({
@@ -3861,7 +3883,8 @@ export interface components {
             fullName: string;
             /** Format: email */
             email: string;
-            employeeNumber: string;
+            /** @description Generated automatically when omitted. */
+            employeeNumber?: string;
             department?: string | null;
             designation?: string | null;
             /** @enum {string} */
@@ -4619,7 +4642,7 @@ export interface components {
         PriorityQueueRequest: {
             /** @description Whether the queue entry is treated as urgent/priority */
             isPriority: boolean;
-            /** @description Optional reason for the priority assignment */
+            /** @description Reason for the priority assignment. Required when isPriority is true so the elevation can be audited. */
             notes?: string;
         };
         StationWorkload: {
@@ -4684,6 +4707,37 @@ export interface components {
                 isPriority: boolean;
             } | null;
         };
+        EventQueueEntry: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            registrationId: string;
+            /** @description Display name for the queued participant */
+            participantDisplayName?: string;
+            participantReference?: string | null;
+            /** Format: uuid */
+            stationId: string;
+            stationName?: string;
+            stationType?: string;
+            queueNumber: number;
+            status: components["schemas"]["QueueStatus"];
+            /**
+             * @description Urgent/priority handling flag surfaced to next-up calling
+             * @default false
+             */
+            isPriority: boolean;
+            priorityNotes?: string | null;
+            /** Format: date-time */
+            enteredAt?: string | null;
+            /** Format: date-time */
+            calledAt?: string | null;
+            /** Format: date-time */
+            startedAt?: string | null;
+            /** Format: date-time */
+            leftQueueAt?: string | null;
+            /** Format: date-time */
+            completedAt?: string | null;
+        };
         EventQueueStatusResponse: {
             event: {
                 /** Format: uuid */
@@ -4693,6 +4747,8 @@ export interface components {
                 venue: string | null;
             };
             stations: components["schemas"]["QueueStationWorkload"][];
+            /** @description Every queue entry for the event, ordered by queue number, with priority ordering surfaced through each station's next-up */
+            entries: components["schemas"]["EventQueueEntry"][];
         };
         JoinQueueRequest: {
             /** Format: uuid */
@@ -9462,6 +9518,40 @@ export interface operations {
             header?: never;
             path: {
                 queueId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PriorityQueueRequest"];
+            };
+        };
+        responses: {
+            /** @description Queue entry priority updated */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["QueueEntry"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            422: components["responses"]["ValidationFailed"];
+        };
+    };
+    updateEventQueueEntryPriority: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                eventId: components["parameters"]["EventId"];
+                queueId: components["parameters"]["QueueId"];
             };
             cookie?: never;
         };

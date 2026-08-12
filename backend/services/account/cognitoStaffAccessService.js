@@ -1,4 +1,4 @@
-const {
+﻿const {
   AdminAddUserToGroupCommand,
   AdminCreateUserCommand,
   AdminDeleteUserCommand,
@@ -12,7 +12,7 @@ const {
 
 const AppError = require("../../errors/AppError");
 const env = require("../../config/env");
-const { normalizeApplicationRole } = require("../../utils/roles");
+const { normalizeApplicationRole } = require("../../utils/auth/roles");
 
 const GROUP_FOR_ROLE = Object.freeze({
   ADMINISTRATOR: "Admin",

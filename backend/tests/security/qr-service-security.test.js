@@ -1,10 +1,10 @@
-const assert = require("node:assert/strict");
+﻿const assert = require("node:assert/strict");
 const crypto = require("node:crypto");
 const test = require("node:test");
 
 process.env.DATABASE_URL ||= "postgresql://test:test@localhost:5432/vsms_test";
 
-const { encrypt, encryptionContext } = require("../../utils/cryptoUtils");
+const { encrypt, encryptionContext } = require("../../utils/crypto/cryptoUtils");
 const qrService = require("../../services/participant/qrService");
 
 const eventId = "11111111-1111-4111-8111-111111111111";

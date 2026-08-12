@@ -1,4 +1,5 @@
-const crypto = require("crypto");
+﻿const crypto = require("crypto");
+const { AppError } = require("../errors/AppError");
 const env = require("../config/env");
 const asyncHandler = require("../middlewares/asyncHandler");
 const {
@@ -9,10 +10,10 @@ const {
     refreshSession,
     changePassword,
     globalSignOut,
-} = require("../utils/cognitoClient");
-const { verifyCognitoToken } = require("../utils/cognitoJwt");
-const { timingSafeEqual } = require("../utils/security");
-const { ALLOWED_ROLES } = require("../utils/staff");
+} = require("../utils/auth/cognitoClient");
+const { verifyCognitoToken } = require("../utils/auth/cognitoJwt");
+const { timingSafeEqual } = require("../utils/crypto/security");
+const { ALLOWED_ROLES } = require("../utils/auth/staff");
 const accountService = require("../services/account/accountService");
 const {
     ACCESS_COOKIE,
@@ -26,7 +27,7 @@ const {
     clearAuthCookies,
     setOAuthCookies,
     clearOAuthCookies,
-} = require("../utils/httpCookies");
+} = require("../utils/http/httpCookies");
 
 function requireFields(payload, fields) {
     const missing = fields.filter((field) => !String(payload?.[field] || "").trim());

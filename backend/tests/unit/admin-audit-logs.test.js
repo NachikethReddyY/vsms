@@ -1,4 +1,4 @@
-const { test } = require("node:test");
+﻿const { test } = require("node:test");
 const assert = require("node:assert/strict");
 const crypto = require("node:crypto");
 
@@ -6,7 +6,7 @@ process.env.DATABASE_URL ||= "postgresql://test:test@localhost:5432/vsms_test";
 
 const prisma = require("../../prisma/prismaClient");
 const adminController = require("../../controllers/adminController");
-const { encodeCursor } = require("../../utils/cursor");
+const { encodeCursor } = require("../../utils/http/cursor");
 
 function replace(t, target, key, value) {
   const original = target[key];

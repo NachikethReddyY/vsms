@@ -1,6 +1,6 @@
-const prisma = require("../../prisma/prismaClient");
+﻿const prisma = require("../../prisma/prismaClient");
 const AppError = require("../../errors/AppError");
-const { createAuditLog } = require("../../utils/audit");
+const { createAuditLog } = require("../../utils/logging/audit");
 const { assertRoleEligibility, requireEventManager, actorId } = require("./eventAuthorizationService");
 const { enqueueAccountLifecycle } = require("../account/accountLifecycleNotificationService");
 

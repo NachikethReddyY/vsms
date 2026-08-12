@@ -1,7 +1,7 @@
-const crypto = require("node:crypto");
+﻿const crypto = require("node:crypto");
 const prisma = require("../../prisma/prismaClient");
 const AppError = require("../../errors/AppError");
-const { resolveAuditContext } = require("../../utils/audit");
+const { resolveAuditContext } = require("../../utils/logging/audit");
 const { synchronizeStaffAccess } = require("./cognitoStaffAccessService");
 const { assertAdministratorRemains, lockAccountTransition } = require("./adminSafety");
 const { enqueueProviderOperation, processProviderOperation, processProviderOperationForResponse } = require("./accountProviderOperationService");
@@ -40,6 +40,8 @@ const isActiveAdministrator = (user, roles = accountSnapshot(user).roles, status
   && (user.approvalState ?? "APPROVED") === "APPROVED"
   && (user.accessState ?? "ENABLED") === "ENABLED"
   && roles.includes("ADMINISTRATOR");
+
+const generateEmployeeNumber = () => `STF-${crypto.randomUUID().replaceAll("-", "").slice(0, 16).toUpperCase()}`;
 
 async function rolesFor(tx, roleNames) {
   const roles = await tx.role.findMany({
@@ -137,7 +139,7 @@ exports.createUser = async (
           username: userData.email,
           fullName: userData.fullName,
           email: userData.email,
-          employeeNumber: userData.employeeNumber,
+          employeeNumber: userData.employeeNumber || generateEmployeeNumber(),
           department: userData.department ?? null,
           designation: userData.designation ?? null,
           professionalCategory: userData.professionalCategory,

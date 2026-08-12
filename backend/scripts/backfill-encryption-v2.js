@@ -1,11 +1,11 @@
-const prisma = require("../prisma/prismaClient");
+﻿const prisma = require("../prisma/prismaClient");
 const {
   encrypt,
   decrypt,
   encryptionContext,
   ciphertextKeyId,
   activeEncryptionKeyId,
-} = require("../utils/cryptoUtils");
+} = require("../utils/crypto/cryptoUtils");
 
 const apply = process.argv.includes("--apply");
 const maskedEmail = /^[^@]\*{3}@[^@]+$/;

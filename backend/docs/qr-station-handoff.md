@@ -10,7 +10,7 @@ Generated QR images encode a **token only** (via a frontend URL), for example:
 http://<host>:<port>/participant-status/<token>
 ```
 
-or a raw hex token string. The token is `QRCodePass.token` (64-char hex in production; demo seed also uses `VSMS-DEMO-QR-001`).
+or a raw hex token string. The token is `QRCodePass.token` (64-char hex in production; the demo seed uses `"ab".repeat(32)` — 64 hex characters).
 
 The QR must **not** embed `stationId`, station slug, or screening type. Station choice is a staff UI decision after verify.
 

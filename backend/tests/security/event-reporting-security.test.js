@@ -1,4 +1,4 @@
-const assert = require("node:assert/strict");
+﻿const assert = require("node:assert/strict");
 const test = require("node:test");
 
 process.env.DATABASE_URL ||= "postgresql://test:test@localhost:5432/vsms_test";
@@ -6,8 +6,8 @@ process.env.DATABASE_URL ||= "postgresql://test:test@localhost:5432/vsms_test";
 const eventController = require("../../controllers/eventController");
 const eventService = require("../../services/event/eventService");
 const env = require("../../config/env");
-const { createExportReceipt } = require("../../utils/eventExportReceipt");
-const { encodeCursor } = require("../../utils/cursor");
+const { createExportReceipt } = require("../../utils/storage/eventExportReceipt");
+const { encodeCursor } = require("../../utils/http/cursor");
 
 const eventId = "11111111-1111-4111-8111-111111111111";
 const managerId = "22222222-2222-4222-8222-222222222222";

@@ -1,4 +1,4 @@
-const assert = require("node:assert/strict");
+﻿const assert = require("node:assert/strict");
 const crypto = require("node:crypto");
 const test = require("node:test");
 
@@ -6,8 +6,8 @@ process.env.DATABASE_URL ||= "postgresql://test:test@localhost:5432/vsms_test";
 
 const prisma = require("../../prisma/prismaClient");
 const userService = require("../../services/account/userService");
-const { rolesFromCognitoGroups } = require("../../utils/roles");
-const { updateUserBody } = require("../../schemas/userSchemas");
+const { rolesFromCognitoGroups } = require("../../utils/auth/roles");
+const { createUserBody, updateUserBody } = require("../../schemas/userSchemas");
 
 const syncedAccess = (overrides = {}) => async () => ({
   managed: true,
@@ -54,6 +54,14 @@ test("staff management blocks self-demotion and rejects lifecycle fields", async
     (error) => error.code === "SELF_ADMIN_CHANGE_BLOCKED",
   );
   assert.equal(updateUserBody.safeParse({ status: "INACTIVE" }).success, false);
+});
+
+test("staff creation accepts a missing employee number", () => {
+  assert.equal(createUserBody.safeParse({
+    fullName: "Support Person",
+    email: "support@example.com",
+    roles: ["SUPPORT"],
+  }).success, true);
 });
 
 test("staff management keeps one active administrator", async (t) => {
@@ -165,7 +173,6 @@ test("staff creation commits an outbox operation before synchronizing Cognito", 
   const result = await userService.createUser({
     fullName: created.fullName,
     email: created.email,
-    employeeNumber: created.employeeNumber,
     department: null,
     designation: null,
     status: "ACTIVE",
@@ -176,7 +183,9 @@ test("staff creation commits an outbox operation before synchronizing Cognito", 
   });
 
   assert.ok(calls.findIndex(([name]) => name === "providerOperation.create") < calls.findIndex(([name]) => name === "cognito.sync"));
-  assert.equal(calls.find(([name]) => name === "user.create")[1].data.cognitoSub, undefined);
+  const createData = calls.find(([name]) => name === "user.create")[1].data;
+  assert.equal(createData.cognitoSub, undefined);
+  assert.match(createData.employeeNumber, /^STF-[A-F0-9]{16}$/);
   assert.equal(calls.some(([name]) => name === "cognito.compensate"), false);
   assert.deepEqual(result.roles, ["SUPPORT"]);
   assert.equal(result.cognitoSub, undefined);

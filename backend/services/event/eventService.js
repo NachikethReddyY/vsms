@@ -1,8 +1,8 @@
-const prisma = require("../../prisma/prismaClient");
+﻿const prisma = require("../../prisma/prismaClient");
 const crypto = require("crypto");
 const { Prisma } = require("@prisma/client");
 const AppError = require("../../errors/AppError");
-const { encodeCursor, decodeCursor } = require("../../utils/cursor");
+const { encodeCursor, decodeCursor } = require("../../utils/http/cursor");
 const {
   classifyTemplates,
   stationTypeForTemplate,
@@ -12,8 +12,8 @@ const {
   processArtifactCleanupTasks,
   collectEventArtifactTasks,
 } = require("../platform/artifactCleanupService");
-const { createExportReceipt } = require("../../utils/eventExportReceipt");
-const { createAuditLog, resolveAuditContext } = require("../../utils/audit");
+const { createExportReceipt } = require("../../utils/storage/eventExportReceipt");
+const { createAuditLog, resolveAuditContext } = require("../../utils/logging/audit");
 const env = require("../../config/env");
 const { attendancePredicate, attendanceWhere } = require("./attendanceDefinition");
 const { enqueueAccountLifecycle } = require("../account/accountLifecycleNotificationService");
@@ -1343,7 +1343,16 @@ const verifyDeletionPreview = (token, eventId, userId, version, now = new Date()
 };
 
 const collectDeletionEntityIds = async (tx, eventId) => {
-  const [registrations, stations, queues, screenings, reviews, referrals, documents, consents, qrCodes, signatures] = await Promise.all([
+  const [participants, registrations, stations, queues, screenings, reviews, referrals, documents, consents, qrCodes, signatures] = await Promise.all([
+    tx.participant.findMany({
+      where: {
+        onboardingEventId: eventId,
+        eventRegistrations: { none: { eventId: { not: eventId } } },
+        eventIntakes: { none: { eventId: { not: eventId } } },
+        consents: { none: { eventId: { not: eventId } } },
+      },
+      select: { id: true },
+    }),
     tx.eventRegistration.findMany({ where: { eventId }, select: { registrationId: true } }),
     tx.station.findMany({ where: { eventId }, select: { stationId: true } }),
     tx.queueEntry.findMany({ where: { registration: { eventId } }, select: { id: true } }),
@@ -1356,6 +1365,7 @@ const collectDeletionEntityIds = async (tx, eventId) => {
     tx.signatureArtifact.findMany({ where: { eventId }, select: { id: true } }),
   ]);
   return {
+    participants: participants.map(({ id }) => id),
     registrations: registrations.map(({ registrationId }) => registrationId),
     stations: stations.map(({ stationId }) => stationId),
     queues: queues.map(({ id }) => id),
@@ -1393,6 +1403,7 @@ const deletionImpact = async (tx, event, entityIds = null) => {
   ]);
   const activeReportJobCount = Array.isArray(activeReportJobs) ? Number(activeReportJobs[0]?.count || 0) : Number(activeReportJobs || 0);
   const counts = {
+    participants: ids.participants.length,
     registrations: ids.registrations.length,
     queues: ids.queues.length,
     screenings: ids.screenings.length,
@@ -1427,8 +1438,8 @@ const previewEventDeletion = async (eventId, user, db = prisma, now = new Date()
   assertDeletionAdministrator(user);
   const event = await db.event.findUnique({ where: { eventId }, select: { eventId: true, name: true, status: true, version: true } });
   if (!event) throw new AppError(404, "EVENT_NOT_FOUND", "Event was not found");
-  if (!["COMPLETED", "CANCELLED"].includes(event.status)) {
-    throw new AppError(409, "EVENT_NOT_TERMINAL", "Only completed or cancelled events can be permanently deleted");
+  if (!["DRAFT", "COMPLETED", "CANCELLED"].includes(event.status)) {
+    throw new AppError(409, "EVENT_NOT_TERMINAL", "Only draft, completed, or cancelled events can be permanently deleted");
   }
   const impact = await deletionImpact(db, event);
   const digest = impactDigest(impact);
@@ -1465,8 +1476,8 @@ const deleteEvent = async (eventId, body, user, correlationId, db = prisma) => {
   const claims = verifyDeletionPreview(body.previewToken, eventId, user.userId, body.version);
   const current = await db.event.findUnique({ where: { eventId }, include: eventInclude });
   if (!current) throw new AppError(404, "EVENT_NOT_FOUND", "Event was not found");
-  if (!['COMPLETED', 'CANCELLED'].includes(current.status)) {
-    throw new AppError(409, "EVENT_NOT_TERMINAL", "Only completed or cancelled events can be permanently deleted");
+  if (!["DRAFT", "COMPLETED", "CANCELLED"].includes(current.status)) {
+    throw new AppError(409, "EVENT_NOT_TERMINAL", "Only draft, completed, or cancelled events can be permanently deleted");
   }
   if (body.confirmationName !== current.name) {
     throw new AppError(422, "EVENT_DELETE_CONFIRMATION_MISMATCH", "Type the event name exactly to confirm permanent deletion");
@@ -1534,8 +1545,23 @@ const deleteEvent = async (eventId, body, user, correlationId, db = prisma) => {
     await tx.queueEntry.deleteMany({ where: { registration: { eventId } } });
     await tx.eventRegistration.deleteMany({ where: { eventId } });
 
-    // Participants are shared records. Remove only their temporary onboarding
-    // scope before deleting the event; the FK also uses SET NULL defensively.
+    await tx.participantEventIntake.deleteMany({ where: { eventId } });
+    if (entityIds.participants.length) {
+      await tx.participantEmergencyContact.deleteMany({ where: { participantId: { in: entityIds.participants } } });
+      const deletedParticipants = await tx.participant.deleteMany({
+        where: {
+          id: { in: entityIds.participants },
+          onboardingEventId: eventId,
+          eventRegistrations: { none: {} },
+          eventIntakes: { none: {} },
+          consents: { none: {} },
+        },
+      });
+      if (deletedParticipants.count !== entityIds.participants.length) {
+        throw new AppError(409, "DELETION_IMPACT_CHANGED", "Deletion impact changed; review a new preview before deleting");
+      }
+    }
+    // Profiles reused by another event are shared and must survive.
     await tx.participant.updateMany({ where: { onboardingEventId: eventId }, data: { onboardingEventId: null } });
 
     await tx.staffAssignment.deleteMany({ where: { eventId } });
@@ -1603,7 +1629,9 @@ const listStaffDirectory = async () => {
   }));
 };
 
-// Import picker: active templates that map to a screening StationType.
+// Read-only catalog for the events UI / OpenAPI StationTemplate DTO (#23).
+// Import/update map templateKey â†’ StationType per #30 (catalog keys include
+// REGISTRATION / CLINICAL_REVIEW which are not StationType and are rejected on import).
 const listStationTemplates = async () => {
   const templates = await prisma.stationTemplate.findMany({
     where: { active: true, stationType: { not: null } },

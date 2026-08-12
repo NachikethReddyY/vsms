@@ -1,4 +1,4 @@
-const assert = require("node:assert/strict");
+﻿const assert = require("node:assert/strict");
 const test = require("node:test");
 const crypto = require("node:crypto");
 const fs = require("node:fs");
@@ -10,7 +10,7 @@ const {
   assertRegistrationAssignment,
   assertScreenerAssignment,
   assertQrVerifyAccess,
-} = require("../../utils/staff");
+} = require("../../utils/auth/staff");
 const {
   getEventIdForAccess,
   assertRegistrationAccess,

@@ -1,9 +1,9 @@
-const crypto = require("node:crypto");
+﻿const crypto = require("node:crypto");
 const nodemailer = require("nodemailer");
 const { Prisma } = require("@prisma/client");
 const prisma = require("../../prisma/prismaClient");
 const env = require("../../config/env");
-const { createAuditLog } = require("../../utils/audit");
+const { createAuditLog } = require("../../utils/logging/audit");
 
 const PURPOSES = new Set(["SIGNUP_RECEIVED", "APPROVED", "REJECTED", "SUSPENDED", "REACTIVATED", "EVENT_ASSIGNMENT", "PASSWORD_CHANGED", "DEPROVISIONED"]);
 const TYPE_MAP = Object.freeze({ APPROVED: "APPROVED", REJECTED: "REJECTED", PENDING: "SIGNUP_RECEIVED", SUSPEND: "SUSPENDED", SUSPENDED: "SUSPENDED", REACTIVATE: "REACTIVATED", REACTIVATED: "REACTIVATED", SIGNUP_RECEIVED: "SIGNUP_RECEIVED", EVENT_ASSIGNMENT: "EVENT_ASSIGNMENT", PASSWORD_CHANGED: "PASSWORD_CHANGED", DEPROVISIONED: "DEPROVISIONED" });

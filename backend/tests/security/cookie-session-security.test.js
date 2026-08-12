@@ -1,4 +1,4 @@
-const assert = require("node:assert/strict");
+﻿const assert = require("node:assert/strict");
 const crypto = require("node:crypto");
 const test = require("node:test");
 const jwt = require("jsonwebtoken");
@@ -13,7 +13,7 @@ const csrf = require("../../middlewares/csrf");
 const requireAuthentication = require("../../middlewares/requireAuthentication");
 const requestContext = require("../../middlewares/requestContext");
 const prisma = require("../../prisma/prismaClient");
-const { parseCookies, setAuthCookies } = require("../../utils/httpCookies");
+const { parseCookies, setAuthCookies } = require("../../utils/http/httpCookies");
 
 const response = () => ({
   headers: {},

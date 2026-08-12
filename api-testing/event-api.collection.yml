@@ -4656,11 +4656,12 @@ item:
               }
             ]
           }
-  - name: Permanently delete a completed or cancelled event
+  - name: Permanently delete a draft, completed, or cancelled event
     description: >-
       Administrator-only hard deletion. Requires the exact event name, permanent-deletion acknowledgement, current
       version, and the unexpired signed token from the latest unchanged impact preview. Event-owned operational records
-      are removed; shared staff accounts, participants, templates, forms, and devices are retained.
+      and participant profiles created for only this event are removed; participant profiles reused by another event,
+      staff accounts, templates, forms, and devices are retained.
     event: []
     request:
       method: DELETE
@@ -4810,9 +4811,10 @@ item:
           {
             "eventId": "00000000-0000-4000-8000-000000000000",
             "eventName": "",
-            "status": "COMPLETED",
+            "status": "DRAFT",
             "version": 1,
             "counts": {
+              "participants": 0,
               "registrations": 0,
               "queues": 0,
               "screenings": 0,
@@ -17322,7 +17324,7 @@ item:
               }
             ]
           }
-  - name: Event queue summary with per-station workload and next-up participant
+  - name: Event queue summary with per-station workload, priority-aware next-up participant, and ordered entries
     description: ''
     event: []
     request:
@@ -17383,6 +17385,26 @@ item:
                   "participantDisplayName": "",
                   "isPriority": false
                 }
+              }
+            ],
+            "entries": [
+              {
+                "id": "00000000-0000-4000-8000-000000000000",
+                "registrationId": "00000000-0000-4000-8000-000000000000",
+                "participantDisplayName": "",
+                "participantReference": "",
+                "stationId": "00000000-0000-4000-8000-000000000000",
+                "stationName": "",
+                "stationType": "",
+                "queueNumber": 0,
+                "status": "WAITING",
+                "isPriority": false,
+                "priorityNotes": "",
+                "enteredAt": "2026-08-07T00:00:00.000Z",
+                "calledAt": "2026-08-07T00:00:00.000Z",
+                "startedAt": "2026-08-07T00:00:00.000Z",
+                "leftQueueAt": "2026-08-07T00:00:00.000Z",
+                "completedAt": "2026-08-07T00:00:00.000Z"
               }
             ]
           }
@@ -19249,6 +19271,146 @@ item:
               description: JSON request body
               type: text
           url: '{{baseUrl}}/queues/entries/{queueId}/priority'
+        status: Forbidden
+        code: 403
+        header:
+          - key: Content-Type
+            value: application/json
+        body: |-
+          {
+            "type": "",
+            "title": "",
+            "status": 0,
+            "code": "",
+            "requestId": "00000000-0000-4000-8000-000000000000",
+            "errors": [
+              {
+                "field": "",
+                "message": ""
+              }
+            ]
+          }
+  - name: Elevate or clear the urgent/priority flag on an active event-scoped queue entry
+    description: Requires a reason when elevating an entry to priority. Emits a QUEUE_PRIORITY_UPDATED audit event.
+    event: []
+    request:
+      method: PATCH
+      header:
+        - key: Content-Type
+          value: application/json
+          description: JSON request body
+          type: text
+        - key: Idempotency-Key
+          value: ''
+          description: ''
+          type: text
+      auth:
+        type: bearer
+        bearer:
+          - key: token
+            value: '{{token}}'
+            type: string
+      url:
+        raw: '{{baseUrl}}/queues/events/{eventId}/entries/{queueId}/priority'
+        host:
+          - '{{baseUrl}}'
+        path:
+          - queues
+          - events
+          - '{eventId}'
+          - entries
+          - '{queueId}'
+          - priority
+        query: []
+      body:
+        mode: raw
+        raw: |-
+          {
+            "isPriority": true,
+            "notes": ""
+          }
+        options:
+          raw:
+            language: json
+    response:
+      - name: 200 Response
+        originalRequest:
+          method: PATCH
+          header:
+            - key: Content-Type
+              value: application/json
+              description: JSON request body
+              type: text
+            - key: Idempotency-Key
+              value: ''
+              description: ''
+              type: text
+          url: '{{baseUrl}}/queues/events/{eventId}/entries/{queueId}/priority'
+        status: OK
+        code: 200
+        header:
+          - key: Content-Type
+            value: application/json
+        body: |-
+          {
+            "id": "00000000-0000-4000-8000-000000000000",
+            "registrationId": "00000000-0000-4000-8000-000000000000",
+            "stationId": "00000000-0000-4000-8000-000000000000",
+            "queueNumber": 0,
+            "status": "WAITING",
+            "isPriority": false,
+            "priorityNotes": "",
+            "enteredAt": "2026-08-07T00:00:00.000Z",
+            "calledAt": "2026-08-07T00:00:00.000Z",
+            "startedAt": "2026-08-07T00:00:00.000Z",
+            "leftQueueAt": "2026-08-07T00:00:00.000Z",
+            "completedAt": "2026-08-07T00:00:00.000Z"
+          }
+      - name: 401 Response
+        originalRequest:
+          method: PATCH
+          header:
+            - key: Content-Type
+              value: application/json
+              description: JSON request body
+              type: text
+            - key: Idempotency-Key
+              value: ''
+              description: ''
+              type: text
+          url: '{{baseUrl}}/queues/events/{eventId}/entries/{queueId}/priority'
+        status: Unauthorized
+        code: 401
+        header:
+          - key: Content-Type
+            value: application/json
+        body: |-
+          {
+            "type": "",
+            "title": "",
+            "status": 0,
+            "code": "",
+            "requestId": "00000000-0000-4000-8000-000000000000",
+            "errors": [
+              {
+                "field": "",
+                "message": ""
+              }
+            ]
+          }
+      - name: 403 Response
+        originalRequest:
+          method: PATCH
+          header:
+            - key: Content-Type
+              value: application/json
+              description: JSON request body
+              type: text
+            - key: Idempotency-Key
+              value: ''
+              description: ''
+              type: text
+          url: '{{baseUrl}}/queues/events/{eventId}/entries/{queueId}/priority'
         status: Forbidden
         code: 403
         header:

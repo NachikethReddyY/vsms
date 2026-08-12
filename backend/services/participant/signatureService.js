@@ -1,9 +1,9 @@
 const prisma = require("../../prisma/prismaClient");
-const { validationError } = require("../../utils/validation");
-const { assertRegistrationAssignment } = require("../../utils/staff");
-const { assertParticipantEventScope } = require("../../utils/participantEventScope");
+const { validationError } = require("../../utils/validation/validation");
+const { assertRegistrationAssignment } = require("../../utils/auth/staff");
+const { assertParticipantEventScope } = require("../../utils/validation/participantEventScope");
 const { requireReviewerAccess } = require("../screening/reviewService");
-const { storeSignature, deleteSignature } = require("../../utils/signatureStorage");
+const { storeSignature, deleteSignature } = require("../../utils/storage/signatureStorage");
 
 exports.authorizeSignatureTarget = async ({ eventId, targetId, purpose, auth }, db = prisma) => {
     const eventUser = { ...auth.user, userId: auth.userId };

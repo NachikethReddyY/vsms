@@ -1,7 +1,7 @@
-const env = require("../config/env");
+﻿const env = require("../config/env");
 const AppError = require("../errors/AppError");
-const { timingSafeEqual } = require("../utils/security");
-const { ACCESS_COOKIE, REFRESH_COOKIE, CSRF_COOKIE } = require("../utils/httpCookies");
+const { timingSafeEqual } = require("../utils/crypto/security");
+const { ACCESS_COOKIE, REFRESH_COOKIE, CSRF_COOKIE } = require("../utils/http/httpCookies");
 
 module.exports = (req, _res, next) => {
   const hasCookieCredentials = Boolean(req.cookies?.[ACCESS_COOKIE] || req.cookies?.[REFRESH_COOKIE]);

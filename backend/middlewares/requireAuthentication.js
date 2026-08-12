@@ -1,11 +1,11 @@
-const asyncHandler = require("./asyncHandler");
+﻿const asyncHandler = require("./asyncHandler");
 const prisma = require("../prisma/prismaClient");
 const AppError = require("../errors/AppError");
-const { verifyAccessToken } = require("../utils/tokens");
-const { verifyCognitoToken } = require("../utils/cognitoJwt");
-const { ACCESS_COOKIE } = require("../utils/httpCookies");
-const { rolesFromCognitoGroups } = require("../utils/staff");
-const { sessionValidity } = require("../utils/sessionValidity");
+const { verifyAccessToken } = require("../utils/auth/tokens");
+const { verifyCognitoToken } = require("../utils/auth/cognitoJwt");
+const { ACCESS_COOKIE } = require("../utils/http/httpCookies");
+const { rolesFromCognitoGroups } = require("../utils/auth/staff");
+const { sessionValidity } = require("../utils/auth/sessionValidity");
 
 module.exports = asyncHandler(async (req, _res, next) => {
   const match = /^Bearer ([A-Za-z0-9._~-]+)$/.exec(req.get("authorization") || "");
