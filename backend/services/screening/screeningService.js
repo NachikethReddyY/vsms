@@ -5,6 +5,7 @@ const { requireEventRoleAndDuty } = require("../event/eventAuthorizationService"
 const qrService = require("../participant/qrService");
 const domainEventBus = require("../domain/domainEventBus");
 const { createAuditLog } = require("../../utils/logging/audit");
+const { completeStationAndAssignNext } = require("./queueAssignmentService");
 const { resolveRegistrationByQrValue } = require("../../utils/crypto/qrToken");
 const { recordVisualAcuity } = require("../../utils/database/visualAcuityProcedure");
 const {

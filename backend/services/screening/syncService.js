@@ -2,6 +2,7 @@
 const prisma = require("../../prisma/prismaClient");
 const screeningService = require("./screeningService");
 const { createAuditLog } = require("../../utils/logging/audit");
+const logger = require("../../utils/logging/logger/logger");
 
 const HANDLERS = {
   VISUAL_ACUITY: "saveVisualAcuity",
@@ -279,6 +280,13 @@ const processAction = async ({ eventId, action, user, db, screening, options }) 
       return responseFor(conflict);
     }
 
+    logger.error("screening.sync_apply_failed", {
+      clientActionId: action.clientActionId,
+      stationId: action.stationId,
+      failureCode: error?.code,
+      failureName: error?.name,
+      message: error?.message,
+    });
     const failed = await finishAction(db, pending.row, "FAILED", {
       errorCode: "SYNC_APPLY_FAILED",
       waitTimeoutMs: options.waitTimeoutMs,

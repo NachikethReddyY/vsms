@@ -66,6 +66,14 @@ before(async () => {
       stationOrder: 1,
     },
   });
+  await helpers.prisma.station.create({
+    data: {
+      eventId: event.eventId,
+      stationName: "Refraction",
+      stationType: "REFRACTION",
+      stationOrder: 2,
+    },
+  });
   await helpers.prisma.staffAssignment.create({
     data: {
       eventId: event.eventId,
@@ -152,6 +160,7 @@ describe("screening sync API", () => {
     expect(first.actions[0]).toEqual(expect.objectContaining({ clientActionId, status: "APPLIED", retryCount: 0 }));
     expect(concurrentReplay.actions[0]).toEqual(expect.objectContaining({ clientActionId, status: "APPLIED", retryCount: 0 }));
     expect(concurrentReplay.actions[0].result).toEqual(first.actions[0].result);
+    expect(first.actions[0].result.journey.state).toBe("AWAITING_STATION");
     const registration = first.pull.stations[0].registrations[0];
     expect(registration.participantDisplayName).toBe("Sync Participant");
     expect(registration.passToken).toBeUndefined();
@@ -188,7 +197,6 @@ describe("screening sync API", () => {
     const staleAction = {
       ...action,
       clientActionId: crypto.randomUUID(),
-      payload: { ...action.payload, idempotencyKey: crypto.randomUUID() },
     };
     const stale = await helpers.prisma.syncAction.create({
       data: {
