@@ -196,6 +196,7 @@ test("screening idempotency stores a canonical fingerprint", async (t) => {
   replace(t, prisma.station, "findFirst", async ({ where }) => ({ ...where, stationName: "Visual Acuity" }));
   replace(t, prisma, "$transaction", async (callback) => callback({
     screeningResult: {
+      findUnique: async () => null,
       upsert: async ({ create }) => {
         saved = create;
         return { resultId: crypto.randomUUID(), ...create, version: 1 };
@@ -207,7 +208,21 @@ test("screening idempotency stores a canonical fingerprint", async (t) => {
     },
     auditLog: { create: async ({ data }) => data },
     domainEvent: { create: async ({ data }) => data },
-    eventRegistration: { findFirst: async () => ({ registrationId, registrationStatus: "CHECKED_IN" }) },
+    eventRegistration: {
+      findFirst: async () => ({ registrationId, eventId, registrationStatus: "CHECKED_IN" }),
+      update: async () => ({ routeVersion: 2 }),
+    },
+    registrationRouteStep: {
+      findMany: async () => [{
+        routeStepId: crypto.randomUUID(), registrationId, stationId, position: 1, completedAt: null,
+        station: { stationId, stationName: "Visual Acuity", stationType: "VISUAL_ACUITY", isActive: true, operationalStatus: "AVAILABLE" },
+      }],
+      updateMany: async () => ({ count: 1 }),
+    },
+    queueEntry: {
+      findFirst: async () => ({ id: crypto.randomUUID(), registrationId, stationId, queueNumber: 1, status: "IN_PROGRESS" }),
+      updateMany: async () => ({ count: 1 }),
+    },
   }));
 
   const result = await screeningService.saveVisualAcuity(eventId, stationId, body, user);
@@ -224,7 +239,8 @@ test("screening idempotency stores a canonical fingerprint", async (t) => {
   assert.equal(result.created, true);
   assert.equal(saved.requestFingerprint, fingerprintFor(request));
   assert.equal(receipt.requestFingerprint, fingerprintFor(request));
-  assert.equal(receipt.resultSnapshot.version, 1);
+  assert.equal(receipt.resultSnapshot.result.version, 1);
+  assert.equal(receipt.resultSnapshot.routeProgression.status, "REVIEW_READY");
   assert.equal(saved.requestFingerprint, screeningService.screeningRequestFingerprint({
     eventId,
     stationId,
@@ -256,6 +272,7 @@ test("delayed K1 replay returns its immutable result without replacing K2", asyn
       },
     },
     screeningResult: {
+      findUnique: async () => currentResult ? { resultId: currentResult.resultId } : null,
       upsert: async ({ update, create }) => {
         if (!currentResult) {
           currentResult = { resultId: crypto.randomUUID(), ...create, createdAt: new Date(), updatedAt: new Date() };
@@ -267,7 +284,21 @@ test("delayed K1 replay returns its immutable result without replacing K2", asyn
         return structuredClone(currentResult);
       },
     },
-    eventRegistration: { findFirst: async () => ({ registrationId, registrationStatus: "CHECKED_IN" }) },
+    eventRegistration: {
+      findFirst: async () => ({ registrationId, eventId, registrationStatus: "CHECKED_IN" }),
+      update: async () => ({ routeVersion: 2 }),
+    },
+    registrationRouteStep: {
+      findMany: async () => [{
+        routeStepId: crypto.randomUUID(), registrationId, stationId, position: 1, completedAt: null,
+        station: { stationId, stationName: "Visual Acuity", stationType: "VISUAL_ACUITY", isActive: true, operationalStatus: "AVAILABLE" },
+      }],
+      updateMany: async () => ({ count: 1 }),
+    },
+    queueEntry: {
+      findFirst: async () => ({ id: crypto.randomUUID(), registrationId, stationId, queueNumber: 1, status: "IN_PROGRESS" }),
+      updateMany: async () => ({ count: 1 }),
+    },
     auditLog: { create: async ({ data }) => data },
     domainEvent: { create: async ({ data }) => data },
   }));
@@ -284,9 +315,12 @@ test("delayed K1 replay returns its immutable result without replacing K2", asyn
   const delayedReplay = await screeningService.saveVisualAcuity(eventId, stationId, k1, user);
 
   assert.equal(first.result.version, 1);
+  assert.equal(first.routeProgression.status, "REVIEW_READY");
   assert.equal(correction.result.version, 2);
+  assert.equal(correction.routeProgression.status, "CORRECTION_SAVED");
   assert.equal(delayedReplay.created, false);
   assert.equal(delayedReplay.result.version, 1);
+  assert.deepEqual(delayedReplay.routeProgression, first.routeProgression);
   assert.deepEqual(delayedReplay.result.resultData, k1.resultData);
   assert.equal(currentResult.version, 2);
   assert.deepEqual(currentResult.resultData, k2.resultData);

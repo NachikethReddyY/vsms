@@ -50,7 +50,6 @@ export type QueueRegistration = {
   participantDisplayName: string;
   queueNumber: number | null;
   status: string;
-  passToken: string | null;
   existingResult: {
     resultId: string;
     overallFlag: OverallFlag;
@@ -134,6 +133,22 @@ export type ScreeningSaveResponse<T> = {
   evaluation?: FlagEvaluation;
   journey?: QueueJourney;
   queued?: boolean;
+  routeProgression?: RouteProgression | null;
+  syncState: 'COMMITTED' | 'PENDING_SYNC';
+};
+
+export type RouteProgression = {
+  status: 'ADDED_TO_QUEUE' | 'REVIEW_READY' | 'BLOCKED' | 'CORRECTION_SAVED';
+  routeVersion?: number;
+  completedStation?: Pick<Station, 'stationId' | 'stationName' | 'stationType'> | null;
+  nextStation?: Pick<Station, 'stationId' | 'stationName' | 'stationType'> | null;
+  nextQueue?: {
+    stationId: string;
+    stationName: string;
+    stationType: StationType;
+    queueNumber: number;
+    status: 'WAITING';
+  } | null;
 };
 
 export type VisualAcuityPayload = ScreeningSavePayload<VisualAcuityResultData>;
@@ -167,10 +182,10 @@ async function saveStation<T extends StationResultData>(
   stationId: string,
   path: ScreeningPath,
   body: ScreeningSavePayload<T>,
-) {
+): Promise<ScreeningSaveResponse<T>> {
   try {
     const { data } = await apiClient.post(`/events/${eventId}/stations/${stationId}/${path}`, body);
-    return data as ScreeningSaveResponse<T>;
+    return { ...(data as Omit<ScreeningSaveResponse<T>, 'syncState'>), syncState: 'COMMITTED' as const };
   } catch (error) {
     if (!isNetworkError(error)) throw error;
     if (path === 'eye-health') throw error;
@@ -193,6 +208,7 @@ async function saveStation<T extends StationResultData>(
       resultData: body.resultData,
       evaluation,
       queued: true,
+      syncState: 'PENDING_SYNC' as const,
     };
   }
 }
@@ -220,9 +236,9 @@ export const screeningApi = {
       participantDisplayName: string;
       queueNumber: number | null;
       status: string;
-      passToken: string | null;
     }>(`/events/${eventId}/registrations/resolve`, { params });
-    return data;
+    const { data: queue } = await apiClient.get<{ activeEntry: { station: { stationId: string; stationName: string; stationType: string } } | null }>(`/queues/events/${eventId}/participants/${data.registrationId}`);
+    return { ...data, activeStation: queue.activeEntry?.station ?? null };
   },
 
   async getPassDisplay(eventId: string, registrationId: string) {

@@ -13,11 +13,11 @@ import {
   UserIcon,
 } from '@heroicons/react/24/outline';
 import axios from 'axios';
-import { useCallback, useEffect, useId, useRef, useState, type FormEvent, type ReactNode } from 'react';
+import { useCallback, useEffect, useRef, useState, type FormEvent, type ReactNode } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { AppDialog } from '../../components/AppDialog';
 import { SignaturePad } from '../../components/SignaturePad';
-import { startQrScanner } from '../screening/startQrScanner';
+import { StationCameraScanner } from '../screening/StationCameraScanner';
 import {
   reviewApi,
   type OverallFlag,
@@ -902,6 +902,10 @@ export default function ReviewWorkspacePage() {
       <div className="review-queue-summary" aria-label="Review queue summary">
         <div><span>Ready for review</span><strong>{queueLoading ? '…' : queueItems.length}</strong></div>
         <p>{queueItems.length === 1 ? 'participant waiting' : 'participants waiting'}</p>
+        <label className="review-participant-lookup"><span>Find participant</span><select value={selectedId} disabled={queueLoading || queueItems.length === 0} onChange={(event) => {
+          const participant = queueItems.find((item) => item.registrationId === event.target.value);
+          if (participant) chooseParticipant(participant);
+        }}><option value="">Choose from review queue</option>{queueItems.map((item) => <option key={item.registrationId} value={item.registrationId}>{item.participantDisplayName}</option>)}</select></label>
         <button className="secondary" type="button" onClick={openNextParticipant} disabled={queueLoading || queueItems.length === 0}>Next participant</button>
       </div>
 
@@ -982,7 +986,13 @@ export default function ReviewWorkspacePage() {
         <button className="danger-button" type="button" onClick={discardDraft}>Discard draft</button>
       </div>
     </AppDialog>
-    <QrScanner open={scannerOpen} onOpenChange={setScannerOpen} onScan={scanParticipant} />
+    <StationCameraScanner
+      open={scannerOpen}
+      onOpenChange={setScannerOpen}
+      onScan={scanParticipant}
+      title="Scan participant QR"
+      description="Use the participant’s event QR throughout screening. Paste it or use a physical reader if the camera is unavailable."
+    />
     {detail && <ParticipantReport detail={detail} />}
   </div>;
 }

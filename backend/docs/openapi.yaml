@@ -2199,55 +2199,6 @@ paths:
         "404": { $ref: "#/components/responses/NotFound" }
         "409": { $ref: "#/components/responses/Conflict" }
         "422": { $ref: "#/components/responses/ValidationFailed" }
-  /api/v1/queues/events/{eventId}/stations/{stationId}/handoff:
-    post:
-      tags: [Queue]
-      operationId: createQueueHandoff
-      summary: Assign a registered participant to a station queue
-      parameters:
-        - $ref: "#/components/parameters/EventId"
-        - $ref: "#/components/parameters/StationId"
-        - $ref: "#/components/parameters/IdempotencyKey"
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema: { $ref: "#/components/schemas/QueueHandoffRequest" }
-      responses:
-        "201": { description: Queue handoff created, content: { application/json: { schema: { $ref: "#/components/schemas/QueueHandoffResponse" } } } }
-        "200": { description: Existing handoff returned, content: { application/json: { schema: { $ref: "#/components/schemas/QueueHandoffResponse" } } } }
-        "401": { $ref: "#/components/responses/Unauthorized" }
-        "403": { $ref: "#/components/responses/Forbidden" }
-        "404": { $ref: "#/components/responses/NotFound" }
-        "409": { $ref: "#/components/responses/Conflict" }
-        "422": { $ref: "#/components/responses/ValidationFailed" }
-  /api/v1/queues/events/{eventId}/stations/{stationId}/join:
-    post:
-      tags: [Queue]
-      operationId: joinQueue
-      summary: Join a participant into a station queue
-      parameters:
-        - name: eventId
-          in: path
-          required: true
-          schema: { type: string, format: uuid }
-        - name: stationId
-          in: path
-          required: true
-          schema: { type: string, format: uuid }
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema: { $ref: "#/components/schemas/JoinQueueRequest" }
-      responses:
-        "201": { description: Participant joined the queue, content: { application/json: { schema: { $ref: "#/components/schemas/JoinQueueResponse" } } } }
-        "200": { description: Participant already in this station queue, content: { application/json: { schema: { $ref: "#/components/schemas/JoinQueueResponse" } } } }
-        "401": { $ref: "#/components/responses/Unauthorized" }
-        "403": { $ref: "#/components/responses/Forbidden" }
-        "404": { $ref: "#/components/responses/NotFound" }
-        "409": { $ref: "#/components/responses/Conflict" }
-        "422": { $ref: "#/components/responses/ValidationFailed" }
   /api/v1/queues/events/{eventId}/participants/{registrationId}:
     get:
       tags: [Queue]
@@ -2264,6 +2215,59 @@ paths:
         "401": { $ref: "#/components/responses/Unauthorized" }
         "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
+        "422": { $ref: "#/components/responses/ValidationFailed" }
+  /api/v1/queues/events/{eventId}/participants/{registrationId}/route:
+    get:
+      tags: [Queue]
+      operationId: getParticipantRoute
+      summary: Read the participant route for an authorized route editor
+      parameters:
+        - $ref: "#/components/parameters/EventId"
+        - name: registrationId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        "200":
+          description: Current route state
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/RouteOverrideResponse" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    patch:
+      tags: [Queue]
+      operationId: replaceParticipantRoute
+      summary: Replace an authorized portion of a participant's unfinished screening route
+      description: Event managers and administrators may reorder the full unfinished tail. On-duty registration officers and screeners may select only the next unfinished station; the server preserves the relative order of the remainder. Completed and active steps are immutable.
+      parameters:
+        - $ref: "#/components/parameters/EventId"
+        - name: registrationId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/RouteOverrideRequest" }
+      responses:
+        "200":
+          description: Latest committed route state
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/RouteOverrideResponse" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409":
+          description: Route version or state conflict; version conflicts include the latest safe route state
+          content:
+            application/problem+json:
+              schema: { $ref: "#/components/schemas/RouteOverrideConflict" }
+            application/json:
+              schema: { $ref: "#/components/schemas/RouteOverrideConflict" }
         "422": { $ref: "#/components/responses/ValidationFailed" }
   /api/v1/queues/participant/{registrationId}:
     get:
@@ -2291,21 +2295,6 @@ paths:
       summary: Start an event-scoped queue entry
       parameters: [{ $ref: "#/components/parameters/EventId" }, { $ref: "#/components/parameters/QueueId" }]
       responses: { "200": { description: Queue entry started, content: { application/json: { schema: { $ref: "#/components/schemas/QueueEntry" } } } }, "403": { $ref: "#/components/responses/Forbidden" }, "404": { $ref: "#/components/responses/NotFound" }, "409": { $ref: "#/components/responses/Conflict" } }
-  /api/v1/queues/events/{eventId}/entries/{queueId}/advance:
-    patch:
-      tags: [Queue]
-      operationId: advanceEventQueueEntry
-      summary: Advance an event-scoped queue entry
-      parameters: [{ $ref: "#/components/parameters/EventId" }, { $ref: "#/components/parameters/QueueId" }, { $ref: "#/components/parameters/IdempotencyKey" }]
-      requestBody: { required: true, content: { application/json: { schema: { $ref: "#/components/schemas/AdvanceQueueRequest" } } } }
-      responses: { "200": { description: Participant transferred, content: { application/json: { schema: { $ref: "#/components/schemas/AdvanceQueueResponse" } } } }, "403": { $ref: "#/components/responses/Forbidden" }, "404": { $ref: "#/components/responses/NotFound" }, "409": { $ref: "#/components/responses/Conflict" } }
-  /api/v1/queues/events/{eventId}/entries/{queueId}/complete:
-    patch:
-      tags: [Queue]
-      operationId: completeEventQueueEntry
-      summary: Complete an event-scoped queue entry
-      parameters: [{ $ref: "#/components/parameters/EventId" }, { $ref: "#/components/parameters/QueueId" }]
-      responses: { "200": { description: Queue entry completed, content: { application/json: { schema: { $ref: "#/components/schemas/QueueEntry" } } } }, "403": { $ref: "#/components/responses/Forbidden" }, "404": { $ref: "#/components/responses/NotFound" }, "409": { $ref: "#/components/responses/Conflict" } }
   /api/v1/queues/events/{eventId}/entries/{queueId}/skip:
     patch:
       tags: [Queue]
@@ -2349,45 +2338,6 @@ paths:
           schema: { type: string, format: uuid }
       responses:
         "200": { description: Queue entry started, content: { application/json: { schema: { $ref: "#/components/schemas/QueueEntry" } } } }
-        "401": { $ref: "#/components/responses/Unauthorized" }
-        "403": { $ref: "#/components/responses/Forbidden" }
-        "404": { $ref: "#/components/responses/NotFound" }
-        "409": { $ref: "#/components/responses/Conflict" }
-        "422": { $ref: "#/components/responses/ValidationFailed" }
-  /api/v1/queues/entries/{queueId}/advance:
-    patch:
-      tags: [Queue]
-      operationId: advanceQueueEntry
-      summary: Transfer a participant to the next station and close the current queue entry
-      parameters:
-        - name: queueId
-          in: path
-          required: true
-          schema: { type: string, format: uuid }
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema: { $ref: "#/components/schemas/AdvanceQueueRequest" }
-      responses:
-        "200": { description: Participant transferred, content: { application/json: { schema: { $ref: "#/components/schemas/AdvanceQueueResponse" } } } }
-        "401": { $ref: "#/components/responses/Unauthorized" }
-        "403": { $ref: "#/components/responses/Forbidden" }
-        "404": { $ref: "#/components/responses/NotFound" }
-        "409": { $ref: "#/components/responses/Conflict" }
-        "422": { $ref: "#/components/responses/ValidationFailed" }
-  /api/v1/queues/entries/{queueId}/complete:
-    patch:
-      tags: [Queue]
-      operationId: completeQueueEntry
-      summary: Complete the final queue station and mark the registration completed
-      parameters:
-        - name: queueId
-          in: path
-          required: true
-          schema: { type: string, format: uuid }
-      responses:
-        "200": { description: Queue entry completed, content: { application/json: { schema: { $ref: "#/components/schemas/QueueEntry" } } } }
         "401": { $ref: "#/components/responses/Unauthorized" }
         "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
@@ -4861,7 +4811,84 @@ components:
         queueNumber: { type: integer, nullable: true }
         status: { $ref: "#/components/schemas/RegistrationStatus" }
         registration: { $ref: "#/components/schemas/Registration" }
+        route: { $ref: "#/components/schemas/RegistrationRouteState" }
+        securePass: { $ref: "#/components/schemas/QrPass" }
         idempotentReplay: { type: boolean }
+    RegistrationRouteStepState:
+      type: object
+      additionalProperties: false
+      required: [stationId, stationName, stationType, position, state]
+      properties:
+        stationId: { type: string, format: uuid }
+        stationName: { type: string }
+        stationType: { type: string }
+        position: { type: integer, minimum: 1 }
+        state: { type: string, enum: [COMPLETED, CURRENT, BLOCKED, UPCOMING] }
+    RegistrationRouteQueue:
+      type: object
+      nullable: true
+      additionalProperties: false
+      required: [queueEntryId, stationId, queueNumber, status]
+      properties:
+        queueEntryId: { type: string, format: uuid }
+        stationId: { type: string, format: uuid }
+        queueNumber: { type: integer, minimum: 1 }
+        status: { type: string, enum: [WAITING, CALLED, IN_PROGRESS] }
+    RegistrationRouteState:
+      type: object
+      additionalProperties: false
+      required: [status, routeVersion, steps, currentStation, queue]
+      properties:
+        status: { type: string, enum: [PENDING_CHECK_IN, READY, REVIEW_READY, NEEDS_STAFF_ACTION, NO_SCREENING_STATIONS] }
+        routeVersion: { type: integer, minimum: 1 }
+        steps:
+          type: array
+          items: { $ref: "#/components/schemas/RegistrationRouteStepState" }
+        currentStation:
+          type: object
+          allOf: [{ $ref: "#/components/schemas/RegistrationRouteStepState" }]
+          nullable: true
+        queue: { $ref: "#/components/schemas/RegistrationRouteQueue" }
+    RouteOverrideReasonCode:
+      type: string
+      enum: [STATION_UNAVAILABLE, QUEUE_BALANCING, PARTICIPANT_NEED, EQUIPMENT_ISSUE, OPERATIONAL_EXCEPTION]
+    RouteOverrideRequest:
+      type: object
+      additionalProperties: false
+      required: [stationIds, reasonCode, expectedVersion]
+      properties:
+        stationIds:
+          type: array
+          minItems: 1
+          maxItems: 100
+          uniqueItems: true
+          description: Complete proposed order of every unfinished required station. The active station, when present, must remain in place; completed stations are retained by the server.
+          items: { type: string, format: uuid }
+        reasonCode: { $ref: "#/components/schemas/RouteOverrideReasonCode" }
+        expectedVersion: { type: integer, minimum: 1 }
+    RouteOverrideResponse:
+      type: object
+      additionalProperties: false
+      required: [status, data]
+      properties:
+        status: { type: string, enum: [success] }
+        data: { $ref: "#/components/schemas/RegistrationRouteState" }
+    RouteOverrideConflict:
+      type: object
+      additionalProperties: false
+      required: [type, title, error, status, code]
+      properties:
+        type: { type: string, format: uri }
+        title: { type: string }
+        error: { type: string }
+        status: { type: integer, enum: [409] }
+        code: { type: string }
+        requestId: { type: string, format: uuid }
+        errors:
+          type: object
+          additionalProperties: false
+          properties:
+            latestRoute: { $ref: "#/components/schemas/RegistrationRouteState" }
     RegistrationListResponse:
       type: object
       additionalProperties: false
@@ -5024,80 +5051,37 @@ components:
         data:
           type: object
           additionalProperties: false
-          required: [valid, eventName, currentQueueNumber, queueNumber, registrationStatus, queueState, aheadAtStation, stations, transfers, expiresAt]
+          required: [valid, eventName, queueNumber, registrationStatus, queueState, route, expiresAt]
           properties:
             valid: { type: boolean, description: Whether the pass is active and unexpired }
             eventName: { type: string, nullable: true, description: "Only the event name; never participant data. Unset when the pass is invalid" }
-            currentQueueNumber: { type: integer, nullable: true, description: "Highest queue number already checked in for the event (now serving). Unset when the pass is invalid" }
             queueNumber: { type: integer, nullable: true }
-            registrationStatus: { $ref: "#/components/schemas/RegistrationStatus" }
+            registrationStatus: { type: string, enum: [SIGNED_UP, CHECKED_IN, COMPLETED, CANCELLED], nullable: true }
             queueState:
               type: object
               nullable: true
               additionalProperties: false
-              required: [status, queueNumber, isPriority, station]
+              required: [status, queueNumber, station]
               properties:
                 status: { $ref: "#/components/schemas/QueueStatus", description: "Participant's own live queue state (waiting/called/in-progress)" }
                 queueNumber: { type: integer }
-                isPriority: { type: boolean }
                 station:
                   type: object
                   additionalProperties: false
-                  required: [id, name, type]
+                  required: [name, type]
                   properties:
-                    id: { type: string, format: uuid }
                     name: { type: string }
                     type: { type: string }
-                enteredAt: { type: string, format: date-time, nullable: true }
-                calledAt: { type: string, format: date-time, nullable: true }
-                startedAt: { type: string, format: date-time, nullable: true }
-                completedAt: { type: string, format: date-time, nullable: true }
-            aheadAtStation: { type: integer, nullable: true, description: "Number of WAITING participants ahead of this pass at its current station" }
-            stations:
+            route:
               type: array
               items:
                 type: object
                 additionalProperties: false
-                required: [stationId, stationName, stationType, stationOrder, status, activeQueueCount, capacity, occupancyPercent, selectable, workload, nextUp]
+                required: [stationName, stationType, state]
                 properties:
-                  stationId: { type: string, format: uuid }
                   stationName: { type: string }
                   stationType: { type: string }
-                  stationOrder: { type: integer }
-                  status: { type: string, enum: [AVAILABLE, BUSY, PAUSED, OFFLINE] }
-                  activeQueueCount: { type: integer, minimum: 0 }
-                  capacity: { type: integer, minimum: 1 }
-                  occupancyPercent: { type: integer, minimum: 0, description: "Active queue entries as a percentage of station capacity; may exceed 100 when overloaded" }
-                  selectable: { type: boolean, description: "Busy stations remain selectable; paused and offline stations do not" }
-                  workload:
-                    type: object
-                    additionalProperties: false
-                    required: [WAITING, CALLED, IN_PROGRESS, COMPLETED, SKIPPED, CANCELLED]
-                    properties:
-                      WAITING: { type: integer }
-                      CALLED: { type: integer }
-                      IN_PROGRESS: { type: integer }
-                      COMPLETED: { type: integer }
-                      SKIPPED: { type: integer }
-                      CANCELLED: { type: integer }
-                  nextUp:
-                    type: object
-                    nullable: true
-                    additionalProperties: false
-                    required: [queueNumber]
-                    properties:
-                      queueNumber: { type: integer }
-            transfers:
-              type: array
-              description: "Station-transfer trail for this pass (no participant data)"
-              items:
-                type: object
-                additionalProperties: false
-                required: [fromStation, toStation, at]
-                properties:
-                  fromStation: { type: string }
-                  toStation: { type: string }
-                  at: { type: string, format: date-time }
+                  state: { type: string, enum: [COMPLETED, CURRENT, UPCOMING, BLOCKED] }
             expiresAt: { type: string, format: date-time, nullable: true }
     QrMutationResponse:
       type: object
@@ -5211,7 +5195,7 @@ components:
     ManualCheckInResult:
       type: object
       additionalProperties: false
-      required: [registrationId, eventId, registrationStatus, checkedIn, checkedInAt, queueNumber]
+      required: [registrationId, eventId, registrationStatus, checkedIn, checkedInAt, queueNumber, route]
       properties:
         registrationId: { type: string, format: uuid }
         eventId: { type: string, format: uuid }
@@ -5219,6 +5203,7 @@ components:
         checkedIn: { type: boolean, enum: [true] }
         checkedInAt: { type: string, format: date-time }
         queueNumber: { type: integer, nullable: true }
+        route: { $ref: "#/components/schemas/RegistrationRouteState" }
     ManualCheckInResponse:
       type: object
       additionalProperties: false
@@ -5423,19 +5408,6 @@ components:
           type: array
           description: "Every queue entry for the event, ordered by queue number, with priority ordering surfaced through each station's next-up"
           items: { $ref: "#/components/schemas/EventQueueEntry" }
-    JoinQueueRequest:
-      type: object
-      additionalProperties: false
-      required: [registrationId]
-      properties:
-        registrationId: { type: string, format: uuid }
-    JoinQueueResponse:
-      type: object
-      additionalProperties: false
-      required: [queueEntry, created]
-      properties:
-        queueEntry: { $ref: "#/components/schemas/QueueEntry" }
-        created: { type: boolean }
     RegistrationStation:
       type: object
       additionalProperties: false
@@ -5465,46 +5437,6 @@ components:
             status: { type: string }
             venue: { type: string, nullable: true }
         stations: { type: array, items: { $ref: "#/components/schemas/RegistrationStation" } }
-    QueueHandoffRequest:
-      type: object
-      additionalProperties: false
-      required: [registrationId]
-      properties:
-        registrationId: { type: string, format: uuid }
-    QueueHandoffResponse:
-      type: object
-      additionalProperties: false
-      required: [created, registrationId, queueEntryId, participant, event, queueNumber, nextStation, assignedStation]
-      properties:
-        created: { type: boolean }
-        registrationId: { type: string, format: uuid }
-        queueEntryId: { type: string, format: uuid }
-        participant:
-          type: object
-          additionalProperties: false
-          required: [id, participantReference, name]
-          properties:
-            id: { type: string, format: uuid }
-            participantReference: { type: string }
-            name: { type: string }
-        event:
-          type: object
-          additionalProperties: false
-          required: [id, name]
-          properties:
-            id: { type: string, format: uuid }
-            name: { type: string }
-        queueNumber: { type: integer }
-        nextStation: { type: string }
-        assignedStation:
-          type: object
-          additionalProperties: false
-          required: [id, name, status, statusBeforeHandoff]
-          properties:
-            id: { type: string, format: uuid }
-            name: { type: string }
-            status: { type: string, enum: [BUSY] }
-            statusBeforeHandoff: { type: string, enum: [AVAILABLE, BUSY] }
     ParticipantQueueStatusResponse:
       type: object
       additionalProperties: false
@@ -5520,20 +5452,6 @@ components:
         history:
           type: array
           additionalProperties: true
-    AdvanceQueueRequest:
-      type: object
-      additionalProperties: false
-      required: [toStationId]
-      properties:
-        toStationId: { type: string, format: uuid }
-        reason: { type: string, maxLength: 100 }
-    AdvanceQueueResponse:
-      type: object
-      additionalProperties: false
-      required: [completed, nextEntry]
-      properties:
-        completed: { $ref: "#/components/schemas/QueueEntry" }
-        nextEntry: { $ref: "#/components/schemas/QueueEntry" }
     EyeReading:
       oneOf:
         - type: object
@@ -5725,6 +5643,7 @@ components:
         overallFlag: { $ref: "#/components/schemas/OverallFlag" }
         isFlagged: { type: boolean }
         ruleVersion: { type: string }
+        routeProgression: { type: object, allOf: [{ $ref: "#/components/schemas/RouteProgression" }], nullable: true }
     ScreeningSyncActionResult:
       type: object
       additionalProperties: false
@@ -5829,8 +5748,37 @@ components:
         idempotencyKey: { type: string }
         version: { type: integer, minimum: 1 }
         evaluation: { $ref: "#/components/schemas/ScreeningEvaluation" }
+        routeProgression: { $ref: "#/components/schemas/RouteProgression" }
         createdAt: { type: string, format: date-time }
         updatedAt: { type: string, format: date-time }
+    RouteProgressionStation:
+      type: object
+      additionalProperties: false
+      required: [stationId, stationName, stationType]
+      properties:
+        stationId: { type: string, format: uuid }
+        stationName: { type: string }
+        stationType: { type: string }
+    RouteProgressionQueue:
+      type: object
+      additionalProperties: false
+      required: [stationId, stationName, stationType, queueNumber, status]
+      properties:
+        stationId: { type: string, format: uuid }
+        stationName: { type: string }
+        stationType: { type: string }
+        queueNumber: { type: integer }
+        status: { type: string, enum: [WAITING] }
+    RouteProgression:
+      type: object
+      additionalProperties: false
+      required: [status]
+      properties:
+        status: { type: string, enum: [ADDED_TO_QUEUE, REVIEW_READY, BLOCKED, CORRECTION_SAVED] }
+        routeVersion: { type: integer, minimum: 1 }
+        completedStation: { type: object, allOf: [{ $ref: "#/components/schemas/RouteProgressionStation" }], nullable: true }
+        nextStation: { type: object, allOf: [{ $ref: "#/components/schemas/RouteProgressionStation" }], nullable: true }
+        nextQueue: { type: object, allOf: [{ $ref: "#/components/schemas/RouteProgressionQueue" }], nullable: true }
     Problem:
       type: object
       required: [type, title, status, code, requestId]

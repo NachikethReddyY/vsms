@@ -14,7 +14,7 @@ import {
   FlagBanner,
   loadStationContext,
   ParticipantLookup,
-  StationHandoffLinks,
+  RouteProgressionNotice,
   StationPageFrame,
 } from './StationShared';
 
@@ -119,8 +119,8 @@ export default function ColourVisionStationPage() {
         acknowledged: preview.isFlagged ? acknowledged : false,
         resultData,
       });
-      setSuccess(saved.queued
-        ? 'Saved offline. It will sync when connected.'
+      setSuccess(saved.syncState === 'PENDING_SYNC'
+        ? 'Pending sync. The participant has not entered the next queue.'
         : saved.isFlagged
           ? `Saved with ${saved.overallFlag} flag (${saved.ruleVersion ?? preview.ruleVersion}): ${saved.flagSummary}`
           : `Saved Colour Vision result (${saved.overallFlag}, ${saved.ruleVersion ?? preview.ruleVersion}).`);
@@ -172,6 +172,7 @@ export default function ColourVisionStationPage() {
     >
       <ParticipantLookup
         eventId={eventId}
+        currentStationId={station?.stationId ?? ''}
         queue={queue}
         selectedId={selectedId}
         onSelect={setSelectedId}

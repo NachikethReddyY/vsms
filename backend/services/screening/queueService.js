@@ -2504,15 +2504,11 @@ const redirectQueueEntry = async (
 };
 
 module.exports = {
-  joinQueue,
   listRegistrationStations,
-  createQueueHandoff,
   getEventQueueStatus,
   getParticipantQueueStatus,
   callQueueEntry,
   startQueueEntry,
-  advanceQueueEntry,
-  completeQueueEntry,
   skipQueueEntry,
   leaveQueue,
   updatePriority,

@@ -5,10 +5,11 @@ const prisma = require("./prismaClient");
 const { encrypt, encryptionContext } = require("../utils/crypto/cryptoUtils");
 const qrService = require("../services/participant/qrService");
 
-const DEMO_PASSWORD = process.env.VSMS_DEMO_PASSWORD || "Demo-Only-Change-Me-2026!";
-if (process.env.NODE_ENV === "production" && !process.env.VSMS_DEMO_PASSWORD) {
-  throw new Error("VSMS_DEMO_PASSWORD is required for production seed execution");
+if (process.env.NODE_ENV === "production") {
+  throw new Error("Demo seed execution is forbidden in production");
 }
+
+const DEMO_PASSWORD = process.env.VSMS_DEMO_PASSWORD || "Demo-Only-Change-Me-2026!";
 
 const DEMO_ANCHOR_DATE = process.env.VSMS_DEMO_ANCHOR_DATE || "2026-08-10";
 if (!/^\d{4}-\d{2}-\d{2}$/.test(DEMO_ANCHOR_DATE) || Number.isNaN(Date.parse(`${DEMO_ANCHOR_DATE}T00:00:00.000Z`))) {
@@ -666,7 +667,7 @@ async function ensureDemoRegistration(staff, participant, event, consent) {
     update: {
       registrationStatus: "SIGNED_UP",
       participantDisplayName: `${participant.firstName} ${participant.lastName}`,
-      passToken: DEMO_QR_TOKEN,
+      passToken: null,
     },
     create: {
       participantId: participant.id,
@@ -676,7 +677,7 @@ async function ensureDemoRegistration(staff, participant, event, consent) {
       participantDisplayName: `${participant.firstName} ${participant.lastName}`,
       queueNumber: 1,
       idempotencyKey,
-      passToken: DEMO_QR_TOKEN,
+      passToken: null,
     },
   });
   const history = await prisma.registrationStatusHistory.findFirst({

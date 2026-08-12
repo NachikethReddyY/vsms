@@ -2199,40 +2199,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/v1/queues/events/{eventId}/stations/{stationId}/handoff": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** Assign a registered participant to a station queue */
-        post: operations["createQueueHandoff"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/queues/events/{eventId}/stations/{stationId}/join": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** Join a participant into a station queue */
-        post: operations["joinQueue"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/api/v1/queues/events/{eventId}/participants/{registrationId}": {
         parameters: {
             query?: never;
@@ -2248,6 +2214,27 @@ export interface paths {
         options?: never;
         head?: never;
         patch?: never;
+        trace?: never;
+    };
+    "/api/v1/queues/events/{eventId}/participants/{registrationId}/route": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Read the participant route for an authorized route editor */
+        get: operations["getParticipantRoute"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Replace an authorized portion of a participant's unfinished screening route
+         * @description Event managers and administrators may reorder the full unfinished tail. On-duty registration officers and screeners may select only the next unfinished station; the server preserves the relative order of the remainder. Completed and active steps are immutable.
+         */
+        patch: operations["replaceParticipantRoute"];
         trace?: never;
     };
     "/api/v1/queues/participant/{registrationId}": {
@@ -2302,40 +2289,6 @@ export interface paths {
         head?: never;
         /** Start an event-scoped queue entry */
         patch: operations["startEventQueueEntry"];
-        trace?: never;
-    };
-    "/api/v1/queues/events/{eventId}/entries/{queueId}/advance": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        /** Advance an event-scoped queue entry */
-        patch: operations["advanceEventQueueEntry"];
-        trace?: never;
-    };
-    "/api/v1/queues/events/{eventId}/entries/{queueId}/complete": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        /** Complete an event-scoped queue entry */
-        patch: operations["completeEventQueueEntry"];
         trace?: never;
     };
     "/api/v1/queues/events/{eventId}/entries/{queueId}/skip": {
@@ -2404,40 +2357,6 @@ export interface paths {
         head?: never;
         /** Begin servicing a called participant */
         patch: operations["startQueueEntry"];
-        trace?: never;
-    };
-    "/api/v1/queues/entries/{queueId}/advance": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        /** Transfer a participant to the next station and close the current queue entry */
-        patch: operations["advanceQueueEntry"];
-        trace?: never;
-    };
-    "/api/v1/queues/entries/{queueId}/complete": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        /** Complete the final queue station and mark the registration completed */
-        patch: operations["completeQueueEntry"];
         trace?: never;
     };
     "/api/v1/queues/entries/{queueId}/skip": {
@@ -4424,9 +4343,64 @@ export interface components {
             queueNumber: number | null;
             status: components["schemas"]["RegistrationStatus"];
             registration: components["schemas"]["Registration"];
+            route?: components["schemas"]["RegistrationRouteState"];
+            securePass?: components["schemas"]["QrPass"];
             idempotentReplay?: boolean;
         } & {
             [key: string]: unknown;
+        };
+        RegistrationRouteStepState: {
+            /** Format: uuid */
+            stationId: string;
+            stationName: string;
+            stationType: string;
+            position: number;
+            /** @enum {string} */
+            state: "COMPLETED" | "CURRENT" | "BLOCKED" | "UPCOMING";
+        };
+        RegistrationRouteQueue: {
+            /** Format: uuid */
+            queueEntryId: string;
+            /** Format: uuid */
+            stationId: string;
+            queueNumber: number;
+            /** @enum {string} */
+            status: "WAITING" | "CALLED" | "IN_PROGRESS";
+        } | null;
+        RegistrationRouteState: {
+            /** @enum {string} */
+            status: "PENDING_CHECK_IN" | "READY" | "REVIEW_READY" | "NEEDS_STAFF_ACTION" | "NO_SCREENING_STATIONS";
+            routeVersion: number;
+            steps: components["schemas"]["RegistrationRouteStepState"][];
+            currentStation: components["schemas"]["RegistrationRouteStepState"] | null;
+            queue: components["schemas"]["RegistrationRouteQueue"];
+        };
+        /** @enum {string} */
+        RouteOverrideReasonCode: "STATION_UNAVAILABLE" | "QUEUE_BALANCING" | "PARTICIPANT_NEED" | "EQUIPMENT_ISSUE" | "OPERATIONAL_EXCEPTION";
+        RouteOverrideRequest: {
+            /** @description Complete proposed order of every unfinished required station. The active station, when present, must remain in place; completed stations are retained by the server. */
+            stationIds: string[];
+            reasonCode: components["schemas"]["RouteOverrideReasonCode"];
+            expectedVersion: number;
+        };
+        RouteOverrideResponse: {
+            /** @enum {string} */
+            status: "success";
+            data: components["schemas"]["RegistrationRouteState"];
+        };
+        RouteOverrideConflict: {
+            /** Format: uri */
+            type: string;
+            title: string;
+            error: string;
+            /** @enum {integer} */
+            status: 409;
+            code: string;
+            /** Format: uuid */
+            requestId?: string;
+            errors?: {
+                latestRoute?: components["schemas"]["RegistrationRouteState"];
+            };
         };
         RegistrationListResponse: {
             registrations: components["schemas"]["Registration"][];
@@ -4583,64 +4557,23 @@ export interface components {
                 valid: boolean;
                 /** @description Only the event name; never participant data. Unset when the pass is invalid */
                 eventName: string | null;
-                /** @description Highest queue number already checked in for the event (now serving). Unset when the pass is invalid */
-                currentQueueNumber: number | null;
                 queueNumber: number | null;
-                registrationStatus: components["schemas"]["RegistrationStatus"];
+                /** @enum {string|null} */
+                registrationStatus: "SIGNED_UP" | "CHECKED_IN" | "COMPLETED" | "CANCELLED" | null;
                 queueState: {
                     /** @description Participant's own live queue state (waiting/called/in-progress) */
                     status: components["schemas"]["QueueStatus"];
                     queueNumber: number;
-                    isPriority: boolean;
                     station: {
-                        /** Format: uuid */
-                        id: string;
                         name: string;
                         type: string;
                     };
-                    /** Format: date-time */
-                    enteredAt?: string | null;
-                    /** Format: date-time */
-                    calledAt?: string | null;
-                    /** Format: date-time */
-                    startedAt?: string | null;
-                    /** Format: date-time */
-                    completedAt?: string | null;
                 } | null;
-                /** @description Number of WAITING participants ahead of this pass at its current station */
-                aheadAtStation: number | null;
-                stations: {
-                    /** Format: uuid */
-                    stationId: string;
+                route: {
                     stationName: string;
                     stationType: string;
-                    stationOrder: number;
                     /** @enum {string} */
-                    status: "AVAILABLE" | "BUSY" | "PAUSED" | "OFFLINE";
-                    activeQueueCount: number;
-                    capacity: number;
-                    /** @description Active queue entries as a percentage of station capacity; may exceed 100 when overloaded */
-                    occupancyPercent: number;
-                    /** @description Busy stations remain selectable; paused and offline stations do not */
-                    selectable: boolean;
-                    workload: {
-                        WAITING: number;
-                        CALLED: number;
-                        IN_PROGRESS: number;
-                        COMPLETED: number;
-                        SKIPPED: number;
-                        CANCELLED: number;
-                    };
-                    nextUp: {
-                        queueNumber: number;
-                    } | null;
-                }[];
-                /** @description Station-transfer trail for this pass (no participant data) */
-                transfers: {
-                    fromStation: string;
-                    toStation: string;
-                    /** Format: date-time */
-                    at: string;
+                    state: "COMPLETED" | "CURRENT" | "UPCOMING" | "BLOCKED";
                 }[];
                 /** Format: date-time */
                 expiresAt: string | null;
@@ -4753,6 +4686,7 @@ export interface components {
             /** Format: date-time */
             checkedInAt: string;
             queueNumber: number | null;
+            route: components["schemas"]["RegistrationRouteState"];
         };
         ManualCheckInResponse: {
             /** @enum {boolean} */
@@ -4938,14 +4872,6 @@ export interface components {
             /** @description Every queue entry for the event, ordered by queue number, with priority ordering surfaced through each station's next-up */
             entries: components["schemas"]["EventQueueEntry"][];
         };
-        JoinQueueRequest: {
-            /** Format: uuid */
-            registrationId: string;
-        };
-        JoinQueueResponse: {
-            queueEntry: components["schemas"]["QueueEntry"];
-            created: boolean;
-        };
         RegistrationStation: {
             /** Format: uuid */
             stationId: string;
@@ -4970,39 +4896,6 @@ export interface components {
             };
             stations: components["schemas"]["RegistrationStation"][];
         };
-        QueueHandoffRequest: {
-            /** Format: uuid */
-            registrationId: string;
-        };
-        QueueHandoffResponse: {
-            created: boolean;
-            /** Format: uuid */
-            registrationId: string;
-            /** Format: uuid */
-            queueEntryId: string;
-            participant: {
-                /** Format: uuid */
-                id: string;
-                participantReference: string;
-                name: string;
-            };
-            event: {
-                /** Format: uuid */
-                id: string;
-                name: string;
-            };
-            queueNumber: number;
-            nextStation: string;
-            assignedStation: {
-                /** Format: uuid */
-                id: string;
-                name: string;
-                /** @enum {string} */
-                status: "BUSY";
-                /** @enum {string} */
-                statusBeforeHandoff: "AVAILABLE" | "BUSY";
-            };
-        };
         ParticipantQueueStatusResponse: {
             /** Format: uuid */
             registrationId: string;
@@ -5012,15 +4905,6 @@ export interface components {
                 [key: string]: unknown;
             } | null;
             history: unknown[];
-        };
-        AdvanceQueueRequest: {
-            /** Format: uuid */
-            toStationId: string;
-            reason?: string;
-        };
-        AdvanceQueueResponse: {
-            completed: components["schemas"]["QueueEntry"];
-            nextEntry: components["schemas"]["QueueEntry"];
         };
         EyeReading: {
             /** @enum {string} */
@@ -5172,6 +5056,7 @@ export interface components {
             overallFlag?: components["schemas"]["OverallFlag"];
             isFlagged?: boolean;
             ruleVersion?: string;
+            routeProgression?: components["schemas"]["RouteProgression"] | null;
         };
         ScreeningSyncActionResult: {
             /** Format: uuid */
@@ -5262,12 +5147,36 @@ export interface components {
             idempotencyKey: string;
             version: number;
             evaluation?: components["schemas"]["ScreeningEvaluation"];
+            routeProgression?: components["schemas"]["RouteProgression"];
             /** Format: date-time */
             createdAt: string;
             /** Format: date-time */
             updatedAt: string;
         } & {
             [key: string]: unknown;
+        };
+        RouteProgressionStation: {
+            /** Format: uuid */
+            stationId: string;
+            stationName: string;
+            stationType: string;
+        };
+        RouteProgressionQueue: {
+            /** Format: uuid */
+            stationId: string;
+            stationName: string;
+            stationType: string;
+            queueNumber: number;
+            /** @enum {string} */
+            status: "WAITING";
+        };
+        RouteProgression: {
+            /** @enum {string} */
+            status: "ADDED_TO_QUEUE" | "REVIEW_READY" | "BLOCKED" | "CORRECTION_SAVED";
+            routeVersion?: number;
+            completedStation?: components["schemas"]["RouteProgressionStation"] | null;
+            nextStation?: components["schemas"]["RouteProgressionStation"] | null;
+            nextQueue?: components["schemas"]["RouteProgressionQueue"] | null;
         };
         Problem: {
             /** Format: uri */
@@ -9367,90 +9276,6 @@ export interface operations {
             422: components["responses"]["ValidationFailed"];
         };
     };
-    createQueueHandoff: {
-        parameters: {
-            query?: never;
-            header: {
-                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
-            };
-            path: {
-                eventId: components["parameters"]["EventId"];
-                stationId: components["parameters"]["StationId"];
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["QueueHandoffRequest"];
-            };
-        };
-        responses: {
-            /** @description Existing handoff returned */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["QueueHandoffResponse"];
-                };
-            };
-            /** @description Queue handoff created */
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["QueueHandoffResponse"];
-                };
-            };
-            401: components["responses"]["Unauthorized"];
-            403: components["responses"]["Forbidden"];
-            404: components["responses"]["NotFound"];
-            409: components["responses"]["Conflict"];
-            422: components["responses"]["ValidationFailed"];
-        };
-    };
-    joinQueue: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                eventId: string;
-                stationId: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["JoinQueueRequest"];
-            };
-        };
-        responses: {
-            /** @description Participant already in this station queue */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["JoinQueueResponse"];
-                };
-            };
-            /** @description Participant joined the queue */
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["JoinQueueResponse"];
-                };
-            };
-            401: components["responses"]["Unauthorized"];
-            403: components["responses"]["Forbidden"];
-            404: components["responses"]["NotFound"];
-            409: components["responses"]["Conflict"];
-            422: components["responses"]["ValidationFailed"];
-        };
-    };
     getParticipantQueueStatus: {
         parameters: {
             query?: never;
@@ -9475,6 +9300,73 @@ export interface operations {
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
+            422: components["responses"]["ValidationFailed"];
+        };
+    };
+    getParticipantRoute: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                eventId: components["parameters"]["EventId"];
+                registrationId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Current route state */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RouteOverrideResponse"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    replaceParticipantRoute: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                eventId: components["parameters"]["EventId"];
+                registrationId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RouteOverrideRequest"];
+            };
+        };
+        responses: {
+            /** @description Latest committed route state */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RouteOverrideResponse"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            /** @description Route version or state conflict; version conflicts include the latest safe route state */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["RouteOverrideConflict"];
+                    "application/json": components["schemas"]["RouteOverrideConflict"];
+                };
+            };
             422: components["responses"]["ValidationFailed"];
         };
     };
@@ -9542,64 +9434,6 @@ export interface operations {
         requestBody?: never;
         responses: {
             /** @description Queue entry started */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["QueueEntry"];
-                };
-            };
-            403: components["responses"]["Forbidden"];
-            404: components["responses"]["NotFound"];
-            409: components["responses"]["Conflict"];
-        };
-    };
-    advanceEventQueueEntry: {
-        parameters: {
-            query?: never;
-            header: {
-                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
-            };
-            path: {
-                eventId: components["parameters"]["EventId"];
-                queueId: components["parameters"]["QueueId"];
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["AdvanceQueueRequest"];
-            };
-        };
-        responses: {
-            /** @description Participant transferred */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["AdvanceQueueResponse"];
-                };
-            };
-            403: components["responses"]["Forbidden"];
-            404: components["responses"]["NotFound"];
-            409: components["responses"]["Conflict"];
-        };
-    };
-    completeEventQueueEntry: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                eventId: components["parameters"]["EventId"];
-                queueId: components["parameters"]["QueueId"];
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Queue entry completed */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -9704,64 +9538,6 @@ export interface operations {
         requestBody?: never;
         responses: {
             /** @description Queue entry started */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["QueueEntry"];
-                };
-            };
-            401: components["responses"]["Unauthorized"];
-            403: components["responses"]["Forbidden"];
-            404: components["responses"]["NotFound"];
-            409: components["responses"]["Conflict"];
-            422: components["responses"]["ValidationFailed"];
-        };
-    };
-    advanceQueueEntry: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                queueId: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["AdvanceQueueRequest"];
-            };
-        };
-        responses: {
-            /** @description Participant transferred */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["AdvanceQueueResponse"];
-                };
-            };
-            401: components["responses"]["Unauthorized"];
-            403: components["responses"]["Forbidden"];
-            404: components["responses"]["NotFound"];
-            409: components["responses"]["Conflict"];
-            422: components["responses"]["ValidationFailed"];
-        };
-    };
-    completeQueueEntry: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                queueId: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Queue entry completed */
             200: {
                 headers: {
                     [name: string]: unknown;

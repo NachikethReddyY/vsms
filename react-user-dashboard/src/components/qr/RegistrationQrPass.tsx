@@ -28,7 +28,7 @@ export function RegistrationQrPass({ registrationId, className = "" }: Registrat
       <div className="registration-qr-pass-copy">
         <span><QrCodeIcon /> Participant QR pass</span>
         <h2>{qrImage ? "QR pass ready" : "Preparing QR pass"}</h2>
-        <p>{qrImage ? "Show this pass at the assigned station to open the participant record." : "The secure, registration-specific pass is being created."}</p>
+        <p>{qrImage ? "Use this same pass at every station and clinical review." : "The secure, registration-specific pass is being created."}</p>
       </div>
       <div className={`registration-qr-pass-code ${qrImage ? "is-ready" : ""}`}>
         {qrImage ? <img src={qrImage} alt="Secure QR code for this registration" /> : <QrCodeIcon aria-hidden="true" />}

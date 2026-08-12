@@ -15,17 +15,7 @@ before(async () => {
   helpers = require("../helpers");
   ({ processScreeningSync, requestFingerprint } = require("../../services/screening/syncService"));
 
-  const screener = await helpers.ensureTestUser("STAFF");
-  const role = await helpers.prisma.role.upsert({
-    where: { roleName: "SCREENER" },
-    update: {},
-    create: { roleName: "SCREENER" },
-  });
-  await helpers.prisma.userRole.upsert({
-    where: { userId_roleId: { userId: screener.id, roleId: role.id } },
-    update: {},
-    create: { userId: screener.id, roleId: role.id },
-  });
+  const screener = await helpers.ensureTestUser("SCREENER", "sync-integration-screener");
 
   const now = Date.now();
   const event = await helpers.prisma.event.create({
@@ -115,6 +105,12 @@ before(async () => {
       passToken: `secret-${crypto.randomUUID()}`,
       checkedIn: true,
     },
+  });
+  await helpers.prisma.registrationRouteStep.create({
+    data: { registrationId: registration.registrationId, stationId: station.stationId, position: 1 },
+  });
+  await helpers.prisma.queueEntry.create({
+    data: { registrationId: registration.registrationId, stationId: station.stationId, queueNumber: 1 },
   });
   fixture = { screener, event, station, participant, registration, membership };
 });

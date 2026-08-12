@@ -97,24 +97,7 @@ exports.getPublicStatus = async (req, res, next) => {
     try {
         const { token } = req.params;
         const status = await qrService.getPublicStatus(token);
-        return res.json({ success: true, data: status });
-    } catch (err) {
-        next(err);
-    }
-};
-
-// ==========================================
-// Public Screener Handoff QR (no auth, no PII)
-// GET /qr/handoff/:token?station=VISUAL_ACUITY
-// Encodes a station URL pre-loaded with the registration so a screener who
-// scans it lands directly on their station with the participant selected.
-// ==========================================
-exports.getStationHandoffQR = async (req, res, next) => {
-    try {
-        const { token } = req.params;
-        const { station } = req.query;
-        const data = await qrService.getStationHandoffQR(token, String(station || ""));
-        return res.json({ success: true, data });
+        return res.set("Cache-Control", "no-store").json({ success: true, data: status });
     } catch (err) {
         next(err);
     }

@@ -1,4 +1,5 @@
 const { z } = require("zod");
+const { ROUTE_OVERRIDE_REASON_CODES } = require("../services/screening/routeOverridePolicy");
 
 const eventParams = z.object({
   eventId: z.string().uuid(),
@@ -49,6 +50,22 @@ const priorityQueueBody = z.object({
   }
 });
 
+const routeOverrideReasonCode = z.enum(ROUTE_OVERRIDE_REASON_CODES);
+
+const routeOverrideBody = z.object({
+  stationIds: z.array(z.string().uuid()).min(1).max(100),
+  reasonCode: routeOverrideReasonCode,
+  expectedVersion: z.number().int().positive(),
+}).strict().superRefine(({ stationIds }, ctx) => {
+  if (new Set(stationIds).size !== stationIds.length) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["stationIds"],
+      message: "Station IDs must be unique",
+    });
+  }
+});
+
 module.exports = {
   eventParams,
   stationParams,
@@ -62,4 +79,6 @@ module.exports = {
   advanceQueueBody,
   redirectQueueBody,
   priorityQueueBody,
+  routeOverrideBody,
+  routeOverrideReasonCode,
 };

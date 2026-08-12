@@ -68,7 +68,7 @@
   gap: 8px;
 }
 
-.review-heading-actions .secondary { min-height: 40px; padding-inline: 13px; white-space: nowrap; }
+.review-heading-actions .secondary { min-height: 44px; padding-inline: 13px; white-space: nowrap; }
 .review-heading-actions .secondary svg { width: 17px; }
 
 .review-page {
@@ -127,6 +127,9 @@
 .review-queue-summary span { color: var(--ink-2); font-size: 12px; font-weight: 650; }
 .review-queue-summary strong { font-size: 26px; line-height: 1; }
 .review-queue-summary p { margin: 0; color: var(--muted); font-size: 12px; }
+.review-participant-lookup { min-width:220px; display:grid; gap:4px; margin-left:auto; }
+.review-participant-lookup>span { font-size:10px; }
+.review-participant-lookup select { min-height:44px; min-width:0; padding:0 34px 0 11px; border:1px solid var(--hairline-strong); border-radius:var(--radius-control); background:var(--surface); color:var(--ink); font:inherit; font-size:12px; }
 .review-queue-summary button { min-width: 132px; margin-left: auto; white-space: nowrap; }
 
 .review-scan-button svg { width: 18px; }
@@ -287,7 +290,7 @@
 .review-participant-heading span { color: var(--muted); font-size: 11px; }
 .review-participant-heading h2 { max-width: 24ch; margin: 4px 0 0; overflow-wrap: anywhere; font-size: 25px; line-height: 31px; }
 .review-participant-actions { display: flex; align-items: center; justify-content: flex-end; gap: 10px; }
-.review-participant-actions .secondary { min-height: 40px; white-space: nowrap; }
+.review-participant-actions .secondary { min-height: 44px; white-space: nowrap; }
 .review-participant-actions .secondary svg { width: 17px; }
 .participant-report { display: none; }
 
@@ -526,7 +529,7 @@
 .referral-issuance header p, .referral-issuance > p { margin: 4px 0 0; color: var(--muted); font-size: 11px; line-height: 18px; }
 .referral-signature { display: grid; gap: 8px; }
 .referral-signature > span { color: var(--ink); font-size: 12px; font-weight: 700; }
-.referral-issuance > .primary, .referral-issuance > .secondary { justify-self: end; min-height: 42px; }
+.referral-issuance > .primary, .referral-issuance > .secondary { justify-self: end; min-height: 44px; }
 .referral-issuance.issued > div:first-child { display: flex; align-items: center; gap: 10px; }
 .referral-issuance.issued > div:first-child > svg { width: 22px; flex: none; color: var(--green); }
 .referral-issuance.issued strong, .referral-issuance.issued small { display: block; }
@@ -598,6 +601,7 @@
   .review-heading-actions .secondary { width: 100%; min-width: 0; padding-inline: 10px; }
   .review-heading-actions .primary { width: 100%; }
   .review-queue-summary { align-items: flex-start; flex-wrap: wrap; }
+  .review-participant-lookup { width:100%; margin-left:0; }
   .review-queue-summary button { width: 100%; margin-left: 0; }
   .review-workspace { border-radius: var(--radius-panel); }
   .review-detail { padding: 16px; }

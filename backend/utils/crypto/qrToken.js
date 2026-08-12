@@ -23,31 +23,22 @@ const extractQrToken = (value) => {
 };
 
 // Resolves a scanned or typed QR value to a registration within an event.
-// Prefers the hardened hashed token lookup on qr_code_passes and falls back to
-// the legacy EventRegistration.passToken column for rows that were seeded
-// before hashed passes existed.
+// The secure pass table is the only production credential authority.
 const resolveRegistrationByQrValue = async (db, { eventId, value }) => {
   if (typeof value !== "string" || !value.trim()) return null;
 
   const token = extractQrToken(value);
-  if (token) {
-    const qr = await db.qRCodePass.findFirst({
-      where: {
-        tokenHash: hashToken(token),
-        registration: { eventId },
-        isActive: true,
-        expiresAt: { gt: new Date() },
-      },
-      select: { registrationId: true },
-    });
-    if (qr) return qr;
-  }
-
-  const registration = await db.eventRegistration.findFirst({
-    where: { eventId, passToken: value.trim() },
+  if (!token) return null;
+  return db.qRCodePass.findFirst({
+    where: {
+      tokenHash: hashToken(token),
+      registration: { eventId },
+      isActive: true,
+      revokedAt: null,
+      expiresAt: { gt: new Date() },
+    },
     select: { registrationId: true },
   });
-  return registration;
 };
 
 module.exports = {

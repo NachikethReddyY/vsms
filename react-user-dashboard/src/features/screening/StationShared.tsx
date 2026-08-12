@@ -359,7 +359,7 @@ export function StationHandoffLinks({
           Back to event
         </Link>
       </div>
-    </nav>
+    </section>
   );
 }
 
@@ -452,12 +452,14 @@ export function FlagBanner({
 
 export function ParticipantLookup({
   eventId,
+  currentStationId,
   queue,
   selectedId,
   onSelect,
   selected,
 }: {
   eventId: string;
+  currentStationId: string;
   queue: QueueRegistration[];
   selectedId: string;
   onSelect: (

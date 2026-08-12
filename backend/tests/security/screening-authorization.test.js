@@ -45,7 +45,11 @@ test("only a screener assigned to the requested station can read its queue", asy
     return where.stationId === stationA ? { id: crypto.randomUUID() } : null;
   });
   replace(t, prisma.station, "findFirst", async ({ where }) => ({ ...where, stationName: "Station A" }));
-  replace(t, prisma.eventRegistration, "findMany", async () => []);
+  replace(t, prisma.queueEntry, "findMany", async ({ where }) => {
+    assert.equal(where.stationId, stationA);
+    assert.deepEqual(where.status.in, ["WAITING", "CALLED", "IN_PROGRESS"]);
+    return [];
+  });
 
   await assert.rejects(
     screeningService.listQueue(eventId, stationB, user),

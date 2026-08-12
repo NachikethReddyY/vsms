@@ -12,7 +12,7 @@ import {
   Station,
   VisualAcuityResultData,
 } from './screeningApi';
-import { loadStationContext, ParticipantLookup, StationHandoffLinks } from './StationShared';
+import { loadStationContext, ParticipantLookup, RouteProgressionNotice } from './StationShared';
 
 const EXCEPTION_CODES = ['CF', 'HM', 'LP', 'NLP', 'NOT_TESTABLE'] as const;
 const DENOMINATORS = [6, 9, 12, 15, 18, 24, 36, 60];
@@ -165,8 +165,8 @@ export default function VisualAcuityStationPage() {
         acknowledged: preview.isFlagged ? acknowledged : false,
         resultData,
       });
-      setSuccess(saved.queued
-        ? 'Saved offline. It will sync when connected.'
+      setSuccess(saved.syncState === 'PENDING_SYNC'
+        ? 'Pending sync. The participant has not entered the next queue.'
         : saved.isFlagged
           ? `Saved with ${saved.overallFlag} flag (${saved.ruleVersion ?? preview.ruleVersion}): ${saved.flagSummary}`
           : `Saved Visual Acuity result (${saved.overallFlag}, ${saved.ruleVersion ?? preview.ruleVersion}).`);
@@ -226,6 +226,7 @@ export default function VisualAcuityStationPage() {
 
       <ParticipantLookup
         eventId={eventId}
+        currentStationId={station?.stationId ?? ''}
         queue={queue}
         selectedId={selectedId}
         onSelect={setSelectedId}

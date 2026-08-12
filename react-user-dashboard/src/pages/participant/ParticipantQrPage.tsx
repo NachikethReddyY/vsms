@@ -35,13 +35,13 @@ export default function ParticipantQrPage() {
   return (
     <section className="participant-v2-page participant-qr-page" aria-labelledby="qr-pass-title">
       <Link className="participant-v2-back" to={backLink}><ArrowLeftIcon /> {eventId ? "Back to event registration" : "Back to events"}</Link>
-      <header className="participant-qr-heading"><span><QrCodeIcon /></span><div><p>QR handoff</p><h1 id="qr-pass-title">Participant handoff</h1><small>Secure QR pass for this event registration.</small></div><strong><ShieldCheckIcon /> Secure</strong></header>
+      <header className="participant-qr-heading"><span><QrCodeIcon /></span><div><p>Event QR</p><h1 id="qr-pass-title">Participant QR pass</h1><small>Use this same secure pass at every station and clinical review.</small></div><strong><ShieldCheckIcon /> Secure</strong></header>
       {error ? <p className="participant-v2-alert" role="alert">{error}</p> : null}
       <section className="participant-qr-card">
         <div className="participant-qr-copy">
-          <span>Registration handoff</span>
+          <span>Event pass</span>
           <h2>{qrImage ? "QR pass" : "Preparing QR pass"}</h2>
-          <p>{qrImage ? "This secure QR code is linked to this registration only." : "Your secure QR pass is being generated."}</p>
+          <p>{qrImage ? "This secure QR stays linked to this registration for the event." : "Your secure QR pass is being prepared."}</p>
           <dl>
             <div><dt>Participant</dt><dd>{isLoadingRegistration ? "Loading..." : registration ? `${registration.participant.firstName} ${registration.participant.lastName}` : "Unavailable"}</dd></div>
             <div><dt>Participant reference</dt><dd>{registration?.participant.participantReference ?? "Unavailable"}</dd></div>

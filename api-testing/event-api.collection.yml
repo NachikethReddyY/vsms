@@ -5536,6 +5536,33 @@ item:
               "createdAt": "2026-08-07T00:00:00.000Z",
               "updatedAt": "2026-08-07T00:00:00.000Z"
             },
+            "route": {
+              "status": "PENDING_CHECK_IN",
+              "routeVersion": 1,
+              "steps": [
+                {
+                  "stationId": "00000000-0000-4000-8000-000000000000",
+                  "stationName": "",
+                  "stationType": "",
+                  "position": 1,
+                  "state": "COMPLETED"
+                }
+              ],
+              "currentStation": {},
+              "queue": {
+                "queueEntryId": "00000000-0000-4000-8000-000000000000",
+                "stationId": "00000000-0000-4000-8000-000000000000",
+                "queueNumber": 1,
+                "status": "WAITING"
+              }
+            },
+            "securePass": {
+              "qrId": "00000000-0000-4000-8000-000000000000",
+              "registrationId": "00000000-0000-4000-8000-000000000000",
+              "issuedAt": "2026-08-07T00:00:00.000Z",
+              "expiresAt": "2026-08-07T00:00:00.000Z",
+              "qrImage": ""
+            },
             "idempotentReplay": true
           }
       - name: 201 Response
@@ -5575,6 +5602,33 @@ item:
               "checkedInAt": "2026-08-07T00:00:00.000Z",
               "createdAt": "2026-08-07T00:00:00.000Z",
               "updatedAt": "2026-08-07T00:00:00.000Z"
+            },
+            "route": {
+              "status": "PENDING_CHECK_IN",
+              "routeVersion": 1,
+              "steps": [
+                {
+                  "stationId": "00000000-0000-4000-8000-000000000000",
+                  "stationName": "",
+                  "stationType": "",
+                  "position": 1,
+                  "state": "COMPLETED"
+                }
+              ],
+              "currentStation": {},
+              "queue": {
+                "queueEntryId": "00000000-0000-4000-8000-000000000000",
+                "stationId": "00000000-0000-4000-8000-000000000000",
+                "queueNumber": 1,
+                "status": "WAITING"
+              }
+            },
+            "securePass": {
+              "qrId": "00000000-0000-4000-8000-000000000000",
+              "registrationId": "00000000-0000-4000-8000-000000000000",
+              "issuedAt": "2026-08-07T00:00:00.000Z",
+              "expiresAt": "2026-08-07T00:00:00.000Z",
+              "qrImage": ""
             },
             "idempotentReplay": true
           }
@@ -8407,7 +8461,24 @@ item:
                   "resultId": "00000000-0000-4000-8000-000000000000",
                   "overallFlag": "NORMAL",
                   "isFlagged": true,
-                  "ruleVersion": ""
+                  "ruleVersion": "",
+                  "routeProgression": {
+                    "status": "ADDED_TO_QUEUE",
+                    "routeVersion": 1,
+                    "completedStation": {
+                      "stationId": "00000000-0000-4000-8000-000000000000",
+                      "stationName": "",
+                      "stationType": ""
+                    },
+                    "nextStation": {},
+                    "nextQueue": {
+                      "stationId": "00000000-0000-4000-8000-000000000000",
+                      "stationName": "",
+                      "stationType": "",
+                      "queueNumber": 0,
+                      "status": "WAITING"
+                    }
+                  }
                 }
               }
             ],
@@ -8932,6 +9003,23 @@ item:
                 }
               ]
             },
+            "routeProgression": {
+              "status": "ADDED_TO_QUEUE",
+              "routeVersion": 1,
+              "completedStation": {
+                "stationId": "00000000-0000-4000-8000-000000000000",
+                "stationName": "",
+                "stationType": ""
+              },
+              "nextStation": {},
+              "nextQueue": {
+                "stationId": "00000000-0000-4000-8000-000000000000",
+                "stationName": "",
+                "stationType": "",
+                "queueNumber": 0,
+                "status": "WAITING"
+              }
+            },
             "createdAt": "2026-08-07T00:00:00.000Z",
             "updatedAt": "2026-08-07T00:00:00.000Z"
           }
@@ -8974,6 +9062,23 @@ item:
                   "reason": ""
                 }
               ]
+            },
+            "routeProgression": {
+              "status": "ADDED_TO_QUEUE",
+              "routeVersion": 1,
+              "completedStation": {
+                "stationId": "00000000-0000-4000-8000-000000000000",
+                "stationName": "",
+                "stationType": ""
+              },
+              "nextStation": {},
+              "nextQueue": {
+                "stationId": "00000000-0000-4000-8000-000000000000",
+                "stationName": "",
+                "stationType": "",
+                "queueNumber": 0,
+                "status": "WAITING"
+              }
             },
             "createdAt": "2026-08-07T00:00:00.000Z",
             "updatedAt": "2026-08-07T00:00:00.000Z"
@@ -9227,6 +9332,23 @@ item:
                 }
               ]
             },
+            "routeProgression": {
+              "status": "ADDED_TO_QUEUE",
+              "routeVersion": 1,
+              "completedStation": {
+                "stationId": "00000000-0000-4000-8000-000000000000",
+                "stationName": "",
+                "stationType": ""
+              },
+              "nextStation": {},
+              "nextQueue": {
+                "stationId": "00000000-0000-4000-8000-000000000000",
+                "stationName": "",
+                "stationType": "",
+                "queueNumber": 0,
+                "status": "WAITING"
+              }
+            },
             "createdAt": "2026-08-07T00:00:00.000Z",
             "updatedAt": "2026-08-07T00:00:00.000Z"
           }
@@ -9269,6 +9391,23 @@ item:
                   "reason": ""
                 }
               ]
+            },
+            "routeProgression": {
+              "status": "ADDED_TO_QUEUE",
+              "routeVersion": 1,
+              "completedStation": {
+                "stationId": "00000000-0000-4000-8000-000000000000",
+                "stationName": "",
+                "stationType": ""
+              },
+              "nextStation": {},
+              "nextQueue": {
+                "stationId": "00000000-0000-4000-8000-000000000000",
+                "stationName": "",
+                "stationType": "",
+                "queueNumber": 0,
+                "status": "WAITING"
+              }
             },
             "createdAt": "2026-08-07T00:00:00.000Z",
             "updatedAt": "2026-08-07T00:00:00.000Z"
@@ -9512,6 +9651,23 @@ item:
                 }
               ]
             },
+            "routeProgression": {
+              "status": "ADDED_TO_QUEUE",
+              "routeVersion": 1,
+              "completedStation": {
+                "stationId": "00000000-0000-4000-8000-000000000000",
+                "stationName": "",
+                "stationType": ""
+              },
+              "nextStation": {},
+              "nextQueue": {
+                "stationId": "00000000-0000-4000-8000-000000000000",
+                "stationName": "",
+                "stationType": "",
+                "queueNumber": 0,
+                "status": "WAITING"
+              }
+            },
             "createdAt": "2026-08-07T00:00:00.000Z",
             "updatedAt": "2026-08-07T00:00:00.000Z"
           }
@@ -9554,6 +9710,23 @@ item:
                   "reason": ""
                 }
               ]
+            },
+            "routeProgression": {
+              "status": "ADDED_TO_QUEUE",
+              "routeVersion": 1,
+              "completedStation": {
+                "stationId": "00000000-0000-4000-8000-000000000000",
+                "stationName": "",
+                "stationType": ""
+              },
+              "nextStation": {},
+              "nextQueue": {
+                "stationId": "00000000-0000-4000-8000-000000000000",
+                "stationName": "",
+                "stationType": "",
+                "queueNumber": 0,
+                "status": "WAITING"
+              }
             },
             "createdAt": "2026-08-07T00:00:00.000Z",
             "updatedAt": "2026-08-07T00:00:00.000Z"
@@ -9801,6 +9974,23 @@ item:
                 }
               ]
             },
+            "routeProgression": {
+              "status": "ADDED_TO_QUEUE",
+              "routeVersion": 1,
+              "completedStation": {
+                "stationId": "00000000-0000-4000-8000-000000000000",
+                "stationName": "",
+                "stationType": ""
+              },
+              "nextStation": {},
+              "nextQueue": {
+                "stationId": "00000000-0000-4000-8000-000000000000",
+                "stationName": "",
+                "stationType": "",
+                "queueNumber": 0,
+                "status": "WAITING"
+              }
+            },
             "createdAt": "2026-08-07T00:00:00.000Z",
             "updatedAt": "2026-08-07T00:00:00.000Z"
           }
@@ -9843,6 +10033,23 @@ item:
                   "reason": ""
                 }
               ]
+            },
+            "routeProgression": {
+              "status": "ADDED_TO_QUEUE",
+              "routeVersion": 1,
+              "completedStation": {
+                "stationId": "00000000-0000-4000-8000-000000000000",
+                "stationName": "",
+                "stationType": ""
+              },
+              "nextStation": {},
+              "nextQueue": {
+                "stationId": "00000000-0000-4000-8000-000000000000",
+                "stationName": "",
+                "stationType": "",
+                "queueNumber": 0,
+                "status": "WAITING"
+              }
             },
             "createdAt": "2026-08-07T00:00:00.000Z",
             "updatedAt": "2026-08-07T00:00:00.000Z"
@@ -10076,6 +10283,23 @@ item:
                 }
               ]
             },
+            "routeProgression": {
+              "status": "ADDED_TO_QUEUE",
+              "routeVersion": 1,
+              "completedStation": {
+                "stationId": "00000000-0000-4000-8000-000000000000",
+                "stationName": "",
+                "stationType": ""
+              },
+              "nextStation": {},
+              "nextQueue": {
+                "stationId": "00000000-0000-4000-8000-000000000000",
+                "stationName": "",
+                "stationType": "",
+                "queueNumber": 0,
+                "status": "WAITING"
+              }
+            },
             "createdAt": "2026-08-07T00:00:00.000Z",
             "updatedAt": "2026-08-07T00:00:00.000Z"
           }
@@ -10118,6 +10342,23 @@ item:
                   "reason": ""
                 }
               ]
+            },
+            "routeProgression": {
+              "status": "ADDED_TO_QUEUE",
+              "routeVersion": 1,
+              "completedStation": {
+                "stationId": "00000000-0000-4000-8000-000000000000",
+                "stationName": "",
+                "stationType": ""
+              },
+              "nextStation": {},
+              "nextQueue": {
+                "stationId": "00000000-0000-4000-8000-000000000000",
+                "stationName": "",
+                "stationType": "",
+                "queueNumber": 0,
+                "status": "WAITING"
+              }
             },
             "createdAt": "2026-08-07T00:00:00.000Z",
             "updatedAt": "2026-08-07T00:00:00.000Z"
@@ -13336,6 +13577,33 @@ item:
               "createdAt": "2026-08-07T00:00:00.000Z",
               "updatedAt": "2026-08-07T00:00:00.000Z"
             },
+            "route": {
+              "status": "PENDING_CHECK_IN",
+              "routeVersion": 1,
+              "steps": [
+                {
+                  "stationId": "00000000-0000-4000-8000-000000000000",
+                  "stationName": "",
+                  "stationType": "",
+                  "position": 1,
+                  "state": "COMPLETED"
+                }
+              ],
+              "currentStation": {},
+              "queue": {
+                "queueEntryId": "00000000-0000-4000-8000-000000000000",
+                "stationId": "00000000-0000-4000-8000-000000000000",
+                "queueNumber": 1,
+                "status": "WAITING"
+              }
+            },
+            "securePass": {
+              "qrId": "00000000-0000-4000-8000-000000000000",
+              "registrationId": "00000000-0000-4000-8000-000000000000",
+              "issuedAt": "2026-08-07T00:00:00.000Z",
+              "expiresAt": "2026-08-07T00:00:00.000Z",
+              "qrImage": ""
+            },
             "idempotentReplay": true
           }
       - name: 201 Response
@@ -13375,6 +13643,33 @@ item:
               "checkedInAt": "2026-08-07T00:00:00.000Z",
               "createdAt": "2026-08-07T00:00:00.000Z",
               "updatedAt": "2026-08-07T00:00:00.000Z"
+            },
+            "route": {
+              "status": "PENDING_CHECK_IN",
+              "routeVersion": 1,
+              "steps": [
+                {
+                  "stationId": "00000000-0000-4000-8000-000000000000",
+                  "stationName": "",
+                  "stationType": "",
+                  "position": 1,
+                  "state": "COMPLETED"
+                }
+              ],
+              "currentStation": {},
+              "queue": {
+                "queueEntryId": "00000000-0000-4000-8000-000000000000",
+                "stationId": "00000000-0000-4000-8000-000000000000",
+                "queueNumber": 1,
+                "status": "WAITING"
+              }
+            },
+            "securePass": {
+              "qrId": "00000000-0000-4000-8000-000000000000",
+              "registrationId": "00000000-0000-4000-8000-000000000000",
+              "issuedAt": "2026-08-07T00:00:00.000Z",
+              "expiresAt": "2026-08-07T00:00:00.000Z",
+              "qrImage": ""
             },
             "idempotentReplay": true
           }
@@ -13460,6 +13755,33 @@ item:
               "checkedInAt": "2026-08-07T00:00:00.000Z",
               "createdAt": "2026-08-07T00:00:00.000Z",
               "updatedAt": "2026-08-07T00:00:00.000Z"
+            },
+            "route": {
+              "status": "PENDING_CHECK_IN",
+              "routeVersion": 1,
+              "steps": [
+                {
+                  "stationId": "00000000-0000-4000-8000-000000000000",
+                  "stationName": "",
+                  "stationType": "",
+                  "position": 1,
+                  "state": "COMPLETED"
+                }
+              ],
+              "currentStation": {},
+              "queue": {
+                "queueEntryId": "00000000-0000-4000-8000-000000000000",
+                "stationId": "00000000-0000-4000-8000-000000000000",
+                "queueNumber": 1,
+                "status": "WAITING"
+              }
+            },
+            "securePass": {
+              "qrId": "00000000-0000-4000-8000-000000000000",
+              "registrationId": "00000000-0000-4000-8000-000000000000",
+              "issuedAt": "2026-08-07T00:00:00.000Z",
+              "expiresAt": "2026-08-07T00:00:00.000Z",
+              "qrImage": ""
             },
             "idempotentReplay": true
           }
@@ -13674,6 +13996,33 @@ item:
               "checkedInAt": "2026-08-07T00:00:00.000Z",
               "createdAt": "2026-08-07T00:00:00.000Z",
               "updatedAt": "2026-08-07T00:00:00.000Z"
+            },
+            "route": {
+              "status": "PENDING_CHECK_IN",
+              "routeVersion": 1,
+              "steps": [
+                {
+                  "stationId": "00000000-0000-4000-8000-000000000000",
+                  "stationName": "",
+                  "stationType": "",
+                  "position": 1,
+                  "state": "COMPLETED"
+                }
+              ],
+              "currentStation": {},
+              "queue": {
+                "queueEntryId": "00000000-0000-4000-8000-000000000000",
+                "stationId": "00000000-0000-4000-8000-000000000000",
+                "queueNumber": 1,
+                "status": "WAITING"
+              }
+            },
+            "securePass": {
+              "qrId": "00000000-0000-4000-8000-000000000000",
+              "registrationId": "00000000-0000-4000-8000-000000000000",
+              "issuedAt": "2026-08-07T00:00:00.000Z",
+              "expiresAt": "2026-08-07T00:00:00.000Z",
+              "qrImage": ""
             },
             "idempotentReplay": true
           }
@@ -16496,7 +16845,27 @@ item:
               "registrationStatus": "SIGNED_UP",
               "checkedIn": true,
               "checkedInAt": "2026-08-07T00:00:00.000Z",
-              "queueNumber": 0
+              "queueNumber": 0,
+              "route": {
+                "status": "PENDING_CHECK_IN",
+                "routeVersion": 1,
+                "steps": [
+                  {
+                    "stationId": "00000000-0000-4000-8000-000000000000",
+                    "stationName": "",
+                    "stationType": "",
+                    "position": 1,
+                    "state": "COMPLETED"
+                  }
+                ],
+                "currentStation": {},
+                "queue": {
+                  "queueEntryId": "00000000-0000-4000-8000-000000000000",
+                  "stationId": "00000000-0000-4000-8000-000000000000",
+                  "queueNumber": 1,
+                  "status": "WAITING"
+                }
+              }
             }
           }
       - name: 400 Response
@@ -16595,53 +16964,21 @@ item:
             "data": {
               "valid": true,
               "eventName": "",
-              "currentQueueNumber": 0,
               "queueNumber": 0,
               "registrationStatus": "SIGNED_UP",
               "queueState": {
                 "status": "WAITING",
                 "queueNumber": 0,
-                "isPriority": true,
                 "station": {
-                  "id": "00000000-0000-4000-8000-000000000000",
                   "name": "",
                   "type": ""
-                },
-                "enteredAt": "2026-08-07T00:00:00.000Z",
-                "calledAt": "2026-08-07T00:00:00.000Z",
-                "startedAt": "2026-08-07T00:00:00.000Z",
-                "completedAt": "2026-08-07T00:00:00.000Z"
+                }
               },
-              "aheadAtStation": 0,
-              "stations": [
+              "route": [
                 {
-                  "stationId": "00000000-0000-4000-8000-000000000000",
                   "stationName": "",
                   "stationType": "",
-                  "stationOrder": 0,
-                  "status": "AVAILABLE",
-                  "activeQueueCount": 0,
-                  "capacity": 1,
-                  "occupancyPercent": 0,
-                  "selectable": true,
-                  "workload": {
-                    "WAITING": 0,
-                    "CALLED": 0,
-                    "IN_PROGRESS": 0,
-                    "COMPLETED": 0,
-                    "SKIPPED": 0,
-                    "CANCELLED": 0
-                  },
-                  "nextUp": {
-                    "queueNumber": 0
-                  }
-                }
-              ],
-              "transfers": [
-                {
-                  "fromStation": "",
-                  "toStation": "",
-                  "at": "2026-08-07T00:00:00.000Z"
+                  "state": "COMPLETED"
                 }
               ],
               "expiresAt": "2026-08-07T00:00:00.000Z"
@@ -18364,292 +18701,6 @@ item:
               }
             ]
           }
-  - name: Assign a registered participant to a station queue
-    description: ''
-    event: []
-    request:
-      method: POST
-      header:
-        - key: Content-Type
-          value: application/json
-          description: JSON request body
-          type: text
-        - key: Idempotency-Key
-          value: ''
-          description: ''
-          type: text
-      auth:
-        type: bearer
-        bearer:
-          - key: token
-            value: '{{token}}'
-            type: string
-      url:
-        raw: '{{baseUrl}}/queues/events/{eventId}/stations/{stationId}/handoff'
-        host:
-          - '{{baseUrl}}'
-        path:
-          - queues
-          - events
-          - '{eventId}'
-          - stations
-          - '{stationId}'
-          - handoff
-        query: []
-      body:
-        mode: raw
-        raw: |-
-          {
-            "registrationId": "00000000-0000-4000-8000-000000000000"
-          }
-        options:
-          raw:
-            language: json
-    response:
-      - name: 200 Response
-        originalRequest:
-          method: POST
-          header:
-            - key: Content-Type
-              value: application/json
-              description: JSON request body
-              type: text
-            - key: Idempotency-Key
-              value: ''
-              description: ''
-              type: text
-          url: '{{baseUrl}}/queues/events/{eventId}/stations/{stationId}/handoff'
-        status: OK
-        code: 200
-        header:
-          - key: Content-Type
-            value: application/json
-        body: |-
-          {
-            "created": true,
-            "registrationId": "00000000-0000-4000-8000-000000000000",
-            "queueEntryId": "00000000-0000-4000-8000-000000000000",
-            "participant": {
-              "id": "00000000-0000-4000-8000-000000000000",
-              "participantReference": "",
-              "name": ""
-            },
-            "event": {
-              "id": "00000000-0000-4000-8000-000000000000",
-              "name": ""
-            },
-            "queueNumber": 0,
-            "nextStation": "",
-            "assignedStation": {
-              "id": "00000000-0000-4000-8000-000000000000",
-              "name": "",
-              "status": "BUSY",
-              "statusBeforeHandoff": "AVAILABLE"
-            }
-          }
-      - name: 201 Response
-        originalRequest:
-          method: POST
-          header:
-            - key: Content-Type
-              value: application/json
-              description: JSON request body
-              type: text
-            - key: Idempotency-Key
-              value: ''
-              description: ''
-              type: text
-          url: '{{baseUrl}}/queues/events/{eventId}/stations/{stationId}/handoff'
-        status: Created
-        code: 201
-        header:
-          - key: Content-Type
-            value: application/json
-        body: |-
-          {
-            "created": true,
-            "registrationId": "00000000-0000-4000-8000-000000000000",
-            "queueEntryId": "00000000-0000-4000-8000-000000000000",
-            "participant": {
-              "id": "00000000-0000-4000-8000-000000000000",
-              "participantReference": "",
-              "name": ""
-            },
-            "event": {
-              "id": "00000000-0000-4000-8000-000000000000",
-              "name": ""
-            },
-            "queueNumber": 0,
-            "nextStation": "",
-            "assignedStation": {
-              "id": "00000000-0000-4000-8000-000000000000",
-              "name": "",
-              "status": "BUSY",
-              "statusBeforeHandoff": "AVAILABLE"
-            }
-          }
-      - name: 401 Response
-        originalRequest:
-          method: POST
-          header:
-            - key: Content-Type
-              value: application/json
-              description: JSON request body
-              type: text
-            - key: Idempotency-Key
-              value: ''
-              description: ''
-              type: text
-          url: '{{baseUrl}}/queues/events/{eventId}/stations/{stationId}/handoff'
-        status: Unauthorized
-        code: 401
-        header:
-          - key: Content-Type
-            value: application/json
-        body: |-
-          {
-            "type": "",
-            "title": "",
-            "status": 0,
-            "code": "",
-            "requestId": "00000000-0000-4000-8000-000000000000",
-            "errors": [
-              {
-                "field": "",
-                "message": ""
-              }
-            ]
-          }
-  - name: Join a participant into a station queue
-    description: ''
-    event: []
-    request:
-      method: POST
-      header:
-        - key: Content-Type
-          value: application/json
-          description: JSON request body
-          type: text
-      auth:
-        type: bearer
-        bearer:
-          - key: token
-            value: '{{token}}'
-            type: string
-      url:
-        raw: '{{baseUrl}}/queues/events/{eventId}/stations/{stationId}/join'
-        host:
-          - '{{baseUrl}}'
-        path:
-          - queues
-          - events
-          - '{eventId}'
-          - stations
-          - '{stationId}'
-          - join
-        query: []
-      body:
-        mode: raw
-        raw: |-
-          {
-            "registrationId": "00000000-0000-4000-8000-000000000000"
-          }
-        options:
-          raw:
-            language: json
-    response:
-      - name: 200 Response
-        originalRequest:
-          method: POST
-          header:
-            - key: Content-Type
-              value: application/json
-              description: JSON request body
-              type: text
-          url: '{{baseUrl}}/queues/events/{eventId}/stations/{stationId}/join'
-        status: OK
-        code: 200
-        header:
-          - key: Content-Type
-            value: application/json
-        body: |-
-          {
-            "queueEntry": {
-              "id": "00000000-0000-4000-8000-000000000000",
-              "registrationId": "00000000-0000-4000-8000-000000000000",
-              "stationId": "00000000-0000-4000-8000-000000000000",
-              "queueNumber": 0,
-              "status": "WAITING",
-              "isPriority": false,
-              "priorityNotes": "",
-              "enteredAt": "2026-08-07T00:00:00.000Z",
-              "calledAt": "2026-08-07T00:00:00.000Z",
-              "startedAt": "2026-08-07T00:00:00.000Z",
-              "leftQueueAt": "2026-08-07T00:00:00.000Z",
-              "completedAt": "2026-08-07T00:00:00.000Z"
-            },
-            "created": true
-          }
-      - name: 201 Response
-        originalRequest:
-          method: POST
-          header:
-            - key: Content-Type
-              value: application/json
-              description: JSON request body
-              type: text
-          url: '{{baseUrl}}/queues/events/{eventId}/stations/{stationId}/join'
-        status: Created
-        code: 201
-        header:
-          - key: Content-Type
-            value: application/json
-        body: |-
-          {
-            "queueEntry": {
-              "id": "00000000-0000-4000-8000-000000000000",
-              "registrationId": "00000000-0000-4000-8000-000000000000",
-              "stationId": "00000000-0000-4000-8000-000000000000",
-              "queueNumber": 0,
-              "status": "WAITING",
-              "isPriority": false,
-              "priorityNotes": "",
-              "enteredAt": "2026-08-07T00:00:00.000Z",
-              "calledAt": "2026-08-07T00:00:00.000Z",
-              "startedAt": "2026-08-07T00:00:00.000Z",
-              "leftQueueAt": "2026-08-07T00:00:00.000Z",
-              "completedAt": "2026-08-07T00:00:00.000Z"
-            },
-            "created": true
-          }
-      - name: 401 Response
-        originalRequest:
-          method: POST
-          header:
-            - key: Content-Type
-              value: application/json
-              description: JSON request body
-              type: text
-          url: '{{baseUrl}}/queues/events/{eventId}/stations/{stationId}/join'
-        status: Unauthorized
-        code: 401
-        header:
-          - key: Content-Type
-            value: application/json
-        body: |-
-          {
-            "type": "",
-            "title": "",
-            "status": 0,
-            "code": "",
-            "requestId": "00000000-0000-4000-8000-000000000000",
-            "errors": [
-              {
-                "field": "",
-                "message": ""
-              }
-            ]
-          }
   - name: Participant queue status and movement history in an explicit event scope
     description: ''
     event: []
@@ -18723,6 +18774,252 @@ item:
           method: GET
           header: []
           url: '{{baseUrl}}/queues/events/{eventId}/participants/{registrationId}'
+        status: Forbidden
+        code: 403
+        header:
+          - key: Content-Type
+            value: application/json
+        body: |-
+          {
+            "type": "",
+            "title": "",
+            "status": 0,
+            "code": "",
+            "requestId": "00000000-0000-4000-8000-000000000000",
+            "errors": [
+              {
+                "field": "",
+                "message": ""
+              }
+            ]
+          }
+  - name: Read the participant route for an authorized route editor
+    description: ''
+    event: []
+    request:
+      method: GET
+      header: []
+      auth:
+        type: bearer
+        bearer:
+          - key: token
+            value: '{{token}}'
+            type: string
+      url:
+        raw: '{{baseUrl}}/queues/events/{eventId}/participants/{registrationId}/route'
+        host:
+          - '{{baseUrl}}'
+        path:
+          - queues
+          - events
+          - '{eventId}'
+          - participants
+          - '{registrationId}'
+          - route
+        query: []
+    response:
+      - name: 200 Response
+        originalRequest:
+          method: GET
+          header: []
+          url: '{{baseUrl}}/queues/events/{eventId}/participants/{registrationId}/route'
+        status: OK
+        code: 200
+        header:
+          - key: Content-Type
+            value: application/json
+        body: |-
+          {
+            "status": "success",
+            "data": {
+              "status": "PENDING_CHECK_IN",
+              "routeVersion": 1,
+              "steps": [
+                {
+                  "stationId": "00000000-0000-4000-8000-000000000000",
+                  "stationName": "",
+                  "stationType": "",
+                  "position": 1,
+                  "state": "COMPLETED"
+                }
+              ],
+              "currentStation": {},
+              "queue": {
+                "queueEntryId": "00000000-0000-4000-8000-000000000000",
+                "stationId": "00000000-0000-4000-8000-000000000000",
+                "queueNumber": 1,
+                "status": "WAITING"
+              }
+            }
+          }
+      - name: 401 Response
+        originalRequest:
+          method: GET
+          header: []
+          url: '{{baseUrl}}/queues/events/{eventId}/participants/{registrationId}/route'
+        status: Unauthorized
+        code: 401
+        header:
+          - key: Content-Type
+            value: application/json
+        body: |-
+          {
+            "type": "",
+            "title": "",
+            "status": 0,
+            "code": "",
+            "requestId": "00000000-0000-4000-8000-000000000000",
+            "errors": [
+              {
+                "field": "",
+                "message": ""
+              }
+            ]
+          }
+      - name: 403 Response
+        originalRequest:
+          method: GET
+          header: []
+          url: '{{baseUrl}}/queues/events/{eventId}/participants/{registrationId}/route'
+        status: Forbidden
+        code: 403
+        header:
+          - key: Content-Type
+            value: application/json
+        body: |-
+          {
+            "type": "",
+            "title": "",
+            "status": 0,
+            "code": "",
+            "requestId": "00000000-0000-4000-8000-000000000000",
+            "errors": [
+              {
+                "field": "",
+                "message": ""
+              }
+            ]
+          }
+  - name: Replace an authorized portion of a participant's unfinished screening route
+    description: >-
+      Event managers and administrators may reorder the full unfinished tail. On-duty registration officers and
+      screeners may select only the next unfinished station; the server preserves the relative order of the remainder.
+      Completed and active steps are immutable.
+    event: []
+    request:
+      method: PATCH
+      header:
+        - key: Content-Type
+          value: application/json
+          description: JSON request body
+          type: text
+      auth:
+        type: bearer
+        bearer:
+          - key: token
+            value: '{{token}}'
+            type: string
+      url:
+        raw: '{{baseUrl}}/queues/events/{eventId}/participants/{registrationId}/route'
+        host:
+          - '{{baseUrl}}'
+        path:
+          - queues
+          - events
+          - '{eventId}'
+          - participants
+          - '{registrationId}'
+          - route
+        query: []
+      body:
+        mode: raw
+        raw: |-
+          {
+            "stationIds": [
+              "00000000-0000-4000-8000-000000000000"
+            ],
+            "reasonCode": "STATION_UNAVAILABLE",
+            "expectedVersion": 1
+          }
+        options:
+          raw:
+            language: json
+    response:
+      - name: 200 Response
+        originalRequest:
+          method: PATCH
+          header:
+            - key: Content-Type
+              value: application/json
+              description: JSON request body
+              type: text
+          url: '{{baseUrl}}/queues/events/{eventId}/participants/{registrationId}/route'
+        status: OK
+        code: 200
+        header:
+          - key: Content-Type
+            value: application/json
+        body: |-
+          {
+            "status": "success",
+            "data": {
+              "status": "PENDING_CHECK_IN",
+              "routeVersion": 1,
+              "steps": [
+                {
+                  "stationId": "00000000-0000-4000-8000-000000000000",
+                  "stationName": "",
+                  "stationType": "",
+                  "position": 1,
+                  "state": "COMPLETED"
+                }
+              ],
+              "currentStation": {},
+              "queue": {
+                "queueEntryId": "00000000-0000-4000-8000-000000000000",
+                "stationId": "00000000-0000-4000-8000-000000000000",
+                "queueNumber": 1,
+                "status": "WAITING"
+              }
+            }
+          }
+      - name: 401 Response
+        originalRequest:
+          method: PATCH
+          header:
+            - key: Content-Type
+              value: application/json
+              description: JSON request body
+              type: text
+          url: '{{baseUrl}}/queues/events/{eventId}/participants/{registrationId}/route'
+        status: Unauthorized
+        code: 401
+        header:
+          - key: Content-Type
+            value: application/json
+        body: |-
+          {
+            "type": "",
+            "title": "",
+            "status": 0,
+            "code": "",
+            "requestId": "00000000-0000-4000-8000-000000000000",
+            "errors": [
+              {
+                "field": "",
+                "message": ""
+              }
+            ]
+          }
+      - name: 403 Response
+        originalRequest:
+          method: PATCH
+          header:
+            - key: Content-Type
+              value: application/json
+              description: JSON request body
+              type: text
+          url: '{{baseUrl}}/queues/events/{eventId}/participants/{registrationId}/route'
         status: Forbidden
         code: 403
         header:
@@ -19009,247 +19306,6 @@ item:
           method: PATCH
           header: []
           url: '{{baseUrl}}/queues/events/{eventId}/entries/{queueId}/start'
-        status: Not Found
-        code: 404
-        header:
-          - key: Content-Type
-            value: application/json
-        body: |-
-          {
-            "type": "",
-            "title": "",
-            "status": 0,
-            "code": "",
-            "requestId": "00000000-0000-4000-8000-000000000000",
-            "errors": [
-              {
-                "field": "",
-                "message": ""
-              }
-            ]
-          }
-  - name: Advance an event-scoped queue entry
-    description: ''
-    event: []
-    request:
-      method: PATCH
-      header:
-        - key: Content-Type
-          value: application/json
-          description: JSON request body
-          type: text
-        - key: Idempotency-Key
-          value: ''
-          description: ''
-          type: text
-      auth:
-        type: bearer
-        bearer:
-          - key: token
-            value: '{{token}}'
-            type: string
-      url:
-        raw: '{{baseUrl}}/queues/events/{eventId}/entries/{queueId}/advance'
-        host:
-          - '{{baseUrl}}'
-        path:
-          - queues
-          - events
-          - '{eventId}'
-          - entries
-          - '{queueId}'
-          - advance
-        query: []
-      body:
-        mode: raw
-        raw: |-
-          {
-            "toStationId": "00000000-0000-4000-8000-000000000000",
-            "reason": ""
-          }
-        options:
-          raw:
-            language: json
-    response:
-      - name: 200 Response
-        originalRequest:
-          method: PATCH
-          header:
-            - key: Content-Type
-              value: application/json
-              description: JSON request body
-              type: text
-            - key: Idempotency-Key
-              value: ''
-              description: ''
-              type: text
-          url: '{{baseUrl}}/queues/events/{eventId}/entries/{queueId}/advance'
-        status: OK
-        code: 200
-        header:
-          - key: Content-Type
-            value: application/json
-        body: |-
-          {
-            "completed": {
-              "id": "00000000-0000-4000-8000-000000000000",
-              "registrationId": "00000000-0000-4000-8000-000000000000",
-              "stationId": "00000000-0000-4000-8000-000000000000",
-              "queueNumber": 0,
-              "status": "WAITING",
-              "isPriority": false,
-              "priorityNotes": "",
-              "enteredAt": "2026-08-07T00:00:00.000Z",
-              "calledAt": "2026-08-07T00:00:00.000Z",
-              "startedAt": "2026-08-07T00:00:00.000Z",
-              "leftQueueAt": "2026-08-07T00:00:00.000Z",
-              "completedAt": "2026-08-07T00:00:00.000Z"
-            },
-            "nextEntry": {}
-          }
-      - name: 403 Response
-        originalRequest:
-          method: PATCH
-          header:
-            - key: Content-Type
-              value: application/json
-              description: JSON request body
-              type: text
-            - key: Idempotency-Key
-              value: ''
-              description: ''
-              type: text
-          url: '{{baseUrl}}/queues/events/{eventId}/entries/{queueId}/advance'
-        status: Forbidden
-        code: 403
-        header:
-          - key: Content-Type
-            value: application/json
-        body: |-
-          {
-            "type": "",
-            "title": "",
-            "status": 0,
-            "code": "",
-            "requestId": "00000000-0000-4000-8000-000000000000",
-            "errors": [
-              {
-                "field": "",
-                "message": ""
-              }
-            ]
-          }
-      - name: 404 Response
-        originalRequest:
-          method: PATCH
-          header:
-            - key: Content-Type
-              value: application/json
-              description: JSON request body
-              type: text
-            - key: Idempotency-Key
-              value: ''
-              description: ''
-              type: text
-          url: '{{baseUrl}}/queues/events/{eventId}/entries/{queueId}/advance'
-        status: Not Found
-        code: 404
-        header:
-          - key: Content-Type
-            value: application/json
-        body: |-
-          {
-            "type": "",
-            "title": "",
-            "status": 0,
-            "code": "",
-            "requestId": "00000000-0000-4000-8000-000000000000",
-            "errors": [
-              {
-                "field": "",
-                "message": ""
-              }
-            ]
-          }
-  - name: Complete an event-scoped queue entry
-    description: ''
-    event: []
-    request:
-      method: PATCH
-      header: []
-      auth:
-        type: bearer
-        bearer:
-          - key: token
-            value: '{{token}}'
-            type: string
-      url:
-        raw: '{{baseUrl}}/queues/events/{eventId}/entries/{queueId}/complete'
-        host:
-          - '{{baseUrl}}'
-        path:
-          - queues
-          - events
-          - '{eventId}'
-          - entries
-          - '{queueId}'
-          - complete
-        query: []
-    response:
-      - name: 200 Response
-        originalRequest:
-          method: PATCH
-          header: []
-          url: '{{baseUrl}}/queues/events/{eventId}/entries/{queueId}/complete'
-        status: OK
-        code: 200
-        header:
-          - key: Content-Type
-            value: application/json
-        body: |-
-          {
-            "id": "00000000-0000-4000-8000-000000000000",
-            "registrationId": "00000000-0000-4000-8000-000000000000",
-            "stationId": "00000000-0000-4000-8000-000000000000",
-            "queueNumber": 0,
-            "status": "WAITING",
-            "isPriority": false,
-            "priorityNotes": "",
-            "enteredAt": "2026-08-07T00:00:00.000Z",
-            "calledAt": "2026-08-07T00:00:00.000Z",
-            "startedAt": "2026-08-07T00:00:00.000Z",
-            "leftQueueAt": "2026-08-07T00:00:00.000Z",
-            "completedAt": "2026-08-07T00:00:00.000Z"
-          }
-      - name: 403 Response
-        originalRequest:
-          method: PATCH
-          header: []
-          url: '{{baseUrl}}/queues/events/{eventId}/entries/{queueId}/complete'
-        status: Forbidden
-        code: 403
-        header:
-          - key: Content-Type
-            value: application/json
-        body: |-
-          {
-            "type": "",
-            "title": "",
-            "status": 0,
-            "code": "",
-            "requestId": "00000000-0000-4000-8000-000000000000",
-            "errors": [
-              {
-                "field": "",
-                "message": ""
-              }
-            ]
-          }
-      - name: 404 Response
-        originalRequest:
-          method: PATCH
-          header: []
-          url: '{{baseUrl}}/queues/events/{eventId}/entries/{queueId}/complete'
         status: Not Found
         code: 404
         header:
@@ -19637,227 +19693,6 @@ item:
           method: PATCH
           header: []
           url: '{{baseUrl}}/queues/entries/{queueId}/start'
-        status: Forbidden
-        code: 403
-        header:
-          - key: Content-Type
-            value: application/json
-        body: |-
-          {
-            "type": "",
-            "title": "",
-            "status": 0,
-            "code": "",
-            "requestId": "00000000-0000-4000-8000-000000000000",
-            "errors": [
-              {
-                "field": "",
-                "message": ""
-              }
-            ]
-          }
-  - name: Transfer a participant to the next station and close the current queue entry
-    description: ''
-    event: []
-    request:
-      method: PATCH
-      header:
-        - key: Content-Type
-          value: application/json
-          description: JSON request body
-          type: text
-      auth:
-        type: bearer
-        bearer:
-          - key: token
-            value: '{{token}}'
-            type: string
-      url:
-        raw: '{{baseUrl}}/queues/entries/{queueId}/advance'
-        host:
-          - '{{baseUrl}}'
-        path:
-          - queues
-          - entries
-          - '{queueId}'
-          - advance
-        query: []
-      body:
-        mode: raw
-        raw: |-
-          {
-            "toStationId": "00000000-0000-4000-8000-000000000000",
-            "reason": ""
-          }
-        options:
-          raw:
-            language: json
-    response:
-      - name: 200 Response
-        originalRequest:
-          method: PATCH
-          header:
-            - key: Content-Type
-              value: application/json
-              description: JSON request body
-              type: text
-          url: '{{baseUrl}}/queues/entries/{queueId}/advance'
-        status: OK
-        code: 200
-        header:
-          - key: Content-Type
-            value: application/json
-        body: |-
-          {
-            "completed": {
-              "id": "00000000-0000-4000-8000-000000000000",
-              "registrationId": "00000000-0000-4000-8000-000000000000",
-              "stationId": "00000000-0000-4000-8000-000000000000",
-              "queueNumber": 0,
-              "status": "WAITING",
-              "isPriority": false,
-              "priorityNotes": "",
-              "enteredAt": "2026-08-07T00:00:00.000Z",
-              "calledAt": "2026-08-07T00:00:00.000Z",
-              "startedAt": "2026-08-07T00:00:00.000Z",
-              "leftQueueAt": "2026-08-07T00:00:00.000Z",
-              "completedAt": "2026-08-07T00:00:00.000Z"
-            },
-            "nextEntry": {}
-          }
-      - name: 401 Response
-        originalRequest:
-          method: PATCH
-          header:
-            - key: Content-Type
-              value: application/json
-              description: JSON request body
-              type: text
-          url: '{{baseUrl}}/queues/entries/{queueId}/advance'
-        status: Unauthorized
-        code: 401
-        header:
-          - key: Content-Type
-            value: application/json
-        body: |-
-          {
-            "type": "",
-            "title": "",
-            "status": 0,
-            "code": "",
-            "requestId": "00000000-0000-4000-8000-000000000000",
-            "errors": [
-              {
-                "field": "",
-                "message": ""
-              }
-            ]
-          }
-      - name: 403 Response
-        originalRequest:
-          method: PATCH
-          header:
-            - key: Content-Type
-              value: application/json
-              description: JSON request body
-              type: text
-          url: '{{baseUrl}}/queues/entries/{queueId}/advance'
-        status: Forbidden
-        code: 403
-        header:
-          - key: Content-Type
-            value: application/json
-        body: |-
-          {
-            "type": "",
-            "title": "",
-            "status": 0,
-            "code": "",
-            "requestId": "00000000-0000-4000-8000-000000000000",
-            "errors": [
-              {
-                "field": "",
-                "message": ""
-              }
-            ]
-          }
-  - name: Complete the final queue station and mark the registration completed
-    description: ''
-    event: []
-    request:
-      method: PATCH
-      header: []
-      auth:
-        type: bearer
-        bearer:
-          - key: token
-            value: '{{token}}'
-            type: string
-      url:
-        raw: '{{baseUrl}}/queues/entries/{queueId}/complete'
-        host:
-          - '{{baseUrl}}'
-        path:
-          - queues
-          - entries
-          - '{queueId}'
-          - complete
-        query: []
-    response:
-      - name: 200 Response
-        originalRequest:
-          method: PATCH
-          header: []
-          url: '{{baseUrl}}/queues/entries/{queueId}/complete'
-        status: OK
-        code: 200
-        header:
-          - key: Content-Type
-            value: application/json
-        body: |-
-          {
-            "id": "00000000-0000-4000-8000-000000000000",
-            "registrationId": "00000000-0000-4000-8000-000000000000",
-            "stationId": "00000000-0000-4000-8000-000000000000",
-            "queueNumber": 0,
-            "status": "WAITING",
-            "isPriority": false,
-            "priorityNotes": "",
-            "enteredAt": "2026-08-07T00:00:00.000Z",
-            "calledAt": "2026-08-07T00:00:00.000Z",
-            "startedAt": "2026-08-07T00:00:00.000Z",
-            "leftQueueAt": "2026-08-07T00:00:00.000Z",
-            "completedAt": "2026-08-07T00:00:00.000Z"
-          }
-      - name: 401 Response
-        originalRequest:
-          method: PATCH
-          header: []
-          url: '{{baseUrl}}/queues/entries/{queueId}/complete'
-        status: Unauthorized
-        code: 401
-        header:
-          - key: Content-Type
-            value: application/json
-        body: |-
-          {
-            "type": "",
-            "title": "",
-            "status": 0,
-            "code": "",
-            "requestId": "00000000-0000-4000-8000-000000000000",
-            "errors": [
-              {
-                "field": "",
-                "message": ""
-              }
-            ]
-          }
-      - name: 403 Response
-        originalRequest:
-          method: PATCH
-          header: []
-          url: '{{baseUrl}}/queues/entries/{queueId}/complete'
         status: Forbidden
         code: 403
         header:

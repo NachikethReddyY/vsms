@@ -21,6 +21,10 @@ const SAFE_CONFLICT_CODES = new Set([
   "INVALID_RESULT_DATA",
   "REGISTRATION_NOT_FOUND",
   "REGISTRATION_NOT_SCREENABLE",
+  "ROUTE_NOT_ASSIGNED",
+  "ROUTE_PROGRESSION_CONFLICT",
+  "ROUTE_QUEUE_CONFLICT",
+  "ROUTE_STATION_MISMATCH",
   "SCREENER_ROLE_REQUIRED",
   "SCREENING_WRITE_CONFLICT",
   "SCREENING_RESULT_REQUIRED",
@@ -49,6 +53,26 @@ const PROCESSING_LEASE_MS = 30_000;
 const TERMINAL_WAIT_MS = 10_000;
 const wait = (milliseconds) => new Promise((resolve) => setTimeout(resolve, milliseconds));
 
+const safeStation = (station) => station ? {
+  stationId: station.stationId,
+  stationName: station.stationName,
+  stationType: station.stationType,
+} : null;
+
+const safeRouteProgression = (progression) => progression ? {
+  status: progression.status,
+  ...(Number.isInteger(progression.routeVersion) ? { routeVersion: progression.routeVersion } : {}),
+  completedStation: safeStation(progression.completedStation),
+  nextStation: safeStation(progression.nextStation),
+  nextQueue: progression.nextQueue ? {
+    stationId: progression.nextQueue.stationId,
+    stationName: progression.nextQueue.stationName,
+    stationType: progression.nextQueue.stationType,
+    queueNumber: progression.nextQueue.queueNumber,
+    status: progression.nextQueue.status,
+  } : null,
+} : null;
+
 const safeResultSnapshot = (receipt) => {
   const result = receipt?.result || {};
   return {
@@ -56,18 +80,7 @@ const safeResultSnapshot = (receipt) => {
     overallFlag: result.overallFlag,
     isFlagged: result.isFlagged,
     ruleVersion: result.ruleVersion || result.evaluation?.ruleVersion,
-    ...(result.journey ? {
-      journey: {
-        state: result.journey.state,
-        registrationId: result.journey.registrationId,
-        registrationStatus: result.journey.registrationStatus,
-        queueNumber: result.journey.queueNumber,
-        activeEntry: result.journey.activeEntry,
-        assignedStation: result.journey.assignedStation,
-        created: result.journey.created,
-        remainingStationCount: result.journey.remainingStationCount,
-      },
-    } : {}),
+    routeProgression: safeRouteProgression(receipt?.routeProgression),
   };
 };
 

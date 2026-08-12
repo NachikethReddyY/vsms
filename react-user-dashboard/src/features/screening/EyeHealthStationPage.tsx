@@ -15,7 +15,7 @@ import {
   FlagBanner,
   loadStationContext,
   ParticipantLookup,
-  StationHandoffLinks,
+  RouteProgressionNotice,
   StationPageFrame,
 } from './StationShared';
 
@@ -81,7 +81,6 @@ export default function EyeHealthStationPage() {
     setAcknowledged(false);
     setError(null);
     setSuccess(null);
-    setSavedRegistrationId(null);
   }, [selectedId]);
 
   const selectParticipant = (registrationId: string) => {
@@ -172,8 +171,8 @@ export default function EyeHealthStationPage() {
         resultData,
       });
       if (generation !== participantRequestGeneration.current) return;
-      setSuccess(saved.queued
-        ? 'Saved offline. It will sync when connected.'
+      setSuccess(saved.syncState === 'PENDING_SYNC'
+        ? 'Pending sync. The participant has not entered the next queue.'
         : saved.isFlagged
           ? `Saved with ${saved.overallFlag} flag (${saved.ruleVersion ?? preview.ruleVersion}): ${saved.flagSummary}`
           : `Saved Eye Health result (${saved.overallFlag}, ${saved.ruleVersion ?? preview.ruleVersion}).`);
@@ -228,6 +227,7 @@ export default function EyeHealthStationPage() {
     >
       <ParticipantLookup
         eventId={eventId}
+        currentStationId={station?.stationId ?? ''}
         queue={queue}
         selectedId={selectedId}
         onSelect={selectParticipant}

@@ -8,6 +8,7 @@ import {
   LightBulbIcon,
   QrCodeIcon,
   ShieldCheckIcon,
+  VideoCameraIcon,
 } from '@heroicons/react/24/outline';
 import { getApiError as getApiMessage } from '../../utils/apiClient';
 import { startQrScanner } from './startQrScanner';
@@ -15,13 +16,9 @@ import { extractQrToken, stationHandoffUrl, verifyQrToken } from './qrHandoff';
 import type { QrVerifyResult } from './qrHandoff';
 import './QRScannerPage.css';
 
-/**
- * Seeded demonstration pass from backend/prisma/seed.js (`DEMO_QR_TOKEN`).
- * `VSMS-DEMO-QR-001` was never a real token and always failed verification.
- */
-const DEMO_QR_TOKEN = 'ab'.repeat(32);
-
 type ScanStatus = 'scanning' | 'verifying' | 'verified';
+type ActiveAssignment = { stationId: string; stationName: string; stationType: string };
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 /** Non-standard `torch` constraint used by html5-qrcode for the flashlight. */
 type TrackCapabilitiesWithTorch = MediaTrackCapabilities & { advanced?: Array<Record<string, unknown>> };
@@ -32,13 +29,29 @@ export default function QRScannerPage() {
   const [status, setStatus] = useState<ScanStatus>('scanning');
   const [error, setError] = useState<string | null>(null);
   const [verified, setVerified] = useState<QrVerifyResult | null>(null);
+  const [lookupOnly, setLookupOnly] = useState(false);
+  const [activeAssignment, setActiveAssignment] = useState<ActiveAssignment | null>(null);
+  const [lookupEventId, setLookupEventId] = useState('');
+  const [lookupRegistrationId, setLookupRegistrationId] = useState('');
+  const inputRef = useRef<HTMLInputElement>(null);
+  const verificationRef = useRef(false);
+
+  const loadAssignment = useCallback(async (eventId: string, registrationId: string) => {
+    const { data } = await apiClient.get<{ activeEntry: { station: ActiveAssignment } | null }>(`/queues/events/${eventId}/participants/${registrationId}`);
+    setActiveAssignment(data.activeEntry?.station ?? null);
+  }, []);
 
   const verifyToken = useCallback(async (token: string) => {
+    if (verificationRef.current) return;
+    verificationRef.current = true;
     setStatus('verifying');
     setError(null);
     setVerified(null);
+    setLookupOnly(false);
+    setActiveAssignment(null);
     try {
       const result = await verifyQrToken(token);
+      await loadAssignment(result.event.id, result.registrationId);
       setRawInput(token);
       setVerified(result);
       setStatus('verified');
@@ -46,8 +59,10 @@ export default function QRScannerPage() {
       setError(getApiMessage(cause, 'Could not verify that QR token.'));
       setStatus('scanning');
       throw new Error(getApiMessage(cause, 'Could not verify that QR token.'));
+    } finally {
+      verificationRef.current = false;
     }
-  }, []);
+  }, [loadAssignment]);
 
   const onCameraScan = useCallback(async (raw: string) => {
     const token = extractQrToken(raw);
@@ -75,9 +90,36 @@ export default function QRScannerPage() {
 
   const resetScan = () => {
     setVerified(null);
+    setLookupOnly(false);
     setError(null);
     setRawInput('');
+    setActiveAssignment(null);
     setStatus('scanning');
+    window.requestAnimationFrame(() => inputRef.current?.focus());
+  };
+
+  const lookupParticipant = async (event: FormEvent) => {
+    event.preventDefault();
+    const eventId = lookupEventId.trim();
+    const registrationId = lookupRegistrationId.trim();
+    if (!UUID.test(eventId) || !UUID.test(registrationId) || verificationRef.current) {
+      setError('Enter valid event and registration UUIDs.');
+      return;
+    }
+    verificationRef.current = true;
+    setError(null);
+    setStatus('verifying');
+    try {
+      await loadAssignment(eventId, registrationId);
+      setVerified({ valid: true, qrId: '', registrationId, participant: { id: '', firstName: 'Participant', lastName: '' }, event: { id: eventId, name: 'Selected event' }, queueNumber: null });
+      setLookupOnly(true);
+      setStatus('verified');
+    } catch (cause) {
+      setError(getApiMessage(cause, 'That participant could not be found in this event.'));
+      setStatus('scanning');
+    } finally {
+      verificationRef.current = false;
+    }
   };
 
   return (
@@ -108,7 +150,7 @@ export default function QRScannerPage() {
           {status === 'verified' && verified ? (
             <div className="qr-verified">
               <div className="qr-verified-head">
-                <span className="qr-verified-badge"><CheckBadgeIcon aria-hidden="true" />Verified</span>
+                <span className="qr-verified-badge"><CheckBadgeIcon aria-hidden="true" />{lookupOnly ? 'Participant found' : 'Verified'}</span>
                 <button type="button" className="qr-scan-again" onClick={resetScan}>
                   <ArrowPathIcon aria-hidden="true" />Scan next
                 </button>
@@ -127,7 +169,7 @@ export default function QRScannerPage() {
               <dl className="qr-verified-facts">
                 <div><dt>Queue</dt><dd>{verified.queueNumber != null ? `#${verified.queueNumber}` : '—'}</dd></div>
                 <div><dt>Registration</dt><dd className="qr-mono">{verified.registrationId.slice(0, 8)}…</dd></div>
-                <div><dt>Pass</dt><dd><ShieldCheckIcon aria-hidden="true" />Server-verified</dd></div>
+                <div><dt>{lookupOnly ? 'Lookup' : 'Pass'}</dt><dd><ShieldCheckIcon aria-hidden="true" />{lookupOnly ? 'Event-scoped' : 'Server-verified'}</dd></div>
               </dl>
 
               <div className="qr-station-picker">
@@ -188,6 +230,8 @@ export default function QRScannerPage() {
               <label htmlFor="qr-scan-input">QR URL or token</label>
               <input
                 id="qr-scan-input"
+                ref={inputRef}
+                autoFocus
                 value={rawInput}
                 onChange={(event) => setRawInput(event.target.value)}
                 placeholder="…/participant-status/&lt;token&gt; or 64-hex token"
@@ -198,15 +242,19 @@ export default function QRScannerPage() {
                 <button type="submit" className="primary" disabled={status === 'verifying'}>
                   {status === 'verifying' ? 'Verifying…' : 'Verify'}
                 </button>
-                <button
-                  type="button"
-                  className="secondary"
-                  disabled={status === 'verifying'}
-                  onClick={() => void runVerify(DEMO_QR_TOKEN)}
-                >
-                  Use seeded demo pass
-                </button>
               </div>
+            </form>
+          </section>
+
+          <section className="qr-paste-panel">
+            <h2>Participant lookup fallback</h2>
+            <p>When the participant cannot present the QR, use the event-scoped registration reference. Access is checked by the server.</p>
+            <form onSubmit={(event) => void lookupParticipant(event)}>
+              <label htmlFor="qr-lookup-event">Event UUID</label>
+              <input id="qr-lookup-event" value={lookupEventId} onChange={(event) => setLookupEventId(event.target.value)} autoComplete="off" spellCheck="false" />
+              <label htmlFor="qr-lookup-registration">Registration UUID</label>
+              <input id="qr-lookup-registration" value={lookupRegistrationId} onChange={(event) => setLookupRegistrationId(event.target.value)} autoComplete="off" spellCheck="false" />
+              <button className="secondary" type="submit" disabled={status === 'verifying'}>Find participant</button>
             </form>
           </section>
 
@@ -220,16 +268,8 @@ export default function QRScannerPage() {
                 clinical data — the server resolves identity when staff scan it.</p>
               </div>
             </div>
-            <div className="qr-scan-help-row">
-              <QrCodeIcon aria-hidden="true" />
-              <div>
-                <strong>Screener handoff</strong>
-                <p>Participants can show a per-station QR that encodes just the event and
-                registration. Scanning it opens that station with the record pre-loaded.</p>
-              </div>
-            </div>
             <p className="qr-scan-help-note">
-              Camera access requires HTTPS (or localhost). Use the paste fallback on any device.
+              The same QR is used at every station. Camera access requires HTTPS (or localhost); paste or use a physical reader when unavailable.
             </p>
           </section>
         </aside>
@@ -249,10 +289,18 @@ function CameraScanPanel({
   const [cameraError, setCameraError] = useState<string | null>(null);
   const [torchSupported, setTorchSupported] = useState(false);
   const [torchOn, setTorchOn] = useState(false);
+  const [cameras, setCameras] = useState<QrCamera[]>([]);
+  const [activeCameraId, setActiveCameraId] = useState('');
+  const [requestedCameraId, setRequestedCameraId] = useState<string>();
+  const [announcement, setAnnouncement] = useState('');
   const [retryCount, setRetryCount] = useState(0);
+  const [switchingCamera, setSwitchingCamera] = useState(false);
   const scannerRef = useRef<import('html5-qrcode').Html5Qrcode | null>(null);
+  const scannerGenerationRef = useRef(0);
 
   useEffect(() => {
+    const generation = scannerGenerationRef.current + 1;
+    scannerGenerationRef.current = generation;
     let stopped = false;
     let running = false;
     let decoding = false;
@@ -261,6 +309,7 @@ function CameraScanPanel({
     setCameraError(null);
     setTorchSupported(false);
     setTorchOn(false);
+    setAnnouncement(requestedCameraId ? 'Switching camera…' : 'Opening camera…');
 
     const start = async () => {
       try {
@@ -268,25 +317,36 @@ function CameraScanPanel({
         if (stopped) return;
         scanner = new Html5Qrcode(scannerId);
         scannerRef.current = scanner;
-        await startQrScanner(
+        const started = await startQrScanner(
           scanner,
           { fps: 16, qrboxWidth: 320, qrboxHeight: 320 },
           async (value) => {
-            if (stopped || decoding) return;
+            if (stopped || generation !== scannerGenerationRef.current || decoding) return;
             decoding = true;
+            setAnnouncement('QR detected. Verifying pass…');
             try { await scanner?.pause(); } catch { /* ignore */ }
             try {
               await onScanResult(value);
+              setAnnouncement('Participant pass verified.');
             } catch {
               // verification failed — keep the camera running for another attempt
+              setAnnouncement('QR could not be verified. Camera remains active.');
             }
-            if (stopped) return;
+            if (stopped || generation !== scannerGenerationRef.current) return;
             try { await scanner?.resume(); } catch { /* ignore */ }
             decoding = false;
           },
           () => {},
         );
+        if (stopped || generation !== scannerGenerationRef.current) {
+          try { await scanner.stop(); } catch { /* scanner already stopped */ }
+          return;
+        }
         running = true;
+        setCameras(started.cameras);
+        setActiveCameraId(started.deviceId ?? '');
+        const activeLabel = started.cameras.find((camera) => camera.id === started.deviceId)?.label;
+        setAnnouncement(activeLabel ? `${activeLabel} active.` : 'Camera active.');
         try {
           const capabilities = scanner.getRunningTrackCapabilities() as TrackCapabilitiesWithTorch;
           setTorchSupported(Boolean(
@@ -296,11 +356,13 @@ function CameraScanPanel({
           // torch detection is best-effort
         }
       } catch (cause) {
+        if (stopped || generation !== scannerGenerationRef.current) return;
         setCameraError(
           cause instanceof DOMException && cause.name === 'NotAllowedError'
             ? 'Camera access was blocked. Allow camera access in your browser, or use the paste field below.'
             : 'The camera could not be opened. Check that this page is served over HTTPS (or localhost) and try again, or use the paste field below.',
         );
+        setAnnouncement('Camera unavailable. Paste the QR value or use a physical reader.');
       }
     };
 
@@ -308,6 +370,7 @@ function CameraScanPanel({
 
     return () => {
       stopped = true;
+      if (scannerGenerationRef.current === generation) scannerGenerationRef.current += 1;
       // html5-qrcode's stop() throws synchronously if the scanner never
       // started (e.g. camera permission denied) — guard it so an unmount
       // cannot crash the page.
@@ -320,7 +383,7 @@ function CameraScanPanel({
       }
       scannerRef.current = null;
     };
-  }, [onScanResult, scannerId, retryCount]);
+  }, [onScanResult, requestedCameraId, scannerId, retryCount]);
 
   const toggleTorch = async () => {
     const scanner = scannerRef.current;
@@ -334,16 +397,32 @@ function CameraScanPanel({
     }
   };
 
+  const switchCamera = async (deviceId: string) => {
+    if (!deviceId || deviceId === activeCameraId || switchingCamera) return;
+    scannerGenerationRef.current += 1;
+    setSwitchingCamera(true);
+    setAnnouncement('Switching camera…');
+    setTorchOn(false);
+    setTorchSupported(false);
+    const scanner = scannerRef.current;
+    scannerRef.current = null;
+    if (scanner) {
+      try {
+        await scanner.stop();
+      } catch {
+        // A scanner finishing startup or already stopped has no active track to release.
+      }
+    }
+    setActiveCameraId('');
+    setRequestedCameraId(deviceId);
+    setSwitchingCamera(false);
+  };
+
   return (
     <div className="qr-camera">
       <div className="qr-camera-viewport">
         <div id={scannerId} aria-label="Live camera preview" />
-        <div className="qr-camera-frame" aria-hidden="true">
-          <span className="qr-corner qr-corner-tl" />
-          <span className="qr-corner qr-corner-tr" />
-          <span className="qr-corner qr-corner-bl" />
-          <span className="qr-corner qr-corner-br" />
-        </div>
+        <div className="qr-camera-frame" aria-hidden="true" />
 
         {cameraError ? (
           <div className="qr-camera-error">
@@ -372,6 +451,8 @@ function CameraScanPanel({
         <p className="qr-camera-hint">
           The code is scanned and verified automatically when it enters the frame.
         </p>
+        <div className="qr-camera-controls">
+        {cameras.length > 1 && <label className="qr-camera-select"><VideoCameraIcon aria-hidden="true" /><span>Camera</span><select value={activeCameraId} disabled={status === 'verifying' || switchingCamera} onChange={(event) => void switchCamera(event.target.value)}>{cameras.map((camera, index) => <option key={camera.id} value={camera.id}>{camera.label || `Camera ${index + 1}`}</option>)}</select></label>}
         {!cameraError && torchSupported && (
           <button
             type="button"
@@ -382,7 +463,9 @@ function CameraScanPanel({
             <LightBulbIcon aria-hidden="true" />{torchOn ? 'Torch on' : 'Torch'}
           </button>
         )}
+        </div>
       </div>
+      <span className="sr-only" role="status" aria-live="polite">{announcement}</span>
     </div>
   );
 }

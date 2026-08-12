@@ -21,15 +21,8 @@ export type QrVerifyResult = {
   journey: QueueJourney;
 };
 
-/** Default station after a successful scan. Staff can switch via picker links. */
-export const DEFAULT_HANDOFF_STATION: StationType = 'VISUAL_ACUITY';
-
-export const HANDOFF_STATION_OPTIONS: StationType[] = (
-  Object.keys(STATION_PATH_SLUG) as StationType[]
-).filter((type) => Boolean(STATION_PATH_SLUG[type]));
-
 /**
- * Pull a QR token from a pasted URL (`…/participant-status/<token>`) or raw hex / demo token.
+ * Pull a QR token from a pasted participant-status URL or raw secure token.
  */
 export function extractQrToken(raw: string): string | null {
   const trimmed = raw.trim();
@@ -60,13 +53,3 @@ export async function verifyQrToken(token: string, eventId?: string): Promise<Qr
   });
   return data.data;
 }
-
-export function stationHandoffUrl(
-  eventId: string,
-  registrationId: string,
-  stationType: StationType = DEFAULT_HANDOFF_STATION,
-): string | null {
-  return stationPath(eventId, stationType, registrationId);
-}
-
-export { STATION_LABEL };
