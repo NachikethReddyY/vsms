@@ -104,6 +104,7 @@ export function ParticipantLookup({
   const [success, setSuccess] = useState<string | null>(null);
   const [scannerOpen, setScannerOpen] = useState(false);
   const [queueSearch, setQueueSearch] = useState('');
+  const [lookupPending, setLookupPending] = useState(false);
   const filteredQueue = useMemo(() => {
     const search = queueSearch.trim().toLowerCase();
     if (!search) return queue;
@@ -116,19 +117,24 @@ export function ParticipantLookup({
     activeStation: { stationId: string; stationName: string } | null;
   }, source: string) => {
     if (!person.activeStation) {
-      setError('This participant has no active station assignment. Ask an authorized officer to resolve the route.');
-      return;
+      const message = 'This participant has no active station assignment. Ask an authorized officer to resolve the route.';
+      setError(message);
+      throw new Error(message);
     }
     if (person.activeStation.stationId !== currentStationId) {
-      setError(`This participant is assigned to ${person.activeStation.stationName}, not this station.`);
-      return;
+      const message = `This participant is assigned to ${person.activeStation.stationName}, not this station.`;
+      setError(message);
+      throw new Error(message);
     }
+    setError(null);
     onSelect(person.registrationId);
     setSuccess(`Loaded ${person.participantDisplayName} from ${source}.`);
   }, [currentStationId, onSelect]);
 
-  const resolvePass = async () => {
+  const resolvePass = async (event?: FormEvent) => {
+    event?.preventDefault();
     if (!eventId || !passToken.trim()) return;
+    setLookupPending(true);
     setError(null);
     setSuccess(null);
     try {
@@ -140,6 +146,8 @@ export function ParticipantLookup({
       applyResolved(person, 'pass / QR token');
     } catch (cause) {
       setError(getApiMessage(cause, 'Could not resolve that participant pass.'));
+    } finally {
+      setLookupPending(false);
     }
   };
 
@@ -168,7 +176,7 @@ export function ParticipantLookup({
       <h2>Find participant</h2>
       {error && <p className="form-error" role="alert">{error}</p>}
       <AppToast message={success ?? ''} />
-      <div className="va-resolve-row">
+      <form className="va-resolve-row" onSubmit={(event) => void resolvePass(event)}>
         <label>
           Pass token / QR value
           <input
@@ -177,11 +185,11 @@ export function ParticipantLookup({
             placeholder="…/participant-status/&lt;token&gt; or 64-hex token"
           />
         </label>
-        <button type="button" className="primary" onClick={() => void resolvePass()}>Load pass</button>
+        <button type="submit" className="primary" disabled={lookupPending}>{lookupPending ? 'Loading…' : 'Load pass'}</button>
         <button type="button" className="secondary" onClick={() => setScannerOpen(true)}>
           Scan QR with camera
         </button>
-      </div>
+      </form>
       <p className="va-resolve-hint">Paste the full QR value or the hex token from the pass.</p>
       <label>
         Search this station queue

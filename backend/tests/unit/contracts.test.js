@@ -103,6 +103,17 @@ test("recorded reviews expose optional eye-health observations as nullable", () 
     assert.equal(document.components.schemas.RecordedReview.properties.eyeHealthObservations.nullable, true);
 });
 
+test("route override contract is versioned, reason-allowlisted, and role-neutral", () => {
+    const document = YAML.parse(read("docs/openapi.yaml"));
+    const operation = document.paths["/api/v1/queues/events/{eventId}/participants/{registrationId}/route"].patch;
+    const request = document.components.schemas.RouteOverrideRequest;
+    assert.ok(operation.responses["409"]);
+    assert.deepEqual(request.required, ["stationIds", "reasonCode", "expectedVersion"]);
+    assert.equal(request.properties.stationIds.uniqueItems, true);
+    assert.equal(Object.hasOwn(request.properties, "role"), false);
+    assert.ok(document.components.schemas.RouteOverrideReasonCode.enum.includes("STATION_UNAVAILABLE"));
+});
+
 test("account contracts allow composed runtime fields and document provider maintenance", () => {
     const document = YAML.parse(read("docs/openapi.yaml"));
     const schemas = document.components.schemas;

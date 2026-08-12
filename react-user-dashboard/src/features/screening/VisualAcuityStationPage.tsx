@@ -161,8 +161,8 @@ export default function VisualAcuityStationPage() {
         acknowledged: preview.isFlagged ? acknowledged : false,
         resultData,
       });
-      setSuccess(saved.queued
-        ? 'Saved offline. It will sync when connected.'
+      setSuccess(saved.syncState === 'PENDING_SYNC'
+        ? 'Pending sync. The participant has not entered the next queue.'
         : saved.isFlagged
           ? `Saved with ${saved.overallFlag} flag (${saved.ruleVersion ?? preview.ruleVersion}): ${saved.flagSummary}`
           : `Saved Visual Acuity result (${saved.overallFlag}, ${saved.ruleVersion ?? preview.ruleVersion}).`);
@@ -208,7 +208,7 @@ export default function VisualAcuityStationPage() {
       {error && <p className="form-error" role="alert">{error}</p>}
       <AppToast message={success ?? ''} />
       {success && (
-        <RouteProgressionNotice eventId={eventId} queued={success.startsWith('Saved offline')} />
+        <RouteProgressionNotice eventId={eventId} queued={success.startsWith('Pending sync')} />
       )}
 
       <ParticipantLookup

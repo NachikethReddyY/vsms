@@ -2193,6 +2193,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/queues/events/{eventId}/participants/{registrationId}/route": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Replace an authorized portion of a participant's unfinished screening route
+         * @description Event managers and administrators may reorder the full unfinished tail. On-duty registration officers and screeners may select only the next unfinished station; the server preserves the relative order of the remainder. Completed and active steps are immutable.
+         */
+        patch: operations["replaceParticipantRoute"];
+        trace?: never;
+    };
     "/api/v1/queues/participant/{registrationId}": {
         parameters: {
             query?: never;
@@ -4213,11 +4233,38 @@ export interface components {
         } | null;
         RegistrationRouteState: {
             /** @enum {string} */
-            status: "PENDING_CHECK_IN" | "READY" | "NEEDS_STAFF_ACTION" | "NO_SCREENING_STATIONS";
+            status: "PENDING_CHECK_IN" | "READY" | "REVIEW_READY" | "NEEDS_STAFF_ACTION" | "NO_SCREENING_STATIONS";
             routeVersion: number;
             steps: components["schemas"]["RegistrationRouteStepState"][];
             currentStation: components["schemas"]["RegistrationRouteStepState"] | null;
             queue: components["schemas"]["RegistrationRouteQueue"];
+        };
+        /** @enum {string} */
+        RouteOverrideReasonCode: "STATION_UNAVAILABLE" | "QUEUE_BALANCING" | "PARTICIPANT_NEED" | "EQUIPMENT_ISSUE" | "OPERATIONAL_EXCEPTION";
+        RouteOverrideRequest: {
+            /** @description Complete proposed order of every unfinished required station. The active station, when present, must remain in place; completed stations are retained by the server. */
+            stationIds: string[];
+            reasonCode: components["schemas"]["RouteOverrideReasonCode"];
+            expectedVersion: number;
+        };
+        RouteOverrideResponse: {
+            /** @enum {string} */
+            status: "success";
+            data: components["schemas"]["RegistrationRouteState"];
+        };
+        RouteOverrideConflict: {
+            /** Format: uri */
+            type: string;
+            title: string;
+            error: string;
+            /** @enum {integer} */
+            status: 409;
+            code: string;
+            /** Format: uuid */
+            requestId?: string;
+            errors?: {
+                latestRoute?: components["schemas"]["RegistrationRouteState"];
+            };
         };
         RegistrationListResponse: {
             registrations: components["schemas"]["Registration"][];
@@ -4873,6 +4920,7 @@ export interface components {
             overallFlag?: components["schemas"]["OverallFlag"];
             isFlagged?: boolean;
             ruleVersion?: string;
+            routeProgression?: components["schemas"]["RouteProgression"] | null;
         };
         ScreeningSyncActionResult: {
             /** Format: uuid */
@@ -9084,6 +9132,47 @@ export interface operations {
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
+            422: components["responses"]["ValidationFailed"];
+        };
+    };
+    replaceParticipantRoute: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                eventId: components["parameters"]["EventId"];
+                registrationId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RouteOverrideRequest"];
+            };
+        };
+        responses: {
+            /** @description Latest committed route state */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RouteOverrideResponse"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            /** @description Route version or state conflict; version conflicts include the latest safe route state */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["RouteOverrideConflict"];
+                    "application/json": components["schemas"]["RouteOverrideConflict"];
+                };
+            };
             422: components["responses"]["ValidationFailed"];
         };
     };

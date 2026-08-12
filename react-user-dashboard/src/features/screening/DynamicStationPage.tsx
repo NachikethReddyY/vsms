@@ -132,7 +132,9 @@ export default function DynamicStationPage() {
         resultData: values,
       });
       if (generation !== participantRequestGeneration.current) return;
-      setSuccess(saved.queued ? 'Saved offline. It will sync when connected.' : `Saved ${station.stationName} result (${saved.overallFlag}).`);
+      setSuccess(saved.syncState === 'PENDING_SYNC'
+        ? 'Pending sync. The participant has not entered the next queue.'
+        : `Saved ${station.stationName} result (${saved.overallFlag}).`);
       setEvaluation(null);
       setAcknowledged(false);
       await load();
@@ -154,7 +156,7 @@ export default function DynamicStationPage() {
     instructions={<p>Complete all required fields marked with an asterisk. This template uses the field schema captured when it was added to the event.</p>}
     error={error}
     success={success}
-    handoff={<RouteProgressionNotice eventId={eventId} queued={Boolean(success?.startsWith('Saved offline'))} />}
+    handoff={<RouteProgressionNotice eventId={eventId} queued={Boolean(success?.startsWith('Pending sync'))} />}
   >
     <ParticipantLookup eventId={eventId} currentStationId={station?.stationId ?? ''} queue={queue} selectedId={selectedId} onSelect={selectParticipant} selected={selected} />
     <form className="detail-panel va-form" onSubmit={(event) => void submit(event)} noValidate>

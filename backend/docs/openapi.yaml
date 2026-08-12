@@ -2184,6 +2184,40 @@ paths:
         "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
         "422": { $ref: "#/components/responses/ValidationFailed" }
+  /api/v1/queues/events/{eventId}/participants/{registrationId}/route:
+    patch:
+      tags: [Queue]
+      operationId: replaceParticipantRoute
+      summary: Replace an authorized portion of a participant's unfinished screening route
+      description: Event managers and administrators may reorder the full unfinished tail. On-duty registration officers and screeners may select only the next unfinished station; the server preserves the relative order of the remainder. Completed and active steps are immutable.
+      parameters:
+        - $ref: "#/components/parameters/EventId"
+        - name: registrationId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/RouteOverrideRequest" }
+      responses:
+        "200":
+          description: Latest committed route state
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/RouteOverrideResponse" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409":
+          description: Route version or state conflict; version conflicts include the latest safe route state
+          content:
+            application/problem+json:
+              schema: { $ref: "#/components/schemas/RouteOverrideConflict" }
+            application/json:
+              schema: { $ref: "#/components/schemas/RouteOverrideConflict" }
+        "422": { $ref: "#/components/responses/ValidationFailed" }
   /api/v1/queues/participant/{registrationId}:
     get:
       deprecated: true
@@ -4591,7 +4625,7 @@ components:
       additionalProperties: false
       required: [status, routeVersion, steps, currentStation, queue]
       properties:
-        status: { type: string, enum: [PENDING_CHECK_IN, READY, NEEDS_STAFF_ACTION, NO_SCREENING_STATIONS] }
+        status: { type: string, enum: [PENDING_CHECK_IN, READY, REVIEW_READY, NEEDS_STAFF_ACTION, NO_SCREENING_STATIONS] }
         routeVersion: { type: integer, minimum: 1 }
         steps:
           type: array
@@ -4601,6 +4635,46 @@ components:
           allOf: [{ $ref: "#/components/schemas/RegistrationRouteStepState" }]
           nullable: true
         queue: { $ref: "#/components/schemas/RegistrationRouteQueue" }
+    RouteOverrideReasonCode:
+      type: string
+      enum: [STATION_UNAVAILABLE, QUEUE_BALANCING, PARTICIPANT_NEED, EQUIPMENT_ISSUE, OPERATIONAL_EXCEPTION]
+    RouteOverrideRequest:
+      type: object
+      additionalProperties: false
+      required: [stationIds, reasonCode, expectedVersion]
+      properties:
+        stationIds:
+          type: array
+          minItems: 1
+          maxItems: 100
+          uniqueItems: true
+          description: Complete proposed order of every unfinished required station. The active station, when present, must remain in place; completed stations are retained by the server.
+          items: { type: string, format: uuid }
+        reasonCode: { $ref: "#/components/schemas/RouteOverrideReasonCode" }
+        expectedVersion: { type: integer, minimum: 1 }
+    RouteOverrideResponse:
+      type: object
+      additionalProperties: false
+      required: [status, data]
+      properties:
+        status: { type: string, enum: [success] }
+        data: { $ref: "#/components/schemas/RegistrationRouteState" }
+    RouteOverrideConflict:
+      type: object
+      additionalProperties: false
+      required: [type, title, error, status, code]
+      properties:
+        type: { type: string, format: uri }
+        title: { type: string }
+        error: { type: string }
+        status: { type: integer, enum: [409] }
+        code: { type: string }
+        requestId: { type: string, format: uuid }
+        errors:
+          type: object
+          additionalProperties: false
+          properties:
+            latestRoute: { $ref: "#/components/schemas/RegistrationRouteState" }
     RegistrationListResponse:
       type: object
       additionalProperties: false
@@ -5355,6 +5429,7 @@ components:
         overallFlag: { $ref: "#/components/schemas/OverallFlag" }
         isFlagged: { type: boolean }
         ruleVersion: { type: string }
+        routeProgression: { type: object, allOf: [{ $ref: "#/components/schemas/RouteProgression" }], nullable: true }
     ScreeningSyncActionResult:
       type: object
       additionalProperties: false

@@ -8,14 +8,14 @@
     "dev": "vite",
     "build": "tsc -b && vite build",
     "lint": "eslint .",
-    "test": "pnpm run test:participants && pnpm run test:queue && pnpm run test:audit && pnpm run test:qr && pnpm run test:shell && pnpm run test:stage4 && pnpm run test:offline && vitest run src/features/events/eventDisplayStatus.test.mjs src/features/screening/qrHandoff.test.ts src/features/reviews/referralRecovery.test.ts src/utils/logout.test.ts",
+    "test": "pnpm run test:participants && pnpm run test:queue && pnpm run test:audit && pnpm run test:qr && pnpm run test:shell && pnpm run test:stage4 && pnpm run test:offline && vitest run src/features/events/eventDisplayStatus.test.mjs src/features/screening/qrHandoff.test.ts src/features/screening/startQrScanner.test.ts src/features/screening/scannerControls.test.ts src/features/reviews/referralRecovery.test.ts src/utils/logout.test.ts",
     "test:participants": "node --test src/pages/participant/ParticipantPage.test.mjs",
     "test:queue": "node --test src/pages/QueuePages.test.mjs",
     "test:audit": "node --test src/pages/admin/SystemAuditDashboardPage.test.mjs",
     "test:qr": "node --test src/components/qr/QRCodePage.test.mjs",
     "test:shell": "node --test src/components/AppShell.navigation.test.mjs",
     "test:stage4": "vitest run src/components/LandingPage.test.tsx src/auth/CognitoRoutes.test.tsx src/features/stage4Api.test.ts src/features/Stage4Pages.behavior.test.tsx src/App.routing.test.tsx src/pages/StationLibraryPage.test.tsx",
-    "test:offline": "vitest run src/features/screening/offlineSync.test.ts src/features/screening/EyeHealthStationPage.test.tsx",
+    "test:offline": "vitest run src/features/screening/offlineSync.test.ts src/features/screening/screeningApi.offline.test.ts src/features/screening/RouteProgressionNotice.test.ts src/features/screening/EyeHealthStationPage.test.tsx",
     "preview": "vite preview"
   },
   "dependencies": {
