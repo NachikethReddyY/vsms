@@ -33,6 +33,7 @@ import {
 } from "./features/Stage4Pages";
 import AccountSecurityPage from "./pages/AccountSecurityPage";
 import StationLibraryPage from "./pages/StationLibraryPage";
+import StationTemplateFormPage from "./pages/StationTemplateFormPage";
 import { QueuePage } from "./pages/QueuePages"; // Imported the QueuePage component
 import EventRegistrationPage from "./pages/participant/EventRegistrationPage";
 import ParticipantCheckInPage from "./pages/participant/ParticipantCheckInPage";
@@ -187,6 +188,8 @@ export default function App() {
           <Route element={<RoleGuard allowedRoles={adminRoles} />}>
             <Route path="/staff" element={<StaffAdministrationPage />} />
             <Route path="/admin/station-templates" element={<StationLibraryPage />} />
+            <Route path="/admin/station-templates/new" element={<StationTemplateFormPage mode="create" />} />
+            <Route path="/admin/station-templates/:stationTemplateId/edit" element={<StationTemplateFormPage mode="edit" />} />
             <Route path="/events/new" element={<EventFormPage mode="create" />} />
             <Route path="/events/:eventId/delete" element={<EventDeletionPage />} />
             <Route path="/admin/audit-logs" element={<RegistrationAuditLogsPage />} />

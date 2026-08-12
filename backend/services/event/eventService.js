@@ -585,9 +585,9 @@ const createEventDays = async (tx, eventId, days) => {
   return new Map(created.map((day) => [day.date.toISOString().slice(0, 10), day]));
 };
 
-/** Only CUSTOM stations freeze and render fieldSchema. Built-in clinical UIs stay hard-coded. */
+/** Freeze catalog fieldSchema onto event stations when present (CUSTOM and clinical). */
 const stationSchemaFields = (template) => {
-  if (template.stationType !== "CUSTOM") {
+  if (!template.fieldSchema || (Array.isArray(template.fieldSchema) && template.fieldSchema.length === 0)) {
     return { fieldSchemaSnapshot: null, schemaVersion: template.version || 1 };
   }
   const fieldSchema = parseFieldSchema(template.fieldSchema);
@@ -979,12 +979,16 @@ const allowedUpdateKeys = {
     "bannerKey",
     "artworkDataUrl",
     "capacity",
+    "stations",
+    "shifts",
   ]),
   IN_PROGRESS: new Set([
     "description",
     "bannerKey",
     "artworkDataUrl",
     "capacity",
+    "stations",
+    "shifts",
   ]),
   COMPLETED: new Set(["bannerKey", "artworkDataUrl"]),
   CANCELLED: new Set(["bannerKey", "artworkDataUrl"]),
@@ -1735,7 +1739,9 @@ const hydrateSystemFieldSchemas = async (templates, db = prisma) => {
   return next;
 };
 
-/** Admin catalog: all templates including inactive / non-importable (#23). */
+/** Admin catalog: screening templates only — registration/clinical review/eye health are not managed here. */
+const HIDDEN_LIBRARY_TEMPLATE_KEYS = new Set(["REGISTRATION", "CLINICAL_REVIEW", "EYE_HEALTH"]);
+
 const listStationTemplateLibrary = async () => {
   const templates = await hydrateSystemFieldSchemas(await prisma.stationTemplate.findMany({
     select: {
@@ -1751,7 +1757,12 @@ const listStationTemplateLibrary = async () => {
     },
     orderBy: [{ active: "desc" }, { name: "asc" }],
   }));
-  return templates.map(serializeStationTemplate);
+  return templates
+    .filter((template) => (
+      !HIDDEN_LIBRARY_TEMPLATE_KEYS.has(template.templateKey)
+      && template.stationType !== "EYE_HEALTH"
+    ))
+    .map((template) => serializeStationTemplate(template));
 };
 
 const createStationTemplate = async (body, user, context, db = prisma) => {
@@ -1817,13 +1828,24 @@ const createStationTemplate = async (body, user, context, db = prisma) => {
 const updateStationTemplate = async (stationTemplateId, body, user, context, db = prisma) => db.$transaction(async (tx) => {
   const existing = await tx.stationTemplate.findUnique({ where: { stationTemplateId } });
   if (!existing) throw new AppError(404, "STATION_TEMPLATE_NOT_FOUND", "Station template not found");
+  if (
+    HIDDEN_LIBRARY_TEMPLATE_KEYS.has(existing.templateKey)
+    || existing.stationType === "EYE_HEALTH"
+  ) {
+    throw new AppError(
+      422,
+      "STATION_TEMPLATE_NOT_EDITABLE",
+      "Registration, clinical review, and eye health are not managed in the station library",
+    );
+  }
   let fieldSchema;
   if (body.fieldSchema !== undefined) {
-    if (existing.stationType !== "CUSTOM") {
+    const editableTypes = new Set(["CUSTOM", "VISUAL_ACUITY", "REFRACTION", "COLOUR_VISION"]);
+    if (!editableTypes.has(existing.stationType)) {
       throw new AppError(
         422,
         "FIELD_SCHEMA_NOT_EDITABLE",
-        "Field schemas can only be edited for custom stations. Built-in stations use fixed clinical forms.",
+        "Field schemas can only be edited for screening station templates",
       );
     }
     try {

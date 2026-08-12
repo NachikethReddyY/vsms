@@ -685,7 +685,22 @@ describe("event lifecycle", () => {
     expect(deniedRunningIdentityChange.status).toBe(409);
     expect(deniedRunningIdentityChange.body.code).toBe("EVENT_NOT_EDITABLE");
 
-    const completed = await request(app).post(`/api/events/${created.body.eventId}/complete`).set("Authorization", `Bearer ${managerToken}`).send({ version: updated.body.version });
+    const liveShiftEdit = await request(app).patch(`/api/events/${created.body.eventId}`).set("Authorization", `Bearer ${managerToken}`).send({
+      version: updated.body.version,
+      shifts: [{
+        shiftId: started.body.shifts[0].shiftId,
+        name: "Live coverage",
+        startsAt: started.body.shifts[0].startsAt,
+        endsAt: started.body.shifts[0].endsAt,
+        requiredStaff: Math.max(started.body.shifts[0].requiredStaff || 1, 2),
+        assignments: [],
+      }],
+    });
+    expect(liveShiftEdit.status).toBe(200);
+    expect(liveShiftEdit.body.shifts[0].name).toBe("Live coverage");
+    expect(liveShiftEdit.body.shifts[0].requiredStaff).toBeGreaterThanOrEqual(2);
+
+    const completed = await request(app).post(`/api/events/${created.body.eventId}/complete`).set("Authorization", `Bearer ${managerToken}`).send({ version: liveShiftEdit.body.version });
     const denied = await request(app).patch(`/api/events/${created.body.eventId}`).set("Authorization", `Bearer ${managerToken}`).send({ version: completed.body.version, capacity: 101 });
     expect(denied.status).toBe(409);
     expect(denied.body.code).toBe("EVENT_NOT_EDITABLE");
