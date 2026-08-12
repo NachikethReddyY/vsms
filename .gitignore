@@ -39,6 +39,7 @@ test-results/
 
 # Local semantic repository indexes
 .repo-index/
+graphify-out/
 
 # Local TLS certificates and private keys (generate these per developer machine)
 react-user-dashboard/certs/*.pem
