@@ -34,7 +34,15 @@ const advanceQueueBody = z.object({
 const priorityQueueBody = z.object({
   isPriority: z.boolean(),
   notes: z.string().trim().max(255).optional(),
-}).strict();
+}).strict().superRefine((value, ctx) => {
+  if (value.isPriority === true && !value.notes) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["notes"],
+      message: "A reason is required when marking a queue entry as priority",
+    });
+  }
+});
 
 module.exports = {
   eventParams,

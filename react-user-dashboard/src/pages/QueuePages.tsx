@@ -1,76 +1,45 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useParams } from "react-router-dom";
+import { useAuth } from "../auth/AuthProvider";
 import { NowServingCard } from "../components/queue/NowServingCard";
 import { QueueHeader } from "../components/queue/QueueHeader";
-import { QueueTable, type QueueItem, type QueueStatus } from "../components/queue/QueueTable";
+import { QueueTable, toQueueItems, type QueueStatus } from "../components/queue/QueueTable";
+import { StationWorkload } from "../components/queue/StationWorkload";
 import { AppShell, LoadingState } from "../components/ui";
-import apiClient, { getApiError } from "../utils/apiClient";
-
-interface RegistrationRecord {
-  id: string;
-  queueNumber: number | null;
-  registrationStatus: QueueStatus;
-  participant: {
-    participantReference: string;
-    firstName: string;
-    lastName: string;
-  };
-}
-
-interface RegistrationPage {
-  registrations: RegistrationRecord[];
-  pagination: { totalPages: number };
-}
+import { queueApi, sortWaitingByPriority, type EventQueueStatus } from "../features/queue/queueApi";
+import { getApiError, getApiErrorCode } from "../utils/apiClient";
 
 const PAGE_SIZE = 12;
-const API_PAGE_SIZE = 100;
+
+const PERMISSION_ERROR_CODES = new Set(["CURRENT_DUTY_REQUIRED", "EVENT_ROLE_REQUIRED", "QUEUE_ACCESS_DENIED"]);
 
 export function QueuePage() {
   const { eventId } = useParams<{ eventId: string }>();
-  const [eventName, setEventName] = useState("");
-  const [queue, setQueue] = useState<QueueItem[]>([]);
+  const { session } = useAuth();
+  const roles = session?.user.roles ?? [];
+  const canManagePriority = roles.includes("EVENT_MANAGER") || roles.includes("ADMINISTRATOR");
+
+  const [status, setStatus] = useState<EventQueueStatus | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [errorCode, setErrorCode] = useState<string | null>(null);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<QueueStatus | "ALL">("ALL");
   const [currentPage, setCurrentPage] = useState(1);
 
+  const isPermissionError = Boolean(errorCode && PERMISSION_ERROR_CODES.has(errorCode));
+
   const fetchQueue = useCallback(async () => {
     if (!eventId) return;
     try {
-      const [eventResponse, firstPageResponse] = await Promise.all([
-        apiClient.get(`/events/${eventId}`),
-        apiClient.get<RegistrationPage>(`/events/${eventId}/registrations`, {
-          params: { page: 1, pageSize: API_PAGE_SIZE },
-        }),
-      ]);
-      const firstPage = firstPageResponse.data;
-      const remainingPages = await Promise.all(
-        Array.from({ length: Math.max(0, firstPage.pagination.totalPages - 1) }, (_, index) =>
-          apiClient.get<RegistrationPage>(`/events/${eventId}/registrations`, {
-            params: { page: index + 2, pageSize: API_PAGE_SIZE },
-          }),
-        ),
-      );
-      const registrations = [
-        ...firstPage.registrations,
-        ...remainingPages.flatMap((response) => response.data.registrations),
-      ];
-
-      setEventName(eventResponse.data.eventName ?? eventResponse.data.name ?? "");
-      setQueue(registrations.map((registration) => ({
-        id: registration.id,
-        queueNumber: registration.queueNumber,
-        status: registration.registrationStatus,
-        participant: {
-          fullName: `${registration.participant.firstName} ${registration.participant.lastName}`.trim(),
-          reference: registration.participant.participantReference,
-        },
-      })));
+      const result = await queueApi.getEventQueueStatus(eventId);
+      setStatus(result);
       setError(null);
+      setErrorCode(null);
     } catch (requestError: unknown) {
       setError(getApiError(requestError, "Unable to load queue data."));
+      setErrorCode(getApiErrorCode(requestError));
     } finally {
       setIsLoading(false);
     }
@@ -82,34 +51,63 @@ export function QueuePage() {
     return () => window.clearInterval(interval);
   }, [fetchQueue]);
 
-  const updateStatus = async (registrationId: string, status: QueueStatus, reason?: string) => {
+  const entries = useMemo(() => status?.entries ?? [], [status]);
+  const queueItems = useMemo(() => toQueueItems(entries), [entries]);
+
+  const nowServing = useMemo(
+    () => entries.find((entry) => entry.status === "CALLED") ?? entries.find((entry) => entry.status === "IN_PROGRESS") ?? null,
+    [entries],
+  );
+
+  const waiting = useMemo(() => sortWaitingByPriority(entries), [entries]);
+  const waitingCount = entries.filter((entry) => entry.status === "WAITING").length;
+  const calledCount = entries.filter((entry) => entry.status === "CALLED").length;
+  const completedCount = entries.filter((entry) => entry.status === "COMPLETED").length;
+  const activeCount = entries.filter((entry) => ["WAITING", "CALLED", "IN_PROGRESS"].includes(entry.status)).length;
+
+  const runAction = async (id: string, action: () => Promise<unknown>) => {
     try {
-      setActionLoading(registrationId);
-      await apiClient.patch(`/registrations/${registrationId}/status`, { toStatus: status, reason });
+      setActionLoading(id);
+      await action();
       await fetchQueue();
     } catch (requestError: unknown) {
-      setError(getApiError(requestError, "Failed to update queue status."));
+      setError(getApiError(requestError, "Failed to update the queue."));
     } finally {
       setActionLoading(null);
     }
   };
 
-  const waiting = queue.filter((item) => item.status === "SIGNED_UP");
-  const checkedIn = queue.filter((item) => item.status === "CHECKED_IN");
-  const completed = queue.filter((item) => item.status === "COMPLETED");
-  const currentServing = checkedIn[0] ?? null;
+  const handleAction = (id: string, action: "CALLED" | "STARTED" | "COMPLETED" | "SKIPPED") => {
+    if (!eventId) return;
+    const runners: Record<string, () => Promise<unknown>> = {
+      CALLED: () => queueApi.callQueueEntry(eventId, id),
+      STARTED: () => queueApi.startQueueEntry(eventId, id),
+      COMPLETED: () => queueApi.completeQueueEntry(eventId, id),
+      SKIPPED: () => queueApi.skipQueueEntry(eventId, id),
+    };
+    void runAction(id, runners[action]);
+  };
+
+  const handleSetPriority = (id: string, isPriority: boolean, notes: string | null) => {
+    if (!eventId) return;
+    void runAction(id, () => queueApi.updatePriority(eventId, id, isPriority, notes));
+  };
+
+  const callNext = () => {
+    if (waiting[0]) handleAction(waiting[0].id, "CALLED");
+  };
 
   const filteredQueue = useMemo(() => {
     const search = searchQuery.trim().toLowerCase();
-    return queue.filter((item) => {
+    return queueItems.filter((item) => {
       const matchesStatus = statusFilter === "ALL" || item.status === statusFilter;
       const matchesSearch = !search
-        || String(item.queueNumber ?? "").includes(search)
-        || item.participant.fullName.toLowerCase().includes(search)
-        || item.participant.reference.toLowerCase().includes(search);
+        || String(item.queueNumber).includes(search)
+        || item.participantDisplayName.toLowerCase().includes(search)
+        || (item.participantReference || "").toLowerCase().includes(search);
       return matchesStatus && matchesSearch;
     });
-  }, [queue, searchQuery, statusFilter]);
+  }, [queueItems, searchQuery, statusFilter]);
 
   const totalPages = Math.max(1, Math.ceil(filteredQueue.length / PAGE_SIZE));
   const paginatedQueue = filteredQueue.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
@@ -126,45 +124,71 @@ export function QueuePage() {
     );
   }
 
+  const eventName = status?.event.name ?? "";
+
   return (
     <AppShell title={eventName ? `${eventName} — Live queue` : "Live queue"}>
       <div className="mx-auto max-w-7xl space-y-4 px-6 pb-16 pt-2">
-        <QueueHeader
-          eventId={eventId}
-          eventName={eventName}
-          totalCount={queue.length}
-          waitingCount={waiting.length}
-          checkedInCount={checkedIn.length}
-          completedCount={completed.length}
-          callNextDisabled={actionLoading !== null || waiting.length === 0}
-          onCallNext={() => {
-            if (waiting[0]) void updateStatus(waiting[0].id, "CHECKED_IN", "Called from queue dashboard");
-          }}
-        />
+        {isPermissionError ? (
+          <div className="rounded-xl bg-amber-50 p-5 text-sm text-amber-900" role="alert">
+            <strong className="block font-semibold">You need an active queue duty to view this event&apos;s live queue.</strong>
+            <span className="mt-1 block text-amber-800">
+              {error}. Ask an event manager to assign you a REGISTRATION, SCREENER, or SUPPORT duty.
+            </span>
+          </div>
+        ) : (
+          <>
+            <QueueHeader
+              eventId={eventId}
+              eventName={eventName}
+              totalCount={activeCount}
+              waitingCount={waitingCount}
+              calledCount={calledCount}
+              completedCount={completedCount}
+              callNextDisabled={actionLoading !== null || waiting.length === 0}
+              onCallNext={callNext}
+            />
 
-        {error && <div className="rounded-xl bg-red-50 p-4 text-sm text-red-800" role="alert">{error}</div>}
+            {error && <div className="rounded-xl bg-red-50 p-4 text-sm text-red-800" role="alert">{error}</div>}
 
-        <NowServingCard
-          currentServing={currentServing}
-          actionLoading={actionLoading}
-          onComplete={(id) => void updateStatus(id, "COMPLETED", "Completed from queue dashboard")}
-          onNoShow={(id) => void updateStatus(id, "CANCELLED", "No show")}
-        />
+            <StationWorkload stations={status?.stations ?? []} />
 
-        <QueueTable
-          items={paginatedQueue}
-          filteredCount={filteredQueue.length}
-          searchQuery={searchQuery}
-          setSearchQuery={setSearchQuery}
-          statusFilter={statusFilter}
-          setStatusFilter={setStatusFilter}
-          currentPage={currentPage}
-          setCurrentPage={setCurrentPage}
-          totalPages={totalPages}
-          actionLoading={actionLoading}
-          onStatusChange={(id, status, reason) => void updateStatus(id, status, reason)}
-        />
+            <NowServingCard
+              nowServing={nowServing}
+              actionLoading={actionLoading}
+              onComplete={(id) => handleAction(id, "COMPLETED")}
+              onNoShow={(id) => handleAction(id, "SKIPPED")}
+            />
+
+            {entries.length === 0 ? (
+              <section className="rounded-2xl border border-[#E2E1DC] bg-white p-10 text-center shadow-sm">
+                <p className="text-sm font-semibold text-[#57554F]">The queue is empty</p>
+                <p className="mt-1 text-sm text-[#7A7870]">
+                  Join or hand off a participant to a station to start the queue.
+                </p>
+              </section>
+            ) : (
+              <QueueTable
+                items={paginatedQueue}
+                filteredCount={filteredQueue.length}
+                searchQuery={searchQuery}
+                setSearchQuery={setSearchQuery}
+                statusFilter={statusFilter}
+                setStatusFilter={setStatusFilter}
+                currentPage={currentPage}
+                setCurrentPage={setCurrentPage}
+                totalPages={totalPages}
+                actionLoading={actionLoading}
+                canManagePriority={canManagePriority}
+                onAction={handleAction}
+                onSetPriority={handleSetPriority}
+              />
+            )}
+          </>
+        )}
       </div>
     </AppShell>
   );
 }
+
+export default QueuePage;

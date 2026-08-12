@@ -1,6 +1,6 @@
-const prisma = require("../prisma/prismaClient");
+﻿const prisma = require("../prisma/prismaClient");
 const env = require("../config/env");
-const logger = require("../utils/logger/logger");
+const logger = require("../utils/logging/logger/logger");
 const { processNextLifecycleEmail, reconcileStaleLifecycleEmails } = require("../services/account/accountLifecycleNotificationService");
 
 const once = process.argv.includes("--once");

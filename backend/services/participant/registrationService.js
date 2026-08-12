@@ -1,7 +1,7 @@
 const prisma = require("../../prisma/prismaClient");
-const { createAuditLog } = require("../../utils/audit");
-const { assertRegistrationAssignment } = require("../../utils/staff");
-const { assertParticipantEventScope } = require("../../utils/participantEventScope");
+const { createAuditLog } = require("../../utils/logging/audit");
+const { assertRegistrationAssignment } = require("../../utils/auth/staff");
+const { assertParticipantEventScope } = require("../../utils/validation/participantEventScope");
 
 const OPEN_EVENT_STATUSES = ["PUBLISHED", "UPCOMING", "ONGOING", "IN_PROGRESS"];
 const REGISTRATION_STATUSES = new Set(["SIGNED_UP", "CHECKED_IN", "COMPLETED", "CANCELLED"]);

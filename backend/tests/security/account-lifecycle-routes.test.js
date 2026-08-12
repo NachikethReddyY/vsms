@@ -1,4 +1,4 @@
-const assert = require("node:assert/strict");
+﻿const assert = require("node:assert/strict");
 const crypto = require("node:crypto");
 const test = require("node:test");
 const cookieParser = require("cookie-parser");
@@ -9,7 +9,7 @@ process.env.NODE_ENV = "test";
 process.env.DATABASE_URL ||= "postgresql://test:test@localhost:5432/vsms_test";
 
 const prisma = require("../../prisma/prismaClient");
-const { signAccessToken } = require("../../utils/tokens");
+const { signAccessToken } = require("../../utils/auth/tokens");
 const requireAuthentication = require("../../middlewares/requireAuthentication");
 const requireApprovedAccount = require("../../middlewares/requireApprovedAccount");
 const accountRoutes = require("../../routes/accountRoutes");

@@ -1,8 +1,8 @@
-const crypto = require("crypto");
+﻿const crypto = require("crypto");
 const bcrypt = require("bcrypt");
 require("dotenv").config();
 const prisma = require("./prismaClient");
-const { encrypt, encryptionContext } = require("../utils/cryptoUtils");
+const { encrypt, encryptionContext } = require("../utils/crypto/cryptoUtils");
 
 const DEMO_PASSWORD = process.env.VSMS_DEMO_PASSWORD || "Demo-Only-Change-Me-2026!";
 if (process.env.NODE_ENV === "production" && !process.env.VSMS_DEMO_PASSWORD) {

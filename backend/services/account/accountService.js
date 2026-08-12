@@ -1,15 +1,14 @@
-const crypto = require("node:crypto");
+﻿const crypto = require("node:crypto");
 const prisma = require("../../prisma/prismaClient");
 const env = require("../../config/env");
 const AppError = require("../../errors/AppError");
-const audit = require("../../utils/audit");
-const { resolveAuditContext } = audit;
+const { resolveAuditContext, createAuthAuditLog } = require("../../utils/logging/audit");
 const { assertAdministratorRemains, lockAccountTransition } = require("./adminSafety");
 const { deriveLegacyStatus } = require("./accountState");
 const { enqueueProviderOperation, processProviderOperationForResponse } = require("./accountProviderOperationService");
 const { enqueueAccountLifecycle } = require("./accountLifecycleNotificationService");
-const { rolesFromCognitoGroups } = require("../../utils/roles");
-const { sessionValidity } = require("../../utils/sessionValidity");
+const { rolesFromCognitoGroups } = require("../../utils/auth/roles");
+const { sessionValidity } = require("../../utils/auth/sessionValidity");
 
 const summarySelect = {
   id: true,
@@ -194,7 +193,7 @@ exports.recordSuccessfulLogin = async (userId, lastLoginAt = new Date()) => {
   return lastLoginAt;
 };
 
-exports.recordAuthAudit = (entry) => audit.createAuthAuditLog(entry);
+exports.recordAuthAudit = (entry) => createAuthAuditLog(entry);
 
 exports.establishCognitoLoginSession = async ({ idTokenPayload, accessTokenPayload, context }) => {
   const emailVerified = idTokenPayload.email_verified === true || idTokenPayload.email_verified === "true";

@@ -3,8 +3,8 @@ title: VSMS secure coding project report
 authors:
   - "[Human input required: verify team names and student identifiers]"
 module: ST2515 Secure Coding
-date: "[Human input required]"
-submission: "[Human input required]"
+date: "11/8/2026"
+submission: "16/8/2026"
 ---
 
 # Visual Screening Management System
@@ -231,7 +231,46 @@ serverless runtime, object-storage deployment, live monitoring, backup restore,
 or runtime artifact-signature verification because no repository evidence
 proves those controls.
 
-## 7. Verification record
+## 7. Testing Results 
+The project adopts a structured testing approach to verify both the functional correctness and security of the Visual Screening Management System (VSMS). As shown in the figure, the automated tests are separated into different testing levels, allowing individual components to be tested independently before validating complete system workflows.
+
+### 7.1 Testing Structure
+We conducted testing throughout the development of the Visual Screening Management System (VSMS) to verify that the implemented features function correctly and meet the project's functional and security requirements. Testing was organized into unit, integration, security, and end-to-end (E2E) tests.
+
+<img width="251" height="119" alt="image" src="https://github.com/user-attachments/assets/437b4328-1a25-4e68-a6ae-0be14c38daff" />
+
+Figure 7.X: VSMS Automated Testing Structure
+
+- Unit Testing – Tests individual functions, utilities, controllers, and services in isolation. This ensures that individual pieces of business logic behave as expected without depending on the complete application.
+- Integration Testing – Verifies that multiple backend components work correctly together, including API routes, controllers, services, Prisma database operations, and authentication-related components.
+- Security Testing – Tests important security controls such as authentication, authorization/RBAC, input validation, CSRF protection, secure error handling, and other security-related requirements.
+- E2E Testing – Tests complete user workflows from the frontend through the backend. This verifies that major user journeys work correctly from the perspective of an actual system user.
+- Test Helpers – Contains reusable setup functions, test data, authentication utilities, database helpers, and other common functions shared across different test suites.
+
+The project also contains a test-results directory for storing generated testing outputs and reports. Additional dedicated tests, such as QR handoff validation, are included to verify specific security-sensitive workflows.
+
+Overall, this testing structure provides coverage at multiple levels rather than relying only on manual testing. It helps identify defects at the appropriate stage and provides evidence that both functional and security requirements have been tested.
+
+### 7.2 Git-Based Testing and Version Control
+
+Git was also used throughout development to manage testing-related changes and maintain a clear development history. Testing was performed alongside feature development rather than only at the end of the project.
+
+The development workflow generally followed these steps:
+
+1. Create or switch to a feature branch for the feature being developed.
+2. Implement the feature and its corresponding tests.
+3. Run the relevant unit, integration, security, or E2E tests locally.
+4. Fix any failing tests or implementation defects.
+5. Commit the completed changes with a meaningful commit message.
+6. Push the branch to the remote repository.
+7. Review the changes and testing results before integrating the feature into the main development branch.
+8. Run the broader test suite again after integration to identify regressions.
+
+For example, testing-related Git history can be used as evidence that tests were developed together with the corresponding system features rather than being added only immediately before submission.
+
+The Git repository therefore provides an additional layer of traceability between feature implementation → test implementation → defect fixing → final validated version.
+
+## 8. Verification record
 
 The following commands are the locally verifiable checks for this branch. The
 results below must be refreshed by the person preparing the final submission;
@@ -264,7 +303,7 @@ next-work plan; visual/reference assets and copied/generated packages under
 `docs/images/` remain out unless they are one of the four supplied brief/guide
 files.
 
-## 8. 15-minute demo outline
+## 9. 15-minute demo outline
 
 The evidence-driven, unrehearsed run sheet is in
 [`demo-outline.md`](demo-outline.md). It follows a path supported by the

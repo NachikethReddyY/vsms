@@ -1,8 +1,8 @@
-const fs = require("fs/promises");
+﻿const fs = require("fs/promises");
 const path = require("path");
 const prisma = require("../../prisma/prismaClient");
 const AppError = require("../../errors/AppError");
-const { deleteEventSignature, signatureMetadata } = require("../../utils/signatureStorage");
+const { deleteEventSignature, signatureMetadata } = require("../../utils/storage/signatureStorage");
 const { artifactPath, deleteArtifact } = require("../reporting/reportArtifactStorage");
 
 const TYPES = Object.freeze({

@@ -46,7 +46,7 @@ vi.mock('./pages/ParticipantPages', () => ({
 vi.mock('./auth/CognitoRoutes', () => ({ CognitoCallback: () => <p>Callback</p> }));
 vi.mock('./features/stage4Api', async () => {
   const actual = await vi.importActual<typeof import('./features/stage4Api')>('./features/stage4Api');
-  return { ...actual, getCurrentAccount: vi.fn(async () => ({ account: { id: 'user-1', approvalState: 'APPROVED', accessState: 'ENABLED', eventMemberships: [{ id: 'm1', eventId: 'event-1', status: 'ACTIVE', roles: [{ role: 'EVENT_MANAGER' }] }] } })), getEvent: vi.fn(async () => ({ eventId: 'event-1', canManage: true })), listMemberships: vi.fn(async () => ({ memberships: [] })), listEligibleUsers: vi.fn(async () => ({ users: [] })), getAnalytics: vi.fn(async () => ({ schemaVersion: 1, aggregateOnly: true, generatedAt: '2026-08-07T00:00:00.000Z', timeBasis: { interval: 'event' }, appliedFilters: {}, smallCellSuppression: { rule: 'n<5' }, dataCompleteness: { registrations: 'complete' }, metricDefinitions: [], tables: [], observations: [] })), listReportJobs: vi.fn(async () => ({ jobs: [] })), getDeletionPreview: vi.fn(async () => ({ previewToken: 'preview-token', blockers: [], version: 7, eventName: 'Clinic Day', counts: { participants: 2, registrations: 2 }, impactDigest: '2 artifacts' })), getDeletionCleanup: vi.fn(async () => ({ eventId: 'event-1', cleanupState: 'COMPLETED', tasks: [] })) };
+  return { ...actual, getCurrentAccount: vi.fn(async () => ({ account: { id: 'user-1', approvalState: 'APPROVED', accessState: 'ENABLED', eventMemberships: [{ id: 'm1', eventId: 'event-1', status: 'ACTIVE', roles: [{ role: 'EVENT_MANAGER' }] }] } })), getEvent: vi.fn(async () => ({ eventId: 'event-1', canManage: true })), getAnalytics: vi.fn(async () => ({ schemaVersion: 1, aggregateOnly: true, generatedAt: '2026-08-07T00:00:00.000Z', timeBasis: { interval: 'event' }, appliedFilters: {}, smallCellSuppression: { rule: 'n<5' }, dataCompleteness: { registrations: 'complete' }, metricDefinitions: [], tables: [], observations: [] })), listReportJobs: vi.fn(async () => ({ jobs: [] })), getDeletionPreview: vi.fn(async () => ({ previewToken: 'preview-token', blockers: [], version: 7, eventName: 'Clinic Day', counts: { participants: 2, registrations: 2 }, impactDigest: '2 artifacts' })), getDeletionCleanup: vi.fn(async () => ({ eventId: 'event-1', cleanupState: 'COMPLETED', tasks: [] })) };
 });
 vi.mock('./features/events/eventApi', async () => {
   const actual = await vi.importActual<typeof import('./features/events/eventApi')>('./features/events/eventApi');
@@ -94,19 +94,9 @@ describe('App route and navigation topology', () => {
     authUser.eventMemberships = [{ id: 'm1', eventId: 'event-1', status: 'ACTIVE', roles: [{ role: 'EVENT_MANAGER' }] }];
     renderPath('/events/event-1/analytics');
     expect(await screen.findByText('Completed-event analytics')).toBeTruthy();
-    expect(screen.getByRole('navigation', { name: 'Event sections' })).toBeTruthy();
-    expect(screen.getByRole('heading', { name: 'Clinic Day' })).toBeTruthy();
     cleanup();
     renderPath('/events/event-1/reports');
     expect(await screen.findByText('Report exports')).toBeTruthy();
-    expect(screen.getByRole('navigation', { name: 'Event sections' })).toBeTruthy();
-  });
-
-  it('renders event staffing below the persistent event header', async () => {
-    renderPath('/events/event-1/staff');
-    expect(await screen.findByRole('heading', { name: 'People and roles' })).toBeTruthy();
-    expect(screen.getByRole('heading', { name: 'Clinic Day' })).toBeTruthy();
-    expect(screen.getByRole('navigation', { name: 'Event sections' })).toBeTruthy();
   });
 
   it('surfaces analytics, reports, and authorized deletion from event detail navigation', async () => {
@@ -120,7 +110,6 @@ describe('App route and navigation topology', () => {
   it('renders admin deletion route for authorized administrators', async () => {
     renderPath('/events/event-1/delete');
     expect(await screen.findByRole('heading', { name: 'Delete event permanently' })).toBeTruthy();
-    expect(screen.getByRole('navigation', { name: 'Event sections' })).toBeTruthy();
   });
 
   it('consolidates staff invitations and lifecycle administration on /staff', async () => {

@@ -19,7 +19,7 @@ import {
   XMarkIcon,
 } from '@heroicons/react/24/outline';
 import { useEffect, useMemo, useRef, useState, type ChangeEvent, type FormEvent } from 'react';
-import { Link, Outlet, useLocation, useParams } from 'react-router-dom';
+import { Link, useLocation, useParams } from 'react-router-dom';
 import { useAuth } from '../../auth/AuthProvider';
 import { AppDialog } from '../../components/AppDialog';
 import { AppToast } from '../../components/AppToast';
@@ -329,7 +329,7 @@ export default function EventDetailPage() {
       && assignment.user.userId === user?.userId
     ))
   ));
-  const canPermanentlyDelete = event.status !== 'IN_PROGRESS' && user?.systemRole === 'ADMIN' && isAdministrator;
+  const canPermanentlyDelete = ['DRAFT', 'COMPLETED', 'CANCELLED'].includes(event.status) && user?.systemRole === 'ADMIN' && isAdministrator;
   const canReview = !isAdministrator && event.status === 'IN_PROGRESS' && event.shifts.some((shift) => (
     shift.status === 'ACTIVE' && shift.staffAssignments.some((assignment) => (
       assignment.assignmentRole === 'REVIEWER'
@@ -351,7 +351,7 @@ export default function EventDetailPage() {
   const totalAssignedStaff = event.shifts.reduce((total, shift) => total + shift.staffAssignments.length, 0);
   const next = nextAction[event.status];
   const routeSection = location.pathname.split('/').filter(Boolean).pop();
-  const requestedView = routeSection && ['stations', 'staff', 'analytics', 'reports', 'attendees', 'activity', 'delete'].includes(routeSection) ? routeSection : 'overview';
+  const requestedView = routeSection && ['stations', 'staff', 'analytics', 'reports', 'attendees', 'activity'].includes(routeSection) ? routeSection : 'overview';
   const view = canManage ? requestedView : 'overview';
   const eventPath = `/events/${event.eventId}`;
   const managementMeasures = metrics ? [
@@ -421,8 +421,6 @@ export default function EventDetailPage() {
       </div>
       <div className="banner-picker-actions"><button className="secondary" type="button" onClick={() => setBannerOpen(false)}>Cancel</button><button className="primary" type="button" disabled={bannerPending} onClick={() => void saveBanner()}>{bannerPending ? 'Saving…' : 'Use selected artwork'}</button></div>
     </section>}
-
-    {['staff', 'analytics', 'reports', 'delete'].includes(view) && <Outlet />}
 
     {view === 'overview' && <div className="event-view">
       <div className="event-view-heading"><div><h2>Overview</h2><p>Key details and operational performance for this event.</p></div><div className="event-view-actions">{canManage && metrics && <button className="secondary compact event-print-button" type="button" onClick={() => window.print()}><PrinterIcon />Print / save PDF</button>}{canManage && !terminal && <Link className="secondary compact" to={`${eventPath}/edit`}><PencilSquareIcon />Edit overview</Link>}</div></div>

@@ -111,28 +111,95 @@ EXECUTE FUNCTION fn_audit_queue_transition();
 -- 2.1 Participant Station Queue Transfer Procedure (FR-04)
 -- Atomically completes the current station and adds participant to the next station queue.
 CREATE OR REPLACE PROCEDURE sp_transfer_participant(
-    p_participant_id VARCHAR,
-    p_current_station VARCHAR,
-    p_next_station VARCHAR,
+    p_queue_entry_id VARCHAR,
+    p_next_station_id VARCHAR,
     p_performed_by VARCHAR
 )
 LANGUAGE plpgsql
 AS $$
+DECLARE
+    v_registration_id VARCHAR;
+    v_current_station_id VARCHAR;
+    v_queue_number INTEGER;
+    v_is_priority BOOLEAN;
+    v_priority_notes VARCHAR;
 BEGIN
-    -- 1. Complete current station entry
-    UPDATE station_queues
-    SET status = 'COMPLETED',
-        updated_by = p_performed_by,
-        completed_at = NOW()
-    WHERE participant_id = p_participant_id
-      AND station_name = p_current_station
-      AND status = 'IN_PROGRESS';
+    /*
+     * 1. Get the current queue entry.
+     * FOR UPDATE prevents another transaction from
+     * modifying the same queue entry simultaneously.
+     */
+    SELECT
+        registration_id,
+        station_id,
+        queue_number,
+        is_priority,
+        priority_notes
+    INTO
+        v_registration_id,
+        v_current_station_id,
+        v_queue_number,
+        v_is_priority,
+        v_priority_notes
+    FROM queue_entry
+    WHERE id = p_queue_entry_id
+      AND status = 'IN_PROGRESS'
+    FOR UPDATE;
 
-    -- 2. If next_station is provided, queue the participant into the next station
-    IF p_next_station IS NOT NULL AND p_next_station != '' THEN
-        INSERT INTO station_queues (participant_id, station_name, status, created_by, updated_by, joined_at)
-        VALUES (p_participant_id, p_next_station, 'WAITING', p_performed_by, p_performed_by, NOW());
+    IF NOT FOUND THEN
+        RAISE EXCEPTION
+            'Queue entry % does not exist or is not IN_PROGRESS',
+            p_queue_entry_id;
     END IF;
+
+
+    /*
+     * 2. Validate the target station exists and is active.
+     */
+    IF NOT EXISTS (
+        SELECT 1
+        FROM station
+        WHERE station_id = p_next_station_id
+          AND is_active = TRUE
+    ) THEN
+        RAISE EXCEPTION
+            'Target station % does not exist or is inactive',
+            p_next_station_id;
+    END IF;
+
+
+    /*
+     * 3. Complete the current station queue entry.
+     */
+    UPDATE queue_entry
+    SET
+        status = 'COMPLETED',
+        completed_at = NOW(),
+        left_queue_at = NOW()
+    WHERE id = p_queue_entry_id;
+
+
+    /*
+     * 4. Create the participant's queue entry
+     *    at the next screening station.
+     */
+    INSERT INTO queue_entry (
+        registration_id,
+        station_id,
+        queue_number,
+        status,
+        is_priority,
+        priority_notes
+    )
+    VALUES (
+        v_registration_id,
+        p_next_station_id,
+        v_queue_number,
+        'WAITING',
+        COALESCE(v_is_priority, FALSE),
+        v_priority_notes
+    );
+
 END;
 $$;
 
@@ -150,6 +217,33 @@ CREATE OR REPLACE PROCEDURE sp_record_visual_acuity(
 LANGUAGE plpgsql
 AS $$
 BEGIN
+    -- Validate required participant ID
+    IF p_participant_id IS NULL
+       OR TRIM(p_participant_id) = '' THEN
+        RAISE EXCEPTION
+            'Participant ID is required';
+    END IF;
+
+    -- Validate visual-acuity values
+    IF p_left_eye_va IS NULL
+       OR TRIM(p_left_eye_va) = '' THEN
+        RAISE EXCEPTION
+            'Left-eye visual acuity is required';
+    END IF;
+
+    IF p_right_eye_va IS NULL
+       OR TRIM(p_right_eye_va) = '' THEN
+        RAISE EXCEPTION
+            'Right-eye visual acuity is required';
+    END IF;
+
+    -- Validate staff member
+    IF p_recorded_by IS NULL
+       OR TRIM(p_recorded_by) = '' THEN
+        RAISE EXCEPTION
+            'Recorded-by user is required';
+    END IF;
+
     INSERT INTO visual_acuity_results (
         participant_id,
         left_eye_va,
@@ -157,7 +251,8 @@ BEGIN
         pinhole_left,
         pinhole_right,
         recorded_by,
-        created_at
+        created_at,
+        updated_at
     )
     VALUES (
         p_participant_id,
@@ -166,10 +261,12 @@ BEGIN
         p_pinhole_left,
         p_pinhole_right,
         p_recorded_by,
+        NOW(),
         NOW()
     )
-    ON CONFLICT (participant_id) DO UPDATE
-    SET left_eye_va = EXCLUDED.left_eye_va,
+    ON CONFLICT (participant_id)
+    DO UPDATE SET
+        left_eye_va = EXCLUDED.left_eye_va,
         right_eye_va = EXCLUDED.right_eye_va,
         pinhole_left = EXCLUDED.pinhole_left,
         pinhole_right = EXCLUDED.pinhole_right,

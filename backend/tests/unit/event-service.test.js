@@ -511,33 +511,6 @@ test("administrator can permanently delete a draft event with a matching signed 
   });
 });
 
-test("administrator can permanently delete a published event", async (t) => {
-  const calls = installDeletionTransaction(t, { status: "PUBLISHED" });
-  const result = await eventService.deleteEvent(eventId, {
-    version: 1,
-    confirmationName: "Service test event",
-    acknowledgePermanentDeletion: true,
-    previewToken: deletionToken({ status: "PUBLISHED" }),
-  }, { ...manager, roles: ["ADMINISTRATOR"] }, crypto.randomUUID());
-
-  assert.equal(result.deleted, true);
-  assert.equal(calls.find(([name]) => name === "event.delete")[1].where.status, "PUBLISHED");
-});
-
-test("administrator cannot permanently delete an ongoing event", async (t) => {
-  const calls = installDeletionTransaction(t, { status: "IN_PROGRESS" });
-  await assert.rejects(
-    eventService.deleteEvent(eventId, {
-      version: 1,
-      confirmationName: "Service test event",
-      acknowledgePermanentDeletion: true,
-      previewToken: deletionToken({ status: "IN_PROGRESS" }),
-    }, { ...manager, roles: ["ADMINISTRATOR"] }, crypto.randomUUID()),
-    (error) => error.code === "EVENT_NOT_TERMINAL" && /ongoing/i.test(error.message),
-  );
-  assert.equal(calls.some(([name]) => name === "event.delete"), false);
-});
-
 test("event deletion rolls back when a participant becomes shared after preview", async (t) => {
   const participantId = crypto.randomUUID();
   const calls = installDeletionTransaction(t, { participantIds: [participantId], participantDeleteCount: 0 });

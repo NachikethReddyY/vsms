@@ -1,15 +1,13 @@
 /**
- * Production-Grade Idempotency Middleware using Redis
- * Requires: ioredis (npm install ioredis)
+ * Production-Grade Idempotency Middleware using Redis.
+ *
+ * Uses the shared node-redis client (backend/utils/infra/redisClient.js) so the
+ * rate limiter and the idempotency middleware reuse a single connection. Fails
+ * open: while Redis is not ready, requests pass through so traffic is never
+ * blocked by an infrastructure outage.
  */
-const Redis = require("ioredis");
-const logger = require("../utils/logger/logger");
-const redis = new Redis(process.env.REDIS_URL || "redis://localhost:6379", {
-  lazyConnect: true,
-  enableOfflineQueue: false,
-  maxRetriesPerRequest: 1,
-  retryStrategy: (times) => (times > 3 ? null : Math.min(times * 100, 1000)),
-});
+const logger = require("../utils/logging/logger/logger");
+const redisClient = require("../utils/infra/redisClient");
 
 const TTL_SECONDS = 600; // Cache responses for 10 minutes (600 seconds)
 
@@ -21,10 +19,16 @@ module.exports = async function checkIdempotency(req, res, next) {
         return next();
     }
 
+    // 2. Fail-open when Redis is unavailable so the endpoint keeps working
+    if (!redisClient.isRedisReady()) {
+        return next();
+    }
+
+    const redis = redisClient.getRedisClient();
     const redisKey = `idempotency:${idempotencyKey}`;
 
     try {
-        // 2. Atomically check if the key already exists in Redis
+        // 3. Atomically check if the key already exists in Redis
         const cachedData = await redis.get(redisKey);
 
         if (cachedData) {
@@ -42,9 +46,12 @@ module.exports = async function checkIdempotency(req, res, next) {
             return res.status(parsedRecord.status).json(parsedRecord.body);
         }
 
-        // 3. Set a lock ("PROCESSING") with a short TTL to prevent race conditions
+        // 4. Set a lock ("PROCESSING") with a short TTL to prevent race conditions
         // NX option ensures it only sets if the key doesn't already exist
-        const lockAcquired = await redis.set(redisKey, JSON.stringify({ status: "PROCESSING" }), "EX", 30, "NX");
+        const lockAcquired = await redis.set(redisKey, JSON.stringify({ status: "PROCESSING" }), {
+            EX: 30,
+            NX: true,
+        });
 
         if (!lockAcquired) {
             return res.status(409).json({
@@ -53,7 +60,7 @@ module.exports = async function checkIdempotency(req, res, next) {
             });
         }
 
-        // 4. Intercept res.json to capture the response before transmission
+        // 5. Intercept res.json to capture the response before transmission
         const originalJson = res.json.bind(res);
 
         res.json = async function (body) {
@@ -65,7 +72,11 @@ module.exports = async function checkIdempotency(req, res, next) {
             };
 
             // Save the finalized response into Redis with a 10-minute expiration window
-            await redis.set(redisKey, JSON.stringify(responsePayload), "EX", TTL_SECONDS);
+            try {
+                await redis.set(redisKey, JSON.stringify(responsePayload), { EX: TTL_SECONDS });
+            } catch (cacheError) {
+                // Response already sent; a cache failure must not fail the request
+            }
 
             return originalJson(body);
         };

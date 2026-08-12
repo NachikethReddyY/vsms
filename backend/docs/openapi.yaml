@@ -693,7 +693,7 @@ paths:
     delete:
       tags: [Events]
       operationId: deleteTerminalEvent
-      summary: Permanently delete any event that is not ongoing
+      summary: Permanently delete a draft, completed, or cancelled event
       description: Administrator-only hard deletion. Requires the exact event name, permanent-deletion acknowledgement, current version, and the unexpired signed token from the latest unchanged impact preview. Event-owned operational records and participant profiles created for only this event are removed; participant profiles reused by another event, staff accounts, templates, forms, and devices are retained.
       requestBody:
         required: true
@@ -2125,7 +2125,7 @@ paths:
     get:
       tags: [Queue]
       operationId: getEventQueueStatus
-      summary: Event queue summary with per-station workload and next-up participant
+      summary: Event queue summary with per-station workload, priority-aware next-up participant, and ordered entries
       parameters:
         - name: eventId
           in: path
@@ -2372,6 +2372,25 @@ paths:
           in: path
           required: true
           schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/PriorityQueueRequest" }
+      responses:
+        "200": { description: Queue entry priority updated, content: { application/json: { schema: { $ref: "#/components/schemas/QueueEntry" } } } }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "422": { $ref: "#/components/responses/ValidationFailed" }
+  /api/v1/queues/events/{eventId}/entries/{queueId}/priority:
+    patch:
+      tags: [Queue]
+      operationId: updateEventQueueEntryPriority
+      summary: Elevate or clear the urgent/priority flag on an active event-scoped queue entry
+      description: Requires a reason when elevating an entry to priority. Emits a QUEUE_PRIORITY_UPDATED audit event.
+      parameters: [{ $ref: "#/components/parameters/EventId" }, { $ref: "#/components/parameters/QueueId" }, { $ref: "#/components/parameters/IdempotencyKey" }]
       requestBody:
         required: true
         content:
@@ -5032,7 +5051,7 @@ components:
       required: [isPriority]
       properties:
         isPriority: { type: boolean, description: "Whether the queue entry is treated as urgent/priority" }
-        notes: { type: string, maxLength: 255, description: "Optional reason for the priority assignment" }
+        notes: { type: string, maxLength: 255, description: "Reason for the priority assignment. Required when isPriority is true so the elevation can be audited." }
     StationWorkload:
       type: object
       additionalProperties: false
@@ -5113,10 +5132,31 @@ components:
             registrationId: { type: string, format: uuid }
             participantDisplayName: { type: string }
             isPriority: { type: boolean, default: false }
+    EventQueueEntry:
+      type: object
+      additionalProperties: false
+      required: [id, registrationId, stationId, queueNumber, status, isPriority]
+      properties:
+        id: { type: string, format: uuid }
+        registrationId: { type: string, format: uuid }
+        participantDisplayName: { type: string, description: "Display name for the queued participant" }
+        participantReference: { type: string, nullable: true }
+        stationId: { type: string, format: uuid }
+        stationName: { type: string }
+        stationType: { type: string }
+        queueNumber: { type: integer }
+        status: { $ref: "#/components/schemas/QueueStatus" }
+        isPriority: { type: boolean, default: false, description: "Urgent/priority handling flag surfaced to next-up calling" }
+        priorityNotes: { type: string, nullable: true }
+        enteredAt: { type: string, format: date-time, nullable: true }
+        calledAt: { type: string, format: date-time, nullable: true }
+        startedAt: { type: string, format: date-time, nullable: true }
+        leftQueueAt: { type: string, format: date-time, nullable: true }
+        completedAt: { type: string, format: date-time, nullable: true }
     EventQueueStatusResponse:
       type: object
       additionalProperties: false
-      required: [event, stations]
+      required: [event, stations, entries]
       properties:
         event:
           type: object
@@ -5128,6 +5168,10 @@ components:
             status: { type: string }
             venue: { type: string, nullable: true }
         stations: { type: array, items: { $ref: "#/components/schemas/QueueStationWorkload" } }
+        entries:
+          type: array
+          description: "Every queue entry for the event, ordered by queue number, with priority ordering surfaced through each station's next-up"
+          items: { $ref: "#/components/schemas/EventQueueEntry" }
     JoinQueueRequest:
       type: object
       additionalProperties: false

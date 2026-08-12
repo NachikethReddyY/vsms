@@ -1,0 +1,49 @@
+import { Html5Qrcode, Html5QrcodeCameraScanConfig, Html5QrcodeResult } from 'html5-qrcode';
+
+/**
+ * Start the html5-qrcode scanner with a resilient camera lookup.
+ *
+ * html5-qrcode throws when it is asked for an `environment` (rear) camera that
+ * does not exist — the common case on laptops/desktops with only a front
+ * webcam. Instead of giving up, walk a fallback chain:
+ *   1. exact rear camera,
+ *   2. any rear-facing camera,
+ *   3. the first camera reported by the browser,
+ *   4. the default camera.
+ */
+export async function startQrScanner(
+  scanner: Html5Qrcode,
+  options: { fps?: number; qrboxWidth?: number; qrboxHeight?: number },
+  onDecoded: (text: string, result: Html5QrcodeResult) => void,
+  onDecodeError: (error: string) => void,
+): Promise<void> {
+  const scanConfig: Html5QrcodeCameraScanConfig = {
+    fps: options.fps ?? 10,
+    qrbox: {
+      width: options.qrboxWidth ?? 260,
+      height: options.qrboxHeight ?? 260,
+    },
+  };
+
+  const attempts: MediaTrackConstraints[] = [
+    { facingMode: { exact: 'environment' } },
+    { facingMode: 'environment' },
+  ];
+
+  const cameras = await Html5Qrcode.getCameras().catch(() => null);
+  if (cameras && cameras.length > 0) {
+    const preferred = cameras.find((camera) => /back|environment|rear/i.test(camera.label)) || cameras[0];
+    attempts.push({ deviceId: { exact: preferred.id } });
+  }
+
+  let lastError: unknown = null;
+  for (const cameraConstraints of attempts) {
+    try {
+      await scanner.start(cameraConstraints, scanConfig, onDecoded, onDecodeError);
+      return;
+    } catch (cause) {
+      lastError = cause;
+    }
+  }
+  throw lastError ?? new Error('No camera could be opened.');
+}
