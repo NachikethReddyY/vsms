@@ -16419,6 +16419,12 @@ item:
                   "stationId": "00000000-0000-4000-8000-000000000000",
                   "stationName": "",
                   "stationType": "",
+                  "stationOrder": 0,
+                  "status": "AVAILABLE",
+                  "activeQueueCount": 0,
+                  "capacity": 1,
+                  "occupancyPercent": 0,
+                  "selectable": true,
                   "workload": {
                     "WAITING": 0,
                     "CALLED": 0,
@@ -18105,6 +18111,8 @@ item:
                 "stationOrder": 0,
                 "status": "AVAILABLE",
                 "activeQueueCount": 0,
+                "capacity": 1,
+                "occupancyPercent": 0,
                 "selectable": true
               }
             ]

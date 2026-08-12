@@ -4188,7 +4188,7 @@ export interface components {
         ConsentFormEnvelope: {
             consentForm: components["schemas"]["ConsentForm"];
         };
-        /** @description Accepted consent requires signature metadata; non-participant signers also require guardian contact and relationship fields. */
+        /** @description Accepted consent requires signature metadata; non-participant signers require their relationship to the participant. Optional contact fields are retained only for legacy records. */
         ConsentRequest: {
             /** Format: uuid */
             consentFormVersionId: string;
@@ -4479,6 +4479,15 @@ export interface components {
                     stationId: string;
                     stationName: string;
                     stationType: string;
+                    stationOrder: number;
+                    /** @enum {string} */
+                    status: "AVAILABLE" | "BUSY" | "PAUSED" | "OFFLINE";
+                    activeQueueCount: number;
+                    capacity: number;
+                    /** @description Active queue entries as a percentage of station capacity; may exceed 100 when overloaded */
+                    occupancyPercent: number;
+                    /** @description Busy stations remain selectable; paused and offline stations do not */
+                    selectable: boolean;
                     workload: {
                         WAITING: number;
                         CALLED: number;
@@ -4811,6 +4820,9 @@ export interface components {
             /** @enum {string} */
             status: "AVAILABLE" | "BUSY" | "PAUSED" | "OFFLINE";
             activeQueueCount: number;
+            capacity: number;
+            /** @description Active queue entries as a percentage of station capacity; may exceed 100 when overloaded */
+            occupancyPercent: number;
             selectable: boolean;
         };
         RegistrationStationListResponse: {

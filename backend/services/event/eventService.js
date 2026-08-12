@@ -1676,7 +1676,7 @@ const listStaffDirectory = async () => {
 // Import/update map templateKey â†’ StationType per #30 (catalog keys include
 // REGISTRATION / CLINICAL_REVIEW which are not StationType and are rejected on import).
 const listStationTemplates = async () => {
-  const templates = await hydrateSystemFieldSchemas(await prisma.stationTemplate.findMany({
+  const templates = await prisma.stationTemplate.findMany({
     where: { active: true, stationType: { not: null } },
     select: {
       stationTemplateId: true,
@@ -1690,7 +1690,7 @@ const listStationTemplates = async () => {
       fieldSchema: true,
     },
     orderBy: { name: "asc" },
-  }));
+  });
   return templates
     .filter((template) => stationTypeForTemplate(template))
     .map(serializeStationTemplate);
@@ -1741,7 +1741,6 @@ const hydrateSystemFieldSchemas = async (templates, db = prisma) => {
 
 /** Admin catalog: screening templates only — registration/clinical review/eye health are not managed here. */
 const HIDDEN_LIBRARY_TEMPLATE_KEYS = new Set(["REGISTRATION", "CLINICAL_REVIEW", "EYE_HEALTH"]);
-
 const listStationTemplateLibrary = async () => {
   const templates = await hydrateSystemFieldSchemas(await prisma.stationTemplate.findMany({
     select: {

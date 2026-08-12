@@ -56,7 +56,7 @@ VISUAL_ACUITY | REFRACTION | COLOUR_VISION | EYE_HEALTH | CUSTOM
 | `COLOUR_VISION` | Colour vision | 3 |
 | `CUSTOM_OD_NOTES` | Custom OD notes (demo CUSTOM) | 2 |
 
-Demo event seeding creates **runtime** `Station` rows for VA / Refraction / Colour Vision / Eye Health (not Registration or Clinical Review). Screening’s `ensureDemoStations` matches that VA/REF/CV/EH set.
+Demo event seeding creates **runtime** `Station` rows for VA / Refraction / Colour Vision only. Eye Health stays in clinical review; Registration and Clinical Review are workflow roles, not screening stations.
 
 QR scan → station handoff (token-only QR; `eventId` + `registrationId` after verify) is documented in [`qr-station-handoff.md`](./qr-station-handoff.md).
 
@@ -143,7 +143,7 @@ Idempotency: clinical types upsert by `(eventId, stationType)`; CUSTOM upserts b
 
 **Screening owners**
 
-4. ~~Is `EYE_HEALTH` in scope for import now?~~ **Decided:** importable screener station; clinicians may still add optional eye-health notes on review decisions.
+4. ~~Is `EYE_HEALTH` in scope for import now?~~ **Decided:** review-only; clinicians may add optional eye-health notes on review decisions.
 5. Should `stationName` stay editable after import without changing `stationType`?
 
 **Auth / staffing owners**

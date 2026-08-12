@@ -28,6 +28,43 @@ const assertForbiddenEventKeysAbsent = (value) => {
   }
 };
 
+test("station template library hydrates missing system schemas for previewing", async (t) => {
+  const originalFindMany = prisma.stationTemplate.findMany;
+  const originalUpdate = prisma.stationTemplate.update;
+  const { SYSTEM_FIELD_SCHEMAS } = require("../../schemas/dynamicStationSchema");
+  const template = {
+    stationTemplateId: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+    templateKey: "VISUAL_ACUITY",
+    stationType: "VISUAL_ACUITY",
+    version: 1,
+    name: "Visual acuity",
+    description: null,
+    defaultCapacity: 4,
+    active: true,
+    fieldSchema: null,
+  };
+  let writes = 0;
+  prisma.stationTemplate.findMany = async () => [template];
+  prisma.stationTemplate.update = async () => {
+    writes += 1;
+    return {
+      ...template,
+      fieldSchema: SYSTEM_FIELD_SCHEMAS.VISUAL_ACUITY,
+    };
+  };
+  t.after(() => {
+    prisma.stationTemplate.findMany = originalFindMany;
+    prisma.stationTemplate.update = originalUpdate;
+  });
+
+  const [catalog] = await eventService.listStationTemplates();
+  const [library] = await eventService.listStationTemplateLibrary();
+
+  assert.equal(writes, 1);
+  assert.equal(catalog.fieldSchema, null);
+  assert.deepEqual(library.fieldSchema, SYSTEM_FIELD_SCHEMAS.VISUAL_ACUITY);
+});
+
 test("station template mutations generate opaque keys and audit atomically", async () => {
   const audits = [];
   const transactionClient = {

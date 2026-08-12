@@ -95,7 +95,7 @@ export default function ParticipantProfilePage() {
       <header className="participant-v2-profile-hero">
         <div className="participant-v2-profile-identity"><span className="participant-v2-profile-avatar" aria-hidden="true">{`${participant.firstName[0] ?? ""}${participant.lastName[0] ?? ""}`.toUpperCase() || "P"}</span><div><p>Registration workspace</p><h1 id="participant-v2-profile-title">{participant.firstName} {participant.lastName}</h1><span>{participant.contactNumber}{participant.email ? ` - ${participant.email}` : ""}</span></div></div>
         <span className="participant-v2-profile-status">{displayStatus(participant.status)}</span>
-        <dl className="participant-v2-profile-facts"><div><dt>Participant reference</dt><dd>{participant.participantReference}</dd></div><div><dt>Registrations</dt><dd>{registrations.length}</dd></div><div><dt>Preferred language</dt><dd>{participant.preferredLanguage ?? "Not recorded"}</dd></div></dl>
+        <dl className="participant-v2-profile-facts"><div><dt>Participant reference</dt><dd>{participant.participantReference}</dd></div><div><dt>NRIC / FIN</dt><dd>{participant.nricMasked ?? "Not recorded"}</dd></div><div><dt>Preferred language</dt><dd>{participant.preferredLanguage ?? "Not recorded"}</dd></div></dl>
       </header>
       <section className="participant-v2-profile-card" aria-label="Participant profile">
         <div className="participant-v2-profile-actions">
@@ -104,15 +104,28 @@ export default function ParticipantProfilePage() {
         </div>
 
         <section className="participant-v2-profile-details" aria-label="Participant details">
-          <div><span>Date of birth</span><strong>{displayDate(participant.dateOfBirth)}</strong></div>
-          <div><span>Contact number</span><strong>{participant.contactNumber}</strong></div>
-          <div><span>NRIC / FIN</span><strong>{participant.nricMasked ?? "Not recorded"}</strong></div>
-          <div><span>Email address</span><strong>{participant.email ?? "Not recorded"}</strong></div>
-          <div><span>Gender</span><strong>{displayGender(participant.gender)}</strong></div>
-          <div><span>Race</span><strong>{participant.race ?? "Not recorded"}</strong></div>
-          <div><span>Nationality</span><strong>{participant.nationality ?? "Not recorded"}</strong></div>
-          <div className="participant-v2-profile-address"><span>Address</span><strong>{displayAddress(participant)}</strong></div>
-          <div><span>Accessibility notes</span><strong>{participant.accessibilityNotes ?? "None recorded"}</strong></div>
+          <section className="participant-v2-profile-detail-group" aria-labelledby="participant-v2-personal-details">
+            <header><span id="participant-v2-personal-details">Personal information</span><p>Identity and demographic details.</p></header>
+            <div className="participant-v2-profile-detail-grid">
+              <div><span>Date of birth</span><strong>{displayDate(participant.dateOfBirth)}</strong></div>
+              <div><span>Gender</span><strong>{displayGender(participant.gender)}</strong></div>
+              <div><span>Race</span><strong>{participant.race ?? "Not recorded"}</strong></div>
+              <div><span>Nationality</span><strong>{participant.nationality ?? "Not recorded"}</strong></div>
+              <div><span>Preferred language</span><strong>{participant.preferredLanguage ?? "Not recorded"}</strong></div>
+            </div>
+          </section>
+          <section className="participant-v2-profile-detail-group" aria-labelledby="participant-v2-contact-details">
+            <header><span id="participant-v2-contact-details">Contact and address</span><p>How to reach the participant.</p></header>
+            <div className="participant-v2-profile-detail-grid">
+              <div><span>Contact number</span><strong>{participant.contactNumber}</strong></div>
+              <div><span>Email address</span><strong>{participant.email ?? "Not recorded"}</strong></div>
+              <div className="participant-v2-profile-address"><span>Address</span><strong>{displayAddress(participant)}</strong></div>
+            </div>
+          </section>
+          <section className="participant-v2-profile-detail-group participant-v2-profile-support-group" aria-labelledby="participant-v2-support-details">
+            <header><span id="participant-v2-support-details">Support needs</span><p>Information staff should consider during the visit.</p></header>
+            <div className="participant-v2-profile-detail-grid"><div><span>Accessibility notes</span><strong>{participant.accessibilityNotes ?? "None recorded"}</strong></div></div>
+          </section>
         </section>
         <div className="participant-v2-profile-summary">
           <article className={primaryContact ? "complete" : "missing"}><PhoneIcon /><div><span>Emergency contact</span>{!primaryContact ? <em className="participant-v2-profile-required">Required</em> : null}<h2>{primaryContact ? primaryContact.contactName : "Not recorded"}</h2><p>{primaryContact ? `${primaryContact.relationship} - ${primaryContact.phoneNumber}` : "Add a primary emergency contact before completing registration."}</p><Link to={`/participants/${participantId}/emergency-contacts${eventId ? `?eventId=${encodeURIComponent(eventId)}` : ""}`}>{primaryContact ? "Manage contacts" : "Add emergency contact"} <ArrowRightIcon /></Link></div></article>
