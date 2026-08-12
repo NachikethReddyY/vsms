@@ -29,7 +29,10 @@ const stationStatus = (station, activeQueueCount = 0) => {
     return "PAUSED";
   }
 
-  return activeQueueCount > 0 ? "BUSY" : "AVAILABLE";
+  return station.operationalStatus === "BUSY" ||
+    activeQueueCount > 0
+    ? "BUSY"
+    : "AVAILABLE";
 };
 
 /**

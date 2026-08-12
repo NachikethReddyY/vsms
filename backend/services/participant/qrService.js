@@ -25,7 +25,7 @@ const stationOccupancyPercent = (activeQueueCount, capacity) => Math.round((acti
 const publicStationStatus = (station, activeQueueCount) => {
     if (!station.isActive || station.operationalStatus === "OFFLINE") return "OFFLINE";
     if (station.operationalStatus === "PAUSED") return "PAUSED";
-    return activeQueueCount > 0 ? "BUSY" : "AVAILABLE";
+    return station.operationalStatus === "BUSY" || activeQueueCount > 0 ? "BUSY" : "AVAILABLE";
 };
 
 const tokenSelector = (token) => ({ tokenHash: hashToken(token) });
@@ -456,6 +456,7 @@ exports.getPublicStatus = async (token, db = prisma) => {
         stationId: station.stationId,
         stationName: station.stationName,
         stationType: station.stationType,
+        stationOrder: station.stationOrder,
         workload: { WAITING: 0, CALLED: 0, IN_PROGRESS: 0, COMPLETED: 0, SKIPPED: 0, CANCELLED: 0 },
         nextUpQueueNumber: null,
     }]));

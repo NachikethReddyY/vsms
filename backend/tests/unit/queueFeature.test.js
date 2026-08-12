@@ -231,6 +231,18 @@ test('registration station list exposes derived availability and queue counts', 
   assert.equal(result.stations[1].selectable, false);
 });
 
+test('registration station list preserves an explicit busy status without a queue', async () => {
+  const db = baseDb({
+    station: { findMany: async () => [{ ...station, operationalStatus: 'BUSY' }] },
+    queueEntry: { findMany: async () => [] },
+  });
+
+  const result = await queueService.listRegistrationStations(eventId, operationalUser, db);
+
+  assert.equal(result.stations[0].status, 'BUSY');
+  assert.equal(result.stations[0].selectable, true);
+});
+
 test('queue handoff allocates a queue number, creates the entry, and audits the assignment', async () => {
   audits.length = 0;
   const registrationWithoutQueue = {

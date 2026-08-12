@@ -601,7 +601,15 @@ test("public pass status reveals no PII and reports expired or revoked passes as
       findMany: async () => [],
     },
     station: {
-      findMany: async () => [],
+      findMany: async () => [{
+        stationId: "station-1",
+        stationName: "Visual Acuity",
+        stationType: "VISUAL_ACUITY",
+        stationOrder: 2,
+        isActive: true,
+        operationalStatus: "BUSY",
+        stationTemplate: { defaultCapacity: 4 },
+      }],
     },
     queueMovement: {
       findMany: async () => [],
@@ -612,6 +620,8 @@ test("public pass status reveals no PII and reports expired or revoked passes as
   assert.equal(valid.valid, true);
   assert.equal(valid.eventName, "Community Vision Screening");
   assert.equal(valid.queueNumber, 42);
+  assert.equal(valid.stations[0].stationOrder, 2);
+  assert.equal(valid.stations[0].status, "BUSY");
   assert.deepEqual(Object.keys(valid).sort(), ["aheadAtStation", "currentQueueNumber", "eventName", "expiresAt", "queueNumber", "queueState", "registrationStatus", "stations", "transfers", "valid"]);
   assert.equal(where.tokenHash, tokenHash(token));
 
