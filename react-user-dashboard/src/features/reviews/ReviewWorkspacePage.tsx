@@ -401,7 +401,7 @@ function ReferralIssuance({ eventId, referral, onRevised }: { eventId: string; r
       const url = URL.createObjectURL(blob);
       const anchor = document.createElement('a');
       anchor.href = url;
-      anchor.download = `vision-referral-${referral.referralId.slice(0, 8)}.pdf`;
+      anchor.download = `health-report-referral-${referral.referralId.slice(0, 8)}.pdf`;
       anchor.click();
       URL.revokeObjectURL(url);
     } catch (requestError) {
@@ -461,18 +461,18 @@ function ReferralIssuance({ eventId, referral, onRevised }: { eventId: string; r
   };
 
   if (referral.status !== 'DRAFT' || result) return <section className="referral-issuance issued" aria-labelledby="issued-referral-title">
-    <div><CheckCircleIcon /><span><strong id="issued-referral-title">Encrypted referral ready</strong><small>Version {result?.documentVersion || referral.document?.version || 1} · electronically signed</small></span></div>
+    <div><CheckCircleIcon /><span><strong id="issued-referral-title">Encrypted referral generated</strong><small>Password-protected PDF · version {result?.documentVersion || referral.document?.version || 1} · electronically signed</small></span></div>
     {delivery?.status === 'DELIVERED'
-      ? <p className="referral-delivery-success">Delivered to the recipient mail server for {delivery.recipient}{delivery.deliveredAt ? ` on ${new Date(delivery.deliveredAt).toLocaleString()}` : ''}.</p>
+      ? <p className="referral-delivery-success" role="status"><strong>Email delivered</strong>Accepted by the recipient mail server for {delivery.recipient}{delivery.deliveredAt ? ` on ${new Date(delivery.deliveredAt).toLocaleString()}` : ''}.</p>
       : delivery?.status === 'SENT'
-        ? <p className="referral-delivery-success">SES accepted the encrypted email for {delivery.recipient}; final delivery confirmation is pending.</p>
+        ? <p className="referral-delivery-success" role="status"><strong>Email accepted</strong>The encrypted PDF attachment was accepted for {delivery.recipient}; final delivery confirmation is pending.</p>
       : delivery?.status === 'SENDING' || delivery?.status === 'RECONCILIATION_REQUIRED'
-        ? <p className="referral-delivery-warning">Delivery confirmation is pending. To prevent a duplicate clinical email, this referral will not be sent again automatically.</p>
+        ? <p className="referral-delivery-warning" role="status"><strong>Email delivery pending</strong>To prevent a duplicate clinical email, this referral will not be sent again automatically.</p>
         : delivery?.status === 'BOUNCED'
-          ? <p className="referral-delivery-warning">The recipient mail server rejected this email. Create a revised referral only after verifying a new destination.</p>
+          ? <p className="referral-delivery-warning" role="status"><strong>Email rejected</strong>The recipient mail server rejected this email. Create a revised referral only after verifying a new destination.</p>
           : delivery?.status === 'COMPLAINT'
-            ? <p className="referral-delivery-warning">A recipient complaint was reported. Do not resend; follow the secure escalation process.</p>
-        : <p className="referral-delivery-warning">Email not sent{delivery?.failureReason === 'DELIVERY_PROVIDER_NOT_CONFIGURED' ? ': the delivery provider is not configured.' : '.'} The encrypted PDF remains available.</p>}
+            ? <p className="referral-delivery-warning" role="status"><strong>Email complaint reported</strong>Do not resend; follow the secure escalation process.</p>
+        : <p className="referral-delivery-warning" role="status"><strong>Email not sent</strong>{delivery?.failureReason === 'DELIVERY_PROVIDER_NOT_CONFIGURED' ? 'The delivery provider is not configured. ' : ''}The encrypted PDF remains available.</p>}
     {result?.handoffSecret && <div className="referral-handoff" role="status"><strong>Securely hand off this passphrase</strong><p>It can be recovered only in this browser until {result.handoffSecretExpiresAt ? new Date(result.handoffSecretExpiresAt).toLocaleTimeString() : 'expiry'}. Share it by phone or another separate channel—never in the referral email.</p><div><code>{result.handoffSecret}</code><button className="secondary compact" type="button" disabled={acknowledging} onClick={() => void copyAndAcknowledge()}>{acknowledging ? 'Acknowledging…' : secretCopied ? 'Copied and acknowledged' : 'Copy and acknowledge'}</button></div></div>}
     {!result?.handoffSecret && savedIssue && <button className="secondary compact" type="button" disabled={issuing} onClick={() => void recover()}>{issuing ? 'Recovering…' : 'Recover passphrase and delivery status'}</button>}
     {!result?.handoffSecret && !savedIssue && <p>The passphrase is not stored after acknowledgement or expiry and is never included in the email.</p>}
@@ -492,11 +492,11 @@ function ReferralIssuance({ eventId, referral, onRevised }: { eventId: string; r
   </section>;
 
   return <form className="referral-issuance" onSubmit={(event) => void issue(event)}>
-    <header><h4>Issue encrypted referral</h4><p>Generate the medical referral, sign it, and send the password-protected attachment.</p></header>
+    <header><h4>Issue encrypted referral</h4><p>Generate and electronically sign the password-protected PDF. VSMS will email it to the address below as an attachment.</p></header>
     {error && <div className="review-error-summary" role="alert">{error}</div>}
-    <label className="review-field"><span>Destination email</span><input type="email" required maxLength={255} value={email} onChange={(event) => { if (savedIssue && event.target.value.trim().toLowerCase() !== savedIssue.destinationEmail) { removeStoredReferralIssue(eventId, referral.referralId); setSavedIssue(null); } setEmail(event.target.value); }} placeholder="clinic@example.com" /></label>
+    <label className="review-field"><span>Recipient email <em>Participant or referral provider</em></span><input type="email" required maxLength={255} value={email} onChange={(event) => { if (savedIssue && event.target.value.trim().toLowerCase() !== savedIssue.destinationEmail) { removeStoredReferralIssue(eventId, referral.referralId); setSavedIssue(null); } setEmail(event.target.value); }} placeholder="recipient@example.com" /></label>
     <div className="referral-signature"><span>Reviewer electronic signature</span><SignaturePad onChange={setSignature} /></div>
-    <label className="decision-confirm"><input type="checkbox" checked={confirmed} onChange={(event) => setConfirmed(event.target.checked)} /><span><strong>I confirm this referral and delivery</strong><small>A random passphrase is held in encrypted recovery escrow for 15 minutes. I will share it through a separate channel, never in the referral email.</small></span></label>
+    <label className="decision-confirm"><input type="checkbox" checked={confirmed} onChange={(event) => setConfirmed(event.target.checked)} /><span><strong>I verified the recipient and confirm delivery</strong><small>This address belongs to the participant or intended referral provider. I will share the random passphrase through a separate channel; it is never included in the email.</small></span></label>
     <button className="primary" type="submit" disabled={issuing}>{issuing ? 'Signing and issuing…' : 'Sign and issue referral'}</button>
   </form>;
 }

@@ -11,6 +11,7 @@ const {
   payloadHash,
   generateReferralPdf,
   buildRawEmail,
+  referralEmailTemplate,
   issueReferral,
   acknowledgeReferralHandoff,
   referralIssueFingerprint,
@@ -137,16 +138,36 @@ test("generates an encrypted PDF whose plaintext clinical values are not exposed
   assert.equal(pdf.includes(Buffer.from("Alicia Lim")), false);
   assert.equal(pdf.includes(Buffer.from("45679876")), false);
 
+  const email = referralEmailTemplate(referralFixture().referralId);
   const raw = buildRawEmail({
     from: "referrals@example.com",
     to: "clinic@example.com",
-    subject: "Encrypted referral",
-    body: "Use the separately known password.",
+    subject: email.subject,
+    body: email.body,
     attachment: pdf,
-    filename: "referral.pdf",
+    filename: email.filename,
   });
   assert.match(raw, /Content-Type: application\/pdf/);
+  assert.match(raw, new RegExp(`Subject: ${email.subject.replace(/[()]/g, "\\$&")}`));
+  assert.equal(raw.match(new RegExp(email.filename, "g")).length, 2);
   assert.equal(raw.includes("45679876"), false);
+});
+
+test("uses one PII-free template for stored delivery metadata and the referral attachment", () => {
+  const referral = referralFixture();
+  const email = referralEmailTemplate(referral.referralId);
+  assert.equal(email.subject, "Confidential document from VSMS (encrypted PDF)");
+  assert.match(email.body, /confidential health report and referral/i);
+  assert.match(email.body, /one-time password.*separate channel/i);
+  assert.equal(email.filename, "health-report-referral-11111111.pdf");
+  for (const sensitiveValue of [
+    referral.review.registration.participant.nric,
+    referral.review.registration.participant.contactNumber,
+    `${referral.review.registration.participant.firstName} ${referral.review.registration.participant.lastName}`,
+    "45679876",
+  ]) {
+    assert.equal(JSON.stringify(email).includes(sensitiveValue), false);
+  }
 });
 
 test("uses the VSMS report palette and formats clinical results without JSON", () => {
