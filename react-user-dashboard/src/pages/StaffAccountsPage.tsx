@@ -1,5 +1,6 @@
-import { ArrowPathIcon, EyeIcon, PencilSquareIcon, PlusIcon, UserGroupIcon } from '@heroicons/react/24/outline';
+import { ArrowPathIcon, EyeIcon, PencilSquareIcon, PlusIcon, TrashIcon, UserGroupIcon } from '@heroicons/react/24/outline';
 import { useCallback, useEffect, useState, type FormEvent } from 'react';
+import { useAuth } from '../auth/AuthProvider';
 import { AppDialog } from '../components/AppDialog';
 import { AppToast } from '../components/AppToast';
 import type { AppUser } from '../types';
@@ -49,6 +50,7 @@ function sortStaff(staff: AppUser[]) {
 }
 
 export default function StaffAccountsPage() {
+  const { session } = useAuth();
   const [staff, setStaff] = useState<AppUser[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -61,6 +63,10 @@ export default function StaffAccountsPage() {
   const [notice, setNotice] = useState('');
   const [reactivatingId, setReactivatingId] = useState<string | null>(null);
   const [actionError, setActionError] = useState('');
+  const [removing, setRemoving] = useState<AppUser | null>(null);
+  const [removalReason, setRemovalReason] = useState('');
+  const [removalError, setRemovalError] = useState('');
+  const [removalPending, setRemovalPending] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -136,7 +142,25 @@ export default function StaffAccountsPage() {
       setReactivatingId(null);
     }
   };
+  const removeAccount = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!removing || removalReason.trim().length < 3) return;
+    setRemovalPending(true);
+    setRemovalError('');
+    try {
+      const response = await apiClient.post(`/admin/accounts/${removing.id}/deprovision`, { reason: removalReason.trim() });
+      setRemoving(null);
+      setRemovalReason('');
+      await load();
+      setNotice(response.status === 202 ? 'Account access removed. Identity-provider synchronization is pending.' : 'Account access removed.');
+    } catch (cause) {
+      setRemovalError(getApiError(cause, `${removing.fullName}'s account access could not be removed.`));
+    } finally {
+      setRemovalPending(false);
+    }
+  };
   const activeCount = staff.filter((member) => member.status === 'ACTIVE').length;
+  const currentUserId = session?.user.userId ?? session?.user.id;
 
   return <div className="page-frame staff-accounts-page">
     <header className="staff-accounts-header">
@@ -163,12 +187,13 @@ export default function StaffAccountsPage() {
               const canReactivate = member.approvalState === 'APPROVED'
                 && member.accessState !== 'DISABLED'
                 && (member.status === 'INACTIVE' || member.status === 'SUSPENDED');
+              const canRemove = member.id !== currentUserId && member.accessState !== 'DISABLED';
               return <tr key={member.id}>
               <th scope="row"><div className="staff-person"><span className="staff-account-avatar" aria-hidden="true">{initial(member.fullName)}</span><span><strong>{member.fullName}</strong><small>{member.email}</small></span></div></th>
               <td><span className="staff-team">{member.designation || 'No designation'}<small>{member.department || 'No department'}</small></span></td>
               <td><div className="staff-role-list"><span className="staff-role-chip">{member.professionalCategory === 'DOCTOR' ? 'Doctor' : labelRole(ROLE_OPTIONS.find((option) => member.roles.includes(option.value))?.value ?? 'SUPPORT')}</span></div></td>
-              <td><span className={`staff-access ${member.status === 'ACTIVE' ? 'active' : 'inactive'}`}><i aria-hidden="true" />{member.status === 'ACTIVE' ? 'Active' : member.status === 'SUSPENDED' ? 'Suspended' : 'Inactive'}</span></td>
-              <td><div className="staff-row-actions">{canReactivate && <button className="secondary compact staff-reactivate-button" type="button" disabled={reactivatingId !== null} onClick={() => void reactivate(member)}><ArrowPathIcon aria-hidden="true" />{reactivatingId === member.id ? 'Reactivating…' : 'Reactivate'}</button>}<button className="secondary compact staff-edit-button" type="button" disabled={reactivatingId === member.id} onClick={() => openEdit(member)}><PencilSquareIcon aria-hidden="true" />Edit</button></div></td>
+              <td><span className={`staff-access ${member.status === 'ACTIVE' ? 'active' : 'inactive'}`}><i aria-hidden="true" />{member.accessState === 'DISABLED' ? 'Disabled' : member.status === 'ACTIVE' ? 'Active' : member.status === 'SUSPENDED' ? 'Suspended' : 'Inactive'}</span></td>
+              <td><div className="staff-row-actions">{canReactivate && <button className="secondary compact staff-reactivate-button" type="button" disabled={reactivatingId !== null} onClick={() => void reactivate(member)}><ArrowPathIcon aria-hidden="true" />{reactivatingId === member.id ? 'Reactivating…' : 'Reactivate'}</button>}<button className="secondary compact staff-edit-button" type="button" disabled={reactivatingId === member.id} onClick={() => openEdit(member)}><PencilSquareIcon aria-hidden="true" />Edit</button>{canRemove && <button className="secondary compact staff-remove-button" type="button" disabled={reactivatingId === member.id} onClick={() => { setRemoving(member); setRemovalReason(''); setRemovalError(''); }}><TrashIcon aria-hidden="true" />Remove</button>}</div></td>
             </tr>;
             })}</tbody>
           </table>
@@ -209,6 +234,20 @@ export default function StaffAccountsPage() {
         <fieldset className="staff-role-selector"><legend>Account type</legend><p>Choose the person’s organization-wide account type. Event duties are assigned inside each event.</p><div>{ROLE_OPTIONS.map((role) => <label key={role.value}><input type="radio" name="accountType" checked={draft.role === role.value} onChange={() => setDraft((current) => ({ ...current, role: role.value }))} /><span><strong>{role.label}</strong><small>{role.description}</small></span></label>)}</div></fieldset>
         </div>
         <div className="app-dialog-actions"><button className="secondary" type="button" disabled={saving} onClick={() => closeDialog(false)}>Cancel</button><button className="primary" type="submit" disabled={saving}>{saving ? 'Saving…' : editing ? 'Save changes' : 'Create account'}</button></div>
+      </form>
+    </AppDialog>
+    <AppDialog
+      open={Boolean(removing)}
+      onOpenChange={(open) => { if (!open && !removalPending) { setRemoving(null); setRemovalReason(''); setRemovalError(''); } }}
+      title={removing ? `Remove ${removing.fullName}'s access?` : 'Remove account access?'}
+      description="This permanently disables sign-in and revokes active sessions. The staff record remains available for audit history."
+      dismissible={!removalPending}
+      className="staff-remove-dialog"
+    >
+      <form className="app-dialog-form" onSubmit={removeAccount}>
+        <label className="app-dialog-field"><span>Reason</span><textarea required minLength={3} maxLength={500} rows={4} value={removalReason} data-dialog-autofocus onChange={(event) => { setRemovalReason(event.target.value); setRemovalError(''); }} /></label>
+        {removalError && <p className="app-dialog-error" role="alert">{removalError}</p>}
+        <div className="app-dialog-actions"><button className="secondary" type="button" disabled={removalPending} onClick={() => setRemoving(null)}>Keep account</button><button className="danger-button" type="submit" disabled={removalPending || removalReason.trim().length < 3}>{removalPending ? 'Removing…' : 'Remove access'}</button></div>
       </form>
     </AppDialog>
     <AppToast message={notice} onDismiss={() => setNotice('')} />

@@ -6,6 +6,11 @@ const test = require("node:test");
 
 process.env.NODE_ENV = "test";
 process.env.DATABASE_URL ||= "postgresql://test:test@localhost:5432/vsms_test";
+process.env.LIFECYCLE_EMAIL_ENABLED = "true";
+process.env.LIFECYCLE_EMAIL_FROM = "sender@example.com";
+process.env.LIFECYCLE_EMAIL_ALLOWED_SENDERS = "sender@example.com";
+process.env.SMTP_USERNAME = "sender@example.com";
+process.env.SMTP_PASSWORD = "test-app-password";
 
 const { attended, attendanceWhere } = require("../../services/event/attendanceDefinition");
 const { aggregateRows, resolveBounds, suppressClinicalRows, suppressSensitiveBlock } = require("../../services/reporting/analyticsService");
@@ -13,6 +18,7 @@ const { protectSpreadsheetCell, renderCsv } = require("../../services/reporting/
 const { claimNextReportJob, renewReportLease } = require("../../services/reporting/reportExportService");
 const { artifactPath, cleanupReportArtifactBlobs, publishArtifact, readArtifact, stagingStorageKey, storageKey, writeArtifact } = require("../../services/reporting/reportArtifactStorage");
 const {
+  createGoogleTransport,
   maintainLifecycleEmail,
   processClaimedLifecycleEmail,
   reconcileStaleLifecycleEmails,
@@ -20,6 +26,15 @@ const {
   safeMetadata,
   lifecyclePurposeForAccount,
 } = require("../../services/account/accountLifecycleNotificationService");
+
+test("Gmail SMTP transport uses STARTTLS and password authentication", () => {
+  const transport = createGoogleTransport();
+  assert.equal(transport.options.host, "smtp.gmail.com");
+  assert.equal(transport.options.port, 587);
+  assert.equal(transport.options.secure, false);
+  assert.equal(transport.options.requireTLS, true);
+  assert.deepEqual(transport.options.auth, { user: "sender@example.com", pass: "test-app-password" });
+});
 
 function createArtifactBlobDb() {
   const blobs = new Map();
