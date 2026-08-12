@@ -3,8 +3,8 @@
 const fs = require("fs");
 const path = require("path");
 
-const env = require("../config/env");
-const logger = require("./logger/logger");
+const env = require("../../config/env");
+const logger = require("../logging/logger/logger");
 
 /**
  * Validates critical environment variables, TLS certificates, and production 
@@ -57,7 +57,7 @@ const runSecurityChecks = () => {
    * TLS upstream and should not require local cert files.
    */
   if (env.localHttps) {
-    const backendDirectory = path.resolve(__dirname, "..");
+    const backendDirectory = path.resolve(__dirname, "..", "..");
     const tlsKeyPath = path.resolve(backendDirectory, env.TLS_KEY_PATH || "");
     const tlsCertPath = path.resolve(backendDirectory, env.TLS_CERT_PATH || "");
 

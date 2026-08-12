@@ -1,4 +1,4 @@
-/**
+﻿/**
  * ============================================================================
  * SHARED, REDIS-BACKED RATE LIMITING
  * Visual Screening Management System (VSMS) Backend API
@@ -19,11 +19,11 @@
  */
 
 const { RedisStore } = require("rate-limit-redis");
-const { createClient } = require("redis");
 const { rateLimit: buildRateLimiter } = require("express-rate-limit");
 
 const env = require("../config/env");
-const logger = require("../utils/logger/logger");
+const logger = require("../utils/logging/logger/logger");
+const redisClient = require("../utils/infra/redisClient");
 
 const MEMORY_CLEANUP_INTERVAL_MS = 5 * 60_000;
 
@@ -39,10 +39,6 @@ const resolveStoreMode = () => {
 
 const storeMode = resolveStoreMode();
 const redisEnabled = storeMode === "redis" && Boolean(env.redisUrl);
-
-/** Shared node-redis client. All limiters reuse this single connection. */
-let redisClient = null;
-let redisReady = false;
 
 /**
  * Stores created while Redis is not yet connected. Once the client becomes
@@ -60,40 +56,9 @@ const runRedisInit = (entry) => {
 };
 
 if (redisEnabled) {
-  redisClient = createClient({
-    url: env.redisUrl,
-    // Fail commands fast while the connection is down instead of buffering
-    // them forever; the SafeRateLimitStore catches the rejection and falls
-    // back to the in-process store.
-    disableOfflineQueue: true,
-    socket: {
-      reconnectStrategy: (retries) => Math.min(retries * 200, 5000),
-    },
-  });
-
-  redisClient.on("ready", () => {
-    redisReady = true;
-    logger.info("rate_limiter.redis.ready");
+  redisClient.onRedisReady(() => {
     while (redisInitQueue.length > 0) runRedisInit(redisInitQueue.shift());
   });
-
-  redisClient.on("error", (err) => {
-    if (redisReady) {
-      logger.warn("rate_limiter.redis.error", { message: err.message });
-    }
-    redisReady = false;
-  });
-
-  redisClient.on("end", () => {
-    redisReady = false;
-  });
-
-  if (env.NODE_ENV !== "test") {
-    redisClient.connect().catch((err) => {
-      logger.warn("rate_limiter.redis.connect_failed_fallback_to_memory", { message: err.message });
-      redisReady = false;
-    });
-  }
 }
 
 /** Registry of live stores so one timer can reap expired memory buckets. */
@@ -111,7 +76,7 @@ class SafeRateLimitStore {
     this.windowMs = 60_000;
     this.memory = new Map();
     this.redisStore = redisEnabled
-      ? new RedisStore({ sendCommand: (...args) => redisClient.sendCommand(args), prefix })
+      ? new RedisStore({ sendCommand: (...args) => redisClient.getRedisClient().sendCommand(args), prefix })
       : null;
     activeStores.add(this);
   }
@@ -119,13 +84,13 @@ class SafeRateLimitStore {
   init(options) {
     if (options?.windowMs) this.windowMs = options.windowMs;
     if (this.redisStore) {
-      if (redisReady) runRedisInit({ store: this.redisStore, options });
+      if (redisClient.isRedisReady()) runRedisInit({ store: this.redisStore, options });
       else redisInitQueue.push({ store: this.redisStore, options });
     }
   }
 
   async increment(key) {
-    if (redisReady && this.redisStore) {
+    if (redisClient.isRedisReady() && this.redisStore) {
       try {
         return await this.redisStore.increment(key);
       } catch (err) {
@@ -136,7 +101,7 @@ class SafeRateLimitStore {
   }
 
   async decrement(key) {
-    if (redisReady && this.redisStore) {
+    if (redisClient.isRedisReady() && this.redisStore) {
       try {
         await this.redisStore.decrement(key);
         return;
@@ -148,7 +113,7 @@ class SafeRateLimitStore {
   }
 
   async resetKey(key) {
-    if (redisReady && this.redisStore) {
+    if (redisClient.isRedisReady() && this.redisStore) {
       try {
         await this.redisStore.resetKey(key);
         return;
@@ -207,13 +172,11 @@ function rateLimit(options = {}) {
 }
 
 /** True when the shared Redis client is currently connected and usable. */
-const isRedisAvailable = () => redisEnabled && redisReady;
+const isRedisAvailable = () => redisClient.isRedisReady();
 
 /** Gracefully closes the shared Redis connection (used during shutdown). */
 const closeRateLimiterClient = async () => {
-  if (!redisClient) return;
-  redisReady = false;
-  await redisClient.quit().catch(() => redisClient.destroy());
+  await redisClient.closeRedisClient();
 };
 
 module.exports = {

@@ -1,13 +1,13 @@
-const QRCode = require("qrcode");
+﻿const QRCode = require("qrcode");
 const crypto = require("crypto");
 const prisma = require("../../prisma/prismaClient");
 const { attendanceWhere } = require("../event/attendanceDefinition");
 const env = require("../../config/env");
-const { decrypt, encrypt, encryptionContext } = require("../../utils/cryptoUtils");
-const { renderBrandedQrSvg } = require("../../utils/qrBranding");
-const { assertUuid } = require("../../utils/validation");
-const { hashToken, QR_TOKEN_PATTERN } = require("../../utils/qrToken");
-const { assertRegistrationAssignment, assertQrVerifyAccess } = require("../../utils/staff");
+const { decrypt, encrypt, encryptionContext } = require("../../utils/crypto/cryptoUtils");
+const { renderBrandedQrSvg } = require("../../utils/qr/qrBranding");
+const { assertUuid } = require("../../utils/validation/validation");
+const { hashToken, QR_TOKEN_PATTERN } = require("../../utils/crypto/qrToken");
+const { assertRegistrationAssignment, assertQrVerifyAccess } = require("../../utils/auth/staff");
 const AppError = require("../../errors/AppError");
 
 function buildQRTargetUrl(token) {

@@ -6,7 +6,7 @@ interface QueueHeaderProps {
   eventName?: string;
   totalCount: number;
   waitingCount: number;
-  checkedInCount: number;
+  calledCount: number;
   completedCount: number;
   callNextDisabled: boolean;
   onCallNext: () => void;
@@ -17,15 +17,15 @@ export function QueueHeader({
   eventName,
   totalCount,
   waitingCount,
-  checkedInCount,
+  calledCount,
   completedCount,
   callNextDisabled,
   onCallNext,
 }: QueueHeaderProps) {
   const metrics = [
-    ["Registered", totalCount, UserGroupIcon],
+    ["In queue", totalCount, UserGroupIcon],
     ["Waiting", waitingCount, ClockIcon],
-    ["Checked in", checkedInCount, PlayIcon],
+    ["Called", calledCount, PlayIcon],
     ["Completed", completedCount, CheckCircleIcon],
   ] as const;
 
@@ -33,8 +33,8 @@ export function QueueHeader({
     <section className="space-y-4 rounded-2xl border border-[#E2E1DC] bg-white p-5 shadow-sm">
       <header className="flex flex-col gap-4 border-b border-[#EEEDEA] pb-4 md:flex-row md:items-center md:justify-between">
         <div>
-          <h1 className="text-xl font-bold">{eventName ? `${eventName} queue` : "Live queue"}</h1>
-          <p className="mt-1 text-sm text-[#7A7870]">Live registration status and queue dispatch.</p>
+          <p className="text-xl font-bold">{eventName ? `${eventName} queue` : "Live queue"}</p>
+          <p className="mt-1 text-sm text-[#7A7870]">Live station queue, priority handling, and transfer dispatch.</p>
         </div>
         <div className="flex gap-2">
           <Link

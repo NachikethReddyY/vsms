@@ -210,7 +210,7 @@ export function ParticipantLookup({
   onSelect: (registrationId: string) => void;
   selected: QueueRegistration | null;
 }) {
-  const [passToken, setPassToken] = useState('abababababababababababababababababababababababababababababababab');
+  const [passToken, setPassToken] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [scannerOpen, setScannerOpen] = useState(false);
@@ -270,7 +270,7 @@ export function ParticipantLookup({
           <input
             value={passToken}
             onChange={(event) => setPassToken(event.target.value)}
-            placeholder="VSMS-DEMO-QR-001 or QR hex token"
+            placeholder="…/participant-status/&lt;token&gt; or 64-hex token"
           />
         </label>
         <button type="button" className="primary" onClick={() => void resolvePass()}>Load pass</button>
@@ -278,6 +278,7 @@ export function ParticipantLookup({
           Scan QR with camera
         </button>
       </div>
+      <p className="va-resolve-hint">Paste the full QR value or the hex token from the pass.</p>
       <label>
         Or choose from station queue
         <select value={selectedId} onChange={(event) => onSelect(event.target.value)}>

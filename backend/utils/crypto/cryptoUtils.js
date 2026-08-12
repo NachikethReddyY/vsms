@@ -1,13 +1,13 @@
 const crypto = require("crypto");
 const fs = require("fs");
 const path = require("path");
-const env = require("../config/env");
+const env = require("../../config/env");
 
 const ALGORITHM = "aes-256-gcm";
 const IV_LENGTH = 12;
 const AUTH_TAG_LENGTH = 16;
 const ENVELOPE_VERSION = "v2";
-const localKeyPath = path.resolve(__dirname, "..", "secure-data", "encryption.key");
+const localKeyPath = path.resolve(__dirname, "..", "..", "secure-data", "encryption.key");
 
 const keyBuffer = (key) => {
   const buffer = Buffer.isBuffer(key) ? key : Buffer.from(key, "hex");

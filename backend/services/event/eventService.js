@@ -1,6 +1,8 @@
-const prisma = require("../../prisma/prismaClient");
+﻿const prisma = require("../../prisma/prismaClient");
 const crypto = require("crypto");
 const { Prisma } = require("@prisma/client");
+const AppError = require("../../errors/AppError");
+const { encodeCursor, decodeCursor } = require("../../utils/http/cursor");
 const {
   classifyTemplates,
   stationTypeForTemplate,
@@ -9,15 +11,13 @@ const {
   CLINICAL_ONE_PER_EVENT_TYPES,
 } = require("./stationTemplateMapping");
 const { parseFieldSchema } = require("../../schemas/dynamicStationSchema");
-const AppError = require("../../errors/AppError");
-const { encodeCursor, decodeCursor } = require("../../utils/cursor");
 const {
   enqueueEventArtifactCleanup,
   processArtifactCleanupTasks,
   collectEventArtifactTasks,
 } = require("../platform/artifactCleanupService");
-const { createExportReceipt } = require("../../utils/eventExportReceipt");
-const { createAuditLog, resolveAuditContext } = require("../../utils/audit");
+const { createExportReceipt } = require("../../utils/storage/eventExportReceipt");
+const { createAuditLog, resolveAuditContext } = require("../../utils/logging/audit");
 const env = require("../../config/env");
 const { attendancePredicate, attendanceWhere } = require("./attendanceDefinition");
 const { enqueueAccountLifecycle } = require("../account/accountLifecycleNotificationService");
@@ -1668,7 +1668,9 @@ const listStaffDirectory = async () => {
   }));
 };
 
-// Import picker: active templates that map to a screening StationType.
+// Read-only catalog for the events UI / OpenAPI StationTemplate DTO (#23).
+// Import/update map templateKey â†’ StationType per #30 (catalog keys include
+// REGISTRATION / CLINICAL_REVIEW which are not StationType and are rejected on import).
 const listStationTemplates = async () => {
   const templates = await hydrateSystemFieldSchemas(await prisma.stationTemplate.findMany({
     where: { active: true, stationType: { not: null } },

@@ -52,8 +52,11 @@ evidence/
 backend/evidence/
 
 # Local security-scan artifacts
-gitleaks-report.json
+gitleaks-*.json
 semgrep-report.json
+
+# Local history-rewrite bookkeeping
+.git-rewrite/
 
 # Locally generated submission archive
 .submission/

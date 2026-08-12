@@ -649,6 +649,7 @@ html[data-vsms-theme-vt="active"]::view-transition-new(root) { clip-path:var(--v
 }
 .va-resolve-row { display:flex; gap:12px; align-items:flex-end; flex-wrap:wrap; margin-bottom:16px; }
 .va-resolve-row label { flex:1; min-width:220px; display:grid; gap:6px; font-size:13px; color:var(--ink-2); }
+.va-resolve-hint { margin:-6px 0 14px; color:var(--muted); font-size:12px; }
 .va-resolve-row input, .va-form select, .detail-panel select, .detail-panel input { min-height:42px; border:1px solid var(--hairline); border-radius:10px; padding:0 12px; background:var(--surface); color:var(--ink); }
 .va-form { display:grid; gap:18px; }
 .va-eye-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:16px; }

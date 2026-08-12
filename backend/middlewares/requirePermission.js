@@ -1,4 +1,4 @@
-const { createAuthAuditLog } = require("../utils/audit");
+﻿const { createAuthAuditLog } = require("../utils/logging/audit");
 const { isApprovedAccount } = require("./requireApprovedAccount");
 
 /**

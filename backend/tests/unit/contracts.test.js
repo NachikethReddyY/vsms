@@ -258,7 +258,7 @@ test("resolveParticipant looks up QRCodePass when passToken is not on registrati
     assert.match(body, /passToken/);
     assert.match(body, /qrToken/);
 
-    const tokenHelper = read("utils/qrToken.js");
+    const tokenHelper = read("utils/crypto/qrToken.js");
     assert.match(tokenHelper, /qRCodePass\.findFirst/);
     assert.match(tokenHelper, /tokenHash/);
 });

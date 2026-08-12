@@ -1,6 +1,7 @@
-const qrService = require("../services/participant/qrService");
+﻿const qrService = require("../services/participant/qrService");
 const env = require("../config/env");
-const { assertUuid } = require("../utils/validation");
+const { assertUuid } = require("../utils/validation/validation");
+const { assertRegistrationAssignment, assertQrVerifyAccess } = require("../utils/auth/staff");
 
 const escapeHtml = (value) => String(value ?? "").replace(/[&<>"']/g, (character) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[character]));
 
@@ -240,7 +241,7 @@ exports.viewQR = async (req, res, next) => {
 };
 
 // ==========================================
-// View QR Code as SVG in browser — DEVELOPMENT ONLY
+// View QR Code as SVG in browser â€” DEVELOPMENT ONLY
 // GET /qr/dev-view/:registrationId
 // No auth required. Returns 403 outside development/test.
 // ==========================================
@@ -266,7 +267,7 @@ exports.devViewQR = async (req, res, next) => {
 };
 
 // ==========================================
-// Dev QR scan-check page — DEVELOPMENT ONLY
+// Dev QR scan-check page â€” DEVELOPMENT ONLY
 // GET /qr/dev-page/:registrationId
 // Renders a centered, large QR with participant/event info
 // and a live status poller. No auth. 403 outside dev/test.
@@ -283,12 +284,20 @@ exports.devPageQR = async (req, res, next) => {
             return res.status(404).send("<h1>Registration not found</h1>");
         }
 
+        const scanQr = pageData.scanQr;
+        const statusUrl = pageData.statusUrl;
+        const token = pageData.statusUrl
+            ? decodeURIComponent(pageData.statusUrl.split("/").pop())
+            : null;
+        const queueNumber = pageData.queueNumber;
+        const displayName = pageData.displayName;
+
         const page = `<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>VSMS QR Pass — ${escapeHtml(pageData.displayName)}</title>
+<title>VSMS QR Pass â€” ${escapeHtml(displayName)}</title>
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body {
@@ -339,12 +348,12 @@ exports.devPageQR = async (req, res, next) => {
     <h1>${escapeHtml(pageData.displayName)}</h1>
     <div class="sub">${escapeHtml(pageData.eventName)}</div>
     <div class="meta">
-      Queue number: <b>${escapeHtml(pageData.queueNumber ?? "—")}</b>
-      ${pageData.tokenPreview ? `&nbsp;·&nbsp; Token: <code style="font-size:12px">${escapeHtml(pageData.tokenPreview)}</code>` : ""}
+      Queue number: <b>${escapeHtml(queueNumber ?? "â€”")}</b>
+      ${token ? `&nbsp;Â·&nbsp; Token: <code style="font-size:12px">${escapeHtml(token.slice(0, 12))}â€¦</code>` : ""}
     </div>
-    <div id="status" class="status pending">Checking pass status…</div>
+    <div id="status" class="status pending">Checking pass statusâ€¦</div>
     <div id="err" class="err"></div>
-    <div class="hint">Scan this QR with a phone camera — it opens a status page served by the backend on your LAN.</div>
+    <div class="hint">Scan this QR with a phone camera â€” it opens a status page served by the backend on your LAN.</div>
   </div>
 <script>
   const statusEl = document.getElementById("status");
@@ -364,8 +373,8 @@ exports.devPageQR = async (req, res, next) => {
       const ok = res.ok && data.valid;
       statusEl.className = ok ? "status valid" : "status invalid";
       statusEl.textContent = ok
-        ? "VALID — pass is active and scannable"
-        : (body.message || "INVALID — pass expired or revoked");
+        ? "VALID â€” pass is active and scannable"
+        : (body.message || "INVALID â€” pass expired or revoked");
     } catch (e) {
       errEl.textContent = "Status check failed: " + e.message;
     }
@@ -382,7 +391,7 @@ exports.devPageQR = async (req, res, next) => {
     document.querySelector(".card").appendChild(banner);
     const tick = () => {
       const remaining = rotationMinutes * 60 - Math.floor((Date.now() % (rotationMinutes * 60 * 1000)) / 1000);
-      banner.textContent = "QR auto-rotates every " + rotationMinutes + " min — next in " + remaining + "s";
+      banner.textContent = "QR auto-rotates every " + rotationMinutes + " min â€” next in " + remaining + "s";
     };
     tick();
     setInterval(() => { tick(); location.reload(); }, rotationMinutes * 60 * 1000);
@@ -400,7 +409,7 @@ exports.devPageQR = async (req, res, next) => {
 };
 
 // ==========================================
-// Dev phone-friendly status page — DEVELOPMENT ONLY
+// Dev phone-friendly status page â€” DEVELOPMENT ONLY
 // GET /qr/dev-status/:token
 // This is the QR scan target in dev. No auth, 403 in production.
 // ==========================================
@@ -448,7 +457,7 @@ exports.devStatusQR = async (req, res, next) => {
 <body>
   <div class="card">
     <div class="brand">VSMS SECURE EVENT PASS</div>
-    <div id="status" class="status pending">Checking…</div>
+    <div id="status" class="status pending">Checkingâ€¦</div>
     <div id="detail" class="detail"></div>
     <div id="err" class="err"></div>
   </div>
@@ -465,7 +474,7 @@ exports.devStatusQR = async (req, res, next) => {
       const ok = res.ok && data.valid;
       statusEl.className = ok ? "status valid" : "status invalid";
       statusEl.textContent = ok ? "VALID" : "INVALID";
-      detailEl.innerHTML = data.eventName ? "Event: <b>" + data.eventName + "</b><br>Queue: <b>" + (data.queueNumber || "—") + "</b>" : "";
+      detailEl.innerHTML = data.eventName ? "Event: <b>" + data.eventName + "</b><br>Queue: <b>" + (data.queueNumber || "â€”") + "</b>" : "";
       if (!ok) detailEl.innerHTML += "<br>This pass is expired or revoked.";
     } catch (e) {
       errEl.textContent = "Status check failed: " + e.message;
