@@ -4082,7 +4082,7 @@
               "value": "application/json"
             }
           ],
-          "body": "{\n  \"registrationId\": \"00000000-0000-4000-8000-000000000000\",\n  \"participantReference\": \"\",\n  \"queueNumber\": 0,\n  \"status\": \"SIGNED_UP\",\n  \"registration\": {\n    \"id\": \"00000000-0000-4000-8000-000000000000\",\n    \"registrationId\": \"00000000-0000-4000-8000-000000000000\",\n    \"eventId\": \"00000000-0000-4000-8000-000000000000\",\n    \"participantId\": \"00000000-0000-4000-8000-000000000000\",\n    \"registrationStatus\": {},\n    \"participantDisplayName\": \"\",\n    \"queueNumber\": 0,\n    \"idempotencyKey\": \"\",\n    \"checkedIn\": true,\n    \"checkedInAt\": \"2026-08-07T00:00:00.000Z\",\n    \"createdAt\": \"2026-08-07T00:00:00.000Z\",\n    \"updatedAt\": \"2026-08-07T00:00:00.000Z\"\n  },\n  \"idempotentReplay\": true\n}"
+          "body": "{\n  \"registrationId\": \"00000000-0000-4000-8000-000000000000\",\n  \"participantReference\": \"\",\n  \"queueNumber\": 0,\n  \"status\": \"SIGNED_UP\",\n  \"registration\": {\n    \"id\": \"00000000-0000-4000-8000-000000000000\",\n    \"registrationId\": \"00000000-0000-4000-8000-000000000000\",\n    \"eventId\": \"00000000-0000-4000-8000-000000000000\",\n    \"participantId\": \"00000000-0000-4000-8000-000000000000\",\n    \"registrationStatus\": {},\n    \"participantDisplayName\": \"\",\n    \"queueNumber\": 0,\n    \"idempotencyKey\": \"\",\n    \"checkedIn\": true,\n    \"checkedInAt\": \"2026-08-07T00:00:00.000Z\",\n    \"createdAt\": \"2026-08-07T00:00:00.000Z\",\n    \"updatedAt\": \"2026-08-07T00:00:00.000Z\"\n  },\n  \"route\": {\n    \"status\": \"PENDING_CHECK_IN\",\n    \"routeVersion\": 1,\n    \"steps\": [\n      {\n        \"stationId\": \"00000000-0000-4000-8000-000000000000\",\n        \"stationName\": \"\",\n        \"stationType\": \"\",\n        \"position\": 1,\n        \"state\": \"COMPLETED\"\n      }\n    ],\n    \"currentStation\": {},\n    \"queue\": {\n      \"queueEntryId\": \"00000000-0000-4000-8000-000000000000\",\n      \"stationId\": \"00000000-0000-4000-8000-000000000000\",\n      \"queueNumber\": 1,\n      \"status\": \"WAITING\"\n    }\n  },\n  \"securePass\": {\n    \"qrId\": \"00000000-0000-4000-8000-000000000000\",\n    \"registrationId\": \"00000000-0000-4000-8000-000000000000\",\n    \"issuedAt\": \"2026-08-07T00:00:00.000Z\",\n    \"expiresAt\": \"2026-08-07T00:00:00.000Z\",\n    \"qrImage\": \"\"\n  },\n  \"idempotentReplay\": true\n}"
         },
         {
           "name": "201 Response",
@@ -4112,7 +4112,7 @@
               "value": "application/json"
             }
           ],
-          "body": "{\n  \"registrationId\": \"00000000-0000-4000-8000-000000000000\",\n  \"participantReference\": \"\",\n  \"queueNumber\": 0,\n  \"status\": \"SIGNED_UP\",\n  \"registration\": {\n    \"id\": \"00000000-0000-4000-8000-000000000000\",\n    \"registrationId\": \"00000000-0000-4000-8000-000000000000\",\n    \"eventId\": \"00000000-0000-4000-8000-000000000000\",\n    \"participantId\": \"00000000-0000-4000-8000-000000000000\",\n    \"registrationStatus\": {},\n    \"participantDisplayName\": \"\",\n    \"queueNumber\": 0,\n    \"idempotencyKey\": \"\",\n    \"checkedIn\": true,\n    \"checkedInAt\": \"2026-08-07T00:00:00.000Z\",\n    \"createdAt\": \"2026-08-07T00:00:00.000Z\",\n    \"updatedAt\": \"2026-08-07T00:00:00.000Z\"\n  },\n  \"idempotentReplay\": true\n}"
+          "body": "{\n  \"registrationId\": \"00000000-0000-4000-8000-000000000000\",\n  \"participantReference\": \"\",\n  \"queueNumber\": 0,\n  \"status\": \"SIGNED_UP\",\n  \"registration\": {\n    \"id\": \"00000000-0000-4000-8000-000000000000\",\n    \"registrationId\": \"00000000-0000-4000-8000-000000000000\",\n    \"eventId\": \"00000000-0000-4000-8000-000000000000\",\n    \"participantId\": \"00000000-0000-4000-8000-000000000000\",\n    \"registrationStatus\": {},\n    \"participantDisplayName\": \"\",\n    \"queueNumber\": 0,\n    \"idempotencyKey\": \"\",\n    \"checkedIn\": true,\n    \"checkedInAt\": \"2026-08-07T00:00:00.000Z\",\n    \"createdAt\": \"2026-08-07T00:00:00.000Z\",\n    \"updatedAt\": \"2026-08-07T00:00:00.000Z\"\n  },\n  \"route\": {\n    \"status\": \"PENDING_CHECK_IN\",\n    \"routeVersion\": 1,\n    \"steps\": [\n      {\n        \"stationId\": \"00000000-0000-4000-8000-000000000000\",\n        \"stationName\": \"\",\n        \"stationType\": \"\",\n        \"position\": 1,\n        \"state\": \"COMPLETED\"\n      }\n    ],\n    \"currentStation\": {},\n    \"queue\": {\n      \"queueEntryId\": \"00000000-0000-4000-8000-000000000000\",\n      \"stationId\": \"00000000-0000-4000-8000-000000000000\",\n      \"queueNumber\": 1,\n      \"status\": \"WAITING\"\n    }\n  },\n  \"securePass\": {\n    \"qrId\": \"00000000-0000-4000-8000-000000000000\",\n    \"registrationId\": \"00000000-0000-4000-8000-000000000000\",\n    \"issuedAt\": \"2026-08-07T00:00:00.000Z\",\n    \"expiresAt\": \"2026-08-07T00:00:00.000Z\",\n    \"qrImage\": \"\"\n  },\n  \"idempotentReplay\": true\n}"
         },
         {
           "name": "400 Response",
@@ -5769,7 +5769,7 @@
               "value": "application/json"
             }
           ],
-          "body": "{\n  \"clientBatchId\": \"00000000-0000-4000-8000-000000000000\",\n  \"serverTime\": \"2026-08-07T00:00:00.000Z\",\n  \"cursor\": \"2026-08-07T00:00:00.000Z\",\n  \"actions\": [\n    {\n      \"clientActionId\": \"00000000-0000-4000-8000-000000000000\",\n      \"status\": \"APPLIED\",\n      \"retryCount\": 0,\n      \"errorCode\": \"\",\n      \"result\": {\n        \"resultId\": \"00000000-0000-4000-8000-000000000000\",\n        \"overallFlag\": \"NORMAL\",\n        \"isFlagged\": true,\n        \"ruleVersion\": \"\"\n      }\n    }\n  ],\n  \"pull\": {\n    \"event\": {\n      \"eventId\": \"00000000-0000-4000-8000-000000000000\",\n      \"name\": \"\",\n      \"status\": \"DRAFT\"\n    },\n    \"stations\": [\n      {\n        \"stationId\": \"00000000-0000-4000-8000-000000000000\",\n        \"eventId\": \"00000000-0000-4000-8000-000000000000\",\n        \"stationName\": \"\",\n        \"stationType\": \"VISUAL_ACUITY\",\n        \"stationOrder\": 0,\n        \"isActive\": true,\n        \"fieldSchemaSnapshot\": [\n          {\n            \"key\": \"\",\n            \"label\": \"\",\n            \"type\": \"text\",\n            \"required\": true,\n            \"options\": [\n              \"\"\n            ],\n            \"min\": 0,\n            \"max\": 0,\n            \"unit\": \"\",\n            \"eyes\": \"OD\"\n          }\n        ],\n        \"schemaVersion\": 1,\n        \"offlineAccessExpiresAt\": \"2026-08-07T00:00:00.000Z\",\n        \"registrations\": [\n          {\n            \"registrationId\": \"00000000-0000-4000-8000-000000000000\",\n            \"participantDisplayName\": \"\",\n            \"queueNumber\": 0,\n            \"status\": \"SIGNED_UP\",\n            \"existingResult\": {\n              \"resultId\": \"00000000-0000-4000-8000-000000000000\",\n              \"overallFlag\": {},\n              \"isFlagged\": true,\n              \"createdAt\": \"2026-08-07T00:00:00.000Z\"\n            }\n          }\n        ]\n      }\n    ]\n  }\n}"
+          "body": "{\n  \"clientBatchId\": \"00000000-0000-4000-8000-000000000000\",\n  \"serverTime\": \"2026-08-07T00:00:00.000Z\",\n  \"cursor\": \"2026-08-07T00:00:00.000Z\",\n  \"actions\": [\n    {\n      \"clientActionId\": \"00000000-0000-4000-8000-000000000000\",\n      \"status\": \"APPLIED\",\n      \"retryCount\": 0,\n      \"errorCode\": \"\",\n      \"result\": {\n        \"resultId\": \"00000000-0000-4000-8000-000000000000\",\n        \"overallFlag\": \"NORMAL\",\n        \"isFlagged\": true,\n        \"ruleVersion\": \"\",\n        \"routeProgression\": {\n          \"status\": \"ADDED_TO_QUEUE\",\n          \"routeVersion\": 1,\n          \"completedStation\": {\n            \"stationId\": \"00000000-0000-4000-8000-000000000000\",\n            \"stationName\": \"\",\n            \"stationType\": \"\"\n          },\n          \"nextStation\": {},\n          \"nextQueue\": {\n            \"stationId\": \"00000000-0000-4000-8000-000000000000\",\n            \"stationName\": \"\",\n            \"stationType\": \"\",\n            \"queueNumber\": 0,\n            \"status\": \"WAITING\"\n          }\n        }\n      }\n    }\n  ],\n  \"pull\": {\n    \"event\": {\n      \"eventId\": \"00000000-0000-4000-8000-000000000000\",\n      \"name\": \"\",\n      \"status\": \"DRAFT\"\n    },\n    \"stations\": [\n      {\n        \"stationId\": \"00000000-0000-4000-8000-000000000000\",\n        \"eventId\": \"00000000-0000-4000-8000-000000000000\",\n        \"stationName\": \"\",\n        \"stationType\": \"VISUAL_ACUITY\",\n        \"stationOrder\": 0,\n        \"isActive\": true,\n        \"fieldSchemaSnapshot\": [\n          {\n            \"key\": \"\",\n            \"label\": \"\",\n            \"type\": \"text\",\n            \"required\": true,\n            \"options\": [\n              \"\"\n            ],\n            \"min\": 0,\n            \"max\": 0,\n            \"unit\": \"\",\n            \"eyes\": \"OD\"\n          }\n        ],\n        \"schemaVersion\": 1,\n        \"offlineAccessExpiresAt\": \"2026-08-07T00:00:00.000Z\",\n        \"registrations\": [\n          {\n            \"registrationId\": \"00000000-0000-4000-8000-000000000000\",\n            \"participantDisplayName\": \"\",\n            \"queueNumber\": 0,\n            \"status\": \"SIGNED_UP\",\n            \"existingResult\": {\n              \"resultId\": \"00000000-0000-4000-8000-000000000000\",\n              \"overallFlag\": {},\n              \"isFlagged\": true,\n              \"createdAt\": \"2026-08-07T00:00:00.000Z\"\n            }\n          }\n        ]\n      }\n    ]\n  }\n}"
         },
         {
           "name": "401 Response",
@@ -6200,7 +6200,7 @@
               "value": "application/json"
             }
           ],
-          "body": "{\n  \"resultId\": \"00000000-0000-4000-8000-000000000000\",\n  \"registrationId\": \"00000000-0000-4000-8000-000000000000\",\n  \"stationId\": \"00000000-0000-4000-8000-000000000000\",\n  \"screeningType\": \"\",\n  \"resultData\": {},\n  \"overallFlag\": \"NORMAL\",\n  \"isFlagged\": true,\n  \"flagSummary\": \"\",\n  \"ruleVersion\": \"\",\n  \"acknowledgedAt\": \"2026-08-07T00:00:00.000Z\",\n  \"idempotencyKey\": \"\",\n  \"version\": 1,\n  \"evaluation\": {\n    \"ruleVersion\": \"\",\n    \"overallFlag\": {},\n    \"isFlagged\": true,\n    \"flagSummary\": \"\",\n    \"reasons\": [\n      {\n        \"flag\": {},\n        \"reason\": \"\"\n      }\n    ]\n  },\n  \"createdAt\": \"2026-08-07T00:00:00.000Z\",\n  \"updatedAt\": \"2026-08-07T00:00:00.000Z\"\n}"
+          "body": "{\n  \"resultId\": \"00000000-0000-4000-8000-000000000000\",\n  \"registrationId\": \"00000000-0000-4000-8000-000000000000\",\n  \"stationId\": \"00000000-0000-4000-8000-000000000000\",\n  \"screeningType\": \"\",\n  \"resultData\": {},\n  \"overallFlag\": \"NORMAL\",\n  \"isFlagged\": true,\n  \"flagSummary\": \"\",\n  \"ruleVersion\": \"\",\n  \"acknowledgedAt\": \"2026-08-07T00:00:00.000Z\",\n  \"idempotencyKey\": \"\",\n  \"version\": 1,\n  \"evaluation\": {\n    \"ruleVersion\": \"\",\n    \"overallFlag\": {},\n    \"isFlagged\": true,\n    \"flagSummary\": \"\",\n    \"reasons\": [\n      {\n        \"flag\": {},\n        \"reason\": \"\"\n      }\n    ]\n  },\n  \"routeProgression\": {\n    \"status\": \"ADDED_TO_QUEUE\",\n    \"routeVersion\": 1,\n    \"completedStation\": {\n      \"stationId\": \"00000000-0000-4000-8000-000000000000\",\n      \"stationName\": \"\",\n      \"stationType\": \"\"\n    },\n    \"nextStation\": {},\n    \"nextQueue\": {\n      \"stationId\": \"00000000-0000-4000-8000-000000000000\",\n      \"stationName\": \"\",\n      \"stationType\": \"\",\n      \"queueNumber\": 0,\n      \"status\": \"WAITING\"\n    }\n  },\n  \"createdAt\": \"2026-08-07T00:00:00.000Z\",\n  \"updatedAt\": \"2026-08-07T00:00:00.000Z\"\n}"
         },
         {
           "name": "201 Response",
@@ -6224,7 +6224,7 @@
               "value": "application/json"
             }
           ],
-          "body": "{\n  \"resultId\": \"00000000-0000-4000-8000-000000000000\",\n  \"registrationId\": \"00000000-0000-4000-8000-000000000000\",\n  \"stationId\": \"00000000-0000-4000-8000-000000000000\",\n  \"screeningType\": \"\",\n  \"resultData\": {},\n  \"overallFlag\": \"NORMAL\",\n  \"isFlagged\": true,\n  \"flagSummary\": \"\",\n  \"ruleVersion\": \"\",\n  \"acknowledgedAt\": \"2026-08-07T00:00:00.000Z\",\n  \"idempotencyKey\": \"\",\n  \"version\": 1,\n  \"evaluation\": {\n    \"ruleVersion\": \"\",\n    \"overallFlag\": {},\n    \"isFlagged\": true,\n    \"flagSummary\": \"\",\n    \"reasons\": [\n      {\n        \"flag\": {},\n        \"reason\": \"\"\n      }\n    ]\n  },\n  \"createdAt\": \"2026-08-07T00:00:00.000Z\",\n  \"updatedAt\": \"2026-08-07T00:00:00.000Z\"\n}"
+          "body": "{\n  \"resultId\": \"00000000-0000-4000-8000-000000000000\",\n  \"registrationId\": \"00000000-0000-4000-8000-000000000000\",\n  \"stationId\": \"00000000-0000-4000-8000-000000000000\",\n  \"screeningType\": \"\",\n  \"resultData\": {},\n  \"overallFlag\": \"NORMAL\",\n  \"isFlagged\": true,\n  \"flagSummary\": \"\",\n  \"ruleVersion\": \"\",\n  \"acknowledgedAt\": \"2026-08-07T00:00:00.000Z\",\n  \"idempotencyKey\": \"\",\n  \"version\": 1,\n  \"evaluation\": {\n    \"ruleVersion\": \"\",\n    \"overallFlag\": {},\n    \"isFlagged\": true,\n    \"flagSummary\": \"\",\n    \"reasons\": [\n      {\n        \"flag\": {},\n        \"reason\": \"\"\n      }\n    ]\n  },\n  \"routeProgression\": {\n    \"status\": \"ADDED_TO_QUEUE\",\n    \"routeVersion\": 1,\n    \"completedStation\": {\n      \"stationId\": \"00000000-0000-4000-8000-000000000000\",\n      \"stationName\": \"\",\n      \"stationType\": \"\"\n    },\n    \"nextStation\": {},\n    \"nextQueue\": {\n      \"stationId\": \"00000000-0000-4000-8000-000000000000\",\n      \"stationName\": \"\",\n      \"stationType\": \"\",\n      \"queueNumber\": 0,\n      \"status\": \"WAITING\"\n    }\n  },\n  \"createdAt\": \"2026-08-07T00:00:00.000Z\",\n  \"updatedAt\": \"2026-08-07T00:00:00.000Z\"\n}"
         },
         {
           "name": "401 Response",
@@ -6447,7 +6447,7 @@
               "value": "application/json"
             }
           ],
-          "body": "{\n  \"resultId\": \"00000000-0000-4000-8000-000000000000\",\n  \"registrationId\": \"00000000-0000-4000-8000-000000000000\",\n  \"stationId\": \"00000000-0000-4000-8000-000000000000\",\n  \"screeningType\": \"\",\n  \"resultData\": {},\n  \"overallFlag\": \"NORMAL\",\n  \"isFlagged\": true,\n  \"flagSummary\": \"\",\n  \"ruleVersion\": \"\",\n  \"acknowledgedAt\": \"2026-08-07T00:00:00.000Z\",\n  \"idempotencyKey\": \"\",\n  \"version\": 1,\n  \"evaluation\": {\n    \"ruleVersion\": \"\",\n    \"overallFlag\": {},\n    \"isFlagged\": true,\n    \"flagSummary\": \"\",\n    \"reasons\": [\n      {\n        \"flag\": {},\n        \"reason\": \"\"\n      }\n    ]\n  },\n  \"createdAt\": \"2026-08-07T00:00:00.000Z\",\n  \"updatedAt\": \"2026-08-07T00:00:00.000Z\"\n}"
+          "body": "{\n  \"resultId\": \"00000000-0000-4000-8000-000000000000\",\n  \"registrationId\": \"00000000-0000-4000-8000-000000000000\",\n  \"stationId\": \"00000000-0000-4000-8000-000000000000\",\n  \"screeningType\": \"\",\n  \"resultData\": {},\n  \"overallFlag\": \"NORMAL\",\n  \"isFlagged\": true,\n  \"flagSummary\": \"\",\n  \"ruleVersion\": \"\",\n  \"acknowledgedAt\": \"2026-08-07T00:00:00.000Z\",\n  \"idempotencyKey\": \"\",\n  \"version\": 1,\n  \"evaluation\": {\n    \"ruleVersion\": \"\",\n    \"overallFlag\": {},\n    \"isFlagged\": true,\n    \"flagSummary\": \"\",\n    \"reasons\": [\n      {\n        \"flag\": {},\n        \"reason\": \"\"\n      }\n    ]\n  },\n  \"routeProgression\": {\n    \"status\": \"ADDED_TO_QUEUE\",\n    \"routeVersion\": 1,\n    \"completedStation\": {\n      \"stationId\": \"00000000-0000-4000-8000-000000000000\",\n      \"stationName\": \"\",\n      \"stationType\": \"\"\n    },\n    \"nextStation\": {},\n    \"nextQueue\": {\n      \"stationId\": \"00000000-0000-4000-8000-000000000000\",\n      \"stationName\": \"\",\n      \"stationType\": \"\",\n      \"queueNumber\": 0,\n      \"status\": \"WAITING\"\n    }\n  },\n  \"createdAt\": \"2026-08-07T00:00:00.000Z\",\n  \"updatedAt\": \"2026-08-07T00:00:00.000Z\"\n}"
         },
         {
           "name": "201 Response",
@@ -6471,7 +6471,7 @@
               "value": "application/json"
             }
           ],
-          "body": "{\n  \"resultId\": \"00000000-0000-4000-8000-000000000000\",\n  \"registrationId\": \"00000000-0000-4000-8000-000000000000\",\n  \"stationId\": \"00000000-0000-4000-8000-000000000000\",\n  \"screeningType\": \"\",\n  \"resultData\": {},\n  \"overallFlag\": \"NORMAL\",\n  \"isFlagged\": true,\n  \"flagSummary\": \"\",\n  \"ruleVersion\": \"\",\n  \"acknowledgedAt\": \"2026-08-07T00:00:00.000Z\",\n  \"idempotencyKey\": \"\",\n  \"version\": 1,\n  \"evaluation\": {\n    \"ruleVersion\": \"\",\n    \"overallFlag\": {},\n    \"isFlagged\": true,\n    \"flagSummary\": \"\",\n    \"reasons\": [\n      {\n        \"flag\": {},\n        \"reason\": \"\"\n      }\n    ]\n  },\n  \"createdAt\": \"2026-08-07T00:00:00.000Z\",\n  \"updatedAt\": \"2026-08-07T00:00:00.000Z\"\n}"
+          "body": "{\n  \"resultId\": \"00000000-0000-4000-8000-000000000000\",\n  \"registrationId\": \"00000000-0000-4000-8000-000000000000\",\n  \"stationId\": \"00000000-0000-4000-8000-000000000000\",\n  \"screeningType\": \"\",\n  \"resultData\": {},\n  \"overallFlag\": \"NORMAL\",\n  \"isFlagged\": true,\n  \"flagSummary\": \"\",\n  \"ruleVersion\": \"\",\n  \"acknowledgedAt\": \"2026-08-07T00:00:00.000Z\",\n  \"idempotencyKey\": \"\",\n  \"version\": 1,\n  \"evaluation\": {\n    \"ruleVersion\": \"\",\n    \"overallFlag\": {},\n    \"isFlagged\": true,\n    \"flagSummary\": \"\",\n    \"reasons\": [\n      {\n        \"flag\": {},\n        \"reason\": \"\"\n      }\n    ]\n  },\n  \"routeProgression\": {\n    \"status\": \"ADDED_TO_QUEUE\",\n    \"routeVersion\": 1,\n    \"completedStation\": {\n      \"stationId\": \"00000000-0000-4000-8000-000000000000\",\n      \"stationName\": \"\",\n      \"stationType\": \"\"\n    },\n    \"nextStation\": {},\n    \"nextQueue\": {\n      \"stationId\": \"00000000-0000-4000-8000-000000000000\",\n      \"stationName\": \"\",\n      \"stationType\": \"\",\n      \"queueNumber\": 0,\n      \"status\": \"WAITING\"\n    }\n  },\n  \"createdAt\": \"2026-08-07T00:00:00.000Z\",\n  \"updatedAt\": \"2026-08-07T00:00:00.000Z\"\n}"
         },
         {
           "name": "401 Response",
@@ -6694,7 +6694,7 @@
               "value": "application/json"
             }
           ],
-          "body": "{\n  \"resultId\": \"00000000-0000-4000-8000-000000000000\",\n  \"registrationId\": \"00000000-0000-4000-8000-000000000000\",\n  \"stationId\": \"00000000-0000-4000-8000-000000000000\",\n  \"screeningType\": \"\",\n  \"resultData\": {},\n  \"overallFlag\": \"NORMAL\",\n  \"isFlagged\": true,\n  \"flagSummary\": \"\",\n  \"ruleVersion\": \"\",\n  \"acknowledgedAt\": \"2026-08-07T00:00:00.000Z\",\n  \"idempotencyKey\": \"\",\n  \"version\": 1,\n  \"evaluation\": {\n    \"ruleVersion\": \"\",\n    \"overallFlag\": {},\n    \"isFlagged\": true,\n    \"flagSummary\": \"\",\n    \"reasons\": [\n      {\n        \"flag\": {},\n        \"reason\": \"\"\n      }\n    ]\n  },\n  \"createdAt\": \"2026-08-07T00:00:00.000Z\",\n  \"updatedAt\": \"2026-08-07T00:00:00.000Z\"\n}"
+          "body": "{\n  \"resultId\": \"00000000-0000-4000-8000-000000000000\",\n  \"registrationId\": \"00000000-0000-4000-8000-000000000000\",\n  \"stationId\": \"00000000-0000-4000-8000-000000000000\",\n  \"screeningType\": \"\",\n  \"resultData\": {},\n  \"overallFlag\": \"NORMAL\",\n  \"isFlagged\": true,\n  \"flagSummary\": \"\",\n  \"ruleVersion\": \"\",\n  \"acknowledgedAt\": \"2026-08-07T00:00:00.000Z\",\n  \"idempotencyKey\": \"\",\n  \"version\": 1,\n  \"evaluation\": {\n    \"ruleVersion\": \"\",\n    \"overallFlag\": {},\n    \"isFlagged\": true,\n    \"flagSummary\": \"\",\n    \"reasons\": [\n      {\n        \"flag\": {},\n        \"reason\": \"\"\n      }\n    ]\n  },\n  \"routeProgression\": {\n    \"status\": \"ADDED_TO_QUEUE\",\n    \"routeVersion\": 1,\n    \"completedStation\": {\n      \"stationId\": \"00000000-0000-4000-8000-000000000000\",\n      \"stationName\": \"\",\n      \"stationType\": \"\"\n    },\n    \"nextStation\": {},\n    \"nextQueue\": {\n      \"stationId\": \"00000000-0000-4000-8000-000000000000\",\n      \"stationName\": \"\",\n      \"stationType\": \"\",\n      \"queueNumber\": 0,\n      \"status\": \"WAITING\"\n    }\n  },\n  \"createdAt\": \"2026-08-07T00:00:00.000Z\",\n  \"updatedAt\": \"2026-08-07T00:00:00.000Z\"\n}"
         },
         {
           "name": "201 Response",
@@ -6718,7 +6718,7 @@
               "value": "application/json"
             }
           ],
-          "body": "{\n  \"resultId\": \"00000000-0000-4000-8000-000000000000\",\n  \"registrationId\": \"00000000-0000-4000-8000-000000000000\",\n  \"stationId\": \"00000000-0000-4000-8000-000000000000\",\n  \"screeningType\": \"\",\n  \"resultData\": {},\n  \"overallFlag\": \"NORMAL\",\n  \"isFlagged\": true,\n  \"flagSummary\": \"\",\n  \"ruleVersion\": \"\",\n  \"acknowledgedAt\": \"2026-08-07T00:00:00.000Z\",\n  \"idempotencyKey\": \"\",\n  \"version\": 1,\n  \"evaluation\": {\n    \"ruleVersion\": \"\",\n    \"overallFlag\": {},\n    \"isFlagged\": true,\n    \"flagSummary\": \"\",\n    \"reasons\": [\n      {\n        \"flag\": {},\n        \"reason\": \"\"\n      }\n    ]\n  },\n  \"createdAt\": \"2026-08-07T00:00:00.000Z\",\n  \"updatedAt\": \"2026-08-07T00:00:00.000Z\"\n}"
+          "body": "{\n  \"resultId\": \"00000000-0000-4000-8000-000000000000\",\n  \"registrationId\": \"00000000-0000-4000-8000-000000000000\",\n  \"stationId\": \"00000000-0000-4000-8000-000000000000\",\n  \"screeningType\": \"\",\n  \"resultData\": {},\n  \"overallFlag\": \"NORMAL\",\n  \"isFlagged\": true,\n  \"flagSummary\": \"\",\n  \"ruleVersion\": \"\",\n  \"acknowledgedAt\": \"2026-08-07T00:00:00.000Z\",\n  \"idempotencyKey\": \"\",\n  \"version\": 1,\n  \"evaluation\": {\n    \"ruleVersion\": \"\",\n    \"overallFlag\": {},\n    \"isFlagged\": true,\n    \"flagSummary\": \"\",\n    \"reasons\": [\n      {\n        \"flag\": {},\n        \"reason\": \"\"\n      }\n    ]\n  },\n  \"routeProgression\": {\n    \"status\": \"ADDED_TO_QUEUE\",\n    \"routeVersion\": 1,\n    \"completedStation\": {\n      \"stationId\": \"00000000-0000-4000-8000-000000000000\",\n      \"stationName\": \"\",\n      \"stationType\": \"\"\n    },\n    \"nextStation\": {},\n    \"nextQueue\": {\n      \"stationId\": \"00000000-0000-4000-8000-000000000000\",\n      \"stationName\": \"\",\n      \"stationType\": \"\",\n      \"queueNumber\": 0,\n      \"status\": \"WAITING\"\n    }\n  },\n  \"createdAt\": \"2026-08-07T00:00:00.000Z\",\n  \"updatedAt\": \"2026-08-07T00:00:00.000Z\"\n}"
         },
         {
           "name": "401 Response",
@@ -6941,7 +6941,7 @@
               "value": "application/json"
             }
           ],
-          "body": "{\n  \"resultId\": \"00000000-0000-4000-8000-000000000000\",\n  \"registrationId\": \"00000000-0000-4000-8000-000000000000\",\n  \"stationId\": \"00000000-0000-4000-8000-000000000000\",\n  \"screeningType\": \"\",\n  \"resultData\": {},\n  \"overallFlag\": \"NORMAL\",\n  \"isFlagged\": true,\n  \"flagSummary\": \"\",\n  \"ruleVersion\": \"\",\n  \"acknowledgedAt\": \"2026-08-07T00:00:00.000Z\",\n  \"idempotencyKey\": \"\",\n  \"version\": 1,\n  \"evaluation\": {\n    \"ruleVersion\": \"\",\n    \"overallFlag\": {},\n    \"isFlagged\": true,\n    \"flagSummary\": \"\",\n    \"reasons\": [\n      {\n        \"flag\": {},\n        \"reason\": \"\"\n      }\n    ]\n  },\n  \"createdAt\": \"2026-08-07T00:00:00.000Z\",\n  \"updatedAt\": \"2026-08-07T00:00:00.000Z\"\n}"
+          "body": "{\n  \"resultId\": \"00000000-0000-4000-8000-000000000000\",\n  \"registrationId\": \"00000000-0000-4000-8000-000000000000\",\n  \"stationId\": \"00000000-0000-4000-8000-000000000000\",\n  \"screeningType\": \"\",\n  \"resultData\": {},\n  \"overallFlag\": \"NORMAL\",\n  \"isFlagged\": true,\n  \"flagSummary\": \"\",\n  \"ruleVersion\": \"\",\n  \"acknowledgedAt\": \"2026-08-07T00:00:00.000Z\",\n  \"idempotencyKey\": \"\",\n  \"version\": 1,\n  \"evaluation\": {\n    \"ruleVersion\": \"\",\n    \"overallFlag\": {},\n    \"isFlagged\": true,\n    \"flagSummary\": \"\",\n    \"reasons\": [\n      {\n        \"flag\": {},\n        \"reason\": \"\"\n      }\n    ]\n  },\n  \"routeProgression\": {\n    \"status\": \"ADDED_TO_QUEUE\",\n    \"routeVersion\": 1,\n    \"completedStation\": {\n      \"stationId\": \"00000000-0000-4000-8000-000000000000\",\n      \"stationName\": \"\",\n      \"stationType\": \"\"\n    },\n    \"nextStation\": {},\n    \"nextQueue\": {\n      \"stationId\": \"00000000-0000-4000-8000-000000000000\",\n      \"stationName\": \"\",\n      \"stationType\": \"\",\n      \"queueNumber\": 0,\n      \"status\": \"WAITING\"\n    }\n  },\n  \"createdAt\": \"2026-08-07T00:00:00.000Z\",\n  \"updatedAt\": \"2026-08-07T00:00:00.000Z\"\n}"
         },
         {
           "name": "201 Response",
@@ -6965,7 +6965,7 @@
               "value": "application/json"
             }
           ],
-          "body": "{\n  \"resultId\": \"00000000-0000-4000-8000-000000000000\",\n  \"registrationId\": \"00000000-0000-4000-8000-000000000000\",\n  \"stationId\": \"00000000-0000-4000-8000-000000000000\",\n  \"screeningType\": \"\",\n  \"resultData\": {},\n  \"overallFlag\": \"NORMAL\",\n  \"isFlagged\": true,\n  \"flagSummary\": \"\",\n  \"ruleVersion\": \"\",\n  \"acknowledgedAt\": \"2026-08-07T00:00:00.000Z\",\n  \"idempotencyKey\": \"\",\n  \"version\": 1,\n  \"evaluation\": {\n    \"ruleVersion\": \"\",\n    \"overallFlag\": {},\n    \"isFlagged\": true,\n    \"flagSummary\": \"\",\n    \"reasons\": [\n      {\n        \"flag\": {},\n        \"reason\": \"\"\n      }\n    ]\n  },\n  \"createdAt\": \"2026-08-07T00:00:00.000Z\",\n  \"updatedAt\": \"2026-08-07T00:00:00.000Z\"\n}"
+          "body": "{\n  \"resultId\": \"00000000-0000-4000-8000-000000000000\",\n  \"registrationId\": \"00000000-0000-4000-8000-000000000000\",\n  \"stationId\": \"00000000-0000-4000-8000-000000000000\",\n  \"screeningType\": \"\",\n  \"resultData\": {},\n  \"overallFlag\": \"NORMAL\",\n  \"isFlagged\": true,\n  \"flagSummary\": \"\",\n  \"ruleVersion\": \"\",\n  \"acknowledgedAt\": \"2026-08-07T00:00:00.000Z\",\n  \"idempotencyKey\": \"\",\n  \"version\": 1,\n  \"evaluation\": {\n    \"ruleVersion\": \"\",\n    \"overallFlag\": {},\n    \"isFlagged\": true,\n    \"flagSummary\": \"\",\n    \"reasons\": [\n      {\n        \"flag\": {},\n        \"reason\": \"\"\n      }\n    ]\n  },\n  \"routeProgression\": {\n    \"status\": \"ADDED_TO_QUEUE\",\n    \"routeVersion\": 1,\n    \"completedStation\": {\n      \"stationId\": \"00000000-0000-4000-8000-000000000000\",\n      \"stationName\": \"\",\n      \"stationType\": \"\"\n    },\n    \"nextStation\": {},\n    \"nextQueue\": {\n      \"stationId\": \"00000000-0000-4000-8000-000000000000\",\n      \"stationName\": \"\",\n      \"stationType\": \"\",\n      \"queueNumber\": 0,\n      \"status\": \"WAITING\"\n    }\n  },\n  \"createdAt\": \"2026-08-07T00:00:00.000Z\",\n  \"updatedAt\": \"2026-08-07T00:00:00.000Z\"\n}"
         },
         {
           "name": "401 Response",
@@ -7188,7 +7188,7 @@
               "value": "application/json"
             }
           ],
-          "body": "{\n  \"resultId\": \"00000000-0000-4000-8000-000000000000\",\n  \"registrationId\": \"00000000-0000-4000-8000-000000000000\",\n  \"stationId\": \"00000000-0000-4000-8000-000000000000\",\n  \"screeningType\": \"\",\n  \"resultData\": {},\n  \"overallFlag\": \"NORMAL\",\n  \"isFlagged\": true,\n  \"flagSummary\": \"\",\n  \"ruleVersion\": \"\",\n  \"acknowledgedAt\": \"2026-08-07T00:00:00.000Z\",\n  \"idempotencyKey\": \"\",\n  \"version\": 1,\n  \"evaluation\": {\n    \"ruleVersion\": \"\",\n    \"overallFlag\": {},\n    \"isFlagged\": true,\n    \"flagSummary\": \"\",\n    \"reasons\": [\n      {\n        \"flag\": {},\n        \"reason\": \"\"\n      }\n    ]\n  },\n  \"createdAt\": \"2026-08-07T00:00:00.000Z\",\n  \"updatedAt\": \"2026-08-07T00:00:00.000Z\"\n}"
+          "body": "{\n  \"resultId\": \"00000000-0000-4000-8000-000000000000\",\n  \"registrationId\": \"00000000-0000-4000-8000-000000000000\",\n  \"stationId\": \"00000000-0000-4000-8000-000000000000\",\n  \"screeningType\": \"\",\n  \"resultData\": {},\n  \"overallFlag\": \"NORMAL\",\n  \"isFlagged\": true,\n  \"flagSummary\": \"\",\n  \"ruleVersion\": \"\",\n  \"acknowledgedAt\": \"2026-08-07T00:00:00.000Z\",\n  \"idempotencyKey\": \"\",\n  \"version\": 1,\n  \"evaluation\": {\n    \"ruleVersion\": \"\",\n    \"overallFlag\": {},\n    \"isFlagged\": true,\n    \"flagSummary\": \"\",\n    \"reasons\": [\n      {\n        \"flag\": {},\n        \"reason\": \"\"\n      }\n    ]\n  },\n  \"routeProgression\": {\n    \"status\": \"ADDED_TO_QUEUE\",\n    \"routeVersion\": 1,\n    \"completedStation\": {\n      \"stationId\": \"00000000-0000-4000-8000-000000000000\",\n      \"stationName\": \"\",\n      \"stationType\": \"\"\n    },\n    \"nextStation\": {},\n    \"nextQueue\": {\n      \"stationId\": \"00000000-0000-4000-8000-000000000000\",\n      \"stationName\": \"\",\n      \"stationType\": \"\",\n      \"queueNumber\": 0,\n      \"status\": \"WAITING\"\n    }\n  },\n  \"createdAt\": \"2026-08-07T00:00:00.000Z\",\n  \"updatedAt\": \"2026-08-07T00:00:00.000Z\"\n}"
         },
         {
           "name": "201 Response",
@@ -7212,7 +7212,7 @@
               "value": "application/json"
             }
           ],
-          "body": "{\n  \"resultId\": \"00000000-0000-4000-8000-000000000000\",\n  \"registrationId\": \"00000000-0000-4000-8000-000000000000\",\n  \"stationId\": \"00000000-0000-4000-8000-000000000000\",\n  \"screeningType\": \"\",\n  \"resultData\": {},\n  \"overallFlag\": \"NORMAL\",\n  \"isFlagged\": true,\n  \"flagSummary\": \"\",\n  \"ruleVersion\": \"\",\n  \"acknowledgedAt\": \"2026-08-07T00:00:00.000Z\",\n  \"idempotencyKey\": \"\",\n  \"version\": 1,\n  \"evaluation\": {\n    \"ruleVersion\": \"\",\n    \"overallFlag\": {},\n    \"isFlagged\": true,\n    \"flagSummary\": \"\",\n    \"reasons\": [\n      {\n        \"flag\": {},\n        \"reason\": \"\"\n      }\n    ]\n  },\n  \"createdAt\": \"2026-08-07T00:00:00.000Z\",\n  \"updatedAt\": \"2026-08-07T00:00:00.000Z\"\n}"
+          "body": "{\n  \"resultId\": \"00000000-0000-4000-8000-000000000000\",\n  \"registrationId\": \"00000000-0000-4000-8000-000000000000\",\n  \"stationId\": \"00000000-0000-4000-8000-000000000000\",\n  \"screeningType\": \"\",\n  \"resultData\": {},\n  \"overallFlag\": \"NORMAL\",\n  \"isFlagged\": true,\n  \"flagSummary\": \"\",\n  \"ruleVersion\": \"\",\n  \"acknowledgedAt\": \"2026-08-07T00:00:00.000Z\",\n  \"idempotencyKey\": \"\",\n  \"version\": 1,\n  \"evaluation\": {\n    \"ruleVersion\": \"\",\n    \"overallFlag\": {},\n    \"isFlagged\": true,\n    \"flagSummary\": \"\",\n    \"reasons\": [\n      {\n        \"flag\": {},\n        \"reason\": \"\"\n      }\n    ]\n  },\n  \"routeProgression\": {\n    \"status\": \"ADDED_TO_QUEUE\",\n    \"routeVersion\": 1,\n    \"completedStation\": {\n      \"stationId\": \"00000000-0000-4000-8000-000000000000\",\n      \"stationName\": \"\",\n      \"stationType\": \"\"\n    },\n    \"nextStation\": {},\n    \"nextQueue\": {\n      \"stationId\": \"00000000-0000-4000-8000-000000000000\",\n      \"stationName\": \"\",\n      \"stationType\": \"\",\n      \"queueNumber\": 0,\n      \"status\": \"WAITING\"\n    }\n  },\n  \"createdAt\": \"2026-08-07T00:00:00.000Z\",\n  \"updatedAt\": \"2026-08-07T00:00:00.000Z\"\n}"
         },
         {
           "name": "401 Response",
@@ -9878,7 +9878,7 @@
               "value": "application/json"
             }
           ],
-          "body": "{\n  \"registrationId\": \"00000000-0000-4000-8000-000000000000\",\n  \"participantReference\": \"\",\n  \"queueNumber\": 0,\n  \"status\": \"SIGNED_UP\",\n  \"registration\": {\n    \"id\": \"00000000-0000-4000-8000-000000000000\",\n    \"registrationId\": \"00000000-0000-4000-8000-000000000000\",\n    \"eventId\": \"00000000-0000-4000-8000-000000000000\",\n    \"participantId\": \"00000000-0000-4000-8000-000000000000\",\n    \"registrationStatus\": {},\n    \"participantDisplayName\": \"\",\n    \"queueNumber\": 0,\n    \"idempotencyKey\": \"\",\n    \"checkedIn\": true,\n    \"checkedInAt\": \"2026-08-07T00:00:00.000Z\",\n    \"createdAt\": \"2026-08-07T00:00:00.000Z\",\n    \"updatedAt\": \"2026-08-07T00:00:00.000Z\"\n  },\n  \"idempotentReplay\": true\n}"
+          "body": "{\n  \"registrationId\": \"00000000-0000-4000-8000-000000000000\",\n  \"participantReference\": \"\",\n  \"queueNumber\": 0,\n  \"status\": \"SIGNED_UP\",\n  \"registration\": {\n    \"id\": \"00000000-0000-4000-8000-000000000000\",\n    \"registrationId\": \"00000000-0000-4000-8000-000000000000\",\n    \"eventId\": \"00000000-0000-4000-8000-000000000000\",\n    \"participantId\": \"00000000-0000-4000-8000-000000000000\",\n    \"registrationStatus\": {},\n    \"participantDisplayName\": \"\",\n    \"queueNumber\": 0,\n    \"idempotencyKey\": \"\",\n    \"checkedIn\": true,\n    \"checkedInAt\": \"2026-08-07T00:00:00.000Z\",\n    \"createdAt\": \"2026-08-07T00:00:00.000Z\",\n    \"updatedAt\": \"2026-08-07T00:00:00.000Z\"\n  },\n  \"route\": {\n    \"status\": \"PENDING_CHECK_IN\",\n    \"routeVersion\": 1,\n    \"steps\": [\n      {\n        \"stationId\": \"00000000-0000-4000-8000-000000000000\",\n        \"stationName\": \"\",\n        \"stationType\": \"\",\n        \"position\": 1,\n        \"state\": \"COMPLETED\"\n      }\n    ],\n    \"currentStation\": {},\n    \"queue\": {\n      \"queueEntryId\": \"00000000-0000-4000-8000-000000000000\",\n      \"stationId\": \"00000000-0000-4000-8000-000000000000\",\n      \"queueNumber\": 1,\n      \"status\": \"WAITING\"\n    }\n  },\n  \"securePass\": {\n    \"qrId\": \"00000000-0000-4000-8000-000000000000\",\n    \"registrationId\": \"00000000-0000-4000-8000-000000000000\",\n    \"issuedAt\": \"2026-08-07T00:00:00.000Z\",\n    \"expiresAt\": \"2026-08-07T00:00:00.000Z\",\n    \"qrImage\": \"\"\n  },\n  \"idempotentReplay\": true\n}"
         },
         {
           "name": "201 Response",
@@ -9908,7 +9908,7 @@
               "value": "application/json"
             }
           ],
-          "body": "{\n  \"registrationId\": \"00000000-0000-4000-8000-000000000000\",\n  \"participantReference\": \"\",\n  \"queueNumber\": 0,\n  \"status\": \"SIGNED_UP\",\n  \"registration\": {\n    \"id\": \"00000000-0000-4000-8000-000000000000\",\n    \"registrationId\": \"00000000-0000-4000-8000-000000000000\",\n    \"eventId\": \"00000000-0000-4000-8000-000000000000\",\n    \"participantId\": \"00000000-0000-4000-8000-000000000000\",\n    \"registrationStatus\": {},\n    \"participantDisplayName\": \"\",\n    \"queueNumber\": 0,\n    \"idempotencyKey\": \"\",\n    \"checkedIn\": true,\n    \"checkedInAt\": \"2026-08-07T00:00:00.000Z\",\n    \"createdAt\": \"2026-08-07T00:00:00.000Z\",\n    \"updatedAt\": \"2026-08-07T00:00:00.000Z\"\n  },\n  \"idempotentReplay\": true\n}"
+          "body": "{\n  \"registrationId\": \"00000000-0000-4000-8000-000000000000\",\n  \"participantReference\": \"\",\n  \"queueNumber\": 0,\n  \"status\": \"SIGNED_UP\",\n  \"registration\": {\n    \"id\": \"00000000-0000-4000-8000-000000000000\",\n    \"registrationId\": \"00000000-0000-4000-8000-000000000000\",\n    \"eventId\": \"00000000-0000-4000-8000-000000000000\",\n    \"participantId\": \"00000000-0000-4000-8000-000000000000\",\n    \"registrationStatus\": {},\n    \"participantDisplayName\": \"\",\n    \"queueNumber\": 0,\n    \"idempotencyKey\": \"\",\n    \"checkedIn\": true,\n    \"checkedInAt\": \"2026-08-07T00:00:00.000Z\",\n    \"createdAt\": \"2026-08-07T00:00:00.000Z\",\n    \"updatedAt\": \"2026-08-07T00:00:00.000Z\"\n  },\n  \"route\": {\n    \"status\": \"PENDING_CHECK_IN\",\n    \"routeVersion\": 1,\n    \"steps\": [\n      {\n        \"stationId\": \"00000000-0000-4000-8000-000000000000\",\n        \"stationName\": \"\",\n        \"stationType\": \"\",\n        \"position\": 1,\n        \"state\": \"COMPLETED\"\n      }\n    ],\n    \"currentStation\": {},\n    \"queue\": {\n      \"queueEntryId\": \"00000000-0000-4000-8000-000000000000\",\n      \"stationId\": \"00000000-0000-4000-8000-000000000000\",\n      \"queueNumber\": 1,\n      \"status\": \"WAITING\"\n    }\n  },\n  \"securePass\": {\n    \"qrId\": \"00000000-0000-4000-8000-000000000000\",\n    \"registrationId\": \"00000000-0000-4000-8000-000000000000\",\n    \"issuedAt\": \"2026-08-07T00:00:00.000Z\",\n    \"expiresAt\": \"2026-08-07T00:00:00.000Z\",\n    \"qrImage\": \"\"\n  },\n  \"idempotentReplay\": true\n}"
         },
         {
           "name": "400 Response",
@@ -9987,7 +9987,7 @@
               "value": "application/json"
             }
           ],
-          "body": "{\n  \"registrationId\": \"00000000-0000-4000-8000-000000000000\",\n  \"participantReference\": \"\",\n  \"queueNumber\": 0,\n  \"status\": \"SIGNED_UP\",\n  \"registration\": {\n    \"id\": \"00000000-0000-4000-8000-000000000000\",\n    \"registrationId\": \"00000000-0000-4000-8000-000000000000\",\n    \"eventId\": \"00000000-0000-4000-8000-000000000000\",\n    \"participantId\": \"00000000-0000-4000-8000-000000000000\",\n    \"registrationStatus\": {},\n    \"participantDisplayName\": \"\",\n    \"queueNumber\": 0,\n    \"idempotencyKey\": \"\",\n    \"checkedIn\": true,\n    \"checkedInAt\": \"2026-08-07T00:00:00.000Z\",\n    \"createdAt\": \"2026-08-07T00:00:00.000Z\",\n    \"updatedAt\": \"2026-08-07T00:00:00.000Z\"\n  },\n  \"idempotentReplay\": true\n}"
+          "body": "{\n  \"registrationId\": \"00000000-0000-4000-8000-000000000000\",\n  \"participantReference\": \"\",\n  \"queueNumber\": 0,\n  \"status\": \"SIGNED_UP\",\n  \"registration\": {\n    \"id\": \"00000000-0000-4000-8000-000000000000\",\n    \"registrationId\": \"00000000-0000-4000-8000-000000000000\",\n    \"eventId\": \"00000000-0000-4000-8000-000000000000\",\n    \"participantId\": \"00000000-0000-4000-8000-000000000000\",\n    \"registrationStatus\": {},\n    \"participantDisplayName\": \"\",\n    \"queueNumber\": 0,\n    \"idempotencyKey\": \"\",\n    \"checkedIn\": true,\n    \"checkedInAt\": \"2026-08-07T00:00:00.000Z\",\n    \"createdAt\": \"2026-08-07T00:00:00.000Z\",\n    \"updatedAt\": \"2026-08-07T00:00:00.000Z\"\n  },\n  \"route\": {\n    \"status\": \"PENDING_CHECK_IN\",\n    \"routeVersion\": 1,\n    \"steps\": [\n      {\n        \"stationId\": \"00000000-0000-4000-8000-000000000000\",\n        \"stationName\": \"\",\n        \"stationType\": \"\",\n        \"position\": 1,\n        \"state\": \"COMPLETED\"\n      }\n    ],\n    \"currentStation\": {},\n    \"queue\": {\n      \"queueEntryId\": \"00000000-0000-4000-8000-000000000000\",\n      \"stationId\": \"00000000-0000-4000-8000-000000000000\",\n      \"queueNumber\": 1,\n      \"status\": \"WAITING\"\n    }\n  },\n  \"securePass\": {\n    \"qrId\": \"00000000-0000-4000-8000-000000000000\",\n    \"registrationId\": \"00000000-0000-4000-8000-000000000000\",\n    \"issuedAt\": \"2026-08-07T00:00:00.000Z\",\n    \"expiresAt\": \"2026-08-07T00:00:00.000Z\",\n    \"qrImage\": \"\"\n  },\n  \"idempotentReplay\": true\n}"
         },
         {
           "name": "401 Response",
@@ -10178,7 +10178,7 @@
               "value": "application/json"
             }
           ],
-          "body": "{\n  \"registrationId\": \"00000000-0000-4000-8000-000000000000\",\n  \"participantReference\": \"\",\n  \"queueNumber\": 0,\n  \"status\": \"SIGNED_UP\",\n  \"registration\": {\n    \"id\": \"00000000-0000-4000-8000-000000000000\",\n    \"registrationId\": \"00000000-0000-4000-8000-000000000000\",\n    \"eventId\": \"00000000-0000-4000-8000-000000000000\",\n    \"participantId\": \"00000000-0000-4000-8000-000000000000\",\n    \"registrationStatus\": {},\n    \"participantDisplayName\": \"\",\n    \"queueNumber\": 0,\n    \"idempotencyKey\": \"\",\n    \"checkedIn\": true,\n    \"checkedInAt\": \"2026-08-07T00:00:00.000Z\",\n    \"createdAt\": \"2026-08-07T00:00:00.000Z\",\n    \"updatedAt\": \"2026-08-07T00:00:00.000Z\"\n  },\n  \"idempotentReplay\": true\n}"
+          "body": "{\n  \"registrationId\": \"00000000-0000-4000-8000-000000000000\",\n  \"participantReference\": \"\",\n  \"queueNumber\": 0,\n  \"status\": \"SIGNED_UP\",\n  \"registration\": {\n    \"id\": \"00000000-0000-4000-8000-000000000000\",\n    \"registrationId\": \"00000000-0000-4000-8000-000000000000\",\n    \"eventId\": \"00000000-0000-4000-8000-000000000000\",\n    \"participantId\": \"00000000-0000-4000-8000-000000000000\",\n    \"registrationStatus\": {},\n    \"participantDisplayName\": \"\",\n    \"queueNumber\": 0,\n    \"idempotencyKey\": \"\",\n    \"checkedIn\": true,\n    \"checkedInAt\": \"2026-08-07T00:00:00.000Z\",\n    \"createdAt\": \"2026-08-07T00:00:00.000Z\",\n    \"updatedAt\": \"2026-08-07T00:00:00.000Z\"\n  },\n  \"route\": {\n    \"status\": \"PENDING_CHECK_IN\",\n    \"routeVersion\": 1,\n    \"steps\": [\n      {\n        \"stationId\": \"00000000-0000-4000-8000-000000000000\",\n        \"stationName\": \"\",\n        \"stationType\": \"\",\n        \"position\": 1,\n        \"state\": \"COMPLETED\"\n      }\n    ],\n    \"currentStation\": {},\n    \"queue\": {\n      \"queueEntryId\": \"00000000-0000-4000-8000-000000000000\",\n      \"stationId\": \"00000000-0000-4000-8000-000000000000\",\n      \"queueNumber\": 1,\n      \"status\": \"WAITING\"\n    }\n  },\n  \"securePass\": {\n    \"qrId\": \"00000000-0000-4000-8000-000000000000\",\n    \"registrationId\": \"00000000-0000-4000-8000-000000000000\",\n    \"issuedAt\": \"2026-08-07T00:00:00.000Z\",\n    \"expiresAt\": \"2026-08-07T00:00:00.000Z\",\n    \"qrImage\": \"\"\n  },\n  \"idempotentReplay\": true\n}"
         },
         {
           "name": "400 Response",
@@ -12326,7 +12326,7 @@
               "value": "application/json"
             }
           ],
-          "body": "{\n  \"success\": true,\n  \"message\": \"\",\n  \"data\": {\n    \"registrationId\": \"00000000-0000-4000-8000-000000000000\",\n    \"eventId\": \"00000000-0000-4000-8000-000000000000\",\n    \"registrationStatus\": \"SIGNED_UP\",\n    \"checkedIn\": true,\n    \"checkedInAt\": \"2026-08-07T00:00:00.000Z\",\n    \"queueNumber\": 0\n  }\n}"
+          "body": "{\n  \"success\": true,\n  \"message\": \"\",\n  \"data\": {\n    \"registrationId\": \"00000000-0000-4000-8000-000000000000\",\n    \"eventId\": \"00000000-0000-4000-8000-000000000000\",\n    \"registrationStatus\": \"SIGNED_UP\",\n    \"checkedIn\": true,\n    \"checkedInAt\": \"2026-08-07T00:00:00.000Z\",\n    \"queueNumber\": 0,\n    \"route\": {\n      \"status\": \"PENDING_CHECK_IN\",\n      \"routeVersion\": 1,\n      \"steps\": [\n        {\n          \"stationId\": \"00000000-0000-4000-8000-000000000000\",\n          \"stationName\": \"\",\n          \"stationType\": \"\",\n          \"position\": 1,\n          \"state\": \"COMPLETED\"\n        }\n      ],\n      \"currentStation\": {},\n      \"queue\": {\n        \"queueEntryId\": \"00000000-0000-4000-8000-000000000000\",\n        \"stationId\": \"00000000-0000-4000-8000-000000000000\",\n        \"queueNumber\": 1,\n        \"status\": \"WAITING\"\n      }\n    }\n  }\n}"
         },
         {
           "name": "400 Response",
@@ -12424,7 +12424,7 @@
               "value": "application/json"
             }
           ],
-          "body": "{\n  \"success\": true,\n  \"data\": {\n    \"valid\": true,\n    \"eventName\": \"\",\n    \"currentQueueNumber\": 0,\n    \"queueNumber\": 0,\n    \"registrationStatus\": \"SIGNED_UP\",\n    \"queueState\": {\n      \"status\": \"WAITING\",\n      \"queueNumber\": 0,\n      \"isPriority\": true,\n      \"station\": {\n        \"id\": \"00000000-0000-4000-8000-000000000000\",\n        \"name\": \"\",\n        \"type\": \"\"\n      },\n      \"enteredAt\": \"2026-08-07T00:00:00.000Z\",\n      \"calledAt\": \"2026-08-07T00:00:00.000Z\",\n      \"startedAt\": \"2026-08-07T00:00:00.000Z\",\n      \"completedAt\": \"2026-08-07T00:00:00.000Z\"\n    },\n    \"aheadAtStation\": 0,\n    \"stations\": [\n      {\n        \"stationId\": \"00000000-0000-4000-8000-000000000000\",\n        \"stationName\": \"\",\n        \"stationType\": \"\",\n        \"stationOrder\": 0,\n        \"status\": \"AVAILABLE\",\n        \"activeQueueCount\": 0,\n        \"capacity\": 1,\n        \"occupancyPercent\": 0,\n        \"selectable\": true,\n        \"workload\": {\n          \"WAITING\": 0,\n          \"CALLED\": 0,\n          \"IN_PROGRESS\": 0,\n          \"COMPLETED\": 0,\n          \"SKIPPED\": 0,\n          \"CANCELLED\": 0\n        },\n        \"nextUp\": {\n          \"queueNumber\": 0\n        }\n      }\n    ],\n    \"transfers\": [\n      {\n        \"fromStation\": \"\",\n        \"toStation\": \"\",\n        \"at\": \"2026-08-07T00:00:00.000Z\"\n      }\n    ],\n    \"expiresAt\": \"2026-08-07T00:00:00.000Z\"\n  }\n}"
+          "body": "{\n  \"success\": true,\n  \"data\": {\n    \"valid\": true,\n    \"eventName\": \"\",\n    \"queueNumber\": 0,\n    \"registrationStatus\": \"SIGNED_UP\",\n    \"queueState\": {\n      \"status\": \"WAITING\",\n      \"queueNumber\": 0,\n      \"station\": {\n        \"name\": \"\",\n        \"type\": \"\"\n      }\n    },\n    \"route\": [\n      {\n        \"stationName\": \"\",\n        \"stationType\": \"\",\n        \"state\": \"COMPLETED\"\n      }\n    ],\n    \"expiresAt\": \"2026-08-07T00:00:00.000Z\"\n  }\n}"
         },
         {
           "name": "400 Response",
@@ -14037,278 +14037,6 @@
       ]
     },
     {
-      "name": "Assign a registered participant to a station queue",
-      "description": "",
-      "event": [],
-      "request": {
-        "method": "POST",
-        "header": [
-          {
-            "key": "Content-Type",
-            "value": "application/json",
-            "description": "JSON request body",
-            "type": "text"
-          },
-          {
-            "key": "Idempotency-Key",
-            "value": "",
-            "description": "",
-            "type": "text"
-          }
-        ],
-        "auth": {
-          "type": "bearer",
-          "bearer": [
-            {
-              "key": "token",
-              "value": "{{token}}",
-              "type": "string"
-            }
-          ]
-        },
-        "url": {
-          "raw": "{{baseUrl}}/queues/events/{eventId}/stations/{stationId}/handoff",
-          "host": [
-            "{{baseUrl}}"
-          ],
-          "path": [
-            "queues",
-            "events",
-            "{eventId}",
-            "stations",
-            "{stationId}",
-            "handoff"
-          ],
-          "query": []
-        },
-        "body": {
-          "mode": "raw",
-          "raw": "{\n  \"registrationId\": \"00000000-0000-4000-8000-000000000000\"\n}",
-          "options": {
-            "raw": {
-              "language": "json"
-            }
-          }
-        }
-      },
-      "response": [
-        {
-          "name": "200 Response",
-          "originalRequest": {
-            "method": "POST",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json",
-                "description": "JSON request body",
-                "type": "text"
-              },
-              {
-                "key": "Idempotency-Key",
-                "value": "",
-                "description": "",
-                "type": "text"
-              }
-            ],
-            "url": "{{baseUrl}}/queues/events/{eventId}/stations/{stationId}/handoff"
-          },
-          "status": "OK",
-          "code": 200,
-          "header": [
-            {
-              "key": "Content-Type",
-              "value": "application/json"
-            }
-          ],
-          "body": "{\n  \"created\": true,\n  \"registrationId\": \"00000000-0000-4000-8000-000000000000\",\n  \"queueEntryId\": \"00000000-0000-4000-8000-000000000000\",\n  \"participant\": {\n    \"id\": \"00000000-0000-4000-8000-000000000000\",\n    \"participantReference\": \"\",\n    \"name\": \"\"\n  },\n  \"event\": {\n    \"id\": \"00000000-0000-4000-8000-000000000000\",\n    \"name\": \"\"\n  },\n  \"queueNumber\": 0,\n  \"nextStation\": \"\",\n  \"assignedStation\": {\n    \"id\": \"00000000-0000-4000-8000-000000000000\",\n    \"name\": \"\",\n    \"status\": \"BUSY\",\n    \"statusBeforeHandoff\": \"AVAILABLE\"\n  }\n}"
-        },
-        {
-          "name": "201 Response",
-          "originalRequest": {
-            "method": "POST",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json",
-                "description": "JSON request body",
-                "type": "text"
-              },
-              {
-                "key": "Idempotency-Key",
-                "value": "",
-                "description": "",
-                "type": "text"
-              }
-            ],
-            "url": "{{baseUrl}}/queues/events/{eventId}/stations/{stationId}/handoff"
-          },
-          "status": "Created",
-          "code": 201,
-          "header": [
-            {
-              "key": "Content-Type",
-              "value": "application/json"
-            }
-          ],
-          "body": "{\n  \"created\": true,\n  \"registrationId\": \"00000000-0000-4000-8000-000000000000\",\n  \"queueEntryId\": \"00000000-0000-4000-8000-000000000000\",\n  \"participant\": {\n    \"id\": \"00000000-0000-4000-8000-000000000000\",\n    \"participantReference\": \"\",\n    \"name\": \"\"\n  },\n  \"event\": {\n    \"id\": \"00000000-0000-4000-8000-000000000000\",\n    \"name\": \"\"\n  },\n  \"queueNumber\": 0,\n  \"nextStation\": \"\",\n  \"assignedStation\": {\n    \"id\": \"00000000-0000-4000-8000-000000000000\",\n    \"name\": \"\",\n    \"status\": \"BUSY\",\n    \"statusBeforeHandoff\": \"AVAILABLE\"\n  }\n}"
-        },
-        {
-          "name": "401 Response",
-          "originalRequest": {
-            "method": "POST",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json",
-                "description": "JSON request body",
-                "type": "text"
-              },
-              {
-                "key": "Idempotency-Key",
-                "value": "",
-                "description": "",
-                "type": "text"
-              }
-            ],
-            "url": "{{baseUrl}}/queues/events/{eventId}/stations/{stationId}/handoff"
-          },
-          "status": "Unauthorized",
-          "code": 401,
-          "header": [
-            {
-              "key": "Content-Type",
-              "value": "application/json"
-            }
-          ],
-          "body": "{\n  \"type\": \"\",\n  \"title\": \"\",\n  \"status\": 0,\n  \"code\": \"\",\n  \"requestId\": \"00000000-0000-4000-8000-000000000000\",\n  \"errors\": [\n    {\n      \"field\": \"\",\n      \"message\": \"\"\n    }\n  ]\n}"
-        }
-      ]
-    },
-    {
-      "name": "Join a participant into a station queue",
-      "description": "",
-      "event": [],
-      "request": {
-        "method": "POST",
-        "header": [
-          {
-            "key": "Content-Type",
-            "value": "application/json",
-            "description": "JSON request body",
-            "type": "text"
-          }
-        ],
-        "auth": {
-          "type": "bearer",
-          "bearer": [
-            {
-              "key": "token",
-              "value": "{{token}}",
-              "type": "string"
-            }
-          ]
-        },
-        "url": {
-          "raw": "{{baseUrl}}/queues/events/{eventId}/stations/{stationId}/join",
-          "host": [
-            "{{baseUrl}}"
-          ],
-          "path": [
-            "queues",
-            "events",
-            "{eventId}",
-            "stations",
-            "{stationId}",
-            "join"
-          ],
-          "query": []
-        },
-        "body": {
-          "mode": "raw",
-          "raw": "{\n  \"registrationId\": \"00000000-0000-4000-8000-000000000000\"\n}",
-          "options": {
-            "raw": {
-              "language": "json"
-            }
-          }
-        }
-      },
-      "response": [
-        {
-          "name": "200 Response",
-          "originalRequest": {
-            "method": "POST",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json",
-                "description": "JSON request body",
-                "type": "text"
-              }
-            ],
-            "url": "{{baseUrl}}/queues/events/{eventId}/stations/{stationId}/join"
-          },
-          "status": "OK",
-          "code": 200,
-          "header": [
-            {
-              "key": "Content-Type",
-              "value": "application/json"
-            }
-          ],
-          "body": "{\n  \"queueEntry\": {\n    \"id\": \"00000000-0000-4000-8000-000000000000\",\n    \"registrationId\": \"00000000-0000-4000-8000-000000000000\",\n    \"stationId\": \"00000000-0000-4000-8000-000000000000\",\n    \"queueNumber\": 0,\n    \"status\": \"WAITING\",\n    \"isPriority\": false,\n    \"priorityNotes\": \"\",\n    \"enteredAt\": \"2026-08-07T00:00:00.000Z\",\n    \"calledAt\": \"2026-08-07T00:00:00.000Z\",\n    \"startedAt\": \"2026-08-07T00:00:00.000Z\",\n    \"leftQueueAt\": \"2026-08-07T00:00:00.000Z\",\n    \"completedAt\": \"2026-08-07T00:00:00.000Z\"\n  },\n  \"created\": true\n}"
-        },
-        {
-          "name": "201 Response",
-          "originalRequest": {
-            "method": "POST",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json",
-                "description": "JSON request body",
-                "type": "text"
-              }
-            ],
-            "url": "{{baseUrl}}/queues/events/{eventId}/stations/{stationId}/join"
-          },
-          "status": "Created",
-          "code": 201,
-          "header": [
-            {
-              "key": "Content-Type",
-              "value": "application/json"
-            }
-          ],
-          "body": "{\n  \"queueEntry\": {\n    \"id\": \"00000000-0000-4000-8000-000000000000\",\n    \"registrationId\": \"00000000-0000-4000-8000-000000000000\",\n    \"stationId\": \"00000000-0000-4000-8000-000000000000\",\n    \"queueNumber\": 0,\n    \"status\": \"WAITING\",\n    \"isPriority\": false,\n    \"priorityNotes\": \"\",\n    \"enteredAt\": \"2026-08-07T00:00:00.000Z\",\n    \"calledAt\": \"2026-08-07T00:00:00.000Z\",\n    \"startedAt\": \"2026-08-07T00:00:00.000Z\",\n    \"leftQueueAt\": \"2026-08-07T00:00:00.000Z\",\n    \"completedAt\": \"2026-08-07T00:00:00.000Z\"\n  },\n  \"created\": true\n}"
-        },
-        {
-          "name": "401 Response",
-          "originalRequest": {
-            "method": "POST",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json",
-                "description": "JSON request body",
-                "type": "text"
-              }
-            ],
-            "url": "{{baseUrl}}/queues/events/{eventId}/stations/{stationId}/join"
-          },
-          "status": "Unauthorized",
-          "code": 401,
-          "header": [
-            {
-              "key": "Content-Type",
-              "value": "application/json"
-            }
-          ],
-          "body": "{\n  \"type\": \"\",\n  \"title\": \"\",\n  \"status\": 0,\n  \"code\": \"\",\n  \"requestId\": \"00000000-0000-4000-8000-000000000000\",\n  \"errors\": [\n    {\n      \"field\": \"\",\n      \"message\": \"\"\n    }\n  ]\n}"
-        }
-      ]
-    },
-    {
       "name": "Participant queue status and movement history in an explicit event scope",
       "description": "",
       "event": [],
@@ -14381,6 +14109,217 @@
             "method": "GET",
             "header": [],
             "url": "{{baseUrl}}/queues/events/{eventId}/participants/{registrationId}"
+          },
+          "status": "Forbidden",
+          "code": 403,
+          "header": [
+            {
+              "key": "Content-Type",
+              "value": "application/json"
+            }
+          ],
+          "body": "{\n  \"type\": \"\",\n  \"title\": \"\",\n  \"status\": 0,\n  \"code\": \"\",\n  \"requestId\": \"00000000-0000-4000-8000-000000000000\",\n  \"errors\": [\n    {\n      \"field\": \"\",\n      \"message\": \"\"\n    }\n  ]\n}"
+        }
+      ]
+    },
+    {
+      "name": "Read the participant route for an authorized route editor",
+      "description": "",
+      "event": [],
+      "request": {
+        "method": "GET",
+        "header": [],
+        "auth": {
+          "type": "bearer",
+          "bearer": [
+            {
+              "key": "token",
+              "value": "{{token}}",
+              "type": "string"
+            }
+          ]
+        },
+        "url": {
+          "raw": "{{baseUrl}}/queues/events/{eventId}/participants/{registrationId}/route",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "queues",
+            "events",
+            "{eventId}",
+            "participants",
+            "{registrationId}",
+            "route"
+          ],
+          "query": []
+        }
+      },
+      "response": [
+        {
+          "name": "200 Response",
+          "originalRequest": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/queues/events/{eventId}/participants/{registrationId}/route"
+          },
+          "status": "OK",
+          "code": 200,
+          "header": [
+            {
+              "key": "Content-Type",
+              "value": "application/json"
+            }
+          ],
+          "body": "{\n  \"status\": \"success\",\n  \"data\": {\n    \"status\": \"PENDING_CHECK_IN\",\n    \"routeVersion\": 1,\n    \"steps\": [\n      {\n        \"stationId\": \"00000000-0000-4000-8000-000000000000\",\n        \"stationName\": \"\",\n        \"stationType\": \"\",\n        \"position\": 1,\n        \"state\": \"COMPLETED\"\n      }\n    ],\n    \"currentStation\": {},\n    \"queue\": {\n      \"queueEntryId\": \"00000000-0000-4000-8000-000000000000\",\n      \"stationId\": \"00000000-0000-4000-8000-000000000000\",\n      \"queueNumber\": 1,\n      \"status\": \"WAITING\"\n    }\n  }\n}"
+        },
+        {
+          "name": "401 Response",
+          "originalRequest": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/queues/events/{eventId}/participants/{registrationId}/route"
+          },
+          "status": "Unauthorized",
+          "code": 401,
+          "header": [
+            {
+              "key": "Content-Type",
+              "value": "application/json"
+            }
+          ],
+          "body": "{\n  \"type\": \"\",\n  \"title\": \"\",\n  \"status\": 0,\n  \"code\": \"\",\n  \"requestId\": \"00000000-0000-4000-8000-000000000000\",\n  \"errors\": [\n    {\n      \"field\": \"\",\n      \"message\": \"\"\n    }\n  ]\n}"
+        },
+        {
+          "name": "403 Response",
+          "originalRequest": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/queues/events/{eventId}/participants/{registrationId}/route"
+          },
+          "status": "Forbidden",
+          "code": 403,
+          "header": [
+            {
+              "key": "Content-Type",
+              "value": "application/json"
+            }
+          ],
+          "body": "{\n  \"type\": \"\",\n  \"title\": \"\",\n  \"status\": 0,\n  \"code\": \"\",\n  \"requestId\": \"00000000-0000-4000-8000-000000000000\",\n  \"errors\": [\n    {\n      \"field\": \"\",\n      \"message\": \"\"\n    }\n  ]\n}"
+        }
+      ]
+    },
+    {
+      "name": "Replace an authorized portion of a participant's unfinished screening route",
+      "description": "Event managers and administrators may reorder the full unfinished tail. On-duty registration officers and screeners may select only the next unfinished station; the server preserves the relative order of the remainder. Completed and active steps are immutable.",
+      "event": [],
+      "request": {
+        "method": "PATCH",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json",
+            "description": "JSON request body",
+            "type": "text"
+          }
+        ],
+        "auth": {
+          "type": "bearer",
+          "bearer": [
+            {
+              "key": "token",
+              "value": "{{token}}",
+              "type": "string"
+            }
+          ]
+        },
+        "url": {
+          "raw": "{{baseUrl}}/queues/events/{eventId}/participants/{registrationId}/route",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "queues",
+            "events",
+            "{eventId}",
+            "participants",
+            "{registrationId}",
+            "route"
+          ],
+          "query": []
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"stationIds\": [\n    \"00000000-0000-4000-8000-000000000000\"\n  ],\n  \"reasonCode\": \"STATION_UNAVAILABLE\",\n  \"expectedVersion\": 1\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "response": [
+        {
+          "name": "200 Response",
+          "originalRequest": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "description": "JSON request body",
+                "type": "text"
+              }
+            ],
+            "url": "{{baseUrl}}/queues/events/{eventId}/participants/{registrationId}/route"
+          },
+          "status": "OK",
+          "code": 200,
+          "header": [
+            {
+              "key": "Content-Type",
+              "value": "application/json"
+            }
+          ],
+          "body": "{\n  \"status\": \"success\",\n  \"data\": {\n    \"status\": \"PENDING_CHECK_IN\",\n    \"routeVersion\": 1,\n    \"steps\": [\n      {\n        \"stationId\": \"00000000-0000-4000-8000-000000000000\",\n        \"stationName\": \"\",\n        \"stationType\": \"\",\n        \"position\": 1,\n        \"state\": \"COMPLETED\"\n      }\n    ],\n    \"currentStation\": {},\n    \"queue\": {\n      \"queueEntryId\": \"00000000-0000-4000-8000-000000000000\",\n      \"stationId\": \"00000000-0000-4000-8000-000000000000\",\n      \"queueNumber\": 1,\n      \"status\": \"WAITING\"\n    }\n  }\n}"
+        },
+        {
+          "name": "401 Response",
+          "originalRequest": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "description": "JSON request body",
+                "type": "text"
+              }
+            ],
+            "url": "{{baseUrl}}/queues/events/{eventId}/participants/{registrationId}/route"
+          },
+          "status": "Unauthorized",
+          "code": 401,
+          "header": [
+            {
+              "key": "Content-Type",
+              "value": "application/json"
+            }
+          ],
+          "body": "{\n  \"type\": \"\",\n  \"title\": \"\",\n  \"status\": 0,\n  \"code\": \"\",\n  \"requestId\": \"00000000-0000-4000-8000-000000000000\",\n  \"errors\": [\n    {\n      \"field\": \"\",\n      \"message\": \"\"\n    }\n  ]\n}"
+        },
+        {
+          "name": "403 Response",
+          "originalRequest": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "description": "JSON request body",
+                "type": "text"
+              }
+            ],
+            "url": "{{baseUrl}}/queues/events/{eventId}/participants/{registrationId}/route"
           },
           "status": "Forbidden",
           "code": 403,
@@ -14639,241 +14578,6 @@
             "method": "PATCH",
             "header": [],
             "url": "{{baseUrl}}/queues/events/{eventId}/entries/{queueId}/start"
-          },
-          "status": "Not Found",
-          "code": 404,
-          "header": [
-            {
-              "key": "Content-Type",
-              "value": "application/json"
-            }
-          ],
-          "body": "{\n  \"type\": \"\",\n  \"title\": \"\",\n  \"status\": 0,\n  \"code\": \"\",\n  \"requestId\": \"00000000-0000-4000-8000-000000000000\",\n  \"errors\": [\n    {\n      \"field\": \"\",\n      \"message\": \"\"\n    }\n  ]\n}"
-        }
-      ]
-    },
-    {
-      "name": "Advance an event-scoped queue entry",
-      "description": "",
-      "event": [],
-      "request": {
-        "method": "PATCH",
-        "header": [
-          {
-            "key": "Content-Type",
-            "value": "application/json",
-            "description": "JSON request body",
-            "type": "text"
-          },
-          {
-            "key": "Idempotency-Key",
-            "value": "",
-            "description": "",
-            "type": "text"
-          }
-        ],
-        "auth": {
-          "type": "bearer",
-          "bearer": [
-            {
-              "key": "token",
-              "value": "{{token}}",
-              "type": "string"
-            }
-          ]
-        },
-        "url": {
-          "raw": "{{baseUrl}}/queues/events/{eventId}/entries/{queueId}/advance",
-          "host": [
-            "{{baseUrl}}"
-          ],
-          "path": [
-            "queues",
-            "events",
-            "{eventId}",
-            "entries",
-            "{queueId}",
-            "advance"
-          ],
-          "query": []
-        },
-        "body": {
-          "mode": "raw",
-          "raw": "{\n  \"toStationId\": \"00000000-0000-4000-8000-000000000000\",\n  \"reason\": \"\"\n}",
-          "options": {
-            "raw": {
-              "language": "json"
-            }
-          }
-        }
-      },
-      "response": [
-        {
-          "name": "200 Response",
-          "originalRequest": {
-            "method": "PATCH",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json",
-                "description": "JSON request body",
-                "type": "text"
-              },
-              {
-                "key": "Idempotency-Key",
-                "value": "",
-                "description": "",
-                "type": "text"
-              }
-            ],
-            "url": "{{baseUrl}}/queues/events/{eventId}/entries/{queueId}/advance"
-          },
-          "status": "OK",
-          "code": 200,
-          "header": [
-            {
-              "key": "Content-Type",
-              "value": "application/json"
-            }
-          ],
-          "body": "{\n  \"completed\": {\n    \"id\": \"00000000-0000-4000-8000-000000000000\",\n    \"registrationId\": \"00000000-0000-4000-8000-000000000000\",\n    \"stationId\": \"00000000-0000-4000-8000-000000000000\",\n    \"queueNumber\": 0,\n    \"status\": \"WAITING\",\n    \"isPriority\": false,\n    \"priorityNotes\": \"\",\n    \"enteredAt\": \"2026-08-07T00:00:00.000Z\",\n    \"calledAt\": \"2026-08-07T00:00:00.000Z\",\n    \"startedAt\": \"2026-08-07T00:00:00.000Z\",\n    \"leftQueueAt\": \"2026-08-07T00:00:00.000Z\",\n    \"completedAt\": \"2026-08-07T00:00:00.000Z\"\n  },\n  \"nextEntry\": {}\n}"
-        },
-        {
-          "name": "403 Response",
-          "originalRequest": {
-            "method": "PATCH",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json",
-                "description": "JSON request body",
-                "type": "text"
-              },
-              {
-                "key": "Idempotency-Key",
-                "value": "",
-                "description": "",
-                "type": "text"
-              }
-            ],
-            "url": "{{baseUrl}}/queues/events/{eventId}/entries/{queueId}/advance"
-          },
-          "status": "Forbidden",
-          "code": 403,
-          "header": [
-            {
-              "key": "Content-Type",
-              "value": "application/json"
-            }
-          ],
-          "body": "{\n  \"type\": \"\",\n  \"title\": \"\",\n  \"status\": 0,\n  \"code\": \"\",\n  \"requestId\": \"00000000-0000-4000-8000-000000000000\",\n  \"errors\": [\n    {\n      \"field\": \"\",\n      \"message\": \"\"\n    }\n  ]\n}"
-        },
-        {
-          "name": "404 Response",
-          "originalRequest": {
-            "method": "PATCH",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json",
-                "description": "JSON request body",
-                "type": "text"
-              },
-              {
-                "key": "Idempotency-Key",
-                "value": "",
-                "description": "",
-                "type": "text"
-              }
-            ],
-            "url": "{{baseUrl}}/queues/events/{eventId}/entries/{queueId}/advance"
-          },
-          "status": "Not Found",
-          "code": 404,
-          "header": [
-            {
-              "key": "Content-Type",
-              "value": "application/json"
-            }
-          ],
-          "body": "{\n  \"type\": \"\",\n  \"title\": \"\",\n  \"status\": 0,\n  \"code\": \"\",\n  \"requestId\": \"00000000-0000-4000-8000-000000000000\",\n  \"errors\": [\n    {\n      \"field\": \"\",\n      \"message\": \"\"\n    }\n  ]\n}"
-        }
-      ]
-    },
-    {
-      "name": "Complete an event-scoped queue entry",
-      "description": "",
-      "event": [],
-      "request": {
-        "method": "PATCH",
-        "header": [],
-        "auth": {
-          "type": "bearer",
-          "bearer": [
-            {
-              "key": "token",
-              "value": "{{token}}",
-              "type": "string"
-            }
-          ]
-        },
-        "url": {
-          "raw": "{{baseUrl}}/queues/events/{eventId}/entries/{queueId}/complete",
-          "host": [
-            "{{baseUrl}}"
-          ],
-          "path": [
-            "queues",
-            "events",
-            "{eventId}",
-            "entries",
-            "{queueId}",
-            "complete"
-          ],
-          "query": []
-        }
-      },
-      "response": [
-        {
-          "name": "200 Response",
-          "originalRequest": {
-            "method": "PATCH",
-            "header": [],
-            "url": "{{baseUrl}}/queues/events/{eventId}/entries/{queueId}/complete"
-          },
-          "status": "OK",
-          "code": 200,
-          "header": [
-            {
-              "key": "Content-Type",
-              "value": "application/json"
-            }
-          ],
-          "body": "{\n  \"id\": \"00000000-0000-4000-8000-000000000000\",\n  \"registrationId\": \"00000000-0000-4000-8000-000000000000\",\n  \"stationId\": \"00000000-0000-4000-8000-000000000000\",\n  \"queueNumber\": 0,\n  \"status\": \"WAITING\",\n  \"isPriority\": false,\n  \"priorityNotes\": \"\",\n  \"enteredAt\": \"2026-08-07T00:00:00.000Z\",\n  \"calledAt\": \"2026-08-07T00:00:00.000Z\",\n  \"startedAt\": \"2026-08-07T00:00:00.000Z\",\n  \"leftQueueAt\": \"2026-08-07T00:00:00.000Z\",\n  \"completedAt\": \"2026-08-07T00:00:00.000Z\"\n}"
-        },
-        {
-          "name": "403 Response",
-          "originalRequest": {
-            "method": "PATCH",
-            "header": [],
-            "url": "{{baseUrl}}/queues/events/{eventId}/entries/{queueId}/complete"
-          },
-          "status": "Forbidden",
-          "code": 403,
-          "header": [
-            {
-              "key": "Content-Type",
-              "value": "application/json"
-            }
-          ],
-          "body": "{\n  \"type\": \"\",\n  \"title\": \"\",\n  \"status\": 0,\n  \"code\": \"\",\n  \"requestId\": \"00000000-0000-4000-8000-000000000000\",\n  \"errors\": [\n    {\n      \"field\": \"\",\n      \"message\": \"\"\n    }\n  ]\n}"
-        },
-        {
-          "name": "404 Response",
-          "originalRequest": {
-            "method": "PATCH",
-            "header": [],
-            "url": "{{baseUrl}}/queues/events/{eventId}/entries/{queueId}/complete"
           },
           "status": "Not Found",
           "code": 404,
@@ -15217,213 +14921,6 @@
             "method": "PATCH",
             "header": [],
             "url": "{{baseUrl}}/queues/entries/{queueId}/start"
-          },
-          "status": "Forbidden",
-          "code": 403,
-          "header": [
-            {
-              "key": "Content-Type",
-              "value": "application/json"
-            }
-          ],
-          "body": "{\n  \"type\": \"\",\n  \"title\": \"\",\n  \"status\": 0,\n  \"code\": \"\",\n  \"requestId\": \"00000000-0000-4000-8000-000000000000\",\n  \"errors\": [\n    {\n      \"field\": \"\",\n      \"message\": \"\"\n    }\n  ]\n}"
-        }
-      ]
-    },
-    {
-      "name": "Transfer a participant to the next station and close the current queue entry",
-      "description": "",
-      "event": [],
-      "request": {
-        "method": "PATCH",
-        "header": [
-          {
-            "key": "Content-Type",
-            "value": "application/json",
-            "description": "JSON request body",
-            "type": "text"
-          }
-        ],
-        "auth": {
-          "type": "bearer",
-          "bearer": [
-            {
-              "key": "token",
-              "value": "{{token}}",
-              "type": "string"
-            }
-          ]
-        },
-        "url": {
-          "raw": "{{baseUrl}}/queues/entries/{queueId}/advance",
-          "host": [
-            "{{baseUrl}}"
-          ],
-          "path": [
-            "queues",
-            "entries",
-            "{queueId}",
-            "advance"
-          ],
-          "query": []
-        },
-        "body": {
-          "mode": "raw",
-          "raw": "{\n  \"toStationId\": \"00000000-0000-4000-8000-000000000000\",\n  \"reason\": \"\"\n}",
-          "options": {
-            "raw": {
-              "language": "json"
-            }
-          }
-        }
-      },
-      "response": [
-        {
-          "name": "200 Response",
-          "originalRequest": {
-            "method": "PATCH",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json",
-                "description": "JSON request body",
-                "type": "text"
-              }
-            ],
-            "url": "{{baseUrl}}/queues/entries/{queueId}/advance"
-          },
-          "status": "OK",
-          "code": 200,
-          "header": [
-            {
-              "key": "Content-Type",
-              "value": "application/json"
-            }
-          ],
-          "body": "{\n  \"completed\": {\n    \"id\": \"00000000-0000-4000-8000-000000000000\",\n    \"registrationId\": \"00000000-0000-4000-8000-000000000000\",\n    \"stationId\": \"00000000-0000-4000-8000-000000000000\",\n    \"queueNumber\": 0,\n    \"status\": \"WAITING\",\n    \"isPriority\": false,\n    \"priorityNotes\": \"\",\n    \"enteredAt\": \"2026-08-07T00:00:00.000Z\",\n    \"calledAt\": \"2026-08-07T00:00:00.000Z\",\n    \"startedAt\": \"2026-08-07T00:00:00.000Z\",\n    \"leftQueueAt\": \"2026-08-07T00:00:00.000Z\",\n    \"completedAt\": \"2026-08-07T00:00:00.000Z\"\n  },\n  \"nextEntry\": {}\n}"
-        },
-        {
-          "name": "401 Response",
-          "originalRequest": {
-            "method": "PATCH",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json",
-                "description": "JSON request body",
-                "type": "text"
-              }
-            ],
-            "url": "{{baseUrl}}/queues/entries/{queueId}/advance"
-          },
-          "status": "Unauthorized",
-          "code": 401,
-          "header": [
-            {
-              "key": "Content-Type",
-              "value": "application/json"
-            }
-          ],
-          "body": "{\n  \"type\": \"\",\n  \"title\": \"\",\n  \"status\": 0,\n  \"code\": \"\",\n  \"requestId\": \"00000000-0000-4000-8000-000000000000\",\n  \"errors\": [\n    {\n      \"field\": \"\",\n      \"message\": \"\"\n    }\n  ]\n}"
-        },
-        {
-          "name": "403 Response",
-          "originalRequest": {
-            "method": "PATCH",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json",
-                "description": "JSON request body",
-                "type": "text"
-              }
-            ],
-            "url": "{{baseUrl}}/queues/entries/{queueId}/advance"
-          },
-          "status": "Forbidden",
-          "code": 403,
-          "header": [
-            {
-              "key": "Content-Type",
-              "value": "application/json"
-            }
-          ],
-          "body": "{\n  \"type\": \"\",\n  \"title\": \"\",\n  \"status\": 0,\n  \"code\": \"\",\n  \"requestId\": \"00000000-0000-4000-8000-000000000000\",\n  \"errors\": [\n    {\n      \"field\": \"\",\n      \"message\": \"\"\n    }\n  ]\n}"
-        }
-      ]
-    },
-    {
-      "name": "Complete the final queue station and mark the registration completed",
-      "description": "",
-      "event": [],
-      "request": {
-        "method": "PATCH",
-        "header": [],
-        "auth": {
-          "type": "bearer",
-          "bearer": [
-            {
-              "key": "token",
-              "value": "{{token}}",
-              "type": "string"
-            }
-          ]
-        },
-        "url": {
-          "raw": "{{baseUrl}}/queues/entries/{queueId}/complete",
-          "host": [
-            "{{baseUrl}}"
-          ],
-          "path": [
-            "queues",
-            "entries",
-            "{queueId}",
-            "complete"
-          ],
-          "query": []
-        }
-      },
-      "response": [
-        {
-          "name": "200 Response",
-          "originalRequest": {
-            "method": "PATCH",
-            "header": [],
-            "url": "{{baseUrl}}/queues/entries/{queueId}/complete"
-          },
-          "status": "OK",
-          "code": 200,
-          "header": [
-            {
-              "key": "Content-Type",
-              "value": "application/json"
-            }
-          ],
-          "body": "{\n  \"id\": \"00000000-0000-4000-8000-000000000000\",\n  \"registrationId\": \"00000000-0000-4000-8000-000000000000\",\n  \"stationId\": \"00000000-0000-4000-8000-000000000000\",\n  \"queueNumber\": 0,\n  \"status\": \"WAITING\",\n  \"isPriority\": false,\n  \"priorityNotes\": \"\",\n  \"enteredAt\": \"2026-08-07T00:00:00.000Z\",\n  \"calledAt\": \"2026-08-07T00:00:00.000Z\",\n  \"startedAt\": \"2026-08-07T00:00:00.000Z\",\n  \"leftQueueAt\": \"2026-08-07T00:00:00.000Z\",\n  \"completedAt\": \"2026-08-07T00:00:00.000Z\"\n}"
-        },
-        {
-          "name": "401 Response",
-          "originalRequest": {
-            "method": "PATCH",
-            "header": [],
-            "url": "{{baseUrl}}/queues/entries/{queueId}/complete"
-          },
-          "status": "Unauthorized",
-          "code": 401,
-          "header": [
-            {
-              "key": "Content-Type",
-              "value": "application/json"
-            }
-          ],
-          "body": "{\n  \"type\": \"\",\n  \"title\": \"\",\n  \"status\": 0,\n  \"code\": \"\",\n  \"requestId\": \"00000000-0000-4000-8000-000000000000\",\n  \"errors\": [\n    {\n      \"field\": \"\",\n      \"message\": \"\"\n    }\n  ]\n}"
-        },
-        {
-          "name": "403 Response",
-          "originalRequest": {
-            "method": "PATCH",
-            "header": [],
-            "url": "{{baseUrl}}/queues/entries/{queueId}/complete"
           },
           "status": "Forbidden",
           "code": 403,
