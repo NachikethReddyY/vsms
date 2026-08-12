@@ -250,7 +250,7 @@ app.get("/favicon.ico", (_req, res) => {
 
 app.get("/health", async (_req, res) => {
   try {
-    await db.$queryRaw`SELECT 1`;
+    await db.query("SELECT 1");
 
     return res.status(200).json({
       status: "healthy",
