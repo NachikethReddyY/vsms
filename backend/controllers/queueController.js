@@ -130,6 +130,15 @@ exports.getParticipantQueueStatus = asyncHandler(async (req, res) => {
     return sendSuccess(res, 200, result);
 });
 
+exports.getParticipantRoute = asyncHandler(async (req, res) => {
+    const result = await routeOverrideService.getRoute({
+        eventId: requireRouteParam(req, "eventId"),
+        registrationId: requireRouteParam(req, "registrationId"),
+        user: getAuthenticatedUser(req),
+    });
+    return sendSuccess(res, 200, result);
+});
+
 exports.replaceParticipantRoute = asyncHandler(async (req, res) => {
     const eventId = requireRouteParam(req, "eventId");
     const registrationId = requireRouteParam(req, "registrationId");

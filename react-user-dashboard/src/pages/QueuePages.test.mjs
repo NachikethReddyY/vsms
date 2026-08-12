@@ -4,6 +4,7 @@ import { readFile } from "node:fs/promises";
 
 const pageSource = await readFile(new URL("./QueuePages.tsx", import.meta.url), "utf8");
 const apiSource = await readFile(new URL("../features/queue/queueApi.ts", import.meta.url), "utf8");
+const routeDialogSource = await readFile(new URL("../components/queue/RouteOverrideDialog.tsx", import.meta.url), "utf8");
 
 test("queue dashboard is wired to the virtual queue API", () => {
   assert.match(pageSource, /queueApi\.getEventQueueStatus/);
@@ -27,4 +28,13 @@ test("queue polling prevents older requests from replacing newer state", () => {
   assert.match(pageSource, /const requestSequence = useRef\(0\)/);
   assert.match(pageSource, /sequence !== requestSequence\.current/);
   assert.match(pageSource, /setInterval\(\(\) => void fetchQueue\(\), 10_000\)/);
+});
+
+test("route editor preserves server locks and submits a versioned allowlisted override", () => {
+  assert.match(pageSource, /RouteOverrideDialog/);
+  assert.match(apiSource, /expectedVersion: number/);
+  assert.match(routeDialogSource, /Clinical review/);
+  assert.match(routeDialogSource, /Locked/);
+  assert.match(routeDialogSource, /route\.routeVersion/);
+  assert.match(routeDialogSource, /STATION_UNAVAILABLE/);
 });

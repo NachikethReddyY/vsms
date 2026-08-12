@@ -2185,6 +2185,25 @@ paths:
         "404": { $ref: "#/components/responses/NotFound" }
         "422": { $ref: "#/components/responses/ValidationFailed" }
   /api/v1/queues/events/{eventId}/participants/{registrationId}/route:
+    get:
+      tags: [Queue]
+      operationId: getParticipantRoute
+      summary: Read the participant route for an authorized route editor
+      parameters:
+        - $ref: "#/components/parameters/EventId"
+        - name: registrationId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        "200":
+          description: Current route state
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/RouteOverrideResponse" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
     patch:
       tags: [Queue]
       operationId: replaceParticipantRoute

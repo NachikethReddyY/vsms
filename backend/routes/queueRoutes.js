@@ -46,6 +46,12 @@ router.patch(
 );
 
 router.get(
+  "/events/:eventId/participants/:registrationId/route",
+  validate({ params: eventParticipantParams }),
+  asyncHandler(queueController.getParticipantRoute),
+);
+
+router.get(
   "/events/:eventId",
   requireAnyRole("REGISTRATION_OFFICER", "SCREENER", "EVENT_MANAGER", "ADMINISTRATOR"),
   validate({

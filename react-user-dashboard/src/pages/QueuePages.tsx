@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useParams } from "react-router-dom";
 import { useAuth } from "../auth/AuthProvider";
 import { NowServingCard } from "../components/queue/NowServingCard";
+import { RouteOverrideDialog } from "../components/queue/RouteOverrideDialog";
 import { QueueHeader } from "../components/queue/QueueHeader";
 import { QueueTable, toQueueItems, type QueueStatus } from "../components/queue/QueueTable";
 import { StationWorkload } from "../components/queue/StationWorkload";
@@ -18,6 +19,8 @@ export function QueuePage() {
   const { session } = useAuth();
   const roles = session?.user.roles ?? [];
   const canManagePriority = roles.includes("EVENT_MANAGER") || roles.includes("ADMINISTRATOR");
+  const canOverrideRoute = roles.some((role) => ["REGISTRATION_OFFICER", "SCREENER", "EVENT_MANAGER", "ADMINISTRATOR"].includes(role));
+  const hasFullRouteAccess = roles.includes("EVENT_MANAGER") || roles.includes("ADMINISTRATOR");
 
   const [status, setStatus] = useState<EventQueueStatus | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -27,6 +30,7 @@ export function QueuePage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<QueueStatus | "ALL">("ALL");
   const [currentPage, setCurrentPage] = useState(1);
+  const [routeRegistrationId, setRouteRegistrationId] = useState<string | null>(null);
   const requestSequence = useRef(0);
 
   const isPermissionError = Boolean(errorCode && PERMISSION_ERROR_CODES.has(errorCode));
@@ -185,13 +189,23 @@ export function QueuePage() {
                 totalPages={totalPages}
                 actionLoading={actionLoading}
                 canManagePriority={canManagePriority}
+                canOverrideRoute={canOverrideRoute}
                 onAction={handleAction}
                 onSetPriority={handleSetPriority}
+                onEditRoute={setRouteRegistrationId}
               />
             )}
           </>
         )}
       </div>
+      {eventId && <RouteOverrideDialog
+        open={routeRegistrationId !== null}
+        eventId={eventId}
+        registrationId={routeRegistrationId}
+        fullAccess={hasFullRouteAccess}
+        onOpenChange={(open) => { if (!open) setRouteRegistrationId(null); }}
+        onCommitted={fetchQueue}
+      />}
     </AppShell>
   );
 }

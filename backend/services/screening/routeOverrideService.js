@@ -58,6 +58,16 @@ const staleRouteError = async (db, registrationId) => new AppError(
   { latestRoute: await getRouteState(db, registrationId) },
 );
 
+const getRoute = async ({ eventId, registrationId, user, db = prisma }) => {
+  await authorizeOverride(db, eventId, user);
+  const registration = await db.eventRegistration.findFirst({
+    where: { registrationId, eventId },
+    select: { registrationId: true },
+  });
+  if (!registration) throw new AppError(404, "REGISTRATION_NOT_FOUND", "Event registration not found.");
+  return getRouteState(db, registrationId);
+};
+
 const replaceRoute = async ({
   eventId,
   registrationId,
@@ -157,5 +167,6 @@ const replaceRoute = async ({
 
 module.exports = {
   authorizeOverride,
+  getRoute,
   replaceRoute,
 };

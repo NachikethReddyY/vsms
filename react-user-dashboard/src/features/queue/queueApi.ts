@@ -50,10 +50,33 @@ export interface PriorityUpdateResult {
   priorityNotes: string | null;
 }
 
+export type RouteOverrideReason = 'STATION_UNAVAILABLE' | 'QUEUE_BALANCING' | 'PARTICIPANT_NEED' | 'EQUIPMENT_ISSUE' | 'OPERATIONAL_EXCEPTION';
+export type RegistrationRouteState = {
+  status: 'PENDING_CHECK_IN' | 'NO_SCREENING_STATIONS' | 'READY' | 'NEEDS_STAFF_ACTION' | 'REVIEW_READY';
+  routeVersion: number;
+  steps: Array<{
+    stationId: string;
+    stationName: string;
+    stationType: string;
+    position: number;
+    state: 'COMPLETED' | 'CURRENT' | 'BLOCKED' | 'UPCOMING';
+  }>;
+};
+
 export const queueApi = {
   async getEventQueueStatus(eventId: string) {
     const { data } = await apiClient.get<EventQueueStatus>(`/queues/events/${eventId}`);
     return data;
+  },
+
+  async getParticipantRoute(eventId: string, registrationId: string) {
+    const { data } = await apiClient.get<{ status: 'success'; data: RegistrationRouteState }>(`/queues/events/${eventId}/participants/${registrationId}/route`);
+    return data.data;
+  },
+
+  async replaceParticipantRoute(eventId: string, registrationId: string, request: { stationIds: string[]; reasonCode: RouteOverrideReason; expectedVersion: number }) {
+    const { data } = await apiClient.patch<{ status: 'success'; data: RegistrationRouteState }>(`/queues/events/${eventId}/participants/${registrationId}/route`, request);
+    return data.data;
   },
 
   async updatePriority(eventId: string, queueId: string, isPriority: boolean, notes: string | null) {
