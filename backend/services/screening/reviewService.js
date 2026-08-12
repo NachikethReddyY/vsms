@@ -1,13 +1,28 @@
-const crypto = require("crypto");
+﻿const crypto = require("crypto");
 const prisma = require("../../prisma/prismaClient");
 const AppError = require("../../errors/AppError");
-const { resolveRegistrationByQrValue } = require("../../utils/qrToken");
-const { SUPPORTED_SCREENING_STATION_TYPES } = require("../event/stationTemplateMapping");
-const { loadVerifiedSignature, consumeSignatureArtifact } = require("../../utils/signatureStorage");
-const { requireEventRoleAndDuty } = require("../event/eventAuthorizationService");
-const { maskNric } = require("../../utils/validation");
+const { resolveRegistrationByQrValue } = require("../../utils/crypto/qrToken");
 
-const FLAG_RANK = { NORMAL: 0, REVIEW: 1, REFER: 2, URGENT: 3 };
+const {
+  IMPORTABLE_TEMPLATE_KEYS,
+  SUPPORTED_SCREENING_STATION_TYPES,
+} = require("../event/stationTemplateMapping");
+
+const {
+  loadVerifiedSignature,
+  consumeSignatureArtifact,
+} = require("../../utils/storage/signatureStorage");
+
+const { requireEventRoleAndDuty } = require("../event/eventAuthorizationService");
+const { maskNric } = require("../../utils/validation/validation");
+
+const FLAG_RANK = {
+  NORMAL: 0,
+  REVIEW: 1,
+  REFER: 2,
+  URGENT: 3,
+};
+
 const SUPPORTED_SCREENING_TYPES = SUPPORTED_SCREENING_STATION_TYPES;
 
 const highestFlag = (results) => results.reduce(

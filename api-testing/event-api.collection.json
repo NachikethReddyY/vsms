@@ -12424,7 +12424,7 @@
               "value": "application/json"
             }
           ],
-          "body": "{\n  \"success\": true,\n  \"data\": {\n    \"valid\": true,\n    \"eventName\": \"\",\n    \"currentQueueNumber\": 0,\n    \"queueNumber\": 0,\n    \"registrationStatus\": \"SIGNED_UP\",\n    \"queueState\": {\n      \"status\": \"WAITING\",\n      \"queueNumber\": 0,\n      \"isPriority\": true,\n      \"station\": {\n        \"id\": \"00000000-0000-4000-8000-000000000000\",\n        \"name\": \"\",\n        \"type\": \"\"\n      },\n      \"enteredAt\": \"2026-08-07T00:00:00.000Z\",\n      \"calledAt\": \"2026-08-07T00:00:00.000Z\",\n      \"startedAt\": \"2026-08-07T00:00:00.000Z\",\n      \"completedAt\": \"2026-08-07T00:00:00.000Z\"\n    },\n    \"aheadAtStation\": 0,\n    \"stations\": [\n      {\n        \"stationId\": \"00000000-0000-4000-8000-000000000000\",\n        \"stationName\": \"\",\n        \"stationType\": \"\",\n        \"workload\": {\n          \"WAITING\": 0,\n          \"CALLED\": 0,\n          \"IN_PROGRESS\": 0,\n          \"COMPLETED\": 0,\n          \"SKIPPED\": 0,\n          \"CANCELLED\": 0\n        },\n        \"nextUp\": {\n          \"queueNumber\": 0\n        }\n      }\n    ],\n    \"transfers\": [\n      {\n        \"fromStation\": \"\",\n        \"toStation\": \"\",\n        \"at\": \"2026-08-07T00:00:00.000Z\"\n      }\n    ],\n    \"expiresAt\": \"2026-08-07T00:00:00.000Z\"\n  }\n}"
+          "body": "{\n  \"success\": true,\n  \"data\": {\n    \"valid\": true,\n    \"eventName\": \"\",\n    \"currentQueueNumber\": 0,\n    \"queueNumber\": 0,\n    \"registrationStatus\": \"SIGNED_UP\",\n    \"queueState\": {\n      \"status\": \"WAITING\",\n      \"queueNumber\": 0,\n      \"isPriority\": true,\n      \"station\": {\n        \"id\": \"00000000-0000-4000-8000-000000000000\",\n        \"name\": \"\",\n        \"type\": \"\"\n      },\n      \"enteredAt\": \"2026-08-07T00:00:00.000Z\",\n      \"calledAt\": \"2026-08-07T00:00:00.000Z\",\n      \"startedAt\": \"2026-08-07T00:00:00.000Z\",\n      \"completedAt\": \"2026-08-07T00:00:00.000Z\"\n    },\n    \"aheadAtStation\": 0,\n    \"stations\": [\n      {\n        \"stationId\": \"00000000-0000-4000-8000-000000000000\",\n        \"stationName\": \"\",\n        \"stationType\": \"\",\n        \"stationOrder\": 0,\n        \"status\": \"AVAILABLE\",\n        \"activeQueueCount\": 0,\n        \"capacity\": 1,\n        \"occupancyPercent\": 0,\n        \"selectable\": true,\n        \"workload\": {\n          \"WAITING\": 0,\n          \"CALLED\": 0,\n          \"IN_PROGRESS\": 0,\n          \"COMPLETED\": 0,\n          \"SKIPPED\": 0,\n          \"CANCELLED\": 0\n        },\n        \"nextUp\": {\n          \"queueNumber\": 0\n        }\n      }\n    ],\n    \"transfers\": [\n      {\n        \"fromStation\": \"\",\n        \"toStation\": \"\",\n        \"at\": \"2026-08-07T00:00:00.000Z\"\n      }\n    ],\n    \"expiresAt\": \"2026-08-07T00:00:00.000Z\"\n  }\n}"
         },
         {
           "name": "400 Response",
@@ -13868,7 +13868,7 @@
       ]
     },
     {
-      "name": "Event queue summary with per-station workload and next-up participant",
+      "name": "Event queue summary with per-station workload, priority-aware next-up participant, and ordered entries",
       "description": "",
       "event": [],
       "request": {
@@ -13913,7 +13913,7 @@
               "value": "application/json"
             }
           ],
-          "body": "{\n  \"event\": {\n    \"eventId\": \"00000000-0000-4000-8000-000000000000\",\n    \"name\": \"\",\n    \"status\": \"\",\n    \"venue\": \"\"\n  },\n  \"stations\": [\n    {\n      \"stationId\": \"00000000-0000-4000-8000-000000000000\",\n      \"stationName\": \"\",\n      \"stationType\": \"\",\n      \"stationOrder\": 0,\n      \"workload\": {\n        \"WAITING\": 0,\n        \"CALLED\": 0,\n        \"IN_PROGRESS\": 0,\n        \"COMPLETED\": 0,\n        \"SKIPPED\": 0,\n        \"CANCELLED\": 0\n      },\n      \"nextUp\": {\n        \"queueId\": \"00000000-0000-4000-8000-000000000000\",\n        \"queueNumber\": 0,\n        \"registrationId\": \"00000000-0000-4000-8000-000000000000\",\n        \"participantDisplayName\": \"\",\n        \"isPriority\": false\n      }\n    }\n  ]\n}"
+          "body": "{\n  \"event\": {\n    \"eventId\": \"00000000-0000-4000-8000-000000000000\",\n    \"name\": \"\",\n    \"status\": \"\",\n    \"venue\": \"\"\n  },\n  \"stations\": [\n    {\n      \"stationId\": \"00000000-0000-4000-8000-000000000000\",\n      \"stationName\": \"\",\n      \"stationType\": \"\",\n      \"stationOrder\": 0,\n      \"workload\": {\n        \"WAITING\": 0,\n        \"CALLED\": 0,\n        \"IN_PROGRESS\": 0,\n        \"COMPLETED\": 0,\n        \"SKIPPED\": 0,\n        \"CANCELLED\": 0\n      },\n      \"nextUp\": {\n        \"queueId\": \"00000000-0000-4000-8000-000000000000\",\n        \"queueNumber\": 0,\n        \"registrationId\": \"00000000-0000-4000-8000-000000000000\",\n        \"participantDisplayName\": \"\",\n        \"isPriority\": false\n      }\n    }\n  ],\n  \"entries\": [\n    {\n      \"id\": \"00000000-0000-4000-8000-000000000000\",\n      \"registrationId\": \"00000000-0000-4000-8000-000000000000\",\n      \"participantDisplayName\": \"\",\n      \"participantReference\": \"\",\n      \"stationId\": \"00000000-0000-4000-8000-000000000000\",\n      \"stationName\": \"\",\n      \"stationType\": \"\",\n      \"queueNumber\": 0,\n      \"status\": \"WAITING\",\n      \"isPriority\": false,\n      \"priorityNotes\": \"\",\n      \"enteredAt\": \"2026-08-07T00:00:00.000Z\",\n      \"calledAt\": \"2026-08-07T00:00:00.000Z\",\n      \"startedAt\": \"2026-08-07T00:00:00.000Z\",\n      \"leftQueueAt\": \"2026-08-07T00:00:00.000Z\",\n      \"completedAt\": \"2026-08-07T00:00:00.000Z\"\n    }\n  ]\n}"
         },
         {
           "name": "401 Response",
@@ -13998,7 +13998,7 @@
               "value": "application/json"
             }
           ],
-          "body": "{\n  \"event\": {\n    \"eventId\": \"00000000-0000-4000-8000-000000000000\",\n    \"name\": \"\",\n    \"status\": \"\",\n    \"venue\": \"\"\n  },\n  \"stations\": [\n    {\n      \"stationId\": \"00000000-0000-4000-8000-000000000000\",\n      \"stationName\": \"\",\n      \"stationType\": \"\",\n      \"stationOrder\": 0,\n      \"status\": \"AVAILABLE\",\n      \"activeQueueCount\": 0,\n      \"selectable\": true\n    }\n  ]\n}"
+          "body": "{\n  \"event\": {\n    \"eventId\": \"00000000-0000-4000-8000-000000000000\",\n    \"name\": \"\",\n    \"status\": \"\",\n    \"venue\": \"\"\n  },\n  \"stations\": [\n    {\n      \"stationId\": \"00000000-0000-4000-8000-000000000000\",\n      \"stationName\": \"\",\n      \"stationType\": \"\",\n      \"stationOrder\": 0,\n      \"status\": \"AVAILABLE\",\n      \"activeQueueCount\": 0,\n      \"capacity\": 1,\n      \"occupancyPercent\": 0,\n      \"selectable\": true\n    }\n  ]\n}"
         },
         {
           "name": "401 Response",
@@ -15631,6 +15631,154 @@
               }
             ],
             "url": "{{baseUrl}}/queues/entries/{queueId}/priority"
+          },
+          "status": "Forbidden",
+          "code": 403,
+          "header": [
+            {
+              "key": "Content-Type",
+              "value": "application/json"
+            }
+          ],
+          "body": "{\n  \"type\": \"\",\n  \"title\": \"\",\n  \"status\": 0,\n  \"code\": \"\",\n  \"requestId\": \"00000000-0000-4000-8000-000000000000\",\n  \"errors\": [\n    {\n      \"field\": \"\",\n      \"message\": \"\"\n    }\n  ]\n}"
+        }
+      ]
+    },
+    {
+      "name": "Elevate or clear the urgent/priority flag on an active event-scoped queue entry",
+      "description": "Requires a reason when elevating an entry to priority. Emits a QUEUE_PRIORITY_UPDATED audit event.",
+      "event": [],
+      "request": {
+        "method": "PATCH",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json",
+            "description": "JSON request body",
+            "type": "text"
+          },
+          {
+            "key": "Idempotency-Key",
+            "value": "",
+            "description": "",
+            "type": "text"
+          }
+        ],
+        "auth": {
+          "type": "bearer",
+          "bearer": [
+            {
+              "key": "token",
+              "value": "{{token}}",
+              "type": "string"
+            }
+          ]
+        },
+        "url": {
+          "raw": "{{baseUrl}}/queues/events/{eventId}/entries/{queueId}/priority",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "queues",
+            "events",
+            "{eventId}",
+            "entries",
+            "{queueId}",
+            "priority"
+          ],
+          "query": []
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"isPriority\": true,\n  \"notes\": \"\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "response": [
+        {
+          "name": "200 Response",
+          "originalRequest": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "description": "JSON request body",
+                "type": "text"
+              },
+              {
+                "key": "Idempotency-Key",
+                "value": "",
+                "description": "",
+                "type": "text"
+              }
+            ],
+            "url": "{{baseUrl}}/queues/events/{eventId}/entries/{queueId}/priority"
+          },
+          "status": "OK",
+          "code": 200,
+          "header": [
+            {
+              "key": "Content-Type",
+              "value": "application/json"
+            }
+          ],
+          "body": "{\n  \"id\": \"00000000-0000-4000-8000-000000000000\",\n  \"registrationId\": \"00000000-0000-4000-8000-000000000000\",\n  \"stationId\": \"00000000-0000-4000-8000-000000000000\",\n  \"queueNumber\": 0,\n  \"status\": \"WAITING\",\n  \"isPriority\": false,\n  \"priorityNotes\": \"\",\n  \"enteredAt\": \"2026-08-07T00:00:00.000Z\",\n  \"calledAt\": \"2026-08-07T00:00:00.000Z\",\n  \"startedAt\": \"2026-08-07T00:00:00.000Z\",\n  \"leftQueueAt\": \"2026-08-07T00:00:00.000Z\",\n  \"completedAt\": \"2026-08-07T00:00:00.000Z\"\n}"
+        },
+        {
+          "name": "401 Response",
+          "originalRequest": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "description": "JSON request body",
+                "type": "text"
+              },
+              {
+                "key": "Idempotency-Key",
+                "value": "",
+                "description": "",
+                "type": "text"
+              }
+            ],
+            "url": "{{baseUrl}}/queues/events/{eventId}/entries/{queueId}/priority"
+          },
+          "status": "Unauthorized",
+          "code": 401,
+          "header": [
+            {
+              "key": "Content-Type",
+              "value": "application/json"
+            }
+          ],
+          "body": "{\n  \"type\": \"\",\n  \"title\": \"\",\n  \"status\": 0,\n  \"code\": \"\",\n  \"requestId\": \"00000000-0000-4000-8000-000000000000\",\n  \"errors\": [\n    {\n      \"field\": \"\",\n      \"message\": \"\"\n    }\n  ]\n}"
+        },
+        {
+          "name": "403 Response",
+          "originalRequest": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "description": "JSON request body",
+                "type": "text"
+              },
+              {
+                "key": "Idempotency-Key",
+                "value": "",
+                "description": "",
+                "type": "text"
+              }
+            ],
+            "url": "{{baseUrl}}/queues/events/{eventId}/entries/{queueId}/priority"
           },
           "status": "Forbidden",
           "code": 403,

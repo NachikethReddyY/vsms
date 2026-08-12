@@ -1,4 +1,4 @@
-import { ArrowLeftIcon, CheckCircleIcon, EnvelopeIcon, PencilSquareIcon, PhoneIcon, PlusIcon, StarIcon, TrashIcon } from "@heroicons/react/24/outline";
+import { ArrowLeftIcon, CheckCircleIcon, EnvelopeIcon, PencilSquareIcon, PhoneIcon, StarIcon, TrashIcon } from "@heroicons/react/24/outline";
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
 import { Link, useParams, useSearchParams } from "react-router-dom";
 import { PhoneInput } from "../../components/PhoneInput";
@@ -176,9 +176,9 @@ export default function ParticipantEmergencyContactsPage() {
 
       <div className="participant-emergency-layout">
         <section className="participant-emergency-list" aria-label="Recorded emergency contacts">
-          <header><div><span>Recorded contacts</span><h2>{activeContacts.length ? `${activeContacts.length} active contact${activeContacts.length === 1 ? "" : "s"}` : "No active contacts"}</h2></div><button type="button" onClick={startNewContact}><PlusIcon /> Add contact</button></header>
+          <header><div><span>Recorded contacts</span><h2>{activeContacts.length ? `${activeContacts.length} active contact${activeContacts.length === 1 ? "" : "s"}` : "No active contacts"}</h2></div></header>
           {isLoading ? <p className="participant-emergency-loading">Loading emergency contacts...</p> : null}
-          {!isLoading && activeContacts.length === 0 ? <div className="participant-emergency-empty"><PhoneIcon /><h3>No emergency contact recorded</h3><p>Add a primary contact before continuing to consent and registration.</p><button className="primary" type="button" onClick={startNewContact}>Add emergency contact</button></div> : null}
+          {!isLoading && activeContacts.length === 0 ? <div className="participant-emergency-empty"><PhoneIcon /><h3>No emergency contact recorded</h3><p>Use the form to add a primary contact before continuing to consent and registration.</p></div> : null}
           {!isLoading && activeContacts.length > 0 ? <div className="participant-emergency-cards">{activeContacts.map((contact) => (
             <article key={contact.id} className={contact.isPrimary ? "is-primary" : ""}>
               <div className="participant-emergency-card-main"><span className="participant-emergency-avatar">{contact.contactName.slice(0, 1).toUpperCase()}</span><div className="participant-emergency-card-details"><div className="participant-emergency-card-name"><h3>{contact.contactName}</h3>{contact.isPrimary ? <strong><StarIcon /> Primary</strong> : null}</div><p>{contact.relationship}</p><div className="participant-emergency-card-meta"><a href={`tel:${contact.phoneNumber.replace(/\s/g, "")}`}><PhoneIcon /> {contact.phoneNumber}</a>{contact.email ? <a href={`mailto:${contact.email}`} title={contact.email}><EnvelopeIcon /> {contact.email}</a> : null}</div></div></div>

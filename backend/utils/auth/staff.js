@@ -1,6 +1,10 @@
+const prisma = require("../../prisma/prismaClient");
+const { AppError } = require("../../errors/AppError");
 const { APPLICATION_ROLES, normalizeApplicationRole, rolesFromCognitoGroups } = require("./roles");
-const eventAuthorization = require("../services/event/eventAuthorizationService");
-const accountService = require("../services/account/accountService");
+const eventAuthorization = require("../../services/event/eventAuthorizationService");
+const env = require("../../config/env");
+const { enqueueAccountLifecycle } = require("../../services/account/accountLifecycleNotificationService");
+const accountService = require("../../services/account/accountService");
 
 const ALLOWED_ROLES = APPLICATION_ROLES;
 

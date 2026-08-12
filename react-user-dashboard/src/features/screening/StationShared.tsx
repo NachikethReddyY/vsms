@@ -1,9 +1,10 @@
 /* eslint-disable react-refresh/only-export-components */
 import { ExclamationTriangleIcon } from '@heroicons/react/24/outline';
-import { FormEvent, ReactNode, useCallback, useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { FormEvent, ReactNode, useCallback, useEffect, useMemo, useState } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
 import { AppToast } from '../../components/AppToast';
-import { getApiError as getApiMessage } from '../../utils/apiClient';
+import { LiveStationHandoffPicker, type LiveStationHandoffStation } from '../../components/qr/LiveStationHandoffPicker';
+import apiClient, { getApiError as getApiMessage } from '../../utils/apiClient';
 import { getStoredSession } from '../../utils/session';
 import {
   FlagEvaluation,
@@ -60,21 +61,32 @@ export function StationHandoffLinks({
   registrationId?: string | null;
   stations?: Station[];
 }) {
-  const orderedStations = stations
-    ? [...stations].filter((item) => item.isActive).sort((left, right) => left.stationOrder - right.stationOrder)
-    : [];
-  const currentIndex = orderedStations.findIndex((item) => item.stationType === currentStationType && (!currentStationId || item.stationId === currentStationId));
-  const nextStations = currentIndex >= 0
-    ? orderedStations.slice(currentIndex + 1).filter((item) => item.stationType === 'CUSTOM' || Boolean(STATION_PATH_SLUG[item.stationType]))
-    : [];
-  const fallbackTypes = nextStations.length ? [] : nextStationTypes(currentStationType, stations);
-  const next = nextStations.length ? nextStations.map((item) => item.stationType) : fallbackTypes;
-  const isLastScreeningStation = next.length === 0;
-  const nextLabel = nextStations[0]?.stationName ?? (next[0] ? STATION_LABEL[next[0]] : null);
+  const navigate = useNavigate();
+  const nextStations = useMemo(() => {
+    const orderedStations = stations
+      ? [...stations].filter((item) => item.isActive).sort((left, right) => left.stationOrder - right.stationOrder)
+      : [];
+    const currentIndex = orderedStations.findIndex((item) => (
+      item.stationType === currentStationType && (!currentStationId || item.stationId === currentStationId)
+    ));
+    if (currentIndex >= 0) {
+      return orderedStations.slice(currentIndex + 1).filter((item) => (
+        item.stationType === 'CUSTOM' || Boolean(STATION_PATH_SLUG[item.stationType])
+      ));
+    }
+    return nextStationTypes(currentStationType, stations).map((stationType) => ({
+      stationType,
+      stationId: '',
+      stationName: STATION_LABEL[stationType],
+    }));
+  }, [currentStationId, currentStationType, stations]);
+  const isLastScreeningStation = nextStations.length === 0;
+  const nextLabel = nextStations[0]?.stationName ?? null;
   const [passImage, setPassImage] = useState<string | null>(null);
   const [passName, setPassName] = useState<string | null>(null);
   const [passQueue, setPassQueue] = useState<number | null>(null);
   const [passError, setPassError] = useState<string | null>(null);
+  const [liveStations, setLiveStations] = useState<LiveStationHandoffStation[]>([]);
 
   useEffect(() => {
     if (!eventId || !registrationId) return;
@@ -94,10 +106,27 @@ export function StationHandoffLinks({
     return () => { cancelled = true; };
   }, [eventId, registrationId]);
 
+  useEffect(() => {
+    if (!eventId) return;
+    let cancelled = false;
+    void apiClient.get<{ stations: LiveStationHandoffStation[] }>(`/queues/events/${eventId}/stations`)
+      .then(({ data }) => {
+        if (!cancelled) setLiveStations(data.stations.filter((station) => (
+          nextStations.some((nextStation) => nextStation.stationId
+            ? nextStation.stationId === station.stationId
+            : nextStation.stationType === station.stationType)
+        )));
+      })
+      .catch(() => {
+        if (!cancelled) setLiveStations([]);
+    });
+    return () => { cancelled = true; };
+  }, [eventId, nextStations]);
+
   return (
     <nav className="va-handoff" aria-label="Continue screening">
       <p className="va-handoff-label">
-        {next.length > 0
+        {nextStations.length > 0
           ? `Station complete — show this QR so the participant can join the ${nextLabel} queue`
           : 'Screening stations complete for this route'}
         {registrationId ? ' · same participant kept' : null}
@@ -122,8 +151,23 @@ export function StationHandoffLinks({
         </div>
       )}
 
+      {registrationId && liveStations.length > 0 && (
+        <LiveStationHandoffPicker
+          stations={liveStations}
+          onSelect={(station) => {
+            const stationType = station.stationType as StationType;
+            const href = stationType === 'CUSTOM'
+              ? customStationPath(eventId, station.stationId, registrationId)
+              : stationPath(eventId, stationType, registrationId);
+            if (href) navigate(href);
+          }}
+          actionLabel="Open station"
+          emptyMessage="No next stations are available."
+        />
+      )}
+
       <div className="action-cluster" style={{ paddingTop: 0 }}>
-        {(nextStations.length ? nextStations : fallbackTypes.map((stationType) => ({ stationType, stationId: '', stationName: STATION_LABEL[stationType] }))).map((nextStation, index) => {
+        {liveStations.length === 0 && nextStations.map((nextStation, index) => {
           const href = nextStation.stationType === 'CUSTOM'
             ? customStationPath(eventId, nextStation.stationId, registrationId)
             : stationPath(eventId, nextStation.stationType, registrationId);
@@ -210,7 +254,7 @@ export function ParticipantLookup({
   onSelect: (registrationId: string) => void;
   selected: QueueRegistration | null;
 }) {
-  const [passToken, setPassToken] = useState('abababababababababababababababababababababababababababababababab');
+  const [passToken, setPassToken] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [scannerOpen, setScannerOpen] = useState(false);
@@ -270,7 +314,7 @@ export function ParticipantLookup({
           <input
             value={passToken}
             onChange={(event) => setPassToken(event.target.value)}
-            placeholder="VSMS-DEMO-QR-001 or QR hex token"
+            placeholder="…/participant-status/&lt;token&gt; or 64-hex token"
           />
         </label>
         <button type="button" className="primary" onClick={() => void resolvePass()}>Load pass</button>
@@ -278,6 +322,7 @@ export function ParticipantLookup({
           Scan QR with camera
         </button>
       </div>
+      <p className="va-resolve-hint">Paste the full QR value or the hex token from the pass.</p>
       <label>
         Or choose from station queue
         <select value={selectedId} onChange={(event) => onSelect(event.target.value)}>

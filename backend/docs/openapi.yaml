@@ -2141,7 +2141,7 @@ paths:
     get:
       tags: [Queue]
       operationId: getEventQueueStatus
-      summary: Event queue summary with per-station workload and next-up participant
+      summary: Event queue summary with per-station workload, priority-aware next-up participant, and ordered entries
       parameters:
         - name: eventId
           in: path
@@ -2388,6 +2388,25 @@ paths:
           in: path
           required: true
           schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/PriorityQueueRequest" }
+      responses:
+        "200": { description: Queue entry priority updated, content: { application/json: { schema: { $ref: "#/components/schemas/QueueEntry" } } } }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "422": { $ref: "#/components/responses/ValidationFailed" }
+  /api/v1/queues/events/{eventId}/entries/{queueId}/priority:
+    patch:
+      tags: [Queue]
+      operationId: updateEventQueueEntryPriority
+      summary: Elevate or clear the urgent/priority flag on an active event-scoped queue entry
+      description: Requires a reason when elevating an entry to priority. Emits a QUEUE_PRIORITY_UPDATED audit event.
+      parameters: [{ $ref: "#/components/parameters/EventId" }, { $ref: "#/components/parameters/QueueId" }, { $ref: "#/components/parameters/IdempotencyKey" }]
       requestBody:
         required: true
         content:
@@ -4566,7 +4585,7 @@ components:
         signatureObjectKey: { type: string, maxLength: 500, nullable: true }
         signatureSha256: { type: string, pattern: '^[a-fA-F0-9]{64}$', nullable: true }
         signatureMimeType: { type: string, enum: [image/png, image/jpeg], nullable: true }
-      description: Accepted consent requires signature metadata; non-participant signers also require guardian contact and relationship fields.
+      description: Accepted consent requires signature metadata; non-participant signers require their relationship to the participant. Optional contact fields are retained only for legacy records.
     ConsentWithEventRequest:
       allOf:
         - $ref: "#/components/schemas/ConsentRequest"
@@ -4844,11 +4863,17 @@ components:
               items:
                 type: object
                 additionalProperties: false
-                required: [stationId, stationName, stationType, workload, nextUp]
+                required: [stationId, stationName, stationType, stationOrder, status, activeQueueCount, capacity, occupancyPercent, selectable, workload, nextUp]
                 properties:
                   stationId: { type: string, format: uuid }
                   stationName: { type: string }
                   stationType: { type: string }
+                  stationOrder: { type: integer }
+                  status: { type: string, enum: [AVAILABLE, BUSY, PAUSED, OFFLINE] }
+                  activeQueueCount: { type: integer, minimum: 0 }
+                  capacity: { type: integer, minimum: 1 }
+                  occupancyPercent: { type: integer, minimum: 0, description: "Active queue entries as a percentage of station capacity; may exceed 100 when overloaded" }
+                  selectable: { type: boolean, description: "Busy stations remain selectable; paused and offline stations do not" }
                   workload:
                     type: object
                     additionalProperties: false
@@ -5082,7 +5107,7 @@ components:
       required: [isPriority]
       properties:
         isPriority: { type: boolean, description: "Whether the queue entry is treated as urgent/priority" }
-        notes: { type: string, maxLength: 255, description: "Optional reason for the priority assignment" }
+        notes: { type: string, maxLength: 255, description: "Reason for the priority assignment. Required when isPriority is true so the elevation can be audited." }
     StationWorkload:
       type: object
       additionalProperties: false
@@ -5163,10 +5188,31 @@ components:
             registrationId: { type: string, format: uuid }
             participantDisplayName: { type: string }
             isPriority: { type: boolean, default: false }
+    EventQueueEntry:
+      type: object
+      additionalProperties: false
+      required: [id, registrationId, stationId, queueNumber, status, isPriority]
+      properties:
+        id: { type: string, format: uuid }
+        registrationId: { type: string, format: uuid }
+        participantDisplayName: { type: string, description: "Display name for the queued participant" }
+        participantReference: { type: string, nullable: true }
+        stationId: { type: string, format: uuid }
+        stationName: { type: string }
+        stationType: { type: string }
+        queueNumber: { type: integer }
+        status: { $ref: "#/components/schemas/QueueStatus" }
+        isPriority: { type: boolean, default: false, description: "Urgent/priority handling flag surfaced to next-up calling" }
+        priorityNotes: { type: string, nullable: true }
+        enteredAt: { type: string, format: date-time, nullable: true }
+        calledAt: { type: string, format: date-time, nullable: true }
+        startedAt: { type: string, format: date-time, nullable: true }
+        leftQueueAt: { type: string, format: date-time, nullable: true }
+        completedAt: { type: string, format: date-time, nullable: true }
     EventQueueStatusResponse:
       type: object
       additionalProperties: false
-      required: [event, stations]
+      required: [event, stations, entries]
       properties:
         event:
           type: object
@@ -5178,6 +5224,10 @@ components:
             status: { type: string }
             venue: { type: string, nullable: true }
         stations: { type: array, items: { $ref: "#/components/schemas/QueueStationWorkload" } }
+        entries:
+          type: array
+          description: "Every queue entry for the event, ordered by queue number, with priority ordering surfaced through each station's next-up"
+          items: { $ref: "#/components/schemas/EventQueueEntry" }
     JoinQueueRequest:
       type: object
       additionalProperties: false
@@ -5194,7 +5244,7 @@ components:
     RegistrationStation:
       type: object
       additionalProperties: false
-      required: [stationId, stationName, stationType, stationOrder, status, activeQueueCount, selectable]
+      required: [stationId, stationName, stationType, stationOrder, status, activeQueueCount, capacity, occupancyPercent, selectable]
       properties:
         stationId: { type: string, format: uuid }
         stationName: { type: string }
@@ -5202,6 +5252,8 @@ components:
         stationOrder: { type: integer }
         status: { type: string, enum: [AVAILABLE, BUSY, PAUSED, OFFLINE] }
         activeQueueCount: { type: integer, minimum: 0 }
+        capacity: { type: integer, minimum: 1 }
+        occupancyPercent: { type: integer, minimum: 0, description: "Active queue entries as a percentage of station capacity; may exceed 100 when overloaded" }
         selectable: { type: boolean }
     RegistrationStationListResponse:
       type: object

@@ -134,3 +134,65 @@
   .participant-emergency-card-actions { justify-content: flex-start; }
   .participant-emergency-cards article { grid-template-columns: 1fr; }
 }
+
+[data-theme="dark"] .participant-emergency-heading > span {
+  background:var(--accent-tint);
+  color:var(--accent);
+}
+
+[data-theme="dark"] .participant-emergency-heading p,
+[data-theme="dark"] .participant-emergency-heading small,
+[data-theme="dark"] .participant-emergency-list > header span,
+[data-theme="dark"] .participant-emergency-form header span,
+[data-theme="dark"] .participant-emergency-form header p,
+[data-theme="dark"] .participant-emergency-empty p,
+[data-theme="dark"] .participant-emergency-loading { color:var(--muted); }
+
+[data-theme="dark"] .participant-emergency-heading h1,
+[data-theme="dark"] .participant-emergency-list h2,
+[data-theme="dark"] .participant-emergency-form h2,
+[data-theme="dark"] .participant-emergency-card-name h3,
+[data-theme="dark"] .participant-emergency-form > label,
+[data-theme="dark"] .participant-emergency-card-meta a,
+[data-theme="dark"] .participant-emergency-form input,
+[data-theme="dark"] .participant-emergency-form select,
+[data-theme="dark"] .participant-emergency-form footer .secondary { color:var(--ink); }
+
+[data-theme="dark"] .participant-emergency-list,
+[data-theme="dark"] .participant-emergency-form,
+[data-theme="dark"] .participant-emergency-cards article,
+[data-theme="dark"] .participant-emergency-form input,
+[data-theme="dark"] .participant-emergency-form select,
+[data-theme="dark"] .participant-emergency-form footer .secondary {
+  border-color:var(--hairline-strong);
+  background:var(--surface);
+}
+
+[data-theme="dark"] .participant-emergency-list > header,
+[data-theme="dark"] .participant-emergency-card-actions { border-color:var(--hairline-strong); background:var(--surface-2); }
+
+[data-theme="dark"] .participant-emergency-cards article.is-primary,
+[data-theme="dark"] .participant-emergency-cards article.is-primary .participant-emergency-card-actions {
+  border-color:color-mix(in srgb,var(--accent) 40%,var(--hairline));
+  background:var(--accent-tint);
+}
+
+[data-theme="dark"] .participant-emergency-avatar { color:var(--accent); background:var(--accent-tint); }
+[data-theme="dark"] .participant-emergency-card-main p { color:var(--ink-2); }
+[data-theme="dark"] .participant-emergency-card-meta a svg { color:var(--muted); }
+[data-theme="dark"] .participant-emergency-list button:hover,
+[data-theme="dark"] .participant-emergency-card-actions button:hover { background:var(--surface-2); }
+
+[data-theme="dark"] .participant-emergency-primary-toggle {
+  border-color:color-mix(in srgb,var(--accent) 35%,var(--hairline));
+  background:var(--canvas-soft);
+}
+
+[data-theme="dark"] .participant-emergency-notice {
+  border-color:color-mix(in srgb,var(--green) 40%,var(--hairline));
+  background:color-mix(in srgb,var(--green) 10%,var(--surface));
+  color:var(--green);
+}
+
+[data-theme="dark"] .participant-emergency-heading > strong.complete { background:color-mix(in srgb,var(--green) 15%,var(--surface)); color:var(--green); }
+[data-theme="dark"] .participant-emergency-heading > strong.missing { background:color-mix(in srgb,var(--red) 15%,var(--surface)); color:var(--red); }

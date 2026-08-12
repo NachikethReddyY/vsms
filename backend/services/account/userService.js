@@ -1,7 +1,7 @@
-const crypto = require("node:crypto");
+﻿const crypto = require("node:crypto");
 const prisma = require("../../prisma/prismaClient");
 const AppError = require("../../errors/AppError");
-const { resolveAuditContext } = require("../../utils/audit");
+const { resolveAuditContext } = require("../../utils/logging/audit");
 const { synchronizeStaffAccess } = require("./cognitoStaffAccessService");
 const { assertAdministratorRemains, lockAccountTransition } = require("./adminSafety");
 const { enqueueProviderOperation, processProviderOperation, processProviderOperationForResponse } = require("./accountProviderOperationService");

@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Domain Event Bus (transactional outbox + in-process handler registry)
  * ---------------------------------------------------------------------
  * Producers call `emit` inside the same database transaction that commits a
@@ -16,7 +16,7 @@
 const crypto = require("node:crypto");
 const prisma = require("../../prisma/prismaClient");
 const AppError = require("../../errors/AppError");
-const logger = require("../../utils/logger/logger");
+const logger = require("../../utils/logging/logger/logger");
 
 const MAX_ATTEMPTS = 5;
 const LEASE_MS = 5 * 60 * 1000;

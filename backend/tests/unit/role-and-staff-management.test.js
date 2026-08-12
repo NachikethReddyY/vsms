@@ -1,4 +1,4 @@
-const assert = require("node:assert/strict");
+﻿const assert = require("node:assert/strict");
 const crypto = require("node:crypto");
 const test = require("node:test");
 
@@ -6,7 +6,7 @@ process.env.DATABASE_URL ||= "postgresql://test:test@localhost:5432/vsms_test";
 
 const prisma = require("../../prisma/prismaClient");
 const userService = require("../../services/account/userService");
-const { rolesFromCognitoGroups } = require("../../utils/roles");
+const { rolesFromCognitoGroups } = require("../../utils/auth/roles");
 const { createUserBody, updateUserBody } = require("../../schemas/userSchemas");
 
 const syncedAccess = (overrides = {}) => async () => ({

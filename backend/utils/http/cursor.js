@@ -1,7 +1,7 @@
 const crypto = require("crypto");
-const env = require("../config/env");
-const AppError = require("../errors/AppError");
-const { timingSafeEqual } = require("./security");
+const env = require("../../config/env");
+const AppError = require("../../errors/AppError");
+const { timingSafeEqual } = require("../crypto/security");
 
 const signature = (payload) => crypto.createHmac("sha256", env.jwtAccessSecret).update(payload).digest("base64url");
 

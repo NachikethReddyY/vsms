@@ -1,7 +1,7 @@
-const reportingService = require("../services/reporting/reportingService");
+﻿const reportingService = require("../services/reporting/reportingService");
 const analyticsService = require("../services/reporting/analyticsService");
 const reportExportService = require("../services/reporting/reportExportService");
-const { createAuditLog } = require("../utils/audit");
+const { createAuditLog } = require("../utils/logging/audit");
 
 exports.operations = async (req, res) => {
   const report = await reportingService.getOperationalReport(req.query, req.user);

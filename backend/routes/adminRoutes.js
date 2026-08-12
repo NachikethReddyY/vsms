@@ -17,6 +17,11 @@ const {
   accountProviderDrainBody,
   accountProviderOperationParams,
   accountProviderOperationActionBody,
+  // Imported Backup Schemas
+  backupListQuery,
+  createBackupBody,
+  backupParams,
+  restoreBackupBody,
 } = require("../schemas/adminSchemas");
 const {
   accountParams,
@@ -74,6 +79,50 @@ router.post(
   "/maintenance/artifact-cleanup/:taskId",
   validate({ params: artifactCleanupParams, body: artifactCleanupActionBody }),
   adminController.maintainArtifactCleanupTask,
+);
+
+/* ==========================================================================
+   BACKUP & RECOVERY ROUTES
+   ========================================================================== */
+
+// 1. List all available backups
+router.get(
+  "/backups",
+  requirePermission("system:backup:read"),
+  validate({ query: backupListQuery }),
+  adminController.listBackups,
+);
+
+// 2. Trigger a manually created backup
+router.post(
+  "/backups",
+  requirePermission("system:backup:write"),
+  validate({ body: createBackupBody }),
+  adminController.createBackup,
+);
+
+// 3. Download a specific backup dump file
+router.get(
+  "/backups/:backupId/download",
+  requirePermission("system:backup:read"),
+  validate({ params: backupParams }),
+  adminController.downloadBackup,
+);
+
+// 4. Restore database state from a given backup
+router.post(
+  "/backups/:backupId/restore",
+  requirePermission("system:backup:execute"),
+  validate({ params: backupParams, body: restoreBackupBody }),
+  adminController.restoreBackup,
+);
+
+// 5. Delete a backup file
+router.delete(
+  "/backups/:backupId",
+  requirePermission("system:backup:delete"),
+  validate({ params: backupParams }),
+  adminController.deleteBackup,
 );
 
 module.exports = router;

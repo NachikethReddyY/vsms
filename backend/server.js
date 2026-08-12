@@ -1,4 +1,4 @@
-/**
+﻿/**
  * ============================================================================
  * SECURE SERVER BOOTSTRAP
  * Visual Screening Management System (VSMS)
@@ -13,135 +13,185 @@
 
 const fs = require("fs");
 const https = require("https");
+const http = require("http");
 const path = require("path");
 
 const app = require("./app");
 const env = require("./config/env");
-const logger = require("./utils/logger/logger");
-const runSecurityChecks = require("./utils/securityCheck");
+const logger = require("./utils/logging/logger/logger");
+const runSecurityChecks = require("./utils/security/securityCheck");
 
-/**
- * ============================================================================
- * 1. GLOBAL PROCESS SECURITY HANDLERS (OWASP A09)
- * Catch unhandled exceptions or rejected promises to prevent memory leaks
- * or unmonitored silent process failures.
- * ============================================================================
- */
+// ============================================================================
+// 1. GLOBAL PROCESS SECURITY HANDLERS
+// ============================================================================
+
 process.on("uncaughtException", (error) => {
     logger.error("uncaught_exception", {
         message: error.message,
-        stack: error.stack
+        stack: error.stack,
     });
+
     process.exit(1);
 });
 
 process.on("unhandledRejection", (reason) => {
     logger.error("unhandled_rejection", {
-        reason: reason instanceof Error ? reason.message : reason,
-        stack: reason instanceof Error ? reason.stack : undefined
+        message: reason instanceof Error ? reason.message : String(reason),
+        stack: reason instanceof Error ? reason.stack : undefined,
     });
+
     process.exit(1);
 });
 
-/**
- * ============================================================================
- * 2. SECURITY CONFIGURATION VALIDATION (OWASP A05)
- * Runs pre-flight startup checks to ensure environment variables, file
- * permissions, and keys are secure before opening ports.
- * ============================================================================
- */
+// ============================================================================
+// 2. SECURITY CONFIGURATION VALIDATION
+// ============================================================================
+
 try {
     runSecurityChecks();
+
     logger.info("Security startup validation passed successfully");
 } catch (error) {
     logger.error("Security startup validation failed", {
-        message: error.message
+        message: error.message,
+        stack: error.stack,
     });
+
     process.exit(1);
 }
 
-/**
- * ============================================================================
- * 3. HTTPS / TLS CONFIGURATION (OWASP A05)
- * Enforces modern cryptographic standards (TLS 1.3 only) to block downgrade attacks.
- * ============================================================================
- */
+// ============================================================================
+// 3. CREATE HTTP / HTTPS SERVER
+// ============================================================================
+
 const useHttps = !env.isProduction && env.localHttps;
+
 let server;
 
 if (useHttps) {
     const tlsOptions = {
-        key: fs.readFileSync(path.resolve(__dirname, env.TLS_KEY_PATH)),
-        cert: fs.readFileSync(path.resolve(__dirname, env.TLS_CERT_PATH)),
+        key: fs.readFileSync(
+            path.resolve(__dirname, env.TLS_KEY_PATH)
+        ),
 
-        // Force modern TLS protocols exclusively (Disables vulnerable TLS 1.0, 1.1, 1.2)
+        cert: fs.readFileSync(
+            path.resolve(__dirname, env.TLS_CERT_PATH)
+        ),
+
+        // TLS 1.3 only
         minVersion: "TLSv1.3",
         maxVersion: "TLSv1.3",
 
-        // Enforce server-preferred cipher suites order
-        honorCipherOrder: true
+        honorCipherOrder: true,
     };
 
     server = https.createServer(tlsOptions, app);
 } else {
-    // In production, TLS termination is typically handled upstream via a reverse proxy (e.g., Nginx, ALB)
-    server = app;
+    server = http.createServer(app);
 }
 
-/**
- * ============================================================================
- * 4. SERVER HARDENING & TIMEOUTS
- * Mitigates Slowloris Denial of Service (DoS) attacks by timing out hanging sockets.
- * ============================================================================
- */
-server.headersTimeout = 10000;    // 10 seconds to parse headers
-server.requestTimeout = 30000;    // 30 seconds max request window
-server.keepAliveTimeout = 5000;   // 5 seconds keep-alive idle limit
+// ============================================================================
+// 4. SERVER TIMEOUT HARDENING
+// ============================================================================
+
+server.headersTimeout = 10_000;
+server.requestTimeout = 30_000;
+server.keepAliveTimeout = 5_000;
+
+// ============================================================================
+// 5. SERVER ERROR HANDLING
+// ============================================================================
 
 server.on("error", (error) => {
+    if (error.code === "EADDRINUSE") {
+        logger.error("server_port_in_use", {
+            host: env.HOST,
+            port: env.PORT,
+            message: `Port ${env.PORT} is already being used.`,
+        });
+
+        process.exit(1);
+    }
+
     logger.error("server_error", {
+        code: error.code,
         message: error.message,
-        stack: error.stack
+        stack: error.stack,
     });
+
+    process.exit(1);
 });
 
-/**
- * ============================================================================
- * 5. GRACEFUL SHUTDOWN HANDLING
- * Ensures ongoing database transactions and open HTTP connections are safely
- * completed before terminating the process.
- * ============================================================================
- */
+// ============================================================================
+// 6. GRACEFUL SHUTDOWN
+// ============================================================================
+
+let shuttingDown = false;
+
 async function shutdown(signal) {
+    if (shuttingDown) {
+        return;
+    }
+
+    shuttingDown = true;
+
     logger.info(`${signal} received. Initiating graceful server shutdown...`);
 
-    server.close(() => {
-        logger.info("HTTP server closed successfully. Releasing system resources.");
+    server.close((error) => {
+        if (error) {
+            logger.error("server_close_error", {
+                message: error.message,
+                stack: error.stack,
+            });
+
+            process.exit(1);
+        }
+
+        logger.info(
+            "HTTP server closed successfully. Releasing system resources."
+        );
+
         process.exit(0);
     });
 
-    // Force shutdown timeout safeguard if connections hang indefinitely
+    // Force shutdown after 10 seconds
     setTimeout(() => {
-        logger.error("Forced server shutdown due to connection drain timeout.");
+        logger.error(
+            "Forced server shutdown due to connection drain timeout."
+        );
+
         process.exit(1);
-    }, 10000);
+    }, 10_000);
 }
 
-process.on("SIGTERM", () => shutdown("SIGTERM"));
-process.on("SIGINT", () => shutdown("SIGINT"));
+process.on("SIGTERM", () => {
+    void shutdown("SIGTERM");
+});
 
-/**
- * ============================================================================
- * 6. START SERVER LISTENER
- * ============================================================================
- */
+process.on("SIGINT", () => {
+    void shutdown("SIGINT");
+});
+
+// ============================================================================
+// 7. START SERVER
+// ============================================================================
+
 if (require.main === module) {
     const HOST = env.HOST || "0.0.0.0";
-    const PORT = env.PORT || 4000;
+    const PORT = env.PORT || 5050;
 
-    server.listen(PORT, HOST);
+    server.listen(PORT, HOST, () => {
+        const protocol = useHttps ? "https" : "http";
+
+        logger.info("VSMS backend server started", {
+            protocol,
+            host: HOST,
+            port: PORT,
+            environment: env.NODE_ENV || "development",
+        });
+    });
 }
 
 module.exports = {
-    server
+    server,
 };

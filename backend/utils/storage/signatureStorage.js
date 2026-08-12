@@ -1,7 +1,7 @@
 const crypto = require("crypto");
 const fs = require("fs/promises");
 const path = require("path");
-const AppError = require("../errors/AppError");
+const AppError = require("../../errors/AppError");
 
 const MIME_EXTENSIONS = { "image/png": "png", "image/jpeg": "jpg" };
 const PURPOSE_SLUGS = Object.freeze({
@@ -11,7 +11,7 @@ const PURPOSE_SLUGS = Object.freeze({
 });
 const SIGNATURE_KEY = /^signatures\/([a-f0-9-]{36})\/(consent|referral|review-decision)-([a-f0-9-]{36})-([a-f0-9-]{36})\.(png|jpg)$/;
 const storageRoot = () => path.resolve(
-  process.env.SIGNATURE_STORAGE_DIR || path.join(__dirname, "..", "secure-data", "signatures"),
+  process.env.SIGNATURE_STORAGE_DIR || path.join(__dirname, "..", "..", "secure-data", "signatures"),
 );
 
 const signatureMetadata = (signatureObjectKey, expectedEventId = null, expectedUserId = null) => {

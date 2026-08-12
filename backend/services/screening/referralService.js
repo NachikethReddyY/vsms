@@ -1,4 +1,4 @@
-const crypto = require("crypto");
+﻿const crypto = require("crypto");
 const fs = require("fs/promises");
 const path = require("path");
 const PDFDocument = require("pdfkit");
@@ -7,10 +7,10 @@ const prisma = require("../../prisma/prismaClient");
 const env = require("../../config/env");
 const AppError = require("../../errors/AppError");
 const domainEventBus = require("../domain/domainEventBus");
-const { encrypt, decrypt, encryptionContext } = require("../../utils/cryptoUtils");
-const { loadVerifiedSignature, consumeSignatureArtifact, deleteSignature } = require("../../utils/signatureStorage");
+const { encrypt, decrypt, encryptionContext } = require("../../utils/crypto/cryptoUtils");
+const { loadVerifiedSignature, consumeSignatureArtifact, deleteSignature } = require("../../utils/storage/signatureStorage");
 const { requireReviewerAccess } = require("./reviewService");
-const { maskNric } = require("../../utils/validation");
+const { maskNric } = require("../../utils/validation/validation");
 
 const documentsRoot = () => path.resolve(
   process.env.REFERRAL_STORAGE_DIR || path.join(__dirname, "..", "secure-data", "documents"),
@@ -25,6 +25,12 @@ const maskEmail = (email) => {
 
 const generateHandoffSecret = () => crypto.randomBytes(18).toString("base64url");
 const HANDOFF_SECRET_TTL_MS = 15 * 60 * 1000;
+
+const referralEmailTemplate = (referralId) => ({
+  subject: "Confidential document from VSMS (encrypted PDF)",
+  body: "A confidential health report and referral is attached as an encrypted PDF. Obtain the one-time password from the issuing reviewer through a separate channel. This email body does not contain the password, participant identity, or clinical details. Do not reply with personal or clinical information.",
+  filename: `health-report-referral-${referralId.slice(0, 8)}.pdf`,
+});
 
 const signedPayload = (referral, destinationEmail, signatureSha256) => JSON.stringify({
   referralId: referral.referralId,
@@ -231,11 +237,9 @@ const buildRawEmail = ({ from, to, subject, body, attachment, filename }) => {
   ].join("\r\n");
 };
 
-const sendWithSes = async ({ to, document, referralId }) => {
+const sendWithSes = async ({ to, document, referralId, subject, body }) => {
   if (!env.SES_FROM_EMAIL) return { status: "FAILED", reason: "DELIVERY_PROVIDER_NOT_CONFIGURED", attempted: false };
-  const subject = "Encrypted vision screening referral";
-  const body = "An encrypted referral is attached. Obtain its one-time passphrase from the issuing reviewer through a separate channel. Do not reply with personal or clinical information.";
-  const filename = `vision-referral-${referralId.slice(0, 8)}.pdf`;
+  const { filename } = referralEmailTemplate(referralId);
   const raw = buildRawEmail({ from: env.SES_FROM_EMAIL, to, subject, body, attachment: document, filename });
   const client = new SESv2Client({ region: env.AWS_REGION });
   const response = await client.send(new SendEmailCommand({
@@ -443,7 +447,13 @@ const resumeQueuedDelivery = async (eventId, referralId, deliveryId, user, ipAdd
 
   let result;
   try {
-    result = await sendWithSes({ to: decrypt(delivery.recipientCiphertext, deliveryEncryptionContext(delivery.id, "recipient")), document, referralId });
+    result = await sendWithSes({
+      to: decrypt(delivery.recipientCiphertext, deliveryEncryptionContext(delivery.id, "recipient")),
+      document,
+      referralId,
+      subject: delivery.subject,
+      body: delivery.body,
+    });
   } catch {
     // The provider may have accepted the message before the connection failed.
     delivery = await prisma.notificationDelivery.update({
@@ -508,6 +518,7 @@ const issueReferral = async (eventId, referralId, input, user, ipAddress, contex
   const signedPayloadHash = payloadHash(signedPayload(referral, destinationEmail, input.signatureSha256));
   const generatedAt = new Date();
   const version = referral.revisionNumber || 1;
+  const email = referralEmailTemplate(referralId);
   const document = await generateReferralPdf({ referral, signature, password: handoffSecret, version, generatedAt });
   const documentId = crypto.randomUUID();
   const deliveryId = crypto.randomUUID();
@@ -555,8 +566,8 @@ const issueReferral = async (eventId, referralId, input, user, ipAddress, contex
         status: "QUEUED",
         recipient: maskEmail(destinationEmail),
         recipientCiphertext: encrypt(destinationEmail, deliveryEncryptionContext(deliveryId, "recipient")),
-        subject: "Encrypted vision screening referral",
-        body: "Encrypted PDF attached; the passphrase must be shared through a separate channel.",
+        subject: email.subject,
+        body: email.body,
         idempotencyKey: input.idempotencyKey,
         requestFingerprint: fingerprint,
         handoffSecretCiphertext: encrypt(handoffSecret, deliveryEncryptionContext(deliveryId, "handoffSecret")),
@@ -633,7 +644,7 @@ const getDocument = async (eventId, referralId, documentId, user) => {
   if (!artifact) throw new AppError(404, "REFERRAL_DOCUMENT_NOT_FOUND", "Referral document not found");
   await requireReviewerAccess(prisma, eventId, user);
   if (artifact.referral.review.reviewedByUserId !== user.userId) throw new AppError(403, "REFERRAL_REVIEWER_REQUIRED", "Only the issuing reviewer can download this referral");
-  return { buffer: await readDocumentArtifact(artifact), filename: `vision-referral-${referralId.slice(0, 8)}.pdf` };
+  return { buffer: await readDocumentArtifact(artifact), filename: referralEmailTemplate(referralId).filename };
 };
 
 const reconcileReferralDeliveries = async (input, user, ipAddress, db = prisma, now = new Date()) => {
@@ -783,6 +794,7 @@ module.exports = {
   maskEmail,
   generateReferralPdf,
   buildRawEmail,
+  referralEmailTemplate,
   PDF_COLORS,
   resultSummary,
   referralIssueFingerprint,

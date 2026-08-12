@@ -1,7 +1,7 @@
-const express = require("express");
+﻿const express = require("express");
 const authenticate = require("../middlewares/authenticate");
 const validate = require("../middlewares/validate");
-const asyncHandler = require("../utils/asyncHandler");
+const asyncHandler = require("../utils/http/asyncHandler");
 const screeningController = require("../controllers/screeningController");
 const {
   eventParams,

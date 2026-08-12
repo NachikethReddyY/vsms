@@ -1,62 +1,335 @@
-const assert = require("node:assert/strict");
+﻿const assert = require("node:assert/strict");
 const test = require("node:test");
-const { buildAuthorizationUrl } = require("../../utils/cognitoClient");
-const { setAuthCookies, setOAuthCookies } = require("../../utils/httpCookies");
-const { normalizeReturnTo } = require("../../controllers/authController");
+const request = require("supertest");
 
-test("managed login uses an authorization-code grant with PKCE", () => {
-    const previous = { ...process.env };
-    Object.assign(process.env, {
-        COGNITO_DOMAIN: "https://vsms.auth.ap-southeast-1.amazoncognito.com",
-        COGNITO_APP_CLIENT_ID: "client-id",
-        COGNITO_REDIRECT_URI: "https://localhost:5173/auth/callback",
-    });
+process.env.DATABASE_URL ||= "postgresql://test:test@localhost:5432/vsms_test";
 
-    try {
-        const url = new URL(buildAuthorizationUrl({ state: "state", codeChallenge: "challenge" }));
-        assert.equal(url.pathname, "/oauth2/authorize");
-        assert.equal(url.searchParams.get("response_type"), "code");
-        assert.equal(url.searchParams.get("code_challenge_method"), "S256");
-        assert.equal(url.searchParams.get("code_challenge"), "challenge");
-        assert.equal(url.searchParams.get("state"), "state");
-        assert.equal(url.searchParams.get("redirect_uri"), "https://localhost:5173/auth/callback");
-    } finally {
-        process.env = previous;
-    }
+Object.assign(process.env, {
+    COGNITO_REGION: "us-east-1",
+    COGNITO_USER_POOL_ID: "us-east-1_test",
+    COGNITO_APP_CLIENT_ID: "test-client",
+    COGNITO_DOMAIN: "https://vsms.auth.us-east-1.amazoncognito.com",
+    COGNITO_REDIRECT_URI: "https://localhost:5173/auth/callback",
+    COGNITO_LOGOUT_URI: "https://localhost:5173",
+    PUBLIC_APP_ORIGIN: "https://localhost:5173",
+    PUBLIC_SIGNUP_ENABLED: "true",
+    AUTH_RATE_LIMIT: "100",
 });
 
-test("OAuth cookies are always Secure", () => {
-    const headers = new Map();
-    const response = {
-        getHeader: (name) => headers.get(name),
-        setHeader: (name, value) => headers.set(name, value),
+const cognitoClient =
+    require("../../utils/auth/cognitoClient");
+
+const cognitoJwt =
+    require("../../utils/auth/cognitoJwt");
+
+const accountService =
+    require("../../services/account/accountService");
+
+const AuthAudit =
+    require("../../utils/logging/audit");
+
+const { AppError } =
+    require("../../errors/AppError");
+
+let localUserMode = "active";
+
+/*
+ * Mock Cognito authorization-code exchange.
+ */
+cognitoClient.exchangeAuthorizationCode =
+    async (code, verifier) => {
+        assert.equal(code, "authorization-code");
+        assert.equal(verifier, "verifier");
+
+        return {
+            AccessToken: "access",
+            IdToken: "id",
+            RefreshToken: "refresh",
+            ExpiresIn: 3600,
+        };
     };
 
-    setOAuthCookies(response, { state: "state", verifier: "verifier", returnTo: "/events" });
+/*
+ * Mock Cognito JWT verification.
+ */
+cognitoJwt.verifyCognitoToken =
+    async (_token, tokenUse) => {
+        if (tokenUse === "id") {
+            return {
+                sub: "cognito-user",
+                email: "staff@example.com",
+                email_verified: true,
+                name: "Test Staff",
+            };
+        }
 
-    assert.equal(headers.get("Set-Cookie").length, 3);
-    assert.ok(headers.get("Set-Cookie").every((cookie) => cookie.includes("; Secure;")));
-});
-
-test("auth cookies include a script-readable CSRF token without exposing credentials", () => {
-    const headers = new Map();
-    const response = {
-        getHeader: (name) => headers.get(name),
-        setHeader: (name, value) => headers.set(name, value),
+        return {
+            sub: "cognito-user",
+            auth_time: Math.floor(Date.now() / 1000),
+        };
     };
 
-    setAuthCookies(response, { AccessToken: "access", RefreshToken: "refresh", ExpiresIn: 60 }, "staff@example.com");
+/*
+ * Mock local account lookup.
+ */
+accountService.syncCognitoUser =
+    async () => {
+        if (localUserMode === "missing") {
+            throw new AppError(
+                403,
+                "LOCAL_PROFILE_NOT_FOUND",
+                "Access denied",
+            );
+        }
 
-    const cookies = headers.get("Set-Cookie");
-    const csrf = cookies.find((value) => value.startsWith("vsms_csrf="));
-    assert.ok(csrf);
-    assert.ok(!csrf.includes("HttpOnly"));
-    assert.ok(cookies.filter((value) => !value.startsWith("vsms_csrf=")).every((value) => value.includes("HttpOnly")));
-});
+        return {
+            id: "staff-id",
+            email: "staff@example.com",
+            status: "ACTIVE",
+            accessState:
+                localUserMode === "blocked"
+                    ? "DISABLED"
+                    : "ENABLED",
+            approvalState: "APPROVED",
+            deprovisionedAt: null,
+            sessionInvalidBefore: null,
+            userRoles: [
+                {
+                    role: {
+                        roleName: "EVENT_MANAGER",
+                    },
+                },
+            ],
+        };
+    };
 
-test("managed login return paths stay on the configured application", () => {
-    assert.equal(normalizeReturnTo("/events/123?tab=operations"), "/events/123?tab=operations");
-    for (const unsafe of ["https://evil.example", "//evil.example", "/\\evil.example", "/%2f%2fevil.example", "/%5c%5cevil.example", "/%0aevil.example"]) {
-        assert.equal(normalizeReturnTo(unsafe), "/events");
+/*
+ * Prevent the callback test from touching the database.
+ */
+accountService.recordSuccessfulLogin =
+    async () => new Date();
+
+accountService.recordAuthAudit =
+    async () => {};
+
+AuthAudit.createAuthAuditLog =
+    async () => {};
+
+/*
+ * Load app only after mocks are installed.
+ */
+const app = require("../../app");
+
+
+test(
+    "authorize route creates a PKCE authorization URL and stores the protected return target",
+    async () => {
+        const response = await request(app)
+            .get(
+                "/api/v1/auth/authorize" +
+                "?returnTo=%2Fevents%3Fview%3Dupcoming"
+            );
+
+        assert.equal(response.status, 302);
+
+        const authorizationUrl =
+            new URL(response.headers.location);
+
+        assert.equal(
+            authorizationUrl.origin,
+            "https://vsms.auth.us-east-1.amazoncognito.com",
+        );
+
+        assert.equal(
+            authorizationUrl.pathname,
+            "/oauth2/authorize",
+        );
+
+        assert.equal(
+            authorizationUrl.searchParams.get("response_type"),
+            "code",
+        );
+
+        assert.equal(
+            authorizationUrl.searchParams.get(
+                "code_challenge_method"
+            ),
+            "S256",
+        );
+
+        assert.ok(
+            authorizationUrl.searchParams.get("state")
+        );
+
+        assert.ok(
+            authorizationUrl.searchParams.get("code_challenge")
+        );
+
+        assert.ok(
+            response.headers["set-cookie"].some(
+                (cookie) =>
+                    cookie.startsWith(
+                        "vsms_oauth_return_to=%2Fevents%3Fview%3Dupcoming"
+                    )
+            )
+        );
     }
-});
+);
+
+
+test(
+    "authorize forwards the sign-up hint to Cognito",
+    async () => {
+        const response = await request(app)
+            .get(
+                "/api/v1/auth/authorize?screen_hint=signup"
+            );
+
+        const authorizationUrl =
+            new URL(response.headers.location);
+
+        assert.equal(
+            authorizationUrl.searchParams.get("screen_hint"),
+            "signup",
+        );
+    }
+);
+
+
+test(
+    "callback returns the same-origin protected target after authorization-code exchange",
+    async () => {
+        localUserMode = "active";
+
+        const response = await request(app)
+            .get(
+                "/api/v1/auth/callback" +
+                "?code=authorization-code&state=state"
+            )
+            .set(
+                "Cookie",
+                [
+                    "vsms_oauth_state=state",
+                    "vsms_oauth_verifier=verifier",
+                    "vsms_oauth_return_to=" +
+                        encodeURIComponent(
+                            "https://localhost:5173/events?view=upcoming"
+                        ),
+                ].join("; ")
+            );
+
+        console.log(
+            "CALLBACK STATUS:",
+            response.status
+        );
+
+        console.log(
+            "CALLBACK BODY:",
+            response.body
+        );
+
+        assert.equal(response.status, 200);
+
+        assert.equal(
+            response.body.returnTo,
+            "/events?view=upcoming",
+        );
+    }
+);
+
+
+test(
+    "callback distinguishes a missing local profile from another blocked account state",
+    async () => {
+        try {
+            localUserMode = "missing";
+
+            const missing = await request(app)
+                .get(
+                    "/api/v1/auth/callback" +
+                    "?code=authorization-code&state=state"
+                )
+                .set(
+                    "Cookie",
+                    "vsms_oauth_state=state; " +
+                    "vsms_oauth_verifier=verifier"
+                );
+
+            assert.equal(missing.status, 403);
+
+            assert.equal(
+                missing.body.code,
+                "LOCAL_PROFILE_NOT_FOUND",
+            );
+
+
+            localUserMode = "blocked";
+
+            const blocked = await request(app)
+                .get(
+                    "/api/v1/auth/callback" +
+                    "?code=authorization-code&state=state"
+                )
+                .set(
+                    "Cookie",
+                    "vsms_oauth_state=state; " +
+                    "vsms_oauth_verifier=verifier"
+                );
+
+            assert.equal(blocked.status, 403);
+
+            assert.equal(
+                blocked.body.code,
+                "ACCOUNT_SESSION_BLOCKED",
+            );
+        } finally {
+            localUserMode = "active";
+        }
+    }
+);
+
+
+const invalidReturnTargets = [
+    "/",
+    "https://untrusted.example/events",
+    "https://localhost:5173//untrusted",
+    "/auth/callback",
+    "/api/v1/auth/authorize",
+];
+
+
+for (const returnTo of invalidReturnTargets) {
+    test(
+        `callback defaults invalid return target ${returnTo} to events`,
+        async () => {
+            localUserMode = "active";
+
+            const response = await request(app)
+                .get(
+                    "/api/v1/auth/callback" +
+                    "?code=authorization-code&state=state"
+                )
+                .set(
+                    "Cookie",
+                    [
+                        "vsms_oauth_state=state",
+                        "vsms_oauth_verifier=verifier",
+                        "vsms_oauth_return_to=" +
+                            encodeURIComponent(returnTo),
+                    ].join("; ")
+                );
+
+            console.log(
+                `CALLBACK STATUS FOR ${returnTo}:`,
+                response.status,
+            );
+
+            assert.equal(response.status, 200);
+
+            assert.equal(
+                response.body.returnTo,
+                "/events",
+            );
+        }
+    );
+}

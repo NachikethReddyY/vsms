@@ -1,7 +1,7 @@
-const crypto = require("crypto");
+﻿const crypto = require("crypto");
 const prisma = require("../prisma/prismaClient");
 const env = require("../config/env");
-const { encrypt, encryptionContext } = require("../utils/cryptoUtils");
+const { encrypt, encryptionContext } = require("../utils/crypto/cryptoUtils");
 
 const PRESET_TOKEN = "cd".repeat(32);
 const PRESET_QR_ID = "cdcdcdcd-0000-4000-8000-000000000001";

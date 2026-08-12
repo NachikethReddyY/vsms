@@ -1,11 +1,11 @@
-/**
+﻿/**
  * @fileoverview Global Express Error Handler
  * @module middlewares/errorHandler
  * @description Centralized error processing, logging, and API error responses.
  */
 
 const { AppError } = require("../errors/AppError"); // Make sure path matches your structure
-const logger = require("../utils/logger/logger");
+const logger = require("../utils/logging/logger/logger");
 
 const fallbackMessage = (status) => ({
     400: "Request could not be processed",

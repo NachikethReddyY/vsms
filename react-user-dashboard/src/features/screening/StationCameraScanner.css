@@ -3,8 +3,9 @@
 .station-scanner-viewport {
   position: relative;
   overflow: hidden;
+  border:1px solid var(--hairline-strong);
   border-radius: 16px;
-  background: #0b0d10;
+  background:var(--canvas);
   aspect-ratio: 4 / 3;
 }
 .station-scanner video { width: 100%; height: 100%; object-fit: cover; }
@@ -23,11 +24,31 @@
   transform: translateX(-50%);
   padding: 8px 14px;
   border-radius: 999px;
-  background: rgba(0, 0, 0, 0.72);
-  color: #fff;
+  background:color-mix(in srgb,var(--canvas) 82%,#000);
+  color:var(--ink);
   font-size: 12px;
 }
 .station-scanner-error { margin: 0; color: var(--red, #b42318); font-size: 12px; line-height: 18px; }
+.station-scanner-torch {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  justify-self: center;
+  min-height: 36px;
+  padding: 0 14px;
+  border: 1px solid var(--hairline-strong);
+  border-radius: 9px;
+  background: var(--surface);
+  color: var(--ink-2);
+  font-size: 12px;
+  cursor: pointer;
+}
+.station-scanner-torch svg { width: 15px; }
+.station-scanner-torch:hover { border-color: var(--accent); color: var(--accent); }
+.station-scanner-torch.is-on { border-color: var(--accent); background: var(--accent-tint); color: var(--accent); }
+.station-scanner-hint { margin: 0; color: var(--muted); font-size: 11.5px; line-height: 1.55; }
+
+[data-theme="dark"] .station-scanner-viewport { background:#0b0d10; }
 
 .station-pass-qr {
   display: grid;

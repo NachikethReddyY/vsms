@@ -1,7 +1,7 @@
 const crypto = require("crypto");
 const { v4: uuidv4, validate: isUuid } = require("uuid");
-const prisma = require("../prisma/prismaClient");
-const { sanitizeMetadata } = require("./sanitize");
+const prisma = require("../../prisma/prismaClient");
+const { sanitizeMetadata } = require("../security/sanitize");
 
 function trimValue(value, maxLength) {
     if (!value) {

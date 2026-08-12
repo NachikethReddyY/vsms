@@ -1,8 +1,8 @@
-const express = require("express");
+﻿const express = require("express");
 const { rateLimit } = require("express-rate-limit");
 const eventController = require("../controllers/eventController");
 const validate = require("../middlewares/validate");
-const asyncHandler = require("../utils/asyncHandler");
+const asyncHandler = require("../utils/http/asyncHandler");
 const { eventParams } = require("../schemas/eventSchemas");
 
 const router = express.Router();

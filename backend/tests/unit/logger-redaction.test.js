@@ -7,7 +7,7 @@ const assert = require("node:assert/strict");
 test("startup error messages and stacks are redacted while safe fields remain", () => {
   const secret = "startup-sensitive-token";
   const script = `
-    const logger = require("./utils/logger/logger");
+    const logger = require("./utils/logging/logger/logger");
     const error = new Error(${JSON.stringify(`startup failed: ${secret}`)});
     error.stack += ${JSON.stringify(`\ncaused by ${secret}`)};
     logger.error("startup_failure", {
@@ -42,7 +42,7 @@ test("request paths do not bypass Pino with console error or warning logs", () =
     "../../app.js",
     "../../middlewares/idempotency.js",
     "../../controllers/userController.js",
-    "../../utils/qrGenerator.js",
+    "../../utils/qr/qrGenerator.js",
     "../../middlewares/validate.js",
   ];
 

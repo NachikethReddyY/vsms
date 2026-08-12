@@ -1,11 +1,12 @@
-const crypto = require("crypto");
+﻿const crypto = require("crypto");
 const prisma = require("../../prisma/prismaClient");
 const AppError = require("../../errors/AppError");
 const { requireEventRoleAndDuty } = require("../event/eventAuthorizationService");
 const qrService = require("../participant/qrService");
 const domainEventBus = require("../domain/domainEventBus");
-const { createAuditLog } = require("../../utils/audit");
-const { resolveRegistrationByQrValue } = require("../../utils/qrToken");
+const { createAuditLog } = require("../../utils/logging/audit");
+const { resolveRegistrationByQrValue } = require("../../utils/crypto/qrToken");
+const { recordVisualAcuity } = require("../../utils/database/visualAcuityProcedure");
 const {
   validateResultAgainstSchema,
   evaluateDynamicResult,
@@ -116,8 +117,8 @@ const evaluateRefraction = (resultData) => {
   const overallFlag = worstFlag(reasons);
   const summaryParts = resultData.measurementStatus === "COMPLETED"
     ? [
-      `OD ${formatDiopter(resultData.od.sphere)}/${formatDiopter(resultData.od.cylinder)} x ${resultData.od.axis ?? "—"}`,
-      `OS ${formatDiopter(resultData.os.sphere)}/${formatDiopter(resultData.os.cylinder)} x ${resultData.os.axis ?? "—"}`,
+      `OD ${formatDiopter(resultData.od.sphere)}/${formatDiopter(resultData.od.cylinder)} x ${resultData.od.axis ?? "â€”"}`,
+      `OS ${formatDiopter(resultData.os.sphere)}/${formatDiopter(resultData.os.cylinder)} x ${resultData.os.axis ?? "â€”"}`,
     ]
     : [resultData.measurementStatus.replaceAll("_", " ").toLowerCase()];
 

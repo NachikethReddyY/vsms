@@ -1,11 +1,9 @@
 import { ArrowLeftIcon, CheckCircleIcon, DocumentTextIcon, ExclamationTriangleIcon, PencilSquareIcon } from "@heroicons/react/24/outline";
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
-import { PhoneInput } from "../../components/PhoneInput";
 import { SignaturePad } from "../../components/SignaturePad";
 import type { ConsentFormVersion, Participant } from "../../types";
 import apiClient, { getApiError } from "../../utils/apiClient";
-import { isValidParticipantPhoneNumber } from "../../utils/phone";
 import "./ParticipantPage.css";
 import "./ParticipantConsentPage.css";
 import "./ParticipantConsentRefinement.css";
@@ -15,9 +13,6 @@ type ConsentFormState = {
   signerType: "PARTICIPANT" | "PARENT" | "GUARDIAN" | "AUTHORISED_REPRESENTATIVE";
   signerName: string;
   signerRelationship: string;
-  guardianContactName: string;
-  guardianContactPhone: string;
-  guardianContactEmail: string;
 };
 
 const signerLabels = {
@@ -32,9 +27,6 @@ const emptyConsent: ConsentFormState = {
   signerType: "PARTICIPANT",
   signerName: "",
   signerRelationship: "",
-  guardianContactName: "",
-  guardianContactPhone: "",
-  guardianContactEmail: "",
 };
 
 type EventConsentRecord = {
@@ -102,11 +94,9 @@ export default function ParticipantConsentPage() {
     if (!eventId) return "Choose an event in Participants before recording consent.";
     if (!form.signerName.trim()) return `${activeSigner.name} is required.`;
     if (requiresRepresentativeDetails && !form.signerRelationship.trim()) return "Relationship to participant is required.";
-    if (requiresRepresentativeDetails && !form.guardianContactName.trim()) return `${activeSigner.person} contact name is required.`;
-    if (requiresRepresentativeDetails && !isValidParticipantPhoneNumber(form.guardianContactPhone)) return `Enter a valid ${activeSigner.person.toLowerCase()} contact phone.`;
     if (form.consentStatus === "ACCEPTED" && !signatureDataUrl) return "Capture an electronic signature before recording accepted consent.";
     return null;
-  }, [activeSigner.name, activeSigner.person, eventId, form, requiresRepresentativeDetails, signatureDataUrl]);
+  }, [activeSigner.name, eventId, form, requiresRepresentativeDetails, signatureDataUrl]);
 
   const canRecord = Boolean(consentForm && !missingRequirement && !submitting);
 
@@ -226,9 +216,6 @@ export default function ParticipantConsentPage() {
 
             {requiresRepresentativeDetails ? <div className="participant-v2-consent-representative-fields">
               <label className="participant-v2-consent-field">Relationship to participant<input value={form.signerRelationship} onChange={(event) => updateForm({ signerRelationship: event.target.value })} maxLength={60} /></label>
-              <label className="participant-v2-consent-field">{activeSigner.person} contact name<input value={form.guardianContactName} onChange={(event) => updateForm({ guardianContactName: event.target.value })} maxLength={150} /></label>
-              <label className="participant-v2-consent-field">{activeSigner.person} contact phone<PhoneInput value={form.guardianContactPhone} onChange={(value) => updateForm({ guardianContactPhone: value })} /></label>
-              <label className="participant-v2-consent-field">{activeSigner.person} contact email <small>optional</small><input type="email" value={form.guardianContactEmail} onChange={(event) => updateForm({ guardianContactEmail: event.target.value })} maxLength={255} /></label>
             </div> : null}
 
             {form.consentStatus === "ACCEPTED" ? <div className="participant-v2-consent-signature">
