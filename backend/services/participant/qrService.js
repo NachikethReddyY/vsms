@@ -22,7 +22,13 @@ const activeQrWhere = (selector = {}, now = new Date()) => ({
 
 const stationCapacity = (station, capacities) => Math.max(1, Number(capacities.get(station.stationId)) || Number(station.stationTemplate?.defaultCapacity) || 1);
 const stationOccupancyPercent = (activeQueueCount, capacity) => Math.round((activeQueueCount / capacity) * 100);
-const publicStationStatus = (station, activeQueueCount) => {
+const stationAvailable = (availability, now) => !availability || (
+    availability.isAvailable
+    && (!availability.startsAt || availability.startsAt <= now)
+    && (!availability.endsAt || availability.endsAt > now)
+);
+const publicStationStatus = (station, activeQueueCount, available = true) => {
+    if (!available) return "OFFLINE";
     if (!station.isActive || station.operationalStatus === "OFFLINE") return "OFFLINE";
     if (station.operationalStatus === "PAUSED") return "PAUSED";
     return station.operationalStatus === "BUSY" || activeQueueCount > 0 ? "BUSY" : "AVAILABLE";
@@ -438,10 +444,11 @@ exports.getPublicStatus = async (token, db = prisma) => {
         }),
         db.eventStationAvailability.findMany({
             where: { eventDay: { eventId, startsAt: { lte: now }, endsAt: { gt: now } } },
-            select: { eventStationId: true, capacity: true },
+            select: { eventStationId: true, capacity: true, isAvailable: true, startsAt: true, endsAt: true },
         }),
     ]);
     const capacities = new Map(availabilities.map(({ eventStationId, capacity }) => [eventStationId, capacity]));
+    const availabilityByStation = new Map(availabilities.map((availability) => [availability.eventStationId, availability]));
 
     const entries = await db.queueEntry.findMany({
         where: { station: { eventId } },
@@ -502,9 +509,10 @@ exports.getPublicStatus = async (token, db = prisma) => {
 
     const liveStations = [...byStation.values()].map((station) => {
         const source = stations.find((item) => item.stationId === station.stationId);
+        const available = stationAvailable(availabilityByStation.get(station.stationId), now);
         const activeQueueCount = station.workload.WAITING + station.workload.CALLED + station.workload.IN_PROGRESS;
         const capacity = stationCapacity(source || {}, capacities);
-        const status = publicStationStatus(source || {}, activeQueueCount);
+        const status = publicStationStatus(source || {}, activeQueueCount, available);
         return {
             ...station,
             status,
@@ -571,6 +579,26 @@ exports.getStationHandoffQR = async (token, stationType, db = prisma) => {
 
     if (!qr) {
         throw new AppError(404, "INVALID_QR", "QR Code is invalid, expired, or unavailable.");
+    }
+
+    const station = await db.station.findFirst({
+        where: { eventId: qr.registration.eventId, stationType },
+        select: { stationId: true, isActive: true, operationalStatus: true },
+    });
+    if (!station || ["PAUSED", "OFFLINE"].includes(publicStationStatus(station, 0))) {
+        throw new AppError(409, "STATION_UNAVAILABLE", "This station is not available for handoff.");
+    }
+
+    const now = new Date();
+    const availability = await db.eventStationAvailability.findFirst({
+        where: {
+            eventStationId: station.stationId,
+            eventDay: { eventId: qr.registration.eventId, startsAt: { lte: now }, endsAt: { gt: now } },
+        },
+        select: { isAvailable: true, startsAt: true, endsAt: true },
+    });
+    if (!stationAvailable(availability, now)) {
+        throw new AppError(409, "STATION_UNAVAILABLE", "This station is not available for handoff.");
     }
 
     const qrImage = await renderBrandedQrSvg(buildStationHandoffUrl(qr.registration.eventId, qr.registration.registrationId, stationType), { width: 300 });

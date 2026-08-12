@@ -18,11 +18,17 @@ const stationCapacity = (station, capacities) => Math.max(
     1
 );
 const occupancyPercent = (activeQueueCount, capacity) => Math.round((activeQueueCount / capacity) * 100);
+const stationAvailable = (availability, now) => !availability || (
+  availability.isAvailable &&
+  (!availability.startsAt || availability.startsAt <= now) &&
+  (!availability.endsAt || availability.endsAt > now)
+);
 
 /**
  * Determine the current operational status of a station.
  */
-const stationStatus = (station, activeQueueCount = 0) => {
+const stationStatus = (station, activeQueueCount = 0, available = true) => {
+  if (!available) return "OFFLINE";
   if (
     !station.isActive ||
     station.operationalStatus === "OFFLINE"
@@ -581,6 +587,9 @@ const listRegistrationStations = async (
          select: {
            eventStationId: true,
            capacity: true,
+           isAvailable: true,
+           startsAt: true,
+           endsAt: true,
          },
        }),
      ]);
@@ -588,6 +597,12 @@ const listRegistrationStations = async (
     availabilities.map(({ eventStationId, capacity }) => [
       eventStationId,
       capacity,
+    ])
+  );
+  const availabilityByStation = new Map(
+    availabilities.map((availability) => [
+      availability.eventStationId,
+      availability,
     ])
   );
   const activeCounts = new Map();
@@ -608,7 +623,11 @@ const listRegistrationStations = async (
 
       const status = stationStatus(
         station,
-        activeQueueCount
+        activeQueueCount,
+        stationAvailable(
+          availabilityByStation.get(station.stationId),
+          now
+        )
       );
       const capacity = stationCapacity(
         station,

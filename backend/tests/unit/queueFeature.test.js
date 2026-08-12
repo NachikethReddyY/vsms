@@ -248,6 +248,20 @@ test('registration station list preserves an explicit busy status without a queu
   assert.equal(result.stations[0].selectable, true);
 });
 
+test('registration station list disables a station unavailable for the event day', async () => {
+  const db = baseDb({
+    station: { findMany: async () => [station] },
+    eventStationAvailability: {
+      findMany: async () => [{ eventStationId: stationId, capacity: 4, isAvailable: false, startsAt: null, endsAt: null }],
+    },
+  });
+
+  const result = await queueService.listRegistrationStations(eventId, operationalUser, db);
+
+  assert.equal(result.stations[0].status, 'OFFLINE');
+  assert.equal(result.stations[0].selectable, false);
+});
+
 test('queue handoff allocates a queue number, creates the entry, and audits the assignment', async () => {
   audits.length = 0;
   const registrationWithoutQueue = {

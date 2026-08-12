@@ -10,6 +10,7 @@ const qrService = require("../../services/participant/qrService");
 const eventId = "11111111-1111-4111-8111-111111111111";
 const registrationId = "22222222-2222-4222-8222-222222222222";
 const qrId = "33333333-3333-4333-8333-333333333333";
+const stationId = "44444444-4444-4444-8444-444444444444";
 
 const tokenHash = (token) => crypto.createHash("sha256").update(token).digest("hex");
 
@@ -240,6 +241,12 @@ test("handoff QR encodes a station URL pre-loaded with the registration, exposin
         return { registration: { registrationId, eventId } };
       },
     },
+    station: {
+      findFirst: async () => ({ stationId, isActive: true, operationalStatus: "AVAILABLE" }),
+    },
+    eventStationAvailability: {
+      findFirst: async () => ({ isAvailable: true, startsAt: null, endsAt: null }),
+    },
   };
 
   const result = await qrService.getStationHandoffQR(token, "VISUAL_ACUITY", db);
@@ -272,6 +279,19 @@ test("handoff QR rejects an unsupported station type and an inactive pass", asyn
   await assert.rejects(
     qrService.getStationHandoffQR("b".repeat(64), "VISUAL_ACUITY", { qRCodePass: { findFirst: async () => null } }),
     (error) => error.code === "INVALID_QR" && error.status === 404,
+  );
+});
+
+test("handoff QR rejects a station unavailable for this event day", async () => {
+  const db = {
+    qRCodePass: { findFirst: async () => ({ registration: { registrationId, eventId } }) },
+    station: { findFirst: async () => ({ stationId, isActive: true, operationalStatus: "AVAILABLE" }) },
+    eventStationAvailability: { findFirst: async () => ({ isAvailable: false, startsAt: null, endsAt: null }) },
+  };
+
+  await assert.rejects(
+    qrService.getStationHandoffQR("c".repeat(64), "VISUAL_ACUITY", db),
+    (error) => error.code === "STATION_UNAVAILABLE" && error.status === 409,
   );
 });
 
@@ -615,7 +635,7 @@ test("public pass status reveals no PII and reports expired or revoked passes as
       findMany: async () => [],
     },
     eventStationAvailability: {
-      findMany: async () => [{ eventStationId: "station-1", capacity: 6 }],
+      findMany: async () => [{ eventStationId: "station-1", capacity: 6, isAvailable: true, startsAt: null, endsAt: null }],
     },
   };
 
