@@ -38,7 +38,10 @@ test.describe('Public participant pass status', () => {
     await page.getByText('Show a screener pass').click();
     await expect(page.getByRole('heading', { name: 'Screener pass' })).toBeVisible();
 
-    await page.getByRole('button', { name: 'Visual Acuity' }).click();
+    await expect(page.getByRole('button', { name: /Refraction/ })).toBeDisabled();
+    const request = page.waitForRequest((candidate) => candidate.url().includes('station=VISUAL_ACUITY'));
+    await page.getByRole('button', { name: /Visual Acuity/ }).click();
+    await request;
     await expect(page.getByAltText('Screener pass QR code')).toBeVisible();
     await expect(page.getByText('No personal information is stored in the code.')).toBeVisible();
   });

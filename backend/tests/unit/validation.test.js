@@ -90,7 +90,7 @@ test("accepted consent requires signer and signature evidence", () => {
     assert.throws(() => validateConsentPayload({ ...base, consentStatus: "WITHDRAWN" }), /ACCEPTED or DECLINED/);
 });
 
-test("representative consent requires relationship and contact information", () => {
+test("representative consent requires a relationship but not duplicate contact information", () => {
     const base = {
         consentFormVersionId: "44444444-4444-4444-8444-444444444444",
         consentStatus: "DECLINED",
@@ -98,6 +98,7 @@ test("representative consent requires relationship and contact information", () 
         signerName: "Guardian",
     };
     assert.throws(() => validateConsentPayload(base), /signerRelationship/);
+    assert.equal(validateConsentPayload({ ...base, signerRelationship: "Parent" }).guardianContactPhone, null);
 });
 
 test("idempotency keys have bounded safe syntax", () => {

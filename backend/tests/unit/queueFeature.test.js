@@ -12,7 +12,7 @@ const registrationId = uuid();
 const queueId = uuid();
 
 const event = { eventId, name: 'Jurong Live', status: 'IN_PROGRESS', venue: 'Jurong Regional Library' };
-const station = { stationId, eventId, stationName: 'Visual Acuity', stationType: 'VISUAL_ACUITY', isActive: true };
+const station = { stationId, eventId, stationName: 'Visual Acuity', stationType: 'VISUAL_ACUITY', isActive: true, stationTemplate: { defaultCapacity: 4 } };
 const targetStation = { stationId: targetStationId, eventId, stationName: 'Refraction', stationType: 'REFRACTION', isActive: true };
 const registration = {
   registrationId,
@@ -77,6 +77,10 @@ const baseDb = (overrides = {}) => ({
     findUnique: async () => queueEntry,
     findMany: async () => [],
     ...(overrides.queueEntry || {}),
+  },
+  eventStationAvailability: {
+    findMany: async () => [],
+    ...(overrides.eventStationAvailability || {}),
   },
   $transaction: async (callback) => callback(baseTransaction()),
   ...(overrides.root || {}),
@@ -218,15 +222,44 @@ test('registration station list exposes derived availability and queue counts', 
   const db = baseDb({
     station: { findMany: async () => [station, pausedStation] },
     queueEntry: { findMany: async () => [{ stationId }] },
+    eventStationAvailability: { findMany: async () => [{ eventStationId: stationId, capacity: 8 }] },
   });
 
   const result = await queueService.listRegistrationStations(eventId, operationalUser, db);
 
   assert.equal(result.stations[0].status, 'BUSY');
   assert.equal(result.stations[0].activeQueueCount, 1);
+  assert.equal(result.stations[0].capacity, 8);
+  assert.equal(result.stations[0].occupancyPercent, 13);
   assert.equal(result.stations[0].selectable, true);
   assert.equal(result.stations[1].status, 'PAUSED');
   assert.equal(result.stations[1].selectable, false);
+});
+
+test('registration station list preserves an explicit busy status without a queue', async () => {
+  const db = baseDb({
+    station: { findMany: async () => [{ ...station, operationalStatus: 'BUSY' }] },
+    queueEntry: { findMany: async () => [] },
+  });
+
+  const result = await queueService.listRegistrationStations(eventId, operationalUser, db);
+
+  assert.equal(result.stations[0].status, 'BUSY');
+  assert.equal(result.stations[0].selectable, true);
+});
+
+test('registration station list disables a station unavailable for the event day', async () => {
+  const db = baseDb({
+    station: { findMany: async () => [station] },
+    eventStationAvailability: {
+      findMany: async () => [{ eventStationId: stationId, capacity: 4, isAvailable: false, startsAt: null, endsAt: null }],
+    },
+  });
+
+  const result = await queueService.listRegistrationStations(eventId, operationalUser, db);
+
+  assert.equal(result.stations[0].status, 'OFFLINE');
+  assert.equal(result.stations[0].selectable, false);
 });
 
 test('queue handoff allocates a queue number, creates the entry, and audits the assignment', async () => {

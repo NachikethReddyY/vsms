@@ -1,9 +1,10 @@
 /* eslint-disable react-refresh/only-export-components */
 import { ExclamationTriangleIcon } from '@heroicons/react/24/outline';
-import { FormEvent, ReactNode, useCallback, useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { FormEvent, ReactNode, useCallback, useEffect, useMemo, useState } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
 import { AppToast } from '../../components/AppToast';
-import { getApiError as getApiMessage } from '../../utils/apiClient';
+import { LiveStationHandoffPicker, type LiveStationHandoffStation } from '../../components/qr/LiveStationHandoffPicker';
+import apiClient, { getApiError as getApiMessage } from '../../utils/apiClient';
 import { getStoredSession } from '../../utils/session';
 import {
   FlagEvaluation,
@@ -58,13 +59,15 @@ export function StationHandoffLinks({
   registrationId?: string | null;
   stations?: Station[];
 }) {
-  const next = nextStationTypes(currentStationType, stations);
+  const navigate = useNavigate();
+  const next = useMemo(() => nextStationTypes(currentStationType, stations), [currentStationType, stations]);
   const isLastScreeningStation = next.length === 0;
   const nextLabel = next[0] ? STATION_LABEL[next[0]] : null;
   const [passImage, setPassImage] = useState<string | null>(null);
   const [passName, setPassName] = useState<string | null>(null);
   const [passQueue, setPassQueue] = useState<number | null>(null);
   const [passError, setPassError] = useState<string | null>(null);
+  const [liveStations, setLiveStations] = useState<LiveStationHandoffStation[]>([]);
 
   useEffect(() => {
     if (!eventId || !registrationId) return;
@@ -83,6 +86,19 @@ export function StationHandoffLinks({
       });
     return () => { cancelled = true; };
   }, [eventId, registrationId]);
+
+  useEffect(() => {
+    if (!eventId) return;
+    let cancelled = false;
+    void apiClient.get<{ stations: LiveStationHandoffStation[] }>(`/queues/events/${eventId}/stations`)
+      .then(({ data }) => {
+        if (!cancelled) setLiveStations(data.stations.filter((station) => next.includes(station.stationType as StationType)));
+      })
+      .catch(() => {
+        if (!cancelled) setLiveStations([]);
+      });
+    return () => { cancelled = true; };
+  }, [eventId, next]);
 
   return (
     <nav className="va-handoff" aria-label="Continue screening">
@@ -112,8 +128,20 @@ export function StationHandoffLinks({
         </div>
       )}
 
+      {registrationId && liveStations.length > 0 && (
+        <LiveStationHandoffPicker
+          stations={liveStations}
+          onSelect={(station) => {
+            const href = stationPath(eventId, station.stationType as StationType, registrationId);
+            if (href) navigate(href);
+          }}
+          actionLabel="Open station"
+          emptyMessage="No next stations are available."
+        />
+      )}
+
       <div className="action-cluster" style={{ paddingTop: 0 }}>
-        {next.map((type, index) => {
+        {liveStations.length === 0 && next.map((type, index) => {
           const href = stationPath(eventId, type, registrationId);
           if (!href) return null;
           return (

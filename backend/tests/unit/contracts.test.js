@@ -286,3 +286,9 @@ test("seed creates VA / refraction / colour vision Station rows", () => {
     assert.match(seed, /\["COLOUR_VISION"/);
     assert.match(seed, /Live event stations/);
 });
+
+test("seeded screener identity is synthetic by default", () => {
+    const seed = read("prisma/seed.js");
+    assert.match(seed, /synthetic\.screener@example\.test/);
+    assert.doesNotMatch(seed, /@gmail\.com/);
+});

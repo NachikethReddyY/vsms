@@ -20,6 +20,20 @@ const activeQrWhere = (selector = {}, now = new Date()) => ({
     expiresAt: { gt: now },
 });
 
+const stationCapacity = (station, capacities) => Math.max(1, Number(capacities.get(station.stationId)) || Number(station.stationTemplate?.defaultCapacity) || 1);
+const stationOccupancyPercent = (activeQueueCount, capacity) => Math.round((activeQueueCount / capacity) * 100);
+const stationAvailable = (availability, now) => !availability || (
+    availability.isAvailable
+    && (!availability.startsAt || availability.startsAt <= now)
+    && (!availability.endsAt || availability.endsAt > now)
+);
+const publicStationStatus = (station, activeQueueCount, available = true) => {
+    if (!available) return "OFFLINE";
+    if (!station.isActive || station.operationalStatus === "OFFLINE") return "OFFLINE";
+    if (station.operationalStatus === "PAUSED") return "PAUSED";
+    return station.operationalStatus === "BUSY" || activeQueueCount > 0 ? "BUSY" : "AVAILABLE";
+};
+
 const tokenSelector = (token) => ({ tokenHash: hashToken(token) });
 
 const qrTokenContext = (qrId) => encryptionContext("QRCodePass", qrId, "token");
@@ -409,7 +423,7 @@ exports.getPublicStatus = async (token, db = prisma) => {
         _max: { queueNumber: true },
     }))._max.queueNumber ?? null;
 
-    const [activeEntry, stations, transfers] = await Promise.all([
+    const [activeEntry, stations, transfers, availabilities] = await Promise.all([
         db.queueEntry.findFirst({
             where: { registrationId, status: { in: ["WAITING", "CALLED", "IN_PROGRESS"] } },
             orderBy: [{ enteredAt: "desc" }, { id: "desc" }],
@@ -418,6 +432,7 @@ exports.getPublicStatus = async (token, db = prisma) => {
         db.station.findMany({
             where: { eventId, isActive: true },
             orderBy: [{ stationOrder: "asc" }, { stationId: "asc" }],
+            include: { stationTemplate: { select: { defaultCapacity: true } } },
         }),
         db.queueMovement.findMany({
             where: { registrationId },
@@ -427,7 +442,13 @@ exports.getPublicStatus = async (token, db = prisma) => {
                 toStation: { select: { stationName: true } },
             },
         }),
+        db.eventStationAvailability.findMany({
+            where: { eventDay: { eventId, startsAt: { lte: now }, endsAt: { gt: now } } },
+            select: { eventStationId: true, capacity: true, isAvailable: true, startsAt: true, endsAt: true },
+        }),
     ]);
+    const capacities = new Map(availabilities.map(({ eventStationId, capacity }) => [eventStationId, capacity]));
+    const availabilityByStation = new Map(availabilities.map((availability) => [availability.eventStationId, availability]));
 
     const entries = await db.queueEntry.findMany({
         where: { station: { eventId } },
@@ -447,6 +468,7 @@ exports.getPublicStatus = async (token, db = prisma) => {
         stationId: station.stationId,
         stationName: station.stationName,
         stationType: station.stationType,
+        stationOrder: station.stationOrder,
         workload: { WAITING: 0, CALLED: 0, IN_PROGRESS: 0, COMPLETED: 0, SKIPPED: 0, CANCELLED: 0 },
         nextUpQueueNumber: null,
     }]));
@@ -485,6 +507,24 @@ exports.getPublicStatus = async (token, db = prisma) => {
         )).length
         : null;
 
+    const liveStations = [...byStation.values()].map((station) => {
+        const source = stations.find((item) => item.stationId === station.stationId);
+        const available = stationAvailable(availabilityByStation.get(station.stationId), now);
+        const activeQueueCount = station.workload.WAITING + station.workload.CALLED + station.workload.IN_PROGRESS;
+        const capacity = stationCapacity(source || {}, capacities);
+        const status = publicStationStatus(source || {}, activeQueueCount, available);
+        return {
+            ...station,
+            status,
+            activeQueueCount,
+            capacity,
+            occupancyPercent: stationOccupancyPercent(activeQueueCount, capacity),
+            selectable: status === "AVAILABLE" || status === "BUSY",
+            nextUp: station.nextUpQueueNumber != null ? { queueNumber: station.nextUpQueueNumber } : null,
+            nextUpQueueNumber: undefined,
+        };
+    });
+
     return {
         valid: true,
         eventName: qr.registration.event.name,
@@ -493,11 +533,7 @@ exports.getPublicStatus = async (token, db = prisma) => {
         registrationStatus: qr.registration.registrationStatus,
         queueState,
         aheadAtStation,
-        stations: [...byStation.values()].map((station) => ({
-            ...station,
-            nextUp: station.nextUpQueueNumber != null ? { queueNumber: station.nextUpQueueNumber } : null,
-            nextUpQueueNumber: undefined,
-        })),
+        stations: liveStations,
         transfers: transfers.map((movement) => ({
             fromStation: movement.fromStation.stationName,
             toStation: movement.toStation.stationName,
@@ -543,6 +579,26 @@ exports.getStationHandoffQR = async (token, stationType, db = prisma) => {
 
     if (!qr) {
         throw new AppError(404, "INVALID_QR", "QR Code is invalid, expired, or unavailable.");
+    }
+
+    const station = await db.station.findFirst({
+        where: { eventId: qr.registration.eventId, stationType },
+        select: { stationId: true, isActive: true, operationalStatus: true },
+    });
+    if (!station || ["PAUSED", "OFFLINE"].includes(publicStationStatus(station, 0))) {
+        throw new AppError(409, "STATION_UNAVAILABLE", "This station is not available for handoff.");
+    }
+
+    const now = new Date();
+    const availability = await db.eventStationAvailability.findFirst({
+        where: {
+            eventStationId: station.stationId,
+            eventDay: { eventId: qr.registration.eventId, startsAt: { lte: now }, endsAt: { gt: now } },
+        },
+        select: { isAvailable: true, startsAt: true, endsAt: true },
+    });
+    if (!stationAvailable(availability, now)) {
+        throw new AppError(409, "STATION_UNAVAILABLE", "This station is not available for handoff.");
     }
 
     const qrImage = await renderBrandedQrSvg(buildStationHandoffUrl(qr.registration.eventId, qr.registration.registrationId, stationType), { width: 300 });
