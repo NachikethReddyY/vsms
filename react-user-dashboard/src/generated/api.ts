@@ -4112,7 +4112,7 @@ export interface components {
         ConsentFormEnvelope: {
             consentForm: components["schemas"]["ConsentForm"];
         };
-        /** @description Accepted consent requires signature metadata; non-participant signers also require guardian contact and relationship fields. */
+        /** @description Accepted consent requires signature metadata; non-participant signers require their relationship to the participant. Optional contact fields are retained only for legacy records. */
         ConsentRequest: {
             /** Format: uuid */
             consentFormVersionId: string;
