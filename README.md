@@ -102,6 +102,7 @@ The Bruno collection is in `api-testing/bruno`. Select its `Local` environment a
 
 ## Deployment notes
 
+- Follow the [availability and recovery runbook](docs/availability-runbook.md) for the production AWS topology, rolling releases, backups, recovery drills, and maintenance records.
 - Run `pnpm --dir backend prisma:migrate` before starting a new API release.
 - Set `NODE_ENV=production`, a 32+ character `JWT_ACCESS_SECRET`, the production `DATABASE_URL`, exact `CORS_ORIGINS`, and a bare HTTPS `PUBLIC_APP_ORIGIN` (used in QR payloads).
 - Keep `PUBLIC_SIGNUP_ENABLED=false` for internet-facing deployments unless account creation is intentionally open.

@@ -7,7 +7,9 @@ RUN corepack enable && corepack prepare pnpm@11.20.0 --activate
 WORKDIR /app
 
 COPY package.json pnpm-lock.yaml ./
-RUN pnpm install --frozen-lockfile --prod
+COPY prisma ./prisma
+RUN pnpm install --frozen-lockfile --prod \
+    && pnpm prisma:generate
 
 FROM node:24-bookworm-slim AS runtime
 

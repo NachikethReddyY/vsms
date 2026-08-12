@@ -77,28 +77,35 @@ describe("event lifecycle", () => {
   test("administrator creates reusable templates of one type and changes are request-audited", async () => {
     const firstRequestId = crypto.randomUUID();
     const secondRequestId = crypto.randomUUID();
+    const fieldSchema = [
+      { key: "odObservation", label: "OD observation", type: "text", required: true },
+      { key: "notes", label: "Notes", type: "text", required: false },
+    ];
     const createTemplate = (name, requestId) => request(app)
       .post("/api/events/station-templates")
       .set("Authorization", `Bearer ${adminToken}`)
       .set("X-Request-Id", requestId)
-      .send({ stationType: "EYE_HEALTH", name, defaultCapacity: 2 });
+      .send({ stationType: "CUSTOM", name, defaultCapacity: 2, fieldSchema });
 
-    const first = await createTemplate(`Eye health ${crypto.randomUUID()}`, firstRequestId);
-    const second = await createTemplate(`Eye health ${crypto.randomUUID()}`, secondRequestId);
+    const first = await createTemplate(`Custom notes ${crypto.randomUUID()}`, firstRequestId);
+    const second = await createTemplate(`Custom notes ${crypto.randomUUID()}`, secondRequestId);
     expect(first.status).toBe(201);
     expect(second.status).toBe(201);
-    expect(first.body.stationType).toBe("EYE_HEALTH");
+    expect(first.body.stationType).toBe("CUSTOM");
     expect(first.body.templateKey).toMatch(/^[a-f0-9-]{36}$/);
     expect(second.body.templateKey).not.toBe(first.body.templateKey);
+    expect(first.body.fieldSchema).toEqual(expect.arrayContaining([
+      expect.objectContaining({ key: "odObservation", type: "text" }),
+    ]));
 
     const deactivateRequestId = crypto.randomUUID();
     const deactivated = await request(app)
       .patch(`/api/events/station-templates/items/${first.body.stationTemplateId}`)
       .set("Authorization", `Bearer ${adminToken}`)
       .set("X-Request-Id", deactivateRequestId)
-      .send({ name: "Updated eye health template", active: false });
+      .send({ name: "Updated custom notes template", active: false });
     expect(deactivated.status).toBe(200);
-    expect(deactivated.body.name).toBe("Updated eye health template");
+    expect(deactivated.body.name).toBe("Updated custom notes template");
     expect(deactivated.body.active).toBe(false);
 
     const audits = await helpers.prisma.auditLog.findMany({

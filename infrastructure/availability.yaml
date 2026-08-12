@@ -36,30 +36,12 @@ Parameters:
     Type: String
     Default: vsmsapp
     AllowedPattern: "[a-zA-Z][a-zA-Z0-9_]{0,15}"
-  DbMasterPassword:
-    Type: String
-    NoEcho: true
-    MinLength: 20
-    MaxLength: 64
-    AllowedPattern: "[A-Za-z0-9]+"
-    Description: Supply through a protected deployment pipeline; alphanumeric avoids URL-encoding ambiguity
-  RedisAuthToken:
-    Type: String
-    NoEcho: true
-    MinLength: 20
-    MaxLength: 128
-    AllowedPattern: "[A-Za-z0-9!&#$^<>-]+"
-  JwtAccessSecret:
-    Type: String
-    NoEcho: true
-    MinLength: 32
   EncryptionActiveKeyId:
     Type: String
     AllowedPattern: "[A-Za-z0-9_-]{1,32}"
-  EncryptionKeyringJson:
+  EncryptionKeyringSecretArn:
     Type: String
-    NoEcho: true
-    Description: Versioned AES-256 keyring JSON required by the production application
+    Description: ARN of a Secrets Manager secret containing the versioned AES-256 keyring JSON
   CognitoDomain:
     Type: String
     Description: HTTPS Cognito hosted UI base URL
@@ -131,6 +113,17 @@ Resources:
       DBSubnetGroupDescription: Private multi-AZ subnets for VSMS PostgreSQL
       SubnetIds: !Ref PrivateSubnetIds
 
+  DatabaseCredentialsSecret:
+    Type: AWS::SecretsManager::Secret
+    Properties:
+      Name: !Sub /vsms/${EnvironmentName}/database-credentials
+      KmsKeyId: alias/aws/secretsmanager
+      GenerateSecretString:
+        SecretStringTemplate: !Sub '{"username":"${DbMasterUsername}"}'
+        GenerateStringKey: password
+        PasswordLength: 32
+        ExcludePunctuation: true
+
   Database:
     Type: AWS::RDS::DBInstance
     DeletionPolicy: Snapshot
@@ -155,7 +148,7 @@ Resources:
       EnablePerformanceInsights: true
       PerformanceInsightsRetentionPeriod: 7
       MasterUsername: !Ref DbMasterUsername
-      MasterUserPassword: !Ref DbMasterPassword
+      MasterUserPassword: !Sub "{{resolve:secretsmanager:${DatabaseCredentialsSecret}:SecretString:password}}"
       DBSubnetGroupName: !Ref DatabaseSubnetGroup
       VPCSecurityGroups:
         - !Ref DatabaseSecurityGroup
@@ -171,6 +164,15 @@ Resources:
       Description: Private multi-AZ subnets for VSMS Redis
       SubnetIds: !Ref PrivateSubnetIds
 
+  RedisAuthTokenSecret:
+    Type: AWS::SecretsManager::Secret
+    Properties:
+      Name: !Sub /vsms/${EnvironmentName}/redis-auth-token
+      KmsKeyId: alias/aws/secretsmanager
+      GenerateSecretString:
+        PasswordLength: 32
+        ExcludePunctuation: true
+
   RedisReplicationGroup:
     Type: AWS::ElastiCache::ReplicationGroup
     Properties:
@@ -182,7 +184,7 @@ Resources:
       MultiAZEnabled: true
       AtRestEncryptionEnabled: true
       TransitEncryptionEnabled: true
-      AuthToken: !Ref RedisAuthToken
+      AuthToken: !Sub "{{resolve:secretsmanager:${RedisAuthTokenSecret}:SecretString}}"
       CacheSubnetGroupName: !Ref RedisSubnetGroup
       SecurityGroupIds:
         - !Ref RedisSecurityGroup
@@ -195,7 +197,7 @@ Resources:
       Name: !Sub /vsms/${EnvironmentName}/database-url
       KmsKeyId: alias/aws/secretsmanager
       SecretString: !Sub
-        - postgresql://${DbMasterUsername}:${DbMasterPassword}@${DatabaseHost}:5432/vsms?sslmode=require&connection_limit=20&pool_timeout=10
+        - postgresql://${DbMasterUsername}:{{resolve:secretsmanager:${DatabaseCredentialsSecret}:SecretString:password}}@${DatabaseHost}:5432/vsms?sslmode=require&connection_limit=20&pool_timeout=10
         - DatabaseHost: !GetAtt Database.Endpoint.Address
 
   RedisUrlSecret:
@@ -204,7 +206,7 @@ Resources:
       Name: !Sub /vsms/${EnvironmentName}/redis-url
       KmsKeyId: alias/aws/secretsmanager
       SecretString: !Sub
-        - rediss://:${RedisAuthToken}@${RedisHost}:6379
+        - rediss://:{{resolve:secretsmanager:${RedisAuthTokenSecret}:SecretString}}@${RedisHost}:6379
         - RedisHost: !GetAtt RedisReplicationGroup.PrimaryEndPoint.Address
 
   JwtSecret:
@@ -212,14 +214,9 @@ Resources:
     Properties:
       Name: !Sub /vsms/${EnvironmentName}/jwt-access-secret
       KmsKeyId: alias/aws/secretsmanager
-      SecretString: !Ref JwtAccessSecret
-
-  EncryptionKeyringSecret:
-    Type: AWS::SecretsManager::Secret
-    Properties:
-      Name: !Sub /vsms/${EnvironmentName}/encryption-keyring
-      KmsKeyId: alias/aws/secretsmanager
-      SecretString: !Ref EncryptionKeyringJson
+      GenerateSecretString:
+        PasswordLength: 64
+        ExcludePunctuation: true
 
   ApiCluster:
     Type: AWS::ECS::Cluster
@@ -252,7 +249,7 @@ Resources:
                   - !Ref DatabaseUrlSecret
                   - !Ref RedisUrlSecret
                   - !Ref JwtSecret
-                  - !Ref EncryptionKeyringSecret
+                  - !Ref EncryptionKeyringSecretArn
 
   ApiTaskRole:
     Type: AWS::IAM::Role
@@ -319,13 +316,83 @@ Resources:
             - Name: JWT_ACCESS_SECRET
               ValueFrom: !Ref JwtSecret
             - Name: ENCRYPTION_KEYRING_JSON
-              ValueFrom: !Ref EncryptionKeyringSecret
+              ValueFrom: !Ref EncryptionKeyringSecretArn
           LogConfiguration:
             LogDriver: awslogs
             Options:
               awslogs-group: !Ref ApiLogGroup
               awslogs-region: !Ref AWS::Region
               awslogs-stream-prefix: api
+          StopTimeout: 30
+
+  ReportWorkerTaskDefinition:
+    Type: AWS::ECS::TaskDefinition
+    Properties:
+      Family: !Sub ${EnvironmentName}-vsms-report-worker
+      Cpu: "256"
+      Memory: "512"
+      NetworkMode: awsvpc
+      RequiresCompatibilities: [FARGATE]
+      ExecutionRoleArn: !GetAtt ApiExecutionRole.Arn
+      TaskRoleArn: !GetAtt ApiTaskRole.Arn
+      ContainerDefinitions:
+        - Name: report-worker
+          Image: !Ref ApiImageUri
+          Essential: true
+          Command: ["node", "scripts/report-worker.js"]
+          Environment:
+            - Name: NODE_ENV
+              Value: production
+            - Name: ENCRYPTION_ACTIVE_KEY_ID
+              Value: !Ref EncryptionActiveKeyId
+          Secrets:
+            - Name: DATABASE_URL
+              ValueFrom: !Ref DatabaseUrlSecret
+            - Name: JWT_ACCESS_SECRET
+              ValueFrom: !Ref JwtSecret
+            - Name: ENCRYPTION_KEYRING_JSON
+              ValueFrom: !Ref EncryptionKeyringSecretArn
+          LogConfiguration:
+            LogDriver: awslogs
+            Options:
+              awslogs-group: !Ref ApiLogGroup
+              awslogs-region: !Ref AWS::Region
+              awslogs-stream-prefix: report-worker
+          StopTimeout: 30
+
+  DomainEventWorkerTaskDefinition:
+    Type: AWS::ECS::TaskDefinition
+    Properties:
+      Family: !Sub ${EnvironmentName}-vsms-domain-event-worker
+      Cpu: "256"
+      Memory: "512"
+      NetworkMode: awsvpc
+      RequiresCompatibilities: [FARGATE]
+      ExecutionRoleArn: !GetAtt ApiExecutionRole.Arn
+      TaskRoleArn: !GetAtt ApiTaskRole.Arn
+      ContainerDefinitions:
+        - Name: domain-event-worker
+          Image: !Ref ApiImageUri
+          Essential: true
+          Command: ["node", "scripts/domain-event-worker.js"]
+          Environment:
+            - Name: NODE_ENV
+              Value: production
+            - Name: ENCRYPTION_ACTIVE_KEY_ID
+              Value: !Ref EncryptionActiveKeyId
+          Secrets:
+            - Name: DATABASE_URL
+              ValueFrom: !Ref DatabaseUrlSecret
+            - Name: JWT_ACCESS_SECRET
+              ValueFrom: !Ref JwtSecret
+            - Name: ENCRYPTION_KEYRING_JSON
+              ValueFrom: !Ref EncryptionKeyringSecretArn
+          LogConfiguration:
+            LogDriver: awslogs
+            Options:
+              awslogs-group: !Ref ApiLogGroup
+              awslogs-region: !Ref AWS::Region
+              awslogs-stream-prefix: domain-event-worker
           StopTimeout: 30
 
   ApiLoadBalancer:
@@ -399,9 +466,56 @@ Resources:
           TargetGroupArn: !Ref ApiTargetGroup
       TaskDefinition: !Ref ApiTaskDefinition
 
+  ReportWorkerService:
+    Type: AWS::ECS::Service
+    Properties:
+      Cluster: !Ref ApiCluster
+      ServiceName: report-worker
+      LaunchType: FARGATE
+      PlatformVersion: LATEST
+      DesiredCount: 1
+      EnableECSManagedTags: true
+      PropagateTags: SERVICE
+      DeploymentConfiguration:
+        MinimumHealthyPercent: 100
+        MaximumPercent: 200
+        DeploymentCircuitBreaker:
+          Enable: true
+          Rollback: true
+      NetworkConfiguration:
+        AwsvpcConfiguration:
+          AssignPublicIp: DISABLED
+          SecurityGroups:
+            - !Ref ApiSecurityGroup
+          Subnets: !Ref PrivateSubnetIds
+      TaskDefinition: !Ref ReportWorkerTaskDefinition
+
+  DomainEventWorkerService:
+    Type: AWS::ECS::Service
+    Properties:
+      Cluster: !Ref ApiCluster
+      ServiceName: domain-event-worker
+      LaunchType: FARGATE
+      PlatformVersion: LATEST
+      DesiredCount: 1
+      EnableECSManagedTags: true
+      PropagateTags: SERVICE
+      DeploymentConfiguration:
+        MinimumHealthyPercent: 100
+        MaximumPercent: 200
+        DeploymentCircuitBreaker:
+          Enable: true
+          Rollback: true
+      NetworkConfiguration:
+        AwsvpcConfiguration:
+          AssignPublicIp: DISABLED
+          SecurityGroups:
+            - !Ref ApiSecurityGroup
+          Subnets: !Ref PrivateSubnetIds
+      TaskDefinition: !Ref DomainEventWorkerTaskDefinition
+
   ApiScalingTarget:
     Type: AWS::ApplicationAutoScaling::ScalableTarget
-    DependsOn: ApiService
     Properties:
       ServiceNamespace: ecs
       ScalableDimension: ecs:service:DesiredCount

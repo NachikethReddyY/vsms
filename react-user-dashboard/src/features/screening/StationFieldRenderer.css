@@ -1,0 +1,5 @@
+.station-field-renderer { display:grid; gap:14px; }
+.station-field-renderer>label { display:grid; gap:6px; }
+.station-eye-pair { margin:0; }
+.station-eye-pair legend { padding:0 4px; font-weight:650; }
+.station-field-renderer .field-error { color:var(--danger); font-size:11px; }

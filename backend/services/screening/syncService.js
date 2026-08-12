@@ -7,7 +7,7 @@ const HANDLERS = {
   VISUAL_ACUITY: "saveVisualAcuity",
   REFRACTION: "saveRefraction",
   COLOUR_VISION: "saveColourVision",
-  EYE_HEALTH: "saveEyeHealth",
+  CUSTOM: "saveDynamic",
 };
 
 const SAFE_CONFLICT_CODES = new Set([
@@ -16,7 +16,8 @@ const SAFE_CONFLICT_CODES = new Set([
   "EVENT_NOT_IN_PROGRESS",
   "FORBIDDEN",
   "IDEMPOTENCY_KEY_REUSED",
-  "QUEUE_STATION_MISMATCH",
+  "INVALID_FIELD_SCHEMA",
+  "INVALID_RESULT_DATA",
   "REGISTRATION_NOT_FOUND",
   "REGISTRATION_NOT_SCREENABLE",
   "SCREENER_ROLE_REQUIRED",
@@ -24,6 +25,8 @@ const SAFE_CONFLICT_CODES = new Set([
   "SCREENING_RESULT_REQUIRED",
   "SHIFT_NOT_ACTIVE",
   "STATION_NOT_FOUND",
+  "STATION_SCHEMA_MISSING",
+  "EYE_HEALTH_REVIEW_ONLY",
 ]);
 
 const canonicalJson = (value) => {
@@ -244,7 +247,19 @@ const processAction = async ({ eventId, action, user, db, screening, options }) 
   if (!pending.shouldApply) return responseFor(pending.row);
 
   try {
-    const receipt = await screening[HANDLERS[action.stationType]](
+    const handlerName = HANDLERS[action.stationType];
+    if (!handlerName || typeof screening[handlerName] !== "function") {
+      const reviewOnly = action.stationType === "EYE_HEALTH";
+      throw Object.assign(new Error(
+        reviewOnly
+          ? "Eye health is recorded during clinical review, not as a screening station"
+          : `Unsupported screening station type: ${action.stationType}`,
+      ), {
+        status: reviewOnly ? 410 : 422,
+        code: reviewOnly ? "EYE_HEALTH_REVIEW_ONLY" : "UNSUPPORTED_STATION_TYPE",
+      });
+    }
+    const receipt = await screening[handlerName](
       eventId,
       action.stationId,
       action.payload,
@@ -279,6 +294,8 @@ const sanitizeStation = (station) => ({
   stationType: station.stationType,
   stationOrder: station.stationOrder,
   isActive: station.isActive,
+  fieldSchemaSnapshot: station.fieldSchemaSnapshot || null,
+  schemaVersion: station.schemaVersion ?? null,
   offlineAccessExpiresAt: station.offlineAccessExpiresAt || null,
 });
 

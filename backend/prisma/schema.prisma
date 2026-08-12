@@ -181,6 +181,7 @@ enum StationType {
   REFRACTION
   COLOUR_VISION
   EYE_HEALTH
+  CUSTOM
 }
 
 enum StationOperationalStatus {
@@ -870,16 +871,18 @@ model Shift {
 }
 
 model Station {
-  stationId         String                   @id @default(uuid()) @map("station_id") @db.Uuid
-  eventId           String                   @map("event_id") @db.Uuid
-  stationTemplateId String?                  @map("station_template_id") @db.Uuid
-  stationName       String                   @map("station_name") @db.VarChar(100)
-  stationType       StationType              @map("station_type")
-  stationOrder      Int                      @map("station_order")
-  isActive          Boolean                  @default(true) @map("is_active")
-  operationalStatus StationOperationalStatus @default(AVAILABLE) @map("operational_status")
-  createdAt         DateTime                 @default(now()) @map("created_at") @db.Timestamptz(3)
-  updatedAt         DateTime                 @updatedAt @map("updated_at") @db.Timestamptz(3)
+  stationId           String      @id @default(uuid()) @map("station_id") @db.Uuid
+  eventId             String      @map("event_id") @db.Uuid
+  stationTemplateId   String?     @map("station_template_id") @db.Uuid
+  stationName         String      @map("station_name") @db.VarChar(100)
+  stationType         StationType @map("station_type")
+  stationOrder        Int         @map("station_order")
+  isActive            Boolean     @default(true) @map("is_active")
+  operationalStatus   StationOperationalStatus @default(AVAILABLE) @map("operational_status")
+  fieldSchemaSnapshot Json?       @map("field_schema_snapshot")
+  schemaVersion       Int?        @map("schema_version")
+  createdAt           DateTime    @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt           DateTime    @updatedAt @map("updated_at") @db.Timestamptz(3)
 
   event                   Event                    @relation(fields: [eventId], references: [eventId], onDelete: Cascade, onUpdate: Cascade)
   stationTemplate         StationTemplate?         @relation(fields: [stationTemplateId], references: [stationTemplateId], onDelete: SetNull, onUpdate: Cascade)
@@ -891,8 +894,9 @@ model Station {
   fromMovements           QueueMovement[]          @relation("FromStation")
   toMovements             QueueMovement[]          @relation("ToStation")
 
-  @@unique([eventId, stationType])
   @@unique([eventId, stationOrder])
+  @@index([eventId, stationType, isActive])
+  @@index([eventId, stationTemplateId])
   @@index([eventId, isActive, stationOrder])
   @@index([eventId, operationalStatus, stationOrder])
   @@index([stationTemplateId])
@@ -906,10 +910,10 @@ model StationTemplate {
   version           Int          @default(1)
   name              String       @db.VarChar(100)
   description       String?
-  defaultCapacity   Int          @default(3) @map("default_capacity")
-  active            Boolean      @default(true)
-  createdAt         DateTime     @default(now()) @map("created_at") @db.Timestamptz(3)
-  updatedAt         DateTime     @updatedAt @map("updated_at") @db.Timestamptz(3)
+  defaultCapacity   Int      @default(3) @map("default_capacity")
+  active            Boolean  @default(true)
+  createdAt         DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt         DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
   stations          Station[]
 
   @@index([stationType, active])
@@ -1043,6 +1047,7 @@ model ScreeningResult {
   isFlagged          Boolean     @default(false) @map("is_flagged")
   flagSummary        String?     @map("flag_summary")
   ruleVersion        String      @default("VSMS-VA-1.0") @map("rule_version") @db.VarChar(20)
+  schemaVersion      Int?        @map("schema_version")
   acknowledgedAt     DateTime?   @map("acknowledged_at") @db.Timestamptz(3)
   idempotencyKey     String      @unique @map("idempotency_key") @db.VarChar(64)
   requestFingerprint String?     @map("request_fingerprint") @db.Char(64)
