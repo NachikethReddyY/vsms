@@ -31,6 +31,18 @@ test("transport configuration rejects HTTP origins and Cognito URLs", () => {
   }).status, 0);
 });
 
+test("enabled lifecycle SMTP requires a matching sender and password", () => {
+  const smtp = {
+    LIFECYCLE_EMAIL_ENABLED: "true",
+    LIFECYCLE_EMAIL_FROM: "sender@example.com",
+    LIFECYCLE_EMAIL_ALLOWED_SENDERS: "sender@example.com",
+    SMTP_USERNAME: "sender@example.com",
+  };
+  assert.notEqual(loadConfig({ ...smtp, SMTP_PASSWORD: "" }).status, 0);
+  assert.notEqual(loadConfig({ ...smtp, SMTP_USERNAME: "other@example.com", SMTP_PASSWORD: "app-password" }).status, 0);
+  assert.equal(loadConfig({ ...smtp, SMTP_PASSWORD: "app-password" }).status, 0);
+});
+
 test("production requires a valid versioned encryption keyring", () => {
   const production = {
     NODE_ENV: "production",
