@@ -260,12 +260,10 @@ async function main() {
   console.log("2) Status JSON API (the poller hits this every 5s)");
   console.log(`   ${apiOrigin}/qr/public-status/${PRESET_TOKEN}`);
   console.log("");
-  console.log("3) Screener handoff QR API (returns the QR as SVG data URL)");
-  for (const [type] of stations) {
-    console.log(`   ${apiOrigin}/qr/handoff/${PRESET_TOKEN}?station=${type}`);
-  }
+  console.log("3) Present the same participant QR at every assigned station");
+  console.log("   Station staff can scan it, use a physical reader, paste it, or search the queue.");
   console.log("");
-  console.log("4) Station pages the handoff QR opens (verify auto-selection)");
+  console.log("4) Station pages (the server verifies the active assignment)");
   for (const [, slug] of stations) {
     console.log(`   ${origin}/events/${event.eventId}/stations/${slug}?registrationId=${registration.registrationId}`);
   }
