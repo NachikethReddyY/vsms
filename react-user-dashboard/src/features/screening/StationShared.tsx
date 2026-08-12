@@ -33,18 +33,12 @@ import {
 } from './screeningApi';
 
 import { extractQrToken } from './qrHandoff';
-import {
-  getOfflineStationContext,
-  isNetworkError,
-} from './offlineSync';
-
-import {
-  customStationPath,
-  STATION_LABEL,
-  STATION_PATH_SLUG,
-  stationPath,
-} from './stationConfig';
-
+import { getOfflineStationContext, isNetworkError } from './offlineSync';
+<<<<<<<<< Temporary merge branch 1
+import { customStationPath, STATION_LABEL, STATION_PATH_SLUG, stationPath } from './stationConfig';
+=========
+import { stationPath } from './stationConfig';
+>>>>>>>>> Temporary merge branch 2
 import { StationCameraScanner } from './StationCameraScanner';
 import './StationCameraScanner.css';
 
@@ -56,8 +50,11 @@ import './StationCameraScanner.css';
 
 export function StationHandoffLinks({
   eventId,
+<<<<<<<<< Temporary merge branch 1
   currentStationType,
   currentStationId,
+=========
+>>>>>>>>> Temporary merge branch 2
   registrationId,
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   journey: _journey,
@@ -65,82 +62,56 @@ export function StationHandoffLinks({
   stations,
 }: {
   eventId: string;
+<<<<<<<<< Temporary merge branch 1
   currentStationType: StationType;
   currentStationId?: string;
+=========
+>>>>>>>>> Temporary merge branch 2
   registrationId?: string | null;
   journey?: QueueJourney | null;
   queuedOffline?: boolean;
   stations?: Station[];
 }) {
+<<<<<<<<< Temporary merge branch 1
   const navigate = useNavigate();
+  const nextStations = useMemo(() => {
+    const orderedStations = stations
+      ? [...stations].filter((item) => item.isActive).sort((left, right) => left.stationOrder - right.stationOrder)
+      : [];
+    const currentIndex = orderedStations.findIndex((item) => (
+      item.stationType === currentStationType && (!currentStationId || item.stationId === currentStationId)
+    ));
+    if (currentIndex >= 0) {
+      return orderedStations.slice(currentIndex + 1).filter((item) => (
+        item.stationType === 'CUSTOM' || Boolean(STATION_PATH_SLUG[item.stationType])
+      ));
+    }
+    return nextStationTypes(currentStationType, stations).map((stationType) => ({
+      stationType,
+      stationId: '',
+      stationName: STATION_LABEL[stationType],
+    }));
+  }, [currentStationId, currentStationType, stations]);
+  const isLastScreeningStation = nextStations.length === 0;
+  const nextLabel = nextStations[0]?.stationName ?? null;
+  const [passImage, setPassImage] = useState<string | null>(null);
+  const [passName, setPassName] = useState<string | null>(null);
+  const [passQueue, setPassQueue] = useState<number | null>(null);
+  const [passError, setPassError] = useState<string | null>(null);
+  const [liveStations, setLiveStations] = useState<LiveStationHandoffStation[]>([]);
+=========
+  const nextStation = journey?.assignedStation;
+>>>>>>>>> Temporary merge branch 2
 
-  const [passImage] = useState<string | null>(null);
-  const [passName] = useState<string | null>(null);
-  const [passQueue] = useState<number | null>(null);
-  const [passError] = useState<string | null>(null);
+  const nextHref =
+    nextStation && registrationId
+      ? stationPath(eventId, nextStation.stationType, registrationId)
+      : null;
 
   const [liveStations, setLiveStations] = useState<
     LiveStationHandoffStation[]
   >([]);
 
-  /**
-   * Determine the stations that come after the current station
-   * according to the event's configured station order.
-   */
-  const nextStations = useMemo(() => {
-    const orderedStations = stations
-      ? [...stations]
-          .filter((item) => item.isActive)
-          .sort(
-            (left, right) =>
-              left.stationOrder - right.stationOrder,
-          )
-      : [];
-
-    const currentIndex = orderedStations.findIndex(
-      (item) =>
-        item.stationType === currentStationType &&
-        (!currentStationId ||
-          item.stationId === currentStationId),
-    );
-
-    if (currentIndex >= 0) {
-      return orderedStations
-        .slice(currentIndex + 1)
-        .filter(
-          (item) =>
-            item.stationType === 'CUSTOM' ||
-            Boolean(STATION_PATH_SLUG[item.stationType]),
-        );
-    }
-
-    return nextStationTypes(
-      currentStationType,
-      stations,
-    ).map((stationType) => ({
-      stationType,
-      stationId: '',
-      stationName: STATION_LABEL[stationType],
-    }));
-  }, [
-    currentStationId,
-    currentStationType,
-    stations,
-  ]);
-
-  const isLastScreeningStation =
-    nextStations.length === 0;
-
-  const nextLabel =
-    nextStations[0]?.stationName ?? null;
-
-  /**
-   * Load currently available stations for handoff.
-   *
-   * The backend determines which stations are currently
-   * available. We then restrict the result to stations that
-   * are actually next according to the event route.
-   */
   useEffect(() => {
     if (!eventId) {
       return;
@@ -153,20 +124,20 @@ export function StationHandoffLinks({
         `/queues/events/${eventId}/stations`,
       )
       .then(({ data }) => {
-        if (cancelled) {
-          return;
-        }
-
-        const filteredStations =
-          data.stations.filter((station) =>
-            nextStations.some((nextStation) =>
-              nextStation.stationId
-                ? nextStation.stationId ===
-                  station.stationId
-                : nextStation.stationType ===
-                  station.stationType,
-            ),
-          );
+<<<<<<<<< Temporary merge branch 1
+        if (!cancelled) setLiveStations(data.stations.filter((station) => (
+          nextStations.some((nextStation) => nextStation.stationId
+            ? nextStation.stationId === station.stationId
+            : nextStation.stationType === station.stationType)
+        )));
+      })
+      .catch(() => {
+        if (!cancelled) setLiveStations([]);
+    });
+    return () => { cancelled = true; };
+  }, [eventId, nextStations]);
+=========
+        if (cancelled) return;
 
         setLiveStations(filteredStations);
       })
@@ -179,7 +150,8 @@ export function StationHandoffLinks({
     return () => {
       cancelled = true;
     };
-  }, [eventId, nextStations]);
+  }, [eventId]);
+>>>>>>>>> Temporary merge branch 2
 
   return (
     <nav
@@ -187,162 +159,84 @@ export function StationHandoffLinks({
       aria-label="Continue screening"
     >
       <p className="va-handoff-label">
+<<<<<<<<< Temporary merge branch 1
         {nextStations.length > 0
           ? `Station complete — show this QR so the participant can join the ${nextLabel} queue`
           : 'Screening stations complete for this route'}
-
-        {registrationId
-          ? ' · same participant kept'
-          : null}
+        {registrationId ? ' · same participant kept' : null}
       </p>
 
-      {/* ================================================================
-          Participant QR Pass
-          ================================================================ */}
-
       {registrationId && (
-        <div
-          className="station-pass-qr"
-          aria-live="polite"
-        >
-          {passError && (
-            <p
-              className="form-error"
-              role="alert"
-            >
-              {passError}
-            </p>
-          )}
-
+        <div className="station-pass-qr" aria-live="polite">
+          {passError && <p className="form-error" role="alert">{passError}</p>}
           {passImage && (
             <>
-              <img
-                src={passImage}
-                alt="Participant QR pass for next station queue"
-              />
-
+              <img src={passImage} alt="Participant QR pass for next station queue" />
               <p>
-                Show this code to{' '}
-                <strong>
-                  {passName || 'the participant'}
-                </strong>
-
-                {nextLabel ? (
-                  <>
-                    {' '}
-                    for{' '}
-                    <strong>{nextLabel}</strong>.
-                  </>
-                ) : null}
+                Show this code to <strong>{passName || 'the participant'}</strong>
+                {nextLabel ? <> for <strong>{nextLabel}</strong></> : null}.
               </p>
-
               {passQueue != null && (
-                <p className="station-pass-qr-meta">
-                  Queue #{passQueue}
-                </p>
+                <p className="station-pass-qr-meta">Queue #{passQueue}</p>
               )}
             </>
           )}
-
-          {!passImage && !passError && (
-            <p className="station-pass-qr-meta">
-              Loading participant QR…
-            </p>
-          )}
+          {!passImage && !passError && <p className="station-pass-qr-meta">Loading participant QR…</p>}
         </div>
       )}
 
-      {/* ================================================================
-          Live Station Picker
-          ================================================================ */}
+      {registrationId && liveStations.length > 0 && (
+        <LiveStationHandoffPicker
+          stations={liveStations}
+          onSelect={(station) => {
+            const stationType = station.stationType as StationType;
+            const href = stationType === 'CUSTOM'
+              ? customStationPath(eventId, station.stationId, registrationId)
+              : stationPath(eventId, stationType, registrationId);
+            if (href) navigate(href);
+          }}
+          actionLabel="Open station"
+          emptyMessage="No next stations are available."
+        />
+      )}
 
-      {registrationId &&
-        !queuedOffline &&
-        liveStations.length > 0 && (
-          <LiveStationHandoffPicker
-            stations={liveStations}
-            onSelect={(station) => {
-              const stationType =
-                station.stationType as StationType;
+      <div className="action-cluster" style={{ paddingTop: 0 }}>
+        {liveStations.length === 0 && nextStations.map((nextStation, index) => {
+          const href = nextStation.stationType === 'CUSTOM'
+            ? customStationPath(eventId, nextStation.stationId, registrationId)
+            : stationPath(eventId, nextStation.stationType, registrationId);
+          if (!href) return null;
+          return (
+            <Link
+              key={nextStation.stationId || nextStation.stationType}
+              className={index === 0 ? 'primary' : 'secondary'}
+              to={href}
+            >
+              {index === 0 ? 'Open next station tablet: ' : ''}{nextStation.stationName}
+            </Link>
+          );
+        })}
+        {isLastScreeningStation && (
+=========
+        {queuedOffline
+          ? 'Result saved offline. Queue movement will be decided by the backend when this action syncs.'
+          : journey?.state === 'QUEUED' && nextStation
+            ? `Station complete. The backend assigned ${nextStation.stationName}.`
+            : journey?.state === 'COMPLETED'
+              ? 'All required screening stations are complete.'
+              : 'Station complete. No remaining staffed station is currently available.'}
+      </p>
 
-              const href =
-                stationType === 'CUSTOM'
-                  ? customStationPath(
-                      eventId,
-                      station.stationId,
-                      registrationId,
-                    )
-                  : stationPath(
-                      eventId,
-                      stationType,
-                      registrationId,
-                    );
-
-              if (href) {
-                navigate(href);
-              }
-            }}
-            actionLabel="Open station"
-            emptyMessage="No next stations are available."
-          />
+      <div className="action-cluster" style={{ paddingTop: 0 }}>
+        {nextHref && nextStation && (
+          <Link className="primary" to={nextHref}>
+            Open {nextStation.stationName} tablet
+          </Link>
         )}
 
-      {/* ================================================================
-          Station Navigation
-          ================================================================ */}
-
-      <div
-        className="action-cluster"
-        style={{ paddingTop: 0 }}
-      >
-        {liveStations.length === 0 &&
-          nextStations.map(
-            (nextStation, index) => {
-              const href =
-                nextStation.stationType ===
-                'CUSTOM'
-                  ? customStationPath(
-                      eventId,
-                      nextStation.stationId,
-                      registrationId,
-                    )
-                  : stationPath(
-                      eventId,
-                      nextStation.stationType,
-                      registrationId,
-                    );
-
-              if (!href) {
-                return null;
-              }
-
-              return (
-                <Link
-                  key={
-                    nextStation.stationId ||
-                    nextStation.stationType
-                  }
-                  className={
-                    index === 0
-                      ? 'primary'
-                      : 'secondary'
-                  }
-                  to={href}
-                >
-                  {index === 0
-                    ? 'Open next station tablet: '
-                    : ''}
-                  {nextStation.stationName}
-                </Link>
-              );
-            },
-          )}
-
-        {isLastScreeningStation && (
-          <Link
-            className="primary"
-            to={`/events/${eventId}/reviews`}
-          >
+        {journey?.state === 'COMPLETED' && (
+>>>>>>>>> Temporary merge branch 2
+          <Link className="primary" to={`/events/${eventId}/reviews`}>
             Open clinical review
           </Link>
         )}
