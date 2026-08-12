@@ -217,6 +217,7 @@ export default function VisualAcuityStationPage() {
       {success && (
         <StationHandoffLinks
           eventId={eventId}
+          currentStationType="VISUAL_ACUITY"
           registrationId={savedRegistrationId || selectedId}
           journey={savedJourney}
           queuedOffline={savedOffline}

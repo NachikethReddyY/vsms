@@ -163,6 +163,7 @@ export default function ColourVisionStationPage() {
       handoff={(
         <StationHandoffLinks
           eventId={eventId}
+          currentStationType="COLOUR_VISION"
           registrationId={savedRegistrationId || selectedId}
           journey={savedJourney}
           queuedOffline={savedOffline}

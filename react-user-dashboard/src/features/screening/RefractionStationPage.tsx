@@ -238,6 +238,7 @@ export default function RefractionStationPage() {
       handoff={(
         <StationHandoffLinks
           eventId={eventId}
+          currentStationType="REFRACTION"
           registrationId={savedRegistrationId || selectedId}
           journey={savedJourney}
           queuedOffline={savedOffline}

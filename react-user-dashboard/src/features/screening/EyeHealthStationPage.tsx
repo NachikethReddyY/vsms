@@ -219,6 +219,7 @@ export default function EyeHealthStationPage() {
       handoff={(
         <StationHandoffLinks
           eventId={eventId}
+          currentStationType="EYE_HEALTH"
           registrationId={savedRegistrationId || selectedId}
           journey={savedJourney}
           queuedOffline={savedOffline}
