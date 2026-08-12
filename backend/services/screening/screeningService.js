@@ -297,7 +297,6 @@ const listQueue = async (eventId, stationId, user) => {
       participantDisplayName: row.participantDisplayName || "Unnamed participant",
       queueNumber: row.queueNumber,
       status: row.registrationStatus,
-      passToken: row.passToken,
       existingResult: row.screeningResults[0] || null,
     })),
   };
@@ -331,7 +330,6 @@ const resolveParticipant = async (eventId, query, user) => {
     participantDisplayName: registration.participantDisplayName || "Unnamed participant",
     queueNumber: registration.queueNumber,
     status: registration.registrationStatus,
-    passToken: registration.passToken,
   };
 };
 

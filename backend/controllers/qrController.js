@@ -92,7 +92,7 @@ exports.getPublicStatus = async (req, res, next) => {
     try {
         const { token } = req.params;
         const status = await qrService.getPublicStatus(token);
-        return res.json({ success: true, data: status });
+        return res.set("Cache-Control", "no-store").json({ success: true, data: status });
     } catch (err) {
         next(err);
     }

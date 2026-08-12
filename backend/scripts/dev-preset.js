@@ -3,6 +3,8 @@ const prisma = require("../prisma/prismaClient");
 const env = require("../config/env");
 const { encrypt, encryptionContext } = require("../utils/crypto/cryptoUtils");
 
+if (env.isProduction) throw new Error("Development preset execution is forbidden in production");
+
 const PRESET_TOKEN = "cd".repeat(32);
 const PRESET_QR_ID = "cdcdcdcd-0000-4000-8000-000000000001";
 const PRESET_STAFF_EMAIL = "preset.admin@cryptix.local";

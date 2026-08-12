@@ -1,5 +1,4 @@
-﻿const QRCode = require("qrcode");
-const crypto = require("crypto");
+﻿const crypto = require("crypto");
 const prisma = require("../../prisma/prismaClient");
 const { attendanceWhere } = require("../event/attendanceDefinition");
 const env = require("../../config/env");
@@ -17,6 +16,7 @@ function buildQRTargetUrl(token) {
 const activeQrWhere = (selector = {}, now = new Date()) => ({
     ...selector,
     isActive: true,
+    revokedAt: null,
     expiresAt: { gt: now },
 });
 
@@ -739,10 +739,7 @@ exports.downloadQR = async (qrId, db = prisma) => {
     return { qrId: qr.id, expiresAt: qr.expiresAt, qrImage };
 };
 
-/**
- * Re-render the active participant pass for station tablets (next-queue handoff).
- * Prefers QRCodePass; falls back to EventRegistration.passToken for demo seeds.
- */
+/** Re-render the active participant pass for authenticated station tablets. */
 exports.renderActivePassForRegistration = async (registrationId, db = prisma) => {
     if (!registrationId) {
         throw new AppError(400, "REGISTRATION_ID_REQUIRED", "Registration ID is required.");
@@ -752,7 +749,6 @@ exports.renderActivePassForRegistration = async (registrationId, db = prisma) =>
         where: { registrationId },
         select: {
             registrationId: true,
-            passToken: true,
             queueNumber: true,
             participant: { select: { firstName: true, lastName: true } },
         },
@@ -779,23 +775,7 @@ exports.renderActivePassForRegistration = async (registrationId, db = prisma) =>
         };
     }
 
-    if (!registration.passToken) {
-        throw new AppError(404, "QR_NOT_FOUND", "No active QR pass is available for this participant.");
-    }
-
-    return {
-        qrId: null,
-        registrationId: registration.registrationId,
-        issuedAt: null,
-        expiresAt: null,
-        qrImage: await QRCode.toDataURL(buildQRTargetUrl(registration.passToken), {
-            errorCorrectionLevel: "H",
-            margin: 2,
-            width: 300,
-        }),
-        participantDisplayName: displayName,
-        queueNumber: registration.queueNumber,
-    };
+    throw new AppError(404, "QR_NOT_FOUND", "No active secure QR pass is available for this participant. Reissue the pass before scanning.");
 };
 
 exports.getDevPageData = async (registrationId, auditContext = {}, db = prisma) => {

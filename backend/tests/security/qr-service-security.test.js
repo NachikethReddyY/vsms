@@ -5,6 +5,7 @@ const test = require("node:test");
 process.env.DATABASE_URL ||= "postgresql://test:test@localhost:5432/vsms_test";
 
 const { encrypt, encryptionContext } = require("../../utils/crypto/cryptoUtils");
+const { resolveRegistrationByQrValue } = require("../../utils/crypto/qrToken");
 const qrService = require("../../services/participant/qrService");
 
 const eventId = "11111111-1111-4111-8111-111111111111";
@@ -13,6 +14,76 @@ const qrId = "33333333-3333-4333-8333-333333333333";
 const stationId = "44444444-4444-4444-8444-444444444444";
 
 const tokenHash = (token) => crypto.createHash("sha256").update(token).digest("hex");
+
+test("shared scanner resolver accepts only active event-scoped secure passes", async () => {
+  const token = "9".repeat(64);
+  const queries = [];
+  const db = {
+    qRCodePass: {
+      findFirst: async (query) => {
+        queries.push(query);
+        return query.where.registration.eventId === eventId ? { registrationId } : null;
+      },
+    },
+    eventRegistration: {
+      findFirst: async () => assert.fail("legacy registration credentials must never be queried"),
+    },
+  };
+
+  assert.deepEqual(await resolveRegistrationByQrValue(db, { eventId, value: token }), { registrationId });
+  assert.deepEqual(await resolveRegistrationByQrValue(db, {
+    eventId,
+    value: `https://app.example.com/participant-status/${token}`,
+  }), { registrationId });
+  assert.equal(await resolveRegistrationByQrValue(db, { eventId, value: "malformed" }), null);
+  assert.equal(await resolveRegistrationByQrValue(db, { eventId, value: "VSMS-DEMO-QR-001" }), null);
+  assert.equal(queries.length, 2);
+  for (const { where } of queries) {
+    assert.equal(where.tokenHash, tokenHash(token));
+    assert.equal(where.isActive, true);
+    assert.equal(where.revokedAt, null);
+    assert.ok(where.expiresAt.gt instanceof Date);
+    assert.deepEqual(where.registration, { eventId });
+  }
+});
+
+test("shared scanner resolver conceals expired, revoked, and cross-event passes", async () => {
+  const token = "8".repeat(64);
+  const foreignEventId = "99999999-9999-4999-8999-999999999999";
+  const db = {
+    qRCodePass: {
+      findFirst: async ({ where }) => {
+        if (where.registration.eventId === foreignEventId) return null;
+        if (where.isActive !== true || where.revokedAt !== null || !(where.expiresAt.gt instanceof Date)) {
+          assert.fail("resolver omitted the secure pass lifecycle predicate");
+        }
+        return null;
+      },
+    },
+  };
+
+  assert.equal(await resolveRegistrationByQrValue(db, { eventId, value: token }), null);
+  assert.equal(await resolveRegistrationByQrValue(db, { eventId: foreignEventId, value: token }), null);
+});
+
+test("active-pass rendering never falls back to EventRegistration.passToken", async () => {
+  const db = {
+    eventRegistration: {
+      findUnique: async () => ({
+        registrationId,
+        passToken: "legacy-token",
+        queueNumber: 7,
+        participant: { firstName: "Ada", lastName: "Lovelace" },
+      }),
+    },
+    qRCodePass: { findFirst: async () => null },
+  };
+
+  await assert.rejects(
+    qrService.renderActivePassForRegistration(registrationId, db),
+    (error) => error.code === "QR_NOT_FOUND" && !error.message.includes("legacy-token"),
+  );
+});
 
 test("token access hashes the bearer and requires an active, unexpired pass", async () => {
   const token = "a".repeat(64);

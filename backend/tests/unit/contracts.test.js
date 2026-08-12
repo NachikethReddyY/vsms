@@ -238,16 +238,28 @@ test("authentication uses verified Cognito tokens and approved local role inters
     assert.doesNotMatch(authRoutes, /"\/login"|"\/signup"/);
 });
 
-test("registration resolve accepts passToken, qrToken, or registrationId", () => {
+test("registration resolve accepts secure QR values or registrationId and rejects legacy/demo values", () => {
     const { resolveQuery } = require("../../schemas/screeningSchemas");
-    assert.doesNotThrow(() => resolveQuery.parse({ passToken: "VSMS-DEMO-QR-001" }));
+    assert.doesNotThrow(() => resolveQuery.parse({ passToken: "a".repeat(64) }));
     assert.doesNotThrow(() => resolveQuery.parse({
-        qrToken: "a".repeat(64),
+        qrToken: `https://app.example.com/participant-status/${"b".repeat(64)}`,
     }));
     assert.doesNotThrow(() => resolveQuery.parse({
         registrationId: "11111111-1111-4111-8111-111111111111",
     }));
+    assert.throws(() => resolveQuery.parse({ passToken: "VSMS-DEMO-QR-001" }), /valid secure QR pass/);
+    assert.throws(() => resolveQuery.parse({ qrToken: "malformed" }), /valid secure QR pass|too small/i);
     assert.throws(() => resolveQuery.parse({}), /passToken, qrToken, or registrationId/);
+});
+
+test("general QR verification normalizes only secure raw tokens and participant URLs", () => {
+    const { tokenBody } = require("../../schemas/qrSchemas");
+    assert.equal(tokenBody.parse({ token: "a".repeat(64) }).token, "a".repeat(64));
+    assert.equal(tokenBody.parse({
+        token: `https://app.example.com/participant-status/${"b".repeat(64)}`,
+    }).token, "b".repeat(64));
+    assert.throws(() => tokenBody.parse({ token: "VSMS-DEMO-QR-001" }), /too small|secure QR/i);
+    assert.throws(() => tokenBody.parse({ token: "a".repeat(64), unexpected: true }), /unrecognized key/i);
 });
 
 test("resolveParticipant looks up QRCodePass when passToken is not on registration", () => {
@@ -261,6 +273,15 @@ test("resolveParticipant looks up QRCodePass when passToken is not on registrati
     const tokenHelper = read("utils/crypto/qrToken.js");
     assert.match(tokenHelper, /qRCodePass\.findFirst/);
     assert.match(tokenHelper, /tokenHash/);
+    assert.doesNotMatch(tokenHelper, /eventRegistration\.findFirst/);
+    assert.doesNotMatch(tokenHelper, /where: \{ eventId, passToken/);
+});
+
+test("demo QR fixtures are forbidden in production", () => {
+    assert.match(read("prisma/seed.js"), /NODE_ENV === "production"[\s\S]*Demo seed execution is forbidden/);
+    assert.match(read("scripts/dev-preset.js"), /env\.isProduction[\s\S]*Development preset execution is forbidden/);
+    const packageJson = JSON.parse(read("package.json"));
+    assert.doesNotMatch(packageJson.scripts["deploy:prod"], /db:setup|prisma:seed/);
 });
 
 test("QR station handoff contract is documented", () => {

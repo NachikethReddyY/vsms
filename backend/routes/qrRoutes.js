@@ -4,6 +4,8 @@ const asyncHandler = require("../utils/http/asyncHandler");
 
 const qrController = require("../controllers/qrController");
 const authenticate = require("../middlewares/authenticate");
+const validate = require("../middlewares/validate");
+const { tokenBody } = require("../schemas/qrSchemas");
 
 // Import your production-grade idempotency middleware
 const checkIdempotency = require("../middlewares/idempotency");
@@ -40,6 +42,7 @@ router.use(authenticate);
 router.post(
   "/verify",
   checkIdempotency,
+  validate({ body: tokenBody }),
   asyncHandler(qrController.verifyQR)
 );
 
