@@ -28,6 +28,36 @@ const assertForbiddenEventKeysAbsent = (value) => {
   }
 };
 
+test("station template reads preserve missing schemas without writing", async (t) => {
+  const originalFindMany = prisma.stationTemplate.findMany;
+  const originalUpdate = prisma.stationTemplate.update;
+  const template = {
+    stationTemplateId: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+    templateKey: "VISUAL_ACUITY",
+    stationType: "VISUAL_ACUITY",
+    version: 1,
+    name: "Visual acuity",
+    description: null,
+    defaultCapacity: 4,
+    active: true,
+    fieldSchema: null,
+  };
+  let writes = 0;
+  prisma.stationTemplate.findMany = async () => [template];
+  prisma.stationTemplate.update = async () => { writes += 1; return template; };
+  t.after(() => {
+    prisma.stationTemplate.findMany = originalFindMany;
+    prisma.stationTemplate.update = originalUpdate;
+  });
+
+  const [catalog] = await eventService.listStationTemplates();
+  const [library] = await eventService.listStationTemplateLibrary();
+
+  assert.equal(writes, 0);
+  assert.equal(catalog.fieldSchema, null);
+  assert.equal(library.fieldSchema, null);
+});
+
 test("station template mutations generate opaque keys and audit atomically", async () => {
   const audits = [];
   const transactionClient = {

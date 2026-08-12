@@ -1672,7 +1672,7 @@ const listStaffDirectory = async () => {
 // Import/update map templateKey â†’ StationType per #30 (catalog keys include
 // REGISTRATION / CLINICAL_REVIEW which are not StationType and are rejected on import).
 const listStationTemplates = async () => {
-  const templates = await hydrateSystemFieldSchemas(await prisma.stationTemplate.findMany({
+  const templates = await prisma.stationTemplate.findMany({
     where: { active: true, stationType: { not: null } },
     select: {
       stationTemplateId: true,
@@ -1686,7 +1686,7 @@ const listStationTemplates = async () => {
       fieldSchema: true,
     },
     orderBy: { name: "asc" },
-  }));
+  });
   return templates
     .filter((template) => stationTypeForTemplate(template))
     .map(serializeStationTemplate);
@@ -1704,40 +1704,9 @@ const serializeStationTemplate = (template) => ({
   fieldSchema: template.fieldSchema ?? null,
 });
 
-/** Persist missing system field schemas so library previews always reflect the DB. */
-const hydrateSystemFieldSchemas = async (templates, db = prisma) => {
-  const { SYSTEM_FIELD_SCHEMAS } = require("../../schemas/dynamicStationSchema");
-  const next = [];
-  for (const template of templates) {
-    const systemSchema = template.stationType ? SYSTEM_FIELD_SCHEMAS[template.stationType] : null;
-    const missing = (!template.fieldSchema || (Array.isArray(template.fieldSchema) && template.fieldSchema.length === 0))
-      && systemSchema;
-    if (!missing) {
-      next.push(template);
-      continue;
-    }
-    next.push(await db.stationTemplate.update({
-      where: { stationTemplateId: template.stationTemplateId },
-      data: { fieldSchema: systemSchema },
-      select: {
-        stationTemplateId: true,
-        templateKey: true,
-        stationType: true,
-        version: true,
-        name: true,
-        description: true,
-        defaultCapacity: true,
-        active: true,
-        fieldSchema: true,
-      },
-    }));
-  }
-  return next;
-};
-
 /** Admin catalog: all templates including inactive / non-importable (#23). */
 const listStationTemplateLibrary = async () => {
-  const templates = await hydrateSystemFieldSchemas(await prisma.stationTemplate.findMany({
+  const templates = await prisma.stationTemplate.findMany({
     select: {
       stationTemplateId: true,
       templateKey: true,
@@ -1750,7 +1719,7 @@ const listStationTemplateLibrary = async () => {
       fieldSchema: true,
     },
     orderBy: [{ active: "desc" }, { name: "asc" }],
-  }));
+  });
   return templates.map(serializeStationTemplate);
 };
 
