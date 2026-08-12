@@ -12,11 +12,8 @@ import EventFormPage from "./features/events/EventFormPage";
 import PublicEventPage from "./features/events/PublicEventPage";
 import ReviewWorkspacePage from "./features/reviews/ReviewWorkspacePage";
 import ReportsPage from "./features/reports/ReportsPage";
-import ColourVisionStationPage from "./features/screening/ColourVisionStationPage";
 import DynamicStationPage from "./features/screening/DynamicStationPage";
 import QRScannerPage from "./features/screening/QRScannerPage";
-import RefractionStationPage from "./features/screening/RefractionStationPage";
-import VisualAcuityStationPage from "./features/screening/VisualAcuityStationPage";
 import { AuditLogsPage as RegistrationAuditLogsPage } from "./pages/AdminPages";
 import {
   AccountStatePage,
@@ -133,13 +130,13 @@ export default function App() {
 
           <Route element={<EventCapabilityGuard allowedRoles={screenerRoles} />}>
             <Route element={<StationDutyGuard stationType="VISUAL_ACUITY" />}>
-              <Route path="/events/:eventId/stations/visual-acuity" element={<VisualAcuityStationPage />} />
+              <Route path="/events/:eventId/stations/visual-acuity" element={<DynamicStationPage stationType="VISUAL_ACUITY" />} />
             </Route>
             <Route element={<StationDutyGuard stationType="REFRACTION" />}>
-              <Route path="/events/:eventId/stations/refraction" element={<RefractionStationPage />} />
+              <Route path="/events/:eventId/stations/refraction" element={<DynamicStationPage stationType="REFRACTION" />} />
             </Route>
             <Route element={<StationDutyGuard stationType="COLOUR_VISION" />}>
-              <Route path="/events/:eventId/stations/colour-vision" element={<ColourVisionStationPage />} />
+              <Route path="/events/:eventId/stations/colour-vision" element={<DynamicStationPage stationType="COLOUR_VISION" />} />
             </Route>
             <Route path="/events/:eventId/stations/eye-health" element={<EyeHealthStationRedirect />} />
             <Route element={<StationDutyGuard stationType="CUSTOM" />}>

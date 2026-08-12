@@ -100,28 +100,42 @@ test("assigned stations publish an offline expiry capped by the event and active
   assert.equal(result.stations[1].offlineAccessExpiresAt, earlierShiftEnd.toISOString());
 });
 
-test("dynamic routes reject built-in stations and accept CUSTOM stations", async (t) => {
+test("dynamic routes accept schema-driven clinical and CUSTOM stations", async (t) => {
   installMembership(t);
   replace(t, prisma.event, "findUnique", async () => ({ eventId, status: "IN_PROGRESS" }));
   replace(t, prisma.staffAssignment, "findFirst", async () => ({ id: crypto.randomUUID() }));
   replace(t, prisma.station, "findFirst", async ({ where }) => {
-    const station = where.stationId === stationA
-      ? { stationId: stationA, stationType: "VISUAL_ACUITY", isActive: true }
-      : {
-        stationId: stationB,
-        stationType: "CUSTOM",
+    if (where.stationId === stationA) {
+      const station = {
+        stationId: stationA,
+        stationType: "VISUAL_ACUITY",
+        stationName: "Visual acuity",
         isActive: true,
-        fieldSchemaSnapshot: [{ key: "notes", label: "Notes", type: "text" }],
+        fieldSchemaSnapshot: [{ key: "notes", label: "Notes", type: "text", required: false }],
+        schemaVersion: 1,
       };
-    return where.stationType && station.stationType !== where.stationType ? null : station;
+      if (where.stationType?.in && !where.stationType.in.includes(station.stationType)) return null;
+      return station;
+    }
+    const station = {
+      stationId: stationB,
+      stationType: "CUSTOM",
+      stationName: "Notes booth",
+      isActive: true,
+      fieldSchemaSnapshot: [{ key: "notes", label: "Notes", type: "text", required: false }],
+      schemaVersion: 1,
+    };
+    if (where.stationType?.in && !where.stationType.in.includes(station.stationType)) return null;
+    return station;
   });
 
-  for (const action of [screeningService.previewDynamic, screeningService.saveDynamic]) {
-    await assert.rejects(
-      action(eventId, stationA, { resultData: { notes: "clear" } }, user),
-      (error) => error.status === 404 && error.code === "STATION_NOT_FOUND",
-    );
-  }
+  const clinicalPreview = await screeningService.previewDynamic(
+    eventId,
+    stationA,
+    { resultData: { notes: "clear" } },
+    user,
+  );
+  assert.equal(clinicalPreview.overallFlag, "NORMAL");
 
   const preview = await screeningService.previewDynamic(
     eventId,

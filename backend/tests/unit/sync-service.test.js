@@ -23,10 +23,10 @@ const action = (overrides = {}) => ({
     idempotencyKey: crypto.randomUUID(),
     acknowledged: false,
     resultData: {
-      chartDistanceMetres: 6,
-      od: { kind: "FRACTION", denominator: 6 },
-      os: { kind: "FRACTION", denominator: 6 },
-      withUsualDistanceGlasses: true,
+      distanceMetres: 6,
+      od: "6/6",
+      os: "6/6",
+      notes: "clear",
     },
   },
   ...overrides,
@@ -115,6 +115,16 @@ const createScreening = ({ save } = {}) => ({
       existingResult: { resultId: crypto.randomUUID(), overallFlag: "NORMAL", isFlagged: false, createdAt: new Date() },
     }],
   }),
+  saveDynamic: save || (async () => ({
+    created: true,
+    result: {
+      resultId: crypto.randomUUID(),
+      overallFlag: "NORMAL",
+      isFlagged: false,
+      evaluation: { ruleVersion: "TEMPLATE-SCHEMA-1.0", reasons: [] },
+      resultData: { clinical: "not persisted in sync ledger" },
+    },
+  })),
   saveVisualAcuity: save || (async () => ({
     created: true,
     result: {

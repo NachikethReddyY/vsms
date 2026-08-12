@@ -120,7 +120,7 @@ test("station template mutations generate opaque keys and audit atomically", asy
   assert.ok(audits.every((audit) => audit.userId === manager.userId && audit.requestId === context.requestId));
 });
 
-test("clinical station templates reject fieldSchema on create and update", async () => {
+test("clinical station templates reject invalid create schemas but allow fieldSchema updates", async () => {
   const createDb = { $transaction: async () => { throw new Error("transaction must not run"); } };
   const context = { requestId: crypto.randomUUID(), ipAddress: "127.0.0.1", deviceName: "Test" };
   await assert.rejects(
@@ -129,11 +129,12 @@ test("clinical station templates reject fieldSchema on create and update", async
       name: "Edited VA form",
       defaultCapacity: 2,
       active: true,
-      fieldSchema: [{ key: "hacked", label: "Hacked", type: "text", required: true }],
+      fieldSchema: [{ key: "1bad", label: "Hacked", type: "text", required: true }],
     }, manager, context, createDb),
-    (error) => error.code === "FIELD_SCHEMA_NOT_EDITABLE",
+    (error) => error.code === "INVALID_FIELD_SCHEMA",
   );
 
+  let savedSchema = null;
   const transactionClient = {
     stationTemplate: {
       findUnique: async () => ({
@@ -147,20 +148,32 @@ test("clinical station templates reject fieldSchema on create and update", async
         active: true,
         fieldSchema: null,
       }),
-      update: async () => { throw new Error("update must not run"); },
+      update: async ({ data }) => {
+        savedSchema = data.fieldSchema;
+        return {
+          stationTemplateId: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+          templateKey: "opaque-existing-key",
+          stationType: "VISUAL_ACUITY",
+          version: 2,
+          name: "Visual acuity booth",
+          description: null,
+          defaultCapacity: 4,
+          active: true,
+          fieldSchema: data.fieldSchema,
+        };
+      },
     },
     auditLog: { create: async () => ({}) },
   };
-  await assert.rejects(
-    () => eventService.updateStationTemplate(
-      "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
-      { fieldSchema: [{ key: "notes", label: "Notes", type: "text", required: false }] },
-      manager,
-      context,
-      { $transaction: async (callback) => callback(transactionClient) },
-    ),
-    (error) => error.code === "FIELD_SCHEMA_NOT_EDITABLE",
+  const updated = await eventService.updateStationTemplate(
+    "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+    { fieldSchema: [{ key: "notes", label: "Notes", type: "text", required: false }] },
+    manager,
+    context,
+    { $transaction: async (callback) => callback(transactionClient) },
   );
+  assert.equal(updated.version, 2);
+  assert.equal(savedSchema[0].key, "notes");
 });
 
 test("registration, clinical review, and eye health catalog templates cannot be updated", async () => {

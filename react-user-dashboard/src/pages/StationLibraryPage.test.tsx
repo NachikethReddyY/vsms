@@ -136,7 +136,7 @@ describe('Station library pages', () => {
     ));
   });
 
-  it('shows built-in clinical forms as read-only on the template page', async () => {
+  it('edits existing clinical form fields on the template page', async () => {
     const clinical = {
       ...template,
       fieldSchema: [
@@ -148,19 +148,19 @@ describe('Station library pages', () => {
     patch.mockResolvedValueOnce({ data: clinical });
     renderLibrary(`/admin/station-templates/${clinical.stationTemplateId}/edit`);
     expect(await screen.findByDisplayValue('Visual acuity booth')).toBeTruthy();
-    expect(screen.getByRole('heading', { level: 2, name: /^Clinical form$/i })).toBeTruthy();
-    expect(screen.queryByRole('heading', { level: 2, name: /^Form fields$/i })).toBeNull();
-    expect(screen.getByText(/Built-in screening stations keep a fixed form/i)).toBeTruthy();
-    await userEvent.clear(screen.getByDisplayValue('Visual acuity booth'));
-    await userEvent.type(screen.getByLabelText(/^Name$/i), 'Visual acuity desk');
+    expect(screen.getByRole('heading', { level: 2, name: /^Form fields$/i })).toBeTruthy();
+    expect(screen.getByDisplayValue('Distance (m)')).toBeTruthy();
+    const notesLabel = screen.getByDisplayValue('Notes');
+    await userEvent.clear(notesLabel);
+    await userEvent.type(notesLabel, 'Screener notes');
     await userEvent.click(screen.getByRole('button', { name: /Save changes/i }));
     await waitFor(() => expect(patch).toHaveBeenCalledWith(
       `/events/station-templates/items/${clinical.stationTemplateId}`,
       expect.objectContaining({
-        name: 'Visual acuity desk',
+        name: 'Visual acuity booth',
+        fieldSchema: expect.arrayContaining([expect.objectContaining({ label: 'Screener notes' })]),
       }),
     ));
-    expect(patch.mock.calls.at(-1)?.[1]).not.toHaveProperty('fieldSchema');
   });
 
   it('hides registration, clinical review, and eye health from the library list', async () => {

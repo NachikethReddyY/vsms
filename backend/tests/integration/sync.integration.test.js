@@ -64,6 +64,13 @@ before(async () => {
       stationName: "Visual Acuity",
       stationType: "VISUAL_ACUITY",
       stationOrder: 1,
+      fieldSchemaSnapshot: [
+        { key: "distanceMetres", label: "Distance (m)", type: "number", required: true, min: 1, max: 10, unit: "m" },
+        { key: "od", label: "Right eye (OD)", type: "text", required: true },
+        { key: "os", label: "Left eye (OS)", type: "text", required: true },
+        { key: "notes", label: "Notes", type: "text", required: false },
+      ],
+      schemaVersion: 1,
     },
   });
   await helpers.prisma.staffAssignment.create({
@@ -134,10 +141,10 @@ describe("screening sync API", () => {
         idempotencyKey: crypto.randomUUID(),
         acknowledged: false,
         resultData: {
-          chartDistanceMetres: 6,
-          od: { kind: "FRACTION", denominator: 6 },
-          os: { kind: "FRACTION", denominator: 6 },
-          withUsualDistanceGlasses: true,
+          distanceMetres: 6,
+          od: "6/6",
+          os: "6/6",
+          notes: "clear",
         },
       },
     };

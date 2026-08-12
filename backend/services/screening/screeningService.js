@@ -562,17 +562,24 @@ const saveEyeHealth = () => {
   );
 };
 
+const SCHEMA_DRIVEN_STATION_TYPES = new Set(["CUSTOM", "VISUAL_ACUITY", "REFRACTION", "COLOUR_VISION"]);
+
 const loadDynamicStation = async (eventId, stationId, user) => {
   await assertCanScreen(eventId, user, stationId);
   const station = await prisma.station.findFirst({
-    where: { eventId, stationId, isActive: true, stationType: "CUSTOM" },
+    where: {
+      eventId,
+      stationId,
+      isActive: true,
+      stationType: { in: [...SCHEMA_DRIVEN_STATION_TYPES] },
+    },
   });
   if (!station) throw new AppError(404, "STATION_NOT_FOUND", "Station not found");
   if (!station.fieldSchemaSnapshot) {
     throw new AppError(
       409,
       "STATION_SCHEMA_MISSING",
-      "Custom station does not have a field schema snapshot",
+      "Station does not have a field schema snapshot",
     );
   }
   return station;

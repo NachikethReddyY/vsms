@@ -24,6 +24,9 @@ const { enqueueAccountLifecycle } = require("../account/accountLifecycleNotifica
 const domainEventBus = require("../domain/domainEventBus");
 const { assertRoleEligibility, eventVisibilityWhere, isAdministrator } = require("./eventAuthorizationService");
 
+/** Station types whose library fieldSchema drives DynamicStationPage + API validation. */
+const SCHEMA_DRIVEN_STATION_TYPES = new Set(["CUSTOM", "VISUAL_ACUITY", "REFRACTION", "COLOUR_VISION"]);
+
 const EVENT_FIELDS = [
   "name", "description", "bannerKey", "artworkDataUrl", "venue", "address", "postalCode",
   "latitude", "longitude", "locationProvider", "locationReference", "timezone", "startsAt",
@@ -1750,16 +1753,16 @@ const createStationTemplate = async (body, user, context, db = prisma) => {
   const { SYSTEM_FIELD_SCHEMAS } = require("../../schemas/dynamicStationSchema");
   let fieldSchema;
   try {
-    if (body.stationType === "CUSTOM") {
-      fieldSchema = parseFieldSchema(body.fieldSchema);
-    } else if (body.fieldSchema !== undefined) {
+    if (!SCHEMA_DRIVEN_STATION_TYPES.has(body.stationType)) {
       throw new AppError(
         422,
         "FIELD_SCHEMA_NOT_EDITABLE",
-        "Field schemas can only be defined for custom stations. Built-in stations use fixed clinical forms.",
+        "Field schemas can only be defined for custom and clinical screening stations",
       );
+    }
+    if (body.stationType === "CUSTOM" || body.fieldSchema !== undefined) {
+      fieldSchema = parseFieldSchema(body.fieldSchema);
     } else {
-      // Catalog metadata only — live VA/REF/CV pages ignore this and keep hard-coded forms.
       fieldSchema = SYSTEM_FIELD_SCHEMAS[body.stationType] ?? null;
     }
   } catch (error) {
@@ -1814,11 +1817,11 @@ const updateStationTemplate = async (stationTemplateId, body, user, context, db 
   }
   let fieldSchema;
   if (body.fieldSchema !== undefined) {
-    if (existing.stationType !== "CUSTOM") {
+    if (!SCHEMA_DRIVEN_STATION_TYPES.has(existing.stationType)) {
       throw new AppError(
         422,
         "FIELD_SCHEMA_NOT_EDITABLE",
-        "Field schemas can only be edited for custom stations. Built-in stations use fixed clinical forms.",
+        "Field schemas can only be edited for custom and clinical screening stations",
       );
     }
     try {

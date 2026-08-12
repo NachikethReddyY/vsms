@@ -36,6 +36,7 @@ type OfflineMutation = {
   clientActionId: string;
   stationId: string;
   path: ScreeningPath;
+  stationType?: StationType;
   body: ScreeningSavePayload<VisualAcuityResultData | RefractionResultData | ColourVisionResultData | DynamicResultData>;
 };
 
@@ -461,7 +462,7 @@ export async function queueOfflineStationSave(
     kind: 'mutation',
     status: 'pending',
     expiresAt,
-  }, { clientActionId, stationId, path, body } satisfies OfflineMutation);
+  }, { clientActionId, stationId, path, stationType: station.stationType, body } satisfies OfflineMutation);
   await putRecord(record);
   notifyOfflineChange();
   return evaluation;
@@ -515,7 +516,7 @@ export async function syncOfflineEvent(ownerId: string, eventId: string): Promis
         clientActionId: mutation.clientActionId,
         stationId: mutation.stationId,
         stationType: mutation.path === 'dynamic'
-          ? 'CUSTOM'
+          ? (mutation.stationType && mutation.stationType !== 'EYE_HEALTH' ? mutation.stationType : 'CUSTOM')
           : mutation.path === 'visual-acuity'
           ? 'VISUAL_ACUITY'
           : mutation.path === 'refraction'
