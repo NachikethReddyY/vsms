@@ -12,6 +12,7 @@ import {
 } from './qrHandoff';
 import type { StationType } from './screeningApi';
 import { StationCameraScanner } from './StationCameraScanner';
+import './QRScannerPage.css';
 
 const DEMO_TOKEN = 'VSMS-DEMO-QR-001';
 
@@ -80,7 +81,7 @@ export default function QRScannerPage() {
   };
 
   return (
-    <div className="page-frame narrow">
+    <div className="page-frame narrow qr-scanner-page">
       <div className="page-heading">
         <div>
           <p className="eyebrow">Staff screening</p>

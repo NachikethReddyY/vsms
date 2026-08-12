@@ -1,0 +1,9 @@
+.qr-scanner-page .page-heading { margin-bottom:26px; }
+.qr-scanner-page .detail-panel { border-color:var(--hairline-strong); background:var(--surface); }
+.qr-scanner-page .detail-panel > h2 { color:var(--ink); }
+.qr-scanner-page .detail-panel label { display:grid; gap:7px; color:var(--ink-2); font-size:13px; font-weight:700; }
+.qr-scanner-page .detail-panel input,
+.qr-scanner-page .detail-panel select { min-height:44px; border:1px solid var(--hairline-strong); border-radius:8px; padding:0 12px; background:var(--canvas-soft); color:var(--ink); font:inherit; }
+.qr-scanner-page .detail-panel input:focus,
+.qr-scanner-page .detail-panel select:focus { outline:0; border-color:var(--accent); box-shadow:0 0 0 3px var(--accent-tint); }
+.qr-scanner-page code { border-radius:5px; padding:2px 5px; background:var(--canvas-soft); color:var(--ink); }

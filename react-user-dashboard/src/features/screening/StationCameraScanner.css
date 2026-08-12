@@ -3,8 +3,9 @@
 .station-scanner-viewport {
   position: relative;
   overflow: hidden;
+  border:1px solid var(--hairline-strong);
   border-radius: 16px;
-  background: #0b0d10;
+  background:var(--canvas);
   aspect-ratio: 4 / 3;
 }
 .station-scanner video { width: 100%; height: 100%; object-fit: cover; }
@@ -23,11 +24,13 @@
   transform: translateX(-50%);
   padding: 8px 14px;
   border-radius: 999px;
-  background: rgba(0, 0, 0, 0.72);
-  color: #fff;
+  background:color-mix(in srgb,var(--canvas) 82%,#000);
+  color:var(--ink);
   font-size: 12px;
 }
 .station-scanner-error { margin: 0; color: var(--red, #b42318); font-size: 12px; line-height: 18px; }
+
+[data-theme="dark"] .station-scanner-viewport { background:#0b0d10; }
 
 .station-pass-qr {
   display: grid;

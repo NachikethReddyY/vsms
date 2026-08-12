@@ -1,6 +1,5 @@
 import {
   ArrowLeftIcon,
-  ArrowRightIcon,
   BuildingOffice2Icon,
   CheckCircleIcon,
   ClipboardDocumentCheckIcon,
@@ -14,6 +13,7 @@ import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom"
 import type { ConsentFormVersion, EmergencyContact, EventSummary, Participant, Registration } from "../../types";
 import apiClient, { getApiError } from "../../utils/apiClient";
 import { LiveStationHandoffPicker, type LiveStationHandoffStation } from "../../components/qr/LiveStationHandoffPicker";
+import { RegistrationQrPass } from "../../components/qr/RegistrationQrPass";
 import "./ParticipantPage.css";
 import "./ParticipantCheckInPage.css";
 import "./ParticipantRegistrationPage.css";
@@ -202,10 +202,10 @@ export default function ParticipantRegistrationPage() {
           <div><span>Queue number</span><strong>Q-{String(handoff.queueNumber).padStart(3, "0")}</strong></div>
           <div><span>Assigned station</span><strong>{handoff.assignedStation.name}</strong></div>
         </section>
+        <RegistrationQrPass registrationId={handoff.registrationId} />
         <div className="participant-handoff-actions">
           <button className="secondary" type="button" onClick={() => navigate(`/events/${encodeURIComponent(eventId)}/register`)}>Register next participant</button>
           <button className="secondary" type="button" onClick={() => navigate("/events")}>Return to dashboard</button>
-          <button className="primary" type="button" onClick={() => navigate(`/participants/registrations/${handoff.registrationId}/qr?eventId=${encodeURIComponent(eventId)}`)}>Open QR pass <ArrowRightIcon /></button>
         </div>
       </section>
     );
