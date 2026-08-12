@@ -204,13 +204,13 @@ async function seedReviewer(roles, staff, passwordHash) {
 }
 
 async function seedScreener(roles, staff, passwordHash) {
-  const email = "okgg68819@gmail.com";
+  const email = String(process.env.SEED_SCREENER_EMAIL || "synthetic.screener@example.test").trim().toLowerCase();
   const screener = await prisma.user.upsert({
     where: { email },
     update: { status: "ACTIVE", sysRole: "STAFF", approvalState: "APPROVED", accessState: "ENABLED", deprovisionedAt: null },
     create: {
       username: email,
-      fullName: "Seeded Visual Acuity Screener",
+      fullName: "Synthetic Visual Acuity Screener",
       email,
       employeeNumber: "SYNTH-SCREENER-001",
       department: "Clinical Operations",
