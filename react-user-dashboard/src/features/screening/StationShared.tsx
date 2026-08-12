@@ -1,10 +1,9 @@
 /* eslint-disable react-refresh/only-export-components */
 import { ExclamationTriangleIcon } from '@heroicons/react/24/outline';
-import { FormEvent, ReactNode, useCallback, useEffect, useMemo, useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { FormEvent, ReactNode, useCallback, useMemo, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { AppToast } from '../../components/AppToast';
-import { LiveStationHandoffPicker, type LiveStationHandoffStation } from '../../components/qr/LiveStationHandoffPicker';
-import apiClient, { getApiError as getApiMessage } from '../../utils/apiClient';
+import { getApiError as getApiMessage } from '../../utils/apiClient';
 import { getStoredSession } from '../../utils/session';
 import {
   FlagEvaluation,
@@ -15,181 +14,25 @@ import {
 } from './screeningApi';
 import { extractQrToken } from './qrHandoff';
 import { getOfflineStationContext, isNetworkError } from './offlineSync';
-import { customStationPath, STATION_LABEL, STATION_PATH_SLUG, stationPath } from './stationConfig';
 import { StationCameraScanner } from './StationCameraScanner';
 import './StationCameraScanner.css';
 
-/** Default clinical order when event stationOrder is unavailable. */
-export const DEFAULT_STATION_ORDER: StationType[] = [
-  'VISUAL_ACUITY',
-  'REFRACTION',
-  'COLOUR_VISION',
-  'EYE_HEALTH',
-];
-
-export function orderedStationTypes(stations?: Station[]): StationType[] {
-  if (stations && stations.length > 0) {
-    return [...stations]
-      .filter((item) => item.isActive)
-      .sort((a, b) => a.stationOrder - b.stationOrder)
-      .map((item) => item.stationType);
-  }
-  return DEFAULT_STATION_ORDER;
-}
-
-/** Stations after the current one that have a working staff UI route. */
-export function nextStationTypes(
-  current: StationType,
-  stations?: Station[],
-): StationType[] {
-  const order = orderedStationTypes(stations);
-  const index = order.indexOf(current);
-  const after = index >= 0 ? order.slice(index + 1) : order.filter((type) => type !== current);
-  return after.filter((type) => Boolean(STATION_PATH_SLUG[type]));
-}
-
-export function StationHandoffLinks({
+export function RouteProgressionNotice({
   eventId,
-  currentStationType,
-  currentStationId,
-  registrationId,
-  stations,
+  queued = false,
 }: {
   eventId: string;
-  currentStationType: StationType;
-  currentStationId?: string;
-  registrationId?: string | null;
-  stations?: Station[];
+  queued?: boolean;
 }) {
-  const navigate = useNavigate();
-  const nextStations = useMemo(() => {
-    const orderedStations = stations
-      ? [...stations].filter((item) => item.isActive).sort((left, right) => left.stationOrder - right.stationOrder)
-      : [];
-    const currentIndex = orderedStations.findIndex((item) => (
-      item.stationType === currentStationType && (!currentStationId || item.stationId === currentStationId)
-    ));
-    if (currentIndex >= 0) {
-      return orderedStations.slice(currentIndex + 1).filter((item) => (
-        item.stationType === 'CUSTOM' || Boolean(STATION_PATH_SLUG[item.stationType])
-      ));
-    }
-    return nextStationTypes(currentStationType, stations).map((stationType) => ({
-      stationType,
-      stationId: '',
-      stationName: STATION_LABEL[stationType],
-    }));
-  }, [currentStationId, currentStationType, stations]);
-  const isLastScreeningStation = nextStations.length === 0;
-  const nextLabel = nextStations[0]?.stationName ?? null;
-  const [passImage, setPassImage] = useState<string | null>(null);
-  const [passName, setPassName] = useState<string | null>(null);
-  const [passQueue, setPassQueue] = useState<number | null>(null);
-  const [passError, setPassError] = useState<string | null>(null);
-  const [liveStations, setLiveStations] = useState<LiveStationHandoffStation[]>([]);
-
-  useEffect(() => {
-    if (!eventId || !registrationId) return;
-    let cancelled = false;
-    setPassError(null);
-    setPassImage(null);
-    void screeningApi.getPassDisplay(eventId, registrationId)
-      .then((pass) => {
-        if (cancelled) return;
-        setPassImage(pass.qrImage);
-        setPassName(pass.participantDisplayName);
-        setPassQueue(pass.queueNumber);
-      })
-      .catch((cause) => {
-        if (!cancelled) setPassError(getApiMessage(cause, 'Could not load the participant QR for next queue.'));
-      });
-    return () => { cancelled = true; };
-  }, [eventId, registrationId]);
-
-  useEffect(() => {
-    if (!eventId) return;
-    let cancelled = false;
-    void apiClient.get<{ stations: LiveStationHandoffStation[] }>(`/queues/events/${eventId}/stations`)
-      .then(({ data }) => {
-        if (!cancelled) setLiveStations(data.stations.filter((station) => (
-          nextStations.some((nextStation) => nextStation.stationId
-            ? nextStation.stationId === station.stationId
-            : nextStation.stationType === station.stationType)
-        )));
-      })
-      .catch(() => {
-        if (!cancelled) setLiveStations([]);
-    });
-    return () => { cancelled = true; };
-  }, [eventId, nextStations]);
-
   return (
-    <nav className="va-handoff" aria-label="Continue screening">
-      <p className="va-handoff-label">
-        {nextStations.length > 0
-          ? `Station complete — show this QR so the participant can join the ${nextLabel} queue`
-          : 'Screening stations complete for this route'}
-        {registrationId ? ' · same participant kept' : null}
-      </p>
-
-      {registrationId && (
-        <div className="station-pass-qr" aria-live="polite">
-          {passError && <p className="form-error" role="alert">{passError}</p>}
-          {passImage && (
-            <>
-              <img src={passImage} alt="Participant QR pass for next station queue" />
-              <p>
-                Show this code to <strong>{passName || 'the participant'}</strong>
-                {nextLabel ? <> for <strong>{nextLabel}</strong></> : null}.
-              </p>
-              {passQueue != null && (
-                <p className="station-pass-qr-meta">Queue #{passQueue}</p>
-              )}
-            </>
-          )}
-          {!passImage && !passError && <p className="station-pass-qr-meta">Loading participant QR…</p>}
-        </div>
-      )}
-
-      {registrationId && liveStations.length > 0 && (
-        <LiveStationHandoffPicker
-          stations={liveStations}
-          onSelect={(station) => {
-            const stationType = station.stationType as StationType;
-            const href = stationType === 'CUSTOM'
-              ? customStationPath(eventId, station.stationId, registrationId)
-              : stationPath(eventId, stationType, registrationId);
-            if (href) navigate(href);
-          }}
-          actionLabel="Open station"
-          emptyMessage="No next stations are available."
-        />
-      )}
-
+    <section className="va-handoff" aria-live="polite">
+      <p className="va-handoff-label">{queued
+        ? 'Pending sync — the participant has not entered the next queue yet.'
+        : 'Result committed. The server has updated the participant route and queue.'}</p>
       <div className="action-cluster" style={{ paddingTop: 0 }}>
-        {liveStations.length === 0 && nextStations.map((nextStation, index) => {
-          const href = nextStation.stationType === 'CUSTOM'
-            ? customStationPath(eventId, nextStation.stationId, registrationId)
-            : stationPath(eventId, nextStation.stationType, registrationId);
-          if (!href) return null;
-          return (
-            <Link
-              key={nextStation.stationId || nextStation.stationType}
-              className={index === 0 ? 'primary' : 'secondary'}
-              to={href}
-            >
-              {index === 0 ? 'Open next station tablet: ' : ''}{nextStation.stationName}
-            </Link>
-          );
-        })}
-        {isLastScreeningStation && (
-          <Link className="primary" to={`/events/${eventId}/reviews`}>
-            Open clinical review
-          </Link>
-        )}
         <Link className="secondary" to={`/events/${eventId}`}>Back to event</Link>
       </div>
-    </nav>
+    </section>
   );
 }
 
@@ -243,12 +86,14 @@ export function FlagBanner({
 
 export function ParticipantLookup({
   eventId,
+  currentStationId,
   queue,
   selectedId,
   onSelect,
   selected,
 }: {
   eventId: string;
+  currentStationId: string;
   queue: QueueRegistration[];
   selectedId: string;
   onSelect: (registrationId: string) => void;
@@ -258,14 +103,29 @@ export function ParticipantLookup({
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [scannerOpen, setScannerOpen] = useState(false);
+  const [queueSearch, setQueueSearch] = useState('');
+  const filteredQueue = useMemo(() => {
+    const search = queueSearch.trim().toLowerCase();
+    if (!search) return queue;
+    return queue.filter((row) => row.participantDisplayName.toLowerCase().includes(search) || String(row.queueNumber ?? '').includes(search));
+  }, [queue, queueSearch]);
 
   const applyResolved = useCallback((person: {
     registrationId: string;
     participantDisplayName: string;
+    activeStation: { stationId: string; stationName: string } | null;
   }, source: string) => {
+    if (!person.activeStation) {
+      setError('This participant has no active station assignment. Ask an authorized officer to resolve the route.');
+      return;
+    }
+    if (person.activeStation.stationId !== currentStationId) {
+      setError(`This participant is assigned to ${person.activeStation.stationName}, not this station.`);
+      return;
+    }
     onSelect(person.registrationId);
     setSuccess(`Loaded ${person.participantDisplayName} from ${source}.`);
-  }, [onSelect]);
+  }, [currentStationId, onSelect]);
 
   const resolvePass = async () => {
     if (!eventId || !passToken.trim()) return;
@@ -324,10 +184,14 @@ export function ParticipantLookup({
       </div>
       <p className="va-resolve-hint">Paste the full QR value or the hex token from the pass.</p>
       <label>
-        Or choose from station queue
+        Search this station queue
+        <input type="search" value={queueSearch} onChange={(event) => setQueueSearch(event.target.value)} placeholder="Queue number or participant name" />
+      </label>
+      <label>
+        Choose from this station queue
         <select value={selectedId} onChange={(event) => onSelect(event.target.value)}>
           <option value="" disabled>Select participant</option>
-          {queue.map((row) => (
+          {filteredQueue.map((row) => (
             <option key={row.registrationId} value={row.registrationId}>
               #{row.queueNumber ?? '—'} {row.participantDisplayName}
               {row.existingResult ? ` · ${row.existingResult.overallFlag}` : ''}
@@ -338,7 +202,6 @@ export function ParticipantLookup({
       {selected && (
         <p>
           Screening <strong>{selected.participantDisplayName}</strong>
-          {selected.passToken ? <> · pass <code>{selected.passToken}</code></> : null}
         </p>
       )}
       <StationCameraScanner

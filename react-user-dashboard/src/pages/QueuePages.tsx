@@ -84,12 +84,11 @@ export function QueuePage() {
     }
   };
 
-  const handleAction = (id: string, action: "CALLED" | "STARTED" | "COMPLETED" | "SKIPPED") => {
+  const handleAction = (id: string, action: "CALLED" | "STARTED" | "SKIPPED") => {
     if (!eventId) return;
     const runners: Record<string, () => Promise<unknown>> = {
       CALLED: () => queueApi.callQueueEntry(eventId, id),
       STARTED: () => queueApi.startQueueEntry(eventId, id),
-      COMPLETED: () => queueApi.completeQueueEntry(eventId, id),
       SKIPPED: () => queueApi.skipQueueEntry(eventId, id),
     };
     void runAction(id, runners[action]);
@@ -163,7 +162,6 @@ export function QueuePage() {
             <NowServingCard
               nowServing={nowServing}
               actionLoading={actionLoading}
-              onComplete={(id) => handleAction(id, "COMPLETED")}
               onNoShow={(id) => handleAction(id, "SKIPPED")}
             />
 
@@ -171,7 +169,7 @@ export function QueuePage() {
               <section className="rounded-2xl border border-[#E2E1DC] bg-white p-10 text-center shadow-sm">
                 <p className="text-sm font-semibold text-[#57554F]">The queue is empty</p>
                 <p className="mt-1 text-sm text-[#7A7870]">
-                  Join or hand off a participant to a station to start the queue.
+                  Participants enter queues through their assigned routes.
                 </p>
               </section>
             ) : (

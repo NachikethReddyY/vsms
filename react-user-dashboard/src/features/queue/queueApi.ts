@@ -74,11 +74,6 @@ export const queueApi = {
     return data;
   },
 
-  async completeQueueEntry(eventId: string, queueId: string) {
-    const { data } = await apiClient.patch<QueueEntry>(`/events/${eventId}/entries/${queueId}/complete`);
-    return data;
-  },
-
   async skipQueueEntry(eventId: string, queueId: string) {
     const { data } = await apiClient.patch<QueueEntry>(`/events/${eventId}/entries/${queueId}/skip`);
     return data;

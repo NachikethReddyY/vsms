@@ -15,7 +15,7 @@ export interface QueueItem {
   stationName: string;
 }
 
-type QueueAction = "CALLED" | "STARTED" | "COMPLETED" | "SKIPPED";
+type QueueAction = "CALLED" | "STARTED" | "SKIPPED";
 
 interface QueueTableProps {
   items: QueueItem[];
@@ -259,16 +259,7 @@ export function QueueTable({
                       </button>
                     </span>
                   )}
-                  {item.status === "IN_PROGRESS" && (
-                    <button
-                      type="button"
-                      disabled={actionLoading === item.id}
-                      onClick={() => onAction(item.id, "COMPLETED")}
-                      className="font-semibold text-emerald-700 disabled:opacity-50"
-                    >
-                      Complete
-                    </button>
-                  )}
+                  {item.status === "IN_PROGRESS" && <span className="text-xs text-[#7A7870]">Save result at station</span>}
                   {["COMPLETED", "SKIPPED", "CANCELLED"].includes(item.status) && (
                     <span className="text-[#A5A29A]">—</span>
                   )}
