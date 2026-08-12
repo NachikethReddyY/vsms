@@ -17,6 +17,8 @@ const participantParams = z.object({
   participantId: uuidSchema,
 }).strict();
 
+const tokenParams = z.object({ token: hexTokenSchema }).strict();
+
 const tokenBody = z.object({
   token: scannedTokenSchema,
   eventId: z.string().uuid().optional(),
@@ -24,6 +26,7 @@ const tokenBody = z.object({
 
 module.exports = { 
   participantParams, 
+  tokenParams,
   tokenBody,
   // Exporting reusable primitives in case other schemas need them
   uuidSchema,

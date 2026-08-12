@@ -5,7 +5,7 @@ const asyncHandler = require("../utils/http/asyncHandler");
 const qrController = require("../controllers/qrController");
 const authenticate = require("../middlewares/authenticate");
 const validate = require("../middlewares/validate");
-const { tokenBody } = require("../schemas/qrSchemas");
+const { tokenBody, tokenParams } = require("../schemas/qrSchemas");
 
 // Import your production-grade idempotency middleware
 const checkIdempotency = require("../middlewares/idempotency");
@@ -14,8 +14,7 @@ const checkIdempotency = require("../middlewares/idempotency");
 // Public pass-status lookup for the QR scan target.
 // (GET requests - Read-only, no idempotency needed)
 // ==========================================
-router.get("/public-status/:token", asyncHandler(qrController.getPublicStatus));
-router.get("/handoff/:token", asyncHandler(qrController.getStationHandoffQR));
+router.get("/public-status/:token", validate({ params: tokenParams }), asyncHandler(qrController.getPublicStatus));
 
 // ==========================================
 // Dev-only QR preview (no auth). Blocked in production by controller.
@@ -56,12 +55,12 @@ router.post("/reissue/:registrationId", checkIdempotency, asyncHandler(qrControl
 router.post("/manual-checkin", checkIdempotency, asyncHandler(qrController.manualCheckIn));
 
 // Participant & History Lookup (GET request - read-only)
-router.get("/participant/:token", asyncHandler(qrController.getParticipantByQR));
+router.get("/participant/:token", validate({ params: tokenParams }), asyncHandler(qrController.getParticipantByQR));
 
 // Revocation & File Output
 router.put("/revoke/:qrId", checkIdempotency, asyncHandler(qrController.revokeQR));
 router.get("/download/:qrId", asyncHandler(qrController.downloadQR));
 router.get("/print/:qrId", asyncHandler(qrController.printQR));
-router.get("/:token", asyncHandler(qrController.getRegistrationByQR));
+router.get("/:token", validate({ params: tokenParams }), asyncHandler(qrController.getRegistrationByQR));
 
 module.exports = router;

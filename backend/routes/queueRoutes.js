@@ -20,32 +20,12 @@ const {
   eventQueueEntryParams,
   participantParams,
   eventParticipantParams,
-  joinQueueBody,
-  queueHandoffBody,
-  transferQueueBody,
-  advanceQueueBody,
   priorityQueueBody
 } = require("../schemas/queueSchemas");
 
 const router = express.Router();
 
 router.use(authenticate);
-
-/**
- * @route   POST /events/:eventId/stations/:stationId/join
- * @desc    Enters a registered participant into a station's virtual queue
- * @access  Registration Officer, Event Manager, Administrator
- */
-router.post(
-  "/events/:eventId/stations/:stationId/join",
-  requireAnyRole("REGISTRATION_OFFICER", "SCREENER", "EVENT_MANAGER", "ADMINISTRATOR"),
-  checkIdempotency,
-  validate({
-    params: stationParams,
-    body: joinQueueBody
-  }),
-  asyncHandler(queueController.joinQueue)
-);
 
 /**
  * @route   GET /events/:eventId
@@ -56,13 +36,6 @@ router.get(
   "/events/:eventId/stations",
   validate({ params: eventParams }),
   asyncHandler(queueController.listRegistrationStations),
-);
-
-router.post(
-  "/events/:eventId/stations/:stationId/handoff",
-  checkIdempotency,
-  validate({ params: stationParams, body: queueHandoffBody }),
-  asyncHandler(queueController.createQueueHandoff),
 );
 
 router.get(
@@ -90,8 +63,6 @@ router.get("/participant/:registrationId", validate({ params: participantParams 
 
 router.patch("/events/:eventId/entries/:queueId/call", validate({ params: eventQueueEntryParams }), asyncHandler(queueController.callQueueEntry));
 router.patch("/events/:eventId/entries/:queueId/start", validate({ params: eventQueueEntryParams }), asyncHandler(queueController.startQueueEntry));
-router.patch("/events/:eventId/entries/:queueId/advance", checkIdempotency, validate({ params: eventQueueEntryParams, body: advanceQueueBody }), asyncHandler(queueController.advanceQueueEntry));
-router.patch("/events/:eventId/entries/:queueId/complete", validate({ params: eventQueueEntryParams }), asyncHandler(queueController.completeQueueEntry));
 router.patch("/events/:eventId/entries/:queueId/skip", validate({ params: eventQueueEntryParams }), asyncHandler(queueController.skipQueueEntry));
 router.patch("/events/:eventId/entries/:queueId/priority", requireAnyRole("EVENT_MANAGER", "ADMINISTRATOR"), checkIdempotency, validate({ params: eventQueueEntryParams, body: priorityQueueBody }), asyncHandler(queueController.updatePriority));
 router.delete("/events/:eventId/entries/:queueId", validate({ params: eventQueueEntryParams }), asyncHandler(queueController.leaveQueue));
@@ -117,36 +88,6 @@ router.patch(
     params: queueEntryParams
   }),
   asyncHandler(queueController.startQueueEntry)
-);
-
-/**
- * @route   PATCH /entries/:queueId/transfer
- * @desc    Transfers a participant to a secondary screening station (e.g., visual acuity to refraction)
- * @access  Screener, Event Manager, Administrator
- */
-router.patch(
-  "/entries/:queueId/transfer",
-  requireAnyRole("SCREENER", "EVENT_MANAGER", "ADMINISTRATOR"),
-  checkIdempotency,
-  validate({
-    params: queueEntryParams,
-    body: transferQueueBody
-  }),
-  asyncHandler(queueController.advanceQueueEntry)
-);
-
-/**
- * @route   PATCH /entries/:queueId/complete
- * @desc    Marks the station entry as successfully completed
- * @access  Screener
- */
-router.patch(
-  "/entries/:queueId/complete",
-  requireAnyRole("SCREENER"),
-  validate({
-    params: queueEntryParams
-  }),
-  asyncHandler(queueController.completeQueueEntry)
 );
 
 /**

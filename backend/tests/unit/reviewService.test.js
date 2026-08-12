@@ -1,6 +1,14 @@
 const { test, describe } = require("node:test");
 const { expect } = require("expect");
-const { compareQueueItems, contextVersion, reviewReadiness } = require("../../services/screening/reviewService");
+const {
+  assertReviewOutcomeAllowed,
+  compareQueueItems,
+  contextVersion,
+  reviewReadiness,
+  routeStations,
+  stopRouteForUrgentReview,
+  unfinishedRouteStationIds,
+} = require("../../services/screening/reviewService");
 const { reviewDecisionBody } = require("../../schemas/screeningSchemas");
 
 const stations = [
@@ -34,6 +42,40 @@ describe("clinical review eligibility and ordering", () => {
   test("results from inactive stations do not affect readiness or priority", () => {
     expect(reviewReadiness([stations[0]], [result(stations[0].stationId), result(stations[1].stationId, "URGENT")]))
       .toMatchObject({ ready: true, readyReason: "SCREENING_COMPLETE", highestFlag: "NORMAL", flaggedResultCount: 0 });
+  });
+
+  test("uses the persisted registration route rather than current event configuration", () => {
+    const registration = {
+      routeSteps: [
+        { position: 2, station: stations[1] },
+        { position: 1, station: stations[0] },
+      ],
+    };
+    expect(routeStations(registration)).toEqual(stations);
+    expect(reviewReadiness(routeStations(registration), [result(stations[0].stationId)]))
+      .toMatchObject({ ready: false, completedStationCount: 1, totalStationCount: 2 });
+  });
+
+  test("incomplete urgent review requires urgent escalation and cancels the active queue", async () => {
+    const readiness = reviewReadiness(stations, [result(stations[0].stationId, "URGENT")]);
+    expect(() => assertReviewOutcomeAllowed(readiness, "REFER"))
+      .toThrow(expect.objectContaining({ code: "URGENT_ESCALATION_REQUIRED" }));
+    expect(assertReviewOutcomeAllowed(readiness, "URGENT_ESCALATION")).toBe(true);
+
+    let mutation;
+    const stopped = await stopRouteForUrgentReview({
+      queueEntry: { updateMany: async (query) => { mutation = query; return { count: 1 }; } },
+    }, "registration-1", new Date("2026-08-12T12:00:00.000Z"));
+    expect(stopped.count).toBe(1);
+    expect(mutation.where).toEqual({
+      registrationId: "registration-1",
+      status: { in: ["WAITING", "CALLED", "IN_PROGRESS"] },
+    });
+    expect(mutation.data).toMatchObject({ status: "CANCELLED" });
+    expect(unfinishedRouteStationIds([
+      { stationId: stations[1].stationId, position: 2, completedAt: null },
+      { stationId: stations[0].stationId, position: 1, completedAt: new Date() },
+    ])).toEqual([stations[1].stationId]);
   });
 
   test("orders severity, queue number with null last, then display name", () => {

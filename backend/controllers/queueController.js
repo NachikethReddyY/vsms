@@ -67,28 +67,6 @@ const requireRouteParam = (req, parameterName) => {
 };
 
 /**
- * Validates and extracts a required body field.
- *
- * @param {Object} req Express request
- * @param {string} fieldName Field key name
- * @returns {*} Field value
- * @throws {ValidationError} When field is missing or empty
- */
-const requireBodyField = (req, fieldName) => {
-    const value = req.body?.[fieldName];
-
-    if (
-        value === undefined ||
-        value === null ||
-        (typeof value === "string" && value.trim() === "")
-    ) {
-        throw new ValidationError(`Field '${fieldName}' is required.`);
-    }
-
-    return value;
-};
-
-/**
  * Formats standard API JSON response.
  *
  * @param {Object} res Express response
@@ -106,25 +84,6 @@ const sendSuccess = (res, statusCode, data) => {
 /* ==========================================================================
    Controller Handlers
    ========================================================================== */
-
-/**
- * Adds a queue entry for a participant registration.
- * @route POST /api/v1/events/:eventId/stations/:stationId/queue
- */
-exports.joinQueue = asyncHandler(async (req, res) => {
-    const eventId = requireRouteParam(req, "eventId");
-    const stationId = requireRouteParam(req, "stationId");
-    const registrationId = requireBodyField(req, "registrationId");
-    const user = getAuthenticatedUser(req);
-
-    const result = await queueService.joinQueue(
-        { eventId, stationId, registrationId },
-        user,
-        getRequestContext(req)
-    );
-
-    return res.status(result.created ? 201 : 200).json(result);
-});
 
 /**
  * Retrieves the current queue status for an event.
@@ -150,25 +109,6 @@ exports.listRegistrationStations = asyncHandler(async (req, res) => {
     const result = await queueService.listRegistrationStations(eventId, user);
 
     return sendSuccess(res, 200, result);
-});
-
-/**
- * Creates a queue handoff between stations.
- * @route POST /api/v1/events/:eventId/stations/:stationId/handoff
- */
-exports.createQueueHandoff = asyncHandler(async (req, res) => {
-    const eventId = requireRouteParam(req, "eventId");
-    const stationId = requireRouteParam(req, "stationId");
-    const registrationId = requireBodyField(req, "registrationId");
-    const user = getAuthenticatedUser(req);
-
-    const result = await queueService.createQueueHandoff(
-        { eventId, stationId, registrationId },
-        user,
-        getRequestContext(req)
-    );
-
-    return sendSuccess(res, result.created ? 201 : 200, result);
 });
 
 /**
@@ -218,45 +158,6 @@ exports.startQueueEntry = asyncHandler(async (req, res) => {
     const user = getAuthenticatedUser(req);
 
     const result = await queueService.startQueueEntry({
-        queueId,
-        eventId,
-        user,
-        context: getRequestContext(req),
-    });
-
-    return sendSuccess(res, 200, result);
-});
-
-/**
- * Advances a queue entry to another station.
- * @route PATCH /api/v1/events/:eventId/entries/:queueId/advance
- */
-exports.advanceQueueEntry = asyncHandler(async (req, res) => {
-    const queueId = requireRouteParam(req, "queueId");
-    const eventId = requireRouteParam(req, "eventId");
-    const toStationId = requireBodyField(req, "toStationId");
-    const reason = req.body?.reason;
-    const user = getAuthenticatedUser(req);
-
-    const result = await queueService.advanceQueueEntry(
-        { queueId, eventId, toStationId, reason },
-        user,
-        getRequestContext(req)
-    );
-
-    return sendSuccess(res, 200, result);
-});
-
-/**
- * Completes a queue entry.
- * @route POST /api/v1/events/:eventId/entries/:queueId/complete
- */
-exports.completeQueueEntry = asyncHandler(async (req, res) => {
-    const queueId = requireRouteParam(req, "queueId");
-    const eventId = requireRouteParam(req, "eventId");
-    const user = getAuthenticatedUser(req);
-
-    const result = await queueService.completeQueueEntry({
         queueId,
         eventId,
         user,

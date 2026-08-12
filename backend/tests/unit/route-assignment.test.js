@@ -22,10 +22,10 @@ const station = (stationId, stationOrder, operationalStatus = "AVAILABLE") => ({
   stationTemplate: { defaultCapacity: 3 },
 });
 
-const routeDb = ({ stations, activeEntries = [], availabilities = [] }) => {
+const routeDb = ({ stations, activeEntries = [], availabilities = [], results = [], existingQueue = null }) => {
   const state = {
     routeSteps: [],
-    queueEntries: [],
+    queueEntries: existingQueue ? [existingQueue] : [],
     queueNumber: null,
     routeCreates: 0,
     queueCreates: 0,
@@ -52,7 +52,7 @@ const routeDb = ({ stations, activeEntries = [], availabilities = [] }) => {
     registrationRouteStep: {
       findMany: async () => state.routeSteps.map((step) => ({
         ...step,
-        completedAt: null,
+        completedAt: step.completedAt || null,
         station: {
           stationName: stations.find(({ stationId }) => stationId === step.stationId).stationName,
           stationType: "CUSTOM",
@@ -64,6 +64,7 @@ const routeDb = ({ stations, activeEntries = [], availabilities = [] }) => {
         return { count: data.length };
       },
     },
+    screeningResult: { findMany: async () => results },
     station: {
       findMany: async () => {
         state.stationReads += 1;
@@ -175,4 +176,30 @@ test("checked-in backfill uses the same assign-once transaction and is idempoten
   assert.equal(replay.status, "READY");
   assert.equal(state.routeCreates, 1);
   assert.equal(state.queueCreates, 1);
+});
+
+test("checked-in backfill preserves completed stations and an existing active queue", async () => {
+  const a = station("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa", 1);
+  const b = station("bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb", 2);
+  const c = station("cccccccc-cccc-4ccc-8ccc-cccccccccccc", 3);
+  const completedAt = new Date("2026-08-12T10:00:00.000Z");
+  const existingQueue = {
+    id: "existing-queue",
+    registrationId,
+    stationId: c.stationId,
+    queueNumber: 7,
+    status: "WAITING",
+  };
+  const { state, tx } = routeDb({
+    stations: [a, b, c],
+    results: [{ stationId: b.stationId, updatedAt: completedAt }],
+    existingQueue,
+  });
+
+  const route = await assignRouteOnce({ tx, registrationId, eventId, actorUserId: userId });
+  assert.deepEqual(route.steps.map(({ stationId }) => stationId), [b.stationId, c.stationId, a.stationId]);
+  assert.equal(route.steps[0].state, "COMPLETED");
+  assert.equal(route.currentStation.stationId, c.stationId);
+  assert.equal(route.queue.queueEntryId, existingQueue.id);
+  assert.equal(state.queueCreates, 0);
 });

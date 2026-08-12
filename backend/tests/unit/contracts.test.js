@@ -284,19 +284,17 @@ test("demo QR fixtures are forbidden in production", () => {
     assert.doesNotMatch(packageJson.scripts["deploy:prod"], /db:setup|prisma:seed/);
 });
 
-test("QR station handoff contract is documented", () => {
-    const doc = read("docs/qr-station-handoff.md");
-    assert.match(doc, /token-only|token only/i);
-    assert.match(doc, /registrationId/);
-    assert.match(doc, /Do \*\*not\*\* put `stationId`|must \*\*not\*\* embed `stationId`/i);
-    assert.match(doc, /\/events\/\{eventId\}\/stations\/\{slug\}\?registrationId=/);
-    assert.match(doc, /visual-acuity/);
+test("single participant QR has no public generated-handoff path", () => {
+    assert.doesNotMatch(read("routes/qrRoutes.js"), /\/handoff\/:token/);
+    assert.doesNotMatch(read("services/participant/qrService.js"), /getStationHandoffQR|buildStationHandoffUrl/);
+    assert.doesNotMatch(read("controllers/qrController.js"), /getStationHandoffQR/);
 });
 
-test("registration queue handoff endpoints and station status are in OpenAPI", () => {
+test("manual queue movement endpoints are retired while station status remains documented", () => {
     const openapi = read("docs/openapi.yaml");
     assert.match(openapi, /\/api\/v1\/queues\/events\/\{eventId\}\/stations:/);
-    assert.match(openapi, /\/api\/v1\/queues\/events\/\{eventId\}\/stations\/\{stationId\}\/handoff:/);
+    assert.doesNotMatch(openapi, /\/api\/v1\/queues\/events\/\{eventId\}\/stations\/\{stationId\}\/(?:handoff|join):/);
+    assert.doesNotMatch(openapi, /\/api\/v1\/queues\/(?:events\/\{eventId\}\/)?entries\/\{queueId\}\/(?:advance|complete):/);
     assert.match(openapi, /operationalStatus: \{ \$ref: "#\/components\/schemas\/StationOperationalStatus" \}/);
 });
 

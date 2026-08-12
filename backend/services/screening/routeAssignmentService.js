@@ -132,6 +132,16 @@ const buildRouteState = ({ routeVersion, steps, queueEntry, eventInProgress = tr
     };
   }
 
+  if (steps.every(({ completedAt }) => completedAt)) {
+    return {
+      status: "REVIEW_READY",
+      routeVersion,
+      steps: steps.map((step) => safeStep(step, null, false)),
+      currentStation: null,
+      queue: null,
+    };
+  }
+
   const blocked = !queueEntry;
   const safeSteps = steps.map((step) => safeStep(step, queueEntry?.stationId, blocked));
   return {
@@ -214,21 +224,55 @@ const assignRouteOnce = async ({
     return buildRouteState({ routeVersion: registration.routeVersion, steps: [], queueEntry: null });
   }
 
+  const [existingResults, existingQueue] = await Promise.all([
+    tx.screeningResult.findMany({
+      where: { registrationId },
+      select: { stationId: true, updatedAt: true },
+    }),
+    tx.queueEntry.findFirst({
+      where: { registrationId, status: { in: ACTIVE_QUEUE_STATUSES } },
+      orderBy: { enteredAt: "desc" },
+    }),
+  ]);
+  const resultByStation = new Map(existingResults.map((result) => [result.stationId, result]));
+  const candidateByStation = new Map(candidates.map((candidate) => [candidate.stationId, candidate]));
+  if (existingQueue && !candidateByStation.has(existingQueue.stationId)) {
+    throw new AppError(409, "ROUTE_QUEUE_CONFLICT", "The active queue is not part of the required screening route.");
+  }
+
+  const completed = candidates.filter(({ stationId }) => (
+    resultByStation.has(stationId) && stationId !== existingQueue?.stationId
+  ));
+  const current = existingQueue ? [candidateByStation.get(existingQueue.stationId)] : [];
+  const preservedIds = new Set([...completed, ...current].map(({ stationId }) => stationId));
+  const orderedCandidates = [
+    ...completed,
+    ...current,
+    ...candidates.filter(({ stationId }) => !preservedIds.has(stationId)),
+  ];
+
   await tx.registrationRouteStep.createMany({
-    data: candidates.map(({ stationId }, index) => ({
+    data: orderedCandidates.map(({ stationId }, index) => ({
       registrationId,
       stationId,
       position: index + 1,
+      completedAt: resultByStation.get(stationId)?.updatedAt || null,
     })),
   });
 
-  const firstStation = candidates.find(({ available }) => available);
-  const queueEntry = await createInitialQueueEntry({
+  const firstStation = orderedCandidates.find(({ stationId, available }) => (
+    !resultByStation.has(stationId) && available
+  ));
+  const queueEntry = existingQueue || await createInitialQueueEntry({
     tx,
     registrationId,
     stationId: firstStation?.stationId || null,
   });
-  const steps = candidates.map((candidate, index) => ({ ...candidate, position: index + 1, completedAt: null }));
+  const steps = orderedCandidates.map((candidate, index) => ({
+    ...candidate,
+    position: index + 1,
+    completedAt: resultByStation.get(candidate.stationId)?.updatedAt || null,
+  }));
 
   await createAuditLog({
     userId: actorUserId,
@@ -237,7 +281,7 @@ const assignRouteOnce = async ({
     entityId: registrationId,
     newValue: {
       eventId,
-      stationIds: candidates.map(({ stationId }) => stationId),
+      stationIds: orderedCandidates.map(({ stationId }) => stationId),
       initialStationId: queueEntry?.stationId || null,
       routeVersion: registration.routeVersion,
     },
