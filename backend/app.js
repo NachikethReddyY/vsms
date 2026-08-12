@@ -13,7 +13,7 @@ const helmet = require("helmet");
 const cookieParser = require("cookie-parser");
 const swaggerUi = require("swagger-ui-express");
 const YAML = require("yaml");
-
+const db = require("./config/db");
 const { rateLimit } = require("./middlewares/rateLimiter");
 
 // Environment Configuration & Error Handling
@@ -248,13 +248,33 @@ app.get("/favicon.ico", (_req, res) => {
     res.status(204).end();
 });
 
-app.get("/health", (_req, res) => {
-    res.json({
-        status: "ok",
-        environment: env.isProduction
-            ? "production"
-            : "development",
+app.get("/health", async (_req, res) => {
+  try {
+    await db.$queryRaw`SELECT 1`;
+
+    return res.status(200).json({
+      status: "healthy",
+      database: "connected",
+      environment: env.isProduction
+        ? "production"
+        : "development",
+      timestamp: new Date().toISOString(),
     });
+  } catch (error) {
+    logger.error("health_check_failed", {
+      event: "health_check_failed",
+      message: error.message,
+    });
+
+    return res.status(503).json({
+      status: "unhealthy",
+      database: "disconnected",
+      environment: env.isProduction
+        ? "production"
+        : "development",
+      timestamp: new Date().toISOString(),
+    });
+  }
 });
 
 /**
