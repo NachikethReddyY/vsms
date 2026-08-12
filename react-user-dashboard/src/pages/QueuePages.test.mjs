@@ -22,3 +22,9 @@ test("queue API calls the event-scoped virtual queue endpoints", () => {
   assert.match(apiSource, /`\/events\/\$\{eventId\}\/entries\/\$\{queueId\}\/complete`/);
   assert.match(apiSource, /`\/events\/\$\{eventId\}\/entries\/\$\{queueId\}\/skip`/);
 });
+
+test("queue polling prevents older requests from replacing newer state", () => {
+  assert.match(pageSource, /const requestSequence = useRef\(0\)/);
+  assert.match(pageSource, /sequence !== requestSequence\.current/);
+  assert.match(pageSource, /setInterval\(\(\) => void fetchQueue\(\), 10_000\)/);
+});

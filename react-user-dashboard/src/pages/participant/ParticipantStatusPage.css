@@ -68,6 +68,31 @@
   font-weight: 700;
 }
 
+.ps-delayed {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 8px 12px;
+  width: 100%;
+  padding: 12px;
+  border: 1px solid var(--event-line);
+  border-radius: 8px;
+  color: var(--event-muted);
+  font-size: 13px;
+}
+.ps-delayed strong { color: var(--event-ink); }
+.ps-delayed button {
+  min-height: 44px;
+  padding: 0 14px;
+  border: 1px solid var(--event-line);
+  border-radius: 7px;
+  background: var(--event-card);
+  color: var(--event-ink);
+  font: inherit;
+  font-weight: 700;
+}
+
 .ps-facts {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));

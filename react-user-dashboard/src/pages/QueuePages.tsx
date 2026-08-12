@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useParams } from "react-router-dom";
 import { useAuth } from "../auth/AuthProvider";
 import { NowServingCard } from "../components/queue/NowServingCard";
@@ -27,28 +27,35 @@ export function QueuePage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<QueueStatus | "ALL">("ALL");
   const [currentPage, setCurrentPage] = useState(1);
+  const requestSequence = useRef(0);
 
   const isPermissionError = Boolean(errorCode && PERMISSION_ERROR_CODES.has(errorCode));
 
   const fetchQueue = useCallback(async () => {
     if (!eventId) return;
+    const sequence = ++requestSequence.current;
     try {
       const result = await queueApi.getEventQueueStatus(eventId);
+      if (sequence !== requestSequence.current) return;
       setStatus(result);
       setError(null);
       setErrorCode(null);
     } catch (requestError: unknown) {
+      if (sequence !== requestSequence.current) return;
       setError(getApiError(requestError, "Unable to load queue data."));
       setErrorCode(getApiErrorCode(requestError));
     } finally {
-      setIsLoading(false);
+      if (sequence === requestSequence.current) setIsLoading(false);
     }
   }, [eventId]);
 
   useEffect(() => {
     void fetchQueue();
     const interval = window.setInterval(() => void fetchQueue(), 10_000);
-    return () => window.clearInterval(interval);
+    return () => {
+      window.clearInterval(interval);
+      requestSequence.current += 1;
+    };
   }, [fetchQueue]);
 
   const entries = useMemo(() => status?.entries ?? [], [status]);

@@ -38,6 +38,8 @@ export default function ParticipantStatusPage() {
   const [status, setStatus] = useState<PublicPassStatus | null>(null);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(true);
+  const [lastUpdatedAt, setLastUpdatedAt] = useState<Date | null>(null);
+  const [retryKey, setRetryKey] = useState(0);
 
   const [handoffOpen, setHandoffOpen] = useState(false);
   const [handoffStationId, setHandoffStationId] = useState<string | null>(null);
@@ -48,13 +50,26 @@ export default function ParticipantStatusPage() {
   const dialogRef = useRef<HTMLDialogElement | null>(null);
 
   useEffect(() => {
+    hasStatusRef.current = false;
+    setStatus(null);
+    setError('');
+    setLastUpdatedAt(null);
+  }, [token]);
+
+  useEffect(() => {
     const controller = new AbortController();
+    let inFlight = false;
     const fetchStatus = () => {
+      if (inFlight) return Promise.resolve();
+      inFlight = true;
       if (!hasStatusRef.current) setLoading(true);
       return apiClient.get<{ success: boolean; data: PublicPassStatus }>(`/qr/public-status/${encodeURIComponent(token)}`, { signal: controller.signal })
-        .then(({ data }) => { if (!controller.signal.aborted) { setStatus(data.data); setError(''); } })
+        .then(({ data }) => { if (!controller.signal.aborted) { setStatus(data.data); setLastUpdatedAt(new Date()); setError(''); } })
         .catch((cause) => { if (!controller.signal.aborted) setError(getApiMessage(cause, 'This pass could not be verified.')); })
-        .finally(() => { if (!controller.signal.aborted) { setLoading(false); hasStatusRef.current = true; } });
+        .finally(() => {
+          inFlight = false;
+          if (!controller.signal.aborted) { setLoading(false); hasStatusRef.current = true; }
+        });
     };
     void fetchStatus();
     pollRef.current = setInterval(() => void fetchStatus(), POLL_MS);
@@ -62,7 +77,7 @@ export default function ParticipantStatusPage() {
       controller.abort();
       if (pollRef.current) clearInterval(pollRef.current);
     };
-  }, [token]);
+  }, [retryKey, token]);
 
   useEffect(() => {
     const previousTitle = document.title;
@@ -99,7 +114,7 @@ export default function ParticipantStatusPage() {
   };
 
   let content;
-  if (error) {
+  if (error && !status) {
     content = <section className="ps-state ps-state-error" role="alert">
       <ExclamationTriangleIcon aria-hidden="true" />
       <h1>Pass could not be verified</h1>
@@ -120,6 +135,14 @@ export default function ParticipantStatusPage() {
       <CheckBadgeIcon aria-hidden="true" />
       <span className="ps-badge">Valid pass</span>
       <h1>{status.eventName ?? 'Event pass'}</h1>
+
+      {error && (
+        <div className="ps-delayed" role="status">
+          <strong>Update delayed</strong>
+          <span>{lastUpdatedAt ? `Last updated ${lastUpdatedAt.toLocaleTimeString()}.` : error}</span>
+          <button type="button" onClick={() => setRetryKey((value) => value + 1)}>Retry</button>
+        </div>
+      )}
 
       {queueState?.isPriority && (
         <span className="ps-badge ps-badge-urgent"><BoltIcon aria-hidden="true" />Priority — urgent handling</span>
