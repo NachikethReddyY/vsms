@@ -162,12 +162,7 @@ exports.callQueueEntry = asyncHandler(async (req, res) => {
     const eventId = requireRouteParam(req, "eventId");
     const user = getAuthenticatedUser(req);
 
-    const result = await queueService.callQueueEntry({
-        queueId,
-        eventId,
-        user,
-        context: getRequestContext(req),
-    });
+    const result = await queueService.callQueueEntry(queueId, user, getRequestContext(req), undefined, eventId);
 
     return sendSuccess(res, 200, result);
 });
@@ -181,12 +176,7 @@ exports.startQueueEntry = asyncHandler(async (req, res) => {
     const eventId = requireRouteParam(req, "eventId");
     const user = getAuthenticatedUser(req);
 
-    const result = await queueService.startQueueEntry({
-        queueId,
-        eventId,
-        user,
-        context: getRequestContext(req),
-    });
+    const result = await queueService.startQueueEntry(queueId, user, getRequestContext(req), undefined, eventId);
 
     return sendSuccess(res, 200, result);
 });
@@ -200,12 +190,7 @@ exports.skipQueueEntry = asyncHandler(async (req, res) => {
     const eventId = requireRouteParam(req, "eventId");
     const user = getAuthenticatedUser(req);
 
-    const result = await queueService.skipQueueEntry({
-        queueId,
-        eventId,
-        user,
-        context: getRequestContext(req),
-    });
+    const result = await queueService.skipQueueEntry(queueId, user, getRequestContext(req), undefined, eventId);
 
     return sendSuccess(res, 200, result);
 });
@@ -219,12 +204,7 @@ exports.leaveQueue = asyncHandler(async (req, res) => {
     const eventId = requireRouteParam(req, "eventId");
     const user = getAuthenticatedUser(req);
 
-    const result = await queueService.leaveQueue({
-        queueId,
-        eventId,
-        user,
-        context: getRequestContext(req),
-    });
+    const result = await queueService.leaveQueue(queueId, user, getRequestContext(req), undefined, eventId);
 
     return sendSuccess(res, 200, result);
 });
