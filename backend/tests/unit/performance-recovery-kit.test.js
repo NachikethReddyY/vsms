@@ -1,4 +1,5 @@
 const assert = require("node:assert/strict");
+const crypto = require("node:crypto");
 const fs = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
@@ -19,6 +20,11 @@ function completeManifest() {
   return ["events", "participants", "event_registrations", "queue_entries", "screening_results", "sync_actions", "audit_logs"]
     .map((table) => `${table}\t0`)
     .join("\n");
+}
+
+function writeChecksum(backup) {
+  const digest = crypto.createHash("sha256").update(fs.readFileSync(backup)).digest("hex");
+  fs.writeFileSync(`${backup}.sha256`, `${digest}  ${path.basename(backup)}\n`);
 }
 
 function writeTool(directory, name, source) {
@@ -74,6 +80,7 @@ test("restore rejects a non-test database URL before invoking PostgreSQL", () =>
   const backup = path.join(directory, "fixture.dump");
   fs.writeFileSync(backup, "not a dump");
   fs.writeFileSync(`${backup}.counts.tsv`, "events\t0\n");
+  writeChecksum(backup);
   const result = run("sh", ["scripts/restore-postgres-test.sh", backup], {
     RESTORE_DATABASE_URL: "postgresql://user:secret@127.0.0.1:1/vsms",
     RESTORE_CONFIRM: "RESTORE_ISOLATED_TEST_DATABASE",
@@ -87,6 +94,7 @@ test("restore rejects an incomplete row-count manifest before it can clear a tes
   const backup = path.join(directory, "fixture.dump");
   fs.writeFileSync(backup, "not a dump");
   fs.writeFileSync(`${backup}.counts.tsv`, "events\t0\n");
+  writeChecksum(backup);
   const result = run("sh", ["scripts/restore-postgres-test.sh", backup], {
     RESTORE_DATABASE_URL: "postgresql://user:secret@127.0.0.1:1/vsms_test",
     RESTORE_CONFIRM: "RESTORE_ISOLATED_TEST_DATABASE",
@@ -128,6 +136,7 @@ test("restore passes pg_restore the single-transaction flag", () => {
   const argumentsFile = path.join(directory, "pg-restore-arguments.txt");
   fs.writeFileSync(backup, "not a real dump");
   fs.writeFileSync(`${backup}.counts.tsv`, `${completeManifest()}\n`);
+  writeChecksum(backup);
   writeTool(tools, "psql", "#!/bin/sh\ncase \"$*\" in *current_database*) printf '%s\\n' vsms_test ;; *) printf '%s\\n' 0 ;; esac\n");
   writeTool(tools, "pg_restore", "#!/bin/sh\nprintf '%s\\n' \"$@\" > \"$PG_RESTORE_ARGUMENTS_FILE\"\n");
   const result = run("sh", ["scripts/restore-postgres-test.sh", backup], {
