@@ -2,11 +2,16 @@ FROM node:24-bookworm-slim AS dependencies
 
 ENV PNPM_HOME=/pnpm
 ENV PATH=$PNPM_HOME:$PATH
+ENV SCARF_ANALYTICS=false
 
-RUN corepack enable && corepack prepare pnpm@11.20.0 --activate
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends openssl \
+    && rm -rf /var/lib/apt/lists/* \
+    && corepack enable \
+    && corepack prepare pnpm@11.20.0 --activate
 WORKDIR /app
 
-COPY package.json pnpm-lock.yaml ./
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 COPY prisma ./prisma
 RUN pnpm install --frozen-lockfile --prod \
     && pnpm prisma:generate
