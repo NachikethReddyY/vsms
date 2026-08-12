@@ -173,7 +173,9 @@ export default function StationTemplateFormPage({ mode }: { mode: Mode }) {
         <p>
           {mode === 'create'
             ? 'Create a new custom station with the fields screeners will fill at events.'
-            : 'Update the catalog name, capacity, and form fields for this station.'}
+            : fieldsEditable
+              ? 'Update the catalog name, capacity, and form fields for this custom station.'
+              : 'Update catalog metadata for this built-in station. Its clinical form stays fixed.'}
         </p>
       </div>
     </header>
@@ -271,6 +273,22 @@ export default function StationTemplateFormPage({ mode }: { mode: Mode }) {
           </div>
         </section>
       </>}
+
+      {!fieldsEditable && mode === 'edit' && (
+        <section className="station-template-section" aria-labelledby="station-fixed-form-title">
+          <div className="station-template-section-copy">
+            <h2 id="station-fixed-form-title">Clinical form</h2>
+            <p>Built-in screening stations keep a fixed form in the screener workflow. Catalog metadata above can still be updated.</p>
+          </div>
+          <div className="station-template-section-body">
+            <div className="station-field-preview">
+              {form.fieldSchema.length
+                ? <StationFieldRenderer fieldSchema={form.fieldSchema} values={previewValues} onChange={updatePreviewValue} disabled />
+                : <p className="station-library-schema-note">This station uses the hard-coded clinical form in the screener workflow.</p>}
+            </div>
+          </div>
+        </section>
+      )}
 
       <div className="station-template-form-actions">
         <Link className="secondary" to="/admin/station-templates">Cancel</Link>

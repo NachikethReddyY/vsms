@@ -638,7 +638,7 @@ export default function EventFormPage({ mode }: { mode: 'create' | 'edit' }) {
     try {
       const liveStatuses = new Set(['IN_PROGRESS', 'ONGOING']);
       const isLiveEdit = mode === 'edit' && liveStatuses.has(existing?.status || '');
-      // Live events lock identity/schedule fields; only send fields the API allows in that state.
+      // Live events lock stations/shifts so assignment lifecycle state cannot be wiped.
       const liveUpdate = isLiveEdit
         ? {
           version: existing!.version,
@@ -646,8 +646,6 @@ export default function EventFormPage({ mode }: { mode: 'create' | 'edit' }) {
           bannerKey: payload.bannerKey,
           artworkDataUrl: payload.artworkDataUrl,
           capacity: payload.capacity,
-          stations: payload.stations,
-          shifts: payload.shifts,
         }
         : { ...payload, version: existing!.version };
       const saved = mode === 'create'
@@ -664,7 +662,7 @@ export default function EventFormPage({ mode }: { mode: 'create' | 'edit' }) {
         isStale
           ? 'This event changed in another session.'
           : isStateLock
-            ? 'This event is live. Only capacity, stations, shifts, and artwork can be changed until it completes.'
+            ? 'This event is live. Only capacity, description, and artwork can be changed until it completes.'
             : 'The event could not be saved.',
       ));
       window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -692,7 +690,7 @@ export default function EventFormPage({ mode }: { mode: 'create' | 'edit' }) {
       {formError && <div className="alert error" role="alert"><span><strong>{conflict ? 'Version conflict. ' : ''}</strong>{formError}</span>{conflict && <button onClick={() => window.location.reload()}>Load latest version</button>}</div>}
       {mode === 'edit' && existing && ['IN_PROGRESS', 'ONGOING'].includes(existing.status) && (
         <div className="alert" role="status">
-          <span>This event is live. Name, venue, and day schedule stay locked. You can still update capacity, stations, shifts, and staff assignments.</span>
+          <span>This event is live. Stations, shifts, and staff assignments stay locked so duty state is preserved. You can still update capacity, description, and artwork.</span>
         </div>
       )}
       <form id="event-form" className="event-create-form event-wizard" onSubmit={submit} noValidate data-astryx-theme="neutral">

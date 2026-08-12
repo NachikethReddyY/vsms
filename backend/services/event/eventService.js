@@ -479,8 +479,8 @@ const auditUpdate = (tx, current, updated, user, correlationId) => tx.eventAudit
 });
 
 const assertStationPlanningState = (event) => {
-  if (!["DRAFT", "PUBLISHED", "IN_PROGRESS"].includes(event.status)) {
-    throw new AppError(409, "STATIONS_NOT_EDITABLE", "Stations cannot be changed for a completed or cancelled event");
+  if (!["DRAFT", "PUBLISHED"].includes(event.status)) {
+    throw new AppError(409, "STATIONS_NOT_EDITABLE", "Stations cannot be changed after an event goes live");
   }
 };
 
@@ -979,16 +979,12 @@ const allowedUpdateKeys = {
     "bannerKey",
     "artworkDataUrl",
     "capacity",
-    "stations",
-    "shifts",
   ]),
   IN_PROGRESS: new Set([
     "description",
     "bannerKey",
     "artworkDataUrl",
     "capacity",
-    "stations",
-    "shifts",
   ]),
   COMPLETED: new Set(["bannerKey", "artworkDataUrl"]),
   CANCELLED: new Set(["bannerKey", "artworkDataUrl"]),
@@ -1708,41 +1704,20 @@ const serializeStationTemplate = (template) => ({
   fieldSchema: template.fieldSchema ?? null,
 });
 
-/** Persist missing system field schemas so library previews always reflect the DB. */
-const hydrateSystemFieldSchemas = async (templates, db = prisma) => {
+/** Read-only preview fallback — never write during catalog GET. */
+const withSystemFieldSchemaFallback = (template) => {
   const { SYSTEM_FIELD_SCHEMAS } = require("../../schemas/dynamicStationSchema");
-  const next = [];
-  for (const template of templates) {
-    const systemSchema = template.stationType ? SYSTEM_FIELD_SCHEMAS[template.stationType] : null;
-    const missing = (!template.fieldSchema || (Array.isArray(template.fieldSchema) && template.fieldSchema.length === 0))
-      && systemSchema;
-    if (!missing) {
-      next.push(template);
-      continue;
-    }
-    next.push(await db.stationTemplate.update({
-      where: { stationTemplateId: template.stationTemplateId },
-      data: { fieldSchema: systemSchema },
-      select: {
-        stationTemplateId: true,
-        templateKey: true,
-        stationType: true,
-        version: true,
-        name: true,
-        description: true,
-        defaultCapacity: true,
-        active: true,
-        fieldSchema: true,
-      },
-    }));
-  }
-  return next;
+  const systemSchema = template.stationType ? SYSTEM_FIELD_SCHEMAS[template.stationType] : null;
+  const missing = (!template.fieldSchema || (Array.isArray(template.fieldSchema) && template.fieldSchema.length === 0))
+    && systemSchema;
+  if (!missing) return template;
+  return { ...template, fieldSchema: systemSchema };
 };
 
 /** Admin catalog: screening templates only — registration/clinical review/eye health are not managed here. */
 const HIDDEN_LIBRARY_TEMPLATE_KEYS = new Set(["REGISTRATION", "CLINICAL_REVIEW", "EYE_HEALTH"]);
 const listStationTemplateLibrary = async () => {
-  const templates = await hydrateSystemFieldSchemas(await prisma.stationTemplate.findMany({
+  const templates = await prisma.stationTemplate.findMany({
     select: {
       stationTemplateId: true,
       templateKey: true,
@@ -1755,13 +1730,13 @@ const listStationTemplateLibrary = async () => {
       fieldSchema: true,
     },
     orderBy: [{ active: "desc" }, { name: "asc" }],
-  }));
+  });
   return templates
     .filter((template) => (
       !HIDDEN_LIBRARY_TEMPLATE_KEYS.has(template.templateKey)
       && template.stationType !== "EYE_HEALTH"
     ))
-    .map((template) => serializeStationTemplate(template));
+    .map((template) => serializeStationTemplate(withSystemFieldSchemaFallback(template)));
 };
 
 const createStationTemplate = async (body, user, context, db = prisma) => {
@@ -1839,12 +1814,11 @@ const updateStationTemplate = async (stationTemplateId, body, user, context, db 
   }
   let fieldSchema;
   if (body.fieldSchema !== undefined) {
-    const editableTypes = new Set(["CUSTOM", "VISUAL_ACUITY", "REFRACTION", "COLOUR_VISION"]);
-    if (!editableTypes.has(existing.stationType)) {
+    if (existing.stationType !== "CUSTOM") {
       throw new AppError(
         422,
         "FIELD_SCHEMA_NOT_EDITABLE",
-        "Field schemas can only be edited for screening station templates",
+        "Field schemas can only be edited for custom stations. Built-in stations use fixed clinical forms.",
       );
     }
     try {

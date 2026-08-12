@@ -27,12 +27,9 @@ export type StationTemplateRecord = {
   fieldSchema: FieldSchema | null;
 };
 
-/** Screening templates that expose an editable field schema in the station library. */
+/** Only CUSTOM schemas drive DynamicStationPage + API validation end to end. */
 export const usesEditableFieldSchema = (stationType: CatalogStationType | null | undefined) => (
   stationType === 'CUSTOM'
-  || stationType === 'VISUAL_ACUITY'
-  || stationType === 'REFRACTION'
-  || stationType === 'COLOUR_VISION'
 );
 
 export const isHiddenFromStationLibrary = (template: Pick<StationTemplateRecord, 'templateKey' | 'stationType'>) => (

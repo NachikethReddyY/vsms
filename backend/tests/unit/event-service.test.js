@@ -28,7 +28,7 @@ const assertForbiddenEventKeysAbsent = (value) => {
   }
 };
 
-test("station template library hydrates missing system schemas for previewing", async (t) => {
+test("station template library falls back to system schemas without writing", async (t) => {
   const originalFindMany = prisma.stationTemplate.findMany;
   const originalUpdate = prisma.stationTemplate.update;
   const { SYSTEM_FIELD_SCHEMAS } = require("../../schemas/dynamicStationSchema");
@@ -60,7 +60,7 @@ test("station template library hydrates missing system schemas for previewing", 
   const [catalog] = await eventService.listStationTemplates();
   const [library] = await eventService.listStationTemplateLibrary();
 
-  assert.equal(writes, 1);
+  assert.equal(writes, 0);
   assert.equal(catalog.fieldSchema, null);
   assert.deepEqual(library.fieldSchema, SYSTEM_FIELD_SCHEMAS.VISUAL_ACUITY);
 });
@@ -120,7 +120,7 @@ test("station template mutations generate opaque keys and audit atomically", asy
   assert.ok(audits.every((audit) => audit.userId === manager.userId && audit.requestId === context.requestId));
 });
 
-test("clinical station templates reject fieldSchema on create but allow fieldSchema updates", async () => {
+test("clinical station templates reject fieldSchema on create and update", async () => {
   const createDb = { $transaction: async () => { throw new Error("transaction must not run"); } };
   const context = { requestId: crypto.randomUUID(), ipAddress: "127.0.0.1", deviceName: "Test" };
   await assert.rejects(
@@ -134,7 +134,6 @@ test("clinical station templates reject fieldSchema on create but allow fieldSch
     (error) => error.code === "FIELD_SCHEMA_NOT_EDITABLE",
   );
 
-  let savedSchema = null;
   const transactionClient = {
     stationTemplate: {
       findUnique: async () => ({
@@ -148,32 +147,20 @@ test("clinical station templates reject fieldSchema on create but allow fieldSch
         active: true,
         fieldSchema: null,
       }),
-      update: async ({ data }) => {
-        savedSchema = data.fieldSchema;
-        return {
-          stationTemplateId: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
-          templateKey: "opaque-existing-key",
-          stationType: "VISUAL_ACUITY",
-          version: 2,
-          name: "Visual acuity booth",
-          description: null,
-          defaultCapacity: 4,
-          active: true,
-          fieldSchema: data.fieldSchema,
-        };
-      },
+      update: async () => { throw new Error("update must not run"); },
     },
     auditLog: { create: async () => ({}) },
   };
-  const updated = await eventService.updateStationTemplate(
-    "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
-    { fieldSchema: [{ key: "notes", label: "Notes", type: "text", required: false }] },
-    manager,
-    context,
-    { $transaction: async (callback) => callback(transactionClient) },
+  await assert.rejects(
+    () => eventService.updateStationTemplate(
+      "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+      { fieldSchema: [{ key: "notes", label: "Notes", type: "text", required: false }] },
+      manager,
+      context,
+      { $transaction: async (callback) => callback(transactionClient) },
+    ),
+    (error) => error.code === "FIELD_SCHEMA_NOT_EDITABLE",
   );
-  assert.equal(updated.version, 2);
-  assert.equal(savedSchema[0].key, "notes");
 });
 
 test("registration, clinical review, and eye health catalog templates cannot be updated", async () => {
@@ -259,6 +246,51 @@ function installTransaction(t, current, updated, overrides = {}) {
     prisma.$transaction = originalTransaction;
   });
 }
+
+test("live events reject station and shift plan updates", async (t) => {
+  const current = eventRecord("IN_PROGRESS", 3);
+  const originalFindFirst = prisma.event.findFirst;
+  const originalTransaction = prisma.$transaction;
+  let transactionCalls = 0;
+  prisma.event.findFirst = async () => current;
+  prisma.$transaction = async () => {
+    transactionCalls += 1;
+    throw new Error("transaction must not run for locked live plan fields");
+  };
+  t.after(() => {
+    prisma.event.findFirst = originalFindFirst;
+    prisma.$transaction = originalTransaction;
+  });
+
+  await assert.rejects(
+    () => eventService.updateEvent(eventId, {
+      version: 3,
+      shifts: [{
+        shiftId,
+        name: "Live coverage",
+        startsAt: startsAt.toISOString(),
+        endsAt: endsAt.toISOString(),
+        requiredStaff: 2,
+        assignments: [],
+      }],
+    }, manager, crypto.randomUUID()),
+    (error) => error.code === "EVENT_NOT_EDITABLE" && error.status === 409,
+  );
+  await assert.rejects(
+    () => eventService.updateEvent(eventId, {
+      version: 3,
+      stations: [{
+        stationTemplateId: crypto.randomUUID(),
+        stationOrder: 1,
+        capacity: 4,
+        isAvailable: true,
+        availabilities: [],
+      }],
+    }, manager, crypto.randomUUID()),
+    (error) => error.code === "EVENT_NOT_EDITABLE" && error.status === 409,
+  );
+  assert.equal(transactionCalls, 0);
+});
 
 test("staff assignment saves an active user and preserves manager permissions", async (t) => {
   const current = eventRecord();

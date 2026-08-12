@@ -696,11 +696,10 @@ describe("event lifecycle", () => {
         assignments: [],
       }],
     });
-    expect(liveShiftEdit.status).toBe(200);
-    expect(liveShiftEdit.body.shifts[0].name).toBe("Live coverage");
-    expect(liveShiftEdit.body.shifts[0].requiredStaff).toBeGreaterThanOrEqual(2);
+    expect(liveShiftEdit.status).toBe(409);
+    expect(liveShiftEdit.body.code).toBe("EVENT_NOT_EDITABLE");
 
-    const completed = await request(app).post(`/api/events/${created.body.eventId}/complete`).set("Authorization", `Bearer ${managerToken}`).send({ version: liveShiftEdit.body.version });
+    const completed = await request(app).post(`/api/events/${created.body.eventId}/complete`).set("Authorization", `Bearer ${managerToken}`).send({ version: updated.body.version });
     const denied = await request(app).patch(`/api/events/${created.body.eventId}`).set("Authorization", `Bearer ${managerToken}`).send({ version: completed.body.version, capacity: 101 });
     expect(denied.status).toBe(409);
     expect(denied.body.code).toBe("EVENT_NOT_EDITABLE");
