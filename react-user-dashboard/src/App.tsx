@@ -13,7 +13,7 @@ import PublicEventPage from "./features/events/PublicEventPage";
 import ReviewWorkspacePage from "./features/reviews/ReviewWorkspacePage";
 import ReportsPage from "./features/reports/ReportsPage";
 import ColourVisionStationPage from "./features/screening/ColourVisionStationPage";
-import EyeHealthStationPage from "./features/screening/EyeHealthStationPage";
+import DynamicStationPage from "./features/screening/DynamicStationPage";
 import QRScannerPage from "./features/screening/QRScannerPage";
 import RefractionStationPage from "./features/screening/RefractionStationPage";
 import VisualAcuityStationPage from "./features/screening/VisualAcuityStationPage";
@@ -87,6 +87,12 @@ function LegacyRegistrationRedirect({ destination }: { destination: "history" | 
   return <Navigate to={`/participants/registrations/${registrationId}/${destination}`} replace />;
 }
 
+/** Eye health is clinician-review only — legacy screener URLs return to the event. */
+function EyeHealthStationRedirect() {
+  const { eventId = "" } = useParams();
+  return <Navigate to={`/events/${eventId}`} replace />;
+}
+
 export default function App() {
   return (
     <Routes>
@@ -134,8 +140,9 @@ export default function App() {
             <Route element={<StationDutyGuard stationType="COLOUR_VISION" />}>
               <Route path="/events/:eventId/stations/colour-vision" element={<ColourVisionStationPage />} />
             </Route>
-            <Route element={<StationDutyGuard stationType="EYE_HEALTH" />}>
-              <Route path="/events/:eventId/stations/eye-health" element={<EyeHealthStationPage />} />
+            <Route path="/events/:eventId/stations/eye-health" element={<EyeHealthStationRedirect />} />
+            <Route element={<StationDutyGuard stationType="CUSTOM" />}>
+              <Route path="/events/:eventId/stations/custom/:stationId" element={<DynamicStationPage />} />
             </Route>
             <Route path="/qr-scanner" element={<QRScannerPage />} />
           </Route>

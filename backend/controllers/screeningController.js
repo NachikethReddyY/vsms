@@ -33,14 +33,14 @@ exports.getPassDisplay = async (req, res) => {
 };
 
 exports.saveVisualAcuity = async (req, res) => {
-  const { result, created } = await screeningService.saveVisualAcuity(
+  const { result, routeProgression, created } = await screeningService.saveVisualAcuity(
     req.params.eventId,
     req.params.stationId,
     req.body,
     req.user,
     req.context,
   );
-  res.status(created ? 201 : 200).json(result);
+  res.status(created ? 201 : 200).json({ ...result, routeProgression });
 };
 
 exports.previewVisualAcuity = async (req, res) => {
@@ -53,14 +53,14 @@ exports.previewVisualAcuity = async (req, res) => {
 };
 
 exports.saveRefraction = async (req, res) => {
-  const { result, created } = await screeningService.saveRefraction(
+  const { result, routeProgression, created } = await screeningService.saveRefraction(
     req.params.eventId,
     req.params.stationId,
     req.body,
     req.user,
     req.context,
   );
-  res.status(created ? 201 : 200).json(result);
+  res.status(created ? 201 : 200).json({ ...result, routeProgression });
 };
 
 exports.previewRefraction = async (req, res) => {
@@ -73,14 +73,14 @@ exports.previewRefraction = async (req, res) => {
 };
 
 exports.saveColourVision = async (req, res) => {
-  const { result, created } = await screeningService.saveColourVision(
+  const { result, routeProgression, created } = await screeningService.saveColourVision(
     req.params.eventId,
     req.params.stationId,
     req.body,
     req.user,
     req.context,
   );
-  res.status(created ? 201 : 200).json(result);
+  res.status(created ? 201 : 200).json({ ...result, routeProgression });
 };
 
 exports.previewColourVision = async (req, res) => {
@@ -93,18 +93,38 @@ exports.previewColourVision = async (req, res) => {
 };
 
 exports.saveEyeHealth = async (req, res) => {
-  const { result, created } = await screeningService.saveEyeHealth(
+  const { result, routeProgression, created } = await screeningService.saveEyeHealth(
     req.params.eventId,
     req.params.stationId,
     req.body,
     req.user,
     req.context,
   );
-  res.status(created ? 201 : 200).json(result);
+  res.status(created ? 201 : 200).json({ ...result, routeProgression });
 };
 
 exports.previewEyeHealth = async (req, res) => {
   res.json(await screeningService.previewEyeHealth(
+    req.params.eventId,
+    req.params.stationId,
+    req.body,
+    req.user,
+  ));
+};
+
+exports.saveDynamic = async (req, res) => {
+  const { result, routeProgression, created } = await screeningService.saveDynamic(
+    req.params.eventId,
+    req.params.stationId,
+    req.body,
+    req.user,
+    req.context,
+  );
+  res.status(created ? 201 : 200).json({ ...result, routeProgression });
+};
+
+exports.previewDynamic = async (req, res) => {
+  res.json(await screeningService.previewDynamic(
     req.params.eventId,
     req.params.stationId,
     req.body,

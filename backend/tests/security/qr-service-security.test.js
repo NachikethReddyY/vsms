@@ -5,13 +5,85 @@ const test = require("node:test");
 process.env.DATABASE_URL ||= "postgresql://test:test@localhost:5432/vsms_test";
 
 const { encrypt, encryptionContext } = require("../../utils/crypto/cryptoUtils");
+const { resolveRegistrationByQrValue } = require("../../utils/crypto/qrToken");
 const qrService = require("../../services/participant/qrService");
 
 const eventId = "11111111-1111-4111-8111-111111111111";
 const registrationId = "22222222-2222-4222-8222-222222222222";
 const qrId = "33333333-3333-4333-8333-333333333333";
+const stationId = "44444444-4444-4444-8444-444444444444";
 
 const tokenHash = (token) => crypto.createHash("sha256").update(token).digest("hex");
+
+test("shared scanner resolver accepts only active event-scoped secure passes", async () => {
+  const token = "9".repeat(64);
+  const queries = [];
+  const db = {
+    qRCodePass: {
+      findFirst: async (query) => {
+        queries.push(query);
+        return query.where.registration.eventId === eventId ? { registrationId } : null;
+      },
+    },
+    eventRegistration: {
+      findFirst: async () => assert.fail("legacy registration credentials must never be queried"),
+    },
+  };
+
+  assert.deepEqual(await resolveRegistrationByQrValue(db, { eventId, value: token }), { registrationId });
+  assert.deepEqual(await resolveRegistrationByQrValue(db, {
+    eventId,
+    value: `https://app.example.com/participant-status/${token}`,
+  }), { registrationId });
+  assert.equal(await resolveRegistrationByQrValue(db, { eventId, value: "malformed" }), null);
+  assert.equal(await resolveRegistrationByQrValue(db, { eventId, value: "VSMS-DEMO-QR-001" }), null);
+  assert.equal(queries.length, 2);
+  for (const { where } of queries) {
+    assert.equal(where.tokenHash, tokenHash(token));
+    assert.equal(where.isActive, true);
+    assert.equal(where.revokedAt, null);
+    assert.ok(where.expiresAt.gt instanceof Date);
+    assert.deepEqual(where.registration, { eventId });
+  }
+});
+
+test("shared scanner resolver conceals expired, revoked, and cross-event passes", async () => {
+  const token = "8".repeat(64);
+  const foreignEventId = "99999999-9999-4999-8999-999999999999";
+  const db = {
+    qRCodePass: {
+      findFirst: async ({ where }) => {
+        if (where.registration.eventId === foreignEventId) return null;
+        if (where.isActive !== true || where.revokedAt !== null || !(where.expiresAt.gt instanceof Date)) {
+          assert.fail("resolver omitted the secure pass lifecycle predicate");
+        }
+        return null;
+      },
+    },
+  };
+
+  assert.equal(await resolveRegistrationByQrValue(db, { eventId, value: token }), null);
+  assert.equal(await resolveRegistrationByQrValue(db, { eventId: foreignEventId, value: token }), null);
+});
+
+test("active-pass rendering never falls back to EventRegistration.passToken", async () => {
+  const db = {
+    eventRegistration: {
+      findUnique: async () => ({
+        registrationId,
+        passToken: "legacy-token",
+        queueNumber: 7,
+        participant: { firstName: "Ada", lastName: "Lovelace" },
+      }),
+    },
+    qRCodePass: { findFirst: async () => null },
+  };
+
+  await assert.rejects(
+    qrService.renderActivePassForRegistration(registrationId, db),
+    (error) => error.code === "QR_NOT_FOUND" && !error.message.includes("legacy-token"),
+  );
+});
 
 test("token access hashes the bearer and requires an active, unexpired pass", async () => {
   const token = "a".repeat(64);
@@ -201,6 +273,35 @@ test("serialized concurrent first issuance returns one database pass", async () 
   assert.equal(locks, 2);
 });
 
+test("the same secure pass remains valid through the event end", async () => {
+  const token = "e".repeat(64);
+  const eventEndsAt = new Date(Date.now() + 3 * 24 * 60 * 60 * 1000);
+  const existing = {
+    id: qrId,
+    registrationId,
+    issuedAt: new Date(),
+    expiresAt: new Date(Date.now() + 60_000),
+    tokenEncryptionVersion: 2,
+    tokenCiphertext: encrypt(token, encryptionContext("QRCodePass", qrId, "token")),
+  };
+  let update;
+  const tx = {
+    eventRegistration: { findUnique: async () => ({ registrationId, event: { endsAt: eventEndsAt } }) },
+    qRCodePass: {
+      findFirst: async () => existing,
+      update: async (query) => {
+        update = query;
+        return { ...existing, expiresAt: query.data.expiresAt };
+      },
+    },
+    auditLog: { create: async () => ({}) },
+  };
+
+  const result = await qrService.generateQR(registrationId, null, tx);
+  assert.equal(result.qrId, qrId);
+  assert.deepEqual(update, { where: { id: qrId }, data: { expiresAt: eventEndsAt } });
+});
+
 test("download renders an active pass from encrypted storage without returning its target URL", async () => {
   const token = "b".repeat(64);
   let where;
@@ -228,51 +329,6 @@ test("download renders an active pass from encrypted storage without returning i
   const branded = Buffer.from(result.qrImage.split(",")[1], "base64").toString("utf8");
   assert.match(branded, /^<svg/);
   assert.doesNotMatch(branded, /VSMS|SECURE EVENT PASS/);
-});
-
-test("handoff QR encodes a station URL pre-loaded with the registration, exposing no bearer", async () => {
-  const token = "f".repeat(64);
-  let where;
-  const db = {
-    qRCodePass: {
-      findFirst: async (query) => {
-        where = query.where;
-        return { registration: { registrationId, eventId } };
-      },
-    },
-  };
-
-  const result = await qrService.getStationHandoffQR(token, "VISUAL_ACUITY", db);
-  assert.equal(where.tokenHash, tokenHash(token));
-  assert.equal(where.isActive, true);
-
-  const svg = Buffer.from(result.qrImage.split(",")[1], "base64").toString("utf8");
-  assert.match(result.qrImage, /^data:image\/svg\+xml;base64,/);
-  assert.match(svg, /^<svg/);
-  assert.doesNotMatch(svg, new RegExp(token));
-  assert.doesNotMatch(svg, /VSMS|SECURE EVENT PASS/);
-});
-
-test("handoff QR target URL resolves to the selected station pre-loaded with the registration", async () => {
-  const url = qrService.buildStationHandoffUrl(eventId, registrationId, "REFRACTION");
-  assert.match(url, new RegExp(`^https?://[^/]+/events/${eventId}/stations/refraction\\?registrationId=${registrationId}$`));
-  assert.match(
-    qrService.buildStationHandoffUrl(eventId, registrationId, "EYE_HEALTH"),
-    new RegExp(`^https?://[^/]+/events/${eventId}/stations/eye-health\\?registrationId=${registrationId}$`),
-  );
-  assert.equal(qrService.buildStationHandoffUrl(eventId, registrationId, "VISUAL_ACUITY").includes("visual-acuity"), true);
-  assert.equal(qrService.buildStationHandoffUrl(eventId, registrationId, "COLOUR_VISION").includes("colour-vision"), true);
-});
-
-test("handoff QR rejects an unsupported station type and an inactive pass", async () => {
-  await assert.rejects(
-    qrService.getStationHandoffQR("a".repeat(64), "REGISTRATION"),
-    (error) => error.code === "STATION_UNSUPPORTED" && error.status === 400,
-  );
-  await assert.rejects(
-    qrService.getStationHandoffQR("b".repeat(64), "VISUAL_ACUITY", { qRCodePass: { findFirst: async () => null } }),
-    (error) => error.code === "INVALID_QR" && error.status === 404,
-  );
 });
 
 test("verification rejects any pass that does not satisfy the shared active-expiry predicate", async () => {
@@ -323,7 +379,17 @@ test("manual QR check-in writes no bearer or participant data and returns a mini
           updateQuery = query;
           return { count: 1 };
         },
+        findUnique: async () => ({
+          registrationId,
+          eventId,
+          routeVersion: 1,
+          event: { status: "IN_PROGRESS" },
+        }),
       },
+      registrationRouteStep: { findMany: async () => [] },
+      station: { findMany: async () => [] },
+      queueEntry: { findMany: async () => [] },
+      eventStationAvailability: { findMany: async () => [] },
       auditLog: { create: async ({ data }) => { audit = data; return data; } },
     }),
   };
@@ -362,7 +428,8 @@ test("manual QR check-in writes no bearer or participant data and returns a mini
   assert.deepEqual(audit.newValue, { eventId, checkInMethod: "QR_TOKEN" });
   assert.equal(JSON.stringify(audit).includes(token), false);
   assert.equal(JSON.stringify(audit).includes("encrypted-nric"), false);
-  assert.deepEqual(Object.keys(result).sort(), ["checkedIn", "checkedInAt", "eventId", "queueNumber", "registrationId", "registrationStatus"]);
+  assert.deepEqual(Object.keys(result).sort(), ["checkedIn", "checkedInAt", "eventId", "queueNumber", "registrationId", "registrationStatus", "route"]);
+  assert.equal(result.route.status, "NO_SCREENING_STATIONS");
   assert.equal(result.registrationStatus, "CHECKED_IN");
   assert.equal(result.checkedIn, true);
   assert.equal(JSON.stringify(result).includes("Ada"), false);
@@ -385,7 +452,17 @@ test("manual registration-reference check-in does not resolve participant identi
           queueNumber: null,
         }),
         updateMany: async () => ({ count: 1 }),
+        findUnique: async () => ({
+          registrationId,
+          eventId,
+          routeVersion: 1,
+          event: { status: "IN_PROGRESS" },
+        }),
       },
+      registrationRouteStep: { findMany: async () => [] },
+      station: { findMany: async () => [] },
+      queueEntry: { findMany: async () => [] },
+      eventStationAvailability: { findMany: async () => [] },
       auditLog: { create: async ({ data }) => { audit = data; return data; } },
     }),
   };
@@ -394,7 +471,7 @@ test("manual registration-reference check-in does not resolve participant identi
 
   assert.equal(qrLookup, false);
   assert.deepEqual(audit.newValue, { eventId, checkInMethod: "REGISTRATION_REFERENCE" });
-  assert.deepEqual(Object.keys(result).sort(), ["checkedIn", "checkedInAt", "eventId", "queueNumber", "registrationId", "registrationStatus"]);
+  assert.deepEqual(Object.keys(result).sort(), ["checkedIn", "checkedInAt", "eventId", "queueNumber", "registrationId", "registrationStatus", "route"]);
 });
 
 test("manual check-in rejects NRIC input", async () => {
@@ -588,23 +665,30 @@ test("public pass status reveals no PII and reports expired or revoked passes as
         where = query.where;
         return {
           expiresAt: new Date(Date.now() + 60_000),
-          isActive: true,
-          registration: { registrationId: "registration-1", eventId: "event-1", queueNumber: 42, registrationStatus: "CHECKED_IN", event: { name: "Community Vision Screening" } },
+          registration: {
+            queueNumber: 42,
+            registrationStatus: "CHECKED_IN",
+            event: { name: "Community Vision Screening" },
+            routeSteps: [
+              {
+                position: 1,
+                completedAt: new Date(),
+                station: { stationId: "station-1", stationName: "Visual Acuity", stationType: "VISUAL_ACUITY" },
+              },
+              {
+                position: 2,
+                completedAt: null,
+                station: { stationId: "station-2", stationName: "Refraction", stationType: "REFRACTION" },
+              },
+            ],
+            queueEntries: [{
+              status: "WAITING",
+              queueNumber: 42,
+              station: { stationId: "station-2", stationName: "Refraction", stationType: "REFRACTION" },
+            }],
+          },
         };
       },
-    },
-    eventRegistration: {
-      aggregate: async () => ({ _max: { queueNumber: 99 } }),
-    },
-    queueEntry: {
-      findFirst: async () => null,
-      findMany: async () => [],
-    },
-    station: {
-      findMany: async () => [],
-    },
-    queueMovement: {
-      findMany: async () => [],
     },
   };
 
@@ -612,20 +696,27 @@ test("public pass status reveals no PII and reports expired or revoked passes as
   assert.equal(valid.valid, true);
   assert.equal(valid.eventName, "Community Vision Screening");
   assert.equal(valid.queueNumber, 42);
-  assert.deepEqual(Object.keys(valid).sort(), ["aheadAtStation", "currentQueueNumber", "eventName", "expiresAt", "queueNumber", "queueState", "registrationStatus", "stations", "transfers", "valid"]);
+  assert.deepEqual(valid.route.map(({ stationName, state }) => [stationName, state]), [
+    ["Visual Acuity", "COMPLETED"],
+    ["Refraction", "CURRENT"],
+    ["Clinical review", "UPCOMING"],
+  ]);
+  assert.deepEqual(Object.keys(valid).sort(), ["eventName", "expiresAt", "queueNumber", "queueState", "registrationStatus", "route", "valid"]);
   assert.equal(where.tokenHash, tokenHash(token));
+  assert.equal(where.isActive, true);
+  assert.equal(where.revokedAt, null);
+  assert.ok(where.expiresAt.gt instanceof Date);
+  const publicJson = JSON.stringify(valid);
+  for (const forbidden of ["stationId", "registrationId", "routeStepId", "actor", "audit", "capacity", "workload", "result", "nric"]) {
+    assert.equal(publicJson.includes(forbidden), false);
+  }
 
-  const revokedDb = {
-    qRCodePass: { findFirst: async () => ({ expiresAt: new Date(Date.now() + 60_000), isActive: false, registration: null }) },
-  };
+  const revokedDb = { qRCodePass: { findFirst: async () => null } };
   const revoked = await qrService.getPublicStatus(token, revokedDb);
   assert.equal(revoked.valid, false);
   assert.equal(revoked.eventName, null);
 
-  const expiredDb = {
-    qRCodePass: { findFirst: async () => ({ expiresAt: new Date(Date.now() - 60_000), isActive: true, registration: { queueNumber: 1, event: { name: "X" } } }) },
-  };
+  const expiredDb = { qRCodePass: { findFirst: async () => null } };
   const expired = await qrService.getPublicStatus(token, expiredDb);
-  assert.equal(expired.valid, false);
-  assert.equal(expired.eventName, null);
+  assert.deepEqual(expired, revoked);
 });

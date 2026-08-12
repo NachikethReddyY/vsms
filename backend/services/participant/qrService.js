@@ -1,7 +1,5 @@
-﻿const QRCode = require("qrcode");
-const crypto = require("crypto");
+﻿const crypto = require("crypto");
 const prisma = require("../../prisma/prismaClient");
-const { attendanceWhere } = require("../event/attendanceDefinition");
 const env = require("../../config/env");
 const { decrypt, encrypt, encryptionContext } = require("../../utils/crypto/cryptoUtils");
 const { renderBrandedQrSvg } = require("../../utils/qr/qrBranding");
@@ -9,6 +7,7 @@ const { assertUuid } = require("../../utils/validation/validation");
 const { hashToken, QR_TOKEN_PATTERN } = require("../../utils/crypto/qrToken");
 const { assertRegistrationAssignment, assertQrVerifyAccess } = require("../../utils/auth/staff");
 const AppError = require("../../errors/AppError");
+const { assignRouteOnce } = require("../screening/routeAssignmentService");
 
 function buildQRTargetUrl(token) {
     return `${env.publicAppOrigin}/participant-status/${encodeURIComponent(token)}`;
@@ -17,6 +16,7 @@ function buildQRTargetUrl(token) {
 const activeQrWhere = (selector = {}, now = new Date()) => ({
     ...selector,
     isActive: true,
+    revokedAt: null,
     expiresAt: { gt: now },
 });
 
@@ -251,19 +251,25 @@ exports.generateQR = async (registrationId, userId = null, externalTx = null, au
         }
 
         const now = new Date();
-        const rotationMs = env.qrRotationIntervalMinutes > 0 ? env.qrRotationIntervalMinutes * 60 * 1000 : 0;
         const existing = await tx.qRCodePass.findFirst({
             where: activeQrWhere({ registrationId }, now),
             orderBy: { issuedAt: "desc" },
         });
-        const shouldRotate = rotationMs > 0
-            && existing
-            && now.getTime() - existing.issuedAt.getTime() >= rotationMs;
-        if (existing && !shouldRotate) return renderQr(existing, decryptQrToken(existing));
+        if (existing) {
+            const eventEndsAt = registration.event.endsAt?.getTime() || 0;
+            const currentExpiry = existing.expiresAt?.getTime() || 0;
+            const stablePass = eventEndsAt > currentExpiry
+                ? await tx.qRCodePass.update({ where: { id: existing.id }, data: { expiresAt: registration.event.endsAt } })
+                : existing;
+            return renderQr(stablePass, decryptQrToken(stablePass));
+        }
 
         const qrId = crypto.randomUUID();
         const token = crypto.randomBytes(32).toString("hex");
-        const expiresAt = new Date(Date.now() + env.qrTtlHours * 60 * 60 * 1000);
+        const expiresAt = new Date(Math.max(
+            now.getTime() + env.qrTtlHours * 60 * 60 * 1000,
+            registration.event.endsAt?.getTime() || 0,
+        ));
 
         await tx.qRCodePass.updateMany({
             // Expired rows can still have is_active=true and therefore occupy
@@ -363,191 +369,91 @@ exports.getPublicStatus = async (token, db = prisma) => {
     }
 
     const qr = await db.qRCodePass.findFirst({
-        where: { tokenHash: hashToken(String(token).toLowerCase().trim()) },
+        where: activeQrWhere(tokenSelector(String(token).toLowerCase().trim())),
         select: {
             expiresAt: true,
-            isActive: true,
             registration: {
                 select: {
-                    registrationId: true,
-                    eventId: true,
                     queueNumber: true,
                     registrationStatus: true,
                     event: { select: { name: true } },
+                    routeSteps: {
+                        orderBy: { position: "asc" },
+                        select: {
+                            position: true,
+                            completedAt: true,
+                            station: { select: { stationId: true, stationName: true, stationType: true } },
+                        },
+                    },
+                    queueEntries: {
+                        where: { status: { in: ["WAITING", "CALLED", "IN_PROGRESS"] } },
+                        orderBy: [{ enteredAt: "desc" }, { id: "desc" }],
+                        take: 1,
+                        select: {
+                            status: true,
+                            queueNumber: true,
+                            station: { select: { stationId: true, stationName: true, stationType: true } },
+                        },
+                    },
                 },
             },
         },
     });
 
-    const now = new Date();
-    const valid = Boolean(
-        qr
-        && qr.isActive
-        && qr.expiresAt > now
-        && qr.registration
-    );
-
-    if (!valid) {
+    if (!qr?.registration) {
         return {
             valid: false,
             eventName: null,
-            currentQueueNumber: null,
             queueNumber: null,
             registrationStatus: null,
             queueState: null,
-            stations: [],
-            transfers: [],
-            expiresAt: qr?.expiresAt ?? null,
+            route: [],
+            expiresAt: null,
         };
     }
 
-    const eventId = qr.registration.eventId;
-    const registrationId = qr.registration.registrationId;
-
-    const currentQueueNumber = (await db.eventRegistration.aggregate({
-        where: attendanceWhere(eventId),
-        _max: { queueNumber: true },
-    }))._max.queueNumber ?? null;
-
-    const [activeEntry, stations, transfers] = await Promise.all([
-        db.queueEntry.findFirst({
-            where: { registrationId, status: { in: ["WAITING", "CALLED", "IN_PROGRESS"] } },
-            orderBy: [{ enteredAt: "desc" }, { id: "desc" }],
-            include: { station: { select: { stationId: true, stationName: true, stationType: true } } },
-        }),
-        db.station.findMany({
-            where: { eventId, isActive: true },
-            orderBy: [{ stationOrder: "asc" }, { stationId: "asc" }],
-        }),
-        db.queueMovement.findMany({
-            where: { registrationId },
-            orderBy: [{ movementTime: "asc" }, { id: "asc" }],
-            include: {
-                fromStation: { select: { stationName: true } },
-                toStation: { select: { stationName: true } },
-            },
-        }),
-    ]);
-
-    const entries = await db.queueEntry.findMany({
-        where: { station: { eventId } },
-        select: {
-            stationId: true,
-            queueNumber: true,
-            status: true,
-            isPriority: true,
-            enteredAt: true,
-            calledAt: true,
-            startedAt: true,
-            completedAt: true,
-        },
-    });
-
-    const byStation = new Map(stations.map((station) => [station.stationId, {
-        stationId: station.stationId,
-        stationName: station.stationName,
-        stationType: station.stationType,
-        workload: { WAITING: 0, CALLED: 0, IN_PROGRESS: 0, COMPLETED: 0, SKIPPED: 0, CANCELLED: 0 },
-        nextUpQueueNumber: null,
-    }]));
-    for (const entry of entries) {
-        const bucket = byStation.get(entry.stationId);
-        if (!bucket) continue;
-        bucket.workload[entry.status] += 1;
-        if (entry.status === "WAITING" && bucket.nextUpQueueNumber == null) {
-            bucket.nextUpQueueNumber = entry.queueNumber;
-        }
-    }
-
+    const activeEntry = qr.registration.queueEntries[0] || null;
+    const firstUnfinishedPosition = qr.registration.routeSteps.find(({ completedAt }) => !completedAt)?.position;
     const queueState = activeEntry
         ? {
             status: activeEntry.status,
             queueNumber: activeEntry.queueNumber,
-            isPriority: activeEntry.isPriority || false,
             station: {
-                id: activeEntry.station.stationId,
                 name: activeEntry.station.stationName,
                 type: activeEntry.station.stationType,
             },
-            enteredAt: activeEntry.enteredAt,
-            calledAt: activeEntry.calledAt,
-            startedAt: activeEntry.startedAt,
-            completedAt: activeEntry.completedAt,
         }
         : null;
-
-    const registeredNumber = qr.registration.queueNumber;
-    const aheadAtStation = activeEntry
-        ? entries.filter((entry) => (
-            entry.stationId === activeEntry.stationId
-            && entry.status === "WAITING"
-            && entry.queueNumber < activeEntry.queueNumber
-        )).length
-        : null;
+    const route = qr.registration.routeSteps.map((step) => ({
+        stationName: step.station.stationName,
+        stationType: step.station.stationType,
+        state: step.completedAt
+            ? "COMPLETED"
+            : activeEntry?.station.stationId === step.station.stationId
+                ? "CURRENT"
+                : !activeEntry && step.position === firstUnfinishedPosition
+                    ? "BLOCKED"
+                    : "UPCOMING",
+    }));
+    if (route.length) {
+        route.push({
+            stationName: "Clinical review",
+            stationType: "CLINICAL_REVIEW",
+            state: qr.registration.registrationStatus === "COMPLETED"
+                ? "COMPLETED"
+                : firstUnfinishedPosition == null ? "CURRENT" : "UPCOMING",
+        });
+    }
 
     return {
         valid: true,
         eventName: qr.registration.event.name,
-        currentQueueNumber,
-        queueNumber: registeredNumber,
+        queueNumber: qr.registration.queueNumber,
         registrationStatus: qr.registration.registrationStatus,
         queueState,
-        aheadAtStation,
-        stations: [...byStation.values()].map((station) => ({
-            ...station,
-            nextUp: station.nextUpQueueNumber != null ? { queueNumber: station.nextUpQueueNumber } : null,
-            nextUpQueueNumber: undefined,
-        })),
-        transfers: transfers.map((movement) => ({
-            fromStation: movement.fromStation.stationName,
-            toStation: movement.toStation.stationName,
-            at: movement.movementTime,
-        })),
+        route,
         expiresAt: qr.expiresAt,
     };
-};
-
-// ==========================================
-// Screener Handoff QR (scan target for station staff)
-// ==========================================
-const STATION_HANDOFF_SLUGS = {
-    VISUAL_ACUITY: "visual-acuity",
-    REFRACTION: "refraction",
-    COLOUR_VISION: "colour-vision",
-    EYE_HEALTH: "eye-health",
-};
-
-function buildStationHandoffUrl(eventId, registrationId, stationType) {
-    const slug = STATION_HANDOFF_SLUGS[stationType];
-    if (!slug) return null;
-    return `${env.publicAppOrigin}/events/${eventId}/stations/${slug}?registrationId=${registrationId}`;
-}
-
-exports.buildStationHandoffUrl = buildStationHandoffUrl;
-
-exports.getStationHandoffQR = async (token, stationType, db = prisma) => {
-    if (!token) {
-        throw new AppError(400, "TOKEN_REQUIRED", "QR Token is required.");
-    }
-    const target = buildStationHandoffUrl("placeholder", "placeholder", stationType);
-    if (!target) {
-        throw new AppError(400, "STATION_UNSUPPORTED", "Station is not supported for screener handoff.");
-    }
-
-    const qr = await db.qRCodePass.findFirst({
-        where: activeQrWhere(tokenSelector(token)),
-        select: {
-            registration: { select: { registrationId: true, eventId: true } },
-        },
-    });
-
-    if (!qr) {
-        throw new AppError(404, "INVALID_QR", "QR Code is invalid, expired, or unavailable.");
-    }
-
-    const qrImage = await renderBrandedQrSvg(buildStationHandoffUrl(qr.registration.eventId, qr.registration.registrationId, stationType), { width: 300 });
-
-    return { qrImage };
 };
 
 // ==========================================
@@ -683,10 +589,7 @@ exports.downloadQR = async (qrId, db = prisma) => {
     return { qrId: qr.id, expiresAt: qr.expiresAt, qrImage };
 };
 
-/**
- * Re-render the active participant pass for station tablets (next-queue handoff).
- * Prefers QRCodePass; falls back to EventRegistration.passToken for demo seeds.
- */
+/** Re-render the active participant pass for authenticated station tablets. */
 exports.renderActivePassForRegistration = async (registrationId, db = prisma) => {
     if (!registrationId) {
         throw new AppError(400, "REGISTRATION_ID_REQUIRED", "Registration ID is required.");
@@ -696,7 +599,6 @@ exports.renderActivePassForRegistration = async (registrationId, db = prisma) =>
         where: { registrationId },
         select: {
             registrationId: true,
-            passToken: true,
             queueNumber: true,
             participant: { select: { firstName: true, lastName: true } },
         },
@@ -723,23 +625,7 @@ exports.renderActivePassForRegistration = async (registrationId, db = prisma) =>
         };
     }
 
-    if (!registration.passToken) {
-        throw new AppError(404, "QR_NOT_FOUND", "No active QR pass is available for this participant.");
-    }
-
-    return {
-        qrId: null,
-        registrationId: registration.registrationId,
-        issuedAt: null,
-        expiresAt: null,
-        qrImage: await QRCode.toDataURL(buildQRTargetUrl(registration.passToken), {
-            errorCorrectionLevel: "H",
-            margin: 2,
-            width: 300,
-        }),
-        participantDisplayName: displayName,
-        queueNumber: registration.queueNumber,
-    };
+    throw new AppError(404, "QR_NOT_FOUND", "No active secure QR pass is available for this participant. Reissue the pass before scanning.");
 };
 
 exports.getDevPageData = async (registrationId, auditContext = {}, db = prisma) => {
@@ -814,7 +700,9 @@ exports.manualCheckIn = async (params, db = prisma, auditContext = {}) => {
     }
     if (identifier) identifier = identifier.toLowerCase();
 
-    return await db.$transaction(async (tx) => {
+    for (let attempt = 0; attempt < 4; attempt += 1) {
+        try {
+            return await db.$transaction(async (tx) => {
         let regIdToUpdate = registrationId;
         let qrIdToUse = null;
 
@@ -884,6 +772,14 @@ exports.manualCheckIn = async (params, db = prisma, auditContext = {}) => {
             checkedInAt,
         });
 
+        const route = await assignRouteOnce({
+            tx,
+            registrationId: registration.registrationId,
+            eventId,
+            actorUserId: userId,
+            context: auditContext,
+        });
+
         await writeAudit(tx, {
             userId,
             action: "MANUAL_CHECKIN_PERFORMED",
@@ -896,6 +792,12 @@ exports.manualCheckIn = async (params, db = prisma, auditContext = {}) => {
             ...auditContext,
         });
 
-        return result;
-    });
+                return { ...result, route };
+            }, { isolationLevel: "Serializable" });
+        } catch (error) {
+            if (error.code === "P2034" && attempt < 3) continue;
+            throw error;
+        }
+    }
+    throw new AppError(409, "CHECKIN_CONFLICT", "Unable to check in this participant. Please retry.");
 };

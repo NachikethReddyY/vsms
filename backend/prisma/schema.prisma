@@ -181,6 +181,7 @@ enum StationType {
   REFRACTION
   COLOUR_VISION
   EYE_HEALTH
+  CUSTOM
 }
 
 enum StationOperationalStatus {
@@ -776,12 +777,12 @@ model EventStationAvailability {
 }
 
 model ParticipantEventIntake {
-  intakeId     String   @id @default(uuid()) @map("intake_id") @db.Uuid
-  participantId String  @map("participant_id") @db.Uuid
-  eventId      String   @map("event_id") @db.Uuid
-  attachedById String   @map("attached_by") @db.Uuid
-  reason       String   @default("REUSED_MATCH") @db.VarChar(40)
-  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  intakeId      String   @id @default(uuid()) @map("intake_id") @db.Uuid
+  participantId String   @map("participant_id") @db.Uuid
+  eventId       String   @map("event_id") @db.Uuid
+  attachedById  String   @map("attached_by") @db.Uuid
+  reason        String   @default("REUSED_MATCH") @db.VarChar(40)
+  createdAt     DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
 
   participant Participant @relation(fields: [participantId], references: [id], onDelete: Restrict, onUpdate: Cascade)
   event       Event       @relation(fields: [eventId], references: [eventId], onDelete: Cascade, onUpdate: Cascade)
@@ -805,6 +806,7 @@ model EventRegistration {
   passToken              String?                 @unique @map("pass_token") @db.VarChar(255)
   checkedIn              Boolean                 @default(false) @map("checked_in")
   checkedInAt            DateTime?               @map("checked_in_at") @db.Timestamptz(3)
+  routeVersion           Int                     @default(1) @map("route_version")
   createdAt              DateTime                @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt              DateTime                @updatedAt @map("updated_at") @db.Timestamptz(3)
 
@@ -820,6 +822,7 @@ model EventRegistration {
   reviews                 Review[]
   statusHistory           RegistrationStatusHistory[]
   consents                ParticipantConsent[]
+  routeSteps              RegistrationRouteStep[]
 
   @@unique([participantId, eventId])
   @@unique([eventId, queueNumber])
@@ -828,6 +831,24 @@ model EventRegistration {
   @@index([participantId])
   @@index([registeredBy])
   @@map("event_registrations")
+}
+
+model RegistrationRouteStep {
+  routeStepId    String    @id @default(uuid()) @map("route_step_id") @db.Uuid
+  registrationId String    @map("registration_id") @db.Uuid
+  stationId      String    @map("station_id") @db.Uuid
+  position       Int
+  completedAt    DateTime? @map("completed_at") @db.Timestamptz(3)
+  createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt      DateTime  @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  registration EventRegistration @relation(fields: [registrationId], references: [registrationId], onDelete: Cascade, onUpdate: Cascade)
+  station      Station           @relation(fields: [stationId], references: [stationId], onDelete: Restrict, onUpdate: Cascade)
+
+  @@unique([registrationId, position])
+  @@unique([registrationId, stationId])
+  @@index([stationId, completedAt])
+  @@map("registration_route_steps")
 }
 
 model EventAuditLog {
@@ -869,16 +890,18 @@ model Shift {
 }
 
 model Station {
-  stationId         String      @id @default(uuid()) @map("station_id") @db.Uuid
-  eventId           String      @map("event_id") @db.Uuid
-  stationTemplateId String?     @map("station_template_id") @db.Uuid
-  stationName       String      @map("station_name") @db.VarChar(100)
-  stationType       StationType @map("station_type")
-  stationOrder      Int         @map("station_order")
-  isActive          Boolean     @default(true) @map("is_active")
-  operationalStatus StationOperationalStatus @default(AVAILABLE) @map("operational_status")
-  createdAt         DateTime    @default(now()) @map("created_at") @db.Timestamptz(3)
-  updatedAt         DateTime    @updatedAt @map("updated_at") @db.Timestamptz(3)
+  stationId           String                   @id @default(uuid()) @map("station_id") @db.Uuid
+  eventId             String                   @map("event_id") @db.Uuid
+  stationTemplateId   String?                  @map("station_template_id") @db.Uuid
+  stationName         String                   @map("station_name") @db.VarChar(100)
+  stationType         StationType              @map("station_type")
+  stationOrder        Int                      @map("station_order")
+  isActive            Boolean                  @default(true) @map("is_active")
+  operationalStatus   StationOperationalStatus @default(AVAILABLE) @map("operational_status")
+  fieldSchemaSnapshot Json?                    @map("field_schema_snapshot")
+  schemaVersion       Int?                     @map("schema_version")
+  createdAt           DateTime                 @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt           DateTime                 @updatedAt @map("updated_at") @db.Timestamptz(3)
 
   event                   Event                    @relation(fields: [eventId], references: [eventId], onDelete: Cascade, onUpdate: Cascade)
   stationTemplate         StationTemplate?         @relation(fields: [stationTemplateId], references: [stationTemplateId], onDelete: SetNull, onUpdate: Cascade)
@@ -889,9 +912,11 @@ model Station {
   screeningRequestLedgers ScreeningRequestLedger[]
   fromMovements           QueueMovement[]          @relation("FromStation")
   toMovements             QueueMovement[]          @relation("ToStation")
+  registrationRouteSteps  RegistrationRouteStep[]
 
-  @@unique([eventId, stationType])
   @@unique([eventId, stationOrder])
+  @@index([eventId, stationType, isActive])
+  @@index([eventId, stationTemplateId])
   @@index([eventId, isActive, stationOrder])
   @@index([eventId, operationalStatus, stationOrder])
   @@index([stationTemplateId])
@@ -899,16 +924,17 @@ model Station {
 }
 
 model StationTemplate {
-  stationTemplateId String   @id @default(uuid()) @map("station_template_id") @db.Uuid
-  templateKey       String   @unique @map("template_key") @db.VarChar(50)
+  stationTemplateId String       @id @default(uuid()) @map("station_template_id") @db.Uuid
+  templateKey       String       @unique @map("template_key") @db.VarChar(50)
   stationType       StationType? @map("station_type")
-  version           Int      @default(1)
-  name              String   @db.VarChar(100)
+  version           Int          @default(1)
+  name              String       @db.VarChar(100)
   description       String?
-  defaultCapacity   Int      @default(3) @map("default_capacity")
-  active            Boolean  @default(true)
-  createdAt         DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
-  updatedAt         DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+  defaultCapacity   Int          @default(3) @map("default_capacity")
+  active            Boolean      @default(true)
+  fieldSchema       Json?        @map("field_schema")
+  createdAt         DateTime     @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt         DateTime     @updatedAt @map("updated_at") @db.Timestamptz(3)
   stations          Station[]
 
   @@index([stationType, active])
@@ -928,7 +954,7 @@ model StaffAssignment {
   status           StaffAssignmentStatus? @default(ASSIGNED)
   notes            String?
 
-  event        Event   @relation(fields: [eventId], references: [eventId], onDelete: Cascade, onUpdate: Cascade)
+  event        Event    @relation(fields: [eventId], references: [eventId], onDelete: Cascade, onUpdate: Cascade)
   station      Station? @relation(fields: [stationId], references: [stationId], onDelete: SetNull, onUpdate: Cascade)
   shift        Shift?   @relation(fields: [shiftId], references: [shiftId], onDelete: Cascade, onUpdate: Cascade)
   assignedUser User     @relation("AssignedUser", fields: [userId], references: [id], onDelete: Cascade, onUpdate: Cascade)
@@ -1042,6 +1068,7 @@ model ScreeningResult {
   isFlagged          Boolean     @default(false) @map("is_flagged")
   flagSummary        String?     @map("flag_summary")
   ruleVersion        String      @default("VSMS-VA-1.0") @map("rule_version") @db.VarChar(20)
+  schemaVersion      Int?        @map("schema_version")
   acknowledgedAt     DateTime?   @map("acknowledged_at") @db.Timestamptz(3)
   idempotencyKey     String      @unique @map("idempotency_key") @db.VarChar(64)
   requestFingerprint String?     @map("request_fingerprint") @db.Char(64)

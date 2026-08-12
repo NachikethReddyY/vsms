@@ -39,6 +39,8 @@ test("manual check-in fallback supports registration reference and QR token only
 test("public pass-status page resolves the QR scan target with no PII", async () => {
   const page = await readFile(new URL("../../pages/participant/ParticipantStatusPage.tsx", import.meta.url), "utf8");
   assert.match(page, /\/qr\/public-status\//);
+  assert.match(page, /status\.route\.map/);
+  assert.doesNotMatch(page, /LiveStationHandoffPicker|HANDOFF_STATIONS|\/qr\/handoff/);
   assert.match(page, /No personal information is shown on this page\./);
   assert.doesNotMatch(page, /firstName|lastName|email/);
 });

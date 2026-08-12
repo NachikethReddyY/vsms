@@ -1,4 +1,9 @@
 const { z } = require("zod");
+const { extractQrToken } = require("../utils/crypto/qrToken");
+
+const secureQrValue = z.string().trim().min(64).max(2048).refine((value) => extractQrToken(value) !== null, {
+  message: "A valid secure QR pass token or participant-status URL is required",
+});
 
 const eyeReading = z.discriminatedUnion("kind", [
   z.object({
@@ -24,7 +29,7 @@ const reviewParams = eventParams.extend({
 }).strict();
 
 const reviewScanBody = z.object({
-  passToken: z.string().trim().min(4).max(255),
+  passToken: secureQrValue,
 }).strict();
 
 const referralParams = eventParams.extend({ referralId: z.string().uuid() }).strict();
@@ -105,10 +110,8 @@ const reviewDecisionBody = z.discriminatedUnion("outcome", [
 ]);
 
 const resolveQuery = z.object({
-  // Demo seed uses EventRegistration.passToken (e.g. VSMS-DEMO-QR-001).
-  // Staff may also paste QRCodePass.token (hex); service looks up either.
-  passToken: z.string().min(4).max(255).optional(),
-  qrToken: z.string().min(4).max(255).optional(),
+  passToken: secureQrValue.optional(),
+  qrToken: secureQrValue.optional(),
   registrationId: z.string().uuid().optional(),
 }).refine((value) => Boolean(value.passToken || value.qrToken || value.registrationId), {
   message: "passToken, qrToken, or registrationId is required",
@@ -210,6 +213,19 @@ const saveEyeHealthBody = z.object({
   resultData: eyeHealthResultData,
 });
 
+const dynamicResultData = z.record(z.string(), z.unknown());
+
+const previewDynamicBody = z.object({
+  resultData: dynamicResultData,
+});
+
+const saveDynamicBody = z.object({
+  registrationId: z.string().uuid(),
+  idempotencyKey: z.string().min(8).max(64),
+  acknowledged: z.boolean(),
+  resultData: dynamicResultData,
+});
+
 const screeningSyncAction = z.discriminatedUnion("stationType", [
   z.object({
     clientActionId: z.string().uuid(),
@@ -232,8 +248,8 @@ const screeningSyncAction = z.discriminatedUnion("stationType", [
   z.object({
     clientActionId: z.string().uuid(),
     stationId: z.string().uuid(),
-    stationType: z.literal("EYE_HEALTH"),
-    payload: saveEyeHealthBody.strict(),
+    stationType: z.literal("CUSTOM"),
+    payload: saveDynamicBody.strict(),
   }).strict(),
 ]);
 
@@ -264,5 +280,7 @@ module.exports = {
   eyeHealthResultData,
   previewEyeHealthBody,
   saveEyeHealthBody,
+  previewDynamicBody,
+  saveDynamicBody,
   screeningSyncBody,
 };

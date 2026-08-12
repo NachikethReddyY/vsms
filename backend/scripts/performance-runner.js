@@ -72,6 +72,22 @@ function assertConfig(config) {
   if (!Number.isInteger(config.readSampleSize) || config.readSampleSize < 1 || config.readSampleSize > config.participantCount) {
     fail("config.readSampleSize must be between 1 and participantCount");
   }
+  if (!Number.isInteger(config.pollDurationSeconds) || config.pollDurationSeconds < 10 || config.pollDurationSeconds > 300) {
+    fail("config.pollDurationSeconds must be between 10 and 300");
+  }
+  for (const [name, value] of Object.entries({
+    participantPollIntervalMs: config.participantPollIntervalMs,
+    staffPollIntervalMs: config.staffPollIntervalMs,
+  })) {
+    if (!Number.isInteger(value) || value < 1000 || value > 60000) fail(`config.${name} must be between 1000 and 60000`);
+  }
+  if (!Number.isInteger(config.staffPollClientCount) || config.staffPollClientCount < 1 || config.staffPollClientCount > 100) {
+    fail("config.staffPollClientCount must be between 1 and 100");
+  }
+  if (!config.thresholds || config.thresholds.readP95Ms <= 0 || config.thresholds.writeP95Ms <= 0
+      || config.thresholds.errorRatePercent < 0 || config.thresholds.errorRatePercent > 100) {
+    fail("config.thresholds must contain positive read/write p95 limits and an error percentage");
+  }
   if (!path.isAbsolute(config.fixtureFile) || isWithinBackend(config.fixtureFile)) {
     fail("config.fixtureFile must be an absolute path outside this repository");
   }
@@ -87,6 +103,10 @@ function assertFixture(fixture, config) {
   }
   if (!Array.isArray(fixture.participantIds) || fixture.participantIds.length < config.participantCount || fixture.participantIds.some((id) => !UUID.test(id))) {
     fail("Fixture does not contain enough valid synthetic participant IDs");
+  }
+  if (!Array.isArray(fixture.pollTokens) || fixture.pollTokens.length < config.participantCount
+      || fixture.pollTokens.some((token) => !/^[a-f0-9]{64}$/.test(token))) {
+    fail("Fixture does not contain enough valid synthetic secure-pass tokens");
   }
   return fixture;
 }
@@ -138,7 +158,7 @@ async function request(baseUrl, authorization, name, method, pathname, body, acc
     const response = await fetch(new URL(pathname, baseUrl), {
       method,
       headers: {
-        Authorization: authorization,
+        ...(authorization ? { Authorization: authorization } : {}),
         "Content-Type": "application/json",
         "X-Request-Id": crypto.randomUUID(),
         ...(body ? { "Idempotency-Key": `${name}-${crypto.randomUUID()}` } : {}),
@@ -165,6 +185,24 @@ async function request(baseUrl, authorization, name, method, pathname, body, acc
   }
 }
 
+const delay = (milliseconds) => new Promise((resolve) => setTimeout(resolve, milliseconds));
+
+async function runPollingScenario(name, clients, intervalMs, durationMs, callback) {
+  const startedAt = performance.now();
+  const samples = (await Promise.all(clients.map(async (client, index) => {
+    const clientSamples = [];
+    await delay(Math.floor((index * intervalMs) / clients.length));
+    while (performance.now() - startedAt < durationMs) {
+      clientSamples.push(await callback(client));
+      const remaining = durationMs - (performance.now() - startedAt);
+      if (remaining <= 0) break;
+      await delay(Math.min(intervalMs, remaining));
+    }
+    return clientSamples;
+  }))).flat();
+  return { samples, summary: summarize(name, samples, performance.now() - startedAt) };
+}
+
 async function runScenario(name, items, concurrency, callback) {
   const startedAt = performance.now();
   const samples = await runPool(items, concurrency, callback);
@@ -189,27 +227,7 @@ async function run(config, baseUrl, fixture, authorization) {
   const registrationRead = await runScenario("registration.read", successfulRegistrations.slice(0, config.readSampleSize), config.concurrency, (registrationId) => request(
     baseUrl, authorization, "performance-registration-read", "GET", `/api/v1/registrations/${registrationId}`, null, [200],
   ));
-  const checkedIn = await runScenario("registration.check-in", successfulRegistrations, config.concurrency, (registrationId) => request(
-    baseUrl,
-    authorization,
-    "performance-check-in",
-    "PATCH",
-    `/api/v1/registrations/${registrationId}/status`,
-    { toStatus: "CHECKED_IN", reason: "Synthetic performance scenario" },
-    [200],
-  ));
-  const checkInIds = successfulRegistrations.filter((_, index) => checkedIn.samples[index]?.ok);
-
-  const queue = await runScenario("queue.write", checkInIds, config.concurrency, (registrationId) => request(
-    baseUrl,
-    authorization,
-    "performance-queue",
-    "POST",
-    `/api/v1/queues/events/${fixture.eventId}/stations/${fixture.stationId}/handoff`,
-    { registrationId },
-    [200, 201],
-    (data) => UUID.test(data?.queueEntryId),
-  ));
+  const checkInIds = successfulRegistrations;
   const queueRead = await runScenario("queue.read", Array.from({ length: config.readSampleSize }), config.concurrency, () => request(
     baseUrl, authorization, "performance-queue-read", "GET", `/api/v1/queues/events/${fixture.eventId}`, null, [200],
   ));
@@ -251,7 +269,33 @@ async function run(config, baseUrl, fixture, authorization) {
     baseUrl, authorization, "performance-reporting", "GET", `/api/v1/events/reports/operations?eventId=${fixture.eventId}`, null, [200],
   ));
 
-  return [registration.summary, registrationRead.summary, checkedIn.summary, queue.summary, queueRead.summary, screening.summary, reporting.summary];
+  const pollingDurationMs = config.pollDurationSeconds * 1000;
+  const participantPolling = await runPollingScenario(
+    "participant-status.poll",
+    fixture.pollTokens.slice(0, config.participantCount),
+    config.participantPollIntervalMs,
+    pollingDurationMs,
+    (token) => request(baseUrl, null, "participant-poll", "GET", `/api/v1/qr/public-status/${token}`, null, [200], (data) => data?.data?.valid === true),
+  );
+  const staffPolling = await runPollingScenario(
+    "staff-queue.poll",
+    Array.from({ length: config.staffPollClientCount }),
+    config.staffPollIntervalMs,
+    pollingDurationMs,
+    () => request(baseUrl, authorization, "staff-poll", "GET", `/api/v1/queues/events/${fixture.eventId}`, null, [200]),
+  );
+
+  return [registration.summary, registrationRead.summary, queueRead.summary, screening.summary, reporting.summary, participantPolling.summary, staffPolling.summary];
+}
+
+function thresholdFailures(results, thresholds) {
+  return results.flatMap((result) => {
+    const failures = [];
+    const p95Limit = result.scenario.includes("write") ? thresholds.writeP95Ms : thresholds.readP95Ms;
+    if (result.p95Ms == null || result.p95Ms > p95Limit) failures.push(`${result.scenario} p95 ${result.p95Ms}ms > ${p95Limit}ms`);
+    if (result.errorRatePercent > thresholds.errorRatePercent) failures.push(`${result.scenario} errors ${result.errorRatePercent}% > ${thresholds.errorRatePercent}%`);
+    return failures;
+  });
 }
 
 async function main() {
@@ -279,7 +323,11 @@ async function main() {
     results,
   }, null, 2)}\n`, { mode: 0o600 });
   process.stdout.write(`${JSON.stringify({ target: config.target, participantCount: config.participantCount, results, outputFile }, null, 2)}\n`);
-  if (results.some((result) => result.errorRatePercent > 0)) process.exitCode = 1;
+  const failures = thresholdFailures(results, config.thresholds);
+  if (failures.length) {
+    process.stderr.write(`Performance thresholds failed:\n${failures.map((failure) => `- ${failure}`).join("\n")}\n`);
+    process.exitCode = 1;
+  }
 }
 
 main().catch((error) => {

@@ -22,7 +22,7 @@ export default function AppShell({ children }: { children: ReactNode }) {
   const canManageStaff = canCreateEvent;
   const canUseOfflineScreening = roles.includes('SCREENER') && !roles.includes('ADMINISTRATOR');
   const eventManagementMatch = location.pathname.match(/^\/events\/([^/]+)(?:\/(overview|stations|staff|analytics|reports|attendees|activity))?$/);
-  const stationWorkflowMatch = location.pathname.match(/^\/events\/([^/]+)\/stations\/(visual-acuity|refraction|colour-vision|eye-health)$/);
+  const stationWorkflowMatch = location.pathname.match(/^\/events\/([^/]+)\/stations\/(visual-acuity|refraction|colour-vision|custom\/[^/]+)$/);
   const eventDetailMatch = location.pathname.match(/^\/events\/([^/]+)$/);
   const offlineEventId = stationWorkflowMatch?.[1]
     ?? (eventDetailMatch && eventDetailMatch[1] !== 'new' ? eventDetailMatch[1] : null);

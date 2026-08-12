@@ -73,6 +73,8 @@ exports.createRegistration = asyncHandler(async (req, res) => {
     res.status(result.idempotentReplay ? 200 : 201).json({
         ...handoff(result.registration),
         registration: publicRegistration(result.registration),
+        route: result.route,
+        securePass: result.securePass,
         idempotentReplay: result.idempotentReplay,
     });
 });

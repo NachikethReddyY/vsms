@@ -3,6 +3,8 @@ const prisma = require("../prisma/prismaClient");
 const env = require("../config/env");
 const { encrypt, encryptionContext } = require("../utils/crypto/cryptoUtils");
 
+if (env.isProduction) throw new Error("Development preset execution is forbidden in production");
+
 const PRESET_TOKEN = "cd".repeat(32);
 const PRESET_QR_ID = "cdcdcdcd-0000-4000-8000-000000000001";
 const PRESET_STAFF_EMAIL = "preset.admin@cryptix.local";
@@ -79,6 +81,7 @@ async function upsertPresetEvent(staff) {
 }
 
 async function upsertStations(event) {
+  const { SYSTEM_FIELD_SCHEMAS } = require("../schemas/dynamicStationSchema");
   const definitions = [
     ["VISUAL_ACUITY", "Visual acuity", 1],
     ["REFRACTION", "Refraction", 2],
@@ -86,12 +89,37 @@ async function upsertStations(event) {
   ];
   const stations = [];
   for (const [stationType, stationName, stationOrder] of definitions) {
-    stations.push(await prisma.station.upsert({
-      where: { eventId_stationType: { eventId: event.eventId, stationType } },
-      update: { stationName, stationOrder, isActive: true },
-      create: { eventId: event.eventId, stationType, stationName, stationOrder, isActive: true },
-    }));
+    const fieldSchema = SYSTEM_FIELD_SCHEMAS[stationType] || null;
+    const existing = await prisma.station.findFirst({
+      where: { eventId: event.eventId, stationType },
+    });
+    stations.push(existing
+      ? await prisma.station.update({
+        where: { stationId: existing.stationId },
+        data: {
+          stationName,
+          stationOrder,
+          isActive: true,
+          fieldSchemaSnapshot: fieldSchema,
+          schemaVersion: 1,
+        },
+      })
+      : await prisma.station.create({
+        data: {
+          eventId: event.eventId,
+          stationType,
+          stationName,
+          stationOrder,
+          isActive: true,
+          fieldSchemaSnapshot: fieldSchema,
+          schemaVersion: 1,
+        },
+      }));
   }
+  await prisma.station.updateMany({
+    where: { eventId: event.eventId, stationType: "EYE_HEALTH", isActive: true },
+    data: { isActive: false },
+  });
   return stations;
 }
 
@@ -232,12 +260,10 @@ async function main() {
   console.log("2) Status JSON API (the poller hits this every 5s)");
   console.log(`   ${apiOrigin}/qr/public-status/${PRESET_TOKEN}`);
   console.log("");
-  console.log("3) Screener handoff QR API (returns the QR as SVG data URL)");
-  for (const [type] of stations) {
-    console.log(`   ${apiOrigin}/qr/handoff/${PRESET_TOKEN}?station=${type}`);
-  }
+  console.log("3) Present the same participant QR at every assigned station");
+  console.log("   Station staff can scan it, use a physical reader, paste it, or search the queue.");
   console.log("");
-  console.log("4) Station pages the handoff QR opens (verify auto-selection)");
+  console.log("4) Station pages (the server verifies the active assignment)");
   for (const [, slug] of stations) {
     console.log(`   ${origin}/events/${event.eventId}/stations/${slug}?registrationId=${registration.registrationId}`);
   }

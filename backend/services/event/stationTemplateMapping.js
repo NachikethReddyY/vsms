@@ -2,7 +2,13 @@ const SUPPORTED_SCREENING_STATION_TYPES = Object.freeze([
   "VISUAL_ACUITY",
   "REFRACTION",
   "COLOUR_VISION",
-  "EYE_HEALTH",
+  "CUSTOM",
+]);
+
+const CLINICAL_ONE_PER_EVENT_TYPES = Object.freeze([
+  "VISUAL_ACUITY",
+  "REFRACTION",
+  "COLOUR_VISION",
 ]);
 
 const stationTypeForTemplate = (template) => (
@@ -23,8 +29,58 @@ const classifyTemplates = (templates) => {
   return { importable, skipped };
 };
 
+/** Clinical types: one template per type in a batch. CUSTOM may repeat different templates. */
+const assertImportableBatch = (importable) => {
+  const clinicalSeen = new Set();
+  const customTemplateIds = new Set();
+  for (const { template, stationType } of importable) {
+    if (stationType === "CUSTOM") {
+      if (customTemplateIds.has(template.stationTemplateId)) {
+        const error = new Error("Choose each custom template at most once per import");
+        error.code = "DUPLICATE_STATION_TYPE";
+        error.status = 422;
+        throw error;
+      }
+      customTemplateIds.add(template.stationTemplateId);
+      continue;
+    }
+    if (clinicalSeen.has(stationType)) {
+      const error = new Error("Choose only one template for each screening station type");
+      error.code = "DUPLICATE_STATION_TYPE";
+      error.status = 422;
+      throw error;
+    }
+    clinicalSeen.add(stationType);
+  }
+};
+
+const findExistingStation = (stations, { stationType, stationTemplateId }) => {
+  if (stationType === "CUSTOM") {
+    return stations.find((station) => (
+      station.stationType === "CUSTOM" && station.stationTemplateId === stationTemplateId
+    ));
+  }
+  return stations.find((station) => station.stationType === stationType);
+};
+
+/** True when a catalog template is still available for import into an event that already has `stations`. */
+const isTemplateAvailableForEvent = (template, stations = []) => {
+  const stationType = stationTypeForTemplate(template);
+  if (!stationType) return false;
+  if (stationType === "CUSTOM") {
+    return !stations.some((station) => (
+      station.stationType === "CUSTOM" && station.stationTemplateId === template.stationTemplateId
+    ));
+  }
+  return !stations.some((station) => station.stationType === stationType);
+};
+
 module.exports = {
   SUPPORTED_SCREENING_STATION_TYPES,
+  CLINICAL_ONE_PER_EVENT_TYPES,
   stationTypeForTemplate,
   classifyTemplates,
+  assertImportableBatch,
+  findExistingStation,
+  isTemplateAvailableForEvent,
 };

@@ -1,8 +1,9 @@
 import apiClient from '../../utils/apiClient';
 import { getStoredSession } from '../../utils/session';
 import { evaluateOfflineStation, isNetworkError, queueOfflineStationSave } from './offlineSync';
+import type { DynamicFieldValues, FieldSchema } from './fieldSchema';
 
-export type StationType = 'VISUAL_ACUITY' | 'REFRACTION' | 'COLOUR_VISION' | 'EYE_HEALTH';
+export type StationType = 'VISUAL_ACUITY' | 'REFRACTION' | 'COLOUR_VISION' | 'EYE_HEALTH' | 'CUSTOM';
 export type OverallFlag = 'NORMAL' | 'REVIEW' | 'REFER' | 'URGENT';
 
 export type Station = {
@@ -12,6 +13,8 @@ export type Station = {
   stationType: StationType;
   stationOrder: number;
   isActive: boolean;
+  fieldSchemaSnapshot?: FieldSchema | null;
+  schemaVersion?: number | null;
   offlineAccessExpiresAt?: string;
 };
 
@@ -20,7 +23,6 @@ export type QueueRegistration = {
   participantDisplayName: string;
   queueNumber: number | null;
   status: string;
-  passToken: string | null;
   existingResult: {
     resultId: string;
     overallFlag: OverallFlag;
@@ -82,7 +84,7 @@ export type FlagEvaluation = {
   ruleVersion: string;
   overallFlag: OverallFlag;
   isFlagged: boolean;
-  flagSummary: string;
+  flagSummary: string | null;
   reasons: Array<{ flag: OverallFlag; reason: string }>;
 };
 
@@ -103,13 +105,32 @@ export type ScreeningSaveResponse<T> = {
   resultData: T;
   evaluation?: FlagEvaluation;
   queued?: boolean;
+  routeProgression?: RouteProgression | null;
+  syncState: 'COMMITTED' | 'PENDING_SYNC';
+};
+
+export type RouteProgression = {
+  status: 'ADDED_TO_QUEUE' | 'REVIEW_READY' | 'BLOCKED' | 'CORRECTION_SAVED';
+  routeVersion?: number;
+  completedStation?: Pick<Station, 'stationId' | 'stationName' | 'stationType'> | null;
+  nextStation?: Pick<Station, 'stationId' | 'stationName' | 'stationType'> | null;
+  nextQueue?: {
+    stationId: string;
+    stationName: string;
+    stationType: StationType;
+    queueNumber: number;
+    status: 'WAITING';
+  } | null;
 };
 
 export type VisualAcuityPayload = ScreeningSavePayload<VisualAcuityResultData>;
 
-type ScreeningPath = 'visual-acuity' | 'refraction' | 'colour-vision' | 'eye-health';
+export type DynamicResultData = DynamicFieldValues;
+type StationResultData = VisualAcuityResultData | RefractionResultData | ColourVisionResultData | EyeHealthResultData | DynamicResultData;
+type OfflineScreeningPath = 'visual-acuity' | 'refraction' | 'colour-vision' | 'dynamic';
+type ScreeningPath = OfflineScreeningPath | 'eye-health';
 
-async function previewStation<T extends VisualAcuityResultData | RefractionResultData | ColourVisionResultData | EyeHealthResultData>(
+async function previewStation<T extends StationResultData>(
   eventId: string,
   stationId: string,
   path: ScreeningPath,
@@ -123,24 +144,32 @@ async function previewStation<T extends VisualAcuityResultData | RefractionResul
     return data;
   } catch (error) {
     if (!isNetworkError(error)) throw error;
-    return evaluateOfflineStation(path, resultData);
+    if (path === 'eye-health') throw error;
+    return evaluateOfflineStation(path, resultData as VisualAcuityResultData | RefractionResultData | ColourVisionResultData | DynamicResultData);
   }
 }
 
-async function saveStation<T extends VisualAcuityResultData | RefractionResultData | ColourVisionResultData | EyeHealthResultData>(
+async function saveStation<T extends StationResultData>(
   eventId: string,
   stationId: string,
   path: ScreeningPath,
   body: ScreeningSavePayload<T>,
-) {
+): Promise<ScreeningSaveResponse<T>> {
   try {
     const { data } = await apiClient.post(`/events/${eventId}/stations/${stationId}/${path}`, body);
-    return data as ScreeningSaveResponse<T>;
+    return { ...(data as Omit<ScreeningSaveResponse<T>, 'syncState'>), syncState: 'COMMITTED' as const };
   } catch (error) {
     if (!isNetworkError(error)) throw error;
+    if (path === 'eye-health') throw error;
     const ownerId = getStoredSession()?.user.id;
     if (!ownerId) throw error;
-    const evaluation = await queueOfflineStationSave(ownerId, eventId, stationId, path, body);
+    const evaluation = await queueOfflineStationSave(
+      ownerId,
+      eventId,
+      stationId,
+      path,
+      body as ScreeningSavePayload<VisualAcuityResultData | RefractionResultData | ColourVisionResultData | DynamicResultData>,
+    );
     return {
       resultId: `offline:${body.idempotencyKey}`,
       overallFlag: evaluation.overallFlag,
@@ -151,6 +180,7 @@ async function saveStation<T extends VisualAcuityResultData | RefractionResultDa
       resultData: body.resultData,
       evaluation,
       queued: true,
+      syncState: 'PENDING_SYNC' as const,
     };
   }
 }
@@ -178,9 +208,9 @@ export const screeningApi = {
       participantDisplayName: string;
       queueNumber: number | null;
       status: string;
-      passToken: string | null;
     }>(`/events/${eventId}/registrations/resolve`, { params });
-    return data;
+    const { data: queue } = await apiClient.get<{ activeEntry: { station: { stationId: string; stationName: string; stationType: string } } | null }>(`/queues/events/${eventId}/participants/${data.registrationId}`);
+    return { ...data, activeStation: queue.activeEntry?.station ?? null };
   },
 
   async getPassDisplay(eventId: string, registrationId: string) {
@@ -225,6 +255,14 @@ export const screeningApi = {
 
   saveEyeHealth(eventId: string, stationId: string, body: ScreeningSavePayload<EyeHealthResultData>) {
     return saveStation(eventId, stationId, 'eye-health', body);
+  },
+
+  previewDynamic(eventId: string, stationId: string, resultData: DynamicResultData) {
+    return previewStation(eventId, stationId, 'dynamic', resultData);
+  },
+
+  saveDynamic(eventId: string, stationId: string, body: ScreeningSavePayload<DynamicResultData>) {
+    return saveStation(eventId, stationId, 'dynamic', body);
   },
 };
 

@@ -1,13 +1,14 @@
 import apiClient from '../../utils/apiClient';
 import type {
   ColourVisionResultData,
-  EyeHealthResultData,
+  DynamicResultData,
   EyeReading,
   FlagEvaluation,
   OverallFlag,
   QueueRegistration,
   RefractionResultData,
   ScreeningSavePayload,
+  RouteProgression,
   Station,
   StationType,
   VisualAcuityResultData,
@@ -16,11 +17,11 @@ import type {
 const DATABASE_NAME = 'vsms-screening-offline';
 const DATABASE_VERSION = 1;
 const KEY_ID = 'screening-cache-key';
-const SUPPORTED_STATIONS = new Set<StationType>(['VISUAL_ACUITY', 'REFRACTION', 'COLOUR_VISION', 'EYE_HEALTH']);
+const SUPPORTED_STATIONS = new Set<StationType>(['VISUAL_ACUITY', 'REFRACTION', 'COLOUR_VISION', 'CUSTOM']);
 const OFFLINE_SYNC_EVENT = 'vsms-offline-sync';
 let cryptoKeyPromise: Promise<CryptoKey> | null = null;
 
-type ScreeningPath = 'visual-acuity' | 'refraction' | 'colour-vision' | 'eye-health';
+type ScreeningPath = 'visual-acuity' | 'refraction' | 'colour-vision' | 'dynamic';
 type OfflineMutationStatus = 'pending' | 'conflict';
 
 type OfflineStation = Station & { offlineAccessExpiresAt: string };
@@ -36,7 +37,7 @@ type OfflineMutation = {
   clientActionId: string;
   stationId: string;
   path: ScreeningPath;
-  body: ScreeningSavePayload<VisualAcuityResultData | RefractionResultData | ColourVisionResultData | EyeHealthResultData>;
+  body: ScreeningSavePayload<VisualAcuityResultData | RefractionResultData | ColourVisionResultData | DynamicResultData>;
 };
 
 type ScreeningSyncActionResult = {
@@ -44,6 +45,13 @@ type ScreeningSyncActionResult = {
   status: 'APPLIED' | 'CONFLICT' | 'FAILED';
   retryCount: number;
   errorCode?: string;
+  result?: {
+    resultId?: string;
+    overallFlag?: OverallFlag;
+    isFlagged?: boolean;
+    ruleVersion?: string;
+    routeProgression?: RouteProgression | null;
+  };
 };
 
 type ScreeningSyncPullStation = OfflineStation & {
@@ -89,6 +97,7 @@ export type OfflineStationContext = {
 export type OfflineSyncResult = OfflineSyncStatus & {
   synced: number;
   expired: boolean;
+  committedProgressions: Array<{ clientActionId: string; routeProgression: RouteProgression }>;
 };
 
 function unsupportedStorage() {
@@ -226,11 +235,13 @@ function toOfflineStation(station: Station): OfflineStation | null {
     stationType: station.stationType,
     stationOrder: station.stationOrder,
     isActive: station.isActive,
+    fieldSchemaSnapshot: station.fieldSchemaSnapshot,
+    schemaVersion: station.schemaVersion,
     offlineAccessExpiresAt: station.offlineAccessExpiresAt,
   };
 }
 
-function toOfflineQueue(rows: Array<Omit<QueueRegistration, 'passToken'> & Partial<Pick<QueueRegistration, 'passToken'>>>): OfflineQueueRegistration[] {
+function toOfflineQueue(rows: QueueRegistration[]): OfflineQueueRegistration[] {
   return rows.map((row) => ({
     registrationId: row.registrationId,
     participantDisplayName: row.participantDisplayName,
@@ -316,10 +327,11 @@ export async function getOfflineStationContext(
   ownerId: string,
   eventId: string,
   stationType: StationType,
+  stationId?: string,
 ): Promise<OfflineStationContext | null> {
   const snapshot = await loadSnapshot(ownerId, eventId);
   if (!snapshot) return null;
-  const station = snapshot.stations.find((item) => item.stationType === stationType);
+  const station = snapshot.stations.find((item) => item.stationType === stationType && (!stationId || item.stationId === stationId));
   if (!station || isExpired(station.offlineAccessExpiresAt)) {
     await purgeEvent(ownerId, eventId);
     return null;
@@ -415,47 +427,16 @@ function evaluateColourVision(resultData: ColourVisionResultData): FlagEvaluatio
   };
 }
 
-function evaluateEyeHealth(resultData: EyeHealthResultData): FlagEvaluation {
-  const reasons: Array<{ flag: OverallFlag; reason: string }> = [];
-  if (resultData.cataractRisk === 'PRESENT' || resultData.glaucomaRisk === 'PRESENT') {
-    reasons.push({
-      flag: 'REFER',
-      reason: `Eye-health risk present (cataract ${resultData.cataractRisk}, glaucoma ${resultData.glaucomaRisk})`,
-    });
-  }
-  if (resultData.cataractRisk === 'SUSPECTED' || resultData.glaucomaRisk === 'SUSPECTED') {
-    reasons.push({
-      flag: 'REVIEW',
-      reason: `Suspected eye-health risk (cataract ${resultData.cataractRisk}, glaucoma ${resultData.glaucomaRisk})`,
-    });
-  }
-  if (resultData.symptomsNoted) {
-    reasons.push({
-      flag: 'REVIEW',
-      reason: resultData.symptomSummary
-        ? `Symptoms noted: ${resultData.symptomSummary}`
-        : 'Participant-reported symptoms noted',
-    });
-  }
-  const overallFlag = worstFlag(reasons);
-  const summary = [
-    `Cataract ${resultData.cataractRisk}`,
-    `Glaucoma ${resultData.glaucomaRisk}`,
-    resultData.symptomsNoted ? 'Symptoms noted' : 'No symptoms',
-  ].join(' / ');
-  return {
-    ruleVersion: 'VSMS-EH-1.0',
-    overallFlag,
-    isFlagged: overallFlag !== 'NORMAL',
-    flagSummary: reasons.length ? reasons.map((item) => item.reason).join('; ') : summary,
-    reasons,
+export function evaluateOfflineStation(path: ScreeningPath, resultData: VisualAcuityResultData | RefractionResultData | ColourVisionResultData | DynamicResultData): FlagEvaluation {
+  if (path === 'dynamic') return {
+    ruleVersion: 'TEMPLATE-SCHEMA-1.0',
+    overallFlag: 'NORMAL',
+    isFlagged: false,
+    flagSummary: 'Custom station result recorded.',
+    reasons: [],
   };
-}
-
-export function evaluateOfflineStation(path: ScreeningPath, resultData: VisualAcuityResultData | RefractionResultData | ColourVisionResultData | EyeHealthResultData): FlagEvaluation {
   if (path === 'visual-acuity') return evaluateVisualAcuity(resultData as VisualAcuityResultData);
   if (path === 'refraction') return evaluateRefraction(resultData as RefractionResultData);
-  if (path === 'eye-health') return evaluateEyeHealth(resultData as EyeHealthResultData);
   return evaluateColourVision(resultData as ColourVisionResultData);
 }
 
@@ -464,7 +445,7 @@ export async function queueOfflineStationSave(
   eventId: string,
   stationId: string,
   path: ScreeningPath,
-  body: ScreeningSavePayload<VisualAcuityResultData | RefractionResultData | ColourVisionResultData | EyeHealthResultData>,
+  body: ScreeningSavePayload<VisualAcuityResultData | RefractionResultData | ColourVisionResultData | DynamicResultData>,
 ): Promise<FlagEvaluation> {
   const snapshot = await loadSnapshot(ownerId, eventId);
   const station = snapshot?.stations.find((item) => item.stationId === stationId);
@@ -521,15 +502,16 @@ async function markConflict(record: EncryptedRecord) {
 
 export async function syncOfflineEvent(ownerId: string, eventId: string): Promise<OfflineSyncResult> {
   const initial = await getOfflineSyncStatus(ownerId, eventId);
-  if (!initial.downloaded) return { ...initial, synced: 0, expired: false };
+  if (!initial.downloaded) return { ...initial, synced: 0, expired: false, committedProgressions: [] };
 
   let synced = 0;
+  const committedProgressions: OfflineSyncResult['committedProgressions'] = [];
   const pending: Array<{ record: EncryptedRecord; mutation: OfflineMutation }> = [];
   for (const record of await recordsForEvent(ownerId, eventId)) {
     if (record.kind !== 'mutation' || record.status !== 'pending') continue;
     if (isExpired(record.expiresAt)) {
       await purgeEvent(ownerId, eventId);
-      return { downloaded: false, pending: 0, conflicts: 0, expiresAt: null, synced, expired: true };
+      return { downloaded: false, pending: 0, conflicts: 0, expiresAt: null, synced, expired: true, committedProgressions };
     }
     pending.push({ record, mutation: await decryptRecord<OfflineMutation>(record) });
   }
@@ -542,13 +524,13 @@ export async function syncOfflineEvent(ownerId: string, eventId: string): Promis
       const response = await requestScreeningSync(eventId, batch.map(({ mutation }) => ({
         clientActionId: mutation.clientActionId,
         stationId: mutation.stationId,
-        stationType: mutation.path === 'visual-acuity'
+        stationType: mutation.path === 'dynamic'
+          ? 'CUSTOM'
+          : mutation.path === 'visual-acuity'
           ? 'VISUAL_ACUITY'
           : mutation.path === 'refraction'
             ? 'REFRACTION'
-            : mutation.path === 'eye-health'
-              ? 'EYE_HEALTH'
-              : 'COLOUR_VISION',
+            : 'COLOUR_VISION',
         payload: mutation.body,
       })));
       const recordByAction = new Map(batch.map((item) => [item.mutation.clientActionId, item.record]));
@@ -558,6 +540,12 @@ export async function syncOfflineEvent(ownerId: string, eventId: string): Promis
         if (result.status === 'APPLIED') {
           await deleteRecords([record]);
           synced += 1;
+          if (result.result?.routeProgression) {
+            committedProgressions.push({
+              clientActionId: result.clientActionId,
+              routeProgression: result.result.routeProgression,
+            });
+          }
         } else if (result.status === 'CONFLICT') {
           await markConflict(record);
         }
@@ -577,13 +565,13 @@ export async function syncOfflineEvent(ownerId: string, eventId: string): Promis
       if (isNetworkError(error)) break;
       if (isScopeExpiredError(error)) {
         await purgeEvent(ownerId, eventId);
-        return { downloaded: false, pending: 0, conflicts: 0, expiresAt: null, synced, expired: true };
+        return { downloaded: false, pending: 0, conflicts: 0, expiresAt: null, synced, expired: true, committedProgressions };
       }
       throw error;
     }
   }
   notifyOfflineChange();
-  return { ...(await getOfflineSyncStatus(ownerId, eventId)), synced, expired: false };
+  return { ...(await getOfflineSyncStatus(ownerId, eventId)), synced, expired: false, committedProgressions };
 }
 
 export async function listOfflineEventIds(ownerId: string): Promise<string[]> {

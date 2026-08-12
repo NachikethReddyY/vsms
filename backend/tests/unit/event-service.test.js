@@ -28,6 +28,36 @@ const assertForbiddenEventKeysAbsent = (value) => {
   }
 };
 
+test("station template reads preserve missing schemas without writing", async (t) => {
+  const originalFindMany = prisma.stationTemplate.findMany;
+  const originalUpdate = prisma.stationTemplate.update;
+  const template = {
+    stationTemplateId: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+    templateKey: "VISUAL_ACUITY",
+    stationType: "VISUAL_ACUITY",
+    version: 1,
+    name: "Visual acuity",
+    description: null,
+    defaultCapacity: 4,
+    active: true,
+    fieldSchema: null,
+  };
+  let writes = 0;
+  prisma.stationTemplate.findMany = async () => [template];
+  prisma.stationTemplate.update = async () => { writes += 1; return template; };
+  t.after(() => {
+    prisma.stationTemplate.findMany = originalFindMany;
+    prisma.stationTemplate.update = originalUpdate;
+  });
+
+  const [catalog] = await eventService.listStationTemplates();
+  const [library] = await eventService.listStationTemplateLibrary();
+
+  assert.equal(writes, 0);
+  assert.equal(catalog.fieldSchema, null);
+  assert.equal(library.fieldSchema, null);
+});
+
 test("station template mutations generate opaque keys and audit atomically", async () => {
   const audits = [];
   const transactionClient = {
@@ -40,37 +70,40 @@ test("station template mutations generate opaque keys and audit atomically", asy
       findUnique: async () => ({
         stationTemplateId: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
         templateKey: "opaque-existing-key",
-        stationType: "EYE_HEALTH",
+        stationType: "VISUAL_ACUITY",
         version: 1,
-        name: "Eye health booth",
+        name: "Visual acuity booth",
         description: null,
-        defaultCapacity: 2,
+        defaultCapacity: 4,
         active: true,
+        fieldSchema: [{ key: "od", label: "OD", type: "text", required: true }],
       }),
       update: async ({ data }) => ({
         stationTemplateId: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
         templateKey: "opaque-existing-key",
-        stationType: "EYE_HEALTH",
+        stationType: "VISUAL_ACUITY",
         version: 2,
-        name: data.name ?? "Eye health booth",
+        name: data.name ?? "Visual acuity booth",
         description: null,
-        defaultCapacity: 2,
+        defaultCapacity: 4,
         active: data.active ?? true,
+        fieldSchema: [{ key: "od", label: "OD", type: "text", required: true }],
       }),
     },
     auditLog: { create: async ({ data }) => { audits.push(data); return data; } },
   };
   const db = { $transaction: async (callback) => callback(transactionClient) };
   const context = { requestId: crypto.randomUUID(), ipAddress: "127.0.0.1", deviceName: "Test" };
-  const body = { stationType: "EYE_HEALTH", name: "Eye health booth", defaultCapacity: 2, active: true };
+  const body = { stationType: "VISUAL_ACUITY", name: "Visual acuity booth", defaultCapacity: 4, active: true };
 
   const first = await eventService.createStationTemplate(body, manager, context, db);
-  const second = await eventService.createStationTemplate({ ...body, name: "Second eye health booth" }, manager, context, db);
-  await eventService.updateStationTemplate(first.stationTemplateId, { name: "Updated eye health booth" }, manager, context, db);
+  const second = await eventService.createStationTemplate({ ...body, name: "Second visual acuity booth" }, manager, context, db);
+  await eventService.updateStationTemplate(first.stationTemplateId, { name: "Updated visual acuity booth" }, manager, context, db);
   await eventService.updateStationTemplate(first.stationTemplateId, { active: false }, manager, context, db);
 
   assert.notEqual(first.templateKey, second.templateKey);
-  assert.equal(first.stationType, "EYE_HEALTH");
+  assert.equal(first.stationType, "VISUAL_ACUITY");
+  assert.ok(Array.isArray(first.fieldSchema) && first.fieldSchema.length > 0);
   assert.deepEqual(audits.map(({ action }) => action), [
     "STATION_TEMPLATE_CREATED",
     "STATION_TEMPLATE_CREATED",
@@ -78,6 +111,49 @@ test("station template mutations generate opaque keys and audit atomically", asy
     "STATION_TEMPLATE_DEACTIVATED",
   ]);
   assert.ok(audits.every((audit) => audit.userId === manager.userId && audit.requestId === context.requestId));
+});
+
+test("clinical station templates reject editable fieldSchema payloads", async () => {
+  const db = { $transaction: async () => { throw new Error("transaction must not run"); } };
+  const context = { requestId: crypto.randomUUID(), ipAddress: "127.0.0.1", deviceName: "Test" };
+  await assert.rejects(
+    () => eventService.createStationTemplate({
+      stationType: "VISUAL_ACUITY",
+      name: "Edited VA form",
+      defaultCapacity: 2,
+      active: true,
+      fieldSchema: [{ key: "hacked", label: "Hacked", type: "text", required: true }],
+    }, manager, context, db),
+    (error) => error.code === "FIELD_SCHEMA_NOT_EDITABLE",
+  );
+
+  const transactionClient = {
+    stationTemplate: {
+      findUnique: async () => ({
+        stationTemplateId: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+        templateKey: "opaque-existing-key",
+        stationType: "VISUAL_ACUITY",
+        version: 1,
+        name: "Visual acuity booth",
+        description: null,
+        defaultCapacity: 4,
+        active: true,
+        fieldSchema: null,
+      }),
+      update: async () => { throw new Error("update must not run"); },
+    },
+    auditLog: { create: async () => ({}) },
+  };
+  await assert.rejects(
+    () => eventService.updateStationTemplate(
+      "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+      { fieldSchema: [{ key: "hacked", label: "Hacked", type: "text", required: true }] },
+      manager,
+      context,
+      { $transaction: async (callback) => callback(transactionClient) },
+    ),
+    (error) => error.code === "FIELD_SCHEMA_NOT_EDITABLE",
+  );
 });
 
 const eventRecord = (status = "DRAFT", version = 1, assignments = [], registrations = []) => ({

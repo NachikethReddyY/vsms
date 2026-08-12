@@ -126,22 +126,23 @@ export const publicPassStatusResponse = {
     valid: true,
     eventName: 'Choa Chu Kang Community Screening',
     queueNumber: 3,
-    currentQueueNumber: 1,
     queueState: {
       status: 'WAITING',
-      station: { id: 'station-visual-acuity', type: 'VISUAL_ACUITY', name: 'Visual Acuity' },
+      station: { type: 'VISUAL_ACUITY', name: 'Visual Acuity' },
       queueNumber: 3,
     },
-    aheadAtStation: 1,
-    stations: [
+    route: [
       {
-        stationId: 'station-visual-acuity',
         stationName: 'Visual Acuity',
-        workload: { WAITING: 2, CALLED: 1, IN_PROGRESS: 0, COMPLETED: 0, SKIPPED: 0, CANCELLED: 0 },
-        nextUp: { queueNumber: 1 },
+        stationType: 'VISUAL_ACUITY',
+        state: 'CURRENT',
+      },
+      {
+        stationName: 'Refraction',
+        stationType: 'REFRACTION',
+        state: 'UPCOMING',
       },
     ],
-    transfers: [],
     expiresAt: '2026-08-20T23:59:59.000Z',
     registrationStatus: 'CHECKED_IN',
   },

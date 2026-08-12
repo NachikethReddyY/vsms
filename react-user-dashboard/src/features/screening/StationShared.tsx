@@ -1,6 +1,6 @@
 /* eslint-disable react-refresh/only-export-components */
 import { ExclamationTriangleIcon } from '@heroicons/react/24/outline';
-import { FormEvent, ReactNode, useCallback, useEffect, useState } from 'react';
+import { FormEvent, ReactNode, useCallback, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { AppToast } from '../../components/AppToast';
 import { getApiError as getApiMessage } from '../../utils/apiClient';
@@ -14,126 +14,25 @@ import {
 } from './screeningApi';
 import { extractQrToken } from './qrHandoff';
 import { getOfflineStationContext, isNetworkError } from './offlineSync';
-import { STATION_LABEL, STATION_PATH_SLUG, stationPath } from './stationConfig';
 import { StationCameraScanner } from './StationCameraScanner';
 import './StationCameraScanner.css';
 
-/** Default clinical order when event stationOrder is unavailable. */
-export const DEFAULT_STATION_ORDER: StationType[] = [
-  'VISUAL_ACUITY',
-  'REFRACTION',
-  'COLOUR_VISION',
-  'EYE_HEALTH',
-];
-
-export function orderedStationTypes(stations?: Station[]): StationType[] {
-  if (stations && stations.length > 0) {
-    return [...stations]
-      .filter((item) => item.isActive)
-      .sort((a, b) => a.stationOrder - b.stationOrder)
-      .map((item) => item.stationType);
-  }
-  return DEFAULT_STATION_ORDER;
-}
-
-/** Stations after the current one that have a working staff UI route. */
-export function nextStationTypes(
-  current: StationType,
-  stations?: Station[],
-): StationType[] {
-  const order = orderedStationTypes(stations);
-  const index = order.indexOf(current);
-  const after = index >= 0 ? order.slice(index + 1) : order.filter((type) => type !== current);
-  return after.filter((type) => Boolean(STATION_PATH_SLUG[type]));
-}
-
-export function StationHandoffLinks({
+export function RouteProgressionNotice({
   eventId,
-  currentStationType,
-  registrationId,
-  stations,
+  queued = false,
 }: {
   eventId: string;
-  currentStationType: StationType;
-  registrationId?: string | null;
-  stations?: Station[];
+  queued?: boolean;
 }) {
-  const next = nextStationTypes(currentStationType, stations);
-  const isLastScreeningStation = next.length === 0;
-  const nextLabel = next[0] ? STATION_LABEL[next[0]] : null;
-  const [passImage, setPassImage] = useState<string | null>(null);
-  const [passName, setPassName] = useState<string | null>(null);
-  const [passQueue, setPassQueue] = useState<number | null>(null);
-  const [passError, setPassError] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (!eventId || !registrationId) return;
-    let cancelled = false;
-    setPassError(null);
-    setPassImage(null);
-    void screeningApi.getPassDisplay(eventId, registrationId)
-      .then((pass) => {
-        if (cancelled) return;
-        setPassImage(pass.qrImage);
-        setPassName(pass.participantDisplayName);
-        setPassQueue(pass.queueNumber);
-      })
-      .catch((cause) => {
-        if (!cancelled) setPassError(getApiMessage(cause, 'Could not load the participant QR for next queue.'));
-      });
-    return () => { cancelled = true; };
-  }, [eventId, registrationId]);
-
   return (
-    <nav className="va-handoff" aria-label="Continue screening">
-      <p className="va-handoff-label">
-        {next.length > 0
-          ? `Station complete — show this QR so the participant can join the ${nextLabel} queue`
-          : 'Screening stations complete for this route'}
-        {registrationId ? ' · same participant kept' : null}
-      </p>
-
-      {registrationId && (
-        <div className="station-pass-qr" aria-live="polite">
-          {passError && <p className="form-error" role="alert">{passError}</p>}
-          {passImage && (
-            <>
-              <img src={passImage} alt="Participant QR pass for next station queue" />
-              <p>
-                Show this code to <strong>{passName || 'the participant'}</strong>
-                {nextLabel ? <> for <strong>{nextLabel}</strong></> : null}.
-              </p>
-              {passQueue != null && (
-                <p className="station-pass-qr-meta">Queue #{passQueue}</p>
-              )}
-            </>
-          )}
-          {!passImage && !passError && <p className="station-pass-qr-meta">Loading participant QR…</p>}
-        </div>
-      )}
-
+    <section className="va-handoff" aria-live="polite">
+      <p className="va-handoff-label">{queued
+        ? 'Pending sync — the participant has not entered the next queue yet.'
+        : 'Result committed. The server has updated the participant route and queue.'}</p>
       <div className="action-cluster" style={{ paddingTop: 0 }}>
-        {next.map((type, index) => {
-          const href = stationPath(eventId, type, registrationId);
-          if (!href) return null;
-          return (
-            <Link
-              key={type}
-              className={index === 0 ? 'primary' : 'secondary'}
-              to={href}
-            >
-              {index === 0 ? 'Open next station tablet: ' : ''}{STATION_LABEL[type]}
-            </Link>
-          );
-        })}
-        {isLastScreeningStation && (
-          <Link className="primary" to={`/events/${eventId}/reviews`}>
-            Open clinical review
-          </Link>
-        )}
         <Link className="secondary" to={`/events/${eventId}`}>Back to event</Link>
       </div>
-    </nav>
+    </section>
   );
 }
 
@@ -161,7 +60,7 @@ export function FlagBanner({
           <small>Rule {evaluation.ruleVersion}</small>
         </div>
       </div>
-      <p>{evaluation.flagSummary}</p>
+      {evaluation.flagSummary && <p>{evaluation.flagSummary}</p>}
       {evaluation.reasons.length > 0 && (
         <ul>
           {evaluation.reasons.map((item) => (
@@ -187,12 +86,14 @@ export function FlagBanner({
 
 export function ParticipantLookup({
   eventId,
+  currentStationId,
   queue,
   selectedId,
   onSelect,
   selected,
 }: {
   eventId: string;
+  currentStationId: string;
   queue: QueueRegistration[];
   selectedId: string;
   onSelect: (registrationId: string) => void;
@@ -202,17 +103,38 @@ export function ParticipantLookup({
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [scannerOpen, setScannerOpen] = useState(false);
+  const [queueSearch, setQueueSearch] = useState('');
+  const [lookupPending, setLookupPending] = useState(false);
+  const filteredQueue = useMemo(() => {
+    const search = queueSearch.trim().toLowerCase();
+    if (!search) return queue;
+    return queue.filter((row) => row.participantDisplayName.toLowerCase().includes(search) || String(row.queueNumber ?? '').includes(search));
+  }, [queue, queueSearch]);
 
   const applyResolved = useCallback((person: {
     registrationId: string;
     participantDisplayName: string;
+    activeStation: { stationId: string; stationName: string } | null;
   }, source: string) => {
+    if (!person.activeStation) {
+      const message = 'This participant has no active station assignment. Ask an authorized officer to resolve the route.';
+      setError(message);
+      throw new Error(message);
+    }
+    if (person.activeStation.stationId !== currentStationId) {
+      const message = `This participant is assigned to ${person.activeStation.stationName}, not this station.`;
+      setError(message);
+      throw new Error(message);
+    }
+    setError(null);
     onSelect(person.registrationId);
     setSuccess(`Loaded ${person.participantDisplayName} from ${source}.`);
-  }, [onSelect]);
+  }, [currentStationId, onSelect]);
 
-  const resolvePass = async () => {
+  const resolvePass = async (event?: FormEvent) => {
+    event?.preventDefault();
     if (!eventId || !passToken.trim()) return;
+    setLookupPending(true);
     setError(null);
     setSuccess(null);
     try {
@@ -224,6 +146,8 @@ export function ParticipantLookup({
       applyResolved(person, 'pass / QR token');
     } catch (cause) {
       setError(getApiMessage(cause, 'Could not resolve that participant pass.'));
+    } finally {
+      setLookupPending(false);
     }
   };
 
@@ -252,7 +176,7 @@ export function ParticipantLookup({
       <h2>Find participant</h2>
       {error && <p className="form-error" role="alert">{error}</p>}
       <AppToast message={success ?? ''} />
-      <div className="va-resolve-row">
+      <form className="va-resolve-row" onSubmit={(event) => void resolvePass(event)}>
         <label>
           Pass token / QR value
           <input
@@ -261,17 +185,21 @@ export function ParticipantLookup({
             placeholder="…/participant-status/&lt;token&gt; or 64-hex token"
           />
         </label>
-        <button type="button" className="primary" onClick={() => void resolvePass()}>Load pass</button>
+        <button type="submit" className="primary" disabled={lookupPending}>{lookupPending ? 'Loading…' : 'Load pass'}</button>
         <button type="button" className="secondary" onClick={() => setScannerOpen(true)}>
           Scan QR with camera
         </button>
-      </div>
+      </form>
       <p className="va-resolve-hint">Paste the full QR value or the hex token from the pass.</p>
       <label>
-        Or choose from station queue
+        Search this station queue
+        <input type="search" value={queueSearch} onChange={(event) => setQueueSearch(event.target.value)} placeholder="Queue number or participant name" />
+      </label>
+      <label>
+        Choose from this station queue
         <select value={selectedId} onChange={(event) => onSelect(event.target.value)}>
           <option value="" disabled>Select participant</option>
-          {queue.map((row) => (
+          {filteredQueue.map((row) => (
             <option key={row.registrationId} value={row.registrationId}>
               #{row.queueNumber ?? '—'} {row.participantDisplayName}
               {row.existingResult ? ` · ${row.existingResult.overallFlag}` : ''}
@@ -282,7 +210,6 @@ export function ParticipantLookup({
       {selected && (
         <p>
           Screening <strong>{selected.participantDisplayName}</strong>
-          {selected.passToken ? <> · pass <code>{selected.passToken}</code></> : null}
         </p>
       )}
       <StationCameraScanner

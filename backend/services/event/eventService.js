@@ -6,7 +6,11 @@ const { encodeCursor, decodeCursor } = require("../../utils/http/cursor");
 const {
   classifyTemplates,
   stationTypeForTemplate,
+  assertImportableBatch,
+  findExistingStation,
+  CLINICAL_ONE_PER_EVENT_TYPES,
 } = require("./stationTemplateMapping");
+const { parseFieldSchema } = require("../../schemas/dynamicStationSchema");
 const {
   enqueueEventArtifactCleanup,
   processArtifactCleanupTasks,
@@ -204,6 +208,8 @@ const mapStationDto = (station, event, templates) => {
     // Capacity is not on Station (#30); expose template default until availability is wired.
     capacity: template?.defaultCapacity || event.capacity,
     isAvailable: station.isActive,
+    fieldSchemaSnapshot: station.fieldSchemaSnapshot ?? template?.fieldSchema ?? null,
+    schemaVersion: station.schemaVersion ?? template?.version ?? null,
     availabilities: [],
   };
 };
@@ -485,9 +491,22 @@ const requireTemplates = async (tx, stations) => {
   if (templates.length !== ids.length) {
     throw new AppError(422, "STATION_TEMPLATE_NOT_AVAILABLE", "One or more station templates are unavailable");
   }
-  const stationTypes = templates.map(stationTypeForTemplate).filter(Boolean);
-  if (new Set(stationTypes).size !== stationTypes.length) {
-    throw new AppError(422, "DUPLICATE_STATION_TYPE", "Choose only one template for each screening station type");
+  const importable = [];
+  for (const template of templates) {
+    const stationType = stationTypeForTemplate(template);
+    if (!stationType) {
+      throw new AppError(
+        422,
+        "STATION_TEMPLATE_NOT_IMPORTABLE",
+        `${template.name} cannot be imported as a screening station`,
+      );
+    }
+    importable.push({ template, stationType });
+  }
+  try {
+    assertImportableBatch(importable);
+  } catch (error) {
+    throw new AppError(error.status || 422, error.code || "DUPLICATE_STATION_TYPE", error.message);
   }
   return new Map(templates.map((template) => [template.stationTemplateId, template]));
 };
@@ -566,6 +585,18 @@ const createEventDays = async (tx, eventId, days) => {
   return new Map(created.map((day) => [day.date.toISOString().slice(0, 10), day]));
 };
 
+/** Only CUSTOM stations freeze and render fieldSchema. Built-in clinical UIs stay hard-coded. */
+const stationSchemaFields = (template) => {
+  if (template.stationType !== "CUSTOM") {
+    return { fieldSchemaSnapshot: null, schemaVersion: template.version || 1 };
+  }
+  const fieldSchema = parseFieldSchema(template.fieldSchema);
+  return {
+    fieldSchemaSnapshot: fieldSchema,
+    schemaVersion: template.version || 1,
+  };
+};
+
 const createEventStations = async (tx, eventId, stations, daysByDate, templatesById) => {
   const stationsByTemplate = new Map();
   const existing = await tx.station.findMany({ where: { eventId }, orderBy: { stationOrder: "asc" } });
@@ -582,7 +613,11 @@ const createEventStations = async (tx, eventId, stations, daysByDate, templatesB
       );
     }
 
-    let station = existing.find((row) => row.stationType === stationType);
+    const schemaFields = stationSchemaFields(template);
+    let station = findExistingStation(existing, {
+      stationType,
+      stationTemplateId: template.stationTemplateId,
+    });
     if (station) {
       station = await tx.station.update({
         where: { stationId: station.stationId },
@@ -591,11 +626,15 @@ const createEventStations = async (tx, eventId, stations, daysByDate, templatesB
           stationTemplateId: template.stationTemplateId,
           stationOrder: input.stationOrder,
           isActive: input.isAvailable !== false,
+          ...schemaFields,
         },
       });
     } else {
+      if (CLINICAL_ONE_PER_EVENT_TYPES.includes(stationType)
+        && existing.some((row) => row.stationType === stationType)) {
+        throw new AppError(422, "DUPLICATE_STATION_TYPE", "Choose only one template for each screening station type");
+      }
       nextOrder = Math.max(nextOrder + 1, input.stationOrder || nextOrder + 1);
-      // Prefer requested order when free; otherwise append.
       const orderTaken = existing.some((row) => row.stationOrder === input.stationOrder)
         || [...stationsByTemplate.values()].some((row) => row.stationOrder === input.stationOrder);
       const stationOrder = orderTaken ? nextOrder : (input.stationOrder || nextOrder);
@@ -608,13 +647,13 @@ const createEventStations = async (tx, eventId, stations, daysByDate, templatesB
           stationName: template.name,
           stationOrder,
           isActive: input.isAvailable !== false,
+          ...schemaFields,
         },
       });
       existing.push(station);
     }
     stationsByTemplate.set(input.stationTemplateId, station);
 
-    // Day-level capacity rows optional; create when the wizard supplies availabilities.
     if (input.availabilities?.length) {
       await tx.eventStationAvailability.deleteMany({ where: { eventStationId: station.stationId } });
       for (const availability of input.availabilities) {
@@ -1644,10 +1683,13 @@ const listStationTemplates = async () => {
       description: true,
       defaultCapacity: true,
       active: true,
+      fieldSchema: true,
     },
     orderBy: { name: "asc" },
   });
-  return templates;
+  return templates
+    .filter((template) => stationTypeForTemplate(template))
+    .map(serializeStationTemplate);
 };
 
 const serializeStationTemplate = (template) => ({
@@ -1659,6 +1701,7 @@ const serializeStationTemplate = (template) => ({
   description: template.description,
   defaultCapacity: template.defaultCapacity,
   active: template.active,
+  fieldSchema: template.fieldSchema ?? null,
 });
 
 /** Admin catalog: all templates including inactive / non-importable (#23). */
@@ -1673,6 +1716,7 @@ const listStationTemplateLibrary = async () => {
       description: true,
       defaultCapacity: true,
       active: true,
+      fieldSchema: true,
     },
     orderBy: [{ active: "desc" }, { name: "asc" }],
   });
@@ -1680,6 +1724,32 @@ const listStationTemplateLibrary = async () => {
 };
 
 const createStationTemplate = async (body, user, context, db = prisma) => {
+  if (body.stationType === "EYE_HEALTH") {
+    throw new AppError(
+      422,
+      "STATION_TYPE_NOT_IMPORTABLE",
+      "Eye health is recorded during clinical review, not as a screening station template",
+    );
+  }
+  const { SYSTEM_FIELD_SCHEMAS } = require("../../schemas/dynamicStationSchema");
+  let fieldSchema;
+  try {
+    if (body.stationType === "CUSTOM") {
+      fieldSchema = parseFieldSchema(body.fieldSchema);
+    } else if (body.fieldSchema !== undefined) {
+      throw new AppError(
+        422,
+        "FIELD_SCHEMA_NOT_EDITABLE",
+        "Field schemas can only be defined for custom stations. Built-in stations use fixed clinical forms.",
+      );
+    } else {
+      // Catalog metadata only — live VA/REF/CV pages ignore this and keep hard-coded forms.
+      fieldSchema = SYSTEM_FIELD_SCHEMAS[body.stationType] ?? null;
+    }
+  } catch (error) {
+    if (error instanceof AppError) throw error;
+    throw new AppError(422, "INVALID_FIELD_SCHEMA", error.message);
+  }
   try {
     return await db.$transaction(async (tx) => {
       const template = await tx.stationTemplate.create({
@@ -1690,6 +1760,7 @@ const createStationTemplate = async (body, user, context, db = prisma) => {
           description: body.description ?? null,
           defaultCapacity: body.defaultCapacity,
           active: body.active,
+          ...(fieldSchema !== undefined ? { fieldSchema } : {}),
         },
       });
       const serialized = serializeStationTemplate(template);
@@ -1715,6 +1786,21 @@ const createStationTemplate = async (body, user, context, db = prisma) => {
 const updateStationTemplate = async (stationTemplateId, body, user, context, db = prisma) => db.$transaction(async (tx) => {
   const existing = await tx.stationTemplate.findUnique({ where: { stationTemplateId } });
   if (!existing) throw new AppError(404, "STATION_TEMPLATE_NOT_FOUND", "Station template not found");
+  let fieldSchema;
+  if (body.fieldSchema !== undefined) {
+    if (existing.stationType !== "CUSTOM") {
+      throw new AppError(
+        422,
+        "FIELD_SCHEMA_NOT_EDITABLE",
+        "Field schemas can only be edited for custom stations. Built-in stations use fixed clinical forms.",
+      );
+    }
+    try {
+      fieldSchema = parseFieldSchema(body.fieldSchema);
+    } catch (error) {
+      throw new AppError(422, "INVALID_FIELD_SCHEMA", error.message);
+    }
+  }
   const template = await tx.stationTemplate.update({
     where: { stationTemplateId },
     data: {
@@ -1722,6 +1808,7 @@ const updateStationTemplate = async (stationTemplateId, body, user, context, db 
       ...(body.description !== undefined ? { description: body.description } : {}),
       ...(body.defaultCapacity !== undefined ? { defaultCapacity: body.defaultCapacity } : {}),
       ...(body.active !== undefined ? { active: body.active } : {}),
+      ...(fieldSchema !== undefined ? { fieldSchema } : {}),
       version: { increment: 1 },
     },
   });
@@ -1760,14 +1847,18 @@ const importStations = async (eventId, body, user, correlationId, db = prisma) =
       `These templates are not screening stations and cannot be imported: ${names}`,
     );
   }
-  if (new Set(importable.map(({ stationType }) => stationType)).size !== importable.length) {
-    throw new AppError(422, "DUPLICATE_STATION_TYPE", "Choose only one template for each screening station type");
+  try {
+    assertImportableBatch(importable);
+  } catch (error) {
+    throw new AppError(422, error.code || "DUPLICATE_STATION_TYPE", error.message);
   }
 
   const existingStations = current.stations || [];
-  const existingTypes = new Set(existingStations.map((station) => station.stationType));
-  const newTypes = importable.filter(({ stationType }) => !existingTypes.has(stationType));
-  if (existingStations.length + newTypes.length > 50) {
+  const newCount = importable.filter(({ template, stationType }) => !findExistingStation(existingStations, {
+    stationType,
+    stationTemplateId: template.stationTemplateId,
+  })).length;
+  if (existingStations.length + newCount > 50) {
     throw new AppError(422, "STATION_LIMIT_EXCEEDED", "An event can have at most 50 stations");
   }
 
@@ -1776,7 +1867,11 @@ const importStations = async (eventId, body, user, correlationId, db = prisma) =
 
     let nextOrder = existingStations.reduce((max, station) => Math.max(max, station.stationOrder), 0);
     for (const { template, stationType } of importable) {
-      const existing = existingStations.find((station) => station.stationType === stationType);
+      const schemaFields = stationSchemaFields(template);
+      const existing = findExistingStation(existingStations, {
+        stationType,
+        stationTemplateId: template.stationTemplateId,
+      });
       if (existing) {
         await tx.station.update({
           where: { stationId: existing.stationId },
@@ -1784,9 +1879,14 @@ const importStations = async (eventId, body, user, correlationId, db = prisma) =
             stationName: template.name,
             stationTemplateId: template.stationTemplateId,
             isActive: true,
+            ...schemaFields,
           },
         });
       } else {
+        if (CLINICAL_ONE_PER_EVENT_TYPES.includes(stationType)
+          && existingStations.some((station) => station.stationType === stationType)) {
+          throw new AppError(422, "DUPLICATE_STATION_TYPE", "Choose only one template for each screening station type");
+        }
         nextOrder += 1;
         const created = await tx.station.create({
           data: {
@@ -1796,6 +1896,7 @@ const importStations = async (eventId, body, user, correlationId, db = prisma) =
             stationName: template.name,
             stationOrder: nextOrder,
             isActive: true,
+            ...schemaFields,
           },
         });
         existingStations.push(created);

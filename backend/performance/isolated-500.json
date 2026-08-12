@@ -3,7 +3,16 @@
   "baseUrl": "http://127.0.0.1:5050",
   "fixtureFile": "/tmp/vsms-performance-fixture.json",
   "participantCount": 500,
-  "concurrency": 10,
+  "concurrency": 50,
   "readSampleSize": 10,
+  "pollDurationSeconds": 15,
+  "participantPollIntervalMs": 5000,
+  "staffPollIntervalMs": 10000,
+  "staffPollClientCount": 10,
+  "thresholds": {
+    "readP95Ms": 250,
+    "writeP95Ms": 500,
+    "errorRatePercent": 1
+  },
   "authorizationEnv": "PERF_AUTHORIZATION"
 }

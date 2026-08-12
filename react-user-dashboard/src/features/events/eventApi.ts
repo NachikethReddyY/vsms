@@ -1,15 +1,21 @@
 import apiClient from '../../utils/apiClient';
 import type { components } from '../../generated/api';
+import type { StationType } from '../screening/screeningApi';
 
-export type EventRecord = Omit<components['schemas']['Event'], 'shifts'> & {
+export type EventStation = Omit<components['schemas']['EventStation'], 'stationType'> & {
+  stationType: StationType;
+};
+export type EventRecord = Omit<components['schemas']['Event'], 'shifts' | 'eventStations'> & {
   shifts: components['schemas']['Shift'][];
+  eventStations: EventStation[];
 };
 export type EventStatus = components['schemas']['EventStatus'];
 export type StaffAssignment = components['schemas']['StaffAssignment'];
 export type StaffAssignmentRole = components['schemas']['StaffAssignmentRole'];
 export type StaffDirectoryEntry = components['schemas']['StaffDirectoryEntry'];
-export type StationTemplate = components['schemas']['StationTemplate'];
-export type EventStation = components['schemas']['EventStation'];
+export type StationTemplate = Omit<components['schemas']['StationTemplate'], 'stationType'> & {
+  stationType: StationType;
+};
 export type CreateEvent = components['schemas']['CreateEventRequest'];
 export type UpdateEvent = components['schemas']['UpdateEventRequest'];
 export type EventDeletionRequest = components['schemas']['EventDeletionRequest'];

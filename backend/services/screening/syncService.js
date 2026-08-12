@@ -7,7 +7,7 @@ const HANDLERS = {
   VISUAL_ACUITY: "saveVisualAcuity",
   REFRACTION: "saveRefraction",
   COLOUR_VISION: "saveColourVision",
-  EYE_HEALTH: "saveEyeHealth",
+  CUSTOM: "saveDynamic",
 };
 
 const SAFE_CONFLICT_CODES = new Set([
@@ -16,12 +16,20 @@ const SAFE_CONFLICT_CODES = new Set([
   "EVENT_NOT_IN_PROGRESS",
   "FORBIDDEN",
   "IDEMPOTENCY_KEY_REUSED",
+  "INVALID_FIELD_SCHEMA",
+  "INVALID_RESULT_DATA",
   "REGISTRATION_NOT_FOUND",
   "REGISTRATION_NOT_SCREENABLE",
+  "ROUTE_NOT_ASSIGNED",
+  "ROUTE_PROGRESSION_CONFLICT",
+  "ROUTE_QUEUE_CONFLICT",
+  "ROUTE_STATION_MISMATCH",
   "SCREENER_ROLE_REQUIRED",
   "SCREENING_WRITE_CONFLICT",
   "SHIFT_NOT_ACTIVE",
   "STATION_NOT_FOUND",
+  "STATION_SCHEMA_MISSING",
+  "EYE_HEALTH_REVIEW_ONLY",
 ]);
 
 const canonicalJson = (value) => {
@@ -43,6 +51,26 @@ const PROCESSING_LEASE_MS = 30_000;
 const TERMINAL_WAIT_MS = 10_000;
 const wait = (milliseconds) => new Promise((resolve) => setTimeout(resolve, milliseconds));
 
+const safeStation = (station) => station ? {
+  stationId: station.stationId,
+  stationName: station.stationName,
+  stationType: station.stationType,
+} : null;
+
+const safeRouteProgression = (progression) => progression ? {
+  status: progression.status,
+  ...(Number.isInteger(progression.routeVersion) ? { routeVersion: progression.routeVersion } : {}),
+  completedStation: safeStation(progression.completedStation),
+  nextStation: safeStation(progression.nextStation),
+  nextQueue: progression.nextQueue ? {
+    stationId: progression.nextQueue.stationId,
+    stationName: progression.nextQueue.stationName,
+    stationType: progression.nextQueue.stationType,
+    queueNumber: progression.nextQueue.queueNumber,
+    status: progression.nextQueue.status,
+  } : null,
+} : null;
+
 const safeResultSnapshot = (receipt) => {
   const result = receipt?.result || {};
   return {
@@ -50,6 +78,7 @@ const safeResultSnapshot = (receipt) => {
     overallFlag: result.overallFlag,
     isFlagged: result.isFlagged,
     ruleVersion: result.ruleVersion || result.evaluation?.ruleVersion,
+    routeProgression: safeRouteProgression(receipt?.routeProgression),
   };
 };
 
@@ -230,7 +259,19 @@ const processAction = async ({ eventId, action, user, db, screening, options }) 
   if (!pending.shouldApply) return responseFor(pending.row);
 
   try {
-    const receipt = await screening[HANDLERS[action.stationType]](
+    const handlerName = HANDLERS[action.stationType];
+    if (!handlerName || typeof screening[handlerName] !== "function") {
+      const reviewOnly = action.stationType === "EYE_HEALTH";
+      throw Object.assign(new Error(
+        reviewOnly
+          ? "Eye health is recorded during clinical review, not as a screening station"
+          : `Unsupported screening station type: ${action.stationType}`,
+      ), {
+        status: reviewOnly ? 410 : 422,
+        code: reviewOnly ? "EYE_HEALTH_REVIEW_ONLY" : "UNSUPPORTED_STATION_TYPE",
+      });
+    }
+    const receipt = await screening[handlerName](
       eventId,
       action.stationId,
       action.payload,
@@ -265,6 +306,8 @@ const sanitizeStation = (station) => ({
   stationType: station.stationType,
   stationOrder: station.stationOrder,
   isActive: station.isActive,
+  fieldSchemaSnapshot: station.fieldSchemaSnapshot || null,
+  schemaVersion: station.schemaVersion ?? null,
   offlineAccessExpiresAt: station.offlineAccessExpiresAt || null,
 });
 

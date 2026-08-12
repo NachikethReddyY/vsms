@@ -11,10 +11,24 @@ const ACTIVE_QUEUE_STATUSES = [
   "IN_PROGRESS",
 ];
 
+const stationCapacity = (station, capacities) => Math.max(
+  1,
+  Number(capacities.get(station.stationId)) ||
+    Number(station.stationTemplate?.defaultCapacity) ||
+    1
+);
+const occupancyPercent = (activeQueueCount, capacity) => Math.round((activeQueueCount / capacity) * 100);
+const stationAvailable = (availability, now) => !availability || (
+  availability.isAvailable &&
+  (!availability.startsAt || availability.startsAt <= now) &&
+  (!availability.endsAt || availability.endsAt > now)
+);
+
 /**
  * Determine the current operational status of a station.
  */
-const stationStatus = (station, activeQueueCount = 0) => {
+const stationStatus = (station, activeQueueCount = 0, available = true) => {
+  if (!available) return "OFFLINE";
   if (
     !station.isActive ||
     station.operationalStatus === "OFFLINE"
@@ -26,7 +40,10 @@ const stationStatus = (station, activeQueueCount = 0) => {
     return "PAUSED";
   }
 
-  return activeQueueCount > 0 ? "BUSY" : "AVAILABLE";
+  return station.operationalStatus === "BUSY" ||
+    activeQueueCount > 0
+    ? "BUSY"
+    : "AVAILABLE";
 };
 
 /**
@@ -515,12 +532,21 @@ const listRegistrationStations = async (
     user
   );
 
-  const [stations, activeEntries] =
+  const now = new Date();
+  const [stations, activeEntries, availabilities] =
     await Promise.all([
-      db.station.findMany({
-        where: {
-          eventId,
-        },
+       db.station.findMany({
+         where: {
+           eventId,
+         },
+
+         include: {
+           stationTemplate: {
+             select: {
+               defaultCapacity: true,
+             },
+           },
+         },
 
         orderBy: [
           {
@@ -533,7 +559,7 @@ const listRegistrationStations = async (
         ],
       }),
 
-      db.queueEntry.findMany({
+       db.queueEntry.findMany({
         where: {
           station: {
             eventId,
@@ -546,10 +572,39 @@ const listRegistrationStations = async (
 
         select: {
           stationId: true,
-        },
-      }),
-    ]);
+         },
+       }),
 
+       db.eventStationAvailability.findMany({
+         where: {
+           eventDay: {
+             eventId,
+             startsAt: { lte: now },
+             endsAt: { gt: now },
+           },
+         },
+
+         select: {
+           eventStationId: true,
+           capacity: true,
+           isAvailable: true,
+           startsAt: true,
+           endsAt: true,
+         },
+       }),
+     ]);
+  const capacities = new Map(
+    availabilities.map(({ eventStationId, capacity }) => [
+      eventStationId,
+      capacity,
+    ])
+  );
+  const availabilityByStation = new Map(
+    availabilities.map((availability) => [
+      availability.eventStationId,
+      availability,
+    ])
+  );
   const activeCounts = new Map();
 
   for (const entry of activeEntries) {
@@ -568,9 +623,16 @@ const listRegistrationStations = async (
 
       const status = stationStatus(
         station,
-        activeQueueCount
+        activeQueueCount,
+        stationAvailable(
+          availabilityByStation.get(station.stationId),
+          now
+        )
       );
-
+      const capacity = stationCapacity(
+        station,
+        capacities
+      );
       return {
         stationId: station.stationId,
 
@@ -583,6 +645,12 @@ const listRegistrationStations = async (
         status,
 
         activeQueueCount,
+        capacity,
+
+        occupancyPercent: occupancyPercent(
+          activeQueueCount,
+          capacity
+        ),
 
         selectable:
           status === "AVAILABLE" ||
@@ -2194,15 +2262,11 @@ const getStationWorkload = async (
 };
 
 module.exports = {
-  joinQueue,
   listRegistrationStations,
-  createQueueHandoff,
   getEventQueueStatus,
   getParticipantQueueStatus,
   callQueueEntry,
   startQueueEntry,
-  advanceQueueEntry,
-  completeQueueEntry,
   skipQueueEntry,
   leaveQueue,
   updatePriority,

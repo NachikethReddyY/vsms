@@ -61,9 +61,10 @@ const createRegistration = async (label, queueNumber, resultFlags) => {
       checkedIn: true,
     },
   });
+  const resultDates = new Map();
   for (const [stationType, overallFlag] of Object.entries(resultFlags)) {
     const station = stationByType.get(stationType);
-    await prisma.screeningResult.create({
+    const result = await prisma.screeningResult.create({
       data: {
         registrationId: registration.registrationId,
         stationId: station.stationId,
@@ -78,6 +79,21 @@ const createRegistration = async (label, queueNumber, resultFlags) => {
         ruleVersion: "1.0",
         idempotencyKey: crypto.randomUUID(),
       },
+    });
+    resultDates.set(station.stationId, result.updatedAt);
+  }
+  await prisma.registrationRouteStep.createMany({
+    data: [...stationByType.values()].map((station, index) => ({
+      registrationId: registration.registrationId,
+      stationId: station.stationId,
+      position: index + 1,
+      completedAt: resultDates.get(station.stationId) || null,
+    })),
+  });
+  const current = [...stationByType.values()].find((station) => !resultDates.has(station.stationId));
+  if (current) {
+    await prisma.queueEntry.create({
+      data: { registrationId: registration.registrationId, stationId: current.stationId, queueNumber },
     });
   }
   registrations[label] = registration.registrationId;
@@ -259,6 +275,11 @@ describe("clinical review API", () => {
       expect(await prisma.review.count({ where: { registrationId } })).toBe(1);
       expect(await prisma.referral.count({ where: { registrationId, status: "DRAFT" } })).toBe(1);
       expect((await prisma.eventRegistration.findUnique({ where: { registrationId } })).registrationStatus).toBe("COMPLETED");
+      if (label === "Urgent") {
+        expect(await prisma.queueEntry.count({ where: { registrationId, status: { in: ["WAITING", "CALLED", "IN_PROGRESS"] } } })).toBe(0);
+        expect(await prisma.queueEntry.count({ where: { registrationId, status: "CANCELLED" } })).toBe(1);
+        expect(await prisma.registrationRouteStep.count({ where: { registrationId, completedAt: null } })).toBe(3);
+      }
       const audits = (await prisma.auditLog.findMany({ where: { userId: testUsers.reviewer.id } })).filter((audit) => audit.details?.registrationId === registrationId);
       expect(audits.map((audit) => audit.action).sort()).toEqual(["CLINICAL_REVIEW_RECORDED", "REFERRAL_DRAFT_CREATED"]);
     });

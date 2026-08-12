@@ -15,6 +15,8 @@ const {
   saveColourVisionBody,
   previewEyeHealthBody,
   saveEyeHealthBody,
+  previewDynamicBody,
+  saveDynamicBody,
   reviewParams,
   reviewScanBody,
   reviewDecisionBody,
@@ -106,6 +108,18 @@ router.post(
   "/:eventId/stations/:stationId/eye-health",
   validate({ params: stationParams, body: saveEyeHealthBody }),
   asyncHandler(screeningController.saveEyeHealth),
+);
+
+router.post(
+  "/:eventId/stations/:stationId/dynamic/preview",
+  validate({ params: stationParams, body: previewDynamicBody }),
+  asyncHandler(screeningController.previewDynamic),
+);
+
+router.post(
+  "/:eventId/stations/:stationId/dynamic",
+  validate({ params: stationParams, body: saveDynamicBody }),
+  asyncHandler(screeningController.saveDynamic),
 );
 
 router.get(

@@ -7,6 +7,11 @@ const domainEventBus = require("../domain/domainEventBus");
 const { createAuditLog } = require("../../utils/logging/audit");
 const { resolveRegistrationByQrValue } = require("../../utils/crypto/qrToken");
 const { recordVisualAcuity } = require("../../utils/database/visualAcuityProcedure");
+const {
+  validateResultAgainstSchema,
+  evaluateDynamicResult,
+} = require("../../schemas/dynamicStationSchema");
+const { advanceAfterFirstResult } = require("./routeProgressionService");
 
 const VA_RULE_VERSION = "VSMS-VA-1.0";
 const REF_RULE_VERSION = "VSMS-REF-1.0";
@@ -43,7 +48,11 @@ const replayReceipt = (receipt, { eventId, stationId, registrationId, userId, fi
   ) {
     throw new AppError(409, "IDEMPOTENCY_KEY_REUSED", "Idempotency key was already used for a different screening request");
   }
-  return { result: receipt.resultSnapshot, created: false };
+  const snapshot = receipt.resultSnapshot;
+  if (snapshot?.result && snapshot?.routeProgression) {
+    return { result: snapshot.result, routeProgression: snapshot.routeProgression, created: false };
+  }
+  return { result: snapshot, routeProgression: null, created: false };
 };
 
 const immutableSnapshot = (value) => JSON.parse(JSON.stringify(value));
@@ -267,20 +276,25 @@ const listQueue = async (eventId, stationId, user) => {
   const station = await prisma.station.findFirst({ where: { stationId, eventId, isActive: true } });
   if (!station) throw new AppError(404, "STATION_NOT_FOUND", "Station not found for this event");
 
-  const registrations = await prisma.eventRegistration.findMany({
+  const entries = await prisma.queueEntry.findMany({
     where: {
-      eventId,
-      registrationStatus: { in: ["CHECKED_IN", "SIGNED_UP"] },
+      stationId,
+      status: { in: ["WAITING", "CALLED", "IN_PROGRESS"] },
+      registration: { eventId, registrationStatus: "CHECKED_IN" },
     },
-    orderBy: [{ queueNumber: "asc" }, { createdAt: "asc" }],
+    orderBy: [{ isPriority: "desc" }, { queueNumber: "asc" }, { enteredAt: "asc" }],
     include: {
-      screeningResults: {
-        where: { stationId },
-        select: {
-          resultId: true,
-          overallFlag: true,
-          isFlagged: true,
-          createdAt: true,
+      registration: {
+        include: {
+          screeningResults: {
+            where: { stationId },
+            select: {
+              resultId: true,
+              overallFlag: true,
+              isFlagged: true,
+              createdAt: true,
+            },
+          },
         },
       },
     },
@@ -288,14 +302,16 @@ const listQueue = async (eventId, stationId, user) => {
 
   return {
     station,
-    registrations: registrations.map((row) => ({
+    registrations: entries.map((entry) => {
+      const row = entry.registration;
+      return {
       registrationId: row.registrationId,
       participantDisplayName: row.participantDisplayName || "Unnamed participant",
       queueNumber: row.queueNumber,
-      status: row.registrationStatus,
-      passToken: row.passToken,
+      status: entry.status,
       existingResult: row.screeningResults[0] || null,
-    })),
+      };
+    }),
   };
 };
 
@@ -327,7 +343,6 @@ const resolveParticipant = async (eventId, query, user) => {
     participantDisplayName: registration.participantDisplayName || "Unnamed participant",
     queueNumber: registration.queueNumber,
     status: registration.registrationStatus,
-    passToken: registration.passToken,
   };
 };
 
@@ -357,6 +372,7 @@ const saveStationResult = async ({
   body,
   user,
   context = null,
+  schemaVersion,
 }) => {
   await assertCanScreen(eventId, user, stationId);
   await assertStation(eventId, stationId, stationType, label);
@@ -384,7 +400,18 @@ const saveStationResult = async ({
         throw new AppError(409, "REGISTRATION_NOT_SCREENABLE", "Completed or cancelled registrations cannot be changed");
       }
 
+      const existingResult = await tx.screeningResult.findUnique({
+        where: {
+          registrationId_stationId: {
+            registrationId: body.registrationId,
+            stationId,
+          },
+        },
+        select: { resultId: true },
+      });
+
       const evaluation = evaluate(body.resultData);
+      const persistedRuleVersion = ruleVersion || evaluation.ruleVersion;
       if (evaluation.isFlagged && body.acknowledged !== true) {
         throw new AppError(
           400,
@@ -401,11 +428,27 @@ const saveStationResult = async ({
         overallFlag: evaluation.overallFlag,
         isFlagged: evaluation.isFlagged,
         flagSummary: evaluation.flagSummary,
-        ruleVersion,
+        ruleVersion: persistedRuleVersion,
+        ...(schemaVersion !== undefined ? { schemaVersion } : {}),
         acknowledgedAt: evaluation.isFlagged ? new Date() : null,
         idempotencyKey: body.idempotencyKey,
         requestFingerprint: fingerprint,
       };
+
+      let routeProgression = { status: "CORRECTION_SAVED" };
+      let queueEntryId;
+      if (!existingResult) {
+        const progression = await advanceAfterFirstResult({
+          tx,
+          registrationId: body.registrationId,
+          eventId,
+          stationId,
+          actorUserId: user.userId,
+          context,
+        });
+        routeProgression = progression.routeProgression;
+        queueEntryId = progression.completedQueueEntryId;
+      }
 
       const result = await tx.screeningResult.upsert({
         where: {
@@ -418,6 +461,7 @@ const saveStationResult = async ({
         create: {
           registrationId: body.registrationId,
           stationId,
+          queueEntryId,
           version: 1,
           ...payload,
         },
@@ -433,7 +477,7 @@ const saveStationResult = async ({
           stationId,
           resultId: result.resultId,
           resultVersion: result.version,
-          resultSnapshot: immutableSnapshot(responseResult),
+          resultSnapshot: immutableSnapshot({ result: responseResult, routeProgression }),
         },
       });
       await createAuditLog({
@@ -467,11 +511,11 @@ const saveStationResult = async ({
           stationType,
           overallFlag: evaluation.overallFlag,
           isFlagged: evaluation.isFlagged,
-          ruleVersion,
+          ruleVersion: persistedRuleVersion,
           version: result.version,
         },
       });
-      return { result: responseResult, created: true };
+      return { result: responseResult, routeProgression, created: !existingResult };
     }, { isolationLevel: "Serializable" });
   } catch (error) {
     if (error.code === "P2002") {
@@ -539,51 +583,65 @@ const saveColourVision = (eventId, stationId, body, user, context) => saveStatio
   context,
 });
 
-const previewEyeHealth = (eventId, stationId, body, user) => previewStationResult(
-  eventId, stationId, "EYE_HEALTH", "Eye health", evaluateEyeHealth, body, user,
-);
+const previewEyeHealth = () => {
+  throw new AppError(
+    410,
+    "EYE_HEALTH_REVIEW_ONLY",
+    "Eye health is recorded during clinical review, not as a screening station",
+  );
+};
 
-const saveEyeHealth = (eventId, stationId, body, user, context) => saveStationResult({
-  eventId,
-  stationId,
-  stationType: "EYE_HEALTH",
-  label: "Eye health",
-  ruleVersion: EH_RULE_VERSION,
-  evaluate: evaluateEyeHealth,
-  body,
-  user,
-  context,
+const saveEyeHealth = () => {
+  throw new AppError(
+    410,
+    "EYE_HEALTH_REVIEW_ONLY",
+    "Eye health is recorded during clinical review, not as a screening station",
+  );
+};
+
+const loadDynamicStation = async (eventId, stationId, user) => {
+  await assertCanScreen(eventId, user, stationId);
+  const station = await prisma.station.findFirst({
+    where: { eventId, stationId, isActive: true, stationType: "CUSTOM" },
+  });
+  if (!station) throw new AppError(404, "STATION_NOT_FOUND", "Station not found");
+  if (!station.fieldSchemaSnapshot) {
+    throw new AppError(
+      409,
+      "STATION_SCHEMA_MISSING",
+      "Custom station does not have a field schema snapshot",
+    );
+  }
+  return station;
+};
+
+const validateDynamicBody = (station, body) => ({
+  ...body,
+  resultData: station.fieldSchemaSnapshot
+    ? validateResultAgainstSchema(station.fieldSchemaSnapshot, body.resultData)
+    : body.resultData,
 });
 
-const ensureDemoStations = async (eventId) => {
-  const desired = [
-    { stationName: "Visual Acuity", stationType: "VISUAL_ACUITY", stationOrder: 1 },
-    { stationName: "Refraction", stationType: "REFRACTION", stationOrder: 2 },
-    { stationName: "Colour Vision", stationType: "COLOUR_VISION", stationOrder: 3 },
-    { stationName: "Eye Health", stationType: "EYE_HEALTH", stationOrder: 4 },
-  ];
-  const existing = await prisma.station.findMany({
-    where: { eventId },
-    select: { stationType: true, stationOrder: true },
+const previewDynamic = async (eventId, stationId, body, user) => {
+  const station = await loadDynamicStation(eventId, stationId, user);
+  validateDynamicBody(station, body);
+  return evaluateDynamicResult();
+};
+
+const saveDynamic = async (eventId, stationId, body, user, context) => {
+  const station = await loadDynamicStation(eventId, stationId, user);
+  const validatedBody = validateDynamicBody(station, body);
+  return saveStationResult({
+    eventId,
+    stationId,
+    stationType: station.stationType,
+    label: station.stationName,
+    evaluate: evaluateDynamicResult,
+    body: validatedBody,
+    user,
+    context,
+    schemaVersion: station.schemaVersion,
   });
-  const present = new Set(existing.map((row) => row.stationType));
-  const usedOrders = new Set(existing.map((row) => row.stationOrder));
-  const missing = [];
-  for (const station of desired) {
-    if (present.has(station.stationType)) continue;
-    let order = station.stationOrder;
-    while (usedOrders.has(order)) order += 1;
-    usedOrders.add(order);
-    missing.push({
-      stationId: crypto.randomUUID(),
-      eventId,
-      stationName: station.stationName,
-      stationType: station.stationType,
-      stationOrder: order,
-      updatedAt: new Date(),
-    });
-  }
-  if (missing.length) await prisma.station.createMany({ data: missing });
 };
 
 module.exports = {
@@ -603,7 +661,8 @@ module.exports = {
   saveColourVision,
   previewEyeHealth,
   saveEyeHealth,
-  ensureDemoStations,
+  previewDynamic,
+  saveDynamic,
   evaluateVisualAcuity,
   evaluateRefraction,
   evaluateColourVision,

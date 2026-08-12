@@ -1,5 +1,12 @@
 import { Html5Qrcode, Html5QrcodeCameraScanConfig, Html5QrcodeResult } from 'html5-qrcode';
 
+export type QrCamera = { id: string; label: string };
+
+export type StartedQrCamera = {
+  cameras: QrCamera[];
+  deviceId: string | null;
+};
+
 /**
  * Start the html5-qrcode scanner with a resilient camera lookup.
  *
@@ -13,10 +20,10 @@ import { Html5Qrcode, Html5QrcodeCameraScanConfig, Html5QrcodeResult } from 'htm
  */
 export async function startQrScanner(
   scanner: Html5Qrcode,
-  options: { fps?: number; qrboxWidth?: number; qrboxHeight?: number },
+  options: { fps?: number; qrboxWidth?: number; qrboxHeight?: number; deviceId?: string },
   onDecoded: (text: string, result: Html5QrcodeResult) => void,
   onDecodeError: (error: string) => void,
-): Promise<void> {
+): Promise<StartedQrCamera> {
   const scanConfig: Html5QrcodeCameraScanConfig = {
     fps: options.fps ?? 10,
     qrbox: {
@@ -25,22 +32,28 @@ export async function startQrScanner(
     },
   };
 
-  const attempts: MediaTrackConstraints[] = [
-    { facingMode: { exact: 'environment' } },
-    { facingMode: 'environment' },
-  ];
-
   const cameras = await Html5Qrcode.getCameras().catch(() => null);
-  if (cameras && cameras.length > 0) {
+  const attempts: MediaTrackConstraints[] = options.deviceId
+    ? [{ deviceId: { exact: options.deviceId } }]
+    : [
+      { facingMode: { exact: 'environment' } },
+      { facingMode: 'environment' },
+    ];
+
+  if (!options.deviceId && cameras && cameras.length > 0) {
     const preferred = cameras.find((camera) => /back|environment|rear/i.test(camera.label)) || cameras[0];
     attempts.push({ deviceId: { exact: preferred.id } });
   }
+  if (!options.deviceId) attempts.push({});
 
   let lastError: unknown = null;
   for (const cameraConstraints of attempts) {
     try {
       await scanner.start(cameraConstraints, scanConfig, onDecoded, onDecodeError);
-      return;
+      return {
+        cameras: cameras ?? [],
+        deviceId: scanner.getRunningTrackSettings().deviceId ?? options.deviceId ?? null,
+      };
     } catch (cause) {
       lastError = cause;
     }

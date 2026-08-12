@@ -1,0 +1,10 @@
+.agents/
+.claude/
+.codex/
+graphify-out/
+docs/ai-transcripts/
+**/*.gif
+**/*.jpeg
+**/*.jpg
+**/*.png
+**/*.webp
