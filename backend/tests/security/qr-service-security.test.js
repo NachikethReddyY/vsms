@@ -614,6 +614,9 @@ test("public pass status reveals no PII and reports expired or revoked passes as
     queueMovement: {
       findMany: async () => [],
     },
+    eventStationAvailability: {
+      findMany: async () => [{ eventStationId: "station-1", capacity: 6 }],
+    },
   };
 
   const valid = await qrService.getPublicStatus(token, db);
@@ -622,6 +625,7 @@ test("public pass status reveals no PII and reports expired or revoked passes as
   assert.equal(valid.queueNumber, 42);
   assert.equal(valid.stations[0].stationOrder, 2);
   assert.equal(valid.stations[0].status, "BUSY");
+  assert.equal(valid.stations[0].capacity, 6);
   assert.deepEqual(Object.keys(valid).sort(), ["aheadAtStation", "currentQueueNumber", "eventName", "expiresAt", "queueNumber", "queueState", "registrationStatus", "stations", "transfers", "valid"]);
   assert.equal(where.tokenHash, tokenHash(token));
 

@@ -78,6 +78,10 @@ const baseDb = (overrides = {}) => ({
     findMany: async () => [],
     ...(overrides.queueEntry || {}),
   },
+  eventStationAvailability: {
+    findMany: async () => [],
+    ...(overrides.eventStationAvailability || {}),
+  },
   $transaction: async (callback) => callback(baseTransaction()),
   ...(overrides.root || {}),
 });
@@ -218,14 +222,15 @@ test('registration station list exposes derived availability and queue counts', 
   const db = baseDb({
     station: { findMany: async () => [station, pausedStation] },
     queueEntry: { findMany: async () => [{ stationId }] },
+    eventStationAvailability: { findMany: async () => [{ eventStationId: stationId, capacity: 8 }] },
   });
 
   const result = await queueService.listRegistrationStations(eventId, operationalUser, db);
 
   assert.equal(result.stations[0].status, 'BUSY');
   assert.equal(result.stations[0].activeQueueCount, 1);
-  assert.equal(result.stations[0].capacity, 4);
-  assert.equal(result.stations[0].occupancyPercent, 25);
+  assert.equal(result.stations[0].capacity, 8);
+  assert.equal(result.stations[0].occupancyPercent, 13);
   assert.equal(result.stations[0].selectable, true);
   assert.equal(result.stations[1].status, 'PAUSED');
   assert.equal(result.stations[1].selectable, false);

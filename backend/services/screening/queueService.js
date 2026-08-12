@@ -11,7 +11,12 @@ const ACTIVE_QUEUE_STATUSES = [
   "IN_PROGRESS",
 ];
 
-const stationCapacity = (station) => Math.max(1, Number(station.stationTemplate?.defaultCapacity) || 1);
+const stationCapacity = (station, capacities) => Math.max(
+  1,
+  Number(capacities.get(station.stationId)) ||
+    Number(station.stationTemplate?.defaultCapacity) ||
+    1
+);
 const occupancyPercent = (activeQueueCount, capacity) => Math.round((activeQueueCount / capacity) * 100);
 
 /**
@@ -521,7 +526,8 @@ const listRegistrationStations = async (
     user
   );
 
-  const [stations, activeEntries] =
+  const now = new Date();
+  const [stations, activeEntries, availabilities] =
     await Promise.all([
        db.station.findMany({
          where: {
@@ -547,7 +553,7 @@ const listRegistrationStations = async (
         ],
       }),
 
-      db.queueEntry.findMany({
+       db.queueEntry.findMany({
         where: {
           station: {
             eventId,
@@ -560,9 +566,30 @@ const listRegistrationStations = async (
 
         select: {
           stationId: true,
-        },
+         },
+       }),
+
+       db.eventStationAvailability.findMany({
+         where: {
+           eventDay: {
+             eventId,
+             startsAt: { lte: now },
+             endsAt: { gt: now },
+           },
+         },
+
+         select: {
+           eventStationId: true,
+           capacity: true,
+         },
        }),
      ]);
+  const capacities = new Map(
+    availabilities.map(({ eventStationId, capacity }) => [
+      eventStationId,
+      capacity,
+    ])
+  );
   const activeCounts = new Map();
 
   for (const entry of activeEntries) {
@@ -583,7 +610,10 @@ const listRegistrationStations = async (
         station,
         activeQueueCount
       );
-      const capacity = stationCapacity(station);
+      const capacity = stationCapacity(
+        station,
+        capacities
+      );
       return {
         stationId: station.stationId,
 

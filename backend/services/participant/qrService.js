@@ -20,7 +20,7 @@ const activeQrWhere = (selector = {}, now = new Date()) => ({
     expiresAt: { gt: now },
 });
 
-const stationCapacity = (station) => Math.max(1, Number(station.stationTemplate?.defaultCapacity) || 1);
+const stationCapacity = (station, capacities) => Math.max(1, Number(capacities.get(station.stationId)) || Number(station.stationTemplate?.defaultCapacity) || 1);
 const stationOccupancyPercent = (activeQueueCount, capacity) => Math.round((activeQueueCount / capacity) * 100);
 const publicStationStatus = (station, activeQueueCount) => {
     if (!station.isActive || station.operationalStatus === "OFFLINE") return "OFFLINE";
@@ -417,7 +417,7 @@ exports.getPublicStatus = async (token, db = prisma) => {
         _max: { queueNumber: true },
     }))._max.queueNumber ?? null;
 
-    const [activeEntry, stations, transfers] = await Promise.all([
+    const [activeEntry, stations, transfers, availabilities] = await Promise.all([
         db.queueEntry.findFirst({
             where: { registrationId, status: { in: ["WAITING", "CALLED", "IN_PROGRESS"] } },
             orderBy: [{ enteredAt: "desc" }, { id: "desc" }],
@@ -436,7 +436,12 @@ exports.getPublicStatus = async (token, db = prisma) => {
                 toStation: { select: { stationName: true } },
             },
         }),
+        db.eventStationAvailability.findMany({
+            where: { eventDay: { eventId, startsAt: { lte: now }, endsAt: { gt: now } } },
+            select: { eventStationId: true, capacity: true },
+        }),
     ]);
+    const capacities = new Map(availabilities.map(({ eventStationId, capacity }) => [eventStationId, capacity]));
 
     const entries = await db.queueEntry.findMany({
         where: { station: { eventId } },
@@ -498,7 +503,7 @@ exports.getPublicStatus = async (token, db = prisma) => {
     const liveStations = [...byStation.values()].map((station) => {
         const source = stations.find((item) => item.stationId === station.stationId);
         const activeQueueCount = station.workload.WAITING + station.workload.CALLED + station.workload.IN_PROGRESS;
-        const capacity = stationCapacity(source || {});
+        const capacity = stationCapacity(source || {}, capacities);
         const status = publicStationStatus(source || {}, activeQueueCount);
         return {
             ...station,
