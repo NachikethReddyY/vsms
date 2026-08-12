@@ -1,11 +1,11 @@
-const test = require("node:test");
+﻿const test = require("node:test");
 const assert = require("node:assert/strict");
 const {
     validateParticipantPayload,
     validateEmergencyContactPayload,
     validateConsentPayload,
     validateIdempotencyKey,
-} = require("../../utils/validation");
+} = require("../../utils/validation/validation");
 
 test("valid participant payload is normalized", () => {
     const value = validateParticipantPayload({

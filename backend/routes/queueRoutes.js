@@ -1,4 +1,4 @@
-/**
+﻿/**
  * @fileoverview Queue & Station Transfer Router
  * @module routes/queueRoutes
  * @description Manages virtual queue entry, station transitions, priority overrides, and operational workload monitoring.
@@ -6,7 +6,7 @@
 
 const express = require("express");
 const validate = require("../middlewares/validate");
-const asyncHandler = require("../utils/asyncHandler");
+const asyncHandler = require("../utils/http/asyncHandler");
 
 const queueController = require("../controllers/queueController");
 const authenticate = require("../middlewares/authenticate");
@@ -93,6 +93,7 @@ router.patch("/events/:eventId/entries/:queueId/start", validate({ params: event
 router.patch("/events/:eventId/entries/:queueId/advance", checkIdempotency, validate({ params: eventQueueEntryParams, body: advanceQueueBody }), asyncHandler(queueController.advanceQueueEntry));
 router.patch("/events/:eventId/entries/:queueId/complete", validate({ params: eventQueueEntryParams }), asyncHandler(queueController.completeQueueEntry));
 router.patch("/events/:eventId/entries/:queueId/skip", validate({ params: eventQueueEntryParams }), asyncHandler(queueController.skipQueueEntry));
+router.patch("/events/:eventId/entries/:queueId/priority", requireAnyRole("EVENT_MANAGER", "ADMINISTRATOR"), checkIdempotency, validate({ params: eventQueueEntryParams, body: priorityQueueBody }), asyncHandler(queueController.updatePriority));
 router.delete("/events/:eventId/entries/:queueId", validate({ params: eventQueueEntryParams }), asyncHandler(queueController.leaveQueue));
 
 router.patch(

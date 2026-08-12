@@ -1,4 +1,4 @@
-const assert = require("node:assert/strict");
+﻿const assert = require("node:assert/strict");
 const crypto = require("node:crypto");
 const test = require("node:test");
 const cookieParser = require("cookie-parser");
@@ -9,11 +9,11 @@ process.env.NODE_ENV = "test";
 process.env.DATABASE_URL ||= "postgresql://test:test@localhost:5432/vsms_test";
 
 const prisma = require("../../prisma/prismaClient");
-const { signAccessToken } = require("../../utils/tokens");
-const { syncLocalUser } = require("../../utils/staff");
+const { signAccessToken } = require("../../utils/auth/tokens");
+const { syncLocalUser } = require("../../utils/auth/staff");
 const accountService = require("../../services/account/accountService");
 const requireApprovedAccount = require("../../middlewares/requireApprovedAccount");
-const { sessionValidity } = require("../../utils/sessionValidity");
+const { sessionValidity } = require("../../utils/auth/sessionValidity");
 const { profileUpdateBody, accountListQuery, approvalBody } = require("../../schemas/accountSchemas");
 
 function patch(t, target, property, value) {

@@ -1,5 +1,5 @@
 const pinoHttp = require("pino-http");
-const logger = require("../utils/logger/logger");
+const logger = require("../utils/logging/logger/logger");
 
 function requestPath(req) {
   return String(req.originalUrl || req.url || req.path || "/").split("?", 1)[0] || "/";

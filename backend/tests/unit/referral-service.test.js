@@ -1,4 +1,4 @@
-const test = require("node:test");
+﻿const test = require("node:test");
 const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const path = require("node:path");
@@ -28,8 +28,8 @@ const {
   encryptionContext,
   encryptWithKeyring,
   decryptWithKeyring,
-} = require("../../utils/cryptoUtils");
-const { storeSignature, loadVerifiedSignature, consumeSignatureArtifact } = require("../../utils/signatureStorage");
+} = require("../../utils/crypto/cryptoUtils");
+const { storeSignature, loadVerifiedSignature, consumeSignatureArtifact } = require("../../utils/storage/signatureStorage");
 
 const replace = (t, target, key, value) => {
   const original = target[key];

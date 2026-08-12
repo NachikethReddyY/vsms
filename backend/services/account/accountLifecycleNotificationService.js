@@ -1,9 +1,9 @@
-const crypto = require("node:crypto");
+﻿const crypto = require("node:crypto");
 const nodemailer = require("nodemailer");
 const { Prisma } = require("@prisma/client");
 const prisma = require("../../prisma/prismaClient");
 const env = require("../../config/env");
-const { createAuditLog } = require("../../utils/audit");
+const { createAuditLog } = require("../../utils/logging/audit");
 
 const PURPOSES = new Set(["SIGNUP_RECEIVED", "APPROVED", "REJECTED", "SUSPENDED", "REACTIVATED", "EVENT_ASSIGNMENT", "PASSWORD_CHANGED", "DEPROVISIONED"]);
 const TYPE_MAP = Object.freeze({ APPROVED: "APPROVED", REJECTED: "REJECTED", PENDING: "SIGNUP_RECEIVED", SUSPEND: "SUSPENDED", SUSPENDED: "SUSPENDED", REACTIVATE: "REACTIVATED", REACTIVATED: "REACTIVATED", SIGNUP_RECEIVED: "SIGNUP_RECEIVED", EVENT_ASSIGNMENT: "EVENT_ASSIGNMENT", PASSWORD_CHANGED: "PASSWORD_CHANGED", DEPROVISIONED: "DEPROVISIONED" });
@@ -46,8 +46,7 @@ function renderTemplate(purpose, account, metadata = {}) {
 
 function createGoogleTransport() {
   if (!env.lifecycleEmailEnabled) return null;
-  const secure = env.SMTP_PORT === 465;
-  return nodemailer.createTransport({ host: env.SMTP_HOST, port: env.SMTP_PORT, secure, requireTLS: !secure, auth: { user: env.SMTP_USERNAME, pass: env.SMTP_PASSWORD }, tls: { rejectUnauthorized: true, minVersion: "TLSv1.2", servername: env.SMTP_HOST }, connectionTimeout: env.LIFECYCLE_EMAIL_CONNECTION_TIMEOUT_MS, greetingTimeout: env.LIFECYCLE_EMAIL_CONNECTION_TIMEOUT_MS, socketTimeout: env.LIFECYCLE_EMAIL_SOCKET_TIMEOUT_MS, disableFileAccess: true, disableUrlAccess: true });
+  return nodemailer.createTransport({ host: "smtp.gmail.com", port: 465, secure: true, auth: { type: "OAuth2", user: env.GOOGLE_WORKSPACE_USER, clientId: env.GOOGLE_WORKSPACE_CLIENT_ID, clientSecret: env.GOOGLE_WORKSPACE_CLIENT_SECRET, refreshToken: env.GOOGLE_WORKSPACE_REFRESH_TOKEN }, tls: { rejectUnauthorized: true, minVersion: "TLSv1.2", servername: "smtp.gmail.com" }, connectionTimeout: env.LIFECYCLE_EMAIL_CONNECTION_TIMEOUT_MS, greetingTimeout: env.LIFECYCLE_EMAIL_CONNECTION_TIMEOUT_MS, socketTimeout: env.LIFECYCLE_EMAIL_SOCKET_TIMEOUT_MS, disableFileAccess: true, disableUrlAccess: true });
 }
 
 async function enqueueLifecycleEmail({ purpose, userId, metadata = {}, idempotencyKey, db = prisma, maxAttempts = 5 }) {

@@ -1,6 +1,6 @@
-const assert = require("node:assert/strict");
+﻿const assert = require("node:assert/strict");
 const test = require("node:test");
-const { createAuthAuditLog } = require("../../utils/audit");
+const { createAuthAuditLog } = require("../../utils/logging/audit");
 
 const userId = "11111111-1111-4111-8111-111111111111";
 const otherUserId = "99999999-9999-4999-8999-999999999999";

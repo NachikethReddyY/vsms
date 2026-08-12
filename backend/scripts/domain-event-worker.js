@@ -1,5 +1,5 @@
-const prisma = require("../prisma/prismaClient");
-const logger = require("../utils/logger/logger");
+﻿const prisma = require("../prisma/prismaClient");
+const logger = require("../utils/logging/logger/logger");
 const domainEventBus = require("../services/domain/domainEventBus");
 const { registerDomainEventHandlers } = require("../services/domain/domainEventHandlers");
 

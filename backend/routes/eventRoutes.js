@@ -1,10 +1,10 @@
-const express = require("express");
+﻿const express = require("express");
 const { rateLimit } = require("../middlewares/rateLimiter");
 const eventController = require("../controllers/eventController");
 const reportingController = require("../controllers/reportingController");
 const membershipController = require("../controllers/eventMembershipController");
 const validate = require("../middlewares/validate");
-const asyncHandler = require("../utils/asyncHandler");
+const asyncHandler = require("../utils/http/asyncHandler");
 const { requireSystemRole } = require("../middlewares/authorize");
 const { requireEventManager, requireEventRoles, requireEventRoleAndDuty } = require("../middlewares/requireEventAuthorization");
 const registrationController = require("../controllers/registrationController");

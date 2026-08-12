@@ -1,9 +1,9 @@
-const test = require("node:test");
+﻿const test = require("node:test");
 const assert = require("node:assert/strict");
-const { rolesFromCognitoGroups } = require("../../utils/roles");
-const { sanitizeMetadata } = require("../../utils/sanitize");
-const { setAuthCookies, parseCookies } = require("../../utils/httpCookies");
-const { buildAuthorizationUrl, getLogoutUrl } = require("../../utils/cognitoClient");
+const { rolesFromCognitoGroups } = require("../../utils/auth/roles");
+const { sanitizeMetadata } = require("../../utils/security/sanitize");
+const { setAuthCookies, parseCookies } = require("../../utils/http/httpCookies");
+const { buildAuthorizationUrl, getLogoutUrl } = require("../../utils/auth/cognitoClient");
 
 test("only verified Cognito groups map to application roles", () => {
     assert.deepEqual(

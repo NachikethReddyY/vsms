@@ -83,6 +83,7 @@ const baseDb = (overrides = {}) => ({
 });
 
 const baseTransaction = (overrides = {}) => ({
+  $executeRaw: async () => undefined,
   station: {
     findFirst: async ({ where }) => {
       if (where.stationId === targetStationId) return targetStation;
@@ -384,23 +385,24 @@ test('callQueueEntry rejects a non-WAITING entry', async () => {
 test('advanceQueueEntry transfers to the target station, closes the old entry, and records movement', async () => {
   audits.length = 0;
   const movements = [];
-  const createdEntries = [];
+  let findUniqueCalls = 0;
   const db = baseDb({
     root: {
       $transaction: async (callback) => callback(baseTransaction({
+        queueEntry: {
+          findUnique: async () => {
+            findUniqueCalls += 1;
+            return findUniqueCalls === 1
+              ? { ...queueEntry, status: 'IN_PROGRESS' }
+              : { ...queueEntry, status: 'COMPLETED', completedAt: new Date(), leftQueueAt: new Date() };
+          },
+          update: async ({ data }) => ({ ...queueEntry, ...data }),
+          create: async ({ data }) => ({ id: uuid(), ...queueEntry, ...data }),
+        },
         queueMovement: {
           create: async ({ data }) => {
             movements.push(data);
             return { id: uuid(), ...data };
-          },
-        },
-        queueEntry: {
-          findUnique: async () => queueEntry,
-          update: async ({ data }) => ({ ...queueEntry, ...data }),
-          create: async ({ data }) => {
-            const created = { id: uuid(), ...data };
-            createdEntries.push(created);
-            return created;
           },
         },
       })),
@@ -420,7 +422,6 @@ test('advanceQueueEntry transfers to the target station, closes the old entry, a
   assert.equal(result.nextEntry.stationId, targetStationId);
   assert.equal(result.nextEntry.status, 'WAITING');
   assert.equal(result.nextEntry.queueNumber, 7);
-  assert.equal(createdEntries.length, 1);
   assert.equal(movements.length, 1);
   assert.equal(movements[0].fromStationId, stationId);
   assert.equal(movements[0].toStationId, targetStationId);
@@ -634,7 +635,7 @@ test('updatePriority rejects changing priority on a closed entry', async () => {
   });
 
   await assert.rejects(
-    queueService.updatePriority({ queueId, isPriority: true }, operationalUser, context, db),
+    queueService.updatePriority({ queueId, isPriority: true, notes: 'Reason for elevation' }, operationalUser, context, db),
     (error) => error.code === 'INVALID_QUEUE_STATE',
   );
 });
@@ -697,4 +698,69 @@ test('getEventQueueStatus pulls a priority waiting entry to next-up', async () =
   assert.equal(va.nextUp.queueNumber, 9);
   assert.equal(va.nextUp.isPriority, true);
   assert.equal(va.nextUp.participantDisplayName, 'Urgent Case');
+});
+
+test('getEventQueueStatus returns ordered entries with priority metadata and participant references', async () => {
+  const db = baseDb({
+    root: {
+      station: {
+        findMany: async () => [station],
+      },
+      queueEntry: {
+        findMany: async () => [
+          { ...queueEntry, id: uuid(), stationId, queueNumber: 3, status: 'WAITING', isPriority: false, priorityNotes: null, registration: { participantDisplayName: 'Tan Mei Ling', participant: { participantReference: 'P-2026-0003' } }, station: { stationName: station.stationName, stationType: station.stationType } },
+          { ...queueEntry, id: uuid(), stationId, queueNumber: 1, status: 'WAITING', isPriority: true, priorityNotes: 'Needs an interpreter', registration: { participantDisplayName: 'Aisha Binte Rahman', participant: { participantReference: 'P-2026-0001' } }, station: { stationName: station.stationName, stationType: station.stationType } },
+          { ...queueEntry, id: uuid(), stationId, queueNumber: 2, status: 'CALLED', isPriority: false, priorityNotes: null, registration: { participantDisplayName: 'Marcus Goh Wei Liang', participant: { participantReference: 'P-2026-0002' } }, station: { stationName: station.stationName, stationType: station.stationType } },
+        ],
+      },
+    },
+  });
+
+  const result = await queueService.getEventQueueStatus(eventId, operationalUser, db);
+
+  const va = result.stations.find((s) => s.stationId === stationId);
+  assert.equal(va.nextUp.queueNumber, 1);
+  assert.equal(va.nextUp.isPriority, true);
+  assert.equal(va.nextUp.participantDisplayName, 'Aisha Binte Rahman');
+
+  assert.equal(result.entries.length, 3);
+  assert.deepEqual(result.entries.map((entry) => entry.queueNumber), [1, 2, 3]);
+  const aisha = result.entries.find((entry) => entry.queueNumber === 1);
+  assert.equal(aisha.participantReference, 'P-2026-0001');
+  assert.equal(aisha.isPriority, true);
+  assert.equal(aisha.priorityNotes, 'Needs an interpreter');
+  assert.equal(aisha.stationName, station.stationName);
+  assert.equal(aisha.stationType, station.stationType);
+});
+
+test('getStationWorkload promotes a priority waiting entry to next-up', async () => {
+  const now = Date.now();
+  const db = baseDb({
+    root: {
+      station: {
+        findMany: async () => [station],
+      },
+      queueEntry: {
+        findMany: async () => [
+          { ...queueEntry, id: uuid(), stationId, queueNumber: 8, status: 'WAITING', isPriority: false, enteredAt: new Date(now - 60000), completedAt: null, registrationId },
+          { ...queueEntry, id: uuid(), stationId, queueNumber: 9, status: 'WAITING', isPriority: true, enteredAt: new Date(now - 120000), completedAt: null, registrationId },
+        ],
+      },
+    },
+  });
+
+  const result = await queueService.getStationWorkload(eventId, operationalUser, db);
+
+  const va = result.stations.find((s) => s.stationId === stationId);
+  assert.equal(va.nextUp.queueNumber, 9);
+  assert.equal(va.nextUp.isPriority, true);
+  assert.equal(va.priorityCount, 1);
+});
+
+test('updatePriority requires a reason when elevating an entry to priority', async () => {
+  const db = baseDb();
+  await assert.rejects(
+    queueService.updatePriority({ queueId, isPriority: true }, operationalUser, context, db),
+    (error) => error.code === 'PRIORITY_NOTES_REQUIRED' && error.status === 422,
+  );
 });

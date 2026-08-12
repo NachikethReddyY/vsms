@@ -1,7 +1,7 @@
-const asyncHandler = require("../middlewares/asyncHandler");
+﻿const asyncHandler = require("../middlewares/asyncHandler");
+const { assertUuid, cleanString, validationError } = require("../utils/validation/validation");
+const { MIME_EXTENSIONS, hasExpectedImageSignature } = require("../utils/storage/signatureStorage");
 const signatureService = require("../services/participant/signatureService");
-const { assertUuid, cleanString, validationError } = require("../utils/validation");
-const { MIME_EXTENSIONS, hasExpectedImageSignature } = require("../utils/signatureStorage");
 
 exports.storeSignature = asyncHandler(async (req, res) => {
     const eventId = assertUuid(req.body?.eventId, "eventId");

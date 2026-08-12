@@ -1,9 +1,9 @@
-const express = require("express");
+﻿const express = require("express");
 const { rateLimit, ipKeyGenerator } = require("express-rate-limit");
 const authenticate = require("../middlewares/authenticate");
 const { requireSystemRole } = require("../middlewares/authorize");
 const validate = require("../middlewares/validate");
-const asyncHandler = require("../utils/asyncHandler");
+const asyncHandler = require("../utils/http/asyncHandler");
 const locationController = require("../controllers/locationController");
 const { locationSearchQuery } = require("../schemas/locationSchemas");
 

@@ -5,10 +5,13 @@ const {
     listArtifactCleanupTasks,
     maintainArtifactCleanupTask,
 } = require("../platform/artifactCleanupService");
-const { encodeCursor, decodeCursor } = require("../../utils/cursor");
-const { createAuditLog } = require("../../utils/audit");
+const { encodeCursor, decodeCursor } = require("../../utils/http/cursor");
+const { createAuditLog } = require("../../utils/logging/audit");
 const { drainDueProviderOperations, maintainProviderOperation } = require("./accountProviderOperationService");
 
+/**
+ * Keyset cursor pagination helper for efficient O(1) reads
+ */
 function pageQuery(cursorValue, filters, limit, sortField, recordId) {
     const where = cursorValue
         ? {
@@ -27,6 +30,9 @@ function pageQuery(cursorValue, filters, limit, sortField, recordId) {
     };
 }
 
+/**
+ * Formats cursor-paginated result pages
+ */
 function pageResult(rows, limit, scope, sortField, recordId) {
     const hasMore = rows.length > limit;
     const items = hasMore ? rows.slice(0, limit) : rows;
@@ -39,26 +45,34 @@ function pageResult(rows, limit, scope, sortField, recordId) {
     };
 }
 
+/**
+ * Fetches application and auth audit log entries using keyset pagination
+ */
 exports.getAuditLogs = async ({ cursor, authCursor, limit, entityName, action, eventType, outcome, from, to }) => {
     const auditScope = "admin-audit";
     const authScope = "admin-auth-audit";
+
     const auditFilters = {
         ...(entityName ? { entityName } : {}),
         ...(action ? { action } : {}),
         ...(outcome ? { outcome } : {}),
         ...(from || to ? { createdAt: { ...(from ? { gte: from } : {}), ...(to ? { lte: to } : {}) } } : {}),
     };
+
     const authFilters = {
         ...(eventType ? { eventType } : {}),
         ...(outcome ? { outcome } : {}),
         ...(from || to ? { occurredAt: { ...(from ? { gte: from } : {}), ...(to ? { lte: to } : {}) } } : {}),
     };
+
     const [logs, authLogs] = await Promise.all([
         prisma.auditLog.findMany(pageQuery(decodeCursor(cursor ?? null, auditScope), auditFilters, limit, "createdAt", "id")),
         prisma.authAuditLog.findMany(pageQuery(decodeCursor(authCursor ?? null, authScope), authFilters, limit, "occurredAt", "id")),
     ]);
+
     const logsPage = pageResult(logs, limit, auditScope, "createdAt", "id");
     const authPage = pageResult(authLogs, limit, authScope, "occurredAt", "id");
+
     return {
         logs: logsPage.items,
         authLogs: authPage.items,
@@ -67,6 +81,9 @@ exports.getAuditLogs = async ({ cursor, authCursor, limit, entityName, action, e
     };
 };
 
+/**
+ * Executes referral delivery maintenance and triggers artifact cleanup
+ */
 exports.runReferralDeliveryMaintenance = async (body, actor, ipAddress) => ({
     deliveries: await referralService.reconcileReferralDeliveries(body, actor, ipAddress),
     artifactCleanup: await processArtifactCleanupTasks({ limit: 200 }),
@@ -78,6 +95,9 @@ exports.maintainArtifactCleanupTask = (taskId, body, actor, ipAddress) => (
     maintainArtifactCleanupTask(taskId, body, actor, ipAddress)
 );
 
+/**
+ * Drains due provider queue operations and generates audit trail
+ */
 exports.drainAccountProviderOperations = async (body, actorId, context) => {
     const summary = await drainDueProviderOperations(body);
     await createAuditLog({

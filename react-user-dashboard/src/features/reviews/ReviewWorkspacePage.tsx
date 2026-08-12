@@ -17,6 +17,7 @@ import { useCallback, useEffect, useId, useRef, useState, type FormEvent, type R
 import { useNavigate, useParams } from 'react-router-dom';
 import { AppDialog } from '../../components/AppDialog';
 import { SignaturePad } from '../../components/SignaturePad';
+import { startQrScanner } from '../screening/startQrScanner';
 import {
   reviewApi,
   type OverallFlag,
@@ -259,9 +260,9 @@ function QrScanner({ open, onOpenChange, onScan }: {
         const { Html5Qrcode } = await import('html5-qrcode');
         if (stopped) return;
         scanner = new Html5Qrcode(scannerId);
-        await scanner.start(
-          { facingMode: 'environment' },
-          { fps: 10, qrbox: { width: 260, height: 260 } },
+        await startQrScanner(
+          scanner,
+          { fps: 10, qrboxWidth: 260, qrboxHeight: 260 },
           async (value) => {
             if (stopped) return;
             stopped = true;

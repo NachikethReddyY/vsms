@@ -1,6 +1,38 @@
-const asyncHandler = require("../middlewares/asyncHandler");
+﻿const asyncHandler = require("../middlewares/asyncHandler");
+const { createAuditLog } = require("../utils/logging/audit");
+const {
+    assertUuid,
+    cleanString,
+    parsePositiveInt,
+    validateIdempotencyKey,
+} = require("../utils/validation/validation");
+const { assertRegistrationAssignment } = require("../utils/auth/staff");
+const { assertParticipantEventScope } = require("../utils/validation/participantEventScope");
 const registrationService = require("../services/participant/registrationService");
-const { assertUuid, cleanString, parsePositiveInt, validateIdempotencyKey } = require("../utils/validation");
+
+const OPEN_EVENT_STATUSES = ["PUBLISHED", "UPCOMING", "ONGOING", "IN_PROGRESS"];
+const REGISTRATION_STATUSES = new Set([
+    "SIGNED_UP",
+    "CHECKED_IN",
+    "COMPLETED",
+    "CANCELLED",
+]);
+
+function registrationInclude() {
+    return {
+        event: true,
+        participant: {
+            select: {
+                id: true,
+                participantReference: true,
+                firstName: true,
+                lastName: true,
+                dateOfBirth: true,
+            },
+        },
+        statusHistory: { orderBy: { occurredAt: "asc" } },
+    };
+}
 
 function handoff(registration) {
     return {

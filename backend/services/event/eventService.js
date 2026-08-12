@@ -1,8 +1,8 @@
-const prisma = require("../../prisma/prismaClient");
+﻿const prisma = require("../../prisma/prismaClient");
 const crypto = require("crypto");
 const { Prisma } = require("@prisma/client");
 const AppError = require("../../errors/AppError");
-const { encodeCursor, decodeCursor } = require("../../utils/cursor");
+const { encodeCursor, decodeCursor } = require("../../utils/http/cursor");
 const {
   classifyTemplates,
   stationTypeForTemplate,
@@ -12,8 +12,8 @@ const {
   processArtifactCleanupTasks,
   collectEventArtifactTasks,
 } = require("../platform/artifactCleanupService");
-const { createExportReceipt } = require("../../utils/eventExportReceipt");
-const { createAuditLog, resolveAuditContext } = require("../../utils/audit");
+const { createExportReceipt } = require("../../utils/storage/eventExportReceipt");
+const { createAuditLog, resolveAuditContext } = require("../../utils/logging/audit");
 const env = require("../../config/env");
 const { attendancePredicate, attendanceWhere } = require("./attendanceDefinition");
 const { enqueueAccountLifecycle } = require("../account/accountLifecycleNotificationService");
@@ -1434,17 +1434,13 @@ const assertDeletionAdministrator = (user) => {
   }
 };
 
-const assertEventDeletable = (event) => {
-  if (event.status === "IN_PROGRESS") {
-    throw new AppError(409, "EVENT_NOT_TERMINAL", "An ongoing event cannot be permanently deleted");
-  }
-};
-
 const previewEventDeletion = async (eventId, user, db = prisma, now = new Date()) => {
   assertDeletionAdministrator(user);
   const event = await db.event.findUnique({ where: { eventId }, select: { eventId: true, name: true, status: true, version: true } });
   if (!event) throw new AppError(404, "EVENT_NOT_FOUND", "Event was not found");
-  assertEventDeletable(event);
+  if (!["DRAFT", "COMPLETED", "CANCELLED"].includes(event.status)) {
+    throw new AppError(409, "EVENT_NOT_TERMINAL", "Only draft, completed, or cancelled events can be permanently deleted");
+  }
   const impact = await deletionImpact(db, event);
   const digest = impactDigest(impact);
   const expiresAt = new Date(now.getTime() + 5 * 60_000);
@@ -1480,7 +1476,9 @@ const deleteEvent = async (eventId, body, user, correlationId, db = prisma) => {
   const claims = verifyDeletionPreview(body.previewToken, eventId, user.userId, body.version);
   const current = await db.event.findUnique({ where: { eventId }, include: eventInclude });
   if (!current) throw new AppError(404, "EVENT_NOT_FOUND", "Event was not found");
-  assertEventDeletable(current);
+  if (!["DRAFT", "COMPLETED", "CANCELLED"].includes(current.status)) {
+    throw new AppError(409, "EVENT_NOT_TERMINAL", "Only draft, completed, or cancelled events can be permanently deleted");
+  }
   if (body.confirmationName !== current.name) {
     throw new AppError(422, "EVENT_DELETE_CONFIRMATION_MISMATCH", "Type the event name exactly to confirm permanent deletion");
   }
@@ -1631,7 +1629,9 @@ const listStaffDirectory = async () => {
   }));
 };
 
-// Import picker: active templates that map to a screening StationType.
+// Read-only catalog for the events UI / OpenAPI StationTemplate DTO (#23).
+// Import/update map templateKey â†’ StationType per #30 (catalog keys include
+// REGISTRATION / CLINICAL_REVIEW which are not StationType and are rejected on import).
 const listStationTemplates = async () => {
   const templates = await prisma.stationTemplate.findMany({
     where: { active: true, stationType: { not: null } },

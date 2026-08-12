@@ -1,5 +1,5 @@
-const requireAuthentication = require("./requireAuthentication");
-const logger = require("../utils/logger/logger"); // Optional: for logging unexpected errors or missing roles
+﻿const requireAuthentication = require("./requireAuthentication");
+const logger = require("../utils/logging/logger/logger"); // Optional: for logging unexpected errors or missing roles
 const requireApprovedAccount = require("./requireApprovedAccount");
 
 /**

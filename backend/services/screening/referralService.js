@@ -1,4 +1,4 @@
-const crypto = require("crypto");
+﻿const crypto = require("crypto");
 const fs = require("fs/promises");
 const path = require("path");
 const PDFDocument = require("pdfkit");
@@ -7,10 +7,10 @@ const prisma = require("../../prisma/prismaClient");
 const env = require("../../config/env");
 const AppError = require("../../errors/AppError");
 const domainEventBus = require("../domain/domainEventBus");
-const { encrypt, decrypt, encryptionContext } = require("../../utils/cryptoUtils");
-const { loadVerifiedSignature, consumeSignatureArtifact, deleteSignature } = require("../../utils/signatureStorage");
+const { encrypt, decrypt, encryptionContext } = require("../../utils/crypto/cryptoUtils");
+const { loadVerifiedSignature, consumeSignatureArtifact, deleteSignature } = require("../../utils/storage/signatureStorage");
 const { requireReviewerAccess } = require("./reviewService");
-const { maskNric } = require("../../utils/validation");
+const { maskNric } = require("../../utils/validation/validation");
 
 const documentsRoot = () => path.resolve(
   process.env.REFERRAL_STORAGE_DIR || path.join(__dirname, "..", "secure-data", "documents"),
