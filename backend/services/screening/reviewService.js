@@ -4,11 +4,6 @@ const AppError = require("../../errors/AppError");
 const { resolveRegistrationByQrValue } = require("../../utils/crypto/qrToken");
 
 const {
-  IMPORTABLE_TEMPLATE_KEYS,
-  SUPPORTED_SCREENING_STATION_TYPES,
-} = require("../event/stationTemplateMapping");
-
-const {
   loadVerifiedSignature,
   consumeSignatureArtifact,
 } = require("../../utils/storage/signatureStorage");
@@ -22,8 +17,6 @@ const FLAG_RANK = {
   REFER: 2,
   URGENT: 3,
 };
-
-const SUPPORTED_SCREENING_TYPES = SUPPORTED_SCREENING_STATION_TYPES;
 
 const highestFlag = (results) => results.reduce(
   (highest, result) => FLAG_RANK[result.overallFlag] > FLAG_RANK[highest] ? result.overallFlag : highest,
@@ -86,17 +79,47 @@ const requireReviewerAccess = async (db, eventId, user) => {
   return event;
 };
 
-const activeStations = (db, eventId) => db.station.findMany({
-  where: { eventId, isActive: true, stationType: { in: SUPPORTED_SCREENING_TYPES } },
-  orderBy: [{ stationOrder: "asc" }, { stationId: "asc" }],
-  select: {
-    stationId: true,
-    stationName: true,
-    stationType: true,
-    stationOrder: true,
-    updatedAt: true,
+const routeStepSelect = {
+  routeStepId: true,
+  stationId: true,
+  position: true,
+  completedAt: true,
+  station: {
+    select: {
+      stationId: true,
+      stationName: true,
+      stationType: true,
+      stationOrder: true,
+      updatedAt: true,
+    },
   },
+};
+
+const routeStations = (registration) => registration.routeSteps
+  .slice()
+  .sort((left, right) => left.position - right.position)
+  .map(({ station }) => station);
+
+const assertReviewOutcomeAllowed = (readiness, outcome) => {
+  const incompleteUrgentRoute = readiness.readyReason === "URGENT_FLAG";
+  if (incompleteUrgentRoute && outcome !== "URGENT_ESCALATION") {
+    throw new AppError(409, "URGENT_ESCALATION_REQUIRED", "An incomplete urgent route can only be closed by urgent escalation.");
+  }
+  if (outcome === "URGENT_ESCALATION" && readiness.highestFlag !== "URGENT") {
+    throw new AppError(409, "URGENT_FLAG_REQUIRED", "Urgent escalation requires an urgent screening result.");
+  }
+  return incompleteUrgentRoute;
+};
+
+const stopRouteForUrgentReview = (tx, registrationId, now = new Date()) => tx.queueEntry.updateMany({
+  where: { registrationId, status: { in: ["WAITING", "CALLED", "IN_PROGRESS"] } },
+  data: { status: "CANCELLED", leftQueueAt: now },
 });
+
+const unfinishedRouteStationIds = (routeSteps) => routeSteps
+  .filter(({ completedAt }) => !completedAt)
+  .sort((left, right) => left.position - right.position)
+  .map(({ stationId }) => stationId);
 
 const resultSelect = {
   resultId: true,
@@ -117,9 +140,6 @@ const displayName = (registration) => registration.participantDisplayName
 
 const listQueue = async (eventId, user) => {
   const event = await requireReviewerAccess(prisma, eventId, user);
-  const stations = await activeStations(prisma, eventId);
-  if (stations.length === 0) return { event, queue: [] };
-  const stationIds = stations.map((station) => station.stationId);
   const registrations = await prisma.eventRegistration.findMany({
     where: {
       eventId,
@@ -132,11 +152,13 @@ const listQueue = async (eventId, user) => {
       participantDisplayName: true,
       queueNumber: true,
       participant: { select: { firstName: true, lastName: true } },
-      screeningResults: { where: { stationId: { in: stationIds } }, select: resultSelect },
+      routeSteps: { select: routeStepSelect, orderBy: { position: "asc" } },
+      screeningResults: { select: resultSelect },
     },
   });
 
   const queue = registrations.flatMap((registration) => {
+    const stations = routeStations(registration);
     const readiness = reviewReadiness(stations, registration.screeningResults);
     if (!readiness.ready) return [];
     return [{
@@ -162,9 +184,7 @@ const resolveScannedRegistration = async (eventId, passToken, user, db = prisma)
   return registration;
 };
 
-const loadRegistration = async (db, eventId, registrationId, stations) => {
-  const stationIds = stations.map((station) => station.stationId);
-  return db.eventRegistration.findFirst({
+const loadRegistration = async (db, eventId, registrationId) => db.eventRegistration.findFirst({
     where: { registrationId, eventId },
     select: {
       registrationId: true,
@@ -181,7 +201,8 @@ const loadRegistration = async (db, eventId, registrationId, stations) => {
           gender: true,
         },
       },
-      screeningResults: { where: { stationId: { in: stationIds } }, select: resultSelect },
+      routeSteps: { select: routeStepSelect, orderBy: { position: "asc" } },
+      screeningResults: { select: resultSelect },
       reviews: {
         where: { version: 1 },
         take: 1,
@@ -228,7 +249,6 @@ const loadRegistration = async (db, eventId, registrationId, stations) => {
       },
     },
   });
-};
 
 const normalizeEyeHealthObservations = (value) => {
   if (!value) return null;
@@ -317,9 +337,9 @@ const buildDetail = (event, stations, registration) => {
 
 const getDetail = async (eventId, registrationId, user) => {
   const event = await requireReviewerAccess(prisma, eventId, user);
-  const stations = await activeStations(prisma, eventId);
-  const registration = await loadRegistration(prisma, eventId, registrationId, stations);
+  const registration = await loadRegistration(prisma, eventId, registrationId);
   if (!registration) throw new AppError(404, "REGISTRATION_NOT_FOUND", "Registration not found");
+  const stations = routeStations(registration);
   return buildDetail(event, stations, registration);
 };
 
@@ -374,13 +394,13 @@ const recordDecision = async (eventId, registrationId, decision, user, ipAddress
   try {
     return await prisma.$transaction(async (tx) => {
       await requireReviewerAccess(tx, eventId, user);
-      const stations = await activeStations(tx, eventId);
-      const registration = await loadRegistration(tx, eventId, registrationId, stations);
+      const registration = await loadRegistration(tx, eventId, registrationId);
       if (!registration) throw new AppError(404, "REGISTRATION_NOT_FOUND", "Registration not found");
       if (registration.reviews[0]) {
         throw new AppError(409, "REVIEW_ALREADY_RECORDED", "A clinical review has already been recorded");
       }
 
+      const stations = routeStations(registration);
       const readiness = reviewReadiness(stations, registration.screeningResults);
       if (!readiness.ready || ["COMPLETED", "CANCELLED"].includes(registration.registrationStatus)) {
         throw new AppError(409, "REVIEW_NOT_READY", "This registration is not ready for clinical review");
@@ -388,6 +408,7 @@ const recordDecision = async (eventId, registrationId, decision, user, ipAddress
       if (contextVersion(stations, registration.screeningResults) !== decision.contextVersion) {
         throw new AppError(409, "SCREENING_RESULTS_CHANGED", "Screening results changed; reassess before deciding");
       }
+      const incompleteUrgentRoute = assertReviewOutcomeAllowed(readiness, decision.outcome);
 
       await consumeSignatureArtifact(
         tx,
@@ -440,6 +461,10 @@ const recordDecision = async (eventId, registrationId, decision, user, ipAddress
         throw new AppError(409, "REVIEW_NOT_READY", "This registration is not ready for clinical review");
       }
 
+      const cancelledQueue = incompleteUrgentRoute
+        ? await stopRouteForUrgentReview(tx, registrationId)
+        : { count: 0 };
+
       const auditBase = {
         eventId,
         registrationId,
@@ -451,6 +476,11 @@ const recordDecision = async (eventId, registrationId, decision, user, ipAddress
         signatureSha256: review.signatureSha256,
         signedPayloadHash: review.signedPayloadHash,
         signedAt: review.signedAt,
+        routeStoppedForUrgentReview: incompleteUrgentRoute,
+        cancelledActiveQueueCount: cancelledQueue.count,
+        stoppedUnfinishedStationIds: incompleteUrgentRoute
+          ? unfinishedRouteStationIds(registration.routeSteps)
+          : [],
       };
       await tx.auditLog.create({
         data: {
@@ -512,4 +542,8 @@ module.exports = {
   contextVersion,
   requireReviewerAccess,
   reviewSignedPayloadHash,
+  assertReviewOutcomeAllowed,
+  routeStations,
+  stopRouteForUrgentReview,
+  unfinishedRouteStationIds,
 };

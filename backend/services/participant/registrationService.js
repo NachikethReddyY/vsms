@@ -2,6 +2,11 @@ const prisma = require("../../prisma/prismaClient");
 const { createAuditLog } = require("../../utils/logging/audit");
 const { assertRegistrationAssignment } = require("../../utils/auth/staff");
 const { assertParticipantEventScope } = require("../../utils/validation/participantEventScope");
+const qrService = require("./qrService");
+const {
+    assignRouteOnce,
+    getRouteState,
+} = require("../screening/routeAssignmentService");
 
 const OPEN_EVENT_STATUSES = ["PUBLISHED", "UPCOMING", "ONGOING", "IN_PROGRESS"];
 const REGISTRATION_STATUSES = new Set(["SIGNED_UP", "CHECKED_IN", "COMPLETED", "CANCELLED"]);
@@ -44,6 +49,34 @@ async function auditDuplicate({ userId, context, participantId, eventId, registr
     }).catch(() => {});
 }
 
+async function provisionExistingRegistration({ registration, userId, eventId, context, db }) {
+    for (let attempt = 0; attempt < 4; attempt += 1) {
+        try {
+            return await db.$transaction(async (tx) => {
+                const securePass = await qrService.generateQR(registration.registrationId, userId, tx, context);
+                const route = registration.event.status === "IN_PROGRESS"
+                    ? await assignRouteOnce({
+                        tx,
+                        registrationId: registration.registrationId,
+                        eventId,
+                        actorUserId: userId,
+                        context,
+                    })
+                    : await getRouteState(tx, registration.registrationId, false);
+                const current = await tx.eventRegistration.findUnique({
+                    where: { registrationId: registration.registrationId },
+                    include: registrationInclude(),
+                });
+                return { registration: current, route, securePass };
+            }, { isolationLevel: "Serializable" });
+        } catch (error) {
+            if (error.code === "P2034" && attempt < 3) continue;
+            throw error;
+        }
+    }
+    throw conflict("Unable to provision registration. Please retry.");
+}
+
 exports.createRegistration = async ({ participantId, eventId, idempotencyKey, auth, context }, db = prisma) => {
     const userId = auth.userId;
     await assertRegistrationAssignment(db, eventId, auth);
@@ -56,7 +89,14 @@ exports.createRegistration = async ({ participantId, eventId, idempotencyKey, au
         if (priorRequest.participantId !== participantId || priorRequest.eventId !== eventId) {
             throw conflict("Idempotency key was already used for a different registration");
         }
-        return { registration: priorRequest, idempotentReplay: true };
+        const provisioning = await provisionExistingRegistration({
+            registration: priorRequest,
+            userId,
+            eventId,
+            context,
+            db,
+        });
+        return { ...provisioning, idempotentReplay: true };
     }
 
     const duplicate = await db.eventRegistration.findUnique({
@@ -140,7 +180,21 @@ exports.createRegistration = async ({ participantId, eventId, idempotencyKey, au
                     context,
                     client: tx,
                 });
-                return created;
+                const securePass = await qrService.generateQR(created.registrationId, userId, tx, context);
+                const route = event.status === "IN_PROGRESS"
+                    ? await assignRouteOnce({
+                        tx,
+                        registrationId: created.registrationId,
+                        eventId,
+                        actorUserId: userId,
+                        context,
+                    })
+                    : await getRouteState(tx, created.registrationId, false);
+                const current = await tx.eventRegistration.findUnique({
+                    where: { registrationId: created.registrationId },
+                    include: registrationInclude(),
+                });
+                return { registration: current, route, securePass };
             }, { isolationLevel: "Serializable" });
             break;
         } catch (error) {
@@ -154,7 +208,14 @@ exports.createRegistration = async ({ participantId, eventId, idempotencyKey, au
                     include: registrationInclude(),
                 });
                 if (existing?.participantId === participantId && existing.eventId === eventId && existing.idempotencyKey === idempotencyKey) {
-                    return { registration: existing, idempotentReplay: true };
+                    const provisioning = await provisionExistingRegistration({
+                        registration: existing,
+                        userId,
+                        eventId,
+                        context,
+                        db,
+                    });
+                    return { ...provisioning, idempotentReplay: true };
                 }
                 if (existing) await auditDuplicate({ userId, context, participantId, eventId, registrationId: existing.registrationId });
                 throw conflict("Participant is already registered for this event");
@@ -163,7 +224,7 @@ exports.createRegistration = async ({ participantId, eventId, idempotencyKey, au
         }
     }
 
-    return { registration, idempotentReplay: false };
+    return { ...registration, idempotentReplay: false };
 };
 
 exports.getRegistrationById = async ({ registrationId, auth }, db = prisma) => {

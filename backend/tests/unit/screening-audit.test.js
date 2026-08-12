@@ -48,9 +48,24 @@ function installSuccessMocks(t, audits) {
       create: async ({ data }) => data,
     },
     screeningResult: {
+      findUnique: async () => null,
       upsert: async ({ create }) => ({ resultId: crypto.randomUUID(), ...create, version: 1 }),
     },
-    eventRegistration: { findFirst: async () => ({ registrationId, registrationStatus: "CHECKED_IN" }) },
+    eventRegistration: {
+      findFirst: async () => ({ registrationId, eventId, registrationStatus: "CHECKED_IN" }),
+      update: async () => ({ routeVersion: 2 }),
+    },
+    registrationRouteStep: {
+      findMany: async () => [{
+        routeStepId: crypto.randomUUID(), registrationId, stationId, position: 1, completedAt: null,
+        station: { stationId, stationName: "Visual Acuity", stationType: "VISUAL_ACUITY", isActive: true, operationalStatus: "AVAILABLE" },
+      }],
+      updateMany: async () => ({ count: 1 }),
+    },
+    queueEntry: {
+      findFirst: async () => ({ id: crypto.randomUUID(), registrationId, stationId, queueNumber: 1, status: "IN_PROGRESS" }),
+      updateMany: async () => ({ count: 1 }),
+    },
     auditLog: {
       create: async ({ data }) => {
         audits.push(data);
@@ -68,8 +83,8 @@ test("screening save emits a SCREENING_RESULT_RECORDED audit inside the transact
   const result = await screeningService.saveVisualAcuity(eventId, stationId, body, user, context);
 
   assert.equal(result.created, true);
-  assert.equal(audits.length, 1);
-  const audit = audits[0];
+  assert.equal(audits.length, 2);
+  const audit = audits.find(({ action }) => action === "SCREENING_RESULT_RECORDED");
   assert.equal(audit.action, "SCREENING_RESULT_RECORDED");
   assert.equal(audit.entityName, "ScreeningResult");
   assert.equal(audit.userId, user.userId);

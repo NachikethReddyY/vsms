@@ -14,7 +14,7 @@ import {
   FlagBanner,
   loadStationContext,
   ParticipantLookup,
-  StationHandoffLinks,
+  RouteProgressionNotice,
   StationPageFrame,
 } from './StationShared';
 
@@ -30,7 +30,6 @@ export default function EyeHealthStationPage() {
   const [searchParams] = useSearchParams();
   const [eventName, setEventName] = useState('');
   const [station, setStation] = useState<Station | null>(null);
-  const [eventStations, setEventStations] = useState<Station[]>([]);
   const [queue, setQueue] = useState<QueueRegistration[]>([]);
   const [selectedId, setSelectedId] = useState(() => searchParams.get('registrationId') || '');
   const [cataractRisk, setCataractRisk] = useState<EyeHealthRisk>('NOT_ASSESSED');
@@ -46,7 +45,6 @@ export default function EyeHealthStationPage() {
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
-  const [savedRegistrationId, setSavedRegistrationId] = useState<string | null>(null);
   const participantRequestGeneration = useRef(0);
 
   const selected = useMemo(
@@ -79,7 +77,6 @@ export default function EyeHealthStationPage() {
     setAcknowledged(false);
     setError(null);
     setSuccess(null);
-    setSavedRegistrationId(null);
   }, [selectedId]);
 
   const selectParticipant = (registrationId: string) => {
@@ -97,7 +94,6 @@ export default function EyeHealthStationPage() {
       const context = await loadStationContext(eventId, 'EYE_HEALTH', 'Eye Health', selectedId);
       setEventName(context.eventName);
       setStation(context.station);
-      setEventStations(context.stations);
       setQueue(context.queue);
       if (!selectedId && context.nextSelectedId) selectParticipant(context.nextSelectedId);
     } catch (cause) {
@@ -171,12 +167,11 @@ export default function EyeHealthStationPage() {
         resultData,
       });
       if (generation !== participantRequestGeneration.current) return;
-      setSuccess(saved.queued
-        ? 'Saved offline. It will sync when connected.'
+      setSuccess(saved.syncState === 'PENDING_SYNC'
+        ? 'Pending sync. The participant has not entered the next queue.'
         : saved.isFlagged
           ? `Saved with ${saved.overallFlag} flag (${saved.ruleVersion ?? preview.ruleVersion}): ${saved.flagSummary}`
           : `Saved Eye Health result (${saved.overallFlag}, ${saved.ruleVersion ?? preview.ruleVersion}).`);
-      setSavedRegistrationId(registrationId);
       setEvaluation(null);
       setAcknowledged(false);
       await load();
@@ -214,16 +209,12 @@ export default function EyeHealthStationPage() {
       error={error}
       success={success}
       handoff={(
-        <StationHandoffLinks
-          eventId={eventId}
-          currentStationType="EYE_HEALTH"
-          registrationId={savedRegistrationId || selectedId}
-          stations={eventStations}
-        />
+        <RouteProgressionNotice eventId={eventId} />
       )}
     >
       <ParticipantLookup
         eventId={eventId}
+        currentStationId={station?.stationId ?? ''}
         queue={queue}
         selectedId={selectedId}
         onSelect={selectParticipant}

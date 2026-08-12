@@ -30,6 +30,14 @@ test("the 500-participant load configuration is accepted without running load", 
   const result = run(process.execPath, ["scripts/performance-runner.js", "--check", "--config", "performance/isolated-500.json"]);
   assert.equal(result.status, 0, result.stderr);
   assert.match(result.stdout, /vsms_test/);
+  const config = JSON.parse(fs.readFileSync(path.join(backend, "performance/isolated-500.json"), "utf8"));
+  const runner = fs.readFileSync(path.join(backend, "scripts/performance-runner.js"), "utf8");
+  assert.equal(config.participantCount, 500);
+  assert.equal(config.participantPollIntervalMs, 5000);
+  assert.equal(config.staffPollIntervalMs, 10000);
+  assert.match(runner, /participant-status\.poll/);
+  assert.match(runner, /staff-queue\.poll/);
+  assert.doesNotMatch(runner, /stations\/\$\{fixture\.stationId\}\/handoff/);
 });
 
 test("the load runner requires explicit acknowledgement before fixture access or HTTP writes", () => {

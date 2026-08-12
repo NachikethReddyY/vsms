@@ -103,6 +103,17 @@ test("recorded reviews expose optional eye-health observations as nullable", () 
     assert.equal(document.components.schemas.RecordedReview.properties.eyeHealthObservations.nullable, true);
 });
 
+test("route override contract is versioned, reason-allowlisted, and role-neutral", () => {
+    const document = YAML.parse(read("docs/openapi.yaml"));
+    const operation = document.paths["/api/v1/queues/events/{eventId}/participants/{registrationId}/route"].patch;
+    const request = document.components.schemas.RouteOverrideRequest;
+    assert.ok(operation.responses["409"]);
+    assert.deepEqual(request.required, ["stationIds", "reasonCode", "expectedVersion"]);
+    assert.equal(request.properties.stationIds.uniqueItems, true);
+    assert.equal(Object.hasOwn(request.properties, "role"), false);
+    assert.ok(document.components.schemas.RouteOverrideReasonCode.enum.includes("STATION_UNAVAILABLE"));
+});
+
 test("account contracts allow composed runtime fields and document provider maintenance", () => {
     const document = YAML.parse(read("docs/openapi.yaml"));
     const schemas = document.components.schemas;
@@ -238,16 +249,28 @@ test("authentication uses verified Cognito tokens and approved local role inters
     assert.doesNotMatch(authRoutes, /"\/login"|"\/signup"/);
 });
 
-test("registration resolve accepts passToken, qrToken, or registrationId", () => {
+test("registration resolve accepts secure QR values or registrationId and rejects legacy/demo values", () => {
     const { resolveQuery } = require("../../schemas/screeningSchemas");
-    assert.doesNotThrow(() => resolveQuery.parse({ passToken: "VSMS-DEMO-QR-001" }));
+    assert.doesNotThrow(() => resolveQuery.parse({ passToken: "a".repeat(64) }));
     assert.doesNotThrow(() => resolveQuery.parse({
-        qrToken: "a".repeat(64),
+        qrToken: `https://app.example.com/participant-status/${"b".repeat(64)}`,
     }));
     assert.doesNotThrow(() => resolveQuery.parse({
         registrationId: "11111111-1111-4111-8111-111111111111",
     }));
+    assert.throws(() => resolveQuery.parse({ passToken: "VSMS-DEMO-QR-001" }), /valid secure QR pass/);
+    assert.throws(() => resolveQuery.parse({ qrToken: "malformed" }), /valid secure QR pass|too small/i);
     assert.throws(() => resolveQuery.parse({}), /passToken, qrToken, or registrationId/);
+});
+
+test("general QR verification normalizes only secure raw tokens and participant URLs", () => {
+    const { tokenBody } = require("../../schemas/qrSchemas");
+    assert.equal(tokenBody.parse({ token: "a".repeat(64) }).token, "a".repeat(64));
+    assert.equal(tokenBody.parse({
+        token: `https://app.example.com/participant-status/${"b".repeat(64)}`,
+    }).token, "b".repeat(64));
+    assert.throws(() => tokenBody.parse({ token: "VSMS-DEMO-QR-001" }), /too small|secure QR/i);
+    assert.throws(() => tokenBody.parse({ token: "a".repeat(64), unexpected: true }), /unrecognized key/i);
 });
 
 test("resolveParticipant looks up QRCodePass when passToken is not on registration", () => {
@@ -261,21 +284,28 @@ test("resolveParticipant looks up QRCodePass when passToken is not on registrati
     const tokenHelper = read("utils/crypto/qrToken.js");
     assert.match(tokenHelper, /qRCodePass\.findFirst/);
     assert.match(tokenHelper, /tokenHash/);
+    assert.doesNotMatch(tokenHelper, /eventRegistration\.findFirst/);
+    assert.doesNotMatch(tokenHelper, /where: \{ eventId, passToken/);
 });
 
-test("QR station handoff contract is documented", () => {
-    const doc = read("docs/qr-station-handoff.md");
-    assert.match(doc, /token-only|token only/i);
-    assert.match(doc, /registrationId/);
-    assert.match(doc, /Do \*\*not\*\* put `stationId`|must \*\*not\*\* embed `stationId`/i);
-    assert.match(doc, /\/events\/\{eventId\}\/stations\/\{slug\}\?registrationId=/);
-    assert.match(doc, /visual-acuity/);
+test("demo QR fixtures are forbidden in production", () => {
+    assert.match(read("prisma/seed.js"), /NODE_ENV === "production"[\s\S]*Demo seed execution is forbidden/);
+    assert.match(read("scripts/dev-preset.js"), /env\.isProduction[\s\S]*Development preset execution is forbidden/);
+    const packageJson = JSON.parse(read("package.json"));
+    assert.doesNotMatch(packageJson.scripts["deploy:prod"], /db:setup|prisma:seed/);
 });
 
-test("registration queue handoff endpoints and station status are in OpenAPI", () => {
+test("single participant QR has no public generated-handoff path", () => {
+    assert.doesNotMatch(read("routes/qrRoutes.js"), /\/handoff\/:token/);
+    assert.doesNotMatch(read("services/participant/qrService.js"), /getStationHandoffQR|buildStationHandoffUrl/);
+    assert.doesNotMatch(read("controllers/qrController.js"), /getStationHandoffQR/);
+});
+
+test("manual queue movement endpoints are retired while station status remains documented", () => {
     const openapi = read("docs/openapi.yaml");
     assert.match(openapi, /\/api\/v1\/queues\/events\/\{eventId\}\/stations:/);
-    assert.match(openapi, /\/api\/v1\/queues\/events\/\{eventId\}\/stations\/\{stationId\}\/handoff:/);
+    assert.doesNotMatch(openapi, /\/api\/v1\/queues\/events\/\{eventId\}\/stations\/\{stationId\}\/(?:handoff|join):/);
+    assert.doesNotMatch(openapi, /\/api\/v1\/queues\/(?:events\/\{eventId\}\/)?entries\/\{queueId\}\/(?:advance|complete):/);
     assert.match(openapi, /operationalStatus: \{ \$ref: "#\/components\/schemas\/StationOperationalStatus" \}/);
 });
 
