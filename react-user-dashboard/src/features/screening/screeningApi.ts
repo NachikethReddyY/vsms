@@ -112,7 +112,8 @@ export type VisualAcuityPayload = ScreeningSavePayload<VisualAcuityResultData>;
 
 export type DynamicResultData = DynamicFieldValues;
 type StationResultData = VisualAcuityResultData | RefractionResultData | ColourVisionResultData | EyeHealthResultData | DynamicResultData;
-type ScreeningPath = 'visual-acuity' | 'refraction' | 'colour-vision' | 'eye-health' | 'dynamic';
+type OfflineScreeningPath = 'visual-acuity' | 'refraction' | 'colour-vision' | 'dynamic';
+type ScreeningPath = OfflineScreeningPath | 'eye-health';
 
 async function previewStation<T extends StationResultData>(
   eventId: string,
@@ -128,7 +129,8 @@ async function previewStation<T extends StationResultData>(
     return data;
   } catch (error) {
     if (!isNetworkError(error)) throw error;
-    return evaluateOfflineStation(path, resultData);
+    if (path === 'eye-health') throw error;
+    return evaluateOfflineStation(path, resultData as VisualAcuityResultData | RefractionResultData | ColourVisionResultData | DynamicResultData);
   }
 }
 
@@ -143,9 +145,16 @@ async function saveStation<T extends StationResultData>(
     return data as ScreeningSaveResponse<T>;
   } catch (error) {
     if (!isNetworkError(error)) throw error;
+    if (path === 'eye-health') throw error;
     const ownerId = getStoredSession()?.user.id;
     if (!ownerId) throw error;
-    const evaluation = await queueOfflineStationSave(ownerId, eventId, stationId, path, body);
+    const evaluation = await queueOfflineStationSave(
+      ownerId,
+      eventId,
+      stationId,
+      path,
+      body as ScreeningSavePayload<VisualAcuityResultData | RefractionResultData | ColourVisionResultData | DynamicResultData>,
+    );
     return {
       resultId: `offline:${body.idempotencyKey}`,
       overallFlag: evaluation.overallFlag,

@@ -416,7 +416,9 @@ export default function EventFormPage({ mode }: { mode: 'create' | 'edit' }) {
       .filter((template): template is NonNullable<typeof template> => Boolean(template));
     const clinicalTypes = selected
       .map((template) => template.stationType)
-      .filter((stationType): stationType is string => Boolean(stationType) && stationType !== 'CUSTOM');
+      .filter((stationType): stationType is Exclude<typeof stationType, 'CUSTOM' | null | undefined> => (
+        Boolean(stationType) && stationType !== 'CUSTOM'
+      ));
     if (new Set(clinicalTypes).size !== clinicalTypes.length) {
       setFormError('Choose only one template for each clinical screening station type.');
       return;
