@@ -565,10 +565,10 @@ const saveEyeHealth = () => {
 const loadDynamicStation = async (eventId, stationId, user) => {
   await assertCanScreen(eventId, user, stationId);
   const station = await prisma.station.findFirst({
-    where: { eventId, stationId, isActive: true },
+    where: { eventId, stationId, isActive: true, stationType: "CUSTOM" },
   });
   if (!station) throw new AppError(404, "STATION_NOT_FOUND", "Station not found");
-  if (station.stationType === "CUSTOM" && !station.fieldSchemaSnapshot) {
+  if (!station.fieldSchemaSnapshot) {
     throw new AppError(
       409,
       "STATION_SCHEMA_MISSING",
