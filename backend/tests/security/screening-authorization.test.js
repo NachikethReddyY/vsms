@@ -57,7 +57,8 @@ test("only a screener assigned to the requested station can read its queue", asy
 
   const queue = await screeningService.listQueue(eventId, stationA, user);
   assert.deepEqual(queue.registrations, []);
-  assert.equal(stationTypeForTemplate({ templateKey: "opaque", stationType: "EYE_HEALTH" }), "EYE_HEALTH");
+  assert.equal(stationTypeForTemplate({ templateKey: "opaque", stationType: "VISUAL_ACUITY" }), "VISUAL_ACUITY");
+  assert.equal(stationTypeForTemplate({ templateKey: "opaque", stationType: "EYE_HEALTH" }), null);
 });
 
 test("an administrator remains denied without a screener event membership", async (t) => {
@@ -97,4 +98,36 @@ test("assigned stations publish an offline expiry capped by the event and active
 
   assert.equal(result.stations[0].offlineAccessExpiresAt, eventEndsAt.toISOString());
   assert.equal(result.stations[1].offlineAccessExpiresAt, earlierShiftEnd.toISOString());
+});
+
+test("dynamic routes reject built-in stations and accept CUSTOM stations", async (t) => {
+  installMembership(t);
+  replace(t, prisma.event, "findUnique", async () => ({ eventId, status: "IN_PROGRESS" }));
+  replace(t, prisma.staffAssignment, "findFirst", async () => ({ id: crypto.randomUUID() }));
+  replace(t, prisma.station, "findFirst", async ({ where }) => {
+    const station = where.stationId === stationA
+      ? { stationId: stationA, stationType: "VISUAL_ACUITY", isActive: true }
+      : {
+        stationId: stationB,
+        stationType: "CUSTOM",
+        isActive: true,
+        fieldSchemaSnapshot: [{ key: "notes", label: "Notes", type: "text" }],
+      };
+    return where.stationType && station.stationType !== where.stationType ? null : station;
+  });
+
+  for (const action of [screeningService.previewDynamic, screeningService.saveDynamic]) {
+    await assert.rejects(
+      action(eventId, stationA, { resultData: { notes: "clear" } }, user),
+      (error) => error.status === 404 && error.code === "STATION_NOT_FOUND",
+    );
+  }
+
+  const preview = await screeningService.previewDynamic(
+    eventId,
+    stationB,
+    { resultData: { notes: "clear" } },
+    user,
+  );
+  assert.equal(preview.overallFlag, "NORMAL");
 });

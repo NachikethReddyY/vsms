@@ -181,6 +181,7 @@ enum StationType {
   REFRACTION
   COLOUR_VISION
   EYE_HEALTH
+  CUSTOM
 }
 
 enum StationOperationalStatus {
@@ -891,8 +892,9 @@ model Station {
   fromMovements           QueueMovement[]          @relation("FromStation")
   toMovements             QueueMovement[]          @relation("ToStation")
 
-  @@unique([eventId, stationType])
   @@unique([eventId, stationOrder])
+  @@index([eventId, stationType, isActive])
+  @@index([eventId, stationTemplateId])
   @@index([eventId, isActive, stationOrder])
   @@index([eventId, operationalStatus, stationOrder])
   @@index([stationTemplateId])
@@ -1043,6 +1045,7 @@ model ScreeningResult {
   isFlagged          Boolean     @default(false) @map("is_flagged")
   flagSummary        String?     @map("flag_summary")
   ruleVersion        String      @default("VSMS-VA-1.0") @map("rule_version") @db.VarChar(20)
+  schemaVersion      Int?        @map("schema_version")
   acknowledgedAt     DateTime?   @map("acknowledged_at") @db.Timestamptz(3)
   idempotencyKey     String      @unique @map("idempotency_key") @db.VarChar(64)
   requestFingerprint String?     @map("request_fingerprint") @db.Char(64)

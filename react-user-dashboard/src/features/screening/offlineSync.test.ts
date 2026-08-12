@@ -189,130 +189,56 @@ describe('encrypted screening outbox', () => {
     expect(await syncOfflineEvent(ownerId, eventId)).toMatchObject({ pending: 0, conflicts: 1, synced: 0 });
   });
 
-  it('queues and syncs eye-health saves with reconnect conflict retention', async () => {
+  it('ignores eye-health stations in offline downloads because eye health is review-only', async () => {
     const eyeStationId = '55555555-5555-4555-8555-555555555555';
+    const vaStationId = '11111111-1111-4111-8111-111111111111';
     post.mockResolvedValueOnce({
       data: {
         ...response().data,
         pull: {
           event: { eventId, name: 'Vision Screening', status: 'IN_PROGRESS' },
-          stations: [{
-            stationId: eyeStationId,
-            eventId,
-            stationName: 'Eye Health',
-            stationType: 'EYE_HEALTH',
-            stationOrder: 4,
-            isActive: true,
-            offlineAccessExpiresAt: expiry,
-            registrations: [{
-              registrationId,
-              participantDisplayName: 'Encrypted Queue Person',
-              queueNumber: 1,
-              status: 'CHECKED_IN',
-              passToken: null,
-              existingResult: null,
-            }],
-          }],
+          stations: [
+            {
+              stationId: vaStationId,
+              eventId,
+              stationName: 'Visual Acuity',
+              stationType: 'VISUAL_ACUITY',
+              stationOrder: 1,
+              isActive: true,
+              offlineAccessExpiresAt: expiry,
+              registrations: [{
+                registrationId,
+                participantDisplayName: 'Encrypted Queue Person',
+                queueNumber: 1,
+                status: 'CHECKED_IN',
+                passToken: null,
+                existingResult: null,
+              }],
+            },
+            {
+              stationId: eyeStationId,
+              eventId,
+              stationName: 'Eye Health',
+              stationType: 'EYE_HEALTH',
+              stationOrder: 4,
+              isActive: true,
+              offlineAccessExpiresAt: expiry,
+              registrations: [{
+                registrationId,
+                participantDisplayName: 'Encrypted Queue Person',
+                queueNumber: 1,
+                status: 'CHECKED_IN',
+                passToken: null,
+                existingResult: null,
+              }],
+            },
+          ],
         },
       },
     });
     await downloadOfflineEvent(ownerId, eventId);
-
-    const eyeBody = {
-      registrationId,
-      idempotencyKey: crypto.randomUUID(),
-      acknowledged: true,
-      resultData: {
-        cataractRisk: 'SUSPECTED' as const,
-        glaucomaRisk: 'NONE' as const,
-        symptomsNoted: false,
-        observations: 'Lens opacity suspected OD on slit-lamp.',
-      },
-    };
-    await queueOfflineStationSave(ownerId, eventId, eyeStationId, 'eye-health', eyeBody);
-
-    const context = await getOfflineStationContext(ownerId, eventId, 'EYE_HEALTH');
-    expect(context?.station.stationType).toBe('EYE_HEALTH');
-
-    post.mockRejectedValueOnce(Object.assign(new Error('offline'), { code: 'ERR_NETWORK' }));
-    expect(await syncOfflineEvent(ownerId, eventId)).toMatchObject({ pending: 1, synced: 0 });
-
-    let firstClientActionId = '';
-    post.mockImplementationOnce(async (_url, body) => {
-      firstClientActionId = syncRequest(body).actions[0].clientActionId;
-      expect(syncRequest(body).actions[0]).toMatchObject({
-        stationId: eyeStationId,
-        stationType: 'EYE_HEALTH',
-        payload: { registrationId, resultData: { cataractRisk: 'SUSPECTED' } },
-      });
-      return response([{
-        clientActionId: firstClientActionId,
-        status: 'FAILED',
-        retryCount: 0,
-        errorCode: 'SYNC_APPLY_FAILED',
-      }]);
-    });
-    expect(await syncOfflineEvent(ownerId, eventId)).toMatchObject({ pending: 1, synced: 0 });
-
-    post.mockImplementationOnce(async (_url, body) => {
-      expect(syncRequest(body).actions[0].clientActionId).toBe(firstClientActionId);
-      return response([{
-        clientActionId: firstClientActionId,
-        status: 'CONFLICT',
-        retryCount: 1,
-        errorCode: 'ACKNOWLEDGEMENT_REQUIRED',
-      }]);
-    });
-    expect(await syncOfflineEvent(ownerId, eventId)).toMatchObject({ pending: 0, conflicts: 1, synced: 0 });
-  });
-
-  it('applies an eye-health offline action once and clears the outbox', async () => {
-    const eyeStationId = '55555555-5555-4555-8555-555555555555';
-    post.mockResolvedValueOnce({
-      data: {
-        ...response().data,
-        pull: {
-          event: { eventId, name: 'Vision Screening', status: 'IN_PROGRESS' },
-          stations: [{
-            stationId: eyeStationId,
-            eventId,
-            stationName: 'Eye Health',
-            stationType: 'EYE_HEALTH',
-            stationOrder: 4,
-            isActive: true,
-            offlineAccessExpiresAt: expiry,
-            registrations: [{
-              registrationId,
-              participantDisplayName: 'Encrypted Queue Person',
-              queueNumber: 1,
-              status: 'CHECKED_IN',
-              passToken: null,
-              existingResult: null,
-            }],
-          }],
-        },
-      },
-    });
-    await downloadOfflineEvent(ownerId, eventId);
-    await queueOfflineStationSave(ownerId, eventId, eyeStationId, 'eye-health', {
-      registrationId,
-      idempotencyKey: crypto.randomUUID(),
-      acknowledged: false,
-      resultData: {
-        cataractRisk: 'NONE',
-        glaucomaRisk: 'NONE',
-        symptomsNoted: false,
-        observations: 'Quiet anterior segment.',
-      },
-    });
-
-    post.mockImplementationOnce(async (_url, body) => response([{
-      clientActionId: syncRequest(body).actions[0].clientActionId,
-      status: 'APPLIED',
-      retryCount: 0,
-    }]));
-    expect(await syncOfflineEvent(ownerId, eventId)).toMatchObject({ pending: 0, conflicts: 0, synced: 1 });
-    expect(await getOfflineSyncStatus(ownerId, eventId)).toMatchObject({ pending: 0, conflicts: 0 });
+    expect(await getOfflineStationContext(ownerId, eventId, 'VISUAL_ACUITY')).toBeTruthy();
+    expect(await getOfflineStationContext(ownerId, eventId, 'EYE_HEALTH')).toBeNull();
   });
 
   it('purges expired and logout-cleared encrypted data', async () => {

@@ -31,6 +31,10 @@ const template = {
   description: 'Snellen chart',
   defaultCapacity: 4,
   active: true,
+  fieldSchema: [
+    { key: 'od', label: 'Right eye (OD)', type: 'text', required: true },
+    { key: 'os', label: 'Left eye (OS)', type: 'text', required: true },
+  ],
 };
 
 function polyfillDialog() {
@@ -113,23 +117,51 @@ describe('StationLibraryPage', () => {
         ...template,
         stationTemplateId: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
         templateKey: '22222222-2222-4222-8222-222222222222',
-        stationType: 'EYE_HEALTH',
-        name: 'Eye health booth',
+        stationType: 'CUSTOM',
+        name: 'Custom notes booth',
+        fieldSchema: [{ key: 'field1', label: 'Field 1', type: 'text', required: false }],
       },
     });
     renderPage();
     await screen.findByRole('heading', { name: /No station templates yet/i });
     await openCreateFromEmpty();
     const dialog = await screen.findByRole('dialog', { name: /Add station template/i });
-    await userEvent.selectOptions(within(dialog).getByLabelText(/Station type/i), 'EYE_HEALTH');
+    await userEvent.selectOptions(within(dialog).getByLabelText(/Station type/i), 'CUSTOM');
     await userEvent.clear(within(dialog).getByLabelText(/^Name$/i));
-    await userEvent.type(within(dialog).getByLabelText(/^Name$/i), 'Eye health booth');
+    await userEvent.type(within(dialog).getByLabelText(/^Name$/i), 'Custom notes booth');
     await userEvent.click(within(dialog).getByRole('button', { name: /Create template/i }));
     await waitFor(() => expect(post).toHaveBeenCalledWith('/events/station-templates', expect.objectContaining({
-      stationType: 'EYE_HEALTH',
-      name: 'Eye health booth',
+      stationType: 'CUSTOM',
+      name: 'Custom notes booth',
+      fieldSchema: expect.arrayContaining([expect.objectContaining({ key: 'field1', type: 'text' })]),
     })));
-    expect(await within(library()).findByText('Eye health booth')).toBeTruthy();
+    expect(await within(library()).findByText('Custom notes booth')).toBeTruthy();
+  });
+
+  it('hides the field builder for built-in clinical templates and omits fieldSchema on create', async () => {
+    get.mockResolvedValueOnce({ data: [] });
+    post.mockResolvedValueOnce({
+      data: {
+        ...template,
+        stationTemplateId: 'cccccccc-cccc-4ccc-8ccc-cccccccccccc',
+        templateKey: '33333333-3333-4333-8333-333333333333',
+        name: 'VA catalog entry',
+        fieldSchema: null,
+      },
+    });
+    renderPage();
+    await screen.findByRole('heading', { name: /No station templates yet/i });
+    await openCreateFromEmpty();
+    const dialog = await screen.findByRole('dialog', { name: /Add station template/i });
+    expect(within(dialog).getByText(/fixed clinical screener form/i)).toBeTruthy();
+    expect(within(dialog).queryByRole('heading', { name: /Preview/i })).toBeNull();
+    await userEvent.type(within(dialog).getByLabelText(/^Name$/i), 'VA catalog entry');
+    await userEvent.click(within(dialog).getByRole('button', { name: /Create template/i }));
+    await waitFor(() => expect(post).toHaveBeenCalledWith('/events/station-templates', expect.objectContaining({
+      stationType: 'VISUAL_ACUITY',
+      name: 'VA catalog entry',
+    })));
+    expect(post.mock.calls[0][1]).not.toHaveProperty('fieldSchema');
   });
 
   it('surfaces create API errors inside the dialog', async () => {
@@ -139,6 +171,7 @@ describe('StationLibraryPage', () => {
     await screen.findByRole('heading', { name: /No station templates yet/i });
     await openCreateFromEmpty();
     const dialog = await screen.findByRole('dialog', { name: /Add station template/i });
+    await userEvent.selectOptions(within(dialog).getByLabelText(/Station type/i), 'CUSTOM');
     await userEvent.type(within(dialog).getByLabelText(/^Name$/i), 'Duplicate');
     await userEvent.click(within(dialog).getByRole('button', { name: /Create template/i }));
     expect(await within(dialog).findByText(/could not be created/i)).toBeTruthy();
