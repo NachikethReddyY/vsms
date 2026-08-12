@@ -1056,6 +1056,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/events/{eventId}/stations/{stationId}/dynamic/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Evaluate a custom/dynamic station result without saving it */
+        post: operations["previewDynamic"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/events/{eventId}/stations/{stationId}/dynamic": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Save or idempotently replay a custom/dynamic station result */
+        post: operations["saveDynamic"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/events/{eventId}/reviews": {
         parameters: {
             query?: never;
@@ -2505,28 +2539,44 @@ export interface components {
             stationTemplateId: string;
             templateKey: string;
             /** @enum {string|null} */
-            stationType: "VISUAL_ACUITY" | "REFRACTION" | "COLOUR_VISION" | "EYE_HEALTH" | null;
+            stationType: "VISUAL_ACUITY" | "REFRACTION" | "COLOUR_VISION" | "EYE_HEALTH" | "CUSTOM" | null;
             version: number;
             name: string;
             description?: string | null;
             defaultCapacity: number;
             active: boolean;
+            fieldSchema?: components["schemas"]["StationFieldDefinition"][] | null;
+        };
+        StationFieldDefinition: {
+            key: string;
+            label: string;
+            /** @enum {string} */
+            type: "text" | "number" | "select" | "boolean" | "eye-pair";
+            required?: boolean;
+            options?: string[];
+            min?: number;
+            max?: number;
+            unit?: string;
+            /** @enum {string} */
+            eyes?: "OD" | "OS" | "BOTH";
         };
         CreateStationTemplateRequest: {
             /** @enum {string} */
-            stationType: "VISUAL_ACUITY" | "REFRACTION" | "COLOUR_VISION" | "EYE_HEALTH";
+            stationType: "VISUAL_ACUITY" | "REFRACTION" | "COLOUR_VISION" | "EYE_HEALTH" | "CUSTOM";
             name: string;
             description?: string | null;
             /** @default 3 */
             defaultCapacity: number;
             /** @default true */
             active: boolean;
+            fieldSchema?: components["schemas"]["StationFieldDefinition"][];
         };
         UpdateStationTemplateRequest: {
             name?: string;
             description?: string | null;
             defaultCapacity?: number;
             active?: boolean;
+            fieldSchema?: components["schemas"]["StationFieldDefinition"][];
         };
         EventStation: {
             /** Format: uuid */
@@ -2536,11 +2586,13 @@ export interface components {
             templateVersion: number;
             name: string;
             /** @enum {string} */
-            stationType: "VISUAL_ACUITY" | "REFRACTION" | "COLOUR_VISION" | "EYE_HEALTH";
+            stationType: "VISUAL_ACUITY" | "REFRACTION" | "COLOUR_VISION" | "EYE_HEALTH" | "CUSTOM";
             description?: string | null;
             stationOrder: number;
             capacity: number;
             isAvailable: boolean;
+            fieldSchemaSnapshot?: components["schemas"]["StationFieldDefinition"][] | null;
+            schemaVersion?: number | null;
             availabilities: components["schemas"]["EventStationAvailability"][];
         };
         EventStationAvailability: {
@@ -3530,10 +3582,11 @@ export interface components {
             /** Format: uuid */
             stationId: string;
             /** @enum {string} */
-            screeningType: "VISUAL_ACUITY" | "REFRACTION" | "COLOUR_VISION" | "EYE_HEALTH";
+            screeningType: "VISUAL_ACUITY" | "REFRACTION" | "COLOUR_VISION" | "EYE_HEALTH" | "CUSTOM";
             resultData: {
                 [key: string]: unknown;
             };
+            schemaVersion?: number | null;
             overallFlag: components["schemas"]["OverallFlag"];
             isFlagged: boolean;
             flagSummary: string | null;
@@ -3548,7 +3601,7 @@ export interface components {
             stationId: string;
             stationName: string;
             /** @enum {string} */
-            stationType: "VISUAL_ACUITY" | "REFRACTION" | "COLOUR_VISION" | "EYE_HEALTH";
+            stationType: "VISUAL_ACUITY" | "REFRACTION" | "COLOUR_VISION" | "EYE_HEALTH" | "CUSTOM";
             stationOrder: number;
             result: components["schemas"]["ScreeningResultSummary"] | null;
         };
@@ -4916,6 +4969,20 @@ export interface components {
             acknowledged: boolean;
             resultData: components["schemas"]["EyeHealthObservations"];
         };
+        DynamicPreviewRequest: {
+            resultData: {
+                [key: string]: unknown;
+            };
+        };
+        DynamicSaveRequest: {
+            /** Format: uuid */
+            registrationId: string;
+            idempotencyKey: string;
+            acknowledged: boolean;
+            resultData: {
+                [key: string]: unknown;
+            };
+        };
         ScreeningSyncAction: {
             /** Format: uuid */
             clientActionId: string;
@@ -4948,6 +5015,14 @@ export interface components {
             /** @enum {string} */
             stationType: "EYE_HEALTH";
             payload: components["schemas"]["EyeHealthSaveRequest"];
+        } | {
+            /** Format: uuid */
+            clientActionId: string;
+            /** Format: uuid */
+            stationId: string;
+            /** @enum {string} */
+            stationType: "CUSTOM";
+            payload: components["schemas"]["DynamicSaveRequest"];
         };
         ScreeningSyncRequest: {
             /** Format: uuid */
@@ -4994,9 +5069,11 @@ export interface components {
             eventId: string;
             stationName: string;
             /** @enum {string} */
-            stationType: "VISUAL_ACUITY" | "REFRACTION" | "COLOUR_VISION" | "EYE_HEALTH";
+            stationType: "VISUAL_ACUITY" | "REFRACTION" | "COLOUR_VISION" | "EYE_HEALTH" | "CUSTOM";
             stationOrder: number;
             isActive: boolean;
+            fieldSchemaSnapshot?: components["schemas"]["StationFieldDefinition"][] | null;
+            schemaVersion?: number | null;
             /** Format: date-time */
             offlineAccessExpiresAt: string | null;
             registrations: components["schemas"]["ScreeningSyncQueueItem"][];
@@ -7106,6 +7183,54 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": components["schemas"]["EyeHealthSaveRequest"];
+            };
+        };
+        responses: {
+            200: components["responses"]["ScreeningSaved"];
+            201: components["responses"]["ScreeningSaved"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            422: components["responses"]["ValidationFailed"];
+        };
+    };
+    previewDynamic: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                eventId: components["parameters"]["EventId"];
+                stationId: components["parameters"]["StationId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DynamicPreviewRequest"];
+            };
+        };
+        responses: {
+            200: components["responses"]["ScreeningPreview"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            422: components["responses"]["ValidationFailed"];
+        };
+    };
+    saveDynamic: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                eventId: components["parameters"]["EventId"];
+                stationId: components["parameters"]["StationId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DynamicSaveRequest"];
             };
         };
         responses: {

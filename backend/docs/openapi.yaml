@@ -1102,6 +1102,22 @@ paths:
       parameters: [{ $ref: "#/components/parameters/EventId" }, { $ref: "#/components/parameters/StationId" }]
       requestBody: { required: true, content: { application/json: { schema: { $ref: "#/components/schemas/EyeHealthSaveRequest" } } } }
       responses: { "200": { $ref: "#/components/responses/ScreeningSaved" }, "201": { $ref: "#/components/responses/ScreeningSaved" }, "401": { $ref: "#/components/responses/Unauthorized" }, "403": { $ref: "#/components/responses/Forbidden" }, "404": { $ref: "#/components/responses/NotFound" }, "409": { $ref: "#/components/responses/Conflict" }, "422": { $ref: "#/components/responses/ValidationFailed" } }
+  /api/v1/events/{eventId}/stations/{stationId}/dynamic/preview:
+    post:
+      tags: [Screening]
+      operationId: previewDynamic
+      summary: Evaluate a custom/dynamic station result without saving it
+      parameters: [{ $ref: "#/components/parameters/EventId" }, { $ref: "#/components/parameters/StationId" }]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: "#/components/schemas/DynamicPreviewRequest" } } } }
+      responses: { "200": { $ref: "#/components/responses/ScreeningPreview" }, "401": { $ref: "#/components/responses/Unauthorized" }, "403": { $ref: "#/components/responses/Forbidden" }, "404": { $ref: "#/components/responses/NotFound" }, "422": { $ref: "#/components/responses/ValidationFailed" } }
+  /api/v1/events/{eventId}/stations/{stationId}/dynamic:
+    post:
+      tags: [Screening]
+      operationId: saveDynamic
+      summary: Save or idempotently replay a custom/dynamic station result
+      parameters: [{ $ref: "#/components/parameters/EventId" }, { $ref: "#/components/parameters/StationId" }]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: "#/components/schemas/DynamicSaveRequest" } } } }
+      responses: { "200": { $ref: "#/components/responses/ScreeningSaved" }, "201": { $ref: "#/components/responses/ScreeningSaved" }, "401": { $ref: "#/components/responses/Unauthorized" }, "403": { $ref: "#/components/responses/Forbidden" }, "404": { $ref: "#/components/responses/NotFound" }, "409": { $ref: "#/components/responses/Conflict" }, "422": { $ref: "#/components/responses/ValidationFailed" } }
   /api/v1/events/{eventId}/reviews:
     get:
       tags: [Clinical Reviews]
@@ -2668,22 +2684,45 @@ components:
         stationType:
           type: string
           nullable: true
-          enum: [VISUAL_ACUITY, REFRACTION, COLOUR_VISION, EYE_HEALTH]
+          enum: [VISUAL_ACUITY, REFRACTION, COLOUR_VISION, EYE_HEALTH, CUSTOM]
         version: { type: integer, minimum: 1 }
         name: { type: string, maxLength: 120 }
         description: { type: string, nullable: true }
         defaultCapacity: { type: integer, minimum: 1, maximum: 1000 }
         active: { type: boolean }
+        fieldSchema:
+          type: array
+          nullable: true
+          items: { $ref: "#/components/schemas/StationFieldDefinition" }
+    StationFieldDefinition:
+      type: object
+      additionalProperties: false
+      required: [key, label, type]
+      properties:
+        key: { type: string, minLength: 1, maxLength: 64 }
+        label: { type: string, minLength: 1, maxLength: 100 }
+        type: { type: string, enum: [text, number, select, boolean, eye-pair] }
+        required: { type: boolean }
+        options: { type: array, items: { type: string } }
+        min: { type: number }
+        max: { type: number }
+        unit: { type: string }
+        eyes: { type: string, enum: [OD, OS, BOTH] }
     CreateStationTemplateRequest:
       type: object
       additionalProperties: false
       required: [stationType, name]
       properties:
-        stationType: { type: string, enum: [VISUAL_ACUITY, REFRACTION, COLOUR_VISION, EYE_HEALTH] }
+        stationType: { type: string, enum: [VISUAL_ACUITY, REFRACTION, COLOUR_VISION, EYE_HEALTH, CUSTOM] }
         name: { type: string, minLength: 2, maxLength: 100 }
         description: { type: string, maxLength: 500, nullable: true }
         defaultCapacity: { type: integer, minimum: 1, maximum: 1000, default: 3 }
         active: { type: boolean, default: true }
+        fieldSchema:
+          type: array
+          minItems: 1
+          maxItems: 40
+          items: { $ref: "#/components/schemas/StationFieldDefinition" }
     UpdateStationTemplateRequest:
       type: object
       additionalProperties: false
@@ -2693,6 +2732,11 @@ components:
         description: { type: string, maxLength: 500, nullable: true }
         defaultCapacity: { type: integer, minimum: 1, maximum: 1000 }
         active: { type: boolean }
+        fieldSchema:
+          type: array
+          minItems: 1
+          maxItems: 40
+          items: { $ref: "#/components/schemas/StationFieldDefinition" }
     EventStation:
       type: object
       additionalProperties: false
@@ -2702,11 +2746,16 @@ components:
         stationTemplateId: { type: string, format: uuid }
         templateVersion: { type: integer, minimum: 1 }
         name: { type: string, maxLength: 120 }
-        stationType: { type: string, enum: [VISUAL_ACUITY, REFRACTION, COLOUR_VISION, EYE_HEALTH] }
+        stationType: { type: string, enum: [VISUAL_ACUITY, REFRACTION, COLOUR_VISION, EYE_HEALTH, CUSTOM] }
         description: { type: string, nullable: true }
         stationOrder: { type: integer, minimum: 1, maximum: 50 }
         capacity: { type: integer, minimum: 1, maximum: 1000 }
         isAvailable: { type: boolean }
+        fieldSchemaSnapshot:
+          type: array
+          nullable: true
+          items: { $ref: "#/components/schemas/StationFieldDefinition" }
+        schemaVersion: { type: integer, minimum: 1, nullable: true }
         availabilities:
           type: array
           items: { $ref: "#/components/schemas/EventStationAvailability" }
@@ -3836,8 +3885,9 @@ components:
       properties:
         resultId: { type: string, format: uuid }
         stationId: { type: string, format: uuid }
-        screeningType: { type: string, enum: [VISUAL_ACUITY, REFRACTION, COLOUR_VISION, EYE_HEALTH] }
+        screeningType: { type: string, enum: [VISUAL_ACUITY, REFRACTION, COLOUR_VISION, EYE_HEALTH, CUSTOM] }
         resultData: { type: object, additionalProperties: true }
+        schemaVersion: { type: integer, minimum: 1, nullable: true }
         overallFlag: { $ref: "#/components/schemas/OverallFlag" }
         isFlagged: { type: boolean }
         flagSummary: { type: string, nullable: true }
@@ -3851,7 +3901,7 @@ components:
       properties:
         stationId: { type: string, format: uuid }
         stationName: { type: string }
-        stationType: { type: string, enum: [VISUAL_ACUITY, REFRACTION, COLOUR_VISION, EYE_HEALTH] }
+        stationType: { type: string, enum: [VISUAL_ACUITY, REFRACTION, COLOUR_VISION, EYE_HEALTH, CUSTOM] }
         stationOrder: { type: integer, minimum: 1 }
         result:
           type: object
@@ -5403,6 +5453,21 @@ components:
         idempotencyKey: { type: string, minLength: 8, maxLength: 64 }
         acknowledged: { type: boolean }
         resultData: { $ref: "#/components/schemas/EyeHealthObservations" }
+    DynamicPreviewRequest:
+      type: object
+      additionalProperties: false
+      required: [resultData]
+      properties:
+        resultData: { type: object, additionalProperties: true }
+    DynamicSaveRequest:
+      type: object
+      additionalProperties: false
+      required: [registrationId, idempotencyKey, acknowledged, resultData]
+      properties:
+        registrationId: { type: string, format: uuid }
+        idempotencyKey: { type: string, minLength: 8, maxLength: 64 }
+        acknowledged: { type: boolean }
+        resultData: { type: object, additionalProperties: true }
     ScreeningSyncAction:
       oneOf:
         - type: object
@@ -5437,6 +5502,14 @@ components:
             stationId: { type: string, format: uuid }
             stationType: { type: string, enum: [EYE_HEALTH] }
             payload: { $ref: "#/components/schemas/EyeHealthSaveRequest" }
+        - type: object
+          additionalProperties: false
+          required: [clientActionId, stationId, stationType, payload]
+          properties:
+            clientActionId: { type: string, format: uuid }
+            stationId: { type: string, format: uuid }
+            stationType: { type: string, enum: [CUSTOM] }
+            payload: { $ref: "#/components/schemas/DynamicSaveRequest" }
       discriminator: { propertyName: stationType }
     ScreeningSyncRequest:
       type: object
@@ -5493,9 +5566,14 @@ components:
         stationId: { type: string, format: uuid }
         eventId: { type: string, format: uuid }
         stationName: { type: string }
-        stationType: { type: string, enum: [VISUAL_ACUITY, REFRACTION, COLOUR_VISION, EYE_HEALTH] }
+        stationType: { type: string, enum: [VISUAL_ACUITY, REFRACTION, COLOUR_VISION, EYE_HEALTH, CUSTOM] }
         stationOrder: { type: integer }
         isActive: { type: boolean }
+        fieldSchemaSnapshot:
+          type: array
+          nullable: true
+          items: { $ref: "#/components/schemas/StationFieldDefinition" }
+        schemaVersion: { type: integer, minimum: 1, nullable: true }
         offlineAccessExpiresAt: { type: string, format: date-time, nullable: true }
         registrations: { type: array, items: { $ref: "#/components/schemas/ScreeningSyncQueueItem" } }
     ScreeningSyncResponse:

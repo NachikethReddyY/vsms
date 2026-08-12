@@ -210,6 +210,19 @@ const saveEyeHealthBody = z.object({
   resultData: eyeHealthResultData,
 });
 
+const dynamicResultData = z.record(z.string(), z.unknown());
+
+const previewDynamicBody = z.object({
+  resultData: dynamicResultData,
+});
+
+const saveDynamicBody = z.object({
+  registrationId: z.string().uuid(),
+  idempotencyKey: z.string().min(8).max(64),
+  acknowledged: z.boolean(),
+  resultData: dynamicResultData,
+});
+
 const screeningSyncAction = z.discriminatedUnion("stationType", [
   z.object({
     clientActionId: z.string().uuid(),
@@ -232,8 +245,8 @@ const screeningSyncAction = z.discriminatedUnion("stationType", [
   z.object({
     clientActionId: z.string().uuid(),
     stationId: z.string().uuid(),
-    stationType: z.literal("EYE_HEALTH"),
-    payload: saveEyeHealthBody.strict(),
+    stationType: z.literal("CUSTOM"),
+    payload: saveDynamicBody.strict(),
   }).strict(),
 ]);
 
@@ -264,5 +277,7 @@ module.exports = {
   eyeHealthResultData,
   previewEyeHealthBody,
   saveEyeHealthBody,
+  previewDynamicBody,
+  saveDynamicBody,
   screeningSyncBody,
 };

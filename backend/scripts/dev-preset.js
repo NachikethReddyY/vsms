@@ -79,6 +79,7 @@ async function upsertPresetEvent(staff) {
 }
 
 async function upsertStations(event) {
+  const { SYSTEM_FIELD_SCHEMAS } = require("../schemas/dynamicStationSchema");
   const definitions = [
     ["VISUAL_ACUITY", "Visual acuity", 1],
     ["REFRACTION", "Refraction", 2],
@@ -86,12 +87,37 @@ async function upsertStations(event) {
   ];
   const stations = [];
   for (const [stationType, stationName, stationOrder] of definitions) {
-    stations.push(await prisma.station.upsert({
-      where: { eventId_stationType: { eventId: event.eventId, stationType } },
-      update: { stationName, stationOrder, isActive: true },
-      create: { eventId: event.eventId, stationType, stationName, stationOrder, isActive: true },
-    }));
+    const fieldSchema = SYSTEM_FIELD_SCHEMAS[stationType] || null;
+    const existing = await prisma.station.findFirst({
+      where: { eventId: event.eventId, stationType },
+    });
+    stations.push(existing
+      ? await prisma.station.update({
+        where: { stationId: existing.stationId },
+        data: {
+          stationName,
+          stationOrder,
+          isActive: true,
+          fieldSchemaSnapshot: fieldSchema,
+          schemaVersion: 1,
+        },
+      })
+      : await prisma.station.create({
+        data: {
+          eventId: event.eventId,
+          stationType,
+          stationName,
+          stationOrder,
+          isActive: true,
+          fieldSchemaSnapshot: fieldSchema,
+          schemaVersion: 1,
+        },
+      }));
   }
+  await prisma.station.updateMany({
+    where: { eventId: event.eventId, stationType: "EYE_HEALTH", isActive: true },
+    data: { isActive: false },
+  });
   return stations;
 }
 
