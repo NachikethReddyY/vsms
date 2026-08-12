@@ -18,17 +18,12 @@ test('review QR scan is scoped to the active reviewer event', async () => {
           ? { registrationId: 'registration-1' }
           : null,
     },
-    eventRegistration: {
-      findFirst: async ({ where }) => where.eventId === 'event-1' && where.passToken === 'valid-token'
-        ? { registrationId: 'registration-1' }
-        : null,
-    },
   };
   const user = { userId: 'reviewer-1', roles: ['REVIEWER'], professionalCategory: 'DOCTOR', status: 'ACTIVE', approvalState: 'APPROVED', accessState: 'ENABLED' };
 
-  assert.deepEqual(await resolveScannedRegistration('event-1', 'valid-token', user, db), { registrationId: 'registration-1' });
+  assert.deepEqual(await resolveScannedRegistration('event-1', qrUrl, user, db), { registrationId: 'registration-1' });
   await assert.rejects(
-    resolveScannedRegistration('event-1', 'wrong-token', user, db),
+    resolveScannedRegistration('event-1', 'VSMS-DEMO-QR-001', user, db),
     (error) => error.code === 'QR_REGISTRATION_NOT_FOUND',
   );
 });
@@ -44,7 +39,6 @@ test('review QR scan resolves a scanned participant-status URL', async () => {
           ? { registrationId: 'registration-1' }
           : null,
     },
-    eventRegistration: { findFirst: async () => null },
   };
   const user = { userId: 'reviewer-1', roles: ['REVIEWER'], professionalCategory: 'DOCTOR', status: 'ACTIVE', approvalState: 'APPROVED', accessState: 'ENABLED' };
 

@@ -113,6 +113,12 @@ before(async () => {
     createRegistration(fixture.eventA, fixture.participantA, fixture.registrationA, 1),
     createRegistration(fixture.eventB, fixture.participantB, fixture.managerB, 1),
   ]);
+  await prisma.registrationRouteStep.create({
+    data: { registrationId: fixture.registrationRecordA.registrationId, stationId: fixture.stationA.stationId, position: 1 },
+  });
+  fixture.queueA = await prisma.queueEntry.create({
+    data: { registrationId: fixture.registrationRecordA.registrationId, stationId: fixture.stationA.stationId, queueNumber: 1 },
+  });
 
   const consentForm = await prisma.consentFormVersion.create({
     data: {
@@ -233,15 +239,21 @@ describe("two-event route authorization matrix", () => {
     expect(referralDenied.status).toBe(403);
   });
 
-  test("queue explicit and compatibility routes reauthorize derived events and station duties", async () => {
-    const joined = await request(app)
+  test("retired manual joins stay unavailable while queue reads and calls reauthorize event duties", async () => {
+    const retiredJoin = await request(app)
       .post(`/api/v1/queues/events/${fixture.eventA.eventId}/stations/${fixture.stationA.stationId}/join`)
       .set(auth(fixture.screenerA))
       .send({ registrationId: fixture.registrationRecordA.registrationId });
-    const wrongStation = await request(app)
+    const retiredWrongStationJoin = await request(app)
       .post(`/api/v1/queues/events/${fixture.eventA.eventId}/stations/${fixture.stationA2.stationId}/join`)
       .set(auth(fixture.screenerA))
       .send({ registrationId: fixture.registrationRecordA.registrationId });
+    const called = await request(app)
+      .patch(`/api/v1/queues/events/${fixture.eventA.eventId}/entries/${fixture.queueA.id}/call`)
+      .set(auth(fixture.screenerA));
+    const crossEventCall = await request(app)
+      .patch(`/api/v1/queues/events/${fixture.eventB.eventId}/entries/${fixture.queueB.id}/call`)
+      .set(auth(fixture.screenerA));
     const explicitAllowed = await request(app)
       .get(`/api/v1/queues/events/${fixture.eventA.eventId}/participants/${fixture.registrationRecordA.registrationId}`)
       .set(auth(fixture.supportA));
@@ -255,9 +267,11 @@ describe("two-event route authorization matrix", () => {
       .get(`/api/v1/queues/participant/${fixture.registrationRecordB.registrationId}`)
       .set(auth(fixture.supportA));
 
-    expect(joined.body).toEqual(expect.objectContaining({ created: true }));
-    expect(joined.status).toBe(201);
-    expect(wrongStation.status).toBe(403);
+    expect(retiredJoin.status).toBe(404);
+    expect(retiredWrongStationJoin.status).toBe(404);
+    expect(called.status).toBe(200);
+    expect(called.body.data.status).toBe("CALLED");
+    expect(crossEventCall.status).toBe(403);
     expect(explicitAllowed.status).toBe(200);
     expect(compatibilityAllowed.status).toBe(200);
     expect(explicitDenied.status).toBe(403);

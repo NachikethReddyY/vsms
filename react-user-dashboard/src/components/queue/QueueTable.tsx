@@ -6,6 +6,7 @@ export type QueueStatus = "WAITING" | "CALLED" | "IN_PROGRESS" | "COMPLETED" | "
 
 export interface QueueItem {
   id: string;
+  registrationId: string;
   queueNumber: number;
   status: QueueStatus;
   isPriority: boolean;
@@ -15,7 +16,7 @@ export interface QueueItem {
   stationName: string;
 }
 
-type QueueAction = "CALLED" | "STARTED" | "COMPLETED" | "SKIPPED";
+type QueueAction = "CALLED" | "STARTED" | "SKIPPED";
 
 interface QueueTableProps {
   items: QueueItem[];
@@ -29,8 +30,10 @@ interface QueueTableProps {
   totalPages: number;
   actionLoading: string | null;
   canManagePriority: boolean;
+  canOverrideRoute: boolean;
   onAction: (id: string, action: QueueAction) => void;
   onSetPriority: (id: string, isPriority: boolean, notes: string | null) => void;
+  onEditRoute: (registrationId: string) => void;
 }
 
 const statusLabel = (status: QueueStatus) => status.replace("_", " ").toLowerCase();
@@ -163,8 +166,10 @@ export function QueueTable({
   totalPages,
   actionLoading,
   canManagePriority,
+  canOverrideRoute,
   onAction,
   onSetPriority,
+  onEditRoute,
 }: QueueTableProps) {
   return (
     <section className="overflow-hidden rounded-2xl border border-[#E2E1DC] bg-white shadow-sm">
@@ -259,16 +264,8 @@ export function QueueTable({
                       </button>
                     </span>
                   )}
-                  {item.status === "IN_PROGRESS" && (
-                    <button
-                      type="button"
-                      disabled={actionLoading === item.id}
-                      onClick={() => onAction(item.id, "COMPLETED")}
-                      className="font-semibold text-emerald-700 disabled:opacity-50"
-                    >
-                      Complete
-                    </button>
-                  )}
+                  {item.status === "IN_PROGRESS" && <span className="text-xs text-[#7A7870]">Save result at station</span>}
+                  {canOverrideRoute && ["WAITING", "CALLED", "IN_PROGRESS"].includes(item.status) && <button type="button" className="ml-3 min-h-11 font-semibold text-blue-700" onClick={() => onEditRoute(item.registrationId)}>Edit route</button>}
                   {["COMPLETED", "SKIPPED", "CANCELLED"].includes(item.status) && (
                     <span className="text-[#A5A29A]">—</span>
                   )}
@@ -315,6 +312,7 @@ export function QueueTable({
 export function toQueueItems(entries: QueueEntry[]): QueueItem[] {
   return entries.map((entry) => ({
     id: entry.id,
+    registrationId: entry.registrationId,
     queueNumber: entry.queueNumber,
     status: entry.status,
     isPriority: entry.isPriority,

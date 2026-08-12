@@ -47,6 +47,11 @@
 .participant-handoff-summary span { color:var(--muted); font-size:10px; font-weight:750; letter-spacing:.07em; text-transform:uppercase; }
 .participant-handoff-summary strong { color:var(--ink); font-size:15px; overflow-wrap:anywhere; }
 .participant-handoff-actions { display:flex; justify-content:flex-end; flex-wrap:wrap; gap:9px; margin-top:20px; }
+.participant-route-summary { display:grid; gap:8px; margin:18px 0; padding:0; list-style:none; }
+.participant-route-summary li { display:grid; grid-template-columns:32px 1fr auto; align-items:center; gap:10px; min-height:52px; padding:8px 12px; border:1px solid var(--hairline-strong); border-radius:8px; background:var(--surface); }
+.participant-route-summary li>span { display:grid; width:28px; height:28px; place-items:center; border:1px solid var(--hairline-strong); border-radius:999px; font-size:12px; font-weight:800; }
+.participant-route-summary strong { font-size:14px; }
+.participant-route-summary small { color:var(--muted); font-size:12px; }
 @media (max-width:800px) { .participant-station-grid { grid-template-columns:repeat(2,minmax(0,1fr)); } }
 @media (max-width:800px) { .participant-v2-registration .participant-v2-checkin-requirements>div { grid-template-columns:repeat(2,minmax(0,1fr)); }.participant-v2-registration .participant-v2-checkin-requirements article { grid-template-columns:22px minmax(0,1fr) auto; min-height:0; align-content:center; }.participant-v2-registration .participant-v2-checkin-requirements article strong { margin-top:0; } }
 @media (max-width:640px) { .participant-v2-registration .participant-v2-checkin-overview,.participant-v2-registration .participant-v2-checkin-requirements { padding-left:18px; padding-right:18px; }.participant-v2-registration .participant-v2-checkin-records,.participant-v2-registration .participant-v2-checkin-actions { margin-left:18px; margin-right:18px; }.participant-v2-registration .participant-v2-checkin-feedback { margin-left:18px; margin-right:18px; }.participant-v2-registration .participant-v2-checkin-requirements>div { grid-template-columns:1fr; }.participant-registration-dialog { padding:20px; }.participant-registration-dialog footer { display:grid; grid-template-columns:1fr; }.participant-registration-dialog footer>* { width:100%; } }

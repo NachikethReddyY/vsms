@@ -49,7 +49,7 @@ vi.mock('./StationShared', () => ({
       </select>
     </label>
   ),
-  StationHandoffLinks: () => <div>Handoff links</div>,
+  RouteProgressionNotice: () => <div>Route updated</div>,
   StationPageFrame: ({
     title,
     children,

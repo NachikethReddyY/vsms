@@ -8,6 +8,7 @@ import type {
   QueueRegistration,
   RefractionResultData,
   ScreeningSavePayload,
+  RouteProgression,
   Station,
   StationType,
   VisualAcuityResultData,
@@ -45,6 +46,13 @@ type ScreeningSyncActionResult = {
   status: 'APPLIED' | 'CONFLICT' | 'FAILED';
   retryCount: number;
   errorCode?: string;
+  result?: {
+    resultId?: string;
+    overallFlag?: OverallFlag;
+    isFlagged?: boolean;
+    ruleVersion?: string;
+    routeProgression?: RouteProgression | null;
+  };
 };
 
 type ScreeningSyncPullStation = OfflineStation & {
@@ -90,6 +98,7 @@ export type OfflineStationContext = {
 export type OfflineSyncResult = OfflineSyncStatus & {
   synced: number;
   expired: boolean;
+  committedProgressions: Array<{ clientActionId: string; routeProgression: RouteProgression }>;
 };
 
 function unsupportedStorage() {
@@ -233,7 +242,7 @@ function toOfflineStation(station: Station): OfflineStation | null {
   };
 }
 
-function toOfflineQueue(rows: Array<Omit<QueueRegistration, 'passToken'> & Partial<Pick<QueueRegistration, 'passToken'>>>): OfflineQueueRegistration[] {
+function toOfflineQueue(rows: QueueRegistration[]): OfflineQueueRegistration[] {
   return rows.map((row) => ({
     registrationId: row.registrationId,
     participantDisplayName: row.participantDisplayName,
@@ -494,15 +503,16 @@ async function markConflict(record: EncryptedRecord) {
 
 export async function syncOfflineEvent(ownerId: string, eventId: string): Promise<OfflineSyncResult> {
   const initial = await getOfflineSyncStatus(ownerId, eventId);
-  if (!initial.downloaded) return { ...initial, synced: 0, expired: false };
+  if (!initial.downloaded) return { ...initial, synced: 0, expired: false, committedProgressions: [] };
 
   let synced = 0;
+  const committedProgressions: OfflineSyncResult['committedProgressions'] = [];
   const pending: Array<{ record: EncryptedRecord; mutation: OfflineMutation }> = [];
   for (const record of await recordsForEvent(ownerId, eventId)) {
     if (record.kind !== 'mutation' || record.status !== 'pending') continue;
     if (isExpired(record.expiresAt)) {
       await purgeEvent(ownerId, eventId);
-      return { downloaded: false, pending: 0, conflicts: 0, expiresAt: null, synced, expired: true };
+      return { downloaded: false, pending: 0, conflicts: 0, expiresAt: null, synced, expired: true, committedProgressions };
     }
     pending.push({ record, mutation: await decryptRecord<OfflineMutation>(record) });
   }
@@ -531,6 +541,12 @@ export async function syncOfflineEvent(ownerId: string, eventId: string): Promis
         if (result.status === 'APPLIED') {
           await deleteRecords([record]);
           synced += 1;
+          if (result.result?.routeProgression) {
+            committedProgressions.push({
+              clientActionId: result.clientActionId,
+              routeProgression: result.result.routeProgression,
+            });
+          }
         } else if (result.status === 'CONFLICT') {
           await markConflict(record);
         }
@@ -550,13 +566,13 @@ export async function syncOfflineEvent(ownerId: string, eventId: string): Promis
       if (isNetworkError(error)) break;
       if (isScopeExpiredError(error)) {
         await purgeEvent(ownerId, eventId);
-        return { downloaded: false, pending: 0, conflicts: 0, expiresAt: null, synced, expired: true };
+        return { downloaded: false, pending: 0, conflicts: 0, expiresAt: null, synced, expired: true, committedProgressions };
       }
       throw error;
     }
   }
   notifyOfflineChange();
-  return { ...(await getOfflineSyncStatus(ownerId, eventId)), synced, expired: false };
+  return { ...(await getOfflineSyncStatus(ownerId, eventId)), synced, expired: false, committedProgressions };
 }
 
 export async function listOfflineEventIds(ownerId: string): Promise<string[]> {

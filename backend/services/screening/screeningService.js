@@ -11,6 +11,7 @@ const {
   validateResultAgainstSchema,
   evaluateDynamicResult,
 } = require("../../schemas/dynamicStationSchema");
+const { advanceAfterFirstResult } = require("./routeProgressionService");
 
 const VA_RULE_VERSION = "VSMS-VA-1.0";
 const REF_RULE_VERSION = "VSMS-REF-1.0";
@@ -47,7 +48,11 @@ const replayReceipt = (receipt, { eventId, stationId, registrationId, userId, fi
   ) {
     throw new AppError(409, "IDEMPOTENCY_KEY_REUSED", "Idempotency key was already used for a different screening request");
   }
-  return { result: receipt.resultSnapshot, created: false };
+  const snapshot = receipt.resultSnapshot;
+  if (snapshot?.result && snapshot?.routeProgression) {
+    return { result: snapshot.result, routeProgression: snapshot.routeProgression, created: false };
+  }
+  return { result: snapshot, routeProgression: null, created: false };
 };
 
 const immutableSnapshot = (value) => JSON.parse(JSON.stringify(value));
@@ -271,20 +276,25 @@ const listQueue = async (eventId, stationId, user) => {
   const station = await prisma.station.findFirst({ where: { stationId, eventId, isActive: true } });
   if (!station) throw new AppError(404, "STATION_NOT_FOUND", "Station not found for this event");
 
-  const registrations = await prisma.eventRegistration.findMany({
+  const entries = await prisma.queueEntry.findMany({
     where: {
-      eventId,
-      registrationStatus: { in: ["CHECKED_IN", "SIGNED_UP"] },
+      stationId,
+      status: { in: ["WAITING", "CALLED", "IN_PROGRESS"] },
+      registration: { eventId, registrationStatus: "CHECKED_IN" },
     },
-    orderBy: [{ queueNumber: "asc" }, { createdAt: "asc" }],
+    orderBy: [{ isPriority: "desc" }, { queueNumber: "asc" }, { enteredAt: "asc" }],
     include: {
-      screeningResults: {
-        where: { stationId },
-        select: {
-          resultId: true,
-          overallFlag: true,
-          isFlagged: true,
-          createdAt: true,
+      registration: {
+        include: {
+          screeningResults: {
+            where: { stationId },
+            select: {
+              resultId: true,
+              overallFlag: true,
+              isFlagged: true,
+              createdAt: true,
+            },
+          },
         },
       },
     },
@@ -292,14 +302,16 @@ const listQueue = async (eventId, stationId, user) => {
 
   return {
     station,
-    registrations: registrations.map((row) => ({
+    registrations: entries.map((entry) => {
+      const row = entry.registration;
+      return {
       registrationId: row.registrationId,
       participantDisplayName: row.participantDisplayName || "Unnamed participant",
       queueNumber: row.queueNumber,
-      status: row.registrationStatus,
-      passToken: row.passToken,
+      status: entry.status,
       existingResult: row.screeningResults[0] || null,
-    })),
+      };
+    }),
   };
 };
 
@@ -331,7 +343,6 @@ const resolveParticipant = async (eventId, query, user) => {
     participantDisplayName: registration.participantDisplayName || "Unnamed participant",
     queueNumber: registration.queueNumber,
     status: registration.registrationStatus,
-    passToken: registration.passToken,
   };
 };
 
@@ -389,6 +400,16 @@ const saveStationResult = async ({
         throw new AppError(409, "REGISTRATION_NOT_SCREENABLE", "Completed or cancelled registrations cannot be changed");
       }
 
+      const existingResult = await tx.screeningResult.findUnique({
+        where: {
+          registrationId_stationId: {
+            registrationId: body.registrationId,
+            stationId,
+          },
+        },
+        select: { resultId: true },
+      });
+
       const evaluation = evaluate(body.resultData);
       const persistedRuleVersion = ruleVersion || evaluation.ruleVersion;
       if (evaluation.isFlagged && body.acknowledged !== true) {
@@ -414,6 +435,21 @@ const saveStationResult = async ({
         requestFingerprint: fingerprint,
       };
 
+      let routeProgression = { status: "CORRECTION_SAVED" };
+      let queueEntryId;
+      if (!existingResult) {
+        const progression = await advanceAfterFirstResult({
+          tx,
+          registrationId: body.registrationId,
+          eventId,
+          stationId,
+          actorUserId: user.userId,
+          context,
+        });
+        routeProgression = progression.routeProgression;
+        queueEntryId = progression.completedQueueEntryId;
+      }
+
       const result = await tx.screeningResult.upsert({
         where: {
           registrationId_stationId: {
@@ -425,6 +461,7 @@ const saveStationResult = async ({
         create: {
           registrationId: body.registrationId,
           stationId,
+          queueEntryId,
           version: 1,
           ...payload,
         },
@@ -440,7 +477,7 @@ const saveStationResult = async ({
           stationId,
           resultId: result.resultId,
           resultVersion: result.version,
-          resultSnapshot: immutableSnapshot(responseResult),
+          resultSnapshot: immutableSnapshot({ result: responseResult, routeProgression }),
         },
       });
       await createAuditLog({
@@ -478,7 +515,7 @@ const saveStationResult = async ({
           version: result.version,
         },
       });
-      return { result: responseResult, created: true };
+      return { result: responseResult, routeProgression, created: !existingResult };
     }, { isolationLevel: "Serializable" });
   } catch (error) {
     if (error.code === "P2002") {

@@ -215,6 +215,72 @@ test("sync applies an authorized action and stores only safe immutable ledger ev
   }
 });
 
+test("APPLIED receipts persist and replay only allowlisted route progression fields", async () => {
+  const db = createDb();
+  const nextStationId = crypto.randomUUID();
+  const currentAction = action();
+  let saves = 0;
+  const screening = createScreening({ save: async () => {
+    saves += 1;
+    return {
+      result: {
+        resultId: crypto.randomUUID(),
+        overallFlag: "NORMAL",
+        isFlagged: false,
+        resultData: { clinical: "must not persist" },
+        evaluation: { ruleVersion: "VSMS-VA-1.0" },
+      },
+      routeProgression: {
+        status: "ADDED_TO_QUEUE",
+        routeVersion: 2,
+        completedStation: { stationId, stationName: "Visual Acuity", stationType: "VISUAL_ACUITY", routeStepId: crypto.randomUUID() },
+        nextStation: { stationId: nextStationId, stationName: "Refraction", stationType: "REFRACTION", internalCapacity: 4 },
+        nextQueue: { stationId: nextStationId, stationName: "Refraction", stationType: "REFRACTION", queueNumber: 8, status: "WAITING", actorUserId: user.userId },
+        audit: { actorUserId: user.userId },
+      },
+    };
+  } });
+  const body = { clientBatchId: crypto.randomUUID(), actions: [currentAction] };
+
+  const first = await invoke(body, { db, screening }).promise;
+  const replay = await invoke({ ...body, clientBatchId: crypto.randomUUID() }, { db, screening }).promise;
+
+  assert.equal(saves, 1);
+  assert.deepEqual(first.actions[0].result, replay.actions[0].result);
+  assert.deepEqual(first.actions[0].result.routeProgression, {
+    status: "ADDED_TO_QUEUE",
+    routeVersion: 2,
+    completedStation: { stationId, stationName: "Visual Acuity", stationType: "VISUAL_ACUITY" },
+    nextStation: { stationId: nextStationId, stationName: "Refraction", stationType: "REFRACTION" },
+    nextQueue: { stationId: nextStationId, stationName: "Refraction", stationType: "REFRACTION", queueNumber: 8, status: "WAITING" },
+  });
+  const durable = JSON.stringify(db.rows[0].responseSnapshot);
+  for (const forbidden of ["clinical", "routeStepId", "internalCapacity", "actorUserId", "audit"]) {
+    assert.equal(durable.includes(forbidden), false, `${forbidden} must not enter the durable sync receipt`);
+  }
+});
+
+test("route and version conflicts stay allowlisted conflicts without a progression receipt", async () => {
+  for (const code of ["ROUTE_STATION_MISMATCH", "ROUTE_PROGRESSION_CONFLICT", "ROUTE_NOT_ASSIGNED", "ROUTE_QUEUE_CONFLICT"]) {
+    const db = createDb();
+    const screening = createScreening({ save: async () => {
+      throw new AppError(409, code, "Internal route conflict details");
+    } });
+    const response = await invoke(
+      { clientBatchId: crypto.randomUUID(), actions: [action()] },
+      { db, screening },
+    ).promise;
+
+    assert.deepEqual(response.actions[0], {
+      clientActionId: response.actions[0].clientActionId,
+      status: "CONFLICT",
+      retryCount: 0,
+      errorCode: code,
+    });
+    assert.equal(db.rows[0].responseSnapshot, null);
+  }
+});
+
 test("exact client-action replay is idempotent and mismatched reuse is a conflict", async () => {
   const db = createDb();
   let saves = 0;

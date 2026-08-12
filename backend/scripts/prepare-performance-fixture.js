@@ -4,6 +4,7 @@ const crypto = require("crypto");
 const fs = require("fs");
 const os = require("os");
 const path = require("path");
+const { hashToken } = require("../utils/crypto/qrToken");
 
 const CONFIRMATION = "CREATE_SYNTHETIC_TEST_DATA";
 const DEFAULT_COUNT = 500;
@@ -91,8 +92,8 @@ async function main() {
       timezone: "Asia/Singapore",
       startsAt: new Date(now - 60 * 60 * 1000),
       endsAt: new Date(now + 24 * 60 * 60 * 1000),
-      capacity: count,
-      expectedAttendance: count,
+      capacity: count * 2,
+      expectedAttendance: count * 2,
       status: "IN_PROGRESS",
       createdByUserId: actor.id,
       createIdempotencyKey: `performance-${runId}`,
@@ -141,9 +142,11 @@ async function main() {
     },
   });
   const participantIds = Array.from({ length: count }, () => crypto.randomUUID());
+  const pollParticipantIds = Array.from({ length: count }, () => crypto.randomUUID());
+  const allParticipantIds = [...participantIds, ...pollParticipantIds];
   await prisma.$transaction(async (tx) => {
     await tx.participant.createMany({
-      data: participantIds.map((id, index) => ({
+      data: allParticipantIds.map((id, index) => ({
         id,
         participantReference: `PERF-${runId.slice(0, 8)}-${String(index + 1).padStart(4, "0")}`,
         firstName: "Synthetic",
@@ -159,7 +162,7 @@ async function main() {
       })),
     });
     await tx.participantEmergencyContact.createMany({
-      data: participantIds.map((participantId, index) => ({
+      data: allParticipantIds.map((participantId, index) => ({
         participantId,
         contactName: `Synthetic Contact ${index + 1}`,
         relationship: "Test contact",
@@ -171,7 +174,7 @@ async function main() {
       })),
     });
     await tx.participantConsent.createMany({
-      data: participantIds.map((participantId) => ({
+      data: allParticipantIds.map((participantId) => ({
         participantId,
         eventId: event.eventId,
         consentFormVersionId: consentForm.id,
@@ -184,12 +187,51 @@ async function main() {
       })),
     });
   });
+  const pollRegistrations = pollParticipantIds.map((participantId, index) => ({
+    registrationId: crypto.randomUUID(),
+    participantId,
+    eventId: event.eventId,
+    registeredBy: actor.id,
+    registrationStatus: "CHECKED_IN",
+    participantDisplayName: `Synthetic Poll Participant ${index + 1}`,
+    queueNumber: index + 1,
+    idempotencyKey: `performance-poll-${runId}-${index + 1}`,
+    checkedIn: true,
+    checkedInAt: new Date(),
+  }));
+  const pollTokens = pollRegistrations.map(() => crypto.randomBytes(32).toString("hex"));
+  await prisma.$transaction(async (tx) => {
+    await tx.eventRegistration.createMany({ data: pollRegistrations });
+    await tx.registrationRouteStep.createMany({
+      data: pollRegistrations.map(({ registrationId }) => ({ registrationId, stationId: station.stationId, position: 1 })),
+    });
+    await tx.queueEntry.createMany({
+      data: pollRegistrations.map(({ registrationId, queueNumber }) => ({
+        registrationId,
+        stationId: station.stationId,
+        queueNumber,
+        status: "WAITING",
+      })),
+    });
+    await tx.qRCodePass.createMany({
+      data: pollRegistrations.map(({ registrationId }, index) => ({
+        id: crypto.randomUUID(),
+        registrationId,
+        tokenHash: hashToken(pollTokens[index]),
+        tokenCiphertext: null,
+        tokenEncryptionVersion: 2,
+        expiresAt: new Date(now + 24 * 60 * 60 * 1000),
+        isActive: true,
+      })),
+    });
+  });
   fs.writeFileSync(output, `${JSON.stringify({
     target: databaseName(process.env.DATABASE_URL),
     eventId: event.eventId,
     stationId: station.stationId,
     actorId: actor.id,
     participantIds,
+    pollTokens,
   }, null, 2)}\n`, { mode: 0o600 });
   process.stdout.write(`Synthetic fixture written to ${output} for ${count} participants.\n`);
   await prisma.$disconnect();

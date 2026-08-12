@@ -1,4 +1,9 @@
 const { z } = require("zod");
+const { extractQrToken } = require("../utils/crypto/qrToken");
+
+const secureQrValue = z.string().trim().min(64).max(2048).refine((value) => extractQrToken(value) !== null, {
+  message: "A valid secure QR pass token or participant-status URL is required",
+});
 
 const eyeReading = z.discriminatedUnion("kind", [
   z.object({
@@ -24,7 +29,7 @@ const reviewParams = eventParams.extend({
 }).strict();
 
 const reviewScanBody = z.object({
-  passToken: z.string().trim().min(4).max(255),
+  passToken: secureQrValue,
 }).strict();
 
 const referralParams = eventParams.extend({ referralId: z.string().uuid() }).strict();
@@ -105,10 +110,8 @@ const reviewDecisionBody = z.discriminatedUnion("outcome", [
 ]);
 
 const resolveQuery = z.object({
-  // Demo seed uses EventRegistration.passToken (e.g. VSMS-DEMO-QR-001).
-  // Staff may also paste QRCodePass.token (hex); service looks up either.
-  passToken: z.string().min(4).max(255).optional(),
-  qrToken: z.string().min(4).max(255).optional(),
+  passToken: secureQrValue.optional(),
+  qrToken: secureQrValue.optional(),
   registrationId: z.string().uuid().optional(),
 }).refine((value) => Boolean(value.passToken || value.qrToken || value.registrationId), {
   message: "passToken, qrToken, or registrationId is required",

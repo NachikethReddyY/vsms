@@ -125,17 +125,17 @@ export default function QRCodePage() {
   };
 
   return <div className="page-frame qr-page">
-    <header className="page-heading qr-heading"><div><h1>Participant QR passes</h1><p>Generate, replace, and verify branded event passes, plus a manual fallback for check-in when scanning fails.</p></div></header>
+    <header className="page-heading qr-heading"><div><h1>Participant QR passes</h1><p>Open, replace, and verify the single secure pass used throughout an event, with a manual check-in fallback.</p></div></header>
 
     <div className="qr-layout">
       <section className="qr-lookup" aria-labelledby="qr-lookup-title">
-        <div className="qr-section-heading"><QrCodeIcon /><div><h2 id="qr-lookup-title">Generate a pass</h2><p>Access is checked against your assigned events before a pass is created. Every pass is unique, time-limited, and branded for VSMS.</p></div></div>
+        <div className="qr-section-heading"><QrCodeIcon /><div><h2 id="qr-lookup-title">Open an event pass</h2><p>Access is checked against your assigned events. The active pass is reused at every station unless authorized staff explicitly reissue it.</p></div></div>
         <form className="qr-form" onSubmit={generate} noValidate>
           <label htmlFor="registration-id">Registration UUID</label>
           <input id="registration-id" value={registrationId} onChange={(event) => setRegistrationId(event.target.value)} autoComplete="off" spellCheck="false" placeholder="00000000-0000-0000-0000-000000000000" aria-invalid={!!error} aria-describedby={error ? 'qr-error' : 'qr-id-help'} />
           <span id="qr-id-help">Use the identifier from the participant’s event registration record.</span>
           {error && <div className="alert error" id="qr-error" role="alert">{error}</div>}
-          <button className="primary" type="submit" disabled={loading}>{loading ? <><ArrowPathIcon className="qr-spin" />Generating pass…</> : <><QrCodeIcon />Generate new pass</>}</button>
+          <button className="primary" type="submit" disabled={loading}>{loading ? <><ArrowPathIcon className="qr-spin" />Opening pass…</> : <><QrCodeIcon />Open active pass</>}</button>
         </form>
         <div className="qr-security-note"><ShieldCheckIcon /><p><strong>Scoped and replaceable.</strong> A new pass revokes the previous active pass. Clinical information is never encoded in the QR image.</p></div>
       </section>
@@ -152,8 +152,8 @@ export default function QRCodePage() {
             <button className={confirmRevoke ? 'danger-button' : 'secondary'} type="button" onClick={() => void revoke()} disabled={action !== null}>{action === 'revoke' ? <><ArrowPathIcon className="qr-spin" />Revoking…</> : <><XCircleIcon />{confirmRevoke ? 'Confirm revoke' : 'Revoke'}</>}</button>
             <button className="secondary" type="button" onClick={() => void reissue()} disabled={action !== null}>{action === 'reissue' ? <><ArrowPathIcon className="qr-spin" />Reissuing…</> : <><ArrowPathIcon />Reissue</>}</button>
           </div>
-          <button className="qr-reset" type="button" onClick={resetAll}>Generate another pass</button>
-        </> : <div className="qr-idle"><QrCodeIcon /><h2 id="qr-preview-title">No pass generated</h2><p>Enter a verified registration UUID to create a time-limited branded QR image.</p></div>}
+          <button className="qr-reset" type="button" onClick={resetAll}>Open another registration</button>
+        </> : <div className="qr-idle"><QrCodeIcon /><h2 id="qr-preview-title">No pass selected</h2><p>Enter a verified registration UUID to open its active event QR.</p></div>}
       </section>
     </div>
 

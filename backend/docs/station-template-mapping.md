@@ -58,7 +58,7 @@ VISUAL_ACUITY | REFRACTION | COLOUR_VISION | EYE_HEALTH | CUSTOM
 
 Demo event seeding creates **runtime** `Station` rows for VA / Refraction / Colour Vision only. Eye Health stays in clinical review; Registration and Clinical Review are workflow roles, not screening stations.
 
-QR scan → station handoff (token-only QR; `eventId` + `registrationId` after verify) is documented in [`qr-station-handoff.md`](./qr-station-handoff.md).
+Every station resolves the same active secure participant QR; no generated station-handoff QR is used.
 
 ---
 

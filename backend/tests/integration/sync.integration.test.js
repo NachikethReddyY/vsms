@@ -15,17 +15,7 @@ before(async () => {
   helpers = require("../helpers");
   ({ processScreeningSync, requestFingerprint } = require("../../services/screening/syncService"));
 
-  const screener = await helpers.ensureTestUser("STAFF");
-  const role = await helpers.prisma.role.upsert({
-    where: { roleName: "SCREENER" },
-    update: {},
-    create: { roleName: "SCREENER" },
-  });
-  await helpers.prisma.userRole.upsert({
-    where: { userId_roleId: { userId: screener.id, roleId: role.id } },
-    update: {},
-    create: { userId: screener.id, roleId: role.id },
-  });
+  const screener = await helpers.ensureTestUser("SCREENER", "sync-integration-screener");
 
   const now = Date.now();
   const event = await helpers.prisma.event.create({
@@ -115,6 +105,12 @@ before(async () => {
       checkedIn: true,
     },
   });
+  await helpers.prisma.registrationRouteStep.create({
+    data: { registrationId: registration.registrationId, stationId: station.stationId, position: 1 },
+  });
+  await helpers.prisma.queueEntry.create({
+    data: { registrationId: registration.registrationId, stationId: station.stationId, queueNumber: 1 },
+  });
   fixture = { screener, event, station, participant, registration, membership };
 });
 
@@ -159,10 +155,12 @@ describe("screening sync API", () => {
     expect(first.actions[0]).toEqual(expect.objectContaining({ clientActionId, status: "APPLIED", retryCount: 0 }));
     expect(concurrentReplay.actions[0]).toEqual(expect.objectContaining({ clientActionId, status: "APPLIED", retryCount: 0 }));
     expect(concurrentReplay.actions[0].result).toEqual(first.actions[0].result);
-    const registration = first.pull.stations[0].registrations[0];
-    expect(registration.participantDisplayName).toBe("Sync Participant");
-    expect(registration.passToken).toBeUndefined();
-    expect(registration.participant).toBeUndefined();
+    expect(first.actions[0].result.routeProgression).toEqual(expect.objectContaining({
+      status: "REVIEW_READY",
+      completedStation: expect.objectContaining({ stationId: fixture.station.stationId }),
+      nextQueue: null,
+    }));
+    expect(first.pull.stations[0].registrations).toEqual([]);
 
     const replay = await push();
     expect(replay.actions[0].status).toBe("APPLIED");

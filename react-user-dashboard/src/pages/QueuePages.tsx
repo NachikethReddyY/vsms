@@ -1,7 +1,8 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useParams } from "react-router-dom";
 import { useAuth } from "../auth/AuthProvider";
 import { NowServingCard } from "../components/queue/NowServingCard";
+import { RouteOverrideDialog } from "../components/queue/RouteOverrideDialog";
 import { QueueHeader } from "../components/queue/QueueHeader";
 import { QueueTable, toQueueItems, type QueueStatus } from "../components/queue/QueueTable";
 import { StationWorkload } from "../components/queue/StationWorkload";
@@ -18,6 +19,8 @@ export function QueuePage() {
   const { session } = useAuth();
   const roles = session?.user.roles ?? [];
   const canManagePriority = roles.includes("EVENT_MANAGER") || roles.includes("ADMINISTRATOR");
+  const canOverrideRoute = roles.some((role) => ["REGISTRATION_OFFICER", "SCREENER", "EVENT_MANAGER", "ADMINISTRATOR"].includes(role));
+  const hasFullRouteAccess = roles.includes("EVENT_MANAGER") || roles.includes("ADMINISTRATOR");
 
   const [status, setStatus] = useState<EventQueueStatus | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -27,28 +30,36 @@ export function QueuePage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<QueueStatus | "ALL">("ALL");
   const [currentPage, setCurrentPage] = useState(1);
+  const [routeRegistrationId, setRouteRegistrationId] = useState<string | null>(null);
+  const requestSequence = useRef(0);
 
   const isPermissionError = Boolean(errorCode && PERMISSION_ERROR_CODES.has(errorCode));
 
   const fetchQueue = useCallback(async () => {
     if (!eventId) return;
+    const sequence = ++requestSequence.current;
     try {
       const result = await queueApi.getEventQueueStatus(eventId);
+      if (sequence !== requestSequence.current) return;
       setStatus(result);
       setError(null);
       setErrorCode(null);
     } catch (requestError: unknown) {
+      if (sequence !== requestSequence.current) return;
       setError(getApiError(requestError, "Unable to load queue data."));
       setErrorCode(getApiErrorCode(requestError));
     } finally {
-      setIsLoading(false);
+      if (sequence === requestSequence.current) setIsLoading(false);
     }
   }, [eventId]);
 
   useEffect(() => {
     void fetchQueue();
     const interval = window.setInterval(() => void fetchQueue(), 10_000);
-    return () => window.clearInterval(interval);
+    return () => {
+      window.clearInterval(interval);
+      requestSequence.current += 1;
+    };
   }, [fetchQueue]);
 
   const entries = useMemo(() => status?.entries ?? [], [status]);
@@ -77,12 +88,11 @@ export function QueuePage() {
     }
   };
 
-  const handleAction = (id: string, action: "CALLED" | "STARTED" | "COMPLETED" | "SKIPPED") => {
+  const handleAction = (id: string, action: "CALLED" | "STARTED" | "SKIPPED") => {
     if (!eventId) return;
     const runners: Record<string, () => Promise<unknown>> = {
       CALLED: () => queueApi.callQueueEntry(eventId, id),
       STARTED: () => queueApi.startQueueEntry(eventId, id),
-      COMPLETED: () => queueApi.completeQueueEntry(eventId, id),
       SKIPPED: () => queueApi.skipQueueEntry(eventId, id),
     };
     void runAction(id, runners[action]);
@@ -156,7 +166,6 @@ export function QueuePage() {
             <NowServingCard
               nowServing={nowServing}
               actionLoading={actionLoading}
-              onComplete={(id) => handleAction(id, "COMPLETED")}
               onNoShow={(id) => handleAction(id, "SKIPPED")}
             />
 
@@ -164,7 +173,7 @@ export function QueuePage() {
               <section className="rounded-2xl border border-[#E2E1DC] bg-white p-10 text-center shadow-sm">
                 <p className="text-sm font-semibold text-[#57554F]">The queue is empty</p>
                 <p className="mt-1 text-sm text-[#7A7870]">
-                  Join or hand off a participant to a station to start the queue.
+                  Participants enter queues through their assigned routes.
                 </p>
               </section>
             ) : (
@@ -180,13 +189,23 @@ export function QueuePage() {
                 totalPages={totalPages}
                 actionLoading={actionLoading}
                 canManagePriority={canManagePriority}
+                canOverrideRoute={canOverrideRoute}
                 onAction={handleAction}
                 onSetPriority={handleSetPriority}
+                onEditRoute={setRouteRegistrationId}
               />
             )}
           </>
         )}
       </div>
+      {eventId && <RouteOverrideDialog
+        open={routeRegistrationId !== null}
+        eventId={eventId}
+        registrationId={routeRegistrationId}
+        fullAccess={hasFullRouteAccess}
+        onOpenChange={(open) => { if (!open) setRouteRegistrationId(null); }}
+        onCommitted={fetchQueue}
+      />}
     </AppShell>
   );
 }

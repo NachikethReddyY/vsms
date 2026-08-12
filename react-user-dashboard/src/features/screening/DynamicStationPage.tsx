@@ -17,7 +17,6 @@ export default function DynamicStationPage({ stationType }: { stationType?: Stat
   const [searchParams] = useSearchParams();
   const [eventName, setEventName] = useState('');
   const [station, setStation] = useState<Station | null>(null);
-  const [eventStations, setEventStations] = useState<Station[]>([]);
   const [queue, setQueue] = useState<QueueRegistration[]>([]);
   const [selectedId, setSelectedId] = useState(() => searchParams.get('registrationId') || '');
   const [values, setValues] = useState<DynamicFieldValues>({});
@@ -29,7 +28,6 @@ export default function DynamicStationPage({ stationType }: { stationType?: Stat
   const [instructionsOpen, setInstructionsOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
-  const [savedRegistrationId, setSavedRegistrationId] = useState<string | null>(null);
   const participantRequestGeneration = useRef(0);
 
   const selected = useMemo(() => queue.find((row) => row.registrationId === selectedId) || null, [queue, selectedId]);
@@ -72,7 +70,6 @@ export default function DynamicStationPage({ stationType }: { stationType?: Stat
       const queuePayload = await screeningApi.listQueue(eventId, selectedStation.stationId);
       setEventName(payload.event.name);
       setStation(selectedStation);
-      setEventStations(payload.stations);
       setQueue(queuePayload.registrations);
       if (!selectedId && queuePayload.registrations[0]) selectParticipant(queuePayload.registrations[0].registrationId);
     } catch (cause) {
@@ -85,7 +82,6 @@ export default function DynamicStationPage({ stationType }: { stationType?: Stat
         if (offline) {
           setEventName(offline.eventName);
           setStation(offline.station);
-          setEventStations(offline.stations);
           setQueue(offline.queue);
           if (!selectedId && offline.queue[0]) selectParticipant(offline.queue[0].registrationId);
           return;
@@ -103,7 +99,6 @@ export default function DynamicStationPage({ stationType }: { stationType?: Stat
     setAcknowledged(false);
     setError(null);
     setSuccess(null);
-    setSavedRegistrationId(null);
   }, [selectedId]);
 
   const updateValue = (key: string, value: unknown) => {
@@ -164,8 +159,9 @@ export default function DynamicStationPage({ stationType }: { stationType?: Stat
         resultData: values,
       });
       if (generation !== participantRequestGeneration.current) return;
-      setSuccess(saved.queued ? 'Saved offline. It will sync when connected.' : `Saved ${station.stationName} result (${saved.overallFlag}).`);
-      setSavedRegistrationId(selected.registrationId);
+      setSuccess(saved.syncState === 'PENDING_SYNC'
+        ? 'Pending sync. The participant has not entered the next queue.'
+        : `Saved ${station.stationName} result (${saved.overallFlag}).`);
       setEvaluation(null);
       setAcknowledged(false);
       await load();
@@ -189,7 +185,7 @@ export default function DynamicStationPage({ stationType }: { stationType?: Stat
     success={success}
     handoff={<StationHandoffLinks eventId={eventId} currentStationType={resolvedType} currentStationId={station?.stationId || routeStationId} registrationId={savedRegistrationId || selectedId} stations={eventStations} />}
   >
-    <ParticipantLookup eventId={eventId} queue={queue} selectedId={selectedId} onSelect={selectParticipant} selected={selected} />
+    <ParticipantLookup eventId={eventId} currentStationId={station?.stationId ?? ''} queue={queue} selectedId={selectedId} onSelect={selectParticipant} selected={selected} />
     <form className="detail-panel va-form" onSubmit={(event) => void submit(event)} noValidate>
       <h2>{station?.stationName || 'Station assessment'}</h2>
       {!fieldSchema.length ? <p className="form-error" role="alert">This station does not have a field schema.</p> : <StationFieldRenderer fieldSchema={fieldSchema} values={values} onChange={updateValue} errors={fieldErrors} disabled={pending} />}
