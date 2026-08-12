@@ -905,6 +905,7 @@ model Station {
 
 model StationTemplate {
   stationTemplateId String       @id @default(uuid()) @map("station_template_id") @db.Uuid
+  fieldSchema       Json?        @map("field_schema")
   templateKey       String       @unique @map("template_key") @db.VarChar(50)
   stationType       StationType? @map("station_type")
   version           Int          @default(1)
