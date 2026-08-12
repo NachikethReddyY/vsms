@@ -491,9 +491,22 @@ const requireTemplates = async (tx, stations) => {
   if (templates.length !== ids.length) {
     throw new AppError(422, "STATION_TEMPLATE_NOT_AVAILABLE", "One or more station templates are unavailable");
   }
-  const stationTypes = templates.map(stationTypeForTemplate).filter(Boolean);
-  if (new Set(stationTypes).size !== stationTypes.length) {
-    throw new AppError(422, "DUPLICATE_STATION_TYPE", "Choose only one template for each screening station type");
+  const importable = [];
+  for (const template of templates) {
+    const stationType = stationTypeForTemplate(template);
+    if (!stationType) {
+      throw new AppError(
+        422,
+        "STATION_TEMPLATE_NOT_IMPORTABLE",
+        `${template.name} cannot be imported as a screening station`,
+      );
+    }
+    importable.push({ template, stationType });
+  }
+  try {
+    assertImportableBatch(importable);
+  } catch (error) {
+    throw new AppError(error.status || 422, error.code || "DUPLICATE_STATION_TYPE", error.message);
   }
   return new Map(templates.map((template) => [template.stationTemplateId, template]));
 };
@@ -572,23 +585,16 @@ const createEventDays = async (tx, eventId, days) => {
   return new Map(created.map((day) => [day.date.toISOString().slice(0, 10), day]));
 };
 
+/** Only CUSTOM stations freeze and render fieldSchema. Built-in clinical UIs stay hard-coded. */
 const stationSchemaFields = (template) => {
-  if (template.stationType === "CUSTOM" || (Array.isArray(template.fieldSchema) && template.fieldSchema.length > 0)) {
-    const fieldSchema = parseFieldSchema(template.fieldSchema);
-    return {
-      fieldSchemaSnapshot: fieldSchema,
-      schemaVersion: template.version || 1,
-    };
-  }
-  if (template.fieldSchema == null) {
+  if (template.stationType !== "CUSTOM") {
     return { fieldSchemaSnapshot: null, schemaVersion: template.version || 1 };
   }
-  try {
-    const fieldSchema = parseFieldSchema(template.fieldSchema);
-    return { fieldSchemaSnapshot: fieldSchema, schemaVersion: template.version || 1 };
-  } catch {
-    return { fieldSchemaSnapshot: null, schemaVersion: template.version || 1 };
-  }
+  const fieldSchema = parseFieldSchema(template.fieldSchema);
+  return {
+    fieldSchemaSnapshot: fieldSchema,
+    schemaVersion: template.version || 1,
+  };
 };
 
 const createEventStations = async (tx, eventId, stations, daysByDate, templatesById) => {
@@ -1755,16 +1761,22 @@ const createStationTemplate = async (body, user, context, db = prisma) => {
     );
   }
   const { SYSTEM_FIELD_SCHEMAS } = require("../../schemas/dynamicStationSchema");
-  let fieldSchema = body.fieldSchema;
+  let fieldSchema;
   try {
     if (body.stationType === "CUSTOM") {
-      fieldSchema = parseFieldSchema(fieldSchema);
-    } else if (fieldSchema !== undefined) {
-      fieldSchema = parseFieldSchema(fieldSchema);
-    } else if (SYSTEM_FIELD_SCHEMAS[body.stationType]) {
-      fieldSchema = SYSTEM_FIELD_SCHEMAS[body.stationType];
+      fieldSchema = parseFieldSchema(body.fieldSchema);
+    } else if (body.fieldSchema !== undefined) {
+      throw new AppError(
+        422,
+        "FIELD_SCHEMA_NOT_EDITABLE",
+        "Field schemas can only be defined for custom stations. Built-in stations use fixed clinical forms.",
+      );
+    } else {
+      // Catalog metadata only — live VA/REF/CV pages ignore this and keep hard-coded forms.
+      fieldSchema = SYSTEM_FIELD_SCHEMAS[body.stationType] ?? null;
     }
   } catch (error) {
+    if (error instanceof AppError) throw error;
     throw new AppError(422, "INVALID_FIELD_SCHEMA", error.message);
   }
   try {
@@ -1805,6 +1817,13 @@ const updateStationTemplate = async (stationTemplateId, body, user, context, db 
   if (!existing) throw new AppError(404, "STATION_TEMPLATE_NOT_FOUND", "Station template not found");
   let fieldSchema;
   if (body.fieldSchema !== undefined) {
+    if (existing.stationType !== "CUSTOM") {
+      throw new AppError(
+        422,
+        "FIELD_SCHEMA_NOT_EDITABLE",
+        "Field schemas can only be edited for custom stations. Built-in stations use fixed clinical forms.",
+      );
+    }
     try {
       fieldSchema = parseFieldSchema(body.fieldSchema);
     } catch (error) {

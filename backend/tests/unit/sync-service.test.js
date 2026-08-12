@@ -445,14 +445,14 @@ test("sync schema rejects participant identifiers and profile fields", () => {
   assert.equal(screeningSyncBody.safeParse({ clientBatchId: crypto.randomUUID(), actions: [unsafe] }).success, false);
 });
 
-test("eye-health sync actions apply through the dedicated handler and stay idempotent", async () => {
+test("eye-health sync actions are rejected as review-only", async () => {
   const db = createDb();
   let saves = 0;
   const screening = createScreening({
     save: async () => {
       saves += 1;
       return {
-        created: saves === 1,
+        created: true,
         result: {
           resultId: crypto.randomUUID(),
           overallFlag: "REVIEW",
@@ -477,32 +477,14 @@ test("eye-health sync actions apply through the dedicated handler and stay idemp
     },
   });
 
+  assert.equal(
+    screeningSyncBody.safeParse({ clientBatchId: crypto.randomUUID(), actions: [eyeAction] }).success,
+    false,
+  );
+
   const first = invoke({ clientBatchId: crypto.randomUUID(), actions: [eyeAction] }, { db, screening });
   const firstResponse = await first.promise;
-  assert.equal(firstResponse.actions[0].status, "APPLIED");
-  assert.deepEqual(db.rows[0].payload, { schemaVersion: 1, stationType: "EYE_HEALTH" });
-  assert.equal(saves, 1);
-
-  const replay = invoke({ clientBatchId: crypto.randomUUID(), actions: [eyeAction] }, { db, screening });
-  const replayResponse = await replay.promise;
-  assert.equal(replayResponse.actions[0].status, "APPLIED");
-  assert.equal(saves, 1);
-
-  const mismatched = action({
-    clientActionId: eyeAction.clientActionId,
-    stationType: "EYE_HEALTH",
-    payload: {
-      ...eyeAction.payload,
-      resultData: {
-        cataractRisk: "PRESENT",
-        glaucomaRisk: "NONE",
-        symptomsNoted: false,
-        observations: "Different payload reuse.",
-      },
-    },
-  });
-  const conflict = invoke({ clientBatchId: crypto.randomUUID(), actions: [mismatched] }, { db, screening });
-  const conflictResponse = await conflict.promise;
-  assert.equal(conflictResponse.actions[0].status, "CONFLICT");
-  assert.equal(saves, 1);
+  assert.equal(firstResponse.actions[0].status, "CONFLICT");
+  assert.equal(firstResponse.actions[0].errorCode, "EYE_HEALTH_REVIEW_ONLY");
+  assert.equal(saves, 0);
 });

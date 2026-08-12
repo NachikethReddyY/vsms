@@ -83,6 +83,49 @@ test("station template mutations generate opaque keys and audit atomically", asy
   assert.ok(audits.every((audit) => audit.userId === manager.userId && audit.requestId === context.requestId));
 });
 
+test("clinical station templates reject editable fieldSchema payloads", async () => {
+  const db = { $transaction: async () => { throw new Error("transaction must not run"); } };
+  const context = { requestId: crypto.randomUUID(), ipAddress: "127.0.0.1", deviceName: "Test" };
+  await assert.rejects(
+    () => eventService.createStationTemplate({
+      stationType: "VISUAL_ACUITY",
+      name: "Edited VA form",
+      defaultCapacity: 2,
+      active: true,
+      fieldSchema: [{ key: "hacked", label: "Hacked", type: "text", required: true }],
+    }, manager, context, db),
+    (error) => error.code === "FIELD_SCHEMA_NOT_EDITABLE",
+  );
+
+  const transactionClient = {
+    stationTemplate: {
+      findUnique: async () => ({
+        stationTemplateId: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+        templateKey: "opaque-existing-key",
+        stationType: "VISUAL_ACUITY",
+        version: 1,
+        name: "Visual acuity booth",
+        description: null,
+        defaultCapacity: 4,
+        active: true,
+        fieldSchema: null,
+      }),
+      update: async () => { throw new Error("update must not run"); },
+    },
+    auditLog: { create: async () => ({}) },
+  };
+  await assert.rejects(
+    () => eventService.updateStationTemplate(
+      "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+      { fieldSchema: [{ key: "hacked", label: "Hacked", type: "text", required: true }] },
+      manager,
+      context,
+      { $transaction: async (callback) => callback(transactionClient) },
+    ),
+    (error) => error.code === "FIELD_SCHEMA_NOT_EDITABLE",
+  );
+});
+
 const eventRecord = (status = "DRAFT", version = 1, assignments = [], registrations = []) => ({
   eventId,
   name: "Service test event",

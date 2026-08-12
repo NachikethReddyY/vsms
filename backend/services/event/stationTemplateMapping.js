@@ -63,6 +63,18 @@ const findExistingStation = (stations, { stationType, stationTemplateId }) => {
   return stations.find((station) => station.stationType === stationType);
 };
 
+/** True when a catalog template is still available for import into an event that already has `stations`. */
+const isTemplateAvailableForEvent = (template, stations = []) => {
+  const stationType = stationTypeForTemplate(template);
+  if (!stationType) return false;
+  if (stationType === "CUSTOM") {
+    return !stations.some((station) => (
+      station.stationType === "CUSTOM" && station.stationTemplateId === template.stationTemplateId
+    ));
+  }
+  return !stations.some((station) => station.stationType === stationType);
+};
+
 module.exports = {
   SUPPORTED_SCREENING_STATION_TYPES,
   CLINICAL_ONE_PER_EVENT_TYPES,
@@ -70,4 +82,5 @@ module.exports = {
   classifyTemplates,
   assertImportableBatch,
   findExistingStation,
+  isTemplateAvailableForEvent,
 };

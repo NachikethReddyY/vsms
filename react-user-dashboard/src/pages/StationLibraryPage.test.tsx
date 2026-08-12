@@ -138,6 +138,32 @@ describe('StationLibraryPage', () => {
     expect(await within(library()).findByText('Custom notes booth')).toBeTruthy();
   });
 
+  it('hides the field builder for built-in clinical templates and omits fieldSchema on create', async () => {
+    get.mockResolvedValueOnce({ data: [] });
+    post.mockResolvedValueOnce({
+      data: {
+        ...template,
+        stationTemplateId: 'cccccccc-cccc-4ccc-8ccc-cccccccccccc',
+        templateKey: '33333333-3333-4333-8333-333333333333',
+        name: 'VA catalog entry',
+        fieldSchema: null,
+      },
+    });
+    renderPage();
+    await screen.findByRole('heading', { name: /No station templates yet/i });
+    await openCreateFromEmpty();
+    const dialog = await screen.findByRole('dialog', { name: /Add station template/i });
+    expect(within(dialog).getByText(/fixed clinical screener form/i)).toBeTruthy();
+    expect(within(dialog).queryByRole('heading', { name: /Preview/i })).toBeNull();
+    await userEvent.type(within(dialog).getByLabelText(/^Name$/i), 'VA catalog entry');
+    await userEvent.click(within(dialog).getByRole('button', { name: /Create template/i }));
+    await waitFor(() => expect(post).toHaveBeenCalledWith('/events/station-templates', expect.objectContaining({
+      stationType: 'VISUAL_ACUITY',
+      name: 'VA catalog entry',
+    })));
+    expect(post.mock.calls[0][1]).not.toHaveProperty('fieldSchema');
+  });
+
   it('surfaces create API errors inside the dialog', async () => {
     get.mockResolvedValueOnce({ data: [] });
     post.mockRejectedValueOnce(new Error('Station template could not be created'));

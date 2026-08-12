@@ -25,8 +25,8 @@ VISUAL_ACUITY | REFRACTION | COLOUR_VISION | EYE_HEALTH | CUSTOM
 
 | Model | Field | Notes |
 |---|---|---|
-| `StationTemplate` | `fieldSchema` | JSON array of field definitions for CUSTOM (and optional system reference schemas). |
-| `Station` | `fieldSchemaSnapshot` | Frozen copy of the template schema at import/create time. |
+| `StationTemplate` | `fieldSchema` | JSON array of field definitions — **editable and frozen only for CUSTOM**. Built-in VA/REF/CV keep hard-coded clinical forms/rules. |
+| `Station` | `fieldSchemaSnapshot` | Frozen CUSTOM schema at import/create. Null for built-in clinical stations. |
 | `Station` | `schemaVersion` | Template version captured with the snapshot. |
 | `ScreeningResult` | `schemaVersion` | Version recorded with the saved result. |
 
@@ -34,7 +34,7 @@ VISUAL_ACUITY | REFRACTION | COLOUR_VISION | EYE_HEALTH | CUSTOM
 
 | Field | Notes |
 |---|---|
-| `stationType` | Required. Clinical types (VA/REF/CV/EH) are one-per-event (enforced in service). `CUSTOM` may appear multiple times. |
+| `stationType` | Required. Clinical types (VA/REF/CV) are one-per-event (enforced in service). `CUSTOM` may appear multiple times (unique by `stationTemplateId`). Eye health is review-only and not importable. |
 | `stationTemplateId` | Links runtime station to catalog template (required for idempotent CUSTOM re-import). |
 | `stationName` | Display name (from template `name` unless overridden later). |
 | `stationOrder` | Unique per `(eventId, stationOrder)`. |

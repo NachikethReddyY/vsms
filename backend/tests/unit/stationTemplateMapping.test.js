@@ -78,3 +78,31 @@ test("findExistingStation matches CUSTOM by template id", () => {
   assert.equal(findExistingStation(stations, { stationType: "CUSTOM", stationTemplateId: "t3" }).stationId, "3");
   assert.equal(findExistingStation(stations, { stationType: "CUSTOM", stationTemplateId: "missing" }), undefined);
 });
+
+test("isTemplateAvailableForEvent allows a second distinct CUSTOM template", () => {
+  const { isTemplateAvailableForEvent } = require("../../services/event/stationTemplateMapping");
+  const stations = [
+    { stationType: "VISUAL_ACUITY", stationTemplateId: "va" },
+    { stationType: "CUSTOM", stationTemplateId: "custom-a" },
+  ];
+  assert.equal(
+    isTemplateAvailableForEvent({ stationType: "CUSTOM", stationTemplateId: "custom-b" }, stations),
+    true,
+  );
+  assert.equal(
+    isTemplateAvailableForEvent({ stationType: "CUSTOM", stationTemplateId: "custom-a" }, stations),
+    false,
+  );
+  assert.equal(
+    isTemplateAvailableForEvent({ stationType: "VISUAL_ACUITY", stationTemplateId: "va-2" }, stations),
+    false,
+  );
+  assert.equal(
+    isTemplateAvailableForEvent({ stationType: "REFRACTION", stationTemplateId: "ref" }, stations),
+    true,
+  );
+  assert.equal(
+    isTemplateAvailableForEvent({ stationType: "EYE_HEALTH", stationTemplateId: "eh" }, stations),
+    false,
+  );
+});

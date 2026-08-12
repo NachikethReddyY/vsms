@@ -245,12 +245,6 @@ const screeningSyncAction = z.discriminatedUnion("stationType", [
   z.object({
     clientActionId: z.string().uuid(),
     stationId: z.string().uuid(),
-    stationType: z.literal("EYE_HEALTH"),
-    payload: saveEyeHealthBody.strict(),
-  }).strict(),
-  z.object({
-    clientActionId: z.string().uuid(),
-    stationId: z.string().uuid(),
     stationType: z.literal("CUSTOM"),
     payload: saveDynamicBody.strict(),
   }).strict(),

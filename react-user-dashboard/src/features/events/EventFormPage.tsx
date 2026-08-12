@@ -411,9 +411,21 @@ export default function EventFormPage({ mode }: { mode: 'create' | 'edit' }) {
   };
 
   const selectTemplates = (ids: string[]) => {
-    const stationTypes = ids.map((id) => templates.find((template) => template.stationTemplateId === id)?.stationType);
-    if (new Set(stationTypes).size !== stationTypes.length) {
-      setFormError('Choose only one template for each screening station type.');
+    const selected = ids
+      .map((id) => templates.find((template) => template.stationTemplateId === id))
+      .filter((template): template is NonNullable<typeof template> => Boolean(template));
+    const clinicalTypes = selected
+      .map((template) => template.stationType)
+      .filter((stationType): stationType is string => Boolean(stationType) && stationType !== 'CUSTOM');
+    if (new Set(clinicalTypes).size !== clinicalTypes.length) {
+      setFormError('Choose only one template for each clinical screening station type.');
+      return;
+    }
+    const customTemplateIds = selected
+      .filter((template) => template.stationType === 'CUSTOM')
+      .map((template) => template.stationTemplateId);
+    if (new Set(customTemplateIds).size !== customTemplateIds.length) {
+      setFormError('Choose each custom template at most once.');
       return;
     }
     setFormError('');
@@ -436,10 +448,10 @@ export default function EventFormPage({ mode }: { mode: 'create' | 'edit' }) {
           })),
         };
       });
-      const selected = new Set(ids);
+      const selectedIds = new Set(ids);
       const shifts = current.shifts.map((shift) => ({
         ...shift,
-        assignments: shift.assignments.map((assignment) => selected.has(assignment.stationTemplateId || '') ? assignment : { ...assignment, stationTemplateId: null }),
+        assignments: shift.assignments.map((assignment) => selectedIds.has(assignment.stationTemplateId || '') ? assignment : { ...assignment, stationTemplateId: null }),
       }));
       return { ...current, stations, shifts };
     });
