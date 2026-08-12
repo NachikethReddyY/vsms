@@ -3,7 +3,6 @@ const path = require("node:path");
 const dotenv = require("dotenv");
 
 const backendRoot = path.resolve(__dirname, "..");
-const pnpmCommand = process.platform === "win32" ? "pnpm.cmd" : "pnpm";
 const integrationTestArgs = ["--test", "tests/integration/*.test.js", "tests/security/rateLimit.test.js", "tests/security/rbac.test.js"];
 const resetAcknowledgement = "I_UNDERSTAND_THIS_RESETS_A_TEST_DATABASE";
 
@@ -43,13 +42,25 @@ const assertResetAcknowledgement = (value) => {
 
 const run = (command, args) => execFileSync(command, args, { cwd: backendRoot, stdio: "inherit" });
 
+const runPnpm = (args) => {
+  if (process.env.npm_execpath) {
+    return process.env.npm_execpath.toLowerCase().endsWith(".exe")
+      ? run(process.env.npm_execpath, args)
+      : run(process.execPath, [process.env.npm_execpath, ...args]);
+  }
+  if (process.platform === "win32") {
+    return run(process.env.ComSpec || "cmd.exe", ["/d", "/s", "/c", "pnpm", ...args]);
+  }
+  return run("pnpm", args);
+};
+
 const prepareTestDatabase = () => {
   dotenv.config({ path: path.join(backendRoot, ".env.test") });
   const databaseName = testDatabaseName(process.env.DATABASE_URL);
   assertResetAcknowledgement(process.env.VSMS_TEST_DATABASE_RESET_ACKNOWLEDGEMENT);
   console.log(`Preparing isolated integration database ${databaseName}.`);
-  run(pnpmCommand, ["prisma:generate"]);
-  run(pnpmCommand, ["exec", "prisma", "migrate", "reset", "--force", "--skip-seed"]);
+  runPnpm(["prisma:generate"]);
+  runPnpm(["exec", "prisma", "migrate", "reset", "--force", "--skip-seed"]);
 };
 
 if (require.main === module) {
