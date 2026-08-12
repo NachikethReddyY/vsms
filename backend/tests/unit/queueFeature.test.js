@@ -88,6 +88,10 @@ const baseDb = (overrides = {}) => ({
 
 const baseTransaction = (overrides = {}) => ({
   $executeRaw: async () => undefined,
+  event: {
+    findUnique: async () => ({ eventId, screeningRoute: null }),
+    ...(overrides.event || {}),
+  },
   station: {
     findFirst: async ({ where }) => {
       if (where.stationId === targetStationId) return targetStation;
@@ -103,9 +107,15 @@ const baseTransaction = (overrides = {}) => ({
     update: async ({ data }) => ({ ...registration, ...data }),
     ...(overrides.eventRegistration || {}),
   },
+  screeningResult: {
+    findUnique: async () => ({ resultId: uuid() }),
+    findMany: async () => [],
+    ...(overrides.screeningResult || {}),
+  },
   queueEntry: {
     findFirst: async () => null,
     findUnique: async () => queueEntry,
+    findMany: async () => [],
     create: async ({ data }) => ({ id: queueId, ...data }),
     update: async ({ data }) => ({ ...queueEntry, ...data }),
     ...(overrides.queueEntry || {}),
@@ -432,6 +442,9 @@ test('advanceQueueEntry transfers to the target station, closes the old entry, a
           update: async ({ data }) => ({ ...queueEntry, ...data }),
           create: async ({ data }) => ({ id: uuid(), ...queueEntry, ...data }),
         },
+        screeningResult: {
+          findUnique: async () => ({ resultId: uuid() }),
+        },
         queueMovement: {
           create: async ({ data }) => {
             movements.push(data);
@@ -477,12 +490,22 @@ test('advanceQueueEntry rejects a transfer to a station outside the event', asyn
   );
 });
 
-test('completeQueueEntry marks the entry COMPLETED, completes the registration, and emits QUEUE_COMPLETED audit', async () => {
+test('completeQueueEntry marks the entry COMPLETED, completes the registration (no stations remain), and emits QUEUE_COMPLETED + QUEUE_JOURNEY_COMPLETED audits', async () => {
   audits.length = 0;
   const statusChanges = [];
   const db = baseDb({
     root: {
       $transaction: async (callback) => callback(baseTransaction({
+        event: {
+          findUnique: async () => ({ eventId, screeningRoute: null }),
+        },
+        station: {
+          findMany: async () => [],
+        },
+        screeningResult: {
+          findMany: async () => [],
+          findUnique: async () => ({ resultId: uuid() }),
+        },
         registrationStatusHistory: {
           create: async ({ data }) => {
             statusChanges.push(data);
@@ -494,6 +517,8 @@ test('completeQueueEntry marks the entry COMPLETED, completes the registration, 
           update: async ({ data }) => ({ ...registration, ...data }),
         },
         queueEntry: {
+          findFirst: async () => null,
+          findMany: async () => [],
           findUnique: async () => ({ ...queueEntry, status: 'IN_PROGRESS' }),
           update: async ({ data }) => ({ ...queueEntry, ...data }),
         },
@@ -508,8 +533,11 @@ test('completeQueueEntry marks the entry COMPLETED, completes the registration, 
   assert.equal(statusChanges.length, 1);
   assert.equal(statusChanges[0].fromStatus, 'CHECKED_IN');
   assert.equal(statusChanges[0].toStatus, 'COMPLETED');
-  assert.equal(audits.length, 1);
+  assert.equal(audits.length, 2);
   assert.equal(audits[0].action, 'QUEUE_COMPLETED');
+  assert.equal(audits[1].action, 'QUEUE_JOURNEY_COMPLETED');
+  assert.equal(result.journey.state, 'COMPLETED');
+  assert.equal(result.journey.remainingStationCount, 0);
 });
 
 test('skipQueueEntry marks WAITING or CALLED entries as SKIPPED', async () => {
@@ -795,5 +823,76 @@ test('updatePriority requires a reason when elevating an entry to priority', asy
   await assert.rejects(
     queueService.updatePriority({ queueId, isPriority: true }, operationalUser, context, db),
     (error) => error.code === 'PRIORITY_NOTES_REQUIRED' && error.status === 422,
+  );
+});
+
+test('redirectQueueEntry cancels the active entry, enqueues at the staff-chosen target, and records STAFF_REDIRECT', async () => {
+  audits.length = 0;
+  const movements = [];
+  const db = baseDb({
+    root: {
+      $transaction: async (callback) => callback(baseTransaction({
+        station: {
+          findFirst: async ({ where }) => {
+            if (where.stationId === targetStationId) return targetStation;
+            if (where.stationId === stationId) return station;
+            return null;
+          },
+        },
+        queueEntry: {
+          findFirst: async () => ({ ...queueEntry, status: 'IN_PROGRESS' }),
+          update: async ({ data }) => ({ ...queueEntry, ...data }),
+          create: async ({ data }) => ({ id: uuid(), ...data, station: targetStation }),
+        },
+        eventRegistration: {
+          findFirst: async () => registration,
+          aggregate: async () => ({ _max: { queueNumber: 9 } }),
+          update: async ({ data }) => ({ ...registration, ...data }),
+        },
+        queueMovement: {
+          create: async ({ data }) => {
+            movements.push(data);
+            return { id: uuid(), ...data };
+          },
+        },
+      })),
+    },
+  });
+
+  const result = await queueService.redirectQueueEntry(
+    { eventId, stationId, registrationId, toStationId: targetStationId },
+    operationalUser,
+    context,
+    db,
+  );
+
+  assert.equal(result.created, true);
+  assert.equal(result.cancelled.status, 'CANCELLED');
+  assert.equal(result.queueEntry.stationId, targetStationId);
+  assert.equal(result.queueEntry.status, 'WAITING');
+  assert.equal(movements.length, 1);
+  assert.equal(movements[0].fromStationId, stationId);
+  assert.equal(movements[0].toStationId, targetStationId);
+  assert.equal(movements[0].movementReason, 'STAFF_REDIRECT');
+  assert.equal(audits.length, 1);
+  assert.equal(audits[0].action, 'QUEUE_REDIRECTED');
+  assert.equal(audits[0].newValue.reason, 'STAFF_REDIRECT');
+});
+
+test('redirectQueueEntry rejects a target that equals the current station', async () => {
+  const db = baseDb({
+    root: {
+      $transaction: async (callback) => callback(baseTransaction({})),
+    },
+  });
+
+  await assert.rejects(
+    queueService.redirectQueueEntry(
+      { eventId, stationId, registrationId, toStationId: stationId },
+      operationalUser,
+      context,
+      db,
+    ),
+    (error) => error.code === 'REDIRECT_TARGET_INVALID',
   );
 });

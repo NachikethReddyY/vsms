@@ -69,11 +69,16 @@ exports.generateQR = async (req, res, next) => {
 // ==========================================
 exports.verifyQR = async (req, res, next) => {
     try {
-        const { token, eventId } = req.body;
+        const { token, eventId, scanId } = req.body;
         const userId = req.auth.userId;
+        assertUuid(scanId, "scanId");
         await assertVerifyAccess(req, { token, eventId });
 
-        const result = await qrService.verifyQR(token, eventId, userId, undefined, { ipAddress: req.ip });
+        const result = await qrService.verifyQR(token, eventId, userId, undefined, {
+            scanId,
+            ipAddress: req.ip,
+            deviceName: req.get("user-agent") || "QR scanner",
+        });
 
         return res.status(200).json({
             success: true,
@@ -381,21 +386,6 @@ exports.devPageQR = async (req, res, next) => {
   }
   check();
   setInterval(check, 5000);
-
-  const rotationMinutes = ${env.qrRotationIntervalMinutes};
-  if (rotationMinutes > 0) {
-    const banner = document.createElement("div");
-    banner.className = "status pending";
-    banner.id = "rotate-banner";
-    banner.style.marginTop = "12px";
-    document.querySelector(".card").appendChild(banner);
-    const tick = () => {
-      const remaining = rotationMinutes * 60 - Math.floor((Date.now() % (rotationMinutes * 60 * 1000)) / 1000);
-      banner.textContent = "QR auto-rotates every " + rotationMinutes + " min â€” next in " + remaining + "s";
-    };
-    tick();
-    setInterval(() => { tick(); location.reload(); }, rotationMinutes * 60 * 1000);
-  }
 </script>
 </body>
 </html>`;

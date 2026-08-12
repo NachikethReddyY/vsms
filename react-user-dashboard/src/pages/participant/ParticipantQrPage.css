@@ -1,6 +1,6 @@
 .participant-qr-page { max-width: 900px; }
 .participant-qr-heading > strong { color: #1a6250; background: #e8f7f2; }
-.participant-qr-card { display: grid; grid-template-columns: minmax(0, 1fr) 300px; gap: 28px; align-items: center; padding: 30px; border: 1px solid #e1e1da; border-radius: 20px; background: #fff; box-shadow: 0 16px 38px rgba(20, 27, 38, .05); }
+.participant-qr-card { display: grid; grid-template-columns: minmax(0, 1fr) minmax(300px, 360px); gap: 28px; align-items: center; padding: 30px; border: 1px solid #e1e1da; border-radius: 20px; background: #fff; box-shadow: 0 16px 38px rgba(20, 27, 38, .05); }
 .participant-qr-copy > span { color: #737780; font-size: 11px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; }
 .participant-qr-copy h2 { margin: 7px 0; color: #22262d; font-size: 27px; letter-spacing: -.035em; }
 .participant-qr-copy > p { max-width: 440px; color: #686d74; line-height: 1.55; }
@@ -16,8 +16,8 @@
 .participant-qr-copy button:disabled { opacity: .55; cursor: not-allowed; }
 .participant-qr-finish { display: inline-flex; margin-top: 16px; color: #2864ed; font-size: 14px; font-weight: 700; text-decoration: none; }
 .participant-qr-finish:hover { text-decoration: underline; }
-.participant-qr-code { display: grid; min-height: 266px; place-items: center; align-content: center; gap: 12px; border: 1px dashed #cbd0da; border-radius: 16px; color: #7d838c; background: #fafbfc; text-align: center; font-size: 13px; }
+.participant-qr-code { display: grid; min-height: 340px; place-items: center; align-content: center; gap: 12px; border: 1px dashed #cbd0da; border-radius: 16px; color: #7d838c; background: #fafbfc; text-align: center; font-size: 13px; }
 .participant-qr-code > svg { width: 54px; height: 54px; color: #9aa2af; }
 .participant-qr-code.ready { border-style: solid; border-color: #c7d8ff; background: #fff; }
-.participant-qr-code img { width: min(236px, 85%); height: auto; image-rendering: pixelated; }
+.participant-qr-code img { width: min(330px, 92%); height: auto; image-rendering: pixelated; }
 @media (max-width: 680px) { .participant-qr-card { grid-template-columns: 1fr; padding: 21px; } .participant-qr-code { min-height: 220px; } }

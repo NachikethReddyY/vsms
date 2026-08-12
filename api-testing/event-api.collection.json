@@ -2484,6 +2484,107 @@
       ]
     },
     {
+      "name": "Monitor authorized events from the Operations Center",
+      "description": "Returns aggregate-only operational health for every event the administrator or active event manager may manage. Participant identity, queue notes, screening values, clinical narratives, referral recipients, and synchronization payloads are excluded. Intended for bounded polling; responses are never cached.",
+      "event": [],
+      "request": {
+        "method": "GET",
+        "header": [],
+        "auth": {
+          "type": "bearer",
+          "bearer": [
+            {
+              "key": "token",
+              "value": "{{token}}",
+              "type": "string"
+            }
+          ]
+        },
+        "url": {
+          "raw": "{{baseUrl}}/operations",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "operations"
+          ],
+          "query": [
+            {
+              "key": "status",
+              "value": "ALL",
+              "description": "",
+              "disabled": true
+            },
+            {
+              "key": "search",
+              "value": "",
+              "description": "",
+              "disabled": true
+            },
+            {
+              "key": "limit",
+              "value": "50",
+              "description": "",
+              "disabled": true
+            }
+          ]
+        }
+      },
+      "response": [
+        {
+          "name": "200 Response",
+          "originalRequest": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/operations"
+          },
+          "status": "OK",
+          "code": 200,
+          "header": [
+            {
+              "key": "Content-Type",
+              "value": "application/json"
+            }
+          ],
+          "body": "{\n  \"generatedAt\": \"2026-08-07T00:00:00.000Z\",\n  \"filters\": {\n    \"status\": \"ALL\",\n    \"search\": \"\"\n  },\n  \"summary\": {\n    \"events\": {\n      \"total\": 0,\n      \"active\": 0,\n      \"upcoming\": 0,\n      \"completed\": 0,\n      \"needsAttention\": 0\n    },\n    \"participants\": {\n      \"checkedIn\": 0,\n      \"completed\": 0\n    },\n    \"queue\": {\n      \"waiting\": 0,\n      \"active\": 0\n    }\n  },\n  \"events\": [\n    {\n      \"eventId\": \"00000000-0000-4000-8000-000000000000\",\n      \"name\": \"\",\n      \"status\": \"DRAFT\",\n      \"venue\": \"\",\n      \"timezone\": \"\",\n      \"startsAt\": \"2026-08-07T00:00:00.000Z\",\n      \"endsAt\": \"2026-08-07T00:00:00.000Z\",\n      \"capacity\": 1,\n      \"progress\": {\n        \"total\": 0,\n        \"signedUp\": 0,\n        \"checkedIn\": 0,\n        \"completed\": 0,\n        \"screened\": 0,\n        \"reviewed\": 0\n      },\n      \"queue\": {\n        \"waiting\": 0,\n        \"called\": 0,\n        \"inProgress\": 0,\n        \"completed\": 0,\n        \"skipped\": 0,\n        \"priority\": 0,\n        \"longestWaitMinutes\": 0\n      },\n      \"stations\": {\n        \"total\": 0,\n        \"available\": 0,\n        \"paused\": 0,\n        \"offline\": 0,\n        \"items\": [\n          {\n            \"stationId\": \"00000000-0000-4000-8000-000000000000\",\n            \"name\": \"\",\n            \"type\": \"VISUAL_ACUITY\",\n            \"order\": 1,\n            \"operationalStatus\": \"AVAILABLE\",\n            \"staffed\": true,\n            \"queue\": {\n              \"waiting\": 0,\n              \"active\": 0\n            }\n          }\n        ]\n      },\n      \"staffing\": {\n        \"shiftId\": \"00000000-0000-4000-8000-000000000000\",\n        \"shiftName\": \"\",\n        \"startsAt\": \"2026-08-07T00:00:00.000Z\",\n        \"endsAt\": \"2026-08-07T00:00:00.000Z\",\n        \"required\": 0,\n        \"assigned\": 0,\n        \"unfilled\": 0,\n        \"unstaffedStations\": 0\n      },\n      \"referrals\": {\n        \"actionRequired\": 0\n      },\n      \"sync\": {\n        \"pending\": 0,\n        \"issues\": 0\n      },\n      \"attention\": {\n        \"severity\": \"critical\",\n        \"reasons\": [\n          {\n            \"code\": \"STATIONS_OFFLINE\",\n            \"label\": \"\",\n            \"count\": 1,\n            \"severity\": \"critical\"\n          }\n        ]\n      }\n    }\n  ],\n  \"truncated\": true\n}"
+        },
+        {
+          "name": "401 Response",
+          "originalRequest": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/operations"
+          },
+          "status": "Unauthorized",
+          "code": 401,
+          "header": [
+            {
+              "key": "Content-Type",
+              "value": "application/json"
+            }
+          ],
+          "body": "{\n  \"type\": \"\",\n  \"title\": \"\",\n  \"status\": 0,\n  \"code\": \"\",\n  \"requestId\": \"00000000-0000-4000-8000-000000000000\",\n  \"errors\": [\n    {\n      \"field\": \"\",\n      \"message\": \"\"\n    }\n  ]\n}"
+        },
+        {
+          "name": "403 Response",
+          "originalRequest": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/operations"
+          },
+          "status": "Forbidden",
+          "code": 403,
+          "header": [
+            {
+              "key": "Content-Type",
+              "value": "application/json"
+            }
+          ],
+          "body": "{\n  \"type\": \"\",\n  \"title\": \"\",\n  \"status\": 0,\n  \"code\": \"\",\n  \"requestId\": \"00000000-0000-4000-8000-000000000000\",\n  \"errors\": [\n    {\n      \"field\": \"\",\n      \"message\": \"\"\n    }\n  ]\n}"
+        }
+      ]
+    },
+    {
       "name": "Search Singapore addresses with OneMap",
       "description": "Uses a server-cached OneMap token that is renewed automatically; requests are rate limited below OneMap's 300 calls/minute quota.",
       "event": [],
@@ -11892,8 +11993,8 @@
       ]
     },
     {
-      "name": "Verify a QR token for an event",
-      "description": "",
+      "name": "Verify a journey QR and assign its current queue station",
+      "description": "Validates the participant's single event-journey QR. A repeated scanId is replayed without creating another queue entry. If no active queue exists, the backend assigns the least-loaded eligible staffed station.",
       "event": [],
       "request": {
         "method": "POST",
@@ -11928,7 +12029,7 @@
         },
         "body": {
           "mode": "raw",
-          "raw": "{\n  \"token\": \"\",\n  \"eventId\": \"00000000-0000-4000-8000-000000000000\"\n}",
+          "raw": "{\n  \"token\": \"\",\n  \"eventId\": \"00000000-0000-4000-8000-000000000000\",\n  \"scanId\": \"00000000-0000-4000-8000-000000000000\"\n}",
           "options": {
             "raw": {
               "language": "json"

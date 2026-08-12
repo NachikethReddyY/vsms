@@ -606,6 +606,7 @@ model Event {
   endsAt               DateTime    @map("ends_at") @db.Timestamptz(3)
   capacity             Int
   expectedAttendance   Int?        @map("expected_attendance")
+  screeningRoute       Json?       @map("screening_route") @db.JsonB
   createIdempotencyKey String?     @map("create_idempotency_key") @db.VarChar(100)
   createPayloadHash    String?     @map("create_payload_hash") @db.Char(64)
   status               EventStatus @default(DRAFT)
@@ -776,12 +777,12 @@ model EventStationAvailability {
 }
 
 model ParticipantEventIntake {
-  intakeId     String   @id @default(uuid()) @map("intake_id") @db.Uuid
-  participantId String  @map("participant_id") @db.Uuid
-  eventId      String   @map("event_id") @db.Uuid
-  attachedById String   @map("attached_by") @db.Uuid
-  reason       String   @default("REUSED_MATCH") @db.VarChar(40)
-  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  intakeId      String   @id @default(uuid()) @map("intake_id") @db.Uuid
+  participantId String   @map("participant_id") @db.Uuid
+  eventId       String   @map("event_id") @db.Uuid
+  attachedById  String   @map("attached_by") @db.Uuid
+  reason        String   @default("REUSED_MATCH") @db.VarChar(40)
+  createdAt     DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
 
   participant Participant @relation(fields: [participantId], references: [id], onDelete: Restrict, onUpdate: Cascade)
   event       Event       @relation(fields: [eventId], references: [eventId], onDelete: Cascade, onUpdate: Cascade)
@@ -869,16 +870,16 @@ model Shift {
 }
 
 model Station {
-  stationId         String      @id @default(uuid()) @map("station_id") @db.Uuid
-  eventId           String      @map("event_id") @db.Uuid
-  stationTemplateId String?     @map("station_template_id") @db.Uuid
-  stationName       String      @map("station_name") @db.VarChar(100)
-  stationType       StationType @map("station_type")
-  stationOrder      Int         @map("station_order")
-  isActive          Boolean     @default(true) @map("is_active")
+  stationId         String                   @id @default(uuid()) @map("station_id") @db.Uuid
+  eventId           String                   @map("event_id") @db.Uuid
+  stationTemplateId String?                  @map("station_template_id") @db.Uuid
+  stationName       String                   @map("station_name") @db.VarChar(100)
+  stationType       StationType              @map("station_type")
+  stationOrder      Int                      @map("station_order")
+  isActive          Boolean                  @default(true) @map("is_active")
   operationalStatus StationOperationalStatus @default(AVAILABLE) @map("operational_status")
-  createdAt         DateTime    @default(now()) @map("created_at") @db.Timestamptz(3)
-  updatedAt         DateTime    @updatedAt @map("updated_at") @db.Timestamptz(3)
+  createdAt         DateTime                 @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt         DateTime                 @updatedAt @map("updated_at") @db.Timestamptz(3)
 
   event                   Event                    @relation(fields: [eventId], references: [eventId], onDelete: Cascade, onUpdate: Cascade)
   stationTemplate         StationTemplate?         @relation(fields: [stationTemplateId], references: [stationTemplateId], onDelete: SetNull, onUpdate: Cascade)
@@ -899,16 +900,16 @@ model Station {
 }
 
 model StationTemplate {
-  stationTemplateId String   @id @default(uuid()) @map("station_template_id") @db.Uuid
-  templateKey       String   @unique @map("template_key") @db.VarChar(50)
+  stationTemplateId String       @id @default(uuid()) @map("station_template_id") @db.Uuid
+  templateKey       String       @unique @map("template_key") @db.VarChar(50)
   stationType       StationType? @map("station_type")
-  version           Int      @default(1)
-  name              String   @db.VarChar(100)
+  version           Int          @default(1)
+  name              String       @db.VarChar(100)
   description       String?
-  defaultCapacity   Int      @default(3) @map("default_capacity")
-  active            Boolean  @default(true)
-  createdAt         DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
-  updatedAt         DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+  defaultCapacity   Int          @default(3) @map("default_capacity")
+  active            Boolean      @default(true)
+  createdAt         DateTime     @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt         DateTime     @updatedAt @map("updated_at") @db.Timestamptz(3)
   stations          Station[]
 
   @@index([stationType, active])
@@ -928,7 +929,7 @@ model StaffAssignment {
   status           StaffAssignmentStatus? @default(ASSIGNED)
   notes            String?
 
-  event        Event   @relation(fields: [eventId], references: [eventId], onDelete: Cascade, onUpdate: Cascade)
+  event        Event    @relation(fields: [eventId], references: [eventId], onDelete: Cascade, onUpdate: Cascade)
   station      Station? @relation(fields: [stationId], references: [stationId], onDelete: SetNull, onUpdate: Cascade)
   shift        Shift?   @relation(fields: [shiftId], references: [shiftId], onDelete: Cascade, onUpdate: Cascade)
   assignedUser User     @relation("AssignedUser", fields: [userId], references: [id], onDelete: Cascade, onUpdate: Cascade)
@@ -986,7 +987,7 @@ model ScanLog {
   id             String     @id @default(uuid()) @map("scan_id") @db.Uuid
   qrId           String?    @map("qr_id") @db.Uuid
   userId         String?    @map("user_id") @db.Uuid
-  stationId      String     @map("station_id") @db.Uuid
+  stationId      String?    @map("station_id") @db.Uuid
   scanResult     ScanResult @map("scan_result")
   deviceName     String     @map("device_name") @db.VarChar(100)
   ipAddress      String     @map("ip_address") @db.VarChar(45)
@@ -995,7 +996,7 @@ model ScanLog {
 
   qrCode       QRCodePass?        @relation(fields: [qrId], references: [id], onDelete: SetNull, onUpdate: Cascade)
   user         User?              @relation(fields: [userId], references: [id], onDelete: SetNull, onUpdate: Cascade)
-  station      Station            @relation(fields: [stationId], references: [stationId], onDelete: Cascade, onUpdate: Cascade)
+  station      Station?           @relation(fields: [stationId], references: [stationId], onDelete: SetNull, onUpdate: Cascade)
   registration EventRegistration? @relation(fields: [registrationId], references: [registrationId], onDelete: Cascade, onUpdate: Cascade)
 
   @@index([stationId, scannedAt])

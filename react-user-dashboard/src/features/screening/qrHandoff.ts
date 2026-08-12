@@ -1,9 +1,11 @@
 import apiClient from '../../utils/apiClient';
 import { STATION_LABEL, STATION_PATH_SLUG, stationPath } from './stationConfig';
-import type { StationType } from './screeningApi';
+import type { QueueJourney, StationType } from './screeningApi';
 
 export type QrVerifyResult = {
   valid: boolean;
+  replayed: boolean;
+  scanId: string;
   qrId: string;
   registrationId: string;
   participant: {
@@ -16,6 +18,7 @@ export type QrVerifyResult = {
     name: string;
   };
   queueNumber: number | null;
+  journey: QueueJourney;
 };
 
 /** Default station after a successful scan. Staff can switch via picker links. */
@@ -47,9 +50,13 @@ export function extractQrToken(raw: string): string | null {
 }
 
 export async function verifyQrToken(token: string, eventId?: string): Promise<QrVerifyResult> {
+  const scanId = crypto.randomUUID();
   const { data } = await apiClient.post<{ success: boolean; data: QrVerifyResult }>('/qr/verify', {
     token,
+    scanId,
     ...(eventId ? { eventId } : {}),
+  }, {
+    headers: { 'Idempotency-Key': scanId },
   });
   return data.data;
 }

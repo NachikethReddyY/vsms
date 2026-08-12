@@ -5,6 +5,7 @@ import {
   ColourVisionResultData,
   FlagEvaluation,
   newIdempotencyKey,
+  QueueJourney,
   QueueRegistration,
   screeningApi,
   Station,
@@ -24,7 +25,6 @@ export default function ColourVisionStationPage() {
   const [searchParams] = useSearchParams();
   const [eventName, setEventName] = useState('');
   const [station, setStation] = useState<Station | null>(null);
-  const [eventStations, setEventStations] = useState<Station[]>([]);
   const [queue, setQueue] = useState<QueueRegistration[]>([]);
   const [selectedId, setSelectedId] = useState(() => searchParams.get('registrationId') || '');
   const [platesPresented, setPlatesPresented] = useState(DEFAULT_PLATES);
@@ -38,6 +38,8 @@ export default function ColourVisionStationPage() {
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [savedRegistrationId, setSavedRegistrationId] = useState<string | null>(null);
+  const [savedJourney, setSavedJourney] = useState<QueueJourney | null>(null);
+  const [savedOffline, setSavedOffline] = useState(false);
 
   const selected = useMemo(
     () => queue.find((row) => row.registrationId === selectedId) || null,
@@ -68,7 +70,6 @@ export default function ColourVisionStationPage() {
       const context = await loadStationContext(eventId, 'COLOUR_VISION', 'Colour Vision', selectedId);
       setEventName(context.eventName);
       setStation(context.station);
-      setEventStations(context.stations);
       setQueue(context.queue);
       if (!selectedId && context.nextSelectedId) setSelectedId(context.nextSelectedId);
     } catch (cause) {
@@ -124,6 +125,8 @@ export default function ColourVisionStationPage() {
           ? `Saved with ${saved.overallFlag} flag (${saved.ruleVersion ?? preview.ruleVersion}): ${saved.flagSummary}`
           : `Saved Colour Vision result (${saved.overallFlag}, ${saved.ruleVersion ?? preview.ruleVersion}).`);
       setSavedRegistrationId(selected.registrationId);
+      setSavedJourney(saved.journey || null);
+      setSavedOffline(Boolean(saved.queued));
       setEvaluation(null);
       setAcknowledged(false);
       await load();
@@ -160,9 +163,9 @@ export default function ColourVisionStationPage() {
       handoff={(
         <StationHandoffLinks
           eventId={eventId}
-          currentStationType="COLOUR_VISION"
           registrationId={savedRegistrationId || selectedId}
-          stations={eventStations}
+          journey={savedJourney}
+          queuedOffline={savedOffline}
         />
       )}
     >

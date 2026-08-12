@@ -16,10 +16,12 @@ const SAFE_CONFLICT_CODES = new Set([
   "EVENT_NOT_IN_PROGRESS",
   "FORBIDDEN",
   "IDEMPOTENCY_KEY_REUSED",
+  "QUEUE_STATION_MISMATCH",
   "REGISTRATION_NOT_FOUND",
   "REGISTRATION_NOT_SCREENABLE",
   "SCREENER_ROLE_REQUIRED",
   "SCREENING_WRITE_CONFLICT",
+  "SCREENING_RESULT_REQUIRED",
   "SHIFT_NOT_ACTIVE",
   "STATION_NOT_FOUND",
 ]);
@@ -50,6 +52,18 @@ const safeResultSnapshot = (receipt) => {
     overallFlag: result.overallFlag,
     isFlagged: result.isFlagged,
     ruleVersion: result.ruleVersion || result.evaluation?.ruleVersion,
+    ...(result.journey ? {
+      journey: {
+        state: result.journey.state,
+        registrationId: result.journey.registrationId,
+        registrationStatus: result.journey.registrationStatus,
+        queueNumber: result.journey.queueNumber,
+        activeEntry: result.journey.activeEntry,
+        assignedStation: result.journey.assignedStation,
+        created: result.journey.created,
+        remainingStationCount: result.journey.remainingStationCount,
+      },
+    } : {}),
   };
 };
 

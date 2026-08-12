@@ -18,10 +18,10 @@ export async function startQrScanner(
   onDecodeError: (error: string) => void,
 ): Promise<void> {
   const scanConfig: Html5QrcodeCameraScanConfig = {
-    fps: options.fps ?? 10,
+    fps: options.fps ?? 16,
     qrbox: {
-      width: options.qrboxWidth ?? 260,
-      height: options.qrboxHeight ?? 260,
+      width: options.qrboxWidth ?? 340,
+      height: options.qrboxHeight ?? 340,
     },
   };
 

@@ -262,7 +262,7 @@ function QrScanner({ open, onOpenChange, onScan }: {
         scanner = new Html5Qrcode(scannerId);
         await startQrScanner(
           scanner,
-          { fps: 10, qrboxWidth: 260, qrboxHeight: 260 },
+          { fps: 16, qrboxWidth: 340, qrboxHeight: 340 },
           async (value) => {
             if (stopped) return;
             stopped = true;

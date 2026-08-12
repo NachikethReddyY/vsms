@@ -369,6 +369,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/operations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Monitor authorized events from the Operations Center
+         * @description Returns aggregate-only operational health for every event the administrator or active event manager may manage. Participant identity, queue notes, screening values, clinical narratives, referral recipients, and synchronization payloads are excluded. Intended for bounded polling; responses are never cached.
+         */
+        get: operations["getMultiEventOperationsOverview"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/locations/search": {
         parameters: {
             query?: never;
@@ -1804,7 +1824,10 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Verify a QR token for an event */
+        /**
+         * Verify a journey QR and assign its current queue station
+         * @description Validates the participant's single event-journey QR. A repeated scanId is replayed without creating another queue entry. If no active queue exists, the backend assigns the least-loaded eligible staffed station.
+         */
         post: operations["verifyQrCode"];
         delete?: never;
         options?: never;
@@ -3361,6 +3384,118 @@ export interface components {
             eventOptions: components["schemas"]["OperationalReportEventOption"][];
             truncated: boolean;
             eventOptionsTruncated: boolean;
+        };
+        OperationsAttentionReason: {
+            /** @enum {string} */
+            code: "STATIONS_OFFLINE" | "SYNC_ISSUES" | "STATIONS_PAUSED" | "STATIONS_UNSTAFFED" | "QUEUE_WITHOUT_STAFF" | "PRIORITY_WAITING" | "REFERRALS_ACTION_REQUIRED";
+            label: string;
+            count: number;
+            /** @enum {string} */
+            severity: "critical" | "warning";
+        };
+        OperationsStation: {
+            /** Format: uuid */
+            stationId: string;
+            name: string;
+            /** @enum {string} */
+            type: "VISUAL_ACUITY" | "REFRACTION" | "COLOUR_VISION" | "EYE_HEALTH";
+            order: number;
+            operationalStatus: components["schemas"]["StationOperationalStatus"];
+            staffed: boolean;
+            queue: {
+                waiting: number;
+                active: number;
+            };
+        };
+        OperationsEvent: {
+            /** Format: uuid */
+            eventId: string;
+            name: string;
+            status: components["schemas"]["EventStatus"];
+            venue: string;
+            timezone: string;
+            /** Format: date-time */
+            startsAt: string;
+            /** Format: date-time */
+            endsAt: string;
+            capacity: number;
+            progress: {
+                total: number;
+                signedUp: number;
+                checkedIn: number;
+                completed: number;
+                screened: number;
+                reviewed: number;
+            };
+            queue: {
+                waiting: number;
+                called: number;
+                inProgress: number;
+                completed: number;
+                skipped: number;
+                priority: number;
+                longestWaitMinutes: number;
+            };
+            stations: {
+                total: number;
+                available: number;
+                paused: number;
+                offline: number;
+                items: components["schemas"]["OperationsStation"][];
+            };
+            staffing: {
+                /** Format: uuid */
+                shiftId: string | null;
+                shiftName: string | null;
+                /** Format: date-time */
+                startsAt: string | null;
+                /** Format: date-time */
+                endsAt: string | null;
+                required: number;
+                assigned: number;
+                unfilled: number;
+                unstaffedStations: number;
+            };
+            referrals: {
+                actionRequired: number;
+            };
+            sync: {
+                pending: number;
+                issues: number;
+            };
+            attention: {
+                /** @enum {string} */
+                severity: "critical" | "warning" | "normal";
+                reasons: components["schemas"]["OperationsAttentionReason"][];
+            };
+        };
+        OperationsOverview: {
+            /** Format: date-time */
+            generatedAt: string;
+            filters: {
+                /** @enum {string} */
+                status: "ALL" | "ACTIVE" | "UPCOMING" | "COMPLETED";
+                search: string | null;
+            };
+            summary: {
+                events: {
+                    total: number;
+                    active: number;
+                    upcoming: number;
+                    completed: number;
+                    needsAttention: number;
+                };
+                participants: {
+                    checkedIn: number;
+                    completed: number;
+                };
+                queue: {
+                    waiting: number;
+                    active: number;
+                };
+            };
+            events: components["schemas"]["OperationsEvent"][];
+            truncated: boolean;
         };
         AnalyticsColumn: {
             key: string;
@@ -5927,6 +6062,35 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["OperationalReport"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            422: components["responses"]["ValidationFailed"];
+            429: components["responses"]["RateLimited"];
+        };
+    };
+    getMultiEventOperationsOverview: {
+        parameters: {
+            query?: {
+                status?: "ALL" | "ACTIVE" | "UPCOMING" | "COMPLETED";
+                search?: string;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Authorized multi-event operational snapshot */
+            200: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OperationsOverview"];
                 };
             };
             401: components["responses"]["Unauthorized"];
@@ -8539,7 +8703,9 @@ export interface operations {
                 "application/json": {
                     token: string;
                     /** Format: uuid */
-                    eventId: string;
+                    eventId?: string;
+                    /** Format: uuid */
+                    scanId: string;
                 };
             };
         };
@@ -8556,6 +8722,7 @@ export interface operations {
             400: components["responses"]["ValidationFailed"];
             401: components["responses"]["Unauthorized"];
             404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
             429: components["responses"]["RateLimited"];
         };
     };

@@ -31,6 +31,11 @@ const advanceQueueBody = z.object({
   reason: z.string().trim().min(1).max(100).optional(),
 }).strict();
 
+const redirectQueueBody = z.object({
+  registrationId: z.string().uuid(),
+  toStationId: z.string().uuid(),
+}).strict();
+
 const priorityQueueBody = z.object({
   isPriority: z.boolean(),
   notes: z.string().trim().max(255).optional(),
@@ -55,5 +60,6 @@ module.exports = {
   queueHandoffBody,
   transferQueueBody: advanceQueueBody,
   advanceQueueBody,
+  redirectQueueBody,
   priorityQueueBody,
 };

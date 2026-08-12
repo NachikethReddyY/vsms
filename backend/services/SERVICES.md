@@ -13,6 +13,7 @@ Cross-folder imports go up one level (e.g. `../event/eventAuthorizationService`)
 | `services/participant/` | Participant registration, registration lifecycle, signature artifacts, and QR identity | `participantService.js`, `registrationService.js`, `signatureService.js`, `qrService.js` |
 | `services/account/` | Accounts, auth, staff access, lifecycle ops, and administrator maintenance | `accountService.js`, `adminService.js`, `accountState.js`, `accountLifecycleNotificationService.js`, `accountProviderOperationService.js`, `userService.js`, `cognitoStaffAccessService.js`, `adminSafety.js` |
 | `services/reporting/` | Reports, exports, analytics, artifact storage | `reportingService.js`, `reportExportService.js`, `reportRenderer.js`, `reportArtifactStorage.js`, `analyticsService.js` |
+| `services/operations/` | Authorized multi-event operational snapshots | `operationsService.js` |
 | `services/domain/` | Domain event bus (outbox) and its handlers | `domainEventBus.js`, `domainEventHandlers/` |
 | `services/platform/` | Cross-cutting background jobs and provider events | `artifactCleanupService.js`, `sesProviderEventService.js`, `snsMessageService.js` |
 
@@ -65,6 +66,11 @@ Cross-folder imports go up one level (e.g. `../event/eventAuthorizationService`)
 | `reportRenderer.js` | Report content rendering. |
 | `reportArtifactStorage.js` | Report artifact staging/publish/cleanup (blob storage). |
 | `analyticsService.js` | Analytics queries/exports. |
+
+### `operations/`
+| File | Responsibility |
+| --- | --- |
+| `operationsService.js` | Aggregate-only multi-event queue, progress, station, staffing, referral, and sync health for administrators and assigned event managers. |
 
 ### `domain/`
 | File | Responsibility |

@@ -7,6 +7,7 @@ const domainEventBus = require("../domain/domainEventBus");
 const { createAuditLog } = require("../../utils/logging/audit");
 const { resolveRegistrationByQrValue } = require("../../utils/crypto/qrToken");
 const { recordVisualAcuity } = require("../../utils/database/visualAcuityProcedure");
+const { completeStationAndAssignNext } = require("./queueAssignmentService");
 
 const VA_RULE_VERSION = "VSMS-VA-1.0";
 const REF_RULE_VERSION = "VSMS-REF-1.0";
@@ -422,7 +423,18 @@ const saveStationResult = async ({
           ...payload,
         },
       });
-      const responseResult = { ...result, evaluation };
+      // Lightweight unit repositories may omit queue delegates. Production Prisma
+      // always supplies them, keeping result storage and movement in one transaction.
+      const journey = tx.queueEntry && tx.station
+        ? await completeStationAndAssignNext(tx, {
+          registration,
+          stationId,
+          resultId: result.resultId,
+          userId: user.userId,
+          context,
+        })
+        : null;
+      const responseResult = { ...result, evaluation, journey };
       await tx.screeningRequestLedger.create({
         data: {
           idempotencyKey: body.idempotencyKey,
@@ -436,6 +448,11 @@ const saveStationResult = async ({
           resultSnapshot: immutableSnapshot(responseResult),
         },
       });
+
+      // Computer-driven routing already happened inside completeStationAndAssignNext
+      // (same transaction): the station is completed and the participant is either
+      // enqueued at the best next required station or the registration is marked
+      // COMPLETED when no required stations remain.
       await createAuditLog({
         userId: user.userId,
         action: "SCREENING_RESULT_RECORDED",

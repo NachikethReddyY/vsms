@@ -1,4 +1,7 @@
-.station-scanner-dialog { width: min(680px, calc(100vw - 32px)); }
+.station-scanner-dialog {
+  width: min(760px, calc(100vw - 32px));
+  max-height: min(860px, calc(100dvh - 32px));
+}
 .station-scanner { display: grid; gap: 12px; }
 .station-scanner-viewport {
   position: relative;
@@ -58,11 +61,11 @@
   padding: 8px 0 4px;
 }
 .station-pass-qr img {
-  width: min(280px, 70vw);
+  width: min(420px, 88vw);
   height: auto;
   border-radius: 12px;
   background: #fff;
-  padding: 12px;
+  padding: 14px;
   border: 1px solid var(--hairline);
 }
 .station-pass-qr p { margin: 0; color: var(--ink-2); font-size: 13px; line-height: 1.45; max-width: 42ch; }

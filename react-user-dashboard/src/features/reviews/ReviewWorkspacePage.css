@@ -240,7 +240,10 @@
 
 .review-mobile-back { display: none; }
 
-.review-scanner-dialog { width: min(680px, calc(100vw - 32px)); }
+.review-scanner-dialog {
+  width: min(760px, calc(100vw - 32px));
+  max-height: min(860px, calc(100dvh - 32px));
+}
 .review-scanner { display: grid; gap: 12px; }
 .review-scanner-viewport {
   position: relative;
@@ -252,7 +255,7 @@
 .review-scanner video { width: 100%; height: 100%; object-fit: cover; }
 .review-scanner-frame {
   position: absolute;
-  width: min(58%, 300px);
+  width: min(62%, 360px);
   aspect-ratio: 1;
   inset: 50% auto auto 50%;
   border: 3px solid var(--accent);

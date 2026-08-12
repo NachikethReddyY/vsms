@@ -12,3 +12,8 @@ test('the workspace owns the only responsive navigation shell', () => {
   assert.match(shell, /className="workspace-mobile-header"/);
   assert.match(styles, /@media \(max-width:680px\)[\s\S]*?\.workspace-site-nav \{ display:none; \}/);
 });
+
+test('event managers receive a global Operations Center navigation entry', () => {
+  assert.match(shell, /to="\/operations"[\s\S]*?>Operations<\/NavLink>/);
+  assert.match(shell, /to="\/operations" aria-label="Operations"/);
+});

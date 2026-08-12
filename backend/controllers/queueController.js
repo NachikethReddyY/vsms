@@ -172,6 +172,27 @@ exports.createQueueHandoff = asyncHandler(async (req, res) => {
 });
 
 /**
+ * Redirects a participant to a chosen station (staff override of the
+ * computer-selected next station).
+ * @route POST /api/v1/events/:eventId/stations/:stationId/redirect
+ */
+exports.redirectQueueEntry = asyncHandler(async (req, res) => {
+    const eventId = requireRouteParam(req, "eventId");
+    const stationId = requireRouteParam(req, "stationId");
+    const registrationId = requireBodyField(req, "registrationId");
+    const toStationId = requireBodyField(req, "toStationId");
+    const user = getAuthenticatedUser(req);
+
+    const result = await queueService.redirectQueueEntry(
+        { eventId, stationId, registrationId, toStationId },
+        user,
+        getRequestContext(req)
+    );
+
+    return sendSuccess(res, result.created ? 201 : 200, result);
+});
+
+/**
  * Retrieves the queue status of a specific participant registration.
  * @route GET /api/v1/events/:eventId/registrations/:registrationId/queue
  */

@@ -6,6 +6,7 @@ import { getApiError as getApiMessage } from '../../utils/apiClient';
 import {
   EyeReading,
   FlagEvaluation,
+  QueueJourney,
   QueueRegistration,
   screeningApi,
   Station,
@@ -73,7 +74,6 @@ export default function VisualAcuityStationPage() {
   const [searchParams] = useSearchParams();
   const [eventName, setEventName] = useState('');
   const [station, setStation] = useState<Station | null>(null);
-  const [eventStations, setEventStations] = useState<Station[]>([]);
   const [queue, setQueue] = useState<QueueRegistration[]>([]);
   const [selectedId, setSelectedId] = useState(() => searchParams.get('registrationId') || '');
   const [od, setOd] = useState<EyeReading>({ kind: 'FRACTION', denominator: 6 });
@@ -87,6 +87,8 @@ export default function VisualAcuityStationPage() {
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [savedRegistrationId, setSavedRegistrationId] = useState<string | null>(null);
+  const [savedJourney, setSavedJourney] = useState<QueueJourney | null>(null);
+  const [savedOffline, setSavedOffline] = useState(false);
 
   const selected = useMemo(
     () => queue.find((row) => row.registrationId === selectedId) || null,
@@ -113,7 +115,6 @@ export default function VisualAcuityStationPage() {
       const context = await loadStationContext(eventId, 'VISUAL_ACUITY', 'Visual Acuity', selectedId);
       setEventName(context.eventName);
       setStation(context.station);
-      setEventStations(context.stations);
       setQueue(context.queue);
       if (!selectedId && context.nextSelectedId) setSelectedId(context.nextSelectedId);
     } catch (cause) {
@@ -170,6 +171,8 @@ export default function VisualAcuityStationPage() {
           ? `Saved with ${saved.overallFlag} flag (${saved.ruleVersion ?? preview.ruleVersion}): ${saved.flagSummary}`
           : `Saved Visual Acuity result (${saved.overallFlag}, ${saved.ruleVersion ?? preview.ruleVersion}).`);
       setSavedRegistrationId(selected.registrationId);
+      setSavedJourney(saved.journey || null);
+      setSavedOffline(Boolean(saved.queued));
       setEvaluation(null);
       setAcknowledged(false);
       await load();
@@ -214,9 +217,9 @@ export default function VisualAcuityStationPage() {
       {success && (
         <StationHandoffLinks
           eventId={eventId}
-          currentStationType="VISUAL_ACUITY"
           registrationId={savedRegistrationId || selectedId}
-          stations={eventStations}
+          journey={savedJourney}
+          queuedOffline={savedOffline}
         />
       )}
 

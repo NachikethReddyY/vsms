@@ -45,6 +45,7 @@ const emergencyContactRoutes = require("./routes/emergencyContactRoutes");
 const signatureRoutes = require("./routes/signatureRoutes");
 const providerEventRoutes = require("./routes/providerEventRoutes");
 const queueRoutes = require("./routes/queueRoutes");
+const operationsRoutes = require("./routes/operationsRoutes");
 
 // Dashboard
 const dashboardRoutes = require("./routes/dashboardRoutes");
@@ -326,6 +327,7 @@ app.use("/api/v1/admin", adminRoutes);
 
 // Dashboard
 app.use("/api/v1/dashboard", dashboardRoutes);
+app.use("/api/v1/operations", operationsRoutes);
 
 // QR Routes
 app.use("/api/v1/qr", qrLimiter, qrRoutes);

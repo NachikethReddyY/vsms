@@ -77,7 +77,7 @@ export function QueuePage() {
     }
   };
 
-  const handleAction = (id: string, action: "CALLED" | "STARTED" | "COMPLETED" | "SKIPPED") => {
+const handleAction = (id: string, action: "CALLED" | "STARTED" | "COMPLETED" | "SKIPPED") => {
     if (!eventId) return;
     const runners: Record<string, () => Promise<unknown>> = {
       CALLED: () => queueApi.callQueueEntry(eventId, id),
@@ -156,7 +156,6 @@ export function QueuePage() {
             <NowServingCard
               nowServing={nowServing}
               actionLoading={actionLoading}
-              onComplete={(id) => handleAction(id, "COMPLETED")}
               onNoShow={(id) => handleAction(id, "SKIPPED")}
             />
 

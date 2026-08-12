@@ -24,6 +24,7 @@ const {
   queueHandoffBody,
   transferQueueBody,
   advanceQueueBody,
+  redirectQueueBody,
   priorityQueueBody
 } = require("../schemas/queueSchemas");
 
@@ -63,6 +64,19 @@ router.post(
   checkIdempotency,
   validate({ params: stationParams, body: queueHandoffBody }),
   asyncHandler(queueController.createQueueHandoff),
+);
+
+/**
+ * @route   POST /events/:eventId/stations/:stationId/redirect
+ * @desc    Staff override: redirect a participant to a chosen station
+ * @access  Screener, Event Manager, Administrator
+ */
+router.post(
+  "/events/:eventId/stations/:stationId/redirect",
+  requireAnyRole("SCREENER", "EVENT_MANAGER", "ADMINISTRATOR"),
+  checkIdempotency,
+  validate({ params: stationParams, body: redirectQueueBody }),
+  asyncHandler(queueController.redirectQueueEntry),
 );
 
 router.get(

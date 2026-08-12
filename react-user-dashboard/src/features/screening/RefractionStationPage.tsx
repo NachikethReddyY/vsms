@@ -4,6 +4,7 @@ import { getApiError as getApiMessage } from '../../utils/apiClient';
 import {
   FlagEvaluation,
   newIdempotencyKey,
+  QueueJourney,
   QueueRegistration,
   RefractionEye,
   RefractionResultData,
@@ -87,7 +88,6 @@ export default function RefractionStationPage() {
   const [searchParams] = useSearchParams();
   const [eventName, setEventName] = useState('');
   const [station, setStation] = useState<Station | null>(null);
-  const [eventStations, setEventStations] = useState<Station[]>([]);
   const [queue, setQueue] = useState<QueueRegistration[]>([]);
   const [selectedId, setSelectedId] = useState(() => searchParams.get('registrationId') || '');
   const [status, setStatus] = useState<RefractionResultData['measurementStatus']>('COMPLETED');
@@ -103,6 +103,8 @@ export default function RefractionStationPage() {
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [savedRegistrationId, setSavedRegistrationId] = useState<string | null>(null);
+  const [savedJourney, setSavedJourney] = useState<QueueJourney | null>(null);
+  const [savedOffline, setSavedOffline] = useState(false);
 
   const selected = useMemo(
     () => queue.find((row) => row.registrationId === selectedId) || null,
@@ -140,7 +142,6 @@ export default function RefractionStationPage() {
       const context = await loadStationContext(eventId, 'REFRACTION', 'Refraction', selectedId);
       setEventName(context.eventName);
       setStation(context.station);
-      setEventStations(context.stations);
       setQueue(context.queue);
       if (!selectedId && context.nextSelectedId) setSelectedId(context.nextSelectedId);
     } catch (cause) {
@@ -200,6 +201,8 @@ export default function RefractionStationPage() {
           ? `Saved with ${saved.overallFlag} flag (${saved.ruleVersion ?? preview.ruleVersion}): ${saved.flagSummary}`
           : `Saved Refraction result (${saved.overallFlag}, ${saved.ruleVersion ?? preview.ruleVersion}).`);
       setSavedRegistrationId(selected.registrationId);
+      setSavedJourney(saved.journey || null);
+      setSavedOffline(Boolean(saved.queued));
       setEvaluation(null);
       setAcknowledged(false);
       await load();
@@ -235,9 +238,9 @@ export default function RefractionStationPage() {
       handoff={(
         <StationHandoffLinks
           eventId={eventId}
-          currentStationType="REFRACTION"
           registrationId={savedRegistrationId || selectedId}
-          stations={eventStations}
+          journey={savedJourney}
+          queuedOffline={savedOffline}
         />
       )}
     >
