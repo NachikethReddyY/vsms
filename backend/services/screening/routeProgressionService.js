@@ -79,6 +79,38 @@ const safeStation = (station) => ({
   stationType: station.stationType,
 });
 
+/** Reconcile a route override without allowing the override service to write queues directly. */
+const reconcileAfterRouteOverride = async ({
+  tx,
+  registrationId,
+  eventId,
+  nextStep,
+  now = new Date(),
+}) => {
+  const activeQueue = await tx.queueEntry.findFirst({
+    where: { registrationId, status: { in: ACTIVE_QUEUE_STATUSES } },
+    orderBy: { enteredAt: "desc" },
+  });
+  if (activeQueue) {
+    if (activeQueue.stationId !== nextStep?.stationId) {
+      throw new AppError(409, "ROUTE_QUEUE_CONFLICT", "The active queue does not match the current route step.");
+    }
+    return activeQueue;
+  }
+  if (!nextStep) return null;
+
+  const availability = await tx.eventStationAvailability.findFirst({
+    where: {
+      eventStationId: nextStep.stationId,
+      eventDay: { eventId, startsAt: { lte: now }, endsAt: { gt: now } },
+    },
+    select: { isAvailable: true, startsAt: true, endsAt: true },
+  });
+  if (!stationAvailable(nextStep.station, availability, now)) return null;
+
+  return createInitialQueueEntry({ tx, registrationId, stationId: nextStep.stationId });
+};
+
 /** Complete the current route step and queue, then create at most one next queue entry. */
 const advanceAfterFirstResult = async ({
   tx,
@@ -205,4 +237,5 @@ module.exports = {
   ACTIVE_QUEUE_STATUSES,
   advanceAfterFirstResult,
   createInitialQueueEntry,
+  reconcileAfterRouteOverride,
 };

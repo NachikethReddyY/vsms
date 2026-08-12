@@ -20,7 +20,8 @@ const {
   eventQueueEntryParams,
   participantParams,
   eventParticipantParams,
-  priorityQueueBody
+  priorityQueueBody,
+  routeOverrideBody,
 } = require("../schemas/queueSchemas");
 
 const router = express.Router();
@@ -36,6 +37,12 @@ router.get(
   "/events/:eventId/stations",
   validate({ params: eventParams }),
   asyncHandler(queueController.listRegistrationStations),
+);
+
+router.patch(
+  "/events/:eventId/participants/:registrationId/route",
+  validate({ params: eventParticipantParams, body: routeOverrideBody }),
+  asyncHandler(queueController.replaceParticipantRoute),
 );
 
 router.get(

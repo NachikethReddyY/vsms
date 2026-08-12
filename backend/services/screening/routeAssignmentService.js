@@ -107,7 +107,7 @@ const safeQueue = (queueEntry) => queueEntry && ({
   status: queueEntry.status,
 });
 
-const safeStep = (step, activeStationId, blocked) => ({
+const safeStep = (step, activeStationId, blockedStationId = null) => ({
   stationId: step.stationId,
   stationName: step.station?.stationName || step.stationName,
   stationType: step.station?.stationType || step.stationType,
@@ -116,7 +116,7 @@ const safeStep = (step, activeStationId, blocked) => ({
     ? "COMPLETED"
     : step.stationId === activeStationId
       ? "CURRENT"
-      : blocked && step.position === 1
+      : step.stationId === blockedStationId
         ? "BLOCKED"
         : "UPCOMING",
 });
@@ -136,14 +136,15 @@ const buildRouteState = ({ routeVersion, steps, queueEntry, eventInProgress = tr
     return {
       status: "REVIEW_READY",
       routeVersion,
-      steps: steps.map((step) => safeStep(step, null, false)),
+      steps: steps.map((step) => safeStep(step, null)),
       currentStation: null,
       queue: null,
     };
   }
 
   const blocked = !queueEntry;
-  const safeSteps = steps.map((step) => safeStep(step, queueEntry?.stationId, blocked));
+  const blockedStationId = blocked ? steps.find(({ completedAt }) => !completedAt)?.stationId : null;
+  const safeSteps = steps.map((step) => safeStep(step, queueEntry?.stationId, blockedStationId));
   return {
     status: blocked ? "NEEDS_STAFF_ACTION" : "READY",
     routeVersion,

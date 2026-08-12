@@ -7,6 +7,7 @@
  */
 
 const queueService = require("../services/screening/queueService");
+const routeOverrideService = require("../services/screening/routeOverrideService");
 const { ValidationError } = require("../middlewares/errorHandler");
 
 /* ==========================================================================
@@ -126,6 +127,20 @@ exports.getParticipantQueueStatus = asyncHandler(async (req, res) => {
         user
     );
 
+    return sendSuccess(res, 200, result);
+});
+
+exports.replaceParticipantRoute = asyncHandler(async (req, res) => {
+    const eventId = requireRouteParam(req, "eventId");
+    const registrationId = requireRouteParam(req, "registrationId");
+    const user = getAuthenticatedUser(req);
+    const result = await routeOverrideService.replaceRoute({
+        eventId,
+        registrationId,
+        ...req.body,
+        user,
+        context: getRequestContext(req),
+    });
     return sendSuccess(res, 200, result);
 });
 
