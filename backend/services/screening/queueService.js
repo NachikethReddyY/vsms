@@ -2516,5 +2516,6 @@ module.exports = {
   skipQueueEntry,
   leaveQueue,
   updatePriority,
+  redirectQueueEntry,
   getStationWorkload,
 };
