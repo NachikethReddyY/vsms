@@ -4666,7 +4666,44 @@ components:
         queueNumber: { type: integer, nullable: true }
         status: { $ref: "#/components/schemas/RegistrationStatus" }
         registration: { $ref: "#/components/schemas/Registration" }
+        route: { $ref: "#/components/schemas/RegistrationRouteState" }
+        securePass: { $ref: "#/components/schemas/QrPass" }
         idempotentReplay: { type: boolean }
+    RegistrationRouteStepState:
+      type: object
+      additionalProperties: false
+      required: [stationId, stationName, stationType, position, state]
+      properties:
+        stationId: { type: string, format: uuid }
+        stationName: { type: string }
+        stationType: { type: string }
+        position: { type: integer, minimum: 1 }
+        state: { type: string, enum: [COMPLETED, CURRENT, BLOCKED, UPCOMING] }
+    RegistrationRouteQueue:
+      type: object
+      nullable: true
+      additionalProperties: false
+      required: [queueEntryId, stationId, queueNumber, status]
+      properties:
+        queueEntryId: { type: string, format: uuid }
+        stationId: { type: string, format: uuid }
+        queueNumber: { type: integer, minimum: 1 }
+        status: { type: string, enum: [WAITING, CALLED, IN_PROGRESS] }
+    RegistrationRouteState:
+      type: object
+      additionalProperties: false
+      required: [status, routeVersion, steps, currentStation, queue]
+      properties:
+        status: { type: string, enum: [PENDING_CHECK_IN, READY, NEEDS_STAFF_ACTION, NO_SCREENING_STATIONS] }
+        routeVersion: { type: integer, minimum: 1 }
+        steps:
+          type: array
+          items: { $ref: "#/components/schemas/RegistrationRouteStepState" }
+        currentStation:
+          type: object
+          allOf: [{ $ref: "#/components/schemas/RegistrationRouteStepState" }]
+          nullable: true
+        queue: { $ref: "#/components/schemas/RegistrationRouteQueue" }
     RegistrationListResponse:
       type: object
       additionalProperties: false
@@ -5016,7 +5053,7 @@ components:
     ManualCheckInResult:
       type: object
       additionalProperties: false
-      required: [registrationId, eventId, registrationStatus, checkedIn, checkedInAt, queueNumber]
+      required: [registrationId, eventId, registrationStatus, checkedIn, checkedInAt, queueNumber, route]
       properties:
         registrationId: { type: string, format: uuid }
         eventId: { type: string, format: uuid }
@@ -5024,6 +5061,7 @@ components:
         checkedIn: { type: boolean, enum: [true] }
         checkedInAt: { type: string, format: date-time }
         queueNumber: { type: integer, nullable: true }
+        route: { $ref: "#/components/schemas/RegistrationRouteState" }
     ManualCheckInResponse:
       type: object
       additionalProperties: false

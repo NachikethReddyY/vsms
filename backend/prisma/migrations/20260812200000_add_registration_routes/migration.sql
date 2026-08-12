@@ -1,6 +1,9 @@
 ALTER TABLE "event_registrations"
 ADD COLUMN "route_version" INTEGER NOT NULL DEFAULT 1;
 
+ALTER TABLE "event_registrations"
+ADD CONSTRAINT "event_registrations_route_version_check" CHECK ("route_version" > 0);
+
 CREATE TABLE "registration_route_steps" (
   "route_step_id" UUID NOT NULL,
   "registration_id" UUID NOT NULL,

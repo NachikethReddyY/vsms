@@ -8,6 +8,7 @@ const { assertUuid } = require("../../utils/validation/validation");
 const { hashToken, QR_TOKEN_PATTERN } = require("../../utils/crypto/qrToken");
 const { assertRegistrationAssignment, assertQrVerifyAccess } = require("../../utils/auth/staff");
 const AppError = require("../../errors/AppError");
+const { assignRouteOnce } = require("../screening/routeAssignmentService");
 
 function buildQRTargetUrl(token) {
     return `${env.publicAppOrigin}/participant-status/${encodeURIComponent(token)}`;
@@ -850,7 +851,9 @@ exports.manualCheckIn = async (params, db = prisma, auditContext = {}) => {
     }
     if (identifier) identifier = identifier.toLowerCase();
 
-    return await db.$transaction(async (tx) => {
+    for (let attempt = 0; attempt < 4; attempt += 1) {
+        try {
+            return await db.$transaction(async (tx) => {
         let regIdToUpdate = registrationId;
         let qrIdToUse = null;
 
@@ -920,6 +923,14 @@ exports.manualCheckIn = async (params, db = prisma, auditContext = {}) => {
             checkedInAt,
         });
 
+        const route = await assignRouteOnce({
+            tx,
+            registrationId: registration.registrationId,
+            eventId,
+            actorUserId: userId,
+            context: auditContext,
+        });
+
         await writeAudit(tx, {
             userId,
             action: "MANUAL_CHECKIN_PERFORMED",
@@ -932,6 +943,12 @@ exports.manualCheckIn = async (params, db = prisma, auditContext = {}) => {
             ...auditContext,
         });
 
-        return result;
-    });
+                return { ...result, route };
+            }, { isolationLevel: "Serializable" });
+        } catch (error) {
+            if (error.code === "P2034" && attempt < 3) continue;
+            throw error;
+        }
+    }
+    throw new AppError(409, "CHECKIN_CONFLICT", "Unable to check in this participant. Please retry.");
 };

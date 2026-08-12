@@ -414,7 +414,17 @@ test("manual QR check-in writes no bearer or participant data and returns a mini
           updateQuery = query;
           return { count: 1 };
         },
+        findUnique: async () => ({
+          registrationId,
+          eventId,
+          routeVersion: 1,
+          event: { status: "IN_PROGRESS" },
+        }),
       },
+      registrationRouteStep: { findMany: async () => [] },
+      station: { findMany: async () => [] },
+      queueEntry: { findMany: async () => [] },
+      eventStationAvailability: { findMany: async () => [] },
       auditLog: { create: async ({ data }) => { audit = data; return data; } },
     }),
   };
@@ -453,7 +463,8 @@ test("manual QR check-in writes no bearer or participant data and returns a mini
   assert.deepEqual(audit.newValue, { eventId, checkInMethod: "QR_TOKEN" });
   assert.equal(JSON.stringify(audit).includes(token), false);
   assert.equal(JSON.stringify(audit).includes("encrypted-nric"), false);
-  assert.deepEqual(Object.keys(result).sort(), ["checkedIn", "checkedInAt", "eventId", "queueNumber", "registrationId", "registrationStatus"]);
+  assert.deepEqual(Object.keys(result).sort(), ["checkedIn", "checkedInAt", "eventId", "queueNumber", "registrationId", "registrationStatus", "route"]);
+  assert.equal(result.route.status, "NO_SCREENING_STATIONS");
   assert.equal(result.registrationStatus, "CHECKED_IN");
   assert.equal(result.checkedIn, true);
   assert.equal(JSON.stringify(result).includes("Ada"), false);
@@ -476,7 +487,17 @@ test("manual registration-reference check-in does not resolve participant identi
           queueNumber: null,
         }),
         updateMany: async () => ({ count: 1 }),
+        findUnique: async () => ({
+          registrationId,
+          eventId,
+          routeVersion: 1,
+          event: { status: "IN_PROGRESS" },
+        }),
       },
+      registrationRouteStep: { findMany: async () => [] },
+      station: { findMany: async () => [] },
+      queueEntry: { findMany: async () => [] },
+      eventStationAvailability: { findMany: async () => [] },
       auditLog: { create: async ({ data }) => { audit = data; return data; } },
     }),
   };
@@ -485,7 +506,7 @@ test("manual registration-reference check-in does not resolve participant identi
 
   assert.equal(qrLookup, false);
   assert.deepEqual(audit.newValue, { eventId, checkInMethod: "REGISTRATION_REFERENCE" });
-  assert.deepEqual(Object.keys(result).sort(), ["checkedIn", "checkedInAt", "eventId", "queueNumber", "registrationId", "registrationStatus"]);
+  assert.deepEqual(Object.keys(result).sort(), ["checkedIn", "checkedInAt", "eventId", "queueNumber", "registrationId", "registrationStatus", "route"]);
 });
 
 test("manual check-in rejects NRIC input", async () => {

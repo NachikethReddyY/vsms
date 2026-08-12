@@ -4289,9 +4289,37 @@ export interface components {
             queueNumber: number | null;
             status: components["schemas"]["RegistrationStatus"];
             registration: components["schemas"]["Registration"];
+            route?: components["schemas"]["RegistrationRouteState"];
+            securePass?: components["schemas"]["QrPass"];
             idempotentReplay?: boolean;
         } & {
             [key: string]: unknown;
+        };
+        RegistrationRouteStepState: {
+            /** Format: uuid */
+            stationId: string;
+            stationName: string;
+            stationType: string;
+            position: number;
+            /** @enum {string} */
+            state: "COMPLETED" | "CURRENT" | "BLOCKED" | "UPCOMING";
+        };
+        RegistrationRouteQueue: {
+            /** Format: uuid */
+            queueEntryId: string;
+            /** Format: uuid */
+            stationId: string;
+            queueNumber: number;
+            /** @enum {string} */
+            status: "WAITING" | "CALLED" | "IN_PROGRESS";
+        } | null;
+        RegistrationRouteState: {
+            /** @enum {string} */
+            status: "PENDING_CHECK_IN" | "READY" | "NEEDS_STAFF_ACTION" | "NO_SCREENING_STATIONS";
+            routeVersion: number;
+            steps: components["schemas"]["RegistrationRouteStepState"][];
+            currentStation: components["schemas"]["RegistrationRouteStepState"] | null;
+            queue: components["schemas"]["RegistrationRouteQueue"];
         };
         RegistrationListResponse: {
             registrations: components["schemas"]["Registration"][];
@@ -4618,6 +4646,7 @@ export interface components {
             /** Format: date-time */
             checkedInAt: string;
             queueNumber: number | null;
+            route: components["schemas"]["RegistrationRouteState"];
         };
         ManualCheckInResponse: {
             /** @enum {boolean} */

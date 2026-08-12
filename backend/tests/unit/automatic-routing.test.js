@@ -58,5 +58,6 @@ test("schema and migration enforce normalized route and active-queue invariants"
   assert.match(schema, /@@unique\(\[registrationId, position\]\)/);
   assert.match(schema, /@@unique\(\[registrationId, stationId\]\)/);
   assert.match(migration, /CHECK \("position" > 0\)/);
+  assert.match(migration, /CHECK \("route_version" > 0\)/);
   assert.match(migration, /CREATE UNIQUE INDEX "queue_entries_one_active_registration_key"[\s\S]*WHERE "status" IN \('WAITING', 'CALLED', 'IN_PROGRESS'\)/);
 });
