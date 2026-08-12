@@ -10,5 +10,6 @@ test("test database preparation invokes pnpm portably", () => {
   assert.match(source, /process\.env\.npm_execpath/);
   assert.match(source, /endsWith\("\.exe"\)/);
   assert.match(source, /process\.env\.ComSpec \|\| "cmd\.exe"/);
+  assert.match(source, /"--test-concurrency=1"/);
   assert.doesNotMatch(source, /const pnpmCommand = process\.platform/);
 });
