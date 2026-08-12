@@ -607,37 +607,6 @@ const saveDynamic = async (eventId, stationId, body, user, context) => {
   });
 };
 
-const ensureDemoStations = async (eventId) => {
-  const desired = [
-    { stationName: "Visual Acuity", stationType: "VISUAL_ACUITY", stationOrder: 1 },
-    { stationName: "Refraction", stationType: "REFRACTION", stationOrder: 2 },
-    { stationName: "Colour Vision", stationType: "COLOUR_VISION", stationOrder: 3 },
-    { stationName: "Eye Health", stationType: "EYE_HEALTH", stationOrder: 4 },
-  ];
-  const existing = await prisma.station.findMany({
-    where: { eventId },
-    select: { stationType: true, stationOrder: true },
-  });
-  const present = new Set(existing.map((row) => row.stationType));
-  const usedOrders = new Set(existing.map((row) => row.stationOrder));
-  const missing = [];
-  for (const station of desired) {
-    if (present.has(station.stationType)) continue;
-    let order = station.stationOrder;
-    while (usedOrders.has(order)) order += 1;
-    usedOrders.add(order);
-    missing.push({
-      stationId: crypto.randomUUID(),
-      eventId,
-      stationName: station.stationName,
-      stationType: station.stationType,
-      stationOrder: order,
-      updatedAt: new Date(),
-    });
-  }
-  if (missing.length) await prisma.station.createMany({ data: missing });
-};
-
 module.exports = {
   VA_RULE_VERSION,
   REF_RULE_VERSION,
@@ -657,7 +626,6 @@ module.exports = {
   saveEyeHealth,
   previewDynamic,
   saveDynamic,
-  ensureDemoStations,
   evaluateVisualAcuity,
   evaluateRefraction,
   evaluateColourVision,
