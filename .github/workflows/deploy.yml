@@ -38,6 +38,7 @@ jobs:
           DATABASE_URL: postgresql://vsms_test:ci-only-not-a-secret@127.0.0.1:5433/vsms_test
           VSMS_TEST_DATABASE_RESET_ACKNOWLEDGEMENT: I_UNDERSTAND_THIS_RESETS_A_TEST_DATABASE
         run: |
+          docker compose --file backend/docker-compose.test.yml down --volumes --remove-orphans
           docker compose --file backend/docker-compose.test.yml up --detach --wait
           pnpm --dir backend db:test:prepare
       - name: Run contracts, tests, lint, and builds
