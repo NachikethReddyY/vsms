@@ -88,7 +88,8 @@ Parameters:
     AllowedValues: ["true", "false"]
   LifecycleEmailConfigurationSecretArn:
     Type: String
-    Default: ""
+    Default: arn:aws:secretsmanager:us-east-1:111111111111:secret:vsms-disabled-placeholder
+    AllowedPattern: "arn:(aws|aws-us-gov|aws-cn):secretsmanager:[a-z0-9-]+:[0-9]{12}:secret:.+"
     Description: JSON secret containing the lifecycle sender and Google Workspace OAuth fields
   AlarmNotificationEmail:
     Type: String
