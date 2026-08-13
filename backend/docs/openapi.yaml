@@ -4706,13 +4706,12 @@ components:
     RegistrationLookup:
       type: object
       additionalProperties: false
-      required: [registrationId, participantDisplayName, queueNumber, status, passToken]
+      required: [registrationId, participantDisplayName, queueNumber, status]
       properties:
         registrationId: { type: string, format: uuid }
         participantDisplayName: { type: string }
         queueNumber: { type: integer, nullable: true }
         status: { $ref: "#/components/schemas/RegistrationStatus" }
-        passToken: { type: string, nullable: true }
     RegistrationResponse:
       type: object
       additionalProperties: true
@@ -5131,13 +5130,12 @@ components:
     ScreeningQueueItem:
       type: object
       additionalProperties: false
-      required: [registrationId, participantDisplayName, queueNumber, status, passToken, existingResult]
+      required: [registrationId, participantDisplayName, queueNumber, status, existingResult]
       properties:
         registrationId: { type: string, format: uuid }
         participantDisplayName: { type: string }
         queueNumber: { type: integer, nullable: true }
         status: { $ref: "#/components/schemas/RegistrationStatus" }
-        passToken: { type: string, nullable: true }
         existingResult:
           type: object
           nullable: true

@@ -552,8 +552,6 @@ model Participant {
   preferredLanguage    String?           @map("preferred_language") @db.VarChar(50)
   accessibilityNotes   String?           @map("accessibility_notes") @db.VarChar(1000)
   status               ParticipantStatus @default(ACTIVE)
-  emergencyContact     String            @map("emergency_contact") @db.VarChar(20)
-  emergencyContactName String?           @map("emergency_contact_name") @db.VarChar(100)
   createdById          String            @map("created_by") @db.Uuid
   updatedById          String            @map("updated_by") @db.Uuid
   onboardingEventId    String?           @map("onboarding_event_id") @db.Uuid
@@ -791,7 +789,6 @@ model EventRegistration {
   participantDisplayName String?                 @map("participant_display_name") @db.VarChar(150)
   queueNumber            Int?                    @map("queue_number")
   idempotencyKey         String                  @map("idempotency_key") @db.VarChar(100)
-  passToken              String?                 @unique @map("pass_token") @db.VarChar(255)
   checkedIn              Boolean                 @default(false) @map("checked_in")
   checkedInAt            DateTime?               @map("checked_in_at") @db.Timestamptz(3)
   routeVersion           Int                     @default(1) @map("route_version")
