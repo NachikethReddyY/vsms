@@ -11,7 +11,7 @@ servers:
     description: Same-origin API server; local development proxies to https://127.0.0.1:5050
 tags:
   - name: System
-    description: Service readiness
+    description: Service liveness and dependency readiness
   - name: Authentication
     description: Amazon Cognito managed login with a secure cookie session
   - name: Events
@@ -44,10 +44,10 @@ paths:
       tags: [System]
       security: []
       operationId: getHealth
-      summary: Check API readiness
+      summary: Check API process liveness
       responses:
         "200":
-          description: API is ready
+          description: API process is alive
           content:
             application/json:
               schema:
@@ -55,12 +55,33 @@ paths:
                 required: [status]
                 properties:
                   status: { type: string, enum: [ok] }
-        "500":
-          description: Service is not ready
-          content: { application/json: { schema: { $ref: "#/components/schemas/Problem" } } }
-        "404":
-          description: Health endpoint is unavailable
-          content: { application/json: { schema: { $ref: "#/components/schemas/Problem" } } }
+  /ready:
+    get:
+      tags: [System]
+      security: []
+      operationId: getReady
+      summary: Check API readiness (database reachability)
+      responses:
+        "200":
+          description: API is ready to serve traffic
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [status, database]
+                properties:
+                  status: { type: string, enum: [ready] }
+                  database: { type: string, enum: [connected] }
+        "503":
+          description: API process is alive but a required dependency (database) is unreachable
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [status, database]
+                properties:
+                  status: { type: string, enum: [not_ready] }
+                  database: { type: string, enum: [disconnected] }
   /api/v1/webhooks/ses:
     post:
       tags: [Provider Events]

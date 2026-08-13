@@ -6,7 +6,7 @@ info:
     the HttpOnly Cognito refresh cookie and CSRF header for replacement auth/CSRF cookies, while its JSON response
     contains user, expiresIn, and sessionExpiresIn only.
 item:
-  - name: Check API readiness
+  - name: Check API process liveness
     description: ''
     event: []
     request:
@@ -36,53 +36,51 @@ item:
           {
             "status": "ok"
           }
-      - name: 404 Response
+  - name: Check API readiness (database reachability)
+    description: ''
+    event: []
+    request:
+      method: GET
+      header: []
+      auth:
+        type: noauth
+      url:
+        raw: '{{baseUrl}}/ready'
+        host:
+          - '{{baseUrl}}'
+        path:
+          - ready
+        query: []
+    response:
+      - name: 200 Response
         originalRequest:
           method: GET
           header: []
-          url: '{{baseUrl}}/health'
-        status: Not Found
-        code: 404
+          url: '{{baseUrl}}/ready'
+        status: OK
+        code: 200
         header:
           - key: Content-Type
             value: application/json
         body: |-
           {
-            "type": "",
-            "title": "",
-            "status": 0,
-            "code": "",
-            "requestId": "00000000-0000-4000-8000-000000000000",
-            "errors": [
-              {
-                "field": "",
-                "message": ""
-              }
-            ]
+            "status": "ready",
+            "database": "connected"
           }
-      - name: 500 Response
+      - name: 503 Response
         originalRequest:
           method: GET
           header: []
-          url: '{{baseUrl}}/health'
-        status: Internal Server Error
-        code: 500
+          url: '{{baseUrl}}/ready'
+        status: Service Unavailable
+        code: 503
         header:
           - key: Content-Type
             value: application/json
         body: |-
           {
-            "type": "",
-            "title": "",
-            "status": 0,
-            "code": "",
-            "requestId": "00000000-0000-4000-8000-000000000000",
-            "errors": [
-              {
-                "field": "",
-                "message": ""
-              }
-            ]
+            "status": "not_ready",
+            "database": "disconnected"
           }
   - name: Accept a signature-verified Amazon SNS envelope for SES delivery lifecycle events
     description: >-

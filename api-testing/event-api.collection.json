@@ -6,7 +6,7 @@
   },
   "item": [
     {
-      "name": "Check API readiness",
+      "name": "Check API process liveness",
       "description": "",
       "event": [],
       "request": {
@@ -43,40 +43,64 @@
             }
           ],
           "body": "{\n  \"status\": \"ok\"\n}"
+        }
+      ]
+    },
+    {
+      "name": "Check API readiness (database reachability)",
+      "description": "",
+      "event": [],
+      "request": {
+        "method": "GET",
+        "header": [],
+        "auth": {
+          "type": "noauth"
         },
+        "url": {
+          "raw": "{{baseUrl}}/ready",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "ready"
+          ],
+          "query": []
+        }
+      },
+      "response": [
         {
-          "name": "404 Response",
+          "name": "200 Response",
           "originalRequest": {
             "method": "GET",
             "header": [],
-            "url": "{{baseUrl}}/health"
+            "url": "{{baseUrl}}/ready"
           },
-          "status": "Not Found",
-          "code": 404,
+          "status": "OK",
+          "code": 200,
           "header": [
             {
               "key": "Content-Type",
               "value": "application/json"
             }
           ],
-          "body": "{\n  \"type\": \"\",\n  \"title\": \"\",\n  \"status\": 0,\n  \"code\": \"\",\n  \"requestId\": \"00000000-0000-4000-8000-000000000000\",\n  \"errors\": [\n    {\n      \"field\": \"\",\n      \"message\": \"\"\n    }\n  ]\n}"
+          "body": "{\n  \"status\": \"ready\",\n  \"database\": \"connected\"\n}"
         },
         {
-          "name": "500 Response",
+          "name": "503 Response",
           "originalRequest": {
             "method": "GET",
             "header": [],
-            "url": "{{baseUrl}}/health"
+            "url": "{{baseUrl}}/ready"
           },
-          "status": "Internal Server Error",
-          "code": 500,
+          "status": "Service Unavailable",
+          "code": 503,
           "header": [
             {
               "key": "Content-Type",
               "value": "application/json"
             }
           ],
-          "body": "{\n  \"type\": \"\",\n  \"title\": \"\",\n  \"status\": 0,\n  \"code\": \"\",\n  \"requestId\": \"00000000-0000-4000-8000-000000000000\",\n  \"errors\": [\n    {\n      \"field\": \"\",\n      \"message\": \"\"\n    }\n  ]\n}"
+          "body": "{\n  \"status\": \"not_ready\",\n  \"database\": \"disconnected\"\n}"
         }
       ]
     },

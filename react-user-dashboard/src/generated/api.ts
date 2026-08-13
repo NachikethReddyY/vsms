@@ -11,8 +11,25 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Check API readiness */
+        /** Check API process liveness */
         get: operations["getHealth"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/ready": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Check API readiness (database reachability) */
+        get: operations["getReady"];
         put?: never;
         post?: never;
         delete?: never;
@@ -5344,7 +5361,7 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description API is ready */
+            /** @description API process is alive */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -5356,22 +5373,43 @@ export interface operations {
                     };
                 };
             };
-            /** @description Health endpoint is unavailable */
-            404: {
+        };
+    };
+    getReady: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description API is ready to serve traffic */
+            200: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["Problem"];
+                    "application/json": {
+                        /** @enum {string} */
+                        status: "ready";
+                        /** @enum {string} */
+                        database: "connected";
+                    };
                 };
             };
-            /** @description Service is not ready */
-            500: {
+            /** @description API process is alive but a required dependency (database) is unreachable */
+            503: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["Problem"];
+                    "application/json": {
+                        /** @enum {string} */
+                        status: "not_ready";
+                        /** @enum {string} */
+                        database: "disconnected";
+                    };
                 };
             };
         };

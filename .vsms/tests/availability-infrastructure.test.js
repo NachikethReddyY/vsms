@@ -5,9 +5,11 @@ const test = require("node:test");
 
 const root = path.resolve(__dirname, "../..");
 const template = fs.readFileSync(path.join(root, "infrastructure/availability.yaml"), "utf8");
-const runbook = fs.readFileSync(path.join(root, "docs/availability-runbook.md"), "utf8");
+const runbook = fs.readFileSync(path.join(root, "docs/07-Operations/availability-runbook.md"), "utf8");
 
 test("production infrastructure retains redundant replaceable services", () => {
+  assert.match(template, /HealthCheckPath: \/health/);
+  assert.doesNotMatch(template, /HealthCheckPath: \/ready/);
   assert.match(template, /DesiredCount: 2/);
   assert.match(template, /MinimumHealthyPercent: 100/);
   assert.match(template, /DeploymentCircuitBreaker:[\s\S]*?Rollback: true/);

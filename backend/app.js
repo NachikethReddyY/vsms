@@ -248,12 +248,22 @@ app.get("/favicon.ico", (_req, res) => {
     res.status(204).end();
 });
 
-app.get("/health", async (_req, res) => {
+app.get("/health", (_req, res) => {
+  return res.status(200).json({
+    status: "ok",
+    environment: env.isProduction
+      ? "production"
+      : "development",
+    timestamp: new Date().toISOString(),
+  });
+});
+
+app.get("/ready", async (_req, res) => {
   try {
     await db.query("SELECT 1");
 
     return res.status(200).json({
-      status: "healthy",
+      status: "ready",
       database: "connected",
       environment: env.isProduction
         ? "production"
@@ -261,13 +271,13 @@ app.get("/health", async (_req, res) => {
       timestamp: new Date().toISOString(),
     });
   } catch (error) {
-    logger.error("health_check_failed", {
-      event: "health_check_failed",
+    logger.error("readiness_check_failed", {
+      event: "readiness_check_failed",
       message: error.message,
     });
 
     return res.status(503).json({
-      status: "unhealthy",
+      status: "not_ready",
       database: "disconnected",
       environment: env.isProduction
         ? "production"
