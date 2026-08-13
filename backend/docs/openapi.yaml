@@ -1747,25 +1747,19 @@ paths:
     get:
       tags: [Administration]
       operationId: listAdministrativeAuditLogs
-      summary: List the latest application and authentication audit records
+      summary: List the unified immutable audit timeline
       description: >
-        Administrator-only paged read surface for the append-only audit trail.
-        Application audit records (`logs`) and authentication audit records
-        (`authLogs`) are returned together with independent signed keyset cursors
-        (`nextCursor` / `nextAuthCursor`) for load-more pagination. Rows are
-        immutable; this endpoint never mutates history.
+        Administrator-only paged read surface combining application,
+        authentication, and event audit ledgers behind one signed keyset cursor.
+        Rows are immutable; this endpoint never mutates history.
       parameters:
         - name: cursor
           in: query
-          description: Signed keyset cursor for the application audit page
-          schema: { type: string }
-        - name: authCursor
-          in: query
-          description: Signed keyset cursor for the authentication audit page
+          description: Signed keyset cursor for the unified audit timeline
           schema: { type: string }
         - name: limit
           in: query
-          description: Maximum rows per table in this page
+          description: Maximum timeline rows in this page
           schema: { type: integer, minimum: 1, maximum: 100, default: 50 }
         - name: entityName
           in: query
@@ -4877,62 +4871,45 @@ components:
     AdminAuditLogsResponse:
       type: object
       additionalProperties: false
-      required: [logs, authLogs, nextCursor, nextAuthCursor]
+      required: [items, nextCursor]
       properties:
-        logs:
+        items:
           type: array
-          description: Reverse-chronological application audit records (max 100)
+          description: Reverse-chronological records from every immutable audit ledger
           items:
             type: object
-            additionalProperties: true
-            required: [id, action, outcome, createdAt]
+            additionalProperties: false
+            required: [id, source, occurredAt, action, outcome, actor, eventId, entityName, entityId, requestId, ipAddress, deviceName, details, oldValue, newValue]
             properties:
               id: { type: string, format: uuid }
-              userId: { type: string, format: uuid, nullable: true }
-              deviceId: { type: string, format: uuid, nullable: true }
-              action:
-                type: string
-                enum: [CREATED, UPDATED, PUBLISHED, STARTED, COMPLETED, CANCELLED, EVENT_DELETED, EVENT_REGISTRATION_CREATED, REGISTRATION_STATUS_CHANGED, DUPLICATE_REGISTRATION_BLOCKED, PARTICIPANT_CREATED, PARTICIPANT_UPDATED, EMERGENCY_CONTACT_CREATED, EMERGENCY_CONTACT_UPDATED, SCREENING_RESULT_RECORDED, CLINICAL_REVIEW_RECORDED, REFERRAL_ISSUED, REFERRAL_REVISION_CREATED, REFERRAL_HANDOFF_ACKNOWLEDGED, REFERRAL_EMAIL_FAILED, REFERRAL_EMAIL_CONFIRMATION_PENDING, REFERRAL_EMAIL_RECONCILIATION_REQUIRED, REFERRAL_EMAIL_RETRY_AUTHORIZED, REFERRAL_DRAFT_CREATED, QR_GENERATED, QR_VERIFIED, QR_REVOKED, QR_REISSUED_REVOCATION, MANUAL_CHECKIN_PERFORMED, STAFF_ACCOUNT_CREATED, STAFF_ACCOUNT_UPDATED, STAFF_ASSIGNMENT_ADDED, STAFF_ASSIGNMENT_REMOVED, REPORT_VIEWED, SCREENING_SYNC_BATCH, ARTIFACT_CLEANUP_ESCALATED, ENCRYPTION_BACKFILL_APPLIED]
-              resource: { type: string, nullable: true }
+              source: { type: string, enum: [APPLICATION, AUTHENTICATION, EVENT] }
+              occurredAt: { type: string, format: date-time }
+              action: { type: string, maxLength: 100 }
+              outcome: { type: string, enum: [SUCCESS, FAILED, DENIED, BLOCKED] }
+              actor:
+                type: object
+                nullable: true
+                additionalProperties: false
+                required: [id, fullName, email, status]
+                properties:
+                  id: { type: string, format: uuid }
+                  fullName: { type: string }
+                  email: { type: string, format: email }
+                  status: { type: string }
+              eventId: { type: string, format: uuid, nullable: true }
               entityName: { type: string, nullable: true }
               entityId: { type: string, format: uuid, nullable: true }
-              outcome: { type: string, enum: [SUCCESS, FAILED, DENIED, BLOCKED] }
               requestId: { type: string, format: uuid, nullable: true }
+              ipAddress: { type: string, nullable: true }
+              deviceName: { type: string, nullable: true }
+              userAgent: { type: string, nullable: true }
               details: { type: object, nullable: true, additionalProperties: true }
               oldValue: { type: object, nullable: true, additionalProperties: true }
               newValue: { type: object, nullable: true, additionalProperties: true }
-              ipAddress: { type: string, nullable: true }
-              deviceName: { type: string, nullable: true }
-              createdAt: { type: string, format: date-time }
-              user: { $ref: "#/components/schemas/User" }
-        authLogs:
-          type: array
-          description: Reverse-chronological authentication audit records (max 100)
-          items:
-            type: object
-            additionalProperties: true
-            required: [id, eventType, outcome, occurredAt]
-            properties:
-              id: { type: string, format: uuid }
-              userId: { type: string, format: uuid, nullable: true }
-              deviceId: { type: string, format: uuid, nullable: true }
-              eventType: { type: string }
-              outcome: { type: string, enum: [SUCCESS, FAILED, DENIED, BLOCKED] }
-              failureCategory: { type: string, nullable: true }
-              identifierHash: { type: string, nullable: true }
-              ipAddress: { type: string, nullable: true }
-              userAgent: { type: string, nullable: true }
-              requestId: { type: string, format: uuid, nullable: true }
-              occurredAt: { type: string, format: date-time }
-              user: { $ref: "#/components/schemas/User" }
         nextCursor:
           type: string
           nullable: true
-          description: Signed keyset cursor for the next page of application logs
-        nextAuthCursor:
-          type: string
-          nullable: true
-          description: Signed keyset cursor for the next page of authentication logs
+          description: Signed keyset cursor for the next timeline page
     QrCode:
       type: object
       additionalProperties: true

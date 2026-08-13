@@ -11,6 +11,33 @@ import type { DynamicFieldValues, FieldSchema } from './fieldSchema';
 export type StationType = 'VISUAL_ACUITY' | 'REFRACTION' | 'COLOUR_VISION' | 'EYE_HEALTH' | 'CUSTOM';
 export type OverallFlag = 'NORMAL' | 'REVIEW' | 'REFER' | 'URGENT';
 
+export type QueueJourney = {
+  state: 'QUEUED' | 'AWAITING_STATION' | 'COMPLETED';
+  registrationId: string;
+  registrationStatus: string;
+  queueNumber: number | null;
+  created: boolean;
+  remainingStationCount: number;
+  activeEntry: {
+    id: string;
+    stationId: string;
+    stationName: string | null;
+    stationType: StationType | null;
+    queueNumber: number;
+    status: string;
+  } | null;
+  assignedStation: {
+    stationId: string;
+    stationName: string;
+    stationType: StationType;
+    stationOrder: number;
+    operationalStatus?: string;
+    waitingCount?: number;
+    currentWorkload?: number;
+    activeStaffCount?: number;
+  } | null;
+};
+
 export type Station = {
   stationId: string;
   eventId: string;
@@ -24,6 +51,7 @@ export type Station = {
 };
 
 export type QueueRegistration = {
+  passToken: unknown;
   registrationId: string;
   participantDisplayName: string;
   queueNumber: number | null;
@@ -109,6 +137,7 @@ export type ScreeningSaveResponse<T> = {
   acknowledgedAt?: string | null;
   resultData: T;
   evaluation?: FlagEvaluation;
+  journey?: QueueJourney;
   queued?: boolean;
   routeProgression?: RouteProgression | null;
   syncState: 'COMMITTED' | 'PENDING_SYNC';

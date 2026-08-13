@@ -8,6 +8,8 @@ const { hashToken, QR_TOKEN_PATTERN } = require("../../utils/crypto/qrToken");
 const { assertRegistrationAssignment, assertQrVerifyAccess } = require("../../utils/auth/staff");
 const AppError = require("../../errors/AppError");
 const { assignRouteOnce } = require("../screening/routeAssignmentService");
+const { createAuditLog, createAuditLogBestEffort } = require("../../utils/logging/audit");
+const { AUDIT_ACTIONS } = require("../../utils/logging/auditEvents");
 
 function buildQRTargetUrl(token) {
     return `${env.publicAppOrigin}/participant-status/${encodeURIComponent(token)}`;
@@ -186,17 +188,26 @@ exports.assertVerificationAccess = async (selectors, auth, db = prisma) => {
 /**
  * Audit Logger Helper conforming to unified schema
  */
-async function writeAudit(tx, { userId, action, entityName, entityId, newValue, ipAddress, deviceName }) {
-    await tx.auditLog.create({
-        data: {
-            userId: userId || null,
-            action,
-            entityName,
-            entityId: entityId || null,
-            newValue: newValue ? JSON.parse(JSON.stringify(newValue)) : null,
-            ipAddress: ipAddress || "127.0.0.1",
-            deviceName: deviceName || "Internal System / QR Service",
-        },
+async function writeAudit(tx, {
+    userId,
+    action,
+    entityName,
+    entityId,
+    newValue,
+    requestId,
+    deviceId,
+    ipAddress,
+    deviceName,
+}) {
+    await createAuditLog({
+        userId,
+        action,
+        resource: entityName,
+        entityName,
+        entityId,
+        newValue,
+        context: { requestId, deviceId, ipAddress, deviceName },
+        client: tx,
     });
 }
 
@@ -319,46 +330,66 @@ exports.verifyQR = async (token, eventId = null, userId = null, db = prisma, aud
         throw new AppError(400, "TOKEN_REQUIRED", "QR Token is required.");
     }
 
-    return await db.$transaction(async (tx) => {
-        const qr = await tx.qRCodePass.findFirst({
-            where: activeQrWhere(tokenSelector(token)),
-            include: {
-                registration: {
-                    include: { participant: true, event: true },
+    try {
+        return await db.$transaction(async (tx) => {
+            const qr = await tx.qRCodePass.findFirst({
+                where: activeQrWhere(tokenSelector(token)),
+                include: {
+                    registration: {
+                        include: { participant: true, event: true },
+                    },
                 },
-            },
+            });
+
+            if (!qr) throw new AppError(404, "INVALID_QR", "QR Code is invalid, expired, or unavailable.");
+            if (eventId && qr.registration.eventId !== eventId) {
+                throw new AppError(400, "QR_EVENT_MISMATCH", "QR Code is not valid for this specific event.");
+            }
+
+            await writeAudit(tx, {
+                userId,
+                action: AUDIT_ACTIONS.QR_VERIFIED,
+                entityName: "QRCodePass",
+                entityId: qr.id,
+                newValue: { registrationId: qr.registration.registrationId, eventId: qr.registration.eventId },
+                ...auditContext,
+            });
+
+            return {
+                valid: true,
+                qrId: qr.id,
+                registrationId: qr.registration.registrationId,
+                participant: {
+                    id: qr.registration.participant.id,
+                    firstName: qr.registration.participant.firstName,
+                    lastName: qr.registration.participant.lastName,
+                },
+                event: {
+                    id: qr.registration.event.eventId,
+                    name: qr.registration.event.name,
+                },
+                queueNumber: qr.registration.queueNumber,
+            };
         });
-
-        if (!qr) throw new AppError(404, "INVALID_QR", "QR Code is invalid, expired, or unavailable.");
-        if (eventId && qr.registration.eventId !== eventId) {
-            throw new AppError(400, "QR_EVENT_MISMATCH", "QR Code is not valid for this specific event.");
-        }
-
-        await writeAudit(tx, {
+    } catch (error) {
+        await createAuditLogBestEffort({
             userId,
-            action: "QR_VERIFIED",
-            entityName: "QRCodePass",
-            entityId: qr.id,
-            newValue: { registrationId: qr.registration.registrationId, eventId },
-            ...auditContext,
+            action: Number(error?.status || error?.statusCode) >= 500
+                ? AUDIT_ACTIONS.QR_VERIFICATION_FAILED
+                : AUDIT_ACTIONS.QR_VERIFICATION_DENIED,
+            resource: "QRCodePass",
+            entityName: "QRCodeVerificationAttempt",
+            outcome: Number(error?.status || error?.statusCode) >= 500 ? "FAILED" : "DENIED",
+            newValue: {
+                eventId,
+                errorCode: error?.code || "QR_VERIFICATION_FAILED",
+                tokenFingerprint: hashToken(token),
+            },
+            context: auditContext,
+            client: db,
         });
-
-        return {
-            valid: true,
-            qrId: qr.id,
-            registrationId: qr.registration.registrationId,
-            participant: {
-                id: qr.registration.participant.id,
-                firstName: qr.registration.participant.firstName,
-                lastName: qr.registration.participant.lastName,
-            },
-            event: {
-                id: qr.registration.event.eventId,
-                name: qr.registration.event.name,
-            },
-            queueNumber: qr.registration.queueNumber,
-        };
-    });
+        throw error;
+    }
 };
 
 // ==========================================

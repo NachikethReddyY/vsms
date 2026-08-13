@@ -331,17 +331,23 @@ test("download renders an active pass from encrypted storage without returning i
 });
 
 test("verification rejects any pass that does not satisfy the shared active-expiry predicate", async () => {
+  let deniedAudit;
   const db = {
     $transaction: async (work) => work({
       qRCodePass: { findFirst: async () => null },
       auditLog: { create: async () => ({}) },
     }),
+    auditLog: { create: async ({ data }) => { deniedAudit = data; return data; } },
   };
 
   await assert.rejects(
     qrService.verifyQR("c".repeat(64), eventId, null, db),
     (error) => error.code === "INVALID_QR" && error.status === 404,
   );
+  assert.equal(deniedAudit.action, "QR_VERIFICATION_DENIED");
+  assert.equal(deniedAudit.outcome, "DENIED");
+  assert.equal(deniedAudit.newValue.errorCode, "INVALID_QR");
+  assert.match(deniedAudit.newValue.tokenFingerprint, /^[a-f0-9]{64}$/);
 });
 
 test("manual QR check-in writes no bearer or participant data and returns a minimal projection", async () => {

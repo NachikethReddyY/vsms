@@ -17,7 +17,7 @@ const {
   collectEventArtifactTasks,
 } = require("../platform/artifactCleanupService");
 const { createExportReceipt } = require("../../utils/storage/eventExportReceipt");
-const { createAuditLog, resolveAuditContext } = require("../../utils/logging/audit");
+const { createAuditLog } = require("../../utils/logging/audit");
 const env = require("../../config/env");
 const { attendancePredicate, attendanceWhere } = require("./attendanceDefinition");
 const { enqueueAccountLifecycle } = require("../account/accountLifecycleNotificationService");
@@ -403,8 +403,6 @@ const assertRange = (data, shifts, eventDays = []) => {
 };
 
 const requestIdFor = (context) => typeof context === "string" ? context : context?.requestId;
-const auditFields = (tx, user, context) => resolveAuditContext({ client: tx, userId: user.userId, context });
-
 const bumpEventVersion = async (tx, eventId, version) => {
   const changed = await tx.event.updateMany({
     where: { eventId, version },
@@ -815,15 +813,15 @@ const createEvent = async (body, user, correlationId, rawIdempotencyKey, db = pr
       include: eventInclude,
     });
 
-    await tx.auditLog.create({
-      data: {
-        userId: user.userId,
-        action: "CREATED",
-        entityName: "Event",
-        entityId: created.eventId,
-        newValue: snapshot(full),
-        ...await auditFields(tx, user, correlationId),
-      },
+    await createAuditLog({
+      client: tx,
+      userId: user.userId,
+      context: correlationId,
+      action: "CREATED",
+      resource: "Event",
+      entityName: "Event",
+      entityId: created.eventId,
+      newValue: snapshot(full),
     });
     await tx.eventAuditLog.create({
       data: {
@@ -1100,17 +1098,16 @@ return db.$transaction(async (tx) => {
     include: eventInclude,
   });
 
-  await tx.auditLog.create({
-    data: {
-      userId: user.userId,
-      action: "UPDATED",
-      resource: "Event",
-      details: {
-        oldValue: snapshot(current),
-        newValue: snapshot(updated),
-      },
-      ...await auditFields(tx, user, correlationId),
-    },
+  await createAuditLog({
+    client: tx,
+    userId: user.userId,
+    context: correlationId,
+    action: "UPDATED",
+    resource: "Event",
+    entityName: "Event",
+    entityId: eventId,
+    oldValue: snapshot(current),
+    newValue: snapshot(updated),
   });
   await auditUpdate(tx, current, updated, user, correlationId);
 
@@ -1143,16 +1140,16 @@ const transitionEvent = async (eventId, command, body, user, correlationId, db =
       include: eventInclude,
     });
 
-    await tx.auditLog.create({
-      data: {
-        userId: user.userId,
-        action: transition.audit,
-        entityName: "Event",
-        entityId: eventId,
-        oldValue: snapshot(current),
-        newValue: snapshot(updated),
-        ...await auditFields(tx, user, correlationId),
-      },
+    await createAuditLog({
+      client: tx,
+      userId: user.userId,
+      context: correlationId,
+      action: transition.audit,
+      resource: "Event",
+      entityName: "Event",
+      entityId: eventId,
+      oldValue: snapshot(current),
+      newValue: snapshot(updated),
     });
     await tx.eventAuditLog.create({
       data: {
@@ -1226,16 +1223,16 @@ const cancelEvent = async (eventId, body, user, correlationId, db = prisma) => {
       include: eventInclude,
     });
 
-    await tx.auditLog.create({
-      data: {
-        userId: user.userId,
-        action: "CANCELLED",
-        entityName: "Event",
-        entityId: eventId,
-        oldValue: snapshot(current),
-        newValue: snapshot(updated),
-        ...await auditFields(tx, user, correlationId),
-      },
+    await createAuditLog({
+      client: tx,
+      userId: user.userId,
+      context: correlationId,
+      action: "CANCELLED",
+      resource: "Event",
+      entityName: "Event",
+      entityId: eventId,
+      oldValue: snapshot(current),
+      newValue: snapshot(updated),
     });
     await tx.eventAuditLog.create({
       data: {
@@ -1617,16 +1614,15 @@ const deleteEvent = async (eventId, body, user, correlationId, db = prisma) => {
     if (deleted.count !== 1) {
       throw new AppError(409, "STALE_EVENT_VERSION", "This event was changed by someone else");
     }
-    await tx.auditLog.create({
-      data: {
-        userId: user.userId,
-        action: "EVENT_DELETED",
-        resource: "Event",
-        entityName: "Event",
-        entityId: eventId,
-        details: { status: current.status, version: body.version, impact, impactDigest: digest, confirmation: "EXACT_NAME_AND_SIGNED_PREVIEW" },
-        ...await auditFields(tx, user, correlationId),
-      },
+    await createAuditLog({
+      client: tx,
+      userId: user.userId,
+      context: correlationId,
+      action: "EVENT_DELETED",
+      resource: "Event",
+      entityName: "Event",
+      entityId: eventId,
+      details: { status: current.status, version: body.version, impact, impactDigest: digest, confirmation: "EXACT_NAME_AND_SIGNED_PREVIEW" },
     });
     return { result: { eventId, deleted: true }, cleanupTaskCount };
   }, { isolationLevel: "Serializable" });
@@ -1918,16 +1914,16 @@ const importStations = async (eventId, body, user, correlationId, db = prisma) =
     }
 
     const updated = await tx.event.findUniqueOrThrow({ where: { eventId }, include: eventInclude });
-    await tx.auditLog.create({
-      data: {
-        userId: user.userId,
-        action: "UPDATED",
-        resource: "Event",
-        entityName: "Event",
-        entityId: eventId,
-        details: { oldValue: snapshot(current), newValue: snapshot(updated) },
-        ...await auditFields(tx, user, correlationId),
-      },
+    await createAuditLog({
+      client: tx,
+      userId: user.userId,
+      context: correlationId,
+      action: "UPDATED",
+      resource: "Event",
+      entityName: "Event",
+      entityId: eventId,
+      oldValue: snapshot(current),
+      newValue: snapshot(updated),
     });
     await auditUpdate(tx, current, updated, user, correlationId);
     return toEventResponse(updated, user, tx);
@@ -1981,16 +1977,16 @@ const updateStation = async (eventId, eventStationId, body, user, correlationId,
 
     // body.capacity accepted for OpenAPI/UI compatibility; Station has no capacity column (#30 MVP).
     const updated = await tx.event.findUniqueOrThrow({ where: { eventId }, include: eventInclude });
-    await tx.auditLog.create({
-      data: {
-        userId: user.userId,
-        action: "UPDATED",
-        resource: "Event",
-        entityName: "Event",
-        entityId: eventId,
-        details: { oldValue: snapshot(current), newValue: snapshot(updated) },
-        ...await auditFields(tx, user, correlationId),
-      },
+    await createAuditLog({
+      client: tx,
+      userId: user.userId,
+      context: correlationId,
+      action: "UPDATED",
+      resource: "Event",
+      entityName: "Event",
+      entityId: eventId,
+      oldValue: snapshot(current),
+      newValue: snapshot(updated),
     });
     await auditUpdate(tx, current, updated, user, correlationId);
     return toEventResponse(updated, user, tx);
@@ -2080,16 +2076,15 @@ const addStaffAssignment = async (eventId, shiftId, body, user, correlationId, d
 
     const updated = await tx.event.findUniqueOrThrow({ where: { eventId }, include: eventInclude });
     await auditUpdate(tx, current, updated, user, correlationId);
-    await tx.auditLog.create({
-      data: {
-        userId: user.userId,
-        action: "STAFF_ASSIGNMENT_ADDED",
-        resource: "Event",
-        entityName: "Event",
-        entityId: eventId,
-        details: { shiftId, assignmentRole: body.assignmentRole, assignedUserId: body.userId },
-        ...await auditFields(tx, user, correlationId),
-      },
+    await createAuditLog({
+      client: tx,
+      userId: user.userId,
+      context: correlationId,
+      action: "STAFF_ASSIGNMENT_ADDED",
+      resource: "Event",
+      entityName: "Event",
+      entityId: eventId,
+      details: { shiftId, assignmentRole: body.assignmentRole, assignedUserId: body.userId },
     });
     return toEventResponse(updated, user, tx);
   });
@@ -2130,16 +2125,15 @@ const removeStaffAssignment = async (eventId, shiftId, assignmentId, version, us
     });
 
     await auditUpdate(tx, current, updated, user, correlationId);
-    await tx.auditLog.create({
-      data: {
-        userId: user.userId,
-        action: "STAFF_ASSIGNMENT_REMOVED",
-        resource: "Event",
-        entityName: "Event",
-        entityId: eventId,
-        details: { shiftId, assignmentId },
-        ...await auditFields(tx, user, correlationId),
-      },
+    await createAuditLog({
+      client: tx,
+      userId: user.userId,
+      context: correlationId,
+      action: "STAFF_ASSIGNMENT_REMOVED",
+      resource: "Event",
+      entityName: "Event",
+      entityId: eventId,
+      details: { shiftId, assignmentId },
     });
     return toEventResponse(updated, user, tx);
   });

@@ -2,13 +2,14 @@
 const prisma = require("../../prisma/prismaClient");
 const env = require("../../config/env");
 const AppError = require("../../errors/AppError");
-const { resolveAuditContext, createAuthAuditLog } = require("../../utils/logging/audit");
+const { createAuditLog, createAuthAuditLog, createAuthAuditLogBestEffort } = require("../../utils/logging/audit");
 const { assertAdministratorRemains, lockAccountTransition } = require("./adminSafety");
 const { deriveLegacyStatus } = require("./accountState");
 const { enqueueProviderOperation, processProviderOperationForResponse } = require("./accountProviderOperationService");
 const { enqueueAccountLifecycle } = require("./accountLifecycleNotificationService");
 const { rolesFromCognitoGroups } = require("../../utils/auth/roles");
 const { sessionValidity } = require("../../utils/auth/sessionValidity");
+const { AUTH_AUDIT_EVENTS } = require("../../utils/logging/auditEvents");
 
 const summarySelect = {
   id: true,
@@ -59,17 +60,16 @@ function activeAdministrator(account, overrides = {}) {
 }
 
 async function writeAudit(tx, actorId, accountId, action, before, after, context) {
-  await tx.auditLog.create({
-    data: {
-      userId: actorId,
-      action,
-      resource: "Account",
-      entityName: "User",
-      entityId: accountId,
-      oldValue: before,
-      newValue: after,
-      ...await resolveAuditContext({ client: tx, userId: actorId, context }),
-    },
+  await createAuditLog({
+    userId: actorId,
+    action,
+    resource: "Account",
+    entityName: "User",
+    entityId: accountId,
+    oldValue: before,
+    newValue: after,
+    context,
+    client: tx,
   });
 }
 
@@ -194,6 +194,7 @@ exports.recordSuccessfulLogin = async (userId, lastLoginAt = new Date()) => {
 };
 
 exports.recordAuthAudit = (entry) => createAuthAuditLog(entry);
+exports.recordAuthAuditBestEffort = (entry) => createAuthAuditLogBestEffort(entry);
 
 exports.establishCognitoLoginSession = async ({ idTokenPayload, accessTokenPayload, context }) => {
   const emailVerified = idTokenPayload.email_verified === true || idTokenPayload.email_verified === "true";
@@ -205,7 +206,7 @@ exports.establishCognitoLoginSession = async ({ idTokenPayload, accessTokenPaylo
   session.localUser.lastLoginAt = await exports.recordSuccessfulLogin(session.localUser.id);
   await exports.recordAuthAudit({
     userId: session.localUser.id,
-    eventType: "LOGIN_SUCCESS",
+    eventType: AUTH_AUDIT_EVENTS.LOGIN_SUCCESS,
     outcome: "SUCCESS",
     identifier: session.localUser.email,
     context,
@@ -221,7 +222,7 @@ exports.establishCognitoRefreshSession = ({ accessTokenPayload, username }) => e
 exports.recordPasswordChange = async ({ userId, email, context, changedAt = new Date() }) => {
   await exports.recordAuthAudit({
     userId,
-    eventType: "PASSWORD_CHANGE_SUCCESS",
+    eventType: AUTH_AUDIT_EVENTS.PASSWORD_CHANGE_SUCCESS,
     outcome: "SUCCESS",
     identifier: email,
     context,

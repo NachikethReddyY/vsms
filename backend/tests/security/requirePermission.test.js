@@ -62,7 +62,7 @@ test("administrator can read audit logs (real route, seeded audit:read permissio
     .set("Authorization", `Bearer ${adminToken}`);
 
   expect(res.statusCode).toBe(200);
-  expect(res.body.logs).toBeDefined();
+  expect(res.body.items).toBeDefined();
 });
 
 test("registration officer is denied audit logs (role guard + missing audit:read)", async () => {

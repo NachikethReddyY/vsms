@@ -11,6 +11,7 @@ const { encrypt, decrypt, encryptionContext } = require("../../utils/crypto/cryp
 const { loadVerifiedSignature, consumeSignatureArtifact, deleteSignature } = require("../../utils/storage/signatureStorage");
 const { requireReviewerAccess } = require("./reviewService");
 const { maskNric } = require("../../utils/validation/validation");
+const { createAuditLog } = require("../../utils/logging/audit");
 
 const documentsRoot = () => path.resolve(
   process.env.REFERRAL_STORAGE_DIR || path.join(__dirname, "..", "secure-data", "documents"),
@@ -322,7 +323,7 @@ const createReferralRevision = async (eventId, referralId, input, user, ipAddres
         urgency: input.urgency,
         status: "DRAFT",
       } });
-      await tx.auditLog.create({ data: {
+      await createAuditLog({
         userId: user.userId,
         action: "REFERRAL_REVISION_CREATED",
         resource: "Referral",
@@ -334,8 +335,9 @@ const createReferralRevision = async (eventId, referralId, input, user, ipAddres
           supersedesReferralId: referralId,
           revisionNumber: created.revisionNumber,
         },
-        ipAddress: String(ipAddress || "").slice(0, 45) || null,
-      } });
+        context: { ipAddress },
+        client: tx,
+      });
       return created;
     }, { isolationLevel: "Serializable" });
     return serializeRevision(revised);
@@ -407,7 +409,7 @@ const deliveryWithDocument = (id) => prisma.notificationDelivery.findUnique({
   include: { document: true },
 });
 
-const auditDelivery = (tx, { userId, action, outcome, delivery, eventId, referralId, ipAddress, failureReason = null }) => tx.auditLog.create({ data: {
+const auditDelivery = (tx, { userId, action, outcome, delivery, eventId, referralId, ipAddress, failureReason = null }) => createAuditLog({
   userId,
   action,
   resource: "NotificationDelivery",
@@ -415,8 +417,9 @@ const auditDelivery = (tx, { userId, action, outcome, delivery, eventId, referra
   entityId: delivery.id,
   outcome,
   details: { eventId, referralId, documentId: delivery.documentId, status: delivery.status, failureReason },
-  ipAddress: String(ipAddress || "").slice(0, 45) || null,
-} });
+  context: { ipAddress },
+  client: tx,
+});
 
 // A delivery is claimed before calling SES. An ambiguous provider response is
 // moved to manual reconciliation and is never retried automatically.
@@ -573,16 +576,16 @@ const issueReferral = async (eventId, referralId, input, user, ipAddress, contex
         handoffSecretCiphertext: encrypt(handoffSecret, deliveryEncryptionContext(deliveryId, "handoffSecret")),
         handoffSecretExpiresAt,
       } });
-      await tx.auditLog.create({ data: {
+      await createAuditLog({
         userId: user.userId,
         action: "REFERRAL_ISSUED",
         resource: "Referral",
         entityName: "Referral",
         entityId: referralId,
         details: { eventId, reviewId: referral.reviewId, documentId, version, signedPayloadHash },
-        requestId: context?.requestId || null,
-        ipAddress: String(ipAddress || "").slice(0, 45) || null,
-      } });
+        context: { ...context, ipAddress },
+        client: tx,
+      });
       await domainEventBus.emit({
         client: tx,
         type: "REFERRAL_ISSUED",
@@ -623,15 +626,16 @@ const acknowledgeReferralHandoff = async (eventId, referralId, input, user, ipAd
       where: { id: delivery.id, handoffSecretAcknowledgedAt: null },
       data: { handoffSecretCiphertext: null, handoffSecretAcknowledgedAt: acknowledgedAt },
     });
-    await tx.auditLog.create({ data: {
+    await createAuditLog({
       userId: user.userId,
       action: "REFERRAL_HANDOFF_ACKNOWLEDGED",
       resource: "Referral",
       entityName: "Referral",
       entityId: referralId,
       details: { eventId, deliveryId: delivery.id },
-      ipAddress: String(ipAddress || "").slice(0, 45) || null,
-    } });
+      context: { ipAddress },
+      client: tx,
+    });
   });
   return { acknowledgedAt };
 };
