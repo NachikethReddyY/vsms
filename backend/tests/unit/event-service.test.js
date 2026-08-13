@@ -279,7 +279,10 @@ function installTransaction(t, current, updated, overrides = {}) {
       create: async () => ({}),
       updateMany: async () => ({ count: 0 }),
     },
-    user: { findFirst: async () => ({ id: staffId, userRoles: [{ role: { roleName: "SUPPORT" } }] }) },
+    user: {
+      findFirst: async () => ({ id: staffId, userRoles: [{ role: { roleName: "SUPPORT" } }] }),
+      findMany: async () => [{ id: staffId, userRoles: [{ role: { roleName: "SUPPORT" } }] }],
+    },
     stationTemplate: { findMany: async () => [] },
     eventAuditLog: { create: async () => ({}) },
     auditLog: { create: async () => ({}) },

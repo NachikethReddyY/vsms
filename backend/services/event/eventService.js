@@ -92,6 +92,17 @@ const eventInclude = {
       date: true,
       startsAt: true,
       endsAt: true,
+      stationAvailabilities: {
+        orderBy: { eventStationAvailabilityId: "asc" },
+        select: {
+          eventStationAvailabilityId: true,
+          eventStationId: true,
+          isAvailable: true,
+          startsAt: true,
+          endsAt: true,
+          capacity: true,
+        },
+      },
     },
   },
   shifts: {
@@ -197,7 +208,7 @@ const templateForStation = (station, templates) => station.stationTemplateId
   ? templates.byId.get(station.stationTemplateId)
   : templates.byType.get(station.stationType);
 
-const mapStationDto = (station, event, templates) => {
+const mapStationDto = (station, event, templates, availabilities = []) => {
   const template = templateForStation(station, templates);
   return {
     eventStationId: station.stationId,
@@ -208,15 +219,26 @@ const mapStationDto = (station, event, templates) => {
     stationType: station.stationType,
     description: template?.description || station.stationType,
     stationOrder: station.stationOrder,
-    // Capacity is not on Station (#30); expose template default until availability is wired.
-    capacity: template?.defaultCapacity || event.capacity,
+    capacity: availabilities[0]?.capacity || template?.defaultCapacity || event.capacity,
     isAvailable: station.isActive,
     fieldSchemaSnapshot: resolveCompatibleFieldSchema(
       station.stationType,
       station.fieldSchemaSnapshot ?? template?.fieldSchema ?? null,
     ),
     schemaVersion: station.schemaVersion ?? template?.version ?? null,
-    availabilities: [],
+    availabilities: availabilities.map((availability) => ({
+      eventStationAvailabilityId: availability.eventStationAvailabilityId,
+      isAvailable: availability.isAvailable,
+      startsAt: availability.startsAt,
+      endsAt: availability.endsAt,
+      capacity: availability.capacity,
+      eventDay: {
+        eventDayId: availability.eventDay.eventDayId,
+        date: availability.eventDay.date instanceof Date
+          ? availability.eventDay.date.toISOString().slice(0, 10)
+          : String(availability.eventDay.date).slice(0, 10),
+      },
+    })),
   };
 };
 
@@ -265,9 +287,17 @@ const toEventResponse = async (event, user, db = prisma, options = {}) => {
   const visibleStationIds = managerView ? null : new Set(shifts.flatMap((shift) => (
     shift.staffAssignments.flatMap((assignment) => assignment.eventStation?.eventStationId || [])
   )));
+  const stationAvailabilities = (event.eventDays || []).flatMap((eventDay) => (
+    (eventDay.stationAvailabilities || []).map((availability) => ({ ...availability, eventDay }))
+  ));
   const eventStations = stations
     .filter((station) => !visibleStationIds || visibleStationIds.has(station.stationId))
-    .map((station) => mapStationDto(station, event, templates));
+    .map((station) => mapStationDto(
+      station,
+      event,
+      templates,
+      stationAvailabilities.filter(({ eventStationId }) => eventStationId === station.stationId),
+    ));
   const registrationCount = _count.registrations || 0;
 
   const response = {
@@ -1923,6 +1953,18 @@ const importStations = async (eventId, body, user, correlationId, db = prisma) =
           },
         });
         existingStations.push(created);
+        for (const day of current.eventDays || []) {
+          await tx.eventStationAvailability.create({
+            data: {
+              eventStationId: created.stationId,
+              eventDayId: day.eventDayId,
+              isAvailable: true,
+              startsAt: day.startsAt,
+              endsAt: day.endsAt,
+              capacity: template.defaultCapacity,
+            },
+          });
+        }
       }
     }
 
@@ -1988,7 +2030,53 @@ const updateStation = async (eventId, eventStationId, body, user, correlationId,
       });
     }
 
-    // body.capacity accepted for OpenAPI/UI compatibility; Station has no capacity column (#30 MVP).
+    if (body.capacity !== undefined) {
+      const days = await tx.eventDay.findMany({ where: { eventId } });
+      for (const day of days) {
+        await tx.eventStationAvailability.upsert({
+          where: { eventStationId_eventDayId: { eventStationId, eventDayId: day.eventDayId } },
+          create: {
+            eventStationId,
+            eventDayId: day.eventDayId,
+            isAvailable: station.isActive,
+            startsAt: station.isActive ? day.startsAt : null,
+            endsAt: station.isActive ? day.endsAt : null,
+            capacity: body.capacity,
+          },
+          update: { capacity: body.capacity },
+        });
+      }
+    }
+
+    if (body.availabilities) {
+      const days = await tx.eventDay.findMany({ where: { eventId } });
+      const daysByDate = new Map(days.map((day) => [day.date.toISOString().slice(0, 10), day]));
+      for (const availability of body.availabilities) {
+        const day = daysByDate.get(availability.date);
+        if (!day) throw new AppError(422, "INVALID_STATION_DAY", "Station availability must match an event date");
+        await tx.eventStationAvailability.upsert({
+          where: { eventStationId_eventDayId: { eventStationId, eventDayId: day.eventDayId } },
+          create: {
+            eventStationId,
+            eventDayId: day.eventDayId,
+            isAvailable: availability.isAvailable,
+            startsAt: availability.isAvailable ? new Date(availability.startsAt) : null,
+            endsAt: availability.isAvailable ? new Date(availability.endsAt) : null,
+            capacity: availability.capacity,
+          },
+          update: {
+            isAvailable: availability.isAvailable,
+            startsAt: availability.isAvailable ? new Date(availability.startsAt) : null,
+            endsAt: availability.isAvailable ? new Date(availability.endsAt) : null,
+            capacity: availability.capacity,
+          },
+        });
+      }
+      await tx.station.update({
+        where: { stationId: eventStationId },
+        data: { isActive: body.availabilities.some(({ isAvailable }) => isAvailable) },
+      });
+    }
     const updated = await tx.event.findUniqueOrThrow({ where: { eventId }, include: eventInclude });
     await createAuditLog({
       client: tx,
@@ -2019,14 +2107,15 @@ const addStaffAssignment = async (eventId, shiftId, body, user, correlationId, d
   if (body.eventStationId && !station) {
     throw new AppError(422, "STATION_NOT_AVAILABLE", "The selected event station is unavailable");
   }
+  const userIds = body.userIds || [body.userId];
 
   return db.$transaction(async (tx) => {
     await bumpEventVersion(tx, eventId, body.version);
-    await lockStaffSchedules(tx, [body.userId]);
+    await lockStaffSchedules(tx, userIds);
 
-    const activeUser = await tx.user.findFirst({
+    const activeUsers = await tx.user.findMany({
       where: {
-        id: body.userId,
+        id: { in: userIds },
         status: "ACTIVE",
         approvalState: "APPROVED",
         accessState: "ENABLED",
@@ -2041,15 +2130,15 @@ const addStaffAssignment = async (eventId, shiftId, body, user, correlationId, d
         userRoles: { select: { role: { select: { roleName: true } } } },
       },
     });
-    if (!activeUser) throw new AppError(422, "STAFF_NOT_AVAILABLE", "The selected staff member is unavailable");
-    assertRoleEligibility(activeUser, [body.assignmentRole]);
+    if (activeUsers.length !== userIds.length) throw new AppError(422, "STAFF_NOT_AVAILABLE", "One or more selected staff members are unavailable");
+    for (const activeUser of activeUsers) assertRoleEligibility(activeUser, [body.assignmentRole]);
 
     // Same shift + different station is allowed (VA / refraction / colour vision).
     // Conflict only when another overlapping shift already has this person, or this
     // exact shift+station slot is already taken.
     const conflict = await tx.staffAssignment.findFirst({
       where: {
-        userId: body.userId,
+        userId: { in: userIds },
         status: { in: ACTIVE_ASSIGNMENT_STATUSES },
         OR: [
           {
@@ -2066,26 +2155,28 @@ const addStaffAssignment = async (eventId, shiftId, body, user, correlationId, d
     });
     if (conflict) throw scheduleConflictError();
 
-    const assignment = await tx.staffAssignment.create({
-      data: {
-        eventId,
-        shiftId,
-        userId: body.userId,
-        stationId: station?.stationId || null,
-        assignedBy: user.userId,
-        assignmentRole: body.assignmentRole,
-        notes: body.notes || null,
-        assignmentStatus: "ASSIGNED",
-        status: "ASSIGNED",
-      },
-    });
-    await enqueueAccountLifecycle({
-      type: "EVENT_ASSIGNMENT",
-      account: { id: body.userId },
-      metadata: { eventId, eventName: current.name, roles: [body.assignmentRole] },
-      idempotencyKey: `EVENT_ASSIGNMENT:DUTY:${assignment.id}`,
-      db: tx,
-    });
+    for (const userId of userIds) {
+      const assignment = await tx.staffAssignment.create({
+        data: {
+          eventId,
+          shiftId,
+          userId,
+          stationId: station?.stationId || null,
+          assignedBy: user.userId,
+          assignmentRole: body.assignmentRole,
+          notes: body.notes || null,
+          assignmentStatus: "ASSIGNED",
+          status: "ASSIGNED",
+        },
+      });
+      await enqueueAccountLifecycle({
+        type: "EVENT_ASSIGNMENT",
+        account: { id: userId },
+        metadata: { eventId, eventName: current.name, roles: [body.assignmentRole] },
+        idempotencyKey: `EVENT_ASSIGNMENT:DUTY:${assignment.id}`,
+        db: tx,
+      });
+    }
 
     const updated = await tx.event.findUniqueOrThrow({ where: { eventId }, include: eventInclude });
     await auditUpdate(tx, current, updated, user, correlationId);
@@ -2097,7 +2188,7 @@ const addStaffAssignment = async (eventId, shiftId, body, user, correlationId, d
       resource: "Event",
       entityName: "Event",
       entityId: eventId,
-      details: { shiftId, assignmentRole: body.assignmentRole, assignedUserId: body.userId },
+      details: { shiftId, assignmentRole: body.assignmentRole, assignedUserIds: userIds },
     });
     return toEventResponse(updated, user, tx);
   });

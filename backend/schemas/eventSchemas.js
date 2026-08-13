@@ -273,11 +273,15 @@ const assignmentDeleteParams = z.object({ eventId: uuid, shiftId: uuid, assignme
 const versionQuery = z.object({ version: z.coerce.number().int().positive() }).strict();
 const assignmentBody = z.object({
   version: z.number().int().positive(),
-  userId: uuid,
+  userId: uuid.optional(),
+  userIds: z.array(uuid).min(1).max(100).refine((ids) => new Set(ids).size === ids.length, "Staff members must be unique").optional(),
   assignmentRole: z.enum(["EVENT_MANAGER", "REGISTRATION", "SCREENER", "REVIEWER", "SUPPORT"]),
   eventStationId: uuid.nullable().optional(),
   notes: z.string().trim().max(500).nullable().optional(),
 }).strict().superRefine((value, ctx) => {
+  if ((value.userId ? 1 : 0) + (value.userIds ? 1 : 0) !== 1) {
+    ctx.addIssue({ code: "custom", path: ["userIds"], message: "Choose one or more staff members" });
+  }
   if (value.assignmentRole === "SCREENER" && !value.eventStationId) {
     ctx.addIssue({ code: "custom", path: ["eventStationId"], message: "Screeners must be assigned to an event station" });
   }
@@ -292,6 +296,7 @@ const stationUpdateBody = z.object({
   stationOrder: z.number().int().min(1).max(50).optional(),
   capacity: z.number().int().min(1).max(1000).optional(),
   isAvailable: z.boolean().optional(),
+  availabilities: z.array(stationAvailabilityInput).max(31).optional(),
   operationalStatus: z.enum(["AVAILABLE", "PAUSED", "OFFLINE"]).optional(),
 }).strict().refine((value) => Object.keys(value).some((key) => key !== "version"), {
   message: "At least one station field is required",

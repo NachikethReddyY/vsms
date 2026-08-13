@@ -196,8 +196,10 @@ describe("event lifecycle", () => {
     expect(created.body.eventStations[0]).toEqual(expect.objectContaining({
       stationTemplateId: template.stationTemplateId,
       name: template.name,
-      // Day-level capacity rows may exist in DB; OpenAPI DTO still returns [] until availability wiring lands.
-      availabilities: [],
+      availabilities: expect.arrayContaining([
+        expect.objectContaining({ isAvailable: true, capacity: 10 }),
+        expect.objectContaining({ isAvailable: false, capacity: 12 }),
+      ]),
     }));
     expect(created.body.shifts[0].staffAssignments[0]).toEqual(expect.objectContaining({
       assignmentRole: "SCREENER",
