@@ -359,7 +359,7 @@ const toEventResponse = async (event, user, db = prisma, options = {}) => {
     activeCapacityCount: registrations.length,
     _count: { eventRegistrations: registrationCount },
     canManage: managerView,
-    eventTeam: managerView ? (event.memberships || []).map(({ user }) => user?.fullName || user?.username).filter(Boolean) : [],
+    eventTeam: (event.memberships || []).map(({ user }) => user?.fullName || user?.username).filter(Boolean),
   };
   if (managerView) {
     response.createdBy = publicUser(event.createdBy);
