@@ -158,3 +158,134 @@ test("dynamic routes accept schema-driven clinical and CUSTOM stations", async (
   );
   assert.equal(preview.overallFlag, "NORMAL");
 });
+
+const visualAcuityResult = {
+  chartDistanceMetres: "6",
+  od: { kind: "FRACTION", denominator: 6 },
+  os: { kind: "FRACTION", denominator: 6 },
+  withUsualDistanceGlasses: "no",
+};
+
+function installDynamicSaveMocks(t, station) {
+  let persisted;
+  replace(t, prisma.event, "findUnique", async () => ({ eventId, name: "Live", status: "IN_PROGRESS", venue: "Hall" }));
+  replace(t, prisma.staffAssignment, "findFirst", async () => ({ id: crypto.randomUUID() }));
+  replace(t, prisma.station, "findFirst", async ({ where }) => {
+    if (where.stationType?.in && !where.stationType.in.includes(station.stationType)) return null;
+    if (typeof where.stationType === "string" && where.stationType !== station.stationType) return null;
+    return station;
+  });
+  replace(t, prisma, "$transaction", async (callback) => callback({
+    screeningRequestLedger: { findUnique: async () => null, create: async ({ data }) => data },
+    screeningResult: {
+      findUnique: async () => null,
+      upsert: async ({ create }) => {
+        persisted = { resultId: crypto.randomUUID(), ...create, version: 1 };
+        return persisted;
+      },
+    },
+    eventRegistration: {
+      findFirst: async () => ({ registrationId: station.registrationId, eventId, registrationStatus: "CHECKED_IN" }),
+      update: async () => ({ routeVersion: 2 }),
+    },
+    registrationRouteStep: {
+      findMany: async () => [{
+        routeStepId: crypto.randomUUID(),
+        registrationId: station.registrationId,
+        stationId: station.stationId,
+        position: 1,
+        completedAt: null,
+        station: {
+          stationId: station.stationId,
+          stationName: station.stationName,
+          stationType: station.stationType,
+          isActive: true,
+          operationalStatus: "AVAILABLE",
+        },
+      }],
+      updateMany: async () => ({ count: 1 }),
+    },
+    queueEntry: {
+      findFirst: async () => ({ id: crypto.randomUUID(), registrationId: station.registrationId, stationId: station.stationId, queueNumber: 1, status: "IN_PROGRESS" }),
+      updateMany: async () => ({ count: 1 }),
+    },
+    auditLog: { create: async ({ data }) => ({ ...data, id: crypto.randomUUID() }) },
+    domainEvent: { create: async ({ data }) => ({ ...data, domainEventId: crypto.randomUUID() }) },
+  }));
+  return () => persisted;
+}
+
+test("a built-in station created before this PR still opens and accepts a result after the upgrade", async (t) => {
+  installMembership(t);
+  const registrationId = crypto.randomUUID();
+  replace(t, prisma.staffAssignment, "findMany", async () => ([{
+    stationId: stationA,
+    shift: { endsAt: new Date("2026-08-04T12:00:00.000Z") },
+  }]));
+  replace(t, prisma.station, "findMany", async () => ([{
+    stationId: stationA,
+    eventId,
+    stationType: "VISUAL_ACUITY",
+    stationName: "VA",
+    stationOrder: 1,
+    isActive: true,
+    fieldSchemaSnapshot: null,
+  }]));
+  const persisted = installDynamicSaveMocks(t, {
+    stationId: stationA,
+    eventId,
+    stationType: "VISUAL_ACUITY",
+    stationName: "Visual acuity",
+    isActive: true,
+    fieldSchemaSnapshot: null,
+    schemaVersion: null,
+    registrationId,
+  });
+
+  const opened = await screeningService.listStations(eventId, user);
+  assert.ok(opened.stations[0].fieldSchemaSnapshot?.some((field) => field.key === "chartDistanceMetres"));
+
+  const preview = await screeningService.previewDynamic(eventId, stationA, { resultData: visualAcuityResult }, user);
+  assert.equal(preview.overallFlag, "NORMAL");
+
+  const saved = await screeningService.saveDynamic(eventId, stationA, {
+    registrationId,
+    idempotencyKey: "legacy-va-upgrade",
+    acknowledged: false,
+    resultData: visualAcuityResult,
+  }, user);
+  assert.equal(saved.created, true);
+  assert.equal(saved.result.resultData.chartDistanceMetres, 6);
+  assert.equal(persisted().resultData.chartDistanceMetres, 6);
+});
+
+test("an extra customized clinical field survives save and appears in the result used by the reviewer", async (t) => {
+  installMembership(t);
+  const { SYSTEM_FIELD_SCHEMAS } = require("../../schemas/dynamicStationSchema");
+  const registrationId = crypto.randomUUID();
+  const persisted = installDynamicSaveMocks(t, {
+    stationId: stationA,
+    eventId,
+    stationType: "VISUAL_ACUITY",
+    stationName: "Visual acuity",
+    isActive: true,
+    fieldSchemaSnapshot: [
+      ...SYSTEM_FIELD_SCHEMAS.VISUAL_ACUITY,
+      { key: "screenerComment", label: "Screener comment", type: "text", required: true },
+    ],
+    schemaVersion: 2,
+    registrationId,
+  });
+
+  const resultData = { ...visualAcuityResult, screenerComment: "Participant needed extra time." };
+  const saved = await screeningService.saveDynamic(eventId, stationA, {
+    registrationId,
+    idempotencyKey: "extra-clinical-field",
+    acknowledged: false,
+    resultData,
+  }, user);
+
+  assert.equal(saved.result.resultData.screenerComment, "Participant needed extra time.");
+  assert.equal(saved.result.resultData.chartDistanceMetres, 6);
+  assert.equal(persisted().resultData.screenerComment, "Participant needed extra time.");
+});
