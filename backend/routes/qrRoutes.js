@@ -5,7 +5,15 @@ const asyncHandler = require("../utils/http/asyncHandler");
 const qrController = require("../controllers/qrController");
 const authenticate = require("../middlewares/authenticate");
 const validate = require("../middlewares/validate");
-const { tokenBody, tokenParams } = require("../schemas/qrSchemas");
+const env = require("../config/env");
+const {
+  tokenBody,
+  tokenParams,
+  registrationParams,
+  qrPassParams,
+  revokeBody,
+  manualCheckInBody,
+} = require("../schemas/qrSchemas");
 
 // Import your production-grade idempotency middleware
 const checkIdempotency = require("../middlewares/idempotency");
@@ -19,9 +27,11 @@ router.get("/public-status/:token", validate({ params: tokenParams }), asyncHand
 // ==========================================
 // Dev-only QR preview (no auth). Blocked in production by controller.
 // ==========================================
-router.get("/dev-view/:registrationId", asyncHandler(qrController.devViewQR));
-router.get("/dev-page/:registrationId", asyncHandler(qrController.devPageQR));
-router.get("/dev-status/:token", asyncHandler(qrController.devStatusQR));
+if (env.NODE_ENV === "development") {
+  router.get("/dev-view/:registrationId", validate({ params: registrationParams }), asyncHandler(qrController.devViewQR));
+  router.get("/dev-page/:registrationId", validate({ params: registrationParams }), asyncHandler(qrController.devPageQR));
+  router.get("/dev-status/:token", validate({ params: tokenParams }), asyncHandler(qrController.devStatusQR));
+}
 
 // ==========================================
 // View QR code as SVG in browser (authenticated)
@@ -29,6 +39,7 @@ router.get("/dev-status/:token", asyncHandler(qrController.devStatusQR));
 router.get(
   "/view/:registrationId",
   authenticate,
+  validate({ params: registrationParams }),
   asyncHandler(qrController.viewQR)
 );
 
@@ -47,20 +58,20 @@ router.post(
 
 // Registration desk / QR management: Generation, Reissuing, and Manual Check-ins
 // are fully protected against accidental double submission or network retries.
-router.post("/registrations/:registrationId", checkIdempotency, asyncHandler(qrController.generateRegistrationQR));
-router.post("/generate/:registrationId", checkIdempotency, asyncHandler(qrController.generateQR));
-router.post("/reissue/:registrationId", checkIdempotency, asyncHandler(qrController.reissueQR));
+router.post("/registrations/:registrationId", checkIdempotency, validate({ params: registrationParams }), asyncHandler(qrController.generateRegistrationQR));
+router.post("/generate/:registrationId", checkIdempotency, validate({ params: registrationParams }), asyncHandler(qrController.generateQR));
+router.post("/reissue/:registrationId", checkIdempotency, validate({ params: registrationParams }), asyncHandler(qrController.reissueQR));
 
 // Attendance (desk)
-router.post("/manual-checkin", checkIdempotency, asyncHandler(qrController.manualCheckIn));
+router.post("/manual-checkin", checkIdempotency, validate({ body: manualCheckInBody }), asyncHandler(qrController.manualCheckIn));
 
 // Participant & History Lookup (GET request - read-only)
 router.get("/participant/:token", validate({ params: tokenParams }), asyncHandler(qrController.getParticipantByQR));
 
 // Revocation & File Output
-router.put("/revoke/:qrId", checkIdempotency, asyncHandler(qrController.revokeQR));
-router.get("/download/:qrId", asyncHandler(qrController.downloadQR));
-router.get("/print/:qrId", asyncHandler(qrController.printQR));
+router.put("/revoke/:qrId", checkIdempotency, validate({ params: qrPassParams, body: revokeBody }), asyncHandler(qrController.revokeQR));
+router.get("/download/:qrId", validate({ params: qrPassParams }), asyncHandler(qrController.downloadQR));
+router.get("/print/:qrId", validate({ params: qrPassParams }), asyncHandler(qrController.printQR));
 router.get("/:token", validate({ params: tokenParams }), asyncHandler(qrController.getRegistrationByQR));
 
 module.exports = router;

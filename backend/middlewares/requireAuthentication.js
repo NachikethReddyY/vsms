@@ -71,6 +71,7 @@ module.exports = asyncHandler(async (req, _res, next) => {
     email: user.email,
     roles,
     permissions,
+    authenticatedAt: Number(payload.auth_time || payload.iat),
   };
   next();
 });

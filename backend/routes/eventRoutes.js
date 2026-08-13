@@ -7,7 +7,9 @@ const validate = require("../middlewares/validate");
 const asyncHandler = require("../utils/http/asyncHandler");
 const { requireSystemRole } = require("../middlewares/authorize");
 const { requireEventManager, requireEventRoles, requireEventRoleAndDuty } = require("../middlewares/requireEventAuthorization");
+const requireRecentAuthentication = require("../middlewares/requireRecentAuthentication");
 const registrationController = require("../controllers/registrationController");
+const { eventRegistrationBody, registrationListQuery } = require("../schemas/registrationSchemas");
 const {
     createEventBody,
     updateEventBody,
@@ -80,11 +82,13 @@ router.post("/:eventId/memberships/:membershipId/roles", validate({ params: memb
 router.delete("/:eventId/memberships/:membershipId/roles/:role", validate({ params: membershipRoleParams }), requireEventManager, asyncHandler(membershipController.removeRole));
 router.post(
   "/:eventId/registrations",
+  validate({ params: eventParams, body: eventRegistrationBody }),
   requireEventRoleAndDuty("REGISTRATION"),
   registrationController.createRegistration
 );
 router.get(
   "/:eventId/registrations",
+  validate({ params: eventParams, query: registrationListQuery }),
   requireEventRoleAndDuty("REGISTRATION"),
   registrationController.listEventRegistrations
 );
@@ -92,12 +96,12 @@ router.get(
 // 3. Dynamic parameter routes come last
 router.get("/:eventId/metrics", reportingLimiter, validate({ params: eventParams }), requireEventManager, asyncHandler(eventController.metrics));
 router.get("/:eventId/analytics", reportingLimiter, validate({ params: eventParams, query: analyticsQuery }), requireEventManager, asyncHandler(reportingController.analytics));
-router.post("/:eventId/report-exports", reportingLimiter, validate({ params: eventParams, body: reportExportBody }), requireEventManager, asyncHandler(reportingController.createExport));
+router.post("/:eventId/report-exports", reportingLimiter, requireRecentAuthentication(), validate({ params: eventParams, body: reportExportBody }), requireEventManager, asyncHandler(reportingController.createExport));
 router.get("/:eventId/report-exports", reportingLimiter, validate({ params: eventParams, query: reportJobListQuery }), requireEventManager, asyncHandler(reportingController.listExports));
 router.get("/:eventId/report-exports/:jobId", reportingLimiter, validate({ params: reportJobParams }), requireEventManager, asyncHandler(reportingController.exportDetail));
-router.get("/:eventId/report-exports/:jobId/download", reportingLimiter, validate({ params: reportJobParams }), requireEventManager, asyncHandler(reportingController.downloadExport));
+router.get("/:eventId/report-exports/:jobId/download", reportingLimiter, requireRecentAuthentication(), validate({ params: reportJobParams }), requireEventManager, asyncHandler(reportingController.downloadExport));
 router.get("/:eventId/attendees", reportingLimiter, validate({ params: eventParams, query: attendeeQuery }), requireEventManager, asyncHandler(eventController.attendees));
-router.get("/:eventId/export", reportingLimiter, validate({ params: eventParams }), requireEventManager, asyncHandler(eventController.export));
+router.get("/:eventId/export", reportingLimiter, requireRecentAuthentication(), validate({ params: eventParams }), requireEventManager, asyncHandler(eventController.export));
 router.get("/:eventId/deletion-preview", requireSystemRole("ADMIN"), validate({ params: eventParams }), asyncHandler(eventController.deletionPreview));
 router.get("/:eventId/deletion-cleanup", requireSystemRole("ADMIN"), validate({ params: eventParams }), asyncHandler(eventController.deletionCleanupStatus));
 router.get("/:eventId", validate({ params: eventParams }), requireEventRoles("EVENT_MANAGER", "REGISTRATION", "SCREENER", "REVIEWER", "SUPPORT"), asyncHandler(eventController.get));
@@ -108,7 +112,7 @@ router.post("/:eventId/publish", validate({ params: eventParams, body: transitio
 router.post("/:eventId/start", validate({ params: eventParams, body: transitionBody }), requireEventManager, asyncHandler(eventController.start));
 router.post("/:eventId/complete", validate({ params: eventParams, body: transitionBody }), requireEventManager, asyncHandler(eventController.complete));
 router.post("/:eventId/cancel", validate({ params: eventParams, body: cancelBody }), requireEventManager, asyncHandler(eventController.cancel));
-router.delete("/:eventId", requireSystemRole("ADMIN"), validate({ params: eventParams, body: deleteEventBody }), asyncHandler(eventController.remove));
+router.delete("/:eventId", requireSystemRole("ADMIN"), requireRecentAuthentication(), validate({ params: eventParams, body: deleteEventBody }), asyncHandler(eventController.remove));
 router.post("/:eventId/shifts/:shiftId/assignments", validate({ params: assignmentParams, body: assignmentBody }), requireEventManager, asyncHandler(eventController.addAssignment));
 router.delete("/:eventId/shifts/:shiftId/assignments/:assignmentId", validate({ params: assignmentDeleteParams, query: versionQuery }), requireEventManager, asyncHandler(eventController.removeAssignment));
 router.get("/:eventId/audit-log", validate({ params: eventParams, query: auditQuery }), requireEventManager, asyncHandler(eventController.audit));
