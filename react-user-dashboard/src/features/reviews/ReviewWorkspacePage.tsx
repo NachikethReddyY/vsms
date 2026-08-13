@@ -16,6 +16,7 @@ import axios from 'axios';
 import { useCallback, useEffect, useRef, useState, type FormEvent, type ReactNode } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { AppDialog } from '../../components/AppDialog';
+import { appDialog } from '../../components/appDialogStyles';
 import { SignaturePad } from '../../components/SignaturePad';
 import { StationCameraScanner } from '../screening/StationCameraScanner';
 import {
@@ -882,7 +883,7 @@ export default function ReviewWorkspacePage() {
       title="Discard clinical review draft?"
       description="Your notes and unrecorded decision will be removed."
     >
-      <div className="app-dialog-actions">
+      <div className={appDialog.actions}>
         <button className="secondary" type="button" data-dialog-autofocus onClick={closeDiscardDialog}>Keep editing</button>
         <button className="danger-button" type="button" onClick={discardDraft}>Discard draft</button>
       </div>

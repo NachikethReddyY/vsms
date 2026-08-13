@@ -21,13 +21,13 @@ export function PasswordRequirements({
   ];
 
   return (
-    <div className="border border-slate-300 bg-slate-50 p-3 text-sm" aria-live="polite">
-      <p className="mb-2 font-semibold text-slate-800">Password must include:</p>
+    <div className="border border-[var(--hairline-strong)] bg-[var(--canvas-soft)] p-3 text-sm" aria-live="polite">
+      <p className="mb-2 font-semibold text-[var(--ink)]">Password must include:</p>
       <ul className="space-y-1">
         {requirements.map((requirement) => (
           <li
             key={requirement.label}
-            className={`flex items-center gap-2 ${requirement.met ? "text-emerald-700" : "text-slate-600"}`}
+            className={`flex items-center gap-2 ${requirement.met ? "text-[var(--green)]" : "text-[var(--ink-2)]"}`}
           >
             <span className="w-4 font-bold" aria-hidden="true">
               {requirement.met ? "Yes" : "No"}

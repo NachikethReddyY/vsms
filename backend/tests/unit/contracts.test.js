@@ -200,10 +200,11 @@ test("listStationTemplates reads active StationTemplate rows", () => {
     assert.doesNotMatch(body, /return\s+\[\];/);
 });
 
-test("importStations and updateStation use Prisma Station not EventStation", () => {
+test("event station mutations use Prisma Station not EventStation", () => {
     const source = read("services/event/eventService.js");
     assert.match(source, /const importStations = async/);
     assert.match(source, /const updateStation = async/);
+    assert.match(source, /const removeStation = async/);
     assert.doesNotMatch(source, /STATION_TEMPLATES_NOT_AVAILABLE/);
     assert.doesNotMatch(source, /tx\.eventStation\./);
     const importFn = source.slice(source.indexOf("const importStations = async"));
@@ -215,6 +216,11 @@ test("importStations and updateStation use Prisma Station not EventStation", () 
     const updateBody = updateFn.slice(0, updateFn.indexOf("\nconst addStaffAssignment"));
     assert.match(updateBody, /tx\.station\.update/);
     assert.match(updateBody, /isActive:\s*body\.isAvailable/);
+    const removeFn = source.slice(source.indexOf("const removeStation = async"));
+    const removeBody = removeFn.slice(0, removeFn.indexOf("\nconst addStaffAssignment"));
+    assert.match(removeBody, /STATION_IN_USE/);
+    assert.match(removeBody, /eventStationAvailability\.deleteMany/);
+    assert.match(removeBody, /station\.delete/);
 });
 
 test("station template mapping imports the explicit screening stationType", () => {

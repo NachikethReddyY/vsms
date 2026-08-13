@@ -340,7 +340,7 @@ test("staff assignment commits with schedule locking and the event version", asy
     audit: async ({ data }) => { audit = data; return {}; },
     tx: {
       $executeRawUnsafe: async () => 1,
-      user: { findFirst: async () => ({ id: assigneeId, userRoles: [{ role: { roleName: "SCREENER" } }] }) },
+      user: { findMany: async () => [{ id: assigneeId, userRoles: [{ role: { roleName: "SCREENER" } }] }] },
       staffAssignment: {
         findFirst: async () => null,
         create: async ({ data }) => { createdAssignment = data; return assignment; },

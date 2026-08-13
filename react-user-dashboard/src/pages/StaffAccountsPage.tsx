@@ -1,6 +1,7 @@
-import { ArrowPathIcon, EyeIcon, PencilSquareIcon, PlusIcon, UserGroupIcon } from '@heroicons/react/24/outline';
+import { ArrowPathIcon, EyeIcon, PencilSquareIcon, PlusIcon, TrashIcon, UserGroupIcon } from '@heroicons/react/24/outline';
 import { useCallback, useEffect, useState, type FormEvent } from 'react';
 import { AppDialog } from '../components/AppDialog';
+import { appDialog } from '../components/appDialogStyles';
 import { AppToast } from '../components/AppToast';
 import type { AppUser } from '../types';
 import apiClient, { getApiError } from '../utils/apiClient';
@@ -61,13 +62,16 @@ export default function StaffAccountsPage() {
   const [notice, setNotice] = useState('');
   const [reactivatingId, setReactivatingId] = useState<string | null>(null);
   const [actionError, setActionError] = useState('');
+  const [search, setSearch] = useState('');
+  const [approvalFilter, setApprovalFilter] = useState('');
+  const [accessFilter, setAccessFilter] = useState('');
 
   const load = useCallback(async () => {
     setLoading(true);
     setError('');
     try {
-      const { data } = await apiClient.get<{ success: true; data: AppUser[] }>('/users');
-      setStaff(sortStaff(data.data));
+      const { data } = await apiClient.get<{ items?: AppUser[]; data?: AppUser[] }>('/admin/accounts', { params: { limit: 100 } });
+      setStaff(sortStaff(data.items ?? data.data ?? []));
     } catch (cause) {
       setError(getApiError(cause, 'Staff accounts could not be loaded.'));
     } finally {
@@ -111,10 +115,11 @@ export default function StaffAccountsPage() {
       } : {}),
     };
     try {
-      const { data } = editing
+      // eslint-disable-next-line @typescript-eslint/no-unused-expressions
+      editing
         ? await apiClient.patch<{ success: true; data: AppUser }>(`/users/${editing.id}`, payload)
         : await apiClient.post<{ success: true; data: AppUser }>('/users', payload);
-      setStaff((current) => sortStaff(editing ? current.map((member) => member.id === data.data.id ? data.data : member) : [...current, data.data]));
+      await load();
       setDialogOpen(false);
       setNotice(editing ? 'Staff account updated.' : 'Staff account created.');
     } catch (cause) {
@@ -136,7 +141,41 @@ export default function StaffAccountsPage() {
       setReactivatingId(null);
     }
   };
+  const deleteAccount = async () => {
+    if (!editing || !window.confirm(`Delete ${editing.fullName}'s staff account? They will immediately lose access and disappear from the staff directory.`)) return;
+    setSaving(true);
+    setFormError('');
+    try {
+      await apiClient.post(`/admin/accounts/${editing.id}/deprovision`, { reason: 'Deleted from the staff directory by an administrator' });
+      await load();
+      setDialogOpen(false);
+      setNotice('Staff account deleted and access revoked.');
+    } catch (cause) {
+      setFormError(getApiError(cause, 'Staff account could not be deleted.'));
+    } finally {
+      setSaving(false);
+    }
+  };
+  const restore = async (member: AppUser) => {
+    setReactivatingId(member.id);
+    setActionError('');
+    try {
+      await apiClient.post(`/admin/accounts/${member.id}/reactivate`, {});
+      await load();
+      setNotice('Staff account restored.');
+    } catch (cause) {
+      setActionError(getApiError(cause, `${member.fullName}'s account could not be restored.`));
+    } finally {
+      setReactivatingId(null);
+    }
+  };
   const activeCount = staff.filter((member) => member.status === 'ACTIVE').length;
+  const visibleStaff = staff.filter((member) => {
+    const query = search.trim().toLowerCase();
+    return (!query || `${member.fullName} ${member.email} ${member.department ?? ''} ${member.designation ?? ''}`.toLowerCase().includes(query))
+      && (!approvalFilter || member.approvalState === approvalFilter)
+      && (!accessFilter || member.accessState === accessFilter);
+  });
 
   return <div className="page-frame staff-accounts-page">
     <header className="staff-accounts-header">
@@ -155,11 +194,18 @@ export default function StaffAccountsPage() {
     {error && <div className="alert error" role="alert"><span>{error}</span><button className="secondary compact" type="button" onClick={() => void load()}>Try again</button></div>}
     {actionError && <div className="alert error" role="alert"><span>{actionError}</span></div>}
 
+    <form className="staff-account-filters" onSubmit={(event) => event.preventDefault()}>
+      <label><span>Search</span><input type="search" value={search} placeholder="Name, email, team or designation" onChange={(event) => setSearch(event.target.value)} /></label>
+      <label><span>Approval</span><select value={approvalFilter} onChange={(event) => setApprovalFilter(event.target.value)}><option value="">Any</option><option value="PENDING">Pending</option><option value="APPROVED">Approved</option><option value="REJECTED">Rejected</option></select></label>
+      <label><span>Access</span><select value={accessFilter} onChange={(event) => setAccessFilter(event.target.value)}><option value="">Any</option><option value="ENABLED">Enabled</option><option value="SUSPENDED">Suspended</option><option value="DISABLED">Disabled</option></select></label>
+      {(search || approvalFilter || accessFilter) && <button className="secondary compact" type="button" onClick={() => { setSearch(''); setApprovalFilter(''); setAccessFilter(''); }}>Clear filters</button>}
+    </form>
+
     <section className="staff-directory" aria-label="Organisation staff accounts">
-      {loading ? <div className="staff-loading" aria-live="polite" aria-label="Loading staff accounts"><span /><span /><span /><span /></div> : staff.length ? <div className="staff-table-shell">
+      {loading ? <div className="staff-loading" aria-live="polite" aria-label="Loading staff accounts"><span /><span /><span /><span /></div> : visibleStaff.length ? <div className="staff-table-shell">
           <table className="staff-table">
-            <thead><tr><th scope="col">Person</th><th scope="col">Team</th><th scope="col">Application roles</th><th scope="col">Access</th><th scope="col"><span className="visually-hidden">Actions</span></th></tr></thead>
-            <tbody>{staff.map((member) => {
+            <thead><tr><th scope="col">Person</th><th scope="col">Team</th><th scope="col">Role</th><th scope="col">Approval</th><th scope="col">Access</th><th scope="col">Last login</th><th scope="col"><span className="visually-hidden">Actions</span></th></tr></thead>
+            <tbody>{visibleStaff.map((member) => {
               const canReactivate = member.approvalState === 'APPROVED'
                 && member.accessState !== 'DISABLED'
                 && (member.status === 'INACTIVE' || member.status === 'SUSPENDED');
@@ -167,12 +213,14 @@ export default function StaffAccountsPage() {
               <th scope="row"><div className="staff-person"><span className="staff-account-avatar" aria-hidden="true">{initial(member.fullName)}</span><span><strong>{member.fullName}</strong><small>{member.email}</small></span></div></th>
               <td><span className="staff-team">{member.designation || 'No designation'}<small>{member.department || 'No department'}</small></span></td>
               <td><div className="staff-role-list"><span className="staff-role-chip">{member.professionalCategory === 'DOCTOR' ? 'Doctor' : labelRole(ROLE_OPTIONS.find((option) => member.roles.includes(option.value))?.value ?? 'SUPPORT')}</span></div></td>
-              <td><span className={`staff-access ${member.status === 'ACTIVE' ? 'active' : 'inactive'}`}><i aria-hidden="true" />{member.status === 'ACTIVE' ? 'Active' : member.status === 'SUSPENDED' ? 'Suspended' : 'Inactive'}</span></td>
-              <td><div className="staff-row-actions">{canReactivate && <button className="secondary compact staff-reactivate-button" type="button" disabled={reactivatingId !== null} onClick={() => void reactivate(member)}><ArrowPathIcon aria-hidden="true" />{reactivatingId === member.id ? 'Reactivating…' : 'Reactivate'}</button>}<button className="secondary compact staff-edit-button" type="button" disabled={reactivatingId === member.id} onClick={() => openEdit(member)}><PencilSquareIcon aria-hidden="true" />Edit</button></div></td>
+              <td><span className={`staff-state ${member.approvalState?.toLowerCase()}`}>{member.approvalState ?? 'Unknown'}</span></td>
+              <td><span className={`staff-access ${member.accessState === 'ENABLED' ? 'active' : 'inactive'}`}><i aria-hidden="true" />{member.accessState === 'DISABLED' ? 'Disabled' : member.accessState === 'SUSPENDED' ? 'Suspended' : 'Enabled'}</span></td>
+              <td><span className="staff-last-login">{member.lastLoginAt ? new Date(member.lastLoginAt).toLocaleString() : 'Not recorded'}</span></td>
+              <td><div className="staff-row-actions">{member.accessState === 'DISABLED' ? <button className="secondary compact staff-reactivate-button" type="button" disabled={reactivatingId !== null} onClick={() => void restore(member)}><ArrowPathIcon aria-hidden="true" />{reactivatingId === member.id ? 'Restoring…' : 'Restore'}</button> : canReactivate && <button className="secondary compact staff-reactivate-button" type="button" disabled={reactivatingId !== null} onClick={() => void reactivate(member)}><ArrowPathIcon aria-hidden="true" />{reactivatingId === member.id ? 'Reactivating…' : 'Reactivate'}</button>}<button className="secondary compact staff-edit-button" type="button" disabled={reactivatingId === member.id || member.accessState === 'DISABLED'} onClick={() => openEdit(member)}><PencilSquareIcon aria-hidden="true" />Edit</button></div></td>
             </tr>;
             })}</tbody>
           </table>
-      </div> : <div className="quiet-empty staff-empty"><UserGroupIcon aria-hidden="true" /><h2>No staff accounts yet</h2><p>Add a staff member to set their access before their first sign-in.</p><button className="secondary compact" type="button" onClick={openCreate}>Add staff member</button></div>}
+      </div> : <div className="quiet-empty staff-empty"><UserGroupIcon aria-hidden="true" /><h2>{staff.length ? 'No staff match these filters' : 'No staff accounts yet'}</h2><p>{staff.length ? 'Clear or change the filters above.' : 'Add a staff member to set their access before their first sign-in.'}</p>{!staff.length && <button className="secondary compact" type="button" onClick={openCreate}>Add staff member</button>}</div>}
     </section>
 
     <AppDialog
@@ -193,14 +241,14 @@ export default function StaffAccountsPage() {
       dismissible={!saving}
       className="staff-account-dialog"
     >
-      <form className="app-dialog-form staff-account-form" onSubmit={submit}>
+      <form className={`${appDialog.form} staff-account-form`} onSubmit={submit}>
         <div className="staff-account-fields">
-        {formError && <p className="app-dialog-error" role="alert">{formError}</p>}
-        <label className="app-dialog-field"><span>Full name</span><input required autoComplete="name" value={draft.fullName} onChange={(event) => setDraft((current) => ({ ...current, fullName: event.target.value }))} /></label>
-        <label className="app-dialog-field"><span>Work email</span><input required type="email" autoComplete="email" disabled={Boolean(editing)} value={draft.email} onChange={(event) => setDraft((current) => ({ ...current, email: event.target.value }))} />{editing && <small className="app-dialog-help">Email is managed by the sign-in provider and cannot be changed here.</small>}</label>
+        {formError && <p className={appDialog.error} role="alert">{formError}</p>}
+        <label className={appDialog.field}><span>Full name</span><input required autoComplete="name" value={draft.fullName} onChange={(event) => setDraft((current) => ({ ...current, fullName: event.target.value }))} /></label>
+        <label className={appDialog.field}><span>Work email</span><input required type="email" autoComplete="email" disabled={Boolean(editing)} value={draft.email} onChange={(event) => setDraft((current) => ({ ...current, email: event.target.value }))} />{editing && <small className={appDialog.help}>Email is managed by the sign-in provider and cannot be changed here.</small>}</label>
         <div className="staff-account-form-grid">
-          <label className="app-dialog-field"><span>Department <small>Optional</small></span><input maxLength={100} value={draft.department} onChange={(event) => setDraft((current) => ({ ...current, department: event.target.value }))} /></label>
-          <label className="app-dialog-field"><span>Designation <small>Optional</small></span><input maxLength={100} value={draft.designation} onChange={(event) => setDraft((current) => ({ ...current, designation: event.target.value }))} /></label>
+          <label className={appDialog.field}><span>Department <small>Optional</small></span><input maxLength={100} value={draft.department} onChange={(event) => setDraft((current) => ({ ...current, department: event.target.value }))} /></label>
+          <label className={appDialog.field}><span>Designation <small>Optional</small></span><input maxLength={100} value={draft.designation} onChange={(event) => setDraft((current) => ({ ...current, designation: event.target.value }))} /></label>
         </div>
         {!editing && <fieldset className="staff-access-selector"><legend>Initial access</legend><div>
           <label><input type="radio" name="accessStatus" checked={draft.status === 'ACTIVE'} onChange={() => setDraft((current) => ({ ...current, status: 'ACTIVE' }))} /><span><strong>Active now</strong><small>Send the invitation and allow VSMS access immediately.</small></span></label>
@@ -208,7 +256,7 @@ export default function StaffAccountsPage() {
         </div></fieldset>}
         <fieldset className="staff-role-selector"><legend>Account type</legend><p>Choose the person’s organization-wide account type. Event duties are assigned inside each event.</p><div>{ROLE_OPTIONS.map((role) => <label key={role.value}><input type="radio" name="accountType" checked={draft.role === role.value} onChange={() => setDraft((current) => ({ ...current, role: role.value }))} /><span><strong>{role.label}</strong><small>{role.description}</small></span></label>)}</div></fieldset>
         </div>
-        <div className="app-dialog-actions"><button className="secondary" type="button" disabled={saving} onClick={() => closeDialog(false)}>Cancel</button><button className="primary" type="submit" disabled={saving}>{saving ? 'Saving…' : editing ? 'Save changes' : 'Create account'}</button></div>
+        <div className={appDialog.actions}>{editing && <button className="danger staff-delete-account" type="button" disabled={saving} onClick={() => void deleteAccount()}><TrashIcon aria-hidden="true" />Delete account</button>}<button className="secondary" type="button" disabled={saving} onClick={() => closeDialog(false)}>Cancel</button><button className="primary" type="submit" disabled={saving}>{saving ? 'Saving…' : editing ? 'Save changes' : 'Create account'}</button></div>
       </form>
     </AppDialog>
     <AppToast message={notice} onDismiss={() => setNotice('')} />

@@ -19,6 +19,7 @@ const userSelect = {
   status: true,
   approvalState: true,
   accessState: true,
+  deprovisionedAt: true,
   sysRole: true,
   createdAt: true,
   userRoles: { select: { role: { select: { id: true, roleName: true } } } },
@@ -84,6 +85,7 @@ async function writeAudit(tx, { actorId, action, accountId, before = null, after
 
 exports.getAllUsers = async () => {
   const users = await prisma.user.findMany({
+    where: { deprovisionedAt: null },
     select: userSelect,
     orderBy: [{ fullName: "asc" }, { id: "asc" }],
   });
@@ -108,6 +110,45 @@ exports.createUser = async (
     const result = await prisma.$transaction(async (tx) => {
       const existing = await tx.user.findUnique({ where: { email: userData.email }, select: userSelect });
       if (existing) {
+        if (existing.deprovisionedAt) {
+          await lockAccountTransition(tx, existing.id);
+          const roles = await rolesFor(tx, userData.roles);
+          const status = deriveLegacyStatus({
+            approvalState: "APPROVED",
+            accessState: "ENABLED",
+            inactive: userData.status === "INACTIVE",
+          });
+          await tx.userRole.deleteMany({ where: { userId: existing.id } });
+          await tx.userRole.createMany({
+            data: roles.map((role) => ({ userId: existing.id, roleId: role.id, assignedById: actorId })),
+          });
+          const restored = await tx.user.update({
+            where: { id: existing.id },
+            data: {
+              username: userData.email,
+              fullName: userData.fullName,
+              department: userData.department ?? null,
+              designation: userData.designation ?? null,
+              professionalCategory: userData.professionalCategory,
+              status,
+              approvalState: "APPROVED",
+              accessState: "ENABLED",
+              sysRole: userData.roles.includes("ADMINISTRATOR") ? "ADMIN" : userData.roles.includes("EVENT_MANAGER") ? "EVENT_MANAGER" : "STAFF",
+              deprovisionedAt: null,
+              deprovisionedById: null,
+              deprovisionReason: null,
+            },
+            select: userSelect,
+          });
+          await writeAudit(tx, { actorId, action: "STAFF_ACCOUNT_RESTORED", accountId: restored.id, before: accountSnapshot(existing), after: accountSnapshot(restored), context });
+          const operation = await enqueueProviderOperation(tx, {
+            userId: restored.id,
+            operationType: "SYNC_ACCESS",
+            idempotencyKey: `SYNC_ACCESS:${restored.id}:RESTORE:${crypto.randomUUID()}`,
+            payload: { roles: userData.roles, status },
+          });
+          return { user: restored, operation };
+        }
         const operation = await tx.accountProviderOperation.findFirst({
           where: { userId: existing.id, operationType: "SYNC_ACCESS", status: { in: ["PENDING", "PROCESSING", "FAILED"] } },
           orderBy: [{ createdAt: "desc" }, { id: "desc" }],

@@ -11,6 +11,8 @@ export interface AppUser {
   status?: string;
   approvalState?: 'PENDING' | 'APPROVED' | 'REJECTED';
   accessState?: 'ENABLED' | 'SUSPENDED' | 'DISABLED';
+  lastLoginAt?: string | null;
+  deprovisionedAt?: string | null;
   roles: string[];
   systemRole?: "ADMIN" | "EVENT_MANAGER" | "STAFF";
 }

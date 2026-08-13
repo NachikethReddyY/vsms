@@ -22,6 +22,7 @@ import { useEffect, useMemo, useRef, useState, type ChangeEvent, type FormEvent 
 import { Link, useLocation, useParams } from 'react-router-dom';
 import { useAuth } from '../../auth/AuthProvider';
 import { AppDialog } from '../../components/AppDialog';
+import { appDialog } from '../../components/appDialogStyles';
 import { AppToast } from '../../components/AppToast';
 import { getApiError as getApiMessage } from '../../utils/apiClient';
 import { getDisplayName } from '../../utils/identity';
@@ -37,6 +38,13 @@ const applicationRoleByAssignment: Record<StaffAssignmentRole, StaffDirectoryEnt
   EVENT_MANAGER: 'EVENT_MANAGER', REGISTRATION: 'REGISTRATION_OFFICER', SCREENER: 'SCREENER', REVIEWER: 'REVIEWER', SUPPORT: 'SUPPORT',
 };
 const roleLabel = (role: string) => role.toLowerCase().replace(/_/g, ' ').replace(/^\w/, (letter: string) => letter.toUpperCase());
+const toInstant = (date: string, time: string) => new Date(`${date}T${time}:00+08:00`).toISOString();
+const scheduleOffset = (milliseconds: number) => {
+  const minutes = Math.round(milliseconds / 60000);
+  const hours = Math.floor(minutes / 60);
+  const remainder = minutes % 60;
+  return [hours && `${hours}h`, remainder && `${remainder}m`].filter(Boolean).join(' ');
+};
 
 const nextAction: Record<string, { action: 'publish' | 'start' | 'complete'; status: EventStatus; label: string; prompt: string } | undefined> = {
   DRAFT: { action: 'publish', status: 'PUBLISHED', label: 'Publish event', prompt: 'Publish this event? Staff with access will see it as ready for operations.' },
@@ -63,6 +71,13 @@ function formatTime(value: string, timezone: string) {
   return new Intl.DateTimeFormat(undefined, {
     hour: 'numeric', minute: '2-digit', timeZone: timezone,
   }).format(new Date(value));
+}
+
+function formatTimeInput(value: string, timezone: string) {
+  const parts = new Intl.DateTimeFormat('en-GB', {
+    hour: '2-digit', minute: '2-digit', hourCycle: 'h23', timeZone: timezone,
+  }).formatToParts(new Date(value));
+  return `${parts.find(({ type }) => type === 'hour')?.value}:${parts.find(({ type }) => type === 'minute')?.value}`;
 }
 
 function eventDuration(startsAt: string, endsAt: string) {
@@ -103,6 +118,7 @@ export default function EventDetailPage() {
   const [directoryLoaded, setDirectoryLoaded] = useState(false);
   const [directoryError, setDirectoryError] = useState('');
   const [assignmentDrafts, setAssignmentDrafts] = useState<Record<string, AssignmentDraft>>({});
+  const [selectedStaffIds, setSelectedStaffIds] = useState<Record<string, string[]>>({});
   const [stationTemplates, setStationTemplates] = useState<StationTemplate[]>([]);
   const [stationPanelOpen, setStationPanelOpen] = useState(false);
   const [stationLoading, setStationLoading] = useState(false);
@@ -231,7 +247,8 @@ export default function EventDetailPage() {
 
   const assignStaff = async (shiftId: string) => {
     const draft = assignmentDrafts[shiftId] ?? emptyAssignment;
-    if (!event || !draft.userId) return;
+    const userIds = selectedStaffIds[shiftId] ?? [];
+    if (!event || userIds.length === 0) return;
     if (draft.assignmentRole === 'SCREENER' && !draft.eventStationId) {
       setError('Choose an event station for the screener.');
       return;
@@ -240,13 +257,14 @@ export default function EventDetailPage() {
     try {
       const updated = await eventApi.assignStaff(event.eventId, shiftId, {
         version: event.version,
-        userId: draft.userId,
+        userIds,
         assignmentRole: draft.assignmentRole,
         eventStationId: draft.eventStationId || null,
       });
       setEvent(updated);
       setAssignmentDrafts((current) => ({ ...current, [shiftId]: emptyAssignment }));
-      setNotice('Staff schedule updated.');
+      setSelectedStaffIds((current) => ({ ...current, [shiftId]: [] }));
+      setNotice(`${userIds.length} staff assignment${userIds.length === 1 ? '' : 's'} saved.`);
       void refreshAudit(event.eventId);
     }
     catch (cause) { setError(getApiMessage(cause, 'The staff assignment could not be saved.')); }
@@ -285,7 +303,7 @@ export default function EventDetailPage() {
     finally { setStationPending(''); }
   };
 
-  const updateStation = async (eventStationId: string, changes: { stationOrder?: number; capacity?: number; isAvailable?: boolean }) => {
+  const updateStation = async (eventStationId: string, changes: { stationOrder?: number; capacity?: number; isAvailable?: boolean; availabilities?: Array<{ date: string; isAvailable: boolean; startsAt: string | null; endsAt: string | null; capacity: number }> }) => {
     if (!event) return;
     setStationPending(eventStationId); setError('');
     try {
@@ -293,6 +311,39 @@ export default function EventDetailPage() {
       setNotice('Station configuration updated.');
       void refreshAudit(event.eventId);
     } catch (cause) { setError(getApiMessage(cause, 'The station configuration could not be saved.')); }
+    finally { setStationPending(''); }
+  };
+
+  const saveStationSchedule = (submitEvent: FormEvent<HTMLFormElement>, eventStationId: string) => {
+    submitEvent.preventDefault();
+    const data = new FormData(submitEvent.currentTarget);
+    const availabilities = event?.eventDays.map((day, index) => {
+      const isAvailable = data.get(`available-${index}`) === 'on';
+      const selectedStation = event.eventStations.find((station) => station.eventStationId === eventStationId);
+      const capacity = selectedStation?.availabilities.find((availability) => availability.eventDay.date === day.date)?.capacity
+        ?? selectedStation?.capacity
+        ?? 1;
+      const startsAt = String(data.get(`starts-${index}`));
+      const endsAt = String(data.get(`ends-${index}`));
+      return {
+        date: day.date,
+        isAvailable,
+        startsAt: isAvailable ? toInstant(day.date, startsAt) : null,
+        endsAt: isAvailable ? toInstant(day.date, endsAt) : null,
+        capacity,
+      };
+    });
+    if (availabilities) void updateStation(eventStationId, { availabilities });
+  };
+
+  const removeStation = async (eventStationId: string, name: string) => {
+    if (!event || !window.confirm(`Remove ${name} from this event? This cannot be undone.`)) return;
+    setStationPending(eventStationId); setError('');
+    try {
+      setEvent(await eventApi.removeStation(event.eventId, eventStationId, event.version));
+      setNotice(`${name} removed from this event.`);
+      void refreshAudit(event.eventId);
+    } catch (cause) { setError(getApiMessage(cause, 'The station could not be removed.')); }
     finally { setStationPending(''); }
   };
 
@@ -487,35 +538,51 @@ export default function EventDetailPage() {
             <div><strong>Add one station</strong><span>Choose the station this event needs. Daily availability is configured independently.</span></div>
             {stationLoading ? <p>Loading station templates…</p> : stationTemplatesError ? <div className="inline-retry" role="alert"><p>{stationTemplatesError}</p><button className="secondary compact" type="button" onClick={() => void loadStationTemplates()}>Retry</button></div> : stationTemplatesLoaded && availableTemplates.length === 0 ? <p>All active station templates are already in this event.</p> : <ul>{availableTemplates.map((template) => <li key={template.stationTemplateId}><span><strong>{template.name}</strong><small>{template.description || 'No template description.'} · Default capacity {template.defaultCapacity}</small></span><button className="secondary compact" type="button" disabled={!!stationPending} onClick={() => void importStation(template.stationTemplateId)}>{stationPending === template.stationTemplateId ? 'Importing…' : 'Import'}</button></li>)}</ul>}
           </div>}
-          {event.eventStations.length === 0 ? <p className="quiet-empty">{canConfigureStations ? 'No stations added yet. Import the first station this event needs.' : 'No stations are configured for this event.'}</p> : <div className="station-table">{event.eventStations.map((station) => <article className={`station-record ${station.isAvailable ? '' : 'is-unavailable'}`} key={station.eventStationId}>
-            <div className="station-record-copy"><strong>{station.name}</strong><span>{station.description || 'No station instructions.'}</span><small>Template v{station.templateVersion}</small><div className="station-day-list">{(station.availabilities.length ? station.availabilities : event.eventDays.map((day) => ({ eventStationAvailabilityId: `${station.eventStationId}-${day.eventDayId}`, eventDay: day, isAvailable: station.isAvailable, capacity: station.capacity }))).map((availability) => <span className={availability.isAvailable ? 'is-available' : 'is-unavailable'} key={availability.eventStationAvailabilityId}>{formatEventDate(availability.eventDay.date, event.timezone, false)} · {availability.isAvailable ? `${availability.capacity} places` : 'Unavailable'}</span>)}</div></div>
-            {canConfigureStations ? <div className="station-controls">
-              <form className="station-capacity" noValidate onSubmit={(submitEvent) => saveStationCapacity(submitEvent, station.eventStationId)}>
-                <label><span>Capacity</span><input key={`${station.eventStationId}-${station.capacity}`} name="capacity" type="number" min="1" max="1000" step="1" required defaultValue={station.capacity} aria-label={`${station.name} capacity`} aria-invalid={!!capacityErrors[station.eventStationId]} aria-describedby={capacityErrors[station.eventStationId] ? `capacity-error-${station.eventStationId}` : undefined} onInput={() => setCapacityErrors((current) => ({ ...current, [station.eventStationId]: '' }))} />{capacityErrors[station.eventStationId] && <span className="field-error" id={`capacity-error-${station.eventStationId}`} role="alert">{capacityErrors[station.eventStationId]}</span>}</label>
-                <button className="secondary compact" type="submit" disabled={!!stationPending}>{stationPending === station.eventStationId ? 'Saving…' : 'Save'}</button>
-              </form>
-              <button className="secondary compact" type="button" disabled={!!stationPending} onClick={() => void updateStation(station.eventStationId, { isAvailable: !station.isAvailable })}>{station.isAvailable ? 'Mark unavailable' : 'Make available'}</button>
-            </div> : <strong className="station-capacity-readonly">{station.capacity} concurrent</strong>}
-          </article>)}</div>}
+          {event.eventStations.length === 0 ? <p className="quiet-empty">{canConfigureStations ? 'No stations added yet. Import the first station this event needs.' : 'No stations are configured for this event.'}</p> : <div className="station-table">{event.eventStations.map((station) => {
+            const availabilities = station.availabilities.length ? station.availabilities : event.eventDays.map((day) => ({ eventStationAvailabilityId: `${station.eventStationId}-${day.eventDayId}`, eventDay: day, isAvailable: station.isAvailable, startsAt: day.startsAt, endsAt: day.endsAt, capacity: station.capacity }));
+            return <article className={`station-record ${station.isAvailable ? '' : 'is-unavailable'}`} key={station.eventStationId}>
+              <div className="station-record-copy"><strong>{station.name}</strong><span>{station.description || 'No station instructions.'}</span><small>Template v{station.templateVersion}</small></div>
+              {canConfigureStations ? <div className="station-stacked-controls">
+                <form className="station-capacity" noValidate onSubmit={(submitEvent) => saveStationCapacity(submitEvent, station.eventStationId)}>
+                  <label><span>Capacity for all days</span><input key={`${station.eventStationId}-${station.capacity}`} name="capacity" type="number" min="1" max="1000" step="1" required defaultValue={station.capacity} aria-label={`${station.name} capacity for every day`} aria-invalid={!!capacityErrors[station.eventStationId]} aria-describedby={capacityErrors[station.eventStationId] ? `capacity-error-${station.eventStationId}` : undefined} onInput={() => setCapacityErrors((current) => ({ ...current, [station.eventStationId]: '' }))} />{capacityErrors[station.eventStationId] && <span className="field-error" id={`capacity-error-${station.eventStationId}`} role="alert">{capacityErrors[station.eventStationId]}</span>}</label>
+                  <button className="secondary compact" type="submit" disabled={!!stationPending}>{stationPending === station.eventStationId ? 'Applying…' : 'Apply to all days'}</button>
+                  <small>One capacity for every available day. Changes save immediately.</small>
+                </form>
+                <form className="station-schedule" onSubmit={(submitEvent) => saveStationSchedule(submitEvent, station.eventStationId)}>
+                  {availabilities.map((availability, index) => {
+                    const scheduledDay = event.eventDays.find((day) => day.date === availability.eventDay.date);
+                    const startsLateBy = availability.startsAt && scheduledDay ? new Date(availability.startsAt).getTime() - new Date(scheduledDay.startsAt).getTime() : 0;
+                    const endsEarlyBy = availability.endsAt && scheduledDay ? new Date(scheduledDay.endsAt).getTime() - new Date(availability.endsAt).getTime() : 0;
+                    return <fieldset key={`${availability.eventStationAvailabilityId}-${availability.capacity}-${availability.startsAt}-${availability.endsAt}`}>
+                    <legend>{formatEventDate(availability.eventDay.date, event.timezone, false)}</legend>
+                    <label className="station-available"><input name={`available-${index}`} type="checkbox" defaultChecked={availability.isAvailable} /> Available</label>
+                    <label><span>From</span><input name={`starts-${index}`} type="time" defaultValue={availability.startsAt ? formatTimeInput(availability.startsAt, event.timezone) : ''} /></label>
+                    <label><span>Until</span><input name={`ends-${index}`} type="time" defaultValue={availability.endsAt ? formatTimeInput(availability.endsAt, event.timezone) : ''} /></label>
+                    {availability.isAvailable && (startsLateBy > 0 || endsEarlyBy > 0) && <div className="station-hours-warning" role="status"><ClockIcon />{startsLateBy > 0 && <span>Starts {scheduleOffset(startsLateBy)} after the event opens.</span>}{endsEarlyBy > 0 && <span>Closes {scheduleOffset(endsEarlyBy)} before the event ends.</span>}</div>}
+                  </fieldset>})}
+                  <button className="primary compact" type="submit" disabled={!!stationPending}>{stationPending === station.eventStationId ? 'Saving…' : 'Save daily schedule'}</button>
+                </form>
+                <button className="secondary compact station-remove" type="button" disabled={!!stationPending} onClick={() => void removeStation(station.eventStationId, station.name)}><TrashIcon />Remove station</button>
+              </div> : <div className="station-day-list">{availabilities.map((availability) => <span className={availability.isAvailable ? 'is-available' : 'is-unavailable'} key={availability.eventStationAvailabilityId}>{formatEventDate(availability.eventDay.date, event.timezone, false)} · {availability.isAvailable ? `${availability.capacity} places` : 'Unavailable'}</span>)}</div>}
+            </article>;
+          })}</div>}
     </section>}
 
     {view === 'staff' && <section className="event-view shift-section" aria-labelledby="shift-title">
         <div className="section-title"><h2 id="shift-title">Shifts</h2><span>{event.shifts.length} scheduled</span></div>
         {event.shifts.length === 0 ? <p className="quiet-empty">No shifts have been added. The event can still be saved as a draft.</p> : <div className="shift-table">{event.shifts.map((shift) => {
           const draft = assignmentDrafts[shift.shiftId] ?? emptyAssignment;
-          const selectedStaff = staffDirectory.find((person) => person.userId === draft.userId);
-          const compatibleRoles = selectedStaff
-            ? assignmentRoles.filter((role) => selectedStaff.roles.includes(applicationRoleByAssignment[role]))
-            : [];
+          const selectedIds = selectedStaffIds[shift.shiftId] ?? [];
+          const eligibleStaff = staffDirectory.filter((person) => person.roles.includes(applicationRoleByAssignment[draft.assignmentRole]));
           return <article className="shift-record" key={shift.shiftId}>
             <div className="shift-record-summary"><span><strong>{shift.name}</strong><small>{STATUS_LABEL[shift.status as keyof typeof STATUS_LABEL] ?? shift.status.toLowerCase()}</small></span><span><small>Schedule</small>{formatTime(shift.startsAt, event.timezone)}–{formatTime(shift.endsAt, event.timezone)}</span><span><small>Coverage</small>{shift.staffAssignments.length} of {shift.requiredStaff} assigned</span>{canEditStaffing && <button className="secondary compact" type="button" aria-expanded={staffingOpen === shift.shiftId} onClick={() => void openStaffing(shift.shiftId)}><PlusIcon />Assign</button>}</div>
             {shift.staffAssignments.length > 0 ? <ul className="assignment-list">{shift.staffAssignments.map((assignment) => <li key={assignment.staffAssignmentId}><span><strong>{getDisplayName(assignment.user.username)}</strong><small>{roleLabel(assignment.assignmentRole)}{assignment.eventStation ? ` · ${assignment.eventStation.name}` : ''}</small></span>{canEditStaffing && <button className="assignment-remove" type="button" aria-label={`Remove ${getDisplayName(assignment.user.username)} from ${shift.name}`} title={`Remove ${getDisplayName(assignment.user.username)}`} onClick={() => void removeStaff(shift.shiftId, assignment.staffAssignmentId)} disabled={staffingPending}><TrashIcon /></button>}</li>)}</ul> : <p className="shift-empty">No staff assigned to this shift.</p>}
             {canEditStaffing && staffingOpen === shift.shiftId && <form className="staffing-editor" onSubmit={(submitEvent) => { submitEvent.preventDefault(); void assignStaff(shift.shiftId); }}>
               {directoryLoading ? <p>Loading available staff…</p> : directoryError ? <div className="inline-retry" role="alert"><p>{directoryError}</p><button className="secondary compact" type="button" onClick={() => void loadStaffDirectory()}>Retry</button></div> : directoryLoaded && staffDirectory.length === 0 ? <p>No active staff members are available.</p> : <>
-                <label><span>Staff member</span><select required value={draft.userId} disabled={staffingPending} onChange={(change) => { const person = staffDirectory.find((candidate) => candidate.userId === change.target.value); const role = assignmentRoles.find((candidate) => person?.roles.includes(applicationRoleByAssignment[candidate])) ?? 'SUPPORT'; updateAssignmentDraft(shift.shiftId, { userId: change.target.value, assignmentRole: role, eventStationId: role === 'SCREENER' ? draft.eventStationId : '' }); }}><option value="">Choose staff</option>{staffDirectory.map((person) => <option value={person.userId} key={person.userId}>{getDisplayName(person.username)} · {person.roles.map(roleLabel).join(', ')}</option>)}</select></label>
-                <label><span>Shift role</span><select value={draft.assignmentRole} disabled={staffingPending || !draft.userId} onChange={(change) => updateAssignmentDraft(shift.shiftId, { assignmentRole: change.target.value as StaffAssignmentRole })}>{compatibleRoles.map((role) => <option value={role} key={role}>{roleLabel(role)}</option>)}</select></label>
+                <label><span>Shift role</span><select value={draft.assignmentRole} disabled={staffingPending} onChange={(change) => { updateAssignmentDraft(shift.shiftId, { assignmentRole: change.target.value as StaffAssignmentRole, eventStationId: '' }); setSelectedStaffIds((current) => ({ ...current, [shift.shiftId]: [] })); }}>{assignmentRoles.map((role) => <option value={role} key={role}>{roleLabel(role)}</option>)}</select></label>
                 <label><span>Station {draft.assignmentRole === 'SCREENER' ? '(required)' : '(optional)'}</span><select required={draft.assignmentRole === 'SCREENER'} value={draft.eventStationId} disabled={staffingPending} onChange={(change) => updateAssignmentDraft(shift.shiftId, { eventStationId: change.target.value })}><option value="">No station</option>{event.eventStations.filter((station) => station.isAvailable).map((station) => <option value={station.eventStationId} key={station.eventStationId}>{station.stationOrder}. {station.name}</option>)}</select></label>
-                <button className="primary compact" type="submit" disabled={staffingPending || !draft.userId || (draft.assignmentRole === 'SCREENER' && !draft.eventStationId)}>{staffingPending ? 'Saving…' : 'Save assignment'}</button>
+                <fieldset className="staff-picker"><legend>Staff members</legend><label><input type="checkbox" checked={eligibleStaff.length > 0 && selectedIds.length === eligibleStaff.length} onChange={(change) => setSelectedStaffIds((current) => ({ ...current, [shift.shiftId]: change.target.checked ? eligibleStaff.map(({ userId }) => userId) : [] }))} /> Select all {eligibleStaff.length}</label>{eligibleStaff.map((person) => <label key={person.userId}><input type="checkbox" checked={selectedIds.includes(person.userId)} onChange={(change) => setSelectedStaffIds((current) => ({ ...current, [shift.shiftId]: change.target.checked ? [...selectedIds, person.userId] : selectedIds.filter((id) => id !== person.userId) }))} /> {getDisplayName(person.username)}</label>)}</fieldset>
+                <button className="primary compact" type="submit" disabled={staffingPending || selectedIds.length === 0 || (draft.assignmentRole === 'SCREENER' && !draft.eventStationId)}>{staffingPending ? 'Saving…' : `Assign ${selectedIds.length || ''} staff`}</button>
               </>}
             </form>}
           </article>;
@@ -549,7 +616,7 @@ export default function EventDetailPage() {
       description={next?.prompt}
       dismissible={!pending}
     >
-      <div className="app-dialog-actions">
+      <div className={appDialog.actions}>
         <button className="secondary" type="button" data-dialog-autofocus disabled={pending} onClick={() => setStatusConfirmOpen(false)}>Keep current status</button>
         <button className="primary" type="button" disabled={pending} onClick={() => void transition()}>{pending ? 'Saving…' : next?.label ?? 'Save status'}</button>
       </div>
@@ -561,11 +628,11 @@ export default function EventDetailPage() {
       description="Record a clear reason before cancelling. This action cannot be reversed."
       dismissible={!pending}
     >
-      <form className="app-dialog-form" noValidate onSubmit={(submitEvent) => { submitEvent.preventDefault(); void cancel(); }}>
-        <label className="app-dialog-field"><span>Cancellation reason</span><textarea required minLength={10} maxLength={500} rows={4} value={cancellationReason} data-dialog-autofocus aria-invalid={!!cancellationError} aria-describedby={cancellationError ? 'event-cancellation-help event-cancellation-error' : 'event-cancellation-help'} onChange={(change) => { setCancellationReason(change.target.value); setCancellationError(''); }} /></label>
-        <p className="app-dialog-help" id="event-cancellation-help">{cancellationReason.length}/500 characters</p>
-        {cancellationError && <p className="app-dialog-error" id="event-cancellation-error" role="alert">{cancellationError}</p>}
-        <div className="app-dialog-actions"><button className="secondary" type="button" disabled={pending} onClick={() => { setCancelOpen(false); setCancellationReason(''); setCancellationError(''); }}>Keep event</button><button className="danger-button" type="submit" disabled={pending}>{pending ? 'Cancelling…' : 'Cancel event'}</button></div>
+      <form className={appDialog.form} noValidate onSubmit={(submitEvent) => { submitEvent.preventDefault(); void cancel(); }}>
+        <label className={appDialog.field}><span>Cancellation reason</span><textarea required minLength={10} maxLength={500} rows={4} value={cancellationReason} data-dialog-autofocus aria-invalid={!!cancellationError} aria-describedby={cancellationError ? 'event-cancellation-help event-cancellation-error' : 'event-cancellation-help'} onChange={(change) => { setCancellationReason(change.target.value); setCancellationError(''); }} /></label>
+        <p className={appDialog.help} id="event-cancellation-help">{cancellationReason.length}/500 characters</p>
+        {cancellationError && <p className={appDialog.error} id="event-cancellation-error" role="alert">{cancellationError}</p>}
+        <div className={appDialog.actions}><button className="secondary" type="button" disabled={pending} onClick={() => { setCancelOpen(false); setCancellationReason(''); setCancellationError(''); }}>Keep event</button><button className="danger-button" type="submit" disabled={pending}>{pending ? 'Cancelling…' : 'Cancel event'}</button></div>
       </form>
     </AppDialog>
   </div>;

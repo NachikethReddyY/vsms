@@ -60,9 +60,14 @@ Parameters:
   CognitoAppClientId:
     Type: String
     MinLength: 1
+  EventArtworkBucketName:
+    Type: String
+    Default: ""
+    Description: Existing private S3 bucket for event artwork; leave empty to retain database-backed artwork
 
 Conditions:
   ApplicationServicesAreEnabled: !Equals [!Ref ApplicationServicesEnabled, "true"]
+  EventArtworkStorageIsConfigured: !Not [!Equals [!Ref EventArtworkBucketName, ""]]
 
 Resources:
   ApiLogGroup:
@@ -379,6 +384,19 @@ Resources:
                 Condition:
                   ArnEquals:
                     elasticfilesystem:AccessPointArn: !Sub arn:${AWS::Partition}:elasticfilesystem:${AWS::Region}:${AWS::AccountId}:access-point/${BackupAccessPoint}
+        - !If
+          - EventArtworkStorageIsConfigured
+          - PolicyName: ManageVsmsEventArtwork
+            PolicyDocument:
+              Version: "2012-10-17"
+              Statement:
+                - Effect: Allow
+                  Action:
+                    - s3:GetObject
+                    - s3:PutObject
+                    - s3:DeleteObject
+                  Resource: !Sub arn:${AWS::Partition}:s3:::${EventArtworkBucketName}/event-artwork/*
+          - !Ref AWS::NoValue
 
   WorkerTaskRole:
     Type: AWS::IAM::Role
@@ -439,6 +457,11 @@ Resources:
               Value: !Sub https://${FrontendDomainName}/
             - Name: ENCRYPTION_ACTIVE_KEY_ID
               Value: !Ref EncryptionActiveKeyId
+            - !If
+              - EventArtworkStorageIsConfigured
+              - Name: EVENT_ARTWORK_BUCKET
+                Value: !Ref EventArtworkBucketName
+              - !Ref AWS::NoValue
             - Name: VSMS_BACKUP_DIR
               Value: /var/lib/vsms/backups
           Secrets:
@@ -563,7 +586,7 @@ Resources:
       Protocol: HTTP
       Port: 5050
       HealthCheckEnabled: true
-      HealthCheckPath: /health
+      HealthCheckPath: /ready
       HealthCheckIntervalSeconds: 30
       HealthCheckTimeoutSeconds: 5
       HealthyThresholdCount: 2

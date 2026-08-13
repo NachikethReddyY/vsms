@@ -8,6 +8,7 @@ export type EventStation = Omit<components['schemas']['EventStation'], 'stationT
 export type EventRecord = Omit<components['schemas']['Event'], 'shifts' | 'eventStations'> & {
   shifts: components['schemas']['Shift'][];
   eventStations: EventStation[];
+  eventTeam?: string[];
 };
 export type EventStatus = components['schemas']['EventStatus'];
 export type StaffAssignment = components['schemas']['StaffAssignment'];
@@ -85,11 +86,15 @@ export const eventApi = {
     const { data } = await apiClient.post<EventRecord>(`/events/${id}/stations/import`, { version, stationTemplateIds });
     return data;
   },
-  async updateStation(id: string, eventStationId: string, input: { version: number; stationOrder?: number; capacity?: number; isAvailable?: boolean }) {
+  async updateStation(id: string, eventStationId: string, input: { version: number; stationOrder?: number; capacity?: number; isAvailable?: boolean; availabilities?: Array<{ date: string; isAvailable: boolean; startsAt: string | null; endsAt: string | null; capacity: number }> }) {
     const { data } = await apiClient.patch<EventRecord>(`/events/${id}/stations/${eventStationId}`, input);
     return data;
   },
-  async assignStaff(id: string, shiftId: string, input: { version: number; userId: string; assignmentRole: StaffAssignmentRole; eventStationId?: string | null; notes?: string | null }) {
+  async removeStation(id: string, eventStationId: string, version: number) {
+    const { data } = await apiClient.delete<EventRecord>(`/events/${id}/stations/${eventStationId}`, { params: { version } });
+    return data;
+  },
+  async assignStaff(id: string, shiftId: string, input: { version: number; userId?: string; userIds?: string[]; assignmentRole: StaffAssignmentRole; eventStationId?: string | null; notes?: string | null }) {
     const { data } = await apiClient.post<EventRecord>(`/events/${id}/shifts/${shiftId}/assignments`, input);
     return data;
   },

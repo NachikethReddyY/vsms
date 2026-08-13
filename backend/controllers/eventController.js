@@ -8,6 +8,14 @@ exports.create = async (req, res) => {
 };
 exports.get = async (req, res) => res.json(await eventService.getEvent(req.params.eventId, req.user));
 exports.publicGet = async (req, res) => res.set("Cache-Control", "public, max-age=60").json(await eventService.getPublicEvent(req.params.eventId));
+const sendArtwork = (res, artwork, cacheControl) => res
+  .set("Cache-Control", cacheControl)
+  .set("Content-Type", artwork.mimeType)
+  .set("ETag", `"${artwork.etag}"`)
+  .set("X-Content-Type-Options", "nosniff")
+  .send(artwork.contents);
+exports.artwork = async (req, res) => sendArtwork(res, await eventService.getEventArtwork(req.params.eventId, req.user), "private, max-age=300");
+exports.publicArtwork = async (req, res) => sendArtwork(res, await eventService.getPublicEventArtwork(req.params.eventId), "public, max-age=300");
 exports.metrics = async (req, res) => res.set("Cache-Control", "no-store").json(await eventService.getEventMetrics(req.params.eventId, req.user));
 exports.attendees = async (req, res) => res.set("Cache-Control", "no-store").json(await eventService.listEventAttendees(req.params.eventId, req.query, req.user));
 exports.export = async (req, res) => res.set("Cache-Control", "no-store").json(await eventService.exportEvent(req.params.eventId, req.user));
@@ -26,6 +34,7 @@ exports.createStationTemplate = async (req, res) => res.status(201).json(await e
 exports.updateStationTemplate = async (req, res) => res.json(await eventService.updateStationTemplate(req.params.stationTemplateId, req.body, req.user, req.context));
 exports.importStations = async (req, res) => res.status(201).json(await eventService.importStations(req.params.eventId, req.body, req.user, req.context));
 exports.updateStation = async (req, res) => res.json(await eventService.updateStation(req.params.eventId, req.params.eventStationId, req.body, req.user, req.context));
+exports.removeStation = async (req, res) => res.json(await eventService.removeStation(req.params.eventId, req.params.eventStationId, req.query.version, req.user, req.context));
 exports.addAssignment = async (req, res) => res.status(201).json(await eventService.addStaffAssignment(req.params.eventId, req.params.shiftId, req.body, req.user, req.context));
 exports.removeAssignment = async (req, res) => res.json(await eventService.removeStaffAssignment(req.params.eventId, req.params.shiftId, req.params.assignmentId, req.query.version, req.user, req.context));
 exports.audit = async (req, res) => res.json(await eventService.getAuditLog(req.params.eventId, req.query, req.user));

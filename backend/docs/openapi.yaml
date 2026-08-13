@@ -571,6 +571,21 @@ paths:
         "404": { $ref: "#/components/responses/NotFound" }
         "422": { $ref: "#/components/responses/ValidationFailed" }
         "429": { $ref: "#/components/responses/RateLimited" }
+  /api/v1/public/events/{eventId}/artwork:
+    get:
+      tags: [Events]
+      operationId: getPublicEventArtwork
+      summary: Read artwork for a public event without exposing private object storage
+      parameters: [{ $ref: "#/components/parameters/EventId" }]
+      responses:
+        "200":
+          description: Event artwork
+          content:
+            image/jpeg: { schema: { type: string, format: binary } }
+            image/webp: { schema: { type: string, format: binary } }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "422": { $ref: "#/components/responses/ValidationFailed" }
+        "429": { $ref: "#/components/responses/RateLimited" }
   /api/v1/events/{eventId}/metrics:
     get:
       tags: [Events]
@@ -760,6 +775,22 @@ paths:
         "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
         "409": { $ref: "#/components/responses/Conflict" }
+        "422": { $ref: "#/components/responses/ValidationFailed" }
+  /api/v1/events/{eventId}/artwork:
+    get:
+      tags: [Events]
+      operationId: getEventArtwork
+      summary: Read private draft or staff-visible event artwork
+      parameters: [{ $ref: "#/components/parameters/EventId" }]
+      responses:
+        "200":
+          description: Event artwork
+          content:
+            image/jpeg: { schema: { type: string, format: binary } }
+            image/webp: { schema: { type: string, format: binary } }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
         "422": { $ref: "#/components/responses/ValidationFailed" }
   /api/v1/events/{eventId}/deletion-preview:
     get:
@@ -994,6 +1025,28 @@ paths:
       responses:
         "200":
           description: Event station updated and audited
+          content: { application/json: { schema: { $ref: "#/components/schemas/Event" } } }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "422": { $ref: "#/components/responses/ValidationFailed" }
+    delete:
+      tags: [Events]
+      operationId: removeEventStation
+      summary: Remove an unused station from a draft or published event
+      parameters:
+        - $ref: "#/components/parameters/EventId"
+        - name: eventStationId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+        - name: version
+          in: query
+          required: true
+          schema: { type: integer, minimum: 1 }
+      responses:
+        "200":
+          description: Station removed and remaining stations reordered
           content: { application/json: { schema: { $ref: "#/components/schemas/Event" } } }
         "401": { $ref: "#/components/responses/Unauthorized" }
         "404": { $ref: "#/components/responses/NotFound" }
@@ -2804,6 +2857,10 @@ components:
         version: { type: integer, minimum: 1 }
         stationOrder: { type: integer, minimum: 1, maximum: 50 }
         capacity: { type: integer, minimum: 1, maximum: 1000 }
+        availabilities:
+          type: array
+          maxItems: 31
+          items: { $ref: "#/components/schemas/StationAvailabilityInput" }
         isAvailable: { type: boolean }
         operationalStatus: { $ref: "#/components/schemas/StationOperationalStatus" }
     StaffAssignmentRequest:
@@ -2821,19 +2878,31 @@ components:
     ScreenerStaffAssignmentRequest:
       type: object
       additionalProperties: false
-      required: [version, userId, assignmentRole, eventStationId]
+      required: [version, assignmentRole, eventStationId]
       properties:
         version: { type: integer, minimum: 1 }
         userId: { type: string, format: uuid }
+        userIds:
+          type: array
+          minItems: 1
+          maxItems: 100
+          uniqueItems: true
+          items: { type: string, format: uuid }
         assignmentRole: { type: string, enum: [SCREENER] }
         eventStationId: { type: string, format: uuid }
     GeneralStaffAssignmentRequest:
       type: object
       additionalProperties: false
-      required: [version, userId, assignmentRole]
+      required: [version, assignmentRole]
       properties:
         version: { type: integer, minimum: 1 }
         userId: { type: string, format: uuid }
+        userIds:
+          type: array
+          minItems: 1
+          maxItems: 100
+          uniqueItems: true
+          items: { type: string, format: uuid }
         assignmentRole: { type: string, enum: [EVENT_MANAGER, REGISTRATION, REVIEWER, SUPPORT] }
         eventStationId: { type: string, format: uuid, nullable: true }
     StaffAssignment:
@@ -3315,9 +3384,10 @@ components:
         artworkDataUrl:
           type: string
           nullable: true
-          maxLength: 180000
-          pattern: '^data:image/(jpeg|webp);base64,[A-Za-z0-9+/]+={0,2}$'
-          description: Cropped square event artwork encoded as a bounded JPEG or WebP data URL
+          description: Cropped square artwork as a bounded data URL on upload or a VSMS artwork route returned by the API
+          oneOf:
+            - { type: string, maxLength: 180000, pattern: '^data:image/(jpeg|webp);base64,[A-Za-z0-9+/]+={0,2}$' }
+            - { type: string, pattern: '^/api/v1/(public/)?events/[a-f0-9-]{36}/artwork(?:\?v=\d+)?$' }
         venue: { type: string, minLength: 1, maxLength: 255 }
         address: { type: string, nullable: true, maxLength: 500 }
         postalCode: { type: string, nullable: true, pattern: '^\d{6}$' }
@@ -3345,8 +3415,9 @@ components:
         artworkDataUrl:
           type: string
           nullable: true
-          maxLength: 180000
-          pattern: '^data:image/(jpeg|webp);base64,[A-Za-z0-9+/]+={0,2}$'
+          oneOf:
+            - { type: string, maxLength: 180000, pattern: '^data:image/(jpeg|webp);base64,[A-Za-z0-9+/]+={0,2}$' }
+            - { type: string, pattern: '^/api/v1/(public/)?events/[a-f0-9-]{36}/artwork(?:\?v=\d+)?$' }
         venue: { type: string, minLength: 1, maxLength: 255 }
         address: { type: string, nullable: true, maxLength: 500 }
         postalCode: { type: string, nullable: true, pattern: '^\d{6}$' }

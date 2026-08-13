@@ -1058,14 +1058,14 @@ async function seedDomainAuditEvidence({ staff, reviewer, liveEvent, completedEv
   return records.length;
 }
 
-<<<<<<< HEAD
-// The assignment demonstration target is 5,000 audit records. These synthetic,
-// PII-free entries make pagination and filtering demonstrable without copying
-// clinical data into the evidence store. Deterministic UUIDs and skipDuplicates
-// keep repeated seeding safe.
+// The assignment demonstration target is 5,000 audit records.
+// These synthetic, PII-free entries make pagination and filtering
+// demonstrable without copying clinical data into the evidence store.
+// Deterministic UUIDs and skipDuplicates keep repeated seeding safe.
 async function seedAssessmentAuditVolume({ staff, liveEvent }, target = 5000) {
   let remaining = Math.max(0, target - await prisma.auditLog.count());
   let candidate = 1;
+
   const actions = [
     ["EVENT_REGISTRATION_CREATED", "EventRegistration"],
     ["SCREENING_RESULT_RECORDED", "ScreeningResult"],
@@ -1079,10 +1079,13 @@ async function seedAssessmentAuditVolume({ staff, liveEvent }, target = 5000) {
 
   while (remaining > 0 && candidate <= target * 2) {
     const batchSize = Math.min(remaining, 500);
+
     const batch = Array.from({ length: batchSize }, (_, offset) => {
       const sequence = candidate + offset;
       const suffix = String(sequence).padStart(12, "0");
-      const [action, entityName] = actions[sequence % actions.length];
+      const [action, entityName] =
+        actions[sequence % actions.length];
+
       return {
         id: `78000000-0000-4000-8000-${suffix}`,
         requestId: `79000000-0000-4000-8000-${suffix}`,
@@ -1091,25 +1094,44 @@ async function seedAssessmentAuditVolume({ staff, liveEvent }, target = 5000) {
         resource: entityName,
         entityName,
         entityId: liveEvent.eventId,
-        outcome: sequence % 29 === 0 ? "DENIED" : sequence % 47 === 0 ? "FAILED" : "SUCCESS",
-        details: { eventId: liveEvent.eventId, synthetic: true, sequence },
-        createdAt: new Date(Date.UTC(2026, 6, 1, 0, 0, 0) + sequence * 1000),
+        outcome:
+          sequence % 29 === 0
+            ? "DENIED"
+            : sequence % 47 === 0
+              ? "FAILED"
+              : "SUCCESS",
+        details: {
+          eventId: liveEvent.eventId,
+          synthetic: true,
+          sequence,
+        },
+        createdAt: new Date(
+          Date.UTC(2026, 6, 1, 0, 0, 0) + sequence * 1000
+        ),
       };
     });
-    const inserted = await prisma.auditLog.createMany({ data: batch, skipDuplicates: true });
+
+    const inserted = await prisma.auditLog.createMany({
+      data: batch,
+      skipDuplicates: true,
+    });
+
     remaining -= inserted.count;
     candidate += batchSize;
   }
 
   const count = await prisma.auditLog.count();
-  if (count < target) throw new Error(`Could not seed the ${target}-record audit demonstration volume`);
+
+  if (count < target) {
+    throw new Error(
+      `Could not seed the ${target}-record audit demonstration volume`
+    );
+  }
+
   return count;
 }
 
-async function seedDemoData(staff, registrationOfficer, reviewer, screener, consentForm) {
-=======
 async function seedDemoData(staff, registrationOfficer, reviewer, screener) {
->>>>>>> 40e42f8bd667cfae3262d148de139e8e755a00d5
   const upcomingEvent = await upsertDemoEvent(staff, {
     key: "seed-demo-tampines",
     name: "VSMS Synthetic Upcoming Event",

@@ -23,7 +23,7 @@ const { attendancePredicate, attendanceWhere } = require("./attendanceDefinition
 const { enqueueAccountLifecycle } = require("../account/accountLifecycleNotificationService");
 const domainEventBus = require("../domain/domainEventBus");
 const { assertRoleEligibility, eventVisibilityWhere, isAdministrator } = require("./eventAuthorizationService");
-const { queueCompletedEventOverview } = require("../reporting/reportExportService");
+const artworkStorage = require("./eventArtworkStorage");
 
 /** Station types whose library fieldSchema drives DynamicStationPage + API validation. */
 const SCHEMA_DRIVEN_STATION_TYPES = new Set(["CUSTOM", "VISUAL_ACUITY", "REFRACTION", "COLOUR_VISION"]);
@@ -34,6 +34,8 @@ const EVENT_FIELDS = [
   "endsAt", "capacity", "expectedAttendance", "status", "version",
 ];
 const ACTIVE_ASSIGNMENT_STATUSES = ["ASSIGNED", "CONFIRMED"];
+const PUBLIC_EVENT_STATUSES = ["PUBLISHED", "IN_PROGRESS", "COMPLETED", "CANCELLED"];
+const ARTWORK_ROUTE_PATTERN = /^\/api\/v1\/(public\/)?events\/([a-f0-9-]{36})\/artwork(?:\?v=\d+)?$/i;
 const ACTIONS = {
   publish: { from: "DRAFT", to: "PUBLISHED", audit: "PUBLISHED" },
   start: { from: "PUBLISHED", to: "IN_PROGRESS", audit: "STARTED" },
@@ -93,6 +95,17 @@ const eventInclude = {
       date: true,
       startsAt: true,
       endsAt: true,
+      stationAvailabilities: {
+        orderBy: { eventStationAvailabilityId: "asc" },
+        select: {
+          eventStationAvailabilityId: true,
+          eventStationId: true,
+          isAvailable: true,
+          startsAt: true,
+          endsAt: true,
+          capacity: true,
+        },
+      },
     },
   },
   shifts: {
@@ -133,7 +146,7 @@ const eventInclude = {
   },
   memberships: {
     where: { status: "ACTIVE" },
-    select: { userId: true, roles: { select: { role: true } } },
+    select: { userId: true, user: { select: { fullName: true, username: true } }, roles: { select: { role: true } } },
   },
   _count: { select: { registrations: { where: { registrationStatus: { not: "CANCELLED" } } } } },
 };
@@ -160,6 +173,10 @@ const eventListInclude = {
   registrations: {
     where: attendancePredicate,
     select: { registrationId: true },
+  },
+  memberships: {
+    where: { status: "ACTIVE" },
+    select: { userId: true, user: { select: { fullName: true, username: true } }, roles: { select: { role: true } } },
   },
   _count: { select: { registrations: { where: { registrationStatus: { not: "CANCELLED" } } } } },
 };
@@ -198,7 +215,11 @@ const templateForStation = (station, templates) => station.stationTemplateId
   ? templates.byId.get(station.stationTemplateId)
   : templates.byType.get(station.stationType);
 
-const mapStationDto = (station, event, templates) => {
+const artworkUrl = (event, publicRoute = false) => event.artworkDataUrl
+  ? `/api/v1/${publicRoute ? "public/" : ""}events/${event.eventId}/artwork?v=${event.version}`
+  : null;
+
+const mapStationDto = (station, event, templates, availabilities = []) => {
   const template = templateForStation(station, templates);
   return {
     eventStationId: station.stationId,
@@ -209,15 +230,26 @@ const mapStationDto = (station, event, templates) => {
     stationType: station.stationType,
     description: template?.description || station.stationType,
     stationOrder: station.stationOrder,
-    // Capacity is not on Station (#30); expose template default until availability is wired.
-    capacity: template?.defaultCapacity || event.capacity,
+    capacity: availabilities[0]?.capacity || template?.defaultCapacity || event.capacity,
     isAvailable: station.isActive,
     fieldSchemaSnapshot: resolveCompatibleFieldSchema(
       station.stationType,
       station.fieldSchemaSnapshot ?? template?.fieldSchema ?? null,
     ),
     schemaVersion: station.schemaVersion ?? template?.version ?? null,
-    availabilities: [],
+    availabilities: availabilities.map((availability) => ({
+      eventStationAvailabilityId: availability.eventStationAvailabilityId,
+      isAvailable: availability.isAvailable,
+      startsAt: availability.startsAt,
+      endsAt: availability.endsAt,
+      capacity: availability.capacity,
+      eventDay: {
+        eventDayId: availability.eventDay.eventDayId,
+        date: availability.eventDay.date instanceof Date
+          ? availability.eventDay.date.toISOString().slice(0, 10)
+          : String(availability.eventDay.date).slice(0, 10),
+      },
+    })),
   };
 };
 
@@ -266,9 +298,17 @@ const toEventResponse = async (event, user, db = prisma, options = {}) => {
   const visibleStationIds = managerView ? null : new Set(shifts.flatMap((shift) => (
     shift.staffAssignments.flatMap((assignment) => assignment.eventStation?.eventStationId || [])
   )));
+  const stationAvailabilities = (event.eventDays || []).flatMap((eventDay) => (
+    (eventDay.stationAvailabilities || []).map((availability) => ({ ...availability, eventDay }))
+  ));
   const eventStations = stations
     .filter((station) => !visibleStationIds || visibleStationIds.has(station.stationId))
-    .map((station) => mapStationDto(station, event, templates));
+    .map((station) => mapStationDto(
+      station,
+      event,
+      templates,
+      stationAvailabilities.filter(({ eventStationId }) => eventStationId === station.stationId),
+    ));
   const registrationCount = _count.registrations || 0;
 
   const response = {
@@ -281,7 +321,7 @@ const toEventResponse = async (event, user, db = prisma, options = {}) => {
     eventName: event.name,
     description: event.description,
     bannerKey: event.bannerKey,
-    artworkDataUrl: event.artworkDataUrl,
+    artworkDataUrl: artworkUrl(event),
     venue: event.venue,
     location: event.venue,
     address: event.address,
@@ -319,6 +359,7 @@ const toEventResponse = async (event, user, db = prisma, options = {}) => {
     activeCapacityCount: registrations.length,
     _count: { eventRegistrations: registrationCount },
     canManage: managerView,
+    eventTeam: managerView ? (event.memberships || []).map(({ user }) => user?.fullName || user?.username).filter(Boolean) : [],
   };
   if (managerView) {
     response.createdBy = publicUser(event.createdBy);
@@ -351,6 +392,30 @@ const requireEvent = async (eventId, user, manage = false, db = prisma) => {
     throw new AppError(404, "EVENT_NOT_FOUND", "Event was not found");
   }
   return event;
+};
+
+const resolveArtworkInput = async (value, user, db = prisma) => {
+  if (value == null || artworkStorage.DATA_URL_PATTERN.test(value) || artworkStorage.isStoredArtwork(value)) {
+    return artworkStorage.storeArtwork(value);
+  }
+  const match = ARTWORK_ROUTE_PATTERN.exec(value);
+  if (!match) throw new AppError(422, "INVALID_EVENT_ARTWORK", "Event artwork reference is invalid");
+  const source = match[1]
+    ? await db.event.findFirst({ where: { eventId: match[2], status: { in: PUBLIC_EVENT_STATUSES } }, select: { artworkDataUrl: true } })
+    : await requireEvent(match[2], user, false, db);
+  if (!source?.artworkDataUrl) throw new AppError(404, "EVENT_ARTWORK_NOT_FOUND", "Event artwork was not found");
+  return artworkStorage.storeArtwork(source.artworkDataUrl);
+};
+
+const releaseArtworkIfUnused = async (reference, db = prisma) => {
+  if (!artworkStorage.isStoredArtwork(reference)) return;
+  try {
+    if (await db.event.count({ where: { artworkDataUrl: reference } }) === 0) {
+      await artworkStorage.deleteArtwork(reference);
+    }
+  } catch (error) {
+    console.error("Event artwork cleanup deferred", { code: error?.code || error?.name || "EVENT_ARTWORK_CLEANUP_FAILED" });
+  }
 };
 
 const normalizeEventData = (body) => ({
@@ -725,7 +790,10 @@ const createEvent = async (body, user, correlationId, rawIdempotencyKey, db = pr
     throw new AppError(422, "INVALID_IDEMPOTENCY_KEY", "Idempotency-Key must contain 8 to 100 letters, numbers, underscores, or hyphens");
   }
   const payloadHash = crypto.createHash("sha256").update(JSON.stringify(body)).digest("hex");
-  return db.$transaction(async (tx) => {
+  const artworkReference = body.artworkDataUrl === undefined ? undefined : await resolveArtworkInput(body.artworkDataUrl, user, db);
+  body = artworkReference === undefined ? body : { ...body, artworkDataUrl: artworkReference };
+  try {
+    return await db.$transaction(async (tx) => {
     if (idempotencyKey) {
       const replay = await tx.event.findUnique({
         where: { createdByUserId_createIdempotencyKey: { createdByUserId: user.userId, createIdempotencyKey: idempotencyKey } },
@@ -834,8 +902,12 @@ const createEvent = async (body, user, correlationId, rawIdempotencyKey, db = pr
         correlationId: requestIdFor(correlationId),
       },
     });
-    return toEventResponse(full, user, tx);
-  });
+      return toEventResponse(full, user, tx);
+    });
+  } catch (error) {
+    await releaseArtworkIfUnused(artworkReference, db);
+    throw error;
+  }
 };
 
 const listEvents = async (query, user, db = prisma) => {
@@ -1018,11 +1090,14 @@ const updateEvent = async (eventId, body, user, correlationId, db = prisma) => {
     );
   }
 
+  const artworkReference = body.artworkDataUrl === undefined ? undefined : await resolveArtworkInput(body.artworkDataUrl, user, db);
+  body = artworkReference === undefined ? body : { ...body, artworkDataUrl: artworkReference };
   const combined = { ...current, ...normalizeEventData(body) };
   const desiredShifts = body.shifts || current.shifts;
   assertRange(combined, desiredShifts, body.eventDays);
 
-return db.$transaction(async (tx) => {
+try {
+  const result = await db.$transaction(async (tx) => {
   const changed = await tx.event.updateMany({
     where: { eventId, version: body.version },
     data: { ...normalizeEventData(body), version: { increment: 1 } },
@@ -1112,8 +1187,18 @@ return db.$transaction(async (tx) => {
   });
   await auditUpdate(tx, current, updated, user, correlationId);
 
-  return toEventResponse(updated, user, tx);
-});
+    return toEventResponse(updated, user, tx);
+  });
+  if (artworkReference !== undefined && artworkReference !== current.artworkDataUrl) {
+    await releaseArtworkIfUnused(current.artworkDataUrl, db);
+  }
+  return result;
+} catch (error) {
+  if (artworkReference !== undefined && artworkReference !== current.artworkDataUrl) {
+    await releaseArtworkIfUnused(artworkReference, db);
+  }
+  throw error;
+}
 };
 
 const transitionEvent = async (eventId, command, body, user, correlationId, db = prisma) => {
@@ -1645,6 +1730,8 @@ const deleteEvent = async (eventId, body, user, correlationId, db = prisma) => {
     return { result: { eventId, deleted: true }, cleanupTaskCount };
   }, { isolationLevel: "Serializable" });
 
+  await releaseArtworkIfUnused(current.artworkDataUrl, db);
+
   if (deletion.cleanupTaskCount > 0) {
     await processArtifactCleanupTasks({ eventId }).catch((error) => {
       // Durable tasks remain retryable; never expose a storage path in logs.
@@ -1928,6 +2015,18 @@ const importStations = async (eventId, body, user, correlationId, db = prisma) =
           },
         });
         existingStations.push(created);
+        for (const day of current.eventDays || []) {
+          await tx.eventStationAvailability.create({
+            data: {
+              eventStationId: created.stationId,
+              eventDayId: day.eventDayId,
+              isAvailable: true,
+              startsAt: day.startsAt,
+              endsAt: day.endsAt,
+              capacity: template.defaultCapacity,
+            },
+          });
+        }
       }
     }
 
@@ -1993,7 +2092,53 @@ const updateStation = async (eventId, eventStationId, body, user, correlationId,
       });
     }
 
-    // body.capacity accepted for OpenAPI/UI compatibility; Station has no capacity column (#30 MVP).
+    if (body.capacity !== undefined) {
+      const days = await tx.eventDay.findMany({ where: { eventId } });
+      for (const day of days) {
+        await tx.eventStationAvailability.upsert({
+          where: { eventStationId_eventDayId: { eventStationId, eventDayId: day.eventDayId } },
+          create: {
+            eventStationId,
+            eventDayId: day.eventDayId,
+            isAvailable: station.isActive,
+            startsAt: station.isActive ? day.startsAt : null,
+            endsAt: station.isActive ? day.endsAt : null,
+            capacity: body.capacity,
+          },
+          update: { capacity: body.capacity },
+        });
+      }
+    }
+
+    if (body.availabilities) {
+      const days = await tx.eventDay.findMany({ where: { eventId } });
+      const daysByDate = new Map(days.map((day) => [day.date.toISOString().slice(0, 10), day]));
+      for (const availability of body.availabilities) {
+        const day = daysByDate.get(availability.date);
+        if (!day) throw new AppError(422, "INVALID_STATION_DAY", "Station availability must match an event date");
+        await tx.eventStationAvailability.upsert({
+          where: { eventStationId_eventDayId: { eventStationId, eventDayId: day.eventDayId } },
+          create: {
+            eventStationId,
+            eventDayId: day.eventDayId,
+            isAvailable: availability.isAvailable,
+            startsAt: availability.isAvailable ? new Date(availability.startsAt) : null,
+            endsAt: availability.isAvailable ? new Date(availability.endsAt) : null,
+            capacity: availability.capacity,
+          },
+          update: {
+            isAvailable: availability.isAvailable,
+            startsAt: availability.isAvailable ? new Date(availability.startsAt) : null,
+            endsAt: availability.isAvailable ? new Date(availability.endsAt) : null,
+            capacity: availability.capacity,
+          },
+        });
+      }
+      await tx.station.update({
+        where: { stationId: eventStationId },
+        data: { isActive: body.availabilities.some(({ isAvailable }) => isAvailable) },
+      });
+    }
     const updated = await tx.event.findUniqueOrThrow({ where: { eventId }, include: eventInclude });
     await createAuditLog({
       client: tx,
@@ -2005,6 +2150,43 @@ const updateStation = async (eventId, eventStationId, body, user, correlationId,
       entityId: eventId,
       oldValue: snapshot(current),
       newValue: snapshot(updated),
+    });
+    await auditUpdate(tx, current, updated, user, correlationId);
+    return toEventResponse(updated, user, tx);
+  });
+};
+
+const removeStation = async (eventId, eventStationId, version, user, correlationId, db = prisma) => {
+  const current = await requireEvent(eventId, user, true, db);
+  assertStationPlanningState(current);
+  const station = current.stations.find((candidate) => candidate.stationId === eventStationId);
+  if (!station) throw new AppError(404, "STATION_NOT_FOUND", "Event station was not found");
+
+  return db.$transaction(async (tx) => {
+    await bumpEventVersion(tx, eventId, version);
+    const usage = await tx.station.findUniqueOrThrow({
+      where: { stationId: eventStationId },
+      select: { _count: { select: {
+        staffAssignments: true, queueEntries: true, scanLogs: true, screeningResults: true,
+        screeningRequestLedgers: true, fromMovements: true, toMovements: true, registrationRouteSteps: true,
+      } } },
+    });
+    if (Object.values(usage._count).some(Boolean)) {
+      throw new AppError(409, "STATION_IN_USE", "Remove this station's staff assignments and operational records before deleting it");
+    }
+    await tx.eventStationAvailability.deleteMany({ where: { eventStationId } });
+    await tx.station.delete({ where: { stationId: eventStationId } });
+    const remaining = current.stations.filter(({ stationId }) => stationId !== eventStationId);
+    for (const [index, item] of remaining.entries()) {
+      if (item.stationOrder !== index + 1) {
+        await tx.station.update({ where: { stationId: item.stationId }, data: { stationOrder: index + 1 } });
+      }
+    }
+    const updated = await tx.event.findUniqueOrThrow({ where: { eventId }, include: eventInclude });
+    await createAuditLog({
+      client: tx, userId: user.userId, context: correlationId, action: "UPDATED",
+      resource: "Event", entityName: "Event", entityId: eventId,
+      oldValue: snapshot(current), newValue: snapshot(updated),
     });
     await auditUpdate(tx, current, updated, user, correlationId);
     return toEventResponse(updated, user, tx);
@@ -2024,14 +2206,15 @@ const addStaffAssignment = async (eventId, shiftId, body, user, correlationId, d
   if (body.eventStationId && !station) {
     throw new AppError(422, "STATION_NOT_AVAILABLE", "The selected event station is unavailable");
   }
+  const userIds = body.userIds || [body.userId];
 
   return db.$transaction(async (tx) => {
     await bumpEventVersion(tx, eventId, body.version);
-    await lockStaffSchedules(tx, [body.userId]);
+    await lockStaffSchedules(tx, userIds);
 
-    const activeUser = await tx.user.findFirst({
+    const activeUsers = await tx.user.findMany({
       where: {
-        id: body.userId,
+        id: { in: userIds },
         status: "ACTIVE",
         approvalState: "APPROVED",
         accessState: "ENABLED",
@@ -2046,15 +2229,15 @@ const addStaffAssignment = async (eventId, shiftId, body, user, correlationId, d
         userRoles: { select: { role: { select: { roleName: true } } } },
       },
     });
-    if (!activeUser) throw new AppError(422, "STAFF_NOT_AVAILABLE", "The selected staff member is unavailable");
-    assertRoleEligibility(activeUser, [body.assignmentRole]);
+    if (activeUsers.length !== userIds.length) throw new AppError(422, "STAFF_NOT_AVAILABLE", "One or more selected staff members are unavailable");
+    for (const activeUser of activeUsers) assertRoleEligibility(activeUser, [body.assignmentRole]);
 
     // Same shift + different station is allowed (VA / refraction / colour vision).
     // Conflict only when another overlapping shift already has this person, or this
     // exact shift+station slot is already taken.
     const conflict = await tx.staffAssignment.findFirst({
       where: {
-        userId: body.userId,
+        userId: { in: userIds },
         status: { in: ACTIVE_ASSIGNMENT_STATUSES },
         OR: [
           {
@@ -2071,26 +2254,28 @@ const addStaffAssignment = async (eventId, shiftId, body, user, correlationId, d
     });
     if (conflict) throw scheduleConflictError();
 
-    const assignment = await tx.staffAssignment.create({
-      data: {
-        eventId,
-        shiftId,
-        userId: body.userId,
-        stationId: station?.stationId || null,
-        assignedBy: user.userId,
-        assignmentRole: body.assignmentRole,
-        notes: body.notes || null,
-        assignmentStatus: "ASSIGNED",
-        status: "ASSIGNED",
-      },
-    });
-    await enqueueAccountLifecycle({
-      type: "EVENT_ASSIGNMENT",
-      account: { id: body.userId },
-      metadata: { eventId, eventName: current.name, roles: [body.assignmentRole] },
-      idempotencyKey: `EVENT_ASSIGNMENT:DUTY:${assignment.id}`,
-      db: tx,
-    });
+    for (const userId of userIds) {
+      const assignment = await tx.staffAssignment.create({
+        data: {
+          eventId,
+          shiftId,
+          userId,
+          stationId: station?.stationId || null,
+          assignedBy: user.userId,
+          assignmentRole: body.assignmentRole,
+          notes: body.notes || null,
+          assignmentStatus: "ASSIGNED",
+          status: "ASSIGNED",
+        },
+      });
+      await enqueueAccountLifecycle({
+        type: "EVENT_ASSIGNMENT",
+        account: { id: userId },
+        metadata: { eventId, eventName: current.name, roles: [body.assignmentRole] },
+        idempotencyKey: `EVENT_ASSIGNMENT:DUTY:${assignment.id}`,
+        db: tx,
+      });
+    }
 
     const updated = await tx.event.findUniqueOrThrow({ where: { eventId }, include: eventInclude });
     await auditUpdate(tx, current, updated, user, correlationId);
@@ -2102,7 +2287,7 @@ const addStaffAssignment = async (eventId, shiftId, body, user, correlationId, d
       resource: "Event",
       entityName: "Event",
       entityId: eventId,
-      details: { shiftId, assignmentRole: body.assignmentRole, assignedUserId: body.userId },
+      details: { shiftId, assignmentRole: body.assignmentRole, assignedUserIds: userIds },
     });
     return toEventResponse(updated, user, tx);
   });
@@ -2208,7 +2393,6 @@ const getAuditLog = async (eventId, query, user, db = prisma) => {
   };
 };
 
-const publicEventStatuses = ["PUBLISHED", "IN_PROGRESS", "COMPLETED", "CANCELLED"];
 const dateTime = (value) => value ? value.toISOString() : null;
 const attendeeSelect = {
   registrationId: true,
@@ -2232,7 +2416,7 @@ const publicEventProjection = (event) => ({
   name: event.name,
   description: event.description,
   bannerKey: event.bannerKey,
-  artworkDataUrl: event.artworkDataUrl,
+  artworkDataUrl: artworkUrl(event, true),
   venue: event.venue,
   address: event.address,
   postalCode: event.postalCode,
@@ -2278,9 +2462,10 @@ const metricsForEvent = async (event, db = prisma) => {
 
 const getPublicEvent = async (eventId, db = prisma) => {
   const event = await db.event.findFirst({
-    where: { eventId, status: { in: publicEventStatuses } },
+    where: { eventId, status: { in: PUBLIC_EVENT_STATUSES } },
     select: {
       eventId: true,
+      version: true,
       name: true,
       description: true,
       bannerKey: true,
@@ -2298,6 +2483,21 @@ const getPublicEvent = async (eventId, db = prisma) => {
   });
   if (!event) throw new AppError(404, "EVENT_NOT_FOUND", "Event was not found");
   return publicEventProjection(event);
+};
+
+const getEventArtwork = async (eventId, user, db = prisma) => {
+  const event = await requireEvent(eventId, user, false, db);
+  if (!event.artworkDataUrl) throw new AppError(404, "EVENT_ARTWORK_NOT_FOUND", "Event artwork was not found");
+  return artworkStorage.readArtwork(event.artworkDataUrl);
+};
+
+const getPublicEventArtwork = async (eventId, db = prisma) => {
+  const event = await db.event.findFirst({
+    where: { eventId, status: { in: PUBLIC_EVENT_STATUSES }, artworkDataUrl: { not: null } },
+    select: { artworkDataUrl: true },
+  });
+  if (!event) throw new AppError(404, "EVENT_ARTWORK_NOT_FOUND", "Event artwork was not found");
+  return artworkStorage.readArtwork(event.artworkDataUrl);
 };
 
 const getEventMetrics = async (eventId, user, db = prisma) => metricsForEvent(await requireEvent(eventId, user, true, db), db);
@@ -2440,10 +2640,13 @@ module.exports = {
   updateStationTemplate,
   importStations,
   updateStation,
+  removeStation,
   addStaffAssignment,
   removeStaffAssignment,
   getAuditLog,
   getPublicEvent,
+  getEventArtwork,
+  getPublicEventArtwork,
   getEventMetrics,
   metricsForEvent,
   listEventAttendees,

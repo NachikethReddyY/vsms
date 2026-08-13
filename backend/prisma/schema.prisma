@@ -534,39 +534,6 @@ model UserRole {
 // ==========================================
 
 model Participant {
-<<<<<<< HEAD
-  id                    String            @id @default(uuid()) @map("participant_id") @db.Uuid
-  participantReference  String            @unique @map("participant_reference") @db.VarChar(30)
-  // Legacy plaintext column retained temporarily for the staged backfill. New writes keep it null.
-  nric                  String?           @unique @db.Text
-  nricMasked            String?           @map("nric_masked") @db.VarChar(9)
-  nricCiphertext        String?           @map("nric_ciphertext") @db.Text
-  nricLookupHash        String?           @unique @map("nric_lookup_hash") @db.Char(64)
-  nricEncryptionVersion Int?              @map("nric_encryption_version")
-  firstName             String            @map("first_name") @db.VarChar(100)
-  lastName              String            @map("last_name") @db.VarChar(100)
-  dateOfBirth           DateTime          @map("date_of_birth") @db.Date
-  gender                String            @db.VarChar(1)
-  race                  String?           @db.VarChar(50)
-  nationality           String?           @default("Singaporean") @db.VarChar(50)
-  addressStreet         String?           @map("address_street") @db.VarChar(255)
-  addressUnit           String?           @map("address_unit") @db.VarChar(20)
-  addressPostalCode     String?           @map("address_postal_code") @db.VarChar(10)
-  contactNumber         String            @map("contact_number") @db.VarChar(20)
-  email                 String?           @db.VarChar(255)
-  preferredLanguage     String?           @map("preferred_language") @db.VarChar(50)
-  accessibilityNotes    String?           @map("accessibility_notes") @db.VarChar(1000)
-  status                ParticipantStatus @default(ACTIVE)
-  emergencyContact      String            @map("emergency_contact") @db.VarChar(20)
-  emergencyContactName  String?           @map("emergency_contact_name") @db.VarChar(100)
-  consentGiven          Boolean           @map("consent_given")
-  createdById           String            @map("created_by") @db.Uuid
-  updatedById           String            @map("updated_by") @db.Uuid
-  onboardingEventId     String?           @map("onboarding_event_id") @db.Uuid
-  version               Int               @default(1)
-  createdAt             DateTime          @default(now()) @map("created_at")
-  updatedAt             DateTime          @updatedAt @map("updated_at")
-=======
   id                   String            @id @default(uuid()) @map("participant_id") @db.Uuid
   participantReference String            @unique @map("participant_reference") @db.VarChar(30)
   nric                 String?           @unique @db.Text
@@ -591,7 +558,6 @@ model Participant {
   version              Int               @default(1)
   createdAt            DateTime          @default(now()) @map("created_at")
   updatedAt            DateTime          @updatedAt @map("updated_at")
->>>>>>> 40e42f8bd667cfae3262d148de139e8e755a00d5
 
   eventRegistrations EventRegistration[]
   eventIntakes       ParticipantEventIntake[]
