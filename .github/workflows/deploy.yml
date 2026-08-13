@@ -28,7 +28,10 @@ jobs:
           node-version: 24
           cache: pnpm
       - name: Install frozen dependencies
-        run: pnpm install --frozen-lockfile
+        run: |
+          pnpm install --frozen-lockfile
+          pnpm --dir backend install --frozen-lockfile
+          pnpm --dir react-user-dashboard install --frozen-lockfile
       - name: Run contracts, tests, lint, and builds
         run: pnpm check && pnpm test && pnpm test:availability && pnpm --dir react-user-dashboard test
       - name: Enforce backward-compatible migrations

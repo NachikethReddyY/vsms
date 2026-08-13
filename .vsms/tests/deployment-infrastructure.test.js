@@ -52,7 +52,8 @@ test("readiness, release rollback alarms, and operations notifications are decla
     assert.match(template, new RegExp(`^  ${resource}:`, "m"));
   }
   assert.match(template, /ApiService:[\s\S]*?Alarms:[\s\S]*?- !Ref Api5xxAlarm/);
-  assert.match(template, /DeploymentAlarmTopic:[\s\S]*?KmsMasterKeyId: alias\/aws\/sns/);
+  assert.match(template, /DeploymentAlarmKey:[\s\S]*?EnableKeyRotation: true/);
+  assert.match(template, /DeploymentAlarmTopic:[\s\S]*?KmsMasterKeyId: !GetAtt DeploymentAlarmKey\.Arn/);
 });
 
 test("all service and migration identifiers needed by the pipeline are exported", () => {

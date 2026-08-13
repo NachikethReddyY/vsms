@@ -305,7 +305,8 @@ test("demo QR fixtures are forbidden in production", () => {
     assert.match(read("prisma/seed.js"), /NODE_ENV === "production"[\s\S]*Demo seed execution is forbidden/);
     assert.match(read("scripts/dev-preset.js"), /env\.isProduction[\s\S]*Development preset execution is forbidden/);
     const packageJson = JSON.parse(read("package.json"));
-    assert.doesNotMatch(packageJson.scripts["deploy:prod"], /db:setup|prisma:seed/);
+    assert.equal(packageJson.scripts["deploy:prod"], undefined);
+    assert.match(packageJson.scripts["setup:demo"], /assert-non-production/);
 });
 
 test("single participant QR has no public generated-handoff path", () => {

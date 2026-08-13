@@ -56,11 +56,13 @@ jobs:
       - name: Capture previous release and stack outputs
         run: |
           PREVIOUS_IMAGE=$(aws cloudformation describe-stacks --stack-name "$STACK_NAME" --query "Stacks[0].Parameters[?ParameterKey=='ApiImageUri'].ParameterValue" --output text)
+          PREVIOUS_SHA=$(aws cloudformation describe-stacks --stack-name "$STACK_NAME" --query "Stacks[0].Parameters[?ParameterKey=='ReleaseSha'].ParameterValue" --output text)
           echo "PREVIOUS_IMAGE=$PREVIOUS_IMAGE" >> "$GITHUB_ENV"
+          echo "PREVIOUS_SHA=$PREVIOUS_SHA" >> "$GITHUB_ENV"
           aws cloudformation describe-stacks --stack-name "$STACK_NAME" --query 'Stacks[0].Outputs' --output json > stack-outputs.json
       - name: Register candidate migration task without shifting traffic
         run: |
-          aws cloudformation deploy --stack-name "$STACK_NAME" --template-file infrastructure/availability.yaml --no-fail-on-empty-changeset --capabilities CAPABILITY_IAM --role-arn "${{ vars.AWS_CLOUDFORMATION_ROLE_ARN }}" --parameter-overrides ApiImageUri="$PREVIOUS_IMAGE" CandidateApiImageUri="$IMAGE_URI" ReleaseSha="$RELEASE_SHA"
+          aws cloudformation deploy --stack-name "$STACK_NAME" --template-file infrastructure/availability.yaml --no-fail-on-empty-changeset --capabilities CAPABILITY_IAM --role-arn "${{ vars.AWS_CLOUDFORMATION_ROLE_ARN }}" --parameter-overrides ApiImageUri="$PREVIOUS_IMAGE" CandidateApiImageUri="$IMAGE_URI" ReleaseSha="$PREVIOUS_SHA" CandidateReleaseSha="$RELEASE_SHA"
       - name: Assume migration launcher role
         uses: aws-actions/configure-aws-credentials@e6de054238d6b7531b4efff3b6587d9aade6a06c # v6
         with:
@@ -83,7 +85,7 @@ jobs:
           role-to-assume: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
           aws-region: ${{ vars.AWS_REGION }}
       - run: |
-          aws cloudformation deploy --stack-name "$STACK_NAME" --template-file infrastructure/availability.yaml --no-fail-on-empty-changeset --capabilities CAPABILITY_IAM --role-arn "${{ vars.AWS_CLOUDFORMATION_ROLE_ARN }}" --parameter-overrides ApiImageUri="$IMAGE_URI" CandidateApiImageUri="$IMAGE_URI" ReleaseSha="$RELEASE_SHA"
+          aws cloudformation deploy --stack-name "$STACK_NAME" --template-file infrastructure/availability.yaml --no-fail-on-empty-changeset --capabilities CAPABILITY_IAM --role-arn "${{ vars.AWS_CLOUDFORMATION_ROLE_ARN }}" --parameter-overrides ApiImageUri="$IMAGE_URI" CandidateApiImageUri="$IMAGE_URI" ReleaseSha="$RELEASE_SHA" CandidateReleaseSha="$RELEASE_SHA"
           aws cloudformation describe-stacks --stack-name "$STACK_NAME" --query 'Stacks[0].Outputs' --output json > stack-outputs.json
       - name: Wait for API and all enabled workers
         run: |
@@ -140,4 +142,4 @@ jobs:
       - name: Roll back application image after a failed post-migration gate
         if: failure() && env.PREVIOUS_IMAGE != ''
         run: |
-          aws cloudformation deploy --stack-name "$STACK_NAME" --template-file infrastructure/availability.yaml --no-fail-on-empty-changeset --capabilities CAPABILITY_IAM --role-arn "${{ vars.AWS_CLOUDFORMATION_ROLE_ARN }}" --parameter-overrides ApiImageUri="$PREVIOUS_IMAGE" CandidateApiImageUri="$IMAGE_URI" ReleaseSha="$RELEASE_SHA"
+          aws cloudformation deploy --stack-name "$STACK_NAME" --template-file infrastructure/availability.yaml --no-fail-on-empty-changeset --capabilities CAPABILITY_IAM --role-arn "${{ vars.AWS_CLOUDFORMATION_ROLE_ARN }}" --parameter-overrides ApiImageUri="$PREVIOUS_IMAGE" CandidateApiImageUri="$IMAGE_URI" ReleaseSha="$PREVIOUS_SHA" CandidateReleaseSha="$RELEASE_SHA"
