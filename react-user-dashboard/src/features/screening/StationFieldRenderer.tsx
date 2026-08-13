@@ -251,6 +251,11 @@ export function StationFieldBuilder({ fieldSchema, onChange, disabled = false, l
   const changeOptions = (index: number, event: ChangeEvent<HTMLInputElement>) => update(index, {
     options: event.target.value.split(',').map((option) => option.trim()).filter(Boolean),
   });
+  const changeLabel = (index: number, label: string) => {
+    const field = fieldSchema[index];
+    const generatedKey = label.trim().replace(/[^a-zA-Z0-9]+(.)/g, (_, letter: string) => letter.toUpperCase()).replace(/^[^a-zA-Z]+/, '');
+    update(index, { label, ...(!field.key || /^field\d+$/.test(field.key) ? { key: generatedKey } : {}) });
+  };
 
   return <section className="station-field-builder" aria-label="Template fields">
     <header>
@@ -275,8 +280,8 @@ export function StationFieldBuilder({ fieldSchema, onChange, disabled = false, l
             </div>
           </div>
           <div className="station-field-builder-grid">
-            <label><span>Label</span><input required maxLength={100} disabled={disabled} value={field.label} onChange={(event) => update(index, { label: event.target.value })} /></label>
-            <label><span>Key</span><input required pattern="[a-zA-Z][a-zA-Z0-9_]*" maxLength={64} disabled={disabled || locked} value={field.key} onChange={(event) => update(index, { key: event.target.value })} /></label>
+            <label><span>Label</span><input required maxLength={100} disabled={disabled} value={field.label} onChange={(event) => changeLabel(index, event.target.value)} /></label>
+            <label><span>Key <small>Generated automatically</small></span><input required pattern="[a-zA-Z][a-zA-Z0-9_]*" maxLength={64} disabled={disabled || locked} value={field.key} onChange={(event) => update(index, { key: event.target.value })} /></label>
             <label><span>Type</span><select disabled={disabled || locked} value={field.type} onChange={(event) => changeType(index, event.target.value as FieldType)}>{FIELD_TYPES.map((type) => <option key={type.value} value={type.value}>{type.label}</option>)}</select></label>
             <label className="station-field-required"><input type="checkbox" disabled={disabled || locked} checked={field.required ?? false} onChange={(event) => update(index, { required: event.target.checked })} /><span>Required</span></label>
             {field.type === 'select' && <label className="wide"><span>Options <small>Comma-separated</small></span><input required disabled={disabled || locked} value={(field.options ?? []).join(', ')} onChange={(event) => changeOptions(index, event)} /></label>}
@@ -287,7 +292,7 @@ export function StationFieldBuilder({ fieldSchema, onChange, disabled = false, l
           {!locked && supportsFieldFlagRules(field) && (
             <div className="station-field-flag-rules">
               <div className="station-field-builder-heading">
-                <strong>Flag rules</strong>
+                <strong>Flag rules · {field.flagRules?.length ?? 0} of 10</strong>
                 <button
                   type="button"
                   className="secondary compact"

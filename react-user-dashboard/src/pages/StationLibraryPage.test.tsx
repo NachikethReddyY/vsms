@@ -118,6 +118,24 @@ describe('Station library pages', () => {
     })));
   });
 
+  it('loads valid example data with multiple flag rules', async () => {
+    post.mockResolvedValueOnce({ data: customTemplate });
+    renderLibrary('/admin/station-templates/new');
+    await userEvent.click(await screen.findByRole('button', { name: /Use example/i }));
+    expect(screen.getAllByText(/Flag rules ·/i).length).toBeGreaterThan(0);
+    await userEvent.click(screen.getByRole('button', { name: /Create template/i }));
+    await waitFor(() => expect(post).toHaveBeenCalledWith('/events/station-templates', expect.objectContaining({
+      name: 'Colour vision screening',
+      fieldSchema: expect.arrayContaining([expect.objectContaining({
+        key: 'platesCorrect',
+        flagRules: expect.arrayContaining([
+          expect.objectContaining({ flag: 'REFER', value: 12 }),
+          expect.objectContaining({ flag: 'REVIEW', value: 16 }),
+        ]),
+      })]),
+    })));
+  });
+
   it('edits an existing custom template including fields', async () => {
     get.mockResolvedValueOnce({ data: [customTemplate] });
     patch.mockResolvedValueOnce({ data: { ...customTemplate, name: 'Updated notes booth' } });

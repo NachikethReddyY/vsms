@@ -51,6 +51,8 @@
 .station-template-section-copy h2 { margin:0 0 6px; font-size:18px; }
 .station-template-section-copy p { margin:0; color:var(--ink-2); font-size:13px; line-height:19px; }
 .station-template-section-body { display:grid; gap:14px; }
+.station-template-example { display:flex; align-items:center; justify-content:space-between; gap:14px; padding:12px 14px; border:1px solid var(--hairline); border-radius:10px; background:var(--surface); }
+.station-template-example strong,.station-template-example span { display:block; }.station-template-example strong { font-size:12px; }.station-template-example span { margin-top:3px; color:var(--muted); font-size:11px; line-height:16px; }
 .station-template-field { display:grid; gap:6px; color:var(--ink-2); font-size:12px; }
 .station-template-field small { color:var(--muted); font-weight:500; }
 .station-template-field input,.station-template-field select,.station-template-field textarea {

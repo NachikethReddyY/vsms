@@ -39,6 +39,23 @@ const blankCreateForm = (): FormState => ({
   fieldSchema: blankCustomFieldSchema(),
 });
 
+const colourVisionExample = (): FormState => ({
+  name: 'Colour vision screening',
+  description: 'Record Ishihara plate results and flag reduced colour discrimination.',
+  defaultCapacity: 10,
+  active: true,
+  fieldSchema: [
+    { key: 'platesPresented', label: 'Plates presented', type: 'number', required: true, min: 1, max: 24 },
+    { key: 'platesCorrect', label: 'Plates correct', type: 'number', required: true, min: 0, max: 24, flagRules: [
+      { op: 'lte', value: 12, flag: 'REFER', reason: 'Low Ishihara plate score' },
+      { op: 'lte', value: 16, flag: 'REVIEW', reason: 'Borderline Ishihara plate score' },
+    ] },
+    { key: 'notes', label: 'Notes', type: 'text', required: false, flagRules: [
+      { op: 'includes', value: 'unable', flag: 'REVIEW', reason: 'Participant was unable to complete the test' },
+    ] },
+  ],
+});
+
 function formFromTemplate(template: StationTemplateRecord): FormState {
   return {
     name: template.name,
@@ -247,6 +264,7 @@ export default function StationTemplateFormPage({ mode }: { mode: Mode }) {
             <p>Define the inputs screeners fill at this station. Add flag rules on custom fields so matching values raise REVIEW / REFER / URGENT.</p>
           </div>
           <div className="station-template-section-body">
+            {mode === 'create' && <div className="station-template-example"><div><strong>Need test data?</strong><span>Load a complete Colour Vision example with three fields and three flag rules.</span></div><button className="secondary compact" type="button" onClick={() => { setForm(colourVisionExample()); setPreviewValues({}); setError(''); }}>Use example</button></div>}
             <StationFieldBuilder
               fieldSchema={form.fieldSchema}
               lockedKeys={lockedFieldKeys}
