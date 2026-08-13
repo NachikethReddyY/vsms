@@ -226,32 +226,12 @@ const saveDynamicBody = z.object({
   resultData: dynamicResultData,
 });
 
-const screeningSyncAction = z.discriminatedUnion("stationType", [
-  z.object({
-    clientActionId: z.string().uuid(),
-    stationId: z.string().uuid(),
-    stationType: z.literal("VISUAL_ACUITY"),
-    payload: saveVisualAcuityBody.strict(),
-  }).strict(),
-  z.object({
-    clientActionId: z.string().uuid(),
-    stationId: z.string().uuid(),
-    stationType: z.literal("REFRACTION"),
-    payload: saveRefractionBody.strict(),
-  }).strict(),
-  z.object({
-    clientActionId: z.string().uuid(),
-    stationId: z.string().uuid(),
-    stationType: z.literal("COLOUR_VISION"),
-    payload: saveColourVisionBody.strict(),
-  }).strict(),
-  z.object({
-    clientActionId: z.string().uuid(),
-    stationId: z.string().uuid(),
-    stationType: z.literal("CUSTOM"),
-    payload: saveDynamicBody.strict(),
-  }).strict(),
-]);
+const screeningSyncAction = z.object({
+  clientActionId: z.string().uuid(),
+  stationId: z.string().uuid(),
+  stationType: z.enum(["VISUAL_ACUITY", "REFRACTION", "COLOUR_VISION", "CUSTOM"]),
+  payload: saveDynamicBody.strict(),
+}).strict();
 
 const screeningSyncBody = z.object({
   clientBatchId: z.string().uuid(),
@@ -271,10 +251,13 @@ module.exports = {
   acknowledgeReferralHandoffBody,
   reviseReferralBody,
   resolveQuery,
+  visualAcuityResultData,
   previewVisualAcuityBody,
   saveVisualAcuityBody,
+  refractionResultData,
   previewRefractionBody,
   saveRefractionBody,
+  colourVisionResultData,
   previewColourVisionBody,
   saveColourVisionBody,
   eyeHealthResultData,

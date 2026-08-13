@@ -12,12 +12,10 @@ import EventFormPage from "./features/events/EventFormPage";
 import PublicEventPage from "./features/events/PublicEventPage";
 import ReviewWorkspacePage from "./features/reviews/ReviewWorkspacePage";
 import ReportsPage from "./features/reports/ReportsPage";
-import ColourVisionStationPage from "./features/screening/ColourVisionStationPage";
+import OperationsCenterPage from "./features/operations/OperationsCenterPage";
 import DynamicStationPage from "./features/screening/DynamicStationPage";
 import EyeHealthStationPage from "./features/screening/EyeHealthStationPage";
 import QRScannerPage from "./features/screening/QRScannerPage";
-import RefractionStationPage from "./features/screening/RefractionStationPage";
-import VisualAcuityStationPage from "./features/screening/VisualAcuityStationPage";
 import { AuditLogsPage as RegistrationAuditLogsPage } from "./pages/AdminPages";
 import {
   AccountStatePage,
@@ -34,6 +32,7 @@ import {
 } from "./features/Stage4Pages";
 import AccountSecurityPage from "./pages/AccountSecurityPage";
 import StationLibraryPage from "./pages/StationLibraryPage";
+import StationTemplateFormPage from "./pages/StationTemplateFormPage";
 import { QueuePage } from "./pages/QueuePages"; // Imported the QueuePage component
 import EventRegistrationPage from "./pages/participant/EventRegistrationPage";
 import ParticipantCheckInPage from "./pages/participant/ParticipantCheckInPage";
@@ -53,6 +52,7 @@ import {
 const adminRoles = ["ADMINISTRATOR"];
 const eventManagerRoles = ["ADMINISTRATOR", "EVENT_MANAGER"];
 const registrationRoles = ["REGISTRATION_OFFICER"];
+const queueRoles = ["ADMINISTRATOR", "EVENT_MANAGER", "REGISTRATION_OFFICER"];
 const screenerRoles = ["SCREENER"];
 const reviewerRoles = ["REVIEWER"];
 
@@ -127,13 +127,13 @@ export default function App() {
 
           <Route element={<EventCapabilityGuard allowedRoles={screenerRoles} />}>
             <Route element={<StationDutyGuard stationType="VISUAL_ACUITY" />}>
-              <Route path="/events/:eventId/stations/visual-acuity" element={<VisualAcuityStationPage />} />
+              <Route path="/events/:eventId/stations/visual-acuity" element={<DynamicStationPage stationType="VISUAL_ACUITY" />} />
             </Route>
             <Route element={<StationDutyGuard stationType="REFRACTION" />}>
-              <Route path="/events/:eventId/stations/refraction" element={<RefractionStationPage />} />
+              <Route path="/events/:eventId/stations/refraction" element={<DynamicStationPage stationType="REFRACTION" />} />
             </Route>
             <Route element={<StationDutyGuard stationType="COLOUR_VISION" />}>
-              <Route path="/events/:eventId/stations/colour-vision" element={<ColourVisionStationPage />} />
+              <Route path="/events/:eventId/stations/colour-vision" element={<DynamicStationPage stationType="COLOUR_VISION" />} />
             </Route>
             <Route element={<StationDutyGuard stationType="EYE_HEALTH" />}>
               <Route path="/events/:eventId/stations/eye-health" element={<EyeHealthStationPage />} />
@@ -145,6 +145,7 @@ export default function App() {
           </Route>
 
           <Route element={<RoleGuard allowedRoles={eventManagerRoles} />}>
+            <Route path="/operations" element={<OperationsCenterPage />} />
             <Route path="/reports" element={<ReportsPage />} />
           </Route>
 
@@ -152,8 +153,11 @@ export default function App() {
             <Route path="/events/:eventId/edit" element={<EventFormPage mode="edit" />} />
           </Route>
 
-          <Route element={<EventCapabilityGuard allowedRoles={registrationRoles} />}>
+          <Route element={<EventCapabilityGuard allowedRoles={queueRoles} />}>
             <Route path="/events/:eventId/queue" element={<QueuePage />} />
+          </Route>
+
+          <Route element={<EventCapabilityGuard allowedRoles={registrationRoles} />}>
             <Route path="/events/qr-pass/:registrationId" element={<QRCodePage />} />
             <Route path="/qr-generator" element={<QRCodePage />} />
             <Route path="/participants" element={<Navigate to="/events" replace />} />
@@ -184,6 +188,8 @@ export default function App() {
           <Route element={<RoleGuard allowedRoles={adminRoles} />}>
             <Route path="/staff" element={<StaffAdministrationPage />} />
             <Route path="/admin/station-templates" element={<StationLibraryPage />} />
+            <Route path="/admin/station-templates/new" element={<StationTemplateFormPage mode="create" />} />
+            <Route path="/admin/station-templates/:stationTemplateId/edit" element={<StationTemplateFormPage mode="edit" />} />
             <Route path="/events/new" element={<EventFormPage mode="create" />} />
             <Route path="/events/:eventId/delete" element={<EventDeletionPage />} />
             <Route path="/admin/audit-logs" element={<RegistrationAuditLogsPage />} />

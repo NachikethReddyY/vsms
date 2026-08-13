@@ -1,4 +1,4 @@
-export type FieldType = 'text' | 'number' | 'select' | 'boolean' | 'eye-pair';
+export type FieldType = 'text' | 'number' | 'select' | 'boolean' | 'eye-pair' | 'va-eye' | 'refraction-eye';
 export type FieldEyes = 'OD' | 'OS' | 'BOTH';
 
 export type FieldDefinition = {
@@ -16,6 +16,44 @@ export type FieldDefinition = {
 export type FieldSchema = FieldDefinition[];
 export type DynamicFieldValues = Record<string, unknown>;
 
+export type VaEyeValue =
+  | { kind: 'FRACTION'; denominator: number }
+  | { kind: 'EXCEPTION'; code: 'CF' | 'HM' | 'LP' | 'NLP' | 'NOT_TESTABLE' };
+
+export type RefractionEyeValue = {
+  sphere: number;
+  cylinder: number;
+  axis: number | null;
+};
+
+/** Required medical fields clinical evaluators need. Labels may change; key/type/required may not. */
+export const CLINICAL_FIELD_CONTRACTS: Partial<Record<string, Array<{ key: string; type: FieldType }>>> = {
+  VISUAL_ACUITY: [
+    { key: 'chartDistanceMetres', type: 'select' },
+    { key: 'od', type: 'va-eye' },
+    { key: 'os', type: 'va-eye' },
+    { key: 'withUsualDistanceGlasses', type: 'select' },
+  ],
+  REFRACTION: [
+    { key: 'measurementStatus', type: 'select' },
+    { key: 'wearsDistanceGlasses', type: 'select' },
+    { key: 'od', type: 'refraction-eye' },
+    { key: 'os', type: 'refraction-eye' },
+    { key: 'notes', type: 'text' },
+  ],
+  COLOUR_VISION: [
+    { key: 'testKit', type: 'select' },
+    { key: 'platesPresented', type: 'number' },
+    { key: 'odCorrect', type: 'number' },
+    { key: 'osCorrect', type: 'number' },
+  ],
+};
+
+export function clinicalLockedKeys(stationType: string | null | undefined): Set<string> {
+  const contract = stationType ? CLINICAL_FIELD_CONTRACTS[stationType] : null;
+  return new Set((contract ?? []).map((field) => field.key));
+}
+
 export function emptyField(index = 0): FieldDefinition {
   return {
     key: `field${index + 1}`,
@@ -25,7 +63,7 @@ export function emptyField(index = 0): FieldDefinition {
   };
 }
 
-export function validateFieldSchema(schema: FieldSchema): string[] {
+export function validateFieldSchema(schema: FieldSchema, stationType?: string | null): string[] {
   const errors: string[] = [];
   const keys = new Set<string>();
   if (!schema.length) errors.push('Add at least one field.');
@@ -39,6 +77,14 @@ export function validateFieldSchema(schema: FieldSchema): string[] {
     if (field.type === 'select' && !field.options?.some((option) => option.trim())) errors.push(`${name} needs at least one option.`);
     if (field.min != null && field.max != null && field.min > field.max) errors.push(`${name} has a minimum greater than its maximum.`);
   });
+  const contract = stationType ? CLINICAL_FIELD_CONTRACTS[stationType] : null;
+  if (contract) {
+    for (const required of contract) {
+      const field = schema.find((item) => item.key === required.key);
+      if (!field) errors.push(`Keep the required clinical field "${required.key}".`);
+      else if (field.type !== required.type) errors.push(`Clinical field "${required.key}" must stay type ${required.type}.`);
+    }
+  }
   return errors;
 }
 
@@ -64,7 +110,112 @@ export function validateFieldValues(schema: FieldSchema, values: DynamicFieldVal
     } else if (field.type === 'eye-pair' && (field.eyes ?? 'BOTH') === 'BOTH') {
       const pair = value as { od?: unknown; os?: unknown } | null;
       if (!pair || isBlank(pair.od) || isBlank(pair.os)) errors[field.key] = `${field.label} requires OD and OS values.`;
+    } else if (field.type === 'va-eye') {
+      const eye = value as VaEyeValue | null;
+      if (!eye || (eye.kind === 'FRACTION' && !eye.denominator) || (eye.kind === 'EXCEPTION' && !eye.code)) {
+        errors[field.key] = `${field.label} needs a chart line or exception code.`;
+      }
+    } else if (field.type === 'refraction-eye') {
+      const eye = value as RefractionEyeValue | null;
+      if (!eye || !Number.isFinite(eye.sphere) || !Number.isFinite(eye.cylinder)) {
+        errors[field.key] = `${field.label} needs sphere and cylinder values.`;
+      } else if (Math.abs(eye.cylinder) >= 0.25 && eye.axis == null) {
+        errors[field.key] = `${field.label} needs an axis when cylinder is non-zero.`;
+      }
     }
   }
   return errors;
+}
+
+export function defaultValueForField(field: FieldDefinition): unknown {
+  if (field.type === 'va-eye') return { kind: 'FRACTION', denominator: 6 } satisfies VaEyeValue;
+  if (field.type === 'refraction-eye') return { sphere: 0, cylinder: 0, axis: null } satisfies RefractionEyeValue;
+  if (field.type === 'boolean') return false;
+  if (field.type === 'number') return field.min ?? 0;
+  if (field.type === 'select') return field.options?.[0] ?? '';
+  if (field.type === 'eye-pair') return (field.eyes ?? 'BOTH') === 'BOTH' ? { od: '', os: '' } : '';
+  return '';
+}
+
+export function defaultValuesForSchema(schema: FieldSchema): DynamicFieldValues {
+  return Object.fromEntries(schema.map((field) => [field.key, defaultValueForField(field)]));
+}
+
+function triStateToNullableBoolean(value: unknown) {
+  if (value === 'yes' || value === true) return true;
+  if (value === 'no' || value === false) return false;
+  return null;
+}
+
+/** Map schema form values into clinical evaluator payload shapes. Extra template fields stay attached. */
+export function normalizeClinicalResultData(stationType: string | null | undefined, resultData: DynamicFieldValues): DynamicFieldValues {
+  if (stationType === 'VISUAL_ACUITY') {
+    return {
+      ...resultData,
+      chartDistanceMetres: Number(resultData.chartDistanceMetres),
+      withUsualDistanceGlasses: triStateToNullableBoolean(resultData.withUsualDistanceGlasses),
+    };
+  }
+  if (stationType === 'REFRACTION') {
+    const { measurementStatus, wearsDistanceGlasses, od, os, notes, ...extras } = resultData;
+    const base: DynamicFieldValues = {
+      ...extras,
+      measurementStatus,
+      wearsDistanceGlasses: triStateToNullableBoolean(wearsDistanceGlasses),
+      ...(notes !== undefined ? { notes } : {}),
+    };
+    if (measurementStatus === 'COMPLETED') {
+      return { ...base, od, os };
+    }
+    return base;
+  }
+  return resultData;
+}
+
+export const SYSTEM_FIELD_SCHEMAS: Partial<Record<string, FieldSchema>> = {
+  VISUAL_ACUITY: [
+    { key: 'chartDistanceMetres', label: 'Chart distance (m)', type: 'select', required: true, options: ['3', '6'] },
+    { key: 'od', label: 'Right eye (OD)', type: 'va-eye', required: true },
+    { key: 'os', label: 'Left eye (OS)', type: 'va-eye', required: true },
+    { key: 'withUsualDistanceGlasses', label: 'With usual distance glasses', type: 'select', required: true, options: ['yes', 'no', 'unknown'] },
+  ],
+  REFRACTION: [
+    { key: 'measurementStatus', label: 'Measurement status', type: 'select', required: true, options: ['COMPLETED', 'UNABLE_TO_MEASURE', 'REPEAT_REQUIRED'] },
+    { key: 'wearsDistanceGlasses', label: 'Wears distance glasses', type: 'select', required: true, options: ['yes', 'no', 'unknown'] },
+    { key: 'od', label: 'Right eye (OD)', type: 'refraction-eye', required: false },
+    { key: 'os', label: 'Left eye (OS)', type: 'refraction-eye', required: false },
+    { key: 'notes', label: 'Notes', type: 'text', required: false },
+  ],
+  COLOUR_VISION: [
+    { key: 'testKit', label: 'Test kit', type: 'select', required: true, options: ['ISHIHARA'] },
+    { key: 'platesPresented', label: 'Plates presented', type: 'number', required: true, min: 8, max: 24 },
+    { key: 'odCorrect', label: 'OD plates correct', type: 'number', required: true, min: 0, max: 24 },
+    { key: 'osCorrect', label: 'OS plates correct', type: 'number', required: true, min: 0, max: 24 },
+  ],
+};
+
+/** Keep configured labels and order when displaying a frozen station result. */
+export function orderedResultFields(schema: FieldSchema | null | undefined, data: Record<string, unknown>) {
+  const configured = new Map((schema ?? []).map((field) => [field.key, field]));
+  const orderedKeys = [
+    ...(schema ?? []).map((field) => field.key).filter((key) => key in data),
+    ...Object.keys(data).filter((key) => !configured.has(key)),
+  ];
+  return orderedKeys.map((key) => ({
+    key,
+    label: configured.get(key)?.label ?? key
+      .replace(/([a-z])([A-Z])/g, '$1 $2')
+      .replace(/_/g, ' ')
+      .replace(/^\w/, (letter: string) => letter.toUpperCase()),
+    value: data[key],
+  }));
+}
+
+/** Open pre-upgrade stations that have no snapshot yet. */
+export function resolveCompatibleFieldSchema(
+  stationType: string | null | undefined,
+  snapshot: FieldSchema | null | undefined,
+): FieldSchema | null {
+  if (Array.isArray(snapshot) && snapshot.length) return snapshot;
+  return (stationType && SYSTEM_FIELD_SCHEMAS[stationType]) || null;
 }

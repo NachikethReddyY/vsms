@@ -9,8 +9,16 @@ const { resolveRegistrationByQrValue } = require("../../utils/crypto/qrToken");
 const { recordVisualAcuity } = require("../../utils/database/visualAcuityProcedure");
 const {
   validateResultAgainstSchema,
+  normalizeClinicalResultData,
+  mergeClinicalAndTemplateResult,
+  resolveCompatibleFieldSchema,
   evaluateDynamicResult,
 } = require("../../schemas/dynamicStationSchema");
+const {
+  visualAcuityResultData,
+  refractionResultData,
+  colourVisionResultData,
+} = require("../../schemas/screeningSchemas");
 const { advanceAfterFirstResult } = require("./routeProgressionService");
 
 const VA_RULE_VERSION = "VSMS-VA-1.0";
@@ -260,10 +268,14 @@ const listStations = async (eventId, user) => {
   return {
     event,
     stations: stations.map((station) => {
-      const assignmentEndsAt = latestAssignmentEndByStation.get(station.stationId);
-      if (!event.endsAt || !assignmentEndsAt) return station;
-      return {
+      const compatible = {
         ...station,
+        fieldSchemaSnapshot: resolveCompatibleFieldSchema(station.stationType, station.fieldSchemaSnapshot),
+      };
+      const assignmentEndsAt = latestAssignmentEndByStation.get(station.stationId);
+      if (!event.endsAt || !assignmentEndsAt) return compatible;
+      return {
+        ...compatible,
         // Offline access may never outlive either the live event or this user's active shift.
         offlineAccessExpiresAt: new Date(Math.min(event.endsAt.getTime(), assignmentEndsAt.getTime())).toISOString(),
       };
@@ -607,33 +619,69 @@ const saveEyeHealth = (eventId, stationId, body, user, context) => saveStationRe
   context,
 });
 
+const SCHEMA_DRIVEN_STATION_TYPES = new Set(["CUSTOM", "VISUAL_ACUITY", "REFRACTION", "COLOUR_VISION"]);
+
+const CLINICAL_RESULT_SCHEMAS = {
+  VISUAL_ACUITY: visualAcuityResultData,
+  REFRACTION: refractionResultData,
+  COLOUR_VISION: colourVisionResultData,
+};
+
+const CLINICAL_EVALUATORS = {
+  VISUAL_ACUITY: evaluateVisualAcuity,
+  REFRACTION: evaluateRefraction,
+  COLOUR_VISION: evaluateColourVision,
+};
+
 const loadDynamicStation = async (eventId, stationId, user) => {
   await assertCanScreen(eventId, user, stationId);
   const station = await prisma.station.findFirst({
-    where: { eventId, stationId, isActive: true, stationType: "CUSTOM" },
+    where: {
+      eventId,
+      stationId,
+      isActive: true,
+      stationType: { in: [...SCHEMA_DRIVEN_STATION_TYPES] },
+    },
   });
   if (!station) throw new AppError(404, "STATION_NOT_FOUND", "Station not found");
-  if (!station.fieldSchemaSnapshot) {
+  const fieldSchemaSnapshot = resolveCompatibleFieldSchema(station.stationType, station.fieldSchemaSnapshot);
+  if (!fieldSchemaSnapshot) {
     throw new AppError(
       409,
       "STATION_SCHEMA_MISSING",
-      "Custom station does not have a field schema snapshot",
+      "Station does not have a field schema snapshot",
     );
   }
-  return station;
+  return { ...station, fieldSchemaSnapshot };
 };
 
-const validateDynamicBody = (station, body) => ({
-  ...body,
-  resultData: station.fieldSchemaSnapshot
-    ? validateResultAgainstSchema(station.fieldSchemaSnapshot, body.resultData)
-    : body.resultData,
-});
+const validateDynamicBody = (station, body) => {
+  const cleaned = validateResultAgainstSchema(station.fieldSchemaSnapshot, body.resultData);
+  const clinicalSchema = CLINICAL_RESULT_SCHEMAS[station.stationType];
+  if (!clinicalSchema) {
+    return { ...body, resultData: cleaned };
+  }
+  const normalized = normalizeClinicalResultData(station.stationType, cleaned);
+  const parsed = clinicalSchema.safeParse(normalized);
+  if (!parsed.success) {
+    throw new AppError(
+      422,
+      "INVALID_RESULT_DATA",
+      parsed.error.issues[0]?.message || "Clinical result data is invalid",
+    );
+  }
+  return { ...body, resultData: mergeClinicalAndTemplateResult(cleaned, parsed.data) };
+};
+
+const evaluateForStationType = (stationType, resultData) => {
+  const evaluate = CLINICAL_EVALUATORS[stationType] || evaluateDynamicResult;
+  return evaluate(resultData);
+};
 
 const previewDynamic = async (eventId, stationId, body, user) => {
   const station = await loadDynamicStation(eventId, stationId, user);
-  validateDynamicBody(station, body);
-  return evaluateDynamicResult();
+  const validatedBody = validateDynamicBody(station, body);
+  return evaluateForStationType(station.stationType, validatedBody.resultData);
 };
 
 const saveDynamic = async (eventId, stationId, body, user, context) => {
@@ -644,7 +692,7 @@ const saveDynamic = async (eventId, stationId, body, user, context) => {
     stationId,
     stationType: station.stationType,
     label: station.stationName,
-    evaluate: evaluateDynamicResult,
+    evaluate: (resultData) => evaluateForStationType(station.stationType, resultData),
     body: validatedBody,
     user,
     context,

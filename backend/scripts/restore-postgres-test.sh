@@ -9,13 +9,12 @@ fail() {
 }
 
 [ "$#" -eq 1 ] || fail "Usage: sh scripts/restore-postgres-test.sh /absolute/path/backup.dump"
-command -v pg_restore >/dev/null 2>&1 || fail "pg_restore is required"
-command -v psql >/dev/null 2>&1 || fail "psql is required"
 [ -n "${RESTORE_DATABASE_URL:-}" ] || fail "RESTORE_DATABASE_URL is required"
 [ "${RESTORE_CONFIRM:-}" = "$RESTORE_CONFIRMATION" ] || fail "Set RESTORE_CONFIRM=$RESTORE_CONFIRMATION before restoring"
 backup_file=$1
 manifest_file="$backup_file.counts.tsv"
 schema_file="$backup_file.schema.tsv"
+checksum_file="$backup_file.sha256"
 
 configured_database=${RESTORE_DATABASE_URL%%\?*}
 configured_database=${configured_database##*/}
@@ -23,6 +22,17 @@ case "$configured_database" in *_test) ;; *) fail "Restore target URL must end i
 [ -f "$backup_file" ] || fail "Backup file does not exist"
 [ -f "$manifest_file" ] || fail "Row-count manifest does not exist"
 [ -f "$schema_file" ] || fail "Schema manifest does not exist"
+[ -f "$checksum_file" ] || fail "SHA-256 checksum does not exist"
+command -v sha256sum >/dev/null 2>&1 || fail "sha256sum is required"
+
+checksum_line=$(cat "$checksum_file")
+expected_hash=${checksum_line%%  *}
+checksum_name=${checksum_line#*  }
+case "$expected_hash" in ''|*[!a-f0-9]*) fail "Invalid SHA-256 checksum" ;; esac
+[ "${#expected_hash}" -eq 64 ] || fail "Invalid SHA-256 checksum"
+[ "$checksum_name" = "$(basename "$backup_file")" ] || fail "Checksum filename does not match backup"
+actual_hash=$(sha256sum "$backup_file" | awk '{print $1}')
+[ "$actual_hash" = "$expected_hash" ] || fail "Backup integrity verification failed"
 
 manifest_entries=0
 seen_tables=''
@@ -35,6 +45,8 @@ while IFS='	' read -r table_name expected_count; do
 done < "$manifest_file"
 [ "$manifest_entries" -eq 7 ] || fail "Manifest must contain every critical table exactly once"
 
+command -v pg_restore >/dev/null 2>&1 || fail "pg_restore is required"
+command -v psql >/dev/null 2>&1 || fail "psql is required"
 target_database=$(psql "$RESTORE_DATABASE_URL" -Atq -v ON_ERROR_STOP=1 -c 'SELECT current_database()')
 case "$target_database" in *_test) ;; *) fail "Restore target must end in _test" ;; esac
 

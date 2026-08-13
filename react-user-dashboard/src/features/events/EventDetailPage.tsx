@@ -318,8 +318,8 @@ export default function EventDetailPage() {
   const terminal = event.status === 'COMPLETED' || event.status === 'CANCELLED';
   const canManage = event.canManage;
   const canCreateEvent = user?.roles.includes('ADMINISTRATOR') ?? false;
-  const canConfigureStations = canManage && ['DRAFT', 'PUBLISHED', 'IN_PROGRESS'].includes(event.status);
-  const canEditStaffing = canManage && ['DRAFT', 'PUBLISHED', 'IN_PROGRESS'].includes(event.status);
+  const canConfigureStations = canManage && ['DRAFT', 'PUBLISHED'].includes(event.status);
+  const canEditStaffing = canManage && ['DRAFT', 'PUBLISHED'].includes(event.status);
   const availableTemplates = stationTemplates.filter((template) => {
     if (template.stationType === 'CUSTOM') {
       return !event.eventStations.some((station) => station.stationTemplateId === template.stationTemplateId);

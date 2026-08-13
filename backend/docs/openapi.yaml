@@ -11,7 +11,7 @@ servers:
     description: Same-origin API server; local development proxies to https://127.0.0.1:5050
 tags:
   - name: System
-    description: Service readiness
+    description: Service liveness and dependency readiness
   - name: Authentication
     description: Amazon Cognito managed login with a secure cookie session
   - name: Events
@@ -44,10 +44,10 @@ paths:
       tags: [System]
       security: []
       operationId: getHealth
-      summary: Check API readiness
+      summary: Check API process liveness
       responses:
         "200":
-          description: API is ready
+          description: API process is alive
           content:
             application/json:
               schema:
@@ -55,12 +55,33 @@ paths:
                 required: [status]
                 properties:
                   status: { type: string, enum: [ok] }
-        "500":
-          description: Service is not ready
-          content: { application/json: { schema: { $ref: "#/components/schemas/Problem" } } }
-        "404":
-          description: Health endpoint is unavailable
-          content: { application/json: { schema: { $ref: "#/components/schemas/Problem" } } }
+  /ready:
+    get:
+      tags: [System]
+      security: []
+      operationId: getReady
+      summary: Check API readiness (database reachability)
+      responses:
+        "200":
+          description: API is ready to serve traffic
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [status, database]
+                properties:
+                  status: { type: string, enum: [ready] }
+                  database: { type: string, enum: [connected] }
+        "503":
+          description: API process is alive but a required dependency (database) is unreachable
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [status, database]
+                properties:
+                  status: { type: string, enum: [not_ready] }
+                  database: { type: string, enum: [disconnected] }
   /api/v1/webhooks/ses:
     post:
       tags: [Provider Events]
@@ -479,6 +500,35 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/OperationalReport" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "422": { $ref: "#/components/responses/ValidationFailed" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+  /api/v1/operations:
+    get:
+      tags: [Events]
+      operationId: getMultiEventOperationsOverview
+      summary: Monitor authorized events from the Operations Center
+      description: Returns aggregate-only operational health for every event the administrator or active event manager may manage. Participant identity, queue notes, screening values, clinical narratives, referral recipients, and synchronization payloads are excluded. Intended for bounded polling; responses are never cached.
+      parameters:
+        - name: status
+          in: query
+          schema: { type: string, enum: [ALL, ACTIVE, UPCOMING, COMPLETED], default: ALL }
+        - name: search
+          in: query
+          schema: { type: string, maxLength: 100 }
+        - name: limit
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 100, default: 50 }
+      responses:
+        "200":
+          description: Authorized multi-event operational snapshot
+          headers:
+            Cache-Control:
+              schema: { type: string, enum: [no-store] }
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/OperationsOverview" }
         "401": { $ref: "#/components/responses/Unauthorized" }
         "403": { $ref: "#/components/responses/Forbidden" }
         "422": { $ref: "#/components/responses/ValidationFailed" }
@@ -1863,7 +1913,8 @@ paths:
     post:
       tags: [QR Codes]
       operationId: verifyQrCode
-      summary: Verify a QR token for an event
+      summary: Verify a journey QR and assign its current queue station
+      description: Validates the participant's single event-journey QR. A repeated scanId is replayed without creating another queue entry. If no active queue exists, the backend assigns the least-loaded eligible staffed station.
       requestBody:
         required: true
         content:
@@ -1871,15 +1922,17 @@ paths:
             schema:
               type: object
               additionalProperties: false
-              required: [token, eventId]
+              required: [token, scanId]
               properties:
                 token: { type: string, minLength: 1 }
                 eventId: { type: string, format: uuid }
+                scanId: { type: string, format: uuid }
       responses:
         "200": { description: Verification result, content: { application/json: { schema: { $ref: "#/components/schemas/ApiDataResponse" } } } }
         "400": { $ref: "#/components/responses/ValidationFailed" }
         "401": { $ref: "#/components/responses/Unauthorized" }
         "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
         "429": { $ref: "#/components/responses/RateLimited" }
   /api/v1/qr/manual-checkin:
     post:
@@ -2651,7 +2704,7 @@ components:
       properties:
         key: { type: string, minLength: 1, maxLength: 64 }
         label: { type: string, minLength: 1, maxLength: 100 }
-        type: { type: string, enum: [text, number, select, boolean, eye-pair] }
+        type: { type: string, enum: [text, number, select, boolean, eye-pair, va-eye, refraction-eye] }
         required: { type: boolean }
         options: { type: array, items: { type: string } }
         min: { type: number }
@@ -3678,6 +3731,169 @@ components:
           items: { $ref: "#/components/schemas/OperationalReportEventOption" }
         truncated: { type: boolean }
         eventOptionsTruncated: { type: boolean }
+    OperationsAttentionReason:
+      type: object
+      additionalProperties: false
+      required: [code, label, count, severity]
+      properties:
+        code:
+          type: string
+          enum: [STATIONS_OFFLINE, SYNC_ISSUES, STATIONS_PAUSED, STATIONS_UNSTAFFED, QUEUE_WITHOUT_STAFF, PRIORITY_WAITING, REFERRALS_ACTION_REQUIRED]
+        label: { type: string, maxLength: 100 }
+        count: { type: integer, minimum: 1 }
+        severity: { type: string, enum: [critical, warning] }
+    OperationsStation:
+      type: object
+      additionalProperties: false
+      required: [stationId, name, type, order, operationalStatus, staffed, queue]
+      properties:
+        stationId: { type: string, format: uuid }
+        name: { type: string, maxLength: 100 }
+        type:
+          type: string
+          enum: [VISUAL_ACUITY, REFRACTION, COLOUR_VISION, EYE_HEALTH]
+        order: { type: integer, minimum: 1 }
+        operationalStatus: { $ref: "#/components/schemas/StationOperationalStatus" }
+        staffed: { type: boolean }
+        queue:
+          type: object
+          additionalProperties: false
+          required: [waiting, active]
+          properties:
+            waiting: { type: integer, minimum: 0 }
+            active: { type: integer, minimum: 0 }
+    OperationsEvent:
+      type: object
+      additionalProperties: false
+      required: [eventId, name, status, venue, timezone, startsAt, endsAt, capacity, progress, queue, stations, staffing, referrals, sync, attention]
+      properties:
+        eventId: { type: string, format: uuid }
+        name: { type: string, maxLength: 150 }
+        status: { $ref: "#/components/schemas/EventStatus" }
+        venue: { type: string, maxLength: 255 }
+        timezone: { type: string, maxLength: 100 }
+        startsAt: { type: string, format: date-time }
+        endsAt: { type: string, format: date-time }
+        capacity: { type: integer, minimum: 1 }
+        progress:
+          type: object
+          additionalProperties: false
+          required: [total, signedUp, checkedIn, completed, screened, reviewed]
+          properties:
+            total: { type: integer, minimum: 0 }
+            signedUp: { type: integer, minimum: 0 }
+            checkedIn: { type: integer, minimum: 0 }
+            completed: { type: integer, minimum: 0 }
+            screened: { type: integer, minimum: 0 }
+            reviewed: { type: integer, minimum: 0 }
+        queue:
+          type: object
+          additionalProperties: false
+          required: [waiting, called, inProgress, completed, skipped, priority, longestWaitMinutes]
+          properties:
+            waiting: { type: integer, minimum: 0 }
+            called: { type: integer, minimum: 0 }
+            inProgress: { type: integer, minimum: 0 }
+            completed: { type: integer, minimum: 0 }
+            skipped: { type: integer, minimum: 0 }
+            priority: { type: integer, minimum: 0 }
+            longestWaitMinutes: { type: integer, minimum: 0 }
+        stations:
+          type: object
+          additionalProperties: false
+          required: [total, available, paused, offline, items]
+          properties:
+            total: { type: integer, minimum: 0 }
+            available: { type: integer, minimum: 0 }
+            paused: { type: integer, minimum: 0 }
+            offline: { type: integer, minimum: 0 }
+            items:
+              type: array
+              maxItems: 50
+              items: { $ref: "#/components/schemas/OperationsStation" }
+        staffing:
+          type: object
+          additionalProperties: false
+          required: [shiftId, shiftName, startsAt, endsAt, required, assigned, unfilled, unstaffedStations]
+          properties:
+            shiftId: { type: string, format: uuid, nullable: true }
+            shiftName: { type: string, maxLength: 100, nullable: true }
+            startsAt: { type: string, format: date-time, nullable: true }
+            endsAt: { type: string, format: date-time, nullable: true }
+            required: { type: integer, minimum: 0 }
+            assigned: { type: integer, minimum: 0 }
+            unfilled: { type: integer, minimum: 0 }
+            unstaffedStations: { type: integer, minimum: 0 }
+        referrals:
+          type: object
+          additionalProperties: false
+          required: [actionRequired]
+          properties:
+            actionRequired: { type: integer, minimum: 0 }
+        sync:
+          type: object
+          additionalProperties: false
+          required: [pending, issues]
+          properties:
+            pending: { type: integer, minimum: 0 }
+            issues: { type: integer, minimum: 0 }
+        attention:
+          type: object
+          additionalProperties: false
+          required: [severity, reasons]
+          properties:
+            severity: { type: string, enum: [critical, warning, normal] }
+            reasons:
+              type: array
+              maxItems: 7
+              items: { $ref: "#/components/schemas/OperationsAttentionReason" }
+    OperationsOverview:
+      type: object
+      additionalProperties: false
+      required: [generatedAt, filters, summary, events, truncated]
+      properties:
+        generatedAt: { type: string, format: date-time }
+        filters:
+          type: object
+          additionalProperties: false
+          required: [status, search]
+          properties:
+            status: { type: string, enum: [ALL, ACTIVE, UPCOMING, COMPLETED] }
+            search: { type: string, maxLength: 100, nullable: true }
+        summary:
+          type: object
+          additionalProperties: false
+          required: [events, participants, queue]
+          properties:
+            events:
+              type: object
+              additionalProperties: false
+              required: [total, active, upcoming, completed, needsAttention]
+              properties:
+                total: { type: integer, minimum: 0 }
+                active: { type: integer, minimum: 0 }
+                upcoming: { type: integer, minimum: 0 }
+                completed: { type: integer, minimum: 0 }
+                needsAttention: { type: integer, minimum: 0 }
+            participants:
+              type: object
+              additionalProperties: false
+              required: [checkedIn, completed]
+              properties:
+                checkedIn: { type: integer, minimum: 0 }
+                completed: { type: integer, minimum: 0 }
+            queue:
+              type: object
+              additionalProperties: false
+              required: [waiting, active]
+              properties:
+                waiting: { type: integer, minimum: 0 }
+                active: { type: integer, minimum: 0 }
+        events:
+          type: array
+          maxItems: 100
+          items: { $ref: "#/components/schemas/OperationsEvent" }
+        truncated: { type: boolean }
     AnalyticsColumn:
       type: object
       additionalProperties: false
@@ -3847,12 +4063,16 @@ components:
     ReviewStationResult:
       type: object
       additionalProperties: false
-      required: [stationId, stationName, stationType, stationOrder, result]
+      required: [stationId, stationName, stationType, stationOrder, fieldSchemaSnapshot, result]
       properties:
         stationId: { type: string, format: uuid }
         stationName: { type: string }
         stationType: { type: string, enum: [VISUAL_ACUITY, REFRACTION, COLOUR_VISION, EYE_HEALTH, CUSTOM] }
         stationOrder: { type: integer, minimum: 1 }
+        fieldSchemaSnapshot:
+          type: array
+          nullable: true
+          items: { $ref: "#/components/schemas/StationFieldDefinition" }
         result:
           type: object
           nullable: true

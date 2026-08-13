@@ -10,7 +10,7 @@ const {
   findExistingStation,
   CLINICAL_ONE_PER_EVENT_TYPES,
 } = require("./stationTemplateMapping");
-const { parseFieldSchema } = require("../../schemas/dynamicStationSchema");
+const { parseFieldSchema, assertClinicalFieldSchema, resolveCompatibleFieldSchema } = require("../../schemas/dynamicStationSchema");
 const {
   enqueueEventArtifactCleanup,
   processArtifactCleanupTasks,
@@ -23,6 +23,9 @@ const { attendancePredicate, attendanceWhere } = require("./attendanceDefinition
 const { enqueueAccountLifecycle } = require("../account/accountLifecycleNotificationService");
 const domainEventBus = require("../domain/domainEventBus");
 const { assertRoleEligibility, eventVisibilityWhere, isAdministrator } = require("./eventAuthorizationService");
+
+/** Station types whose library fieldSchema drives DynamicStationPage + API validation. */
+const SCHEMA_DRIVEN_STATION_TYPES = new Set(["CUSTOM", "VISUAL_ACUITY", "REFRACTION", "COLOUR_VISION"]);
 
 const EVENT_FIELDS = [
   "name", "description", "bannerKey", "artworkDataUrl", "venue", "address", "postalCode",
@@ -208,7 +211,10 @@ const mapStationDto = (station, event, templates) => {
     // Capacity is not on Station (#30); expose template default until availability is wired.
     capacity: template?.defaultCapacity || event.capacity,
     isAvailable: station.isActive,
-    fieldSchemaSnapshot: station.fieldSchemaSnapshot ?? template?.fieldSchema ?? null,
+    fieldSchemaSnapshot: resolveCompatibleFieldSchema(
+      station.stationType,
+      station.fieldSchemaSnapshot ?? template?.fieldSchema ?? null,
+    ),
     schemaVersion: station.schemaVersion ?? template?.version ?? null,
     availabilities: [],
   };
@@ -479,8 +485,8 @@ const auditUpdate = (tx, current, updated, user, correlationId) => tx.eventAudit
 });
 
 const assertStationPlanningState = (event) => {
-  if (!["DRAFT", "PUBLISHED", "IN_PROGRESS"].includes(event.status)) {
-    throw new AppError(409, "STATIONS_NOT_EDITABLE", "Stations cannot be changed for a completed or cancelled event");
+  if (!["DRAFT", "PUBLISHED"].includes(event.status)) {
+    throw new AppError(409, "STATIONS_NOT_EDITABLE", "Stations cannot be changed after an event goes live");
   }
 };
 
@@ -585,12 +591,9 @@ const createEventDays = async (tx, eventId, days) => {
   return new Map(created.map((day) => [day.date.toISOString().slice(0, 10), day]));
 };
 
-/** Only CUSTOM stations freeze and render fieldSchema. Built-in clinical UIs stay hard-coded. */
+/** Freeze catalog fieldSchema onto event stations when present (CUSTOM and clinical). */
 const stationSchemaFields = (template) => {
-  if (template.stationType !== "CUSTOM") {
-    return { fieldSchemaSnapshot: null, schemaVersion: template.version || 1 };
-  }
-  const fieldSchema = parseFieldSchema(template.fieldSchema);
+  const fieldSchema = resolveCompatibleFieldSchema(template.stationType, template.fieldSchema);
   return {
     fieldSchemaSnapshot: fieldSchema,
     schemaVersion: template.version || 1,
@@ -1704,7 +1707,15 @@ const serializeStationTemplate = (template) => ({
   fieldSchema: template.fieldSchema ?? null,
 });
 
-/** Admin catalog: all templates including inactive / non-importable (#23). */
+/** Read-only preview fallback — never write during catalog GET. */
+const withSystemFieldSchemaFallback = (template) => {
+  const fieldSchema = resolveCompatibleFieldSchema(template.stationType, template.fieldSchema);
+  if (!fieldSchema) return template;
+  return { ...template, fieldSchema };
+};
+
+/** Admin catalog: screening templates only — registration/clinical review/eye health are not managed here. */
+const HIDDEN_LIBRARY_TEMPLATE_KEYS = new Set(["REGISTRATION", "CLINICAL_REVIEW", "EYE_HEALTH"]);
 const listStationTemplateLibrary = async () => {
   const templates = await prisma.stationTemplate.findMany({
     select: {
@@ -1720,23 +1731,30 @@ const listStationTemplateLibrary = async () => {
     },
     orderBy: [{ active: "desc" }, { name: "asc" }],
   });
-  return templates.map(serializeStationTemplate);
+  return templates
+    .filter((template) => (
+      !HIDDEN_LIBRARY_TEMPLATE_KEYS.has(template.templateKey)
+      && template.stationType !== "EYE_HEALTH"
+    ))
+    .map((template) => serializeStationTemplate(withSystemFieldSchemaFallback(template)));
 };
 
 const createStationTemplate = async (body, user, context, db = prisma) => {
   const { SYSTEM_FIELD_SCHEMAS } = require("../../schemas/dynamicStationSchema");
   let fieldSchema;
   try {
-    if (body.stationType === "CUSTOM") {
-      fieldSchema = parseFieldSchema(body.fieldSchema);
-    } else if (body.fieldSchema !== undefined) {
+    if (!SCHEMA_DRIVEN_STATION_TYPES.has(body.stationType)) {
       throw new AppError(
         422,
         "FIELD_SCHEMA_NOT_EDITABLE",
-        "Field schemas can only be defined for custom stations. Built-in stations use fixed clinical forms.",
+        "Field schemas can only be defined for custom and clinical screening stations",
       );
+    }
+    if (body.stationType === "CUSTOM" || body.fieldSchema !== undefined) {
+      fieldSchema = SCHEMA_DRIVEN_STATION_TYPES.has(body.stationType) && body.stationType !== "CUSTOM"
+        ? assertClinicalFieldSchema(body.stationType, body.fieldSchema)
+        : parseFieldSchema(body.fieldSchema);
     } else {
-      // Catalog metadata only — live VA/REF/CV pages ignore this and keep hard-coded forms.
       fieldSchema = SYSTEM_FIELD_SCHEMAS[body.stationType] ?? null;
     }
   } catch (error) {
@@ -1779,17 +1797,29 @@ const createStationTemplate = async (body, user, context, db = prisma) => {
 const updateStationTemplate = async (stationTemplateId, body, user, context, db = prisma) => db.$transaction(async (tx) => {
   const existing = await tx.stationTemplate.findUnique({ where: { stationTemplateId } });
   if (!existing) throw new AppError(404, "STATION_TEMPLATE_NOT_FOUND", "Station template not found");
+  if (
+    HIDDEN_LIBRARY_TEMPLATE_KEYS.has(existing.templateKey)
+    || existing.stationType === "EYE_HEALTH"
+  ) {
+    throw new AppError(
+      422,
+      "STATION_TEMPLATE_NOT_EDITABLE",
+      "Registration, clinical review, and eye health are not managed in the station library",
+    );
+  }
   let fieldSchema;
   if (body.fieldSchema !== undefined) {
-    if (existing.stationType !== "CUSTOM") {
+    if (!SCHEMA_DRIVEN_STATION_TYPES.has(existing.stationType)) {
       throw new AppError(
         422,
         "FIELD_SCHEMA_NOT_EDITABLE",
-        "Field schemas can only be edited for custom stations. Built-in stations use fixed clinical forms.",
+        "Field schemas can only be edited for custom and clinical screening stations",
       );
     }
     try {
-      fieldSchema = parseFieldSchema(body.fieldSchema);
+      fieldSchema = SCHEMA_DRIVEN_STATION_TYPES.has(existing.stationType) && existing.stationType !== "CUSTOM"
+        ? assertClinicalFieldSchema(existing.stationType, body.fieldSchema)
+        : parseFieldSchema(body.fieldSchema);
     } catch (error) {
       throw new AppError(422, "INVALID_FIELD_SCHEMA", error.message);
     }

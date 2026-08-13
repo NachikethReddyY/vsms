@@ -6,7 +6,7 @@ info:
     the HttpOnly Cognito refresh cookie and CSRF header for replacement auth/CSRF cookies, while its JSON response
     contains user, expiresIn, and sessionExpiresIn only.
 item:
-  - name: Check API readiness
+  - name: Check API process liveness
     description: ''
     event: []
     request:
@@ -36,53 +36,51 @@ item:
           {
             "status": "ok"
           }
-      - name: 404 Response
+  - name: Check API readiness (database reachability)
+    description: ''
+    event: []
+    request:
+      method: GET
+      header: []
+      auth:
+        type: noauth
+      url:
+        raw: '{{baseUrl}}/ready'
+        host:
+          - '{{baseUrl}}'
+        path:
+          - ready
+        query: []
+    response:
+      - name: 200 Response
         originalRequest:
           method: GET
           header: []
-          url: '{{baseUrl}}/health'
-        status: Not Found
-        code: 404
+          url: '{{baseUrl}}/ready'
+        status: OK
+        code: 200
         header:
           - key: Content-Type
             value: application/json
         body: |-
           {
-            "type": "",
-            "title": "",
-            "status": 0,
-            "code": "",
-            "requestId": "00000000-0000-4000-8000-000000000000",
-            "errors": [
-              {
-                "field": "",
-                "message": ""
-              }
-            ]
+            "status": "ready",
+            "database": "connected"
           }
-      - name: 500 Response
+      - name: 503 Response
         originalRequest:
           method: GET
           header: []
-          url: '{{baseUrl}}/health'
-        status: Internal Server Error
-        code: 500
+          url: '{{baseUrl}}/ready'
+        status: Service Unavailable
+        code: 503
         header:
           - key: Content-Type
             value: application/json
         body: |-
           {
-            "type": "",
-            "title": "",
-            "status": 0,
-            "code": "",
-            "requestId": "00000000-0000-4000-8000-000000000000",
-            "errors": [
-              {
-                "field": "",
-                "message": ""
-              }
-            ]
+            "status": "not_ready",
+            "database": "disconnected"
           }
   - name: Accept a signature-verified Amazon SNS envelope for SES delivery lifecycle events
     description: >-
@@ -3228,6 +3226,202 @@ item:
           method: GET
           header: []
           url: '{{baseUrl}}/events/reports/operations'
+        status: Forbidden
+        code: 403
+        header:
+          - key: Content-Type
+            value: application/json
+        body: |-
+          {
+            "type": "",
+            "title": "",
+            "status": 0,
+            "code": "",
+            "requestId": "00000000-0000-4000-8000-000000000000",
+            "errors": [
+              {
+                "field": "",
+                "message": ""
+              }
+            ]
+          }
+  - name: Monitor authorized events from the Operations Center
+    description: >-
+      Returns aggregate-only operational health for every event the administrator or active event manager may manage.
+      Participant identity, queue notes, screening values, clinical narratives, referral recipients, and synchronization
+      payloads are excluded. Intended for bounded polling; responses are never cached.
+    event: []
+    request:
+      method: GET
+      header: []
+      auth:
+        type: bearer
+        bearer:
+          - key: token
+            value: '{{token}}'
+            type: string
+      url:
+        raw: '{{baseUrl}}/operations'
+        host:
+          - '{{baseUrl}}'
+        path:
+          - operations
+        query:
+          - key: status
+            value: ALL
+            description: ''
+            disabled: true
+          - key: search
+            value: ''
+            description: ''
+            disabled: true
+          - key: limit
+            value: '50'
+            description: ''
+            disabled: true
+    response:
+      - name: 200 Response
+        originalRequest:
+          method: GET
+          header: []
+          url: '{{baseUrl}}/operations'
+        status: OK
+        code: 200
+        header:
+          - key: Content-Type
+            value: application/json
+        body: |-
+          {
+            "generatedAt": "2026-08-07T00:00:00.000Z",
+            "filters": {
+              "status": "ALL",
+              "search": ""
+            },
+            "summary": {
+              "events": {
+                "total": 0,
+                "active": 0,
+                "upcoming": 0,
+                "completed": 0,
+                "needsAttention": 0
+              },
+              "participants": {
+                "checkedIn": 0,
+                "completed": 0
+              },
+              "queue": {
+                "waiting": 0,
+                "active": 0
+              }
+            },
+            "events": [
+              {
+                "eventId": "00000000-0000-4000-8000-000000000000",
+                "name": "",
+                "status": "DRAFT",
+                "venue": "",
+                "timezone": "",
+                "startsAt": "2026-08-07T00:00:00.000Z",
+                "endsAt": "2026-08-07T00:00:00.000Z",
+                "capacity": 1,
+                "progress": {
+                  "total": 0,
+                  "signedUp": 0,
+                  "checkedIn": 0,
+                  "completed": 0,
+                  "screened": 0,
+                  "reviewed": 0
+                },
+                "queue": {
+                  "waiting": 0,
+                  "called": 0,
+                  "inProgress": 0,
+                  "completed": 0,
+                  "skipped": 0,
+                  "priority": 0,
+                  "longestWaitMinutes": 0
+                },
+                "stations": {
+                  "total": 0,
+                  "available": 0,
+                  "paused": 0,
+                  "offline": 0,
+                  "items": [
+                    {
+                      "stationId": "00000000-0000-4000-8000-000000000000",
+                      "name": "",
+                      "type": "VISUAL_ACUITY",
+                      "order": 1,
+                      "operationalStatus": "AVAILABLE",
+                      "staffed": true,
+                      "queue": {
+                        "waiting": 0,
+                        "active": 0
+                      }
+                    }
+                  ]
+                },
+                "staffing": {
+                  "shiftId": "00000000-0000-4000-8000-000000000000",
+                  "shiftName": "",
+                  "startsAt": "2026-08-07T00:00:00.000Z",
+                  "endsAt": "2026-08-07T00:00:00.000Z",
+                  "required": 0,
+                  "assigned": 0,
+                  "unfilled": 0,
+                  "unstaffedStations": 0
+                },
+                "referrals": {
+                  "actionRequired": 0
+                },
+                "sync": {
+                  "pending": 0,
+                  "issues": 0
+                },
+                "attention": {
+                  "severity": "critical",
+                  "reasons": [
+                    {
+                      "code": "STATIONS_OFFLINE",
+                      "label": "",
+                      "count": 1,
+                      "severity": "critical"
+                    }
+                  ]
+                }
+              }
+            ],
+            "truncated": true
+          }
+      - name: 401 Response
+        originalRequest:
+          method: GET
+          header: []
+          url: '{{baseUrl}}/operations'
+        status: Unauthorized
+        code: 401
+        header:
+          - key: Content-Type
+            value: application/json
+        body: |-
+          {
+            "type": "",
+            "title": "",
+            "status": 0,
+            "code": "",
+            "requestId": "00000000-0000-4000-8000-000000000000",
+            "errors": [
+              {
+                "field": "",
+                "message": ""
+              }
+            ]
+          }
+      - name: 403 Response
+        originalRequest:
+          method: GET
+          header: []
+          url: '{{baseUrl}}/operations'
         status: Forbidden
         code: 403
         header:
@@ -10355,6 +10549,21 @@ item:
                 "stationName": "",
                 "stationType": "VISUAL_ACUITY",
                 "stationOrder": 1,
+                "fieldSchemaSnapshot": [
+                  {
+                    "key": "",
+                    "label": "",
+                    "type": "text",
+                    "required": true,
+                    "options": [
+                      ""
+                    ],
+                    "min": 0,
+                    "max": 0,
+                    "unit": "",
+                    "eyes": "OD"
+                  }
+                ],
                 "result": {
                   "resultId": "00000000-0000-4000-8000-000000000000",
                   "stationId": "00000000-0000-4000-8000-000000000000",
@@ -16476,8 +16685,10 @@ item:
               }
             ]
           }
-  - name: Verify a QR token for an event
-    description: ''
+  - name: Verify a journey QR and assign its current queue station
+    description: >-
+      Validates the participant's single event-journey QR. A repeated scanId is replayed without creating another queue
+      entry. If no active queue exists, the backend assigns the least-loaded eligible staffed station.
     event: []
     request:
       method: POST
@@ -16505,7 +16716,8 @@ item:
         raw: |-
           {
             "token": "",
-            "eventId": "00000000-0000-4000-8000-000000000000"
+            "eventId": "00000000-0000-4000-8000-000000000000",
+            "scanId": "00000000-0000-4000-8000-000000000000"
           }
         options:
           raw:

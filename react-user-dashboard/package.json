@@ -15,7 +15,7 @@
     "test:qr": "node --test src/components/qr/QRCodePage.test.mjs",
     "test:shell": "node --test src/components/AppShell.navigation.test.mjs",
     "test:stage4": "vitest run src/components/LandingPage.test.tsx src/auth/CognitoRoutes.test.tsx src/features/stage4Api.test.ts src/features/Stage4Pages.behavior.test.tsx src/App.routing.test.tsx src/pages/StationLibraryPage.test.tsx",
-    "test:offline": "vitest run src/features/screening/offlineSync.test.ts src/features/screening/screeningApi.offline.test.ts src/features/screening/RouteProgressionNotice.test.ts src/features/screening/EyeHealthStationPage.test.tsx",
+    "test:offline": "vitest run src/features/screening/offlineSync.test.ts src/features/screening/screeningApi.offline.test.ts src/features/screening/RouteProgressionNotice.test.ts src/features/screening/EyeHealthStationPage.test.tsx src/features/screening/fieldSchema.compatibility.test.ts",
     "preview": "vite preview"
   },
   "dependencies": {

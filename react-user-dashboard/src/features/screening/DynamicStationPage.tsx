@@ -3,14 +3,17 @@ import { useParams, useSearchParams } from 'react-router-dom';
 import { getApiError as getApiMessage } from '../../utils/apiClient';
 import { getStoredSession } from '../../utils/session';
 import type { DynamicFieldValues } from './fieldSchema';
-import { validateFieldValues } from './fieldSchema';
+import { defaultValuesForSchema, resolveCompatibleFieldSchema, validateFieldValues } from './fieldSchema';
 import { getOfflineStationContext, isNetworkError } from './offlineSync';
-import { screeningApi, newIdempotencyKey, type FlagEvaluation, type QueueRegistration, type Station } from './screeningApi';
+import { screeningApi, newIdempotencyKey, type FlagEvaluation, type QueueRegistration, type Station, type StationType } from './screeningApi';
 import { StationFieldRenderer } from './StationFieldRenderer';
 import { FlagBanner, ParticipantLookup, RouteProgressionNotice, StationPageFrame } from './StationShared';
+import { STATION_LABEL } from './stationConfig';
 
-export default function DynamicStationPage() {
-  const { eventId = '', stationId = '' } = useParams();
+const SCHEMA_DRIVEN_TYPES = new Set<StationType>(['CUSTOM', 'VISUAL_ACUITY', 'REFRACTION', 'COLOUR_VISION']);
+
+export default function DynamicStationPage({ stationType }: { stationType?: StationType } = {}) {
+  const { eventId = '', stationId: routeStationId = '' } = useParams();
   const [searchParams] = useSearchParams();
   const [eventName, setEventName] = useState('');
   const [station, setStation] = useState<Station | null>(null);
@@ -28,7 +31,11 @@ export default function DynamicStationPage() {
   const participantRequestGeneration = useRef(0);
 
   const selected = useMemo(() => queue.find((row) => row.registrationId === selectedId) || null, [queue, selectedId]);
-  const fieldSchema = station?.fieldSchemaSnapshot ?? [];
+  const resolvedType = station?.stationType || stationType || 'CUSTOM';
+  const fieldSchema = useMemo(
+    () => resolveCompatibleFieldSchema(resolvedType, station?.fieldSchemaSnapshot) ?? [],
+    [resolvedType, station?.fieldSchemaSnapshot],
+  );
 
   const selectParticipant = (registrationId: string) => {
     if (registrationId === selectedId) return;
@@ -36,22 +43,50 @@ export default function DynamicStationPage() {
     setSelectedId(registrationId);
   };
 
+  const pickStation = (stations: Station[]) => {
+    if (routeStationId) {
+      return stations.find((item) => (
+        item.stationId === routeStationId
+        && SCHEMA_DRIVEN_TYPES.has(item.stationType)
+      )) || null;
+    }
+    if (stationType) {
+      return stations.find((item) => item.stationType === stationType && item.isActive) || null;
+    }
+    return null;
+  };
+
   const load = async () => {
-    if (!eventId || !stationId) return;
+    if (!eventId) return;
     setError(null);
     try {
       const payload = await screeningApi.listStations(eventId);
-      const selectedStation = payload.stations.find((item) => item.stationId === stationId && item.stationType === 'CUSTOM');
-      if (!selectedStation) throw new Error('This custom station is not assigned to your active shift.');
-      const queuePayload = await screeningApi.listQueue(eventId, stationId);
+      const selectedStation = pickStation(payload.stations);
+      if (!selectedStation) {
+        throw new Error(stationType
+          ? `This ${STATION_LABEL[stationType] || 'station'} is not assigned to your active shift.`
+          : 'This station is not assigned to your active shift.');
+      }
+      const compatibleSchema = resolveCompatibleFieldSchema(
+        selectedStation.stationType,
+        selectedStation.fieldSchemaSnapshot,
+      );
+      if (!compatibleSchema?.length) {
+        throw new Error('This station does not have a field schema snapshot.');
+      }
+      const compatibleStation = { ...selectedStation, fieldSchemaSnapshot: compatibleSchema };
+      const queuePayload = await screeningApi.listQueue(eventId, compatibleStation.stationId);
       setEventName(payload.event.name);
-      setStation(selectedStation);
+      setStation(compatibleStation);
       setQueue(queuePayload.registrations);
       if (!selectedId && queuePayload.registrations[0]) selectParticipant(queuePayload.registrations[0].registrationId);
     } catch (cause) {
       if (isNetworkError(cause)) {
         const ownerId = getStoredSession()?.user.id;
-        const offline = ownerId ? await getOfflineStationContext(ownerId, eventId, 'CUSTOM', stationId) : null;
+        const offlineType = stationType || 'CUSTOM';
+        const offline = ownerId
+          ? await getOfflineStationContext(ownerId, eventId, offlineType, routeStationId || undefined)
+          : null;
         if (offline) {
           setEventName(offline.eventName);
           setStation(offline.station);
@@ -60,19 +95,19 @@ export default function DynamicStationPage() {
           return;
         }
       }
-      setError(getApiMessage(cause, 'Could not load this custom station.'));
+      setError(getApiMessage(cause, 'Could not load this station.'));
     }
   };
 
-  useEffect(() => { void load(); }, [eventId, stationId]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { void load(); }, [eventId, routeStationId, stationType]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
-    setValues({});
+    setValues(defaultValuesForSchema(fieldSchema));
     setFieldErrors({});
     setEvaluation(null);
     setAcknowledged(false);
     setError(null);
     setSuccess(null);
-  }, [selectedId]);
+  }, [selectedId, station?.stationId, station?.schemaVersion, fieldSchema]);
 
   const updateValue = (key: string, value: unknown) => {
     setValues((current) => ({ ...current, [key]: value }));
@@ -87,6 +122,17 @@ export default function DynamicStationPage() {
 
   const validate = () => {
     const next = validateFieldValues(fieldSchema, values);
+    if (resolvedType === 'REFRACTION' && values.measurementStatus === 'COMPLETED') {
+      if (!values.od) next.od = 'Right eye refraction is required.';
+      if (!values.os) next.os = 'Left eye refraction is required.';
+    }
+    if (
+      resolvedType === 'REFRACTION'
+      && values.measurementStatus !== 'COMPLETED'
+      && (!values.notes || String(values.notes).trim().length < 3)
+    ) {
+      next.notes = 'Add notes when measurement is incomplete.';
+    }
     setFieldErrors(next);
     if (Object.keys(next).length) setError('Complete the required station fields.');
     return Object.keys(next).length === 0;
@@ -98,7 +144,7 @@ export default function DynamicStationPage() {
     setError(null);
     const generation = participantRequestGeneration.current;
     try {
-      const next = await screeningApi.previewDynamic(eventId, station.stationId, values);
+      const next = await screeningApi.previewDynamic(eventId, station.stationId, values, resolvedType);
       if (generation !== participantRequestGeneration.current) return null;
       setEvaluation(next);
       if (!next.isFlagged) setAcknowledged(false);
@@ -147,7 +193,7 @@ export default function DynamicStationPage() {
 
   return <StationPageFrame
     eventId={eventId}
-    title={station?.stationName || 'Custom station'}
+    title={station?.stationName || STATION_LABEL[resolvedType] || 'Station'}
     eyebrow={`Dynamic station${station?.schemaVersion ? ` · Schema v${station.schemaVersion}` : ''}`}
     description="Record the configured screening fields and save the result."
     eventName={eventName}
@@ -163,7 +209,7 @@ export default function DynamicStationPage() {
       <h2>{station?.stationName || 'Station assessment'}</h2>
       {!fieldSchema.length ? <p className="form-error" role="alert">This station does not have a field schema.</p> : <StationFieldRenderer fieldSchema={fieldSchema} values={values} onChange={updateValue} errors={fieldErrors} disabled={pending} />}
       <div className="va-flag-actions"><button type="button" className="secondary" disabled={!selected || !fieldSchema.length || previewPending} onClick={() => void runPreview()}>{previewPending ? 'Evaluating…' : 'Check result'}</button></div>
-      {evaluation && <FlagBanner evaluation={evaluation} acknowledged={acknowledged} onAcknowledgedChange={setAcknowledged} stationLabel={station?.stationName || 'custom station'} />}
+      {evaluation && <FlagBanner evaluation={evaluation} acknowledged={acknowledged} onAcknowledgedChange={setAcknowledged} stationLabel={station?.stationName || 'station'} />}
       <button className="primary" type="submit" disabled={!selected || !fieldSchema.length || pending || previewPending || (evaluation?.isFlagged && !acknowledged)}>{pending ? 'Saving…' : 'Save station result'}</button>
     </form>
   </StationPageFrame>;

@@ -4,10 +4,9 @@ const screeningService = require("./screeningService");
 const { createAuditLog } = require("../../utils/logging/audit");
 
 const HANDLERS = {
-  VISUAL_ACUITY: "saveVisualAcuity",
-  REFRACTION: "saveRefraction",
-  COLOUR_VISION: "saveColourVision",
-  EYE_HEALTH: "saveEyeHealth",
+  VISUAL_ACUITY: "saveDynamic",
+  REFRACTION: "saveDynamic",
+  COLOUR_VISION: "saveDynamic",
   CUSTOM: "saveDynamic",
 };
 
