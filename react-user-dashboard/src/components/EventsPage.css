@@ -643,6 +643,8 @@ html[data-theme="light"] .events-workspace {
 .events-workspace .station-day-screeners-heading { display:flex; align-items:center; justify-content:space-between; gap:10px; }
 .events-workspace .station-day-screeners-heading>span { display:flex; align-items:center; gap:6px; color:var(--ink); font-size:12px; font-weight:700; }
 .events-workspace .station-day-screeners-heading svg,.events-workspace .station-add-person>svg { width:17px; height:17px; }
+.events-workspace .station-shift-empty { display:flex; align-items:center; justify-content:space-between; gap:12px; }
+.events-workspace .station-shift-empty .compact { flex:none; }
 .events-workspace .station-shift-screeners { display:grid; grid-template-columns:minmax(150px,.8fr) minmax(220px,1.4fr) minmax(170px,.8fr); align-items:center; gap:10px; }
 .events-workspace .station-shift-label { color:var(--ink-2); font-size:11px; }
 .events-workspace .station-person-tags { display:flex; flex-wrap:wrap; gap:6px; }

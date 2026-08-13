@@ -137,6 +137,7 @@ export default function EventDetailPage() {
   const [stationTemplatesLoaded, setStationTemplatesLoaded] = useState(false);
   const [stationTemplatesError, setStationTemplatesError] = useState('');
   const [stationPending, setStationPending] = useState('');
+  const [shiftPending, setShiftPending] = useState('');
   const [capacityErrors, setCapacityErrors] = useState<Record<string, string>>({});
   const [auditLoading, setAuditLoading] = useState(false);
   const [auditError, setAuditError] = useState('');
@@ -380,6 +381,24 @@ export default function EventDetailPage() {
     finally { setStationPending(''); }
   };
 
+  const addDayShift = async (date: string, startsAt: string, endsAt: string) => {
+    if (!event) return;
+    setShiftPending(date); setError('');
+    try {
+      const shifts = [...event.shifts.map((shift) => ({
+        shiftId: shift.shiftId,
+        name: shift.name,
+        startsAt: shift.startsAt,
+        endsAt: shift.endsAt,
+        requiredStaff: shift.requiredStaff,
+      })), { name: 'Screening shift', startsAt, endsAt, requiredStaff: 1 }];
+      setEvent(await eventApi.update(event.eventId, { version: event.version, shifts }));
+      setNotice('Shift added. You can now assign screeners.');
+      void refreshAudit(event.eventId);
+    } catch (cause) { setError(getApiMessage(cause, 'The shift could not be added.')); }
+    finally { setShiftPending(''); }
+  };
+
   const saveStationCapacity = (submitEvent: FormEvent<HTMLFormElement>, eventStationId: string) => {
     submitEvent.preventDefault();
     const input = submitEvent.currentTarget.elements.namedItem('capacity');
@@ -597,7 +616,7 @@ export default function EventDetailPage() {
                     {availability.isAvailable && (startsLateBy > 0 || endsEarlyBy > 0) && <div className="station-hours-warning" role="status"><ClockIcon />{startsLateBy > 0 && <span>Starts {scheduleOffset(startsLateBy)} after the event opens.</span>}{endsEarlyBy > 0 && <span>Closes {scheduleOffset(endsEarlyBy)} before the event ends.</span>}</div>}
                     {availability.isAvailable && <div className="station-day-screeners">
                       <div className="station-day-screeners-heading"><span><UserGroupIcon />Screeners</span>{!screenersLoaded && !screenersLoading && <button className="secondary compact" type="button" onClick={() => void loadEventScreeners()}><UserPlusIcon />Add person</button>}</div>
-                      {screenersLoading ? <small>Loading event screeners…</small> : screenersError ? <div className="station-screeners-error" role="alert"><small>{screenersError}</small><button className="secondary compact" type="button" onClick={() => void loadEventScreeners()}>Retry</button></div> : dayShifts.length === 0 ? <small>No shift is scheduled for this day. Add a shift before assigning screeners.</small> : dayShifts.map((shift) => {
+                      {screenersLoading ? <small>Loading event screeners…</small> : screenersError ? <div className="station-screeners-error" role="alert"><small>{screenersError}</small><button className="secondary compact" type="button" onClick={() => void loadEventScreeners()}>Retry</button></div> : dayShifts.length === 0 ? <div className="station-shift-empty"><small>No shift is scheduled for this day.</small><button className="secondary compact" type="button" disabled={!!shiftPending} onClick={() => void addDayShift(availability.eventDay.date, availability.startsAt || toInstant(availability.eventDay.date, formatTimeInput(event.startsAt, event.timezone)), availability.endsAt || toInstant(availability.eventDay.date, formatTimeInput(event.endsAt, event.timezone)))}><PlusIcon />{shiftPending === availability.eventDay.date ? 'Adding…' : 'Add shift'}</button></div> : dayShifts.map((shift) => {
                         const assigned = shift.staffAssignments.filter((assignment) => assignment.assignmentRole === 'SCREENER' && assignment.eventStation?.eventStationId === station.eventStationId);
                         const assignedIds = new Set(assigned.map((assignment) => assignment.user.userId));
                         const candidates = eventScreeners.filter((membership) => !assignedIds.has(membership.userId));
