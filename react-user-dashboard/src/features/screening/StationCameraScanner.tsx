@@ -217,7 +217,7 @@ export function StationCameraScanner({
           )}
         </div>
         <form className="station-scanner-manual" onSubmit={(event) => void submitManual(event)}>
-          <label htmlFor={`${scannerId}-manual`}>QR URL or token</label>
+          <label htmlFor={`${scannerId}-manual`}>QR value or registration UUID</label>
           <div><input id={`${scannerId}-manual`} data-dialog-autofocus value={manualValue} onChange={(event) => setManualValue(event.target.value)} autoComplete="off" spellCheck="false" placeholder="Paste, type, or scan with a physical reader" /><button className="secondary" type="submit" disabled={resolving || !manualValue.trim()}>Load</button></div>
         </form>
         <p className="station-scanner-hint">

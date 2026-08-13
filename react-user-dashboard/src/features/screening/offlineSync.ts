@@ -94,6 +94,14 @@ export type OfflineStationContext = {
   queue: QueueRegistration[];
 };
 
+export type OfflineRegistrationResolution = {
+  registrationId: string;
+  participantDisplayName: string;
+  queueNumber: number | null;
+  status: string;
+  activeStation: Pick<Station, 'stationId' | 'stationName' | 'stationType'>;
+};
+
 export type OfflineSyncResult = OfflineSyncStatus & {
   synced: number;
   expired: boolean;
@@ -344,6 +352,29 @@ export async function getOfflineStationContext(
   };
 }
 
+export async function resolveOfflineRegistration(
+  ownerId: string,
+  eventId: string,
+  registrationId: string,
+): Promise<OfflineRegistrationResolution | null> {
+  const snapshot = await loadSnapshot(ownerId, eventId);
+  if (!snapshot) return null;
+  for (const station of snapshot.stations) {
+    const registration = snapshot.queues[station.stationId]?.find((row) => row.registrationId === registrationId);
+    if (registration) {
+      return {
+        ...registration,
+        activeStation: {
+          stationId: station.stationId,
+          stationName: station.stationName,
+          stationType: station.stationType,
+        },
+      };
+    }
+  }
+  return null;
+}
+
 export function isNetworkError(error: unknown) {
   if (typeof error !== 'object' || error === null) return false;
   const candidate = error as { response?: unknown; code?: string; message?: string };
@@ -489,6 +520,14 @@ export async function getOfflineSyncStatus(ownerId: string, eventId: string): Pr
     conflicts: records.filter((record) => record.kind === 'mutation' && record.status === 'conflict').length,
     expiresAt: snapshot?.expiresAt ?? null,
   };
+}
+
+export async function discardOfflineConflicts(ownerId: string, eventId: string): Promise<OfflineSyncStatus> {
+  await deleteRecords((await recordsForEvent(ownerId, eventId)).filter(
+    (record) => record.kind === 'mutation' && record.status === 'conflict',
+  ));
+  notifyOfflineChange();
+  return getOfflineSyncStatus(ownerId, eventId);
 }
 
 function isScopeExpiredError(error: unknown) {
