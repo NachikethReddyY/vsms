@@ -511,9 +511,9 @@ test("event responses project operational staff to only their own planned or act
     ],
     stations: [ownAssignment.station, otherAssignment.station],
     memberships: [
-      { userId: manager.userId, roles: [{ role: "EVENT_MANAGER" }] },
-      { userId: staffId, roles: [{ role: "SUPPORT" }] },
-      { userId: otherStaffId, roles: [{ role: "EVENT_MANAGER" }] },
+      { userId: manager.userId, user: { fullName: "Admin" }, roles: [{ role: "EVENT_MANAGER" }] },
+      { userId: staffId, user: { fullName: "Support Person" }, roles: [{ role: "SUPPORT" }] },
+      { userId: otherStaffId, user: { fullName: "Other Person" }, roles: [{ role: "EVENT_MANAGER" }] },
     ],
   };
   current.shifts[0].staffAssignments = [otherAssignment];
@@ -544,6 +544,7 @@ test("event responses project operational staff to only their own planned or act
     accessState: "ENABLED",
   });
   assert.equal(supportResult.canManage, false);
+  assert.deepEqual(supportResult.eventTeam, ["Admin", "Support Person", "Other Person"]);
   assert.equal(supportResult.shifts.length, 1);
   assert.deepEqual(supportResult.shifts[0].staffAssignments.map(({ user }) => user.userId), [staffId]);
   assert.equal(supportResult.shifts[0].staffAssignments[0].notes, "Report to the north entrance");

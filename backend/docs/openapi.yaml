@@ -2927,10 +2927,11 @@ components:
         user:
           type: object
           additionalProperties: false
-          required: [userId, username]
+          required: [userId, username, fullName]
           properties:
             userId: { type: string, format: uuid }
             username: { type: string }
+            fullName: { type: string }
     ShiftAssignmentInput:
       type: object
       additionalProperties: false

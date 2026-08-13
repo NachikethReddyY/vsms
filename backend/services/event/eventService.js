@@ -197,6 +197,7 @@ const rosterOwner = (value) => value ? {
 const assignmentUser = (value) => value ? {
   userId: value.id,
   username: value.username || value.fullName || "Staff member",
+  fullName: value.fullName || "Staff member",
 } : null;
 
 const loadStationTemplates = async (db = prisma) => {
@@ -359,7 +360,7 @@ const toEventResponse = async (event, user, db = prisma, options = {}) => {
     activeCapacityCount: registrations.length,
     _count: { eventRegistrations: registrationCount },
     canManage: managerView,
-    eventTeam: managerView ? (event.memberships || []).map(({ user }) => user?.fullName || user?.username).filter(Boolean) : [],
+    eventTeam: (event.memberships || []).map(({ user }) => user?.fullName || user?.username).filter(Boolean),
   };
   if (managerView) {
     response.createdBy = publicUser(event.createdBy);

@@ -1,7 +1,7 @@
 ﻿const prisma = require("../../prisma/prismaClient");
 const AppError = require("../../errors/AppError");
 const { createAuditLog } = require("../../utils/logging/audit");
-const { assertRoleEligibility, requireEventManager, actorId } = require("./eventAuthorizationService");
+const { assertRoleEligibility, requireEventManager, requireEventRoles, actorId } = require("./eventAuthorizationService");
 const { enqueueAccountLifecycle } = require("../account/accountLifecycleNotificationService");
 
 const EVENT_ROLES = ["EVENT_MANAGER", "REGISTRATION", "SCREENER", "REVIEWER", "SUPPORT"];
@@ -84,7 +84,7 @@ const beginMembershipMutation = async (tx, eventId, user) => {
 };
 
 const listMemberships = async (eventId, user, db = prisma) => {
-  await requireEventManager(eventId, user, { db });
+  await requireEventRoles(eventId, user, EVENT_ROLES, { db, allowAdministrator: true });
   const memberships = await db.eventMembership.findMany({
     where: { eventId },
     include: memberInclude,

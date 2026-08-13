@@ -21,3 +21,8 @@ test('event managers receive a global Operations Center navigation entry', () =>
 test('unassigned staff see the events workspace empty state', () => {
   assert.match(eventsPage, /No events assigned/);
 });
+
+test('assigned staff avatars are visible to non-manager event members', () => {
+  assert.doesNotMatch(eventsPage, /event\.canManage\s*\?\s*\[\.\.\.new Set\(event\.eventTeam/);
+  assert.match(eventsPage, /className=\{`events-team/);
+});

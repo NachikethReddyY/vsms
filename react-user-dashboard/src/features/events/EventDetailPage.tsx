@@ -26,12 +26,13 @@ import { appDialog } from '../../components/appDialogStyles';
 import { AppToast } from '../../components/AppToast';
 import { getApiError as getApiMessage } from '../../utils/apiClient';
 import { getDisplayName } from '../../utils/identity';
-import { eventApi, formatEventDate, STATUS_LABEL, type AuditRecord, type EventAttendee, type EventMetrics, type EventRecord, type EventStatus, type StaffAssignmentRole, type StaffDirectoryEntry, type StationTemplate } from './eventApi';
+import { eventApi, formatEventDate, STATUS_LABEL, type AuditRecord, type EventAttendee, type EventMembership, type EventMetrics, type EventRecord, type EventStatus, type StaffAssignmentRole, type StaffDirectoryEntry, type StationTemplate } from './eventApi';
 import { EVENT_BANNERS, getEventArtwork, type EventBannerKey } from './eventBanners';
 import { managementPercent } from './eventReport';
 import { customStationPath } from '../screening/stationConfig';
 
 type AssignmentDraft = { userId: string; assignmentRole: StaffAssignmentRole; eventStationId: string };
+type ShiftDraft = { name: string; startsAt: string; endsAt: string };
 const emptyAssignment: AssignmentDraft = { userId: '', assignmentRole: 'SUPPORT', eventStationId: '' };
 const assignmentRoles: StaffAssignmentRole[] = ['EVENT_MANAGER', 'REGISTRATION', 'SCREENER', 'REVIEWER', 'SUPPORT'];
 const applicationRoleByAssignment: Record<StaffAssignmentRole, StaffDirectoryEntry['roles'][number]> = {
@@ -80,6 +81,14 @@ function formatTimeInput(value: string, timezone: string) {
   return `${parts.find(({ type }) => type === 'hour')?.value}:${parts.find(({ type }) => type === 'minute')?.value}`;
 }
 
+function dateKey(value: string, timezone: string) {
+  const parts = new Intl.DateTimeFormat('en', {
+    year: 'numeric', month: '2-digit', day: '2-digit', timeZone: timezone,
+  }).formatToParts(new Date(value));
+  const part = (type: string) => parts.find((item) => item.type === type)?.value;
+  return `${part('year')}-${part('month')}-${part('day')}`;
+}
+
 function eventDuration(startsAt: string, endsAt: string) {
   const minutes = Math.max(0, Math.round((new Date(endsAt).getTime() - new Date(startsAt).getTime()) / 60_000));
   const hours = Math.floor(minutes / 60);
@@ -112,6 +121,10 @@ export default function EventDetailPage() {
   const [artworkFile, setArtworkFile] = useState('');
   const [selectedBannerKey, setSelectedBannerKey] = useState<EventBannerKey>('COMMUNITY_SCREENING');
   const [staffDirectory, setStaffDirectory] = useState<StaffDirectoryEntry[]>([]);
+  const [eventScreeners, setEventScreeners] = useState<EventMembership[]>([]);
+  const [screenersLoading, setScreenersLoading] = useState(false);
+  const [screenersLoaded, setScreenersLoaded] = useState(false);
+  const [screenersError, setScreenersError] = useState('');
   const [staffingOpen, setStaffingOpen] = useState<string | null>(null);
   const [staffingPending, setStaffingPending] = useState(false);
   const [directoryLoading, setDirectoryLoading] = useState(false);
@@ -125,6 +138,10 @@ export default function EventDetailPage() {
   const [stationTemplatesLoaded, setStationTemplatesLoaded] = useState(false);
   const [stationTemplatesError, setStationTemplatesError] = useState('');
   const [stationPending, setStationPending] = useState('');
+  const [shiftPending, setShiftPending] = useState('');
+  const [shiftDrafts, setShiftDrafts] = useState<Record<string, ShiftDraft>>({});
+  const [newShiftDay, setNewShiftDay] = useState('');
+  const [newShiftDrafts, setNewShiftDrafts] = useState<Record<string, ShiftDraft>>({});
   const [capacityErrors, setCapacityErrors] = useState<Record<string, string>>({});
   const [auditLoading, setAuditLoading] = useState(false);
   const [auditError, setAuditError] = useState('');
@@ -232,6 +249,27 @@ export default function EventDetailPage() {
     try { setStaffDirectory(await eventApi.staffDirectory()); setDirectoryLoaded(true); }
     catch (cause) { setDirectoryError(getApiMessage(cause, 'Staff could not be loaded.')); setDirectoryLoaded(false); }
     finally { setDirectoryLoading(false); }
+  };
+
+  const loadEventScreeners = async () => {
+    setScreenersLoading(true); setScreenersError('');
+    try {
+      const memberships = await eventApi.memberships(eventId);
+      setEventScreeners(memberships.filter((membership) => membership.status === 'ACTIVE' && membership.roles.some(({ role }) => role === 'SCREENER')));
+      setScreenersLoaded(true);
+    } catch (cause) { setScreenersError(getApiMessage(cause, 'Event screeners could not be loaded.')); setScreenersLoaded(false); }
+    finally { setScreenersLoading(false); }
+  };
+
+  const assignStationScreener = async (shiftId: string, eventStationId: string, userId: string) => {
+    if (!event || !userId) return;
+    setStaffingPending(true); setError('');
+    try {
+      setEvent(await eventApi.assignStaff(event.eventId, shiftId, { version: event.version, userId, assignmentRole: 'SCREENER', eventStationId }));
+      setNotice('Screener assigned to this station.');
+      void refreshAudit(event.eventId);
+    } catch (cause) { setError(getApiMessage(cause, 'The screener could not be assigned.')); }
+    finally { setStaffingPending(false); }
   };
 
   const openStaffing = async (shiftId: string) => {
@@ -347,6 +385,78 @@ export default function EventDetailPage() {
     finally { setStationPending(''); }
   };
 
+  const openShiftComposer = (key: string, startsAt: string, endsAt: string) => {
+    setNewShiftDrafts((current) => ({ ...current, [key]: current[key] ?? {
+      name: '',
+      startsAt: formatTimeInput(startsAt, event?.timezone || 'Asia/Singapore'),
+      endsAt: formatTimeInput(endsAt, event?.timezone || 'Asia/Singapore'),
+    } }));
+    setNewShiftDay(key);
+  };
+
+  const addDayShift = async (key: string, date: string) => {
+    if (!event) return;
+    const draft = newShiftDrafts[key];
+    if (!draft?.name.trim() || draft.endsAt <= draft.startsAt) return;
+    setShiftPending(date); setError('');
+    try {
+      const shifts = [...event.shifts.map((shift) => ({
+        shiftId: shift.shiftId,
+        name: shift.name,
+        startsAt: shift.startsAt,
+        endsAt: shift.endsAt,
+        requiredStaff: shift.requiredStaff,
+      })), { name: draft.name.trim(), startsAt: toInstant(date, draft.startsAt), endsAt: toInstant(date, draft.endsAt), requiredStaff: 1 }];
+      setEvent(await eventApi.update(event.eventId, { version: event.version, shifts }));
+      setNewShiftDay('');
+      setNewShiftDrafts((current) => { const next = { ...current }; delete next[key]; return next; });
+      setNotice('Shift added. You can now assign screeners.');
+      void refreshAudit(event.eventId);
+    } catch (cause) { setError(getApiMessage(cause, 'The shift could not be added.')); }
+    finally { setShiftPending(''); }
+  };
+
+  const saveShift = async (shiftId: string) => {
+    if (!event) return;
+    const current = event.shifts.find((shift) => shift.shiftId === shiftId);
+    if (!current) return;
+    const draft = shiftDrafts[shiftId] ?? { name: current.name, startsAt: formatTimeInput(current.startsAt, event.timezone), endsAt: formatTimeInput(current.endsAt, event.timezone) };
+    const date = dateKey(current.startsAt, event.timezone);
+    setShiftPending(shiftId); setError('');
+    try {
+      const shifts = event.shifts.map((shift) => shift.shiftId === shiftId ? {
+        shiftId,
+        name: draft.name.trim(),
+        startsAt: toInstant(date, draft.startsAt),
+        endsAt: toInstant(date, draft.endsAt),
+        requiredStaff: shift.requiredStaff,
+      } : { shiftId: shift.shiftId, name: shift.name, startsAt: shift.startsAt, endsAt: shift.endsAt, requiredStaff: shift.requiredStaff });
+      setEvent(await eventApi.update(event.eventId, { version: event.version, shifts }));
+      setShiftDrafts((currentDrafts) => { const next = { ...currentDrafts }; delete next[shiftId]; return next; });
+      setNotice('Shift updated.');
+      void refreshAudit(event.eventId);
+    } catch (cause) { setError(getApiMessage(cause, 'The shift could not be updated.')); }
+    finally { setShiftPending(''); }
+  };
+
+  const deleteShift = async (shiftId: string, name: string) => {
+    if (!event || !window.confirm(`Delete ${name}? Its staff assignments will also be removed.`)) return;
+    setShiftPending(shiftId); setError('');
+    try {
+      const shifts = event.shifts.filter((shift) => shift.shiftId !== shiftId).map((shift) => ({
+        shiftId: shift.shiftId,
+        name: shift.name,
+        startsAt: shift.startsAt,
+        endsAt: shift.endsAt,
+        requiredStaff: shift.requiredStaff,
+      }));
+      setEvent(await eventApi.update(event.eventId, { version: event.version, shifts }));
+      setNotice('Shift deleted.');
+      void refreshAudit(event.eventId);
+    } catch (cause) { setError(getApiMessage(cause, 'The shift could not be deleted.')); }
+    finally { setShiftPending(''); }
+  };
+
   const saveStationCapacity = (submitEvent: FormEvent<HTMLFormElement>, eventStationId: string) => {
     submitEvent.preventDefault();
     const input = submitEvent.currentTarget.elements.namedItem('capacity');
@@ -458,16 +568,18 @@ export default function EventDetailPage() {
       </div>
     </section>
 
-    {canManage && <nav className="event-detail-tabs" aria-label="Event sections">
+    <nav className="event-detail-tabs" aria-label="Event sections">
       <Link className={view === 'overview' ? 'active' : undefined} to={eventPath}>Overview</Link>
-      <Link className={view === 'stations' ? 'active' : undefined} to={`${eventPath}/stations`}>Stations</Link>
       <Link className={view === 'staff' ? 'active' : undefined} to={`${eventPath}/staff`}>Staff</Link>
+      {canManage && <>
+      <Link className={view === 'stations' ? 'active' : undefined} to={`${eventPath}/stations`}>Stations</Link>
       <Link className={view === 'analytics' ? 'active' : undefined} to={`${eventPath}/analytics`}>Analytics</Link>
       <Link className={view === 'reports' ? 'active' : undefined} to={`${eventPath}/reports`}>Reports</Link>
       <Link className={view === 'attendees' ? 'active' : undefined} to={`${eventPath}/attendees`}>Attendees</Link>
       <Link className={view === 'activity' ? 'active' : undefined} to={`${eventPath}/activity`}>Activity</Link>
       {canPermanentlyDelete && <Link className="danger-link" to={`${eventPath}/delete`}>Delete event</Link>}
-    </nav>}
+      </>}
+    </nav>
 
     <AppToast message={notice} onDismiss={() => setNotice('')} />
     {error && <div className="alert error" role="alert">{error}</div>}
@@ -544,25 +656,41 @@ export default function EventDetailPage() {
               <div className="station-record-copy"><strong>{station.name}</strong><span>{station.description || 'No station instructions.'}</span><small>Template v{station.templateVersion}</small></div>
               {canConfigureStations ? <div className="station-stacked-controls">
                 <form className="station-capacity" noValidate onSubmit={(submitEvent) => saveStationCapacity(submitEvent, station.eventStationId)}>
-                  <label><span>Capacity for all days</span><input key={`${station.eventStationId}-${station.capacity}`} name="capacity" type="number" min="1" max="1000" step="1" required defaultValue={station.capacity} aria-label={`${station.name} capacity for every day`} aria-invalid={!!capacityErrors[station.eventStationId]} aria-describedby={capacityErrors[station.eventStationId] ? `capacity-error-${station.eventStationId}` : undefined} onInput={() => setCapacityErrors((current) => ({ ...current, [station.eventStationId]: '' }))} />{capacityErrors[station.eventStationId] && <span className="field-error" id={`capacity-error-${station.eventStationId}`} role="alert">{capacityErrors[station.eventStationId]}</span>}</label>
-                  <button className="secondary compact" type="submit" disabled={!!stationPending}>{stationPending === station.eventStationId ? 'Applying…' : 'Apply to all days'}</button>
-                  <small>One capacity for every available day. Changes save immediately.</small>
+                  <div><strong>Default capacity</strong><small>Apply one participant limit to every available day.</small></div>
+                  <label><span>People per day</span><input key={`${station.eventStationId}-${station.capacity}`} name="capacity" type="number" min="1" max="1000" step="1" required defaultValue={station.capacity} aria-label={`${station.name} capacity for every day`} aria-invalid={!!capacityErrors[station.eventStationId]} aria-describedby={capacityErrors[station.eventStationId] ? `capacity-error-${station.eventStationId}` : undefined} onInput={() => setCapacityErrors((current) => ({ ...current, [station.eventStationId]: '' }))} />{capacityErrors[station.eventStationId] && <span className="field-error" id={`capacity-error-${station.eventStationId}`} role="alert">{capacityErrors[station.eventStationId]}</span>}</label>
+                  <button className="secondary compact" type="submit" disabled={!!stationPending}>{stationPending === station.eventStationId ? 'Applying…' : 'Apply'}</button>
                 </form>
                 <form className="station-schedule" onSubmit={(submitEvent) => saveStationSchedule(submitEvent, station.eventStationId)}>
                   {availabilities.map((availability, index) => {
                     const scheduledDay = event.eventDays.find((day) => day.date === availability.eventDay.date);
                     const startsLateBy = availability.startsAt && scheduledDay ? new Date(availability.startsAt).getTime() - new Date(scheduledDay.startsAt).getTime() : 0;
                     const endsEarlyBy = availability.endsAt && scheduledDay ? new Date(scheduledDay.endsAt).getTime() - new Date(availability.endsAt).getTime() : 0;
+                    const dayShifts = event.shifts.filter((shift) => dateKey(shift.startsAt, event.timezone) === dateKey(availability.eventDay.date, event.timezone));
+                    const shiftComposerKey = `${station.eventStationId}:${availability.eventDay.date}`;
                     return <fieldset key={`${availability.eventStationAvailabilityId}-${availability.capacity}-${availability.startsAt}-${availability.endsAt}`}>
                     <legend>{formatEventDate(availability.eventDay.date, event.timezone, false)}</legend>
-                    <label className="station-available"><input name={`available-${index}`} type="checkbox" defaultChecked={availability.isAvailable} /> Available</label>
-                    <label><span>From</span><input name={`starts-${index}`} type="time" defaultValue={availability.startsAt ? formatTimeInput(availability.startsAt, event.timezone) : ''} /></label>
-                    <label><span>Until</span><input name={`ends-${index}`} type="time" defaultValue={availability.endsAt ? formatTimeInput(availability.endsAt, event.timezone) : ''} /></label>
+                    <div className="station-day-availability"><span>Station hours</span><label className="station-available"><input name={`available-${index}`} type="checkbox" defaultChecked={availability.isAvailable} />Open this day</label></div>
+                    <div className="station-day-hours"><label><span>Opens</span><input name={`starts-${index}`} type="time" defaultValue={availability.startsAt ? formatTimeInput(availability.startsAt, event.timezone) : ''} /></label><span aria-hidden="true">–</span><label><span>Closes</span><input name={`ends-${index}`} type="time" defaultValue={availability.endsAt ? formatTimeInput(availability.endsAt, event.timezone) : ''} /></label></div>
                     {availability.isAvailable && (startsLateBy > 0 || endsEarlyBy > 0) && <div className="station-hours-warning" role="status"><ClockIcon />{startsLateBy > 0 && <span>Starts {scheduleOffset(startsLateBy)} after the event opens.</span>}{endsEarlyBy > 0 && <span>Closes {scheduleOffset(endsEarlyBy)} before the event ends.</span>}</div>}
+                    {availability.isAvailable && <div className="station-day-screeners">
+                      <div className="station-day-screeners-heading"><span><UserGroupIcon />Shifts &amp; screeners <small>{dayShifts.length ? `${dayShifts.length} ${dayShifts.length === 1 ? 'shift' : 'shifts'}` : 'No shift yet'}</small></span><span className="station-staffing-actions"><button className="secondary compact" type="button" onClick={() => openShiftComposer(shiftComposerKey, availability.startsAt || toInstant(availability.eventDay.date, formatTimeInput(event.startsAt, event.timezone)), availability.endsAt || toInstant(availability.eventDay.date, formatTimeInput(event.endsAt, event.timezone)))}><PlusIcon />Add shift</button>{dayShifts.length > 0 && !screenersLoaded && !screenersLoading && <button className="secondary compact" type="button" onClick={() => void loadEventScreeners()}><UserPlusIcon />Assign screener</button>}</span></div>
+                      {newShiftDay === shiftComposerKey && (() => { const draft = newShiftDrafts[shiftComposerKey]; return draft && <div className="station-new-shift"><div><strong>New staffing shift</strong><small>Name the block and set its working hours before assigning screeners.</small></div><label><span>Shift name</span><input autoFocus value={draft.name} maxLength={100} placeholder="Morning screening" onChange={(change) => setNewShiftDrafts((current) => ({ ...current, [shiftComposerKey]: { ...draft, name: change.target.value } }))} /></label><label><span>Starts</span><input type="time" value={draft.startsAt} onChange={(change) => setNewShiftDrafts((current) => ({ ...current, [shiftComposerKey]: { ...draft, startsAt: change.target.value } }))} /></label><label><span>Ends</span><input type="time" value={draft.endsAt} onChange={(change) => setNewShiftDrafts((current) => ({ ...current, [shiftComposerKey]: { ...draft, endsAt: change.target.value } }))} /></label><span><button className="secondary compact" type="button" onClick={() => setNewShiftDay('')}>Cancel</button><button className="primary compact" type="button" disabled={shiftPending === availability.eventDay.date || !draft.name.trim() || draft.endsAt <= draft.startsAt} onClick={() => void addDayShift(shiftComposerKey, availability.eventDay.date)}>{shiftPending === availability.eventDay.date ? 'Adding…' : 'Create shift'}</button></span></div>; })()}
+                      {screenersLoading ? <small>Loading event screeners…</small> : screenersError ? <div className="station-screeners-error" role="alert"><small>{screenersError}</small><button className="secondary compact" type="button" onClick={() => void loadEventScreeners()}>Retry</button></div> : dayShifts.length === 0 ? <div className="station-shift-empty"><span><strong>No staffing shifts yet</strong><small>Station hours show availability. Add one or more shifts to schedule people within that window.</small></span></div> : dayShifts.map((shift) => {
+                        const assigned = shift.staffAssignments.filter((assignment) => assignment.assignmentRole === 'SCREENER' && assignment.eventStation?.eventStationId === station.eventStationId);
+                        const assignedIds = new Set(assigned.map((assignment) => assignment.user.userId));
+                        const candidates = eventScreeners.filter((membership) => !assignedIds.has(membership.userId));
+                        const draft = shiftDrafts[shift.shiftId] ?? { name: shift.name, startsAt: formatTimeInput(shift.startsAt, event.timezone), endsAt: formatTimeInput(shift.endsAt, event.timezone) };
+                        const updateDraft = (patch: Partial<ShiftDraft>) => setShiftDrafts((current) => ({ ...current, [shift.shiftId]: { ...draft, ...patch } }));
+                        return <div className="station-shift-screeners" key={shift.shiftId}>
+                          <div className="station-shift-editor"><label><span>Shift name</span><input value={draft.name} maxLength={100} onChange={(change) => updateDraft({ name: change.target.value })} /></label><div><label><span>Starts</span><input type="time" value={draft.startsAt} onChange={(change) => updateDraft({ startsAt: change.target.value })} /></label><label><span>Ends</span><input type="time" value={draft.endsAt} onChange={(change) => updateDraft({ endsAt: change.target.value })} /></label></div><span className="station-shift-actions"><button className="icon-button danger" type="button" disabled={shiftPending === shift.shiftId} aria-label={`Delete ${shift.name}`} title={`Delete ${shift.name}`} onClick={() => void deleteShift(shift.shiftId, shift.name)}><TrashIcon /></button><button className="secondary compact" type="button" disabled={shiftPending === shift.shiftId || !draft.name.trim() || draft.endsAt <= draft.startsAt} onClick={() => void saveShift(shift.shiftId)}>{shiftPending === shift.shiftId ? 'Saving…' : 'Save shift'}</button></span></div>
+                          <div className="station-person-tags">{assigned.map((assignment) => <span className="station-person-tag" key={assignment.staffAssignmentId}>{assignment.user.fullName}<button type="button" aria-label={`Remove ${assignment.user.fullName} from ${station.name} on ${formatEventDate(availability.eventDay.date, event.timezone, false)}`} disabled={staffingPending} onClick={() => void removeStaff(shift.shiftId, assignment.staffAssignmentId)}><XMarkIcon /></button></span>)}{assigned.length === 0 && <small>No screener assigned.</small>}</div>
+                          {screenersLoaded && <label className="station-add-person"><UserPlusIcon /><span className="visually-hidden">Add screener to {station.name} for {shift.name}</span><select value="" disabled={staffingPending || candidates.length === 0} onChange={(change) => { const userId = change.target.value; change.currentTarget.value = ''; if (userId) void assignStationScreener(shift.shiftId, station.eventStationId, userId); }}><option value="">{candidates.length ? 'Add person…' : 'No screeners available'}</option>{candidates.map((membership) => <option value={membership.userId} key={membership.membershipId}>{membership.user.fullName}</option>)}</select></label>}
+                        </div>;
+                      })}
+                    </div>}
                   </fieldset>})}
-                  <button className="primary compact" type="submit" disabled={!!stationPending}>{stationPending === station.eventStationId ? 'Saving…' : 'Save daily schedule'}</button>
+                  <div className="station-actions"><button className="secondary compact station-remove" type="button" disabled={!!stationPending} onClick={() => void removeStation(station.eventStationId, station.name)}><TrashIcon />Remove station</button><button className="primary compact" type="submit" disabled={!!stationPending}>{stationPending === station.eventStationId ? 'Saving…' : 'Save station schedule'}</button></div>
                 </form>
-                <button className="secondary compact station-remove" type="button" disabled={!!stationPending} onClick={() => void removeStation(station.eventStationId, station.name)}><TrashIcon />Remove station</button>
               </div> : <div className="station-day-list">{availabilities.map((availability) => <span className={availability.isAvailable ? 'is-available' : 'is-unavailable'} key={availability.eventStationAvailabilityId}>{formatEventDate(availability.eventDay.date, event.timezone, false)} · {availability.isAvailable ? `${availability.capacity} places` : 'Unavailable'}</span>)}</div>}
             </article>;
           })}</div>}
@@ -576,7 +704,7 @@ export default function EventDetailPage() {
           const eligibleStaff = staffDirectory.filter((person) => person.roles.includes(applicationRoleByAssignment[draft.assignmentRole]));
           return <article className="shift-record" key={shift.shiftId}>
             <div className="shift-record-summary"><span><strong>{shift.name}</strong><small>{STATUS_LABEL[shift.status as keyof typeof STATUS_LABEL] ?? shift.status.toLowerCase()}</small></span><span><small>Schedule</small>{formatTime(shift.startsAt, event.timezone)}–{formatTime(shift.endsAt, event.timezone)}</span><span><small>Coverage</small>{shift.staffAssignments.length} of {shift.requiredStaff} assigned</span>{canEditStaffing && <button className="secondary compact" type="button" aria-expanded={staffingOpen === shift.shiftId} onClick={() => void openStaffing(shift.shiftId)}><PlusIcon />Assign</button>}</div>
-            {shift.staffAssignments.length > 0 ? <ul className="assignment-list">{shift.staffAssignments.map((assignment) => <li key={assignment.staffAssignmentId}><span><strong>{getDisplayName(assignment.user.username)}</strong><small>{roleLabel(assignment.assignmentRole)}{assignment.eventStation ? ` · ${assignment.eventStation.name}` : ''}</small></span>{canEditStaffing && <button className="assignment-remove" type="button" aria-label={`Remove ${getDisplayName(assignment.user.username)} from ${shift.name}`} title={`Remove ${getDisplayName(assignment.user.username)}`} onClick={() => void removeStaff(shift.shiftId, assignment.staffAssignmentId)} disabled={staffingPending}><TrashIcon /></button>}</li>)}</ul> : <p className="shift-empty">No staff assigned to this shift.</p>}
+            {shift.staffAssignments.length > 0 ? <ul className="assignment-list">{shift.staffAssignments.map((assignment) => <li key={assignment.staffAssignmentId}><span><strong>{assignment.user.fullName}</strong><small>{roleLabel(assignment.assignmentRole)}{assignment.eventStation ? ` · ${assignment.eventStation.name}` : ''}</small></span>{canEditStaffing && <button className="assignment-remove" type="button" aria-label={`Remove ${assignment.user.fullName} from ${shift.name}`} title={`Remove ${assignment.user.fullName}`} onClick={() => void removeStaff(shift.shiftId, assignment.staffAssignmentId)} disabled={staffingPending}><TrashIcon /></button>}</li>)}</ul> : <p className="shift-empty">No staff assigned to this shift.</p>}
             {canEditStaffing && staffingOpen === shift.shiftId && <form className="staffing-editor" onSubmit={(submitEvent) => { submitEvent.preventDefault(); void assignStaff(shift.shiftId); }}>
               {directoryLoading ? <p>Loading available staff…</p> : directoryError ? <div className="inline-retry" role="alert"><p>{directoryError}</p><button className="secondary compact" type="button" onClick={() => void loadStaffDirectory()}>Retry</button></div> : directoryLoaded && staffDirectory.length === 0 ? <p>No active staff members are available.</p> : <>
                 <label><span>Shift role</span><select value={draft.assignmentRole} disabled={staffingPending} onChange={(change) => { updateAssignmentDraft(shift.shiftId, { assignmentRole: change.target.value as StaffAssignmentRole, eventStationId: '' }); setSelectedStaffIds((current) => ({ ...current, [shift.shiftId]: [] })); }}>{assignmentRoles.map((role) => <option value={role} key={role}>{roleLabel(role)}</option>)}</select></label>
