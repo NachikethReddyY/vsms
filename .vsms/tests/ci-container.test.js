@@ -6,6 +6,7 @@ const test = require("node:test");
 const root = path.resolve(__dirname, "../..");
 const dockerfile = fs.readFileSync(path.join(root, ".vsms/Dockerfile.ci"), "utf8");
 const dockerignore = fs.readFileSync(path.join(root, ".dockerignore"), "utf8");
+const collectionCheck = fs.readFileSync(path.join(root, "scripts/check-api-collection.cjs"), "utf8");
 
 test("the local CI image uses the pinned package manager and frozen lockfiles", () => {
   assert.match(dockerfile, /FROM node:24-bookworm-slim/);
@@ -17,4 +18,9 @@ test("the CI build context excludes credentials, dependencies, dumps, and genera
   for (const entry of [".git", "**/node_modules", "**/*.dump", "backend/certs", "secure-data"]) {
     assert.match(dockerignore, new RegExp(`^${entry.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}$`, "m"));
   }
+});
+
+test("generated API parity is stable across Windows and Linux line endings", () => {
+  assert.match(collectionCheck, /normalizeLineEndings/);
+  assert.match(collectionCheck, /replace\(\/\\r\\n\/g, '\\n'\)/);
 });
