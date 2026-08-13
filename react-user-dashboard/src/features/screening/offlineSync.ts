@@ -249,7 +249,7 @@ function toOfflineStation(station: Station): OfflineStation | null {
   };
 }
 
-function toOfflineQueue(rows: QueueRegistration[]): OfflineQueueRegistration[] {
+function toOfflineQueue(rows: OfflineQueueRegistration[]): OfflineQueueRegistration[] {
   return rows.map((row) => ({
     registrationId: row.registrationId,
     participantDisplayName: row.participantDisplayName,
