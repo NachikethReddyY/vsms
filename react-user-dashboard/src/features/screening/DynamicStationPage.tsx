@@ -172,7 +172,7 @@ export default function DynamicStationPage({ stationType }: { stationType?: Stat
         idempotencyKey: newIdempotencyKey(),
         acknowledged: preview.isFlagged ? acknowledged : false,
         resultData: values,
-      }, resolvedType);
+      });
       if (generation !== participantRequestGeneration.current) return;
       setSuccess(saved.syncState === 'PENDING_SYNC'
         ? 'Pending sync. The participant has not entered the next queue.'

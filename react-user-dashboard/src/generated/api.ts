@@ -2470,7 +2470,7 @@ export interface components {
             key: string;
             label: string;
             /** @enum {string} */
-            type: "text" | "number" | "select" | "boolean" | "eye-pair";
+            type: "text" | "number" | "select" | "boolean" | "eye-pair" | "va-eye" | "refraction-eye";
             required?: boolean;
             options?: string[];
             min?: number;

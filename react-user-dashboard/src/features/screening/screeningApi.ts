@@ -266,7 +266,7 @@ export const screeningApi = {
     return previewStation(eventId, stationId, 'dynamic', resultData, stationType);
   },
 
-  saveDynamic(eventId: string, stationId: string, body: ScreeningSavePayload<DynamicResultData>, _stationType?: StationType) {
+  saveDynamic(eventId: string, stationId: string, body: ScreeningSavePayload<DynamicResultData>) {
     return saveStation(eventId, stationId, 'dynamic', body);
   },
 };
