@@ -28,9 +28,10 @@ const assertForbiddenEventKeysAbsent = (value) => {
   }
 };
 
-test("station template reads preserve missing schemas without writing", async (t) => {
+test("station template library falls back to system schemas without writing", async (t) => {
   const originalFindMany = prisma.stationTemplate.findMany;
   const originalUpdate = prisma.stationTemplate.update;
+  const { SYSTEM_FIELD_SCHEMAS } = require("../../schemas/dynamicStationSchema");
   const template = {
     stationTemplateId: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
     templateKey: "VISUAL_ACUITY",
@@ -44,7 +45,13 @@ test("station template reads preserve missing schemas without writing", async (t
   };
   let writes = 0;
   prisma.stationTemplate.findMany = async () => [template];
-  prisma.stationTemplate.update = async () => { writes += 1; return template; };
+  prisma.stationTemplate.update = async () => {
+    writes += 1;
+    return {
+      ...template,
+      fieldSchema: SYSTEM_FIELD_SCHEMAS.VISUAL_ACUITY,
+    };
+  };
   t.after(() => {
     prisma.stationTemplate.findMany = originalFindMany;
     prisma.stationTemplate.update = originalUpdate;
@@ -55,7 +62,7 @@ test("station template reads preserve missing schemas without writing", async (t
 
   assert.equal(writes, 0);
   assert.equal(catalog.fieldSchema, null);
-  assert.equal(library.fieldSchema, null);
+  assert.deepEqual(library.fieldSchema, SYSTEM_FIELD_SCHEMAS.VISUAL_ACUITY);
 });
 
 test("station template mutations generate opaque keys and audit atomically", async () => {
@@ -113,8 +120,8 @@ test("station template mutations generate opaque keys and audit atomically", asy
   assert.ok(audits.every((audit) => audit.userId === manager.userId && audit.requestId === context.requestId));
 });
 
-test("clinical station templates reject editable fieldSchema payloads", async () => {
-  const db = { $transaction: async () => { throw new Error("transaction must not run"); } };
+test("clinical station templates reject invalid create schemas but allow fieldSchema updates", async () => {
+  const createDb = { $transaction: async () => { throw new Error("transaction must not run"); } };
   const context = { requestId: crypto.randomUUID(), ipAddress: "127.0.0.1", deviceName: "Test" };
   await assert.rejects(
     () => eventService.createStationTemplate({
@@ -122,11 +129,45 @@ test("clinical station templates reject editable fieldSchema payloads", async ()
       name: "Edited VA form",
       defaultCapacity: 2,
       active: true,
-      fieldSchema: [{ key: "hacked", label: "Hacked", type: "text", required: true }],
-    }, manager, context, db),
-    (error) => error.code === "FIELD_SCHEMA_NOT_EDITABLE",
+      fieldSchema: [{ key: "1bad", label: "Hacked", type: "text", required: true }],
+    }, manager, context, createDb),
+    (error) => error.code === "INVALID_FIELD_SCHEMA",
   );
 
+  await assert.rejects(
+    () => eventService.updateStationTemplate(
+      "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+      { fieldSchema: [{ key: "notes", label: "Notes", type: "text", required: false }] },
+      manager,
+      context,
+      {
+        $transaction: async (callback) => callback({
+          stationTemplate: {
+            findUnique: async () => ({
+              stationTemplateId: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+              templateKey: "opaque-existing-key",
+              stationType: "VISUAL_ACUITY",
+              version: 1,
+              name: "Visual acuity booth",
+              description: null,
+              defaultCapacity: 4,
+              active: true,
+              fieldSchema: null,
+            }),
+            update: async () => { throw new Error("update must not run"); },
+          },
+          auditLog: { create: async () => ({}) },
+        }),
+      },
+    ),
+    (error) => error.code === "INVALID_FIELD_SCHEMA",
+  );
+
+  const { SYSTEM_FIELD_SCHEMAS } = require("../../schemas/dynamicStationSchema");
+  let savedSchema = null;
+  const relabeled = SYSTEM_FIELD_SCHEMAS.VISUAL_ACUITY.map((field) => (
+    field.key === "od" ? { ...field, label: "OD acuity reading" } : field
+  ));
   const transactionClient = {
     stationTemplate: {
       findUnique: async () => ({
@@ -140,20 +181,65 @@ test("clinical station templates reject editable fieldSchema payloads", async ()
         active: true,
         fieldSchema: null,
       }),
-      update: async () => { throw new Error("update must not run"); },
+      update: async ({ data }) => {
+        savedSchema = data.fieldSchema;
+        return {
+          stationTemplateId: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+          templateKey: "opaque-existing-key",
+          stationType: "VISUAL_ACUITY",
+          version: 2,
+          name: "Visual acuity booth",
+          description: null,
+          defaultCapacity: 4,
+          active: true,
+          fieldSchema: data.fieldSchema,
+        };
+      },
     },
     auditLog: { create: async () => ({}) },
   };
-  await assert.rejects(
-    () => eventService.updateStationTemplate(
-      "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
-      { fieldSchema: [{ key: "hacked", label: "Hacked", type: "text", required: true }] },
-      manager,
-      context,
-      { $transaction: async (callback) => callback(transactionClient) },
-    ),
-    (error) => error.code === "FIELD_SCHEMA_NOT_EDITABLE",
+  const updated = await eventService.updateStationTemplate(
+    "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+    { fieldSchema: relabeled },
+    manager,
+    context,
+    { $transaction: async (callback) => callback(transactionClient) },
   );
+  assert.equal(updated.version, 2);
+  assert.equal(savedSchema.find((field) => field.key === "od").label, "OD acuity reading");
+});
+
+test("registration, clinical review, and eye health catalog templates cannot be updated", async () => {
+  const context = { requestId: crypto.randomUUID(), ipAddress: "127.0.0.1", deviceName: "Test" };
+  for (const templateKey of ["CLINICAL_REVIEW", "REGISTRATION", "EYE_HEALTH"]) {
+    const transactionClient = {
+      stationTemplate: {
+        findUnique: async () => ({
+          stationTemplateId: "60000000-0000-4000-8000-000000000004",
+          templateKey,
+          stationType: templateKey === "EYE_HEALTH" ? "EYE_HEALTH" : null,
+          version: 1,
+          name: templateKey === "REGISTRATION" ? "Registration" : templateKey === "EYE_HEALTH" ? "Eye health" : "Clinical review",
+          description: null,
+          defaultCapacity: 2,
+          active: true,
+          fieldSchema: null,
+        }),
+        update: async () => { throw new Error("update must not run"); },
+      },
+      auditLog: { create: async () => ({}) },
+    };
+    await assert.rejects(
+      () => eventService.updateStationTemplate(
+        "60000000-0000-4000-8000-000000000004",
+        { name: "Edited workflow" },
+        manager,
+        context,
+        { $transaction: async (callback) => callback(transactionClient) },
+      ),
+      (error) => error.code === "STATION_TEMPLATE_NOT_EDITABLE",
+    );
+  }
 });
 
 const eventRecord = (status = "DRAFT", version = 1, assignments = [], registrations = []) => ({
@@ -206,6 +292,51 @@ function installTransaction(t, current, updated, overrides = {}) {
     prisma.$transaction = originalTransaction;
   });
 }
+
+test("live events reject station and shift plan updates", async (t) => {
+  const current = eventRecord("IN_PROGRESS", 3);
+  const originalFindFirst = prisma.event.findFirst;
+  const originalTransaction = prisma.$transaction;
+  let transactionCalls = 0;
+  prisma.event.findFirst = async () => current;
+  prisma.$transaction = async () => {
+    transactionCalls += 1;
+    throw new Error("transaction must not run for locked live plan fields");
+  };
+  t.after(() => {
+    prisma.event.findFirst = originalFindFirst;
+    prisma.$transaction = originalTransaction;
+  });
+
+  await assert.rejects(
+    () => eventService.updateEvent(eventId, {
+      version: 3,
+      shifts: [{
+        shiftId,
+        name: "Live coverage",
+        startsAt: startsAt.toISOString(),
+        endsAt: endsAt.toISOString(),
+        requiredStaff: 2,
+        assignments: [],
+      }],
+    }, manager, crypto.randomUUID()),
+    (error) => error.code === "EVENT_NOT_EDITABLE" && error.status === 409,
+  );
+  await assert.rejects(
+    () => eventService.updateEvent(eventId, {
+      version: 3,
+      stations: [{
+        stationTemplateId: crypto.randomUUID(),
+        stationOrder: 1,
+        capacity: 4,
+        isAvailable: true,
+        availabilities: [],
+      }],
+    }, manager, crypto.randomUUID()),
+    (error) => error.code === "EVENT_NOT_EDITABLE" && error.status === 409,
+  );
+  assert.equal(transactionCalls, 0);
+});
 
 test("staff assignment saves an active user and preserves manager permissions", async (t) => {
   const current = eventRecord();

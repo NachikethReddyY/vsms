@@ -18,7 +18,7 @@ import { useEffect, useMemo, useRef, useState, type ChangeEvent, type FormEvent 
 import Cropper, { type Area } from 'react-easy-crop';
 import { Link, useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { z } from 'zod';
-import { getApiError as getApiMessage } from '../../utils/apiClient';
+import { getApiError as getApiMessage, getApiErrorCode } from '../../utils/apiClient';
 import { getDisplayName } from '../../utils/identity';
 import {
   eventApi,
@@ -636,14 +636,35 @@ export default function EventFormPage({ mode }: { mode: 'create' | 'edit' }) {
     };
     setSaving(true);
     try {
+      const liveStatuses = new Set(['IN_PROGRESS', 'ONGOING']);
+      const isLiveEdit = mode === 'edit' && liveStatuses.has(existing?.status || '');
+      // Live events lock stations/shifts so assignment lifecycle state cannot be wiped.
+      const liveUpdate = isLiveEdit
+        ? {
+          version: existing!.version,
+          description: payload.description,
+          bannerKey: payload.bannerKey,
+          artworkDataUrl: payload.artworkDataUrl,
+          capacity: payload.capacity,
+        }
+        : { ...payload, version: existing!.version };
       const saved = mode === 'create'
         ? await eventApi.create(payload, createIdempotencyKey.current)
-        : await eventApi.update(eventId!, { ...payload, version: existing!.version });
+        : await eventApi.update(eventId!, liveUpdate);
       navigate(`/events/${saved.eventId}`, { state: { notice: isDuplicate ? 'Draft event duplicated.' : mode === 'create' ? 'Draft event created.' : 'Event plan updated.' } });
     } catch (error) {
-      const isConflict = (error as { response?: { status?: number } }).response?.status === 409;
-      setConflict(isConflict);
-      setFormError(getApiMessage(error, isConflict ? 'This event changed in another session.' : 'The event could not be saved.'));
+      const code = getApiErrorCode(error);
+      const isStale = code === 'STALE_EVENT_VERSION';
+      const isStateLock = code === 'EVENT_NOT_EDITABLE';
+      setConflict(isStale);
+      setFormError(getApiMessage(
+        error,
+        isStale
+          ? 'This event changed in another session.'
+          : isStateLock
+            ? 'This event is live. Only capacity, description, and artwork can be changed until it completes.'
+            : 'The event could not be saved.',
+      ));
       window.scrollTo({ top: 0, behavior: 'smooth' });
     } finally {
       setSaving(false);
@@ -667,6 +688,11 @@ export default function EventFormPage({ mode }: { mode: 'create' | 'edit' }) {
   return (
     <div className="page-frame event-form-page">
       {formError && <div className="alert error" role="alert"><span><strong>{conflict ? 'Version conflict. ' : ''}</strong>{formError}</span>{conflict && <button onClick={() => window.location.reload()}>Load latest version</button>}</div>}
+      {mode === 'edit' && existing && ['IN_PROGRESS', 'ONGOING'].includes(existing.status) && (
+        <div className="alert" role="status">
+          <span>This event is live. Stations, shifts, and staff assignments stay locked so duty state is preserved. You can still update capacity, description, and artwork.</span>
+        </div>
+      )}
       <form id="event-form" className="event-create-form event-wizard" onSubmit={submit} noValidate data-astryx-theme="neutral">
         <Toolbar
           className="event-form-toolbar"

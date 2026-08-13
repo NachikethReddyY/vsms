@@ -5,9 +5,9 @@ const { createAuditLog } = require("../../utils/logging/audit");
 const { AUDIT_ACTIONS } = require("../../utils/logging/auditEvents");
 
 const HANDLERS = {
-  VISUAL_ACUITY: "saveVisualAcuity",
-  REFRACTION: "saveRefraction",
-  COLOUR_VISION: "saveColourVision",
+  VISUAL_ACUITY: "saveDynamic",
+  REFRACTION: "saveDynamic",
+  COLOUR_VISION: "saveDynamic",
   CUSTOM: "saveDynamic",
 };
 

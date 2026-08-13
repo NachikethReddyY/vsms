@@ -1,6 +1,11 @@
 import apiClient from '../../utils/apiClient';
 import { getStoredSession } from '../../utils/session';
-import { evaluateOfflineStation, isNetworkError, queueOfflineStationSave } from './offlineSync';
+import {
+  evaluateOfflineStation,
+  isNetworkError,
+  queueOfflineStationSave,
+  resolveOfflineRegistration,
+} from './offlineSync';
 import type { DynamicFieldValues, FieldSchema } from './fieldSchema';
 
 export type StationType = 'VISUAL_ACUITY' | 'REFRACTION' | 'COLOUR_VISION' | 'EYE_HEALTH' | 'CUSTOM';
@@ -164,6 +169,7 @@ async function previewStation<T extends StationResultData>(
   stationId: string,
   path: ScreeningPath,
   resultData: T,
+  stationType?: StationType,
 ) {
   try {
     const { data } = await apiClient.post<FlagEvaluation>(
@@ -174,7 +180,11 @@ async function previewStation<T extends StationResultData>(
   } catch (error) {
     if (!isNetworkError(error)) throw error;
     if (path === 'eye-health') throw error;
-    return evaluateOfflineStation(path, resultData as VisualAcuityResultData | RefractionResultData | ColourVisionResultData | DynamicResultData);
+    return evaluateOfflineStation(
+      path,
+      resultData as VisualAcuityResultData | RefractionResultData | ColourVisionResultData | DynamicResultData,
+      stationType,
+    );
   }
 }
 
@@ -232,14 +242,22 @@ export const screeningApi = {
   },
 
   async resolve(eventId: string, params: { passToken?: string; qrToken?: string; registrationId?: string }) {
-    const { data } = await apiClient.get<{
-      registrationId: string;
-      participantDisplayName: string;
-      queueNumber: number | null;
-      status: string;
-    }>(`/events/${eventId}/registrations/resolve`, { params });
-    const { data: queue } = await apiClient.get<{ activeEntry: { station: { stationId: string; stationName: string; stationType: string } } | null }>(`/queues/events/${eventId}/participants/${data.registrationId}`);
-    return { ...data, activeStation: queue.activeEntry?.station ?? null };
+    try {
+      const { data } = await apiClient.get<{
+        registrationId: string;
+        participantDisplayName: string;
+        queueNumber: number | null;
+        status: string;
+      }>(`/events/${eventId}/registrations/resolve`, { params });
+      const { data: queue } = await apiClient.get<{ activeEntry: { station: { stationId: string; stationName: string; stationType: string } } | null }>(`/queues/events/${eventId}/participants/${data.registrationId}`);
+      return { ...data, activeStation: queue.activeEntry?.station ?? null };
+    } catch (error) {
+      const ownerId = getStoredSession()?.user.id;
+      if (!isNetworkError(error) || !ownerId || !params.registrationId) throw error;
+      const registration = await resolveOfflineRegistration(ownerId, eventId, params.registrationId);
+      if (!registration) throw new Error('That registration is not in the current offline station download.');
+      return registration;
+    }
   },
 
   async getPassDisplay(eventId: string, registrationId: string) {
@@ -286,8 +304,8 @@ export const screeningApi = {
     return saveStation(eventId, stationId, 'eye-health', body);
   },
 
-  previewDynamic(eventId: string, stationId: string, resultData: DynamicResultData) {
-    return previewStation(eventId, stationId, 'dynamic', resultData);
+  previewDynamic(eventId: string, stationId: string, resultData: DynamicResultData, stationType?: StationType) {
+    return previewStation(eventId, stationId, 'dynamic', resultData, stationType);
   },
 
   saveDynamic(eventId: string, stationId: string, body: ScreeningSavePayload<DynamicResultData>) {

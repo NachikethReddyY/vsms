@@ -13,11 +13,8 @@ import PublicEventPage from "./features/events/PublicEventPage";
 import ReviewWorkspacePage from "./features/reviews/ReviewWorkspacePage";
 import ReportsPage from "./features/reports/ReportsPage";
 import OperationsCenterPage from "./features/operations/OperationsCenterPage";
-import ColourVisionStationPage from "./features/screening/ColourVisionStationPage";
 import DynamicStationPage from "./features/screening/DynamicStationPage";
 import QRScannerPage from "./features/screening/QRScannerPage";
-import RefractionStationPage from "./features/screening/RefractionStationPage";
-import VisualAcuityStationPage from "./features/screening/VisualAcuityStationPage";
 import { AuditLogsPage as RegistrationAuditLogsPage } from "./pages/AdminPages";
 import {
   AccountStatePage,
@@ -34,6 +31,7 @@ import {
 } from "./features/Stage4Pages";
 import AccountSecurityPage from "./pages/AccountSecurityPage";
 import StationLibraryPage from "./pages/StationLibraryPage";
+import StationTemplateFormPage from "./pages/StationTemplateFormPage";
 import { QueuePage } from "./pages/QueuePages"; // Imported the QueuePage component
 import EventRegistrationPage from "./pages/participant/EventRegistrationPage";
 import ParticipantCheckInPage from "./pages/participant/ParticipantCheckInPage";
@@ -134,13 +132,13 @@ export default function App() {
 
           <Route element={<EventCapabilityGuard allowedRoles={screenerRoles} />}>
             <Route element={<StationDutyGuard stationType="VISUAL_ACUITY" />}>
-              <Route path="/events/:eventId/stations/visual-acuity" element={<VisualAcuityStationPage />} />
+              <Route path="/events/:eventId/stations/visual-acuity" element={<DynamicStationPage stationType="VISUAL_ACUITY" />} />
             </Route>
             <Route element={<StationDutyGuard stationType="REFRACTION" />}>
-              <Route path="/events/:eventId/stations/refraction" element={<RefractionStationPage />} />
+              <Route path="/events/:eventId/stations/refraction" element={<DynamicStationPage stationType="REFRACTION" />} />
             </Route>
             <Route element={<StationDutyGuard stationType="COLOUR_VISION" />}>
-              <Route path="/events/:eventId/stations/colour-vision" element={<ColourVisionStationPage />} />
+              <Route path="/events/:eventId/stations/colour-vision" element={<DynamicStationPage stationType="COLOUR_VISION" />} />
             </Route>
             <Route path="/events/:eventId/stations/eye-health" element={<EyeHealthStationRedirect />} />
             <Route element={<StationDutyGuard stationType="CUSTOM" />}>
@@ -193,6 +191,8 @@ export default function App() {
           <Route element={<RoleGuard allowedRoles={adminRoles} />}>
             <Route path="/staff" element={<StaffAdministrationPage />} />
             <Route path="/admin/station-templates" element={<StationLibraryPage />} />
+            <Route path="/admin/station-templates/new" element={<StationTemplateFormPage mode="create" />} />
+            <Route path="/admin/station-templates/:stationTemplateId/edit" element={<StationTemplateFormPage mode="edit" />} />
             <Route path="/events/new" element={<EventFormPage mode="create" />} />
             <Route path="/events/:eventId/delete" element={<EventDeletionPage />} />
             <Route path="/admin/audit-logs" element={<RegistrationAuditLogsPage />} />
