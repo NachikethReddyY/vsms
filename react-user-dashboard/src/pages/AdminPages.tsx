@@ -128,7 +128,7 @@ export function AuditLogsPage() {
         className={`inline-block rounded px-2 py-0.5 text-xs font-semibold tracking-wide uppercase ${
           isSuccess
             ? "bg-emerald-100 text-emerald-800 border border-emerald-200"
-            : "bg-red-100 text-red-800 border border-red-200"
+            : "bg-[color-mix(in_srgb,var(--red)_10%,var(--surface))] text-[var(--red)] border border-[color-mix(in_srgb,var(--red)_35%,var(--hairline))]"
         }`}
       >
         {outcome}
@@ -138,42 +138,42 @@ export function AuditLogsPage() {
 
   const renderFilters = () => (
     <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-      <label className="block text-xs font-medium text-slate-600">
+      <label className="block text-xs font-medium text-[var(--ink-2)]">
         Entity name
         <input
           type="text"
           value={filters.entityName}
           onChange={(event) => setFilters({ ...filters, entityName: event.target.value })}
           placeholder="e.g. Event, QRCodePass"
-          className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none"
+          className="mt-1 w-full rounded-lg border border-[var(--hairline-strong)] bg-[var(--surface)] px-3 py-2 text-sm text-[var(--ink)] focus:border-[var(--accent)] focus:outline-none"
         />
       </label>
-      <label className="block text-xs font-medium text-slate-600">
+      <label className="block text-xs font-medium text-[var(--ink-2)]">
         Action
         <input
           type="text"
           value={filters.action}
           onChange={(event) => setFilters({ ...filters, action: event.target.value })}
           placeholder="e.g. QUEUE_JOINED"
-          className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none"
+          className="mt-1 w-full rounded-lg border border-[var(--hairline-strong)] bg-[var(--surface)] px-3 py-2 text-sm text-[var(--ink)] focus:border-[var(--accent)] focus:outline-none"
         />
       </label>
-      <label className="block text-xs font-medium text-slate-600">
+      <label className="block text-xs font-medium text-[var(--ink-2)]">
         Event type
         <input
           type="text"
           value={filters.eventType}
           onChange={(event) => setFilters({ ...filters, eventType: event.target.value })}
           placeholder="e.g. LOGIN_SUCCESS"
-          className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none"
+          className="mt-1 w-full rounded-lg border border-[var(--hairline-strong)] bg-[var(--surface)] px-3 py-2 text-sm text-[var(--ink)] focus:border-[var(--accent)] focus:outline-none"
         />
       </label>
-      <label className="block text-xs font-medium text-slate-600">
+      <label className="block text-xs font-medium text-[var(--ink-2)]">
         Outcome
         <select
           value={filters.outcome}
           onChange={(event) => setFilters({ ...filters, outcome: event.target.value })}
-          className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none"
+          className="mt-1 w-full rounded-lg border border-[var(--hairline-strong)] bg-[var(--surface)] px-3 py-2 text-sm text-[var(--ink)] focus:border-[var(--accent)] focus:outline-none"
         >
           <option value="">All outcomes</option>
           {OUTCOME_OPTIONS.map((option) => (
@@ -190,11 +190,11 @@ export function AuditLogsPage() {
   if (isRestricted) {
     return (
         <div className="page-frame narrow audit-hub flex min-h-[60vh] items-center justify-center p-4">
-          <div className="w-full max-w-md rounded-2xl border border-red-500/30 bg-red-950/10 p-8 text-center shadow-lg">
-            <h2 className="text-sm font-semibold uppercase tracking-wider text-red-500">
+          <div className="w-full max-w-md rounded-2xl border border-[color-mix(in_srgb,var(--red)_35%,var(--hairline))] bg-[color-mix(in_srgb,var(--red)_8%,var(--surface))] p-8 text-center">
+            <h2 className="text-sm font-semibold uppercase tracking-wider text-[var(--red)]">
               RESTRICTED
             </h2>
-            <p className="mt-2 text-sm text-slate-300 leading-relaxed">
+            <p className="mt-2 text-sm leading-relaxed text-[var(--ink-2)]">
               Audit logs are visible to Administrator accounts only.
               <br />
               Contact your event administrator if you need access.
@@ -207,7 +207,7 @@ export function AuditLogsPage() {
   // 2. Generic Error View
   if (error) {
     return (
-        <div className="page-frame narrow audit-hub p-6 text-center text-sm font-medium text-red-500">
+        <div className="page-frame narrow audit-hub p-6 text-center text-sm font-medium text-[var(--red)]">
           {error}
         </div>
     );
@@ -222,23 +222,23 @@ export function AuditLogsPage() {
   return (
       <div className="page-frame narrow audit-hub space-y-6">
         <div>
-          <h1 className="text-xl font-bold text-slate-900">Audit Logs Hub</h1>
-          <p className="text-sm text-slate-500">
+          <h1 className="text-xl font-bold text-[var(--ink)]">Audit Logs Hub</h1>
+          <p className="text-sm text-[var(--ink-2)]">
             Monitor administrative activities and authentication logs across the system.
           </p>
         </div>
 
-        <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-          <h2 className="mb-3 text-sm font-semibold text-slate-900">Filters</h2>
+        <section className="rounded-2xl border border-[var(--hairline)] bg-[var(--surface)] p-5">
+          <h2 className="mb-3 text-sm font-semibold text-[var(--ink)]">Filters</h2>
           {renderFilters()}
         </section>
 
         <div className="grid gap-6 xl:grid-cols-2">
           {/* Application Audit Logs Section */}
-          <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-              <h2 className="text-lg font-semibold text-slate-900">Application audit logs</h2>
-              <span className="rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-medium text-slate-600">
+          <section className="rounded-2xl border border-[var(--hairline)] bg-[var(--surface)] p-5">
+            <div className="flex items-center justify-between border-b border-[var(--hairline-soft)] pb-3">
+              <h2 className="text-lg font-semibold text-[var(--ink)]">Application audit logs</h2>
+              <span className="rounded-full bg-[var(--surface-2)] px-2.5 py-0.5 text-xs font-medium text-[var(--ink-2)]">
                 {logs.length}
               </span>
             </div>
@@ -246,21 +246,21 @@ export function AuditLogsPage() {
             <div className="mt-4 space-y-3">
               {logs.length > 0 ? (
                 logs.map((entry) => (
-                  <article key={entry.id} className="rounded-xl border border-slate-200 p-3 text-sm hover:border-slate-300 transition-colors">
+                  <article key={entry.id} className="rounded-xl border border-[var(--hairline)] p-3 text-sm transition-colors hover:border-[var(--hairline-strong)]">
                     <div className="flex items-start justify-between gap-2">
-                      <p className="font-medium text-slate-900">{entry.action}</p>
+                      <p className="font-medium text-[var(--ink)]">{entry.action}</p>
                       {entry.outcome && renderBadge(entry.outcome)}
                     </div>
-                    <p className="mt-1 text-xs text-slate-600">
-                      <span className="font-semibold text-slate-800">{entry.entityName ?? "—"}</span> - {entry.user?.email ?? "unknown user"}
+                    <p className="mt-1 text-xs text-[var(--ink-2)]">
+                      <span className="font-semibold text-[var(--ink)]">{entry.entityName ?? "—"}</span> - {entry.user?.email ?? "unknown user"}
                     </p>
                     {formatTimestamp(entry.createdAt) && (
-                      <p className="mt-1.5 text-[11px] font-mono text-slate-400">{formatTimestamp(entry.createdAt)}</p>
+                      <p className="mt-1.5 text-[11px] font-mono text-[var(--muted)]">{formatTimestamp(entry.createdAt)}</p>
                     )}
                   </article>
                 ))
               ) : (
-                <p className="py-6 text-center text-sm text-slate-400">No application audit logs found.</p>
+                <p className="py-6 text-center text-sm text-[var(--muted)]">No application audit logs found.</p>
               )}
             </div>
 
@@ -269,7 +269,7 @@ export function AuditLogsPage() {
                 type="button"
                 onClick={() => void loadMore("logs")}
                 disabled={loadingMore === "logs"}
-                className="mt-4 w-full rounded-lg border border-slate-300 bg-slate-50 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-100 disabled:opacity-50"
+                className="mt-4 min-h-11 w-full rounded-lg border border-[var(--hairline-strong)] bg-[var(--canvas-soft)] px-4 py-2 text-sm font-medium text-[var(--ink-2)] hover:bg-[var(--surface-2)] disabled:opacity-50"
               >
                 {loadingMore === "logs" ? "Loading more..." : "Load more"}
               </button>
@@ -277,10 +277,10 @@ export function AuditLogsPage() {
           </section>
 
           {/* Authentication Audit Logs Section */}
-          <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-              <h2 className="text-lg font-semibold text-slate-900">Authentication audit logs</h2>
-              <span className="rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-medium text-slate-600">
+          <section className="rounded-2xl border border-[var(--hairline)] bg-[var(--surface)] p-5">
+            <div className="flex items-center justify-between border-b border-[var(--hairline-soft)] pb-3">
+              <h2 className="text-lg font-semibold text-[var(--ink)]">Authentication audit logs</h2>
+              <span className="rounded-full bg-[var(--surface-2)] px-2.5 py-0.5 text-xs font-medium text-[var(--ink-2)]">
                 {authLogs.length}
               </span>
             </div>
@@ -288,21 +288,21 @@ export function AuditLogsPage() {
             <div className="mt-4 space-y-3">
               {authLogs.length > 0 ? (
                 authLogs.map((entry) => (
-                  <article key={entry.id} className="rounded-xl border border-slate-200 p-3 text-sm hover:border-slate-300 transition-colors">
+                  <article key={entry.id} className="rounded-xl border border-[var(--hairline)] p-3 text-sm transition-colors hover:border-[var(--hairline-strong)]">
                     <div className="flex items-start justify-between gap-2">
-                      <p className="font-medium text-slate-900">{entry.eventType}</p>
+                      <p className="font-medium text-[var(--ink)]">{entry.eventType}</p>
                       {entry.outcome && renderBadge(entry.outcome)}
                     </div>
-                    <p className="mt-1 text-xs text-slate-600">
+                    <p className="mt-1 text-xs text-[var(--ink-2)]">
                       {entry.user?.email ?? "unknown user"}
                     </p>
                     {formatTimestamp(entry.occurredAt) && (
-                      <p className="mt-1.5 text-[11px] font-mono text-slate-400">{formatTimestamp(entry.occurredAt)}</p>
+                      <p className="mt-1.5 text-[11px] font-mono text-[var(--muted)]">{formatTimestamp(entry.occurredAt)}</p>
                     )}
                   </article>
                 ))
               ) : (
-                <p className="py-6 text-center text-sm text-slate-400">No authentication audit logs found.</p>
+                <p className="py-6 text-center text-sm text-[var(--muted)]">No authentication audit logs found.</p>
               )}
             </div>
 
@@ -311,7 +311,7 @@ export function AuditLogsPage() {
                 type="button"
                 onClick={() => void loadMore("authLogs")}
                 disabled={loadingMore === "authLogs"}
-                className="mt-4 w-full rounded-lg border border-slate-300 bg-slate-50 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-100 disabled:opacity-50"
+                className="mt-4 min-h-11 w-full rounded-lg border border-[var(--hairline-strong)] bg-[var(--canvas-soft)] px-4 py-2 text-sm font-medium text-[var(--ink-2)] hover:bg-[var(--surface-2)] disabled:opacity-50"
               >
                 {loadingMore === "authLogs" ? "Loading more..." : "Load more"}
               </button>
@@ -320,7 +320,7 @@ export function AuditLogsPage() {
         </div>
 
         {loadMoreError && (
-          <p className="text-center text-sm font-medium text-red-500">{loadMoreError}</p>
+          <p className="text-center text-sm font-medium text-[var(--red)]">{loadMoreError}</p>
         )}
       </div>
   );

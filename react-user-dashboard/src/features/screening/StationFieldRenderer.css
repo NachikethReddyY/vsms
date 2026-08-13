@@ -1,8 +1,0 @@
-.station-field-renderer { display:grid; gap:14px; }
-.station-field-renderer>label { display:grid; gap:6px; }
-.station-eye-pair { margin:0; }
-.station-eye-pair legend { padding:0 4px; font-weight:650; }
-.station-field-renderer .field-error { color:var(--danger); font-size:11px; }
-.station-field-flag-rules { display:grid; gap:10px; margin-top:12px; padding-top:12px; border-top:1px solid color-mix(in srgb, var(--line) 80%, transparent); }
-.station-flag-rule-row { align-items:end; }
-.station-flag-rule-row .icon-button { justify-self:start; }

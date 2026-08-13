@@ -22,6 +22,7 @@ import { useEffect, useMemo, useRef, useState, type ChangeEvent, type FormEvent 
 import { Link, useLocation, useParams } from 'react-router-dom';
 import { useAuth } from '../../auth/AuthProvider';
 import { AppDialog } from '../../components/AppDialog';
+import { appDialog } from '../../components/appDialogStyles';
 import { AppToast } from '../../components/AppToast';
 import { getApiError as getApiMessage } from '../../utils/apiClient';
 import { getDisplayName } from '../../utils/identity';
@@ -549,7 +550,7 @@ export default function EventDetailPage() {
       description={next?.prompt}
       dismissible={!pending}
     >
-      <div className="app-dialog-actions">
+      <div className={appDialog.actions}>
         <button className="secondary" type="button" data-dialog-autofocus disabled={pending} onClick={() => setStatusConfirmOpen(false)}>Keep current status</button>
         <button className="primary" type="button" disabled={pending} onClick={() => void transition()}>{pending ? 'Saving…' : next?.label ?? 'Save status'}</button>
       </div>
@@ -561,11 +562,11 @@ export default function EventDetailPage() {
       description="Record a clear reason before cancelling. This action cannot be reversed."
       dismissible={!pending}
     >
-      <form className="app-dialog-form" noValidate onSubmit={(submitEvent) => { submitEvent.preventDefault(); void cancel(); }}>
-        <label className="app-dialog-field"><span>Cancellation reason</span><textarea required minLength={10} maxLength={500} rows={4} value={cancellationReason} data-dialog-autofocus aria-invalid={!!cancellationError} aria-describedby={cancellationError ? 'event-cancellation-help event-cancellation-error' : 'event-cancellation-help'} onChange={(change) => { setCancellationReason(change.target.value); setCancellationError(''); }} /></label>
-        <p className="app-dialog-help" id="event-cancellation-help">{cancellationReason.length}/500 characters</p>
-        {cancellationError && <p className="app-dialog-error" id="event-cancellation-error" role="alert">{cancellationError}</p>}
-        <div className="app-dialog-actions"><button className="secondary" type="button" disabled={pending} onClick={() => { setCancelOpen(false); setCancellationReason(''); setCancellationError(''); }}>Keep event</button><button className="danger-button" type="submit" disabled={pending}>{pending ? 'Cancelling…' : 'Cancel event'}</button></div>
+      <form className={appDialog.form} noValidate onSubmit={(submitEvent) => { submitEvent.preventDefault(); void cancel(); }}>
+        <label className={appDialog.field}><span>Cancellation reason</span><textarea required minLength={10} maxLength={500} rows={4} value={cancellationReason} data-dialog-autofocus aria-invalid={!!cancellationError} aria-describedby={cancellationError ? 'event-cancellation-help event-cancellation-error' : 'event-cancellation-help'} onChange={(change) => { setCancellationReason(change.target.value); setCancellationError(''); }} /></label>
+        <p className={appDialog.help} id="event-cancellation-help">{cancellationReason.length}/500 characters</p>
+        {cancellationError && <p className={appDialog.error} id="event-cancellation-error" role="alert">{cancellationError}</p>}
+        <div className={appDialog.actions}><button className="secondary" type="button" disabled={pending} onClick={() => { setCancelOpen(false); setCancellationReason(''); setCancellationError(''); }}>Keep event</button><button className="danger-button" type="submit" disabled={pending}>{pending ? 'Cancelling…' : 'Cancel event'}</button></div>
       </form>
     </AppDialog>
   </div>;

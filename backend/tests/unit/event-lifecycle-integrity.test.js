@@ -40,6 +40,7 @@ function transactionDb(current, updated, handlers = {}) {
       findUniqueOrThrow: async () => updated,
     },
     shift: { updateMany: async () => ({ count: 0 }) },
+    qRCodePass: { updateMany: handlers.revokeQrPasses || (async () => ({ count: 0 })) },
     staffAssignment: { updateMany: async () => ({ count: 0 }) },
     station: { findMany: async () => [], deleteMany: async () => ({ count: 0 }) },
     eventDay: { findMany: async () => [] },
@@ -96,11 +97,23 @@ test("event lifecycle commands use the real primary key and retain management ac
   const cancelling = eventRecord("PUBLISHED", 2);
   const cancelled = { ...eventRecord("CANCELLED", 3), cancellationReason: "Venue is no longer available" };
   let cancelWhere;
+  let revokedQrWhere;
+  let revokedQrData;
   const cancelDb = transactionDb(cancelling, cancelled, {
     updateEvent: async ({ where }) => { cancelWhere = where; return { count: 1 }; },
+    revokeQrPasses: async ({ where, data }) => {
+      revokedQrWhere = where;
+      revokedQrData = data;
+      return { count: 2 };
+    },
   });
   const cancelResult = await eventService.cancelEvent(eventId, { version: 2, reason: "Venue is no longer available" }, user, requestId, cancelDb);
   assert.deepEqual(cancelWhere, { eventId, version: 2, status: "PUBLISHED" });
+  assert.deepEqual(revokedQrWhere, { isActive: true, registration: { eventId } });
+  assert.equal(revokedQrData.isActive, false);
+  assert.equal(revokedQrData.revokedBy, userId);
+  assert.equal(revokedQrData.revokedReason, "Event cancelled");
+  assert.ok(revokedQrData.revokedAt instanceof Date);
   assert.equal(cancelResult.status, "CANCELLED");
   assert.equal(cancelResult.canManage, true);
 });

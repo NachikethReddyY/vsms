@@ -2,6 +2,7 @@ import { ArrowPathIcon, MagnifyingGlassIcon, PlusIcon, UserGroupIcon, XMarkIcon 
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { AppDialog } from '../components/AppDialog';
+import { appDialog } from '../components/appDialogStyles';
 import { getApiError } from '../utils/apiClient';
 import * as api from './stage4Api';
 
@@ -165,7 +166,7 @@ export default function EventStaffingPage() {
         </div>
         <fieldset className="event-person-picker"><legend>Choose a person</legend><div>{candidates.length ? candidates.map((person) => { const id = person.userId ?? person.id; return <label key={id}><input type="radio" name="event-person" value={id} checked={accountId === id} onChange={() => { setAccountId(id); setRoles((current) => current.filter((role) => (role !== 'REVIEWER' || person.professionalCategory === 'DOCTOR') && (role !== 'EVENT_MANAGER' || person.roles?.includes('EVENT_MANAGER')))); }} /><span><strong>{person.fullName}</strong><small>{person.email}</small></span></label>; }) : <p>No eligible staff match this search.</p>}</div></fieldset>
         <fieldset className="event-role-picker"><legend>Roles for this event</legend><div>{EVENT_ROLES.map((role) => { const disabled = !selectedPerson || (role.value === 'REVIEWER' && selectedPerson.professionalCategory !== 'DOCTOR') || (role.value === 'EVENT_MANAGER' && !selectedPerson.roles?.includes('EVENT_MANAGER')); return <label key={role.value} aria-disabled={disabled}><input type="checkbox" checked={roles.includes(role.value)} disabled={disabled} onChange={() => toggleRole(role.value)} /><span>{role.label}</span></label>; })}</div></fieldset>
-        <div className="app-dialog-actions"><button className="secondary" type="button" onClick={() => setAddOpen(false)}>Cancel</button><button type="submit" disabled={!accountId || !roles.length || busy === 'assign'}><PlusIcon />{busy === 'assign' ? 'Adding…' : 'Add to event'}</button></div>
+        <div className={appDialog.actions}><button className="secondary" type="button" onClick={() => setAddOpen(false)}>Cancel</button><button type="submit" disabled={!accountId || !roles.length || busy === 'assign'}><PlusIcon />{busy === 'assign' ? 'Adding…' : 'Add to event'}</button></div>
       </form>
     </AppDialog>
   </div>;
