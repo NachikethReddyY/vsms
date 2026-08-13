@@ -17,3 +17,7 @@ test('event managers receive a global Operations Center navigation entry', () =>
   assert.match(shell, /to="\/operations"[\s\S]*?>Operations<\/NavLink>/);
   assert.match(shell, /to="\/operations" aria-label="Operations"/);
 });
+
+test('unassigned staff see the events workspace empty state', () => {
+  assert.match(eventsPage, /No events assigned/);
+});

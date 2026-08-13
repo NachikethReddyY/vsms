@@ -173,8 +173,8 @@ export default function EventsPage() {
         ) : (
           <section className="events-empty-state" aria-live="polite">
             <MagnifyingGlassIcon aria-hidden="true" />
-            <h2>{query ? 'No events found' : period === 'upcoming' ? 'No upcoming events' : 'No past events'}</h2>
-            <p>{query ? 'Try a different event or venue name.' : period === 'upcoming' ? 'Assigned and newly created events will appear here.' : 'Completed and cancelled events will appear here.'}</p>
+            <h2>{query ? 'No events found' : canCreate ? period === 'upcoming' ? 'No upcoming events' : 'No past events' : 'No events assigned'}</h2>
+            <p>{query ? 'Try a different event or venue name.' : canCreate ? period === 'upcoming' ? 'Assigned and newly created events will appear here.' : 'Completed and cancelled events will appear here.' : 'An administrator or event manager needs to assign you to an event.'}</p>
             {query && <Button variant="ghost" onClick={() => setQuery('')}>Clear search</Button>}
             {!query && period === 'upcoming' && canCreate && <Button onClick={() => navigate('/events/new')}><PlusIcon aria-hidden="true" />Create event</Button>}
           </section>

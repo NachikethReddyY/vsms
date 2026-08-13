@@ -76,10 +76,10 @@ describe('Stage 4 rendered route behavior', () => {
     expect(await screen.findByText('Missing page')).toBeTruthy();
   });
 
-  it('routes approved enabled accounts without active membership to unassigned state while profile remains reachable', async () => {
+  it('allows approved enabled accounts without active membership to view events and their profile', async () => {
     authUser = { approvalState: 'APPROVED', accessState: 'ENABLED', roles: [], eventMemberships: [] };
     render(<MemoryRouter initialEntries={["/events"]}><Routes><Route element={<ProtectedRoute />}><Route path="/events" element={<p>Events</p>} /><Route path="/account/state" element={<pages.AccountStatePage />} /></Route></Routes></MemoryRouter>);
-    expect(await screen.findByText(/Account activated — event assignment required/i)).toBeTruthy();
+    expect(await screen.findByText('Events')).toBeTruthy();
     render(<MemoryRouter initialEntries={["/account/profile"]}><Routes><Route element={<ProtectedRoute />}><Route path="/account/profile" element={<pages.ProfilePage />} /></Route></Routes></MemoryRouter>);
     expect(await screen.findByRole('heading', { name: 'Profile and access' })).toBeTruthy();
   });
@@ -93,7 +93,7 @@ describe('Stage 4 rendered route behavior', () => {
     cleanup();
     delete authUser.eventMemberships; delete authUser.memberships; accountMode = 'empty';
     render(<MemoryRouter initialEntries={["/events"]}><Routes><Route element={<ProtectedRoute />}><Route path="/events" element={<p>Events</p>} /><Route path="/account/state" element={<pages.AccountStatePage />} /></Route></Routes></MemoryRouter>);
-    expect(await screen.findByText(/Account activated — event assignment required/i)).toBeTruthy();
+    expect(await screen.findByText('Events')).toBeTruthy();
   });
 
   it('requires current station duty instead of membership-only station access', async () => {
