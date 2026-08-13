@@ -1220,6 +1220,19 @@ const cancelEvent = async (eventId, body, user, correlationId, db = prisma) => {
       data: { status: "CANCELLED" },
     });
 
+    const revokedQrPasses = await tx.qRCodePass.updateMany({
+      where: {
+        isActive: true,
+        registration: { eventId },
+      },
+      data: {
+        isActive: false,
+        revokedAt: new Date(),
+        revokedBy: user.userId,
+        revokedReason: "Event cancelled",
+      },
+    });
+
     const updated = await tx.event.findUniqueOrThrow({
       where: { eventId },
       include: eventInclude,
@@ -1234,7 +1247,7 @@ const cancelEvent = async (eventId, body, user, correlationId, db = prisma) => {
       entityName: "Event",
       entityId: eventId,
       oldValue: snapshot(current),
-      newValue: snapshot(updated),
+      newValue: { ...snapshot(updated), revokedQrPassCount: revokedQrPasses.count },
     });
     await tx.eventAuditLog.create({
       data: {
