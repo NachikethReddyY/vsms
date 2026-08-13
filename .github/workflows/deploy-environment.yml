@@ -105,6 +105,12 @@ jobs:
         run: |
           pnpm --dir react-user-dashboard install --frozen-lockfile
           pnpm --dir react-user-dashboard build
+      - name: Capture current frontend entry point for rollback
+        run: |
+          BUCKET=$(node scripts/deploy/read-stack-output.cjs stack-outputs.json FrontendBucketName)
+          PREVIOUS_INDEX_VERSION=$(aws s3api head-object --bucket "$BUCKET" --key index.html --query VersionId --output text 2>/dev/null || true)
+          if [ "$PREVIOUS_INDEX_VERSION" = "None" ]; then PREVIOUS_INDEX_VERSION=""; fi
+          echo "PREVIOUS_INDEX_VERSION=$PREVIOUS_INDEX_VERSION" >> "$GITHUB_ENV"
       - name: Publish immutable assets before runtime entry point
         run: |
           BUCKET=$(node scripts/deploy/read-stack-output.cjs stack-outputs.json FrontendBucketName)
@@ -123,16 +129,6 @@ jobs:
           test "$ALARM_COUNT" = "0"
           node scripts/deploy/write-release-manifest.cjs stack-outputs.json release-manifest.json
           pnpm --dir backend deploy:verify -- ../release-manifest.json
-      - name: Upload release audit evidence
-        if: always()
-        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
-        with:
-          name: release-${{ inputs.environment }}-${{ inputs.release_sha }}
-          path: |
-            release-manifest.json
-            stack-outputs.json
-          if-no-files-found: warn
-          retention-days: 90
       - name: Re-assume deployment role for rollback
         if: failure() && env.PREVIOUS_IMAGE != ''
         uses: aws-actions/configure-aws-credentials@e6de054238d6b7531b4efff3b6587d9aade6a06c # v6
@@ -143,3 +139,33 @@ jobs:
         if: failure() && env.PREVIOUS_IMAGE != ''
         run: |
           aws cloudformation deploy --stack-name "$STACK_NAME" --template-file infrastructure/availability.yaml --no-fail-on-empty-changeset --capabilities CAPABILITY_IAM --role-arn "${{ vars.AWS_CLOUDFORMATION_ROLE_ARN }}" --parameter-overrides ApiImageUri="$PREVIOUS_IMAGE" CandidateApiImageUri="$IMAGE_URI" ReleaseSha="$PREVIOUS_SHA" CandidateReleaseSha="$RELEASE_SHA"
+          echo "APPLICATION_ROLLBACK_SUCCEEDED=true" >> "$GITHUB_ENV"
+      - name: Restore the previous frontend entry point after failure
+        if: failure() && env.PREVIOUS_INDEX_VERSION != ''
+        run: |
+          BUCKET=$(node scripts/deploy/read-stack-output.cjs stack-outputs.json FrontendBucketName)
+          DISTRIBUTION=$(node scripts/deploy/read-stack-output.cjs stack-outputs.json FrontendDistributionId)
+          aws s3api get-object --bucket "$BUCKET" --key index.html --version-id "$PREVIOUS_INDEX_VERSION" previous-index.html
+          aws s3 cp previous-index.html "s3://$BUCKET/index.html" --cache-control 'no-store' --content-type 'text/html; charset=utf-8'
+          aws cloudfront create-invalidation --distribution-id "$DISTRIBUTION" --paths '/index.html'
+          echo "FRONTEND_ROLLBACK_SUCCEEDED=true" >> "$GITHUB_ENV"
+      - name: Ensure rollback evidence has stack context
+        if: failure()
+        run: test -s stack-outputs.json || printf '[]\n' > stack-outputs.json
+      - name: Record rollback evidence
+        if: failure()
+        env:
+          RELEASE_OUTCOME: rolled_back
+          ROLLBACK_REASON: A release gate failed; consult the linked workflow logs.
+        run: node scripts/deploy/write-release-manifest.cjs stack-outputs.json rollback-manifest.json
+      - name: Upload release audit evidence
+        if: always()
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        with:
+          name: release-${{ inputs.environment }}-${{ inputs.release_sha }}
+          path: |
+            release-manifest.json
+            rollback-manifest.json
+            stack-outputs.json
+          if-no-files-found: error
+          retention-days: 90

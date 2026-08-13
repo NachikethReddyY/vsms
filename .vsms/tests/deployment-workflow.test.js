@@ -32,6 +32,8 @@ test("environment deployment migrates before promotion and publishes frontend in
   assert.ok(migration > 0 && promotion > migration);
   assert.ok(assets > promotion && index > assets);
   assert.match(environment, /if: failure\(\)[\s\S]*?ApiImageUri="\$PREVIOUS_IMAGE"/);
+  assert.match(environment, /PREVIOUS_INDEX_VERSION[\s\S]*?--version-id "\$PREVIOUS_INDEX_VERSION"/);
+  assert.match(environment, /RELEASE_OUTCOME: rolled_back[\s\S]*?rollback-manifest\.json/);
   assert.match(environment, /SMOKE_AUTH_PATH:[\s\S]*?SMOKE_BEARER_TOKEN:/);
 });
 

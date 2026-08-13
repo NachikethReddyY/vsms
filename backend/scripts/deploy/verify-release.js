@@ -25,7 +25,9 @@ if (!manifest.actor || !manifest.approvalEnvironment) fail("actor and approvalEn
 if (!Number.isFinite(Date.parse(manifest.startedAt)) || !Number.isFinite(Date.parse(manifest.completedAt))) fail("release timestamps are invalid");
 if (Date.parse(manifest.completedAt) < Date.parse(manifest.startedAt)) fail("completedAt precedes startedAt");
 if (!Array.isArray(manifest.migrations) || !Array.isArray(manifest.services)) fail("migrations and services must be arrays");
-if (!manifest.evidence || manifest.evidence.smoke !== "passed" || manifest.evidence.security !== "passed") fail("required release evidence is incomplete");
 if (!new Set(["succeeded", "rolled_back"]).has(manifest.outcome)) fail("outcome must be succeeded or rolled_back");
+if (!manifest.evidence || manifest.evidence.security !== "passed") fail("required security evidence is incomplete");
+if (manifest.outcome === "succeeded" && manifest.evidence.smoke !== "passed") fail("successful releases require passed smoke evidence");
+if (manifest.outcome === "rolled_back" && !manifest.rollback?.reason) fail("rolled-back releases require a rollback reason");
 
 process.stdout.write(`${JSON.stringify({ status: "verified", environment: manifest.environment, outcome: manifest.outcome })}\n`);

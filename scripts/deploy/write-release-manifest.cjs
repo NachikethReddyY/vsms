@@ -8,6 +8,11 @@ const get = (key) => outputs.find((output) => output.OutputKey === key)?.OutputV
 const services = ["ApiServiceName", "ReportWorkerServiceName", "DomainEventWorkerServiceName", "LifecycleEmailWorkerServiceName"]
   .map(get)
   .filter(Boolean);
+const outcome = process.env.RELEASE_OUTCOME || "succeeded";
+if (!new Set(["succeeded", "rolled_back"]).has(outcome)) {
+  process.stderr.write("RELEASE_OUTCOME must be succeeded or rolled_back.\n");
+  process.exit(1);
+}
 
 const required = ["DEPLOY_ENVIRONMENT", "RELEASE_SHA", "IMAGE_URI", "GITHUB_SERVER_URL", "GITHUB_REPOSITORY", "GITHUB_RUN_ID", "GITHUB_ACTOR", "RELEASE_STARTED_AT"];
 const missing = required.filter((name) => !process.env[name]);
@@ -37,12 +42,17 @@ const manifest = {
     alarmTopicArn: get("DeploymentAlarmTopicArn"),
   },
   evidence: {
-    smoke: "passed",
+    smoke: outcome === "succeeded" ? "passed" : "failed_or_not_reached",
     security: "passed",
     immutableImage: true,
-    cloudWatchAlarms: "ok",
+    cloudWatchAlarms: outcome === "succeeded" ? "ok" : "failed_or_not_reached",
   },
-  outcome: "succeeded",
+  outcome,
+  rollback: outcome === "rolled_back" ? {
+    reason: process.env.ROLLBACK_REASON || "A release gate failed; consult the linked workflow logs.",
+    applicationImageRestored: process.env.APPLICATION_ROLLBACK_SUCCEEDED === "true",
+    frontendVersionRestored: process.env.FRONTEND_ROLLBACK_SUCCEEDED === "true",
+  } : null,
 };
 
 fs.writeFileSync(destination, `${JSON.stringify(manifest, null, 2)}\n`, { flag: "wx" });

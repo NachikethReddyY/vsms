@@ -121,3 +121,31 @@ test("release verification accepts complete evidence and rejects mutable images"
   assert.equal(invalid.status, 1);
   assert.match(invalid.stderr, /imageUri must be immutable/);
 });
+
+test("release verification requires a reason for rollback evidence", () => {
+  const temp = fs.mkdtempSync(path.join(os.tmpdir(), "vsms-rollback-"));
+  const manifestPath = path.join(temp, "release.json");
+  const manifest = {
+    schemaVersion: 1,
+    environment: "production",
+    commitSha: sha,
+    imageUri: digest,
+    workflowUrl: "https://github.com/example/vsms/actions/runs/2",
+    actor: "release-user",
+    approvalEnvironment: "production",
+    startedAt: "2026-08-13T00:00:00.000Z",
+    completedAt: "2026-08-13T00:01:00.000Z",
+    migrations: ["prisma migrate deploy"],
+    services: ["api"],
+    evidence: { smoke: "failed_or_not_reached", security: "passed" },
+    outcome: "rolled_back",
+  };
+  fs.writeFileSync(manifestPath, JSON.stringify(manifest));
+  const missingReason = run("verify-release.js", [manifestPath]);
+  assert.equal(missingReason.status, 1);
+  assert.match(missingReason.stderr, /rollback reason/);
+
+  fs.writeFileSync(manifestPath, JSON.stringify({ ...manifest, rollback: { reason: "readiness failed" } }));
+  const complete = run("verify-release.js", [manifestPath]);
+  assert.equal(complete.status, 0, complete.stderr);
+});
