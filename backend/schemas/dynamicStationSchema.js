@@ -93,13 +93,20 @@ const assertClinicalFieldSchema = (stationType, schema) => {
     }
     if (required.options) {
       const options = field.options || [];
-      for (const option of required.options) {
-        if (!options.includes(option)) {
-          const error = new Error(`Clinical field "${required.key}" must keep option "${option}"`);
-          error.code = "INVALID_FIELD_SCHEMA";
-          error.status = 422;
-          throw error;
-        }
+      if (options.length !== required.options.length
+        || required.options.some((option) => !options.includes(option))) {
+        const error = new Error(`Clinical field "${required.key}" options cannot be changed`);
+        error.code = "INVALID_FIELD_SCHEMA";
+        error.status = 422;
+        throw error;
+      }
+    }
+    for (const boundary of ["min", "max"]) {
+      if (required[boundary] !== undefined && field[boundary] !== required[boundary]) {
+        const error = new Error(`Clinical field "${required.key}" ${boundary} cannot be changed`);
+        error.code = "INVALID_FIELD_SCHEMA";
+        error.status = 422;
+        throw error;
       }
     }
   }
@@ -345,13 +352,9 @@ const upgradeClinicalSchema = (stationType, fields) => {
     const required = system.find((item) => item.key === mappedKey);
     if (required) {
       if (seen.has(required.key)) continue;
-      const options = required.options && field.options?.length
-        ? [...new Set([...required.options, ...field.options])]
-        : required.options;
       upgraded.push({
         ...required,
         label: field.label || required.label,
-        ...(options ? { options } : {}),
       });
       seen.add(required.key);
       continue;

@@ -2,6 +2,7 @@ const assert = require("node:assert/strict");
 const test = require("node:test");
 const {
   SYSTEM_FIELD_SCHEMAS,
+  assertClinicalFieldSchema,
   resolveCompatibleFieldSchema,
   mergeClinicalAndTemplateResult,
   validateResultAgainstSchema,
@@ -45,6 +46,24 @@ test("current clinical templates keep the administrator field order", () => {
     "os",
     "withUsualDistanceGlasses",
   ]);
+});
+
+test("clinical templates cannot loosen evaluator options or numeric limits", () => {
+  const extraOption = SYSTEM_FIELD_SCHEMAS.VISUAL_ACUITY.map((field) => (
+    field.key === "chartDistanceMetres" ? { ...field, options: [...field.options, "4"] } : field
+  ));
+  assert.throws(
+    () => assertClinicalFieldSchema("VISUAL_ACUITY", extraOption),
+    (error) => error.code === "INVALID_FIELD_SCHEMA" && /options cannot be changed/.test(error.message),
+  );
+
+  const widerRange = SYSTEM_FIELD_SCHEMAS.COLOUR_VISION.map((field) => (
+    field.key === "platesPresented" ? { ...field, min: 1 } : field
+  ));
+  assert.throws(
+    () => assertClinicalFieldSchema("COLOUR_VISION", widerRange),
+    (error) => error.code === "INVALID_FIELD_SCHEMA" && /min cannot be changed/.test(error.message),
+  );
 });
 
 test("clinical validation keeps extra customized fields that Zod would strip", () => {
