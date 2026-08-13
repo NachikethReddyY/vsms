@@ -327,6 +327,17 @@ export default function EventDetailPage() {
     if (availabilities) void updateStation(eventStationId, { availabilities });
   };
 
+  const removeStation = async (eventStationId: string, name: string) => {
+    if (!event || !window.confirm(`Remove ${name} from this event? This cannot be undone.`)) return;
+    setStationPending(eventStationId); setError('');
+    try {
+      setEvent(await eventApi.removeStation(event.eventId, eventStationId, event.version));
+      setNotice(`${name} removed from this event.`);
+      void refreshAudit(event.eventId);
+    } catch (cause) { setError(getApiMessage(cause, 'The station could not be removed.')); }
+    finally { setStationPending(''); }
+  };
+
   const saveStationCapacity = (submitEvent: FormEvent<HTMLFormElement>, eventStationId: string) => {
     submitEvent.preventDefault();
     const input = submitEvent.currentTarget.elements.namedItem('capacity');
@@ -537,6 +548,7 @@ export default function EventDetailPage() {
                   </fieldset>)}
                   <button className="primary compact" type="submit" disabled={!!stationPending}>{stationPending === station.eventStationId ? 'Saving…' : 'Save daily schedule'}</button>
                 </form>
+                <button className="secondary compact station-remove" type="button" disabled={!!stationPending} onClick={() => void removeStation(station.eventStationId, station.name)}><TrashIcon />Remove station</button>
               </div> : <div className="station-day-list">{availabilities.map((availability) => <span className={availability.isAvailable ? 'is-available' : 'is-unavailable'} key={availability.eventStationAvailabilityId}>{formatEventDate(availability.eventDay.date, event.timezone, false)} · {availability.isAvailable ? `${availability.capacity} places` : 'Unavailable'}</span>)}</div>}
             </article>;
           })}</div>}

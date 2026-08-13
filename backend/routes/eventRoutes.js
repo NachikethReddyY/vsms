@@ -110,6 +110,7 @@ router.get("/:eventId", validate({ params: eventParams }), requireEventRoles("EV
 router.patch("/:eventId", validate({ params: eventParams, body: updateEventBody }), requireEventManager, asyncHandler(eventController.update));
 router.post("/:eventId/stations/import", validate({ params: eventParams, body: stationImportBody }), requireEventManager, asyncHandler(eventController.importStations));
 router.patch("/:eventId/stations/:eventStationId", validate({ params: stationParams, body: stationUpdateBody }), requireEventManager, asyncHandler(eventController.updateStation));
+router.delete("/:eventId/stations/:eventStationId", validate({ params: stationParams, query: versionQuery }), requireEventManager, asyncHandler(eventController.removeStation));
 router.post("/:eventId/publish", validate({ params: eventParams, body: transitionBody }), requireEventManager, asyncHandler(eventController.publish));
 router.post("/:eventId/start", validate({ params: eventParams, body: transitionBody }), requireEventManager, asyncHandler(eventController.start));
 router.post("/:eventId/complete", validate({ params: eventParams, body: transitionBody }), requireEventManager, asyncHandler(eventController.complete));

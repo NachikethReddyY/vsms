@@ -2147,6 +2147,43 @@ const updateStation = async (eventId, eventStationId, body, user, correlationId,
   });
 };
 
+const removeStation = async (eventId, eventStationId, version, user, correlationId, db = prisma) => {
+  const current = await requireEvent(eventId, user, true, db);
+  assertStationPlanningState(current);
+  const station = current.stations.find((candidate) => candidate.stationId === eventStationId);
+  if (!station) throw new AppError(404, "STATION_NOT_FOUND", "Event station was not found");
+
+  return db.$transaction(async (tx) => {
+    await bumpEventVersion(tx, eventId, version);
+    const usage = await tx.station.findUniqueOrThrow({
+      where: { stationId: eventStationId },
+      select: { _count: { select: {
+        staffAssignments: true, queueEntries: true, scanLogs: true, screeningResults: true,
+        screeningRequestLedgers: true, fromMovements: true, toMovements: true, registrationRouteSteps: true,
+      } } },
+    });
+    if (Object.values(usage._count).some(Boolean)) {
+      throw new AppError(409, "STATION_IN_USE", "Remove this station's staff assignments and operational records before deleting it");
+    }
+    await tx.eventStationAvailability.deleteMany({ where: { eventStationId } });
+    await tx.station.delete({ where: { stationId: eventStationId } });
+    const remaining = current.stations.filter(({ stationId }) => stationId !== eventStationId);
+    for (const [index, item] of remaining.entries()) {
+      if (item.stationOrder !== index + 1) {
+        await tx.station.update({ where: { stationId: item.stationId }, data: { stationOrder: index + 1 } });
+      }
+    }
+    const updated = await tx.event.findUniqueOrThrow({ where: { eventId }, include: eventInclude });
+    await createAuditLog({
+      client: tx, userId: user.userId, context: correlationId, action: "UPDATED",
+      resource: "Event", entityName: "Event", entityId: eventId,
+      oldValue: snapshot(current), newValue: snapshot(updated),
+    });
+    await auditUpdate(tx, current, updated, user, correlationId);
+    return toEventResponse(updated, user, tx);
+  });
+};
+
 const addStaffAssignment = async (eventId, shiftId, body, user, correlationId, db = prisma) => {
   const current = await requireEvent(eventId, user, true, db);
   if (!["DRAFT", "PUBLISHED", "IN_PROGRESS"].includes(current.status)) {
@@ -2594,6 +2631,7 @@ module.exports = {
   updateStationTemplate,
   importStations,
   updateStation,
+  removeStation,
   addStaffAssignment,
   removeStaffAssignment,
   getAuditLog,

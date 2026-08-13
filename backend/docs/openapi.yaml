@@ -1027,6 +1027,28 @@ paths:
         "404": { $ref: "#/components/responses/NotFound" }
         "409": { $ref: "#/components/responses/Conflict" }
         "422": { $ref: "#/components/responses/ValidationFailed" }
+    delete:
+      tags: [Events]
+      operationId: removeEventStation
+      summary: Remove an unused station from a draft or published event
+      parameters:
+        - $ref: "#/components/parameters/EventId"
+        - name: eventStationId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+        - name: version
+          in: query
+          required: true
+          schema: { type: integer, minimum: 1 }
+      responses:
+        "200":
+          description: Station removed and remaining stations reordered
+          content: { application/json: { schema: { $ref: "#/components/schemas/Event" } } }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "422": { $ref: "#/components/responses/ValidationFailed" }
   /api/v1/events/{eventId}/publish:
     post:
       tags: [Events]
