@@ -46,7 +46,6 @@ const artifactCleanupListQuery = z.object({
 
 const auditLogListQuery = z.object({
   cursor: z.string().trim().min(1).max(512).optional(),
-  authCursor: z.string().trim().min(1).max(512).optional(),
   limit: z.coerce.number().int().min(1).max(100).default(50),
   entityName: z.string().trim().min(1).max(50).optional(),
   action: z.string().trim().min(1).max(100).optional(),
