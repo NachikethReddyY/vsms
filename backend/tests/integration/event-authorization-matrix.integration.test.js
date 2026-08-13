@@ -18,7 +18,6 @@ const createParticipant = (label, creator, onboardingEventId = null) => prisma.p
     gender: "U",
     contactNumber: `+65${crypto.randomInt(1_000_0000, 9_999_9999)}`,
     emergencyContact: "+6560002000",
-    consentGiven: false,
     createdById: creator.id,
     updatedById: creator.id,
     onboardingEventId,
@@ -95,7 +94,7 @@ before(async () => {
   fixture.participantA = await createParticipant("RegisteredA", fixture.registrationA, fixture.eventA.eventId);
   fixture.participantB = await createParticipant("RegisteredB", fixture.managerB, fixture.eventB.eventId);
   fixture.onboardingA = await createParticipant("OnboardingA", fixture.registrationA, fixture.eventA.eventId);
-  fixture.consentOnly = await createParticipant("ConsentOnly", fixture.managerB);
+  fixture.unrelatedParticipant = await createParticipant("Unrelated", fixture.managerB);
   const createRegistration = (event, participant, registeredBy, queueNumber) => prisma.eventRegistration.create({
     data: {
       eventId: event.eventId,
@@ -118,30 +117,6 @@ before(async () => {
   });
   fixture.queueA = await prisma.queueEntry.create({
     data: { registrationId: fixture.registrationRecordA.registrationId, stationId: fixture.stationA.stationId, queueNumber: 1 },
-  });
-
-  const consentForm = await prisma.consentFormVersion.create({
-    data: {
-      formCode: `MATRIX-${crypto.randomUUID()}`,
-      versionNumber: "1",
-      title: "Authorization matrix consent",
-      contentHash: "a".repeat(64),
-      documentObjectKey: `matrix/${crypto.randomUUID()}.pdf`,
-      effectiveFrom: new Date(Date.now() - 60_000),
-      createdById: fixture.admin.id,
-    },
-  });
-  await prisma.participantConsent.create({
-    data: {
-      participantId: fixture.consentOnly.id,
-      eventId: fixture.eventA.eventId,
-      consentFormVersionId: consentForm.id,
-      consentStatus: "DECLINED",
-      signerType: "PARTICIPANT",
-      signerName: "Consent Only",
-      recordedById: fixture.registrationA.id,
-      decisionAt: new Date(),
-    },
   });
 
   fixture.reviewB = await prisma.review.create({
@@ -203,7 +178,7 @@ describe("two-event route authorization matrix", () => {
     expect(deniedDerived.status).toBe(403);
   });
 
-  test("participant search allows registered and creator-owned onboarding records but not consent-only discovery", async () => {
+  test("participant search allows registered and creator-owned onboarding records but not unrelated discovery", async () => {
     const response = await request(app)
       .get("/api/v1/participants?name=MatrixScope")
       .set(auth(fixture.registrationA))
@@ -212,7 +187,7 @@ describe("two-event route authorization matrix", () => {
     const ids = response.body.participants.map(({ id }) => id);
     expect(ids).toEqual(expect.arrayContaining([fixture.participantA.id, fixture.onboardingA.id]));
     expect(ids).not.toContain(fixture.participantB.id);
-    expect(ids).not.toContain(fixture.consentOnly.id);
+    expect(ids).not.toContain(fixture.unrelatedParticipant.id);
   });
 
   test("screening and review or referral routes reject the other event", async () => {

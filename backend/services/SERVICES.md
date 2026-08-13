@@ -41,7 +41,7 @@ Cross-folder imports go up one level (e.g. `../event/eventAuthorizationService`)
 ### `participant/`
 | File | Responsibility |
 | --- | --- |
-| `participantService.js` | Participant registration and consent flows. |
+| `participantService.js` | Participant registration, lookup, and emergency-contact flows. |
 | `registrationService.js` | Event registration lifecycle, event-duty checks, duplicate/idempotency handling, and registration history. |
 | `signatureService.js` | Signature-target authorization and signature-artifact persistence. |
 | `qrService.js` | QR token issue/rotation, event-scoped QR authorization, and registration resolution. |

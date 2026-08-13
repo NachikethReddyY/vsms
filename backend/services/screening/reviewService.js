@@ -2,6 +2,7 @@
 const prisma = require("../../prisma/prismaClient");
 const AppError = require("../../errors/AppError");
 const { resolveRegistrationByQrValue } = require("../../utils/crypto/qrToken");
+const { createAuditLog } = require("../../utils/logging/audit");
 const { resolveCompatibleFieldSchema } = require("../../schemas/dynamicStationSchema");
 
 const {

@@ -5,6 +5,7 @@ const asyncHandler = require("../utils/http/asyncHandler");
 const qrController = require("../controllers/qrController");
 const authenticate = require("../middlewares/authenticate");
 const validate = require("../middlewares/validate");
+<<<<<<< HEAD
 const env = require("../config/env");
 const {
   tokenBody,
@@ -14,6 +15,11 @@ const {
   revokeBody,
   manualCheckInBody,
 } = require("../schemas/qrSchemas");
+=======
+const { rateLimit } = require("../middlewares/rateLimiter");
+const { hashToken } = require("../utils/crypto/qrToken");
+const { tokenBody, tokenParams } = require("../schemas/qrSchemas");
+>>>>>>> 40e42f8bd667cfae3262d148de139e8e755a00d5
 
 // Import your production-grade idempotency middleware
 const checkIdempotency = require("../middlewares/idempotency");
@@ -22,7 +28,18 @@ const checkIdempotency = require("../middlewares/idempotency");
 // Public pass-status lookup for the QR scan target.
 // (GET requests - Read-only, no idempotency needed)
 // ==========================================
-router.get("/public-status/:token", validate({ params: tokenParams }), asyncHandler(qrController.getPublicStatus));
+const publicStatusTokenLimiter = rateLimit({
+  name: "qr-public-status-token",
+  windowMs: 60000,
+  limit: 15,
+  keyGenerator: (req) => hashToken(req.params.token),
+});
+router.get(
+  "/public-status/:token",
+  validate({ params: tokenParams }),
+  publicStatusTokenLimiter,
+  asyncHandler(qrController.getPublicStatus),
+);
 
 // ==========================================
 // Dev-only QR preview (no auth). Blocked in production by controller.

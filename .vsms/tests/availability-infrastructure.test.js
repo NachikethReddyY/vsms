@@ -31,7 +31,13 @@ test("database and frontend recovery data are retained", () => {
 });
 
 test("secrets are injected rather than placed in normal task environment values", () => {
-  for (const name of ["DATABASE_URL", "REDIS_URL", "JWT_ACCESS_SECRET", "ENCRYPTION_KEYRING_JSON"]) {
+  for (const name of [
+    "DATABASE_URL",
+    "REDIS_URL",
+    "JWT_ACCESS_SECRET",
+    "ENCRYPTION_KEYRING_JSON",
+    "PARTICIPANT_LOOKUP_HMAC_KEY",
+  ]) {
     assert.match(template, new RegExp(`- Name: ${name}\\n\\s+ValueFrom:`));
     assert.doesNotMatch(template, new RegExp(`- Name: ${name}\\n\\s+Value:`));
   }
@@ -44,6 +50,19 @@ test("secrets are injected rather than placed in normal task environment values"
   assert.doesNotMatch(template, /DbMasterPassword:/);
   assert.doesNotMatch(template, /RedisAuthToken:\n/);
   assert.doesNotMatch(template, /JwtAccessSecret:/);
+});
+
+test("participant lookup HMAC secret is available to every ECS workload", () => {
+  assert.match(template, /ParticipantLookupHmacSecretArn:\n\s+Type: String/);
+  assert.match(
+    template,
+    /ReadVsmsRuntimeSecrets:[\s\S]*?Resource:[\s\S]*?- !Ref ParticipantLookupHmacSecretArn/,
+  );
+
+  const taskSecretInjections = template.match(
+    /- Name: PARTICIPANT_LOOKUP_HMAC_KEY\n\s+ValueFrom: !Ref ParticipantLookupHmacSecretArn/g,
+  );
+  assert.equal(taskSecretInjections?.length, 3);
 });
 
 test("ECS has the required Cognito and durable backup boundaries", () => {

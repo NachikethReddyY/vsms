@@ -16,7 +16,7 @@ An issued referral is immutable. The issuing reviewer can create the next sequen
 
 ## Event artifact cleanup
 
-Hard-delete first validates and records every event-owned consent signature, referral signature, and referral PDF in `artifact_cleanup_tasks` inside the same database transaction that deletes the event. It never deletes a file before commit. After commit, the service claims those durable tasks and unlinks only validated regular files under the configured signature or referral roots.
+Hard-delete first validates and records every event-owned reviewer/referral signature and referral PDF in `artifact_cleanup_tasks` inside the same database transaction that deletes the event. It never deletes a file before commit. After commit, the service claims those durable tasks and unlinks only validated regular files under the configured signature or referral roots.
 
 Failed and stale claims remain retryable with bounded exponential backoff. After the final automatic attempt, the task moves to `ESCALATED`; it is not silently abandoned. Administrators can list tasks without exposing storage paths and must explicitly choose one of the audited maintenance actions:
 

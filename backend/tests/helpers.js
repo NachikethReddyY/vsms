@@ -50,7 +50,6 @@ const COGNITO_GROUPS = {
 const TEST_PERMISSIONS = [
   "participants:read",
   "participants:write",
-  "consents:record",
   "registrations:create",
   "registrations:read",
   "audit:read",

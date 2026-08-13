@@ -72,6 +72,9 @@ function assertConfig(config) {
   if (!Number.isInteger(config.readSampleSize) || config.readSampleSize < 1 || config.readSampleSize > config.participantCount) {
     fail("config.readSampleSize must be between 1 and participantCount");
   }
+  if (!Number.isInteger(config.checkInSampleSize) || config.checkInSampleSize < 1 || config.checkInSampleSize > 20) {
+    fail("config.checkInSampleSize must be between 1 and 20 so the QR security limiter remains enabled");
+  }
   if (!Number.isInteger(config.pollDurationSeconds) || config.pollDurationSeconds < 10 || config.pollDurationSeconds > 300) {
     fail("config.pollDurationSeconds must be between 10 and 300");
   }
@@ -84,9 +87,11 @@ function assertConfig(config) {
   if (!Number.isInteger(config.staffPollClientCount) || config.staffPollClientCount < 1 || config.staffPollClientCount > 100) {
     fail("config.staffPollClientCount must be between 1 and 100");
   }
-  if (!config.thresholds || config.thresholds.readP95Ms <= 0 || config.thresholds.writeP95Ms <= 0
+  if (!config.thresholds || config.thresholds.readP95Ms <= 0 || config.thresholds.reportingReadP95Ms <= 0
+      || config.thresholds.writeP95Ms <= 0
+      || config.thresholds.screeningBatchP95Ms <= 0
       || config.thresholds.errorRatePercent < 0 || config.thresholds.errorRatePercent > 100) {
-    fail("config.thresholds must contain positive read/write p95 limits and an error percentage");
+    fail("config.thresholds must contain positive read/reporting/write/screening-batch p95 limits and an error percentage");
   }
   if (!path.isAbsolute(config.fixtureFile) || isWithinBackend(config.fixtureFile)) {
     fail("config.fixtureFile must be an absolute path outside this repository");
@@ -98,8 +103,8 @@ function assertConfig(config) {
 }
 
 function assertFixture(fixture, config) {
-  if (fixture.target !== config.target || !UUID.test(fixture.eventId) || !UUID.test(fixture.stationId)) {
-    fail("Fixture target, eventId, or stationId is invalid");
+  if (fixture.target !== config.target || !UUID.test(fixture.eventId) || !UUID.test(fixture.registrationEventId) || !UUID.test(fixture.stationId)) {
+    fail("Fixture target, eventId, registrationEventId, or stationId is invalid");
   }
   if (!Array.isArray(fixture.participantIds) || fixture.participantIds.length < config.participantCount || fixture.participantIds.some((id) => !UUID.test(id))) {
     fail("Fixture does not contain enough valid synthetic participant IDs");
@@ -107,6 +112,10 @@ function assertFixture(fixture, config) {
   if (!Array.isArray(fixture.pollTokens) || fixture.pollTokens.length < config.participantCount
       || fixture.pollTokens.some((token) => !/^[a-f0-9]{64}$/.test(token))) {
     fail("Fixture does not contain enough valid synthetic secure-pass tokens");
+  }
+  if (!Array.isArray(fixture.pollRegistrationIds) || fixture.pollRegistrationIds.length < config.participantCount
+      || fixture.pollRegistrationIds.some((id) => !UUID.test(id))) {
+    fail("Fixture does not contain enough valid checked-in registration IDs");
   }
   return fixture;
 }
@@ -217,7 +226,7 @@ async function run(config, baseUrl, fixture, authorization) {
     "performance-registration",
     "POST",
     "/api/v1/registrations",
-    { eventId: fixture.eventId, participantId },
+    { eventId: fixture.registrationEventId, participantId },
     [200, 201],
     (data) => UUID.test(data?.registrationId),
   ));
@@ -227,14 +236,28 @@ async function run(config, baseUrl, fixture, authorization) {
   const registrationRead = await runScenario("registration.read", successfulRegistrations.slice(0, config.readSampleSize), config.concurrency, (registrationId) => request(
     baseUrl, authorization, "performance-registration-read", "GET", `/api/v1/registrations/${registrationId}`, null, [200],
   ));
-  const checkInIds = successfulRegistrations;
+  const checkIn = await runScenario(
+    "registration.check-in.write",
+    successfulRegistrations.slice(0, config.checkInSampleSize),
+    config.concurrency,
+    (registrationId) => request(
+      baseUrl,
+      authorization,
+      "performance-check-in",
+      "POST",
+      "/api/v1/qr/manual-checkin",
+      { registrationId, eventId: fixture.registrationEventId },
+      [200],
+      (data) => data?.data?.registrationId === registrationId,
+    ),
+  );
   const queueRead = await runScenario("queue.read", Array.from({ length: config.readSampleSize }), config.concurrency, () => request(
-    baseUrl, authorization, "performance-queue-read", "GET", `/api/v1/queues/events/${fixture.eventId}`, null, [200],
+    baseUrl, authorization, "performance-queue-read", "GET", `/api/v1/queues/events/${fixture.registrationEventId}`, null, [200],
   ));
 
   const screeningBatches = [];
-  for (let index = 0; index < checkInIds.length; index += 25) {
-    const registrations = checkInIds.slice(index, index + 25);
+  for (let index = 0; index < config.participantCount; index += 25) {
+    const registrations = fixture.pollRegistrationIds.slice(index, index + 25);
     screeningBatches.push({
       clientBatchId: crypto.randomUUID(),
       actions: registrations.map((registrationId) => ({
@@ -246,10 +269,10 @@ async function run(config, baseUrl, fixture, authorization) {
           idempotencyKey: crypto.randomUUID(),
           acknowledged: false,
           resultData: {
-            chartDistanceMetres: 6,
+            chartDistanceMetres: "6",
             od: { kind: "FRACTION", denominator: 6 },
             os: { kind: "FRACTION", denominator: 6 },
-            withUsualDistanceGlasses: true,
+            withUsualDistanceGlasses: "yes",
           },
         },
       })),
@@ -270,28 +293,34 @@ async function run(config, baseUrl, fixture, authorization) {
   ));
 
   const pollingDurationMs = config.pollDurationSeconds * 1000;
-  const participantPolling = await runPollingScenario(
-    "participant-status.poll",
-    fixture.pollTokens.slice(0, config.participantCount),
-    config.participantPollIntervalMs,
-    pollingDurationMs,
-    (token) => request(baseUrl, null, "participant-poll", "GET", `/api/v1/qr/public-status/${token}`, null, [200], (data) => data?.data?.valid === true),
-  );
-  const staffPolling = await runPollingScenario(
-    "staff-queue.poll",
-    Array.from({ length: config.staffPollClientCount }),
-    config.staffPollIntervalMs,
-    pollingDurationMs,
-    () => request(baseUrl, authorization, "staff-poll", "GET", `/api/v1/queues/events/${fixture.eventId}`, null, [200]),
-  );
+  const [participantPolling, staffPolling] = await Promise.all([
+    runPollingScenario(
+      "participant-status.poll",
+      fixture.pollTokens.slice(0, config.participantCount),
+      config.participantPollIntervalMs,
+      pollingDurationMs,
+      (token) => request(baseUrl, null, "participant-poll", "GET", `/api/v1/qr/public-status/${token}`, null, [200], (data) => data?.data?.valid === true),
+    ),
+    runPollingScenario(
+      "staff-queue.poll",
+      Array.from({ length: config.staffPollClientCount }),
+      config.staffPollIntervalMs,
+      pollingDurationMs,
+      () => request(baseUrl, authorization, "staff-poll", "GET", `/api/v1/queues/events/${fixture.eventId}`, null, [200]),
+    ),
+  ]);
 
-  return [registration.summary, registrationRead.summary, queueRead.summary, screening.summary, reporting.summary, participantPolling.summary, staffPolling.summary];
+  return [registration.summary, registrationRead.summary, checkIn.summary, queueRead.summary, screening.summary, reporting.summary, participantPolling.summary, staffPolling.summary];
 }
 
 function thresholdFailures(results, thresholds) {
   return results.flatMap((result) => {
     const failures = [];
-    const p95Limit = result.scenario.includes("write") ? thresholds.writeP95Ms : thresholds.readP95Ms;
+    const p95Limit = result.scenario === "screening.sync.write"
+      ? thresholds.screeningBatchP95Ms
+      : result.scenario === "reporting.read"
+        ? thresholds.reportingReadP95Ms
+        : result.scenario.includes("write") ? thresholds.writeP95Ms : thresholds.readP95Ms;
     if (result.p95Ms == null || result.p95Ms > p95Limit) failures.push(`${result.scenario} p95 ${result.p95Ms}ms > ${p95Limit}ms`);
     if (result.errorRatePercent > thresholds.errorRatePercent) failures.push(`${result.scenario} errors ${result.errorRatePercent}% > ${thresholds.errorRatePercent}%`);
     return failures;

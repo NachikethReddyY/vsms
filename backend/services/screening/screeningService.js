@@ -14,6 +14,7 @@ const {
   mergeClinicalAndTemplateResult,
   resolveCompatibleFieldSchema,
   evaluateDynamicResult,
+  mergeFlagEvaluations,
 } = require("../../schemas/dynamicStationSchema");
 const {
   visualAcuityResultData,
@@ -400,6 +401,14 @@ const saveStationResult = async ({
 
   try {
     return await prisma.$transaction(async (tx) => {
+      if (typeof tx.$queryRaw === "function") {
+        await tx.$queryRaw`
+          SELECT registration_id
+          FROM event_registrations
+          WHERE registration_id = CAST(${body.registrationId} AS uuid)
+          FOR UPDATE
+        `;
+      }
       const existingByKey = await tx.screeningRequestLedger.findUnique({
         where: { idempotencyKey: body.idempotencyKey },
       });
@@ -564,7 +573,7 @@ const saveStationResult = async ({
         },
       });
       return { result: responseResult, routeProgression, created: !existingResult };
-    }, { isolationLevel: "Serializable" });
+    }, { isolationLevel: "ReadCommitted" });
   } catch (error) {
     if (error.code === "P2002") {
       const raced = await prisma.screeningRequestLedger.findUnique({ where: { idempotencyKey: body.idempotencyKey } });
@@ -701,15 +710,17 @@ const validateDynamicBody = (station, body) => {
   return { ...body, resultData: mergeClinicalAndTemplateResult(cleaned, parsed.data) };
 };
 
-const evaluateForStationType = (stationType, resultData) => {
-  const evaluate = CLINICAL_EVALUATORS[stationType] || evaluateDynamicResult;
-  return evaluate(resultData);
+const evaluateForStationType = (stationType, resultData, fieldSchema = []) => {
+  const schemaEvaluation = evaluateDynamicResult(resultData, fieldSchema);
+  const clinicalEvaluate = CLINICAL_EVALUATORS[stationType];
+  if (!clinicalEvaluate) return schemaEvaluation;
+  return mergeFlagEvaluations(clinicalEvaluate(resultData), schemaEvaluation);
 };
 
 const previewDynamic = async (eventId, stationId, body, user) => {
   const station = await loadDynamicStation(eventId, stationId, user);
   const validatedBody = validateDynamicBody(station, body);
-  return evaluateForStationType(station.stationType, validatedBody.resultData);
+  return evaluateForStationType(station.stationType, validatedBody.resultData, station.fieldSchemaSnapshot);
 };
 
 const saveDynamic = async (eventId, stationId, body, user, context) => {
@@ -720,7 +731,7 @@ const saveDynamic = async (eventId, stationId, body, user, context) => {
     stationId,
     stationType: station.stationType,
     label: station.stationName,
-    evaluate: (resultData) => evaluateForStationType(station.stationType, resultData),
+    evaluate: (resultData) => evaluateForStationType(station.stationType, resultData, station.fieldSchemaSnapshot),
     body: validatedBody,
     user,
     context,

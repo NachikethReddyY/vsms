@@ -9,7 +9,7 @@ import styles from './LandingPage.module.css';
 const workflowSteps = [
   {
     title: 'Registration',
-    description: 'Confirm identity and consent, then create the event registration.',
+    description: 'Confirm identity and the emergency contact, then create the event registration.',
     icon: <path d="M7 9h18v16H7zM11 6h10v6H11zM11 17h10M11 21h7" />,
   },
   {

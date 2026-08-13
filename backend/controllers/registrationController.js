@@ -62,38 +62,18 @@ function publicRegistration(registration) {
     };
 }
 
-function registrationEvidence(body, now = new Date()) {
-    const paperFormUsed = body.paperFormUsed === true;
-    if (body.paperFormUsed !== undefined && typeof body.paperFormUsed !== "boolean") {
-        const error = new Error("paperFormUsed must be a boolean");
-        error.statusCode = 400;
-        throw error;
-    }
-
-    const paperExceptionReason = cleanString(body.paperExceptionReason, "paperExceptionReason", { max: 200 });
-    if (paperFormUsed !== Boolean(paperExceptionReason)) {
-        const error = new Error("A paper exception reason is required only when a paper form was used");
-        error.statusCode = 400;
-        throw error;
-    }
-    if (paperExceptionReason && paperExceptionReason.length < 3) {
-        const error = new Error("paperExceptionReason must contain at least 3 characters");
-        error.statusCode = 400;
-        throw error;
-    }
-
-    let workflowStartedAt = null;
-    if (body.workflowStartedAt !== undefined) {
-        workflowStartedAt = new Date(body.workflowStartedAt);
-        const ageMs = now.getTime() - workflowStartedAt.getTime();
-        if (Number.isNaN(workflowStartedAt.getTime()) || ageMs < -5 * 60_000 || ageMs > 24 * 60 * 60_000) {
-            const error = new Error("workflowStartedAt must be a valid time within the last 24 hours");
-            error.statusCode = 400;
-            throw error;
-        }
-    }
-
-    return { workflowStartedAt, paperFormUsed, paperExceptionReason: paperExceptionReason || null };
+function publicRegistrationSummary(summary) {
+    return {
+        eventId: summary.event_id,
+        capacity: Number(summary.capacity),
+        signedUpCount: Number(summary.signed_up_count),
+        waitlistedCount: Number(summary.waitlisted_count),
+        checkedInCount: Number(summary.checked_in_count),
+        completedCount: Number(summary.completed_count),
+        cancelledCount: Number(summary.cancelled_count),
+        filledCount: Number(summary.filled_count),
+        remainingCapacity: Number(summary.remaining_capacity),
+    };
 }
 
 exports.createRegistration = asyncHandler(async (req, res) => {
@@ -131,6 +111,14 @@ exports.listEventRegistrations = asyncHandler(async (req, res) => {
         auth: req.auth,
     });
     res.json({ registrations: result.registrations.map(publicRegistration), pagination: result.pagination });
+});
+
+exports.getEventRegistrationSummary = asyncHandler(async (req, res) => {
+    const summary = await registrationService.getEventRegistrationSummary({
+        eventId: assertUuid(req.params.eventId, "eventId"),
+        auth: req.auth,
+    });
+    res.json({ summary: publicRegistrationSummary(summary) });
 });
 
 exports.getRegistrationHistory = asyncHandler(async (req, res) => {

@@ -38,14 +38,25 @@ function writeTool(directory, name, source) {
 test("the 500-participant load configuration is accepted without running load", () => {
   const result = run(process.execPath, ["scripts/performance-runner.js", "--check", "--config", "performance/isolated-500.json"]);
   assert.equal(result.status, 0, result.stderr);
-  assert.match(result.stdout, /vsms_test/);
+  assert.match(result.stdout, /vsms_perf_test/);
   const config = JSON.parse(fs.readFileSync(path.join(backend, "performance/isolated-500.json"), "utf8"));
   const runner = fs.readFileSync(path.join(backend, "scripts/performance-runner.js"), "utf8");
   assert.equal(config.participantCount, 500);
+  assert.equal(config.concurrency, 5);
+  assert.equal(config.pollDurationSeconds, 30);
+  assert.equal(config.checkInSampleSize, 20);
+  assert.equal(config.thresholds.reportingReadP95Ms, 350);
+  assert.equal(config.thresholds.screeningBatchP95Ms, 7500);
   assert.equal(config.participantPollIntervalMs, 5000);
   assert.equal(config.staffPollIntervalMs, 10000);
   assert.match(runner, /participant-status\.poll/);
   assert.match(runner, /staff-queue\.poll/);
+  assert.match(runner, /registration\.check-in\.write/);
+  assert.match(runner, /reportingReadP95Ms/);
+  assert.match(runner, /screeningBatchP95Ms/);
+  assert.match(runner, /pollRegistrationIds/);
+  assert.match(runner, /chartDistanceMetres: "6"/);
+  assert.match(runner, /withUsualDistanceGlasses: "yes"/);
   assert.doesNotMatch(runner, /stations\/\$\{fixture\.stationId\}\/handoff/);
 });
 
@@ -91,6 +102,7 @@ shellTest("restore rejects a non-test database URL before invoking PostgreSQL", 
   const backup = path.join(directory, "fixture.dump");
   fs.writeFileSync(backup, "not a dump");
   fs.writeFileSync(`${backup}.counts.tsv`, "events\t0\n");
+  fs.writeFileSync(`${backup}.schema.tsv`, "");
   writeChecksum(backup);
   const result = run("sh", ["scripts/restore-postgres-test.sh", backup], {
     RESTORE_DATABASE_URL: "postgresql://user:secret@127.0.0.1:1/vsms",
@@ -105,6 +117,7 @@ shellTest("restore rejects an incomplete row-count manifest before it can clear 
   const backup = path.join(directory, "fixture.dump");
   fs.writeFileSync(backup, "not a dump");
   fs.writeFileSync(`${backup}.counts.tsv`, "events\t0\n");
+  fs.writeFileSync(`${backup}.schema.tsv`, "");
   writeChecksum(backup);
   const result = run("sh", ["scripts/restore-postgres-test.sh", backup], {
     RESTORE_DATABASE_URL: "postgresql://user:secret@127.0.0.1:1/vsms_test",
@@ -147,6 +160,7 @@ shellTest("restore passes pg_restore the single-transaction flag", () => {
   const argumentsFile = path.join(directory, "pg-restore-arguments.txt");
   fs.writeFileSync(backup, "not a real dump");
   fs.writeFileSync(`${backup}.counts.tsv`, `${completeManifest()}\n`);
+  fs.writeFileSync(`${backup}.schema.tsv`, "0\n");
   writeChecksum(backup);
   writeTool(tools, "psql", "#!/bin/sh\ncase \"$*\" in *current_database*) printf '%s\\n' vsms_test ;; *) printf '%s\\n' 0 ;; esac\n");
   writeTool(tools, "pg_restore", "#!/bin/sh\nprintf '%s\\n' \"$@\" > \"$PG_RESTORE_ARGUMENTS_FILE\"\n");

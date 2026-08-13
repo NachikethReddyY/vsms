@@ -315,6 +315,12 @@ const fieldSchemaValue = z.array(z.object({
   max: z.number().optional(),
   unit: z.string().optional(),
   eyes: z.enum(["OD", "OS", "BOTH"]).optional(),
+  flagRules: z.array(z.object({
+    op: z.enum(["eq", "neq", "lt", "lte", "gt", "gte", "includes", "isTrue", "isFalse", "isEmpty", "notEmpty"]),
+    value: z.union([z.string(), z.number(), z.boolean()]).optional(),
+    flag: z.enum(["REVIEW", "REFER", "URGENT"]),
+    reason: z.string().trim().min(1).max(200),
+  }).passthrough()).max(10).optional(),
 }).passthrough()).min(1).max(40).optional();
 const createStationTemplateBody = z.object({
   stationType: z.enum(SCREENING_STATION_TYPES),

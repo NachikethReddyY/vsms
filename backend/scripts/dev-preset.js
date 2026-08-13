@@ -133,7 +133,6 @@ async function upsertParticipant(staff, { participantReference, firstName, lastN
       firstName,
       lastName,
       status: "ACTIVE",
-      consentGiven: true,
       updatedById: staff.id,
     },
     create: {
@@ -149,7 +148,6 @@ async function upsertParticipant(staff, { participantReference, firstName, lastN
       preferredLanguage: "English",
       status: "ACTIVE",
       emergencyContact: "+65 8000 0099",
-      consentGiven: true,
       createdById: staff.id,
       updatedById: staff.id,
     },
