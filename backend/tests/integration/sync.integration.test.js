@@ -54,6 +54,8 @@ before(async () => {
       stationName: "Visual Acuity",
       stationType: "VISUAL_ACUITY",
       stationOrder: 1,
+      fieldSchemaSnapshot: require("../../schemas/dynamicStationSchema").SYSTEM_FIELD_SCHEMAS.VISUAL_ACUITY,
+      schemaVersion: 1,
     },
   });
   await helpers.prisma.staffAssignment.create({
@@ -130,10 +132,10 @@ describe("screening sync API", () => {
         idempotencyKey: crypto.randomUUID(),
         acknowledged: false,
         resultData: {
-          chartDistanceMetres: 6,
+          chartDistanceMetres: "6",
           od: { kind: "FRACTION", denominator: 6 },
           os: { kind: "FRACTION", denominator: 6 },
-          withUsualDistanceGlasses: true,
+          withUsualDistanceGlasses: "unknown",
         },
       },
     };

@@ -5,6 +5,6 @@ export default defineConfig({
     environment: 'node',
     restoreMocks: true,
     globals: true, // Enables global 'describe', 'it', 'expect' without explicit imports
-    include: ['src/**/*.{test,spec}.{js,ts,jsx,tsx}'],
+    include: ['src/**/*.{test,spec}.{js,ts,tsx,mjs}'],
   },
 });

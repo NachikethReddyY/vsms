@@ -10549,6 +10549,21 @@ item:
                 "stationName": "",
                 "stationType": "VISUAL_ACUITY",
                 "stationOrder": 1,
+                "fieldSchemaSnapshot": [
+                  {
+                    "key": "",
+                    "label": "",
+                    "type": "text",
+                    "required": true,
+                    "options": [
+                      ""
+                    ],
+                    "min": 0,
+                    "max": 0,
+                    "unit": "",
+                    "eyes": "OD"
+                  }
+                ],
                 "result": {
                   "resultId": "00000000-0000-4000-8000-000000000000",
                   "stationId": "00000000-0000-4000-8000-000000000000",
