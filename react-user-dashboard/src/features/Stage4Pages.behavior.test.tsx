@@ -108,22 +108,19 @@ describe('Stage 4 rendered route behavior', () => {
     expect(await screen.findByText('VA station')).toBeTruthy();
   });
 
-  it('treats eye-health screener URLs as review-only redirects to the event', async () => {
-    const { Navigate, Route, Routes, useParams } = await import('react-router-dom');
-    function EyeHealthStationRedirect() {
-      const { eventId = '' } = useParams();
-      return <Navigate to={`/events/${eventId}`} replace />;
-    }
+  it('allows eye-health screener URLs only with an active eye-health duty', async () => {
+    const { StationDutyGuard } = await import('../auth/RoleGuard');
     render(
       <MemoryRouter initialEntries={['/events/event-1/stations/eye-health']}>
         <Routes>
-          <Route path="/events/:eventId/stations/eye-health" element={<EyeHealthStationRedirect />} />
-          <Route path="/events/:eventId" element={<p>Event overview</p>} />
+          <Route element={<StationDutyGuard stationType="EYE_HEALTH" />}>
+            <Route path="/events/:eventId/stations/eye-health" element={<p>Eye health station</p>} />
+          </Route>
+          <Route path="/forbidden" element={<p>Forbidden page</p>} />
         </Routes>
       </MemoryRouter>,
     );
-    expect(await screen.findByText('Event overview')).toBeTruthy();
-    expect(screen.queryByText('Eye health station')).toBeNull();
+    expect(await screen.findByText('Eye health station')).toBeTruthy();
   });
 
   it('renders profile eventMemberships exact field and profile failure', async () => {

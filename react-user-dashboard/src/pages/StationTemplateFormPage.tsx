@@ -99,7 +99,7 @@ export default function StationTemplateFormPage({ mode }: { mode: Mode }) {
           templateKey: template.templateKey,
           version: template.version,
         });
-        setLoadError('Registration, clinical review, and eye health are not managed in the station library.');
+        setLoadError('Registration and clinical review are not managed in the station library.');
         return;
       }
       setEditingMeta({
@@ -208,7 +208,7 @@ export default function StationTemplateFormPage({ mode }: { mode: Mode }) {
           {mode === 'edit' && editingMeta && (
             <label className="station-template-field">
               <span>Station type</span>
-              <input disabled value={labelStationType(editingMeta.stationType, editingMeta.templateKey)} />
+              <input disabled value={labelStationType(editingMeta.stationType)} />
             </label>
           )}
           <label className="station-template-field">

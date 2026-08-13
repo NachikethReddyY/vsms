@@ -36,7 +36,8 @@ test("live acceptance runner writes and validates a template without network acc
 });
 
 test("passed evidence requires run metadata and sanitized capture metadata", () => {
-  const kit = loadKit();
+  const kit = structuredClone(loadKit());
+  kit.scenarios[0].proofLevel = "DEPENDENCY_BLOCKED";
   const evidence = newEvidence(kit);
   evidence.run = {
     environment: "approved-test",

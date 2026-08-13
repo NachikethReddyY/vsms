@@ -15,7 +15,7 @@ availability; dated deployment and performance evidence is identified below.
 - [x] Participant search, create, update, emergency contacts and event registration — participant/registration routes and services.
 - [x] QR issue, verification, reissue, revocation, download and print paths — `backend/services/participant/qrService.js` and QR routes.
 - [x] Queue join, hand-off, call, start, advance, complete, skip and priority — queue routes and `services/screening/queueService.js`.
-- [x] Visual-acuity, refraction and colour-vision station save/preview paths with server-side flags, plus reviewer-owned eye-health observations — `screeningService.js`, `reviewService.js`, OpenAPI and station pages.
+- [x] Visual-acuity, refraction, colour-vision and eye-health station save/preview paths with server-side flags, offline synchronization, plus reviewer-owned final observations — `screeningService.js`, `syncService.js`, `reviewService.js`, OpenAPI and station pages.
 - [x] Review decisions and referral issue/revision/acknowledgement/document paths — `reviewService.js`, `referralService.js` and routes.
 - [x] Metrics, analytics, operational reports and queued PDF/CSV export source paths — `services/reporting/` and OpenAPI.
 

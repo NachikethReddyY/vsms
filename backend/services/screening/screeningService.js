@@ -20,6 +20,7 @@ const {
   visualAcuityResultData,
   refractionResultData,
   colourVisionResultData,
+  eyeHealthResultData,
 } = require("../../schemas/screeningSchemas");
 const { advanceAfterFirstResult } = require("./routeProgressionService");
 
@@ -640,34 +641,36 @@ const saveColourVision = (eventId, stationId, body, user, context) => saveStatio
   context,
 });
 
-const previewEyeHealth = () => {
-  throw new AppError(
-    410,
-    "EYE_HEALTH_REVIEW_ONLY",
-    "Eye health is recorded during clinical review, not as a screening station",
-  );
-};
+const previewEyeHealth = (eventId, stationId, body, user) => previewStationResult(
+  eventId, stationId, "EYE_HEALTH", "Eye health", evaluateEyeHealth, body, user,
+);
 
-const saveEyeHealth = () => {
-  throw new AppError(
-    410,
-    "EYE_HEALTH_REVIEW_ONLY",
-    "Eye health is recorded during clinical review, not as a screening station",
-  );
-};
+const saveEyeHealth = (eventId, stationId, body, user, context) => saveStationResult({
+  eventId,
+  stationId,
+  stationType: "EYE_HEALTH",
+  label: "Eye health",
+  ruleVersion: EH_RULE_VERSION,
+  evaluate: evaluateEyeHealth,
+  body,
+  user,
+  context,
+});
 
-const SCHEMA_DRIVEN_STATION_TYPES = new Set(["CUSTOM", "VISUAL_ACUITY", "REFRACTION", "COLOUR_VISION"]);
+const SCHEMA_DRIVEN_STATION_TYPES = new Set(["CUSTOM", "VISUAL_ACUITY", "REFRACTION", "COLOUR_VISION", "EYE_HEALTH"]);
 
 const CLINICAL_RESULT_SCHEMAS = {
   VISUAL_ACUITY: visualAcuityResultData,
   REFRACTION: refractionResultData,
   COLOUR_VISION: colourVisionResultData,
+  EYE_HEALTH: eyeHealthResultData,
 };
 
 const CLINICAL_EVALUATORS = {
   VISUAL_ACUITY: evaluateVisualAcuity,
   REFRACTION: evaluateRefraction,
   COLOUR_VISION: evaluateColourVision,
+  EYE_HEALTH: evaluateEyeHealth,
 };
 
 const loadDynamicStation = async (eventId, stationId, user) => {

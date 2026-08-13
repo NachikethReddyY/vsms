@@ -14,6 +14,7 @@ import ReviewWorkspacePage from "./features/reviews/ReviewWorkspacePage";
 import ReportsPage from "./features/reports/ReportsPage";
 import OperationsCenterPage from "./features/operations/OperationsCenterPage";
 import DynamicStationPage from "./features/screening/DynamicStationPage";
+import EyeHealthStationPage from "./features/screening/EyeHealthStationPage";
 import QRScannerPage from "./features/screening/QRScannerPage";
 import { AuditLogsPage as RegistrationAuditLogsPage } from "./pages/AdminPages";
 import {
@@ -86,12 +87,6 @@ function LegacyRegistrationRedirect({ destination }: { destination: "history" | 
   return <Navigate to={`/participants/registrations/${registrationId}/${destination}`} replace />;
 }
 
-/** Eye health is clinician-review only — legacy screener URLs return to the event. */
-function EyeHealthStationRedirect() {
-  const { eventId = "" } = useParams();
-  return <Navigate to={`/events/${eventId}`} replace />;
-}
-
 export default function App() {
   return (
     <Routes>
@@ -142,7 +137,9 @@ export default function App() {
             <Route element={<StationDutyGuard stationType="COLOUR_VISION" />}>
               <Route path="/events/:eventId/stations/colour-vision" element={<DynamicStationPage stationType="COLOUR_VISION" />} />
             </Route>
-            <Route path="/events/:eventId/stations/eye-health" element={<EyeHealthStationRedirect />} />
+            <Route element={<StationDutyGuard stationType="EYE_HEALTH" />}>
+              <Route path="/events/:eventId/stations/eye-health" element={<EyeHealthStationPage />} />
+            </Route>
             <Route element={<StationDutyGuard stationType="CUSTOM" />}>
               <Route path="/events/:eventId/stations/custom/:stationId" element={<DynamicStationPage />} />
             </Route>
