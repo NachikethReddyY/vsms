@@ -7,6 +7,7 @@ const HANDLERS = {
   VISUAL_ACUITY: "saveVisualAcuity",
   REFRACTION: "saveRefraction",
   COLOUR_VISION: "saveColourVision",
+  EYE_HEALTH: "saveEyeHealth",
   CUSTOM: "saveDynamic",
 };
 
@@ -29,7 +30,6 @@ const SAFE_CONFLICT_CODES = new Set([
   "SHIFT_NOT_ACTIVE",
   "STATION_NOT_FOUND",
   "STATION_SCHEMA_MISSING",
-  "EYE_HEALTH_REVIEW_ONLY",
 ]);
 
 const canonicalJson = (value) => {
@@ -260,17 +260,10 @@ const processAction = async ({ eventId, action, user, db, screening, options }) 
 
   try {
     const handlerName = HANDLERS[action.stationType];
-    if (!handlerName || typeof screening[handlerName] !== "function") {
-      const reviewOnly = action.stationType === "EYE_HEALTH";
-      throw Object.assign(new Error(
-        reviewOnly
-          ? "Eye health is recorded during clinical review, not as a screening station"
-          : `Unsupported screening station type: ${action.stationType}`,
-      ), {
-        status: reviewOnly ? 410 : 422,
-        code: reviewOnly ? "EYE_HEALTH_REVIEW_ONLY" : "UNSUPPORTED_STATION_TYPE",
-      });
-    }
+    if (!handlerName || typeof screening[handlerName] !== "function") throw Object.assign(
+      new Error(`Unsupported screening station type: ${action.stationType}`),
+      { status: 422, code: "UNSUPPORTED_STATION_TYPE" },
+    );
     const receipt = await screening[handlerName](
       eventId,
       action.stationId,

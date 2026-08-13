@@ -12,6 +12,7 @@ export const STATION_TYPE_OPTIONS = [
   { value: 'VISUAL_ACUITY', label: 'Visual acuity' },
   { value: 'REFRACTION', label: 'Refraction' },
   { value: 'COLOUR_VISION', label: 'Colour vision' },
+  { value: 'EYE_HEALTH', label: 'Eye health' },
   { value: 'CUSTOM', label: 'Custom' },
 ] as const;
 
@@ -65,7 +66,6 @@ const toEditDraft = (template: StationTemplateRecord): EditDraft => ({
 });
 
 const labelStationType = (stationType: CatalogStationType | null) => {
-  if (stationType === 'EYE_HEALTH') return 'Eye health (review only)';
   return STATION_TYPE_OPTIONS.find((item) => item.value === stationType)?.label ?? 'Legacy catalog only';
 };
 

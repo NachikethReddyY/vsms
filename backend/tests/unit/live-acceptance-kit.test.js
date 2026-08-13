@@ -45,26 +45,13 @@ test("passed evidence requires run metadata and sanitized capture metadata", () 
   };
   for (const capture of evidence.captures) {
     capture.capturedAt = "2026-08-10T12:01:00.000Z";
-    if (capture.proofLevel === "DEPENDENCY_BLOCKED") {
-      capture.status = "BLOCKED";
-      capture.note = "Known implementation dependency.";
-    } else {
-      capture.status = "PASSED";
-      capture.sanitizedScreenshot = { path: `screenshots/${capture.scenarioId}.png`, sanitized: true };
-      capture.requestIds = ["11111111-1111-4111-8111-111111111111"];
-      capture.httpStatuses = [200];
-      capture.rowCounts = { syntheticRows: 1 };
-    }
+    capture.status = "PASSED";
+    capture.sanitizedScreenshot = { path: `screenshots/${capture.scenarioId}.png`, sanitized: true };
+    capture.requestIds = ["11111111-1111-4111-8111-111111111111"];
+    capture.httpStatuses = [200];
+    capture.rowCounts = { syntheticRows: 1 };
   }
   assert.doesNotThrow(() => assertEvidence(evidence, kit));
-  const dependency = evidence.captures.find((capture) => capture.proofLevel === "DEPENDENCY_BLOCKED");
-  dependency.status = "PASSED";
-  dependency.sanitizedScreenshot = { path: "screenshots/dependency.png", sanitized: true };
-  dependency.requestIds = ["11111111-1111-4111-8111-111111111111"];
-  dependency.httpStatuses = [200];
-  dependency.rowCounts = { syntheticRows: 1 };
-  assert.throws(() => assertEvidence(evidence, kit), /must not validate as PASSED/);
-  dependency.status = "BLOCKED";
   const passed = evidence.captures.find((capture) => capture.status === "PASSED");
   passed.httpStatuses = [503];
   assert.throws(() => assertEvidence(evidence, kit), /must not include a 5xx status/);

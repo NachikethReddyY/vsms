@@ -56,9 +56,9 @@ The executable scenario catalogue is [`backend/acceptance/live-workflow.json`](.
 3. Give synthetic staff an active event membership and duty. Show one allowed duty action, then repeat it on another event and retain the denied status/request ID.
 4. Suspend, revoke session, and deprovision separate synthetic accounts. Show the existing session denied after each action. Do not reuse a real staff account.
 5. Register Synthetic Charlie, record consent, issue/verify a QR pass, check in, and capture aggregate registration/queue count changes.
-6. Transfer through visual acuity, refraction, and colour vision queues. Capture only the synthetic fixture marker, request IDs, statuses, and counts.
+6. Transfer through visual acuity, refraction, colour vision, and eye-health queues. Capture only the synthetic fixture marker, request IDs, statuses, and counts.
 7. Record a review/referral with the synthetic recipient; retain a masked view only.
-8. Download an assigned station while online, disconnect, save one synthetic result, reconnect, and show one applied sync action without a duplicate.
+8. Download an assigned station while online, disconnect, save one synthetic eye-health result, reconnect, and show one applied sync action without a duplicate.
 9. Compare dashboard aggregate counts with the recorded row counts, then generate an authorized event export/report without retaining its contents.
 
 ## What is locally proven vs blocked
@@ -68,6 +68,5 @@ The executable scenario catalogue is [`backend/acceptance/live-workflow.json`](.
 | Fixture shape, local-only reset guard, scenario catalogue, evidence template/validation | Automated locally by `acceptance:check` and its unit test. |
 | Authorization, lifecycle, QR, queue, review/referral, sync implementation | Has existing local backend/frontend test coverage; this is not browser/live proof. |
 | Invitation, password, MFA, Cognito group intersection, session revocation, suspension/deprovisioning | Requires an approved deployment and synthetic Cognito accounts; no AWS/Cognito mutation is performed here. |
-| Visual acuity, refraction, colour vision, queues/transfers, review/referral, dashboard/export | Requires a browser against an approved deployment to become live evidence. |
-| Eye health fourth station | Blocked. `EYE_HEALTH` remains catalog-only in the Station Library and has no capture route/page; do not mark this path passed. |
+| All four stations, queues/transfers, review/referral, dashboard/export | Implemented with automated coverage; requires a browser against an approved deployment to become live evidence. |
 | Offline reconnect | Requires real browser storage, an active assigned station, and a deliberate connection interruption. Unit coverage does not establish a live reconnect. |

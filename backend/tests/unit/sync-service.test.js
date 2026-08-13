@@ -511,7 +511,7 @@ test("sync schema rejects participant identifiers and profile fields", () => {
   assert.equal(screeningSyncBody.safeParse({ clientBatchId: crypto.randomUUID(), actions: [unsafe] }).success, false);
 });
 
-test("eye-health sync actions are rejected as review-only", async () => {
+test("eye-health sync actions apply through the dedicated handler and stay idempotent", async () => {
   const db = createDb();
   let saves = 0;
   const screening = createScreening({
@@ -543,14 +543,15 @@ test("eye-health sync actions are rejected as review-only", async () => {
     },
   });
 
-  assert.equal(
-    screeningSyncBody.safeParse({ clientBatchId: crypto.randomUUID(), actions: [eyeAction] }).success,
-    false,
-  );
-
   const first = invoke({ clientBatchId: crypto.randomUUID(), actions: [eyeAction] }, { db, screening });
   const firstResponse = await first.promise;
-  assert.equal(firstResponse.actions[0].status, "CONFLICT");
-  assert.equal(firstResponse.actions[0].errorCode, "EYE_HEALTH_REVIEW_ONLY");
-  assert.equal(saves, 0);
+  assert.equal(firstResponse.actions[0].status, "APPLIED");
+  assert.equal(saves, 1);
+
+  const replayResponse = await invoke(
+    { clientBatchId: crypto.randomUUID(), actions: [eyeAction] },
+    { db, screening },
+  ).promise;
+  assert.equal(replayResponse.actions[0].status, "APPLIED");
+  assert.equal(saves, 1);
 });

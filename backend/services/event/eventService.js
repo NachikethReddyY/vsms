@@ -1724,13 +1724,6 @@ const listStationTemplateLibrary = async () => {
 };
 
 const createStationTemplate = async (body, user, context, db = prisma) => {
-  if (body.stationType === "EYE_HEALTH") {
-    throw new AppError(
-      422,
-      "STATION_TYPE_NOT_IMPORTABLE",
-      "Eye health is recorded during clinical review, not as a screening station template",
-    );
-  }
   const { SYSTEM_FIELD_SCHEMAS } = require("../../schemas/dynamicStationSchema");
   let fieldSchema;
   try {
