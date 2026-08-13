@@ -576,7 +576,7 @@ Resources:
       Protocol: HTTP
       Port: 5050
       HealthCheckEnabled: true
-      HealthCheckPath: /health
+      HealthCheckPath: /ready
       HealthCheckIntervalSeconds: 30
       HealthCheckTimeoutSeconds: 5
       HealthyThresholdCount: 2
