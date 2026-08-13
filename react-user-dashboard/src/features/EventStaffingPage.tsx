@@ -1,4 +1,4 @@
-import { ArrowPathIcon, MagnifyingGlassIcon, PlusIcon, UserGroupIcon, XMarkIcon } from '@heroicons/react/24/outline';
+import { ArrowLeftIcon, ArrowPathIcon, MagnifyingGlassIcon, PlusIcon, UserGroupIcon, XMarkIcon } from '@heroicons/react/24/outline';
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { AppDialog } from '../components/AppDialog';
@@ -24,7 +24,7 @@ export default function EventStaffingPage() {
   const [eligible, setEligible] = useState<api.AccountProfile[]>([]);
   const [search, setSearch] = useState('');
   const [teamSearch, setTeamSearch] = useState('');
-  const [accountId, setAccountId] = useState('');
+  const [accountIds, setAccountIds] = useState<string[]>([]);
   const [roles, setRoles] = useState<string[]>(['REGISTRATION']);
   const [addOpen, setAddOpen] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -53,7 +53,16 @@ export default function EventStaffingPage() {
     const query = search.trim().toLowerCase();
     return eligible.filter((person) => !query || `${person.fullName} ${person.email}`.toLowerCase().includes(query));
   }, [eligible, search]);
-  const selectedPerson = eligible.find((person) => (person.userId ?? person.id) === accountId);
+  const selectedPeople = eligible.filter((person) => accountIds.includes(person.userId ?? person.id));
+  const canAssignRole = (role: string) => selectedPeople.length > 0
+    && (role !== 'REVIEWER' || selectedPeople.every((person) => person.professionalCategory === 'DOCTOR'))
+    && (role !== 'EVENT_MANAGER' || selectedPeople.every((person) => person.roles?.includes('EVENT_MANAGER')));
+
+  const selectPeople = (ids: string[]) => {
+    setAccountIds(ids);
+    const people = eligible.filter((person) => ids.includes(person.userId ?? person.id));
+    setRoles((current) => current.filter((role) => (role !== 'REVIEWER' || people.every((person) => person.professionalCategory === 'DOCTOR')) && (role !== 'EVENT_MANAGER' || people.every((person) => person.roles?.includes('EVENT_MANAGER')))));
+  };
 
   const toggleRole = (role: string) => setRoles((current) => current.includes(role) ? current.filter((item) => item !== role) : [...current, role]);
 
@@ -67,16 +76,16 @@ export default function EventStaffingPage() {
 
   const assign = async (submitEvent: FormEvent<HTMLFormElement>) => {
     submitEvent.preventDefault();
-    if (!accountId || !roles.length) return;
+    if (!accountIds.length || !roles.length) return;
     setBusy('assign');
     setError('');
     try {
-      await api.addMembership(eventId, accountId, roles);
-      setAccountId('');
+      await Promise.all(accountIds.map((accountId) => api.addMembership(eventId, accountId, roles)));
+      setAccountIds([]);
       setRoles(['REGISTRATION']);
       setSearch('');
       setAddOpen(false);
-      setNotice('Person assigned to this event.');
+      setNotice(`${accountIds.length} ${accountIds.length === 1 ? 'person' : 'people'} assigned to this event.`);
       await load();
     } catch (cause) {
       setError(getApiError(cause, 'The event assignment could not be saved.'));
@@ -137,8 +146,8 @@ export default function EventStaffingPage() {
 
   return <div className="stage4-page event-staffing-page">
     <header className="event-staffing-header">
-      <div><h1>People and roles</h1><p>Find approved staff, assign their event roles, and manage the active team.</p></div>
-      <div className="stage4-actions"><Link className="stage4-button secondary" to={`/events/${eventId}`}>Event detail</Link><button className="secondary event-staffing-refresh" type="button" aria-label="Refresh event team" title="Refresh event team" disabled={loading} onClick={() => void load()}><ArrowPathIcon className={loading ? 'is-spinning' : ''} /></button><button type="button" onClick={() => { setAccountId(''); setRoles(['REGISTRATION']); setSearch(''); setAddOpen(true); }}><PlusIcon />Add staff</button></div>
+      <div><Link className="event-staffing-back" to={`/events/${eventId}`}><ArrowLeftIcon />Back to event</Link><h1>People and roles</h1><p>Find approved staff, assign their event roles, and manage the active team.</p></div>
+      <div className="stage4-actions"><button className="secondary event-staffing-refresh" type="button" aria-label="Refresh event team" title="Refresh event team" disabled={loading} onClick={() => void load()}><ArrowPathIcon className={loading ? 'is-spinning' : ''} /></button><button type="button" onClick={() => { setAccountIds([]); setRoles(['REGISTRATION']); setSearch(''); setAddOpen(true); }}><PlusIcon />Add staff</button></div>
     </header>
 
     {notice && <div className="stage4-alert good" role="status">{notice}</div>}
@@ -159,14 +168,14 @@ export default function EventStaffingPage() {
       })}</div> : <div className="quiet-empty"><UserGroupIcon /><h2>{activeMembers.length ? 'No team members match' : 'No one assigned yet'}</h2><p>{activeMembers.length ? 'Try a different name, email, or role.' : 'Use Add staff to build this event team.'}</p></div>}
     </section>
 
-    <AppDialog open={addOpen} onOpenChange={setAddOpen} title="Add staff" description="Search approved, enabled accounts and assign one or more roles for this event." className="event-staffing-dialog" initialFocusRef={searchRef}>
+    <AppDialog open={addOpen} onOpenChange={setAddOpen} title="Add staff" description="Select approved, enabled accounts and assign the same roles to all of them." className="event-staffing-dialog" initialFocusRef={searchRef}>
       <form className="event-staffing-dialog-form" onSubmit={(event) => void assign(event)}>
         <div className="event-staffing-search">
           <label><span>Search staff</span><div><MagnifyingGlassIcon /><input ref={searchRef} type="search" value={search} onChange={(event) => setSearch(event.target.value)} onKeyDown={(event) => { if (event.key === 'Enter') { event.preventDefault(); void searchEligible(); } }} placeholder="Name or email" /><button className="secondary" type="button" disabled={busy === 'search'} onClick={() => void searchEligible()}>{busy === 'search' ? 'Searching…' : 'Search'}</button></div></label>
         </div>
-        <fieldset className="event-person-picker"><legend>Choose a person</legend><div>{candidates.length ? candidates.map((person) => { const id = person.userId ?? person.id; return <label key={id}><input type="radio" name="event-person" value={id} checked={accountId === id} onChange={() => { setAccountId(id); setRoles((current) => current.filter((role) => (role !== 'REVIEWER' || person.professionalCategory === 'DOCTOR') && (role !== 'EVENT_MANAGER' || person.roles?.includes('EVENT_MANAGER')))); }} /><span><strong>{person.fullName}</strong><small>{person.email}</small></span></label>; }) : <p>No eligible staff match this search.</p>}</div></fieldset>
-        <fieldset className="event-role-picker"><legend>Roles for this event</legend><div>{EVENT_ROLES.map((role) => { const disabled = !selectedPerson || (role.value === 'REVIEWER' && selectedPerson.professionalCategory !== 'DOCTOR') || (role.value === 'EVENT_MANAGER' && !selectedPerson.roles?.includes('EVENT_MANAGER')); return <label key={role.value} aria-disabled={disabled}><input type="checkbox" checked={roles.includes(role.value)} disabled={disabled} onChange={() => toggleRole(role.value)} /><span>{role.label}</span></label>; })}</div></fieldset>
-        <div className={appDialog.actions}><button className="secondary" type="button" onClick={() => setAddOpen(false)}>Cancel</button><button type="submit" disabled={!accountId || !roles.length || busy === 'assign'}><PlusIcon />{busy === 'assign' ? 'Adding…' : 'Add to event'}</button></div>
+        <fieldset className="event-person-picker"><legend>Choose people</legend>{candidates.length > 1 && <label className="event-person-select-all"><input type="checkbox" checked={candidates.every((person) => accountIds.includes(person.userId ?? person.id))} onChange={(event) => selectPeople(event.target.checked ? Array.from(new Set([...accountIds, ...candidates.map((person) => person.userId ?? person.id)])) : accountIds.filter((id) => !candidates.some((person) => (person.userId ?? person.id) === id)))} /><span>Select all {candidates.length}</span></label>}<div>{candidates.length ? candidates.map((person) => { const id = person.userId ?? person.id; return <label key={id}><input type="checkbox" value={id} checked={accountIds.includes(id)} onChange={(event) => selectPeople(event.target.checked ? [...accountIds, id] : accountIds.filter((item) => item !== id))} /><span><strong>{person.fullName}</strong><small>{person.email}</small></span><span className="event-person-badges">{person.roles?.includes('EVENT_MANAGER') && <span>Event manager</span>}{person.professionalCategory === 'DOCTOR' && <span>Doctor</span>}</span></label>; }) : <p>No eligible staff match this search.</p>}</div></fieldset>
+        <fieldset className="event-role-picker"><legend>Roles for this event</legend><div>{EVENT_ROLES.map((role) => { const disabled = !canAssignRole(role.value); return <label key={role.value} aria-disabled={disabled}><input type="checkbox" checked={roles.includes(role.value)} disabled={disabled} onChange={() => toggleRole(role.value)} /><span>{role.label}</span></label>; })}</div></fieldset>
+        <div className={appDialog.actions}><button className="secondary" type="button" onClick={() => setAddOpen(false)}>Cancel</button><button type="submit" disabled={!accountIds.length || !roles.length || busy === 'assign'}><PlusIcon />{busy === 'assign' ? 'Adding…' : `Add ${accountIds.length || ''} to event`}</button></div>
       </form>
     </AppDialog>
   </div>;

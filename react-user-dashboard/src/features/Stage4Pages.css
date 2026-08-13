@@ -81,6 +81,8 @@
 .event-staffing-header { display:flex; align-items:center; justify-content:space-between; gap:24px; padding-bottom:24px; border-bottom:1px solid var(--hairline); }
 .event-staffing-header h1 { margin:0; font-size:34px; letter-spacing:-.035em; }
 .event-staffing-header p:not(.eyebrow) { max-width:68ch; margin:8px 0 0; color:var(--ink-2); line-height:21px; }
+.event-staffing-back { display:inline-flex; align-items:center; gap:7px; margin-bottom:14px; color:var(--ink-2); font-size:13px; font-weight:700; text-decoration:none; }
+.event-staffing-back svg { width:17px; }
 .event-staffing-refresh { width:40px; padding:0!important; }
 .event-staffing-refresh svg { width:18px; }
 .event-staffing-header .stage4-actions { flex-wrap:nowrap; }
@@ -128,13 +130,16 @@
 .event-person-picker { min-width:0; margin:0; padding:0; border:0; }
 .event-person-picker legend { margin-bottom:8px; color:var(--ink-2); font-size:12px; font-weight:700; }
 .event-person-picker>div { max-height:250px; overflow:auto; border-top:1px solid var(--hairline); border-bottom:1px solid var(--hairline); }
-.event-person-picker label { min-height:58px; display:grid; grid-template-columns:20px minmax(0,1fr); align-items:center; gap:10px; padding:8px 10px; border-bottom:1px solid var(--hairline-soft); cursor:pointer; }
+.event-person-picker label { min-height:58px; display:grid; grid-template-columns:20px minmax(0,1fr) auto; align-items:center; gap:10px; padding:8px 10px; border-bottom:1px solid var(--hairline-soft); cursor:pointer; }
+.event-person-picker .event-person-select-all { min-height:40px; grid-template-columns:20px 1fr; border:1px solid var(--hairline); border-bottom:0; font-size:12px; font-weight:700; }
 .event-person-picker label:last-child { border-bottom:0; }
 .event-person-picker label:has(input:checked) { background:var(--accent-tint); }
 .event-person-picker input { width:16px; height:16px; accent-color:var(--accent); }
 .event-person-picker strong,.event-person-picker small { display:block; }
 .event-person-picker strong { font-size:13px; }
 .event-person-picker small { margin-top:2px; color:var(--muted); font-size:11px; }
+.event-person-badges { display:flex; justify-content:flex-end; gap:5px; }
+.event-person-badges>span { padding:4px 7px; border:1px solid var(--hairline-strong); border-radius:999px; color:var(--ink-2); font-size:10px; font-weight:700; white-space:nowrap; }
 .event-person-picker p { margin:0; padding:22px 10px; color:var(--muted); font-size:13px; }
 .event-staffing-dialog .app-dialog-actions svg { width:18px; }
 
