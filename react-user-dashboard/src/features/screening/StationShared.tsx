@@ -17,6 +17,15 @@ import { getOfflineStationContext, isNetworkError } from './offlineSync';
 import { StationCameraScanner } from './StationCameraScanner';
 import './StationCameraScanner.css';
 
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+function participantReference(value: string) {
+  const reference = value.trim();
+  if (UUID.test(reference)) return { registrationId: reference };
+  const token = extractQrToken(reference) || reference;
+  return { passToken: token, qrToken: token };
+}
+
 export function RouteProgressionNotice({
   eventId,
   queued = false,
@@ -138,12 +147,9 @@ export function ParticipantLookup({
     setError(null);
     setSuccess(null);
     try {
-      const token = extractQrToken(passToken) || passToken.trim();
-      const person = await screeningApi.resolve(eventId, {
-        passToken: token,
-        qrToken: token,
-      });
-      applyResolved(person, 'pass / QR token');
+      const reference = participantReference(passToken);
+      const person = await screeningApi.resolve(eventId, reference);
+      applyResolved(person, 'registration reference');
     } catch (cause) {
       setError(getApiMessage(cause, 'Could not resolve that participant pass.'));
     } finally {
@@ -153,17 +159,13 @@ export function ParticipantLookup({
 
   const onCameraScan = useCallback(async (raw: string) => {
     if (!eventId) throw new Error('Event is not ready.');
-    const token = extractQrToken(raw);
-    if (!token) throw new Error('No QR token found in the scan.');
+    const reference = participantReference(raw);
     setError(null);
     setSuccess(null);
-    setPassToken(token);
+    setPassToken(raw.trim());
     try {
-      const person = await screeningApi.resolve(eventId, {
-        passToken: token,
-        qrToken: token,
-      });
-      applyResolved(person, 'camera scan');
+      const person = await screeningApi.resolve(eventId, reference);
+      applyResolved(person, 'scanner');
     } catch (cause) {
       const message = getApiMessage(cause, 'Could not resolve that participant pass.');
       setError(message);
@@ -178,11 +180,11 @@ export function ParticipantLookup({
       <AppToast message={success ?? ''} />
       <form className="va-resolve-row" onSubmit={(event) => void resolvePass(event)}>
         <label>
-          Pass token / QR value
+          QR value / registration UUID
           <input
             value={passToken}
             onChange={(event) => setPassToken(event.target.value)}
-            placeholder="…/participant-status/&lt;token&gt; or 64-hex token"
+            placeholder="QR URL, token, or registration UUID"
           />
         </label>
         <button type="submit" className="primary" disabled={lookupPending}>{lookupPending ? 'Loading…' : 'Load pass'}</button>
@@ -190,7 +192,7 @@ export function ParticipantLookup({
           Scan QR with camera
         </button>
       </form>
-      <p className="va-resolve-hint">Paste the full QR value or the hex token from the pass.</p>
+      <p className="va-resolve-hint">Registration UUID lookup continues to work from the encrypted station download when offline.</p>
       <label>
         Search this station queue
         <input type="search" value={queueSearch} onChange={(event) => setQueueSearch(event.target.value)} placeholder="Queue number or participant name" />
