@@ -4,6 +4,7 @@ const AppError = require("../../errors/AppError");
 const { requireEventRoleAndDuty } = require("../event/eventAuthorizationService");
 const qrService = require("../participant/qrService");
 const domainEventBus = require("../domain/domainEventBus");
+const { AUDIT_ACTIONS } = require("../../utils/logging/auditEvents");
 const { createAuditLog } = require("../../utils/logging/audit");
 const { resolveRegistrationByQrValue } = require("../../utils/crypto/qrToken");
 const { recordVisualAcuity } = require("../../utils/database/visualAcuityProcedure");
@@ -407,7 +408,14 @@ const saveStationResult = async ({
             stationId,
           },
         },
-        select: { resultId: true },
+        select: {
+          resultId: true,
+          version: true,
+          overallFlag: true,
+          isFlagged: true,
+          ruleVersion: true,
+          acknowledgedAt: true,
+        },
       });
 
       const evaluation = evaluate(body.resultData);
@@ -482,9 +490,16 @@ const saveStationResult = async ({
       });
       await createAuditLog({
         userId: user.userId,
-        action: "SCREENING_RESULT_RECORDED",
+        action: existingResult ? AUDIT_ACTIONS.SCREENING_RESULT_CORRECTED : AUDIT_ACTIONS.SCREENING_RESULT_RECORDED,
         entityName: "ScreeningResult",
         entityId: result.resultId,
+        oldValue: existingResult ? {
+          overallFlag: existingResult.overallFlag,
+          isFlagged: existingResult.isFlagged,
+          ruleVersion: existingResult.ruleVersion,
+          acknowledgedAt: existingResult.acknowledgedAt,
+          version: existingResult.version,
+        } : null,
         newValue: {
           eventId,
           stationId,
@@ -492,11 +507,32 @@ const saveStationResult = async ({
           registrationId: body.registrationId,
           overallFlag: evaluation.overallFlag,
           isFlagged: evaluation.isFlagged,
+          acknowledgedAt: result.acknowledgedAt,
           version: result.version,
         },
         context,
         client: tx,
       });
+      if (evaluation.isFlagged) {
+        await createAuditLog({
+          userId: user.userId,
+          action: AUDIT_ACTIONS.SCREENING_FLAG_ACKNOWLEDGED,
+          entityName: "ScreeningResult",
+          entityId: result.resultId,
+          newValue: {
+            eventId,
+            stationId,
+            stationType,
+            registrationId: body.registrationId,
+            overallFlag: evaluation.overallFlag,
+            ruleVersion: persistedRuleVersion,
+            acknowledgedAt: result.acknowledgedAt,
+            version: result.version,
+          },
+          context,
+          client: tx,
+        });
+      }
       await domainEventBus.emit({
         client: tx,
         type: "SCREENING_RESULT_RECORDED",

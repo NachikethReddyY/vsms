@@ -1,5 +1,5 @@
 const assert = require("node:assert/strict");
-const test = require("node:test");
+const { test, beforeEach } = require("node:test");
 const request = require("supertest");
 
 process.env.DATABASE_URL ||= "postgresql://test:test@localhost:5432/vsms_test";
@@ -11,6 +11,15 @@ process.env.COGNITO_REDIRECT_URI = "https://localhost:5173/auth/callback";
 process.env.COGNITO_LOGOUT_URI = "https://localhost:5173";
 
 const app = require("../../app");
+const accountService = require("../../services/account/accountService");
+const authAudits = [];
+
+accountService.recordAuthAuditBestEffort = async (entry) => {
+    authAudits.push(entry);
+    return entry;
+};
+
+beforeEach(() => { authAudits.length = 0; });
 
 test("logout clears browser auth without requiring a valid access token", async () => {
     const response = await request(app)
@@ -23,6 +32,23 @@ test("logout clears browser auth without requiring a valid access token", async 
     assert.equal(response.status, 200);
     assert.equal(response.body.logoutUrl, "https://vsms.auth.us-east-1.amazoncognito.com/logout?client_id=test-client&logout_uri=https%3A%2F%2Flocalhost%3A5173");
     assert.ok(response.headers["set-cookie"].every((value) => value.includes("Max-Age=0")));
+    assert.equal(authAudits[0].eventType, "LOGOUT_SUCCESS");
+    assert.equal(authAudits[0].outcome, "SUCCESS");
+});
+
+test("refresh denial is recorded without storing a refresh token", async () => {
+    const response = await request(app)
+        .post("/api/v1/auth/refresh")
+        .set("Origin", "https://localhost:5173")
+        .set("Cookie", "vsms_csrf=test-token")
+        .set("X-CSRF-Token", "test-token")
+        .send({});
+
+    assert.equal(response.status, 401);
+    assert.equal(authAudits[0].eventType, "TOKEN_REFRESH_FAILED");
+    assert.equal(authAudits[0].outcome, "DENIED");
+    assert.equal(authAudits[0].failureCategory, "REFRESH_SESSION_UNAVAILABLE");
+    assert.equal(JSON.stringify(authAudits).includes("refreshToken"), false);
 });
 
 test("global logout requires an access session and still clears browser auth", async () => {
@@ -35,6 +61,8 @@ test("global logout requires an access session and still clears browser auth", a
 
     assert.equal(response.status, 401);
     assert.ok(response.headers["set-cookie"].every((value) => value.includes("Max-Age=0")));
+    assert.equal(authAudits[0].eventType, "GLOBAL_LOGOUT_FAILED");
+    assert.equal(authAudits[0].outcome, "DENIED");
 });
 
 test("logout does not clear cookies when CSRF validation rejects the request", async () => {
@@ -86,6 +114,7 @@ test("global logout waits for Cognito revocation before confirming success", asy
         assert.equal(response.status, 200);
         assert.equal(target, "AWSCognitoIdentityProviderService.GlobalSignOut");
         assert.ok(response.headers["set-cookie"].every((value) => value.includes("Max-Age=0")));
+        assert.equal(authAudits[0].eventType, "GLOBAL_LOGOUT_SUCCESS");
     } finally {
         global.fetch = originalFetch;
     }
@@ -107,6 +136,8 @@ test("global logout surfaces Cognito revocation failure after clearing browser a
 
         assert.equal(response.status, 502);
         assert.ok(response.headers["set-cookie"].every((value) => value.includes("Max-Age=0")));
+        assert.equal(authAudits[0].eventType, "GLOBAL_LOGOUT_FAILED");
+        assert.equal(authAudits[0].outcome, "FAILED");
     } finally {
         global.fetch = originalFetch;
     }

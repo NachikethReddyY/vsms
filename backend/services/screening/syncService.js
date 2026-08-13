@@ -2,6 +2,7 @@
 const prisma = require("../../prisma/prismaClient");
 const screeningService = require("./screeningService");
 const { createAuditLog } = require("../../utils/logging/audit");
+const { AUDIT_ACTIONS } = require("../../utils/logging/auditEvents");
 
 const HANDLERS = {
   VISUAL_ACUITY: "saveVisualAcuity",
@@ -373,9 +374,29 @@ const processScreeningSync = async (
     return acc;
   }, {});
 
+  for (const action of actions) {
+    await audit({
+      userId: user.userId,
+      action: AUDIT_ACTIONS[`SCREENING_SYNC_ACTION_${action.status}`],
+      entityName: "SyncAction",
+      entityId: action.clientActionId,
+      outcome: action.status === "APPLIED" ? "SUCCESS" : action.status === "CONFLICT" ? "DENIED" : "FAILED",
+      newValue: {
+        eventId,
+        clientBatchId: body.clientBatchId,
+        clientActionId: action.clientActionId,
+        status: action.status,
+        retryCount: action.retryCount,
+        errorCode: action.errorCode || null,
+      },
+      context,
+      client: db,
+    });
+  }
+
   await audit({
     userId: user.userId,
-    action: "SCREENING_SYNC_BATCH",
+    action: AUDIT_ACTIONS.SCREENING_SYNC_BATCH,
     entityName: "Event",
     entityId: eventId,
     newValue: {

@@ -73,7 +73,10 @@ exports.verifyQR = async (req, res, next) => {
         const userId = req.auth.userId;
         await assertVerifyAccess(req, { token, eventId });
 
-        const result = await qrService.verifyQR(token, eventId, userId, undefined, { ipAddress: req.ip });
+        const result = await qrService.verifyQR(token, eventId, userId, undefined, {
+            ...req.context,
+            ipAddress: req.ip,
+        });
 
         return res.status(200).json({
             success: true,

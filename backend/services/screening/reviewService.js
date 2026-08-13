@@ -2,6 +2,7 @@
 const prisma = require("../../prisma/prismaClient");
 const AppError = require("../../errors/AppError");
 const { resolveRegistrationByQrValue } = require("../../utils/crypto/qrToken");
+const { createAuditLog } = require("../../utils/logging/audit");
 
 const {
   loadVerifiedSignature,
@@ -482,24 +483,26 @@ const recordDecision = async (eventId, registrationId, decision, user, ipAddress
           ? unfinishedRouteStationIds(registration.routeSteps)
           : [],
       };
-      await tx.auditLog.create({
-        data: {
-          userId,
-          action: "CLINICAL_REVIEW_RECORDED",
-          resource: "Review",
-          details: auditBase,
-          ipAddress: String(ipAddress || "").slice(0, 45) || null,
-        },
+      await createAuditLog({
+        userId,
+        action: "CLINICAL_REVIEW_RECORDED",
+        resource: "Review",
+        entityName: "Review",
+        entityId: review.reviewId,
+        details: auditBase,
+        context: { ipAddress },
+        client: tx,
       });
       if (referral) {
-        await tx.auditLog.create({
-          data: {
-            userId,
-            action: "REFERRAL_DRAFT_CREATED",
-            resource: "Referral",
-            details: { ...auditBase, referralId: referral.referralId, referralStatus: referral.status },
-            ipAddress: String(ipAddress || "").slice(0, 45) || null,
-          },
+        await createAuditLog({
+          userId,
+          action: "REFERRAL_DRAFT_CREATED",
+          resource: "Referral",
+          entityName: "Referral",
+          entityId: referral.referralId,
+          details: { ...auditBase, referralId: referral.referralId, referralStatus: referral.status },
+          context: { ipAddress },
+          client: tx,
         });
       }
 

@@ -6,6 +6,7 @@ const {
   ciphertextKeyId,
   activeEncryptionKeyId,
 } = require("../utils/crypto/cryptoUtils");
+const { createAuditLog } = require("../utils/logging/audit");
 
 const apply = process.argv.includes("--apply");
 const maskedEmail = /^[^@]\*{3}@[^@]+$/;
@@ -55,7 +56,8 @@ async function main() {
     if (item.handoffPlain) data.handoffSecretCiphertext = encrypt(item.handoffPlain, context(row.id, "handoffSecret"));
     await prisma.$transaction(async (tx) => {
       await tx.notificationDelivery.update({ where: { id: row.id }, data });
-      await tx.auditLog.create({ data: {
+      await createAuditLog({
+        client: tx,
         action: "ENCRYPTION_BACKFILL_APPLIED",
         resource: "NotificationDelivery",
         entityName: "NotificationDelivery",
@@ -68,7 +70,7 @@ async function main() {
           previousHandoffKeyId: ciphertextKeyId(row.handoffSecretCiphertext),
           activeKeyId,
         },
-      } });
+      });
     });
   }
   await prisma.$executeRawUnsafe('ALTER TABLE "notification_deliveries" VALIDATE CONSTRAINT "notification_deliveries_recipient_masked_check"');

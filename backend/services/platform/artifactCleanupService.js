@@ -2,6 +2,7 @@
 const path = require("path");
 const prisma = require("../../prisma/prismaClient");
 const AppError = require("../../errors/AppError");
+const { createAuditLog } = require("../../utils/logging/audit");
 const { deleteEventSignature, signatureMetadata } = require("../../utils/storage/signatureStorage");
 const { artifactPath, deleteArtifact } = require("../reporting/reportArtifactStorage");
 
@@ -157,7 +158,8 @@ const serializeTask = (task) => ({
   updatedAt: task.updatedAt,
 });
 
-const auditTask = (db, { task, userId = null, action, outcome, details = {}, ipAddress = null }) => db.auditLog.create({ data: {
+const auditTask = (db, { task, userId = null, action, outcome, details = {}, ipAddress = null }) => createAuditLog({
+  client: db,
   userId,
   action,
   resource: "ArtifactCleanupTask",
@@ -165,8 +167,8 @@ const auditTask = (db, { task, userId = null, action, outcome, details = {}, ipA
   entityId: task.id,
   outcome,
   details: { eventId: task.eventId, artifactType: task.artifactType, attemptCount: task.attemptCount, ...details },
-  ipAddress: String(ipAddress || "").slice(0, 45) || null,
-} });
+  context: { ipAddress },
+});
 
 const processArtifactCleanupTasks = async ({ eventId = null, limit = 100, db = prisma, now = new Date() } = {}) => {
   const staleBefore = new Date(now.getTime() - STALE_CLAIM_MS);

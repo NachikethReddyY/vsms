@@ -1,7 +1,9 @@
 const crypto = require("crypto");
-const { v4: uuidv4, validate: isUuid } = require("uuid");
+const { validate: isUuid } = require("uuid");
 const prisma = require("../../prisma/prismaClient");
 const { sanitizeMetadata } = require("../security/sanitize");
+const logger = require("./logger/logger");
+const { AUTH_AUDIT_EVENT_VALUES } = require("./auditEvents");
 
 function trimValue(value, maxLength) {
     if (!value) {
@@ -67,6 +69,9 @@ async function createAuthAuditLog({
     context,
     client = prisma,
 }) {
+    if (!AUTH_AUDIT_EVENT_VALUES.has(eventType)) {
+        throw new TypeError(`Unsupported authentication audit event: ${eventType}`);
+    }
     const auditContext = await resolveAuditContext({
         userId,
         context,
@@ -89,10 +94,12 @@ async function createAuthAuditLog({
 }
 
 async function createAuditLog({
-    userId,
+    userId = null,
     action,
+    resource = null,
     entityName,
-    entityId,
+    entityId = null,
+    details = null,
     oldValue = null,
     newValue = null,
     outcome = "SUCCESS",
@@ -104,11 +111,13 @@ async function createAuditLog({
         data: {
             userId,
             action: trimValue(action, 100),
+            resource: trimValue(resource, 100),
             entityName: trimValue(entityName, 50),
-            entityId: entityId || uuidv4(),
+            entityId,
             outcome,
             requestId: auditContext.requestId,
             deviceId: auditContext.deviceId,
+            details: sanitizeMetadata(details),
             oldValue: sanitizeMetadata(oldValue),
             newValue: sanitizeMetadata(newValue),
             ipAddress: auditContext.ipAddress,
@@ -117,9 +126,39 @@ async function createAuditLog({
     });
 }
 
+async function createAuditLogBestEffort(entry) {
+    try {
+        return await createAuditLog(entry);
+    } catch (error) {
+        logger.error({
+            event: "security.audit.write_failed",
+            auditAction: entry.action,
+            requestId: entry.context?.requestId || null,
+            errorCode: error?.code || error?.name || "AUDIT_WRITE_FAILED",
+        }, "security.audit.write_failed");
+        return null;
+    }
+}
+
+async function createAuthAuditLogBestEffort(entry) {
+    try {
+        return await createAuthAuditLog(entry);
+    } catch (error) {
+        logger.error({
+            event: "security.auth_audit.write_failed",
+            auditEventType: entry.eventType,
+            requestId: entry.context?.requestId || null,
+            errorCode: error?.code || error?.name || "AUTH_AUDIT_WRITE_FAILED",
+        }, "security.auth_audit.write_failed");
+        return null;
+    }
+}
+
 module.exports = {
     createAuthAuditLog,
+    createAuthAuditLogBestEffort,
     createAuditLog,
+    createAuditLogBestEffort,
     resolveAuditContext,
     sanitizeMetadata,
 };

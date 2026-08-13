@@ -1,7 +1,7 @@
 ﻿const crypto = require("node:crypto");
 const prisma = require("../../prisma/prismaClient");
 const AppError = require("../../errors/AppError");
-const { resolveAuditContext } = require("../../utils/logging/audit");
+const { createAuditLog } = require("../../utils/logging/audit");
 const { lockAccountTransition } = require("./adminSafety");
 const {
   synchronizeStaffAccess,
@@ -301,26 +301,25 @@ async function maintainProviderOperation(operationId, action, reason, actorId, c
         })
       : null;
     const updated = await tx.accountProviderOperation.findUnique({ where: { id: operationId } });
-    await tx.auditLog.create({
-      data: {
-        userId: actorId,
-        action: action === "REQUEUE" ? "ACCOUNT_PROVIDER_OPERATION_REQUEUED" : "ACCOUNT_PROVIDER_OPERATION_RESOLVED",
-        resource: "AccountProviderOperation",
-        entityName: "AccountProviderOperation",
-        entityId: source.id,
-        oldValue: {
-          status: source.status,
-          generation: source.generation,
-          attemptCount: source.attemptCount,
-          lastErrorCode: source.lastErrorCode,
-        },
-        newValue: {
-          status: updated.status,
-          resolutionReason: normalizedReason,
-          ...(replacement ? { requeuedOperationId: replacement.id, requeuedGeneration: replacement.generation } : {}),
-        },
-        ...await resolveAuditContext({ client: tx, userId: actorId, context }),
+    await createAuditLog({
+      userId: actorId,
+      action: action === "REQUEUE" ? "ACCOUNT_PROVIDER_OPERATION_REQUEUED" : "ACCOUNT_PROVIDER_OPERATION_RESOLVED",
+      resource: "AccountProviderOperation",
+      entityName: "AccountProviderOperation",
+      entityId: source.id,
+      oldValue: {
+        status: source.status,
+        generation: source.generation,
+        attemptCount: source.attemptCount,
+        lastErrorCode: source.lastErrorCode,
       },
+      newValue: {
+        status: updated.status,
+        resolutionReason: normalizedReason,
+        ...(replacement ? { requeuedOperationId: replacement.id, requeuedGeneration: replacement.generation } : {}),
+      },
+      context,
+      client: tx,
     });
     return { source: updated, replacement };
   });

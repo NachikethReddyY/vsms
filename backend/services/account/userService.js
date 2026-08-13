@@ -1,7 +1,7 @@
 ﻿const crypto = require("node:crypto");
 const prisma = require("../../prisma/prismaClient");
 const AppError = require("../../errors/AppError");
-const { resolveAuditContext } = require("../../utils/logging/audit");
+const { createAuditLog } = require("../../utils/logging/audit");
 const { synchronizeStaffAccess } = require("./cognitoStaffAccessService");
 const { assertAdministratorRemains, lockAccountTransition } = require("./adminSafety");
 const { enqueueProviderOperation, processProviderOperation, processProviderOperationForResponse } = require("./accountProviderOperationService");
@@ -69,17 +69,16 @@ async function assertAdminSafety(tx, current, nextRoles, nextStatus, actorId) {
 }
 
 async function writeAudit(tx, { actorId, action, accountId, before = null, after, context }) {
-  await tx.auditLog.create({
-    data: {
-      userId: actorId,
-      action,
-      resource: "StaffAccount",
-      entityName: "User",
-      entityId: accountId,
-      oldValue: before,
-      newValue: after,
-      ...await resolveAuditContext({ client: tx, userId: actorId, context }),
-    },
+  await createAuditLog({
+    userId: actorId,
+    action,
+    resource: "StaffAccount",
+    entityName: "User",
+    entityId: accountId,
+    oldValue: before,
+    newValue: after,
+    context,
+    client: tx,
   });
 }
 

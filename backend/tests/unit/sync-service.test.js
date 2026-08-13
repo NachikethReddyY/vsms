@@ -197,7 +197,11 @@ test("sync applies an authorized action and stores only safe immutable ledger ev
   assert.equal(response.pull.stations[0].registrations[0].nric, undefined);
   assert.equal(response.pull.stations[0].registrations[0].participant, undefined);
   assert.equal(response.pull.event.venue, undefined);
-  assert.equal(run.audits[0].newValue.actionCount, 1);
+  assert.equal(run.audits[0].action, "SCREENING_SYNC_ACTION_APPLIED");
+  assert.equal(run.audits[0].entityId, currentAction.clientActionId);
+  assert.equal(run.audits[0].outcome, "SUCCESS");
+  assert.equal(run.audits[1].action, "SCREENING_SYNC_BATCH");
+  assert.equal(run.audits[1].newValue.actionCount, 1);
 
   const durable = JSON.stringify({ rows: db.rows, transitions: db.transitions, audits: run.audits });
   for (const forbidden of ["must-not-sync", "S1234567A", "dateOfBirth", "resultData"]) {
@@ -256,10 +260,11 @@ test("route and version conflicts stay allowlisted conflicts without a progressi
     const screening = createScreening({ save: async () => {
       throw new AppError(409, code, "Internal route conflict details");
     } });
-    const response = await invoke(
+    const run = invoke(
       { clientBatchId: crypto.randomUUID(), actions: [action()] },
       { db, screening },
-    ).promise;
+    );
+    const response = await run.promise;
 
     assert.deepEqual(response.actions[0], {
       clientActionId: response.actions[0].clientActionId,
@@ -268,6 +273,9 @@ test("route and version conflicts stay allowlisted conflicts without a progressi
       errorCode: code,
     });
     assert.equal(db.rows[0].responseSnapshot, null);
+    assert.equal(run.audits[0].action, "SCREENING_SYNC_ACTION_CONFLICT");
+    assert.equal(run.audits[0].outcome, "DENIED");
+    assert.equal(run.audits[0].newValue.errorCode, code);
   }
 });
 
@@ -312,6 +320,9 @@ test("failed actions retain a safe code and retry through a claimed PROCESSING a
   const firstResponse = await first.promise;
   assert.equal(firstResponse.actions[0].status, "FAILED");
   assert.equal(firstResponse.actions[0].errorCode, "SYNC_APPLY_FAILED");
+  assert.equal(first.audits[0].action, "SCREENING_SYNC_ACTION_FAILED");
+  assert.equal(first.audits[0].outcome, "FAILED");
+  assert.equal(first.audits[0].newValue.errorCode, "SYNC_APPLY_FAILED");
   assert.equal(JSON.stringify(db.rows).includes("database password"), false);
 
   const second = invoke({ clientBatchId: crypto.randomUUID(), actions: [retryable] }, { db, screening });
