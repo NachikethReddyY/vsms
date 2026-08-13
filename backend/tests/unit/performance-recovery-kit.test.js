@@ -55,6 +55,8 @@ test("the 500-participant load configuration is accepted without running load", 
   assert.match(runner, /reportingReadP95Ms/);
   assert.match(runner, /screeningBatchP95Ms/);
   assert.match(runner, /pollRegistrationIds/);
+  assert.match(runner, /chartDistanceMetres: "6"/);
+  assert.match(runner, /withUsualDistanceGlasses: "yes"/);
   assert.doesNotMatch(runner, /stations\/\$\{fixture\.stationId\}\/handoff/);
 });
 

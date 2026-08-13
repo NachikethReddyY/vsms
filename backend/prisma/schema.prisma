@@ -794,7 +794,6 @@ model EventRegistration {
   passToken              String?                 @unique @map("pass_token") @db.VarChar(255)
   checkedIn              Boolean                 @default(false) @map("checked_in")
   checkedInAt            DateTime?               @map("checked_in_at") @db.Timestamptz(3)
-  consentAcknowledged    Boolean                 @default(false) @map("consent_acknowledged")
   routeVersion           Int                     @default(1) @map("route_version")
   createdAt              DateTime                @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt              DateTime                @updatedAt @map("updated_at") @db.Timestamptz(3)

@@ -21,10 +21,10 @@ submission: "16/8/2026"
 VSMS replaces paper hand-offs at community vision-screening events with an
 auditable workflow. A React/Vite progressive web application is backed by a
 Node.js Express REST API and Prisma-managed PostgreSQL. Staff can create and
-publish staffed events, register consenting participants, issue QR passes,
-operate virtual queues, record all four required screening types (visual
-acuity, refraction, colour vision and eye health), synchronize encrypted
-offline captures, complete Doctor review, issue referrals, and view or export
+publish staffed events, register participants, issue QR passes,
+operate virtual queues, record visual-acuity, refraction and colour-vision
+screening results, synchronize encrypted offline captures, complete Doctor
+review with eye-health observations and a digital signature, issue referrals, and view or export
 aggregate reports.
 
 The security model treats authentication and authorization as separate
@@ -200,8 +200,8 @@ configured; the API still owns local account state and event authorization.
 | Implemented | Express REST API | `backend/app.js`, `backend/routes/`, OpenAPI contract |
 | Implemented | PostgreSQL/Prisma persistence | `backend/prisma/schema.prisma`, migrations, services |
 | Implemented | Event, membership, station and queue operations | `backend/services/event/`, `backend/services/screening/`, queue routes |
-| Implemented | Participant, consent, QR and registration flows | `backend/services/participant/`, participant/registration/QR routes |
-| Implemented | Visual acuity, refraction, colour-vision and eye-health save paths | `screeningService.js`, corresponding OpenAPI operations, frontend station pages and offline sync schemas |
+| Implemented | Participant, emergency-contact, QR and registration flows | `backend/services/participant/`, participant/registration/QR routes |
+| Implemented | Visual acuity, refraction and colour-vision save paths plus reviewer-owned eye-health observations | `screeningService.js`, `reviewService.js`, corresponding OpenAPI operations, frontend station pages and offline sync schemas |
 | Implemented | Review, referral and aggregate report/export source paths | `reviewService.js`, `referralService.js`, `services/reporting/` |
 | Implemented | Transactional outbox and separate Node worker processes | `domainEventBus.js`, `scripts/domain-event-worker.js`, `scripts/report-worker.js`, and `scripts/lifecycle-email-worker.js`; each is a standalone entry point over shared PostgreSQL state |
 | Implemented | Installable PWA and scoped offline screening pack | `backend/docs/offline-screening-28.md`, `offlineSync.ts`, Vite PWA configuration and generated `manifest.json` |
@@ -225,12 +225,12 @@ The core mapping is:
 | --- | --- | --- |
 | FR-01 Event management | Event list/create/detail/update/delete, lifecycle commands, stations, shifts and memberships | Implemented in OpenAPI and event services |
 | FR-02 Account and access management | Cognito authorize/callback/refresh, account administration, local event-role checks | Implemented/config-dependent at the provider boundary |
-| FR-03 Participant registration | Participant search/create/update, consent, emergency contacts and event registration | Implemented |
+| FR-03 Participant registration | Participant search/create/update, emergency contacts and event registration | Implemented |
 | FR-04 Queue management | Event queues, station hand-off, join/call/start/advance/complete/skip/priority | Implemented |
-| FR-05 Screening results and flags | Visual-acuity, refraction, colour-vision and eye-health preview/save operations; server-side rules and acknowledgement | Implemented for all four station types |
+| FR-05 Screening results and flags | Visual-acuity, refraction and colour-vision preview/save operations; server-side rules and acknowledgement | Implemented for three screener station types; eye health belongs to Doctor review |
 | FR-06 Review and referral | Review list/detail/decision and referral issue/revision/acknowledgement/document operations | Implemented |
 | FR-07 Dashboard and reporting | Metrics, analytics, operations report and PDF/CSV export jobs | Implemented as source paths; no measured production result claimed |
-| NFR-OFFLINE | Installable PWA, `POST /api/v1/events/{eventId}/sync/screening`, encrypted IndexedDB pack and durable sync ledger | Implemented for scoped four-station flow |
+| NFR-OFFLINE | Installable PWA, `POST /api/v1/events/{eventId}/sync/screening`, encrypted IndexedDB pack and durable sync ledger | Implemented for the three screener station types |
 
 ## 5. PostgreSQL design and limitations
 

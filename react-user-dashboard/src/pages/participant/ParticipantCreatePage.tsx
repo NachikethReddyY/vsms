@@ -110,7 +110,7 @@ export default function ParticipantCreatePage() {
       <Link className="participant-v2-back" to={searchLink}><ArrowLeftIcon /> {eventId ? "Back to event registration" : "Back to events"}</Link>
       <header className="participant-v2-create-heading">
         <span><UserPlusIcon /></span>
-        <div><p>Registration workspace · Participant details</p><h1 id="participant-v2-create-title">Register a new participant</h1><small>Enter the participant's details for the selected event. You can add consent and an emergency contact from the profile afterwards.</small></div>
+        <div><p>Registration workspace · Participant details</p><h1 id="participant-v2-create-title">Register a new participant</h1><small>Enter the participant's details for the selected event. You can add an emergency contact from the profile afterwards.</small></div>
       </header>
       <section className="participant-v2-create-panel">
         <div className="participant-v2-create-context"><span>Selected event</span><strong>{eventId ? "Event selected" : "No event selected"}</strong><p>The participant profile will open after this record is created.</p></div>
@@ -151,4 +151,3 @@ export default function ParticipantCreatePage() {
     </section>
   );
 }
-

@@ -97,7 +97,7 @@ Keep this as a **backend constant** (or seed-maintained map) used by import — 
 **Why exclude Registration and Clinical Review**
 
 - Registration and Clinical Review are **not** values of `StationType`, and `Station.stationType` is required.
-- Registration is a **workflow / role** (`StaffAssignmentRole.REGISTRATION`, check-in / consent / QR), not a screening station. Seed assigns registration officers with `stationId: null`.
+- Registration is a **workflow / role** (`StaffAssignmentRole.REGISTRATION`, check-in / QR), not a screening station. Seed assigns registration officers with `stationId: null`.
 - Clinical review is the **`Review`** domain (outcomes, referrals), not `ScreeningResult` / queue-at-station.
 
 Import should **422** (or skip with a clear error) if the client includes those template IDs in `stationTemplateIds`.

@@ -25,7 +25,7 @@ const assertKit = (kit) => {
     assert.equal(typeof scenario.expected, "string");
     ids.add(scenario.id);
   }
-  for (const required of ["managed-auth-session", "event-duty-boundary", "account-lifecycle-boundary", "registration-consent-qr-checkin", "queue-transfer-and-three-stations", "eye-health-fourth-station", "review-referral", "offline-reconnect", "dashboard-and-export"]) {
+  for (const required of ["managed-auth-session", "event-duty-boundary", "account-lifecycle-boundary", "registration-qr-checkin", "queue-transfer-and-three-stations", "eye-health-fourth-station", "review-referral", "offline-reconnect", "dashboard-and-export"]) {
     assert.ok(ids.has(required), `missing required scenario: ${required}`);
   }
 };

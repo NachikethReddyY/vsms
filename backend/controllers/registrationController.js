@@ -80,7 +80,6 @@ exports.createRegistration = asyncHandler(async (req, res) => {
     const result = await registrationService.createRegistration({
         participantId: assertUuid(req.body.participantId, "participantId"),
         eventId: assertUuid(req.params.eventId || req.body.eventId, "eventId"),
-        consentAcknowledged: req.body.consentAcknowledged === true,
         idempotencyKey: validateIdempotencyKey(req.headers["idempotency-key"]),
         auth: req.auth,
         context: req.context,

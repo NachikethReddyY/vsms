@@ -813,10 +813,9 @@ paths:
             schema:
               type: object
               additionalProperties: false
-              required: [participantId, consentAcknowledged]
+              required: [participantId]
               properties:
                 participantId: { type: string, format: uuid }
-                consentAcknowledged: { type: boolean }
       responses:
         "200": { description: Idempotent replay, content: { application/json: { schema: { $ref: "#/components/schemas/RegistrationResponse" } } } }
         "201": { description: Participant registered, content: { application/json: { schema: { $ref: "#/components/schemas/RegistrationResponse" } } } }
@@ -1516,11 +1515,10 @@ paths:
             schema:
               type: object
               additionalProperties: false
-              required: [eventId, participantId, consentAcknowledged]
+              required: [eventId, participantId]
               properties:
                 eventId: { type: string, format: uuid }
                 participantId: { type: string, format: uuid }
-                consentAcknowledged: { type: boolean }
       responses:
         "200": { description: Idempotent replay, content: { application/json: { schema: { $ref: "#/components/schemas/RegistrationResponse" } } } }
         "201": { description: Participant registered, content: { application/json: { schema: { $ref: "#/components/schemas/RegistrationResponse" } } } }
@@ -4707,7 +4705,6 @@ components:
         participantDisplayName: { type: string, nullable: true }
         queueNumber: { type: integer, nullable: true }
         idempotencyKey: { type: string }
-        consentAcknowledged: { type: boolean }
         checkedIn: { type: boolean }
         checkedInAt: { type: string, format: date-time, nullable: true }
         createdAt: { type: string, format: date-time }

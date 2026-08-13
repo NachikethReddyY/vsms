@@ -269,10 +269,10 @@ async function run(config, baseUrl, fixture, authorization) {
           idempotencyKey: crypto.randomUUID(),
           acknowledged: false,
           resultData: {
-            chartDistanceMetres: 6,
+            chartDistanceMetres: "6",
             od: { kind: "FRACTION", denominator: 6 },
             os: { kind: "FRACTION", denominator: 6 },
-            withUsualDistanceGlasses: true,
+            withUsualDistanceGlasses: "yes",
           },
         },
       })),

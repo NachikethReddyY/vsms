@@ -4209,7 +4209,6 @@ export interface components {
             participantDisplayName?: string | null;
             queueNumber?: number | null;
             idempotencyKey: string;
-            consentAcknowledged?: boolean;
             checkedIn?: boolean;
             /** Format: date-time */
             checkedInAt?: string | null;
@@ -6485,7 +6484,6 @@ export interface operations {
                 "application/json": {
                     /** Format: uuid */
                     participantId: string;
-                    consentAcknowledged: boolean;
                 };
             };
         };
@@ -7818,7 +7816,6 @@ export interface operations {
                     eventId: string;
                     /** Format: uuid */
                     participantId: string;
-                    consentAcknowledged: boolean;
                 };
             };
         };

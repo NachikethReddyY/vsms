@@ -12,10 +12,10 @@ availability; dated deployment and performance evidence is identified below.
 - [x] Event create, update, lifecycle transitions, station setup and staffing — `backend/services/event/`, event routes, Prisma `Event`/`Station`/`Shift` models.
 - [x] Account approval, suspension, reactivation, deprovisioning and event-scoped roles — `backend/services/account/`, admin routes, event membership services.
 - [x] Cognito authorization-code + PKCE callback and secure-cookie session exchange — `backend/routes/authRoutes.js`, `authController.js`, `utils/cognitoClient.js`.
-- [x] Participant search, create, update, consent, emergency contacts and event registration — participant/registration routes and services.
+- [x] Participant search, create, update, emergency contacts and event registration — participant/registration routes and services.
 - [x] QR issue, verification, reissue, revocation, download and print paths — `backend/services/participant/qrService.js` and QR routes.
 - [x] Queue join, hand-off, call, start, advance, complete, skip and priority — queue routes and `services/screening/queueService.js`.
-- [x] Visual-acuity, refraction, colour-vision and eye-health station save/preview paths with server-side flags — `screeningService.js`, OpenAPI and station pages.
+- [x] Visual-acuity, refraction and colour-vision station save/preview paths with server-side flags, plus reviewer-owned eye-health observations — `screeningService.js`, `reviewService.js`, OpenAPI and station pages.
 - [x] Review decisions and referral issue/revision/acknowledgement/document paths — `reviewService.js`, `referralService.js` and routes.
 - [x] Metrics, analytics, operational reports and queued PDF/CSV export source paths — `services/reporting/` and OpenAPI.
 
@@ -29,7 +29,7 @@ availability; dated deployment and performance evidence is identified below.
 - [x] Preserve retryable network failures and surface server conflicts for staff attention.
 - [x] Purge expired offline packs and clear them on logout/user change.
 - [x] Responsive installable React/Vite PWA with service-worker app-shell caching and hard-refresh offline support.
-- [x] Offline capture and synchronization for visual acuity, refraction, colour vision and eye health.
+- [x] Offline capture and synchronization for visual acuity, refraction and colour vision.
 - [ ] Participant self-service offline and a broader sync-centre conflict UI.
 
 ## Security and operations

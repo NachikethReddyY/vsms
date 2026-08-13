@@ -18,7 +18,6 @@ Participant arrives
 │  │
 │  └─ No participant found
 │     ├─ Create participant record
-│     ├─ Record consent
 │     └─ Create this event’s registration/check-in
 │
 ├─ System creates participant ID
@@ -34,7 +33,6 @@ Participant arrives
 - Contact number
 - ID/reference number only if required
 - Emergency contact only if required
-- Consent confirmation
 - Optional operational notes: mobility assistance or preferred language
 
 ### Keep these records separate
@@ -192,13 +190,13 @@ An autorefractor normally returns measurements; it is not the retinal photograph
 
 ## 7. Station D: Clinical Review & Eye Health — Option B (implemented direction)
 
-Keep the formal review/referral requirements at a clinician-led booth. **Eye health is a screener station** (`EYE_HEALTH`) with offline capture; clinicians may still add optional eye-health notes on the immutable clinical review decision (`Review.eyeHealthObservations`). The screen is a **Clinical Review Workspace**, not a generic dashboard.
+Keep eye health and the formal review/referral requirements together at the clinician-led doctor station. Eye-health observations are part of the immutable clinical review decision, not a screener station. The screen is a **Clinical Review Workspace**, not a generic dashboard.
 
 ```text
 Participant enters Station D / Clinical Review queue
 → clinician scans QR
 → one participant summary opens
-→ clinician reviews Station A–D results and preliminary flags
+→ clinician reviews Station A–C results and preliminary flags
 → clinician may add optional eye-health observations (cataract/glaucoma risk, symptoms, notes, optional device findings)
 → clinician decides: complete / monitor / refer / urgent escalation
 → system stores one signed review (and optional draft referral)
@@ -206,7 +204,7 @@ Participant enters Station D / Clinical Review queue
 
 ### Clinical Review Workspace
 
-- Participant identity, event, consent status, and contact details needed for follow-up
+- Participant identity, event, and contact details needed for follow-up
 - Red-flag/symptom banner and screening timeline
 - Visual Acuity: OD, OS, correction/pinhole status, flag
 - Refraction: glasses status and machine readings per eye
@@ -276,7 +274,7 @@ Urgent flag or severe symptom at any station
 | Role | Required / actor | Responsibilities in this flow | Discussed in this document |
 | --- | --- | --- | --- |
 | Participant | Actor | Arrives, receives QR pass, monitors private queue, completes stations, receives summary/referral. No VSMS account. | ✓ |
-| Registration Officer | Required role | Finds/creates participant, records consent, creates event check-in, generates QR, starts first queue. | ✓ |
+| Registration Officer | Required role | Finds/creates participant, creates event check-in, generates QR, starts first queue. | ✓ |
 | Screener | Required role | Runs Stations A–C, scans QR, records results, acknowledges flags, saves offline, transfers queue. | ✓ |
 | Reviewer / Clinical Reviewer | Required role | Runs Station D; reviews flagged cases, records approved findings, decides outcome/referral, approves documents and urgent handover. A doctor or other authorised clinician may hold this role. | ✓ |
 | Event Manager / Event Organiser | Required role | Creates/opens events, configures stations and staff assignment, monitors queues, throughput, sync health, and operational issues. | ✓ |

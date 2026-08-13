@@ -178,7 +178,7 @@ export default function ParticipantEmergencyContactsPage() {
         <section className="participant-emergency-list" aria-label="Recorded emergency contacts">
           <header><div><span>Recorded contacts</span><h2>{activeContacts.length ? `${activeContacts.length} active contact${activeContacts.length === 1 ? "" : "s"}` : "No active contacts"}</h2></div></header>
           {isLoading ? <p className="participant-emergency-loading">Loading emergency contacts...</p> : null}
-          {!isLoading && activeContacts.length === 0 ? <div className="participant-emergency-empty"><PhoneIcon /><h3>No emergency contact recorded</h3><p>Use the form to add a primary contact before continuing to consent and registration.</p></div> : null}
+          {!isLoading && activeContacts.length === 0 ? <div className="participant-emergency-empty"><PhoneIcon /><h3>No emergency contact recorded</h3><p>Use the form to add a primary contact before continuing to registration.</p></div> : null}
           {!isLoading && activeContacts.length > 0 ? <div className="participant-emergency-cards">{activeContacts.map((contact) => (
             <article key={contact.id} className={contact.isPrimary ? "is-primary" : ""}>
               <div className="participant-emergency-card-main"><span className="participant-emergency-avatar">{contact.contactName.slice(0, 1).toUpperCase()}</span><div className="participant-emergency-card-details"><div className="participant-emergency-card-name"><h3>{contact.contactName}</h3>{contact.isPrimary ? <strong><StarIcon /> Primary</strong> : null}</div><p>{contact.relationship}</p><div className="participant-emergency-card-meta"><a href={`tel:${contact.phoneNumber.replace(/\s/g, "")}`}><PhoneIcon /> {contact.phoneNumber}</a>{contact.email ? <a href={`mailto:${contact.email}`} title={contact.email}><EnvelopeIcon /> {contact.email}</a> : null}</div></div></div>
@@ -201,4 +201,3 @@ export default function ParticipantEmergencyContactsPage() {
     </section>
   );
 }
-

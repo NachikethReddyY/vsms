@@ -38,10 +38,10 @@
       "expected": "After each lifecycle action, the prior browser session is rejected and the account cannot regain event access."
     },
     {
-      "id": "registration-consent-qr-checkin",
+      "id": "registration-qr-checkin",
       "proofLevel": "LIVE_BROWSER",
-      "title": "Registration through consent, QR, and check-in",
-      "expected": "Synthetic Charlie is registered with consent, a QR pass is issued, and check-in changes the expected registration and queue counts."
+      "title": "Registration through QR and check-in",
+      "expected": "Synthetic Charlie is registered, a QR pass is issued, and check-in changes the expected registration and queue counts."
     },
     {
       "id": "queue-transfer-and-three-stations",
