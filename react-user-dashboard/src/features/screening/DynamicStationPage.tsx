@@ -3,7 +3,7 @@ import { useParams, useSearchParams } from 'react-router-dom';
 import { getApiError as getApiMessage } from '../../utils/apiClient';
 import { getStoredSession } from '../../utils/session';
 import type { DynamicFieldValues } from './fieldSchema';
-import { defaultValueForField, resolveCompatibleFieldSchema, validateFieldValues } from './fieldSchema';
+import { defaultValuesForSchema, resolveCompatibleFieldSchema, validateFieldValues } from './fieldSchema';
 import { getOfflineStationContext, isNetworkError } from './offlineSync';
 import { screeningApi, newIdempotencyKey, type FlagEvaluation, type QueueRegistration, type Station, type StationType } from './screeningApi';
 import { StationFieldRenderer } from './StationFieldRenderer';
@@ -32,7 +32,10 @@ export default function DynamicStationPage({ stationType }: { stationType?: Stat
 
   const selected = useMemo(() => queue.find((row) => row.registrationId === selectedId) || null, [queue, selectedId]);
   const resolvedType = station?.stationType || stationType || 'CUSTOM';
-  const fieldSchema = resolveCompatibleFieldSchema(resolvedType, station?.fieldSchemaSnapshot) ?? [];
+  const fieldSchema = useMemo(
+    () => resolveCompatibleFieldSchema(resolvedType, station?.fieldSchemaSnapshot) ?? [],
+    [resolvedType, station?.fieldSchemaSnapshot],
+  );
 
   const selectParticipant = (registrationId: string) => {
     if (registrationId === selectedId) return;
@@ -98,17 +101,13 @@ export default function DynamicStationPage({ stationType }: { stationType?: Stat
 
   useEffect(() => { void load(); }, [eventId, routeStationId, stationType]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
-    const defaults: DynamicFieldValues = {};
-    for (const field of (station?.fieldSchemaSnapshot ?? [])) {
-      defaults[field.key] = defaultValueForField(field);
-    }
-    setValues(defaults);
+    setValues(defaultValuesForSchema(fieldSchema));
     setFieldErrors({});
     setEvaluation(null);
     setAcknowledged(false);
     setError(null);
     setSuccess(null);
-  }, [selectedId, station?.stationId, station?.schemaVersion]);
+  }, [selectedId, station?.stationId, station?.schemaVersion, fieldSchema]);
 
   const updateValue = (key: string, value: unknown) => {
     setValues((current) => ({ ...current, [key]: value }));

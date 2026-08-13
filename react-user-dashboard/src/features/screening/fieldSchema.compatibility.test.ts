@@ -1,9 +1,15 @@
 import { describe, expect, it } from 'vitest';
-import { orderedResultFields, resolveCompatibleFieldSchema, SYSTEM_FIELD_SCHEMAS } from './fieldSchema';
+import { defaultValuesForSchema, orderedResultFields, resolveCompatibleFieldSchema, SYSTEM_FIELD_SCHEMAS } from './fieldSchema';
 
 describe('compatible station schemas', () => {
   it('opens a built-in station that has no snapshot yet', () => {
-    expect(resolveCompatibleFieldSchema('VISUAL_ACUITY', null)).toEqual(SYSTEM_FIELD_SCHEMAS.VISUAL_ACUITY);
+    const schema = resolveCompatibleFieldSchema('VISUAL_ACUITY', null);
+    expect(schema).toEqual(SYSTEM_FIELD_SCHEMAS.VISUAL_ACUITY);
+    expect(defaultValuesForSchema(schema!)).toMatchObject({
+      chartDistanceMetres: '3',
+      od: { kind: 'FRACTION', denominator: 6 },
+      os: { kind: 'FRACTION', denominator: 6 },
+    });
   });
 
   it('uses frozen administrator labels and order for reviewer fields', () => {

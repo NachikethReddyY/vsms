@@ -137,6 +137,10 @@ export function defaultValueForField(field: FieldDefinition): unknown {
   return '';
 }
 
+export function defaultValuesForSchema(schema: FieldSchema): DynamicFieldValues {
+  return Object.fromEntries(schema.map((field) => [field.key, defaultValueForField(field)]));
+}
+
 function triStateToNullableBoolean(value: unknown) {
   if (value === 'yes' || value === true) return true;
   if (value === 'no' || value === false) return false;
