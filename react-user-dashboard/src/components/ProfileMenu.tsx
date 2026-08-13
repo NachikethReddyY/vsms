@@ -1,4 +1,4 @@
-import { ArrowRightStartOnRectangleIcon, Cog6ToothIcon } from '@heroicons/react/24/outline';
+import { ArrowRightStartOnRectangleIcon, ClipboardDocumentListIcon, Cog6ToothIcon } from '@heroicons/react/24/outline';
 import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../auth/AuthProvider';
@@ -10,6 +10,7 @@ export default function ProfileMenu({ triggerClassName = '', compact = false }: 
   const triggerRef = useRef<HTMLButtonElement>(null);
   const { session, clearSession } = useAuth();
   const user = session?.user;
+  const canReadAudit = user?.roles.includes('ADMINISTRATOR') ?? false;
   const label = user?.username || user?.email || 'Signed-in user';
   const initials = label.split(/[@._ -]+/).filter(Boolean).slice(0, 2).map((part) => part[0]).join('').toUpperCase();
 
@@ -44,6 +45,7 @@ export default function ProfileMenu({ triggerClassName = '', compact = false }: 
       {open && <div className="profile-menu-panel" role="menu">
         <div className="profile-menu-identity"><strong>{user?.username || 'Account'}</strong><span>{user?.email}</span></div>
         <Link to="/account/security" role="menuitem" onClick={() => setOpen(false)}><Cog6ToothIcon aria-hidden="true" />Account security</Link>
+        {canReadAudit && <Link to="/admin/audit-logs" role="menuitem" onClick={() => setOpen(false)}><ClipboardDocumentListIcon aria-hidden="true" />Audit history</Link>}
         <button type="button" role="menuitem" onClick={() => { setOpen(false); void logout(); }}><ArrowRightStartOnRectangleIcon aria-hidden="true" />Sign out</button>
       </div>}
     </div>

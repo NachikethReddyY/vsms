@@ -1,4 +1,4 @@
-import { CalendarDaysIcon, ChartBarSquareIcon, PencilSquareIcon, PlusIcon, SignalIcon, Squares2X2Icon, UserGroupIcon } from '@heroicons/react/24/outline';
+import { CalendarDaysIcon, ChartBarSquareIcon, ClipboardDocumentListIcon, PencilSquareIcon, PlusIcon, SignalIcon, Squares2X2Icon, UserGroupIcon } from '@heroicons/react/24/outline';
 import { useEffect, useRef, type ReactNode } from 'react';
 import { Link, NavLink, useLocation } from 'react-router-dom';
 import { useAuth } from '../auth/AuthProvider';
@@ -56,6 +56,7 @@ export default function AppShell({ children }: { children: ReactNode }) {
           {canManageEvents && <NavLink to="/reports" className={({ isActive }) => isActive ? 'active' : undefined}><ChartBarSquareIcon aria-hidden="true" />Reports</NavLink>}
           {canManageStaff && <NavLink to="/staff" className={({ isActive }) => isActive ? 'active' : undefined}><UserGroupIcon aria-hidden="true" />Staff</NavLink>}
           {canManageStaff && <NavLink to="/admin/station-templates" className={({ isActive }) => isActive ? 'active' : undefined}><Squares2X2Icon aria-hidden="true" />Stations</NavLink>}
+          {canCreateEvent && <NavLink to="/admin/audit-logs" className={({ isActive }) => isActive ? 'active' : undefined}><ClipboardDocumentListIcon aria-hidden="true" />Audit</NavLink>}
         </nav>
 
         <div className="workspace-nav-actions">
