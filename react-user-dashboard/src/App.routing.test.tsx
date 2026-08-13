@@ -40,11 +40,10 @@ vi.mock('./pages/StationLibraryPage', () => ({ default: () => <p>Station library
 vi.mock('./pages/AccountSecurityPage', () => ({ default: () => <p>Security</p> }));
 vi.mock('./pages/QueuePages', () => ({ QueuePage: () => <p>Queue</p> }));
 vi.mock('./pages/ParticipantStatusPage', () => ({ default: () => <p>Participant status</p> }));
-vi.mock('./pages/ParticipantV2ConsentPage', () => ({ default: () => <p>V2 consent</p> }));
 vi.mock('./pages/ParticipantV2Page', () => ({ default: () => <p>V2</p> }));
 vi.mock('./pages/ParticipantV2ProfilePage', () => ({ default: () => <p>V2 profile</p> }));
 vi.mock('./pages/ParticipantPages', () => ({
-  ConsentPage: () => <p>Consent</p>, EmergencyContactsPage: () => <p>Emergency</p>, EventRegistrationStartPage: () => <p>Register</p>, EventRegistrationsPage: () => <p>Registrations</p>, ParticipantConsentsPage: () => <p>Consents</p>, ParticipantCreatePage: () => <p>Participant create</p>, ParticipantDetailPage: () => <p>Participant detail</p>, ParticipantEditPage: () => <p>Participant edit</p>, ParticipantHistoryPage: () => <p>History</p>, ParticipantSearchPage: () => <p>Participant search</p>, RegistrationConfirmationPage: () => <p>Confirmation</p>, RegistrationHistoryPage: () => <p>Reg history</p>, RegistrationQrPage: () => <p>Reg QR</p>, RegistrationReviewPage: () => <p>Reg review</p>,
+  EmergencyContactsPage: () => <p>Emergency</p>, EventRegistrationStartPage: () => <p>Register</p>, EventRegistrationsPage: () => <p>Registrations</p>, ParticipantCreatePage: () => <p>Participant create</p>, ParticipantDetailPage: () => <p>Participant detail</p>, ParticipantEditPage: () => <p>Participant edit</p>, ParticipantHistoryPage: () => <p>History</p>, ParticipantSearchPage: () => <p>Participant search</p>, RegistrationConfirmationPage: () => <p>Confirmation</p>, RegistrationHistoryPage: () => <p>Reg history</p>, RegistrationQrPage: () => <p>Reg QR</p>, RegistrationReviewPage: () => <p>Reg review</p>,
 }));
 vi.mock('./auth/CognitoRoutes', () => ({ CognitoCallback: () => <p>Callback</p> }));
 vi.mock('./features/stage4Api', async () => {

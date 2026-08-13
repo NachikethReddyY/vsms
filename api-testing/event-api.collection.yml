@@ -5484,7 +5484,6 @@ item:
                 "participantDisplayName": "",
                 "queueNumber": 0,
                 "idempotencyKey": "",
-                "consentAcknowledged": true,
                 "checkedIn": true,
                 "checkedInAt": "2026-08-07T00:00:00.000Z",
                 "createdAt": "2026-08-07T00:00:00.000Z",
@@ -5579,8 +5578,7 @@ item:
         mode: raw
         raw: |-
           {
-            "participantId": "00000000-0000-4000-8000-000000000000",
-            "consentAcknowledged": true
+            "participantId": "00000000-0000-4000-8000-000000000000"
           }
         options:
           raw:
@@ -5619,7 +5617,6 @@ item:
               "participantDisplayName": "",
               "queueNumber": 0,
               "idempotencyKey": "",
-              "consentAcknowledged": true,
               "checkedIn": true,
               "checkedInAt": "2026-08-07T00:00:00.000Z",
               "createdAt": "2026-08-07T00:00:00.000Z",
@@ -5687,7 +5684,6 @@ item:
               "participantDisplayName": "",
               "queueNumber": 0,
               "idempotencyKey": "",
-              "consentAcknowledged": true,
               "checkedIn": true,
               "checkedInAt": "2026-08-07T00:00:00.000Z",
               "createdAt": "2026-08-07T00:00:00.000Z",
@@ -12512,7 +12508,6 @@ item:
                 "participantDisplayName": "",
                 "queueNumber": 0,
                 "idempotencyKey": "",
-                "consentAcknowledged": true,
                 "checkedIn": true,
                 "checkedInAt": "2026-08-07T00:00:00.000Z",
                 "createdAt": "2026-08-07T00:00:00.000Z",
@@ -13214,8 +13209,7 @@ item:
         raw: |-
           {
             "eventId": "00000000-0000-4000-8000-000000000000",
-            "participantId": "00000000-0000-4000-8000-000000000000",
-            "consentAcknowledged": true
+            "participantId": "00000000-0000-4000-8000-000000000000"
           }
         options:
           raw:
@@ -13254,7 +13248,6 @@ item:
               "participantDisplayName": "",
               "queueNumber": 0,
               "idempotencyKey": "",
-              "consentAcknowledged": true,
               "checkedIn": true,
               "checkedInAt": "2026-08-07T00:00:00.000Z",
               "createdAt": "2026-08-07T00:00:00.000Z",
@@ -13322,7 +13315,6 @@ item:
               "participantDisplayName": "",
               "queueNumber": 0,
               "idempotencyKey": "",
-              "consentAcknowledged": true,
               "checkedIn": true,
               "checkedInAt": "2026-08-07T00:00:00.000Z",
               "createdAt": "2026-08-07T00:00:00.000Z",
@@ -13435,7 +13427,6 @@ item:
               "participantDisplayName": "",
               "queueNumber": 0,
               "idempotencyKey": "",
-              "consentAcknowledged": true,
               "checkedIn": true,
               "checkedInAt": "2026-08-07T00:00:00.000Z",
               "createdAt": "2026-08-07T00:00:00.000Z",
@@ -13677,7 +13668,6 @@ item:
               "participantDisplayName": "",
               "queueNumber": 0,
               "idempotencyKey": "",
-              "consentAcknowledged": true,
               "checkedIn": true,
               "checkedInAt": "2026-08-07T00:00:00.000Z",
               "createdAt": "2026-08-07T00:00:00.000Z",
@@ -18121,6 +18111,14 @@ item:
                 }
               }
             ],
+            "totals": {
+              "WAITING": 0,
+              "CALLED": 0,
+              "IN_PROGRESS": 0,
+              "COMPLETED": 0,
+              "SKIPPED": 0,
+              "CANCELLED": 0
+            },
             "entries": [
               {
                 "id": "00000000-0000-4000-8000-000000000000",

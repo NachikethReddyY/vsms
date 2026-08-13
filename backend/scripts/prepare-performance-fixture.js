@@ -125,12 +125,51 @@ async function main() {
       { eventId: event.eventId, stationId: station.stationId, shiftId: shift.shiftId, userId: actor.id, assignedBy: actor.id, assignmentRole: "SCREENER", assignmentStatus: "CONFIRMED", status: "CONFIRMED" },
     ],
   });
+  const registrationEvent = await prisma.event.create({
+    data: {
+      name: `Synthetic registration ${runId.slice(0, 8)}`,
+      description: "Synthetic registration-write target for the same 500 participants.",
+      venue: "Isolated test environment",
+      timezone: "Asia/Singapore",
+      startsAt: new Date(now - 60 * 60 * 1000),
+      endsAt: new Date(now + 24 * 60 * 60 * 1000),
+      capacity: count * 2,
+      expectedAttendance: count,
+      status: "IN_PROGRESS",
+      createdByUserId: actor.id,
+      createIdempotencyKey: `performance-registration-${runId}`,
+      createPayloadHash: crypto.createHash("sha256").update(`registration-${runId}`).digest("hex"),
+    },
+  });
+  const registrationMembership = await prisma.eventMembership.create({
+    data: { eventId: registrationEvent.eventId, userId: actor.id, addedById: actor.id },
+  });
+  for (const role of ["REGISTRATION", "EVENT_MANAGER"]) {
+    await prisma.eventMembershipRole.create({ data: { membershipId: registrationMembership.id, role, assignedById: actor.id } });
+  }
+  const registrationShift = await prisma.shift.create({
+    data: {
+      eventId: registrationEvent.eventId,
+      name: "Synthetic registration duty",
+      startsAt: new Date(now - 30 * 60 * 1000),
+      endsAt: new Date(now + 24 * 60 * 60 * 1000),
+      requiredStaff: 1,
+      status: "ACTIVE",
+    },
+  });
+  const registrationStation = await prisma.station.create({
+    data: { eventId: registrationEvent.eventId, stationName: "Synthetic registration visual acuity", stationType: "VISUAL_ACUITY", stationOrder: 1 },
+  });
+  await prisma.staffAssignment.createMany({
+    data: [
+      { eventId: registrationEvent.eventId, shiftId: registrationShift.shiftId, userId: actor.id, assignedBy: actor.id, assignmentRole: "REGISTRATION", assignmentStatus: "CONFIRMED", status: "CONFIRMED" },
+      { eventId: registrationEvent.eventId, stationId: registrationStation.stationId, shiftId: registrationShift.shiftId, userId: actor.id, assignedBy: actor.id, assignmentRole: "SCREENER", assignmentStatus: "CONFIRMED", status: "CONFIRMED" },
+    ],
+  });
   const participantIds = Array.from({ length: count }, () => crypto.randomUUID());
-  const pollParticipantIds = Array.from({ length: count }, () => crypto.randomUUID());
-  const allParticipantIds = [...participantIds, ...pollParticipantIds];
   await prisma.$transaction(async (tx) => {
     await tx.participant.createMany({
-      data: allParticipantIds.map((id, index) => ({
+      data: participantIds.map((id, index) => ({
         id,
         participantReference: `PERF-${runId.slice(0, 8)}-${String(index + 1).padStart(4, "0")}`,
         firstName: "Synthetic",
@@ -145,7 +184,7 @@ async function main() {
       })),
     });
     await tx.participantEmergencyContact.createMany({
-      data: allParticipantIds.map((participantId, index) => ({
+      data: participantIds.map((participantId, index) => ({
         participantId,
         contactName: `Synthetic Contact ${index + 1}`,
         relationship: "Test contact",
@@ -156,8 +195,16 @@ async function main() {
         updatedById: actor.id,
       })),
     });
+    await tx.participantEventIntake.createMany({
+      data: participantIds.map((participantId) => ({
+        participantId,
+        eventId: registrationEvent.eventId,
+        attachedById: actor.id,
+        reason: "PERFORMANCE_TEST",
+      })),
+    });
   });
-  const pollRegistrations = pollParticipantIds.map((participantId, index) => ({
+  const pollRegistrations = participantIds.map((participantId, index) => ({
     registrationId: crypto.randomUUID(),
     participantId,
     eventId: event.eventId,
@@ -198,9 +245,11 @@ async function main() {
   fs.writeFileSync(output, `${JSON.stringify({
     target: databaseName(process.env.DATABASE_URL),
     eventId: event.eventId,
+    registrationEventId: registrationEvent.eventId,
     stationId: station.stationId,
     actorId: actor.id,
     participantIds,
+    pollRegistrationIds: pollRegistrations.map(({ registrationId }) => registrationId),
     pollTokens,
   }, null, 2)}\n`, { mode: 0o600 });
   process.stdout.write(`Synthetic fixture written to ${output} for ${count} participants.\n`);

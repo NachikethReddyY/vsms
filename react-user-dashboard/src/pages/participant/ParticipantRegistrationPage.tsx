@@ -50,7 +50,6 @@ export default function ParticipantRegistrationPage() {
   const [isLoading, setIsLoading] = useState(Boolean(eventId));
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showConfirmation, setShowConfirmation] = useState(false);
-  const [consentAcknowledged, setConsentAcknowledged] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const idempotencyKey = useRef(crypto.randomUUID());
 
@@ -87,9 +86,8 @@ export default function ParticipantRegistrationPage() {
       { label: "Active participant record", complete: review.participant.status === "ACTIVE" },
       { label: "Open event", complete: OPEN_EVENT_STATUSES.has(review.event.status) },
       { label: "Active emergency contact", complete: Boolean(review.emergencyContact) },
-      { label: "Consent acknowledgement", complete: consentAcknowledged },
     ];
-  }, [consentAcknowledged, review]);
+  }, [review]);
 
   const missingRequirement = requirements.find((item) => !item.complete)?.label;
   const canRegister = Boolean(review && !missingRequirement && !isSubmitting);
@@ -99,7 +97,7 @@ export default function ParticipantRegistrationPage() {
     setIsSubmitting(true);
     setError(null);
     try {
-      const response = await apiClient.post<components['schemas']['RegistrationResponse']>(`/events/${eventId}/registrations`, { participantId, consentAcknowledged }, {
+      const response = await apiClient.post<components['schemas']['RegistrationResponse']>(`/events/${eventId}/registrations`, { participantId }, {
         headers: { "Idempotency-Key": idempotencyKey.current },
       });
       const registrationId = response.data.registration?.id ?? response.data.registrationId;
@@ -182,10 +180,6 @@ export default function ParticipantRegistrationPage() {
         <section className="participant-v2-checkin-records" aria-label="Participant registration records">
           <article><PhoneIcon /><div><span>Emergency contact</span><strong>{review.emergencyContact ? `${review.emergencyContact.contactName} - ${review.emergencyContact.phoneNumber}` : "No active emergency contact"}</strong></div></article>
         </section>
-        <label className="participant-registration-consent">
-          <input type="checkbox" checked={consentAcknowledged} onChange={(event) => setConsentAcknowledged(event.target.checked)} />
-          <span>I confirm that the participant has consented to take part in this event screening.</span>
-        </label>
         <footer className="participant-v2-checkin-actions">
           <Link className="secondary" to={profileLink}>Back to profile</Link>
           <button className="primary" type="button" disabled={!canRegister} onClick={() => setShowConfirmation(true)}>Confirm participant</button>

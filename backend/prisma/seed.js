@@ -596,7 +596,6 @@ async function ensureDemoRegistration(staff, participant, event) {
     },
     update: {
       registrationStatus: "SIGNED_UP",
-      consentAcknowledged: true,
       participantDisplayName: `${participant.firstName} ${participant.lastName}`,
       passToken: null,
     },
@@ -605,7 +604,6 @@ async function ensureDemoRegistration(staff, participant, event) {
       eventId: event.eventId,
       registeredBy: staff.id,
       registrationStatus: "SIGNED_UP",
-      consentAcknowledged: true,
       participantDisplayName: `${participant.firstName} ${participant.lastName}`,
       queueNumber: 1,
       idempotencyKey,
@@ -663,7 +661,6 @@ async function ensureScreenerQueueRegistration(staff, participant, event, statio
     where: { participantId_eventId: { participantId: participant.id, eventId: event.eventId } },
     update: {
       registrationStatus: "SIGNED_UP",
-      consentAcknowledged: true,
       participantDisplayName: `${participant.firstName} ${participant.lastName}`,
       queueNumber,
       checkedIn: false,
@@ -674,7 +671,6 @@ async function ensureScreenerQueueRegistration(staff, participant, event, statio
       eventId: event.eventId,
       registeredBy: staff.id,
       registrationStatus: "SIGNED_UP",
-      consentAcknowledged: true,
       participantDisplayName: `${participant.firstName} ${participant.lastName}`,
       queueNumber,
       idempotencyKey: `seed-screener-queue-${participant.participantReference}`,

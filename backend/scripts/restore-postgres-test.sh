@@ -13,6 +13,7 @@ fail() {
 [ "${RESTORE_CONFIRM:-}" = "$RESTORE_CONFIRMATION" ] || fail "Set RESTORE_CONFIRM=$RESTORE_CONFIRMATION before restoring"
 backup_file=$1
 manifest_file="$backup_file.counts.tsv"
+schema_file="$backup_file.schema.tsv"
 checksum_file="$backup_file.sha256"
 
 configured_database=${RESTORE_DATABASE_URL%%\?*}
@@ -20,6 +21,7 @@ configured_database=${configured_database##*/}
 case "$configured_database" in *_test) ;; *) fail "Restore target URL must end in _test" ;; esac
 [ -f "$backup_file" ] || fail "Backup file does not exist"
 [ -f "$manifest_file" ] || fail "Row-count manifest does not exist"
+[ -f "$schema_file" ] || fail "Schema manifest does not exist"
 [ -f "$checksum_file" ] || fail "SHA-256 checksum does not exist"
 command -v sha256sum >/dev/null 2>&1 || fail "sha256sum is required"
 
@@ -56,8 +58,20 @@ while IFS='	' read -r table_name expected_count; do
   [ "$actual_count" = "$expected_count" ] || fail "Row-count validation failed for $table_name"
 done < "$manifest_file"
 
-unvalidated_constraints=$(psql "$RESTORE_DATABASE_URL" -Atq -v ON_ERROR_STOP=1 -c "SELECT count(*) FROM pg_constraint WHERE connamespace = 'public'::regnamespace AND contype IN ('p', 'u', 'f', 'c') AND NOT convalidated")
-[ "$unvalidated_constraints" = "0" ] || fail "Constraint validation failed"
+restored_schema=$(mktemp "${TMPDIR:-/tmp}/vsms-restored-schema.XXXXXX")
+trap 'rm -f -- "$restored_schema"' EXIT HUP INT TERM
+psql "$RESTORE_DATABASE_URL" -Atq -F '	' -v ON_ERROR_STOP=1 -c "
+  SELECT 'CONSTRAINT', c.conrelid::regclass::text, c.conname, c.contype::text, c.convalidated::text
+  FROM pg_constraint c
+  JOIN pg_namespace n ON n.oid = c.connamespace
+  WHERE n.nspname = 'public' AND c.contype IN ('p', 'u', 'f', 'c')
+  UNION ALL
+  SELECT 'INDEX', tablename, indexname, '', indexdef
+  FROM pg_indexes
+  WHERE schemaname = 'public'
+  ORDER BY 1, 2, 3
+" > "$restored_schema"
+cmp -s "$schema_file" "$restored_schema" || fail "Constraint or index parity validation failed"
 
 elapsed=$(( $(date +%s) - started_epoch ))
-printf 'Restore validated for %s\nElapsed seconds: %s\n' "$target_database" "$elapsed"
+printf 'Restore validated for %s with exact row-count, constraint, and index parity\nElapsed seconds: %s\n' "$target_database" "$elapsed"

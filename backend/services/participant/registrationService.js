@@ -39,7 +39,6 @@ const conflict = (message) => {
 const routineErrors = {
     REGISTRATION_EVENT_NOT_FOUND: [404, "Event not found"],
     REGISTRATION_EVENT_NOT_OPEN: [400, "Event is not open for registration"],
-    REGISTRATION_CONSENT_REQUIRED: [400, "Consent acknowledgement is required before registration"],
     REGISTRATION_PARTICIPANT_NOT_ACTIVE: [404, "Active participant not found"],
     REGISTRATION_EMERGENCY_CONTACT_REQUIRED: [400, "An active emergency contact is required before registration"],
     REGISTRATION_DUPLICATE: [409, "Participant is already registered for this event"],
@@ -78,7 +77,7 @@ async function provisionExistingRegistration({ registration, userId, eventId, co
         try {
             return await db.$transaction(async (tx) => {
                 const securePass = await qrService.generateQR(registration.registrationId, userId, tx, context);
-                const route = registration.event.status === "IN_PROGRESS"
+                const route = registration.event.status === "IN_PROGRESS" && registration.checkedIn
                     ? await assignRouteOnce({
                         tx,
                         registrationId: registration.registrationId,
@@ -92,7 +91,7 @@ async function provisionExistingRegistration({ registration, userId, eventId, co
                     include: registrationInclude(),
                 });
                 return { registration: current, route, securePass };
-            }, { isolationLevel: "Serializable" });
+            }, { isolationLevel: "ReadCommitted" });
         } catch (error) {
             if (error.code === "P2034" && attempt < 3) continue;
             throw error;
@@ -101,7 +100,7 @@ async function provisionExistingRegistration({ registration, userId, eventId, co
     throw conflict("Unable to provision registration. Please retry.");
 }
 
-exports.createRegistration = async ({ participantId, eventId, consentAcknowledged, idempotencyKey, auth, context }, db = prisma) => {
+exports.createRegistration = async ({ participantId, eventId, idempotencyKey, auth, context }, db = prisma) => {
     const userId = auth.userId;
     await assertRegistrationAssignment(db, eventId, auth);
 
@@ -142,8 +141,7 @@ exports.createRegistration = async ({ participantId, eventId, consentAcknowledge
                         CAST(${participantId} AS uuid),
                         CAST(${eventId} AS uuid),
                         CAST(${userId} AS uuid),
-                        ${idempotencyKey},
-                        ${consentAcknowledged}
+                        ${idempotencyKey}
                     )
                 `;
                 const operation = rows[0];
@@ -157,7 +155,7 @@ exports.createRegistration = async ({ participantId, eventId, consentAcknowledge
                         action: "EVENT_REGISTRATION_CREATED",
                         entityName: "EventRegistration",
                         entityId: created.registrationId,
-                        newValue: { participantId, eventId, queueNumber: null, status: created.registrationStatus, consentAcknowledged: true },
+                        newValue: { participantId, eventId, queueNumber: null, status: created.registrationStatus },
                         context,
                         client: tx,
                     });
@@ -181,7 +179,7 @@ exports.createRegistration = async ({ participantId, eventId, consentAcknowledge
                     include: registrationInclude(),
                 });
                 return { registration: current, route, securePass, idempotentReplay: operation.idempotent_replay === true };
-            }, { isolationLevel: "Serializable" });
+            }, { isolationLevel: "ReadCommitted" });
             break;
         } catch (error) {
             const target = JSON.stringify(error.meta?.target || "");

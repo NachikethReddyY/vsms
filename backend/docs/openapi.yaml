@@ -813,10 +813,9 @@ paths:
             schema:
               type: object
               additionalProperties: false
-              required: [participantId, consentAcknowledged]
+              required: [participantId]
               properties:
                 participantId: { type: string, format: uuid }
-                consentAcknowledged: { type: boolean }
       responses:
         "200": { description: Idempotent replay, content: { application/json: { schema: { $ref: "#/components/schemas/RegistrationResponse" } } } }
         "201": { description: Participant registered, content: { application/json: { schema: { $ref: "#/components/schemas/RegistrationResponse" } } } }
@@ -1516,11 +1515,10 @@ paths:
             schema:
               type: object
               additionalProperties: false
-              required: [eventId, participantId, consentAcknowledged]
+              required: [eventId, participantId]
               properties:
                 eventId: { type: string, format: uuid }
                 participantId: { type: string, format: uuid }
-                consentAcknowledged: { type: boolean }
       responses:
         "200": { description: Idempotent replay, content: { application/json: { schema: { $ref: "#/components/schemas/RegistrationResponse" } } } }
         "201": { description: Participant registered, content: { application/json: { schema: { $ref: "#/components/schemas/RegistrationResponse" } } } }
@@ -4707,7 +4705,6 @@ components:
         participantDisplayName: { type: string, nullable: true }
         queueNumber: { type: integer, nullable: true }
         idempotencyKey: { type: string }
-        consentAcknowledged: { type: boolean }
         checkedIn: { type: boolean }
         checkedInAt: { type: string, format: date-time, nullable: true }
         createdAt: { type: string, format: date-time }
@@ -5309,7 +5306,7 @@ components:
     EventQueueStatusResponse:
       type: object
       additionalProperties: false
-      required: [event, stations, entries]
+      required: [event, stations, totals, entries]
       properties:
         event:
           type: object
@@ -5321,9 +5318,20 @@ components:
             status: { type: string }
             venue: { type: string, nullable: true }
         stations: { type: array, items: { $ref: "#/components/schemas/QueueStationWorkload" } }
+        totals:
+          type: object
+          additionalProperties: false
+          required: [WAITING, CALLED, IN_PROGRESS, COMPLETED, SKIPPED, CANCELLED]
+          properties:
+            WAITING: { type: integer, minimum: 0 }
+            CALLED: { type: integer, minimum: 0 }
+            IN_PROGRESS: { type: integer, minimum: 0 }
+            COMPLETED: { type: integer, minimum: 0 }
+            SKIPPED: { type: integer, minimum: 0 }
+            CANCELLED: { type: integer, minimum: 0 }
         entries:
           type: array
-          description: "Every queue entry for the event, ordered by queue number, with priority ordering surfaced through each station's next-up"
+          description: "Active queue entries for the event, ordered by queue number, with complete status counts in totals"
           items: { $ref: "#/components/schemas/EventQueueEntry" }
     RegistrationStation:
       type: object

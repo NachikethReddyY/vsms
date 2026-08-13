@@ -2,6 +2,7 @@
 
 const assert = require("node:assert/strict");
 const fs = require("node:fs");
+const { args: parseFinalArgs, assertSafeEntries } = require("./package-final-submission.cjs");
 const {
   archiveNames,
   ARCHIVE_PREFIX,
@@ -38,6 +39,8 @@ const cases = [
   ["docs/secure_coding/diagrams/draft.md", false],
   ["docs/vsms-next-work-visual-plan.html", false],
   ["docs/secure_coding/report.md", true],
+  ["docs/secure_coding/final/VSMS_Secure_Coding_Report.pdf", false],
+  ["docs/secure_coding/final/VSMS_Demonstration.pptx", false],
 ];
 
 for (const [file, expected] of cases) assert.equal(shouldInclude(file), expected, file);
@@ -51,6 +54,12 @@ assert.throws(
   () => validateEntryNames([...safeNames, `${ARCHIVE_PREFIX}backend/.env`]),
   /excluded or unsafe paths/,
 );
+assert.deepEqual(parseFinalArgs(["--student-id", "123", "--name", "Student"]), {
+  "student-id": "123",
+  name: "Student",
+});
+assert.doesNotThrow(() => assertSafeEntries(["Student_Code.zip", "Student_Db.zip"]));
+assert.throws(() => assertSafeEntries(["../outside.sql"]), /unsafe paths/);
 assert.throws(
   () => validateEntryNames([...safeNames, "../outside.txt"]),
   /excluded or unsafe paths/,

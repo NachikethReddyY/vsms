@@ -400,6 +400,14 @@ const saveStationResult = async ({
 
   try {
     return await prisma.$transaction(async (tx) => {
+      if (typeof tx.$queryRaw === "function") {
+        await tx.$queryRaw`
+          SELECT registration_id
+          FROM event_registrations
+          WHERE registration_id = CAST(${body.registrationId} AS uuid)
+          FOR UPDATE
+        `;
+      }
       const existingByKey = await tx.screeningRequestLedger.findUnique({
         where: { idempotencyKey: body.idempotencyKey },
       });
@@ -529,7 +537,7 @@ const saveStationResult = async ({
         },
       });
       return { result: responseResult, routeProgression, created: !existingResult };
-    }, { isolationLevel: "Serializable" });
+    }, { isolationLevel: "ReadCommitted" });
   } catch (error) {
     if (error.code === "P2002") {
       const raced = await prisma.screeningRequestLedger.findUnique({ where: { idempotencyKey: body.idempotencyKey } });

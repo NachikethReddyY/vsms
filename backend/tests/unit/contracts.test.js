@@ -76,7 +76,7 @@ test("API routes expose the required versioned contracts", () => {
     assert.match(events, /"\/active"/);
     assert.ok(events.indexOf('"/active"') < events.indexOf('"/:eventId"'), "active events route must precede the dynamic event route");
     assert.match(registrations, /"\/:registrationId\/history"/);
-    assert.match(read("controllers/registrationController.js"), /consentAcknowledged/);
+    assert.doesNotMatch(read("controllers/registrationController.js"), /consentAcknowledged/);
     for (const route of ["/authorize", "/callback", "/logout", "/refresh", "/me"]) {
         assert.ok(auth.includes(`"${route}"`), `missing auth route ${route}`);
     }
@@ -137,13 +137,14 @@ test("registration service delegates atomic registration work to stored function
     const service = read("services/participant/registrationService.js");
     const qrService = read("services/participant/qrService.js");
     const migration = read("prisma/migrations/20260813150100_add_registration_stored_functions/migration.sql");
+    const consentRemoval = read("prisma/migrations/20260813170000_remove_registration_consent_acknowledgement/migration.sql");
     const transactionBody = service.slice(service.indexOf("db.$transaction"));
     assert.match(transactionBody, /register_participant_for_event/);
     assert.match(service, /cancel_event_registration/);
     assert.match(qrService, /check_in_event_registration/);
     assert.match(service, /get_event_registration_summary/);
     assert.match(transactionBody, /createAuditLog/);
-    assert.match(transactionBody, /isolationLevel:\s*"Serializable"/);
+    assert.match(transactionBody, /isolationLevel:\s*"ReadCommitted"/);
     assert.match(service, /DUPLICATE_REGISTRATION_BLOCKED/);
     assert.match(controller, /registrationService\.createRegistration/);
     assert.match(controller, /registrationService\.getEventRegistrationSummary/);
@@ -153,6 +154,8 @@ test("registration service delegates atomic registration work to stored function
     assert.match(migration, /CREATE OR REPLACE FUNCTION "check_in_event_registration"/);
     assert.match(migration, /CREATE OR REPLACE FUNCTION "get_event_registration_summary"/);
     assert.match(migration, /registration_status_history/);
+    assert.match(consentRemoval, /DROP COLUMN IF EXISTS consent_acknowledged/);
+    assert.doesNotMatch(consentRemoval, /p_consent_acknowledged/);
 });
 
 test("migration preserves history and enforces one active primary contact", () => {

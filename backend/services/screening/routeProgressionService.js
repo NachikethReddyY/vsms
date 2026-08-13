@@ -6,6 +6,14 @@ const ACTIVE_QUEUE_STATUSES = ["WAITING", "CALLED", "IN_PROGRESS"];
 const allocateQueueNumber = async (tx, registration) => {
   if (registration.queueNumber != null) return registration.queueNumber;
 
+  if (typeof tx.$queryRaw === "function") {
+    await tx.$queryRaw`
+      SELECT event_id
+      FROM events
+      WHERE event_id = CAST(${registration.eventId} AS uuid)
+      FOR UPDATE
+    `;
+  }
   const aggregate = await tx.eventRegistration.aggregate({
     where: { eventId: registration.eventId },
     _max: { queueNumber: true },
