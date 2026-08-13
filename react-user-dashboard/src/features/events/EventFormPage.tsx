@@ -639,18 +639,17 @@ export default function EventFormPage({ mode }: { mode: 'create' | 'edit' }) {
       const liveStatuses = new Set(['IN_PROGRESS', 'ONGOING']);
       const isLiveEdit = mode === 'edit' && liveStatuses.has(existing?.status || '');
       // Live events lock stations/shifts so assignment lifecycle state cannot be wiped.
-      const liveUpdate = isLiveEdit
-        ? {
-          version: existing!.version,
-          description: payload.description,
-          bannerKey: payload.bannerKey,
-          artworkDataUrl: payload.artworkDataUrl,
-          capacity: payload.capacity,
-        }
-        : { ...payload, version: existing!.version };
       const saved = mode === 'create'
         ? await eventApi.create(payload, createIdempotencyKey.current)
-        : await eventApi.update(eventId!, liveUpdate);
+        : await eventApi.update(eventId!, isLiveEdit
+          ? {
+            version: existing!.version,
+            description: payload.description,
+            bannerKey: payload.bannerKey,
+            artworkDataUrl: payload.artworkDataUrl,
+            capacity: payload.capacity,
+          }
+          : { ...payload, version: existing!.version });
       navigate(`/events/${saved.eventId}`, { state: { notice: isDuplicate ? 'Draft event duplicated.' : mode === 'create' ? 'Draft event created.' : 'Event plan updated.' } });
     } catch (error) {
       const code = getApiErrorCode(error);
