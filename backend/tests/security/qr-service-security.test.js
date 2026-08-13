@@ -307,6 +307,7 @@ test("the same secure pass remains valid through the event end", async () => {
 test("download renders an active pass from encrypted storage without returning its target URL", async () => {
   const token = "b".repeat(64);
   let where;
+  let audit;
   const db = {
     qRCodePass: {
       findFirst: async (query) => {
@@ -320,9 +321,10 @@ test("download renders an active pass from encrypted storage without returning i
         };
       },
     },
+    auditLog: { create: async ({ data }) => { audit = data; return data; } },
   };
 
-  const result = await qrService.downloadQR(qrId, db);
+  const result = await qrService.downloadQR(qrId, db, { userId: registrationId, requestId: eventId });
   assert.equal(where.id, qrId);
   assert.equal(where.isActive, true);
   assert.ok(where.expiresAt.gt instanceof Date);
@@ -331,6 +333,50 @@ test("download renders an active pass from encrypted storage without returning i
   const branded = Buffer.from(result.qrImage.split(",")[1], "base64").toString("utf8");
   assert.match(branded, /^<svg/);
   assert.doesNotMatch(branded, /VSMS|SECURE EVENT PASS/);
+  assert.equal(audit.action, "QR_DOWNLOADED");
+  assert.equal(audit.userId, registrationId);
+  assert.equal(audit.requestId, eventId);
+  assert.deepEqual(audit.newValue, { registrationId });
+});
+
+test("print has its own audit event and does not double-log as a download", async () => {
+  const token = "f".repeat(64);
+  const actions = [];
+  const db = {
+    qRCodePass: {
+      findFirst: async () => ({
+        id: qrId,
+        registrationId,
+        expiresAt: new Date(Date.now() + 60_000),
+        tokenCiphertext: encrypt(token, encryptionContext("QRCodePass", qrId, "token")),
+        tokenEncryptionVersion: 2,
+      }),
+    },
+    auditLog: { create: async ({ data }) => { actions.push(data.action); return data; } },
+  };
+
+  await qrService.printQR(qrId, db, { userId: registrationId });
+  assert.deepEqual(actions, ["QR_PRINTED"]);
+});
+
+test("authorization denials are audited without recording the bearer token", async () => {
+  const token = "7".repeat(64);
+  let audit;
+  const db = { auditLog: { create: async ({ data }) => { audit = data; return data; } } };
+
+  await qrService.auditAccessDenied({
+    selectors: { token, eventId },
+    operation: "VERIFY",
+    userId: registrationId,
+    error: { code: "EVENT_ROLE_REQUIRED" },
+    context: { requestId: qrId },
+  }, db);
+
+  assert.equal(audit.action, "QR_VERIFICATION_DENIED");
+  assert.equal(audit.outcome, "DENIED");
+  assert.equal(audit.newValue.errorCode, "EVENT_ROLE_REQUIRED");
+  assert.match(audit.newValue.tokenFingerprint, /^[a-f0-9]{64}$/);
+  assert.equal(JSON.stringify(audit).includes(token), false);
 });
 
 test("verification rejects any pass that does not satisfy the shared active-expiry predicate", async () => {
