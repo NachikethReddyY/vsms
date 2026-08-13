@@ -86,7 +86,7 @@ jobs:
           DIGEST: ${{ steps.build.outputs.digest }}
         run: |
           aws ecr wait image-scan-complete --repository-name "$REPOSITORY" --image-id imageDigest="$DIGEST"
-          CRITICAL=$(aws ecr describe-image-scan-findings --repository-name "$REPOSITORY" --image-id imageDigest="$DIGEST" --query 'imageScanFindings.findingSeverityCounts.CRITICAL || `0`' --output text)
+          CRITICAL=$(aws ecr describe-image-scan-findings --repository-name "$REPOSITORY" --image-id imageDigest="$DIGEST" --query "imageScanFindings.findingSeverityCounts.CRITICAL || \`0\`" --output text)
           test "$CRITICAL" = "0"
       - name: Attest image provenance
         uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4
