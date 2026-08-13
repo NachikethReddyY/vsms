@@ -1,29 +1,4 @@
-.app-dialog {
-  width: min(480px, calc(100vw - 32px));
-  max-height: min(680px, calc(100dvh - 32px));
-  position: fixed;
-  inset: 0;
-  margin: auto;
-  padding: 0;
-  overflow: auto;
-  border: 1px solid var(--line-strong, var(--hairline-strong));
-  border-radius: 14px;
-  background: var(--panel, var(--surface));
-  color: var(--ink);
-  box-shadow: 0 24px 70px rgba(0, 0, 0, .42);
-}
-
-.app-dialog::backdrop { background: rgba(0, 0, 0, .64); }
-.app-dialog-panel { display: grid; gap: 18px; padding: 22px; }
-.app-dialog-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; }
-.app-dialog-header > div { min-width: 0; }
-.app-dialog-header h2 { margin: 0; color: var(--ink); font-size: 22px; line-height: 28px; letter-spacing: -.02em; }
-.app-dialog-header p { margin: 6px 0 0; color: var(--ink-2); font-size: 13px; line-height: 20px; }
-.app-dialog-close { width: 44px; height: 44px; display: grid; place-items: center; flex: none; margin: -10px -10px 0 0; padding: 0; border: 0; border-radius: 8px; background: transparent; color: var(--ink-2); cursor: pointer; }
-.app-dialog-close:hover { background: var(--surface-2); color: var(--ink); }
-.app-dialog-close svg { width: 18px; }
-.app-dialog-content { min-width: 0; }
-.app-dialog-content > p { margin: 0; color: var(--ink-2); font-size: 13px; line-height: 20px; }
+/* Shared form hooks remain because several feature dialogs provide this content. */
 .app-dialog-form { display: grid; gap: 14px; }
 .app-dialog-field { display: grid; gap: 6px; }
 .app-dialog-field > span { color: var(--ink-2); font-size: 12px; font-weight: 700; }
@@ -46,12 +21,7 @@
 .app-dialog-error { margin: 0; padding: 10px 12px; border: 1px solid color-mix(in srgb, var(--red) 40%, var(--hairline)); border-radius: 8px; background: color-mix(in srgb, var(--red) 9%, var(--surface)); color: var(--red); font-size: 12px; line-height: 18px; }
 .app-dialog-actions { display: flex; justify-content: flex-end; flex-wrap: wrap-reverse; gap: 8px; padding-top: 2px; }
 
-@media (max-width: 520px) {
-  .app-dialog { width: calc(100vw - 24px); max-height: calc(100dvh - 24px); }
-  .app-dialog-panel { padding: 18px; }
-  .app-dialog-header h2 { font-size: 20px; line-height: 26px; }
-  .app-dialog-actions > button { flex: 1 1 140px; }
-}
+@media (max-width: 520px) { .app-dialog-actions > button { flex: 1 1 140px; } }
 
 @media (prefers-reduced-motion: reduce) {
   .app-dialog { scroll-behavior: auto; }

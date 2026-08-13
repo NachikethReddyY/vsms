@@ -1,6 +1,5 @@
 import { CheckCircleIcon, ExclamationCircleIcon, XMarkIcon } from '@heroicons/react/24/outline';
 import { useCallback, useEffect, useState } from 'react';
-import './AppToast.css';
 
 type AppToastProps = {
   message: string;
@@ -32,7 +31,7 @@ export function AppToast({ message, onDismiss, tone = 'success', duration = 5000
   if (!message || !visible) return null;
   const Icon = tone === 'success' ? CheckCircleIcon : ExclamationCircleIcon;
   return <div
-    className={`app-toast ${tone}`}
+    className="fixed top-[max(1rem,env(safe-area-inset-top))] right-[max(1rem,env(safe-area-inset-right))] z-[120] grid min-h-13 w-[min(23.75rem,calc(100vw-2rem))] grid-cols-[1.25rem_minmax(0,1fr)_2.75rem] items-center gap-2.5 rounded-xl border border-[var(--line-strong,var(--hairline-strong))] bg-[color-mix(in_srgb,var(--panel,var(--surface))_92%,transparent)] py-2.5 pr-2 pl-3.5 text-[0.8125rem] leading-[1.1875rem] font-semibold text-[var(--ink)] shadow-[0_0.875rem_2.5rem_rgba(0,0,0,.26)] backdrop-blur-xl max-[520px]:top-[max(.75rem,env(safe-area-inset-top))] max-[520px]:right-3 max-[520px]:w-[calc(100vw-1.5rem)]"
     role={tone === 'error' ? 'alert' : 'status'}
     aria-live={tone === 'error' ? 'assertive' : 'polite'}
     onMouseEnter={() => setPaused(true)}
@@ -40,8 +39,8 @@ export function AppToast({ message, onDismiss, tone = 'success', duration = 5000
     onFocusCapture={() => setPaused(true)}
     onBlurCapture={(event) => { if (!event.currentTarget.contains(event.relatedTarget)) setPaused(false); }}
   >
-    <Icon aria-hidden="true" />
-    <span>{message}</span>
-    <button type="button" onClick={dismiss} aria-label="Dismiss notification"><XMarkIcon /></button>
+    <Icon className={`size-5 ${tone === 'success' ? 'text-[var(--green)]' : 'text-[var(--red)]'}`} aria-hidden="true" />
+    <span className="min-w-0 wrap-anywhere">{message}</span>
+    <button className="grid size-11 cursor-pointer place-items-center rounded-lg border-0 bg-transparent p-0 text-[var(--ink-2)] transition-[background,color,transform] duration-150 hover:bg-[var(--surface-2)] hover:text-[var(--ink)] active:scale-[.97]" type="button" onClick={dismiss} aria-label="Dismiss notification"><XMarkIcon className="size-[1.0625rem]" /></button>
   </div>;
 }
