@@ -7,12 +7,14 @@ const jsonPath = path.join(root, 'api-testing/event-api.collection.json');
 const ymlPath = path.join(root, 'api-testing/event-api.collection.yml');
 const beforeJson = fs.readFileSync(jsonPath, 'utf8');
 const beforeYml = fs.readFileSync(ymlPath, 'utf8');
+const normalizeLineEndings = (value) => value.replace(/\r\n/g, '\n');
 
 execFileSync(process.execPath, [path.join(__dirname, 'generate-api-collection.cjs')], { cwd: root, stdio: 'pipe' });
 
 const afterJson = fs.readFileSync(jsonPath, 'utf8');
 const afterYml = fs.readFileSync(ymlPath, 'utf8');
-if (afterJson !== beforeJson || afterYml !== beforeYml) {
+if (normalizeLineEndings(afterJson) !== normalizeLineEndings(beforeJson)
+  || normalizeLineEndings(afterYml) !== normalizeLineEndings(beforeYml)) {
   throw new Error('Generated API collections are out of date. Run node scripts/generate-api-collection.cjs.');
 }
 
