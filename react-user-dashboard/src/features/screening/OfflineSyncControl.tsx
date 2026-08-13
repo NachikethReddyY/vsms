@@ -5,7 +5,7 @@ import { useOfflineSync } from './OfflineSyncProvider';
 const QUIET_REFRESH_MS = 5 * 60 * 1000;
 
 export function OfflineSyncControl({ eventId }: { eventId: string }) {
-  const { online, statusFor, downloadEvent, syncEvent, ensureOfflineReady } = useOfflineSync();
+  const { online, statusFor, downloadEvent, syncEvent, discardConflicts, ensureOfflineReady } = useOfflineSync();
   const status = statusFor(eventId);
   const working = status.downloading || status.syncing;
   const hasAttention = status.conflicts > 0;
@@ -39,13 +39,19 @@ export function OfflineSyncControl({ eventId }: { eventId: string }) {
             : online
               ? 'Retry offline prep'
               : 'Offline unavailable';
-  const action = status.downloaded
-    ? () => void syncEvent(eventId)
-    : () => void downloadEvent(eventId);
+  const action = hasAttention
+    ? () => {
+      if (window.confirm('Discard the rejected offline saves from this device? Re-enter any result that still needs to be recorded.')) {
+        void discardConflicts(eventId);
+      }
+    }
+    : status.downloaded
+      ? () => void syncEvent(eventId)
+      : () => void downloadEvent(eventId);
   const disabled = working || (!status.downloaded && !online);
   const title = status.error
     ?? (hasAttention
-      ? 'One or more offline results need staff attention before they can be sent. Open the station, fix the flagged save, then sync again.'
+      ? 'The server rejected one or more offline saves. Tap to discard those rejected copies, then re-enter any result that is still required.'
       : status.downloaded
         ? 'Offline pack is ready. Tap to sync pending results now.'
         : 'Assigned station queues download automatically while you are online. Tap to retry if preparation failed.');
@@ -66,7 +72,7 @@ export function OfflineSyncControl({ eventId }: { eventId: string }) {
       {(status.error || hasAttention) && (
         <p className="workspace-sync-hint" role="status">
           {status.error
-            ?? 'Some offline saves conflicted (for example missing acknowledgement or an ended event). Fix on the station form, then sync again.'}
+            ?? 'Some offline saves were rejected. Tap the warning to discard them, then re-enter any result that is still required.'}
         </p>
       )}
       <span className="sr-only" aria-live="polite">{status.error ?? label}</span>

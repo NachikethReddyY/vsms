@@ -522,6 +522,14 @@ export async function getOfflineSyncStatus(ownerId: string, eventId: string): Pr
   };
 }
 
+export async function discardOfflineConflicts(ownerId: string, eventId: string): Promise<OfflineSyncStatus> {
+  await deleteRecords((await recordsForEvent(ownerId, eventId)).filter(
+    (record) => record.kind === 'mutation' && record.status === 'conflict',
+  ));
+  notifyOfflineChange();
+  return getOfflineSyncStatus(ownerId, eventId);
+}
+
 function isScopeExpiredError(error: unknown) {
   const status = (error as { response?: { status?: number } })?.response?.status;
   return status === 403 || status === 404 || status === 409;

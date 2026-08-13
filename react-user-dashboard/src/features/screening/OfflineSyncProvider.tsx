@@ -3,6 +3,7 @@ import { useAuth } from '../../auth/AuthProvider';
 import { getStoredSession } from '../../utils/session';
 import {
   clearOfflineData,
+  discardOfflineConflicts,
   downloadOfflineEvent,
   getOfflineSyncStatus,
   listOfflineEventIds,
@@ -23,6 +24,7 @@ type OfflineSyncContextValue = {
   statusFor: (eventId: string) => EventSyncState;
   downloadEvent: (eventId: string) => Promise<void>;
   syncEvent: (eventId: string) => Promise<void>;
+  discardConflicts: (eventId: string) => Promise<void>;
   /** Download if missing, or refresh the snapshot when already present. Safe to call repeatedly. */
   ensureOfflineReady: (eventId: string, options?: { refreshIfPresent?: boolean }) => Promise<void>;
 };
@@ -99,6 +101,12 @@ export function OfflineSyncProvider({ children }: PropsWithChildren) {
     } finally {
       setEventState(eventId, { syncing: false });
     }
+  }, [ownerId, setEventState]);
+
+  const discardConflicts = useCallback(async (eventId: string) => {
+    if (!ownerId) return;
+    const status = await discardOfflineConflicts(ownerId, eventId);
+    setEventState(eventId, { ...status, error: null });
   }, [ownerId, setEventState]);
 
   const ensureOfflineReady = useCallback(async (
@@ -191,8 +199,9 @@ export function OfflineSyncProvider({ children }: PropsWithChildren) {
     },
     downloadEvent,
     syncEvent,
+    discardConflicts,
     ensureOfflineReady,
-  }), [downloadEvent, ensureOfflineReady, online, states, syncEvent]);
+  }), [discardConflicts, downloadEvent, ensureOfflineReady, online, states, syncEvent]);
 
   return <OfflineSyncContext.Provider value={value}>{children}</OfflineSyncContext.Provider>;
 }
