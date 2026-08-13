@@ -32,6 +32,7 @@ import { managementPercent } from './eventReport';
 import { customStationPath } from '../screening/stationConfig';
 
 type AssignmentDraft = { userId: string; assignmentRole: StaffAssignmentRole; eventStationId: string };
+type ShiftDraft = { name: string; startsAt: string; endsAt: string };
 const emptyAssignment: AssignmentDraft = { userId: '', assignmentRole: 'SUPPORT', eventStationId: '' };
 const assignmentRoles: StaffAssignmentRole[] = ['EVENT_MANAGER', 'REGISTRATION', 'SCREENER', 'REVIEWER', 'SUPPORT'];
 const applicationRoleByAssignment: Record<StaffAssignmentRole, StaffDirectoryEntry['roles'][number]> = {
@@ -138,6 +139,7 @@ export default function EventDetailPage() {
   const [stationTemplatesError, setStationTemplatesError] = useState('');
   const [stationPending, setStationPending] = useState('');
   const [shiftPending, setShiftPending] = useState('');
+  const [shiftDrafts, setShiftDrafts] = useState<Record<string, ShiftDraft>>({});
   const [capacityErrors, setCapacityErrors] = useState<Record<string, string>>({});
   const [auditLoading, setAuditLoading] = useState(false);
   const [auditError, setAuditError] = useState('');
@@ -399,6 +401,29 @@ export default function EventDetailPage() {
     finally { setShiftPending(''); }
   };
 
+  const saveShift = async (shiftId: string) => {
+    if (!event) return;
+    const current = event.shifts.find((shift) => shift.shiftId === shiftId);
+    if (!current) return;
+    const draft = shiftDrafts[shiftId] ?? { name: current.name, startsAt: formatTimeInput(current.startsAt, event.timezone), endsAt: formatTimeInput(current.endsAt, event.timezone) };
+    const date = dateKey(current.startsAt, event.timezone);
+    setShiftPending(shiftId); setError('');
+    try {
+      const shifts = event.shifts.map((shift) => shift.shiftId === shiftId ? {
+        shiftId,
+        name: draft.name.trim(),
+        startsAt: toInstant(date, draft.startsAt),
+        endsAt: toInstant(date, draft.endsAt),
+        requiredStaff: shift.requiredStaff,
+      } : { shiftId: shift.shiftId, name: shift.name, startsAt: shift.startsAt, endsAt: shift.endsAt, requiredStaff: shift.requiredStaff });
+      setEvent(await eventApi.update(event.eventId, { version: event.version, shifts }));
+      setShiftDrafts((currentDrafts) => { const next = { ...currentDrafts }; delete next[shiftId]; return next; });
+      setNotice('Shift updated.');
+      void refreshAudit(event.eventId);
+    } catch (cause) { setError(getApiMessage(cause, 'The shift could not be updated.')); }
+    finally { setShiftPending(''); }
+  };
+
   const saveStationCapacity = (submitEvent: FormEvent<HTMLFormElement>, eventStationId: string) => {
     submitEvent.preventDefault();
     const input = submitEvent.currentTarget.elements.namedItem('capacity');
@@ -619,9 +644,11 @@ export default function EventDetailPage() {
                         const assigned = shift.staffAssignments.filter((assignment) => assignment.assignmentRole === 'SCREENER' && assignment.eventStation?.eventStationId === station.eventStationId);
                         const assignedIds = new Set(assigned.map((assignment) => assignment.user.userId));
                         const candidates = eventScreeners.filter((membership) => !assignedIds.has(membership.userId));
+                        const draft = shiftDrafts[shift.shiftId] ?? { name: shift.name, startsAt: formatTimeInput(shift.startsAt, event.timezone), endsAt: formatTimeInput(shift.endsAt, event.timezone) };
+                        const updateDraft = (patch: Partial<ShiftDraft>) => setShiftDrafts((current) => ({ ...current, [shift.shiftId]: { ...draft, ...patch } }));
                         return <div className="station-shift-screeners" key={shift.shiftId}>
-                          <span className="station-shift-label">{shift.name} · {formatTime(shift.startsAt, event.timezone)}–{formatTime(shift.endsAt, event.timezone)}</span>
-                          <div className="station-person-tags">{assigned.map((assignment) => <span className="station-person-tag" key={assignment.staffAssignmentId}>{getDisplayName(assignment.user.username)}<button type="button" aria-label={`Remove ${getDisplayName(assignment.user.username)} from ${station.name} on ${formatEventDate(availability.eventDay.date, event.timezone, false)}`} disabled={staffingPending} onClick={() => void removeStaff(shift.shiftId, assignment.staffAssignmentId)}><XMarkIcon /></button></span>)}{assigned.length === 0 && <small>No screener assigned.</small>}</div>
+                          <div className="station-shift-editor"><label><span>Shift name</span><input value={draft.name} maxLength={100} onChange={(change) => updateDraft({ name: change.target.value })} /></label><div><label><span>Starts</span><input type="time" value={draft.startsAt} onChange={(change) => updateDraft({ startsAt: change.target.value })} /></label><label><span>Ends</span><input type="time" value={draft.endsAt} onChange={(change) => updateDraft({ endsAt: change.target.value })} /></label></div><button className="secondary compact" type="button" disabled={shiftPending === shift.shiftId || !draft.name.trim() || draft.endsAt <= draft.startsAt} onClick={() => void saveShift(shift.shiftId)}>{shiftPending === shift.shiftId ? 'Saving…' : 'Save shift'}</button></div>
+                          <div className="station-person-tags">{assigned.map((assignment) => <span className="station-person-tag" key={assignment.staffAssignmentId}>{assignment.user.fullName}<button type="button" aria-label={`Remove ${assignment.user.fullName} from ${station.name} on ${formatEventDate(availability.eventDay.date, event.timezone, false)}`} disabled={staffingPending} onClick={() => void removeStaff(shift.shiftId, assignment.staffAssignmentId)}><XMarkIcon /></button></span>)}{assigned.length === 0 && <small>No screener assigned.</small>}</div>
                           {screenersLoaded && <label className="station-add-person"><UserPlusIcon /><span className="visually-hidden">Add screener to {station.name} for {shift.name}</span><select value="" disabled={staffingPending || candidates.length === 0} onChange={(change) => { const userId = change.target.value; change.currentTarget.value = ''; if (userId) void assignStationScreener(shift.shiftId, station.eventStationId, userId); }}><option value="">{candidates.length ? 'Add person…' : 'No screeners available'}</option>{candidates.map((membership) => <option value={membership.userId} key={membership.membershipId}>{membership.user.fullName}</option>)}</select></label>}
                         </div>;
                       })}
@@ -642,7 +669,7 @@ export default function EventDetailPage() {
           const eligibleStaff = staffDirectory.filter((person) => person.roles.includes(applicationRoleByAssignment[draft.assignmentRole]));
           return <article className="shift-record" key={shift.shiftId}>
             <div className="shift-record-summary"><span><strong>{shift.name}</strong><small>{STATUS_LABEL[shift.status as keyof typeof STATUS_LABEL] ?? shift.status.toLowerCase()}</small></span><span><small>Schedule</small>{formatTime(shift.startsAt, event.timezone)}–{formatTime(shift.endsAt, event.timezone)}</span><span><small>Coverage</small>{shift.staffAssignments.length} of {shift.requiredStaff} assigned</span>{canEditStaffing && <button className="secondary compact" type="button" aria-expanded={staffingOpen === shift.shiftId} onClick={() => void openStaffing(shift.shiftId)}><PlusIcon />Assign</button>}</div>
-            {shift.staffAssignments.length > 0 ? <ul className="assignment-list">{shift.staffAssignments.map((assignment) => <li key={assignment.staffAssignmentId}><span><strong>{getDisplayName(assignment.user.username)}</strong><small>{roleLabel(assignment.assignmentRole)}{assignment.eventStation ? ` · ${assignment.eventStation.name}` : ''}</small></span>{canEditStaffing && <button className="assignment-remove" type="button" aria-label={`Remove ${getDisplayName(assignment.user.username)} from ${shift.name}`} title={`Remove ${getDisplayName(assignment.user.username)}`} onClick={() => void removeStaff(shift.shiftId, assignment.staffAssignmentId)} disabled={staffingPending}><TrashIcon /></button>}</li>)}</ul> : <p className="shift-empty">No staff assigned to this shift.</p>}
+            {shift.staffAssignments.length > 0 ? <ul className="assignment-list">{shift.staffAssignments.map((assignment) => <li key={assignment.staffAssignmentId}><span><strong>{assignment.user.fullName}</strong><small>{roleLabel(assignment.assignmentRole)}{assignment.eventStation ? ` · ${assignment.eventStation.name}` : ''}</small></span>{canEditStaffing && <button className="assignment-remove" type="button" aria-label={`Remove ${assignment.user.fullName} from ${shift.name}`} title={`Remove ${assignment.user.fullName}`} onClick={() => void removeStaff(shift.shiftId, assignment.staffAssignmentId)} disabled={staffingPending}><TrashIcon /></button>}</li>)}</ul> : <p className="shift-empty">No staff assigned to this shift.</p>}
             {canEditStaffing && staffingOpen === shift.shiftId && <form className="staffing-editor" onSubmit={(submitEvent) => { submitEvent.preventDefault(); void assignStaff(shift.shiftId); }}>
               {directoryLoading ? <p>Loading available staff…</p> : directoryError ? <div className="inline-retry" role="alert"><p>{directoryError}</p><button className="secondary compact" type="button" onClick={() => void loadStaffDirectory()}>Retry</button></div> : directoryLoaded && staffDirectory.length === 0 ? <p>No active staff members are available.</p> : <>
                 <label><span>Shift role</span><select value={draft.assignmentRole} disabled={staffingPending} onChange={(change) => { updateAssignmentDraft(shift.shiftId, { assignmentRole: change.target.value as StaffAssignmentRole, eventStationId: '' }); setSelectedStaffIds((current) => ({ ...current, [shift.shiftId]: [] })); }}>{assignmentRoles.map((role) => <option value={role} key={role}>{roleLabel(role)}</option>)}</select></label>

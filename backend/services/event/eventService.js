@@ -197,6 +197,7 @@ const rosterOwner = (value) => value ? {
 const assignmentUser = (value) => value ? {
   userId: value.id,
   username: value.username || value.fullName || "Staff member",
+  fullName: value.fullName || "Staff member",
 } : null;
 
 const loadStationTemplates = async (db = prisma) => {

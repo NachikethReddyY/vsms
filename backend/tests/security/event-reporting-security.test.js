@@ -147,7 +147,7 @@ test("support staff roster projection omits contact metadata and assignment note
   const result = await eventService.listEvents({ limit: 25 }, approved(staffId), db);
   const assignment = result.events[0].shifts[0].staffAssignments[0];
 
-  assert.deepEqual(assignment.user, { userId: staffId, username: "support" });
+  assert.deepEqual(assignment.user, { userId: staffId, username: "support", fullName: "Support Person" });
   assert.equal("notes" in assignment, false);
   assert.deepEqual(result.events[0].createdBy, { userId: managerId, username: "manager" });
 });

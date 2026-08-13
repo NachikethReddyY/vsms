@@ -2634,6 +2634,7 @@ export interface components {
                 /** Format: uuid */
                 userId: string;
                 username: string;
+                fullName: string;
             };
         };
         ShiftAssignmentInput: {

@@ -654,7 +654,9 @@ html[data-theme="light"] .events-workspace {
 .events-workspace .station-shift-empty small { color:var(--ink-2); line-height:17px; }
 .events-workspace .station-shift-empty .compact { flex:none; }
 .events-workspace .station-shift-screeners { display:grid; grid-template-columns:minmax(150px,.8fr) minmax(220px,1.4fr) minmax(170px,.8fr); align-items:center; gap:10px; }
-.events-workspace .station-shift-label { color:var(--ink-2); font-size:11px; }
+.events-workspace .station-shift-editor { grid-column:1/-1; display:grid; grid-template-columns:minmax(220px,1fr) minmax(260px,1fr) auto; align-items:end; gap:10px; padding-bottom:12px; border-bottom:1px solid var(--line); }
+.events-workspace .station-shift-editor>div { display:grid; grid-template-columns:1fr 1fr; gap:8px; }
+.events-workspace .station-shift-editor input { width:100%; min-height:44px; padding:0 10px; border:1px solid var(--line-strong); border-radius:7px; background:var(--surface); color:var(--ink); }
 .events-workspace .station-person-tags { display:flex; flex-wrap:wrap; gap:6px; }
 .events-workspace .station-person-tag { min-height:32px; display:inline-flex; align-items:center; gap:4px; padding:0 4px 0 10px; border:1px solid var(--line); border-radius:999px; color:var(--ink); font-size:11px; font-weight:650; }
 .events-workspace .station-person-tag button { width:28px; height:28px; display:grid; place-items:center; padding:0; border:0; border-radius:50%; background:transparent; color:var(--ink-2); }
@@ -702,6 +704,9 @@ html[data-theme="light"] .events-workspace {
   .events-workspace .station-capacity { grid-template-columns:1fr 112px auto; }
   .events-workspace .station-schedule fieldset { grid-template-columns:1fr; gap:14px; }
   .events-workspace .station-shift-screeners { grid-template-columns:1fr; }
+  .events-workspace .station-shift-editor { grid-template-columns:1fr auto; }
+  .events-workspace .station-shift-editor>div { grid-column:1; }
+  .events-workspace .station-shift-editor>button { grid-column:2; grid-row:2; }
 }
 
 @media (max-width:680px) {
@@ -745,6 +750,9 @@ html[data-theme="light"] .events-workspace {
   .events-workspace .station-shift-empty .compact { width:100%; }
   .events-workspace .station-actions { align-items:stretch; flex-direction:column-reverse; }
   .events-workspace .station-actions .compact { width:100%; }
+  .events-workspace .station-shift-editor { grid-template-columns:1fr; }
+  .events-workspace .station-shift-editor>div,.events-workspace .station-shift-editor>button { grid-column:1; grid-row:auto; }
+  .events-workspace .station-shift-editor>button { width:100%; }
 }
 
 @media print {
