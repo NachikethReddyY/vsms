@@ -23,6 +23,7 @@
     "acceptance:check": "node scripts/live-acceptance.js check",
     "acceptance:prepare": "node scripts/live-acceptance.js prepare",
     "acceptance:validate": "node scripts/live-acceptance.js validate",
+    "artwork:migrate-s3": "node scripts/migrate-event-artwork-to-s3.js",
     "test": "node --test --test-force-exit \"tests/unit/*.test.js\" \"tests/security/*.test.js\"",
     "test:watch": "node --test --watch \"tests/unit/*.test.js\" \"tests/security/*.test.js\"",
     "test:coverage": "node --test --experimental-test-coverage \"tests/unit/*.test.js\" \"tests/security/*.test.js\"",
@@ -60,6 +61,7 @@
   "type": "commonjs",
   "dependencies": {
     "@aws-sdk/client-cognito-identity-provider": "^3.1101.0",
+    "@aws-sdk/client-s3": "^3.1108.0",
     "@aws-sdk/client-sesv2": "^3.1102.0",
     "@aws-sdk/client-sns": "^3.1102.0",
     "@prisma/client": "^6.19.3",

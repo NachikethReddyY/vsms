@@ -8,6 +8,14 @@ exports.create = async (req, res) => {
 };
 exports.get = async (req, res) => res.json(await eventService.getEvent(req.params.eventId, req.user));
 exports.publicGet = async (req, res) => res.set("Cache-Control", "public, max-age=60").json(await eventService.getPublicEvent(req.params.eventId));
+const sendArtwork = (res, artwork, cacheControl) => res
+  .set("Cache-Control", cacheControl)
+  .set("Content-Type", artwork.mimeType)
+  .set("ETag", `"${artwork.etag}"`)
+  .set("X-Content-Type-Options", "nosniff")
+  .send(artwork.contents);
+exports.artwork = async (req, res) => sendArtwork(res, await eventService.getEventArtwork(req.params.eventId, req.user), "private, max-age=300");
+exports.publicArtwork = async (req, res) => sendArtwork(res, await eventService.getPublicEventArtwork(req.params.eventId), "public, max-age=300");
 exports.metrics = async (req, res) => res.set("Cache-Control", "no-store").json(await eventService.getEventMetrics(req.params.eventId, req.user));
 exports.attendees = async (req, res) => res.set("Cache-Control", "no-store").json(await eventService.listEventAttendees(req.params.eventId, req.query, req.user));
 exports.export = async (req, res) => res.set("Cache-Control", "no-store").json(await eventService.exportEvent(req.params.eventId, req.user));

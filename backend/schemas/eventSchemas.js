@@ -3,10 +3,16 @@ const { z } = require("zod");
 const uuid = z.string().uuid();
 const timestamp = z.string().datetime({ offset: true });
 const bannerKey = z.enum(["COMMUNITY_SCREENING", "LIBRARY_SCREENING", "EVENT_OPERATIONS"]);
-const artworkDataUrl = z.string().max(180000).regex(
-  /^data:image\/(jpeg|webp);base64,[A-Za-z0-9+/]+={0,2}$/,
-  "Artwork must be a JPEG or WebP data URL",
-).nullable();
+const artworkDataUrl = z.union([
+  z.string().max(180000).regex(
+    /^data:image\/(jpeg|webp);base64,[A-Za-z0-9+/]+={0,2}$/,
+    "Artwork must be a JPEG or WebP data URL",
+  ),
+  z.string().regex(
+    /^\/api\/v1\/(?:public\/)?events\/[a-f0-9-]{36}\/artwork(?:\?v=\d+)?$/i,
+    "Artwork must reference a VSMS event image",
+  ),
+]).nullable();
 const timezone = z.string().trim().min(1).max(100).refine((value) => {
   try {
     new Intl.DateTimeFormat("en", { timeZone: value });

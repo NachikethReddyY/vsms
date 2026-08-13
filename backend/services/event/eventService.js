@@ -23,6 +23,7 @@ const { attendancePredicate, attendanceWhere } = require("./attendanceDefinition
 const { enqueueAccountLifecycle } = require("../account/accountLifecycleNotificationService");
 const domainEventBus = require("../domain/domainEventBus");
 const { assertRoleEligibility, eventVisibilityWhere, isAdministrator } = require("./eventAuthorizationService");
+const artworkStorage = require("./eventArtworkStorage");
 
 /** Station types whose library fieldSchema drives DynamicStationPage + API validation. */
 const SCHEMA_DRIVEN_STATION_TYPES = new Set(["CUSTOM", "VISUAL_ACUITY", "REFRACTION", "COLOUR_VISION"]);
@@ -33,6 +34,8 @@ const EVENT_FIELDS = [
   "endsAt", "capacity", "expectedAttendance", "status", "version",
 ];
 const ACTIVE_ASSIGNMENT_STATUSES = ["ASSIGNED", "CONFIRMED"];
+const PUBLIC_EVENT_STATUSES = ["PUBLISHED", "IN_PROGRESS", "COMPLETED", "CANCELLED"];
+const ARTWORK_ROUTE_PATTERN = /^\/api\/v1\/(public\/)?events\/([a-f0-9-]{36})\/artwork(?:\?v=\d+)?$/i;
 const ACTIONS = {
   publish: { from: "DRAFT", to: "PUBLISHED", audit: "PUBLISHED" },
   start: { from: "PUBLISHED", to: "IN_PROGRESS", audit: "STARTED" },
@@ -208,6 +211,10 @@ const templateForStation = (station, templates) => station.stationTemplateId
   ? templates.byId.get(station.stationTemplateId)
   : templates.byType.get(station.stationType);
 
+const artworkUrl = (event, publicRoute = false) => event.artworkDataUrl
+  ? `/api/v1/${publicRoute ? "public/" : ""}events/${event.eventId}/artwork?v=${event.version}`
+  : null;
+
 const mapStationDto = (station, event, templates, availabilities = []) => {
   const template = templateForStation(station, templates);
   return {
@@ -310,7 +317,7 @@ const toEventResponse = async (event, user, db = prisma, options = {}) => {
     eventName: event.name,
     description: event.description,
     bannerKey: event.bannerKey,
-    artworkDataUrl: event.artworkDataUrl,
+    artworkDataUrl: artworkUrl(event),
     venue: event.venue,
     location: event.venue,
     address: event.address,
@@ -380,6 +387,30 @@ const requireEvent = async (eventId, user, manage = false, db = prisma) => {
     throw new AppError(404, "EVENT_NOT_FOUND", "Event was not found");
   }
   return event;
+};
+
+const resolveArtworkInput = async (value, user, db = prisma) => {
+  if (value == null || artworkStorage.DATA_URL_PATTERN.test(value) || artworkStorage.isStoredArtwork(value)) {
+    return artworkStorage.storeArtwork(value);
+  }
+  const match = ARTWORK_ROUTE_PATTERN.exec(value);
+  if (!match) throw new AppError(422, "INVALID_EVENT_ARTWORK", "Event artwork reference is invalid");
+  const source = match[1]
+    ? await db.event.findFirst({ where: { eventId: match[2], status: { in: PUBLIC_EVENT_STATUSES } }, select: { artworkDataUrl: true } })
+    : await requireEvent(match[2], user, false, db);
+  if (!source?.artworkDataUrl) throw new AppError(404, "EVENT_ARTWORK_NOT_FOUND", "Event artwork was not found");
+  return artworkStorage.storeArtwork(source.artworkDataUrl);
+};
+
+const releaseArtworkIfUnused = async (reference, db = prisma) => {
+  if (!artworkStorage.isStoredArtwork(reference)) return;
+  try {
+    if (await db.event.count({ where: { artworkDataUrl: reference } }) === 0) {
+      await artworkStorage.deleteArtwork(reference);
+    }
+  } catch (error) {
+    console.error("Event artwork cleanup deferred", { code: error?.code || error?.name || "EVENT_ARTWORK_CLEANUP_FAILED" });
+  }
 };
 
 const normalizeEventData = (body) => ({
@@ -754,7 +785,10 @@ const createEvent = async (body, user, correlationId, rawIdempotencyKey, db = pr
     throw new AppError(422, "INVALID_IDEMPOTENCY_KEY", "Idempotency-Key must contain 8 to 100 letters, numbers, underscores, or hyphens");
   }
   const payloadHash = crypto.createHash("sha256").update(JSON.stringify(body)).digest("hex");
-  return db.$transaction(async (tx) => {
+  const artworkReference = body.artworkDataUrl === undefined ? undefined : await resolveArtworkInput(body.artworkDataUrl, user, db);
+  body = artworkReference === undefined ? body : { ...body, artworkDataUrl: artworkReference };
+  try {
+    return await db.$transaction(async (tx) => {
     if (idempotencyKey) {
       const replay = await tx.event.findUnique({
         where: { createdByUserId_createIdempotencyKey: { createdByUserId: user.userId, createIdempotencyKey: idempotencyKey } },
@@ -863,8 +897,12 @@ const createEvent = async (body, user, correlationId, rawIdempotencyKey, db = pr
         correlationId: requestIdFor(correlationId),
       },
     });
-    return toEventResponse(full, user, tx);
-  });
+      return toEventResponse(full, user, tx);
+    });
+  } catch (error) {
+    await releaseArtworkIfUnused(artworkReference, db);
+    throw error;
+  }
 };
 
 const listEvents = async (query, user, db = prisma) => {
@@ -1047,11 +1085,14 @@ const updateEvent = async (eventId, body, user, correlationId, db = prisma) => {
     );
   }
 
+  const artworkReference = body.artworkDataUrl === undefined ? undefined : await resolveArtworkInput(body.artworkDataUrl, user, db);
+  body = artworkReference === undefined ? body : { ...body, artworkDataUrl: artworkReference };
   const combined = { ...current, ...normalizeEventData(body) };
   const desiredShifts = body.shifts || current.shifts;
   assertRange(combined, desiredShifts, body.eventDays);
 
-return db.$transaction(async (tx) => {
+try {
+  const result = await db.$transaction(async (tx) => {
   const changed = await tx.event.updateMany({
     where: { eventId, version: body.version },
     data: { ...normalizeEventData(body), version: { increment: 1 } },
@@ -1141,8 +1182,18 @@ return db.$transaction(async (tx) => {
   });
   await auditUpdate(tx, current, updated, user, correlationId);
 
-  return toEventResponse(updated, user, tx);
-});
+    return toEventResponse(updated, user, tx);
+  });
+  if (artworkReference !== undefined && artworkReference !== current.artworkDataUrl) {
+    await releaseArtworkIfUnused(current.artworkDataUrl, db);
+  }
+  return result;
+} catch (error) {
+  if (artworkReference !== undefined && artworkReference !== current.artworkDataUrl) {
+    await releaseArtworkIfUnused(artworkReference, db);
+  }
+  throw error;
+}
 };
 
 const transitionEvent = async (eventId, command, body, user, correlationId, db = prisma) => {
@@ -1669,6 +1720,8 @@ const deleteEvent = async (eventId, body, user, correlationId, db = prisma) => {
     });
     return { result: { eventId, deleted: true }, cleanupTaskCount };
   }, { isolationLevel: "Serializable" });
+
+  await releaseArtworkIfUnused(current.artworkDataUrl, db);
 
   if (deletion.cleanupTaskCount > 0) {
     await processArtifactCleanupTasks({ eventId }).catch((error) => {
@@ -2294,7 +2347,6 @@ const getAuditLog = async (eventId, query, user, db = prisma) => {
   };
 };
 
-const publicEventStatuses = ["PUBLISHED", "IN_PROGRESS", "COMPLETED", "CANCELLED"];
 const dateTime = (value) => value ? value.toISOString() : null;
 const attendeeSelect = {
   registrationId: true,
@@ -2318,7 +2370,7 @@ const publicEventProjection = (event) => ({
   name: event.name,
   description: event.description,
   bannerKey: event.bannerKey,
-  artworkDataUrl: event.artworkDataUrl,
+  artworkDataUrl: artworkUrl(event, true),
   venue: event.venue,
   address: event.address,
   postalCode: event.postalCode,
@@ -2364,9 +2416,10 @@ const metricsForEvent = async (event, db = prisma) => {
 
 const getPublicEvent = async (eventId, db = prisma) => {
   const event = await db.event.findFirst({
-    where: { eventId, status: { in: publicEventStatuses } },
+    where: { eventId, status: { in: PUBLIC_EVENT_STATUSES } },
     select: {
       eventId: true,
+      version: true,
       name: true,
       description: true,
       bannerKey: true,
@@ -2384,6 +2437,21 @@ const getPublicEvent = async (eventId, db = prisma) => {
   });
   if (!event) throw new AppError(404, "EVENT_NOT_FOUND", "Event was not found");
   return publicEventProjection(event);
+};
+
+const getEventArtwork = async (eventId, user, db = prisma) => {
+  const event = await requireEvent(eventId, user, false, db);
+  if (!event.artworkDataUrl) throw new AppError(404, "EVENT_ARTWORK_NOT_FOUND", "Event artwork was not found");
+  return artworkStorage.readArtwork(event.artworkDataUrl);
+};
+
+const getPublicEventArtwork = async (eventId, db = prisma) => {
+  const event = await db.event.findFirst({
+    where: { eventId, status: { in: PUBLIC_EVENT_STATUSES }, artworkDataUrl: { not: null } },
+    select: { artworkDataUrl: true },
+  });
+  if (!event) throw new AppError(404, "EVENT_ARTWORK_NOT_FOUND", "Event artwork was not found");
+  return artworkStorage.readArtwork(event.artworkDataUrl);
 };
 
 const getEventMetrics = async (eventId, user, db = prisma) => metricsForEvent(await requireEvent(eventId, user, true, db), db);
@@ -2530,6 +2598,8 @@ module.exports = {
   removeStaffAssignment,
   getAuditLog,
   getPublicEvent,
+  getEventArtwork,
+  getPublicEventArtwork,
   getEventMetrics,
   metricsForEvent,
   listEventAttendees,

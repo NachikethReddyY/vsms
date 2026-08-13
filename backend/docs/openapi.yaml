@@ -571,6 +571,21 @@ paths:
         "404": { $ref: "#/components/responses/NotFound" }
         "422": { $ref: "#/components/responses/ValidationFailed" }
         "429": { $ref: "#/components/responses/RateLimited" }
+  /api/v1/public/events/{eventId}/artwork:
+    get:
+      tags: [Events]
+      operationId: getPublicEventArtwork
+      summary: Read artwork for a public event without exposing private object storage
+      parameters: [{ $ref: "#/components/parameters/EventId" }]
+      responses:
+        "200":
+          description: Event artwork
+          content:
+            image/jpeg: { schema: { type: string, format: binary } }
+            image/webp: { schema: { type: string, format: binary } }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "422": { $ref: "#/components/responses/ValidationFailed" }
+        "429": { $ref: "#/components/responses/RateLimited" }
   /api/v1/events/{eventId}/metrics:
     get:
       tags: [Events]
@@ -760,6 +775,22 @@ paths:
         "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
         "409": { $ref: "#/components/responses/Conflict" }
+        "422": { $ref: "#/components/responses/ValidationFailed" }
+  /api/v1/events/{eventId}/artwork:
+    get:
+      tags: [Events]
+      operationId: getEventArtwork
+      summary: Read private draft or staff-visible event artwork
+      parameters: [{ $ref: "#/components/parameters/EventId" }]
+      responses:
+        "200":
+          description: Event artwork
+          content:
+            image/jpeg: { schema: { type: string, format: binary } }
+            image/webp: { schema: { type: string, format: binary } }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
         "422": { $ref: "#/components/responses/ValidationFailed" }
   /api/v1/events/{eventId}/deletion-preview:
     get:
@@ -3310,9 +3341,10 @@ components:
         artworkDataUrl:
           type: string
           nullable: true
-          maxLength: 180000
-          pattern: '^data:image/(jpeg|webp);base64,[A-Za-z0-9+/]+={0,2}$'
-          description: Cropped square event artwork encoded as a bounded JPEG or WebP data URL
+          description: Cropped square artwork as a bounded data URL on upload or a VSMS artwork route returned by the API
+          oneOf:
+            - { type: string, maxLength: 180000, pattern: '^data:image/(jpeg|webp);base64,[A-Za-z0-9+/]+={0,2}$' }
+            - { type: string, pattern: '^/api/v1/(public/)?events/[a-f0-9-]{36}/artwork(?:\?v=\d+)?$' }
         venue: { type: string, minLength: 1, maxLength: 255 }
         address: { type: string, nullable: true, maxLength: 500 }
         postalCode: { type: string, nullable: true, pattern: '^\d{6}$' }
@@ -3340,8 +3372,9 @@ components:
         artworkDataUrl:
           type: string
           nullable: true
-          maxLength: 180000
-          pattern: '^data:image/(jpeg|webp);base64,[A-Za-z0-9+/]+={0,2}$'
+          oneOf:
+            - { type: string, maxLength: 180000, pattern: '^data:image/(jpeg|webp);base64,[A-Za-z0-9+/]+={0,2}$' }
+            - { type: string, pattern: '^/api/v1/(public/)?events/[a-f0-9-]{36}/artwork(?:\?v=\d+)?$' }
         venue: { type: string, minLength: 1, maxLength: 255 }
         address: { type: string, nullable: true, maxLength: 500 }
         postalCode: { type: string, nullable: true, pattern: '^\d{6}$' }
