@@ -2776,6 +2776,91 @@
       ]
     },
     {
+      "name": "Read artwork for a public event without exposing private object storage",
+      "description": "",
+      "event": [],
+      "request": {
+        "method": "GET",
+        "header": [],
+        "auth": {
+          "type": "bearer",
+          "bearer": [
+            {
+              "key": "token",
+              "value": "{{token}}",
+              "type": "string"
+            }
+          ]
+        },
+        "url": {
+          "raw": "{{baseUrl}}/public/events/{eventId}/artwork",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "public",
+            "events",
+            "{eventId}",
+            "artwork"
+          ],
+          "query": []
+        }
+      },
+      "response": [
+        {
+          "name": "200 Response",
+          "originalRequest": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/public/events/{eventId}/artwork"
+          },
+          "status": "OK",
+          "code": 200,
+          "header": [
+            {
+              "key": "Content-Type",
+              "value": "application/json"
+            }
+          ],
+          "body": ""
+        },
+        {
+          "name": "404 Response",
+          "originalRequest": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/public/events/{eventId}/artwork"
+          },
+          "status": "Not Found",
+          "code": 404,
+          "header": [
+            {
+              "key": "Content-Type",
+              "value": "application/json"
+            }
+          ],
+          "body": "{\n  \"type\": \"\",\n  \"title\": \"\",\n  \"status\": 0,\n  \"code\": \"\",\n  \"requestId\": \"00000000-0000-4000-8000-000000000000\",\n  \"errors\": [\n    {\n      \"field\": \"\",\n      \"message\": \"\"\n    }\n  ]\n}"
+        },
+        {
+          "name": "422 Response",
+          "originalRequest": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/public/events/{eventId}/artwork"
+          },
+          "status": "Unprocessable Entity",
+          "code": 422,
+          "header": [
+            {
+              "key": "Content-Type",
+              "value": "application/json"
+            }
+          ],
+          "body": "{\n  \"type\": \"\",\n  \"title\": \"\",\n  \"status\": 0,\n  \"code\": \"\",\n  \"requestId\": \"00000000-0000-4000-8000-000000000000\",\n  \"errors\": [\n    {\n      \"field\": \"\",\n      \"message\": \"\"\n    }\n  ]\n}"
+        }
+      ]
+    },
+    {
       "name": "Get event operations metrics",
       "description": "Requires an active EVENT_MANAGER membership for this event. Platform administrator status and event creation do not grant implicit access.",
       "event": [],
@@ -3848,6 +3933,90 @@
               }
             ],
             "url": "{{baseUrl}}/events/{eventId}"
+          },
+          "status": "Forbidden",
+          "code": 403,
+          "header": [
+            {
+              "key": "Content-Type",
+              "value": "application/json"
+            }
+          ],
+          "body": "{\n  \"type\": \"\",\n  \"title\": \"\",\n  \"status\": 0,\n  \"code\": \"\",\n  \"requestId\": \"00000000-0000-4000-8000-000000000000\",\n  \"errors\": [\n    {\n      \"field\": \"\",\n      \"message\": \"\"\n    }\n  ]\n}"
+        }
+      ]
+    },
+    {
+      "name": "Read private draft or staff-visible event artwork",
+      "description": "",
+      "event": [],
+      "request": {
+        "method": "GET",
+        "header": [],
+        "auth": {
+          "type": "bearer",
+          "bearer": [
+            {
+              "key": "token",
+              "value": "{{token}}",
+              "type": "string"
+            }
+          ]
+        },
+        "url": {
+          "raw": "{{baseUrl}}/events/{eventId}/artwork",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "events",
+            "{eventId}",
+            "artwork"
+          ],
+          "query": []
+        }
+      },
+      "response": [
+        {
+          "name": "200 Response",
+          "originalRequest": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/events/{eventId}/artwork"
+          },
+          "status": "OK",
+          "code": 200,
+          "header": [
+            {
+              "key": "Content-Type",
+              "value": "application/json"
+            }
+          ],
+          "body": ""
+        },
+        {
+          "name": "401 Response",
+          "originalRequest": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/events/{eventId}/artwork"
+          },
+          "status": "Unauthorized",
+          "code": 401,
+          "header": [
+            {
+              "key": "Content-Type",
+              "value": "application/json"
+            }
+          ],
+          "body": "{\n  \"type\": \"\",\n  \"title\": \"\",\n  \"status\": 0,\n  \"code\": \"\",\n  \"requestId\": \"00000000-0000-4000-8000-000000000000\",\n  \"errors\": [\n    {\n      \"field\": \"\",\n      \"message\": \"\"\n    }\n  ]\n}"
+        },
+        {
+          "name": "403 Response",
+          "originalRequest": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/events/{eventId}/artwork"
           },
           "status": "Forbidden",
           "code": 403,
@@ -5031,7 +5200,7 @@
         },
         "body": {
           "mode": "raw",
-          "raw": "{\n  \"version\": 1,\n  \"userId\": \"00000000-0000-4000-8000-000000000000\",\n  \"assignmentRole\": \"SCREENER\",\n  \"eventStationId\": \"00000000-0000-4000-8000-000000000000\"\n}",
+          "raw": "{\n  \"version\": 1,\n  \"userId\": \"00000000-0000-4000-8000-000000000000\",\n  \"userIds\": [\n    \"00000000-0000-4000-8000-000000000000\"\n  ],\n  \"assignmentRole\": \"SCREENER\",\n  \"eventStationId\": \"00000000-0000-4000-8000-000000000000\"\n}",
           "options": {
             "raw": {
               "language": "json"
@@ -5369,7 +5538,7 @@
         },
         "body": {
           "mode": "raw",
-          "raw": "{\n  \"version\": 1,\n  \"stationOrder\": 1,\n  \"capacity\": 1,\n  \"isAvailable\": true,\n  \"operationalStatus\": \"AVAILABLE\"\n}",
+          "raw": "{\n  \"version\": 1,\n  \"stationOrder\": 1,\n  \"capacity\": 1,\n  \"availabilities\": [\n    {\n      \"date\": \"2026-08-07\",\n      \"isAvailable\": true,\n      \"startsAt\": \"2026-08-07T00:00:00.000Z\",\n      \"endsAt\": \"2026-08-07T00:00:00.000Z\",\n      \"capacity\": 1\n    }\n  ],\n  \"isAvailable\": true,\n  \"operationalStatus\": \"AVAILABLE\"\n}",
           "options": {
             "raw": {
               "language": "json"
@@ -5438,6 +5607,98 @@
                 "type": "text"
               }
             ],
+            "url": "{{baseUrl}}/events/{eventId}/stations/{eventStationId}"
+          },
+          "status": "Not Found",
+          "code": 404,
+          "header": [
+            {
+              "key": "Content-Type",
+              "value": "application/json"
+            }
+          ],
+          "body": "{\n  \"type\": \"\",\n  \"title\": \"\",\n  \"status\": 0,\n  \"code\": \"\",\n  \"requestId\": \"00000000-0000-4000-8000-000000000000\",\n  \"errors\": [\n    {\n      \"field\": \"\",\n      \"message\": \"\"\n    }\n  ]\n}"
+        }
+      ]
+    },
+    {
+      "name": "Remove an unused station from a draft or published event",
+      "description": "",
+      "event": [],
+      "request": {
+        "method": "DELETE",
+        "header": [],
+        "auth": {
+          "type": "bearer",
+          "bearer": [
+            {
+              "key": "token",
+              "value": "{{token}}",
+              "type": "string"
+            }
+          ]
+        },
+        "url": {
+          "raw": "{{baseUrl}}/events/{eventId}/stations/{eventStationId}",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "events",
+            "{eventId}",
+            "stations",
+            "{eventStationId}"
+          ],
+          "query": [
+            {
+              "key": "version",
+              "value": "1",
+              "description": "",
+              "disabled": false
+            }
+          ]
+        }
+      },
+      "response": [
+        {
+          "name": "200 Response",
+          "originalRequest": {
+            "method": "DELETE",
+            "header": [],
+            "url": "{{baseUrl}}/events/{eventId}/stations/{eventStationId}"
+          },
+          "status": "OK",
+          "code": 200,
+          "header": [
+            {
+              "key": "Content-Type",
+              "value": "application/json"
+            }
+          ],
+          "body": "{\n  \"firstManagerUserId\": \"00000000-0000-4000-8000-000000000000\",\n  \"name\": \"\",\n  \"description\": \"\",\n  \"bannerKey\": \"COMMUNITY_SCREENING\",\n  \"artworkDataUrl\": \"\",\n  \"venue\": \"\",\n  \"address\": \"\",\n  \"postalCode\": \"\",\n  \"latitude\": 1.13,\n  \"longitude\": 103.59,\n  \"locationProvider\": \"ONEMAP\",\n  \"locationReference\": \"\",\n  \"timezone\": \"Asia/Singapore\",\n  \"startsAt\": \"2026-08-07T00:00:00.000Z\",\n  \"endsAt\": \"2026-08-07T00:00:00.000Z\",\n  \"capacity\": 1,\n  \"expectedAttendance\": 1,\n  \"eventDays\": [\n    {\n      \"eventDayId\": \"00000000-0000-4000-8000-000000000000\"\n    }\n  ],\n  \"stations\": [\n    {\n      \"eventStationId\": \"00000000-0000-4000-8000-000000000000\",\n      \"stationTemplateId\": \"00000000-0000-4000-8000-000000000000\",\n      \"stationOrder\": 1,\n      \"capacity\": 1,\n      \"isAvailable\": true,\n      \"availabilities\": [\n        {\n          \"date\": \"2026-08-07\",\n          \"isAvailable\": true,\n          \"startsAt\": \"2026-08-07T00:00:00.000Z\",\n          \"endsAt\": \"2026-08-07T00:00:00.000Z\",\n          \"capacity\": 1\n        }\n      ]\n    }\n  ],\n  \"shifts\": [\n    {\n      \"shiftId\": \"00000000-0000-4000-8000-000000000000\",\n      \"status\": \"PLANNED\",\n      \"staffAssignments\": [\n        {\n          \"staffAssignmentId\": \"00000000-0000-4000-8000-000000000000\",\n          \"assignmentRole\": {},\n          \"status\": \"ASSIGNED\",\n          \"notes\": \"\",\n          \"eventStation\": {\n            \"eventStationId\": \"00000000-0000-4000-8000-000000000000\",\n            \"stationTemplateId\": \"00000000-0000-4000-8000-000000000000\",\n            \"name\": \"\",\n            \"stationOrder\": 1\n          },\n          \"user\": {\n            \"userId\": \"00000000-0000-4000-8000-000000000000\",\n            \"username\": \"\"\n          }\n        }\n      ]\n    }\n  ],\n  \"eventId\": \"00000000-0000-4000-8000-000000000000\",\n  \"status\": \"DRAFT\",\n  \"version\": 1,\n  \"cancelledAt\": \"2026-08-07T00:00:00.000Z\",\n  \"cancellationReason\": \"\",\n  \"createdAt\": \"2026-08-07T00:00:00.000Z\",\n  \"updatedAt\": \"2026-08-07T00:00:00.000Z\",\n  \"eventStations\": [\n    {\n      \"eventStationId\": \"00000000-0000-4000-8000-000000000000\",\n      \"stationTemplateId\": \"00000000-0000-4000-8000-000000000000\",\n      \"templateVersion\": 1,\n      \"name\": \"\",\n      \"stationType\": \"VISUAL_ACUITY\",\n      \"description\": \"\",\n      \"stationOrder\": 1,\n      \"capacity\": 1,\n      \"isAvailable\": true,\n      \"fieldSchemaSnapshot\": [\n        {\n          \"key\": \"\",\n          \"label\": \"\",\n          \"type\": \"text\",\n          \"required\": true,\n          \"options\": [\n            \"\"\n          ],\n          \"min\": 0,\n          \"max\": 0,\n          \"unit\": \"\",\n          \"eyes\": \"OD\",\n          \"flagRules\": [\n            {\n              \"op\": \"eq\",\n              \"value\": \"\",\n              \"flag\": \"REVIEW\",\n              \"reason\": \"\"\n            }\n          ]\n        }\n      ],\n      \"schemaVersion\": 1,\n      \"availabilities\": [\n        {\n          \"eventStationAvailabilityId\": \"00000000-0000-4000-8000-000000000000\",\n          \"isAvailable\": true,\n          \"startsAt\": \"2026-08-07T00:00:00.000Z\",\n          \"endsAt\": \"2026-08-07T00:00:00.000Z\",\n          \"capacity\": 1,\n          \"eventDay\": {\n            \"eventDayId\": \"00000000-0000-4000-8000-000000000000\",\n            \"date\": \"2026-08-07\"\n          }\n        }\n      ]\n    }\n  ],\n  \"signupCount\": 0,\n  \"activeCapacityCount\": 0,\n  \"canManage\": true,\n  \"createdBy\": {\n    \"id\": \"00000000-0000-4000-8000-000000000000\",\n    \"userId\": \"00000000-0000-4000-8000-000000000000\",\n    \"username\": \"\",\n    \"email\": \"\",\n    \"fullName\": \"\",\n    \"employeeNumber\": \"\",\n    \"contactNumber\": \"\",\n    \"department\": \"\",\n    \"designation\": \"\",\n    \"systemRole\": \"ADMIN\",\n    \"status\": \"ACTIVE\",\n    \"approvalState\": \"PENDING\",\n    \"accessState\": \"ENABLED\",\n    \"professionalCategory\": \"STAFF\",\n    \"roles\": [\n      \"ADMINISTRATOR\"\n    ],\n    \"createdAt\": \"2026-08-07T00:00:00.000Z\"\n  },\n  \"cancelledBy\": {}\n}"
+        },
+        {
+          "name": "401 Response",
+          "originalRequest": {
+            "method": "DELETE",
+            "header": [],
+            "url": "{{baseUrl}}/events/{eventId}/stations/{eventStationId}"
+          },
+          "status": "Unauthorized",
+          "code": 401,
+          "header": [
+            {
+              "key": "Content-Type",
+              "value": "application/json"
+            }
+          ],
+          "body": "{\n  \"type\": \"\",\n  \"title\": \"\",\n  \"status\": 0,\n  \"code\": \"\",\n  \"requestId\": \"00000000-0000-4000-8000-000000000000\",\n  \"errors\": [\n    {\n      \"field\": \"\",\n      \"message\": \"\"\n    }\n  ]\n}"
+        },
+        {
+          "name": "404 Response",
+          "originalRequest": {
+            "method": "DELETE",
+            "header": [],
             "url": "{{baseUrl}}/events/{eventId}/stations/{eventStationId}"
           },
           "status": "Not Found",
