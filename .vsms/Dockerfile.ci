@@ -1,0 +1,24 @@
+FROM node:24-bookworm-slim
+
+ENV PNPM_HOME=/pnpm
+ENV PATH=$PNPM_HOME:$PATH
+ENV SCARF_ANALYTICS=false
+
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends ca-certificates openssl \
+    && rm -rf /var/lib/apt/lists/* \
+    && corepack enable \
+    && corepack prepare pnpm@11.20.0 --activate
+
+WORKDIR /workspace
+
+COPY backend/package.json backend/pnpm-lock.yaml backend/pnpm-workspace.yaml ./backend/
+COPY backend/prisma ./backend/prisma
+RUN pnpm --dir backend install --frozen-lockfile
+
+COPY react-user-dashboard/package.json react-user-dashboard/pnpm-lock.yaml react-user-dashboard/pnpm-workspace.yaml ./react-user-dashboard/
+RUN pnpm --dir react-user-dashboard install --frozen-lockfile
+
+COPY . .
+
+CMD ["sh"]

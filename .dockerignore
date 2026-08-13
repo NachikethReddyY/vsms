@@ -1,0 +1,17 @@
+.git
+.worktrees
+**/node_modules
+**/dist
+**/coverage
+**/logs
+**/playwright-report
+**/test-results
+**/*.dump
+**/backups
+backend/certs
+backend/performance-results
+backend/qr-report-screenshots
+backend/queue-report-screenshots
+docs/09-Evidence
+graphify-out
+secure-data
