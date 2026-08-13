@@ -6,6 +6,7 @@ process.env.DATABASE_URL ||= "postgresql://test:test@localhost:5432/vsms_test";
 
 const prisma = require("../../prisma/prismaClient");
 const participantService = require("../../services/participant/participantService");
+const { nricLookupHash } = require("../../utils/crypto/participantIdentity");
 
 function replace(t, target, key, value) {
   const original = target[key];
@@ -60,7 +61,8 @@ test("an exact NRIC or FIN match is returned when the other entered details have
     request(participantId, eventId, crypto.randomUUID()),
   );
 
-  assert.deepEqual(matchQuery.OR[0], { nric: "S1234567A" });
+  assert.deepEqual(matchQuery.OR[0], { nricLookupHash: nricLookupHash("S1234567A") });
+  assert.deepEqual(matchQuery.OR[1], { nric: "S1234567A" });
   assert.equal(result.result, "POSSIBLE_MATCH");
   assert.deepEqual(result.matches[0].matchReasons, ["NRIC / FIN"]);
 });

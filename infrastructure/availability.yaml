@@ -42,6 +42,9 @@ Parameters:
   EncryptionKeyringSecretArn:
     Type: String
     Description: ARN of a Secrets Manager secret containing the versioned AES-256 keyring JSON
+  ParticipantLookupHmacSecretArn:
+    Type: String
+    Description: ARN of a Secrets Manager secret containing a dedicated 256-bit hexadecimal participant lookup HMAC key
   CognitoDomain:
     Type: String
     Description: HTTPS Cognito hosted UI base URL
@@ -317,6 +320,8 @@ Resources:
               ValueFrom: !Ref JwtSecret
             - Name: ENCRYPTION_KEYRING_JSON
               ValueFrom: !Ref EncryptionKeyringSecretArn
+            - Name: PARTICIPANT_LOOKUP_HMAC_KEY
+              ValueFrom: !Ref ParticipantLookupHmacSecretArn
           LogConfiguration:
             LogDriver: awslogs
             Options:
@@ -352,6 +357,8 @@ Resources:
               ValueFrom: !Ref JwtSecret
             - Name: ENCRYPTION_KEYRING_JSON
               ValueFrom: !Ref EncryptionKeyringSecretArn
+            - Name: PARTICIPANT_LOOKUP_HMAC_KEY
+              ValueFrom: !Ref ParticipantLookupHmacSecretArn
           LogConfiguration:
             LogDriver: awslogs
             Options:
@@ -387,6 +394,8 @@ Resources:
               ValueFrom: !Ref JwtSecret
             - Name: ENCRYPTION_KEYRING_JSON
               ValueFrom: !Ref EncryptionKeyringSecretArn
+            - Name: PARTICIPANT_LOOKUP_HMAC_KEY
+              ValueFrom: !Ref ParticipantLookupHmacSecretArn
           LogConfiguration:
             LogDriver: awslogs
             Options:

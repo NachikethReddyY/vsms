@@ -2,6 +2,7 @@
 const prisma = require("../prisma/prismaClient");
 const env = require("../config/env");
 const { encrypt, encryptionContext } = require("../utils/crypto/cryptoUtils");
+const { protectParticipantNric } = require("../utils/crypto/participantIdentity");
 
 if (env.isProduction) throw new Error("Development preset execution is forbidden in production");
 
@@ -124,6 +125,8 @@ async function upsertStations(event) {
 }
 
 async function upsertParticipant(staff, { participantReference, firstName, lastName, queueNumber }) {
+  const participantId = crypto.randomUUID();
+  const nric = crypto.randomUUID().replace(/-/g, "").slice(0, 9).toUpperCase();
   const participant = await prisma.participant.upsert({
     where: { participantReference },
     update: {
@@ -134,9 +137,9 @@ async function upsertParticipant(staff, { participantReference, firstName, lastN
       updatedById: staff.id,
     },
     create: {
+      id: participantId,
       participantReference,
-      nric: crypto.randomUUID().replace(/-/g, "").slice(0, 9).toUpperCase(),
-      nricMasked: "••••0001",
+      ...protectParticipantNric(participantId, nric),
       firstName,
       lastName,
       dateOfBirth: new Date("1990-01-01T00:00:00.000Z"),

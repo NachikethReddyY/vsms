@@ -14,6 +14,7 @@
     "prisma:push": "prisma db push",
     "prisma:seed": "node prisma/seed.js",
     "qr:reissue-active": "node scripts/reissue-active-qr-passes.js",
+    "nric:backfill": "node scripts/backfill-participant-nric.js",
     "routes:backfill-checked-in": "node scripts/backfill-checked-in-registration-routes.js",
     "seed": "node prisma/seed.js",
     "db:reset": "pnpm db:test:prepare",

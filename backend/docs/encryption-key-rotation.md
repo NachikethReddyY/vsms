@@ -15,6 +15,8 @@ ENCRYPTION_ACTIVE_KEY_ID=current
 ENCRYPTION_KEYRING_JSON={"previous":"<64 hex characters>","current":"<64 hex characters>"}
 ```
 
+Participant NRIC lookup uses the separate `PARTICIPANT_LOOKUP_HMAC_KEY`. Do not rotate that key as part of routine AES envelope rotation: changing it requires an audited re-index of every encrypted NRIC before traffic moves to the new key.
+
 Key IDs must contain only letters, numbers, `_`, or `-`. Keys must be unique 256-bit hexadecimal values. Keep `ENCRYPTION_KEY` temporarily during the legacy backfill if old three-part ciphertext was encrypted with it; remove it after the backfill succeeds.
 
 ## Deployment and rotation

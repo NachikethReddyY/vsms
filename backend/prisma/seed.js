@@ -3,6 +3,7 @@ const bcrypt = require("bcrypt");
 require("dotenv").config();
 const prisma = require("./prismaClient");
 const { encrypt, encryptionContext } = require("../utils/crypto/cryptoUtils");
+const { protectParticipantNric } = require("../utils/crypto/participantIdentity");
 const qrService = require("../services/participant/qrService");
 
 if (process.env.NODE_ENV === "production") {
@@ -537,13 +538,15 @@ async function upsertDemoParticipant(staff, {
   email,
   accessibilityNotes = null,
 }) {
+  const existing = await prisma.participant.findUnique({ where: { participantReference }, select: { id: true } });
+  const participantId = existing?.id || crypto.randomUUID();
+  const protectedNric = protectParticipantNric(participantId, nric);
   return prisma.participant.upsert({
     where: { participantReference },
     update: {
       firstName,
       lastName,
-      nric,
-      nricMasked: `••••${nric.slice(-4)}`,
+      ...protectedNric,
       dateOfBirth: new Date(`${dateOfBirth}T00:00:00.000Z`),
       contactNumber,
       email,
@@ -552,9 +555,9 @@ async function upsertDemoParticipant(staff, {
       updatedById: staff.id,
     },
     create: {
+      id: participantId,
       participantReference,
-      nric,
-      nricMasked: `••••${nric.slice(-4)}`,
+      ...protectedNric,
       firstName,
       lastName,
       dateOfBirth: new Date(`${dateOfBirth}T00:00:00.000Z`),
