@@ -52,6 +52,7 @@ const registrationRoles = ["REGISTRATION_OFFICER"];
 const queueRoles = ["ADMINISTRATOR", "EVENT_MANAGER", "REGISTRATION_OFFICER"];
 const screenerRoles = ["SCREENER"];
 const reviewerRoles = ["REVIEWER"];
+const eventMemberRoles = ["ADMINISTRATOR", "EVENT_MANAGER", "REGISTRATION_OFFICER", "SCREENER", "REVIEWER", "SUPPORT"];
 
 function EventWorkspace() {
   return <AppShell><Outlet /></AppShell>;
@@ -112,10 +113,13 @@ export default function App() {
           <Route path="/events/:eventId" element={<EventDetailPage />} />
           <Route path="/settings" element={<SettingsPage />} />
 
+          <Route element={<EventCapabilityGuard allowedRoles={eventMemberRoles} />}>
+            <Route path="/events/:eventId/staff" element={<EventStaffingPage />} />
+          </Route>
+
           <Route element={<EventCapabilityGuard allowedRoles={eventManagerRoles} />}>
             <Route path="/events/:eventId/overview" element={<EventDetailPage />} />
             <Route path="/events/:eventId/stations" element={<EventDetailPage />} />
-            <Route path="/events/:eventId/staff" element={<EventStaffingPage />} />
             <Route path="/events/:eventId/staff/:membershipId/duties" element={<DutyEditorPage />} />
             <Route path="/events/:eventId/analytics" element={<EventAnalyticsPage />} />
             <Route path="/events/:eventId/reports" element={<EventReportsPage />} />

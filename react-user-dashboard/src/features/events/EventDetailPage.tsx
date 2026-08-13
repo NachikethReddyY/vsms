@@ -458,16 +458,18 @@ export default function EventDetailPage() {
       </div>
     </section>
 
-    {canManage && <nav className="event-detail-tabs" aria-label="Event sections">
+    <nav className="event-detail-tabs" aria-label="Event sections">
       <Link className={view === 'overview' ? 'active' : undefined} to={eventPath}>Overview</Link>
-      <Link className={view === 'stations' ? 'active' : undefined} to={`${eventPath}/stations`}>Stations</Link>
       <Link className={view === 'staff' ? 'active' : undefined} to={`${eventPath}/staff`}>Staff</Link>
+      {canManage && <>
+      <Link className={view === 'stations' ? 'active' : undefined} to={`${eventPath}/stations`}>Stations</Link>
       <Link className={view === 'analytics' ? 'active' : undefined} to={`${eventPath}/analytics`}>Analytics</Link>
       <Link className={view === 'reports' ? 'active' : undefined} to={`${eventPath}/reports`}>Reports</Link>
       <Link className={view === 'attendees' ? 'active' : undefined} to={`${eventPath}/attendees`}>Attendees</Link>
       <Link className={view === 'activity' ? 'active' : undefined} to={`${eventPath}/activity`}>Activity</Link>
       {canPermanentlyDelete && <Link className="danger-link" to={`${eventPath}/delete`}>Delete event</Link>}
-    </nav>}
+      </>}
+    </nav>
 
     <AppToast message={notice} onDismiss={() => setNotice('')} />
     {error && <div className="alert error" role="alert">{error}</div>}

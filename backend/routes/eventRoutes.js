@@ -73,7 +73,7 @@ router.get(
 router.get("/", validate({ query: listQuery }), asyncHandler(eventController.list));
 router.post("/", requireSystemRole("ADMIN"), validate({ body: createEventBody }), asyncHandler(eventController.create));
 router.get("/:eventId/memberships/eligible-users", validate({ params: eventParams, query: eligibleUsersQuery }), requireEventManager, asyncHandler(membershipController.eligible));
-router.get("/:eventId/memberships", validate({ params: eventParams }), requireEventManager, asyncHandler(membershipController.list));
+router.get("/:eventId/memberships", validate({ params: eventParams }), requireEventRoles("EVENT_MANAGER", "REGISTRATION", "SCREENER", "REVIEWER", "SUPPORT"), asyncHandler(membershipController.list));
 router.post("/:eventId/memberships", validate({ params: eventParams, body: membershipBody }), requireEventManager, asyncHandler(membershipController.add));
 router.delete("/:eventId/memberships/:membershipId", validate({ params: membershipParams, body: membershipRemovalBody }), requireEventManager, asyncHandler(membershipController.remove));
 router.post("/:eventId/memberships/:membershipId/roles", validate({ params: membershipParams, body: membershipRoleBody }), requireEventManager, asyncHandler(membershipController.addRole));

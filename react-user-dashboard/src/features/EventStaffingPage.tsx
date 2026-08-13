@@ -31,15 +31,17 @@ export default function EventStaffingPage() {
   const [busy, setBusy] = useState('');
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
+  const [canManage, setCanManage] = useState(false);
   const searchRef = useRef<HTMLInputElement>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
     setError('');
     try {
-      const [membershipPage, eligiblePage] = await Promise.all([api.listMemberships(eventId), api.listEligibleUsers(eventId)]);
+      const [membershipPage, event] = await Promise.all([api.listMemberships(eventId), api.getEvent(eventId)]);
       setMembers(list(membershipPage));
-      setEligible(list(eligiblePage));
+      setCanManage(Boolean(event.canManage));
+      setEligible(event.canManage ? list(await api.listEligibleUsers(eventId)) : []);
     } catch (cause) {
       setError(getApiError(cause, 'Event team could not be loaded.'));
     } finally {
@@ -146,8 +148,8 @@ export default function EventStaffingPage() {
 
   return <div className="stage4-page event-staffing-page">
     <header className="event-staffing-header">
-      <div><Link className="event-staffing-back" to={`/events/${eventId}`}><ArrowLeftIcon />Back to event</Link><h1>People and roles</h1><p>Find approved staff, assign their event roles, and manage the active team.</p></div>
-      <div className="stage4-actions"><button className="secondary event-staffing-refresh" type="button" aria-label="Refresh event team" title="Refresh event team" disabled={loading} onClick={() => void load()}><ArrowPathIcon className={loading ? 'is-spinning' : ''} /></button><button type="button" onClick={() => { setAccountIds([]); setRoles(['REGISTRATION']); setSearch(''); setAddOpen(true); }}><PlusIcon />Add staff</button></div>
+      <div><Link className="event-staffing-back" to={`/events/${eventId}`}><ArrowLeftIcon />Back to event</Link><h1>People and roles</h1><p>{canManage ? 'Find approved staff, assign their event roles, and manage the active team.' : 'View everyone assigned to this event and their roles.'}</p></div>
+      <div className="stage4-actions"><button className="secondary event-staffing-refresh" type="button" aria-label="Refresh event team" title="Refresh event team" disabled={loading} onClick={() => void load()}><ArrowPathIcon className={loading ? 'is-spinning' : ''} /></button>{canManage && <button type="button" onClick={() => { setAccountIds([]); setRoles(['REGISTRATION']); setSearch(''); setAddOpen(true); }}><PlusIcon />Add staff</button>}</div>
     </header>
 
     {notice && <div className="stage4-alert good" role="status">{notice}</div>}
@@ -161,9 +163,9 @@ export default function EventStaffingPage() {
         const person = member.user ?? member.account;
         const availableRoles = EVENT_ROLES.filter((role) => !currentRoles.includes(role.value) && (role.value !== 'REVIEWER' || person?.professionalCategory === 'DOCTOR') && (role.value !== 'EVENT_MANAGER' || person?.roles?.includes('EVENT_MANAGER')));
         return <article className="event-team-card" key={memberId}>
-          <header><span className="event-team-avatar"><UserGroupIcon /></span><div><h3>{person?.fullName ?? member.userId}</h3><p>{person?.email ?? 'Approved account'}</p></div><button className="secondary event-team-remove" type="button" disabled={busy === memberId} onClick={() => void removePerson(member)}>Remove</button></header>
-          <div className="event-team-roles">{currentRoles.map((role) => <span key={role}>{roleLabel(role)}<button type="button" aria-label={`Remove ${roleLabel(role)} from ${person?.fullName ?? 'person'}`} disabled={Boolean(busy)} onClick={() => void removeRole(member, role)}><XMarkIcon /></button></span>)}</div>
-          {availableRoles.length > 0 && <label className="event-team-add-role">Add another role<select defaultValue="" onChange={(event) => { const role = event.target.value; event.currentTarget.value = ''; void addRole(member, role); }}><option value="">Choose role</option>{availableRoles.map((role) => <option key={role.value} value={role.value}>{role.label}</option>)}</select></label>}
+          <header><span className="event-team-avatar"><UserGroupIcon /></span><div><h3>{person?.fullName ?? member.userId}</h3><p>{person?.email ?? 'Approved account'}</p></div>{canManage && <button className="secondary event-team-remove" type="button" disabled={busy === memberId} onClick={() => void removePerson(member)}>Remove</button>}</header>
+          <div className="event-team-roles">{currentRoles.map((role) => <span key={role}>{roleLabel(role)}{canManage && <button type="button" aria-label={`Remove ${roleLabel(role)} from ${person?.fullName ?? 'person'}`} disabled={Boolean(busy)} onClick={() => void removeRole(member, role)}><XMarkIcon /></button>}</span>)}</div>
+          {canManage && availableRoles.length > 0 && <label className="event-team-add-role">Add another role<select defaultValue="" onChange={(event) => { const role = event.target.value; event.currentTarget.value = ''; void addRole(member, role); }}><option value="">Choose role</option>{availableRoles.map((role) => <option key={role.value} value={role.value}>{role.label}</option>)}</select></label>}
         </article>;
       })}</div> : <div className="quiet-empty"><UserGroupIcon /><h2>{activeMembers.length ? 'No team members match' : 'No one assigned yet'}</h2><p>{activeMembers.length ? 'Try a different name, email, or role.' : 'Use Add staff to build this event team.'}</p></div>}
     </section>

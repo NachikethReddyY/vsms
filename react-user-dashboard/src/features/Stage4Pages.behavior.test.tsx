@@ -10,8 +10,9 @@ let eventMode: 'ok' | '403' | '404' = 'ok';
 let accountMode: 'ok' | 'fail' | 'empty' = 'ok';
 let membershipRoles = [{ role: 'REGISTRATION' }];
 let stationMode: 'allow' | 'deny' = 'allow';
+let eventCanManage = true;
 const eventData = {
-  eventId: 'event-1', name: 'Clinic Day', version: 3, canManage: false,
+  eventId: 'event-1', name: 'Clinic Day', version: 3,
   shifts: [{ shiftId: 'shift-1', name: 'Morning', startsAt: '2026-08-07T08:00:00.000Z', endsAt: '2026-08-07T12:00:00.000Z', status: 'PLANNED', staffAssignments: [{ staffAssignmentId: 'duty-1', assignmentRole: 'SCREENER', user: { userId: 'user-1', fullName: 'Asha Rao' }, eventStation: { eventStationId: 'station-1', name: 'VA' } }] }],
   eventStations: [{ eventStationId: 'station-1', name: 'VA', stationOrder: 1, isAvailable: true }],
 };
@@ -34,7 +35,7 @@ vi.mock('./stage4Api', async () => {
     addMembershipRole: vi.fn(async (...args: unknown[]) => { calls.push({ name: 'addMembershipRole', args }); return {}; }),
     removeMembershipRole: vi.fn(async (...args: unknown[]) => { calls.push({ name: 'removeMembershipRole', args }); return {}; }),
     removeMembership: vi.fn(async (...args: unknown[]) => { calls.push({ name: 'removeMembership', args }); return {}; }),
-    getEvent: vi.fn(async () => { if (eventMode === '403') throw new Error('403 forbidden'); if (eventMode === '404') throw new Error('404 not found'); return eventData; }),
+    getEvent: vi.fn(async () => { if (eventMode === '403') throw new Error('403 forbidden'); if (eventMode === '404') throw new Error('404 not found'); return { ...eventData, canManage: eventCanManage }; }),
     assignShiftStaff: vi.fn(async (...args: unknown[]) => { calls.push({ name: 'assignShiftStaff', args }); return eventData; }),
     removeShiftAssignment: vi.fn(async (...args: unknown[]) => { calls.push({ name: 'removeShiftAssignment', args }); return eventData; }),
     getAnalytics: vi.fn(async () => ({ schemaVersion: 1, aggregateOnly: true, generatedAt: '2026-08-07T00:00:00.000Z', timeBasis: { interval: 'event' }, appliedFilters: {}, smallCellSuppression: { rule: 'n<5' }, dataCompleteness: { registrations: 'complete' }, metricDefinitions: [{ id: 'checkedIn', definition: 'Checked-in attendees' }], tables: [{ id: 'ops', title: 'Operations', columns: [{ key: 'checkedIn', label: 'Checked in' }], rows: [{ checkedIn: 12 }] }], observations: ['Aggregate only'] })),
@@ -53,7 +54,7 @@ const { EventCapabilityGuard } = await import('../auth/RoleGuard');
 const { ProtectedRoute } = await import('../auth/ProtectedRoute');
 
 beforeEach(() => {
-  calls.length = 0; eventMode = 'ok'; accountMode = 'ok'; membershipRoles = [{ role: 'REGISTRATION' }]; stationMode = 'allow'; authUser = { approvalState: 'APPROVED', accessState: 'ENABLED', roles: [], eventMemberships: [{ id: 'm1', eventId: 'event-1', status: 'ACTIVE', roles: [{ role: 'EVENT_MANAGER' }] }] }; vi.useRealTimers();
+  calls.length = 0; eventMode = 'ok'; eventCanManage = true; accountMode = 'ok'; membershipRoles = [{ role: 'REGISTRATION' }]; stationMode = 'allow'; authUser = { approvalState: 'APPROVED', accessState: 'ENABLED', roles: [], eventMemberships: [{ id: 'm1', eventId: 'event-1', status: 'ACTIVE', roles: [{ role: 'EVENT_MANAGER' }] }] }; vi.useRealTimers();
   HTMLDialogElement.prototype.showModal = function showModal() { this.setAttribute('open', ''); };
   HTMLDialogElement.prototype.close = function close() { this.removeAttribute('open'); };
 });
@@ -63,6 +64,7 @@ function renderRoute(path: string, element: React.ReactNode) { render(<MemoryRou
 
 describe('Stage 4 rendered route behavior', () => {
   it('uses event membership guard outcomes for allow, 403, and 404 without operational global-role bypass', async () => {
+    eventCanManage = false;
     authUser = { approvalState: 'APPROVED', accessState: 'ENABLED', roles: ['ADMINISTRATOR'], eventMemberships: [] }; accountMode = 'fail';
     render(<MemoryRouter initialEntries={["/events/event-1/staff"]}><Routes><Route element={<EventCapabilityGuard allowedRoles={['ADMINISTRATOR','EVENT_MANAGER']} />}><Route path="/events/:eventId/staff" element={<p>Allowed staff</p>} /></Route><Route path="/forbidden" element={<p>Forbidden page</p>} /><Route path="/not-found" element={<p>Missing page</p>} /></Routes></MemoryRouter>);
     expect(await screen.findByText('Forbidden page')).toBeTruthy();
