@@ -46,7 +46,7 @@ function toEventItem(event: EventRecord, now: Date): EventItem {
   const eventDate = dateKey(startsAt, event.timezone);
   const shortDate = new Intl.DateTimeFormat('en-SG', { day: 'numeric', month: 'short', timeZone: event.timezone }).format(startsAt);
   const names = event.canManage
-    ? [...new Set(event.shifts.flatMap((shift) => shift.staffAssignments.map((assignment) => assignment.user.username)))]
+    ? [...new Set(event.eventTeam?.length ? event.eventTeam : event.shifts.flatMap((shift) => shift.staffAssignments.map((assignment) => assignment.user.username)))]
     : [];
   const timeFormatter = new Intl.DateTimeFormat('en-SG', { hour: 'numeric', minute: '2-digit', timeZone: event.timezone });
   const time = `${timeFormatter.format(startsAt)} – ${timeFormatter.format(endsAt)}`.toUpperCase();

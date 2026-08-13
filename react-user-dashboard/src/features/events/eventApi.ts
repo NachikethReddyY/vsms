@@ -8,6 +8,7 @@ export type EventStation = Omit<components['schemas']['EventStation'], 'stationT
 export type EventRecord = Omit<components['schemas']['Event'], 'shifts' | 'eventStations'> & {
   shifts: components['schemas']['Shift'][];
   eventStations: EventStation[];
+  eventTeam?: string[];
 };
 export type EventStatus = components['schemas']['EventStatus'];
 export type StaffAssignment = components['schemas']['StaffAssignment'];

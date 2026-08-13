@@ -146,7 +146,7 @@ const eventInclude = {
   },
   memberships: {
     where: { status: "ACTIVE" },
-    select: { userId: true, roles: { select: { role: true } } },
+    select: { userId: true, user: { select: { fullName: true, username: true } }, roles: { select: { role: true } } },
   },
   _count: { select: { registrations: { where: { registrationStatus: { not: "CANCELLED" } } } } },
 };
@@ -173,6 +173,10 @@ const eventListInclude = {
   registrations: {
     where: attendancePredicate,
     select: { registrationId: true },
+  },
+  memberships: {
+    where: { status: "ACTIVE" },
+    select: { userId: true, user: { select: { fullName: true, username: true } }, roles: { select: { role: true } } },
   },
   _count: { select: { registrations: { where: { registrationStatus: { not: "CANCELLED" } } } } },
 };
@@ -355,6 +359,7 @@ const toEventResponse = async (event, user, db = prisma, options = {}) => {
     activeCapacityCount: registrations.length,
     _count: { eventRegistrations: registrationCount },
     canManage: managerView,
+    eventTeam: managerView ? (event.memberships || []).map(({ user }) => user?.fullName || user?.username).filter(Boolean) : [],
   };
   if (managerView) {
     response.createdBy = publicUser(event.createdBy);
