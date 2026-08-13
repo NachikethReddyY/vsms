@@ -4,8 +4,8 @@ This checklist describes the current repository, not the original proposal.
 
 Legend: `[x]` evidence is present in the current source; `[~]` is partial or
 configuration-dependent; `[ ]` is planned/deferred; `[?]` requires a human or
-external artifact. A checked item is not a claim of live deployment or
-measured performance.
+external artifact. A checked item is not automatically a claim of current live
+availability; dated deployment and performance evidence is identified below.
 
 ## Core workflow
 
@@ -15,7 +15,7 @@ measured performance.
 - [x] Participant search, create, update, consent, emergency contacts and event registration — participant/registration routes and services.
 - [x] QR issue, verification, reissue, revocation, download and print paths — `backend/services/participant/qrService.js` and QR routes.
 - [x] Queue join, hand-off, call, start, advance, complete, skip and priority — queue routes and `services/screening/queueService.js`.
-- [x] Visual-acuity, refraction and colour-vision station save/preview paths with server-side flags — `screeningService.js`, OpenAPI and station pages.
+- [x] Visual-acuity, refraction, colour-vision and eye-health station save/preview paths with server-side flags — `screeningService.js`, OpenAPI and station pages.
 - [x] Review decisions and referral issue/revision/acknowledgement/document paths — `reviewService.js`, `referralService.js` and routes.
 - [x] Metrics, analytics, operational reports and queued PDF/CSV export source paths — `services/reporting/` and OpenAPI.
 
@@ -28,9 +28,9 @@ measured performance.
 - [x] Reconnect and sync through `POST /api/v1/events/{eventId}/sync/screening`.
 - [x] Preserve retryable network failures and surface server conflicts for staff attention.
 - [x] Purge expired offline packs and clear them on logout/user change.
-- [~] Responsive React/Vite browser application with offline screening capability.
-- [ ] Service worker, installable PWA shell and hard-refresh offline support.
-- [ ] Participant self-service offline, full sync-centre conflict UI and eye-health offline capture.
+- [x] Responsive installable React/Vite PWA with service-worker app-shell caching and hard-refresh offline support.
+- [x] Offline capture and synchronization for visual acuity, refraction, colour vision and eye health.
+- [ ] Participant self-service offline and a broader sync-centre conflict UI.
 
 ## Security and operations
 
@@ -41,7 +41,8 @@ measured performance.
 - [x] Structured local logging through `backend/utils/logger/logger.js`.
 - [~] Cognito, OneMap, SES/SNS and Redis integrations; provider/configuration evidence is environment-dependent.
 - [x] Pino and pino-http structured request/completion logging through `backend/utils/logger/logger.js`, `backend/middlewares/httpLogger.js`, and `backend/app.js`.
-- [ ] EC2 live deployment evidence, reverse-proxy evidence, backups, monitoring and restore evidence.
+- [x] Dated Amplify/EC2/Nginx/RDS/Cognito deployment evidence and repeatable PostgreSQL dump/restore verification.
+- [~] Current AWS availability and external-provider delivery require the final live replay.
 - [ ] Production artifact-signature enforcement; no runtime signature claim is made.
 
 ## Database evidence
@@ -53,16 +54,17 @@ measured performance.
 
 ## Cloud and optional scope
 
-- [~] EC2 is the stated deployment target; repository scripts support a Node process but contain no live-instance proof.
+- [x] The 11 August runbook records Amplify, Nginx/EC2, private encrypted RDS, Cognito, TLS, workers and recovery points; current availability still requires the final replay.
 - [~] Cognito is an implemented integration boundary when configured.
-- [ ] Serverless compute, static object-storage hosting and managed secret-store deployment are not part of the verified submission architecture.
+- [x] RDS-owned Secrets Manager credential in the dated deployment; EC2 consumes a root-owned static environment copy that must be refreshed after rotation.
+- [ ] Serverless compute is not part of the selected architecture.
 - [ ] AI/LLM clinical decisioning, microservice decomposition, event bus infrastructure and real-time external notifications beyond current provider adapters.
 
 ## Final-submission inputs
 
-- [?] Verify team names, student identifiers, report date and course-specific formatting.
+- [?] Supply the submitting student's exact name/identifier and the official BrightSpace individual-report template.
 - [?] Complete and sign `docs/ai-transcripts/DECLARATION_TEMPLATE.md`.
 - [?] Add only verified external AI/chat links to `docs/ai-transcripts/EXTERNAL_AI_CHAT_LINKS.md`.
 - [?] Supply any required manual Lucidchart/Draw.io export or link; Mermaid sources in `docs/secure_coding/diagrams/` are the repository-side editable source.
-- [?] Collect authorized EC2/PostgreSQL/Cognito/HTTPS screenshots and rehearse the demo; no such evidence is claimed here.
-- [?] Assemble the final submission package manually; the repository packager is source-only and does not create the database backup, declaration/signature, presentation slides, or final combined package.
+- [?] Renew authorized AWS access, collect current Cognito/RBAC/workflow screenshots and rehearse the demo.
+- [?] Assemble the final DBSP package after the student supplies the BrightSpace report template, exact name/ID, signed declaration, Lucidchart link/iterations and authorized production SQL backup.

@@ -1,7 +1,7 @@
 # VSMS request and synchronization sequence
 
-This sequence uses the current event-scoped API and the supported offline
-station paths. Eye-health offline capture is intentionally absent.
+This sequence uses the current event-scoped API and all four supported
+offline station paths.
 
 ```mermaid
 sequenceDiagram
@@ -61,7 +61,7 @@ sequenceDiagram
     UI->>Local: Encrypt and store snapshot
 
     alt Online screening save
-        Staff->>UI: Enter VA/refraction/colour result
+        Staff->>UI: Enter VA/refraction/colour/eye-health result
         UI->>API: POST station result with idempotency key
         API->>Guard: Request context, auth, duty and validation
         Guard->>Route: Validated event/station request
