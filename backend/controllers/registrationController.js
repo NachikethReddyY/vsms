@@ -62,11 +62,47 @@ function publicRegistration(registration) {
     };
 }
 
+function registrationEvidence(body, now = new Date()) {
+    const paperFormUsed = body.paperFormUsed === true;
+    if (body.paperFormUsed !== undefined && typeof body.paperFormUsed !== "boolean") {
+        const error = new Error("paperFormUsed must be a boolean");
+        error.statusCode = 400;
+        throw error;
+    }
+
+    const paperExceptionReason = cleanString(body.paperExceptionReason, "paperExceptionReason", { max: 200 });
+    if (paperFormUsed !== Boolean(paperExceptionReason)) {
+        const error = new Error("A paper exception reason is required only when a paper form was used");
+        error.statusCode = 400;
+        throw error;
+    }
+    if (paperExceptionReason && paperExceptionReason.length < 3) {
+        const error = new Error("paperExceptionReason must contain at least 3 characters");
+        error.statusCode = 400;
+        throw error;
+    }
+
+    let workflowStartedAt = null;
+    if (body.workflowStartedAt !== undefined) {
+        workflowStartedAt = new Date(body.workflowStartedAt);
+        const ageMs = now.getTime() - workflowStartedAt.getTime();
+        if (Number.isNaN(workflowStartedAt.getTime()) || ageMs < -5 * 60_000 || ageMs > 24 * 60 * 60_000) {
+            const error = new Error("workflowStartedAt must be a valid time within the last 24 hours");
+            error.statusCode = 400;
+            throw error;
+        }
+    }
+
+    return { workflowStartedAt, paperFormUsed, paperExceptionReason: paperExceptionReason || null };
+}
+
 exports.createRegistration = asyncHandler(async (req, res) => {
+    const evidence = registrationEvidence(req.body);
     const result = await registrationService.createRegistration({
         participantId: assertUuid(req.body.participantId, "participantId"),
         eventId: assertUuid(req.params.eventId || req.body.eventId, "eventId"),
         idempotencyKey: validateIdempotencyKey(req.headers["idempotency-key"]),
+        ...evidence,
         auth: req.auth,
         context: req.context,
     });

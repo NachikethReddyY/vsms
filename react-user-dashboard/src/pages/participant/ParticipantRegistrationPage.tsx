@@ -17,6 +17,7 @@ import { RegistrationQrPass } from "../../components/qr/RegistrationQrPass";
 import "./ParticipantPage.css";
 import "./ParticipantCheckInPage.css";
 import "./ParticipantRegistrationPage.css";
+import { clearRegistrationEvidence, getRegistrationStartedAt } from "./registrationEvidence";
 
 type ConsentRecord = {
   id: string;
@@ -59,6 +60,8 @@ export default function ParticipantRegistrationPage() {
   const [isLoading, setIsLoading] = useState(Boolean(eventId));
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showConfirmation, setShowConfirmation] = useState(false);
+  const [paperFormUsed, setPaperFormUsed] = useState(false);
+  const [paperExceptionReason, setPaperExceptionReason] = useState("");
   const [error, setError] = useState<string | null>(null);
   const idempotencyKey = useRef(crypto.randomUUID());
 
@@ -109,9 +112,15 @@ export default function ParticipantRegistrationPage() {
     setIsSubmitting(true);
     setError(null);
     try {
-      const response = await apiClient.post<components['schemas']['RegistrationResponse']>(`/events/${eventId}/registrations`, { participantId }, {
+      const response = await apiClient.post<components['schemas']['RegistrationResponse']>(`/events/${eventId}/registrations`, {
+        participantId,
+        workflowStartedAt: getRegistrationStartedAt(eventId),
+        paperFormUsed,
+        paperExceptionReason: paperFormUsed ? paperExceptionReason.trim() : undefined,
+      }, {
         headers: { "Idempotency-Key": idempotencyKey.current },
       });
+      clearRegistrationEvidence(eventId);
       const registrationId = response.data.registration?.id ?? response.data.registrationId;
       if (review?.event.status !== "IN_PROGRESS" || !response.data.route) {
         navigate(`/participants/registrations/${registrationId}/qr?eventId=${encodeURIComponent(eventId)}`, { replace: true });
@@ -208,9 +217,17 @@ export default function ParticipantRegistrationPage() {
               <div><dt>Event</dt><dd>{review.event.eventName}</dd></div>
               <div><dt>Participant reference</dt><dd>{review.participant.participantReference}</dd></div>
             </dl>
+            <label className="participant-registration-paper-exception">
+              <input type="checkbox" checked={paperFormUsed} onChange={(event) => {
+                setPaperFormUsed(event.target.checked);
+                if (!event.target.checked) setPaperExceptionReason("");
+              }} />
+              <span>A paper form was required for this registration</span>
+            </label>
+            {paperFormUsed ? <label className="participant-registration-paper-reason"><span>Reason for paper exception</span><input required minLength={3} maxLength={200} value={paperExceptionReason} onChange={(event) => setPaperExceptionReason(event.target.value)} placeholder="For example, participant requested a paper copy" /></label> : null}
             <p className="participant-registration-dialog-note">{review.event.status === "IN_PROGRESS" ? "This creates the secure event QR and assigns a stable route using current station load." : "This creates the secure event QR. The route is assigned at event check-in."}</p>
             {error ? <p className="participant-v2-alert participant-v2-checkin-alert" role="alert">{error}</p> : null}
-            <footer><button className="secondary" type="button" disabled={isSubmitting} onClick={() => setShowConfirmation(false)}>Cancel</button><button className="primary" type="button" disabled={isSubmitting} onClick={() => void createRegistration()}>{isSubmitting ? "Creating registration..." : "Confirm registration"}</button></footer>
+            <footer><button className="secondary" type="button" disabled={isSubmitting} onClick={() => setShowConfirmation(false)}>Cancel</button><button className="primary" type="button" disabled={isSubmitting || (paperFormUsed && paperExceptionReason.trim().length < 3)} onClick={() => void createRegistration()}>{isSubmitting ? "Creating registration..." : "Confirm registration"}</button></footer>
           </section>
       </AppDialog>
     </section>

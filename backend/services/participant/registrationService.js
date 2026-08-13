@@ -77,7 +77,16 @@ async function provisionExistingRegistration({ registration, userId, eventId, co
     throw conflict("Unable to provision registration. Please retry.");
 }
 
-exports.createRegistration = async ({ participantId, eventId, idempotencyKey, auth, context }, db = prisma) => {
+exports.createRegistration = async ({
+    participantId,
+    eventId,
+    idempotencyKey,
+    workflowStartedAt = null,
+    paperFormUsed = false,
+    paperExceptionReason = null,
+    auth,
+    context,
+}, db = prisma) => {
     const userId = auth.userId;
     await assertRegistrationAssignment(db, eventId, auth);
 
@@ -155,6 +164,9 @@ exports.createRegistration = async ({ participantId, eventId, idempotencyKey, au
                         registrationStatus: "SIGNED_UP",
                         registeredBy: userId,
                         idempotencyKey,
+                        workflowStartedAt,
+                        paperFormUsed,
+                        paperExceptionReason,
                     },
                     include: registrationInclude(),
                 });
@@ -176,7 +188,16 @@ exports.createRegistration = async ({ participantId, eventId, idempotencyKey, au
                     action: "EVENT_REGISTRATION_CREATED",
                     entityName: "EventRegistration",
                     entityId: created.registrationId,
-                    newValue: { participantId, eventId, queueNumber: null, status: "SIGNED_UP" },
+                    newValue: {
+                        participantId,
+                        eventId,
+                        queueNumber: null,
+                        status: "SIGNED_UP",
+                        workflowDurationSeconds: workflowStartedAt
+                            ? Math.max(0, Math.round((created.createdAt.getTime() - workflowStartedAt.getTime()) / 1000))
+                            : null,
+                        paperFormUsed,
+                    },
                     context,
                     client: tx,
                 });

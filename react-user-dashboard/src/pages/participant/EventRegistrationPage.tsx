@@ -14,6 +14,7 @@ import { PhoneInput } from "../../components/PhoneInput";
 import apiClient, { getApiError } from "../../utils/apiClient";
 import { isValidParticipantNric, isValidParticipantPhoneNumber } from "../../utils/phone";
 import "./ParticipantPage.css";
+import { beginRegistrationEvidence } from "./registrationEvidence";
 import "./ParticipantCreatePage.css";
 import "./EventRegistrationPage.css";
 
@@ -48,6 +49,10 @@ export default function EventRegistrationPage() {
   const [eventLoading, setEventLoading] = useState(true);
   const [eventError, setEventError] = useState<string | null>(null);
   const [form, setForm] = useState<ParticipantForm>({ firstName: "", lastName: "", dateOfBirth: "", gender: "U", contactNumber: "", nric: "", email: "", race: "", nationality: "Singaporean", addressStreet: "", addressUnit: "", addressPostalCode: "", preferredLanguage: "English", accessibilityNotes: "" });
+
+  useEffect(() => {
+    if (eventId) beginRegistrationEvidence(eventId);
+  }, [eventId]);
   const [error, setError] = useState<string | null>(null);
   const [checking, setChecking] = useState(false);
   const [creating, setCreating] = useState(false);

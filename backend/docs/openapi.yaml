@@ -817,6 +817,9 @@ paths:
               required: [participantId]
               properties:
                 participantId: { type: string, format: uuid }
+                workflowStartedAt: { type: string, format: date-time, description: "Client-observed start of the current registration workflow, accepted only within a bounded 24-hour window." }
+                paperFormUsed: { type: boolean, default: false }
+                paperExceptionReason: { type: string, minLength: 3, maxLength: 200 }
       responses:
         "200": { description: Idempotent replay, content: { application/json: { schema: { $ref: "#/components/schemas/RegistrationResponse" } } } }
         "201": { description: Participant registered, content: { application/json: { schema: { $ref: "#/components/schemas/RegistrationResponse" } } } }
@@ -3761,7 +3764,7 @@ components:
     OperationsEvent:
       type: object
       additionalProperties: false
-      required: [eventId, name, status, venue, timezone, startsAt, endsAt, capacity, progress, queue, stations, staffing, referrals, sync, attention]
+      required: [eventId, name, status, venue, timezone, startsAt, endsAt, capacity, progress, queue, stations, staffing, referrals, sync, businessMetrics, attention]
       properties:
         eventId: { type: string, format: uuid }
         name: { type: string, maxLength: 150 }
@@ -3785,7 +3788,7 @@ components:
         queue:
           type: object
           additionalProperties: false
-          required: [waiting, called, inProgress, completed, skipped, priority, longestWaitMinutes]
+          required: [waiting, called, inProgress, completed, skipped, priority, longestWaitMinutes, waitP50Minutes, waitP90Minutes, serviceP50Minutes, serviceP90Minutes]
           properties:
             waiting: { type: integer, minimum: 0 }
             called: { type: integer, minimum: 0 }
@@ -3794,15 +3797,20 @@ components:
             skipped: { type: integer, minimum: 0 }
             priority: { type: integer, minimum: 0 }
             longestWaitMinutes: { type: integer, minimum: 0 }
+            waitP50Minutes: { type: number, minimum: 0, nullable: true }
+            waitP90Minutes: { type: number, minimum: 0, nullable: true }
+            serviceP50Minutes: { type: number, minimum: 0, nullable: true }
+            serviceP90Minutes: { type: number, minimum: 0, nullable: true }
         stations:
           type: object
           additionalProperties: false
-          required: [total, available, paused, offline, items]
+          required: [total, available, paused, offline, offlineCapable, items]
           properties:
             total: { type: integer, minimum: 0 }
             available: { type: integer, minimum: 0 }
             paused: { type: integer, minimum: 0 }
             offline: { type: integer, minimum: 0 }
+            offlineCapable: { type: integer, minimum: 0 }
             items:
               type: array
               maxItems: 50
@@ -3829,10 +3837,26 @@ components:
         sync:
           type: object
           additionalProperties: false
-          required: [pending, issues]
+          required: [pending, issues, applied, successRatePercent, lastUpdatedAt]
           properties:
             pending: { type: integer, minimum: 0 }
             issues: { type: integer, minimum: 0 }
+            applied: { type: integer, minimum: 0 }
+            successRatePercent: { type: number, minimum: 0, maximum: 100, nullable: true }
+            lastUpdatedAt: { type: string, format: date-time, nullable: true }
+        businessMetrics:
+          type: object
+          additionalProperties: false
+          required: [registrationDurationP50Seconds, measuredRegistrations, paperlessRatePercent, completedVisitsPerHour, offlineCoveragePercent, reportGeneratedAt, reportMinutesFromEventEnd, sameDayReportReady]
+          properties:
+            registrationDurationP50Seconds: { type: number, minimum: 0, nullable: true }
+            measuredRegistrations: { type: integer, minimum: 0 }
+            paperlessRatePercent: { type: number, minimum: 0, maximum: 100, nullable: true }
+            completedVisitsPerHour: { type: number, minimum: 0, nullable: true }
+            offlineCoveragePercent: { type: number, minimum: 0, maximum: 100, nullable: true }
+            reportGeneratedAt: { type: string, format: date-time, nullable: true }
+            reportMinutesFromEventEnd: { type: number, minimum: 0, nullable: true }
+            sameDayReportReady: { type: boolean, nullable: true }
         attention:
           type: object
           additionalProperties: false

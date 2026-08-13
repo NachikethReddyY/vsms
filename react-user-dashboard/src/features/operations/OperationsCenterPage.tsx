@@ -45,6 +45,15 @@ function progressPercent(event: OperationsEvent) {
   return event.progress.total ? Math.round((event.progress.completed / event.progress.total) * 100) : 0;
 }
 
+function metric(value: number | null, suffix = '') {
+  return value == null ? 'Not measured' : `${count.format(value)}${suffix}`;
+}
+
+function registrationDuration(seconds: number | null) {
+  if (seconds == null) return 'Not measured';
+  return seconds < 60 ? `${count.format(seconds)} sec` : `${(seconds / 60).toFixed(1)} min`;
+}
+
 function EventOperation({ event }: { event: OperationsEvent }) {
   const activeQueue = event.queue.called + event.queue.inProgress;
   const progress = progressPercent(event);
@@ -109,6 +118,19 @@ function EventOperation({ event }: { event: OperationsEvent }) {
           {event.attention.reasons.length > 0 && <ul className="operations-reasons">
             {event.attention.reasons.map((reason) => <li key={reason.code}>{reason.label}</li>)}
           </ul>}
+        </section>
+
+        <section className="operations-evidence" aria-label={`${event.name} business objective evidence`}>
+          <div className="operations-section-heading"><h3>Business objective evidence</h3><span>{event.businessMetrics.measuredRegistrations} timed registrations</span></div>
+          <dl className="operations-evidence-metrics">
+            <div><dt>Median registration</dt><dd>{registrationDuration(event.businessMetrics.registrationDurationP50Seconds)}</dd><small>Workflow start to QR registration</small></div>
+            <div><dt>Paperless cases</dt><dd>{metric(event.businessMetrics.paperlessRatePercent, '%')}</dd><small>Registrations without a declared paper exception</small></div>
+            <div><dt>Queue wait p90</dt><dd>{metric(event.queue.waitP90Minutes, ' min')}</dd><small>90% of measured waits are at or below this value</small></div>
+            <div><dt>Throughput</dt><dd>{metric(event.businessMetrics.completedVisitsPerHour, '/hr')}</dd><small>Completed station visits per event hour</small></div>
+            <div><dt>Offline coverage</dt><dd>{metric(event.businessMetrics.offlineCoveragePercent, '%')}</dd><small>{event.stations.offlineCapable} of {event.stations.total} active stations</small></div>
+            <div><dt>Sync success</dt><dd>{metric(event.sync.successRatePercent, '%')}</dd><small>{event.sync.pending} pending · {event.sync.issues} requiring attention</small></div>
+            <div><dt>Same-day report</dt><dd>{event.businessMetrics.sameDayReportReady == null ? 'Not generated' : event.businessMetrics.sameDayReportReady ? 'Met' : 'Missed'}</dd><small>{event.businessMetrics.reportMinutesFromEventEnd == null ? 'No completed report evidence' : `${event.businessMetrics.reportMinutesFromEventEnd} min after event end`}</small></div>
+          </dl>
         </section>
       </div>
     </article>

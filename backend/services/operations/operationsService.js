@@ -9,6 +9,7 @@ const { attended } = require("../event/attendanceDefinition");
 
 const ACTIVE_ASSIGNMENT_STATUSES = new Set(["ASSIGNED", "CONFIRMED"]);
 const ACTIVE_QUEUE_STATUSES = new Set(["WAITING", "CALLED", "IN_PROGRESS"]);
+const OFFLINE_CAPABLE_STATION_TYPES = new Set(["VISUAL_ACUITY", "REFRACTION", "COLOUR_VISION", "CUSTOM"]);
 const EVENT_STATUS_FILTERS = {
   ACTIVE: ["IN_PROGRESS"],
   UPCOMING: ["DRAFT", "PUBLISHED"],
@@ -33,7 +34,31 @@ const emptyQueue = () => ({
   skipped: 0,
   priority: 0,
   longestWaitMinutes: 0,
+  waitP50Minutes: null,
+  waitP90Minutes: null,
+  serviceP50Minutes: null,
+  serviceP90Minutes: null,
 });
+
+const percentile = (values, fraction) => {
+  if (!values.length) return null;
+  const sorted = [...values].sort((left, right) => left - right);
+  const index = (sorted.length - 1) * fraction;
+  const lower = Math.floor(index);
+  const upper = Math.ceil(index);
+  const value = lower === upper
+    ? sorted[lower]
+    : sorted[lower] + (sorted[upper] - sorted[lower]) * (index - lower);
+  return Number(value.toFixed(1));
+};
+
+const elapsedMinutes = (from, to) => {
+  if (!from || !to) return null;
+  const duration = (new Date(to).getTime() - new Date(from).getTime()) / 60_000;
+  return Number.isFinite(duration) && duration >= 0 ? duration : null;
+};
+
+const percentage = (part, total) => total ? Number(((part / total) * 100).toFixed(1)) : null;
 
 const hasActiveAssignmentState = (assignment) => {
   const states = [assignment.status, assignment.assignmentStatus].filter(Boolean);
@@ -185,7 +210,7 @@ const getOverview = async (query, user, db = prisma, now = new Date()) => {
     };
   }
 
-  const [registrations, queueEntries, screeningResults, reviews, referrals] = await Promise.all([
+  const [registrations, queueEntries, screeningResults, reviews, referrals, completedReports] = await Promise.all([
     db.eventRegistration.findMany({
       where: { eventId: { in: eventIds } },
       select: {
@@ -194,6 +219,9 @@ const getOverview = async (query, user, db = prisma, now = new Date()) => {
         registrationStatus: true,
         checkedIn: true,
         checkedInAt: true,
+        workflowStartedAt: true,
+        paperFormUsed: true,
+        createdAt: true,
       },
     }),
     db.queueEntry.findMany({
@@ -204,6 +232,9 @@ const getOverview = async (query, user, db = prisma, now = new Date()) => {
         status: true,
         isPriority: true,
         enteredAt: true,
+        calledAt: true,
+        startedAt: true,
+        completedAt: true,
         registration: { select: { eventId: true } },
       },
     }),
@@ -223,6 +254,12 @@ const getOverview = async (query, user, db = prisma, now = new Date()) => {
         review: { select: { registration: { select: { eventId: true } } } },
       },
     }),
+    db.reportExportJob.findMany({
+      where: { eventId: { in: eventIds }, status: "COMPLETED", generatedAt: { not: null } },
+      select: { eventId: true, generatedAt: true },
+      distinct: ["eventId"],
+      orderBy: [{ eventId: "asc" }, { generatedAt: "desc" }],
+    }),
   ]);
 
   const entityEvent = new Map(eventIds.map((eventId) => [eventId, eventId]));
@@ -238,9 +275,8 @@ const getOverview = async (query, user, db = prisma, now = new Date()) => {
         { eventId: { in: eventIds } },
         { entityId: { in: [...entityEvent.keys()] } },
       ],
-      status: { in: ["PENDING", "PROCESSING", "CONFLICT", "FAILED"] },
     },
-    select: { eventId: true, entityId: true, status: true },
+    select: { eventId: true, entityId: true, status: true, updatedAt: true },
   });
 
   const byEvent = new Map(events.map((event) => [event.eventId, {
@@ -249,8 +285,12 @@ const getOverview = async (query, user, db = prisma, now = new Date()) => {
     screenedRegistrations: new Set(),
     reviewedRegistrations: new Set(),
     referrals: { actionRequired: 0 },
-    sync: { pending: 0, issues: 0 },
+    sync: { pending: 0, issues: 0, applied: 0, successRatePercent: null, lastUpdatedAt: null },
     queueByStation: new Map(),
+    queueWaitMinutes: [],
+    serviceMinutes: [],
+    registrationDurations: [],
+    paperForms: 0,
   }]));
 
   for (const row of registrations) {
@@ -260,6 +300,9 @@ const getOverview = async (query, user, db = prisma, now = new Date()) => {
     if (row.registrationStatus === "SIGNED_UP") aggregate.progress.signedUp += 1;
     if (attended(row)) aggregate.progress.checkedIn += 1;
     if (row.registrationStatus === "COMPLETED") aggregate.progress.completed += 1;
+    if (row.paperFormUsed) aggregate.paperForms += 1;
+    const registrationDuration = elapsedMinutes(row.workflowStartedAt, row.createdAt);
+    if (registrationDuration != null) aggregate.registrationDurations.push(registrationDuration * 60);
   }
 
   for (const row of queueEntries) {
@@ -282,6 +325,10 @@ const getOverview = async (query, user, db = prisma, now = new Date()) => {
     } else if (row.status === "COMPLETED") aggregate.queue.completed += 1;
     else if (row.status === "SKIPPED") aggregate.queue.skipped += 1;
     if (row.isPriority && ACTIVE_QUEUE_STATUSES.has(row.status)) aggregate.queue.priority += 1;
+    const wait = elapsedMinutes(row.enteredAt, row.startedAt || row.calledAt);
+    if (wait != null) aggregate.queueWaitMinutes.push(wait);
+    const service = elapsedMinutes(row.startedAt || row.calledAt, row.completedAt);
+    if (service != null) aggregate.serviceMinutes.push(service);
     aggregate.queueByStation.set(row.stationId, station);
   }
 
@@ -302,13 +349,27 @@ const getOverview = async (query, user, db = prisma, now = new Date()) => {
     const aggregate = byEvent.get(eventId);
     if (!aggregate) continue;
     if (["PENDING", "PROCESSING"].includes(row.status)) aggregate.sync.pending += 1;
+    else if (row.status === "APPLIED") aggregate.sync.applied += 1;
     else aggregate.sync.issues += 1;
+    if (!aggregate.sync.lastUpdatedAt || new Date(row.updatedAt) > new Date(aggregate.sync.lastUpdatedAt)) {
+      aggregate.sync.lastUpdatedAt = row.updatedAt;
+    }
   }
+
+  const reportByEvent = new Map(completedReports.map((report) => [report.eventId, report]));
 
   const operationEvents = events.map((event) => {
     const aggregate = byEvent.get(event.eventId);
     aggregate.progress.screened = aggregate.screenedRegistrations.size;
     aggregate.progress.reviewed = aggregate.reviewedRegistrations.size;
+    aggregate.queue.waitP50Minutes = percentile(aggregate.queueWaitMinutes, 0.5);
+    aggregate.queue.waitP90Minutes = percentile(aggregate.queueWaitMinutes, 0.9);
+    aggregate.queue.serviceP50Minutes = percentile(aggregate.serviceMinutes, 0.5);
+    aggregate.queue.serviceP90Minutes = percentile(aggregate.serviceMinutes, 0.9);
+    aggregate.sync.successRatePercent = percentage(
+      aggregate.sync.applied,
+      aggregate.sync.applied + aggregate.sync.pending + aggregate.sync.issues,
+    );
     const shift = operationalShiftFor(event, now);
     const assignments = (shift?.staffAssignments || []).filter(hasActiveAssignmentState);
     const assignedUsers = new Set(assignments.map(({ userId }) => userId));
@@ -333,6 +394,28 @@ const getOverview = async (query, user, db = prisma, now = new Date()) => {
       available: activeStations.filter(({ operationalStatus }) => operationalStatus === "AVAILABLE").length,
       paused: activeStations.filter(({ operationalStatus }) => operationalStatus === "PAUSED").length,
       offline: activeStations.filter(({ operationalStatus }) => operationalStatus === "OFFLINE").length,
+      offlineCapable: activeStations.filter(({ stationType }) => OFFLINE_CAPABLE_STATION_TYPES.has(stationType)).length,
+    };
+    const operationalEnd = Math.min(now.getTime(), new Date(event.endsAt).getTime());
+    const operationalHours = Math.max(0, operationalEnd - new Date(event.startsAt).getTime()) / 3_600_000;
+    const completedReport = reportByEvent.get(event.eventId) || null;
+    const reportMinutesFromEnd = completedReport
+      ? elapsedMinutes(event.endsAt, completedReport.generatedAt)
+      : null;
+    const businessMetrics = {
+      registrationDurationP50Seconds: percentile(aggregate.registrationDurations, 0.5),
+      measuredRegistrations: aggregate.registrationDurations.length,
+      paperlessRatePercent: percentage(aggregate.progress.total - aggregate.paperForms, aggregate.progress.total),
+      completedVisitsPerHour: operationalHours > 0
+        ? Number((aggregate.queue.completed / operationalHours).toFixed(1))
+        : null,
+      offlineCoveragePercent: percentage(stationSummary.offlineCapable, stationSummary.total),
+      reportGeneratedAt: completedReport?.generatedAt || null,
+      reportMinutesFromEventEnd: reportMinutesFromEnd == null ? null : Number(reportMinutesFromEnd.toFixed(1)),
+      sameDayReportReady: completedReport
+        ? new Date(completedReport.generatedAt).toLocaleDateString("en-CA", { timeZone: event.timezone })
+          === new Date(event.endsAt).toLocaleDateString("en-CA", { timeZone: event.timezone })
+        : null,
     };
     const staffing = {
       shiftId: shift?.shiftId || null,
@@ -370,6 +453,7 @@ const getOverview = async (query, user, db = prisma, now = new Date()) => {
       staffing,
       referrals: aggregate.referrals,
       sync: aggregate.sync,
+      businessMetrics,
       attention,
     };
   }).sort((left, right) => (

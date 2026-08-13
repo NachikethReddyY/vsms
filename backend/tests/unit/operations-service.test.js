@@ -66,8 +66,8 @@ const operationsDb = (capturedWhere = []) => ({
   },
   eventRegistration: {
     findMany: async () => [
-      { registrationId, eventId, registrationStatus: "CHECKED_IN", checkedIn: true, checkedInAt: now },
-      { registrationId: crypto.randomUUID(), eventId, registrationStatus: "COMPLETED", checkedIn: true, checkedInAt: now },
+      { registrationId, eventId, registrationStatus: "CHECKED_IN", checkedIn: true, checkedInAt: now, workflowStartedAt: new Date("2026-08-12T02:58:00.000Z"), createdAt: now, paperFormUsed: false },
+      { registrationId: crypto.randomUUID(), eventId, registrationStatus: "COMPLETED", checkedIn: true, checkedInAt: now, workflowStartedAt: new Date("2026-08-12T02:56:00.000Z"), createdAt: now, paperFormUsed: true },
     ],
   },
   queueEntry: {
@@ -77,6 +77,9 @@ const operationsDb = (capturedWhere = []) => ({
       status: "WAITING",
       isPriority: true,
       enteredAt: new Date("2026-08-12T02:30:00.000Z"),
+      calledAt: new Date("2026-08-12T02:40:00.000Z"),
+      startedAt: new Date("2026-08-12T02:45:00.000Z"),
+      completedAt: null,
       registration: { eventId },
     }],
   },
@@ -90,7 +93,13 @@ const operationsDb = (capturedWhere = []) => ({
     findMany: async () => [{ referralId: crypto.randomUUID(), status: "DRAFT", review: { registration: { eventId } } }],
   },
   syncAction: {
-    findMany: async () => [{ eventId, entityId: registrationId, status: "CONFLICT" }],
+    findMany: async () => [
+      { eventId, entityId: registrationId, status: "CONFLICT", updatedAt: now },
+      { eventId, entityId: registrationId, status: "APPLIED", updatedAt: new Date("2026-08-12T02:59:00.000Z") },
+    ],
+  },
+  reportExportJob: {
+    findMany: async () => [{ eventId, generatedAt: new Date("2026-08-12T09:30:00.000Z") }],
   },
 });
 
@@ -118,10 +127,22 @@ test("event managers receive only scoped aggregate operational data", async () =
   assert.equal(result.events[0].queue.waiting, 1);
   assert.equal(result.events[0].queue.priority, 1);
   assert.equal(result.events[0].queue.longestWaitMinutes, 30);
+  assert.equal(result.events[0].queue.waitP50Minutes, 15);
   assert.equal(result.events[0].staffing.assigned, 1);
   assert.equal(result.events[0].staffing.unfilled, 1);
   assert.equal(result.events[0].stations.items[0].staffed, true);
   assert.equal(result.events[0].attention.severity, "critical");
+  assert.deepEqual(result.events[0].businessMetrics, {
+    registrationDurationP50Seconds: 180,
+    measuredRegistrations: 2,
+    paperlessRatePercent: 50,
+    completedVisitsPerHour: 0,
+    offlineCoveragePercent: 100,
+    reportGeneratedAt: new Date("2026-08-12T09:30:00.000Z"),
+    reportMinutesFromEventEnd: 30,
+    sameDayReportReady: true,
+  });
+  assert.equal(result.events[0].sync.successRatePercent, 50);
 
   const serialized = JSON.stringify(result).toLowerCase();
   for (const forbidden of ["participantdisplayname", "participantreference", "resultdata", "clinicalsummary", "prioritynotes", "recipient"]) {
