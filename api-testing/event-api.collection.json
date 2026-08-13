@@ -11258,8 +11258,8 @@
       ]
     },
     {
-      "name": "List the latest application and authentication audit records",
-      "description": "Administrator-only paged read surface for the append-only audit trail. Application audit records (`logs`) and authentication audit records (`authLogs`) are returned together with independent signed keyset cursors (`nextCursor` / `nextAuthCursor`) for load-more pagination. Rows are immutable; this endpoint never mutates history.\n",
+      "name": "List the unified immutable audit timeline",
+      "description": "Administrator-only paged read surface combining application, authentication, and event audit ledgers behind one signed keyset cursor. Rows are immutable; this endpoint never mutates history.\n",
       "event": [],
       "request": {
         "method": "GET",
@@ -11287,19 +11287,13 @@
             {
               "key": "cursor",
               "value": "",
-              "description": "Signed keyset cursor for the application audit page",
-              "disabled": true
-            },
-            {
-              "key": "authCursor",
-              "value": "",
-              "description": "Signed keyset cursor for the authentication audit page",
+              "description": "Signed keyset cursor for the unified audit timeline",
               "disabled": true
             },
             {
               "key": "limit",
               "value": "50",
-              "description": "Maximum rows per table in this page",
+              "description": "Maximum timeline rows in this page",
               "disabled": true
             },
             {
@@ -11357,7 +11351,7 @@
               "value": "application/json"
             }
           ],
-          "body": "{\n  \"logs\": [\n    {\n      \"id\": \"00000000-0000-4000-8000-000000000000\",\n      \"userId\": \"00000000-0000-4000-8000-000000000000\",\n      \"deviceId\": \"00000000-0000-4000-8000-000000000000\",\n      \"action\": \"CREATED\",\n      \"resource\": \"\",\n      \"entityName\": \"\",\n      \"entityId\": \"00000000-0000-4000-8000-000000000000\",\n      \"outcome\": \"SUCCESS\",\n      \"requestId\": \"00000000-0000-4000-8000-000000000000\",\n      \"details\": {},\n      \"oldValue\": {},\n      \"newValue\": {},\n      \"ipAddress\": \"\",\n      \"deviceName\": \"\",\n      \"createdAt\": \"2026-08-07T00:00:00.000Z\",\n      \"user\": {\n        \"id\": \"00000000-0000-4000-8000-000000000000\",\n        \"userId\": \"00000000-0000-4000-8000-000000000000\",\n        \"username\": \"\",\n        \"email\": \"\",\n        \"fullName\": \"\",\n        \"employeeNumber\": \"\",\n        \"contactNumber\": \"\",\n        \"department\": \"\",\n        \"designation\": \"\",\n        \"systemRole\": \"ADMIN\",\n        \"status\": \"ACTIVE\",\n        \"approvalState\": \"PENDING\",\n        \"accessState\": \"ENABLED\",\n        \"professionalCategory\": \"STAFF\",\n        \"roles\": [\n          \"ADMINISTRATOR\"\n        ],\n        \"createdAt\": \"2026-08-07T00:00:00.000Z\"\n      }\n    }\n  ],\n  \"authLogs\": [\n    {\n      \"id\": \"00000000-0000-4000-8000-000000000000\",\n      \"userId\": \"00000000-0000-4000-8000-000000000000\",\n      \"deviceId\": \"00000000-0000-4000-8000-000000000000\",\n      \"eventType\": \"\",\n      \"outcome\": \"SUCCESS\",\n      \"failureCategory\": \"\",\n      \"identifierHash\": \"\",\n      \"ipAddress\": \"\",\n      \"userAgent\": \"\",\n      \"requestId\": \"00000000-0000-4000-8000-000000000000\",\n      \"occurredAt\": \"2026-08-07T00:00:00.000Z\",\n      \"user\": {}\n    }\n  ],\n  \"nextCursor\": \"\",\n  \"nextAuthCursor\": \"\"\n}"
+          "body": "{\n  \"items\": [\n    {\n      \"id\": \"00000000-0000-4000-8000-000000000000\",\n      \"source\": \"APPLICATION\",\n      \"occurredAt\": \"2026-08-07T00:00:00.000Z\",\n      \"action\": \"\",\n      \"outcome\": \"SUCCESS\",\n      \"actor\": {\n        \"id\": \"00000000-0000-4000-8000-000000000000\",\n        \"fullName\": \"\",\n        \"email\": \"\",\n        \"status\": \"\"\n      },\n      \"eventId\": \"00000000-0000-4000-8000-000000000000\",\n      \"entityName\": \"\",\n      \"entityId\": \"00000000-0000-4000-8000-000000000000\",\n      \"requestId\": \"00000000-0000-4000-8000-000000000000\",\n      \"ipAddress\": \"\",\n      \"deviceName\": \"\",\n      \"userAgent\": \"\",\n      \"details\": {},\n      \"oldValue\": {},\n      \"newValue\": {}\n    }\n  ],\n  \"nextCursor\": \"\"\n}"
         },
         {
           "name": "400 Response",

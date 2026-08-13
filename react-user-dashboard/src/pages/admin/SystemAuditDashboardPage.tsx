@@ -24,36 +24,26 @@ interface AuditRow {
   details: string;
 }
 
-interface AuditLogRecord {
+interface AuditRecord {
   id: string;
-  action?: string;
+  source: "APPLICATION" | "AUTHENTICATION" | "EVENT";
+  occurredAt: string;
+  action: string;
+  outcome: string;
+  actor?: { email?: string | null; fullName?: string | null } | null;
   entityName?: string | null;
   entityId?: string | null;
-  outcome?: string;
   details?: unknown;
   newValue?: unknown;
   oldValue?: unknown;
   ipAddress?: string | null;
   deviceName?: string | null;
-  createdAt?: string;
-  user?: { email?: string | null; fullName?: string | null } | null;
-}
-
-interface AuthAuditRecord {
-  id: string;
-  eventType?: string;
-  outcome?: string;
-  failureCategory?: string | null;
-  identifierHash?: string | null;
-  ipAddress?: string | null;
   userAgent?: string | null;
-  occurredAt?: string;
-  user?: { email?: string | null; fullName?: string | null } | null;
 }
 
 interface AuditDashboardResponse {
-  logs: AuditLogRecord[];
-  authLogs: AuthAuditRecord[];
+  items: AuditRecord[];
+  nextCursor: string | null;
 }
 
 // eslint-disable-next-line react-refresh/only-export-components
@@ -77,35 +67,19 @@ function truncateDetails(value: unknown): string {
 
 // eslint-disable-next-line react-refresh/only-export-components
 export function mapAuditRows(response: AuditDashboardResponse): AuditRow[] {
-  const rows: AuditRow[] = [];
-  for (const log of response.logs || []) {
+  return (response.items || []).map((log) => {
     const action = log.action || "UNKNOWN";
-    rows.push({
+    return {
       id: log.id,
       action,
       category: deriveCategory(action),
-      actorEmail: log.user?.email || log.user?.fullName || "System / Anonymous",
-      ipAddress: log.ipAddress || "127.0.0.1",
-      userAgent: log.deviceName || "Unknown",
-      timestamp: log.createdAt || "",
-      details: truncateDetails(log.details ?? log.newValue ?? log.oldValue ?? log.entityName ?? ""),
-    });
-  }
-  for (const log of response.authLogs || []) {
-    const action = log.eventType || "UNKNOWN";
-    const parts = [log.outcome, log.failureCategory].filter(Boolean);
-    rows.push({
-      id: log.id,
-      action,
-      category: deriveCategory(action),
-      actorEmail: log.user?.email || log.user?.fullName || "System / Anonymous",
-      ipAddress: log.ipAddress || "127.0.0.1",
-      userAgent: log.userAgent || "Unknown",
-      timestamp: log.occurredAt || "",
-      details: parts.join(" · ") || log.identifierHash || "",
-    });
-  }
-  return rows.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+      actorEmail: log.actor?.email || log.actor?.fullName || "System / Anonymous",
+      ipAddress: log.ipAddress || "Unavailable",
+      userAgent: log.userAgent || log.deviceName || "Unknown",
+      timestamp: log.occurredAt,
+      details: truncateDetails(log.details ?? log.newValue ?? log.oldValue ?? log.entityName ?? log.outcome),
+    };
+  });
 }
 
 export function SystemAuditDashboardPage() {

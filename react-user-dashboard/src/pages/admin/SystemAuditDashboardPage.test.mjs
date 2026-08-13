@@ -7,14 +7,14 @@ const source = await readFile(new URL("./SystemAuditDashboardPage.tsx", import.m
 test("audit dashboard stays wired to the backend admin audit contract", () => {
   assert.match(source, /apiClient\.get<AuditDashboardResponse>\("\/admin\/audit-logs"\)/);
   assert.match(source, /setRows\(mapAuditRows\(response\.data\)\)/);
-  assert.match(source, /response\.logs \|\|\ \[\]/);
-  assert.match(source, /response\.authLogs \|\| \[\]/);
+  assert.match(source, /response\.items \|\| \[\]/);
+  assert.match(source, /log\.actor\?\.email/);
 });
 
-test("audit dashboard maps both ledger and auth events into one view model", () => {
+test("audit dashboard maps the unified audit timeline into one view model", () => {
   assert.match(source, /export function mapAuditRows/);
   assert.match(source, /deriveCategory/);
-  assert.match(source, /new Date\(b\.timestamp\)\.getTime\(\) - new Date\(a\.timestamp\)\.getTime\(\)/);
+  assert.match(source, /timestamp: log\.occurredAt/);
 });
 
 test("audit dashboard handles loading, empty, failure, and permission states", () => {

@@ -15719,12 +15719,10 @@ item:
               }
             ]
           }
-  - name: List the latest application and authentication audit records
+  - name: List the unified immutable audit timeline
     description: >
-      Administrator-only paged read surface for the append-only audit trail. Application audit records (`logs`) and
-      authentication audit records (`authLogs`) are returned together with independent signed keyset cursors
-      (`nextCursor` / `nextAuthCursor`) for load-more pagination. Rows are immutable; this endpoint never mutates
-      history.
+      Administrator-only paged read surface combining application, authentication, and event audit ledgers behind one
+      signed keyset cursor. Rows are immutable; this endpoint never mutates history.
     event: []
     request:
       method: GET
@@ -15745,15 +15743,11 @@ item:
         query:
           - key: cursor
             value: ''
-            description: Signed keyset cursor for the application audit page
-            disabled: true
-          - key: authCursor
-            value: ''
-            description: Signed keyset cursor for the authentication audit page
+            description: Signed keyset cursor for the unified audit timeline
             disabled: true
           - key: limit
             value: '50'
-            description: Maximum rows per table in this page
+            description: Maximum timeline rows in this page
             disabled: true
           - key: entityName
             value: ''
@@ -15792,63 +15786,32 @@ item:
             value: application/json
         body: |-
           {
-            "logs": [
+            "items": [
               {
                 "id": "00000000-0000-4000-8000-000000000000",
-                "userId": "00000000-0000-4000-8000-000000000000",
-                "deviceId": "00000000-0000-4000-8000-000000000000",
-                "action": "CREATED",
-                "resource": "",
+                "source": "APPLICATION",
+                "occurredAt": "2026-08-07T00:00:00.000Z",
+                "action": "",
+                "outcome": "SUCCESS",
+                "actor": {
+                  "id": "00000000-0000-4000-8000-000000000000",
+                  "fullName": "",
+                  "email": "",
+                  "status": ""
+                },
+                "eventId": "00000000-0000-4000-8000-000000000000",
                 "entityName": "",
                 "entityId": "00000000-0000-4000-8000-000000000000",
-                "outcome": "SUCCESS",
                 "requestId": "00000000-0000-4000-8000-000000000000",
-                "details": {},
-                "oldValue": {},
-                "newValue": {},
                 "ipAddress": "",
                 "deviceName": "",
-                "createdAt": "2026-08-07T00:00:00.000Z",
-                "user": {
-                  "id": "00000000-0000-4000-8000-000000000000",
-                  "userId": "00000000-0000-4000-8000-000000000000",
-                  "username": "",
-                  "email": "",
-                  "fullName": "",
-                  "employeeNumber": "",
-                  "contactNumber": "",
-                  "department": "",
-                  "designation": "",
-                  "systemRole": "ADMIN",
-                  "status": "ACTIVE",
-                  "approvalState": "PENDING",
-                  "accessState": "ENABLED",
-                  "professionalCategory": "STAFF",
-                  "roles": [
-                    "ADMINISTRATOR"
-                  ],
-                  "createdAt": "2026-08-07T00:00:00.000Z"
-                }
-              }
-            ],
-            "authLogs": [
-              {
-                "id": "00000000-0000-4000-8000-000000000000",
-                "userId": "00000000-0000-4000-8000-000000000000",
-                "deviceId": "00000000-0000-4000-8000-000000000000",
-                "eventType": "",
-                "outcome": "SUCCESS",
-                "failureCategory": "",
-                "identifierHash": "",
-                "ipAddress": "",
                 "userAgent": "",
-                "requestId": "00000000-0000-4000-8000-000000000000",
-                "occurredAt": "2026-08-07T00:00:00.000Z",
-                "user": {}
+                "details": {},
+                "oldValue": {},
+                "newValue": {}
               }
             ],
-            "nextCursor": "",
-            "nextAuthCursor": ""
+            "nextCursor": ""
           }
       - name: 400 Response
         originalRequest:
