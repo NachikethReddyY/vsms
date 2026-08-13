@@ -1,6 +1,6 @@
 import { CheckCircleIcon, QrCodeIcon } from "@heroicons/react/24/outline";
 import { useEffect, useState } from "react";
-import apiClient, { getApiError } from "../../utils/apiClient";
+import apiClient, { getApiError, newIdempotencyHeaders } from "../../utils/apiClient";
 import "./RegistrationQrPass.css";
 
 type RegistrationQrPassProps = {
@@ -17,7 +17,7 @@ export function RegistrationQrPass({ registrationId, className = "" }: Registrat
     let active = true;
     setQrImage(null);
     setError(null);
-    void apiClient.post<{ qrImage: string }>(`/qr/registrations/${registrationId}`)
+    void apiClient.post<{ qrImage: string }>(`/qr/registrations/${registrationId}`, undefined, { headers: newIdempotencyHeaders() })
       .then(({ data }) => { if (active) setQrImage(data.qrImage); })
       .catch((cause: unknown) => { if (active) setError(getApiError(cause, "Unable to create the QR pass.")); });
     return () => { active = false; };

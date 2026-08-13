@@ -30,6 +30,10 @@ export function getCsrfToken() {
   }
 }
 
+export function newIdempotencyHeaders() {
+  return { "Idempotency-Key": crypto.randomUUID() };
+}
+
 export function beginLogout() {
   authGeneration += 1;
   logoutStarted = true;
