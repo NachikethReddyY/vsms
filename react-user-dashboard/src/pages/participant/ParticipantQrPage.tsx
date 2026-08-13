@@ -2,7 +2,7 @@ import { ArrowLeftIcon, CheckCircleIcon, QrCodeIcon, ShieldCheckIcon } from "@he
 import { useEffect, useState } from "react";
 import { Link, useParams, useSearchParams } from "react-router-dom";
 import type { Registration } from "../../types";
-import apiClient, { getApiError } from "../../utils/apiClient";
+import apiClient, { getApiError, newIdempotencyHeaders } from "../../utils/apiClient";
 import "./ParticipantPage.css";
 import "./ParticipantQrPage.css";
 
@@ -20,7 +20,7 @@ export default function ParticipantQrPage() {
     let active = true;
     void Promise.all([
       apiClient.get(`/registrations/${registrationId}`),
-      apiClient.post(`/qr/registrations/${registrationId}`),
+      apiClient.post(`/qr/registrations/${registrationId}`, undefined, { headers: newIdempotencyHeaders() }),
     ])
       .then(([registrationResponse, qrResponse]) => {
         if (!active) return;
