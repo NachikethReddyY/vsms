@@ -12,6 +12,7 @@ import EventFormPage from "./features/events/EventFormPage";
 import PublicEventPage from "./features/events/PublicEventPage";
 import ReviewWorkspacePage from "./features/reviews/ReviewWorkspacePage";
 import ReportsPage from "./features/reports/ReportsPage";
+import OperationsCenterPage from "./features/operations/OperationsCenterPage";
 import DynamicStationPage from "./features/screening/DynamicStationPage";
 import QRScannerPage from "./features/screening/QRScannerPage";
 import { AuditLogsPage as RegistrationAuditLogsPage } from "./pages/AdminPages";

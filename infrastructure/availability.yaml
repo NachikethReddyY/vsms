@@ -14,7 +14,11 @@ Parameters:
     Description: At least two public subnets in different Availability Zones for the load balancer
   PrivateSubnetIds:
     Type: List<AWS::EC2::Subnet::Id>
+<<<<<<< HEAD
     Description: At least two private subnets in different Availability Zones with NAT or required VPC endpoints
+=======
+    Description: Two private subnets in different Availability Zones with NAT or required VPC endpoints
+>>>>>>> dc49640e71d64c2f18a1875cc218a52eab3cf5e7
   HostedZoneId:
     Type: AWS::Route53::HostedZone::Id
   FrontendDomainName:
@@ -36,15 +40,26 @@ Parameters:
     Type: String
     Default: vsmsapp
     AllowedPattern: "[a-zA-Z][a-zA-Z0-9_]{0,15}"
+<<<<<<< HEAD
+=======
+  ApplicationServicesEnabled:
+    Type: String
+    Default: "false"
+    AllowedValues: ["true", "false"]
+    Description: Enable only after migrations and the restricted runtime database role are provisioned
+>>>>>>> dc49640e71d64c2f18a1875cc218a52eab3cf5e7
   EncryptionActiveKeyId:
     Type: String
     AllowedPattern: "[A-Za-z0-9_-]{1,32}"
   EncryptionKeyringSecretArn:
     Type: String
     Description: ARN of a Secrets Manager secret containing the versioned AES-256 keyring JSON
+<<<<<<< HEAD
   ParticipantLookupHmacSecretArn:
     Type: String
     Description: ARN of a Secrets Manager secret containing a dedicated 256-bit hexadecimal participant lookup HMAC key
+=======
+>>>>>>> dc49640e71d64c2f18a1875cc218a52eab3cf5e7
   CognitoDomain:
     Type: String
     Description: HTTPS Cognito hosted UI base URL
@@ -52,6 +67,15 @@ Parameters:
     Type: String
   CognitoUserPoolId:
     Type: String
+<<<<<<< HEAD
+=======
+  CognitoAppClientId:
+    Type: String
+    MinLength: 1
+
+Conditions:
+  ApplicationServicesAreEnabled: !Equals [!Ref ApplicationServicesEnabled, "true"]
+>>>>>>> dc49640e71d64c2f18a1875cc218a52eab3cf5e7
 
 Resources:
   ApiLogGroup:
@@ -110,16 +134,81 @@ Resources:
           ToPort: 6379
           SourceSecurityGroupId: !Ref ApiSecurityGroup
 
+<<<<<<< HEAD
+=======
+  BackupFileSystemSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Encrypted EFS backup access from VSMS API tasks only
+      VpcId: !Ref VpcId
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 2049
+          ToPort: 2049
+          SourceSecurityGroupId: !Ref ApiSecurityGroup
+
+>>>>>>> dc49640e71d64c2f18a1875cc218a52eab3cf5e7
   DatabaseSubnetGroup:
     Type: AWS::RDS::DBSubnetGroup
     Properties:
       DBSubnetGroupDescription: Private multi-AZ subnets for VSMS PostgreSQL
       SubnetIds: !Ref PrivateSubnetIds
 
+<<<<<<< HEAD
   DatabaseCredentialsSecret:
     Type: AWS::SecretsManager::Secret
     Properties:
       Name: !Sub /vsms/${EnvironmentName}/database-credentials
+=======
+  BackupFileSystem:
+    Type: AWS::EFS::FileSystem
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      Encrypted: true
+      BackupPolicy:
+        Status: ENABLED
+      LifecyclePolicies:
+        - TransitionToIA: AFTER_30_DAYS
+      FileSystemTags:
+        - Key: Name
+          Value: !Sub ${EnvironmentName}-vsms-backups
+
+  BackupAccessPoint:
+    Type: AWS::EFS::AccessPoint
+    Properties:
+      FileSystemId: !Ref BackupFileSystem
+      PosixUser:
+        Uid: "1000"
+        Gid: "1000"
+      RootDirectory:
+        Path: /backups
+        CreationInfo:
+          OwnerUid: "1000"
+          OwnerGid: "1000"
+          Permissions: "0750"
+
+  BackupMountTargetA:
+    Type: AWS::EFS::MountTarget
+    Properties:
+      FileSystemId: !Ref BackupFileSystem
+      SubnetId: !Select [0, !Ref PrivateSubnetIds]
+      SecurityGroups:
+        - !Ref BackupFileSystemSecurityGroup
+
+  BackupMountTargetB:
+    Type: AWS::EFS::MountTarget
+    Properties:
+      FileSystemId: !Ref BackupFileSystem
+      SubnetId: !Select [1, !Ref PrivateSubnetIds]
+      SecurityGroups:
+        - !Ref BackupFileSystemSecurityGroup
+
+  DatabaseCredentialsSecret:
+    Type: AWS::SecretsManager::Secret
+    Properties:
+      Name: !Sub /vsms/${EnvironmentName}/database-master-credentials
+>>>>>>> dc49640e71d64c2f18a1875cc218a52eab3cf5e7
       KmsKeyId: alias/aws/secretsmanager
       GenerateSecretString:
         SecretStringTemplate: !Sub '{"username":"${DbMasterUsername}"}'
@@ -161,6 +250,20 @@ Resources:
         - Key: Environment
           Value: !Ref EnvironmentName
 
+<<<<<<< HEAD
+=======
+  DatabaseRuntimeCredentialsSecret:
+    Type: AWS::SecretsManager::Secret
+    Properties:
+      Name: !Sub /vsms/${EnvironmentName}/database-runtime-credentials
+      KmsKeyId: alias/aws/secretsmanager
+      GenerateSecretString:
+        SecretStringTemplate: '{"username":"vsms_runtime"}'
+        GenerateStringKey: password
+        PasswordLength: 32
+        ExcludePunctuation: true
+
+>>>>>>> dc49640e71d64c2f18a1875cc218a52eab3cf5e7
   RedisSubnetGroup:
     Type: AWS::ElastiCache::SubnetGroup
     Properties:
@@ -194,15 +297,34 @@ Resources:
       SnapshotRetentionLimit: 7
       SnapshotWindow: 17:00-18:00
 
+<<<<<<< HEAD
   DatabaseUrlSecret:
     Type: AWS::SecretsManager::Secret
     Properties:
       Name: !Sub /vsms/${EnvironmentName}/database-url
+=======
+  DatabaseMigrationUrlSecret:
+    Type: AWS::SecretsManager::Secret
+    Properties:
+      Name: !Sub /vsms/${EnvironmentName}/database-migration-url
+>>>>>>> dc49640e71d64c2f18a1875cc218a52eab3cf5e7
       KmsKeyId: alias/aws/secretsmanager
       SecretString: !Sub
         - postgresql://${DbMasterUsername}:{{resolve:secretsmanager:${DatabaseCredentialsSecret}:SecretString:password}}@${DatabaseHost}:5432/vsms?sslmode=require&connection_limit=20&pool_timeout=10
         - DatabaseHost: !GetAtt Database.Endpoint.Address
 
+<<<<<<< HEAD
+=======
+  DatabaseRuntimeUrlSecret:
+    Type: AWS::SecretsManager::Secret
+    Properties:
+      Name: !Sub /vsms/${EnvironmentName}/database-runtime-url
+      KmsKeyId: alias/aws/secretsmanager
+      SecretString: !Sub
+        - postgresql://vsms_runtime:{{resolve:secretsmanager:${DatabaseRuntimeCredentialsSecret}:SecretString:password}}@${DatabaseHost}:5432/vsms?sslmode=require&connection_limit=20&pool_timeout=10
+        - DatabaseHost: !GetAtt Database.Endpoint.Address
+
+>>>>>>> dc49640e71d64c2f18a1875cc218a52eab3cf5e7
   RedisUrlSecret:
     Type: AWS::SecretsManager::Secret
     Properties:
@@ -249,7 +371,11 @@ Resources:
               - Effect: Allow
                 Action: secretsmanager:GetSecretValue
                 Resource:
+<<<<<<< HEAD
                   - !Ref DatabaseUrlSecret
+=======
+                  - !Ref DatabaseRuntimeUrlSecret
+>>>>>>> dc49640e71d64c2f18a1875cc218a52eab3cf5e7
                   - !Ref RedisUrlSecret
                   - !Ref JwtSecret
                   - !Ref EncryptionKeyringSecretArn
@@ -264,6 +390,48 @@ Resources:
             Principal:
               Service: ecs-tasks.amazonaws.com
             Action: sts:AssumeRole
+<<<<<<< HEAD
+=======
+      Policies:
+        - PolicyName: ManageVsmsCognitoStaff
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - cognito-idp:AdminAddUserToGroup
+                  - cognito-idp:AdminCreateUser
+                  - cognito-idp:AdminDeleteUser
+                  - cognito-idp:AdminDisableUser
+                  - cognito-idp:AdminGetUser
+                  - cognito-idp:AdminListGroupsForUser
+                  - cognito-idp:AdminRemoveUserFromGroup
+                  - cognito-idp:AdminUserGlobalSignOut
+                Resource: !Sub arn:${AWS::Partition}:cognito-idp:${CognitoRegion}:${AWS::AccountId}:userpool/${CognitoUserPoolId}
+        - PolicyName: WriteVsmsBackups
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - elasticfilesystem:ClientMount
+                  - elasticfilesystem:ClientWrite
+                Resource: !Sub arn:${AWS::Partition}:elasticfilesystem:${AWS::Region}:${AWS::AccountId}:file-system/${BackupFileSystem}
+                Condition:
+                  ArnEquals:
+                    elasticfilesystem:AccessPointArn: !Sub arn:${AWS::Partition}:elasticfilesystem:${AWS::Region}:${AWS::AccountId}:access-point/${BackupAccessPoint}
+
+  WorkerTaskRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: ecs-tasks.amazonaws.com
+            Action: sts:AssumeRole
+>>>>>>> dc49640e71d64c2f18a1875cc218a52eab3cf5e7
 
   ApiTaskDefinition:
     Type: AWS::ECS::TaskDefinition
@@ -305,23 +473,39 @@ Resources:
               Value: !Ref CognitoRegion
             - Name: COGNITO_USER_POOL_ID
               Value: !Ref CognitoUserPoolId
+<<<<<<< HEAD
+=======
+            - Name: COGNITO_APP_CLIENT_ID
+              Value: !Ref CognitoAppClientId
+>>>>>>> dc49640e71d64c2f18a1875cc218a52eab3cf5e7
             - Name: COGNITO_REDIRECT_URI
               Value: !Sub https://${FrontendDomainName}/auth/callback
             - Name: COGNITO_LOGOUT_URI
               Value: !Sub https://${FrontendDomainName}/
             - Name: ENCRYPTION_ACTIVE_KEY_ID
               Value: !Ref EncryptionActiveKeyId
+<<<<<<< HEAD
           Secrets:
             - Name: DATABASE_URL
               ValueFrom: !Ref DatabaseUrlSecret
+=======
+            - Name: VSMS_BACKUP_DIR
+              Value: /var/lib/vsms/backups
+          Secrets:
+            - Name: DATABASE_URL
+              ValueFrom: !Ref DatabaseRuntimeUrlSecret
+>>>>>>> dc49640e71d64c2f18a1875cc218a52eab3cf5e7
             - Name: REDIS_URL
               ValueFrom: !Ref RedisUrlSecret
             - Name: JWT_ACCESS_SECRET
               ValueFrom: !Ref JwtSecret
             - Name: ENCRYPTION_KEYRING_JSON
               ValueFrom: !Ref EncryptionKeyringSecretArn
+<<<<<<< HEAD
             - Name: PARTICIPANT_LOOKUP_HMAC_KEY
               ValueFrom: !Ref ParticipantLookupHmacSecretArn
+=======
+>>>>>>> dc49640e71d64c2f18a1875cc218a52eab3cf5e7
           LogConfiguration:
             LogDriver: awslogs
             Options:
@@ -329,6 +513,21 @@ Resources:
               awslogs-region: !Ref AWS::Region
               awslogs-stream-prefix: api
           StopTimeout: 30
+<<<<<<< HEAD
+=======
+          MountPoints:
+            - SourceVolume: backups
+              ContainerPath: /var/lib/vsms/backups
+              ReadOnly: false
+      Volumes:
+        - Name: backups
+          EFSVolumeConfiguration:
+            FilesystemId: !Ref BackupFileSystem
+            TransitEncryption: ENABLED
+            AuthorizationConfig:
+              AccessPointId: !Ref BackupAccessPoint
+              IAM: ENABLED
+>>>>>>> dc49640e71d64c2f18a1875cc218a52eab3cf5e7
 
   ReportWorkerTaskDefinition:
     Type: AWS::ECS::TaskDefinition
@@ -339,7 +538,11 @@ Resources:
       NetworkMode: awsvpc
       RequiresCompatibilities: [FARGATE]
       ExecutionRoleArn: !GetAtt ApiExecutionRole.Arn
+<<<<<<< HEAD
       TaskRoleArn: !GetAtt ApiTaskRole.Arn
+=======
+      TaskRoleArn: !GetAtt WorkerTaskRole.Arn
+>>>>>>> dc49640e71d64c2f18a1875cc218a52eab3cf5e7
       ContainerDefinitions:
         - Name: report-worker
           Image: !Ref ApiImageUri
@@ -352,13 +555,20 @@ Resources:
               Value: !Ref EncryptionActiveKeyId
           Secrets:
             - Name: DATABASE_URL
+<<<<<<< HEAD
               ValueFrom: !Ref DatabaseUrlSecret
+=======
+              ValueFrom: !Ref DatabaseRuntimeUrlSecret
+>>>>>>> dc49640e71d64c2f18a1875cc218a52eab3cf5e7
             - Name: JWT_ACCESS_SECRET
               ValueFrom: !Ref JwtSecret
             - Name: ENCRYPTION_KEYRING_JSON
               ValueFrom: !Ref EncryptionKeyringSecretArn
+<<<<<<< HEAD
             - Name: PARTICIPANT_LOOKUP_HMAC_KEY
               ValueFrom: !Ref ParticipantLookupHmacSecretArn
+=======
+>>>>>>> dc49640e71d64c2f18a1875cc218a52eab3cf5e7
           LogConfiguration:
             LogDriver: awslogs
             Options:
@@ -376,7 +586,11 @@ Resources:
       NetworkMode: awsvpc
       RequiresCompatibilities: [FARGATE]
       ExecutionRoleArn: !GetAtt ApiExecutionRole.Arn
+<<<<<<< HEAD
       TaskRoleArn: !GetAtt ApiTaskRole.Arn
+=======
+      TaskRoleArn: !GetAtt WorkerTaskRole.Arn
+>>>>>>> dc49640e71d64c2f18a1875cc218a52eab3cf5e7
       ContainerDefinitions:
         - Name: domain-event-worker
           Image: !Ref ApiImageUri
@@ -389,13 +603,20 @@ Resources:
               Value: !Ref EncryptionActiveKeyId
           Secrets:
             - Name: DATABASE_URL
+<<<<<<< HEAD
               ValueFrom: !Ref DatabaseUrlSecret
+=======
+              ValueFrom: !Ref DatabaseRuntimeUrlSecret
+>>>>>>> dc49640e71d64c2f18a1875cc218a52eab3cf5e7
             - Name: JWT_ACCESS_SECRET
               ValueFrom: !Ref JwtSecret
             - Name: ENCRYPTION_KEYRING_JSON
               ValueFrom: !Ref EncryptionKeyringSecretArn
+<<<<<<< HEAD
             - Name: PARTICIPANT_LOOKUP_HMAC_KEY
               ValueFrom: !Ref ParticipantLookupHmacSecretArn
+=======
+>>>>>>> dc49640e71d64c2f18a1875cc218a52eab3cf5e7
           LogConfiguration:
             LogDriver: awslogs
             Options:
@@ -447,13 +668,24 @@ Resources:
 
   ApiService:
     Type: AWS::ECS::Service
+<<<<<<< HEAD
     DependsOn: ApiHttpsListener
+=======
+    DependsOn:
+      - ApiHttpsListener
+      - BackupMountTargetA
+      - BackupMountTargetB
+>>>>>>> dc49640e71d64c2f18a1875cc218a52eab3cf5e7
     Properties:
       Cluster: !Ref ApiCluster
       ServiceName: api
       LaunchType: FARGATE
       PlatformVersion: LATEST
+<<<<<<< HEAD
       DesiredCount: 2
+=======
+      DesiredCount: !If [ApplicationServicesAreEnabled, 2, 0]
+>>>>>>> dc49640e71d64c2f18a1875cc218a52eab3cf5e7
       EnableECSManagedTags: true
       PropagateTags: SERVICE
       HealthCheckGracePeriodSeconds: 60
@@ -482,7 +714,11 @@ Resources:
       ServiceName: report-worker
       LaunchType: FARGATE
       PlatformVersion: LATEST
+<<<<<<< HEAD
       DesiredCount: 1
+=======
+      DesiredCount: !If [ApplicationServicesAreEnabled, 1, 0]
+>>>>>>> dc49640e71d64c2f18a1875cc218a52eab3cf5e7
       EnableECSManagedTags: true
       PropagateTags: SERVICE
       DeploymentConfiguration:
@@ -506,7 +742,11 @@ Resources:
       ServiceName: domain-event-worker
       LaunchType: FARGATE
       PlatformVersion: LATEST
+<<<<<<< HEAD
       DesiredCount: 1
+=======
+      DesiredCount: !If [ApplicationServicesAreEnabled, 1, 0]
+>>>>>>> dc49640e71d64c2f18a1875cc218a52eab3cf5e7
       EnableECSManagedTags: true
       PropagateTags: SERVICE
       DeploymentConfiguration:
@@ -529,7 +769,11 @@ Resources:
       ServiceNamespace: ecs
       ScalableDimension: ecs:service:DesiredCount
       ResourceId: !Sub service/${ApiCluster}/${ApiService.Name}
+<<<<<<< HEAD
       MinCapacity: 2
+=======
+      MinCapacity: !If [ApplicationServicesAreEnabled, 2, 0]
+>>>>>>> dc49640e71d64c2f18a1875cc218a52eab3cf5e7
       MaxCapacity: 4
       RoleARN: !Sub arn:${AWS::Partition}:iam::${AWS::AccountId}:role/aws-service-role/ecs.application-autoscaling.amazonaws.com/AWSServiceRoleForApplicationAutoScaling_ECSService
 
@@ -669,3 +913,12 @@ Outputs:
     Value: !GetAtt ApiService.Name
   DatabaseEndpoint:
     Value: !GetAtt Database.Endpoint.Address
+<<<<<<< HEAD
+=======
+  DatabaseMigrationUrlSecretArn:
+    Value: !Ref DatabaseMigrationUrlSecret
+  DatabaseRuntimeCredentialsSecretArn:
+    Value: !Ref DatabaseRuntimeCredentialsSecret
+  BackupFileSystemId:
+    Value: !Ref BackupFileSystem
+>>>>>>> dc49640e71d64c2f18a1875cc218a52eab3cf5e7

@@ -1,3 +1,5 @@
+FROM postgres:16-bookworm AS postgres-client
+
 FROM node:24-bookworm-slim AS dependencies
 
 ENV PNPM_HOME=/pnpm
@@ -23,15 +25,16 @@ ENV PNPM_HOME=/pnpm
 ENV PATH=$PNPM_HOME:$PATH
 
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends ca-certificates dumb-init openssl \
+    && apt-get install -y --no-install-recommends ca-certificates dumb-init libpq5 openssl \
     && rm -rf /var/lib/apt/lists/* \
     && corepack enable \
     && corepack prepare pnpm@11.20.0 --activate
 
+COPY --from=postgres-client /usr/lib/postgresql/16/bin/pg_dump /usr/local/bin/pg_dump
+COPY --from=postgres-client /usr/lib/postgresql/16/bin/pg_restore /usr/local/bin/pg_restore
 WORKDIR /app
 COPY --from=dependencies /app/node_modules ./node_modules
 COPY --chown=node:node . .
-
 USER node
 EXPOSE 5050
 

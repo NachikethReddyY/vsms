@@ -22,6 +22,7 @@ vi.mock('./features/events/EventFormPage', () => ({ default: ({ mode }: { mode: 
 vi.mock('./features/events/PublicEventPage', () => ({ default: () => <p>Public event</p> }));
 vi.mock('./features/reviews/ReviewWorkspacePage', () => ({ default: () => <p>Reviews page</p> }));
 vi.mock('./features/reports/ReportsPage', () => ({ default: () => <p>Global reports page</p> }));
+vi.mock('./features/operations/OperationsCenterPage', () => ({ default: () => <p>Operations center page</p> }));
 vi.mock('./features/screening/DynamicStationPage', () => ({
   default: ({ stationType }: { stationType?: string }) => (
     <p>{stationType === 'VISUAL_ACUITY' ? 'Visual acuity station' : stationType === 'REFRACTION' ? 'Refraction station' : stationType === 'COLOUR_VISION' ? 'Colour vision station' : 'Custom station'}</p>

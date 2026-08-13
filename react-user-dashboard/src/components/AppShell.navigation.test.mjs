@@ -17,7 +17,3 @@ test('event managers receive a global Operations Center navigation entry', () =>
   assert.match(shell, /to="\/operations"[\s\S]*?>Operations<\/NavLink>/);
   assert.match(shell, /to="\/operations" aria-label="Operations"/);
 });
-
-test('administrators receive a discoverable audit history navigation entry', () => {
-  assert.match(shell, /to="\/admin\/audit-logs"[\s\S]*?>Audit<\/NavLink>/);
-});

@@ -3423,17 +3423,12 @@ export interface components {
                 skipped: number;
                 priority: number;
                 longestWaitMinutes: number;
-                waitP50Minutes: number | null;
-                waitP90Minutes: number | null;
-                serviceP50Minutes: number | null;
-                serviceP90Minutes: number | null;
             };
             stations: {
                 total: number;
                 available: number;
                 paused: number;
                 offline: number;
-                offlineCapable: number;
                 items: components["schemas"]["OperationsStation"][];
             };
             staffing: {
@@ -3455,21 +3450,6 @@ export interface components {
             sync: {
                 pending: number;
                 issues: number;
-                applied: number;
-                successRatePercent: number | null;
-                /** Format: date-time */
-                lastUpdatedAt: string | null;
-            };
-            businessMetrics: {
-                registrationDurationP50Seconds: number | null;
-                measuredRegistrations: number;
-                paperlessRatePercent: number | null;
-                completedVisitsPerHour: number | null;
-                offlineCoveragePercent: number | null;
-                /** Format: date-time */
-                reportGeneratedAt: string | null;
-                reportMinutesFromEventEnd: number | null;
-                sameDayReportReady: boolean | null;
             };
             attention: {
                 /** @enum {string} */

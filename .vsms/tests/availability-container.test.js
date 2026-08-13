@@ -17,3 +17,12 @@ test("production image generates Prisma Client from the deployed schema", () => 
   assert.ok(install < generate, "Prisma Client must be generated after dependencies are installed");
   assert.ok(generate < runtimeStage, "the generated client must be copied into the runtime image");
 });
+<<<<<<< HEAD
+=======
+
+test("production image includes PostgreSQL backup and restore tools", () => {
+  assert.match(dockerfile, /FROM postgres:16-bookworm AS postgres-client/);
+  assert.match(dockerfile, /COPY --from=postgres-client .*pg_dump \/usr\/local\/bin\/pg_dump/);
+  assert.match(dockerfile, /COPY --from=postgres-client .*pg_restore \/usr\/local\/bin\/pg_restore/);
+});
+>>>>>>> dc49640e71d64c2f18a1875cc218a52eab3cf5e7
