@@ -31,7 +31,7 @@ export function AppToast({ message, onDismiss, tone = 'success', duration = 5000
   if (!message || !visible) return null;
   const Icon = tone === 'success' ? CheckCircleIcon : ExclamationCircleIcon;
   return <div
-    className="fixed top-[max(1rem,env(safe-area-inset-top))] right-[max(1rem,env(safe-area-inset-right))] z-[120] grid min-h-13 w-[min(23.75rem,calc(100vw-2rem))] grid-cols-[1.25rem_minmax(0,1fr)_2.75rem] items-center gap-2.5 rounded-xl border border-[var(--line-strong,var(--hairline-strong))] bg-[color-mix(in_srgb,var(--panel,var(--surface))_92%,transparent)] py-2.5 pr-2 pl-3.5 text-[0.8125rem] leading-[1.1875rem] font-semibold text-[var(--ink)] shadow-[0_0.875rem_2.5rem_rgba(0,0,0,.26)] backdrop-blur-xl max-[520px]:top-[max(.75rem,env(safe-area-inset-top))] max-[520px]:right-3 max-[520px]:w-[calc(100vw-1.5rem)]"
+    className="fixed top-[max(1rem,env(safe-area-inset-top))] right-[max(1rem,env(safe-area-inset-right))] z-[120] grid min-h-13 w-[min(23.75rem,calc(100vw-2rem))] grid-cols-[1.25rem_minmax(0,1fr)_2.75rem] items-center gap-2.5 rounded-xl border border-[var(--line-strong,var(--hairline-strong))] bg-[var(--panel,var(--surface))] py-2.5 pr-2 pl-3.5 text-[0.8125rem] leading-[1.1875rem] font-semibold text-[var(--ink)] shadow-[0_0.875rem_2.5rem_rgba(0,0,0,.26)] max-[520px]:top-[max(.75rem,env(safe-area-inset-top))] max-[520px]:right-3 max-[520px]:w-[calc(100vw-1.5rem)]"
     role={tone === 'error' ? 'alert' : 'status'}
     aria-live={tone === 'error' ? 'assertive' : 'polite'}
     onMouseEnter={() => setPaused(true)}
