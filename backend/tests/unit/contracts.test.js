@@ -215,8 +215,8 @@ test("station template mapping imports the explicit screening stationType", () =
         { templateKey: "CLINICAL_REVIEW", stationType: null, name: "Clinical review" },
         { templateKey: "opaque-2", stationType: "EYE_HEALTH", name: "Eye health" },
     ]);
-    assert.deepEqual(importable.map(({ stationType }) => stationType), ["VISUAL_ACUITY"]);
-    assert.deepEqual(skipped.map((template) => template.templateKey), ["REGISTRATION", "CLINICAL_REVIEW", "opaque-2"]);
+    assert.deepEqual(importable.map(({ stationType }) => stationType), ["VISUAL_ACUITY", "EYE_HEALTH"]);
+    assert.deepEqual(skipped.map((template) => template.templateKey), ["REGISTRATION", "CLINICAL_REVIEW"]);
 });
 
 test("participant search matches any supplied identifier", () => {
