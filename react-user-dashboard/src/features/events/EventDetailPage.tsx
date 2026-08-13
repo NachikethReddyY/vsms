@@ -39,6 +39,12 @@ const applicationRoleByAssignment: Record<StaffAssignmentRole, StaffDirectoryEnt
 };
 const roleLabel = (role: string) => role.toLowerCase().replace(/_/g, ' ').replace(/^\w/, (letter: string) => letter.toUpperCase());
 const toInstant = (date: string, time: string) => new Date(`${date}T${time}:00+08:00`).toISOString();
+const scheduleOffset = (milliseconds: number) => {
+  const minutes = Math.round(milliseconds / 60000);
+  const hours = Math.floor(minutes / 60);
+  const remainder = minutes % 60;
+  return [hours && `${hours}h`, remainder && `${remainder}m`].filter(Boolean).join(' ');
+};
 
 const nextAction: Record<string, { action: 'publish' | 'start' | 'complete'; status: EventStatus; label: string; prompt: string } | undefined> = {
   DRAFT: { action: 'publish', status: 'PUBLISHED', label: 'Publish event', prompt: 'Publish this event? Staff with access will see it as ready for operations.' },
@@ -313,7 +319,10 @@ export default function EventDetailPage() {
     const data = new FormData(submitEvent.currentTarget);
     const availabilities = event?.eventDays.map((day, index) => {
       const isAvailable = data.get(`available-${index}`) === 'on';
-      const capacity = Number(data.get(`capacity-${index}`));
+      const selectedStation = event.eventStations.find((station) => station.eventStationId === eventStationId);
+      const capacity = selectedStation?.availabilities.find((availability) => availability.eventDay.date === day.date)?.capacity
+        ?? selectedStation?.capacity
+        ?? 1;
       const startsAt = String(data.get(`starts-${index}`));
       const endsAt = String(data.get(`ends-${index}`));
       return {
@@ -535,17 +544,22 @@ export default function EventDetailPage() {
               <div className="station-record-copy"><strong>{station.name}</strong><span>{station.description || 'No station instructions.'}</span><small>Template v{station.templateVersion}</small></div>
               {canConfigureStations ? <div className="station-stacked-controls">
                 <form className="station-capacity" noValidate onSubmit={(submitEvent) => saveStationCapacity(submitEvent, station.eventStationId)}>
-                  <label><span>Set capacity for every day</span><input key={`${station.eventStationId}-${station.capacity}`} name="capacity" type="number" min="1" max="1000" step="1" required defaultValue={station.capacity} aria-label={`${station.name} capacity for every day`} aria-invalid={!!capacityErrors[station.eventStationId]} aria-describedby={capacityErrors[station.eventStationId] ? `capacity-error-${station.eventStationId}` : undefined} onInput={() => setCapacityErrors((current) => ({ ...current, [station.eventStationId]: '' }))} />{capacityErrors[station.eventStationId] && <span className="field-error" id={`capacity-error-${station.eventStationId}`} role="alert">{capacityErrors[station.eventStationId]}</span>}</label>
-                  <button className="secondary compact" type="submit" disabled={!!stationPending}>{stationPending === station.eventStationId ? 'Saving…' : 'Apply'}</button>
+                  <label><span>Capacity for all days</span><input key={`${station.eventStationId}-${station.capacity}`} name="capacity" type="number" min="1" max="1000" step="1" required defaultValue={station.capacity} aria-label={`${station.name} capacity for every day`} aria-invalid={!!capacityErrors[station.eventStationId]} aria-describedby={capacityErrors[station.eventStationId] ? `capacity-error-${station.eventStationId}` : undefined} onInput={() => setCapacityErrors((current) => ({ ...current, [station.eventStationId]: '' }))} />{capacityErrors[station.eventStationId] && <span className="field-error" id={`capacity-error-${station.eventStationId}`} role="alert">{capacityErrors[station.eventStationId]}</span>}</label>
+                  <button className="secondary compact" type="submit" disabled={!!stationPending}>{stationPending === station.eventStationId ? 'Applying…' : 'Apply to all days'}</button>
+                  <small>One capacity for every available day. Changes save immediately.</small>
                 </form>
                 <form className="station-schedule" onSubmit={(submitEvent) => saveStationSchedule(submitEvent, station.eventStationId)}>
-                  {availabilities.map((availability, index) => <fieldset key={availability.eventStationAvailabilityId}>
+                  {availabilities.map((availability, index) => {
+                    const scheduledDay = event.eventDays.find((day) => day.date === availability.eventDay.date);
+                    const startsLateBy = availability.startsAt && scheduledDay ? new Date(availability.startsAt).getTime() - new Date(scheduledDay.startsAt).getTime() : 0;
+                    const endsEarlyBy = availability.endsAt && scheduledDay ? new Date(scheduledDay.endsAt).getTime() - new Date(availability.endsAt).getTime() : 0;
+                    return <fieldset key={`${availability.eventStationAvailabilityId}-${availability.capacity}-${availability.startsAt}-${availability.endsAt}`}>
                     <legend>{formatEventDate(availability.eventDay.date, event.timezone, false)}</legend>
                     <label className="station-available"><input name={`available-${index}`} type="checkbox" defaultChecked={availability.isAvailable} /> Available</label>
                     <label><span>From</span><input name={`starts-${index}`} type="time" defaultValue={availability.startsAt ? formatTimeInput(availability.startsAt, event.timezone) : ''} /></label>
                     <label><span>Until</span><input name={`ends-${index}`} type="time" defaultValue={availability.endsAt ? formatTimeInput(availability.endsAt, event.timezone) : ''} /></label>
-                    <label><span>Capacity</span><input name={`capacity-${index}`} type="number" min="1" max="1000" step="1" required defaultValue={availability.capacity} /></label>
-                  </fieldset>)}
+                    {availability.isAvailable && (startsLateBy > 0 || endsEarlyBy > 0) && <div className="station-hours-warning" role="status"><ClockIcon />{startsLateBy > 0 && <span>Starts {scheduleOffset(startsLateBy)} after the event opens.</span>}{endsEarlyBy > 0 && <span>Closes {scheduleOffset(endsEarlyBy)} before the event ends.</span>}</div>}
+                  </fieldset>})}
                   <button className="primary compact" type="submit" disabled={!!stationPending}>{stationPending === station.eventStationId ? 'Saving…' : 'Save daily schedule'}</button>
                 </form>
                 <button className="secondary compact station-remove" type="button" disabled={!!stationPending} onClick={() => void removeStation(station.eventStationId, station.name)}><TrashIcon />Remove station</button>
