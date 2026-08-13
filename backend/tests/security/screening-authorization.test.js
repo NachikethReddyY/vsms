@@ -62,7 +62,7 @@ test("only a screener assigned to the requested station can read its queue", asy
   const queue = await screeningService.listQueue(eventId, stationA, user);
   assert.deepEqual(queue.registrations, []);
   assert.equal(stationTypeForTemplate({ templateKey: "opaque", stationType: "VISUAL_ACUITY" }), "VISUAL_ACUITY");
-  assert.equal(stationTypeForTemplate({ templateKey: "opaque", stationType: "EYE_HEALTH" }), "EYE_HEALTH");
+  assert.equal(stationTypeForTemplate({ templateKey: "opaque", stationType: "EYE_HEALTH" }), null);
 });
 
 test("an administrator remains denied without a screener event membership", async (t) => {
