@@ -43,7 +43,9 @@ test("shared scanner resolver accepts only active event-scoped secure passes", a
     assert.equal(where.isActive, true);
     assert.equal(where.revokedAt, null);
     assert.ok(where.expiresAt.gt instanceof Date);
-    assert.deepEqual(where.registration, { eventId });
+    assert.equal(where.registration.eventId, eventId);
+    assert.deepEqual(where.registration.registrationStatus, { not: "CANCELLED" });
+    assert.deepEqual(where.registration.event.status, { not: "CANCELLED" });
   }
 });
 
@@ -402,7 +404,9 @@ test("manual QR check-in writes no bearer or participant data and returns a mini
     registrationId: true,
   });
   assert.equal(qrQueries[0].where.tokenHash, tokenHash(token));
-  assert.deepEqual(qrQueries[0].where.registration, { eventId });
+  assert.equal(qrQueries[0].where.registration.eventId, eventId);
+  assert.deepEqual(qrQueries[0].where.registration.registrationStatus, { not: "CANCELLED" });
+  assert.deepEqual(qrQueries[0].where.registration.event.status, { not: "CANCELLED" });
   assert.equal(JSON.stringify(qrQueries[0]).includes(token), false);
   assert.equal(rawQueries.some((sql) => sql.includes("check_in_event_registration")), true);
   assert.deepEqual(audit.newValue, { eventId, checkInMethod: "QR_TOKEN" });
@@ -508,7 +512,9 @@ test("unknown and cross-event QR tokens have the same concealed error and event-
   assert.deepEqual(foreignError, unknownError);
   assert.equal(queries.length, 2);
   for (const query of queries) {
-    assert.deepEqual(query.where.registration, { eventId });
+    assert.equal(query.where.registration.eventId, eventId);
+    assert.deepEqual(query.where.registration.registrationStatus, { not: "CANCELLED" });
+    assert.deepEqual(query.where.registration.event.status, { not: "CANCELLED" });
   }
   assert.equal(queries[1].where.tokenHash, tokenHash(foreignToken));
   assert.equal(updated, false);

@@ -4,7 +4,7 @@ const env = require("../../config/env");
 const { decrypt, encrypt, encryptionContext } = require("../../utils/crypto/cryptoUtils");
 const { renderBrandedQrSvg } = require("../../utils/qr/qrBranding");
 const { assertUuid } = require("../../utils/validation/validation");
-const { hashToken, QR_TOKEN_PATTERN } = require("../../utils/crypto/qrToken");
+const { activeQrPassWhere, hashToken, QR_TOKEN_PATTERN } = require("../../utils/crypto/qrToken");
 const { assertRegistrationAssignment, assertQrVerifyAccess } = require("../../utils/auth/staff");
 const AppError = require("../../errors/AppError");
 const { assignRouteOnce } = require("../screening/routeAssignmentService");
@@ -15,12 +15,7 @@ function buildQRTargetUrl(token) {
     return `${env.publicAppOrigin}/participant-status/${encodeURIComponent(token)}`;
 }
 
-const activeQrWhere = (selector = {}, now = new Date()) => ({
-    ...selector,
-    isActive: true,
-    revokedAt: null,
-    expiresAt: { gt: now },
-});
+const activeQrWhere = activeQrPassWhere;
 
 const tokenSelector = (token) => ({ tokenHash: hashToken(token) });
 
@@ -260,6 +255,9 @@ exports.generateQR = async (registrationId, userId = null, externalTx = null, au
 
         if (!registration) {
             throw new AppError(404, "REGISTRATION_NOT_FOUND", "Event registration not found.");
+        }
+        if (registration.registrationStatus === "CANCELLED" || registration.event.status === "CANCELLED") {
+            throw new AppError(409, "QR_LIFECYCLE_CLOSED", "A QR pass cannot be issued for a cancelled registration or event.");
         }
 
         const now = new Date();

@@ -4,6 +4,29 @@ const QR_TOKEN_PATTERN = /^[a-f0-9]{64}$/i;
 
 const hashToken = (token) => crypto.createHash("sha256").update(token).digest("hex");
 
+// A pass is operational only while its own lifecycle and its parent
+// registration/event are all active. Keeping this predicate shared prevents
+// scanner and management lookups from disagreeing after a cancellation.
+const activeQrPassWhere = (selector = {}, now = new Date()) => {
+  const { registration, ...passSelector } = selector;
+  const { event, ...registrationSelector } = registration || {};
+
+  return {
+    ...passSelector,
+    registration: {
+      ...registrationSelector,
+      registrationStatus: { not: "CANCELLED" },
+      event: {
+        ...(event || {}),
+        status: { not: "CANCELLED" },
+      },
+    },
+    isActive: true,
+    revokedAt: null,
+    expiresAt: { gt: now },
+  };
+};
+
 // Accepts either a bare 64-hex pass token or a full participant-status URL
 // (the value a camera scanner actually returns) and normalises it to the
 // raw 64-hex token. Returns null when neither shape is recognised.
@@ -30,13 +53,10 @@ const resolveRegistrationByQrValue = async (db, { eventId, value }) => {
   const token = extractQrToken(value);
   if (!token) return null;
   return db.qRCodePass.findFirst({
-    where: {
+    where: activeQrPassWhere({
       tokenHash: hashToken(token),
       registration: { eventId },
-      isActive: true,
-      revokedAt: null,
-      expiresAt: { gt: new Date() },
-    },
+    }),
     select: { registrationId: true },
   });
 };
@@ -44,6 +64,7 @@ const resolveRegistrationByQrValue = async (db, { eventId, value }) => {
 module.exports = {
   QR_TOKEN_PATTERN,
   hashToken,
+  activeQrPassWhere,
   extractQrToken,
   resolveRegistrationByQrValue,
 };

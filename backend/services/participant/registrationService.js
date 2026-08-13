@@ -320,6 +320,17 @@ exports.changeRegistrationStatus = async ({ registrationId, toStatus, reason, au
             data: { registrationStatus: toStatus },
             include: registrationInclude(),
         });
+        const revokedQrPasses = toStatus === "CANCELLED"
+            ? await tx.qRCodePass.updateMany({
+                where: { registrationId, isActive: true },
+                data: {
+                    isActive: false,
+                    revokedAt: new Date(),
+                    revokedBy: auth.userId,
+                    revokedReason: "Registration cancelled",
+                },
+            })
+            : { count: 0 };
         await tx.registrationStatusHistory.create({
             data: {
                 registrationId,
@@ -335,7 +346,7 @@ exports.changeRegistrationStatus = async ({ registrationId, toStatus, reason, au
             entityName: "EventRegistration",
             entityId: registrationId,
             oldValue: { status: existing.registrationStatus },
-            newValue: { status: toStatus, reason },
+            newValue: { status: toStatus, reason, revokedQrPassCount: revokedQrPasses.count },
             context,
             client: tx,
         });
