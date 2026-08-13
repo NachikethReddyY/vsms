@@ -108,7 +108,7 @@ describe('Station library pages', () => {
     expect(await screen.findByRole('heading', { name: /Add station template/i })).toBeTruthy();
     expect(screen.queryByLabelText(/Station type/i)).toBeNull();
     expect(screen.getByRole('heading', { level: 2, name: /^Form fields$/i })).toBeTruthy();
-    expect(screen.getByRole('heading', { level: 2, name: /^Preview$/i })).toBeTruthy();
+    expect(screen.getByRole('heading', { level: 2, name: /^Live preview$/i })).toBeTruthy();
     await userEvent.type(screen.getByLabelText(/^Name$/i), 'Custom notes booth');
     await userEvent.click(screen.getByRole('button', { name: /Create template/i }));
     await waitFor(() => expect(post).toHaveBeenCalledWith('/events/station-templates', expect.objectContaining({
@@ -123,6 +123,8 @@ describe('Station library pages', () => {
     renderLibrary('/admin/station-templates/new');
     await userEvent.click(await screen.findByRole('button', { name: /Use example/i }));
     expect(screen.getAllByText(/Flag rules ·/i).length).toBeGreaterThan(0);
+    expect(screen.getByRole('heading', { name: /Live preview/i })).toBeTruthy();
+    expect((screen.getByLabelText('Plates presented *') as HTMLInputElement).value).toBe('1');
     await userEvent.click(screen.getByRole('button', { name: /Create template/i }));
     await waitFor(() => expect(post).toHaveBeenCalledWith('/events/station-templates', expect.objectContaining({
       name: 'Colour vision screening',

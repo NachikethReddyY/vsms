@@ -162,7 +162,7 @@ function RefractionEyeFields({
 }
 
 export function StationFieldRenderer({ fieldSchema, values, onChange, errors = {}, disabled = false }: RendererProps) {
-  return <div className="grid gap-3.5 [&>label]:grid [&>label]:gap-1.5">
+  return <div className="station-field-renderer grid gap-3.5 [&>label]:grid [&>label]:gap-1.5">
     {fieldSchema.map((field) => {
       const id = fieldId(field.key);
       const error = errors[field.key];
