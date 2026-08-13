@@ -236,7 +236,7 @@ describe("clinical review API", () => {
     expect(JSON.stringify(audits)).not.toContain("Screening is within expected limits");
     expect(audits[0].details.signaturePurpose).toBe("REVIEW_DECISION");
     expect(audits[0].details.eyeHealthRecorded).toBe(true);
-    expect(audits[0].details.signatureSha256).toBe(signature.signatureSha256);
+    expect(audits[0].details.signatureSha256).toBe("[REDACTED]");
     const review = await prisma.review.findFirstOrThrow({ where: { registrationId: registrations.Normal } });
     expect(review.signatureSignerUserId).toBe(testUsers.reviewer.id);
     expect(review.signatureObjectKey).toBe(signature.signatureObjectKey);
