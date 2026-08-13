@@ -2651,7 +2651,7 @@ components:
       properties:
         key: { type: string, minLength: 1, maxLength: 64 }
         label: { type: string, minLength: 1, maxLength: 100 }
-        type: { type: string, enum: [text, number, select, boolean, eye-pair] }
+        type: { type: string, enum: [text, number, select, boolean, eye-pair, va-eye, refraction-eye] }
         required: { type: boolean }
         options: { type: array, items: { type: string } }
         min: { type: number }

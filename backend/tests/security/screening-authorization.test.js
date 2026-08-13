@@ -108,6 +108,7 @@ test("dynamic routes accept schema-driven clinical and CUSTOM stations", async (
   installMembership(t);
   replace(t, prisma.event, "findUnique", async () => ({ eventId, status: "IN_PROGRESS" }));
   replace(t, prisma.staffAssignment, "findFirst", async () => ({ id: crypto.randomUUID() }));
+  const { SYSTEM_FIELD_SCHEMAS } = require("../../schemas/dynamicStationSchema");
   replace(t, prisma.station, "findFirst", async ({ where }) => {
     if (where.stationId === stationA) {
       const station = {
@@ -115,7 +116,7 @@ test("dynamic routes accept schema-driven clinical and CUSTOM stations", async (
         stationType: "VISUAL_ACUITY",
         stationName: "Visual acuity",
         isActive: true,
-        fieldSchemaSnapshot: [{ key: "notes", label: "Notes", type: "text", required: false }],
+        fieldSchemaSnapshot: SYSTEM_FIELD_SCHEMAS.VISUAL_ACUITY,
         schemaVersion: 1,
       };
       if (where.stationType?.in && !where.stationType.in.includes(station.stationType)) return null;
@@ -136,10 +137,18 @@ test("dynamic routes accept schema-driven clinical and CUSTOM stations", async (
   const clinicalPreview = await screeningService.previewDynamic(
     eventId,
     stationA,
-    { resultData: { notes: "clear" } },
+    {
+      resultData: {
+        chartDistanceMetres: "6",
+        od: { kind: "EXCEPTION", code: "NLP" },
+        os: { kind: "FRACTION", denominator: 6 },
+        withUsualDistanceGlasses: "unknown",
+      },
+    },
     user,
   );
-  assert.equal(clinicalPreview.overallFlag, "NORMAL");
+  assert.equal(clinicalPreview.overallFlag, "URGENT");
+  assert.equal(clinicalPreview.ruleVersion, "VSMS-VA-1.0");
 
   const preview = await screeningService.previewDynamic(
     eventId,

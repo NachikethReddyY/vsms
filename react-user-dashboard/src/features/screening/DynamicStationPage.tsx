@@ -3,7 +3,7 @@ import { useParams, useSearchParams } from 'react-router-dom';
 import { getApiError as getApiMessage } from '../../utils/apiClient';
 import { getStoredSession } from '../../utils/session';
 import type { DynamicFieldValues } from './fieldSchema';
-import { validateFieldValues } from './fieldSchema';
+import { defaultValueForField, validateFieldValues } from './fieldSchema';
 import { getOfflineStationContext, isNetworkError } from './offlineSync';
 import { screeningApi, newIdempotencyKey, type FlagEvaluation, type QueueRegistration, type Station, type StationType } from './screeningApi';
 import { StationFieldRenderer } from './StationFieldRenderer';
@@ -93,13 +93,17 @@ export default function DynamicStationPage({ stationType }: { stationType?: Stat
 
   useEffect(() => { void load(); }, [eventId, routeStationId, stationType]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
-    setValues({});
+    const defaults: DynamicFieldValues = {};
+    for (const field of (station?.fieldSchemaSnapshot ?? [])) {
+      defaults[field.key] = defaultValueForField(field);
+    }
+    setValues(defaults);
     setFieldErrors({});
     setEvaluation(null);
     setAcknowledged(false);
     setError(null);
     setSuccess(null);
-  }, [selectedId]);
+  }, [selectedId, station?.stationId, station?.schemaVersion]);
 
   const updateValue = (key: string, value: unknown) => {
     setValues((current) => ({ ...current, [key]: value }));
@@ -114,6 +118,17 @@ export default function DynamicStationPage({ stationType }: { stationType?: Stat
 
   const validate = () => {
     const next = validateFieldValues(fieldSchema, values);
+    if (resolvedType === 'REFRACTION' && values.measurementStatus === 'COMPLETED') {
+      if (!values.od) next.od = 'Right eye refraction is required.';
+      if (!values.os) next.os = 'Left eye refraction is required.';
+    }
+    if (
+      resolvedType === 'REFRACTION'
+      && values.measurementStatus !== 'COMPLETED'
+      && (!values.notes || String(values.notes).trim().length < 3)
+    ) {
+      next.notes = 'Add notes when measurement is incomplete.';
+    }
     setFieldErrors(next);
     if (Object.keys(next).length) setError('Complete the required station fields.');
     return Object.keys(next).length === 0;
@@ -125,7 +140,7 @@ export default function DynamicStationPage({ stationType }: { stationType?: Stat
     setError(null);
     const generation = participantRequestGeneration.current;
     try {
-      const next = await screeningApi.previewDynamic(eventId, station.stationId, values);
+      const next = await screeningApi.previewDynamic(eventId, station.stationId, values, resolvedType);
       if (generation !== participantRequestGeneration.current) return null;
       setEvaluation(next);
       if (!next.isFlagged) setAcknowledged(false);
@@ -157,7 +172,7 @@ export default function DynamicStationPage({ stationType }: { stationType?: Stat
         idempotencyKey: newIdempotencyKey(),
         acknowledged: preview.isFlagged ? acknowledged : false,
         resultData: values,
-      });
+      }, resolvedType);
       if (generation !== participantRequestGeneration.current) return;
       setSuccess(saved.syncState === 'PENDING_SYNC'
         ? 'Pending sync. The participant has not entered the next queue.'

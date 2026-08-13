@@ -2,7 +2,7 @@ import { ArrowLeftIcon } from '@heroicons/react/24/outline';
 import { useCallback, useEffect, useState, type FormEvent } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { AppToast } from '../components/AppToast';
-import { validateFieldSchema, type DynamicFieldValues, type FieldSchema } from '../features/screening/fieldSchema';
+import { validateFieldSchema, clinicalLockedKeys, type DynamicFieldValues, type FieldSchema } from '../features/screening/fieldSchema';
 import { StationFieldBuilder, StationFieldRenderer } from '../features/screening/StationFieldRenderer';
 import apiClient, { getApiError } from '../utils/apiClient';
 import {
@@ -62,6 +62,7 @@ export default function StationTemplateFormPage({ mode }: { mode: Mode }) {
   const [editingMeta, setEditingMeta] = useState<EditingMeta | null>(null);
 
   const fieldsEditable = mode === 'create' || usesEditableFieldSchema(editingMeta?.stationType);
+  const lockedFieldKeys = clinicalLockedKeys(editingMeta?.stationType);
   const hiddenCatalog = mode === 'edit' && editingMeta ? isHiddenFromStationLibrary(editingMeta) : false;
 
   const loadTemplate = useCallback(async () => {
@@ -112,7 +113,7 @@ export default function StationTemplateFormPage({ mode }: { mode: Mode }) {
         setError('Add at least one form field for this station.');
         return;
       }
-      const schemaErrors = validateFieldSchema(form.fieldSchema);
+      const schemaErrors = validateFieldSchema(form.fieldSchema, editingMeta?.stationType);
       if (schemaErrors.length) {
         setError(schemaErrors[0]);
         return;
@@ -248,6 +249,7 @@ export default function StationTemplateFormPage({ mode }: { mode: Mode }) {
           <div className="station-template-section-body">
             <StationFieldBuilder
               fieldSchema={form.fieldSchema}
+              lockedKeys={lockedFieldKeys}
               onChange={(fieldSchema) => {
                 setForm((current) => ({ ...current, fieldSchema }));
                 setPreviewValues({});

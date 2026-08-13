@@ -140,7 +140,10 @@ describe('Station library pages', () => {
     const clinical = {
       ...template,
       fieldSchema: [
-        { key: 'distanceMetres', label: 'Distance (m)', type: 'number', required: true, min: 1, max: 10, unit: 'm' },
+        { key: 'chartDistanceMetres', label: 'Chart distance (m)', type: 'select', required: true, options: ['3', '6'] },
+        { key: 'od', label: 'Right eye (OD)', type: 'va-eye', required: true },
+        { key: 'os', label: 'Left eye (OS)', type: 'va-eye', required: true },
+        { key: 'withUsualDistanceGlasses', label: 'With usual distance glasses', type: 'select', required: true, options: ['yes', 'no', 'unknown'] },
         { key: 'notes', label: 'Notes', type: 'text', required: false },
       ],
     };
@@ -149,7 +152,7 @@ describe('Station library pages', () => {
     renderLibrary(`/admin/station-templates/${clinical.stationTemplateId}/edit`);
     expect(await screen.findByDisplayValue('Visual acuity booth')).toBeTruthy();
     expect(screen.getByRole('heading', { level: 2, name: /^Form fields$/i })).toBeTruthy();
-    expect(screen.getByDisplayValue('Distance (m)')).toBeTruthy();
+    expect(screen.getByDisplayValue('Chart distance (m)')).toBeTruthy();
     const notesLabel = screen.getByDisplayValue('Notes');
     await userEvent.clear(notesLabel);
     await userEvent.type(notesLabel, 'Screener notes');

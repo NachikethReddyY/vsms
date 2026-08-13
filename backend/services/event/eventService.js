@@ -10,7 +10,7 @@ const {
   findExistingStation,
   CLINICAL_ONE_PER_EVENT_TYPES,
 } = require("./stationTemplateMapping");
-const { parseFieldSchema } = require("../../schemas/dynamicStationSchema");
+const { parseFieldSchema, assertClinicalFieldSchema } = require("../../schemas/dynamicStationSchema");
 const {
   enqueueEventArtifactCleanup,
   processArtifactCleanupTasks,
@@ -1761,7 +1761,9 @@ const createStationTemplate = async (body, user, context, db = prisma) => {
       );
     }
     if (body.stationType === "CUSTOM" || body.fieldSchema !== undefined) {
-      fieldSchema = parseFieldSchema(body.fieldSchema);
+      fieldSchema = SCHEMA_DRIVEN_STATION_TYPES.has(body.stationType) && body.stationType !== "CUSTOM"
+        ? assertClinicalFieldSchema(body.stationType, body.fieldSchema)
+        : parseFieldSchema(body.fieldSchema);
     } else {
       fieldSchema = SYSTEM_FIELD_SCHEMAS[body.stationType] ?? null;
     }
@@ -1825,7 +1827,9 @@ const updateStationTemplate = async (stationTemplateId, body, user, context, db 
       );
     }
     try {
-      fieldSchema = parseFieldSchema(body.fieldSchema);
+      fieldSchema = SCHEMA_DRIVEN_STATION_TYPES.has(existing.stationType) && existing.stationType !== "CUSTOM"
+        ? assertClinicalFieldSchema(existing.stationType, body.fieldSchema)
+        : parseFieldSchema(body.fieldSchema);
     } catch (error) {
       throw new AppError(422, "INVALID_FIELD_SCHEMA", error.message);
     }

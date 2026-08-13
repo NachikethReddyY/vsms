@@ -1,6 +1,13 @@
-import type { ChangeEvent } from 'react';
+import { type ChangeEvent } from 'react';
 import { ArrowDownIcon, ArrowUpIcon, PlusIcon, TrashIcon } from '@heroicons/react/24/outline';
-import type { DynamicFieldValues, FieldDefinition, FieldSchema, FieldType } from './fieldSchema';
+import type {
+  DynamicFieldValues,
+  FieldDefinition,
+  FieldSchema,
+  FieldType,
+  RefractionEyeValue,
+  VaEyeValue,
+} from './fieldSchema';
 import { emptyField } from './fieldSchema';
 import './StationFieldRenderer.css';
 
@@ -12,7 +19,142 @@ type RendererProps = {
   disabled?: boolean;
 };
 
+const EXCEPTION_CODES = ['CF', 'HM', 'LP', 'NLP', 'NOT_TESTABLE'] as const;
+const DENOMINATORS = [6, 9, 12, 15, 18, 24, 36, 60];
+
 const fieldId = (key: string, suffix = '') => `dynamic-field-${key.replace(/[^a-zA-Z0-9_-]/g, '-')}${suffix}`;
+
+function VaEyeFields({
+  id,
+  label,
+  required,
+  value,
+  disabled,
+  error,
+  onChange,
+}: {
+  id: string;
+  label: string;
+  required?: boolean;
+  value: VaEyeValue;
+  disabled?: boolean;
+  error?: string;
+  onChange: (next: VaEyeValue) => void;
+}) {
+  const isFraction = value.kind === 'FRACTION';
+  return (
+    <fieldset className="va-eye-card station-eye-pair" aria-describedby={error ? `${id}-error` : undefined}>
+      <legend>{label}{required ? ' *' : ''}</legend>
+      <div className="va-fraction">
+        <span>6 /</span>
+        <select
+          id={id}
+          value={isFraction ? String(value.denominator) : ''}
+          disabled={disabled || !isFraction}
+          onChange={(event) => onChange({ kind: 'FRACTION', denominator: Number(event.target.value) })}
+        >
+          <option value="" disabled>Select line</option>
+          {DENOMINATORS.map((line) => <option key={line} value={line}>{line}</option>)}
+        </select>
+      </div>
+      <div className="va-exceptions">
+        {EXCEPTION_CODES.map((code) => (
+          <button
+            key={code}
+            type="button"
+            className={`secondary compact ${!isFraction && value.code === code ? 'is-selected' : ''}`}
+            disabled={disabled}
+            onClick={() => onChange({ kind: 'EXCEPTION', code })}
+          >
+            {code === 'NOT_TESTABLE' ? 'Not testable' : code}
+          </button>
+        ))}
+        {!isFraction && (
+          <button type="button" className="secondary compact" disabled={disabled} onClick={() => onChange({ kind: 'FRACTION', denominator: 6 })}>
+            Use chart line
+          </button>
+        )}
+      </div>
+      {error && <span className="field-error" id={`${id}-error`}>{error}</span>}
+    </fieldset>
+  );
+}
+
+function RefractionEyeFields({
+  id,
+  label,
+  required,
+  value,
+  disabled,
+  error,
+  onChange,
+}: {
+  id: string;
+  label: string;
+  required?: boolean;
+  value: RefractionEyeValue;
+  disabled?: boolean;
+  error?: string;
+  onChange: (next: RefractionEyeValue) => void;
+}) {
+  const needsAxis = Math.abs(value.cylinder) >= 0.25;
+  return (
+    <fieldset className="va-eye-card station-eye-pair" aria-describedby={error ? `${id}-error` : undefined}>
+      <legend>{label}{required ? ' *' : ''}</legend>
+      <label>
+        Sphere (SPH)
+        <input
+          id={`${id}-sphere`}
+          type="number"
+          step="0.25"
+          min={-20}
+          max={20}
+          disabled={disabled}
+          value={value.sphere}
+          onChange={(event) => onChange({ ...value, sphere: Number(event.target.value) })}
+        />
+      </label>
+      <label>
+        Cylinder (CYL)
+        <input
+          id={`${id}-cylinder`}
+          type="number"
+          step="0.25"
+          min={-10}
+          max={10}
+          disabled={disabled}
+          value={value.cylinder}
+          onChange={(event) => {
+            const cylinder = Number(event.target.value);
+            onChange({
+              ...value,
+              cylinder,
+              axis: Math.abs(cylinder) < 0.25 ? null : (value.axis ?? 90),
+            });
+          }}
+        />
+      </label>
+      <label>
+        Axis
+        <input
+          id={`${id}-axis`}
+          type="number"
+          step="1"
+          min={0}
+          max={180}
+          disabled={disabled || !needsAxis}
+          value={needsAxis ? (value.axis ?? '') : ''}
+          placeholder={needsAxis ? '0–180' : 'N/A'}
+          onChange={(event) => onChange({
+            ...value,
+            axis: event.target.value === '' ? null : Number(event.target.value),
+          })}
+        />
+      </label>
+      {error && <span className="field-error" id={`${id}-error`}>{error}</span>}
+    </fieldset>
+  );
+}
 
 export function StationFieldRenderer({ fieldSchema, values, onChange, errors = {}, disabled = false }: RendererProps) {
   return <div className="station-field-renderer">
@@ -26,6 +168,14 @@ export function StationFieldRenderer({ fieldSchema, values, onChange, errors = {
           <span><strong>{field.label}{field.required ? ' *' : ''}</strong>{field.unit && <small>{field.unit}</small>}</span>
           {error && <small className="field-error" id={`${id}-error`}>{error}</small>}
         </label>;
+      }
+      if (field.type === 'va-eye') {
+        const value = (values[field.key] as VaEyeValue | undefined) ?? { kind: 'FRACTION', denominator: 6 };
+        return <VaEyeFields key={field.key} id={id} label={field.label} required={field.required} value={value} disabled={disabled} error={error} onChange={(next) => onChange(field.key, next)} />;
+      }
+      if (field.type === 'refraction-eye') {
+        const value = (values[field.key] as RefractionEyeValue | undefined) ?? { sphere: 0, cylinder: 0, axis: null };
+        return <RefractionEyeFields key={field.key} id={id} label={field.label} required={field.required} value={value} disabled={disabled} error={error} onChange={(next) => onChange(field.key, next)} />;
       }
       if (field.type === 'eye-pair') {
         const eyes = field.eyes ?? 'BOTH';
@@ -69,12 +219,15 @@ const FIELD_TYPES: Array<{ value: FieldType; label: string }> = [
   { value: 'select', label: 'Select' },
   { value: 'boolean', label: 'Yes / no' },
   { value: 'eye-pair', label: 'Eye value' },
+  { value: 'va-eye', label: 'Visual acuity eye' },
+  { value: 'refraction-eye', label: 'Refraction eye' },
 ];
 
-export function StationFieldBuilder({ fieldSchema, onChange, disabled = false }: {
+export function StationFieldBuilder({ fieldSchema, onChange, disabled = false, lockedKeys = new Set<string>() }: {
   fieldSchema: FieldSchema;
   onChange: (schema: FieldSchema) => void;
   disabled?: boolean;
+  lockedKeys?: Set<string>;
 }) {
   const update = (index: number, changes: Partial<FieldDefinition>) => onChange(fieldSchema.map((field, fieldIndex) => fieldIndex === index ? { ...field, ...changes } : field));
   const move = (index: number, direction: -1 | 1) => {
@@ -95,25 +248,39 @@ export function StationFieldBuilder({ fieldSchema, onChange, disabled = false }:
   });
 
   return <section className="station-field-builder" aria-label="Template fields">
-    <header><div><h3>Form fields</h3><p>Configure the data this station records.</p></div><button className="secondary compact" type="button" disabled={disabled || fieldSchema.length >= 40} onClick={() => onChange([...fieldSchema, emptyField(fieldSchema.length)])}><PlusIcon />Add field</button></header>
+    <header>
+      <div>
+        <h3>Form fields</h3>
+        <p>{lockedKeys.size
+          ? 'Clinical fields stay required for medical flagging. You can rename labels, reorder, and add extra fields.'
+          : 'Configure the data this station records.'}</p>
+      </div>
+      <button className="secondary compact" type="button" disabled={disabled || fieldSchema.length >= 40} onClick={() => onChange([...fieldSchema, emptyField(fieldSchema.length)])}><PlusIcon />Add field</button>
+    </header>
     <div className="station-field-builder-list">
-      {fieldSchema.map((field, index) => <article key={`${field.key}-${index}`}>
-        <div className="station-field-builder-heading"><strong>Field {index + 1}</strong><div>
-          <button type="button" className="icon-button" disabled={disabled || index === 0} aria-label={`Move ${field.label} up`} onClick={() => move(index, -1)}><ArrowUpIcon /></button>
-          <button type="button" className="icon-button" disabled={disabled || index === fieldSchema.length - 1} aria-label={`Move ${field.label} down`} onClick={() => move(index, 1)}><ArrowDownIcon /></button>
-          <button type="button" className="icon-button" disabled={disabled} aria-label={`Remove ${field.label}`} onClick={() => onChange(fieldSchema.filter((_, fieldIndex) => fieldIndex !== index))}><TrashIcon /></button>
-        </div></div>
-        <div className="station-field-builder-grid">
-          <label><span>Label</span><input required maxLength={100} disabled={disabled} value={field.label} onChange={(event) => update(index, { label: event.target.value })} /></label>
-          <label><span>Key</span><input required pattern="[a-zA-Z][a-zA-Z0-9_]*" maxLength={64} disabled={disabled} value={field.key} onChange={(event) => update(index, { key: event.target.value })} /></label>
-          <label><span>Type</span><select disabled={disabled} value={field.type} onChange={(event) => changeType(index, event.target.value as FieldType)}>{FIELD_TYPES.map((type) => <option key={type.value} value={type.value}>{type.label}</option>)}</select></label>
-          <label className="station-field-required"><input type="checkbox" disabled={disabled} checked={field.required ?? false} onChange={(event) => update(index, { required: event.target.checked })} /><span>Required</span></label>
-          {field.type === 'select' && <label className="wide"><span>Options <small>Comma-separated</small></span><input required disabled={disabled} value={(field.options ?? []).join(', ')} onChange={(event) => changeOptions(index, event)} /></label>}
-          {field.type === 'eye-pair' && <label><span>Eyes</span><select disabled={disabled} value={field.eyes ?? 'BOTH'} onChange={(event) => update(index, { eyes: event.target.value as FieldDefinition['eyes'] })}><option value="BOTH">OD and OS</option><option value="OD">OD only</option><option value="OS">OS only</option></select></label>}
-          {field.type === 'number' && <><label><span>Minimum</span><input type="number" disabled={disabled} value={field.min ?? ''} onChange={(event) => update(index, { min: event.target.value === '' ? undefined : event.target.valueAsNumber })} /></label><label><span>Maximum</span><input type="number" disabled={disabled} value={field.max ?? ''} onChange={(event) => update(index, { max: event.target.value === '' ? undefined : event.target.valueAsNumber })} /></label></>}
-          {(field.type === 'number' || field.type === 'eye-pair') && <label><span>Unit <small>Optional</small></span><input maxLength={20} disabled={disabled} value={field.unit ?? ''} onChange={(event) => update(index, { unit: event.target.value || undefined })} /></label>}
-        </div>
-      </article>)}
+      {fieldSchema.map((field, index) => {
+        const locked = lockedKeys.has(field.key);
+        return <article key={`${field.key}-${index}`}>
+          <div className="station-field-builder-heading">
+            <strong>Field {index + 1}{locked ? ' · clinical' : ''}</strong>
+            <div>
+              <button type="button" className="icon-button" disabled={disabled || index === 0} aria-label={`Move ${field.label} up`} onClick={() => move(index, -1)}><ArrowUpIcon /></button>
+              <button type="button" className="icon-button" disabled={disabled || index === fieldSchema.length - 1} aria-label={`Move ${field.label} down`} onClick={() => move(index, 1)}><ArrowDownIcon /></button>
+              <button type="button" className="icon-button" disabled={disabled || locked} aria-label={`Remove ${field.label}`} onClick={() => onChange(fieldSchema.filter((_, fieldIndex) => fieldIndex !== index))}><TrashIcon /></button>
+            </div>
+          </div>
+          <div className="station-field-builder-grid">
+            <label><span>Label</span><input required maxLength={100} disabled={disabled} value={field.label} onChange={(event) => update(index, { label: event.target.value })} /></label>
+            <label><span>Key</span><input required pattern="[a-zA-Z][a-zA-Z0-9_]*" maxLength={64} disabled={disabled || locked} value={field.key} onChange={(event) => update(index, { key: event.target.value })} /></label>
+            <label><span>Type</span><select disabled={disabled || locked} value={field.type} onChange={(event) => changeType(index, event.target.value as FieldType)}>{FIELD_TYPES.map((type) => <option key={type.value} value={type.value}>{type.label}</option>)}</select></label>
+            <label className="station-field-required"><input type="checkbox" disabled={disabled || locked} checked={field.required ?? false} onChange={(event) => update(index, { required: event.target.checked })} /><span>Required</span></label>
+            {field.type === 'select' && <label className="wide"><span>Options <small>Comma-separated</small></span><input required disabled={disabled || locked} value={(field.options ?? []).join(', ')} onChange={(event) => changeOptions(index, event)} /></label>}
+            {field.type === 'eye-pair' && <label><span>Eyes</span><select disabled={disabled || locked} value={field.eyes ?? 'BOTH'} onChange={(event) => update(index, { eyes: event.target.value as FieldDefinition['eyes'] })}><option value="BOTH">OD and OS</option><option value="OD">OD only</option><option value="OS">OS only</option></select></label>}
+            {field.type === 'number' && <><label><span>Minimum</span><input type="number" disabled={disabled || locked} value={field.min ?? ''} onChange={(event) => update(index, { min: event.target.value === '' ? undefined : event.target.valueAsNumber })} /></label><label><span>Maximum</span><input type="number" disabled={disabled || locked} value={field.max ?? ''} onChange={(event) => update(index, { max: event.target.value === '' ? undefined : event.target.valueAsNumber })} /></label></>}
+            {(field.type === 'number' || field.type === 'eye-pair') && <label><span>Unit <small>Optional</small></span><input maxLength={20} disabled={disabled} value={field.unit ?? ''} onChange={(event) => update(index, { unit: event.target.value || undefined })} /></label>}
+          </div>
+        </article>;
+      })}
     </div>
   </section>;
 }

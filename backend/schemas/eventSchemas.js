@@ -308,7 +308,7 @@ const stationTemplateParams = z.object({ stationTemplateId: uuid }).strict();
 const fieldSchemaValue = z.array(z.object({
   key: z.string().trim().min(1).max(64),
   label: z.string().trim().min(1).max(100),
-  type: z.enum(["text", "number", "select", "boolean", "eye-pair"]),
+  type: z.enum(["text", "number", "select", "boolean", "eye-pair", "va-eye", "refraction-eye"]),
   required: z.boolean().optional(),
   options: z.array(z.string()).optional(),
   min: z.number().optional(),

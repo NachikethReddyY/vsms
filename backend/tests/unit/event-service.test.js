@@ -134,7 +134,40 @@ test("clinical station templates reject invalid create schemas but allow fieldSc
     (error) => error.code === "INVALID_FIELD_SCHEMA",
   );
 
+  await assert.rejects(
+    () => eventService.updateStationTemplate(
+      "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+      { fieldSchema: [{ key: "notes", label: "Notes", type: "text", required: false }] },
+      manager,
+      context,
+      {
+        $transaction: async (callback) => callback({
+          stationTemplate: {
+            findUnique: async () => ({
+              stationTemplateId: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+              templateKey: "opaque-existing-key",
+              stationType: "VISUAL_ACUITY",
+              version: 1,
+              name: "Visual acuity booth",
+              description: null,
+              defaultCapacity: 4,
+              active: true,
+              fieldSchema: null,
+            }),
+            update: async () => { throw new Error("update must not run"); },
+          },
+          auditLog: { create: async () => ({}) },
+        }),
+      },
+    ),
+    (error) => error.code === "INVALID_FIELD_SCHEMA",
+  );
+
+  const { SYSTEM_FIELD_SCHEMAS } = require("../../schemas/dynamicStationSchema");
   let savedSchema = null;
+  const relabeled = SYSTEM_FIELD_SCHEMAS.VISUAL_ACUITY.map((field) => (
+    field.key === "od" ? { ...field, label: "OD acuity reading" } : field
+  ));
   const transactionClient = {
     stationTemplate: {
       findUnique: async () => ({
@@ -167,13 +200,13 @@ test("clinical station templates reject invalid create schemas but allow fieldSc
   };
   const updated = await eventService.updateStationTemplate(
     "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
-    { fieldSchema: [{ key: "notes", label: "Notes", type: "text", required: false }] },
+    { fieldSchema: relabeled },
     manager,
     context,
     { $transaction: async (callback) => callback(transactionClient) },
   );
   assert.equal(updated.version, 2);
-  assert.equal(savedSchema[0].key, "notes");
+  assert.equal(savedSchema.find((field) => field.key === "od").label, "OD acuity reading");
 });
 
 test("registration, clinical review, and eye health catalog templates cannot be updated", async () => {
