@@ -26,7 +26,7 @@ import { appDialog } from '../../components/appDialogStyles';
 import { AppToast } from '../../components/AppToast';
 import { getApiError as getApiMessage } from '../../utils/apiClient';
 import { getDisplayName } from '../../utils/identity';
-import { eventApi, formatEventDate, STATUS_LABEL, type AuditRecord, type EventAttendee, type EventMetrics, type EventRecord, type EventStatus, type StaffAssignmentRole, type StaffDirectoryEntry, type StationTemplate } from './eventApi';
+import { eventApi, formatEventDate, STATUS_LABEL, type AuditRecord, type EventAttendee, type EventMembership, type EventMetrics, type EventRecord, type EventStatus, type StaffAssignmentRole, type StaffDirectoryEntry, type StationTemplate } from './eventApi';
 import { EVENT_BANNERS, getEventArtwork, type EventBannerKey } from './eventBanners';
 import { managementPercent } from './eventReport';
 import { customStationPath } from '../screening/stationConfig';
@@ -80,6 +80,14 @@ function formatTimeInput(value: string, timezone: string) {
   return `${parts.find(({ type }) => type === 'hour')?.value}:${parts.find(({ type }) => type === 'minute')?.value}`;
 }
 
+function dateKey(value: string, timezone: string) {
+  const parts = new Intl.DateTimeFormat('en', {
+    year: 'numeric', month: '2-digit', day: '2-digit', timeZone: timezone,
+  }).formatToParts(new Date(value));
+  const part = (type: string) => parts.find((item) => item.type === type)?.value;
+  return `${part('year')}-${part('month')}-${part('day')}`;
+}
+
 function eventDuration(startsAt: string, endsAt: string) {
   const minutes = Math.max(0, Math.round((new Date(endsAt).getTime() - new Date(startsAt).getTime()) / 60_000));
   const hours = Math.floor(minutes / 60);
@@ -112,6 +120,10 @@ export default function EventDetailPage() {
   const [artworkFile, setArtworkFile] = useState('');
   const [selectedBannerKey, setSelectedBannerKey] = useState<EventBannerKey>('COMMUNITY_SCREENING');
   const [staffDirectory, setStaffDirectory] = useState<StaffDirectoryEntry[]>([]);
+  const [eventScreeners, setEventScreeners] = useState<EventMembership[]>([]);
+  const [screenersLoading, setScreenersLoading] = useState(false);
+  const [screenersLoaded, setScreenersLoaded] = useState(false);
+  const [screenersError, setScreenersError] = useState('');
   const [staffingOpen, setStaffingOpen] = useState<string | null>(null);
   const [staffingPending, setStaffingPending] = useState(false);
   const [directoryLoading, setDirectoryLoading] = useState(false);
@@ -232,6 +244,27 @@ export default function EventDetailPage() {
     try { setStaffDirectory(await eventApi.staffDirectory()); setDirectoryLoaded(true); }
     catch (cause) { setDirectoryError(getApiMessage(cause, 'Staff could not be loaded.')); setDirectoryLoaded(false); }
     finally { setDirectoryLoading(false); }
+  };
+
+  const loadEventScreeners = async () => {
+    setScreenersLoading(true); setScreenersError('');
+    try {
+      const memberships = await eventApi.memberships(eventId);
+      setEventScreeners(memberships.filter((membership) => membership.status === 'ACTIVE' && membership.roles.some(({ role }) => role === 'SCREENER')));
+      setScreenersLoaded(true);
+    } catch (cause) { setScreenersError(getApiMessage(cause, 'Event screeners could not be loaded.')); setScreenersLoaded(false); }
+    finally { setScreenersLoading(false); }
+  };
+
+  const assignStationScreener = async (shiftId: string, eventStationId: string, userId: string) => {
+    if (!event || !userId) return;
+    setStaffingPending(true); setError('');
+    try {
+      setEvent(await eventApi.assignStaff(event.eventId, shiftId, { version: event.version, userId, assignmentRole: 'SCREENER', eventStationId }));
+      setNotice('Screener assigned to this station.');
+      void refreshAudit(event.eventId);
+    } catch (cause) { setError(getApiMessage(cause, 'The screener could not be assigned.')); }
+    finally { setStaffingPending(false); }
   };
 
   const openStaffing = async (shiftId: string) => {
@@ -555,12 +588,26 @@ export default function EventDetailPage() {
                     const scheduledDay = event.eventDays.find((day) => day.date === availability.eventDay.date);
                     const startsLateBy = availability.startsAt && scheduledDay ? new Date(availability.startsAt).getTime() - new Date(scheduledDay.startsAt).getTime() : 0;
                     const endsEarlyBy = availability.endsAt && scheduledDay ? new Date(scheduledDay.endsAt).getTime() - new Date(availability.endsAt).getTime() : 0;
+                    const dayShifts = event.shifts.filter((shift) => dateKey(shift.startsAt, event.timezone) === dateKey(availability.eventDay.date, event.timezone));
                     return <fieldset key={`${availability.eventStationAvailabilityId}-${availability.capacity}-${availability.startsAt}-${availability.endsAt}`}>
                     <legend>{formatEventDate(availability.eventDay.date, event.timezone, false)}</legend>
                     <label className="station-available"><input name={`available-${index}`} type="checkbox" defaultChecked={availability.isAvailable} /> Available</label>
                     <label><span>From</span><input name={`starts-${index}`} type="time" defaultValue={availability.startsAt ? formatTimeInput(availability.startsAt, event.timezone) : ''} /></label>
                     <label><span>Until</span><input name={`ends-${index}`} type="time" defaultValue={availability.endsAt ? formatTimeInput(availability.endsAt, event.timezone) : ''} /></label>
                     {availability.isAvailable && (startsLateBy > 0 || endsEarlyBy > 0) && <div className="station-hours-warning" role="status"><ClockIcon />{startsLateBy > 0 && <span>Starts {scheduleOffset(startsLateBy)} after the event opens.</span>}{endsEarlyBy > 0 && <span>Closes {scheduleOffset(endsEarlyBy)} before the event ends.</span>}</div>}
+                    {availability.isAvailable && <div className="station-day-screeners">
+                      <div className="station-day-screeners-heading"><span><UserGroupIcon />Screeners</span>{!screenersLoaded && !screenersLoading && <button className="secondary compact" type="button" onClick={() => void loadEventScreeners()}><UserPlusIcon />Add person</button>}</div>
+                      {screenersLoading ? <small>Loading event screeners…</small> : screenersError ? <div className="station-screeners-error" role="alert"><small>{screenersError}</small><button className="secondary compact" type="button" onClick={() => void loadEventScreeners()}>Retry</button></div> : dayShifts.length === 0 ? <small>No shift is scheduled for this day. Add a shift before assigning screeners.</small> : dayShifts.map((shift) => {
+                        const assigned = shift.staffAssignments.filter((assignment) => assignment.assignmentRole === 'SCREENER' && assignment.eventStation?.eventStationId === station.eventStationId);
+                        const assignedIds = new Set(assigned.map((assignment) => assignment.user.userId));
+                        const candidates = eventScreeners.filter((membership) => !assignedIds.has(membership.userId));
+                        return <div className="station-shift-screeners" key={shift.shiftId}>
+                          <span className="station-shift-label">{shift.name} · {formatTime(shift.startsAt, event.timezone)}–{formatTime(shift.endsAt, event.timezone)}</span>
+                          <div className="station-person-tags">{assigned.map((assignment) => <span className="station-person-tag" key={assignment.staffAssignmentId}>{getDisplayName(assignment.user.username)}<button type="button" aria-label={`Remove ${getDisplayName(assignment.user.username)} from ${station.name} on ${formatEventDate(availability.eventDay.date, event.timezone, false)}`} disabled={staffingPending} onClick={() => void removeStaff(shift.shiftId, assignment.staffAssignmentId)}><XMarkIcon /></button></span>)}{assigned.length === 0 && <small>No screener assigned.</small>}</div>
+                          {screenersLoaded && <label className="station-add-person"><UserPlusIcon /><span className="visually-hidden">Add screener to {station.name} for {shift.name}</span><select value="" disabled={staffingPending || candidates.length === 0} onChange={(change) => { const userId = change.target.value; change.currentTarget.value = ''; if (userId) void assignStationScreener(shift.shiftId, station.eventStationId, userId); }}><option value="">{candidates.length ? 'Add person…' : 'No screeners available'}</option>{candidates.map((membership) => <option value={membership.userId} key={membership.membershipId}>{membership.user.fullName}</option>)}</select></label>}
+                        </div>;
+                      })}
+                    </div>}
                   </fieldset>})}
                   <button className="primary compact" type="submit" disabled={!!stationPending}>{stationPending === station.eventStationId ? 'Saving…' : 'Save daily schedule'}</button>
                 </form>

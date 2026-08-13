@@ -14,6 +14,7 @@ export type EventStatus = components['schemas']['EventStatus'];
 export type StaffAssignment = components['schemas']['StaffAssignment'];
 export type StaffAssignmentRole = components['schemas']['StaffAssignmentRole'];
 export type StaffDirectoryEntry = components['schemas']['StaffDirectoryEntry'];
+export type EventMembership = components['schemas']['EventMembershipDetail'];
 export type StationTemplate = Omit<components['schemas']['StationTemplate'], 'stationType'> & {
   stationType: StationType;
 };
@@ -70,6 +71,10 @@ export const eventApi = {
   async staffDirectory() {
     const { data } = await apiClient.get<StaffDirectoryEntry[]>('/events/staff-directory');
     return data;
+  },
+  async memberships(id: string) {
+    const { data } = await apiClient.get<components['schemas']['EventMembershipListResponse']>(`/events/${id}/memberships`);
+    return data.memberships;
   },
   async stationTemplates() {
     const { data } = await apiClient.get<StationTemplate[]>('/events/station-templates');
