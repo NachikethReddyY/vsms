@@ -25,7 +25,8 @@ const {
   transferQueueBody,
   advanceQueueBody,
   redirectQueueBody,
-  priorityQueueBody
+  priorityQueueBody,
+  routeOverrideBody,
 } = require("../schemas/queueSchemas");
 
 const router = express.Router();
