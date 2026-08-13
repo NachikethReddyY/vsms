@@ -7,7 +7,6 @@ const domainEventBus = require("../domain/domainEventBus");
 const { AUDIT_ACTIONS } = require("../../utils/logging/auditEvents");
 const { createAuditLog } = require("../../utils/logging/audit");
 const { resolveRegistrationByQrValue } = require("../../utils/crypto/qrToken");
-const { recordVisualAcuity } = require("../../utils/database/visualAcuityProcedure");
 const {
   validateResultAgainstSchema,
   normalizeClinicalResultData,

@@ -113,12 +113,15 @@ test("report claims use a PostgreSQL skip-locked lease and return one claimed ro
   assert.match(statement, /attempt_count < max_attempts/);
 });
 
-test("queue analytics scopes stations by event and counts throughput by completion time with a matching index", async () => {
+test("queue analytics delegates percentiles to the migration-managed PostgreSQL function", async () => {
   const statements = [];
   await aggregateRows({ $queryRaw: async (sql) => { statements.push(sql.strings.join(" ")); return [{}]; } }, crypto.randomUUID(), new Date("2026-01-01T00:00:00Z"), new Date("2026-01-02T00:00:00Z"));
-  assert.match(statements[1], /q\.completed_at >=/);
+  assert.match(statements[1], /vsms_event_queue_statistics/);
   assert.match(statements[2], /q\.completed_at >=/);
   assert.match(statements[2], /WHERE s\.event_id/);
+  const routines = fs.readFileSync(path.join(__dirname, "../../prisma/migrations/20260813040000_add_database_routines/migration.sql"), "utf8");
+  assert.match(routines, /percentile_cont\(0\.90\)/);
+  assert.match(routines, /registration\."event_id" = p_event_id/);
   const migration = fs.readFileSync(path.join(__dirname, "../../prisma/migrations/20260806172000_stage3_hardening/migration.sql"), "utf8");
   assert.match(migration, /stations_event_id_station_id_idx/);
   assert.match(migration, /queue_entries_station_completed_at_idx/);
