@@ -18330,6 +18330,14 @@ item:
                 }
               }
             ],
+            "totals": {
+              "WAITING": 0,
+              "CALLED": 0,
+              "IN_PROGRESS": 0,
+              "COMPLETED": 0,
+              "SKIPPED": 0,
+              "CANCELLED": 0
+            },
             "entries": [
               {
                 "id": "00000000-0000-4000-8000-000000000000",
