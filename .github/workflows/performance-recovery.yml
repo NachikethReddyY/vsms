@@ -2,6 +2,8 @@ name: Performance and Recovery Evidence
 
 on:
   workflow_dispatch:
+  push:
+    branches: ["audit/**"]
 
 permissions:
   contents: read
