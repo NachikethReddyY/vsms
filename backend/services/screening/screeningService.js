@@ -10,6 +10,8 @@ const { recordVisualAcuity } = require("../../utils/database/visualAcuityProcedu
 const {
   validateResultAgainstSchema,
   normalizeClinicalResultData,
+  mergeClinicalAndTemplateResult,
+  resolveCompatibleFieldSchema,
   evaluateDynamicResult,
 } = require("../../schemas/dynamicStationSchema");
 const {
@@ -266,10 +268,14 @@ const listStations = async (eventId, user) => {
   return {
     event,
     stations: stations.map((station) => {
-      const assignmentEndsAt = latestAssignmentEndByStation.get(station.stationId);
-      if (!event.endsAt || !assignmentEndsAt) return station;
-      return {
+      const compatible = {
         ...station,
+        fieldSchemaSnapshot: resolveCompatibleFieldSchema(station.stationType, station.fieldSchemaSnapshot),
+      };
+      const assignmentEndsAt = latestAssignmentEndByStation.get(station.stationId);
+      if (!event.endsAt || !assignmentEndsAt) return compatible;
+      return {
+        ...compatible,
         // Offline access may never outlive either the live event or this user's active shift.
         offlineAccessExpiresAt: new Date(Math.min(event.endsAt.getTime(), assignmentEndsAt.getTime())).toISOString(),
       };
@@ -630,20 +636,19 @@ const loadDynamicStation = async (eventId, stationId, user) => {
     },
   });
   if (!station) throw new AppError(404, "STATION_NOT_FOUND", "Station not found");
-  if (!station.fieldSchemaSnapshot) {
+  const fieldSchemaSnapshot = resolveCompatibleFieldSchema(station.stationType, station.fieldSchemaSnapshot);
+  if (!fieldSchemaSnapshot) {
     throw new AppError(
       409,
       "STATION_SCHEMA_MISSING",
       "Station does not have a field schema snapshot",
     );
   }
-  return station;
+  return { ...station, fieldSchemaSnapshot };
 };
 
 const validateDynamicBody = (station, body) => {
-  const cleaned = station.fieldSchemaSnapshot
-    ? validateResultAgainstSchema(station.fieldSchemaSnapshot, body.resultData)
-    : body.resultData;
+  const cleaned = validateResultAgainstSchema(station.fieldSchemaSnapshot, body.resultData);
   const clinicalSchema = CLINICAL_RESULT_SCHEMAS[station.stationType];
   if (!clinicalSchema) {
     return { ...body, resultData: cleaned };
@@ -657,7 +662,7 @@ const validateDynamicBody = (station, body) => {
       parsed.error.issues[0]?.message || "Clinical result data is invalid",
     );
   }
-  return { ...body, resultData: parsed.data };
+  return { ...body, resultData: mergeClinicalAndTemplateResult(cleaned, parsed.data) };
 };
 
 const evaluateForStationType = (stationType, resultData) => {

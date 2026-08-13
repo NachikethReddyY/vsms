@@ -143,7 +143,7 @@ function triStateToNullableBoolean(value: unknown) {
   return null;
 }
 
-/** Map schema form values into clinical evaluator payload shapes. */
+/** Map schema form values into clinical evaluator payload shapes. Extra template fields stay attached. */
 export function normalizeClinicalResultData(stationType: string | null | undefined, resultData: DynamicFieldValues): DynamicFieldValues {
   if (stationType === 'VISUAL_ACUITY') {
     return {
@@ -153,16 +153,63 @@ export function normalizeClinicalResultData(stationType: string | null | undefin
     };
   }
   if (stationType === 'REFRACTION') {
-    const measurementStatus = resultData.measurementStatus;
+    const { measurementStatus, wearsDistanceGlasses, od, os, notes, ...extras } = resultData;
     const base: DynamicFieldValues = {
+      ...extras,
       measurementStatus,
-      wearsDistanceGlasses: triStateToNullableBoolean(resultData.wearsDistanceGlasses),
-      ...(resultData.notes !== undefined ? { notes: resultData.notes } : {}),
+      wearsDistanceGlasses: triStateToNullableBoolean(wearsDistanceGlasses),
+      ...(notes !== undefined ? { notes } : {}),
     };
     if (measurementStatus === 'COMPLETED') {
-      return { ...base, od: resultData.od, os: resultData.os };
+      return { ...base, od, os };
     }
     return base;
   }
   return resultData;
+}
+
+export const SYSTEM_FIELD_SCHEMAS: Partial<Record<string, FieldSchema>> = {
+  VISUAL_ACUITY: [
+    { key: 'chartDistanceMetres', label: 'Chart distance (m)', type: 'select', required: true, options: ['3', '6'] },
+    { key: 'od', label: 'Right eye (OD)', type: 'va-eye', required: true },
+    { key: 'os', label: 'Left eye (OS)', type: 'va-eye', required: true },
+    { key: 'withUsualDistanceGlasses', label: 'With usual distance glasses', type: 'select', required: true, options: ['yes', 'no', 'unknown'] },
+  ],
+  REFRACTION: [
+    { key: 'measurementStatus', label: 'Measurement status', type: 'select', required: true, options: ['COMPLETED', 'UNABLE_TO_MEASURE', 'REPEAT_REQUIRED'] },
+    { key: 'wearsDistanceGlasses', label: 'Wears distance glasses', type: 'select', required: true, options: ['yes', 'no', 'unknown'] },
+    { key: 'od', label: 'Right eye (OD)', type: 'refraction-eye', required: false },
+    { key: 'os', label: 'Left eye (OS)', type: 'refraction-eye', required: false },
+    { key: 'notes', label: 'Notes', type: 'text', required: false },
+  ],
+  COLOUR_VISION: [
+    { key: 'testKit', label: 'Test kit', type: 'select', required: true, options: ['ISHIHARA'] },
+    { key: 'platesPresented', label: 'Plates presented', type: 'number', required: true, min: 8, max: 24 },
+    { key: 'odCorrect', label: 'OD plates correct', type: 'number', required: true, min: 0, max: 24 },
+    { key: 'osCorrect', label: 'OS plates correct', type: 'number', required: true, min: 0, max: 24 },
+  ],
+};
+
+const CLINICAL_RESULT_KEYS: Record<string, string[]> = {
+  VISUAL_ACUITY: ['chartDistanceMetres', 'od', 'os', 'withUsualDistanceGlasses'],
+  REFRACTION: ['measurementStatus', 'wearsDistanceGlasses', 'od', 'os', 'notes'],
+  COLOUR_VISION: ['testKit', 'platesPresented', 'odCorrect', 'osCorrect'],
+  EYE_HEALTH: ['cataractRisk', 'glaucomaRisk', 'symptomsNoted', 'symptomSummary', 'observations', 'deviceFindings'],
+};
+
+/** Fields a reviewer should still see after clinical display of known medical keys. */
+export function extraResultData(stationType: string | null | undefined, data: Record<string, unknown> | null | undefined): Record<string, unknown> {
+  if (!data) return {};
+  const known = new Set(stationType ? CLINICAL_RESULT_KEYS[stationType] || [] : []);
+  if (!known.size) return data;
+  return Object.fromEntries(Object.entries(data).filter(([key]) => !known.has(key)));
+}
+
+/** Open pre-upgrade stations that have no snapshot yet. */
+export function resolveCompatibleFieldSchema(
+  stationType: string | null | undefined,
+  snapshot: FieldSchema | null | undefined,
+): FieldSchema | null {
+  if (Array.isArray(snapshot) && snapshot.length) return snapshot;
+  return (stationType && SYSTEM_FIELD_SCHEMAS[stationType]) || null;
 }

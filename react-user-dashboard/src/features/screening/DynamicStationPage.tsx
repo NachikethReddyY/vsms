@@ -3,7 +3,7 @@ import { useParams, useSearchParams } from 'react-router-dom';
 import { getApiError as getApiMessage } from '../../utils/apiClient';
 import { getStoredSession } from '../../utils/session';
 import type { DynamicFieldValues } from './fieldSchema';
-import { defaultValueForField, validateFieldValues } from './fieldSchema';
+import { defaultValueForField, resolveCompatibleFieldSchema, validateFieldValues } from './fieldSchema';
 import { getOfflineStationContext, isNetworkError } from './offlineSync';
 import { screeningApi, newIdempotencyKey, type FlagEvaluation, type QueueRegistration, type Station, type StationType } from './screeningApi';
 import { StationFieldRenderer } from './StationFieldRenderer';
@@ -31,8 +31,8 @@ export default function DynamicStationPage({ stationType }: { stationType?: Stat
   const participantRequestGeneration = useRef(0);
 
   const selected = useMemo(() => queue.find((row) => row.registrationId === selectedId) || null, [queue, selectedId]);
-  const fieldSchema = station?.fieldSchemaSnapshot ?? [];
   const resolvedType = station?.stationType || stationType || 'CUSTOM';
+  const fieldSchema = resolveCompatibleFieldSchema(resolvedType, station?.fieldSchemaSnapshot) ?? [];
 
   const selectParticipant = (registrationId: string) => {
     if (registrationId === selectedId) return;
@@ -64,12 +64,17 @@ export default function DynamicStationPage({ stationType }: { stationType?: Stat
           ? `This ${STATION_LABEL[stationType] || 'station'} is not assigned to your active shift.`
           : 'This station is not assigned to your active shift.');
       }
-      if (!selectedStation.fieldSchemaSnapshot?.length) {
+      const compatibleSchema = resolveCompatibleFieldSchema(
+        selectedStation.stationType,
+        selectedStation.fieldSchemaSnapshot,
+      );
+      if (!compatibleSchema?.length) {
         throw new Error('This station does not have a field schema snapshot.');
       }
-      const queuePayload = await screeningApi.listQueue(eventId, selectedStation.stationId);
+      const compatibleStation = { ...selectedStation, fieldSchemaSnapshot: compatibleSchema };
+      const queuePayload = await screeningApi.listQueue(eventId, compatibleStation.stationId);
       setEventName(payload.event.name);
-      setStation(selectedStation);
+      setStation(compatibleStation);
       setQueue(queuePayload.registrations);
       if (!selectedId && queuePayload.registrations[0]) selectParticipant(queuePayload.registrations[0].registrationId);
     } catch (cause) {

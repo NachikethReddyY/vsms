@@ -36,6 +36,7 @@ import {
   removeStoredReferralIssue,
   writeStoredReferralIssue,
 } from './referralRecovery';
+import { extraResultData } from '../screening/fieldSchema';
 import './ReviewWorkspacePage.css';
 
 type EyeHealthRisk = 'NONE' | 'SUSPECTED' | 'PRESENT' | 'NOT_ASSESSED';
@@ -145,16 +146,25 @@ function GenericResultData({ data }: { data: Record<string, unknown> }) {
   </dl>;
 }
 
+function ExtraResultData({ stationType, data }: { stationType: string; data: Record<string, unknown> }) {
+  const extras = extraResultData(stationType, data);
+  if (!Object.keys(extras).length) return null;
+  return <GenericResultData data={extras} />;
+}
+
 function ResultData({ station }: { station: ReviewDetailResponse['stations'][number] }) {
   const data = station.result?.resultData;
   if (!data) return <p className="review-missing-result">Awaiting result</p>;
   if (station.stationType === 'VISUAL_ACUITY') {
-    return <dl className="visual-acuity-result">
-      <div><dt>Right eye (OD)</dt><dd>{eyeReading(data.od, data.chartDistanceMetres)}</dd></div>
-      <div><dt>Left eye (OS)</dt><dd>{eyeReading(data.os, data.chartDistanceMetres)}</dd></div>
-      <div><dt>Chart distance</dt><dd>{displayValue(data.chartDistanceMetres)} m</dd></div>
-      <div><dt>Usual distance glasses</dt><dd>{displayValue(data.withUsualDistanceGlasses)}</dd></div>
-    </dl>;
+    return <>
+      <dl className="visual-acuity-result">
+        <div><dt>Right eye (OD)</dt><dd>{eyeReading(data.od, data.chartDistanceMetres)}</dd></div>
+        <div><dt>Left eye (OS)</dt><dd>{eyeReading(data.os, data.chartDistanceMetres)}</dd></div>
+        <div><dt>Chart distance</dt><dd>{displayValue(data.chartDistanceMetres)} m</dd></div>
+        <div><dt>Usual distance glasses</dt><dd>{displayValue(data.withUsualDistanceGlasses)}</dd></div>
+      </dl>
+      <ExtraResultData stationType={station.stationType} data={data} />
+    </>;
   }
   if (station.stationType === 'REFRACTION') {
     const refraction = data as typeof data & {
@@ -165,21 +175,27 @@ function ResultData({ station }: { station: ReviewDetailResponse['stations'][num
       if (!eye || eye.sphere == null || eye.cylinder == null) return '—';
       return `${eye.sphere}/${eye.cylinder} x ${eye.axis ?? '—'}`;
     };
-    return <dl className="visual-acuity-result">
-      <div><dt>Status</dt><dd>{displayValue(data.measurementStatus)}</dd></div>
-      <div><dt>Usual distance glasses</dt><dd>{displayValue(data.wearsDistanceGlasses)}</dd></div>
-      <div><dt>Right eye (OD)</dt><dd>{formatEye(refraction.od)}</dd></div>
-      <div><dt>Left eye (OS)</dt><dd>{formatEye(refraction.os)}</dd></div>
-      {data.notes ? <div><dt>Notes</dt><dd>{displayValue(data.notes)}</dd></div> : null}
-    </dl>;
+    return <>
+      <dl className="visual-acuity-result">
+        <div><dt>Status</dt><dd>{displayValue(data.measurementStatus)}</dd></div>
+        <div><dt>Usual distance glasses</dt><dd>{displayValue(data.wearsDistanceGlasses)}</dd></div>
+        <div><dt>Right eye (OD)</dt><dd>{formatEye(refraction.od)}</dd></div>
+        <div><dt>Left eye (OS)</dt><dd>{formatEye(refraction.os)}</dd></div>
+        {data.notes ? <div><dt>Notes</dt><dd>{displayValue(data.notes)}</dd></div> : null}
+      </dl>
+      <ExtraResultData stationType={station.stationType} data={data} />
+    </>;
   }
   if (station.stationType === 'COLOUR_VISION') {
-    return <dl className="visual-acuity-result">
-      <div><dt>Test kit</dt><dd>{displayValue(data.testKit)}</dd></div>
-      <div><dt>Plates presented</dt><dd>{displayValue(data.platesPresented)}</dd></div>
-      <div><dt>Right eye (OD)</dt><dd>{displayValue(data.odCorrect)} / {displayValue(data.platesPresented)}</dd></div>
-      <div><dt>Left eye (OS)</dt><dd>{displayValue(data.osCorrect)} / {displayValue(data.platesPresented)}</dd></div>
-    </dl>;
+    return <>
+      <dl className="visual-acuity-result">
+        <div><dt>Test kit</dt><dd>{displayValue(data.testKit)}</dd></div>
+        <div><dt>Plates presented</dt><dd>{displayValue(data.platesPresented)}</dd></div>
+        <div><dt>Right eye (OD)</dt><dd>{displayValue(data.odCorrect)} / {displayValue(data.platesPresented)}</dd></div>
+        <div><dt>Left eye (OS)</dt><dd>{displayValue(data.osCorrect)} / {displayValue(data.platesPresented)}</dd></div>
+      </dl>
+      <ExtraResultData stationType={station.stationType} data={data} />
+    </>;
   }
   if (station.stationType === 'EYE_HEALTH') {
     const eyeHealth = data as typeof data & {

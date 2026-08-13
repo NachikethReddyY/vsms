@@ -10,7 +10,7 @@ const {
   findExistingStation,
   CLINICAL_ONE_PER_EVENT_TYPES,
 } = require("./stationTemplateMapping");
-const { parseFieldSchema, assertClinicalFieldSchema } = require("../../schemas/dynamicStationSchema");
+const { parseFieldSchema, assertClinicalFieldSchema, resolveCompatibleFieldSchema } = require("../../schemas/dynamicStationSchema");
 const {
   enqueueEventArtifactCleanup,
   processArtifactCleanupTasks,
@@ -211,7 +211,10 @@ const mapStationDto = (station, event, templates) => {
     // Capacity is not on Station (#30); expose template default until availability is wired.
     capacity: template?.defaultCapacity || event.capacity,
     isAvailable: station.isActive,
-    fieldSchemaSnapshot: station.fieldSchemaSnapshot ?? template?.fieldSchema ?? null,
+    fieldSchemaSnapshot: resolveCompatibleFieldSchema(
+      station.stationType,
+      station.fieldSchemaSnapshot ?? template?.fieldSchema ?? null,
+    ),
     schemaVersion: station.schemaVersion ?? template?.version ?? null,
     availabilities: [],
   };
@@ -590,10 +593,7 @@ const createEventDays = async (tx, eventId, days) => {
 
 /** Freeze catalog fieldSchema onto event stations when present (CUSTOM and clinical). */
 const stationSchemaFields = (template) => {
-  if (!template.fieldSchema || (Array.isArray(template.fieldSchema) && template.fieldSchema.length === 0)) {
-    return { fieldSchemaSnapshot: null, schemaVersion: template.version || 1 };
-  }
-  const fieldSchema = parseFieldSchema(template.fieldSchema);
+  const fieldSchema = resolveCompatibleFieldSchema(template.stationType, template.fieldSchema);
   return {
     fieldSchemaSnapshot: fieldSchema,
     schemaVersion: template.version || 1,
@@ -1709,12 +1709,9 @@ const serializeStationTemplate = (template) => ({
 
 /** Read-only preview fallback — never write during catalog GET. */
 const withSystemFieldSchemaFallback = (template) => {
-  const { SYSTEM_FIELD_SCHEMAS } = require("../../schemas/dynamicStationSchema");
-  const systemSchema = template.stationType ? SYSTEM_FIELD_SCHEMAS[template.stationType] : null;
-  const missing = (!template.fieldSchema || (Array.isArray(template.fieldSchema) && template.fieldSchema.length === 0))
-    && systemSchema;
-  if (!missing) return template;
-  return { ...template, fieldSchema: systemSchema };
+  const fieldSchema = resolveCompatibleFieldSchema(template.stationType, template.fieldSchema);
+  if (!fieldSchema) return template;
+  return { ...template, fieldSchema };
 };
 
 /** Admin catalog: screening templates only — registration/clinical review/eye health are not managed here. */

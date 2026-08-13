@@ -193,7 +193,7 @@ const triStateToNullableBoolean = (value) => {
   return null;
 };
 
-/** Map schema-collected values into the shapes clinical evaluators expect. */
+/** Map schema-collected values into the shapes clinical evaluators expect. Extra template fields stay attached. */
 const normalizeClinicalResultData = (stationType, resultData) => {
   if (stationType === "VISUAL_ACUITY") {
     return {
@@ -203,18 +203,28 @@ const normalizeClinicalResultData = (stationType, resultData) => {
     };
   }
   if (stationType === "REFRACTION") {
-    const measurementStatus = resultData.measurementStatus;
+    const { measurementStatus, wearsDistanceGlasses, od, os, notes, ...extras } = resultData;
     const base = {
+      ...extras,
       measurementStatus,
-      wearsDistanceGlasses: triStateToNullableBoolean(resultData.wearsDistanceGlasses),
-      ...(resultData.notes !== undefined ? { notes: resultData.notes } : {}),
+      wearsDistanceGlasses: triStateToNullableBoolean(wearsDistanceGlasses),
+      ...(notes !== undefined ? { notes } : {}),
     };
     if (measurementStatus === "COMPLETED") {
-      return { ...base, od: resultData.od, os: resultData.os };
+      return { ...base, od, os };
     }
     return base;
   }
   return resultData;
+};
+
+/** Keep template-validated extras that clinical Zod schemas would otherwise strip. */
+const mergeClinicalAndTemplateResult = (templateResult, clinicalResult) => {
+  const merged = { ...clinicalResult };
+  for (const [key, value] of Object.entries(templateResult || {})) {
+    if (!Object.prototype.hasOwnProperty.call(merged, key)) merged[key] = value;
+  }
+  return merged;
 };
 
 const evaluateDynamicResult = () => ({
@@ -284,6 +294,101 @@ const CUSTOM_OD_NOTES_SCHEMA = [
   { key: "notes", label: "Notes", type: "text", required: false },
 ];
 
+const TYPE_ALIASES = { string: "text", textarea: "text", integer: "number", bool: "boolean" };
+const LEGACY_CLINICAL_KEY_ALIASES = {
+  VISUAL_ACUITY: { distanceMetres: "chartDistanceMetres" },
+  COLOUR_VISION: { odScore: "odCorrect", osScore: "osCorrect" },
+};
+const LEGACY_CLINICAL_KEYS_TO_DROP = {
+  VISUAL_ACUITY: new Set(["distanceMetres"]),
+  REFRACTION: new Set(["odSph", "odCyl", "odAxis", "osSph", "osCyl", "osAxis"]),
+  COLOUR_VISION: new Set(["odScore", "osScore"]),
+};
+
+const coerceField = (raw) => {
+  if (!raw || typeof raw !== "object") return null;
+  const key = String(raw.key || raw.id || "").trim();
+  const label = String(raw.label || raw.name || key).trim();
+  const type = TYPE_ALIASES[raw.type] || raw.type;
+  if (!key || !label || !FIELD_TYPES.includes(type)) return null;
+  const field = { key, label, type, required: Boolean(raw.required) };
+  if (Array.isArray(raw.options)) field.options = raw.options;
+  if (Number.isFinite(raw.min)) field.min = raw.min;
+  if (Number.isFinite(raw.max)) field.max = raw.max;
+  if (typeof raw.unit === "string") field.unit = raw.unit;
+  if (raw.eyes === "OD" || raw.eyes === "OS" || raw.eyes === "BOTH") field.eyes = raw.eyes;
+  return field;
+};
+
+const coerceSchema = (value) => {
+  if (!Array.isArray(value)) return [];
+  const fields = [];
+  const seen = new Set();
+  for (const raw of value) {
+    const field = coerceField(raw);
+    if (!field || seen.has(field.key)) continue;
+    seen.add(field.key);
+    fields.push(field);
+  }
+  return fields;
+};
+
+const upgradeClinicalSchema = (stationType, fields) => {
+  const system = SYSTEM_FIELD_SCHEMAS[stationType];
+  if (!system) return fields;
+  const aliases = LEGACY_CLINICAL_KEY_ALIASES[stationType] || {};
+  const drop = LEGACY_CLINICAL_KEYS_TO_DROP[stationType] || new Set();
+  const extras = [];
+  const seenExtra = new Set();
+  for (const field of fields) {
+    const mappedKey = aliases[field.key] || field.key;
+    if (system.some((item) => item.key === mappedKey) || drop.has(field.key)) continue;
+    if (seenExtra.has(field.key)) continue;
+    seenExtra.add(field.key);
+    extras.push(field);
+  }
+  return [
+    ...system.map((required) => {
+      const existing = fields.find((field) => (aliases[field.key] || field.key) === required.key);
+      if (!existing) return required;
+      const options = required.options && existing.options?.length
+        ? [...new Set([...required.options, ...existing.options])]
+        : required.options;
+      return {
+        ...required,
+        label: existing.label || required.label,
+        ...(options ? { options } : {}),
+      };
+    }),
+    ...extras,
+  ];
+};
+
+const keepParseableFields = (fields) => {
+  const kept = [];
+  for (const field of fields) {
+    const next = [...kept, field];
+    if (fieldSchema.safeParse(next).success) kept.push(field);
+  }
+  return kept;
+};
+
+/**
+ * Open pre-upgrade stations/templates: missing snapshots fall back to the current
+ * clinical contract, and older field JSON is coerced without dropping extra fields.
+ */
+const resolveCompatibleFieldSchema = (stationType, snapshot) => {
+  const coerced = coerceSchema(snapshot);
+  if (CLINICAL_FIELD_CONTRACTS[stationType]) {
+    return parseFieldSchema(upgradeClinicalSchema(stationType, coerced));
+  }
+  if (!coerced.length) return null;
+  const parsed = fieldSchema.safeParse(coerced);
+  if (parsed.success) return parsed.data;
+  const kept = keepParseableFields(coerced);
+  return kept.length ? kept : null;
+};
+
 module.exports = {
   FIELD_TYPES,
   fieldDefinition,
@@ -293,6 +398,8 @@ module.exports = {
   CLINICAL_FIELD_CONTRACTS,
   validateResultAgainstSchema,
   normalizeClinicalResultData,
+  mergeClinicalAndTemplateResult,
+  resolveCompatibleFieldSchema,
   evaluateDynamicResult,
   SYSTEM_FIELD_SCHEMAS,
   CUSTOM_OD_NOTES_SCHEMA,
