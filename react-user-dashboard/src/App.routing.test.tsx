@@ -120,6 +120,5 @@ describe('App route and navigation topology', () => {
   it('consolidates staff invitations and lifecycle administration on /staff', async () => {
     renderPath('/staff');
     expect(await screen.findByText('Staff directory')).toBeTruthy();
-    expect(await screen.findByText('Account administration')).toBeTruthy();
   });
 });

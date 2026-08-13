@@ -115,9 +115,11 @@ export default function StaffAccountsPage() {
       } : {}),
     };
     try {
-      editing
-        ? await apiClient.patch<{ success: true; data: AppUser }>(`/users/${editing.id}`, payload)
-        : await apiClient.post<{ success: true; data: AppUser }>('/users', payload);
+      if (editing) {
+        await apiClient.patch<{ success: true; data: AppUser }>(`/users/${editing.id}`, payload);
+      } else {
+        await apiClient.post<{ success: true; data: AppUser }>('/users', payload);
+      }
       await load();
       setDialogOpen(false);
       setNotice(editing ? 'Staff account updated.' : 'Staff account created.');
