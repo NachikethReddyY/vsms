@@ -11,7 +11,8 @@ import {
   ShieldCheckIcon,
   VideoCameraIcon,
 } from '@heroicons/react/24/outline';
-import apiClient, { getApiError as getApiMessage } from '../../utils/apiClient';
+import { getApiError as getApiMessage } from '../../utils/apiClient';
+import { screeningApi } from './screeningApi';
 import { startQrScanner, type QrCamera } from './startQrScanner';
 import {
   extractQrToken,
@@ -43,8 +44,9 @@ export default function QRScannerPage() {
   const verificationRef = useRef(false);
 
   const loadAssignment = useCallback(async (eventId: string, registrationId: string) => {
-    const { data } = await apiClient.get<{ activeEntry: { station: ActiveAssignment } | null }>(`/queues/events/${eventId}/participants/${registrationId}`);
-    setActiveAssignment(data.activeEntry?.station ?? null);
+    const registration = await screeningApi.resolve(eventId, { registrationId });
+    setActiveAssignment(registration.activeStation);
+    return registration;
   }, []);
 
   const verifyToken = useCallback(async (token: string) => {
@@ -124,8 +126,15 @@ export default function QRScannerPage() {
     setError(null);
     setStatus('verifying');
     try {
-      await loadAssignment(eventId, registrationId);
-      setVerified({ valid: true, qrId: '', registrationId, participant: { id: '', firstName: 'Participant', lastName: '' }, event: { id: eventId, name: 'Selected event' }, queueNumber: null });
+      const registration = await loadAssignment(eventId, registrationId);
+      setVerified({
+        valid: true,
+        qrId: '',
+        registrationId,
+        participant: { id: '', firstName: registration.participantDisplayName, lastName: '' },
+        event: { id: eventId, name: 'Selected event' },
+        queueNumber: registration.queueNumber,
+      });
       setLookupOnly(true);
       setStatus('verified');
     } catch (cause) {
@@ -229,7 +238,7 @@ export default function QRScannerPage() {
 
           <section className="qr-paste-panel">
             <h2>Participant lookup fallback</h2>
-            <p>When the participant cannot present the QR, use the event-scoped registration reference. Access is checked by the server.</p>
+            <p>When the participant cannot present the QR, use the event-scoped registration reference. Online access is checked by the server; offline lookup uses the encrypted station download.</p>
             <form onSubmit={(event) => void lookupParticipant(event)}>
               <label htmlFor="qr-lookup-event">Event UUID</label>
               <input id="qr-lookup-event" value={lookupEventId} onChange={(event) => setLookupEventId(event.target.value)} autoComplete="off" spellCheck="false" />
