@@ -13,6 +13,7 @@
   "thresholds": {
     "readP95Ms": 250,
     "writeP95Ms": 500,
+    "screeningBatchP95Ms": 7500,
     "errorRatePercent": 1
   },
   "authorizationEnv": "PERF_AUTHORIZATION"

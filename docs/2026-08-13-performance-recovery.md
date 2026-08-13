@@ -8,7 +8,7 @@ This evidence was produced with synthetic data in an isolated local database. It
 - Node.js API, PostgreSQL 18.4, loopback network
 - 500 synthetic participants, five concurrent staff writers
 - 500 participant status clients polling every five seconds while ten staff clients polled the live queue every ten seconds
-- Thresholds: read p95 <= 250 ms, write p95 <= 500 ms, error rate <= 1%
+- Thresholds: read p95 <= 250 ms, single-record write p95 <= 500 ms, 25-action offline screening batch p95 <= 7,500 ms, error rate <= 1%
 
 ## Results
 

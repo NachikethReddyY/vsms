@@ -36,11 +36,13 @@ test("the 500-participant load configuration is accepted without running load", 
   assert.equal(config.concurrency, 5);
   assert.equal(config.pollDurationSeconds, 30);
   assert.equal(config.checkInSampleSize, 20);
+  assert.equal(config.thresholds.screeningBatchP95Ms, 7500);
   assert.equal(config.participantPollIntervalMs, 5000);
   assert.equal(config.staffPollIntervalMs, 10000);
   assert.match(runner, /participant-status\.poll/);
   assert.match(runner, /staff-queue\.poll/);
   assert.match(runner, /registration\.check-in\.write/);
+  assert.match(runner, /screeningBatchP95Ms/);
   assert.match(runner, /pollRegistrationIds/);
   assert.doesNotMatch(runner, /stations\/\$\{fixture\.stationId\}\/handoff/);
 });

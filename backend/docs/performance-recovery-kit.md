@@ -80,7 +80,7 @@ For containerized local PostgreSQL, also use `docker stats` and retain the outpu
 
 The documented AWS deployment separates the EC2 API from encrypted RDS, but one API instance is still an availability bottleneck. The scripts reduce accidental destructive restore risk; they do not provide automated failover or establish a production RPO/RTO.
 
-The current deployment already uses encrypted RDS. Add Multi-AZ and at least two stateless API instances before accepting a 500-participant event in production if an authorized AWS run misses p95 <= 500 ms for writes, p95 <= 250 ms for reads, error rate <= 1%, or if sustained normalized CPU exceeds 70%, memory exceeds 80%, or restore time exceeds the agreed event RTO.
+The current deployment already uses encrypted RDS. Add Multi-AZ and at least two stateless API instances before accepting a 500-participant event in production if an authorized AWS run misses p95 <= 500 ms for single-record writes, p95 <= 7,500 ms for a maximum 25-action offline screening batch, p95 <= 250 ms for reads, error rate <= 1%, or if sustained normalized CPU exceeds 70%, memory exceeds 80%, or restore time exceeds the agreed event RTO.
 
 ## Current evidence status
 

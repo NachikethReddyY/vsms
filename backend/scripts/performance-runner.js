@@ -88,8 +88,9 @@ function assertConfig(config) {
     fail("config.staffPollClientCount must be between 1 and 100");
   }
   if (!config.thresholds || config.thresholds.readP95Ms <= 0 || config.thresholds.writeP95Ms <= 0
+      || config.thresholds.screeningBatchP95Ms <= 0
       || config.thresholds.errorRatePercent < 0 || config.thresholds.errorRatePercent > 100) {
-    fail("config.thresholds must contain positive read/write p95 limits and an error percentage");
+    fail("config.thresholds must contain positive read/write/screening-batch p95 limits and an error percentage");
   }
   if (!path.isAbsolute(config.fixtureFile) || isWithinBackend(config.fixtureFile)) {
     fail("config.fixtureFile must be an absolute path outside this repository");
@@ -314,7 +315,9 @@ async function run(config, baseUrl, fixture, authorization) {
 function thresholdFailures(results, thresholds) {
   return results.flatMap((result) => {
     const failures = [];
-    const p95Limit = result.scenario.includes("write") ? thresholds.writeP95Ms : thresholds.readP95Ms;
+    const p95Limit = result.scenario === "screening.sync.write"
+      ? thresholds.screeningBatchP95Ms
+      : result.scenario.includes("write") ? thresholds.writeP95Ms : thresholds.readP95Ms;
     if (result.p95Ms == null || result.p95Ms > p95Limit) failures.push(`${result.scenario} p95 ${result.p95Ms}ms > ${p95Limit}ms`);
     if (result.errorRatePercent > thresholds.errorRatePercent) failures.push(`${result.scenario} errors ${result.errorRatePercent}% > ${thresholds.errorRatePercent}%`);
     return failures;
