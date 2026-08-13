@@ -3764,11 +3764,7 @@ components:
     OperationsEvent:
       type: object
       additionalProperties: false
-<<<<<<< HEAD
-      required: [eventId, name, status, venue, timezone, startsAt, endsAt, capacity, progress, queue, stations, staffing, referrals, sync, businessMetrics, attention]
-=======
       required: [eventId, name, status, venue, timezone, startsAt, endsAt, capacity, progress, queue, stations, staffing, referrals, sync, attention]
->>>>>>> dc49640e71d64c2f18a1875cc218a52eab3cf5e7
       properties:
         eventId: { type: string, format: uuid }
         name: { type: string, maxLength: 150 }
@@ -3792,11 +3788,7 @@ components:
         queue:
           type: object
           additionalProperties: false
-<<<<<<< HEAD
-          required: [waiting, called, inProgress, completed, skipped, priority, longestWaitMinutes, waitP50Minutes, waitP90Minutes, serviceP50Minutes, serviceP90Minutes]
-=======
           required: [waiting, called, inProgress, completed, skipped, priority, longestWaitMinutes]
->>>>>>> dc49640e71d64c2f18a1875cc218a52eab3cf5e7
           properties:
             waiting: { type: integer, minimum: 0 }
             called: { type: integer, minimum: 0 }
@@ -3805,31 +3797,14 @@ components:
             skipped: { type: integer, minimum: 0 }
             priority: { type: integer, minimum: 0 }
             longestWaitMinutes: { type: integer, minimum: 0 }
-<<<<<<< HEAD
+
             waitP50Minutes: { type: number, minimum: 0, nullable: true }
             waitP90Minutes: { type: number, minimum: 0, nullable: true }
             serviceP50Minutes: { type: number, minimum: 0, nullable: true }
-            serviceP90Minutes: { type: number, minimum: 0, nullable: true }
-        stations:
-          type: object
-          additionalProperties: false
-          required: [total, available, paused, offline, offlineCapable, items]
-=======
-        stations:
-          type: object
-          additionalProperties: false
-          required: [total, available, paused, offline, items]
->>>>>>> dc49640e71d64c2f18a1875cc218a52eab3cf5e7
           properties:
             total: { type: integer, minimum: 0 }
             available: { type: integer, minimum: 0 }
-            paused: { type: integer, minimum: 0 }
             offline: { type: integer, minimum: 0 }
-<<<<<<< HEAD
-            offlineCapable: { type: integer, minimum: 0 }
-=======
->>>>>>> dc49640e71d64c2f18a1875cc218a52eab3cf5e7
-            items:
               type: array
               maxItems: 50
               items: { $ref: "#/components/schemas/OperationsStation" }
@@ -3840,10 +3815,6 @@ components:
           properties:
             shiftId: { type: string, format: uuid, nullable: true }
             shiftName: { type: string, maxLength: 100, nullable: true }
-            startsAt: { type: string, format: date-time, nullable: true }
-            endsAt: { type: string, format: date-time, nullable: true }
-            required: { type: integer, minimum: 0 }
-            assigned: { type: integer, minimum: 0 }
             unfilled: { type: integer, minimum: 0 }
             unstaffedStations: { type: integer, minimum: 0 }
         referrals:
@@ -3855,33 +3826,10 @@ components:
         sync:
           type: object
           additionalProperties: false
-<<<<<<< HEAD
-          required: [pending, issues, applied, successRatePercent, lastUpdatedAt]
-          properties:
-            pending: { type: integer, minimum: 0 }
-            issues: { type: integer, minimum: 0 }
-            applied: { type: integer, minimum: 0 }
-            successRatePercent: { type: number, minimum: 0, maximum: 100, nullable: true }
-            lastUpdatedAt: { type: string, format: date-time, nullable: true }
-        businessMetrics:
-          type: object
-          additionalProperties: false
-          required: [registrationDurationP50Seconds, measuredRegistrations, paperlessRatePercent, completedVisitsPerHour, offlineCoveragePercent, reportGeneratedAt, reportMinutesFromEventEnd, sameDayReportReady]
-          properties:
-            registrationDurationP50Seconds: { type: number, minimum: 0, nullable: true }
-            measuredRegistrations: { type: integer, minimum: 0 }
-            paperlessRatePercent: { type: number, minimum: 0, maximum: 100, nullable: true }
-            completedVisitsPerHour: { type: number, minimum: 0, nullable: true }
-            offlineCoveragePercent: { type: number, minimum: 0, maximum: 100, nullable: true }
-            reportGeneratedAt: { type: string, format: date-time, nullable: true }
-            reportMinutesFromEventEnd: { type: number, minimum: 0, nullable: true }
-            sameDayReportReady: { type: boolean, nullable: true }
-=======
           required: [pending, issues]
           properties:
             pending: { type: integer, minimum: 0 }
             issues: { type: integer, minimum: 0 }
->>>>>>> dc49640e71d64c2f18a1875cc218a52eab3cf5e7
         attention:
           type: object
           additionalProperties: false
