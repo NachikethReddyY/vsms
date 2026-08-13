@@ -433,7 +433,6 @@ describe("event lifecycle", () => {
           gender: "U",
           contactNumber: `+65 6000 10${String(index).padStart(2, "0")}`,
           emergencyContact: "+65 6000 2000",
-          consentGiven: true,
           createdById: staff.id,
           updatedById: staff.id,
         },
@@ -749,7 +748,7 @@ describe("event lifecycle", () => {
     const task = await helpers.prisma.artifactCleanupTask.create({
       data: {
         eventId: created.body.eventId,
-        artifactType: "CONSENT_SIGNATURE",
+        artifactType: "REVIEW_DECISION_SIGNATURE",
         storageKey: `signatures/${created.body.eventId}/${crypto.randomUUID()}.png`,
       },
     });

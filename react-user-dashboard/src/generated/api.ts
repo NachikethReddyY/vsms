@@ -656,6 +656,25 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/events/{eventId}/registrations/summary": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                eventId: components["parameters"]["EventId"];
+            };
+            cookie?: never;
+        };
+        /** Get registration capacity and status totals for an event */
+        get: operations["getEventRegistrationSummary"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/events/{eventId}/memberships": {
         parameters: {
             query?: never;
@@ -1281,23 +1300,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/v1/participants/active-consent-form": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Get the currently effective consent form */
-        get: operations["getParticipantActiveConsentForm"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/api/v1/participants/match": {
         parameters: {
             query?: never;
@@ -1375,43 +1377,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/v1/participants/{participantId}/consents": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                participantId: components["parameters"]["ParticipantId"];
-            };
-            cookie?: never;
-        };
-        /** List a participant's consent records */
-        get: operations["listParticipantConsents"];
-        put?: never;
-        /** Record consent using an event ID in the request body */
-        post: operations["createParticipantConsent"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/participants/{participantId}/consents/{consentId}/withdraw": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** Create an immutable withdrawal for accepted consent */
-        post: operations["withdrawParticipantConsent"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/api/v1/participants/{participantId}/emergency-contacts": {
         parameters: {
             query?: never;
@@ -1449,23 +1414,6 @@ export interface paths {
         patch: operations["updateParticipantEmergencyContact"];
         trace?: never;
     };
-    "/api/v1/participants/{participantId}/events/{eventId}/consent": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** Record consent for a participant and event */
-        post: operations["createEventConsent"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/api/v1/participants/{participantId}/events/{eventId}/review": {
         parameters: {
             query?: never;
@@ -1473,7 +1421,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Get participant, event, emergency contact, and latest consent for registration review */
+        /** Get participant, event, and emergency contact for registration review */
         get: operations["getParticipantRegistrationReview"];
         put?: never;
         post?: never;
@@ -1549,23 +1497,6 @@ export interface paths {
         head?: never;
         /** Change a registration's status */
         patch: operations["changeRegistrationStatus"];
-        trace?: never;
-    };
-    "/api/v1/consent-forms/active": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Get the currently effective consent form */
-        get: operations["getActiveConsentForm"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
         trace?: never;
     };
     "/api/v1/emergency-contacts/{contactId}": {
@@ -2518,6 +2449,14 @@ export interface components {
             unit?: string;
             /** @enum {string} */
             eyes?: "OD" | "OS" | "BOTH";
+            flagRules?: {
+                /** @enum {string} */
+                op: "eq" | "neq" | "lt" | "lte" | "gt" | "gte" | "includes" | "isTrue" | "isFalse" | "isEmpty" | "notEmpty";
+                value?: string | number | boolean;
+                /** @enum {string} */
+                flag: "REVIEW" | "REFER" | "URGENT";
+                reason: string;
+            }[];
         };
         CreateStationTemplateRequest: {
             /** @enum {string} */
@@ -3241,7 +3180,7 @@ export interface components {
             participantDisplayName?: string | null;
             participantReference: string;
             /** @enum {string} */
-            registrationStatus: "SIGNED_UP" | "CHECKED_IN" | "COMPLETED" | "CANCELLED";
+            registrationStatus: "SIGNED_UP" | "WAITLISTED" | "CHECKED_IN" | "COMPLETED" | "CANCELLED";
             checkedIn: boolean;
             /** Format: date-time */
             checkedInAt?: string | null;
@@ -3641,7 +3580,7 @@ export interface components {
             participantDisplayName: string;
             queueNumber: number | null;
             /** @enum {string} */
-            registrationStatus: "SIGNED_UP" | "CHECKED_IN" | "COMPLETED" | "CANCELLED";
+            registrationStatus: "SIGNED_UP" | "WAITLISTED" | "CHECKED_IN" | "COMPLETED" | "CANCELLED";
             maskedNric: string;
             /** Format: date */
             dateOfBirth: string;
@@ -3828,7 +3767,7 @@ export interface components {
             /** Format: uuid */
             eventId: string;
             /** @enum {string} */
-            artifactType: "CONSENT_SIGNATURE" | "REFERRAL_SIGNATURE" | "REVIEW_DECISION_SIGNATURE" | "REFERRAL_DOCUMENT";
+            artifactType: "REFERRAL_SIGNATURE" | "REVIEW_DECISION_SIGNATURE" | "REFERRAL_DOCUMENT";
             /** @enum {string} */
             status: "PENDING" | "PROCESSING" | "FAILED" | "ESCALATED" | "COMPLETED" | "RESOLVED";
             attemptCount: number;
@@ -4060,13 +3999,13 @@ export interface components {
             /** @description Required NRIC or FIN. It is never returned by this API. */
             nric: string;
             /** Format: email */
-            email?: string | null;
-            race?: string | null;
-            nationality?: string | null;
-            addressStreet?: string | null;
-            addressUnit?: string | null;
-            addressPostalCode?: string | null;
-            preferredLanguage?: string | null;
+            email: string | null;
+            race: string | null;
+            nationality: string | null;
+            addressStreet: string | null;
+            addressUnit: string | null;
+            addressPostalCode: string | null;
+            preferredLanguage: string | null;
             accessibilityNotes?: string | null;
             /** @enum {string} */
             status?: "ACTIVE" | "INACTIVE" | "DECEASED";
@@ -4178,7 +4117,7 @@ export interface components {
                 id: string;
                 queueNumber: number | null;
                 /** @enum {string} */
-                status: "SIGNED_UP" | "CHECKED_IN" | "COMPLETED" | "CANCELLED";
+                status: "SIGNED_UP" | "WAITLISTED" | "CHECKED_IN" | "COMPLETED" | "CANCELLED";
                 assignedBooth: string | null;
             } | null;
         };
@@ -4240,89 +4179,23 @@ export interface components {
         EmergencyContactsEnvelope: {
             contacts: components["schemas"]["EmergencyContact"][];
         };
-        ConsentForm: {
-            /** Format: uuid */
-            id: string;
-            formCode: string;
-            versionNumber: string;
-            title: string;
-            contentText?: string | null;
-            contentHash: string;
-            documentObjectKey: string;
-            /** Format: date-time */
-            effectiveFrom: string;
-            /** Format: date-time */
-            effectiveTo?: string | null;
-            isActive: boolean;
-        } & {
-            [key: string]: unknown;
-        };
-        ConsentFormEnvelope: {
-            consentForm: components["schemas"]["ConsentForm"];
-        };
-        /** @description Accepted consent requires signature metadata; non-participant signers require their relationship to the participant. Optional contact fields are retained only for legacy records. */
-        ConsentRequest: {
-            /** Format: uuid */
-            consentFormVersionId: string;
-            /** @enum {string} */
-            consentStatus: "ACCEPTED" | "DECLINED";
-            /** @enum {string} */
-            signerType: "PARTICIPANT" | "PARENT" | "GUARDIAN" | "AUTHORISED_REPRESENTATIVE";
-            signerName: string;
-            signerRelationship?: string | null;
-            guardianContactName?: string | null;
-            guardianContactPhone?: string | null;
-            /** Format: email */
-            guardianContactEmail?: string | null;
-            signatureObjectKey?: string | null;
-            signatureSha256?: string | null;
-            /** @enum {string|null} */
-            signatureMimeType?: "image/png" | "image/jpeg" | null;
-        };
-        ConsentWithEventRequest: components["schemas"]["ConsentRequest"] & {
-            /** Format: uuid */
-            eventId: string;
-        };
-        ConsentWithdrawalRequest: {
-            withdrawalReason: string;
-        };
-        Consent: {
-            /** Format: uuid */
-            id: string;
-            /** Format: uuid */
-            participantId: string;
-            /** Format: uuid */
-            eventId: string;
-            /** Format: uuid */
-            registrationId?: string | null;
-            /** Format: uuid */
-            withdrawalOfId?: string | null;
-            /** Format: uuid */
-            consentFormVersionId: string;
-            /** @enum {string} */
-            consentStatus: "PENDING" | "ACCEPTED" | "DECLINED" | "WITHDRAWN";
-            signerType?: string | null;
-            signerName?: string | null;
-            /** Format: uuid */
-            recordedById: string;
-            /** Format: date-time */
-            signedAt?: string | null;
-            /** Format: date-time */
-            withdrawnAt?: string | null;
-            withdrawalReason?: string | null;
-            /** Format: date-time */
-            createdAt: string;
-        } & {
-            [key: string]: unknown;
-        };
-        ConsentEnvelope: {
-            consent: components["schemas"]["Consent"];
-        };
-        ConsentsEnvelope: {
-            consents: components["schemas"]["Consent"][];
-        };
         /** @enum {string} */
-        RegistrationStatus: "SIGNED_UP" | "CHECKED_IN" | "COMPLETED" | "CANCELLED";
+        RegistrationStatus: "SIGNED_UP" | "WAITLISTED" | "CHECKED_IN" | "COMPLETED" | "CANCELLED";
+        EventRegistrationSummary: {
+            /** Format: uuid */
+            eventId: string;
+            capacity: number;
+            signedUpCount: number;
+            waitlistedCount: number;
+            checkedInCount: number;
+            completedCount: number;
+            cancelledCount: number;
+            filledCount: number;
+            remainingCapacity: number;
+        };
+        EventRegistrationSummaryResponse: {
+            summary: components["schemas"]["EventRegistrationSummary"];
+        };
         Registration: {
             /** Format: uuid */
             id?: string;
@@ -4336,6 +4209,7 @@ export interface components {
             participantDisplayName?: string | null;
             queueNumber?: number | null;
             idempotencyKey: string;
+            consentAcknowledged?: boolean;
             checkedIn?: boolean;
             /** Format: date-time */
             checkedInAt?: string | null;
@@ -4446,24 +4320,24 @@ export interface components {
             history: components["schemas"]["RegistrationHistoryItem"][];
         };
         RegistrationStatusRequest: {
-            toStatus: components["schemas"]["RegistrationStatus"];
+            /** @enum {string} */
+            toStatus: "SIGNED_UP" | "CHECKED_IN" | "COMPLETED" | "CANCELLED";
             reason?: string | null;
         };
         ParticipantRegistrationReview: {
             participant: components["schemas"]["Participant"];
             event: components["schemas"]["Event"];
             emergencyContact: components["schemas"]["EmergencyContact"] | null;
-            latestConsent: components["schemas"]["Consent"] | null;
         };
         SignatureRequest: {
             dataUrl: string;
             /** Format: uuid */
             eventId: string;
             /** @enum {string} */
-            purpose: "CONSENT" | "REFERRAL" | "REVIEW_DECISION";
+            purpose: "REFERRAL" | "REVIEW_DECISION";
             /**
              * Format: uuid
-             * @description Participant ID for consent, referral ID for referral issuance, or registration ID for a review decision.
+             * @description Referral ID for referral issuance or registration ID for a review decision.
              */
             targetId: string;
         };
@@ -4483,7 +4357,7 @@ export interface components {
                 /** Format: uuid */
                 deviceId?: string | null;
                 /** @enum {string} */
-                action: "CREATED" | "UPDATED" | "PUBLISHED" | "STARTED" | "COMPLETED" | "CANCELLED" | "EVENT_DELETED" | "EVENT_REGISTRATION_CREATED" | "REGISTRATION_STATUS_CHANGED" | "DUPLICATE_REGISTRATION_BLOCKED" | "PARTICIPANT_CREATED" | "PARTICIPANT_UPDATED" | "EMERGENCY_CONTACT_CREATED" | "EMERGENCY_CONTACT_UPDATED" | "CONSENT_WITHDRAWN" | "SCREENING_RESULT_RECORDED" | "CLINICAL_REVIEW_RECORDED" | "REFERRAL_ISSUED" | "REFERRAL_REVISION_CREATED" | "REFERRAL_HANDOFF_ACKNOWLEDGED" | "REFERRAL_EMAIL_FAILED" | "REFERRAL_EMAIL_CONFIRMATION_PENDING" | "REFERRAL_EMAIL_RECONCILIATION_REQUIRED" | "REFERRAL_EMAIL_RETRY_AUTHORIZED" | "REFERRAL_DRAFT_CREATED" | "QR_GENERATED" | "QR_VERIFIED" | "QR_REVOKED" | "QR_REISSUED_REVOCATION" | "MANUAL_CHECKIN_PERFORMED" | "STAFF_ACCOUNT_CREATED" | "STAFF_ACCOUNT_UPDATED" | "STAFF_ASSIGNMENT_ADDED" | "STAFF_ASSIGNMENT_REMOVED" | "REPORT_VIEWED" | "SCREENING_SYNC_BATCH" | "ARTIFACT_CLEANUP_ESCALATED" | "ENCRYPTION_BACKFILL_APPLIED";
+                action: "CREATED" | "UPDATED" | "PUBLISHED" | "STARTED" | "COMPLETED" | "CANCELLED" | "EVENT_DELETED" | "EVENT_REGISTRATION_CREATED" | "REGISTRATION_STATUS_CHANGED" | "DUPLICATE_REGISTRATION_BLOCKED" | "PARTICIPANT_CREATED" | "PARTICIPANT_UPDATED" | "EMERGENCY_CONTACT_CREATED" | "EMERGENCY_CONTACT_UPDATED" | "SCREENING_RESULT_RECORDED" | "CLINICAL_REVIEW_RECORDED" | "REFERRAL_ISSUED" | "REFERRAL_REVISION_CREATED" | "REFERRAL_HANDOFF_ACKNOWLEDGED" | "REFERRAL_EMAIL_FAILED" | "REFERRAL_EMAIL_CONFIRMATION_PENDING" | "REFERRAL_EMAIL_RECONCILIATION_REQUIRED" | "REFERRAL_EMAIL_RETRY_AUTHORIZED" | "REFERRAL_DRAFT_CREATED" | "QR_GENERATED" | "QR_VERIFIED" | "QR_REVOKED" | "QR_REISSUED_REVOCATION" | "MANUAL_CHECKIN_PERFORMED" | "STAFF_ACCOUNT_CREATED" | "STAFF_ACCOUNT_UPDATED" | "STAFF_ASSIGNMENT_ADDED" | "STAFF_ASSIGNMENT_REMOVED" | "REPORT_VIEWED" | "SCREENING_SYNC_BATCH" | "ARTIFACT_CLEANUP_ESCALATED" | "ENCRYPTION_BACKFILL_APPLIED";
                 resource?: string | null;
                 entityName?: string | null;
                 /** Format: uuid */
@@ -4577,7 +4451,7 @@ export interface components {
                 eventName: string | null;
                 queueNumber: number | null;
                 /** @enum {string|null} */
-                registrationStatus: "SIGNED_UP" | "CHECKED_IN" | "COMPLETED" | "CANCELLED" | null;
+                registrationStatus: "SIGNED_UP" | "WAITLISTED" | "CHECKED_IN" | "COMPLETED" | "CANCELLED" | null;
                 queueState: {
                     /** @description Participant's own live queue state (waiting/called/in-progress) */
                     status: components["schemas"]["QueueStatus"];
@@ -5333,7 +5207,6 @@ export interface components {
         ParticipantId: string;
         StationId: string;
         ContactId: string;
-        ConsentId: string;
         QrId: string;
         QrToken: string;
         Cursor: string;
@@ -6379,7 +6252,7 @@ export interface operations {
             query?: {
                 cursor?: string;
                 limit?: number;
-                status?: "SIGNED_UP" | "CHECKED_IN" | "COMPLETED" | "CANCELLED";
+                status?: "SIGNED_UP" | "WAITLISTED" | "CHECKED_IN" | "COMPLETED" | "CANCELLED";
                 search?: string;
             };
             header?: never;
@@ -6594,7 +6467,6 @@ export interface operations {
             };
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
-            404: components["responses"]["NotFound"];
         };
     };
     createEventRegistration: {
@@ -6613,6 +6485,7 @@ export interface operations {
                 "application/json": {
                     /** Format: uuid */
                     participantId: string;
+                    consentAcknowledged: boolean;
                 };
             };
         };
@@ -6639,6 +6512,31 @@ export interface operations {
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
             409: components["responses"]["Conflict"];
+        };
+    };
+    getEventRegistrationSummary: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                eventId: components["parameters"]["EventId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Registration summary */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EventRegistrationSummaryResponse"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
         };
     };
     listEventMemberships: {
@@ -7656,29 +7554,6 @@ export interface operations {
             403: components["responses"]["Forbidden"];
         };
     };
-    getParticipantActiveConsentForm: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Active consent form */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ConsentFormEnvelope"];
-                };
-            };
-            401: components["responses"]["Unauthorized"];
-            403: components["responses"]["Forbidden"];
-            404: components["responses"]["NotFound"];
-        };
-    };
     matchParticipantsForRegistration: {
         parameters: {
             query?: never;
@@ -7816,92 +7691,6 @@ export interface operations {
             403: components["responses"]["Forbidden"];
         };
     };
-    listParticipantConsents: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                participantId: components["parameters"]["ParticipantId"];
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Consent records */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ConsentsEnvelope"];
-                };
-            };
-            401: components["responses"]["Unauthorized"];
-            403: components["responses"]["Forbidden"];
-        };
-    };
-    createParticipantConsent: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                participantId: components["parameters"]["ParticipantId"];
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["ConsentWithEventRequest"];
-            };
-        };
-        responses: {
-            /** @description Consent recorded */
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ConsentEnvelope"];
-                };
-            };
-            400: components["responses"]["ValidationFailed"];
-            401: components["responses"]["Unauthorized"];
-            403: components["responses"]["Forbidden"];
-            404: components["responses"]["NotFound"];
-        };
-    };
-    withdrawParticipantConsent: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                participantId: components["parameters"]["ParticipantId"];
-                consentId: components["parameters"]["ConsentId"];
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["ConsentWithdrawalRequest"];
-            };
-        };
-        responses: {
-            /** @description Consent withdrawn */
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ConsentEnvelope"];
-                };
-            };
-            400: components["responses"]["ValidationFailed"];
-            401: components["responses"]["Unauthorized"];
-            403: components["responses"]["Forbidden"];
-            404: components["responses"]["NotFound"];
-            409: components["responses"]["Conflict"];
-        };
-    };
     listEmergencyContacts: {
         parameters: {
             query?: never;
@@ -7987,37 +7776,6 @@ export interface operations {
             404: components["responses"]["NotFound"];
         };
     };
-    createEventConsent: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                participantId: components["parameters"]["ParticipantId"];
-                eventId: components["parameters"]["EventId"];
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["ConsentRequest"];
-            };
-        };
-        responses: {
-            /** @description Consent recorded */
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ConsentEnvelope"];
-                };
-            };
-            400: components["responses"]["ValidationFailed"];
-            401: components["responses"]["Unauthorized"];
-            403: components["responses"]["Forbidden"];
-            404: components["responses"]["NotFound"];
-        };
-    };
     getParticipantRegistrationReview: {
         parameters: {
             query?: never;
@@ -8060,6 +7818,7 @@ export interface operations {
                     eventId: string;
                     /** Format: uuid */
                     participantId: string;
+                    consentAcknowledged: boolean;
                 };
             };
         };
@@ -8166,29 +7925,6 @@ export interface operations {
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
             409: components["responses"]["Conflict"];
-        };
-    };
-    getActiveConsentForm: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Active consent form */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ConsentFormEnvelope"];
-                };
-            };
-            401: components["responses"]["Unauthorized"];
-            403: components["responses"]["Forbidden"];
-            404: components["responses"]["NotFound"];
         };
     };
     updateEmergencyContact: {

@@ -1853,7 +1853,15 @@ item:
                         "min": 0,
                         "max": 0,
                         "unit": "",
-                        "eyes": "OD"
+                        "eyes": "OD",
+                        "flagRules": [
+                          {
+                            "op": "eq",
+                            "value": "",
+                            "flag": "REVIEW",
+                            "reason": ""
+                          }
+                        ]
                       }
                     ],
                     "schemaVersion": 1,
@@ -2159,7 +2167,15 @@ item:
                     "min": 0,
                     "max": 0,
                     "unit": "",
-                    "eyes": "OD"
+                    "eyes": "OD",
+                    "flagRules": [
+                      {
+                        "op": "eq",
+                        "value": "",
+                        "flag": "REVIEW",
+                        "reason": ""
+                      }
+                    ]
                   }
                 ],
                 "schemaVersion": 1,
@@ -2395,7 +2411,15 @@ item:
                       "min": 0,
                       "max": 0,
                       "unit": "",
-                      "eyes": "OD"
+                      "eyes": "OD",
+                      "flagRules": [
+                        {
+                          "op": "eq",
+                          "value": "",
+                          "flag": "REVIEW",
+                          "reason": ""
+                        }
+                      ]
                     }
                   ],
                   "schemaVersion": 1,
@@ -2608,7 +2632,15 @@ item:
                   "min": 0,
                   "max": 0,
                   "unit": "",
-                  "eyes": "OD"
+                  "eyes": "OD",
+                  "flagRules": [
+                    {
+                      "op": "eq",
+                      "value": "",
+                      "flag": "REVIEW",
+                      "reason": ""
+                    }
+                  ]
                 }
               ]
             }
@@ -2706,7 +2738,15 @@ item:
                 "min": 0,
                 "max": 0,
                 "unit": "",
-                "eyes": "OD"
+                "eyes": "OD",
+                "flagRules": [
+                  {
+                    "op": "eq",
+                    "value": "",
+                    "flag": "REVIEW",
+                    "reason": ""
+                  }
+                ]
               }
             ]
           }
@@ -2750,7 +2790,15 @@ item:
                 "min": 0,
                 "max": 0,
                 "unit": "",
-                "eyes": "OD"
+                "eyes": "OD",
+                "flagRules": [
+                  {
+                    "op": "eq",
+                    "value": "",
+                    "flag": "REVIEW",
+                    "reason": ""
+                  }
+                ]
               }
             ]
           }
@@ -2865,7 +2913,15 @@ item:
                   "min": 0,
                   "max": 0,
                   "unit": "",
-                  "eyes": "OD"
+                  "eyes": "OD",
+                  "flagRules": [
+                    {
+                      "op": "eq",
+                      "value": "",
+                      "flag": "REVIEW",
+                      "reason": ""
+                    }
+                  ]
                 }
               ]
             }
@@ -2964,7 +3020,15 @@ item:
                 "min": 0,
                 "max": 0,
                 "unit": "",
-                "eyes": "OD"
+                "eyes": "OD",
+                "flagRules": [
+                  {
+                    "op": "eq",
+                    "value": "",
+                    "flag": "REVIEW",
+                    "reason": ""
+                  }
+                ]
               }
             ]
           }
@@ -3008,7 +3072,15 @@ item:
                 "min": 0,
                 "max": 0,
                 "unit": "",
-                "eyes": "OD"
+                "eyes": "OD",
+                "flagRules": [
+                  {
+                    "op": "eq",
+                    "value": "",
+                    "flag": "REVIEW",
+                    "reason": ""
+                  }
+                ]
               }
             ]
           }
@@ -4624,7 +4696,15 @@ item:
                     "min": 0,
                     "max": 0,
                     "unit": "",
-                    "eyes": "OD"
+                    "eyes": "OD",
+                    "flagRules": [
+                      {
+                        "op": "eq",
+                        "value": "",
+                        "flag": "REVIEW",
+                        "reason": ""
+                      }
+                    ]
                   }
                 ],
                 "schemaVersion": 1,
@@ -4920,7 +5000,15 @@ item:
                     "min": 0,
                     "max": 0,
                     "unit": "",
-                    "eyes": "OD"
+                    "eyes": "OD",
+                    "flagRules": [
+                      {
+                        "op": "eq",
+                        "value": "",
+                        "flag": "REVIEW",
+                        "reason": ""
+                      }
+                    ]
                   }
                 ],
                 "schemaVersion": 1,
@@ -5396,6 +5484,7 @@ item:
                 "participantDisplayName": "",
                 "queueNumber": 0,
                 "idempotencyKey": "",
+                "consentAcknowledged": true,
                 "checkedIn": true,
                 "checkedInAt": "2026-08-07T00:00:00.000Z",
                 "createdAt": "2026-08-07T00:00:00.000Z",
@@ -5490,7 +5579,8 @@ item:
         mode: raw
         raw: |-
           {
-            "participantId": "00000000-0000-4000-8000-000000000000"
+            "participantId": "00000000-0000-4000-8000-000000000000",
+            "consentAcknowledged": true
           }
         options:
           raw:
@@ -5529,6 +5619,7 @@ item:
               "participantDisplayName": "",
               "queueNumber": 0,
               "idempotencyKey": "",
+              "consentAcknowledged": true,
               "checkedIn": true,
               "checkedInAt": "2026-08-07T00:00:00.000Z",
               "createdAt": "2026-08-07T00:00:00.000Z",
@@ -5596,6 +5687,7 @@ item:
               "participantDisplayName": "",
               "queueNumber": 0,
               "idempotencyKey": "",
+              "consentAcknowledged": true,
               "checkedIn": true,
               "checkedInAt": "2026-08-07T00:00:00.000Z",
               "createdAt": "2026-08-07T00:00:00.000Z",
@@ -5645,6 +5737,101 @@ item:
           url: '{{baseUrl}}/events/{eventId}/registrations'
         status: Bad Request
         code: 400
+        header:
+          - key: Content-Type
+            value: application/json
+        body: |-
+          {
+            "type": "",
+            "title": "",
+            "status": 0,
+            "code": "",
+            "requestId": "00000000-0000-4000-8000-000000000000",
+            "errors": [
+              {
+                "field": "",
+                "message": ""
+              }
+            ]
+          }
+  - name: Get registration capacity and status totals for an event
+    description: ''
+    event: []
+    request:
+      method: GET
+      header: []
+      auth:
+        type: bearer
+        bearer:
+          - key: token
+            value: '{{token}}'
+            type: string
+      url:
+        raw: '{{baseUrl}}/events/{eventId}/registrations/summary'
+        host:
+          - '{{baseUrl}}'
+        path:
+          - events
+          - '{eventId}'
+          - registrations
+          - summary
+        query: []
+    response:
+      - name: 200 Response
+        originalRequest:
+          method: GET
+          header: []
+          url: '{{baseUrl}}/events/{eventId}/registrations/summary'
+        status: OK
+        code: 200
+        header:
+          - key: Content-Type
+            value: application/json
+        body: |-
+          {
+            "summary": {
+              "eventId": "00000000-0000-4000-8000-000000000000",
+              "capacity": 0,
+              "signedUpCount": 0,
+              "waitlistedCount": 0,
+              "checkedInCount": 0,
+              "completedCount": 0,
+              "cancelledCount": 0,
+              "filledCount": 0,
+              "remainingCapacity": 0
+            }
+          }
+      - name: 401 Response
+        originalRequest:
+          method: GET
+          header: []
+          url: '{{baseUrl}}/events/{eventId}/registrations/summary'
+        status: Unauthorized
+        code: 401
+        header:
+          - key: Content-Type
+            value: application/json
+        body: |-
+          {
+            "type": "",
+            "title": "",
+            "status": 0,
+            "code": "",
+            "requestId": "00000000-0000-4000-8000-000000000000",
+            "errors": [
+              {
+                "field": "",
+                "message": ""
+              }
+            ]
+          }
+      - name: 403 Response
+        originalRequest:
+          method: GET
+          header: []
+          url: '{{baseUrl}}/events/{eventId}/registrations/summary'
+        status: Forbidden
+        code: 403
         header:
           - key: Content-Type
             value: application/json
@@ -6538,7 +6725,15 @@ item:
                     "min": 0,
                     "max": 0,
                     "unit": "",
-                    "eyes": "OD"
+                    "eyes": "OD",
+                    "flagRules": [
+                      {
+                        "op": "eq",
+                        "value": "",
+                        "flag": "REVIEW",
+                        "reason": ""
+                      }
+                    ]
                   }
                 ],
                 "schemaVersion": 1,
@@ -6773,7 +6968,15 @@ item:
                     "min": 0,
                     "max": 0,
                     "unit": "",
-                    "eyes": "OD"
+                    "eyes": "OD",
+                    "flagRules": [
+                      {
+                        "op": "eq",
+                        "value": "",
+                        "flag": "REVIEW",
+                        "reason": ""
+                      }
+                    ]
                   }
                 ],
                 "schemaVersion": 1,
@@ -7016,7 +7219,15 @@ item:
                     "min": 0,
                     "max": 0,
                     "unit": "",
-                    "eyes": "OD"
+                    "eyes": "OD",
+                    "flagRules": [
+                      {
+                        "op": "eq",
+                        "value": "",
+                        "flag": "REVIEW",
+                        "reason": ""
+                      }
+                    ]
                   }
                 ],
                 "schemaVersion": 1,
@@ -7266,7 +7477,15 @@ item:
                     "min": 0,
                     "max": 0,
                     "unit": "",
-                    "eyes": "OD"
+                    "eyes": "OD",
+                    "flagRules": [
+                      {
+                        "op": "eq",
+                        "value": "",
+                        "flag": "REVIEW",
+                        "reason": ""
+                      }
+                    ]
                   }
                 ],
                 "schemaVersion": 1,
@@ -7494,7 +7713,15 @@ item:
                     "min": 0,
                     "max": 0,
                     "unit": "",
-                    "eyes": "OD"
+                    "eyes": "OD",
+                    "flagRules": [
+                      {
+                        "op": "eq",
+                        "value": "",
+                        "flag": "REVIEW",
+                        "reason": ""
+                      }
+                    ]
                   }
                 ],
                 "schemaVersion": 1,
@@ -7714,7 +7941,15 @@ item:
                     "min": 0,
                     "max": 0,
                     "unit": "",
-                    "eyes": "OD"
+                    "eyes": "OD",
+                    "flagRules": [
+                      {
+                        "op": "eq",
+                        "value": "",
+                        "flag": "REVIEW",
+                        "reason": ""
+                      }
+                    ]
                   }
                 ],
                 "schemaVersion": 1,
@@ -7934,7 +8169,15 @@ item:
                     "min": 0,
                     "max": 0,
                     "unit": "",
-                    "eyes": "OD"
+                    "eyes": "OD",
+                    "flagRules": [
+                      {
+                        "op": "eq",
+                        "value": "",
+                        "flag": "REVIEW",
+                        "reason": ""
+                      }
+                    ]
                   }
                 ],
                 "schemaVersion": 1,
@@ -8172,7 +8415,15 @@ item:
                     "min": 0,
                     "max": 0,
                     "unit": "",
-                    "eyes": "OD"
+                    "eyes": "OD",
+                    "flagRules": [
+                      {
+                        "op": "eq",
+                        "value": "",
+                        "flag": "REVIEW",
+                        "reason": ""
+                      }
+                    ]
                   }
                 ],
                 "schemaVersion": 1,
@@ -8506,7 +8757,15 @@ item:
                       "min": 0,
                       "max": 0,
                       "unit": "",
-                      "eyes": "OD"
+                      "eyes": "OD",
+                      "flagRules": [
+                        {
+                          "op": "eq",
+                          "value": "",
+                          "flag": "REVIEW",
+                          "reason": ""
+                        }
+                      ]
                     }
                   ],
                   "schemaVersion": 1,
@@ -10561,7 +10820,15 @@ item:
                     "min": 0,
                     "max": 0,
                     "unit": "",
-                    "eyes": "OD"
+                    "eyes": "OD",
+                    "flagRules": [
+                      {
+                        "op": "eq",
+                        "value": "",
+                        "flag": "REVIEW",
+                        "reason": ""
+                      }
+                    ]
                   }
                 ],
                 "result": {
@@ -11698,100 +11965,6 @@ item:
               }
             ]
           }
-  - name: Get the currently effective consent form
-    description: ''
-    event: []
-    request:
-      method: GET
-      header: []
-      auth:
-        type: bearer
-        bearer:
-          - key: token
-            value: '{{token}}'
-            type: string
-      url:
-        raw: '{{baseUrl}}/participants/active-consent-form'
-        host:
-          - '{{baseUrl}}'
-        path:
-          - participants
-          - active-consent-form
-        query: []
-    response:
-      - name: 200 Response
-        originalRequest:
-          method: GET
-          header: []
-          url: '{{baseUrl}}/participants/active-consent-form'
-        status: OK
-        code: 200
-        header:
-          - key: Content-Type
-            value: application/json
-        body: |-
-          {
-            "consentForm": {
-              "id": "00000000-0000-4000-8000-000000000000",
-              "formCode": "",
-              "versionNumber": "",
-              "title": "",
-              "contentText": "",
-              "contentHash": "",
-              "documentObjectKey": "",
-              "effectiveFrom": "2026-08-07T00:00:00.000Z",
-              "effectiveTo": "2026-08-07T00:00:00.000Z",
-              "isActive": true
-            }
-          }
-      - name: 401 Response
-        originalRequest:
-          method: GET
-          header: []
-          url: '{{baseUrl}}/participants/active-consent-form'
-        status: Unauthorized
-        code: 401
-        header:
-          - key: Content-Type
-            value: application/json
-        body: |-
-          {
-            "type": "",
-            "title": "",
-            "status": 0,
-            "code": "",
-            "requestId": "00000000-0000-4000-8000-000000000000",
-            "errors": [
-              {
-                "field": "",
-                "message": ""
-              }
-            ]
-          }
-      - name: 403 Response
-        originalRequest:
-          method: GET
-          header: []
-          url: '{{baseUrl}}/participants/active-consent-form'
-        status: Forbidden
-        code: 403
-        header:
-          - key: Content-Type
-            value: application/json
-        body: |-
-          {
-            "type": "",
-            "title": "",
-            "status": 0,
-            "code": "",
-            "requestId": "00000000-0000-4000-8000-000000000000",
-            "errors": [
-              {
-                "field": "",
-                "message": ""
-              }
-            ]
-          }
   - name: Find possible participant matches for the assigned registration event
     description: >-
       A name alone never produces a possible match. An exact NRIC or FIN match is a strong match; otherwise at least two
@@ -12339,6 +12512,7 @@ item:
                 "participantDisplayName": "",
                 "queueNumber": 0,
                 "idempotencyKey": "",
+                "consentAcknowledged": true,
                 "checkedIn": true,
                 "checkedInAt": "2026-08-07T00:00:00.000Z",
                 "createdAt": "2026-08-07T00:00:00.000Z",
@@ -12377,368 +12551,6 @@ item:
           url: '{{baseUrl}}/participants/{participantId}/registrations'
         status: Forbidden
         code: 403
-        header:
-          - key: Content-Type
-            value: application/json
-        body: |-
-          {
-            "type": "",
-            "title": "",
-            "status": 0,
-            "code": "",
-            "requestId": "00000000-0000-4000-8000-000000000000",
-            "errors": [
-              {
-                "field": "",
-                "message": ""
-              }
-            ]
-          }
-  - name: List a participant's consent records
-    description: ''
-    event: []
-    request:
-      method: GET
-      header: []
-      auth:
-        type: bearer
-        bearer:
-          - key: token
-            value: '{{token}}'
-            type: string
-      url:
-        raw: '{{baseUrl}}/participants/{participantId}/consents'
-        host:
-          - '{{baseUrl}}'
-        path:
-          - participants
-          - '{participantId}'
-          - consents
-        query: []
-    response:
-      - name: 200 Response
-        originalRequest:
-          method: GET
-          header: []
-          url: '{{baseUrl}}/participants/{participantId}/consents'
-        status: OK
-        code: 200
-        header:
-          - key: Content-Type
-            value: application/json
-        body: |-
-          {
-            "consents": [
-              {
-                "id": "00000000-0000-4000-8000-000000000000",
-                "participantId": "00000000-0000-4000-8000-000000000000",
-                "eventId": "00000000-0000-4000-8000-000000000000",
-                "registrationId": "00000000-0000-4000-8000-000000000000",
-                "withdrawalOfId": "00000000-0000-4000-8000-000000000000",
-                "consentFormVersionId": "00000000-0000-4000-8000-000000000000",
-                "consentStatus": "PENDING",
-                "signerType": "",
-                "signerName": "",
-                "recordedById": "00000000-0000-4000-8000-000000000000",
-                "signedAt": "2026-08-07T00:00:00.000Z",
-                "withdrawnAt": "2026-08-07T00:00:00.000Z",
-                "withdrawalReason": "",
-                "createdAt": "2026-08-07T00:00:00.000Z"
-              }
-            ]
-          }
-      - name: 401 Response
-        originalRequest:
-          method: GET
-          header: []
-          url: '{{baseUrl}}/participants/{participantId}/consents'
-        status: Unauthorized
-        code: 401
-        header:
-          - key: Content-Type
-            value: application/json
-        body: |-
-          {
-            "type": "",
-            "title": "",
-            "status": 0,
-            "code": "",
-            "requestId": "00000000-0000-4000-8000-000000000000",
-            "errors": [
-              {
-                "field": "",
-                "message": ""
-              }
-            ]
-          }
-      - name: 403 Response
-        originalRequest:
-          method: GET
-          header: []
-          url: '{{baseUrl}}/participants/{participantId}/consents'
-        status: Forbidden
-        code: 403
-        header:
-          - key: Content-Type
-            value: application/json
-        body: |-
-          {
-            "type": "",
-            "title": "",
-            "status": 0,
-            "code": "",
-            "requestId": "00000000-0000-4000-8000-000000000000",
-            "errors": [
-              {
-                "field": "",
-                "message": ""
-              }
-            ]
-          }
-  - name: Record consent using an event ID in the request body
-    description: ''
-    event: []
-    request:
-      method: POST
-      header:
-        - key: Content-Type
-          value: application/json
-          description: JSON request body
-          type: text
-      auth:
-        type: bearer
-        bearer:
-          - key: token
-            value: '{{token}}'
-            type: string
-      url:
-        raw: '{{baseUrl}}/participants/{participantId}/consents'
-        host:
-          - '{{baseUrl}}'
-        path:
-          - participants
-          - '{participantId}'
-          - consents
-        query: []
-      body:
-        mode: raw
-        raw: |-
-          {
-            "consentFormVersionId": "00000000-0000-4000-8000-000000000000",
-            "consentStatus": "ACCEPTED",
-            "signerType": "PARTICIPANT",
-            "signerName": "",
-            "signerRelationship": "",
-            "guardianContactName": "",
-            "guardianContactPhone": "",
-            "guardianContactEmail": "",
-            "signatureObjectKey": "",
-            "signatureSha256": "",
-            "signatureMimeType": "image/png",
-            "eventId": "00000000-0000-4000-8000-000000000000"
-          }
-        options:
-          raw:
-            language: json
-    response:
-      - name: 201 Response
-        originalRequest:
-          method: POST
-          header:
-            - key: Content-Type
-              value: application/json
-              description: JSON request body
-              type: text
-          url: '{{baseUrl}}/participants/{participantId}/consents'
-        status: Created
-        code: 201
-        header:
-          - key: Content-Type
-            value: application/json
-        body: |-
-          {
-            "consent": {
-              "id": "00000000-0000-4000-8000-000000000000",
-              "participantId": "00000000-0000-4000-8000-000000000000",
-              "eventId": "00000000-0000-4000-8000-000000000000",
-              "registrationId": "00000000-0000-4000-8000-000000000000",
-              "withdrawalOfId": "00000000-0000-4000-8000-000000000000",
-              "consentFormVersionId": "00000000-0000-4000-8000-000000000000",
-              "consentStatus": "PENDING",
-              "signerType": "",
-              "signerName": "",
-              "recordedById": "00000000-0000-4000-8000-000000000000",
-              "signedAt": "2026-08-07T00:00:00.000Z",
-              "withdrawnAt": "2026-08-07T00:00:00.000Z",
-              "withdrawalReason": "",
-              "createdAt": "2026-08-07T00:00:00.000Z"
-            }
-          }
-      - name: 400 Response
-        originalRequest:
-          method: POST
-          header:
-            - key: Content-Type
-              value: application/json
-              description: JSON request body
-              type: text
-          url: '{{baseUrl}}/participants/{participantId}/consents'
-        status: Bad Request
-        code: 400
-        header:
-          - key: Content-Type
-            value: application/json
-        body: |-
-          {
-            "type": "",
-            "title": "",
-            "status": 0,
-            "code": "",
-            "requestId": "00000000-0000-4000-8000-000000000000",
-            "errors": [
-              {
-                "field": "",
-                "message": ""
-              }
-            ]
-          }
-      - name: 401 Response
-        originalRequest:
-          method: POST
-          header:
-            - key: Content-Type
-              value: application/json
-              description: JSON request body
-              type: text
-          url: '{{baseUrl}}/participants/{participantId}/consents'
-        status: Unauthorized
-        code: 401
-        header:
-          - key: Content-Type
-            value: application/json
-        body: |-
-          {
-            "type": "",
-            "title": "",
-            "status": 0,
-            "code": "",
-            "requestId": "00000000-0000-4000-8000-000000000000",
-            "errors": [
-              {
-                "field": "",
-                "message": ""
-              }
-            ]
-          }
-  - name: Create an immutable withdrawal for accepted consent
-    description: ''
-    event: []
-    request:
-      method: POST
-      header:
-        - key: Content-Type
-          value: application/json
-          description: JSON request body
-          type: text
-      auth:
-        type: bearer
-        bearer:
-          - key: token
-            value: '{{token}}'
-            type: string
-      url:
-        raw: '{{baseUrl}}/participants/{participantId}/consents/{consentId}/withdraw'
-        host:
-          - '{{baseUrl}}'
-        path:
-          - participants
-          - '{participantId}'
-          - consents
-          - '{consentId}'
-          - withdraw
-        query: []
-      body:
-        mode: raw
-        raw: |-
-          {
-            "withdrawalReason": ""
-          }
-        options:
-          raw:
-            language: json
-    response:
-      - name: 201 Response
-        originalRequest:
-          method: POST
-          header:
-            - key: Content-Type
-              value: application/json
-              description: JSON request body
-              type: text
-          url: '{{baseUrl}}/participants/{participantId}/consents/{consentId}/withdraw'
-        status: Created
-        code: 201
-        header:
-          - key: Content-Type
-            value: application/json
-        body: |-
-          {
-            "consent": {
-              "id": "00000000-0000-4000-8000-000000000000",
-              "participantId": "00000000-0000-4000-8000-000000000000",
-              "eventId": "00000000-0000-4000-8000-000000000000",
-              "registrationId": "00000000-0000-4000-8000-000000000000",
-              "withdrawalOfId": "00000000-0000-4000-8000-000000000000",
-              "consentFormVersionId": "00000000-0000-4000-8000-000000000000",
-              "consentStatus": "PENDING",
-              "signerType": "",
-              "signerName": "",
-              "recordedById": "00000000-0000-4000-8000-000000000000",
-              "signedAt": "2026-08-07T00:00:00.000Z",
-              "withdrawnAt": "2026-08-07T00:00:00.000Z",
-              "withdrawalReason": "",
-              "createdAt": "2026-08-07T00:00:00.000Z"
-            }
-          }
-      - name: 400 Response
-        originalRequest:
-          method: POST
-          header:
-            - key: Content-Type
-              value: application/json
-              description: JSON request body
-              type: text
-          url: '{{baseUrl}}/participants/{participantId}/consents/{consentId}/withdraw'
-        status: Bad Request
-        code: 400
-        header:
-          - key: Content-Type
-            value: application/json
-        body: |-
-          {
-            "type": "",
-            "title": "",
-            "status": 0,
-            "code": "",
-            "requestId": "00000000-0000-4000-8000-000000000000",
-            "errors": [
-              {
-                "field": "",
-                "message": ""
-              }
-            ]
-          }
-      - name: 401 Response
-        originalRequest:
-          method: POST
-          header:
-            - key: Content-Type
-              value: application/json
-              description: JSON request body
-              type: text
-          url: '{{baseUrl}}/participants/{participantId}/consents/{consentId}/withdraw'
-        status: Unauthorized
-        code: 401
         header:
           - key: Content-Type
             value: application/json
@@ -13104,143 +12916,7 @@ item:
               }
             ]
           }
-  - name: Record consent for a participant and event
-    description: ''
-    event: []
-    request:
-      method: POST
-      header:
-        - key: Content-Type
-          value: application/json
-          description: JSON request body
-          type: text
-      auth:
-        type: bearer
-        bearer:
-          - key: token
-            value: '{{token}}'
-            type: string
-      url:
-        raw: '{{baseUrl}}/participants/{participantId}/events/{eventId}/consent'
-        host:
-          - '{{baseUrl}}'
-        path:
-          - participants
-          - '{participantId}'
-          - events
-          - '{eventId}'
-          - consent
-        query: []
-      body:
-        mode: raw
-        raw: |-
-          {
-            "consentFormVersionId": "00000000-0000-4000-8000-000000000000",
-            "consentStatus": "ACCEPTED",
-            "signerType": "PARTICIPANT",
-            "signerName": "",
-            "signerRelationship": "",
-            "guardianContactName": "",
-            "guardianContactPhone": "",
-            "guardianContactEmail": "",
-            "signatureObjectKey": "",
-            "signatureSha256": "",
-            "signatureMimeType": "image/png"
-          }
-        options:
-          raw:
-            language: json
-    response:
-      - name: 201 Response
-        originalRequest:
-          method: POST
-          header:
-            - key: Content-Type
-              value: application/json
-              description: JSON request body
-              type: text
-          url: '{{baseUrl}}/participants/{participantId}/events/{eventId}/consent'
-        status: Created
-        code: 201
-        header:
-          - key: Content-Type
-            value: application/json
-        body: |-
-          {
-            "consent": {
-              "id": "00000000-0000-4000-8000-000000000000",
-              "participantId": "00000000-0000-4000-8000-000000000000",
-              "eventId": "00000000-0000-4000-8000-000000000000",
-              "registrationId": "00000000-0000-4000-8000-000000000000",
-              "withdrawalOfId": "00000000-0000-4000-8000-000000000000",
-              "consentFormVersionId": "00000000-0000-4000-8000-000000000000",
-              "consentStatus": "PENDING",
-              "signerType": "",
-              "signerName": "",
-              "recordedById": "00000000-0000-4000-8000-000000000000",
-              "signedAt": "2026-08-07T00:00:00.000Z",
-              "withdrawnAt": "2026-08-07T00:00:00.000Z",
-              "withdrawalReason": "",
-              "createdAt": "2026-08-07T00:00:00.000Z"
-            }
-          }
-      - name: 400 Response
-        originalRequest:
-          method: POST
-          header:
-            - key: Content-Type
-              value: application/json
-              description: JSON request body
-              type: text
-          url: '{{baseUrl}}/participants/{participantId}/events/{eventId}/consent'
-        status: Bad Request
-        code: 400
-        header:
-          - key: Content-Type
-            value: application/json
-        body: |-
-          {
-            "type": "",
-            "title": "",
-            "status": 0,
-            "code": "",
-            "requestId": "00000000-0000-4000-8000-000000000000",
-            "errors": [
-              {
-                "field": "",
-                "message": ""
-              }
-            ]
-          }
-      - name: 401 Response
-        originalRequest:
-          method: POST
-          header:
-            - key: Content-Type
-              value: application/json
-              description: JSON request body
-              type: text
-          url: '{{baseUrl}}/participants/{participantId}/events/{eventId}/consent'
-        status: Unauthorized
-        code: 401
-        header:
-          - key: Content-Type
-            value: application/json
-        body: |-
-          {
-            "type": "",
-            "title": "",
-            "status": 0,
-            "code": "",
-            "requestId": "00000000-0000-4000-8000-000000000000",
-            "errors": [
-              {
-                "field": "",
-                "message": ""
-              }
-            ]
-          }
-  - name: Get participant, event, emergency contact, and latest consent for registration review
+  - name: Get participant, event, and emergency contact for registration review
     description: ''
     event: []
     request:
@@ -13393,7 +13069,15 @@ item:
                       "min": 0,
                       "max": 0,
                       "unit": "",
-                      "eyes": "OD"
+                      "eyes": "OD",
+                      "flagRules": [
+                        {
+                          "op": "eq",
+                          "value": "",
+                          "flag": "REVIEW",
+                          "reason": ""
+                        }
+                      ]
                     }
                   ],
                   "schemaVersion": 1,
@@ -13448,22 +13132,6 @@ item:
               "status": "ACTIVE",
               "createdAt": "2026-08-07T00:00:00.000Z",
               "updatedAt": "2026-08-07T00:00:00.000Z"
-            },
-            "latestConsent": {
-              "id": "00000000-0000-4000-8000-000000000000",
-              "participantId": "00000000-0000-4000-8000-000000000000",
-              "eventId": "00000000-0000-4000-8000-000000000000",
-              "registrationId": "00000000-0000-4000-8000-000000000000",
-              "withdrawalOfId": "00000000-0000-4000-8000-000000000000",
-              "consentFormVersionId": "00000000-0000-4000-8000-000000000000",
-              "consentStatus": "PENDING",
-              "signerType": "",
-              "signerName": "",
-              "recordedById": "00000000-0000-4000-8000-000000000000",
-              "signedAt": "2026-08-07T00:00:00.000Z",
-              "withdrawnAt": "2026-08-07T00:00:00.000Z",
-              "withdrawalReason": "",
-              "createdAt": "2026-08-07T00:00:00.000Z"
             }
           }
       - name: 401 Response
@@ -13546,7 +13214,8 @@ item:
         raw: |-
           {
             "eventId": "00000000-0000-4000-8000-000000000000",
-            "participantId": "00000000-0000-4000-8000-000000000000"
+            "participantId": "00000000-0000-4000-8000-000000000000",
+            "consentAcknowledged": true
           }
         options:
           raw:
@@ -13585,6 +13254,7 @@ item:
               "participantDisplayName": "",
               "queueNumber": 0,
               "idempotencyKey": "",
+              "consentAcknowledged": true,
               "checkedIn": true,
               "checkedInAt": "2026-08-07T00:00:00.000Z",
               "createdAt": "2026-08-07T00:00:00.000Z",
@@ -13652,6 +13322,7 @@ item:
               "participantDisplayName": "",
               "queueNumber": 0,
               "idempotencyKey": "",
+              "consentAcknowledged": true,
               "checkedIn": true,
               "checkedInAt": "2026-08-07T00:00:00.000Z",
               "createdAt": "2026-08-07T00:00:00.000Z",
@@ -13764,6 +13435,7 @@ item:
               "participantDisplayName": "",
               "queueNumber": 0,
               "idempotencyKey": "",
+              "consentAcknowledged": true,
               "checkedIn": true,
               "checkedInAt": "2026-08-07T00:00:00.000Z",
               "createdAt": "2026-08-07T00:00:00.000Z",
@@ -14005,6 +13677,7 @@ item:
               "participantDisplayName": "",
               "queueNumber": 0,
               "idempotencyKey": "",
+              "consentAcknowledged": true,
               "checkedIn": true,
               "checkedInAt": "2026-08-07T00:00:00.000Z",
               "createdAt": "2026-08-07T00:00:00.000Z",
@@ -14078,100 +13751,6 @@ item:
           url: '{{baseUrl}}/registrations/{registrationId}/status'
         status: Unauthorized
         code: 401
-        header:
-          - key: Content-Type
-            value: application/json
-        body: |-
-          {
-            "type": "",
-            "title": "",
-            "status": 0,
-            "code": "",
-            "requestId": "00000000-0000-4000-8000-000000000000",
-            "errors": [
-              {
-                "field": "",
-                "message": ""
-              }
-            ]
-          }
-  - name: Get the currently effective consent form
-    description: ''
-    event: []
-    request:
-      method: GET
-      header: []
-      auth:
-        type: bearer
-        bearer:
-          - key: token
-            value: '{{token}}'
-            type: string
-      url:
-        raw: '{{baseUrl}}/consent-forms/active'
-        host:
-          - '{{baseUrl}}'
-        path:
-          - consent-forms
-          - active
-        query: []
-    response:
-      - name: 200 Response
-        originalRequest:
-          method: GET
-          header: []
-          url: '{{baseUrl}}/consent-forms/active'
-        status: OK
-        code: 200
-        header:
-          - key: Content-Type
-            value: application/json
-        body: |-
-          {
-            "consentForm": {
-              "id": "00000000-0000-4000-8000-000000000000",
-              "formCode": "",
-              "versionNumber": "",
-              "title": "",
-              "contentText": "",
-              "contentHash": "",
-              "documentObjectKey": "",
-              "effectiveFrom": "2026-08-07T00:00:00.000Z",
-              "effectiveTo": "2026-08-07T00:00:00.000Z",
-              "isActive": true
-            }
-          }
-      - name: 401 Response
-        originalRequest:
-          method: GET
-          header: []
-          url: '{{baseUrl}}/consent-forms/active'
-        status: Unauthorized
-        code: 401
-        header:
-          - key: Content-Type
-            value: application/json
-        body: |-
-          {
-            "type": "",
-            "title": "",
-            "status": 0,
-            "code": "",
-            "requestId": "00000000-0000-4000-8000-000000000000",
-            "errors": [
-              {
-                "field": "",
-                "message": ""
-              }
-            ]
-          }
-      - name: 403 Response
-        originalRequest:
-          method: GET
-          header: []
-          url: '{{baseUrl}}/consent-forms/active'
-        status: Forbidden
-        code: 403
         header:
           - key: Content-Type
             value: application/json
@@ -14342,7 +13921,7 @@ item:
           {
             "dataUrl": "",
             "eventId": "00000000-0000-4000-8000-000000000000",
-            "purpose": "CONSENT",
+            "purpose": "REFERRAL",
             "targetId": "00000000-0000-4000-8000-000000000000"
           }
         options:
@@ -18298,7 +17877,7 @@ item:
               {
                 "taskId": "00000000-0000-4000-8000-000000000000",
                 "eventId": "00000000-0000-4000-8000-000000000000",
-                "artifactType": "CONSENT_SIGNATURE",
+                "artifactType": "REFERRAL_SIGNATURE",
                 "status": "PENDING",
                 "attemptCount": 0,
                 "lastError": "",
@@ -18413,7 +17992,7 @@ item:
           {
             "taskId": "00000000-0000-4000-8000-000000000000",
             "eventId": "00000000-0000-4000-8000-000000000000",
-            "artifactType": "CONSENT_SIGNATURE",
+            "artifactType": "REFERRAL_SIGNATURE",
             "status": "PENDING",
             "attemptCount": 0,
             "lastError": "",

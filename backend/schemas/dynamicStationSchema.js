@@ -1,6 +1,21 @@
 const { z } = require("zod");
 
 const FIELD_TYPES = ["text", "number", "select", "boolean", "eye-pair", "va-eye", "refraction-eye"];
+const FLAG_LEVELS = ["REVIEW", "REFER", "URGENT"];
+const FLAG_OPS = ["eq", "neq", "lt", "lte", "gt", "gte", "includes", "isTrue", "isFalse", "isEmpty", "notEmpty"];
+const FLAG_RANK = { NORMAL: 0, REVIEW: 1, REFER: 2, URGENT: 3 };
+const TEMPLATE_FLAG_RULE_VERSION = "TEMPLATE-FLAG-1.0";
+
+const fieldFlagRule = z.object({
+  op: z.enum(FLAG_OPS),
+  value: z.union([z.string().trim().max(200), z.number(), z.boolean()]).optional(),
+  flag: z.enum(FLAG_LEVELS),
+  reason: z.string().trim().min(1).max(200),
+}).strict().superRefine((rule, ctx) => {
+  if (["eq", "neq", "lt", "lte", "gt", "gte", "includes"].includes(rule.op) && rule.value === undefined) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, message: `Flag rule ${rule.op} requires a value` });
+  }
+});
 
 const fieldDefinition = z.object({
   key: z.string().trim().min(1).max(64).regex(/^[a-zA-Z][a-zA-Z0-9_]*$/),
@@ -12,12 +27,19 @@ const fieldDefinition = z.object({
   max: z.number().optional(),
   unit: z.string().trim().max(20).optional(),
   eyes: z.enum(["OD", "OS", "BOTH"]).optional(),
+  flagRules: z.array(fieldFlagRule).max(10).optional(),
 }).strict().superRefine((field, ctx) => {
   if (field.type === "select" && (!field.options || field.options.length < 1)) {
     ctx.addIssue({ code: z.ZodIssueCode.custom, message: `Select field ${field.key} requires options` });
   }
   if (field.min !== undefined && field.max !== undefined && field.min > field.max) {
     ctx.addIssue({ code: z.ZodIssueCode.custom, message: `Field ${field.key} min cannot exceed max` });
+  }
+  if (field.flagRules?.length && (field.type === "va-eye" || field.type === "refraction-eye" || field.type === "eye-pair")) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: `Field ${field.key} type ${field.type} cannot define template flag rules`,
+    });
   }
 });
 
@@ -108,6 +130,12 @@ const assertClinicalFieldSchema = (stationType, schema) => {
         error.status = 422;
         throw error;
       }
+    }
+    if (field.flagRules?.length) {
+      const error = new Error(`Clinical field "${required.key}" uses built-in medical flagging and cannot define template flag rules`);
+      error.code = "INVALID_FIELD_SCHEMA";
+      error.status = 422;
+      throw error;
     }
   }
   return fields;
@@ -225,6 +253,88 @@ const normalizeClinicalResultData = (stationType, resultData) => {
   return resultData;
 };
 
+const isBlankValue = (value) => value == null || value === "";
+
+const matchesFlagRule = (value, rule) => {
+  switch (rule.op) {
+    case "isEmpty":
+      return isBlankValue(value);
+    case "notEmpty":
+      return !isBlankValue(value);
+    case "isTrue":
+      return value === true || value === "yes";
+    case "isFalse":
+      return value === false || value === "no";
+    case "eq":
+      return value === rule.value || String(value) === String(rule.value);
+    case "neq":
+      return value !== rule.value && String(value) !== String(rule.value);
+    case "includes":
+      return typeof value === "string" && typeof rule.value === "string" && value.toLowerCase().includes(String(rule.value).toLowerCase());
+    case "lt":
+    case "lte":
+    case "gt":
+    case "gte": {
+      const left = typeof value === "number" ? value : Number(value);
+      const right = typeof rule.value === "number" ? rule.value : Number(rule.value);
+      if (!Number.isFinite(left) || !Number.isFinite(right)) return false;
+      if (rule.op === "lt") return left < right;
+      if (rule.op === "lte") return left <= right;
+      if (rule.op === "gt") return left > right;
+      return left >= right;
+    }
+    default:
+      return false;
+  }
+};
+
+const evaluateDynamicResult = (resultData = {}, fieldSchema = []) => {
+  const reasons = [];
+  for (const field of fieldSchema || []) {
+    for (const rule of field.flagRules || []) {
+      if (matchesFlagRule(resultData?.[field.key], rule)) {
+        reasons.push({ flag: rule.flag, reason: rule.reason });
+      }
+    }
+  }
+  const overallFlag = reasons.reduce(
+    (worst, item) => (FLAG_RANK[item.flag] > FLAG_RANK[worst] ? item.flag : worst),
+    "NORMAL",
+  );
+  return {
+    overallFlag,
+    isFlagged: overallFlag !== "NORMAL",
+    flagSummary: reasons.length ? reasons.map((item) => item.reason).join("; ") : null,
+    ruleVersion: TEMPLATE_FLAG_RULE_VERSION,
+    reasons,
+  };
+};
+
+const mergeFlagEvaluations = (...evaluations) => {
+  const present = evaluations.filter(Boolean);
+  const reasons = present.flatMap((evaluation) => evaluation.reasons || []);
+  const overallFlag = present.reduce((worst, evaluation) => {
+    const flag = evaluation.overallFlag || "NORMAL";
+    return FLAG_RANK[flag] > FLAG_RANK[worst] ? flag : worst;
+  }, "NORMAL");
+  const clinical = present.find((evaluation) => String(evaluation.ruleVersion || "").startsWith("VSMS-"));
+  const template = present.find((evaluation) => evaluation.ruleVersion === TEMPLATE_FLAG_RULE_VERSION);
+  let ruleVersion = clinical?.ruleVersion || template?.ruleVersion || TEMPLATE_FLAG_RULE_VERSION;
+  // ScreeningResult.ruleVersion is VarChar(20); keep a compact combined marker.
+  if (clinical?.ruleVersion && template?.reasons?.length) {
+    ruleVersion = `${clinical.ruleVersion}+TF`.slice(0, 20);
+  }
+  return {
+    overallFlag,
+    isFlagged: overallFlag !== "NORMAL",
+    flagSummary: reasons.length
+      ? reasons.map((item) => item.reason).join("; ")
+      : present.find((evaluation) => evaluation.flagSummary)?.flagSummary || null,
+    ruleVersion,
+    reasons,
+  };
+};
+
 /** Keep template-validated extras that clinical Zod schemas would otherwise strip. */
 const mergeClinicalAndTemplateResult = (templateResult, clinicalResult) => {
   const merged = { ...clinicalResult };
@@ -233,14 +343,6 @@ const mergeClinicalAndTemplateResult = (templateResult, clinicalResult) => {
   }
   return merged;
 };
-
-const evaluateDynamicResult = () => ({
-  overallFlag: "NORMAL",
-  isFlagged: false,
-  flagSummary: null,
-  ruleVersion: "TEMPLATE-SCHEMA-1.0",
-  reasons: [],
-});
 
 const SYSTEM_FIELD_SCHEMAS = {
   VISUAL_ACUITY: [
@@ -393,6 +495,9 @@ const resolveCompatibleFieldSchema = (stationType, snapshot) => {
 
 module.exports = {
   FIELD_TYPES,
+  FLAG_LEVELS,
+  FLAG_OPS,
+  TEMPLATE_FLAG_RULE_VERSION,
   fieldDefinition,
   fieldSchema,
   parseFieldSchema,
@@ -403,6 +508,7 @@ module.exports = {
   mergeClinicalAndTemplateResult,
   resolveCompatibleFieldSchema,
   evaluateDynamicResult,
+  mergeFlagEvaluations,
   SYSTEM_FIELD_SCHEMAS,
   CUSTOM_OD_NOTES_SCHEMA,
 };

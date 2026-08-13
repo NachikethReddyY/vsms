@@ -3,12 +3,11 @@ const assert = require("node:assert/strict");
 const {
     validateParticipantPayload,
     validateEmergencyContactPayload,
-    validateConsentPayload,
     validateIdempotencyKey,
 } = require("../../utils/validation/validation");
 
 test("valid participant payload is normalized", () => {
-    const value = validateParticipantPayload({
+    const payload = {
         firstName: "  John ",
         lastName: " Tan ",
         dateOfBirth: "1980-03-14",
@@ -24,7 +23,8 @@ test("valid participant payload is normalized", () => {
         preferredLanguage: "English",
         accessibilityNotes: "",
         status: "active",
-    });
+    };
+    const value = validateParticipantPayload(payload);
     assert.equal(value.firstName, "John");
     assert.equal(value.gender, "M");
     assert.equal(value.email, "john@example.com");
@@ -37,6 +37,8 @@ test("valid participant payload is normalized", () => {
     assert.equal(value.addressPostalCode, "123456");
     assert.equal(value.accessibilityNotes, null);
     assert.equal(value.status, "ACTIVE");
+    assert.throws(() => validateParticipantPayload({ ...payload, email: "" }), /email is required/);
+    assert.throws(() => validateParticipantPayload({ ...payload, addressPostalCode: "" }), /addressPostalCode is required/);
 });
 
 test("participant rejects future DOB, invalid email, phone, enum and missing names", () => {
@@ -73,32 +75,6 @@ test("emergency contact validates active/removal history fields", () => {
         () => validateEmergencyContactPayload({ ...value, status: "REMOVED", isPrimary: true }),
         /removed emergency contact cannot be the primary contact/i
     );
-});
-
-test("accepted consent requires signer and signature evidence", () => {
-    const base = {
-        consentFormVersionId: "44444444-4444-4444-8444-444444444444",
-        consentStatus: "ACCEPTED",
-        signerType: "PARTICIPANT",
-        signerName: "John Tan",
-        signatureObjectKey: "signatures/example.png",
-        signatureSha256: "a".repeat(64),
-        signatureMimeType: "image/png",
-    };
-    assert.equal(validateConsentPayload(base).consentStatus, "ACCEPTED");
-    assert.throws(() => validateConsentPayload({ ...base, signatureSha256: "" }), /signature/);
-    assert.throws(() => validateConsentPayload({ ...base, consentStatus: "WITHDRAWN" }), /ACCEPTED or DECLINED/);
-});
-
-test("representative consent requires a relationship but not duplicate contact information", () => {
-    const base = {
-        consentFormVersionId: "44444444-4444-4444-8444-444444444444",
-        consentStatus: "DECLINED",
-        signerType: "GUARDIAN",
-        signerName: "Guardian",
-    };
-    assert.throws(() => validateConsentPayload(base), /signerRelationship/);
-    assert.equal(validateConsentPayload({ ...base, signerRelationship: "Parent" }).guardianContactPhone, null);
 });
 
 test("idempotency keys have bounded safe syntax", () => {

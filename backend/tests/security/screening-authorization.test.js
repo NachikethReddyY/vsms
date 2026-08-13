@@ -148,7 +148,7 @@ test("dynamic routes accept schema-driven clinical and CUSTOM stations", async (
     user,
   );
   assert.equal(clinicalPreview.overallFlag, "URGENT");
-  assert.equal(clinicalPreview.ruleVersion, "VSMS-VA-1.0");
+  assert.match(clinicalPreview.ruleVersion, /VSMS-VA-1\.0/);
 
   const preview = await screeningService.previewDynamic(
     eventId,

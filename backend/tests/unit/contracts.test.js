@@ -55,8 +55,7 @@ test("schema contains all required registration module tables", () => {
     const schema = read("prisma/schema.prisma");
     for (const model of [
         "User", "Role", "Permission", "UserRole", "RolePermission", "AuthAuditLog",
-        "Participant", "ParticipantEmergencyContact", "ConsentFormVersion",
-        "ParticipantConsent", "Event", "EventRegistration", "RegistrationStatusHistory",
+        "Participant", "ParticipantEmergencyContact", "Event", "EventRegistration", "RegistrationStatusHistory",
         "AuditLog", "Device",
     ]) {
         assert.match(schema, new RegExp(`model ${model}\\s*\\{`), `missing ${model}`);
@@ -69,14 +68,15 @@ test("API routes expose the required versioned contracts", () => {
     const events = read("routes/eventRoutes.js");
     const registrations = read("routes/registrationRoutes.js");
     const auth = read("routes/authRoutes.js");
-    assert.match(app, /"\/api\/v1\/consent-forms"/);
+    assert.doesNotMatch(app, /"\/api\/v1\/consent-forms"/);
     assert.match(app, /"\/api\/v1\/emergency-contacts"/);
     assert.match(participants, /"\/:participantId\/registrations"/);
-    assert.match(participants, /"\/:participantId\/consents"/);
+    assert.doesNotMatch(participants, /"\/:participantId\/consents"/);
     assert.match(events, /"\/:eventId\/registrations"/);
     assert.match(events, /"\/active"/);
     assert.ok(events.indexOf('"/active"') < events.indexOf('"/:eventId"'), "active events route must precede the dynamic event route");
     assert.match(registrations, /"\/:registrationId\/history"/);
+    assert.match(read("controllers/registrationController.js"), /consentAcknowledged/);
     for (const route of ["/authorize", "/callback", "/logout", "/refresh", "/me"]) {
         assert.ok(auth.includes(`"${route}"`), `missing auth route ${route}`);
     }
@@ -132,17 +132,27 @@ test("account contracts allow composed runtime fields and document provider main
     assert.ok(document.paths["/api/v1/users"].post.responses["202"]);
 });
 
-test("registration service creates registration, history and audit together", () => {
+test("registration service delegates atomic registration work to stored functions", () => {
     const controller = read("controllers/registrationController.js");
     const service = read("services/participant/registrationService.js");
+    const qrService = read("services/participant/qrService.js");
+    const migration = read("prisma/migrations/20260813150100_add_registration_stored_functions/migration.sql");
     const transactionBody = service.slice(service.indexOf("db.$transaction"));
-    assert.match(transactionBody, /eventRegistration\.create/);
-    assert.match(transactionBody, /registrationStatusHistory\.create/);
+    assert.match(transactionBody, /register_participant_for_event/);
+    assert.match(service, /cancel_event_registration/);
+    assert.match(qrService, /check_in_event_registration/);
+    assert.match(service, /get_event_registration_summary/);
     assert.match(transactionBody, /createAuditLog/);
     assert.match(transactionBody, /isolationLevel:\s*"ReadCommitted"/);
     assert.match(service, /DUPLICATE_REGISTRATION_BLOCKED/);
     assert.match(controller, /registrationService\.createRegistration/);
+    assert.match(controller, /registrationService\.getEventRegistrationSummary/);
     assert.doesNotMatch(controller, /prisma/);
+    assert.match(migration, /CREATE OR REPLACE FUNCTION "register_participant_for_event"/);
+    assert.match(migration, /CREATE OR REPLACE FUNCTION "cancel_event_registration"/);
+    assert.match(migration, /CREATE OR REPLACE FUNCTION "check_in_event_registration"/);
+    assert.match(migration, /CREATE OR REPLACE FUNCTION "get_event_registration_summary"/);
+    assert.match(migration, /registration_status_history/);
 });
 
 test("migration preserves history and enforces one active primary contact", () => {

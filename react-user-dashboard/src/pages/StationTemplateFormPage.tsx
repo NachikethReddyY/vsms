@@ -244,7 +244,7 @@ export default function StationTemplateFormPage({ mode }: { mode: Mode }) {
         <section className="station-template-section" aria-labelledby="station-fields-title">
           <div className="station-template-section-copy">
             <h2 id="station-fields-title">Form fields</h2>
-            <p>Define the inputs screeners fill at this station. The schema is frozen onto an event when imported.</p>
+            <p>Define the inputs screeners fill at this station. Add flag rules on custom fields so matching values raise REVIEW / REFER / URGENT.</p>
           </div>
           <div className="station-template-section-body">
             <StationFieldBuilder

@@ -134,7 +134,6 @@ test("QR lookups return only the operational registration projection", async () 
               lastName: "Lovelace",
               nric: "encrypted-nric",
               contactNumber: "+6512345678",
-              consentGiven: true,
               createdById: "66666666-6666-4666-8666-666666666666",
             },
             event: {
@@ -348,11 +347,24 @@ test("verification rejects any pass that does not satisfy the shared active-expi
 test("manual QR check-in writes no bearer or participant data and returns a minimal projection", async () => {
   const token = "e".repeat(64);
   const qrQueries = [];
-  let registrationQuery;
-  let updateQuery;
+  const rawQueries = [];
   let audit;
   const db = {
     $transaction: async (work) => work({
+      $queryRaw: async (strings) => {
+        const sql = strings.join("");
+        rawQueries.push(sql);
+        if (sql.includes("FROM event_registrations")) return [{ registration_id: registrationId }];
+        if (sql.includes("FROM qr_code_passes")) return [{ id: qrId, registrationId }];
+        return [{
+          registration_id: registrationId,
+          event_id: eventId,
+          registration_status: "CHECKED_IN",
+          checked_in: true,
+          checked_in_at: new Date(),
+          queue_number: 7,
+        }];
+      },
       qRCodePass: {
         findFirst: async (query) => {
           qrQueries.push(query);
@@ -362,23 +374,6 @@ test("manual QR check-in writes no bearer or participant data and returns a mini
         },
       },
       eventRegistration: {
-        findFirst: async (query) => {
-          registrationQuery = query;
-          return {
-            registrationId,
-            eventId,
-            registrationStatus: "SIGNED_UP",
-            checkedIn: false,
-            checkedInAt: null,
-            queueNumber: 7,
-            participant: { nric: "encrypted-nric", firstName: "Ada" },
-            event: { name: "Internal event" },
-          };
-        },
-        updateMany: async (query) => {
-          updateQuery = query;
-          return { count: 1 };
-        },
         findUnique: async () => ({
           registrationId,
           eventId,
@@ -403,28 +398,7 @@ test("manual QR check-in writes no bearer or participant data and returns a mini
   assert.equal(qrQueries[0].where.tokenHash, tokenHash(token));
   assert.deepEqual(qrQueries[0].where.registration, { eventId });
   assert.equal(JSON.stringify(qrQueries[0]).includes(token), false);
-  assert.deepEqual(qrQueries[1].select, { id: true, registrationId: true });
-  assert.equal(qrQueries[1].where.id, qrId);
-  assert.equal(qrQueries[1].where.registrationId, registrationId);
-  assert.equal(qrQueries[1].where.isActive, true);
-  assert.ok(qrQueries[1].where.expiresAt.gt instanceof Date);
-  assert.deepEqual(registrationQuery.select, {
-    registrationId: true,
-    eventId: true,
-    registrationStatus: true,
-    checkedIn: true,
-    checkedInAt: true,
-    queueNumber: true,
-  });
-  assert.deepEqual(updateQuery.where, {
-    registrationId,
-    eventId,
-    registrationStatus: "SIGNED_UP",
-    checkedIn: false,
-  });
-  assert.equal(updateQuery.data.registrationStatus, "CHECKED_IN");
-  assert.equal(updateQuery.data.checkedIn, true);
-  assert.ok(updateQuery.data.checkedInAt instanceof Date);
+  assert.equal(rawQueries.some((sql) => sql.includes("check_in_event_registration")), true);
   assert.deepEqual(audit.newValue, { eventId, checkInMethod: "QR_TOKEN" });
   assert.equal(JSON.stringify(audit).includes(token), false);
   assert.equal(JSON.stringify(audit).includes("encrypted-nric"), false);
@@ -441,17 +415,18 @@ test("manual registration-reference check-in does not resolve participant identi
   let audit;
   const db = {
     $transaction: async (work) => work({
+      $queryRaw: async (strings) => strings.join("").includes("FROM event_registrations")
+        ? [{ registration_id: registrationId }]
+        : [{
+            registration_id: registrationId,
+            event_id: eventId,
+            registration_status: "CHECKED_IN",
+            checked_in: true,
+            checked_in_at: new Date(),
+            queue_number: null,
+          }],
       qRCodePass: { findFirst: async () => { qrLookup = true; return null; } },
       eventRegistration: {
-        findFirst: async () => ({
-          registrationId,
-          eventId,
-          registrationStatus: "SIGNED_UP",
-          checkedIn: false,
-          checkedInAt: null,
-          queueNumber: null,
-        }),
-        updateMany: async () => ({ count: 1 }),
         findUnique: async () => ({
           registrationId,
           eventId,
@@ -590,37 +565,21 @@ test("missing and cross-event registration references have the same concealed er
   }
 });
 
-test("manual check-in cannot reopen terminal registrations or win a stale update race", async () => {
-  for (const [registrationStatus, checkedIn] of [["CANCELLED", false], ["COMPLETED", false], ["CHECKED_IN", true]]) {
-    let updated = false;
-    const db = {
-      $transaction: async (work) => work({
-        eventRegistration: {
-          findFirst: async () => ({ registrationId, eventId, registrationStatus, checkedIn, checkedInAt: null, queueNumber: 1 }),
-          updateMany: async () => { updated = true; return { count: 1 }; },
-        },
-        auditLog: { create: async () => ({}) },
-      }),
-    };
-    await assert.rejects(
-      qrService.manualCheckIn({ registrationId, eventId, userId: qrId }, db),
-      (error) => error.code === "CHECKIN_STATE_CONFLICT" && error.status === 409,
-    );
-    assert.equal(updated, false);
-  }
-
+test("manual check-in maps stored-routine state conflicts and writes no audit", async () => {
   let auditWrites = 0;
-  const staleDb = {
+  let rawCalls = 0;
+  const db = {
     $transaction: async (work) => work({
-      eventRegistration: {
-        findFirst: async () => ({ registrationId, eventId, registrationStatus: "SIGNED_UP", checkedIn: false, checkedInAt: null, queueNumber: 1 }),
-        updateMany: async () => ({ count: 0 }),
+      $queryRaw: async () => {
+        rawCalls += 1;
+        if (rawCalls === 1) return [{ registration_id: registrationId }];
+        throw new Error("REGISTRATION_CHECKIN_CONFLICT");
       },
       auditLog: { create: async () => { auditWrites += 1; return {}; } },
     }),
   };
   await assert.rejects(
-    qrService.manualCheckIn({ registrationId, eventId, userId: qrId }, staleDb),
+    qrService.manualCheckIn({ registrationId, eventId, userId: qrId }, db),
     (error) => error.code === "CHECKIN_STATE_CONFLICT" && error.status === 409,
   );
   assert.equal(auditWrites, 0);

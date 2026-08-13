@@ -8,8 +8,7 @@ const {
     getRouteState,
 } = require("../screening/routeAssignmentService");
 
-const OPEN_EVENT_STATUSES = ["PUBLISHED", "UPCOMING", "ONGOING", "IN_PROGRESS"];
-const REGISTRATION_STATUSES = new Set(["SIGNED_UP", "CHECKED_IN", "COMPLETED", "CANCELLED"]);
+const REGISTRATION_STATUSES = new Set(["SIGNED_UP", "WAITLISTED", "CHECKED_IN", "COMPLETED", "CANCELLED"]);
 
 const registrationInclude = () => ({
     event: true,
@@ -37,6 +36,28 @@ const conflict = (message) => {
     return error;
 };
 
+const routineErrors = {
+    REGISTRATION_EVENT_NOT_FOUND: [404, "Event not found"],
+    REGISTRATION_EVENT_NOT_OPEN: [400, "Event is not open for registration"],
+    REGISTRATION_CONSENT_REQUIRED: [400, "Consent acknowledgement is required before registration"],
+    REGISTRATION_PARTICIPANT_NOT_ACTIVE: [404, "Active participant not found"],
+    REGISTRATION_EMERGENCY_CONTACT_REQUIRED: [400, "An active emergency contact is required before registration"],
+    REGISTRATION_DUPLICATE: [409, "Participant is already registered for this event"],
+    REGISTRATION_IDEMPOTENCY_CONFLICT: [409, "Idempotency key was already used for a different registration"],
+    REGISTRATION_NOT_FOUND: [404, "Registration not found"],
+    REGISTRATION_CANNOT_BE_CANCELLED: [409, "Only signed-up or waitlisted registrations can be cancelled"],
+    REGISTRATION_CHECKIN_CONFLICT: [409, "Only a signed-up participant can be checked in"],
+};
+
+function mapRoutineError(error) {
+    const routineCode = Object.keys(routineErrors).find((code) => String(error?.message || "").includes(code));
+    const entry = routineErrors[routineCode];
+    if (!entry) return error;
+    const mapped = new Error(entry[1]);
+    mapped.statusCode = entry[0];
+    return mapped;
+}
+
 async function auditDuplicate({ userId, context, participantId, eventId, registrationId }) {
     await createAuditLog({
         userId,
@@ -50,6 +71,9 @@ async function auditDuplicate({ userId, context, participantId, eventId, registr
 }
 
 async function provisionExistingRegistration({ registration, userId, eventId, context, db }) {
+    if (registration.registrationStatus === "WAITLISTED") {
+        return { registration, route: null, securePass: null };
+    }
     for (let attempt = 0; attempt < 4; attempt += 1) {
         try {
             return await db.$transaction(async (tx) => {
@@ -77,7 +101,7 @@ async function provisionExistingRegistration({ registration, userId, eventId, co
     throw conflict("Unable to provision registration. Please retry.");
 }
 
-exports.createRegistration = async ({ participantId, eventId, idempotencyKey, auth, context }, db = prisma) => {
+exports.createRegistration = async ({ participantId, eventId, consentAcknowledged, idempotencyKey, auth, context }, db = prisma) => {
     const userId = auth.userId;
     await assertRegistrationAssignment(db, eventId, auth);
 
@@ -113,81 +137,51 @@ exports.createRegistration = async ({ participantId, eventId, idempotencyKey, au
         try {
             registration = await db.$transaction(async (tx) => {
                 await assertParticipantEventScope(tx, participantId, eventId, userId);
-                const [participant, event, acceptedConsent, activeContact] = await Promise.all([
-                    tx.participant.findUnique({ where: { id: participantId } }),
-                    tx.event.findUnique({ where: { eventId } }),
-                    tx.participantConsent.findFirst({
-                        where: {
-                            participantId,
-                            eventId,
-                            consentStatus: "ACCEPTED",
-                            withdrawals: { none: { consentStatus: "WITHDRAWN" } },
-                        },
-                        orderBy: { createdAt: "desc" },
-                    }),
-                    tx.participantEmergencyContact.findFirst({
-                        where: { participantId, status: "ACTIVE" },
-                        select: { id: true },
-                    }),
-                ]);
-
-                if (!participant || participant.status !== "ACTIVE") throw notFound("Active participant not found");
-                if (!event || !OPEN_EVENT_STATUSES.includes(event.status)) {
-                    const error = new Error("Event is not open for registration");
-                    error.statusCode = 400;
-                    throw error;
-                }
-                if (!acceptedConsent) {
-                    const error = new Error("Accepted, non-withdrawn consent is required before registration");
-                    error.statusCode = 400;
-                    throw error;
-                }
-                if (!activeContact) {
-                    const error = new Error("An active emergency contact is required before registration");
-                    error.statusCode = 400;
-                    throw error;
-                }
-
-                const created = await tx.eventRegistration.create({
-                    data: {
-                        participantId,
-                        eventId,
-                        registrationStatus: "SIGNED_UP",
-                        registeredBy: userId,
-                        idempotencyKey,
-                    },
+                const rows = await tx.$queryRaw`
+                    SELECT * FROM "register_participant_for_event"(
+                        CAST(${participantId} AS uuid),
+                        CAST(${eventId} AS uuid),
+                        CAST(${userId} AS uuid),
+                        ${idempotencyKey},
+                        ${consentAcknowledged}
+                    )
+                `;
+                const operation = rows[0];
+                const created = await tx.eventRegistration.findUnique({
+                    where: { registrationId: operation.registration_id },
                     include: registrationInclude(),
                 });
-                await tx.registrationStatusHistory.create({
-                    data: {
+                if (!operation.idempotent_replay) {
+                    await createAuditLog({
+                        userId,
+                        action: "EVENT_REGISTRATION_CREATED",
+                        entityName: "EventRegistration",
+                        entityId: created.registrationId,
+                        newValue: { participantId, eventId, queueNumber: null, status: created.registrationStatus, consentAcknowledged: true },
+                        context,
+                        client: tx,
+                    });
+                }
+                const securePass = created.registrationStatus === "WAITLISTED"
+                    ? null
+                    : await qrService.generateQR(created.registrationId, userId, tx, context);
+                const route = created.registrationStatus === "WAITLISTED"
+                    ? null
+                    : created.event.status === "IN_PROGRESS"
+                    ? await assignRouteOnce({
+                        tx,
                         registrationId: created.registrationId,
-                        fromStatus: null,
-                        toStatus: "SIGNED_UP",
-                        changedById: userId,
-                        reason: "Initial registration",
-                    },
-                });
-                await tx.participantConsent.update({
-                    where: { id: acceptedConsent.id },
-                    data: { registrationId: created.registrationId },
-                });
-                await createAuditLog({
-                    userId,
-                    action: "EVENT_REGISTRATION_CREATED",
-                    entityName: "EventRegistration",
-                    entityId: created.registrationId,
-                    newValue: { participantId, eventId, queueNumber: null, status: "SIGNED_UP" },
-                    context,
-                    client: tx,
-                });
-                const securePass = await qrService.generateQR(created.registrationId, userId, tx, context);
-                const route = await getRouteState(tx, created.registrationId, false);
+                        eventId,
+                        actorUserId: userId,
+                        context,
+                    })
+                    : await getRouteState(tx, created.registrationId, false);
                 const current = await tx.eventRegistration.findUnique({
                     where: { registrationId: created.registrationId },
                     include: registrationInclude(),
                 });
-                return { registration: current, route, securePass };
-            }, { isolationLevel: "ReadCommitted" });
+                return { registration: current, route, securePass, idempotentReplay: operation.idempotent_replay === true };
+            }, { isolationLevel: "Serializable" });
             break;
         } catch (error) {
             const target = JSON.stringify(error.meta?.target || "");
@@ -212,11 +206,11 @@ exports.createRegistration = async ({ participantId, eventId, idempotencyKey, au
                 if (existing) await auditDuplicate({ userId, context, participantId, eventId, registrationId: existing.registrationId });
                 throw conflict("Participant is already registered for this event");
             }
-            throw error;
+            throw mapRoutineError(error);
         }
     }
 
-    return { ...registration, idempotentReplay: false };
+    return { ...registration, idempotentReplay: registration.idempotentReplay === true };
 };
 
 exports.getRegistrationById = async ({ registrationId, auth }, db = prisma) => {
@@ -242,6 +236,15 @@ exports.listEventRegistrations = async ({ eventId, page, pageSize, auth }, db = 
     return { registrations, pagination: { page, pageSize, total, totalPages: Math.ceil(total / pageSize) } };
 };
 
+exports.getEventRegistrationSummary = async ({ eventId, auth }, db = prisma) => {
+    await assertRegistrationAssignment(db, eventId, auth);
+    const rows = await db.$queryRaw`
+        SELECT * FROM "get_event_registration_summary"(CAST(${eventId} AS uuid))
+    `;
+    if (!rows[0]) throw notFound("Event not found");
+    return rows[0];
+};
+
 exports.getRegistrationHistory = async ({ registrationId, auth }, db = prisma) => {
     const registration = await db.eventRegistration.findUnique({ where: { registrationId }, select: { eventId: true } });
     if (!registration) throw notFound("Registration not found");
@@ -259,6 +262,55 @@ exports.changeRegistrationStatus = async ({ registrationId, toStatus, reason, au
         error.statusCode = 400;
         throw error;
     }
+
+    if (toStatus === "CANCELLED") {
+        const existing = await db.eventRegistration.findUnique({ where: { registrationId }, select: { eventId: true, registrationStatus: true } });
+        if (!existing) throw notFound("Registration not found");
+        await assertRegistrationAssignment(db, existing.eventId, auth);
+
+        let promotedRegistrationId = null;
+        const cancelled = await db.$transaction(async (tx) => {
+            const rows = await tx.$queryRaw`
+                SELECT * FROM "cancel_event_registration"(
+                    CAST(${registrationId} AS uuid),
+                    CAST(${auth.userId} AS uuid),
+                    ${reason || null}
+                )
+            `;
+            promotedRegistrationId = rows[0]?.promoted_registration_id || null;
+            const registration = await tx.eventRegistration.findUnique({ where: { registrationId }, include: registrationInclude() });
+            await createAuditLog({
+                userId: auth.userId,
+                action: "REGISTRATION_STATUS_CHANGED",
+                entityName: "EventRegistration",
+                entityId: registrationId,
+                oldValue: { status: existing.registrationStatus },
+                newValue: { status: "CANCELLED", reason },
+                context,
+                client: tx,
+            });
+            if (promotedRegistrationId) {
+                await createAuditLog({
+                    userId: auth.userId,
+                    action: "REGISTRATION_WAITLIST_PROMOTED",
+                    entityName: "EventRegistration",
+                    entityId: promotedRegistrationId,
+                    newValue: { status: "SIGNED_UP", promotedByCancellationOf: registrationId },
+                    context,
+                    client: tx,
+                });
+            }
+            return registration;
+        }, { isolationLevel: "Serializable" }).catch((error) => { throw mapRoutineError(error); });
+
+        if (promotedRegistrationId) {
+            const promoted = await db.eventRegistration.findUnique({ where: { registrationId: promotedRegistrationId }, include: registrationInclude() });
+            await provisionExistingRegistration({ registration: promoted, userId: auth.userId, eventId: promoted.eventId, context, db });
+        }
+        return cancelled;
+    }
+
+    if (toStatus === "WAITLISTED") throw conflict("Waitlist status is assigned automatically when an event is full");
 
     return db.$transaction(async (tx) => {
         const existing = await tx.eventRegistration.findUnique({ where: { registrationId } });

@@ -37,25 +37,24 @@ test("event cleanup validates event ownership and cannot delete another event si
   const ownerId = crypto.randomUUID();
   const eventId = crypto.randomUUID();
   const otherEventId = crypto.randomUUID();
-  const stored = await storeSignature(png(), "image/png", ownerId, eventId, "CONSENT");
+  const stored = await storeSignature(png(), "image/png", ownerId, eventId, "REFERRAL");
 
   await assert.rejects(
-    removeTaskArtifact({ artifactType: TYPES.CONSENT_SIGNATURE, storageKey: stored.signatureObjectKey, eventId: otherEventId }),
+    removeTaskArtifact({ artifactType: TYPES.REFERRAL_SIGNATURE, storageKey: stored.signatureObjectKey, eventId: otherEventId }),
     (error) => error.code === "INVALID_SIGNATURE",
   );
   assert.equal(fs.existsSync(path.join(root, ownerId, path.basename(stored.signatureObjectKey))), true);
-  assert.equal(await removeTaskArtifact({ artifactType: TYPES.CONSENT_SIGNATURE, storageKey: stored.signatureObjectKey, eventId }), true);
-  assert.equal(await removeTaskArtifact({ artifactType: TYPES.CONSENT_SIGNATURE, storageKey: stored.signatureObjectKey, eventId }), false);
+  assert.equal(await removeTaskArtifact({ artifactType: TYPES.REFERRAL_SIGNATURE, storageKey: stored.signatureObjectKey, eventId }), true);
+  assert.equal(await removeTaskArtifact({ artifactType: TYPES.REFERRAL_SIGNATURE, storageKey: stored.signatureObjectKey, eventId }), false);
 });
 
 test("event cleanup rejects an artifact key owned outside the event before enqueue", async () => {
   const eventId = crypto.randomUUID();
   const otherEventId = crypto.randomUUID();
   const userId = crypto.randomUUID();
-  const foreignKey = `signatures/${userId}/consent-${otherEventId}-${crypto.randomUUID()}.png`;
+  const foreignKey = `signatures/${userId}/referral-${otherEventId}-${crypto.randomUUID()}.png`;
   const tx = {
-    participantConsent: { findMany: async () => [{ signatureObjectKey: foreignKey }] },
-    referral: { findMany: async () => [] },
+    referral: { findMany: async () => [{ signatureObjectKey: foreignKey }] },
     signatureArtifact: { findMany: async () => [] },
     documentArtifact: { findMany: async () => [], findFirst: async () => null },
   };

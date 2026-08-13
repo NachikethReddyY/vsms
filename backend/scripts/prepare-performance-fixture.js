@@ -166,22 +166,6 @@ async function main() {
       { eventId: registrationEvent.eventId, stationId: registrationStation.stationId, shiftId: registrationShift.shiftId, userId: actor.id, assignedBy: actor.id, assignmentRole: "SCREENER", assignmentStatus: "CONFIRMED", status: "CONFIRMED" },
     ],
   });
-  const consentText = "Synthetic performance-test consent; no real participant data.";
-  const consentForm = await prisma.consentFormVersion.upsert({
-    where: { formCode_versionNumber: { formCode: "PERF-TEST", versionNumber: "1" } },
-    update: { isActive: true, effectiveTo: null },
-    create: {
-      formCode: "PERF-TEST",
-      versionNumber: "1",
-      title: "Synthetic performance consent",
-      contentText: consentText,
-      contentHash: crypto.createHash("sha256").update(consentText).digest("hex"),
-      documentObjectKey: "synthetic/performance/consent-v1",
-      effectiveFrom: new Date(now - 24 * 60 * 60 * 1000),
-      isActive: true,
-      createdById: actor.id,
-    },
-  });
   const participantIds = Array.from({ length: count }, () => crypto.randomUUID());
   await prisma.$transaction(async (tx) => {
     await tx.participant.createMany({
@@ -194,7 +178,6 @@ async function main() {
         gender: "U",
         contactNumber: `+658${String(index).padStart(7, "0")}`,
         emergencyContact: `+659${String(index).padStart(7, "0")}`,
-        consentGiven: true,
         createdById: actor.id,
         updatedById: actor.id,
         onboardingEventId: event.eventId,
@@ -211,19 +194,6 @@ async function main() {
         createdById: actor.id,
         updatedById: actor.id,
       })),
-    });
-    await tx.participantConsent.createMany({
-      data: participantIds.flatMap((participantId) => [event.eventId, registrationEvent.eventId].map((eventId) => ({
-        participantId,
-        eventId,
-        consentFormVersionId: consentForm.id,
-        consentStatus: "ACCEPTED",
-        signerType: "PARTICIPANT",
-        signerName: "Synthetic Participant",
-        recordedById: actor.id,
-        signedAt: new Date(),
-        decisionAt: new Date(),
-      }))),
     });
     await tx.participantEventIntake.createMany({
       data: participantIds.map((participantId) => ({

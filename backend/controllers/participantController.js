@@ -36,11 +36,6 @@ exports.getParticipantRegistrations = asyncHandler(async (req, res) => {
     res.json({ registrations });
 });
 
-exports.getParticipantConsents = asyncHandler(async (req, res) => {
-    const consents = await participantService.getParticipantConsentsService(req.params.participantId, req.registrationEventId, req.auth.userId);
-    res.json({ consents });
-});
-
 exports.getEmergencyContacts = asyncHandler(async (req, res) => {
     const contacts = await participantService.getEmergencyContactsService(req.params.participantId, req.registrationEventId, req.auth.userId);
     res.json({ contacts });
@@ -54,21 +49,6 @@ exports.addEmergencyContact = asyncHandler(async (req, res) => {
 exports.updateEmergencyContact = asyncHandler(async (req, res) => {
     const contact = await participantService.updateEmergencyContactService(req);
     res.json({ contact });
-});
-
-exports.getActiveConsentForm = asyncHandler(async (req, res) => {
-    const consentForm = await participantService.getActiveConsentFormService();
-    res.json({ consentForm });
-});
-
-exports.saveConsent = asyncHandler(async (req, res) => {
-    const consent = await participantService.saveConsentService(req);
-    res.status(201).json({ consent });
-});
-
-exports.withdrawConsent = asyncHandler(async (req, res) => {
-    const withdrawal = await participantService.withdrawConsentService(req);
-    res.status(201).json({ consent: withdrawal });
 });
 
 exports.getRegistrationReview = asyncHandler(async (req, res) => {

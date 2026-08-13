@@ -141,6 +141,7 @@ async function previewStation<T extends StationResultData>(
   path: ScreeningPath,
   resultData: T,
   stationType?: StationType,
+  fieldSchema?: import('./fieldSchema').FieldSchema,
 ) {
   try {
     const { data } = await apiClient.post<FlagEvaluation>(
@@ -155,6 +156,7 @@ async function previewStation<T extends StationResultData>(
       path,
       resultData as VisualAcuityResultData | RefractionResultData | ColourVisionResultData | DynamicResultData,
       stationType,
+      fieldSchema ?? [],
     );
   }
 }
@@ -275,8 +277,14 @@ export const screeningApi = {
     return saveStation(eventId, stationId, 'eye-health', body);
   },
 
-  previewDynamic(eventId: string, stationId: string, resultData: DynamicResultData, stationType?: StationType) {
-    return previewStation(eventId, stationId, 'dynamic', resultData, stationType);
+  previewDynamic(
+    eventId: string,
+    stationId: string,
+    resultData: DynamicResultData,
+    stationType?: StationType,
+    fieldSchema?: import('./fieldSchema').FieldSchema,
+  ) {
+    return previewStation(eventId, stationId, 'dynamic', resultData, stationType, fieldSchema);
   },
 
   saveDynamic(eventId: string, stationId: string, body: ScreeningSavePayload<DynamicResultData>) {

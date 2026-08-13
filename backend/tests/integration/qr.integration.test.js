@@ -72,7 +72,6 @@ const fixture = async (label) => {
       gender: "U",
       contactNumber: "+6590000000",
       emergencyContact: "+6590000001",
-      consentGiven: true,
       createdById: user.id,
       updatedById: user.id,
       onboardingEventId: event.eventId,

@@ -1,7 +1,6 @@
 import {
   ArrowLeftIcon,
   CheckCircleIcon,
-  ClipboardDocumentCheckIcon,
   ExclamationTriangleIcon,
   PhoneIcon,
   TicketIcon,
@@ -9,7 +8,7 @@ import {
 } from "@heroicons/react/24/outline";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
-import type { ConsentFormVersion, EmergencyContact, EventSummary, Participant, Registration } from "../../types";
+import type { EmergencyContact, EventSummary, Participant, Registration } from "../../types";
 import type { components } from "../../generated/api";
 import apiClient, { getApiError } from "../../utils/apiClient";
 import { AppDialog } from "../../components/AppDialog";
@@ -18,18 +17,10 @@ import "./ParticipantPage.css";
 import "./ParticipantCheckInPage.css";
 import "./ParticipantRegistrationPage.css";
 
-type ConsentRecord = {
-  id: string;
-  consentStatus: string;
-  consentFormVersion: ConsentFormVersion;
-  withdrawals: Array<{ id: string; consentStatus: string }>;
-};
-
 type RegistrationReview = {
   participant: Participant;
   event: EventSummary;
   emergencyContact: EmergencyContact | null;
-  latestConsent: ConsentRecord | null;
 };
 
 type RegistrationOutcome = {
@@ -59,6 +50,7 @@ export default function ParticipantRegistrationPage() {
   const [isLoading, setIsLoading] = useState(Boolean(eventId));
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showConfirmation, setShowConfirmation] = useState(false);
+  const [consentAcknowledged, setConsentAcknowledged] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const idempotencyKey = useRef(crypto.randomUUID());
 
@@ -91,15 +83,13 @@ export default function ParticipantRegistrationPage() {
 
   const requirements = useMemo(() => {
     if (!review) return [];
-    const consentAccepted = review.latestConsent?.consentStatus === "ACCEPTED"
-      && !review.latestConsent.withdrawals.some((withdrawal) => withdrawal.consentStatus === "WITHDRAWN");
     return [
       { label: "Active participant record", complete: review.participant.status === "ACTIVE" },
       { label: "Open event", complete: OPEN_EVENT_STATUSES.has(review.event.status) },
       { label: "Active emergency contact", complete: Boolean(review.emergencyContact) },
-      { label: "Accepted consent", complete: Boolean(consentAccepted) },
+      { label: "Consent acknowledgement", complete: consentAcknowledged },
     ];
-  }, [review]);
+  }, [consentAcknowledged, review]);
 
   const missingRequirement = requirements.find((item) => !item.complete)?.label;
   const canRegister = Boolean(review && !missingRequirement && !isSubmitting);
@@ -109,7 +99,7 @@ export default function ParticipantRegistrationPage() {
     setIsSubmitting(true);
     setError(null);
     try {
-      const response = await apiClient.post<components['schemas']['RegistrationResponse']>(`/events/${eventId}/registrations`, { participantId }, {
+      const response = await apiClient.post<components['schemas']['RegistrationResponse']>(`/events/${eventId}/registrations`, { participantId, consentAcknowledged }, {
         headers: { "Idempotency-Key": idempotencyKey.current },
       });
       const registrationId = response.data.registration?.id ?? response.data.registrationId;
@@ -191,8 +181,11 @@ export default function ParticipantRegistrationPage() {
         </section>
         <section className="participant-v2-checkin-records" aria-label="Participant registration records">
           <article><PhoneIcon /><div><span>Emergency contact</span><strong>{review.emergencyContact ? `${review.emergencyContact.contactName} - ${review.emergencyContact.phoneNumber}` : "No active emergency contact"}</strong></div></article>
-          <article><ClipboardDocumentCheckIcon /><div><span>Consent</span><strong>{review.latestConsent ? `${displayStatus(review.latestConsent.consentStatus)} - Version ${review.latestConsent.consentFormVersion.versionNumber}` : "No consent recorded"}</strong></div></article>
         </section>
+        <label className="participant-registration-consent">
+          <input type="checkbox" checked={consentAcknowledged} onChange={(event) => setConsentAcknowledged(event.target.checked)} />
+          <span>I confirm that the participant has consented to take part in this event screening.</span>
+        </label>
         <footer className="participant-v2-checkin-actions">
           <Link className="secondary" to={profileLink}>Back to profile</Link>
           <button className="primary" type="button" disabled={!canRegister} onClick={() => setShowConfirmation(true)}>Confirm participant</button>

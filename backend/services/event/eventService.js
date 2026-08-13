@@ -1267,16 +1267,14 @@ const cancelEvent = async (eventId, body, user, correlationId, db = prisma) => {
 };
 
 const assertNoCrossEventReferences = async (tx, eventId) => {
-  const [registrations, stations, reviews, consents] = await Promise.all([
+  const [registrations, stations, reviews] = await Promise.all([
     tx.eventRegistration.findMany({ where: { eventId }, select: { registrationId: true } }),
     tx.station.findMany({ where: { eventId }, select: { stationId: true } }),
     tx.review.findMany({ where: { registration: { eventId } }, select: { reviewId: true } }),
-    tx.participantConsent.findMany({ where: { eventId }, select: { id: true } }),
   ]);
   const registrationIds = registrations.map(({ registrationId }) => registrationId);
   const stationIds = stations.map(({ stationId }) => stationId);
   const reviewIds = reviews.map(({ reviewId }) => reviewId);
-  const consentIds = consents.map(({ id }) => id);
 
   const checks = [];
   if (reviewIds.length) checks.push(tx.review.findFirst({
@@ -1285,13 +1283,6 @@ const assertNoCrossEventReferences = async (tx, eventId) => {
       { reviewId: { notIn: reviewIds }, parentReviewId: { in: reviewIds } },
     ] },
     select: { reviewId: true },
-  }));
-  if (consentIds.length) checks.push(tx.participantConsent.findFirst({
-    where: { OR: [
-      { id: { in: consentIds }, withdrawalOfId: { not: null, notIn: consentIds } },
-      { id: { notIn: consentIds }, withdrawalOfId: { in: consentIds } },
-    ] },
-    select: { id: true },
   }));
   if (registrationIds.length || stationIds.length) {
     checks.push(tx.queueEntry.findFirst({
@@ -1385,13 +1376,12 @@ const verifyDeletionPreview = (token, eventId, userId, version, now = new Date()
 };
 
 const collectDeletionEntityIds = async (tx, eventId) => {
-  const [participants, registrations, stations, queues, screenings, reviews, referrals, documents, consents, qrCodes, signatures] = await Promise.all([
+  const [participants, registrations, stations, queues, screenings, reviews, referrals, documents, qrCodes, signatures] = await Promise.all([
     tx.participant.findMany({
       where: {
         onboardingEventId: eventId,
         eventRegistrations: { none: { eventId: { not: eventId } } },
         eventIntakes: { none: { eventId: { not: eventId } } },
-        consents: { none: { eventId: { not: eventId } } },
       },
       select: { id: true },
     }),
@@ -1402,7 +1392,6 @@ const collectDeletionEntityIds = async (tx, eventId) => {
     tx.review.findMany({ where: { registration: { eventId } }, select: { reviewId: true } }),
     tx.referral.findMany({ where: { review: { registration: { eventId } } }, select: { referralId: true } }),
     tx.documentArtifact.findMany({ where: { review: { registration: { eventId } } }, select: { documentId: true } }),
-    tx.participantConsent.findMany({ where: { eventId }, select: { id: true } }),
     tx.qRCodePass.findMany({ where: { registration: { eventId } }, select: { id: true } }),
     tx.signatureArtifact.findMany({ where: { eventId }, select: { id: true } }),
   ]);
@@ -1415,7 +1404,6 @@ const collectDeletionEntityIds = async (tx, eventId) => {
     reviews: reviews.map(({ reviewId }) => reviewId),
     referrals: referrals.map(({ referralId }) => referralId),
     documents: documents.map(({ documentId }) => documentId),
-    consents: consents.map(({ id }) => id),
     qrCodes: qrCodes.map(({ id }) => id),
     signatures: signatures.map(({ id }) => id),
   };
@@ -1563,8 +1551,6 @@ const deleteEvent = async (eventId, body, user, correlationId, db = prisma) => {
     await tx.review.updateMany({ where: { registration: { eventId }, parentReviewId: { not: null } }, data: { parentReviewId: null } });
     await tx.review.deleteMany({ where: { registration: { eventId } } });
 
-    await tx.participantConsent.updateMany({ where: { eventId, withdrawalOfId: { not: null } }, data: { withdrawalOfId: null } });
-    await tx.participantConsent.deleteMany({ where: { eventId } });
     await tx.signatureArtifact.deleteMany({ where: { eventId } });
     await tx.registrationStatusHistory.deleteMany({ where: { registration: { eventId } } });
     await tx.screeningResult.deleteMany({ where: { registration: { eventId } } });
@@ -1576,7 +1562,6 @@ const deleteEvent = async (eventId, body, user, correlationId, db = prisma) => {
       ["Review", entityIds.reviews],
       ["Referral", entityIds.referrals],
       ["DocumentArtifact", entityIds.documents],
-      ["ParticipantConsent", entityIds.consents],
       ["QRCodePass", entityIds.qrCodes],
       ["SignatureArtifact", entityIds.signatures],
     ].filter(([, ids]) => ids.length).map(([entityType, ids]) => ({ eventId: null, entityType, entityId: { in: ids } }));
@@ -1596,7 +1581,6 @@ const deleteEvent = async (eventId, body, user, correlationId, db = prisma) => {
           onboardingEventId: eventId,
           eventRegistrations: { none: {} },
           eventIntakes: { none: {} },
-          consents: { none: {} },
         },
       });
       if (deletedParticipants.count !== entityIds.participants.length) {

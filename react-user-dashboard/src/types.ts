@@ -73,15 +73,6 @@ export interface EmergencyContact {
   status: string;
 }
 
-export interface ConsentFormVersion {
-  id: string;
-  formCode: string;
-  versionNumber: string;
-  title: string;
-  contentText: string | null;
-  documentObjectKey: string;
-}
-
 export interface Registration {
   id: string;
   participantId: string;
