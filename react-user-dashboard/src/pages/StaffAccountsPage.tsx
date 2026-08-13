@@ -62,13 +62,16 @@ export default function StaffAccountsPage() {
   const [notice, setNotice] = useState('');
   const [reactivatingId, setReactivatingId] = useState<string | null>(null);
   const [actionError, setActionError] = useState('');
+  const [search, setSearch] = useState('');
+  const [approvalFilter, setApprovalFilter] = useState('');
+  const [accessFilter, setAccessFilter] = useState('');
 
   const load = useCallback(async () => {
     setLoading(true);
     setError('');
     try {
-      const { data } = await apiClient.get<{ success: true; data: AppUser[] }>('/users');
-      setStaff(sortStaff(data.data));
+      const { data } = await apiClient.get<{ items?: AppUser[]; data?: AppUser[] }>('/admin/accounts', { params: { limit: 100 } });
+      setStaff(sortStaff(data.items ?? data.data ?? []));
     } catch (cause) {
       setError(getApiError(cause, 'Staff accounts could not be loaded.'));
     } finally {
@@ -112,10 +115,10 @@ export default function StaffAccountsPage() {
       } : {}),
     };
     try {
-      const { data } = editing
+      editing
         ? await apiClient.patch<{ success: true; data: AppUser }>(`/users/${editing.id}`, payload)
         : await apiClient.post<{ success: true; data: AppUser }>('/users', payload);
-      setStaff((current) => sortStaff(editing ? current.map((member) => member.id === data.data.id ? data.data : member) : [...current, data.data]));
+      await load();
       setDialogOpen(false);
       setNotice(editing ? 'Staff account updated.' : 'Staff account created.');
     } catch (cause) {
@@ -143,7 +146,7 @@ export default function StaffAccountsPage() {
     setFormError('');
     try {
       await apiClient.post(`/admin/accounts/${editing.id}/deprovision`, { reason: 'Deleted from the staff directory by an administrator' });
-      setStaff((current) => current.filter((member) => member.id !== editing.id));
+      await load();
       setDialogOpen(false);
       setNotice('Staff account deleted and access revoked.');
     } catch (cause) {
@@ -152,7 +155,26 @@ export default function StaffAccountsPage() {
       setSaving(false);
     }
   };
+  const restore = async (member: AppUser) => {
+    setReactivatingId(member.id);
+    setActionError('');
+    try {
+      await apiClient.post(`/admin/accounts/${member.id}/reactivate`, {});
+      await load();
+      setNotice('Staff account restored.');
+    } catch (cause) {
+      setActionError(getApiError(cause, `${member.fullName}'s account could not be restored.`));
+    } finally {
+      setReactivatingId(null);
+    }
+  };
   const activeCount = staff.filter((member) => member.status === 'ACTIVE').length;
+  const visibleStaff = staff.filter((member) => {
+    const query = search.trim().toLowerCase();
+    return (!query || `${member.fullName} ${member.email} ${member.department ?? ''} ${member.designation ?? ''}`.toLowerCase().includes(query))
+      && (!approvalFilter || member.approvalState === approvalFilter)
+      && (!accessFilter || member.accessState === accessFilter);
+  });
 
   return <div className="page-frame staff-accounts-page">
     <header className="staff-accounts-header">
@@ -171,11 +193,18 @@ export default function StaffAccountsPage() {
     {error && <div className="alert error" role="alert"><span>{error}</span><button className="secondary compact" type="button" onClick={() => void load()}>Try again</button></div>}
     {actionError && <div className="alert error" role="alert"><span>{actionError}</span></div>}
 
+    <form className="staff-account-filters" onSubmit={(event) => event.preventDefault()}>
+      <label><span>Search</span><input type="search" value={search} placeholder="Name, email, team or designation" onChange={(event) => setSearch(event.target.value)} /></label>
+      <label><span>Approval</span><select value={approvalFilter} onChange={(event) => setApprovalFilter(event.target.value)}><option value="">Any</option><option value="PENDING">Pending</option><option value="APPROVED">Approved</option><option value="REJECTED">Rejected</option></select></label>
+      <label><span>Access</span><select value={accessFilter} onChange={(event) => setAccessFilter(event.target.value)}><option value="">Any</option><option value="ENABLED">Enabled</option><option value="SUSPENDED">Suspended</option><option value="DISABLED">Disabled</option></select></label>
+      {(search || approvalFilter || accessFilter) && <button className="secondary compact" type="button" onClick={() => { setSearch(''); setApprovalFilter(''); setAccessFilter(''); }}>Clear filters</button>}
+    </form>
+
     <section className="staff-directory" aria-label="Organisation staff accounts">
-      {loading ? <div className="staff-loading" aria-live="polite" aria-label="Loading staff accounts"><span /><span /><span /><span /></div> : staff.length ? <div className="staff-table-shell">
+      {loading ? <div className="staff-loading" aria-live="polite" aria-label="Loading staff accounts"><span /><span /><span /><span /></div> : visibleStaff.length ? <div className="staff-table-shell">
           <table className="staff-table">
-            <thead><tr><th scope="col">Person</th><th scope="col">Team</th><th scope="col">Application roles</th><th scope="col">Access</th><th scope="col"><span className="visually-hidden">Actions</span></th></tr></thead>
-            <tbody>{staff.map((member) => {
+            <thead><tr><th scope="col">Person</th><th scope="col">Team</th><th scope="col">Role</th><th scope="col">Approval</th><th scope="col">Access</th><th scope="col">Last login</th><th scope="col"><span className="visually-hidden">Actions</span></th></tr></thead>
+            <tbody>{visibleStaff.map((member) => {
               const canReactivate = member.approvalState === 'APPROVED'
                 && member.accessState !== 'DISABLED'
                 && (member.status === 'INACTIVE' || member.status === 'SUSPENDED');
@@ -183,12 +212,14 @@ export default function StaffAccountsPage() {
               <th scope="row"><div className="staff-person"><span className="staff-account-avatar" aria-hidden="true">{initial(member.fullName)}</span><span><strong>{member.fullName}</strong><small>{member.email}</small></span></div></th>
               <td><span className="staff-team">{member.designation || 'No designation'}<small>{member.department || 'No department'}</small></span></td>
               <td><div className="staff-role-list"><span className="staff-role-chip">{member.professionalCategory === 'DOCTOR' ? 'Doctor' : labelRole(ROLE_OPTIONS.find((option) => member.roles.includes(option.value))?.value ?? 'SUPPORT')}</span></div></td>
-              <td><span className={`staff-access ${member.status === 'ACTIVE' ? 'active' : 'inactive'}`}><i aria-hidden="true" />{member.status === 'ACTIVE' ? 'Active' : member.status === 'SUSPENDED' ? 'Suspended' : 'Inactive'}</span></td>
-              <td><div className="staff-row-actions">{canReactivate && <button className="secondary compact staff-reactivate-button" type="button" disabled={reactivatingId !== null} onClick={() => void reactivate(member)}><ArrowPathIcon aria-hidden="true" />{reactivatingId === member.id ? 'Reactivating…' : 'Reactivate'}</button>}<button className="secondary compact staff-edit-button" type="button" disabled={reactivatingId === member.id} onClick={() => openEdit(member)}><PencilSquareIcon aria-hidden="true" />Edit</button></div></td>
+              <td><span className={`staff-state ${member.approvalState?.toLowerCase()}`}>{member.approvalState ?? 'Unknown'}</span></td>
+              <td><span className={`staff-access ${member.accessState === 'ENABLED' ? 'active' : 'inactive'}`}><i aria-hidden="true" />{member.accessState === 'DISABLED' ? 'Disabled' : member.accessState === 'SUSPENDED' ? 'Suspended' : 'Enabled'}</span></td>
+              <td><span className="staff-last-login">{member.lastLoginAt ? new Date(member.lastLoginAt).toLocaleString() : 'Not recorded'}</span></td>
+              <td><div className="staff-row-actions">{member.accessState === 'DISABLED' ? <button className="secondary compact staff-reactivate-button" type="button" disabled={reactivatingId !== null} onClick={() => void restore(member)}><ArrowPathIcon aria-hidden="true" />{reactivatingId === member.id ? 'Restoring…' : 'Restore'}</button> : canReactivate && <button className="secondary compact staff-reactivate-button" type="button" disabled={reactivatingId !== null} onClick={() => void reactivate(member)}><ArrowPathIcon aria-hidden="true" />{reactivatingId === member.id ? 'Reactivating…' : 'Reactivate'}</button>}<button className="secondary compact staff-edit-button" type="button" disabled={reactivatingId === member.id || member.accessState === 'DISABLED'} onClick={() => openEdit(member)}><PencilSquareIcon aria-hidden="true" />Edit</button></div></td>
             </tr>;
             })}</tbody>
           </table>
-      </div> : <div className="quiet-empty staff-empty"><UserGroupIcon aria-hidden="true" /><h2>No staff accounts yet</h2><p>Add a staff member to set their access before their first sign-in.</p><button className="secondary compact" type="button" onClick={openCreate}>Add staff member</button></div>}
+      </div> : <div className="quiet-empty staff-empty"><UserGroupIcon aria-hidden="true" /><h2>{staff.length ? 'No staff match these filters' : 'No staff accounts yet'}</h2><p>{staff.length ? 'Clear or change the filters above.' : 'Add a staff member to set their access before their first sign-in.'}</p>{!staff.length && <button className="secondary compact" type="button" onClick={openCreate}>Add staff member</button>}</div>}
     </section>
 
     <AppDialog

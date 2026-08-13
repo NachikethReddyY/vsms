@@ -427,7 +427,8 @@ exports.changeAccess = async (userId, action, reason, actorId, context, options 
   const result = await prisma.$transaction(async (tx) => {
     await lockAccountTransition(tx, userId);
     const before = await findAccount(tx, userId);
-    if (before.deprovisionedAt || before.accessState === "DISABLED") {
+    const restoring = action === "reactivate" && Boolean(before.deprovisionedAt);
+    if ((before.deprovisionedAt || before.accessState === "DISABLED") && !restoring) {
       throw new AppError(409, "ACCOUNT_DISABLED", "A disabled account cannot change access state");
     }
     if (before.approvalState !== "APPROVED") {
@@ -443,7 +444,7 @@ exports.changeAccess = async (userId, action, reason, actorId, context, options 
       }
       throw new AppError(409, "ACCESS_STATE_UNCHANGED", `Account access is already ${nextAccessState.toLowerCase()}`);
     }
-    if (action === "reactivate" && before.accessState !== "SUSPENDED" && !dormantReactivation) {
+    if (action === "reactivate" && before.accessState !== "SUSPENDED" && !dormantReactivation && !restoring) {
       throw new AppError(409, "ACCOUNT_NOT_SUSPENDED", "Only a suspended account can be reactivated");
     }
     if (action === "suspend" && before.status !== "ACTIVE") {
@@ -452,7 +453,7 @@ exports.changeAccess = async (userId, action, reason, actorId, context, options 
     const nextStatus = deriveLegacyStatus({
       approvalState: before.approvalState,
       accessState: nextAccessState,
-      deprovisionedAt: before.deprovisionedAt,
+      deprovisionedAt: restoring ? null : before.deprovisionedAt,
     });
     await protectAdministratorTransition(tx, before, actorId, { accessState: nextAccessState, status: nextStatus });
     const updated = await tx.user.update({
@@ -460,6 +461,7 @@ exports.changeAccess = async (userId, action, reason, actorId, context, options 
       data: {
         accessState: nextAccessState,
         status: nextStatus,
+        ...(restoring ? { deprovisionedAt: null, deprovisionedById: null, deprovisionReason: null } : {}),
         ...(invalidBefore ? { sessionInvalidBefore: invalidBefore } : {}),
       },
       select: accountSelect,
