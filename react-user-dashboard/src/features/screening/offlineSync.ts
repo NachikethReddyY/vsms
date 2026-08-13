@@ -94,6 +94,14 @@ export type OfflineStationContext = {
   queue: QueueRegistration[];
 };
 
+export type OfflineRegistrationResolution = {
+  registrationId: string;
+  participantDisplayName: string;
+  queueNumber: number | null;
+  status: string;
+  activeStation: Pick<Station, 'stationId' | 'stationName' | 'stationType'>;
+};
+
 export type OfflineSyncResult = OfflineSyncStatus & {
   synced: number;
   expired: boolean;
@@ -342,6 +350,29 @@ export async function getOfflineStationContext(
     stations: snapshot.stations,
     queue: (snapshot.queues[station.stationId] ?? []).map((row) => ({ ...row, passToken: null })),
   };
+}
+
+export async function resolveOfflineRegistration(
+  ownerId: string,
+  eventId: string,
+  registrationId: string,
+): Promise<OfflineRegistrationResolution | null> {
+  const snapshot = await loadSnapshot(ownerId, eventId);
+  if (!snapshot) return null;
+  for (const station of snapshot.stations) {
+    const registration = snapshot.queues[station.stationId]?.find((row) => row.registrationId === registrationId);
+    if (registration) {
+      return {
+        ...registration,
+        activeStation: {
+          stationId: station.stationId,
+          stationName: station.stationName,
+          stationType: station.stationType,
+        },
+      };
+    }
+  }
+  return null;
 }
 
 export function isNetworkError(error: unknown) {
