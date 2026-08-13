@@ -4734,7 +4734,15 @@ export interface components {
                 venue: string | null;
             };
             stations: components["schemas"]["QueueStationWorkload"][];
-            /** @description Every queue entry for the event, ordered by queue number, with priority ordering surfaced through each station's next-up */
+            totals: {
+                WAITING: number;
+                CALLED: number;
+                IN_PROGRESS: number;
+                COMPLETED: number;
+                SKIPPED: number;
+                CANCELLED: number;
+            };
+            /** @description Active queue entries for the event, ordered by queue number, with complete status counts in totals */
             entries: components["schemas"]["EventQueueEntry"][];
         };
         RegistrationStation: {

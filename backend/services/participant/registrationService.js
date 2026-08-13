@@ -54,7 +54,7 @@ async function provisionExistingRegistration({ registration, userId, eventId, co
         try {
             return await db.$transaction(async (tx) => {
                 const securePass = await qrService.generateQR(registration.registrationId, userId, tx, context);
-                const route = registration.event.status === "IN_PROGRESS"
+                const route = registration.event.status === "IN_PROGRESS" && registration.checkedIn
                     ? await assignRouteOnce({
                         tx,
                         registrationId: registration.registrationId,
@@ -68,7 +68,7 @@ async function provisionExistingRegistration({ registration, userId, eventId, co
                     include: registrationInclude(),
                 });
                 return { registration: current, route, securePass };
-            }, { isolationLevel: "Serializable" });
+            }, { isolationLevel: "ReadCommitted" });
         } catch (error) {
             if (error.code === "P2034" && attempt < 3) continue;
             throw error;
@@ -181,21 +181,13 @@ exports.createRegistration = async ({ participantId, eventId, idempotencyKey, au
                     client: tx,
                 });
                 const securePass = await qrService.generateQR(created.registrationId, userId, tx, context);
-                const route = event.status === "IN_PROGRESS"
-                    ? await assignRouteOnce({
-                        tx,
-                        registrationId: created.registrationId,
-                        eventId,
-                        actorUserId: userId,
-                        context,
-                    })
-                    : await getRouteState(tx, created.registrationId, false);
+                const route = await getRouteState(tx, created.registrationId, false);
                 const current = await tx.eventRegistration.findUnique({
                     where: { registrationId: created.registrationId },
                     include: registrationInclude(),
                 });
                 return { registration: current, route, securePass };
-            }, { isolationLevel: "Serializable" });
+            }, { isolationLevel: "ReadCommitted" });
             break;
         } catch (error) {
             const target = JSON.stringify(error.meta?.target || "");

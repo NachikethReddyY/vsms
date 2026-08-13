@@ -71,10 +71,10 @@ export function QueuePage() {
   );
 
   const waiting = useMemo(() => sortWaitingByPriority(entries), [entries]);
-  const waitingCount = entries.filter((entry) => entry.status === "WAITING").length;
-  const calledCount = entries.filter((entry) => entry.status === "CALLED").length;
-  const completedCount = entries.filter((entry) => entry.status === "COMPLETED").length;
-  const activeCount = entries.filter((entry) => ["WAITING", "CALLED", "IN_PROGRESS"].includes(entry.status)).length;
+  const waitingCount = status?.totals.WAITING ?? 0;
+  const calledCount = status?.totals.CALLED ?? 0;
+  const completedCount = status?.totals.COMPLETED ?? 0;
+  const activeCount = waitingCount + calledCount + (status?.totals.IN_PROGRESS ?? 0);
 
   const runAction = async (id: string, action: () => Promise<unknown>) => {
     try {

@@ -793,7 +793,7 @@ exports.manualCheckIn = async (params, db = prisma, auditContext = {}) => {
         });
 
                 return { ...result, route };
-            }, { isolationLevel: "Serializable" });
+            }, { isolationLevel: "ReadCommitted" });
         } catch (error) {
             if (error.code === "P2034" && attempt < 3) continue;
             throw error;

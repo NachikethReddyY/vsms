@@ -139,7 +139,7 @@ test("registration service creates registration, history and audit together", ()
     assert.match(transactionBody, /eventRegistration\.create/);
     assert.match(transactionBody, /registrationStatusHistory\.create/);
     assert.match(transactionBody, /createAuditLog/);
-    assert.match(transactionBody, /isolationLevel:\s*"Serializable"/);
+    assert.match(transactionBody, /isolationLevel:\s*"ReadCommitted"/);
     assert.match(service, /DUPLICATE_REGISTRATION_BLOCKED/);
     assert.match(controller, /registrationService\.createRegistration/);
     assert.doesNotMatch(controller, /prisma/);

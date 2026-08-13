@@ -5197,7 +5197,7 @@ components:
     EventQueueStatusResponse:
       type: object
       additionalProperties: false
-      required: [event, stations, entries]
+      required: [event, stations, totals, entries]
       properties:
         event:
           type: object
@@ -5209,9 +5209,20 @@ components:
             status: { type: string }
             venue: { type: string, nullable: true }
         stations: { type: array, items: { $ref: "#/components/schemas/QueueStationWorkload" } }
+        totals:
+          type: object
+          additionalProperties: false
+          required: [WAITING, CALLED, IN_PROGRESS, COMPLETED, SKIPPED, CANCELLED]
+          properties:
+            WAITING: { type: integer, minimum: 0 }
+            CALLED: { type: integer, minimum: 0 }
+            IN_PROGRESS: { type: integer, minimum: 0 }
+            COMPLETED: { type: integer, minimum: 0 }
+            SKIPPED: { type: integer, minimum: 0 }
+            CANCELLED: { type: integer, minimum: 0 }
         entries:
           type: array
-          description: "Every queue entry for the event, ordered by queue number, with priority ordering surfaced through each station's next-up"
+          description: "Active queue entries for the event, ordered by queue number, with complete status counts in totals"
           items: { $ref: "#/components/schemas/EventQueueEntry" }
     RegistrationStation:
       type: object

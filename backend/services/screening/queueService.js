@@ -907,7 +907,7 @@ const getEventQueueStatus = async (
     user
   );
 
-  const [stations, entries] =
+  const [stations, entries, groupedCounts] =
     await Promise.all([
       db.station.findMany({
         where: {
@@ -931,6 +931,7 @@ const getEventQueueStatus = async (
           station: {
             eventId,
           },
+          status: { in: ACTIVE_QUEUE_STATUSES },
         },
 
         include: {
@@ -964,6 +965,14 @@ const getEventQueueStatus = async (
           },
         ],
       }),
+
+      typeof db.queueEntry.groupBy === "function"
+        ? db.queueEntry.groupBy({
+          by: ["stationId", "status"],
+          where: { station: { eventId } },
+          _count: { _all: true },
+        })
+        : [],
     ]);
 
   const byStation = new Map(
@@ -987,17 +996,28 @@ const getEventQueueStatus = async (
     ])
   );
 
-  for (const entry of entries) {
-    const bucket = byStation.get(
-      entry.stationId
-    );
+  const totals = {
+    WAITING: 0,
+    CALLED: 0,
+    IN_PROGRESS: 0,
+    COMPLETED: 0,
+    SKIPPED: 0,
+    CANCELLED: 0,
+  };
+  const counts = groupedCounts.length
+    ? groupedCounts
+    : entries.map(({ stationId, status }) => ({ stationId, status, _count: { _all: 1 } }));
+
+  for (const count of counts) {
+    const bucket = byStation.get(count.stationId);
 
     if (!bucket) {
       continue;
     }
 
-    if (bucket.workload[entry.status] !== undefined) {
-      bucket.workload[entry.status] += 1;
+    if (bucket.workload[count.status] !== undefined) {
+      bucket.workload[count.status] += count._count._all;
+      totals[count.status] += count._count._all;
     }
   }
 
@@ -1055,6 +1075,8 @@ const getEventQueueStatus = async (
     event,
 
     stations: [...byStation.values()],
+
+    totals,
 
     entries: orderedEntries.map(
       serializeQueueEntry

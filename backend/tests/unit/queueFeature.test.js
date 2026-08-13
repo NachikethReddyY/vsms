@@ -76,6 +76,7 @@ const baseDb = (overrides = {}) => ({
   queueEntry: {
     findUnique: async () => queueEntry,
     findMany: async () => [],
+    groupBy: async () => [],
     ...(overrides.queueEntry || {}),
   },
   eventStationAvailability: {
@@ -283,6 +284,7 @@ test('getEventQueueStatus reports per-station workload and next-up participant',
   const result = await queueService.getEventQueueStatus(eventId, operationalUser, db);
 
   assert.equal(result.event.eventId, eventId);
+  assert.equal(result.totals.WAITING, 1);
   assert.equal(result.stations.length, 2);
   const va = result.stations.find((s) => s.stationId === stationId);
   assert.equal(va.workload.WAITING, 1);
