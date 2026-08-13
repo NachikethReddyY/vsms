@@ -10,6 +10,7 @@ const {
 
 const { requireEventRoleAndDuty } = require("../event/eventAuthorizationService");
 const { maskNric } = require("../../utils/validation/validation");
+const { resolveCompatibleFieldSchema } = require("../../schemas/dynamicStationSchema");
 
 const FLAG_RANK = {
   NORMAL: 0,
@@ -90,6 +91,7 @@ const routeStepSelect = {
       stationName: true,
       stationType: true,
       stationOrder: true,
+      fieldSchemaSnapshot: true,
       updatedAt: true,
     },
   },
@@ -321,6 +323,7 @@ const buildDetail = (event, stations, registration) => {
       stationName: station.stationName,
       stationType: station.stationType,
       stationOrder: station.stationOrder,
+      fieldSchemaSnapshot: resolveCompatibleFieldSchema(station.stationType, station.fieldSchemaSnapshot),
       result: resultByStation.get(station.stationId) || null,
     })),
     readiness: {

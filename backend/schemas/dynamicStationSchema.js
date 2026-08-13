@@ -93,14 +93,26 @@ const assertClinicalFieldSchema = (stationType, schema) => {
     }
     if (required.options) {
       const options = field.options || [];
-      for (const option of required.options) {
-        if (!options.includes(option)) {
-          const error = new Error(`Clinical field "${required.key}" must keep option "${option}"`);
-          error.code = "INVALID_FIELD_SCHEMA";
-          error.status = 422;
-          throw error;
-        }
+      const locked = required.options;
+      const same = locked.length === options.length && locked.every((option) => options.includes(option));
+      if (!same) {
+        const error = new Error(`Clinical field "${required.key}" options must remain ${locked.join(", ")}`);
+        error.code = "INVALID_FIELD_SCHEMA";
+        error.status = 422;
+        throw error;
       }
+    }
+    if (required.min !== undefined && field.min !== required.min) {
+      const error = new Error(`Clinical field "${required.key}" minimum must remain ${required.min}`);
+      error.code = "INVALID_FIELD_SCHEMA";
+      error.status = 422;
+      throw error;
+    }
+    if (required.max !== undefined && field.max !== required.max) {
+      const error = new Error(`Clinical field "${required.key}" maximum must remain ${required.max}`);
+      error.code = "INVALID_FIELD_SCHEMA";
+      error.status = 422;
+      throw error;
     }
   }
   return fields;
@@ -351,13 +363,9 @@ const upgradeClinicalSchema = (stationType, fields) => {
     ...system.map((required) => {
       const existing = fields.find((field) => (aliases[field.key] || field.key) === required.key);
       if (!existing) return required;
-      const options = required.options && existing.options?.length
-        ? [...new Set([...required.options, ...existing.options])]
-        : required.options;
       return {
         ...required,
         label: existing.label || required.label,
-        ...(options ? { options } : {}),
       };
     }),
     ...extras,

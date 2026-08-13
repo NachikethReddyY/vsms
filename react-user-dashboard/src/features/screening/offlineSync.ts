@@ -13,7 +13,7 @@ import type {
   StationType,
   VisualAcuityResultData,
 } from './screeningApi';
-import { normalizeClinicalResultData } from './fieldSchema';
+import { normalizeClinicalResultData, withCompatibleFieldSchema } from './fieldSchema';
 
 const DATABASE_NAME = 'vsms-screening-offline';
 const DATABASE_VERSION = 1;
@@ -348,8 +348,8 @@ export async function getOfflineStationContext(
   }
   return {
     eventName: snapshot.event.name,
-    station,
-    stations: snapshot.stations,
+    station: withCompatibleFieldSchema(station),
+    stations: snapshot.stations.map((item) => withCompatibleFieldSchema(item)),
     queue: (snapshot.queues[station.stationId] ?? []).map((row) => ({ ...row, passToken: null })),
   };
 }

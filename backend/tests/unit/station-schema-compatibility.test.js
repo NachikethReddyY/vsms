@@ -6,6 +6,7 @@ const {
   mergeClinicalAndTemplateResult,
   validateResultAgainstSchema,
   normalizeClinicalResultData,
+  assertClinicalFieldSchema,
 } = require("../../schemas/dynamicStationSchema");
 const { visualAcuityResultData } = require("../../schemas/screeningSchemas");
 
@@ -53,4 +54,22 @@ test("clinical validation keeps extra customized fields that Zod would strip", (
   assert.equal(persisted.screenerComment, "Needs extra time");
   assert.equal(persisted.chartDistanceMetres, 6);
   assert.equal(persisted.withUsualDistanceGlasses, false);
+});
+
+test("locked clinical options and numeric limits cannot be widened", () => {
+  const extraOption = SYSTEM_FIELD_SCHEMAS.VISUAL_ACUITY.map((field) => (
+    field.key === "chartDistanceMetres" ? { ...field, options: ["3", "6", "9"] } : field
+  ));
+  assert.throws(
+    () => assertClinicalFieldSchema("VISUAL_ACUITY", extraOption),
+    (error) => error.code === "INVALID_FIELD_SCHEMA" && /options must remain/.test(error.message),
+  );
+
+  const widened = SYSTEM_FIELD_SCHEMAS.COLOUR_VISION.map((field) => (
+    field.key === "platesPresented" ? { ...field, min: 1, max: 48 } : field
+  ));
+  assert.throws(
+    () => assertClinicalFieldSchema("COLOUR_VISION", widened),
+    (error) => error.code === "INVALID_FIELD_SCHEMA" && /must remain/.test(error.message),
+  );
 });

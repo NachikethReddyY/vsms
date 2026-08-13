@@ -3847,12 +3847,16 @@ components:
     ReviewStationResult:
       type: object
       additionalProperties: false
-      required: [stationId, stationName, stationType, stationOrder, result]
+      required: [stationId, stationName, stationType, stationOrder, fieldSchemaSnapshot, result]
       properties:
         stationId: { type: string, format: uuid }
         stationName: { type: string }
         stationType: { type: string, enum: [VISUAL_ACUITY, REFRACTION, COLOUR_VISION, EYE_HEALTH, CUSTOM] }
         stationOrder: { type: integer, minimum: 1 }
+        fieldSchemaSnapshot:
+          type: array
+          nullable: true
+          items: { $ref: "#/components/schemas/StationFieldDefinition" }
         result:
           type: object
           nullable: true

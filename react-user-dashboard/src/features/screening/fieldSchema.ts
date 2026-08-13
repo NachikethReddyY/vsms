@@ -26,26 +26,35 @@ export type RefractionEyeValue = {
   axis: number | null;
 };
 
-/** Required medical fields clinical evaluators need. Labels may change; key/type/required may not. */
-export const CLINICAL_FIELD_CONTRACTS: Partial<Record<string, Array<{ key: string; type: FieldType }>>> = {
+type ClinicalFieldContract = {
+  key: string;
+  type: FieldType;
+  required?: boolean;
+  options?: string[];
+  min?: number;
+  max?: number;
+};
+
+/** Required medical fields clinical evaluators need. Labels may change; key/type/required/options/limits may not. */
+export const CLINICAL_FIELD_CONTRACTS: Partial<Record<string, ClinicalFieldContract[]>> = {
   VISUAL_ACUITY: [
-    { key: 'chartDistanceMetres', type: 'select' },
-    { key: 'od', type: 'va-eye' },
-    { key: 'os', type: 'va-eye' },
-    { key: 'withUsualDistanceGlasses', type: 'select' },
+    { key: 'chartDistanceMetres', type: 'select', required: true, options: ['3', '6'] },
+    { key: 'od', type: 'va-eye', required: true },
+    { key: 'os', type: 'va-eye', required: true },
+    { key: 'withUsualDistanceGlasses', type: 'select', required: true, options: ['yes', 'no', 'unknown'] },
   ],
   REFRACTION: [
-    { key: 'measurementStatus', type: 'select' },
-    { key: 'wearsDistanceGlasses', type: 'select' },
+    { key: 'measurementStatus', type: 'select', required: true, options: ['COMPLETED', 'UNABLE_TO_MEASURE', 'REPEAT_REQUIRED'] },
+    { key: 'wearsDistanceGlasses', type: 'select', required: true, options: ['yes', 'no', 'unknown'] },
     { key: 'od', type: 'refraction-eye' },
     { key: 'os', type: 'refraction-eye' },
     { key: 'notes', type: 'text' },
   ],
   COLOUR_VISION: [
-    { key: 'testKit', type: 'select' },
-    { key: 'platesPresented', type: 'number' },
-    { key: 'odCorrect', type: 'number' },
-    { key: 'osCorrect', type: 'number' },
+    { key: 'testKit', type: 'select', required: true, options: ['ISHIHARA'] },
+    { key: 'platesPresented', type: 'number', required: true, min: 8, max: 24 },
+    { key: 'odCorrect', type: 'number', required: true, min: 0, max: 24 },
+    { key: 'osCorrect', type: 'number', required: true, min: 0, max: 24 },
   ],
 };
 
@@ -81,8 +90,18 @@ export function validateFieldSchema(schema: FieldSchema, stationType?: string | 
   if (contract) {
     for (const required of contract) {
       const field = schema.find((item) => item.key === required.key);
+      const name = field?.label.trim() || required.key;
       if (!field) errors.push(`Keep the required clinical field "${required.key}".`);
       else if (field.type !== required.type) errors.push(`Clinical field "${required.key}" must stay type ${required.type}.`);
+      else if (required.options) {
+        const options = field.options ?? [];
+        const same = required.options.length === options.length && required.options.every((option) => options.includes(option));
+        if (!same) errors.push(`${name} options must stay ${required.options.join(', ')}.`);
+      } else if (required.min != null && field.min !== required.min) {
+        errors.push(`${name} minimum must stay ${required.min}.`);
+      } else if (required.max != null && field.max !== required.max) {
+        errors.push(`${name} maximum must stay ${required.max}.`);
+      }
     }
   }
   return errors;
@@ -212,4 +231,13 @@ export function resolveCompatibleFieldSchema(
 ): FieldSchema | null {
   if (Array.isArray(snapshot) && snapshot.length) return snapshot;
   return (stationType && SYSTEM_FIELD_SCHEMAS[stationType]) || null;
+}
+
+export function withCompatibleFieldSchema<T extends { stationType: string; fieldSchemaSnapshot?: FieldSchema | null }>(
+  station: T,
+): Omit<T, 'fieldSchemaSnapshot'> & { fieldSchemaSnapshot: FieldSchema | null } {
+  return {
+    ...station,
+    fieldSchemaSnapshot: resolveCompatibleFieldSchema(station.stationType, station.fieldSchemaSnapshot),
+  };
 }

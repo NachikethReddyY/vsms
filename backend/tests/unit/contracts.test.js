@@ -7,6 +7,17 @@ const YAML = require("yaml");
 const backendRoot = path.resolve(__dirname, "../..");
 const read = (relativePath) => fs.readFileSync(path.join(backendRoot, relativePath), "utf8");
 
+test("review station results carry the frozen field schema", () => {
+    const document = YAML.parse(read("docs/openapi.yaml"));
+    const schema = document.components.schemas.ReviewStationResult;
+    assert.ok(schema.required.includes("fieldSchemaSnapshot"));
+    assert.equal(schema.properties.fieldSchemaSnapshot.nullable, true);
+    assert.equal(
+        schema.properties.fieldSchemaSnapshot.items.$ref,
+        "#/components/schemas/StationFieldDefinition",
+    );
+});
+
 test("manual check-in contract accepts exactly one reference and always returns a message", () => {
     const document = YAML.parse(read("docs/openapi.yaml"));
     const schemas = document.components.schemas;

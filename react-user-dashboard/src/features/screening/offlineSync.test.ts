@@ -66,6 +66,7 @@ function response(actions: ActionResult[] = [], expiresAt = expiry) {
           stationType: 'VISUAL_ACUITY',
           stationOrder: 1,
           isActive: true,
+          fieldSchemaSnapshot: null,
           offlineAccessExpiresAt: expiresAt,
           registrations: [{
             registrationId,
@@ -143,6 +144,16 @@ describe('encrypted screening outbox', () => {
     expect(bytes).not.toContain('Encrypted Queue Person');
     expect(bytes).not.toContain('defensively-removed-pass-token');
     expect(bytes).not.toContain(registrationId);
+  });
+
+  it('normalizes a pre-upgrade offline pack before it enters page state', async () => {
+    const payload = response();
+    payload.data.pull.stations[0].fieldSchemaSnapshot = null;
+    post.mockResolvedValueOnce(payload);
+    await downloadOfflineEvent(ownerId, eventId);
+    const context = await getOfflineStationContext(ownerId, eventId, 'VISUAL_ACUITY');
+    expect(context?.station.fieldSchemaSnapshot?.some((field) => field.key === 'chartDistanceMetres')).toBe(true);
+    expect(context?.station.fieldSchemaSnapshot?.every((field) => typeof field.label === 'string' && field.label.length > 0)).toBe(true);
   });
 
   it('pushes a stable encrypted action through the batch API and clears it only when applied', async () => {

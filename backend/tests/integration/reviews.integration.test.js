@@ -198,6 +198,10 @@ describe("clinical review API", () => {
 
     const detail = await request(app).get(`/api/events/${eventId}/reviews/${registrations.Normal}`).set(auth(reviewerToken));
     expect(detail.status).toBe(200);
+    const visualAcuity = detail.body.stations.find((station) => station.stationType === "VISUAL_ACUITY");
+    expect(visualAcuity.fieldSchemaSnapshot).toEqual(expect.arrayContaining([
+      expect.objectContaining({ key: "chartDistanceMetres", label: expect.any(String) }),
+    ]));
     expect(detail.body.participant.maskedNric).toMatch(/^••••/);
     expect(JSON.stringify(detail.body)).not.toContain("TEST-");
     expect(JSON.stringify(detail.body)).not.toContain(testUsers.reviewer.email);

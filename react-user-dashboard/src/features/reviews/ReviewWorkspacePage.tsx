@@ -36,7 +36,7 @@ import {
   removeStoredReferralIssue,
   writeStoredReferralIssue,
 } from './referralRecovery';
-import { extraResultData } from '../screening/fieldSchema';
+import { extraResultData, type FieldDefinition, type FieldSchema } from '../screening/fieldSchema';
 import './ReviewWorkspacePage.css';
 
 type EyeHealthRisk = 'NONE' | 'SUSPECTED' | 'PRESENT' | 'NOT_ASSESSED';
@@ -152,9 +152,36 @@ function ExtraResultData({ stationType, data }: { stationType: string; data: Rec
   return <GenericResultData data={extras} />;
 }
 
+function schemaValue(field: FieldDefinition, value: unknown, data: Record<string, unknown>) {
+  if (field.type === 'va-eye') return eyeReading(value, data.chartDistanceMetres);
+  if (field.type === 'refraction-eye') {
+    const eye = value as { sphere?: number; cylinder?: number; axis?: number | null } | undefined;
+    if (!eye || eye.sphere == null || eye.cylinder == null) return '—';
+    return `${eye.sphere}/${eye.cylinder} x ${eye.axis ?? '—'}`;
+  }
+  if (field.type === 'eye-pair') {
+    const pair = value && typeof value === 'object' ? value as Record<string, unknown> : null;
+    if (pair && ('od' in pair || 'os' in pair)) return `OD: ${displayValue(pair.od)} · OS: ${displayValue(pair.os)}`;
+  }
+  return displayValue(value);
+}
+
+function SchemaResultData({ schema, data }: { schema: FieldSchema; data: Record<string, unknown> }) {
+  return <dl className="visual-acuity-result">
+    {schema.map((field) => (
+      <div key={field.key} className={field.type === 'text' ? 'wide' : undefined}>
+        <dt>{field.label}{field.unit ? ` (${field.unit})` : ''}</dt>
+        <dd>{schemaValue(field, data[field.key], data)}</dd>
+      </div>
+    ))}
+  </dl>;
+}
+
 function ResultData({ station }: { station: ReviewDetailResponse['stations'][number] }) {
   const data = station.result?.resultData;
   if (!data) return <p className="review-missing-result">Awaiting result</p>;
+  const schema = station.fieldSchemaSnapshot;
+  if (schema?.length) return <SchemaResultData schema={schema} data={data} />;
   if (station.stationType === 'VISUAL_ACUITY') {
     return <>
       <dl className="visual-acuity-result">
