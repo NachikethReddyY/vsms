@@ -2,6 +2,7 @@
 const prisma = require("../../prisma/prismaClient");
 const AppError = require("../../errors/AppError");
 const { resolveRegistrationByQrValue } = require("../../utils/crypto/qrToken");
+const { resolveCompatibleFieldSchema } = require("../../schemas/dynamicStationSchema");
 
 const {
   loadVerifiedSignature,
@@ -90,6 +91,7 @@ const routeStepSelect = {
       stationName: true,
       stationType: true,
       stationOrder: true,
+      fieldSchemaSnapshot: true,
       updatedAt: true,
     },
   },
@@ -321,6 +323,10 @@ const buildDetail = (event, stations, registration) => {
       stationName: station.stationName,
       stationType: station.stationType,
       stationOrder: station.stationOrder,
+      fieldSchemaSnapshot: resolveCompatibleFieldSchema(
+        station.stationType,
+        station.fieldSchemaSnapshot,
+      ),
       result: resultByStation.get(station.stationId) || null,
     })),
     readiness: {

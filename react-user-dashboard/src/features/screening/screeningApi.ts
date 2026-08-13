@@ -140,6 +140,7 @@ async function previewStation<T extends StationResultData>(
   stationId: string,
   path: ScreeningPath,
   resultData: T,
+  stationType?: StationType,
 ) {
   try {
     const { data } = await apiClient.post<FlagEvaluation>(
@@ -150,7 +151,11 @@ async function previewStation<T extends StationResultData>(
   } catch (error) {
     if (!isNetworkError(error)) throw error;
     if (path === 'eye-health') throw error;
-    return evaluateOfflineStation(path, resultData as VisualAcuityResultData | RefractionResultData | ColourVisionResultData | DynamicResultData);
+    return evaluateOfflineStation(
+      path,
+      resultData as VisualAcuityResultData | RefractionResultData | ColourVisionResultData | DynamicResultData,
+      stationType,
+    );
   }
 }
 
@@ -270,8 +275,8 @@ export const screeningApi = {
     return saveStation(eventId, stationId, 'eye-health', body);
   },
 
-  previewDynamic(eventId: string, stationId: string, resultData: DynamicResultData) {
-    return previewStation(eventId, stationId, 'dynamic', resultData);
+  previewDynamic(eventId: string, stationId: string, resultData: DynamicResultData, stationType?: StationType) {
+    return previewStation(eventId, stationId, 'dynamic', resultData, stationType);
   },
 
   saveDynamic(eventId: string, stationId: string, body: ScreeningSavePayload<DynamicResultData>) {

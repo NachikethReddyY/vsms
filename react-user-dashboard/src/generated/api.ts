@@ -2470,7 +2470,7 @@ export interface components {
             key: string;
             label: string;
             /** @enum {string} */
-            type: "text" | "number" | "select" | "boolean" | "eye-pair";
+            type: "text" | "number" | "select" | "boolean" | "eye-pair" | "va-eye" | "refraction-eye";
             required?: boolean;
             options?: string[];
             min?: number;
@@ -3522,6 +3522,7 @@ export interface components {
             /** @enum {string} */
             stationType: "VISUAL_ACUITY" | "REFRACTION" | "COLOUR_VISION" | "EYE_HEALTH" | "CUSTOM";
             stationOrder: number;
+            fieldSchemaSnapshot: components["schemas"]["StationFieldDefinition"][] | null;
             result: components["schemas"]["ScreeningResultSummary"] | null;
         };
         ReviewReadiness: {

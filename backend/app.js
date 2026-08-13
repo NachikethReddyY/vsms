@@ -176,10 +176,12 @@ app.use(
 );
 
 // General mutation limiter
+// Integration suites share one in-memory IP key; keep production tight but
+// give NODE_ENV=test enough headroom for the full suite in one window.
 const mutationLimiter = rateLimit({
     name: "mutation",
     windowMs: 60000,
-    limit: 60,
+    limit: env.NODE_ENV === "test" ? 1000 : 60,
     standardHeaders: "draft-8",
     legacyHeaders: false,
 });
