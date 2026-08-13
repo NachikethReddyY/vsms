@@ -8382,7 +8382,9 @@ export interface operations {
     generateRegistrationQrCode: {
         parameters: {
             query?: never;
-            header?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
             path: {
                 registrationId: components["parameters"]["RegistrationId"];
             };
@@ -8408,7 +8410,9 @@ export interface operations {
     generateQrCode: {
         parameters: {
             query?: never;
-            header?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
             path: {
                 registrationId: components["parameters"]["RegistrationId"];
             };
@@ -8434,7 +8438,9 @@ export interface operations {
     reissueQrCode: {
         parameters: {
             query?: never;
-            header?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
             path: {
                 registrationId: components["parameters"]["RegistrationId"];
             };
@@ -8518,7 +8524,9 @@ export interface operations {
     manualQrCheckIn: {
         parameters: {
             query?: never;
-            header?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
             path?: never;
             cookie?: never;
         };
@@ -8686,16 +8694,18 @@ export interface operations {
     revokeQrCode: {
         parameters: {
             query?: never;
-            header?: never;
+            header: {
+                "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+            };
             path: {
                 qrId: components["parameters"]["QrId"];
             };
             cookie?: never;
         };
-        requestBody: {
+        requestBody?: {
             content: {
                 "application/json": {
-                    revokedReason: string;
+                    revokedReason?: string;
                 };
             };
         };

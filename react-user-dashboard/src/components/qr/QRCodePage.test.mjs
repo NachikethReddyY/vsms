@@ -11,6 +11,7 @@ test("QR generator stays wired to the backend pass lifecycle endpoints", () => {
   assert.match(source, /\/qr\/revoke\//);
   assert.match(source, /\/qr\/reissue\//);
   assert.match(source, /\/qr\/manual-checkin/);
+  assert.match(source, /newIdempotencyHeaders/);
 });
 
 test("QR pass images are rendered and handled with loading, success, and failure states", () => {

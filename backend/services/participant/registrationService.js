@@ -276,6 +276,15 @@ exports.changeRegistrationStatus = async ({ registrationId, toStatus, reason, au
                 )
             `;
             promotedRegistrationId = rows[0]?.promoted_registration_id || null;
+            const revokedQrPasses = await tx.qRCodePass.updateMany({
+                where: { registrationId, isActive: true },
+                data: {
+                    isActive: false,
+                    revokedAt: new Date(),
+                    revokedBy: auth.userId,
+                    revokedReason: "Registration cancelled",
+                },
+            });
             const registration = await tx.eventRegistration.findUnique({ where: { registrationId }, include: registrationInclude() });
             await createAuditLog({
                 userId: auth.userId,
@@ -283,7 +292,7 @@ exports.changeRegistrationStatus = async ({ registrationId, toStatus, reason, au
                 entityName: "EventRegistration",
                 entityId: registrationId,
                 oldValue: { status: existing.registrationStatus },
-                newValue: { status: "CANCELLED", reason },
+                newValue: { status: "CANCELLED", reason, revokedQrPassCount: revokedQrPasses.count },
                 context,
                 client: tx,
             });
