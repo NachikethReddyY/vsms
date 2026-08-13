@@ -3,8 +3,8 @@ const test = require("node:test");
 
 process.env.DATABASE_URL ||= "postgresql://test:test@localhost:5432/vsms_test";
 
-const qrService = require("../../services/participant/qrService");
-const registrationService = require("../../services/participant/registrationService");
+const qrService = require("../../backend/services/participant/qrService");
+const registrationService = require("../../backend/services/participant/registrationService");
 
 const eventId = "11111111-1111-4111-8111-111111111111";
 const registrationId = "22222222-2222-4222-8222-222222222222";
@@ -60,16 +60,22 @@ test("cancelling a registration revokes its active passes in the same transactio
       findFirst: async () => ({ id: "44444444-4444-4444-8444-444444444444", assignmentRole: "REGISTRATION" }),
     },
     eventRegistration: {
-      findUnique: async () => existing,
-      update: async () => updated,
+      findUnique: async () => updated,
     },
     qRCodePass: {
       updateMany: async (query) => { revoked = query; return { count: 1 }; },
     },
     registrationStatusHistory: { create: async () => ({}) },
     auditLog: { create: async ({ data }) => { audit = data; return data; } },
+    $queryRaw: async () => [{ promoted_registration_id: null }],
   };
-  const db = { $transaction: async (work) => work(tx) };
+  const db = {
+    event: tx.event,
+    eventMembership: tx.eventMembership,
+    eventRegistration: { findUnique: async () => existing },
+    staffAssignment: tx.staffAssignment,
+    $transaction: async (work) => work(tx),
+  };
 
   const result = await registrationService.changeRegistrationStatus({
     registrationId,
