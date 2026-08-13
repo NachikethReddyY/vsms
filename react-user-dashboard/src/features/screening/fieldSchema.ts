@@ -1,5 +1,14 @@
 export type FieldType = 'text' | 'number' | 'select' | 'boolean' | 'eye-pair' | 'va-eye' | 'refraction-eye';
 export type FieldEyes = 'OD' | 'OS' | 'BOTH';
+export type FlagLevel = 'REVIEW' | 'REFER' | 'URGENT';
+export type FlagOp = 'eq' | 'neq' | 'lt' | 'lte' | 'gt' | 'gte' | 'includes' | 'isTrue' | 'isFalse' | 'isEmpty' | 'notEmpty';
+
+export type FieldFlagRule = {
+  op: FlagOp;
+  value?: string | number | boolean;
+  flag: FlagLevel;
+  reason: string;
+};
 
 export type FieldDefinition = {
   key: string;
@@ -11,6 +20,7 @@ export type FieldDefinition = {
   max?: number;
   unit?: string;
   eyes?: FieldEyes;
+  flagRules?: FieldFlagRule[];
 };
 
 export type FieldSchema = FieldDefinition[];
@@ -25,6 +35,31 @@ export type RefractionEyeValue = {
   cylinder: number;
   axis: number | null;
 };
+
+export type TemplateFlagEvaluation = {
+  overallFlag: 'NORMAL' | FlagLevel;
+  isFlagged: boolean;
+  flagSummary: string | null;
+  ruleVersion: string;
+  reasons: Array<{ flag: 'NORMAL' | FlagLevel; reason: string }>;
+};
+
+const FLAG_RANK: Record<string, number> = { NORMAL: 0, REVIEW: 1, REFER: 2, URGENT: 3 };
+export const TEMPLATE_FLAG_RULE_VERSION = 'TEMPLATE-FLAG-1.0';
+
+export const FLAG_OP_OPTIONS: Array<{ value: FlagOp; label: string; needsValue: boolean }> = [
+  { value: 'eq', label: 'Equals', needsValue: true },
+  { value: 'neq', label: 'Does not equal', needsValue: true },
+  { value: 'lt', label: 'Less than', needsValue: true },
+  { value: 'lte', label: 'Less than or equal', needsValue: true },
+  { value: 'gt', label: 'Greater than', needsValue: true },
+  { value: 'gte', label: 'Greater than or equal', needsValue: true },
+  { value: 'includes', label: 'Text includes', needsValue: true },
+  { value: 'isTrue', label: 'Is yes / true', needsValue: false },
+  { value: 'isFalse', label: 'Is no / false', needsValue: false },
+  { value: 'isEmpty', label: 'Is empty', needsValue: false },
+  { value: 'notEmpty', label: 'Is not empty', needsValue: false },
+];
 
 /** Required medical fields clinical evaluators need. Labels may change; key/type/required may not. */
 export const CLINICAL_FIELD_CONTRACTS: Partial<Record<string, Array<{ key: string; type: FieldType }>>> = {
@@ -54,6 +89,10 @@ export function clinicalLockedKeys(stationType: string | null | undefined): Set<
   return new Set((contract ?? []).map((field) => field.key));
 }
 
+export function supportsFieldFlagRules(field: Pick<FieldDefinition, 'type'>): boolean {
+  return field.type === 'text' || field.type === 'number' || field.type === 'select' || field.type === 'boolean';
+}
+
 export function emptyField(index = 0): FieldDefinition {
   return {
     key: `field${index + 1}`,
@@ -63,9 +102,14 @@ export function emptyField(index = 0): FieldDefinition {
   };
 }
 
+export function emptyFlagRule(): FieldFlagRule {
+  return { op: 'eq', value: '', flag: 'REVIEW', reason: '' };
+}
+
 export function validateFieldSchema(schema: FieldSchema, stationType?: string | null): string[] {
   const errors: string[] = [];
   const keys = new Set<string>();
+  const locked = clinicalLockedKeys(stationType);
   if (!schema.length) errors.push('Add at least one field.');
   if (schema.length > 40) errors.push('A template can contain at most 40 fields.');
   schema.forEach((field, index) => {
@@ -76,6 +120,18 @@ export function validateFieldSchema(schema: FieldSchema, stationType?: string | 
     if (!field.label.trim()) errors.push(`Field ${index + 1} needs a label.`);
     if (field.type === 'select' && !field.options?.some((option) => option.trim())) errors.push(`${name} needs at least one option.`);
     if (field.min != null && field.max != null && field.min > field.max) errors.push(`${name} has a minimum greater than its maximum.`);
+    if (field.flagRules?.length) {
+      if (locked.has(field.key)) errors.push(`${name} is a clinical field and cannot define template flag rules.`);
+      if (!supportsFieldFlagRules(field)) errors.push(`${name} type cannot define template flag rules.`);
+      if (field.flagRules.length > 10) errors.push(`${name} can have at most 10 flag rules.`);
+      field.flagRules.forEach((rule, ruleIndex) => {
+        if (!rule.reason.trim()) errors.push(`${name} flag rule ${ruleIndex + 1} needs a reason.`);
+        const opMeta = FLAG_OP_OPTIONS.find((item) => item.value === rule.op);
+        if (opMeta?.needsValue && (rule.value === undefined || rule.value === '')) {
+          errors.push(`${name} flag rule ${ruleIndex + 1} needs a comparison value.`);
+        }
+      });
+    }
   });
   const contract = stationType ? CLINICAL_FIELD_CONTRACTS[stationType] : null;
   if (contract) {
@@ -170,6 +226,86 @@ export function normalizeClinicalResultData(stationType: string | null | undefin
     return base;
   }
   return resultData;
+}
+
+function matchesFlagRule(value: unknown, rule: FieldFlagRule): boolean {
+  switch (rule.op) {
+    case 'isEmpty':
+      return isBlank(value);
+    case 'notEmpty':
+      return !isBlank(value);
+    case 'isTrue':
+      return value === true || value === 'yes';
+    case 'isFalse':
+      return value === false || value === 'no';
+    case 'eq':
+      return value === rule.value || String(value) === String(rule.value);
+    case 'neq':
+      return value !== rule.value && String(value) !== String(rule.value);
+    case 'includes':
+      return typeof value === 'string' && typeof rule.value === 'string' && value.toLowerCase().includes(String(rule.value).toLowerCase());
+    case 'lt':
+    case 'lte':
+    case 'gt':
+    case 'gte': {
+      const left = typeof value === 'number' ? value : Number(value);
+      const right = typeof rule.value === 'number' ? rule.value : Number(rule.value);
+      if (!Number.isFinite(left) || !Number.isFinite(right)) return false;
+      if (rule.op === 'lt') return left < right;
+      if (rule.op === 'lte') return left <= right;
+      if (rule.op === 'gt') return left > right;
+      return left >= right;
+    }
+    default:
+      return false;
+  }
+}
+
+export function evaluateTemplateFlagRules(resultData: DynamicFieldValues, fieldSchema: FieldSchema = []): TemplateFlagEvaluation {
+  const reasons: Array<{ flag: FlagLevel; reason: string }> = [];
+  for (const field of fieldSchema) {
+    for (const rule of field.flagRules ?? []) {
+      if (matchesFlagRule(resultData[field.key], rule)) {
+        reasons.push({ flag: rule.flag, reason: rule.reason });
+      }
+    }
+  }
+  const overallFlag = reasons.reduce<'NORMAL' | FlagLevel>(
+    (worst, item) => (FLAG_RANK[item.flag] > FLAG_RANK[worst] ? item.flag : worst),
+    'NORMAL',
+  );
+  return {
+    overallFlag,
+    isFlagged: overallFlag !== 'NORMAL',
+    flagSummary: reasons.length ? reasons.map((item) => item.reason).join('; ') : null,
+    ruleVersion: TEMPLATE_FLAG_RULE_VERSION,
+    reasons,
+  };
+}
+
+export function mergeFlagEvaluations(...evaluations: Array<Pick<TemplateFlagEvaluation, 'overallFlag' | 'isFlagged' | 'flagSummary' | 'ruleVersion' | 'reasons'> | null | undefined>): TemplateFlagEvaluation {
+  const present = evaluations.filter((evaluation): evaluation is NonNullable<typeof evaluation> => Boolean(evaluation));
+  const reasons = present.flatMap((evaluation) => evaluation.reasons ?? []);
+  const overallFlag = present.reduce<'NORMAL' | FlagLevel>((worst, evaluation) => {
+    const flag = evaluation.overallFlag ?? 'NORMAL';
+    return FLAG_RANK[flag] > FLAG_RANK[worst] ? flag : worst;
+  }, 'NORMAL');
+  const clinical = present.find((evaluation) => String(evaluation.ruleVersion || '').startsWith('VSMS-'));
+  const template = present.find((evaluation) => evaluation.ruleVersion === TEMPLATE_FLAG_RULE_VERSION);
+  let ruleVersion = clinical?.ruleVersion || template?.ruleVersion || TEMPLATE_FLAG_RULE_VERSION;
+  // Keep under ScreeningResult.ruleVersion VarChar(20).
+  if (clinical?.ruleVersion && template?.reasons?.length) {
+    ruleVersion = `${clinical.ruleVersion}+TF`.slice(0, 20);
+  }
+  return {
+    overallFlag,
+    isFlagged: overallFlag !== 'NORMAL',
+    flagSummary: reasons.length
+      ? reasons.map((item) => item.reason).join('; ')
+      : present.find((evaluation) => evaluation.flagSummary)?.flagSummary ?? null,
+    ruleVersion,
+    reasons,
+  };
 }
 
 export const SYSTEM_FIELD_SCHEMAS: Partial<Record<string, FieldSchema>> = {

@@ -3,12 +3,18 @@ import { ArrowDownIcon, ArrowUpIcon, PlusIcon, TrashIcon } from '@heroicons/reac
 import type {
   DynamicFieldValues,
   FieldDefinition,
+  FieldFlagRule,
   FieldSchema,
   FieldType,
   RefractionEyeValue,
   VaEyeValue,
 } from './fieldSchema';
-import { emptyField } from './fieldSchema';
+import {
+  emptyField,
+  emptyFlagRule,
+  FLAG_OP_OPTIONS,
+  supportsFieldFlagRules,
+} from './fieldSchema';
 import './StationFieldRenderer.css';
 
 type RendererProps = {
@@ -279,6 +285,74 @@ export function StationFieldBuilder({ fieldSchema, onChange, disabled = false, l
             {field.type === 'number' && <><label><span>Minimum</span><input type="number" disabled={disabled || locked} value={field.min ?? ''} onChange={(event) => update(index, { min: event.target.value === '' ? undefined : event.target.valueAsNumber })} /></label><label><span>Maximum</span><input type="number" disabled={disabled || locked} value={field.max ?? ''} onChange={(event) => update(index, { max: event.target.value === '' ? undefined : event.target.valueAsNumber })} /></label></>}
             {(field.type === 'number' || field.type === 'eye-pair') && <label><span>Unit <small>Optional</small></span><input maxLength={20} disabled={disabled} value={field.unit ?? ''} onChange={(event) => update(index, { unit: event.target.value || undefined })} /></label>}
           </div>
+          {!locked && supportsFieldFlagRules(field) && (
+            <div className="station-field-flag-rules">
+              <div className="station-field-builder-heading">
+                <strong>Flag rules</strong>
+                <button
+                  type="button"
+                  className="secondary compact"
+                  disabled={disabled || (field.flagRules?.length ?? 0) >= 10}
+                  onClick={() => update(index, { flagRules: [...(field.flagRules ?? []), emptyFlagRule()] })}
+                >
+                  <PlusIcon />Add rule
+                </button>
+              </div>
+              <p className="station-library-schema-note">When this field matches a rule, the station result is flagged.</p>
+              {(field.flagRules ?? []).map((rule, ruleIndex) => {
+                const needsValue = FLAG_OP_OPTIONS.find((item) => item.value === rule.op)?.needsValue ?? true;
+                const updateRule = (changes: Partial<FieldFlagRule>) => {
+                  const nextRules = [...(field.flagRules ?? [])];
+                  nextRules[ruleIndex] = { ...nextRules[ruleIndex], ...changes };
+                  update(index, { flagRules: nextRules });
+                };
+                return <div className="station-field-builder-grid station-flag-rule-row" key={`${field.key}-rule-${ruleIndex}`}>
+                  <label>
+                    <span>When</span>
+                    <select disabled={disabled} value={rule.op} onChange={(event) => updateRule({ op: event.target.value as FieldFlagRule['op'], value: FLAG_OP_OPTIONS.find((item) => item.value === event.target.value)?.needsValue ? rule.value ?? '' : undefined })}>
+                      {FLAG_OP_OPTIONS.map((op) => <option key={op.value} value={op.value}>{op.label}</option>)}
+                    </select>
+                  </label>
+                  {needsValue && (
+                    <label>
+                      <span>Value</span>
+                      <input
+                        disabled={disabled}
+                        type={field.type === 'number' ? 'number' : 'text'}
+                        value={rule.value === undefined || rule.value === null ? '' : String(rule.value)}
+                        onChange={(event) => updateRule({
+                          value: field.type === 'number'
+                            ? (event.target.value === '' ? '' : event.target.valueAsNumber)
+                            : event.target.value,
+                        })}
+                      />
+                    </label>
+                  )}
+                  <label>
+                    <span>Flag</span>
+                    <select disabled={disabled} value={rule.flag} onChange={(event) => updateRule({ flag: event.target.value as FieldFlagRule['flag'] })}>
+                      <option value="REVIEW">REVIEW</option>
+                      <option value="REFER">REFER</option>
+                      <option value="URGENT">URGENT</option>
+                    </select>
+                  </label>
+                  <label className="wide">
+                    <span>Reason</span>
+                    <input required maxLength={200} disabled={disabled} value={rule.reason} onChange={(event) => updateRule({ reason: event.target.value })} />
+                  </label>
+                  <button
+                    type="button"
+                    className="icon-button"
+                    disabled={disabled}
+                    aria-label={`Remove flag rule ${ruleIndex + 1}`}
+                    onClick={() => update(index, { flagRules: (field.flagRules ?? []).filter((_, itemIndex) => itemIndex !== ruleIndex) })}
+                  >
+                    <TrashIcon />
+                  </button>
+                </div>;
+              })}
+            </div>
+          )}
         </article>;
       })}
     </div>

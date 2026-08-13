@@ -2449,6 +2449,14 @@ export interface components {
             unit?: string;
             /** @enum {string} */
             eyes?: "OD" | "OS" | "BOTH";
+            flagRules?: {
+                /** @enum {string} */
+                op: "eq" | "neq" | "lt" | "lte" | "gt" | "gte" | "includes" | "isTrue" | "isFalse" | "isEmpty" | "notEmpty";
+                value?: string | number | boolean;
+                /** @enum {string} */
+                flag: "REVIEW" | "REFER" | "URGENT";
+                reason: string;
+            }[];
         };
         CreateStationTemplateRequest: {
             /** @enum {string} */

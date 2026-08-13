@@ -13,7 +13,8 @@ import type {
   StationType,
   VisualAcuityResultData,
 } from './screeningApi';
-import { normalizeClinicalResultData } from './fieldSchema';
+import { evaluateTemplateFlagRules, mergeFlagEvaluations, normalizeClinicalResultData } from './fieldSchema';
+import type { FieldSchema } from './fieldSchema';
 
 const DATABASE_NAME = 'vsms-screening-offline';
 const DATABASE_VERSION = 1;
@@ -464,19 +465,31 @@ export function evaluateOfflineStation(
   path: ScreeningPath,
   resultData: VisualAcuityResultData | RefractionResultData | ColourVisionResultData | DynamicResultData,
   stationType?: StationType,
+  fieldSchema: FieldSchema = [],
 ): FlagEvaluation {
   if (path === 'dynamic') {
-    const normalized = normalizeClinicalResultData(stationType, resultData as DynamicResultData);
-    if (stationType === 'VISUAL_ACUITY') return evaluateVisualAcuity(normalized as VisualAcuityResultData);
-    if (stationType === 'REFRACTION') return evaluateRefraction(normalized as RefractionResultData);
-    if (stationType === 'COLOUR_VISION') return evaluateColourVision(normalized as ColourVisionResultData);
-    return {
-      ruleVersion: 'TEMPLATE-SCHEMA-1.0',
-      overallFlag: 'NORMAL',
-      isFlagged: false,
-      flagSummary: 'Custom station result recorded.',
-      reasons: [],
-    };
+    const raw = resultData as DynamicResultData;
+    const schemaEvaluation = evaluateTemplateFlagRules(raw, fieldSchema);
+    if (stationType === 'VISUAL_ACUITY') {
+      const normalized = normalizeClinicalResultData(stationType, raw);
+      return mergeFlagEvaluations(evaluateVisualAcuity(normalized as VisualAcuityResultData), schemaEvaluation);
+    }
+    if (stationType === 'REFRACTION') {
+      const normalized = normalizeClinicalResultData(stationType, raw);
+      return mergeFlagEvaluations(evaluateRefraction(normalized as RefractionResultData), schemaEvaluation);
+    }
+    if (stationType === 'COLOUR_VISION') {
+      return mergeFlagEvaluations(evaluateColourVision(raw as ColourVisionResultData), schemaEvaluation);
+    }
+    return schemaEvaluation.reasons.length
+      ? schemaEvaluation
+      : {
+        ruleVersion: 'TEMPLATE-FLAG-1.0',
+        overallFlag: 'NORMAL',
+        isFlagged: false,
+        flagSummary: 'Custom station result recorded.',
+        reasons: [],
+      };
   }
   if (path === 'visual-acuity') return evaluateVisualAcuity(resultData as VisualAcuityResultData);
   if (path === 'refraction') return evaluateRefraction(resultData as RefractionResultData);
@@ -500,7 +513,12 @@ export async function queueOfflineStationSave(
     await purgeEvent(ownerId, eventId);
     throw new Error('Offline access for this station has expired. Reconnect before saving.');
   }
-  const evaluation = evaluateOfflineStation(path, body.resultData, station.stationType);
+  const evaluation = evaluateOfflineStation(
+    path,
+    body.resultData,
+    station.stationType,
+    station.fieldSchemaSnapshot ?? [],
+  );
   if (evaluation.isFlagged && body.acknowledged !== true) {
     throw new Error(`Flagged result (${evaluation.overallFlag}) must be acknowledged before saving.`);
   }

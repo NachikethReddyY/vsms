@@ -2641,11 +2641,28 @@ components:
         label: { type: string, minLength: 1, maxLength: 100 }
         type: { type: string, enum: [text, number, select, boolean, eye-pair, va-eye, refraction-eye] }
         required: { type: boolean }
-        options: { type: array, items: { type: string } }
+        options:
+          type: array
+          items: { type: string }
         min: { type: number }
         max: { type: number }
         unit: { type: string }
         eyes: { type: string, enum: [OD, OS, BOTH] }
+        flagRules:
+          type: array
+          maxItems: 10
+          items:
+            type: object
+            required: [op, flag, reason]
+            properties:
+              op: { type: string, enum: [eq, neq, lt, lte, gt, gte, includes, isTrue, isFalse, isEmpty, notEmpty] }
+              value:
+                oneOf:
+                  - { type: string }
+                  - { type: number }
+                  - { type: boolean }
+              flag: { type: string, enum: [REVIEW, REFER, URGENT] }
+              reason: { type: string, maxLength: 200 }
     CreateStationTemplateRequest:
       type: object
       additionalProperties: false

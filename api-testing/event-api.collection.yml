@@ -1853,7 +1853,15 @@ item:
                         "min": 0,
                         "max": 0,
                         "unit": "",
-                        "eyes": "OD"
+                        "eyes": "OD",
+                        "flagRules": [
+                          {
+                            "op": "eq",
+                            "value": "",
+                            "flag": "REVIEW",
+                            "reason": ""
+                          }
+                        ]
                       }
                     ],
                     "schemaVersion": 1,
@@ -2159,7 +2167,15 @@ item:
                     "min": 0,
                     "max": 0,
                     "unit": "",
-                    "eyes": "OD"
+                    "eyes": "OD",
+                    "flagRules": [
+                      {
+                        "op": "eq",
+                        "value": "",
+                        "flag": "REVIEW",
+                        "reason": ""
+                      }
+                    ]
                   }
                 ],
                 "schemaVersion": 1,
@@ -2395,7 +2411,15 @@ item:
                       "min": 0,
                       "max": 0,
                       "unit": "",
-                      "eyes": "OD"
+                      "eyes": "OD",
+                      "flagRules": [
+                        {
+                          "op": "eq",
+                          "value": "",
+                          "flag": "REVIEW",
+                          "reason": ""
+                        }
+                      ]
                     }
                   ],
                   "schemaVersion": 1,
@@ -2608,7 +2632,15 @@ item:
                   "min": 0,
                   "max": 0,
                   "unit": "",
-                  "eyes": "OD"
+                  "eyes": "OD",
+                  "flagRules": [
+                    {
+                      "op": "eq",
+                      "value": "",
+                      "flag": "REVIEW",
+                      "reason": ""
+                    }
+                  ]
                 }
               ]
             }
@@ -2706,7 +2738,15 @@ item:
                 "min": 0,
                 "max": 0,
                 "unit": "",
-                "eyes": "OD"
+                "eyes": "OD",
+                "flagRules": [
+                  {
+                    "op": "eq",
+                    "value": "",
+                    "flag": "REVIEW",
+                    "reason": ""
+                  }
+                ]
               }
             ]
           }
@@ -2750,7 +2790,15 @@ item:
                 "min": 0,
                 "max": 0,
                 "unit": "",
-                "eyes": "OD"
+                "eyes": "OD",
+                "flagRules": [
+                  {
+                    "op": "eq",
+                    "value": "",
+                    "flag": "REVIEW",
+                    "reason": ""
+                  }
+                ]
               }
             ]
           }
@@ -2865,7 +2913,15 @@ item:
                   "min": 0,
                   "max": 0,
                   "unit": "",
-                  "eyes": "OD"
+                  "eyes": "OD",
+                  "flagRules": [
+                    {
+                      "op": "eq",
+                      "value": "",
+                      "flag": "REVIEW",
+                      "reason": ""
+                    }
+                  ]
                 }
               ]
             }
@@ -2964,7 +3020,15 @@ item:
                 "min": 0,
                 "max": 0,
                 "unit": "",
-                "eyes": "OD"
+                "eyes": "OD",
+                "flagRules": [
+                  {
+                    "op": "eq",
+                    "value": "",
+                    "flag": "REVIEW",
+                    "reason": ""
+                  }
+                ]
               }
             ]
           }
@@ -3008,7 +3072,15 @@ item:
                 "min": 0,
                 "max": 0,
                 "unit": "",
-                "eyes": "OD"
+                "eyes": "OD",
+                "flagRules": [
+                  {
+                    "op": "eq",
+                    "value": "",
+                    "flag": "REVIEW",
+                    "reason": ""
+                  }
+                ]
               }
             ]
           }
@@ -4624,7 +4696,15 @@ item:
                     "min": 0,
                     "max": 0,
                     "unit": "",
-                    "eyes": "OD"
+                    "eyes": "OD",
+                    "flagRules": [
+                      {
+                        "op": "eq",
+                        "value": "",
+                        "flag": "REVIEW",
+                        "reason": ""
+                      }
+                    ]
                   }
                 ],
                 "schemaVersion": 1,
@@ -4920,7 +5000,15 @@ item:
                     "min": 0,
                     "max": 0,
                     "unit": "",
-                    "eyes": "OD"
+                    "eyes": "OD",
+                    "flagRules": [
+                      {
+                        "op": "eq",
+                        "value": "",
+                        "flag": "REVIEW",
+                        "reason": ""
+                      }
+                    ]
                   }
                 ],
                 "schemaVersion": 1,
@@ -6637,7 +6725,15 @@ item:
                     "min": 0,
                     "max": 0,
                     "unit": "",
-                    "eyes": "OD"
+                    "eyes": "OD",
+                    "flagRules": [
+                      {
+                        "op": "eq",
+                        "value": "",
+                        "flag": "REVIEW",
+                        "reason": ""
+                      }
+                    ]
                   }
                 ],
                 "schemaVersion": 1,
@@ -6872,7 +6968,15 @@ item:
                     "min": 0,
                     "max": 0,
                     "unit": "",
-                    "eyes": "OD"
+                    "eyes": "OD",
+                    "flagRules": [
+                      {
+                        "op": "eq",
+                        "value": "",
+                        "flag": "REVIEW",
+                        "reason": ""
+                      }
+                    ]
                   }
                 ],
                 "schemaVersion": 1,
@@ -7115,7 +7219,15 @@ item:
                     "min": 0,
                     "max": 0,
                     "unit": "",
-                    "eyes": "OD"
+                    "eyes": "OD",
+                    "flagRules": [
+                      {
+                        "op": "eq",
+                        "value": "",
+                        "flag": "REVIEW",
+                        "reason": ""
+                      }
+                    ]
                   }
                 ],
                 "schemaVersion": 1,
@@ -7365,7 +7477,15 @@ item:
                     "min": 0,
                     "max": 0,
                     "unit": "",
-                    "eyes": "OD"
+                    "eyes": "OD",
+                    "flagRules": [
+                      {
+                        "op": "eq",
+                        "value": "",
+                        "flag": "REVIEW",
+                        "reason": ""
+                      }
+                    ]
                   }
                 ],
                 "schemaVersion": 1,
@@ -7593,7 +7713,15 @@ item:
                     "min": 0,
                     "max": 0,
                     "unit": "",
-                    "eyes": "OD"
+                    "eyes": "OD",
+                    "flagRules": [
+                      {
+                        "op": "eq",
+                        "value": "",
+                        "flag": "REVIEW",
+                        "reason": ""
+                      }
+                    ]
                   }
                 ],
                 "schemaVersion": 1,
@@ -7813,7 +7941,15 @@ item:
                     "min": 0,
                     "max": 0,
                     "unit": "",
-                    "eyes": "OD"
+                    "eyes": "OD",
+                    "flagRules": [
+                      {
+                        "op": "eq",
+                        "value": "",
+                        "flag": "REVIEW",
+                        "reason": ""
+                      }
+                    ]
                   }
                 ],
                 "schemaVersion": 1,
@@ -8033,7 +8169,15 @@ item:
                     "min": 0,
                     "max": 0,
                     "unit": "",
-                    "eyes": "OD"
+                    "eyes": "OD",
+                    "flagRules": [
+                      {
+                        "op": "eq",
+                        "value": "",
+                        "flag": "REVIEW",
+                        "reason": ""
+                      }
+                    ]
                   }
                 ],
                 "schemaVersion": 1,
@@ -8271,7 +8415,15 @@ item:
                     "min": 0,
                     "max": 0,
                     "unit": "",
-                    "eyes": "OD"
+                    "eyes": "OD",
+                    "flagRules": [
+                      {
+                        "op": "eq",
+                        "value": "",
+                        "flag": "REVIEW",
+                        "reason": ""
+                      }
+                    ]
                   }
                 ],
                 "schemaVersion": 1,
@@ -8605,7 +8757,15 @@ item:
                       "min": 0,
                       "max": 0,
                       "unit": "",
-                      "eyes": "OD"
+                      "eyes": "OD",
+                      "flagRules": [
+                        {
+                          "op": "eq",
+                          "value": "",
+                          "flag": "REVIEW",
+                          "reason": ""
+                        }
+                      ]
                     }
                   ],
                   "schemaVersion": 1,
@@ -10660,7 +10820,15 @@ item:
                     "min": 0,
                     "max": 0,
                     "unit": "",
-                    "eyes": "OD"
+                    "eyes": "OD",
+                    "flagRules": [
+                      {
+                        "op": "eq",
+                        "value": "",
+                        "flag": "REVIEW",
+                        "reason": ""
+                      }
+                    ]
                   }
                 ],
                 "result": {
@@ -12901,7 +13069,15 @@ item:
                       "min": 0,
                       "max": 0,
                       "unit": "",
-                      "eyes": "OD"
+                      "eyes": "OD",
+                      "flagRules": [
+                        {
+                          "op": "eq",
+                          "value": "",
+                          "flag": "REVIEW",
+                          "reason": ""
+                        }
+                      ]
                     }
                   ],
                   "schemaVersion": 1,
