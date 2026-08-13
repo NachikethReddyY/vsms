@@ -1783,8 +1783,8 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * List the latest application and authentication audit records
-         * @description Administrator-only paged read surface for the append-only audit trail. Application audit records (`logs`) and authentication audit records (`authLogs`) are returned together with independent signed keyset cursors (`nextCursor` / `nextAuthCursor`) for load-more pagination. Rows are immutable; this endpoint never mutates history.
+         * List the centralized immutable audit history
+         * @description Administrator-only paged read surface for the append-only audit trail. Application, authentication, and event-history records are normalized into one globally ordered timeline. A filter-bound signed keyset cursor provides stable load-more pagination. Rows are immutable; this endpoint never mutates history.
          */
         get: operations["listAdministrativeAuditLogs"];
         put?: never;
@@ -4473,68 +4473,48 @@ export interface components {
             signatureMimeType: "image/png" | "image/jpeg";
         };
         AdminAuditLogsResponse: {
-            /** @description Reverse-chronological application audit records (max 100) */
-            logs: ({
-                /** Format: uuid */
-                id: string;
-                /** Format: uuid */
-                userId?: string | null;
-                /** Format: uuid */
-                deviceId?: string | null;
-                /** @enum {string} */
-                action: "CREATED" | "UPDATED" | "PUBLISHED" | "STARTED" | "COMPLETED" | "CANCELLED" | "EVENT_DELETED" | "EVENT_REGISTRATION_CREATED" | "REGISTRATION_STATUS_CHANGED" | "DUPLICATE_REGISTRATION_BLOCKED" | "PARTICIPANT_CREATED" | "PARTICIPANT_UPDATED" | "EMERGENCY_CONTACT_CREATED" | "EMERGENCY_CONTACT_UPDATED" | "CONSENT_WITHDRAWN" | "SCREENING_RESULT_RECORDED" | "CLINICAL_REVIEW_RECORDED" | "REFERRAL_ISSUED" | "REFERRAL_REVISION_CREATED" | "REFERRAL_HANDOFF_ACKNOWLEDGED" | "REFERRAL_EMAIL_FAILED" | "REFERRAL_EMAIL_CONFIRMATION_PENDING" | "REFERRAL_EMAIL_RECONCILIATION_REQUIRED" | "REFERRAL_EMAIL_RETRY_AUTHORIZED" | "REFERRAL_DRAFT_CREATED" | "QR_GENERATED" | "QR_VERIFIED" | "QR_REVOKED" | "QR_REISSUED_REVOCATION" | "MANUAL_CHECKIN_PERFORMED" | "STAFF_ACCOUNT_CREATED" | "STAFF_ACCOUNT_UPDATED" | "STAFF_ASSIGNMENT_ADDED" | "STAFF_ASSIGNMENT_REMOVED" | "REPORT_VIEWED" | "SCREENING_SYNC_BATCH" | "ARTIFACT_CLEANUP_ESCALATED" | "ENCRYPTION_BACKFILL_APPLIED";
-                resource?: string | null;
-                entityName?: string | null;
-                /** Format: uuid */
-                entityId?: string | null;
-                /** @enum {string} */
-                outcome: "SUCCESS" | "FAILED" | "DENIED" | "BLOCKED";
-                /** Format: uuid */
-                requestId?: string | null;
-                details?: {
-                    [key: string]: unknown;
-                } | null;
-                oldValue?: {
-                    [key: string]: unknown;
-                } | null;
-                newValue?: {
-                    [key: string]: unknown;
-                } | null;
-                ipAddress?: string | null;
-                deviceName?: string | null;
-                /** Format: date-time */
-                createdAt: string;
-                user?: components["schemas"]["User"];
-            } & {
-                [key: string]: unknown;
-            })[];
-            /** @description Reverse-chronological authentication audit records (max 100) */
-            authLogs: ({
-                /** Format: uuid */
-                id: string;
-                /** Format: uuid */
-                userId?: string | null;
-                /** Format: uuid */
-                deviceId?: string | null;
-                eventType: string;
-                /** @enum {string} */
-                outcome: "SUCCESS" | "FAILED" | "DENIED" | "BLOCKED";
-                failureCategory?: string | null;
-                identifierHash?: string | null;
-                ipAddress?: string | null;
-                userAgent?: string | null;
-                /** Format: uuid */
-                requestId?: string | null;
-                /** Format: date-time */
-                occurredAt: string;
-                user?: components["schemas"]["User"];
-            } & {
-                [key: string]: unknown;
-            })[];
-            /** @description Signed keyset cursor for the next page of application logs */
+            /** @description Globally reverse-chronological records from every immutable audit ledger */
+            items: components["schemas"]["AdminAuditEntry"][];
+            /** @description Filter-bound signed keyset cursor for the next timeline page */
             nextCursor: string | null;
-            /** @description Signed keyset cursor for the next page of authentication logs */
-            nextAuthCursor: string | null;
+        };
+        AdminAuditEntry: {
+            /** Format: uuid */
+            id: string;
+            /** @enum {string} */
+            source: "APPLICATION" | "AUTHENTICATION" | "EVENT";
+            /** Format: date-time */
+            occurredAt: string;
+            action: string;
+            /** @enum {string} */
+            outcome: "SUCCESS" | "FAILED" | "DENIED";
+            actor: {
+                /** Format: uuid */
+                id: string;
+                fullName: string | null;
+                /** Format: email */
+                email: string;
+                status: string;
+            } | null;
+            /** Format: uuid */
+            eventId: string | null;
+            entityName: string | null;
+            /** Format: uuid */
+            entityId: string | null;
+            /** Format: uuid */
+            requestId: string | null;
+            ipAddress: string | null;
+            deviceName: string | null;
+            userAgent?: string | null;
+            details: {
+                [key: string]: unknown;
+            } | null;
+            oldValue: {
+                [key: string]: unknown;
+            } | null;
+            newValue: {
+                [key: string]: unknown;
+            } | null;
         };
         QrCode: {
             /** Format: uuid */
@@ -8622,19 +8602,17 @@ export interface operations {
     listAdministrativeAuditLogs: {
         parameters: {
             query?: {
-                /** @description Signed keyset cursor for the application audit page */
+                /** @description Signed keyset cursor for the unified timeline */
                 cursor?: string;
-                /** @description Signed keyset cursor for the authentication audit page */
-                authCursor?: string;
-                /** @description Maximum rows per table in this page */
+                /** @description Maximum timeline records in this page */
                 limit?: number;
-                /** @description Filter application logs by target entity name */
+                /** @description Filter records by target entity name */
                 entityName?: string;
-                /** @description Filter application logs by action verb */
+                /** @description Filter records by action or authentication event */
                 action?: string;
-                /** @description Filter authentication logs by event type */
+                /** @description Restrict the feed to a specific authentication event type */
                 eventType?: string;
-                /** @description Filter both tables by outcome */
+                /** @description Filter the timeline by outcome */
                 outcome?: "SUCCESS" | "FAILED" | "DENIED";
                 /** @description Inclusive lower bound (ISO-8601) for occurred/created time */
                 from?: string;

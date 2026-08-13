@@ -1015,7 +1015,7 @@ async function seedDomainAuditEvidence({ staff, reviewer, liveEvent, completedEv
       key: "76000000-0000-4000-8000-000000000002",
       data: {
         userId: staff.id,
-        eventType: "LOGIN_FAILURE",
+        eventType: "LOGIN_FAILED",
         outcome: "FAILED",
         failureCategory: "INVALID_CREDENTIALS",
         ipAddress: "127.0.0.1",
@@ -1132,6 +1132,53 @@ async function seedDomainAuditEvidence({ staff, reviewer, liveEvent, completedEv
     });
   }
   return records.length;
+}
+
+// The assignment demonstration target is 5,000 audit records. These synthetic,
+// PII-free entries make pagination and filtering demonstrable without copying
+// clinical data into the evidence store. Deterministic UUIDs and skipDuplicates
+// keep repeated seeding safe.
+async function seedAssessmentAuditVolume({ staff, liveEvent }, target = 5000) {
+  let remaining = Math.max(0, target - await prisma.auditLog.count());
+  let candidate = 1;
+  const actions = [
+    ["EVENT_REGISTRATION_CREATED", "EventRegistration"],
+    ["SCREENING_RESULT_RECORDED", "ScreeningResult"],
+    ["SCREENING_FLAG_ACKNOWLEDGED", "ScreeningResult"],
+    ["QUEUE_JOINED", "QueueEntry"],
+    ["QR_VERIFIED", "QRCodePass"],
+    ["CLINICAL_REVIEW_RECORDED", "Review"],
+    ["REFERRAL_ISSUED", "Referral"],
+    ["SCREENING_SYNC_ACTION_APPLIED", "SyncAction"],
+  ];
+
+  while (remaining > 0 && candidate <= target * 2) {
+    const batchSize = Math.min(remaining, 500);
+    const batch = Array.from({ length: batchSize }, (_, offset) => {
+      const sequence = candidate + offset;
+      const suffix = String(sequence).padStart(12, "0");
+      const [action, entityName] = actions[sequence % actions.length];
+      return {
+        id: `78000000-0000-4000-8000-${suffix}`,
+        requestId: `79000000-0000-4000-8000-${suffix}`,
+        userId: staff.id,
+        action,
+        resource: entityName,
+        entityName,
+        entityId: liveEvent.eventId,
+        outcome: sequence % 29 === 0 ? "DENIED" : sequence % 47 === 0 ? "FAILED" : "SUCCESS",
+        details: { eventId: liveEvent.eventId, synthetic: true, sequence },
+        createdAt: new Date(Date.UTC(2026, 6, 1, 0, 0, 0) + sequence * 1000),
+      };
+    });
+    const inserted = await prisma.auditLog.createMany({ data: batch, skipDuplicates: true });
+    remaining -= inserted.count;
+    candidate += batchSize;
+  }
+
+  const count = await prisma.auditLog.count();
+  if (count < target) throw new Error(`Could not seed the ${target}-record audit demonstration volume`);
+  return count;
 }
 
 async function seedDemoData(staff, registrationOfficer, reviewer, screener, consentForm) {
@@ -1401,6 +1448,7 @@ async function seedDemoData(staff, registrationOfficer, reviewer, screener, cons
     queueEntry,
     screenerQueue,
   });
+  const auditVolumeCount = await seedAssessmentAuditVolume({ staff, liveEvent });
 
   return {
     events: { upcomingEvent, liveEvent, screenerEvent, completedEvent },
@@ -1413,6 +1461,7 @@ async function seedDemoData(staff, registrationOfficer, reviewer, screener, cons
     syncEvidence,
     referralLifecycle,
     auditEvidenceCount,
+    auditVolumeCount,
   };
 }
 
@@ -1441,6 +1490,7 @@ async function main() {
   console.log(`Registration ID: ${demo.registration.registrationId}`);
   console.log(`Demo QR pass: ${demo.qr.id}`);
   console.log(`Audit evidence records: ${demo.auditEvidenceCount}`);
+  console.log(`Audit demonstration volume: ${demo.auditVolumeCount} records`);
   console.log("Synthetic QR pass created (do not copy the bearer value into evidence).");
   console.log(`Synthetic referral delivery: ${demo.referralLifecycle.delivery.status} (${demo.referralLifecycle.delivery.id})`);
   const liveStations = await prisma.station.findMany({
