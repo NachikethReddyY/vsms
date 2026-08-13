@@ -51,7 +51,6 @@ export type Station = {
 };
 
 export type QueueRegistration = {
-  passToken: unknown;
   registrationId: string;
   participantDisplayName: string;
   queueNumber: number | null;

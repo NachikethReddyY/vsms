@@ -158,10 +158,8 @@ describe('encrypted screening outbox', () => {
     expect(post.mock.calls[0][0]).toBe(`/events/${eventId}/sync/screening`);
     expect(post.mock.calls[0][1]).toMatchObject({ actions: [] });
     const context = await getOfflineStationContext(ownerId, eventId, 'VISUAL_ACUITY');
-    expect(context?.queue[0]).toMatchObject({
-      participantDisplayName: 'Encrypted Queue Person',
-      passToken: null,
-    });
+    expect(context?.queue[0]).toMatchObject({ participantDisplayName: 'Encrypted Queue Person' });
+    expect(context?.queue[0]).not.toHaveProperty('passToken');
 
     const records = await rawRecords();
     expect(records).toHaveLength(1);
@@ -279,7 +277,6 @@ describe('encrypted screening outbox', () => {
                 participantDisplayName: 'Encrypted Queue Person',
                 queueNumber: 1,
                 status: 'CHECKED_IN',
-                passToken: null,
                 existingResult: null,
               }],
             },
@@ -296,7 +293,6 @@ describe('encrypted screening outbox', () => {
                 participantDisplayName: 'Encrypted Queue Person',
                 queueNumber: 1,
                 status: 'CHECKED_IN',
-                passToken: null,
                 existingResult: null,
               }],
             },

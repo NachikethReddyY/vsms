@@ -4225,7 +4225,6 @@ export interface components {
             participantDisplayName: string;
             queueNumber: number | null;
             status: components["schemas"]["RegistrationStatus"];
-            passToken: string | null;
         };
         RegistrationResponse: {
             /** Format: uuid */
@@ -4591,7 +4590,6 @@ export interface components {
             participantDisplayName: string;
             queueNumber: number | null;
             status: components["schemas"]["RegistrationStatus"];
-            passToken: string | null;
             existingResult: {
                 [key: string]: unknown;
             } | null;

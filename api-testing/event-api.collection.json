@@ -6079,7 +6079,7 @@
               "value": "application/json"
             }
           ],
-          "body": "{\n  \"station\": {\n    \"stationId\": \"00000000-0000-4000-8000-000000000000\",\n    \"eventId\": \"00000000-0000-4000-8000-000000000000\",\n    \"stationType\": \"\",\n    \"stationOrder\": 0,\n    \"isActive\": true\n  },\n  \"registrations\": [\n    {\n      \"registrationId\": \"00000000-0000-4000-8000-000000000000\",\n      \"participantDisplayName\": \"\",\n      \"queueNumber\": 0,\n      \"status\": \"SIGNED_UP\",\n      \"passToken\": \"\",\n      \"existingResult\": {}\n    }\n  ]\n}"
+          "body": "{\n  \"station\": {\n    \"stationId\": \"00000000-0000-4000-8000-000000000000\",\n    \"eventId\": \"00000000-0000-4000-8000-000000000000\",\n    \"stationType\": \"\",\n    \"stationOrder\": 0,\n    \"isActive\": true\n  },\n  \"registrations\": [\n    {\n      \"registrationId\": \"00000000-0000-4000-8000-000000000000\",\n      \"participantDisplayName\": \"\",\n      \"queueNumber\": 0,\n      \"status\": \"SIGNED_UP\",\n      \"existingResult\": {}\n    }\n  ]\n}"
         },
         {
           "name": "401 Response",
@@ -6177,7 +6177,7 @@
               "value": "application/json"
             }
           ],
-          "body": "{\n  \"registrationId\": \"00000000-0000-4000-8000-000000000000\",\n  \"participantDisplayName\": \"\",\n  \"queueNumber\": 0,\n  \"status\": \"SIGNED_UP\",\n  \"passToken\": \"\"\n}"
+          "body": "{\n  \"registrationId\": \"00000000-0000-4000-8000-000000000000\",\n  \"participantDisplayName\": \"\",\n  \"queueNumber\": 0,\n  \"status\": \"SIGNED_UP\"\n}"
         },
         {
           "name": "401 Response",

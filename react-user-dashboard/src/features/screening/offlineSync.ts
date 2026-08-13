@@ -27,7 +27,7 @@ type ScreeningPath = 'visual-acuity' | 'refraction' | 'colour-vision' | 'dynamic
 type OfflineMutationStatus = 'pending' | 'conflict';
 
 type OfflineStation = Station & { offlineAccessExpiresAt: string };
-type OfflineQueueRegistration = Omit<QueueRegistration, 'passToken'>;
+type OfflineQueueRegistration = QueueRegistration;
 
 type OfflineSnapshot = {
   event: { eventId: string; name: string };
@@ -351,7 +351,7 @@ export async function getOfflineStationContext(
     eventName: snapshot.event.name,
     station,
     stations: snapshot.stations,
-    queue: (snapshot.queues[station.stationId] ?? []).map((row) => ({ ...row, passToken: null })),
+    queue: snapshot.queues[station.stationId] ?? [],
   };
 }
 

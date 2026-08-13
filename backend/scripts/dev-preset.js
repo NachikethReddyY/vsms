@@ -144,7 +144,6 @@ async function upsertParticipant(staff, { participantReference, firstName, lastN
       email: `${participantReference.toLowerCase()}@example.test`,
       preferredLanguage: "English",
       status: "ACTIVE",
-      emergencyContact: "+65 8000 0099",
       createdById: staff.id,
       updatedById: staff.id,
     },
