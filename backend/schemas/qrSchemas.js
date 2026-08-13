@@ -18,16 +18,39 @@ const participantParams = z.object({
 }).strict();
 
 const tokenParams = z.object({ token: hexTokenSchema }).strict();
+const registrationParams = z.object({ registrationId: uuidSchema }).strict();
+const qrPassParams = z.object({ qrId: uuidSchema }).strict();
 
 const tokenBody = z.object({
   token: scannedTokenSchema,
   eventId: z.string().uuid().optional(),
 }).strict();
 
+const revokeBody = z.object({
+  revokedReason: z.string().trim().min(3).max(255).optional(),
+}).strict();
+
+const manualCheckInBody = z.object({
+  eventId: uuidSchema,
+  registrationId: uuidSchema.optional(),
+  identifier: scannedTokenSchema.optional(),
+}).strict().superRefine(({ registrationId, identifier }, context) => {
+  if (Boolean(registrationId) === Boolean(identifier)) {
+    context.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: "Supply exactly one registration reference or QR token",
+    });
+  }
+});
+
 module.exports = { 
   participantParams, 
   tokenParams,
   tokenBody,
+  registrationParams,
+  qrPassParams,
+  revokeBody,
+  manualCheckInBody,
   // Exporting reusable primitives in case other schemas need them
   uuidSchema,
   hexTokenSchema,

@@ -11395,7 +11395,14 @@
       "event": [],
       "request": {
         "method": "POST",
-        "header": [],
+        "header": [
+          {
+            "key": "Idempotency-Key",
+            "value": "",
+            "description": "",
+            "type": "text"
+          }
+        ],
         "auth": {
           "type": "bearer",
           "bearer": [
@@ -11424,7 +11431,14 @@
           "name": "201 Response",
           "originalRequest": {
             "method": "POST",
-            "header": [],
+            "header": [
+              {
+                "key": "Idempotency-Key",
+                "value": "",
+                "description": "",
+                "type": "text"
+              }
+            ],
             "url": "{{baseUrl}}/qr/registrations/{registrationId}"
           },
           "status": "Created",
@@ -11441,7 +11455,14 @@
           "name": "401 Response",
           "originalRequest": {
             "method": "POST",
-            "header": [],
+            "header": [
+              {
+                "key": "Idempotency-Key",
+                "value": "",
+                "description": "",
+                "type": "text"
+              }
+            ],
             "url": "{{baseUrl}}/qr/registrations/{registrationId}"
           },
           "status": "Unauthorized",
@@ -11458,7 +11479,14 @@
           "name": "404 Response",
           "originalRequest": {
             "method": "POST",
-            "header": [],
+            "header": [
+              {
+                "key": "Idempotency-Key",
+                "value": "",
+                "description": "",
+                "type": "text"
+              }
+            ],
             "url": "{{baseUrl}}/qr/registrations/{registrationId}"
           },
           "status": "Not Found",
@@ -11479,7 +11507,14 @@
       "event": [],
       "request": {
         "method": "POST",
-        "header": [],
+        "header": [
+          {
+            "key": "Idempotency-Key",
+            "value": "",
+            "description": "",
+            "type": "text"
+          }
+        ],
         "auth": {
           "type": "bearer",
           "bearer": [
@@ -11508,7 +11543,14 @@
           "name": "201 Response",
           "originalRequest": {
             "method": "POST",
-            "header": [],
+            "header": [
+              {
+                "key": "Idempotency-Key",
+                "value": "",
+                "description": "",
+                "type": "text"
+              }
+            ],
             "url": "{{baseUrl}}/qr/generate/{registrationId}"
           },
           "status": "Created",
@@ -11525,7 +11567,14 @@
           "name": "401 Response",
           "originalRequest": {
             "method": "POST",
-            "header": [],
+            "header": [
+              {
+                "key": "Idempotency-Key",
+                "value": "",
+                "description": "",
+                "type": "text"
+              }
+            ],
             "url": "{{baseUrl}}/qr/generate/{registrationId}"
           },
           "status": "Unauthorized",
@@ -11542,7 +11591,14 @@
           "name": "404 Response",
           "originalRequest": {
             "method": "POST",
-            "header": [],
+            "header": [
+              {
+                "key": "Idempotency-Key",
+                "value": "",
+                "description": "",
+                "type": "text"
+              }
+            ],
             "url": "{{baseUrl}}/qr/generate/{registrationId}"
           },
           "status": "Not Found",
@@ -11563,7 +11619,14 @@
       "event": [],
       "request": {
         "method": "POST",
-        "header": [],
+        "header": [
+          {
+            "key": "Idempotency-Key",
+            "value": "",
+            "description": "",
+            "type": "text"
+          }
+        ],
         "auth": {
           "type": "bearer",
           "bearer": [
@@ -11592,7 +11655,14 @@
           "name": "201 Response",
           "originalRequest": {
             "method": "POST",
-            "header": [],
+            "header": [
+              {
+                "key": "Idempotency-Key",
+                "value": "",
+                "description": "",
+                "type": "text"
+              }
+            ],
             "url": "{{baseUrl}}/qr/reissue/{registrationId}"
           },
           "status": "Created",
@@ -11609,7 +11679,14 @@
           "name": "401 Response",
           "originalRequest": {
             "method": "POST",
-            "header": [],
+            "header": [
+              {
+                "key": "Idempotency-Key",
+                "value": "",
+                "description": "",
+                "type": "text"
+              }
+            ],
             "url": "{{baseUrl}}/qr/reissue/{registrationId}"
           },
           "status": "Unauthorized",
@@ -11626,7 +11703,14 @@
           "name": "404 Response",
           "originalRequest": {
             "method": "POST",
-            "header": [],
+            "header": [
+              {
+                "key": "Idempotency-Key",
+                "value": "",
+                "description": "",
+                "type": "text"
+              }
+            ],
             "url": "{{baseUrl}}/qr/reissue/{registrationId}"
           },
           "status": "Not Found",
@@ -11857,6 +11941,12 @@
             "value": "application/json",
             "description": "JSON request body",
             "type": "text"
+          },
+          {
+            "key": "Idempotency-Key",
+            "value": "",
+            "description": "",
+            "type": "text"
           }
         ],
         "auth": {
@@ -11901,6 +11991,12 @@
                 "value": "application/json",
                 "description": "JSON request body",
                 "type": "text"
+              },
+              {
+                "key": "Idempotency-Key",
+                "value": "",
+                "description": "",
+                "type": "text"
               }
             ],
             "url": "{{baseUrl}}/qr/manual-checkin"
@@ -11925,6 +12021,12 @@
                 "value": "application/json",
                 "description": "JSON request body",
                 "type": "text"
+              },
+              {
+                "key": "Idempotency-Key",
+                "value": "",
+                "description": "",
+                "type": "text"
               }
             ],
             "url": "{{baseUrl}}/qr/manual-checkin"
@@ -11948,6 +12050,12 @@
                 "key": "Content-Type",
                 "value": "application/json",
                 "description": "JSON request body",
+                "type": "text"
+              },
+              {
+                "key": "Idempotency-Key",
+                "value": "",
+                "description": "",
                 "type": "text"
               }
             ],
@@ -12380,6 +12488,12 @@
             "value": "application/json",
             "description": "JSON request body",
             "type": "text"
+          },
+          {
+            "key": "Idempotency-Key",
+            "value": "",
+            "description": "",
+            "type": "text"
           }
         ],
         "auth": {
@@ -12425,6 +12539,12 @@
                 "value": "application/json",
                 "description": "JSON request body",
                 "type": "text"
+              },
+              {
+                "key": "Idempotency-Key",
+                "value": "",
+                "description": "",
+                "type": "text"
               }
             ],
             "url": "{{baseUrl}}/qr/revoke/{qrId}"
@@ -12449,6 +12569,12 @@
                 "value": "application/json",
                 "description": "JSON request body",
                 "type": "text"
+              },
+              {
+                "key": "Idempotency-Key",
+                "value": "",
+                "description": "",
+                "type": "text"
               }
             ],
             "url": "{{baseUrl}}/qr/revoke/{qrId}"
@@ -12472,6 +12598,12 @@
                 "key": "Content-Type",
                 "value": "application/json",
                 "description": "JSON request body",
+                "type": "text"
+              },
+              {
+                "key": "Idempotency-Key",
+                "value": "",
+                "description": "",
                 "type": "text"
               }
             ],

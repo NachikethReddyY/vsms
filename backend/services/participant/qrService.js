@@ -4,7 +4,7 @@ const env = require("../../config/env");
 const { decrypt, encrypt, encryptionContext } = require("../../utils/crypto/cryptoUtils");
 const { renderBrandedQrSvg } = require("../../utils/qr/qrBranding");
 const { assertUuid } = require("../../utils/validation/validation");
-const { hashToken, QR_TOKEN_PATTERN } = require("../../utils/crypto/qrToken");
+const { activeQrPassWhere, hashToken, QR_TOKEN_PATTERN } = require("../../utils/crypto/qrToken");
 const { assertRegistrationAssignment, assertQrVerifyAccess } = require("../../utils/auth/staff");
 const AppError = require("../../errors/AppError");
 const { assignRouteOnce } = require("../screening/routeAssignmentService");
@@ -15,12 +15,7 @@ function buildQRTargetUrl(token) {
     return `${env.publicAppOrigin}/participant-status/${encodeURIComponent(token)}`;
 }
 
-const activeQrWhere = (selector = {}, now = new Date()) => ({
-    ...selector,
-    isActive: true,
-    revokedAt: null,
-    expiresAt: { gt: now },
-});
+const activeQrWhere = activeQrPassWhere;
 
 const tokenSelector = (token) => ({ tokenHash: hashToken(token) });
 
@@ -185,6 +180,27 @@ exports.assertVerificationAccess = async (selectors, auth, db = prisma) => {
     return eventId;
 };
 
+exports.auditAccessDenied = async ({ selectors = {}, operation, userId, error, context = {} }, db = prisma) => {
+    const tokenFingerprint = selectors.token ? hashToken(String(selectors.token).toLowerCase().trim()) : null;
+    return createAuditLogBestEffort({
+        userId,
+        action: operation === "VERIFY" ? AUDIT_ACTIONS.QR_VERIFICATION_DENIED : AUDIT_ACTIONS.QR_ACCESS_DENIED,
+        resource: "QRCodePass",
+        entityName: "QRCodeAuthorizationAttempt",
+        entityId: selectors.qrId || null,
+        outcome: "DENIED",
+        newValue: {
+            operation,
+            eventId: selectors.eventId || null,
+            registrationId: selectors.registrationId || null,
+            tokenFingerprint,
+            errorCode: error?.code || "QR_ACCESS_DENIED",
+        },
+        context,
+        client: db,
+    });
+};
+
 /**
  * Audit Logger Helper conforming to unified schema
  */
@@ -261,6 +277,9 @@ exports.generateQR = async (registrationId, userId = null, externalTx = null, au
         if (!registration) {
             throw new AppError(404, "REGISTRATION_NOT_FOUND", "Event registration not found.");
         }
+        if (registration.registrationStatus === "CANCELLED" || registration.event.status === "CANCELLED") {
+            throw new AppError(409, "QR_LIFECYCLE_CLOSED", "A QR pass cannot be issued for a cancelled registration or event.");
+        }
 
         const now = new Date();
         const existing = await tx.qRCodePass.findFirst({
@@ -309,7 +328,7 @@ exports.generateQR = async (registrationId, userId = null, externalTx = null, au
 
         await writeAudit(tx, {
             userId,
-            action: "QR_GENERATED",
+            action: AUDIT_ACTIONS.QR_GENERATED,
             entityName: "QRCodePass",
             entityId: qrRecord.id,
             newValue: { registrationId, expiresAt },
@@ -558,7 +577,7 @@ exports.revokeQR = async (qrId, revokedReason = "Revoked by staff", revokedBy = 
 
         await writeAudit(tx, {
             userId: revokedBy,
-            action: "QR_REVOKED",
+            action: AUDIT_ACTIONS.QR_REVOKED,
             entityName: "QRCodePass",
             entityId: qrId,
             newValue: { reason: revokedReason },
@@ -593,7 +612,7 @@ exports.reissueQR = async (registrationId, userId = null, db = prisma, auditCont
 
         await writeAudit(tx, {
             userId,
-            action: "QR_REISSUED_REVOCATION",
+            action: AUDIT_ACTIONS.QR_REISSUED_REVOCATION,
             entityName: "EventRegistration",
             entityId: registrationId,
             newValue: { action: "Revoked prior active QRs" },
@@ -608,7 +627,7 @@ exports.reissueQR = async (registrationId, userId = null, db = prisma, auditCont
 // ==========================================
 // Download QR Image
 // ==========================================
-exports.downloadQR = async (qrId, db = prisma) => {
+const renderQrArtifact = async (qrId, action, db, auditContext) => {
     if (!qrId) {
         throw new AppError(400, "QR_ID_REQUIRED", "QR ID is required.");
     }
@@ -618,8 +637,22 @@ exports.downloadQR = async (qrId, db = prisma) => {
 
     const qrImage = await renderBrandedQrSvg(buildQRTargetUrl(decryptQrToken(qr)), { width: 600 });
 
+    const { userId = null, ...context } = auditContext;
+    await writeAudit(db, {
+        userId,
+        action,
+        entityName: "QRCodePass",
+        entityId: qr.id,
+        newValue: { registrationId: qr.registrationId },
+        ...context,
+    });
+
     return { qrId: qr.id, expiresAt: qr.expiresAt, qrImage };
 };
+
+exports.downloadQR = async (qrId, db = prisma, auditContext = {}) => (
+    renderQrArtifact(qrId, AUDIT_ACTIONS.QR_DOWNLOADED, db, auditContext)
+);
 
 /** Re-render the active participant pass for authenticated station tablets. */
 exports.renderActivePassForRegistration = async (registrationId, db = prisma) => {
@@ -700,12 +733,9 @@ exports.getDevPageData = async (registrationId, auditContext = {}, db = prisma) 
 // ==========================================
 // Print QR Helper
 // ==========================================
-exports.printQR = async (qrId, db = prisma) => {
-    if (!qrId) {
-        throw new AppError(400, "QR_ID_REQUIRED", "QR ID is required.");
-    }
-    return exports.downloadQR(qrId, db);
-};
+exports.printQR = async (qrId, db = prisma, auditContext = {}) => (
+    renderQrArtifact(qrId, AUDIT_ACTIONS.QR_PRINTED, db, auditContext)
+);
 
 // ==========================================
 // Manual Check-In Procedure
@@ -792,7 +822,7 @@ exports.manualCheckIn = async (params, db = prisma, auditContext = {}) => {
 
         await writeAudit(tx, {
             userId,
-            action: "MANUAL_CHECKIN_PERFORMED",
+            action: AUDIT_ACTIONS.MANUAL_CHECKIN_PERFORMED,
             entityName: "EventRegistration",
             entityId: regIdToUpdate,
             newValue: {

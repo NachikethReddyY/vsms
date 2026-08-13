@@ -1,6 +1,6 @@
 import { ArrowDownTrayIcon, ArrowPathIcon, CheckCircleIcon, PrinterIcon, QrCodeIcon, ShieldCheckIcon, UserPlusIcon, XCircleIcon } from '@heroicons/react/24/outline';
 import { useState, type FormEvent } from 'react';
-import apiClient, { getApiError as getApiMessage } from '../../utils/apiClient';
+import apiClient, { getApiError as getApiMessage, newIdempotencyHeaders } from '../../utils/apiClient';
 import QRCode from './QRCode';
 import './qrCodePage.css';
 
@@ -43,7 +43,7 @@ export default function QRCodePage() {
     if (!UUID.test(id)) { setError('Enter a valid event registration UUID.'); return; }
     setLoading(true);
     try {
-      const { data } = await apiClient.post<QrMutationResponse>(`/qr/generate/${id}`);
+      const { data } = await apiClient.post<QrMutationResponse>(`/qr/generate/${id}`, undefined, { headers: newIdempotencyHeaders() });
       setPass(data.data);
     } catch (cause) { setError(getApiMessage(cause, 'A QR pass could not be generated for this registration.')); }
     finally { setLoading(false); }
@@ -84,14 +84,14 @@ export default function QRCodePage() {
   const revoke = async () => {
     if (!confirmRevoke) { setConfirmRevoke(true); return; }
     await runAction('revoke', async () => {
-      await apiClient.put(`/qr/revoke/${pass?.qrId}`, { revokedReason: 'Revoked by staff' });
+      await apiClient.put(`/qr/revoke/${pass?.qrId}`, { revokedReason: 'Revoked by staff' }, { headers: newIdempotencyHeaders() });
       setPass(null); setConfirmRevoke(false);
       return {};
     });
   };
 
   const reissue = () => runAction('reissue', async () => {
-    const { data } = await apiClient.post<QrMutationResponse>(`/qr/reissue/${pass?.registrationId}`);
+    const { data } = await apiClient.post<QrMutationResponse>(`/qr/reissue/${pass?.registrationId}`, undefined, { headers: newIdempotencyHeaders() });
     setPass(data.data); setConfirmRevoke(false);
     return {};
   });
@@ -112,7 +112,7 @@ export default function QRCodePage() {
       const body = checkInMode === 'registration'
         ? { eventId, registrationId: reference }
         : { eventId, identifier: reference };
-      const { data } = await apiClient.post<ManualCheckInResponse>('/qr/manual-checkin', body);
+      const { data } = await apiClient.post<ManualCheckInResponse>('/qr/manual-checkin', body, { headers: newIdempotencyHeaders() });
       setCheckInResult(data.data);
       setCheckInReference('');
     } catch (cause) { setCheckInError(getApiMessage(cause, 'That participant could not be checked in.')); }
