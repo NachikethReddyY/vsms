@@ -19,7 +19,7 @@ tags:
   - name: Users
     description: Restricted administrative user projection
   - name: Participants
-    description: Participant onboarding, lookup, consent, and emergency contacts
+    description: Participant onboarding, lookup, and emergency contacts
   - name: Registrations
     description: Event registration and status history
   - name: Screening
@@ -682,7 +682,7 @@ paths:
           schema: { type: integer, minimum: 1, maximum: 100, default: 50 }
         - name: status
           in: query
-          schema: { type: string, enum: [SIGNED_UP, CHECKED_IN, COMPLETED, CANCELLED] }
+          schema: { type: string, enum: [SIGNED_UP, WAITLISTED, CHECKED_IN, COMPLETED, CANCELLED] }
         - name: search
           in: query
           schema: { type: string, maxLength: 150 }
@@ -801,7 +801,6 @@ paths:
           content: { application/json: { schema: { $ref: "#/components/schemas/RegistrationListResponse" } } }
         "401": { $ref: "#/components/responses/Unauthorized" }
         "403": { $ref: "#/components/responses/Forbidden" }
-        "404": { $ref: "#/components/responses/NotFound" }
     post:
       tags: [Registrations]
       operationId: createEventRegistration
@@ -814,9 +813,10 @@ paths:
             schema:
               type: object
               additionalProperties: false
-              required: [participantId]
+              required: [participantId, consentAcknowledged]
               properties:
                 participantId: { type: string, format: uuid }
+                consentAcknowledged: { type: boolean }
       responses:
         "200": { description: Idempotent replay, content: { application/json: { schema: { $ref: "#/components/schemas/RegistrationResponse" } } } }
         "201": { description: Participant registered, content: { application/json: { schema: { $ref: "#/components/schemas/RegistrationResponse" } } } }
@@ -824,6 +824,17 @@ paths:
         "401": { $ref: "#/components/responses/Unauthorized" }
         "403": { $ref: "#/components/responses/Forbidden" }
         "409": { $ref: "#/components/responses/Conflict" }
+  /api/v1/events/{eventId}/registrations/summary:
+    parameters: [{ $ref: "#/components/parameters/EventId" }]
+    get:
+      tags: [Registrations]
+      operationId: getEventRegistrationSummary
+      summary: Get registration capacity and status totals for an event
+      responses:
+        "200": { description: Registration summary, content: { application/json: { schema: { $ref: "#/components/schemas/EventRegistrationSummaryResponse" } } } }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
   /api/v1/events/{eventId}/memberships:
     parameters: [{ $ref: "#/components/parameters/EventId" }]
     get:
@@ -1364,16 +1375,6 @@ paths:
         "400": { $ref: "#/components/responses/ValidationFailed" }
         "401": { $ref: "#/components/responses/Unauthorized" }
         "403": { $ref: "#/components/responses/Forbidden" }
-  /api/v1/participants/active-consent-form:
-    get:
-      tags: [Participants]
-      operationId: getParticipantActiveConsentForm
-      summary: Get the currently effective consent form
-      responses:
-        "200": { description: Active consent form, content: { application/json: { schema: { $ref: "#/components/schemas/ConsentFormEnvelope" } } } }
-        "401": { $ref: "#/components/responses/Unauthorized" }
-        "403": { $ref: "#/components/responses/Forbidden" }
-        "404": { $ref: "#/components/responses/NotFound" }
   /api/v1/participants/match:
     post:
       tags: [Participants]
@@ -1453,43 +1454,6 @@ paths:
         "200": { description: Registrations, content: { application/json: { schema: { $ref: "#/components/schemas/RegistrationsEnvelope" } } } }
         "401": { $ref: "#/components/responses/Unauthorized" }
         "403": { $ref: "#/components/responses/Forbidden" }
-  /api/v1/participants/{participantId}/consents:
-    parameters: [{ $ref: "#/components/parameters/ParticipantId" }]
-    get:
-      tags: [Participants]
-      operationId: listParticipantConsents
-      summary: List a participant's consent records
-      responses:
-        "200": { description: Consent records, content: { application/json: { schema: { $ref: "#/components/schemas/ConsentsEnvelope" } } } }
-        "401": { $ref: "#/components/responses/Unauthorized" }
-        "403": { $ref: "#/components/responses/Forbidden" }
-    post:
-      tags: [Participants]
-      operationId: createParticipantConsent
-      summary: Record consent using an event ID in the request body
-      requestBody: { required: true, content: { application/json: { schema: { $ref: "#/components/schemas/ConsentWithEventRequest" } } } }
-      responses:
-        "201": { description: Consent recorded, content: { application/json: { schema: { $ref: "#/components/schemas/ConsentEnvelope" } } } }
-        "400": { $ref: "#/components/responses/ValidationFailed" }
-        "401": { $ref: "#/components/responses/Unauthorized" }
-        "403": { $ref: "#/components/responses/Forbidden" }
-        "404": { $ref: "#/components/responses/NotFound" }
-  /api/v1/participants/{participantId}/consents/{consentId}/withdraw:
-    post:
-      tags: [Participants]
-      operationId: withdrawParticipantConsent
-      summary: Create an immutable withdrawal for accepted consent
-      parameters:
-        - $ref: "#/components/parameters/ParticipantId"
-        - $ref: "#/components/parameters/ConsentId"
-      requestBody: { required: true, content: { application/json: { schema: { $ref: "#/components/schemas/ConsentWithdrawalRequest" } } } }
-      responses:
-        "201": { description: Consent withdrawn, content: { application/json: { schema: { $ref: "#/components/schemas/ConsentEnvelope" } } } }
-        "400": { $ref: "#/components/responses/ValidationFailed" }
-        "401": { $ref: "#/components/responses/Unauthorized" }
-        "403": { $ref: "#/components/responses/Forbidden" }
-        "404": { $ref: "#/components/responses/NotFound" }
-        "409": { $ref: "#/components/responses/Conflict" }
   /api/v1/participants/{participantId}/emergency-contacts:
     parameters: [{ $ref: "#/components/parameters/ParticipantId" }]
     get:
@@ -1526,26 +1490,11 @@ paths:
         "401": { $ref: "#/components/responses/Unauthorized" }
         "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
-  /api/v1/participants/{participantId}/events/{eventId}/consent:
-    post:
-      tags: [Participants]
-      operationId: createEventConsent
-      summary: Record consent for a participant and event
-      parameters:
-        - $ref: "#/components/parameters/ParticipantId"
-        - $ref: "#/components/parameters/EventId"
-      requestBody: { required: true, content: { application/json: { schema: { $ref: "#/components/schemas/ConsentRequest" } } } }
-      responses:
-        "201": { description: Consent recorded, content: { application/json: { schema: { $ref: "#/components/schemas/ConsentEnvelope" } } } }
-        "400": { $ref: "#/components/responses/ValidationFailed" }
-        "401": { $ref: "#/components/responses/Unauthorized" }
-        "403": { $ref: "#/components/responses/Forbidden" }
-        "404": { $ref: "#/components/responses/NotFound" }
   /api/v1/participants/{participantId}/events/{eventId}/review:
     get:
       tags: [Participants]
       operationId: getParticipantRegistrationReview
-      summary: Get participant, event, emergency contact, and latest consent for registration review
+      summary: Get participant, event, and emergency contact for registration review
       parameters:
         - $ref: "#/components/parameters/ParticipantId"
         - $ref: "#/components/parameters/EventId"
@@ -1567,10 +1516,11 @@ paths:
             schema:
               type: object
               additionalProperties: false
-              required: [eventId, participantId]
+              required: [eventId, participantId, consentAcknowledged]
               properties:
                 eventId: { type: string, format: uuid }
                 participantId: { type: string, format: uuid }
+                consentAcknowledged: { type: boolean }
       responses:
         "200": { description: Idempotent replay, content: { application/json: { schema: { $ref: "#/components/schemas/RegistrationResponse" } } } }
         "201": { description: Participant registered, content: { application/json: { schema: { $ref: "#/components/schemas/RegistrationResponse" } } } }
@@ -1613,16 +1563,6 @@ paths:
         "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
         "409": { $ref: "#/components/responses/Conflict" }
-  /api/v1/consent-forms/active:
-    get:
-      tags: [Participants]
-      operationId: getActiveConsentForm
-      summary: Get the currently effective consent form
-      responses:
-        "200": { description: Active consent form, content: { application/json: { schema: { $ref: "#/components/schemas/ConsentFormEnvelope" } } } }
-        "401": { $ref: "#/components/responses/Unauthorized" }
-        "403": { $ref: "#/components/responses/Forbidden" }
-        "404": { $ref: "#/components/responses/NotFound" }
   /api/v1/emergency-contacts/{contactId}:
     patch:
       tags: [Participants]
@@ -2535,11 +2475,6 @@ components:
       schema: { type: string, format: uuid }
     ContactId:
       name: contactId
-      in: path
-      required: true
-      schema: { type: string, format: uuid }
-    ConsentId:
-      name: consentId
       in: path
       required: true
       schema: { type: string, format: uuid }
@@ -3552,7 +3487,7 @@ components:
         registrationId: { type: string, format: uuid }
         participantDisplayName: { type: string, nullable: true }
         participantReference: { type: string }
-        registrationStatus: { type: string, enum: [SIGNED_UP, CHECKED_IN, COMPLETED, CANCELLED] }
+        registrationStatus: { type: string, enum: [SIGNED_UP, WAITLISTED, CHECKED_IN, COMPLETED, CANCELLED] }
         checkedIn: { type: boolean }
         checkedInAt: { type: string, format: date-time, nullable: true }
         queueNumber: { type: integer, nullable: true }
@@ -4040,7 +3975,7 @@ components:
         registrationId: { type: string, format: uuid }
         participantDisplayName: { type: string }
         queueNumber: { type: integer, nullable: true }
-        registrationStatus: { type: string, enum: [SIGNED_UP, CHECKED_IN, COMPLETED, CANCELLED] }
+        registrationStatus: { type: string, enum: [SIGNED_UP, WAITLISTED, CHECKED_IN, COMPLETED, CANCELLED] }
         maskedNric: { type: string, pattern: '^(?:•••••[0-9]{3}[A-Z]|Not recorded)$' }
         dateOfBirth: { type: string, format: date }
         gender: { type: string, maxLength: 1 }
@@ -4260,7 +4195,7 @@ components:
       properties:
         taskId: { type: string, format: uuid }
         eventId: { type: string, format: uuid }
-        artifactType: { type: string, enum: [CONSENT_SIGNATURE, REFERRAL_SIGNATURE, REVIEW_DECISION_SIGNATURE, REFERRAL_DOCUMENT] }
+        artifactType: { type: string, enum: [REFERRAL_SIGNATURE, REVIEW_DECISION_SIGNATURE, REFERRAL_DOCUMENT] }
         status: { type: string, enum: [PENDING, PROCESSING, FAILED, ESCALATED, COMPLETED, RESOLVED] }
         attemptCount: { type: integer, minimum: 0 }
         lastError: { type: string, nullable: true }
@@ -4524,7 +4459,7 @@ components:
     ParticipantRequest:
       type: object
       additionalProperties: false
-      required: [firstName, lastName, dateOfBirth, gender, contactNumber, nric]
+      required: [firstName, lastName, dateOfBirth, gender, contactNumber, nric, email, race, nationality, addressStreet, addressUnit, addressPostalCode, preferredLanguage]
       properties:
         firstName: { type: string, minLength: 1, maxLength: 100 }
         lastName: { type: string, minLength: 1, maxLength: 100 }
@@ -4662,7 +4597,7 @@ components:
           properties:
             id: { type: string, format: uuid }
             queueNumber: { type: integer, nullable: true }
-            status: { type: string, enum: [SIGNED_UP, CHECKED_IN, COMPLETED, CANCELLED] }
+            status: { type: string, enum: [SIGNED_UP, WAITLISTED, CHECKED_IN, COMPLETED, CANCELLED] }
             assignedBooth: { type: string, nullable: true }
     ParticipantReuseResponse:
       type: object
@@ -4719,86 +4654,29 @@ components:
       additionalProperties: false
       required: [contacts]
       properties: { contacts: { type: array, items: { $ref: "#/components/schemas/EmergencyContact" } } }
-    ConsentForm:
-      type: object
-      additionalProperties: true
-      required: [id, formCode, versionNumber, title, contentHash, documentObjectKey, effectiveFrom, isActive]
-      properties:
-        id: { type: string, format: uuid }
-        formCode: { type: string }
-        versionNumber: { type: string }
-        title: { type: string }
-        contentText: { type: string, nullable: true }
-        contentHash: { type: string, pattern: '^[a-f0-9]{64}$' }
-        documentObjectKey: { type: string }
-        effectiveFrom: { type: string, format: date-time }
-        effectiveTo: { type: string, format: date-time, nullable: true }
-        isActive: { type: boolean }
-    ConsentFormEnvelope:
-      type: object
-      additionalProperties: false
-      required: [consentForm]
-      properties: { consentForm: { $ref: "#/components/schemas/ConsentForm" } }
-    ConsentRequest:
-      type: object
-      additionalProperties: false
-      required: [consentFormVersionId, consentStatus, signerType, signerName]
-      properties:
-        consentFormVersionId: { type: string, format: uuid }
-        consentStatus: { type: string, enum: [ACCEPTED, DECLINED] }
-        signerType: { type: string, enum: [PARTICIPANT, PARENT, GUARDIAN, AUTHORISED_REPRESENTATIVE] }
-        signerName: { type: string, minLength: 1, maxLength: 150 }
-        signerRelationship: { type: string, maxLength: 60, nullable: true }
-        guardianContactName: { type: string, maxLength: 150, nullable: true }
-        guardianContactPhone: { type: string, maxLength: 30, nullable: true }
-        guardianContactEmail: { type: string, format: email, nullable: true }
-        signatureObjectKey: { type: string, maxLength: 500, nullable: true }
-        signatureSha256: { type: string, pattern: '^[a-fA-F0-9]{64}$', nullable: true }
-        signatureMimeType: { type: string, enum: [image/png, image/jpeg], nullable: true }
-      description: Accepted consent requires signature metadata; non-participant signers require their relationship to the participant. Optional contact fields are retained only for legacy records.
-    ConsentWithEventRequest:
-      allOf:
-        - $ref: "#/components/schemas/ConsentRequest"
-        - type: object
-          required: [eventId]
-          properties: { eventId: { type: string, format: uuid } }
-    ConsentWithdrawalRequest:
-      type: object
-      additionalProperties: false
-      required: [withdrawalReason]
-      properties: { withdrawalReason: { type: string, minLength: 1, maxLength: 1000 } }
-    Consent:
-      type: object
-      additionalProperties: true
-      required: [id, participantId, eventId, consentFormVersionId, consentStatus, recordedById, createdAt]
-      properties:
-        id: { type: string, format: uuid }
-        participantId: { type: string, format: uuid }
-        eventId: { type: string, format: uuid }
-        registrationId: { type: string, format: uuid, nullable: true }
-        withdrawalOfId: { type: string, format: uuid, nullable: true }
-        consentFormVersionId: { type: string, format: uuid }
-        consentStatus: { type: string, enum: [PENDING, ACCEPTED, DECLINED, WITHDRAWN] }
-        signerType: { type: string, nullable: true }
-        signerName: { type: string, nullable: true }
-        recordedById: { type: string, format: uuid }
-        signedAt: { type: string, format: date-time, nullable: true }
-        withdrawnAt: { type: string, format: date-time, nullable: true }
-        withdrawalReason: { type: string, nullable: true }
-        createdAt: { type: string, format: date-time }
-    ConsentEnvelope:
-      type: object
-      additionalProperties: false
-      required: [consent]
-      properties: { consent: { $ref: "#/components/schemas/Consent" } }
-    ConsentsEnvelope:
-      type: object
-      additionalProperties: false
-      required: [consents]
-      properties: { consents: { type: array, items: { $ref: "#/components/schemas/Consent" } } }
     RegistrationStatus:
       type: string
-      enum: [SIGNED_UP, CHECKED_IN, COMPLETED, CANCELLED]
+      enum: [SIGNED_UP, WAITLISTED, CHECKED_IN, COMPLETED, CANCELLED]
+    EventRegistrationSummary:
+      type: object
+      additionalProperties: false
+      required: [eventId, capacity, signedUpCount, waitlistedCount, checkedInCount, completedCount, cancelledCount, filledCount, remainingCapacity]
+      properties:
+        eventId: { type: string, format: uuid }
+        capacity: { type: integer, minimum: 0 }
+        signedUpCount: { type: integer, minimum: 0 }
+        waitlistedCount: { type: integer, minimum: 0 }
+        checkedInCount: { type: integer, minimum: 0 }
+        completedCount: { type: integer, minimum: 0 }
+        cancelledCount: { type: integer, minimum: 0 }
+        filledCount: { type: integer, minimum: 0 }
+        remainingCapacity: { type: integer, minimum: 0 }
+    EventRegistrationSummaryResponse:
+      type: object
+      additionalProperties: false
+      required: [summary]
+      properties:
+        summary: { $ref: "#/components/schemas/EventRegistrationSummary" }
     Registration:
       type: object
       additionalProperties: true
@@ -4812,6 +4690,7 @@ components:
         participantDisplayName: { type: string, nullable: true }
         queueNumber: { type: integer, nullable: true }
         idempotencyKey: { type: string }
+        consentAcknowledged: { type: boolean }
         checkedIn: { type: boolean }
         checkedInAt: { type: string, format: date-time, nullable: true }
         createdAt: { type: string, format: date-time }
@@ -4948,12 +4827,12 @@ components:
       additionalProperties: false
       required: [toStatus]
       properties:
-        toStatus: { $ref: "#/components/schemas/RegistrationStatus" }
+        toStatus: { type: string, enum: [SIGNED_UP, CHECKED_IN, COMPLETED, CANCELLED] }
         reason: { type: string, maxLength: 200, nullable: true }
     ParticipantRegistrationReview:
       type: object
       additionalProperties: false
-      required: [participant, event, emergencyContact, latestConsent]
+      required: [participant, event, emergencyContact]
       properties:
         participant: { $ref: "#/components/schemas/Participant" }
         event: { $ref: "#/components/schemas/Event" }
@@ -4961,10 +4840,6 @@ components:
           type: object
           nullable: true
           allOf: [{ $ref: "#/components/schemas/EmergencyContact" }]
-        latestConsent:
-          type: object
-          nullable: true
-          allOf: [{ $ref: "#/components/schemas/Consent" }]
     SignatureRequest:
       type: object
       additionalProperties: false
@@ -4975,14 +4850,14 @@ components:
           maxLength: 140000
           pattern: '^data:image/(png|jpeg);base64,'
         eventId: { type: string, format: uuid }
-        purpose: { type: string, enum: [CONSENT, REFERRAL, REVIEW_DECISION] }
-        targetId: { type: string, format: uuid, description: "Participant ID for consent, referral ID for referral issuance, or registration ID for a review decision." }
+        purpose: { type: string, enum: [REFERRAL, REVIEW_DECISION] }
+        targetId: { type: string, format: uuid, description: "Referral ID for referral issuance or registration ID for a review decision." }
     SignatureResponse:
       type: object
       additionalProperties: false
       required: [signatureObjectKey, signatureSha256, signatureMimeType]
       properties:
-        signatureObjectKey: { type: string, pattern: '^signatures/[a-f0-9-]{36}/(consent|referral|review-decision)-[a-f0-9-]{36}-[a-f0-9-]{36}\\.(png|jpg)$' }
+        signatureObjectKey: { type: string, pattern: '^signatures/[a-f0-9-]{36}/(referral|review-decision)-[a-f0-9-]{36}-[a-f0-9-]{36}\\.(png|jpg)$' }
         signatureSha256: { type: string, pattern: '^[a-f0-9]{64}$' }
         signatureMimeType: { type: string, enum: [image/png, image/jpeg] }
     AdminAuditLogsResponse:
@@ -5003,7 +4878,7 @@ components:
               deviceId: { type: string, format: uuid, nullable: true }
               action:
                 type: string
-                enum: [CREATED, UPDATED, PUBLISHED, STARTED, COMPLETED, CANCELLED, EVENT_DELETED, EVENT_REGISTRATION_CREATED, REGISTRATION_STATUS_CHANGED, DUPLICATE_REGISTRATION_BLOCKED, PARTICIPANT_CREATED, PARTICIPANT_UPDATED, EMERGENCY_CONTACT_CREATED, EMERGENCY_CONTACT_UPDATED, CONSENT_WITHDRAWN, SCREENING_RESULT_RECORDED, CLINICAL_REVIEW_RECORDED, REFERRAL_ISSUED, REFERRAL_REVISION_CREATED, REFERRAL_HANDOFF_ACKNOWLEDGED, REFERRAL_EMAIL_FAILED, REFERRAL_EMAIL_CONFIRMATION_PENDING, REFERRAL_EMAIL_RECONCILIATION_REQUIRED, REFERRAL_EMAIL_RETRY_AUTHORIZED, REFERRAL_DRAFT_CREATED, QR_GENERATED, QR_VERIFIED, QR_REVOKED, QR_REISSUED_REVOCATION, MANUAL_CHECKIN_PERFORMED, STAFF_ACCOUNT_CREATED, STAFF_ACCOUNT_UPDATED, STAFF_ASSIGNMENT_ADDED, STAFF_ASSIGNMENT_REMOVED, REPORT_VIEWED, SCREENING_SYNC_BATCH, ARTIFACT_CLEANUP_ESCALATED, ENCRYPTION_BACKFILL_APPLIED]
+                enum: [CREATED, UPDATED, PUBLISHED, STARTED, COMPLETED, CANCELLED, EVENT_DELETED, EVENT_REGISTRATION_CREATED, REGISTRATION_STATUS_CHANGED, DUPLICATE_REGISTRATION_BLOCKED, PARTICIPANT_CREATED, PARTICIPANT_UPDATED, EMERGENCY_CONTACT_CREATED, EMERGENCY_CONTACT_UPDATED, SCREENING_RESULT_RECORDED, CLINICAL_REVIEW_RECORDED, REFERRAL_ISSUED, REFERRAL_REVISION_CREATED, REFERRAL_HANDOFF_ACKNOWLEDGED, REFERRAL_EMAIL_FAILED, REFERRAL_EMAIL_CONFIRMATION_PENDING, REFERRAL_EMAIL_RECONCILIATION_REQUIRED, REFERRAL_EMAIL_RETRY_AUTHORIZED, REFERRAL_DRAFT_CREATED, QR_GENERATED, QR_VERIFIED, QR_REVOKED, QR_REISSUED_REVOCATION, MANUAL_CHECKIN_PERFORMED, STAFF_ACCOUNT_CREATED, STAFF_ACCOUNT_UPDATED, STAFF_ASSIGNMENT_ADDED, STAFF_ASSIGNMENT_REMOVED, REPORT_VIEWED, SCREENING_SYNC_BATCH, ARTIFACT_CLEANUP_ESCALATED, ENCRYPTION_BACKFILL_APPLIED]
               resource: { type: string, nullable: true }
               entityName: { type: string, nullable: true }
               entityId: { type: string, format: uuid, nullable: true }
@@ -5081,7 +4956,7 @@ components:
             valid: { type: boolean, description: Whether the pass is active and unexpired }
             eventName: { type: string, nullable: true, description: "Only the event name; never participant data. Unset when the pass is invalid" }
             queueNumber: { type: integer, nullable: true }
-            registrationStatus: { type: string, enum: [SIGNED_UP, CHECKED_IN, COMPLETED, CANCELLED], nullable: true }
+            registrationStatus: { type: string, enum: [SIGNED_UP, WAITLISTED, CHECKED_IN, COMPLETED, CANCELLED], nullable: true }
             queueState:
               type: object
               nullable: true

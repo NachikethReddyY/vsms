@@ -5,11 +5,10 @@ const AppError = require("../../errors/AppError");
 
 const MIME_EXTENSIONS = { "image/png": "png", "image/jpeg": "jpg" };
 const PURPOSE_SLUGS = Object.freeze({
-  CONSENT: "consent",
   REFERRAL: "referral",
   REVIEW_DECISION: "review-decision",
 });
-const SIGNATURE_KEY = /^signatures\/([a-f0-9-]{36})\/(consent|referral|review-decision)-([a-f0-9-]{36})-([a-f0-9-]{36})\.(png|jpg)$/;
+const SIGNATURE_KEY = /^signatures\/([a-f0-9-]{36})\/(referral|review-decision)-([a-f0-9-]{36})-([a-f0-9-]{36})\.(png|jpg)$/;
 const storageRoot = () => path.resolve(
   process.env.SIGNATURE_STORAGE_DIR || path.join(__dirname, "..", "..", "secure-data", "signatures"),
 );

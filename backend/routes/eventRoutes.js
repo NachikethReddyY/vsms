@@ -88,6 +88,11 @@ router.get(
   requireEventRoleAndDuty("REGISTRATION"),
   registrationController.listEventRegistrations
 );
+router.get(
+  "/:eventId/registrations/summary",
+  requireEventRoleAndDuty("REGISTRATION"),
+  registrationController.getEventRegistrationSummary
+);
 
 // 3. Dynamic parameter routes come last
 router.get("/:eventId/metrics", reportingLimiter, validate({ params: eventParams }), requireEventManager, asyncHandler(eventController.metrics));

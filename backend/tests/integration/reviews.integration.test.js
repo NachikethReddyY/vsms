@@ -43,7 +43,6 @@ const createRegistration = async (label, queueNumber, resultFlags) => {
       gender: "F",
       contactNumber: "+65 6000 1000",
       emergencyContact: "+65 6000 1001",
-      consentGiven: true,
       createdById: testUsers.manager.id,
       updatedById: testUsers.manager.id,
       onboardingEventId: eventId,

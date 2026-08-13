@@ -257,10 +257,10 @@ test("binds stored signatures to their user, event, and purpose", async (t) => {
   const eventId = crypto.randomUUID();
   const image = Buffer.alloc(128);
   Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]).copy(image);
-  const stored = await storeSignature(image, "image/png", userId, eventId, "CONSENT");
-  assert.deepEqual(await loadVerifiedSignature(stored, userId, eventId, "CONSENT"), image);
+  const stored = await storeSignature(image, "image/png", userId, eventId, "REFERRAL");
+  assert.deepEqual(await loadVerifiedSignature(stored, userId, eventId, "REFERRAL"), image);
   await assert.rejects(
-    loadVerifiedSignature(stored, userId, eventId, "REFERRAL"),
+    loadVerifiedSignature(stored, userId, eventId, "REVIEW_DECISION"),
     (error) => error.status === 422 && error.code === "INVALID_SIGNATURE",
   );
 

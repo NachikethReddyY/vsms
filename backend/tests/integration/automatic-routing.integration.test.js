@@ -19,7 +19,6 @@ const createRegistration = async (label, withRoute = true) => {
       gender: "U",
       contactNumber: `+65${crypto.randomInt(10_000_000, 99_999_999)}`,
       emergencyContact: "+6560002000",
-      consentGiven: true,
       createdById: fixture.manager.id,
       updatedById: fixture.manager.id,
       onboardingEventId: fixture.event.eventId,

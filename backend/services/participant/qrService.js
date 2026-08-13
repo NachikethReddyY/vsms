@@ -58,15 +58,6 @@ const qrLookupRegistration = (registration) => ({
     checkedIn: registration.checkedIn,
 });
 
-const manualCheckInRegistrationSelect = {
-    registrationId: true,
-    eventId: true,
-    registrationStatus: true,
-    checkedIn: true,
-    checkedInAt: true,
-    queueNumber: true,
-};
-
 const manualCheckInRegistration = (registration) => ({
     registrationId: registration.registrationId,
     eventId: registration.eventId,
@@ -75,6 +66,16 @@ const manualCheckInRegistration = (registration) => ({
     checkedInAt: registration.checkedInAt,
     queueNumber: registration.queueNumber,
 });
+
+const mapCheckInRoutineError = (error) => {
+    if (String(error?.message || "").includes("REGISTRATION_NOT_FOUND")) {
+        return new AppError(404, "REGISTRATION_NOT_FOUND", "Registration record was not found for this event.");
+    }
+    if (String(error?.message || "").includes("REGISTRATION_CHECKIN_CONFLICT")) {
+        return new AppError(409, "CHECKIN_STATE_CONFLICT", "Only a signed-up participant can be checked in.");
+    }
+    return error;
+};
 
 const decryptQrToken = (qr) => {
     if (qr.tokenEncryptionVersion !== 2 || !qr.tokenCiphertext) {
@@ -733,48 +734,26 @@ exports.manualCheckIn = async (params, db = prisma, auditContext = {}) => {
             throw new AppError(404, "INVALID_QR", "QR Code is invalid, expired, or unavailable.");
         }
 
-        const registration = await tx.eventRegistration.findFirst({
-            where: {
-                registrationId: regIdToUpdate,
-                eventId,
-            },
-            select: manualCheckInRegistrationSelect,
-        });
-        if (!registration) {
-            throw new AppError(404, "REGISTRATION_NOT_FOUND", "Registration record was not found for this event.");
-        }
-        if (registration.registrationStatus !== "SIGNED_UP" || registration.checkedIn) {
-            throw new AppError(409, "CHECKIN_STATE_CONFLICT", "Only a signed-up participant can be checked in.");
-        }
-
-        const checkedInAt = new Date();
-        const updated = await tx.eventRegistration.updateMany({
-            where: {
-                registrationId: registration.registrationId,
-                eventId,
-                registrationStatus: "SIGNED_UP",
-                checkedIn: false,
-            },
-            data: {
-                checkedIn: true,
-                checkedInAt,
-                registrationStatus: "CHECKED_IN",
-            },
-        });
-        if (updated.count !== 1) {
-            throw new AppError(409, "CHECKIN_STATE_CONFLICT", "Registration was changed before check-in completed.");
-        }
-
+        const rows = await tx.$queryRaw`
+            SELECT * FROM "check_in_event_registration"(
+                CAST(${regIdToUpdate} AS uuid),
+                CAST(${eventId} AS uuid),
+                CAST(${userId} AS uuid)
+            )
+        `;
+        const checkedIn = rows[0];
         const result = manualCheckInRegistration({
-            ...registration,
-            registrationStatus: "CHECKED_IN",
-            checkedIn: true,
-            checkedInAt,
+            registrationId: checkedIn.registration_id,
+            eventId: checkedIn.event_id,
+            registrationStatus: checkedIn.registration_status,
+            checkedIn: checkedIn.checked_in,
+            checkedInAt: checkedIn.checked_in_at,
+            queueNumber: checkedIn.queue_number,
         });
 
         const route = await assignRouteOnce({
             tx,
-            registrationId: registration.registrationId,
+            registrationId: result.registrationId,
             eventId,
             actorUserId: userId,
             context: auditContext,
@@ -796,7 +775,7 @@ exports.manualCheckIn = async (params, db = prisma, auditContext = {}) => {
             }, { isolationLevel: "Serializable" });
         } catch (error) {
             if (error.code === "P2034" && attempt < 3) continue;
-            throw error;
+            throw mapCheckInRoutineError(error);
         }
     }
     throw new AppError(409, "CHECKIN_CONFLICT", "Unable to check in this participant. Please retry.");

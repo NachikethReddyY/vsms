@@ -4088,7 +4088,7 @@
               "value": "application/json"
             }
           ],
-          "body": "{\n  \"registrations\": [\n    {\n      \"id\": \"00000000-0000-4000-8000-000000000000\",\n      \"registrationId\": \"00000000-0000-4000-8000-000000000000\",\n      \"eventId\": \"00000000-0000-4000-8000-000000000000\",\n      \"participantId\": \"00000000-0000-4000-8000-000000000000\",\n      \"registrationStatus\": \"SIGNED_UP\",\n      \"participantDisplayName\": \"\",\n      \"queueNumber\": 0,\n      \"idempotencyKey\": \"\",\n      \"checkedIn\": true,\n      \"checkedInAt\": \"2026-08-07T00:00:00.000Z\",\n      \"createdAt\": \"2026-08-07T00:00:00.000Z\",\n      \"updatedAt\": \"2026-08-07T00:00:00.000Z\"\n    }\n  ],\n  \"pagination\": {\n    \"page\": 1,\n    \"pageSize\": 1,\n    \"total\": 0,\n    \"totalPages\": 0\n  }\n}"
+          "body": "{\n  \"registrations\": [\n    {\n      \"id\": \"00000000-0000-4000-8000-000000000000\",\n      \"registrationId\": \"00000000-0000-4000-8000-000000000000\",\n      \"eventId\": \"00000000-0000-4000-8000-000000000000\",\n      \"participantId\": \"00000000-0000-4000-8000-000000000000\",\n      \"registrationStatus\": \"SIGNED_UP\",\n      \"participantDisplayName\": \"\",\n      \"queueNumber\": 0,\n      \"idempotencyKey\": \"\",\n      \"consentAcknowledged\": true,\n      \"checkedIn\": true,\n      \"checkedInAt\": \"2026-08-07T00:00:00.000Z\",\n      \"createdAt\": \"2026-08-07T00:00:00.000Z\",\n      \"updatedAt\": \"2026-08-07T00:00:00.000Z\"\n    }\n  ],\n  \"pagination\": {\n    \"page\": 1,\n    \"pageSize\": 1,\n    \"total\": 0,\n    \"totalPages\": 0\n  }\n}"
         },
         {
           "name": "401 Response",
@@ -4170,7 +4170,7 @@
         },
         "body": {
           "mode": "raw",
-          "raw": "{\n  \"participantId\": \"00000000-0000-4000-8000-000000000000\"\n}",
+          "raw": "{\n  \"participantId\": \"00000000-0000-4000-8000-000000000000\",\n  \"consentAcknowledged\": true\n}",
           "options": {
             "raw": {
               "language": "json"
@@ -4207,7 +4207,7 @@
               "value": "application/json"
             }
           ],
-          "body": "{\n  \"registrationId\": \"00000000-0000-4000-8000-000000000000\",\n  \"participantReference\": \"\",\n  \"queueNumber\": 0,\n  \"status\": \"SIGNED_UP\",\n  \"registration\": {\n    \"id\": \"00000000-0000-4000-8000-000000000000\",\n    \"registrationId\": \"00000000-0000-4000-8000-000000000000\",\n    \"eventId\": \"00000000-0000-4000-8000-000000000000\",\n    \"participantId\": \"00000000-0000-4000-8000-000000000000\",\n    \"registrationStatus\": {},\n    \"participantDisplayName\": \"\",\n    \"queueNumber\": 0,\n    \"idempotencyKey\": \"\",\n    \"checkedIn\": true,\n    \"checkedInAt\": \"2026-08-07T00:00:00.000Z\",\n    \"createdAt\": \"2026-08-07T00:00:00.000Z\",\n    \"updatedAt\": \"2026-08-07T00:00:00.000Z\"\n  },\n  \"route\": {\n    \"status\": \"PENDING_CHECK_IN\",\n    \"routeVersion\": 1,\n    \"steps\": [\n      {\n        \"stationId\": \"00000000-0000-4000-8000-000000000000\",\n        \"stationName\": \"\",\n        \"stationType\": \"\",\n        \"position\": 1,\n        \"state\": \"COMPLETED\"\n      }\n    ],\n    \"currentStation\": {},\n    \"queue\": {\n      \"queueEntryId\": \"00000000-0000-4000-8000-000000000000\",\n      \"stationId\": \"00000000-0000-4000-8000-000000000000\",\n      \"queueNumber\": 1,\n      \"status\": \"WAITING\"\n    }\n  },\n  \"securePass\": {\n    \"qrId\": \"00000000-0000-4000-8000-000000000000\",\n    \"registrationId\": \"00000000-0000-4000-8000-000000000000\",\n    \"issuedAt\": \"2026-08-07T00:00:00.000Z\",\n    \"expiresAt\": \"2026-08-07T00:00:00.000Z\",\n    \"qrImage\": \"\"\n  },\n  \"idempotentReplay\": true\n}"
+          "body": "{\n  \"registrationId\": \"00000000-0000-4000-8000-000000000000\",\n  \"participantReference\": \"\",\n  \"queueNumber\": 0,\n  \"status\": \"SIGNED_UP\",\n  \"registration\": {\n    \"id\": \"00000000-0000-4000-8000-000000000000\",\n    \"registrationId\": \"00000000-0000-4000-8000-000000000000\",\n    \"eventId\": \"00000000-0000-4000-8000-000000000000\",\n    \"participantId\": \"00000000-0000-4000-8000-000000000000\",\n    \"registrationStatus\": {},\n    \"participantDisplayName\": \"\",\n    \"queueNumber\": 0,\n    \"idempotencyKey\": \"\",\n    \"consentAcknowledged\": true,\n    \"checkedIn\": true,\n    \"checkedInAt\": \"2026-08-07T00:00:00.000Z\",\n    \"createdAt\": \"2026-08-07T00:00:00.000Z\",\n    \"updatedAt\": \"2026-08-07T00:00:00.000Z\"\n  },\n  \"route\": {\n    \"status\": \"PENDING_CHECK_IN\",\n    \"routeVersion\": 1,\n    \"steps\": [\n      {\n        \"stationId\": \"00000000-0000-4000-8000-000000000000\",\n        \"stationName\": \"\",\n        \"stationType\": \"\",\n        \"position\": 1,\n        \"state\": \"COMPLETED\"\n      }\n    ],\n    \"currentStation\": {},\n    \"queue\": {\n      \"queueEntryId\": \"00000000-0000-4000-8000-000000000000\",\n      \"stationId\": \"00000000-0000-4000-8000-000000000000\",\n      \"queueNumber\": 1,\n      \"status\": \"WAITING\"\n    }\n  },\n  \"securePass\": {\n    \"qrId\": \"00000000-0000-4000-8000-000000000000\",\n    \"registrationId\": \"00000000-0000-4000-8000-000000000000\",\n    \"issuedAt\": \"2026-08-07T00:00:00.000Z\",\n    \"expiresAt\": \"2026-08-07T00:00:00.000Z\",\n    \"qrImage\": \"\"\n  },\n  \"idempotentReplay\": true\n}"
         },
         {
           "name": "201 Response",
@@ -4237,7 +4237,7 @@
               "value": "application/json"
             }
           ],
-          "body": "{\n  \"registrationId\": \"00000000-0000-4000-8000-000000000000\",\n  \"participantReference\": \"\",\n  \"queueNumber\": 0,\n  \"status\": \"SIGNED_UP\",\n  \"registration\": {\n    \"id\": \"00000000-0000-4000-8000-000000000000\",\n    \"registrationId\": \"00000000-0000-4000-8000-000000000000\",\n    \"eventId\": \"00000000-0000-4000-8000-000000000000\",\n    \"participantId\": \"00000000-0000-4000-8000-000000000000\",\n    \"registrationStatus\": {},\n    \"participantDisplayName\": \"\",\n    \"queueNumber\": 0,\n    \"idempotencyKey\": \"\",\n    \"checkedIn\": true,\n    \"checkedInAt\": \"2026-08-07T00:00:00.000Z\",\n    \"createdAt\": \"2026-08-07T00:00:00.000Z\",\n    \"updatedAt\": \"2026-08-07T00:00:00.000Z\"\n  },\n  \"route\": {\n    \"status\": \"PENDING_CHECK_IN\",\n    \"routeVersion\": 1,\n    \"steps\": [\n      {\n        \"stationId\": \"00000000-0000-4000-8000-000000000000\",\n        \"stationName\": \"\",\n        \"stationType\": \"\",\n        \"position\": 1,\n        \"state\": \"COMPLETED\"\n      }\n    ],\n    \"currentStation\": {},\n    \"queue\": {\n      \"queueEntryId\": \"00000000-0000-4000-8000-000000000000\",\n      \"stationId\": \"00000000-0000-4000-8000-000000000000\",\n      \"queueNumber\": 1,\n      \"status\": \"WAITING\"\n    }\n  },\n  \"securePass\": {\n    \"qrId\": \"00000000-0000-4000-8000-000000000000\",\n    \"registrationId\": \"00000000-0000-4000-8000-000000000000\",\n    \"issuedAt\": \"2026-08-07T00:00:00.000Z\",\n    \"expiresAt\": \"2026-08-07T00:00:00.000Z\",\n    \"qrImage\": \"\"\n  },\n  \"idempotentReplay\": true\n}"
+          "body": "{\n  \"registrationId\": \"00000000-0000-4000-8000-000000000000\",\n  \"participantReference\": \"\",\n  \"queueNumber\": 0,\n  \"status\": \"SIGNED_UP\",\n  \"registration\": {\n    \"id\": \"00000000-0000-4000-8000-000000000000\",\n    \"registrationId\": \"00000000-0000-4000-8000-000000000000\",\n    \"eventId\": \"00000000-0000-4000-8000-000000000000\",\n    \"participantId\": \"00000000-0000-4000-8000-000000000000\",\n    \"registrationStatus\": {},\n    \"participantDisplayName\": \"\",\n    \"queueNumber\": 0,\n    \"idempotencyKey\": \"\",\n    \"consentAcknowledged\": true,\n    \"checkedIn\": true,\n    \"checkedInAt\": \"2026-08-07T00:00:00.000Z\",\n    \"createdAt\": \"2026-08-07T00:00:00.000Z\",\n    \"updatedAt\": \"2026-08-07T00:00:00.000Z\"\n  },\n  \"route\": {\n    \"status\": \"PENDING_CHECK_IN\",\n    \"routeVersion\": 1,\n    \"steps\": [\n      {\n        \"stationId\": \"00000000-0000-4000-8000-000000000000\",\n        \"stationName\": \"\",\n        \"stationType\": \"\",\n        \"position\": 1,\n        \"state\": \"COMPLETED\"\n      }\n    ],\n    \"currentStation\": {},\n    \"queue\": {\n      \"queueEntryId\": \"00000000-0000-4000-8000-000000000000\",\n      \"stationId\": \"00000000-0000-4000-8000-000000000000\",\n      \"queueNumber\": 1,\n      \"status\": \"WAITING\"\n    }\n  },\n  \"securePass\": {\n    \"qrId\": \"00000000-0000-4000-8000-000000000000\",\n    \"registrationId\": \"00000000-0000-4000-8000-000000000000\",\n    \"issuedAt\": \"2026-08-07T00:00:00.000Z\",\n    \"expiresAt\": \"2026-08-07T00:00:00.000Z\",\n    \"qrImage\": \"\"\n  },\n  \"idempotentReplay\": true\n}"
         },
         {
           "name": "400 Response",
@@ -4261,6 +4261,91 @@
           },
           "status": "Bad Request",
           "code": 400,
+          "header": [
+            {
+              "key": "Content-Type",
+              "value": "application/json"
+            }
+          ],
+          "body": "{\n  \"type\": \"\",\n  \"title\": \"\",\n  \"status\": 0,\n  \"code\": \"\",\n  \"requestId\": \"00000000-0000-4000-8000-000000000000\",\n  \"errors\": [\n    {\n      \"field\": \"\",\n      \"message\": \"\"\n    }\n  ]\n}"
+        }
+      ]
+    },
+    {
+      "name": "Get registration capacity and status totals for an event",
+      "description": "",
+      "event": [],
+      "request": {
+        "method": "GET",
+        "header": [],
+        "auth": {
+          "type": "bearer",
+          "bearer": [
+            {
+              "key": "token",
+              "value": "{{token}}",
+              "type": "string"
+            }
+          ]
+        },
+        "url": {
+          "raw": "{{baseUrl}}/events/{eventId}/registrations/summary",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "events",
+            "{eventId}",
+            "registrations",
+            "summary"
+          ],
+          "query": []
+        }
+      },
+      "response": [
+        {
+          "name": "200 Response",
+          "originalRequest": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/events/{eventId}/registrations/summary"
+          },
+          "status": "OK",
+          "code": 200,
+          "header": [
+            {
+              "key": "Content-Type",
+              "value": "application/json"
+            }
+          ],
+          "body": "{\n  \"summary\": {\n    \"eventId\": \"00000000-0000-4000-8000-000000000000\",\n    \"capacity\": 0,\n    \"signedUpCount\": 0,\n    \"waitlistedCount\": 0,\n    \"checkedInCount\": 0,\n    \"completedCount\": 0,\n    \"cancelledCount\": 0,\n    \"filledCount\": 0,\n    \"remainingCapacity\": 0\n  }\n}"
+        },
+        {
+          "name": "401 Response",
+          "originalRequest": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/events/{eventId}/registrations/summary"
+          },
+          "status": "Unauthorized",
+          "code": 401,
+          "header": [
+            {
+              "key": "Content-Type",
+              "value": "application/json"
+            }
+          ],
+          "body": "{\n  \"type\": \"\",\n  \"title\": \"\",\n  \"status\": 0,\n  \"code\": \"\",\n  \"requestId\": \"00000000-0000-4000-8000-000000000000\",\n  \"errors\": [\n    {\n      \"field\": \"\",\n      \"message\": \"\"\n    }\n  ]\n}"
+        },
+        {
+          "name": "403 Response",
+          "originalRequest": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/events/{eventId}/registrations/summary"
+          },
+          "status": "Forbidden",
+          "code": 403,
           "header": [
             {
               "key": "Content-Type",
@@ -8450,89 +8535,6 @@
       ]
     },
     {
-      "name": "Get the currently effective consent form",
-      "description": "",
-      "event": [],
-      "request": {
-        "method": "GET",
-        "header": [],
-        "auth": {
-          "type": "bearer",
-          "bearer": [
-            {
-              "key": "token",
-              "value": "{{token}}",
-              "type": "string"
-            }
-          ]
-        },
-        "url": {
-          "raw": "{{baseUrl}}/participants/active-consent-form",
-          "host": [
-            "{{baseUrl}}"
-          ],
-          "path": [
-            "participants",
-            "active-consent-form"
-          ],
-          "query": []
-        }
-      },
-      "response": [
-        {
-          "name": "200 Response",
-          "originalRequest": {
-            "method": "GET",
-            "header": [],
-            "url": "{{baseUrl}}/participants/active-consent-form"
-          },
-          "status": "OK",
-          "code": 200,
-          "header": [
-            {
-              "key": "Content-Type",
-              "value": "application/json"
-            }
-          ],
-          "body": "{\n  \"consentForm\": {\n    \"id\": \"00000000-0000-4000-8000-000000000000\",\n    \"formCode\": \"\",\n    \"versionNumber\": \"\",\n    \"title\": \"\",\n    \"contentText\": \"\",\n    \"contentHash\": \"\",\n    \"documentObjectKey\": \"\",\n    \"effectiveFrom\": \"2026-08-07T00:00:00.000Z\",\n    \"effectiveTo\": \"2026-08-07T00:00:00.000Z\",\n    \"isActive\": true\n  }\n}"
-        },
-        {
-          "name": "401 Response",
-          "originalRequest": {
-            "method": "GET",
-            "header": [],
-            "url": "{{baseUrl}}/participants/active-consent-form"
-          },
-          "status": "Unauthorized",
-          "code": 401,
-          "header": [
-            {
-              "key": "Content-Type",
-              "value": "application/json"
-            }
-          ],
-          "body": "{\n  \"type\": \"\",\n  \"title\": \"\",\n  \"status\": 0,\n  \"code\": \"\",\n  \"requestId\": \"00000000-0000-4000-8000-000000000000\",\n  \"errors\": [\n    {\n      \"field\": \"\",\n      \"message\": \"\"\n    }\n  ]\n}"
-        },
-        {
-          "name": "403 Response",
-          "originalRequest": {
-            "method": "GET",
-            "header": [],
-            "url": "{{baseUrl}}/participants/active-consent-form"
-          },
-          "status": "Forbidden",
-          "code": 403,
-          "header": [
-            {
-              "key": "Content-Type",
-              "value": "application/json"
-            }
-          ],
-          "body": "{\n  \"type\": \"\",\n  \"title\": \"\",\n  \"status\": 0,\n  \"code\": \"\",\n  \"requestId\": \"00000000-0000-4000-8000-000000000000\",\n  \"errors\": [\n    {\n      \"field\": \"\",\n      \"message\": \"\"\n    }\n  ]\n}"
-        }
-      ]
-    },
-    {
       "name": "Find possible participant matches for the assigned registration event",
       "description": "A name alone never produces a possible match. An exact NRIC or FIN match is a strong match; otherwise at least two of full name, date of birth, and contact number must agree.",
       "event": [],
@@ -9022,7 +9024,7 @@
               "value": "application/json"
             }
           ],
-          "body": "{\n  \"registrations\": [\n    {\n      \"id\": \"00000000-0000-4000-8000-000000000000\",\n      \"registrationId\": \"00000000-0000-4000-8000-000000000000\",\n      \"eventId\": \"00000000-0000-4000-8000-000000000000\",\n      \"participantId\": \"00000000-0000-4000-8000-000000000000\",\n      \"registrationStatus\": \"SIGNED_UP\",\n      \"participantDisplayName\": \"\",\n      \"queueNumber\": 0,\n      \"idempotencyKey\": \"\",\n      \"checkedIn\": true,\n      \"checkedInAt\": \"2026-08-07T00:00:00.000Z\",\n      \"createdAt\": \"2026-08-07T00:00:00.000Z\",\n      \"updatedAt\": \"2026-08-07T00:00:00.000Z\"\n    }\n  ]\n}"
+          "body": "{\n  \"registrations\": [\n    {\n      \"id\": \"00000000-0000-4000-8000-000000000000\",\n      \"registrationId\": \"00000000-0000-4000-8000-000000000000\",\n      \"eventId\": \"00000000-0000-4000-8000-000000000000\",\n      \"participantId\": \"00000000-0000-4000-8000-000000000000\",\n      \"registrationStatus\": \"SIGNED_UP\",\n      \"participantDisplayName\": \"\",\n      \"queueNumber\": 0,\n      \"idempotencyKey\": \"\",\n      \"consentAcknowledged\": true,\n      \"checkedIn\": true,\n      \"checkedInAt\": \"2026-08-07T00:00:00.000Z\",\n      \"createdAt\": \"2026-08-07T00:00:00.000Z\",\n      \"updatedAt\": \"2026-08-07T00:00:00.000Z\"\n    }\n  ]\n}"
         },
         {
           "name": "401 Response",
@@ -9050,334 +9052,6 @@
           },
           "status": "Forbidden",
           "code": 403,
-          "header": [
-            {
-              "key": "Content-Type",
-              "value": "application/json"
-            }
-          ],
-          "body": "{\n  \"type\": \"\",\n  \"title\": \"\",\n  \"status\": 0,\n  \"code\": \"\",\n  \"requestId\": \"00000000-0000-4000-8000-000000000000\",\n  \"errors\": [\n    {\n      \"field\": \"\",\n      \"message\": \"\"\n    }\n  ]\n}"
-        }
-      ]
-    },
-    {
-      "name": "List a participant's consent records",
-      "description": "",
-      "event": [],
-      "request": {
-        "method": "GET",
-        "header": [],
-        "auth": {
-          "type": "bearer",
-          "bearer": [
-            {
-              "key": "token",
-              "value": "{{token}}",
-              "type": "string"
-            }
-          ]
-        },
-        "url": {
-          "raw": "{{baseUrl}}/participants/{participantId}/consents",
-          "host": [
-            "{{baseUrl}}"
-          ],
-          "path": [
-            "participants",
-            "{participantId}",
-            "consents"
-          ],
-          "query": []
-        }
-      },
-      "response": [
-        {
-          "name": "200 Response",
-          "originalRequest": {
-            "method": "GET",
-            "header": [],
-            "url": "{{baseUrl}}/participants/{participantId}/consents"
-          },
-          "status": "OK",
-          "code": 200,
-          "header": [
-            {
-              "key": "Content-Type",
-              "value": "application/json"
-            }
-          ],
-          "body": "{\n  \"consents\": [\n    {\n      \"id\": \"00000000-0000-4000-8000-000000000000\",\n      \"participantId\": \"00000000-0000-4000-8000-000000000000\",\n      \"eventId\": \"00000000-0000-4000-8000-000000000000\",\n      \"registrationId\": \"00000000-0000-4000-8000-000000000000\",\n      \"withdrawalOfId\": \"00000000-0000-4000-8000-000000000000\",\n      \"consentFormVersionId\": \"00000000-0000-4000-8000-000000000000\",\n      \"consentStatus\": \"PENDING\",\n      \"signerType\": \"\",\n      \"signerName\": \"\",\n      \"recordedById\": \"00000000-0000-4000-8000-000000000000\",\n      \"signedAt\": \"2026-08-07T00:00:00.000Z\",\n      \"withdrawnAt\": \"2026-08-07T00:00:00.000Z\",\n      \"withdrawalReason\": \"\",\n      \"createdAt\": \"2026-08-07T00:00:00.000Z\"\n    }\n  ]\n}"
-        },
-        {
-          "name": "401 Response",
-          "originalRequest": {
-            "method": "GET",
-            "header": [],
-            "url": "{{baseUrl}}/participants/{participantId}/consents"
-          },
-          "status": "Unauthorized",
-          "code": 401,
-          "header": [
-            {
-              "key": "Content-Type",
-              "value": "application/json"
-            }
-          ],
-          "body": "{\n  \"type\": \"\",\n  \"title\": \"\",\n  \"status\": 0,\n  \"code\": \"\",\n  \"requestId\": \"00000000-0000-4000-8000-000000000000\",\n  \"errors\": [\n    {\n      \"field\": \"\",\n      \"message\": \"\"\n    }\n  ]\n}"
-        },
-        {
-          "name": "403 Response",
-          "originalRequest": {
-            "method": "GET",
-            "header": [],
-            "url": "{{baseUrl}}/participants/{participantId}/consents"
-          },
-          "status": "Forbidden",
-          "code": 403,
-          "header": [
-            {
-              "key": "Content-Type",
-              "value": "application/json"
-            }
-          ],
-          "body": "{\n  \"type\": \"\",\n  \"title\": \"\",\n  \"status\": 0,\n  \"code\": \"\",\n  \"requestId\": \"00000000-0000-4000-8000-000000000000\",\n  \"errors\": [\n    {\n      \"field\": \"\",\n      \"message\": \"\"\n    }\n  ]\n}"
-        }
-      ]
-    },
-    {
-      "name": "Record consent using an event ID in the request body",
-      "description": "",
-      "event": [],
-      "request": {
-        "method": "POST",
-        "header": [
-          {
-            "key": "Content-Type",
-            "value": "application/json",
-            "description": "JSON request body",
-            "type": "text"
-          }
-        ],
-        "auth": {
-          "type": "bearer",
-          "bearer": [
-            {
-              "key": "token",
-              "value": "{{token}}",
-              "type": "string"
-            }
-          ]
-        },
-        "url": {
-          "raw": "{{baseUrl}}/participants/{participantId}/consents",
-          "host": [
-            "{{baseUrl}}"
-          ],
-          "path": [
-            "participants",
-            "{participantId}",
-            "consents"
-          ],
-          "query": []
-        },
-        "body": {
-          "mode": "raw",
-          "raw": "{\n  \"consentFormVersionId\": \"00000000-0000-4000-8000-000000000000\",\n  \"consentStatus\": \"ACCEPTED\",\n  \"signerType\": \"PARTICIPANT\",\n  \"signerName\": \"\",\n  \"signerRelationship\": \"\",\n  \"guardianContactName\": \"\",\n  \"guardianContactPhone\": \"\",\n  \"guardianContactEmail\": \"\",\n  \"signatureObjectKey\": \"\",\n  \"signatureSha256\": \"\",\n  \"signatureMimeType\": \"image/png\",\n  \"eventId\": \"00000000-0000-4000-8000-000000000000\"\n}",
-          "options": {
-            "raw": {
-              "language": "json"
-            }
-          }
-        }
-      },
-      "response": [
-        {
-          "name": "201 Response",
-          "originalRequest": {
-            "method": "POST",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json",
-                "description": "JSON request body",
-                "type": "text"
-              }
-            ],
-            "url": "{{baseUrl}}/participants/{participantId}/consents"
-          },
-          "status": "Created",
-          "code": 201,
-          "header": [
-            {
-              "key": "Content-Type",
-              "value": "application/json"
-            }
-          ],
-          "body": "{\n  \"consent\": {\n    \"id\": \"00000000-0000-4000-8000-000000000000\",\n    \"participantId\": \"00000000-0000-4000-8000-000000000000\",\n    \"eventId\": \"00000000-0000-4000-8000-000000000000\",\n    \"registrationId\": \"00000000-0000-4000-8000-000000000000\",\n    \"withdrawalOfId\": \"00000000-0000-4000-8000-000000000000\",\n    \"consentFormVersionId\": \"00000000-0000-4000-8000-000000000000\",\n    \"consentStatus\": \"PENDING\",\n    \"signerType\": \"\",\n    \"signerName\": \"\",\n    \"recordedById\": \"00000000-0000-4000-8000-000000000000\",\n    \"signedAt\": \"2026-08-07T00:00:00.000Z\",\n    \"withdrawnAt\": \"2026-08-07T00:00:00.000Z\",\n    \"withdrawalReason\": \"\",\n    \"createdAt\": \"2026-08-07T00:00:00.000Z\"\n  }\n}"
-        },
-        {
-          "name": "400 Response",
-          "originalRequest": {
-            "method": "POST",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json",
-                "description": "JSON request body",
-                "type": "text"
-              }
-            ],
-            "url": "{{baseUrl}}/participants/{participantId}/consents"
-          },
-          "status": "Bad Request",
-          "code": 400,
-          "header": [
-            {
-              "key": "Content-Type",
-              "value": "application/json"
-            }
-          ],
-          "body": "{\n  \"type\": \"\",\n  \"title\": \"\",\n  \"status\": 0,\n  \"code\": \"\",\n  \"requestId\": \"00000000-0000-4000-8000-000000000000\",\n  \"errors\": [\n    {\n      \"field\": \"\",\n      \"message\": \"\"\n    }\n  ]\n}"
-        },
-        {
-          "name": "401 Response",
-          "originalRequest": {
-            "method": "POST",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json",
-                "description": "JSON request body",
-                "type": "text"
-              }
-            ],
-            "url": "{{baseUrl}}/participants/{participantId}/consents"
-          },
-          "status": "Unauthorized",
-          "code": 401,
-          "header": [
-            {
-              "key": "Content-Type",
-              "value": "application/json"
-            }
-          ],
-          "body": "{\n  \"type\": \"\",\n  \"title\": \"\",\n  \"status\": 0,\n  \"code\": \"\",\n  \"requestId\": \"00000000-0000-4000-8000-000000000000\",\n  \"errors\": [\n    {\n      \"field\": \"\",\n      \"message\": \"\"\n    }\n  ]\n}"
-        }
-      ]
-    },
-    {
-      "name": "Create an immutable withdrawal for accepted consent",
-      "description": "",
-      "event": [],
-      "request": {
-        "method": "POST",
-        "header": [
-          {
-            "key": "Content-Type",
-            "value": "application/json",
-            "description": "JSON request body",
-            "type": "text"
-          }
-        ],
-        "auth": {
-          "type": "bearer",
-          "bearer": [
-            {
-              "key": "token",
-              "value": "{{token}}",
-              "type": "string"
-            }
-          ]
-        },
-        "url": {
-          "raw": "{{baseUrl}}/participants/{participantId}/consents/{consentId}/withdraw",
-          "host": [
-            "{{baseUrl}}"
-          ],
-          "path": [
-            "participants",
-            "{participantId}",
-            "consents",
-            "{consentId}",
-            "withdraw"
-          ],
-          "query": []
-        },
-        "body": {
-          "mode": "raw",
-          "raw": "{\n  \"withdrawalReason\": \"\"\n}",
-          "options": {
-            "raw": {
-              "language": "json"
-            }
-          }
-        }
-      },
-      "response": [
-        {
-          "name": "201 Response",
-          "originalRequest": {
-            "method": "POST",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json",
-                "description": "JSON request body",
-                "type": "text"
-              }
-            ],
-            "url": "{{baseUrl}}/participants/{participantId}/consents/{consentId}/withdraw"
-          },
-          "status": "Created",
-          "code": 201,
-          "header": [
-            {
-              "key": "Content-Type",
-              "value": "application/json"
-            }
-          ],
-          "body": "{\n  \"consent\": {\n    \"id\": \"00000000-0000-4000-8000-000000000000\",\n    \"participantId\": \"00000000-0000-4000-8000-000000000000\",\n    \"eventId\": \"00000000-0000-4000-8000-000000000000\",\n    \"registrationId\": \"00000000-0000-4000-8000-000000000000\",\n    \"withdrawalOfId\": \"00000000-0000-4000-8000-000000000000\",\n    \"consentFormVersionId\": \"00000000-0000-4000-8000-000000000000\",\n    \"consentStatus\": \"PENDING\",\n    \"signerType\": \"\",\n    \"signerName\": \"\",\n    \"recordedById\": \"00000000-0000-4000-8000-000000000000\",\n    \"signedAt\": \"2026-08-07T00:00:00.000Z\",\n    \"withdrawnAt\": \"2026-08-07T00:00:00.000Z\",\n    \"withdrawalReason\": \"\",\n    \"createdAt\": \"2026-08-07T00:00:00.000Z\"\n  }\n}"
-        },
-        {
-          "name": "400 Response",
-          "originalRequest": {
-            "method": "POST",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json",
-                "description": "JSON request body",
-                "type": "text"
-              }
-            ],
-            "url": "{{baseUrl}}/participants/{participantId}/consents/{consentId}/withdraw"
-          },
-          "status": "Bad Request",
-          "code": 400,
-          "header": [
-            {
-              "key": "Content-Type",
-              "value": "application/json"
-            }
-          ],
-          "body": "{\n  \"type\": \"\",\n  \"title\": \"\",\n  \"status\": 0,\n  \"code\": \"\",\n  \"requestId\": \"00000000-0000-4000-8000-000000000000\",\n  \"errors\": [\n    {\n      \"field\": \"\",\n      \"message\": \"\"\n    }\n  ]\n}"
-        },
-        {
-          "name": "401 Response",
-          "originalRequest": {
-            "method": "POST",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json",
-                "description": "JSON request body",
-                "type": "text"
-              }
-            ],
-            "url": "{{baseUrl}}/participants/{participantId}/consents/{consentId}/withdraw"
-          },
-          "status": "Unauthorized",
-          "code": 401,
           "header": [
             {
               "key": "Content-Type",
@@ -9716,130 +9390,7 @@
       ]
     },
     {
-      "name": "Record consent for a participant and event",
-      "description": "",
-      "event": [],
-      "request": {
-        "method": "POST",
-        "header": [
-          {
-            "key": "Content-Type",
-            "value": "application/json",
-            "description": "JSON request body",
-            "type": "text"
-          }
-        ],
-        "auth": {
-          "type": "bearer",
-          "bearer": [
-            {
-              "key": "token",
-              "value": "{{token}}",
-              "type": "string"
-            }
-          ]
-        },
-        "url": {
-          "raw": "{{baseUrl}}/participants/{participantId}/events/{eventId}/consent",
-          "host": [
-            "{{baseUrl}}"
-          ],
-          "path": [
-            "participants",
-            "{participantId}",
-            "events",
-            "{eventId}",
-            "consent"
-          ],
-          "query": []
-        },
-        "body": {
-          "mode": "raw",
-          "raw": "{\n  \"consentFormVersionId\": \"00000000-0000-4000-8000-000000000000\",\n  \"consentStatus\": \"ACCEPTED\",\n  \"signerType\": \"PARTICIPANT\",\n  \"signerName\": \"\",\n  \"signerRelationship\": \"\",\n  \"guardianContactName\": \"\",\n  \"guardianContactPhone\": \"\",\n  \"guardianContactEmail\": \"\",\n  \"signatureObjectKey\": \"\",\n  \"signatureSha256\": \"\",\n  \"signatureMimeType\": \"image/png\"\n}",
-          "options": {
-            "raw": {
-              "language": "json"
-            }
-          }
-        }
-      },
-      "response": [
-        {
-          "name": "201 Response",
-          "originalRequest": {
-            "method": "POST",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json",
-                "description": "JSON request body",
-                "type": "text"
-              }
-            ],
-            "url": "{{baseUrl}}/participants/{participantId}/events/{eventId}/consent"
-          },
-          "status": "Created",
-          "code": 201,
-          "header": [
-            {
-              "key": "Content-Type",
-              "value": "application/json"
-            }
-          ],
-          "body": "{\n  \"consent\": {\n    \"id\": \"00000000-0000-4000-8000-000000000000\",\n    \"participantId\": \"00000000-0000-4000-8000-000000000000\",\n    \"eventId\": \"00000000-0000-4000-8000-000000000000\",\n    \"registrationId\": \"00000000-0000-4000-8000-000000000000\",\n    \"withdrawalOfId\": \"00000000-0000-4000-8000-000000000000\",\n    \"consentFormVersionId\": \"00000000-0000-4000-8000-000000000000\",\n    \"consentStatus\": \"PENDING\",\n    \"signerType\": \"\",\n    \"signerName\": \"\",\n    \"recordedById\": \"00000000-0000-4000-8000-000000000000\",\n    \"signedAt\": \"2026-08-07T00:00:00.000Z\",\n    \"withdrawnAt\": \"2026-08-07T00:00:00.000Z\",\n    \"withdrawalReason\": \"\",\n    \"createdAt\": \"2026-08-07T00:00:00.000Z\"\n  }\n}"
-        },
-        {
-          "name": "400 Response",
-          "originalRequest": {
-            "method": "POST",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json",
-                "description": "JSON request body",
-                "type": "text"
-              }
-            ],
-            "url": "{{baseUrl}}/participants/{participantId}/events/{eventId}/consent"
-          },
-          "status": "Bad Request",
-          "code": 400,
-          "header": [
-            {
-              "key": "Content-Type",
-              "value": "application/json"
-            }
-          ],
-          "body": "{\n  \"type\": \"\",\n  \"title\": \"\",\n  \"status\": 0,\n  \"code\": \"\",\n  \"requestId\": \"00000000-0000-4000-8000-000000000000\",\n  \"errors\": [\n    {\n      \"field\": \"\",\n      \"message\": \"\"\n    }\n  ]\n}"
-        },
-        {
-          "name": "401 Response",
-          "originalRequest": {
-            "method": "POST",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json",
-                "description": "JSON request body",
-                "type": "text"
-              }
-            ],
-            "url": "{{baseUrl}}/participants/{participantId}/events/{eventId}/consent"
-          },
-          "status": "Unauthorized",
-          "code": 401,
-          "header": [
-            {
-              "key": "Content-Type",
-              "value": "application/json"
-            }
-          ],
-          "body": "{\n  \"type\": \"\",\n  \"title\": \"\",\n  \"status\": 0,\n  \"code\": \"\",\n  \"requestId\": \"00000000-0000-4000-8000-000000000000\",\n  \"errors\": [\n    {\n      \"field\": \"\",\n      \"message\": \"\"\n    }\n  ]\n}"
-        }
-      ]
-    },
-    {
-      "name": "Get participant, event, emergency contact, and latest consent for registration review",
+      "name": "Get participant, event, and emergency contact for registration review",
       "description": "",
       "event": [],
       "request": {
@@ -9886,7 +9437,7 @@
               "value": "application/json"
             }
           ],
-          "body": "{\n  \"participant\": {\n    \"id\": \"00000000-0000-4000-8000-000000000000\",\n    \"participantReference\": \"\",\n    \"firstName\": \"\",\n    \"lastName\": \"\",\n    \"dateOfBirth\": \"2026-08-07T00:00:00.000Z\",\n    \"gender\": \"M\",\n    \"contactNumber\": \"\",\n    \"nricMasked\": \"\",\n    \"email\": \"\",\n    \"race\": \"\",\n    \"nationality\": \"\",\n    \"addressStreet\": \"\",\n    \"addressUnit\": \"\",\n    \"addressPostalCode\": \"\",\n    \"preferredLanguage\": \"\",\n    \"accessibilityNotes\": \"\",\n    \"status\": \"ACTIVE\",\n    \"version\": 1,\n    \"createdAt\": \"2026-08-07T00:00:00.000Z\",\n    \"updatedAt\": \"2026-08-07T00:00:00.000Z\"\n  },\n  \"event\": {\n    \"firstManagerUserId\": \"00000000-0000-4000-8000-000000000000\",\n    \"name\": \"\",\n    \"description\": \"\",\n    \"bannerKey\": \"COMMUNITY_SCREENING\",\n    \"artworkDataUrl\": \"\",\n    \"venue\": \"\",\n    \"address\": \"\",\n    \"postalCode\": \"\",\n    \"latitude\": 1.13,\n    \"longitude\": 103.59,\n    \"locationProvider\": \"ONEMAP\",\n    \"locationReference\": \"\",\n    \"timezone\": \"Asia/Singapore\",\n    \"startsAt\": \"2026-08-07T00:00:00.000Z\",\n    \"endsAt\": \"2026-08-07T00:00:00.000Z\",\n    \"capacity\": 1,\n    \"expectedAttendance\": 1,\n    \"eventDays\": [\n      {\n        \"eventDayId\": \"00000000-0000-4000-8000-000000000000\"\n      }\n    ],\n    \"stations\": [\n      {\n        \"eventStationId\": \"00000000-0000-4000-8000-000000000000\",\n        \"stationTemplateId\": \"00000000-0000-4000-8000-000000000000\",\n        \"stationOrder\": 1,\n        \"capacity\": 1,\n        \"isAvailable\": true,\n        \"availabilities\": [\n          {\n            \"date\": \"2026-08-07\",\n            \"isAvailable\": true,\n            \"startsAt\": \"2026-08-07T00:00:00.000Z\",\n            \"endsAt\": \"2026-08-07T00:00:00.000Z\",\n            \"capacity\": 1\n          }\n        ]\n      }\n    ],\n    \"shifts\": [\n      {\n        \"shiftId\": \"00000000-0000-4000-8000-000000000000\",\n        \"status\": \"PLANNED\",\n        \"staffAssignments\": [\n          {\n            \"staffAssignmentId\": \"00000000-0000-4000-8000-000000000000\",\n            \"assignmentRole\": {},\n            \"status\": \"ASSIGNED\",\n            \"notes\": \"\",\n            \"eventStation\": {\n              \"eventStationId\": \"00000000-0000-4000-8000-000000000000\",\n              \"stationTemplateId\": \"00000000-0000-4000-8000-000000000000\",\n              \"name\": \"\",\n              \"stationOrder\": 1\n            },\n            \"user\": {\n              \"userId\": \"00000000-0000-4000-8000-000000000000\",\n              \"username\": \"\"\n            }\n          }\n        ]\n      }\n    ],\n    \"eventId\": \"00000000-0000-4000-8000-000000000000\",\n    \"status\": \"DRAFT\",\n    \"version\": 1,\n    \"cancelledAt\": \"2026-08-07T00:00:00.000Z\",\n    \"cancellationReason\": \"\",\n    \"createdAt\": \"2026-08-07T00:00:00.000Z\",\n    \"updatedAt\": \"2026-08-07T00:00:00.000Z\",\n    \"eventStations\": [\n      {\n        \"eventStationId\": \"00000000-0000-4000-8000-000000000000\",\n        \"stationTemplateId\": \"00000000-0000-4000-8000-000000000000\",\n        \"templateVersion\": 1,\n        \"name\": \"\",\n        \"stationType\": \"VISUAL_ACUITY\",\n        \"description\": \"\",\n        \"stationOrder\": 1,\n        \"capacity\": 1,\n        \"isAvailable\": true,\n        \"fieldSchemaSnapshot\": [\n          {\n            \"key\": \"\",\n            \"label\": \"\",\n            \"type\": \"text\",\n            \"required\": true,\n            \"options\": [\n              \"\"\n            ],\n            \"min\": 0,\n            \"max\": 0,\n            \"unit\": \"\",\n            \"eyes\": \"OD\"\n          }\n        ],\n        \"schemaVersion\": 1,\n        \"availabilities\": [\n          {\n            \"eventStationAvailabilityId\": \"00000000-0000-4000-8000-000000000000\",\n            \"isAvailable\": true,\n            \"startsAt\": \"2026-08-07T00:00:00.000Z\",\n            \"endsAt\": \"2026-08-07T00:00:00.000Z\",\n            \"capacity\": 1,\n            \"eventDay\": {\n              \"eventDayId\": \"00000000-0000-4000-8000-000000000000\",\n              \"date\": \"2026-08-07\"\n            }\n          }\n        ]\n      }\n    ],\n    \"signupCount\": 0,\n    \"activeCapacityCount\": 0,\n    \"canManage\": true,\n    \"createdBy\": {\n      \"id\": \"00000000-0000-4000-8000-000000000000\",\n      \"userId\": \"00000000-0000-4000-8000-000000000000\",\n      \"username\": \"\",\n      \"email\": \"\",\n      \"fullName\": \"\",\n      \"employeeNumber\": \"\",\n      \"contactNumber\": \"\",\n      \"department\": \"\",\n      \"designation\": \"\",\n      \"systemRole\": \"ADMIN\",\n      \"status\": \"ACTIVE\",\n      \"approvalState\": \"PENDING\",\n      \"accessState\": \"ENABLED\",\n      \"professionalCategory\": \"STAFF\",\n      \"roles\": [\n        \"ADMINISTRATOR\"\n      ],\n      \"createdAt\": \"2026-08-07T00:00:00.000Z\"\n    },\n    \"cancelledBy\": {}\n  },\n  \"emergencyContact\": {\n    \"id\": \"00000000-0000-4000-8000-000000000000\",\n    \"participantId\": \"00000000-0000-4000-8000-000000000000\",\n    \"contactName\": \"\",\n    \"relationship\": \"\",\n    \"phoneNumber\": \"\",\n    \"email\": \"\",\n    \"isPrimary\": true,\n    \"status\": \"ACTIVE\",\n    \"createdAt\": \"2026-08-07T00:00:00.000Z\",\n    \"updatedAt\": \"2026-08-07T00:00:00.000Z\"\n  },\n  \"latestConsent\": {\n    \"id\": \"00000000-0000-4000-8000-000000000000\",\n    \"participantId\": \"00000000-0000-4000-8000-000000000000\",\n    \"eventId\": \"00000000-0000-4000-8000-000000000000\",\n    \"registrationId\": \"00000000-0000-4000-8000-000000000000\",\n    \"withdrawalOfId\": \"00000000-0000-4000-8000-000000000000\",\n    \"consentFormVersionId\": \"00000000-0000-4000-8000-000000000000\",\n    \"consentStatus\": \"PENDING\",\n    \"signerType\": \"\",\n    \"signerName\": \"\",\n    \"recordedById\": \"00000000-0000-4000-8000-000000000000\",\n    \"signedAt\": \"2026-08-07T00:00:00.000Z\",\n    \"withdrawnAt\": \"2026-08-07T00:00:00.000Z\",\n    \"withdrawalReason\": \"\",\n    \"createdAt\": \"2026-08-07T00:00:00.000Z\"\n  }\n}"
+          "body": "{\n  \"participant\": {\n    \"id\": \"00000000-0000-4000-8000-000000000000\",\n    \"participantReference\": \"\",\n    \"firstName\": \"\",\n    \"lastName\": \"\",\n    \"dateOfBirth\": \"2026-08-07T00:00:00.000Z\",\n    \"gender\": \"M\",\n    \"contactNumber\": \"\",\n    \"nricMasked\": \"\",\n    \"email\": \"\",\n    \"race\": \"\",\n    \"nationality\": \"\",\n    \"addressStreet\": \"\",\n    \"addressUnit\": \"\",\n    \"addressPostalCode\": \"\",\n    \"preferredLanguage\": \"\",\n    \"accessibilityNotes\": \"\",\n    \"status\": \"ACTIVE\",\n    \"version\": 1,\n    \"createdAt\": \"2026-08-07T00:00:00.000Z\",\n    \"updatedAt\": \"2026-08-07T00:00:00.000Z\"\n  },\n  \"event\": {\n    \"firstManagerUserId\": \"00000000-0000-4000-8000-000000000000\",\n    \"name\": \"\",\n    \"description\": \"\",\n    \"bannerKey\": \"COMMUNITY_SCREENING\",\n    \"artworkDataUrl\": \"\",\n    \"venue\": \"\",\n    \"address\": \"\",\n    \"postalCode\": \"\",\n    \"latitude\": 1.13,\n    \"longitude\": 103.59,\n    \"locationProvider\": \"ONEMAP\",\n    \"locationReference\": \"\",\n    \"timezone\": \"Asia/Singapore\",\n    \"startsAt\": \"2026-08-07T00:00:00.000Z\",\n    \"endsAt\": \"2026-08-07T00:00:00.000Z\",\n    \"capacity\": 1,\n    \"expectedAttendance\": 1,\n    \"eventDays\": [\n      {\n        \"eventDayId\": \"00000000-0000-4000-8000-000000000000\"\n      }\n    ],\n    \"stations\": [\n      {\n        \"eventStationId\": \"00000000-0000-4000-8000-000000000000\",\n        \"stationTemplateId\": \"00000000-0000-4000-8000-000000000000\",\n        \"stationOrder\": 1,\n        \"capacity\": 1,\n        \"isAvailable\": true,\n        \"availabilities\": [\n          {\n            \"date\": \"2026-08-07\",\n            \"isAvailable\": true,\n            \"startsAt\": \"2026-08-07T00:00:00.000Z\",\n            \"endsAt\": \"2026-08-07T00:00:00.000Z\",\n            \"capacity\": 1\n          }\n        ]\n      }\n    ],\n    \"shifts\": [\n      {\n        \"shiftId\": \"00000000-0000-4000-8000-000000000000\",\n        \"status\": \"PLANNED\",\n        \"staffAssignments\": [\n          {\n            \"staffAssignmentId\": \"00000000-0000-4000-8000-000000000000\",\n            \"assignmentRole\": {},\n            \"status\": \"ASSIGNED\",\n            \"notes\": \"\",\n            \"eventStation\": {\n              \"eventStationId\": \"00000000-0000-4000-8000-000000000000\",\n              \"stationTemplateId\": \"00000000-0000-4000-8000-000000000000\",\n              \"name\": \"\",\n              \"stationOrder\": 1\n            },\n            \"user\": {\n              \"userId\": \"00000000-0000-4000-8000-000000000000\",\n              \"username\": \"\"\n            }\n          }\n        ]\n      }\n    ],\n    \"eventId\": \"00000000-0000-4000-8000-000000000000\",\n    \"status\": \"DRAFT\",\n    \"version\": 1,\n    \"cancelledAt\": \"2026-08-07T00:00:00.000Z\",\n    \"cancellationReason\": \"\",\n    \"createdAt\": \"2026-08-07T00:00:00.000Z\",\n    \"updatedAt\": \"2026-08-07T00:00:00.000Z\",\n    \"eventStations\": [\n      {\n        \"eventStationId\": \"00000000-0000-4000-8000-000000000000\",\n        \"stationTemplateId\": \"00000000-0000-4000-8000-000000000000\",\n        \"templateVersion\": 1,\n        \"name\": \"\",\n        \"stationType\": \"VISUAL_ACUITY\",\n        \"description\": \"\",\n        \"stationOrder\": 1,\n        \"capacity\": 1,\n        \"isAvailable\": true,\n        \"fieldSchemaSnapshot\": [\n          {\n            \"key\": \"\",\n            \"label\": \"\",\n            \"type\": \"text\",\n            \"required\": true,\n            \"options\": [\n              \"\"\n            ],\n            \"min\": 0,\n            \"max\": 0,\n            \"unit\": \"\",\n            \"eyes\": \"OD\"\n          }\n        ],\n        \"schemaVersion\": 1,\n        \"availabilities\": [\n          {\n            \"eventStationAvailabilityId\": \"00000000-0000-4000-8000-000000000000\",\n            \"isAvailable\": true,\n            \"startsAt\": \"2026-08-07T00:00:00.000Z\",\n            \"endsAt\": \"2026-08-07T00:00:00.000Z\",\n            \"capacity\": 1,\n            \"eventDay\": {\n              \"eventDayId\": \"00000000-0000-4000-8000-000000000000\",\n              \"date\": \"2026-08-07\"\n            }\n          }\n        ]\n      }\n    ],\n    \"signupCount\": 0,\n    \"activeCapacityCount\": 0,\n    \"canManage\": true,\n    \"createdBy\": {\n      \"id\": \"00000000-0000-4000-8000-000000000000\",\n      \"userId\": \"00000000-0000-4000-8000-000000000000\",\n      \"username\": \"\",\n      \"email\": \"\",\n      \"fullName\": \"\",\n      \"employeeNumber\": \"\",\n      \"contactNumber\": \"\",\n      \"department\": \"\",\n      \"designation\": \"\",\n      \"systemRole\": \"ADMIN\",\n      \"status\": \"ACTIVE\",\n      \"approvalState\": \"PENDING\",\n      \"accessState\": \"ENABLED\",\n      \"professionalCategory\": \"STAFF\",\n      \"roles\": [\n        \"ADMINISTRATOR\"\n      ],\n      \"createdAt\": \"2026-08-07T00:00:00.000Z\"\n    },\n    \"cancelledBy\": {}\n  },\n  \"emergencyContact\": {\n    \"id\": \"00000000-0000-4000-8000-000000000000\",\n    \"participantId\": \"00000000-0000-4000-8000-000000000000\",\n    \"contactName\": \"\",\n    \"relationship\": \"\",\n    \"phoneNumber\": \"\",\n    \"email\": \"\",\n    \"isPrimary\": true,\n    \"status\": \"ACTIVE\",\n    \"createdAt\": \"2026-08-07T00:00:00.000Z\",\n    \"updatedAt\": \"2026-08-07T00:00:00.000Z\"\n  }\n}"
         },
         {
           "name": "401 Response",
@@ -9966,7 +9517,7 @@
         },
         "body": {
           "mode": "raw",
-          "raw": "{\n  \"eventId\": \"00000000-0000-4000-8000-000000000000\",\n  \"participantId\": \"00000000-0000-4000-8000-000000000000\"\n}",
+          "raw": "{\n  \"eventId\": \"00000000-0000-4000-8000-000000000000\",\n  \"participantId\": \"00000000-0000-4000-8000-000000000000\",\n  \"consentAcknowledged\": true\n}",
           "options": {
             "raw": {
               "language": "json"
@@ -10003,7 +9554,7 @@
               "value": "application/json"
             }
           ],
-          "body": "{\n  \"registrationId\": \"00000000-0000-4000-8000-000000000000\",\n  \"participantReference\": \"\",\n  \"queueNumber\": 0,\n  \"status\": \"SIGNED_UP\",\n  \"registration\": {\n    \"id\": \"00000000-0000-4000-8000-000000000000\",\n    \"registrationId\": \"00000000-0000-4000-8000-000000000000\",\n    \"eventId\": \"00000000-0000-4000-8000-000000000000\",\n    \"participantId\": \"00000000-0000-4000-8000-000000000000\",\n    \"registrationStatus\": {},\n    \"participantDisplayName\": \"\",\n    \"queueNumber\": 0,\n    \"idempotencyKey\": \"\",\n    \"checkedIn\": true,\n    \"checkedInAt\": \"2026-08-07T00:00:00.000Z\",\n    \"createdAt\": \"2026-08-07T00:00:00.000Z\",\n    \"updatedAt\": \"2026-08-07T00:00:00.000Z\"\n  },\n  \"route\": {\n    \"status\": \"PENDING_CHECK_IN\",\n    \"routeVersion\": 1,\n    \"steps\": [\n      {\n        \"stationId\": \"00000000-0000-4000-8000-000000000000\",\n        \"stationName\": \"\",\n        \"stationType\": \"\",\n        \"position\": 1,\n        \"state\": \"COMPLETED\"\n      }\n    ],\n    \"currentStation\": {},\n    \"queue\": {\n      \"queueEntryId\": \"00000000-0000-4000-8000-000000000000\",\n      \"stationId\": \"00000000-0000-4000-8000-000000000000\",\n      \"queueNumber\": 1,\n      \"status\": \"WAITING\"\n    }\n  },\n  \"securePass\": {\n    \"qrId\": \"00000000-0000-4000-8000-000000000000\",\n    \"registrationId\": \"00000000-0000-4000-8000-000000000000\",\n    \"issuedAt\": \"2026-08-07T00:00:00.000Z\",\n    \"expiresAt\": \"2026-08-07T00:00:00.000Z\",\n    \"qrImage\": \"\"\n  },\n  \"idempotentReplay\": true\n}"
+          "body": "{\n  \"registrationId\": \"00000000-0000-4000-8000-000000000000\",\n  \"participantReference\": \"\",\n  \"queueNumber\": 0,\n  \"status\": \"SIGNED_UP\",\n  \"registration\": {\n    \"id\": \"00000000-0000-4000-8000-000000000000\",\n    \"registrationId\": \"00000000-0000-4000-8000-000000000000\",\n    \"eventId\": \"00000000-0000-4000-8000-000000000000\",\n    \"participantId\": \"00000000-0000-4000-8000-000000000000\",\n    \"registrationStatus\": {},\n    \"participantDisplayName\": \"\",\n    \"queueNumber\": 0,\n    \"idempotencyKey\": \"\",\n    \"consentAcknowledged\": true,\n    \"checkedIn\": true,\n    \"checkedInAt\": \"2026-08-07T00:00:00.000Z\",\n    \"createdAt\": \"2026-08-07T00:00:00.000Z\",\n    \"updatedAt\": \"2026-08-07T00:00:00.000Z\"\n  },\n  \"route\": {\n    \"status\": \"PENDING_CHECK_IN\",\n    \"routeVersion\": 1,\n    \"steps\": [\n      {\n        \"stationId\": \"00000000-0000-4000-8000-000000000000\",\n        \"stationName\": \"\",\n        \"stationType\": \"\",\n        \"position\": 1,\n        \"state\": \"COMPLETED\"\n      }\n    ],\n    \"currentStation\": {},\n    \"queue\": {\n      \"queueEntryId\": \"00000000-0000-4000-8000-000000000000\",\n      \"stationId\": \"00000000-0000-4000-8000-000000000000\",\n      \"queueNumber\": 1,\n      \"status\": \"WAITING\"\n    }\n  },\n  \"securePass\": {\n    \"qrId\": \"00000000-0000-4000-8000-000000000000\",\n    \"registrationId\": \"00000000-0000-4000-8000-000000000000\",\n    \"issuedAt\": \"2026-08-07T00:00:00.000Z\",\n    \"expiresAt\": \"2026-08-07T00:00:00.000Z\",\n    \"qrImage\": \"\"\n  },\n  \"idempotentReplay\": true\n}"
         },
         {
           "name": "201 Response",
@@ -10033,7 +9584,7 @@
               "value": "application/json"
             }
           ],
-          "body": "{\n  \"registrationId\": \"00000000-0000-4000-8000-000000000000\",\n  \"participantReference\": \"\",\n  \"queueNumber\": 0,\n  \"status\": \"SIGNED_UP\",\n  \"registration\": {\n    \"id\": \"00000000-0000-4000-8000-000000000000\",\n    \"registrationId\": \"00000000-0000-4000-8000-000000000000\",\n    \"eventId\": \"00000000-0000-4000-8000-000000000000\",\n    \"participantId\": \"00000000-0000-4000-8000-000000000000\",\n    \"registrationStatus\": {},\n    \"participantDisplayName\": \"\",\n    \"queueNumber\": 0,\n    \"idempotencyKey\": \"\",\n    \"checkedIn\": true,\n    \"checkedInAt\": \"2026-08-07T00:00:00.000Z\",\n    \"createdAt\": \"2026-08-07T00:00:00.000Z\",\n    \"updatedAt\": \"2026-08-07T00:00:00.000Z\"\n  },\n  \"route\": {\n    \"status\": \"PENDING_CHECK_IN\",\n    \"routeVersion\": 1,\n    \"steps\": [\n      {\n        \"stationId\": \"00000000-0000-4000-8000-000000000000\",\n        \"stationName\": \"\",\n        \"stationType\": \"\",\n        \"position\": 1,\n        \"state\": \"COMPLETED\"\n      }\n    ],\n    \"currentStation\": {},\n    \"queue\": {\n      \"queueEntryId\": \"00000000-0000-4000-8000-000000000000\",\n      \"stationId\": \"00000000-0000-4000-8000-000000000000\",\n      \"queueNumber\": 1,\n      \"status\": \"WAITING\"\n    }\n  },\n  \"securePass\": {\n    \"qrId\": \"00000000-0000-4000-8000-000000000000\",\n    \"registrationId\": \"00000000-0000-4000-8000-000000000000\",\n    \"issuedAt\": \"2026-08-07T00:00:00.000Z\",\n    \"expiresAt\": \"2026-08-07T00:00:00.000Z\",\n    \"qrImage\": \"\"\n  },\n  \"idempotentReplay\": true\n}"
+          "body": "{\n  \"registrationId\": \"00000000-0000-4000-8000-000000000000\",\n  \"participantReference\": \"\",\n  \"queueNumber\": 0,\n  \"status\": \"SIGNED_UP\",\n  \"registration\": {\n    \"id\": \"00000000-0000-4000-8000-000000000000\",\n    \"registrationId\": \"00000000-0000-4000-8000-000000000000\",\n    \"eventId\": \"00000000-0000-4000-8000-000000000000\",\n    \"participantId\": \"00000000-0000-4000-8000-000000000000\",\n    \"registrationStatus\": {},\n    \"participantDisplayName\": \"\",\n    \"queueNumber\": 0,\n    \"idempotencyKey\": \"\",\n    \"consentAcknowledged\": true,\n    \"checkedIn\": true,\n    \"checkedInAt\": \"2026-08-07T00:00:00.000Z\",\n    \"createdAt\": \"2026-08-07T00:00:00.000Z\",\n    \"updatedAt\": \"2026-08-07T00:00:00.000Z\"\n  },\n  \"route\": {\n    \"status\": \"PENDING_CHECK_IN\",\n    \"routeVersion\": 1,\n    \"steps\": [\n      {\n        \"stationId\": \"00000000-0000-4000-8000-000000000000\",\n        \"stationName\": \"\",\n        \"stationType\": \"\",\n        \"position\": 1,\n        \"state\": \"COMPLETED\"\n      }\n    ],\n    \"currentStation\": {},\n    \"queue\": {\n      \"queueEntryId\": \"00000000-0000-4000-8000-000000000000\",\n      \"stationId\": \"00000000-0000-4000-8000-000000000000\",\n      \"queueNumber\": 1,\n      \"status\": \"WAITING\"\n    }\n  },\n  \"securePass\": {\n    \"qrId\": \"00000000-0000-4000-8000-000000000000\",\n    \"registrationId\": \"00000000-0000-4000-8000-000000000000\",\n    \"issuedAt\": \"2026-08-07T00:00:00.000Z\",\n    \"expiresAt\": \"2026-08-07T00:00:00.000Z\",\n    \"qrImage\": \"\"\n  },\n  \"idempotentReplay\": true\n}"
         },
         {
           "name": "400 Response",
@@ -10112,7 +9663,7 @@
               "value": "application/json"
             }
           ],
-          "body": "{\n  \"registrationId\": \"00000000-0000-4000-8000-000000000000\",\n  \"participantReference\": \"\",\n  \"queueNumber\": 0,\n  \"status\": \"SIGNED_UP\",\n  \"registration\": {\n    \"id\": \"00000000-0000-4000-8000-000000000000\",\n    \"registrationId\": \"00000000-0000-4000-8000-000000000000\",\n    \"eventId\": \"00000000-0000-4000-8000-000000000000\",\n    \"participantId\": \"00000000-0000-4000-8000-000000000000\",\n    \"registrationStatus\": {},\n    \"participantDisplayName\": \"\",\n    \"queueNumber\": 0,\n    \"idempotencyKey\": \"\",\n    \"checkedIn\": true,\n    \"checkedInAt\": \"2026-08-07T00:00:00.000Z\",\n    \"createdAt\": \"2026-08-07T00:00:00.000Z\",\n    \"updatedAt\": \"2026-08-07T00:00:00.000Z\"\n  },\n  \"route\": {\n    \"status\": \"PENDING_CHECK_IN\",\n    \"routeVersion\": 1,\n    \"steps\": [\n      {\n        \"stationId\": \"00000000-0000-4000-8000-000000000000\",\n        \"stationName\": \"\",\n        \"stationType\": \"\",\n        \"position\": 1,\n        \"state\": \"COMPLETED\"\n      }\n    ],\n    \"currentStation\": {},\n    \"queue\": {\n      \"queueEntryId\": \"00000000-0000-4000-8000-000000000000\",\n      \"stationId\": \"00000000-0000-4000-8000-000000000000\",\n      \"queueNumber\": 1,\n      \"status\": \"WAITING\"\n    }\n  },\n  \"securePass\": {\n    \"qrId\": \"00000000-0000-4000-8000-000000000000\",\n    \"registrationId\": \"00000000-0000-4000-8000-000000000000\",\n    \"issuedAt\": \"2026-08-07T00:00:00.000Z\",\n    \"expiresAt\": \"2026-08-07T00:00:00.000Z\",\n    \"qrImage\": \"\"\n  },\n  \"idempotentReplay\": true\n}"
+          "body": "{\n  \"registrationId\": \"00000000-0000-4000-8000-000000000000\",\n  \"participantReference\": \"\",\n  \"queueNumber\": 0,\n  \"status\": \"SIGNED_UP\",\n  \"registration\": {\n    \"id\": \"00000000-0000-4000-8000-000000000000\",\n    \"registrationId\": \"00000000-0000-4000-8000-000000000000\",\n    \"eventId\": \"00000000-0000-4000-8000-000000000000\",\n    \"participantId\": \"00000000-0000-4000-8000-000000000000\",\n    \"registrationStatus\": {},\n    \"participantDisplayName\": \"\",\n    \"queueNumber\": 0,\n    \"idempotencyKey\": \"\",\n    \"consentAcknowledged\": true,\n    \"checkedIn\": true,\n    \"checkedInAt\": \"2026-08-07T00:00:00.000Z\",\n    \"createdAt\": \"2026-08-07T00:00:00.000Z\",\n    \"updatedAt\": \"2026-08-07T00:00:00.000Z\"\n  },\n  \"route\": {\n    \"status\": \"PENDING_CHECK_IN\",\n    \"routeVersion\": 1,\n    \"steps\": [\n      {\n        \"stationId\": \"00000000-0000-4000-8000-000000000000\",\n        \"stationName\": \"\",\n        \"stationType\": \"\",\n        \"position\": 1,\n        \"state\": \"COMPLETED\"\n      }\n    ],\n    \"currentStation\": {},\n    \"queue\": {\n      \"queueEntryId\": \"00000000-0000-4000-8000-000000000000\",\n      \"stationId\": \"00000000-0000-4000-8000-000000000000\",\n      \"queueNumber\": 1,\n      \"status\": \"WAITING\"\n    }\n  },\n  \"securePass\": {\n    \"qrId\": \"00000000-0000-4000-8000-000000000000\",\n    \"registrationId\": \"00000000-0000-4000-8000-000000000000\",\n    \"issuedAt\": \"2026-08-07T00:00:00.000Z\",\n    \"expiresAt\": \"2026-08-07T00:00:00.000Z\",\n    \"qrImage\": \"\"\n  },\n  \"idempotentReplay\": true\n}"
         },
         {
           "name": "401 Response",
@@ -10303,7 +9854,7 @@
               "value": "application/json"
             }
           ],
-          "body": "{\n  \"registrationId\": \"00000000-0000-4000-8000-000000000000\",\n  \"participantReference\": \"\",\n  \"queueNumber\": 0,\n  \"status\": \"SIGNED_UP\",\n  \"registration\": {\n    \"id\": \"00000000-0000-4000-8000-000000000000\",\n    \"registrationId\": \"00000000-0000-4000-8000-000000000000\",\n    \"eventId\": \"00000000-0000-4000-8000-000000000000\",\n    \"participantId\": \"00000000-0000-4000-8000-000000000000\",\n    \"registrationStatus\": {},\n    \"participantDisplayName\": \"\",\n    \"queueNumber\": 0,\n    \"idempotencyKey\": \"\",\n    \"checkedIn\": true,\n    \"checkedInAt\": \"2026-08-07T00:00:00.000Z\",\n    \"createdAt\": \"2026-08-07T00:00:00.000Z\",\n    \"updatedAt\": \"2026-08-07T00:00:00.000Z\"\n  },\n  \"route\": {\n    \"status\": \"PENDING_CHECK_IN\",\n    \"routeVersion\": 1,\n    \"steps\": [\n      {\n        \"stationId\": \"00000000-0000-4000-8000-000000000000\",\n        \"stationName\": \"\",\n        \"stationType\": \"\",\n        \"position\": 1,\n        \"state\": \"COMPLETED\"\n      }\n    ],\n    \"currentStation\": {},\n    \"queue\": {\n      \"queueEntryId\": \"00000000-0000-4000-8000-000000000000\",\n      \"stationId\": \"00000000-0000-4000-8000-000000000000\",\n      \"queueNumber\": 1,\n      \"status\": \"WAITING\"\n    }\n  },\n  \"securePass\": {\n    \"qrId\": \"00000000-0000-4000-8000-000000000000\",\n    \"registrationId\": \"00000000-0000-4000-8000-000000000000\",\n    \"issuedAt\": \"2026-08-07T00:00:00.000Z\",\n    \"expiresAt\": \"2026-08-07T00:00:00.000Z\",\n    \"qrImage\": \"\"\n  },\n  \"idempotentReplay\": true\n}"
+          "body": "{\n  \"registrationId\": \"00000000-0000-4000-8000-000000000000\",\n  \"participantReference\": \"\",\n  \"queueNumber\": 0,\n  \"status\": \"SIGNED_UP\",\n  \"registration\": {\n    \"id\": \"00000000-0000-4000-8000-000000000000\",\n    \"registrationId\": \"00000000-0000-4000-8000-000000000000\",\n    \"eventId\": \"00000000-0000-4000-8000-000000000000\",\n    \"participantId\": \"00000000-0000-4000-8000-000000000000\",\n    \"registrationStatus\": {},\n    \"participantDisplayName\": \"\",\n    \"queueNumber\": 0,\n    \"idempotencyKey\": \"\",\n    \"consentAcknowledged\": true,\n    \"checkedIn\": true,\n    \"checkedInAt\": \"2026-08-07T00:00:00.000Z\",\n    \"createdAt\": \"2026-08-07T00:00:00.000Z\",\n    \"updatedAt\": \"2026-08-07T00:00:00.000Z\"\n  },\n  \"route\": {\n    \"status\": \"PENDING_CHECK_IN\",\n    \"routeVersion\": 1,\n    \"steps\": [\n      {\n        \"stationId\": \"00000000-0000-4000-8000-000000000000\",\n        \"stationName\": \"\",\n        \"stationType\": \"\",\n        \"position\": 1,\n        \"state\": \"COMPLETED\"\n      }\n    ],\n    \"currentStation\": {},\n    \"queue\": {\n      \"queueEntryId\": \"00000000-0000-4000-8000-000000000000\",\n      \"stationId\": \"00000000-0000-4000-8000-000000000000\",\n      \"queueNumber\": 1,\n      \"status\": \"WAITING\"\n    }\n  },\n  \"securePass\": {\n    \"qrId\": \"00000000-0000-4000-8000-000000000000\",\n    \"registrationId\": \"00000000-0000-4000-8000-000000000000\",\n    \"issuedAt\": \"2026-08-07T00:00:00.000Z\",\n    \"expiresAt\": \"2026-08-07T00:00:00.000Z\",\n    \"qrImage\": \"\"\n  },\n  \"idempotentReplay\": true\n}"
         },
         {
           "name": "400 Response",
@@ -10345,89 +9896,6 @@
           },
           "status": "Unauthorized",
           "code": 401,
-          "header": [
-            {
-              "key": "Content-Type",
-              "value": "application/json"
-            }
-          ],
-          "body": "{\n  \"type\": \"\",\n  \"title\": \"\",\n  \"status\": 0,\n  \"code\": \"\",\n  \"requestId\": \"00000000-0000-4000-8000-000000000000\",\n  \"errors\": [\n    {\n      \"field\": \"\",\n      \"message\": \"\"\n    }\n  ]\n}"
-        }
-      ]
-    },
-    {
-      "name": "Get the currently effective consent form",
-      "description": "",
-      "event": [],
-      "request": {
-        "method": "GET",
-        "header": [],
-        "auth": {
-          "type": "bearer",
-          "bearer": [
-            {
-              "key": "token",
-              "value": "{{token}}",
-              "type": "string"
-            }
-          ]
-        },
-        "url": {
-          "raw": "{{baseUrl}}/consent-forms/active",
-          "host": [
-            "{{baseUrl}}"
-          ],
-          "path": [
-            "consent-forms",
-            "active"
-          ],
-          "query": []
-        }
-      },
-      "response": [
-        {
-          "name": "200 Response",
-          "originalRequest": {
-            "method": "GET",
-            "header": [],
-            "url": "{{baseUrl}}/consent-forms/active"
-          },
-          "status": "OK",
-          "code": 200,
-          "header": [
-            {
-              "key": "Content-Type",
-              "value": "application/json"
-            }
-          ],
-          "body": "{\n  \"consentForm\": {\n    \"id\": \"00000000-0000-4000-8000-000000000000\",\n    \"formCode\": \"\",\n    \"versionNumber\": \"\",\n    \"title\": \"\",\n    \"contentText\": \"\",\n    \"contentHash\": \"\",\n    \"documentObjectKey\": \"\",\n    \"effectiveFrom\": \"2026-08-07T00:00:00.000Z\",\n    \"effectiveTo\": \"2026-08-07T00:00:00.000Z\",\n    \"isActive\": true\n  }\n}"
-        },
-        {
-          "name": "401 Response",
-          "originalRequest": {
-            "method": "GET",
-            "header": [],
-            "url": "{{baseUrl}}/consent-forms/active"
-          },
-          "status": "Unauthorized",
-          "code": 401,
-          "header": [
-            {
-              "key": "Content-Type",
-              "value": "application/json"
-            }
-          ],
-          "body": "{\n  \"type\": \"\",\n  \"title\": \"\",\n  \"status\": 0,\n  \"code\": \"\",\n  \"requestId\": \"00000000-0000-4000-8000-000000000000\",\n  \"errors\": [\n    {\n      \"field\": \"\",\n      \"message\": \"\"\n    }\n  ]\n}"
-        },
-        {
-          "name": "403 Response",
-          "originalRequest": {
-            "method": "GET",
-            "header": [],
-            "url": "{{baseUrl}}/consent-forms/active"
-          },
-          "status": "Forbidden",
-          "code": 403,
           "header": [
             {
               "key": "Content-Type",
@@ -10594,7 +10062,7 @@
         },
         "body": {
           "mode": "raw",
-          "raw": "{\n  \"dataUrl\": \"\",\n  \"eventId\": \"00000000-0000-4000-8000-000000000000\",\n  \"purpose\": \"CONSENT\",\n  \"targetId\": \"00000000-0000-4000-8000-000000000000\"\n}",
+          "raw": "{\n  \"dataUrl\": \"\",\n  \"eventId\": \"00000000-0000-4000-8000-000000000000\",\n  \"purpose\": \"REFERRAL\",\n  \"targetId\": \"00000000-0000-4000-8000-000000000000\"\n}",
           "options": {
             "raw": {
               "language": "json"
@@ -13832,7 +13300,7 @@
               "value": "application/json"
             }
           ],
-          "body": "{\n  \"tasks\": [\n    {\n      \"taskId\": \"00000000-0000-4000-8000-000000000000\",\n      \"eventId\": \"00000000-0000-4000-8000-000000000000\",\n      \"artifactType\": \"CONSENT_SIGNATURE\",\n      \"status\": \"PENDING\",\n      \"attemptCount\": 0,\n      \"lastError\": \"\",\n      \"nextAttemptAt\": \"2026-08-07T00:00:00.000Z\",\n      \"claimedAt\": \"2026-08-07T00:00:00.000Z\",\n      \"completedAt\": \"2026-08-07T00:00:00.000Z\",\n      \"createdAt\": \"2026-08-07T00:00:00.000Z\",\n      \"updatedAt\": \"2026-08-07T00:00:00.000Z\"\n    }\n  ]\n}"
+          "body": "{\n  \"tasks\": [\n    {\n      \"taskId\": \"00000000-0000-4000-8000-000000000000\",\n      \"eventId\": \"00000000-0000-4000-8000-000000000000\",\n      \"artifactType\": \"REFERRAL_SIGNATURE\",\n      \"status\": \"PENDING\",\n      \"attemptCount\": 0,\n      \"lastError\": \"\",\n      \"nextAttemptAt\": \"2026-08-07T00:00:00.000Z\",\n      \"claimedAt\": \"2026-08-07T00:00:00.000Z\",\n      \"completedAt\": \"2026-08-07T00:00:00.000Z\",\n      \"createdAt\": \"2026-08-07T00:00:00.000Z\",\n      \"updatedAt\": \"2026-08-07T00:00:00.000Z\"\n    }\n  ]\n}"
         },
         {
           "name": "401 Response",
@@ -13940,7 +13408,7 @@
               "value": "application/json"
             }
           ],
-          "body": "{\n  \"taskId\": \"00000000-0000-4000-8000-000000000000\",\n  \"eventId\": \"00000000-0000-4000-8000-000000000000\",\n  \"artifactType\": \"CONSENT_SIGNATURE\",\n  \"status\": \"PENDING\",\n  \"attemptCount\": 0,\n  \"lastError\": \"\",\n  \"nextAttemptAt\": \"2026-08-07T00:00:00.000Z\",\n  \"claimedAt\": \"2026-08-07T00:00:00.000Z\",\n  \"completedAt\": \"2026-08-07T00:00:00.000Z\",\n  \"createdAt\": \"2026-08-07T00:00:00.000Z\",\n  \"updatedAt\": \"2026-08-07T00:00:00.000Z\"\n}"
+          "body": "{\n  \"taskId\": \"00000000-0000-4000-8000-000000000000\",\n  \"eventId\": \"00000000-0000-4000-8000-000000000000\",\n  \"artifactType\": \"REFERRAL_SIGNATURE\",\n  \"status\": \"PENDING\",\n  \"attemptCount\": 0,\n  \"lastError\": \"\",\n  \"nextAttemptAt\": \"2026-08-07T00:00:00.000Z\",\n  \"claimedAt\": \"2026-08-07T00:00:00.000Z\",\n  \"completedAt\": \"2026-08-07T00:00:00.000Z\",\n  \"createdAt\": \"2026-08-07T00:00:00.000Z\",\n  \"updatedAt\": \"2026-08-07T00:00:00.000Z\"\n}"
         },
         {
           "name": "401 Response",

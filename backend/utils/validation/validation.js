@@ -5,8 +5,6 @@ const PHONE_PATTERN = /^\+?[0-9][0-9\s-]{6,19}$/;
 const GENDERS = new Set(["M", "F", "O", "U"]);
 const PARTICIPANT_STATUSES = new Set(["ACTIVE", "INACTIVE", "DECEASED"]);
 const CONTACT_STATUSES = new Set(["ACTIVE", "REMOVED"]);
-const CONSENT_STATUSES = new Set(["ACCEPTED", "DECLINED"]);
-const SIGNER_TYPES = new Set(["PARTICIPANT", "PARENT", "GUARDIAN", "AUTHORISED_REPRESENTATIVE"]);
 const NRIC_PATTERN = /^[STFGM]\d{7}[A-Z]$/;
 
 function validationError(message, details = null) {
@@ -36,8 +34,8 @@ function cleanString(value, fieldName, { required = false, max = 255 } = {}) {
     return cleaned;
 }
 
-function cleanEmail(value, fieldName = "email") {
-    const email = cleanString(value, fieldName, { max: 255 });
+function cleanEmail(value, fieldName = "email", { required = false } = {}) {
+    const email = cleanString(value, fieldName, { required, max: 255 });
     if (email && !EMAIL_PATTERN.test(email)) throw validationError(`${fieldName} is invalid`);
     return email ? email.toLowerCase() : null;
 }
@@ -87,13 +85,13 @@ function validateParticipantPayload(payload, { partial = false } = {}) {
 
     if (!partial || has("contactNumber")) result.contactNumber = cleanPhone(payload.contactNumber, "contactNumber", true);
     if (!partial || has("nric")) Object.assign(result, cleanNric(payload.nric, { required: true }));
-    if (has("email")) result.email = cleanEmail(payload.email);
-    if (has("race")) result.race = cleanString(payload.race, "race", { max: 50 });
-    if (has("nationality")) result.nationality = cleanString(payload.nationality, "nationality", { max: 50 });
-    if (has("addressStreet")) result.addressStreet = cleanString(payload.addressStreet, "addressStreet", { max: 255 });
-    if (has("addressUnit")) result.addressUnit = cleanString(payload.addressUnit, "addressUnit", { max: 20 });
-    if (has("addressPostalCode")) result.addressPostalCode = cleanString(payload.addressPostalCode, "addressPostalCode", { max: 10 });
-    if (has("preferredLanguage")) result.preferredLanguage = cleanString(payload.preferredLanguage, "preferredLanguage", { max: 50 });
+    if (!partial || has("email")) result.email = cleanEmail(payload.email, "email", { required: !partial });
+    if (!partial || has("race")) result.race = cleanString(payload.race, "race", { required: !partial, max: 50 });
+    if (!partial || has("nationality")) result.nationality = cleanString(payload.nationality, "nationality", { required: !partial, max: 50 });
+    if (!partial || has("addressStreet")) result.addressStreet = cleanString(payload.addressStreet, "addressStreet", { required: !partial, max: 255 });
+    if (!partial || has("addressUnit")) result.addressUnit = cleanString(payload.addressUnit, "addressUnit", { required: !partial, max: 20 });
+    if (!partial || has("addressPostalCode")) result.addressPostalCode = cleanString(payload.addressPostalCode, "addressPostalCode", { required: !partial, max: 10 });
+    if (!partial || has("preferredLanguage")) result.preferredLanguage = cleanString(payload.preferredLanguage, "preferredLanguage", { required: !partial, max: 50 });
     if (has("accessibilityNotes")) result.accessibilityNotes = cleanString(payload.accessibilityNotes, "accessibilityNotes", { max: 1000 });
 
     if (has("status")) {
@@ -127,38 +125,6 @@ function validateEmergencyContactPayload(payload, { partial = false } = {}) {
     return result;
 }
 
-function validateConsentPayload(payload) {
-    const consentFormVersionId = assertUuid(payload.consentFormVersionId, "consentFormVersionId");
-    const consentStatus = cleanString(payload.consentStatus, "consentStatus", { required: true, max: 20 }).toUpperCase();
-    const signerType = cleanString(payload.signerType, "signerType", { required: true, max: 40 }).toUpperCase();
-
-    if (!CONSENT_STATUSES.has(consentStatus)) throw validationError("consentStatus must be ACCEPTED or DECLINED");
-    if (!SIGNER_TYPES.has(signerType)) throw validationError("signerType is invalid");
-
-    const result = {
-        consentFormVersionId,
-        consentStatus,
-        signerType,
-        signerName: cleanString(payload.signerName, "signerName", { required: true, max: 150 }),
-        signerRelationship: cleanString(payload.signerRelationship, "signerRelationship", { required: signerType !== "PARTICIPANT", max: 60 }),
-        guardianContactName: cleanString(payload.guardianContactName, "guardianContactName", { max: 150 }),
-        guardianContactPhone: cleanPhone(payload.guardianContactPhone, "guardianContactPhone", false),
-        guardianContactEmail: cleanEmail(payload.guardianContactEmail, "guardianContactEmail"),
-        signatureObjectKey: cleanString(payload.signatureObjectKey, "signatureObjectKey", { max: 500 }),
-        signatureSha256: cleanString(payload.signatureSha256, "signatureSha256", { max: 64 }),
-        signatureMimeType: cleanString(payload.signatureMimeType, "signatureMimeType", { max: 100 }),
-    };
-
-    if (consentStatus === "ACCEPTED") {
-        if (!result.signatureObjectKey || !/^[a-f0-9]{64}$/i.test(result.signatureSha256 || "")) {
-            throw validationError("Accepted consent requires a signature object key and SHA-256 hash");
-        }
-        if (!result.signatureMimeType) throw validationError("Accepted consent requires a signature MIME type");
-    }
-
-    return result;
-}
-
 function parsePositiveInt(value, fallback, maximum = 100) {
     const parsed = Number(value ?? fallback);
     if (!Number.isInteger(parsed) || parsed < 1) throw validationError("Pagination values must be positive integers");
@@ -181,7 +147,6 @@ module.exports = {
     parsePositiveInt,
     validateParticipantPayload,
     validateEmergencyContactPayload,
-    validateConsentPayload,
     validateIdempotencyKey,
     validationError,
 };
