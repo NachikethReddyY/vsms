@@ -1,6 +1,8 @@
 .app-dialog {
   width: min(480px, calc(100vw - 32px));
   max-height: min(680px, calc(100dvh - 32px));
+  position: fixed;
+  inset: 0;
   margin: auto;
   padding: 0;
   overflow: auto;

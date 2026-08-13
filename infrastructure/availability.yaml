@@ -1,0 +1,812 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: Highly available AWS production foundation for VSMS (monitoring alarms are managed separately)
+
+Parameters:
+  EnvironmentName:
+    Type: String
+    Default: production
+    AllowedPattern: "[a-z0-9-]+"
+    MaxLength: 20
+  VpcId:
+    Type: AWS::EC2::VPC::Id
+  PublicSubnetIds:
+    Type: List<AWS::EC2::Subnet::Id>
+    Description: At least two public subnets in different Availability Zones for the load balancer
+  PrivateSubnetIds:
+    Type: List<AWS::EC2::Subnet::Id>
+    Description: Two private subnets in different Availability Zones with NAT or required VPC endpoints
+  HostedZoneId:
+    Type: AWS::Route53::HostedZone::Id
+  FrontendDomainName:
+    Type: String
+    Description: Public dashboard hostname, for example vsms.example.edu
+  ApiDomainName:
+    Type: String
+    Description: Public API hostname, for example api.vsms.example.edu
+  ApiCertificateArn:
+    Type: String
+    Description: ACM certificate ARN in this stack's region for ApiDomainName
+  FrontendCertificateArn:
+    Type: String
+    Description: ACM certificate ARN in us-east-1 for FrontendDomainName
+  ApiImageUri:
+    Type: String
+    Description: Immutable ECR image URI including a digest or release tag
+  DbMasterUsername:
+    Type: String
+    Default: vsmsapp
+    AllowedPattern: "[a-zA-Z][a-zA-Z0-9_]{0,15}"
+  ApplicationServicesEnabled:
+    Type: String
+    Default: "false"
+    AllowedValues: ["true", "false"]
+    Description: Enable only after migrations and the restricted runtime database role are provisioned
+  EncryptionActiveKeyId:
+    Type: String
+    AllowedPattern: "[A-Za-z0-9_-]{1,32}"
+  EncryptionKeyringSecretArn:
+    Type: String
+    Description: ARN of a Secrets Manager secret containing the versioned AES-256 keyring JSON
+  CognitoDomain:
+    Type: String
+    Description: HTTPS Cognito hosted UI base URL
+  CognitoRegion:
+    Type: String
+  CognitoUserPoolId:
+    Type: String
+  CognitoAppClientId:
+    Type: String
+    MinLength: 1
+
+Conditions:
+  ApplicationServicesAreEnabled: !Equals [!Ref ApplicationServicesEnabled, "true"]
+
+Resources:
+  ApiLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub /vsms/${EnvironmentName}/api
+      RetentionInDays: 30
+
+  ApiLoadBalancerSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Public HTTPS access to the VSMS application load balancer
+      VpcId: !Ref VpcId
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 443
+          ToPort: 443
+          CidrIp: 0.0.0.0/0
+      Tags:
+        - Key: Name
+          Value: !Sub ${EnvironmentName}-vsms-alb
+
+  ApiSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: VSMS API tasks; ingress is restricted to the load balancer
+      VpcId: !Ref VpcId
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 5050
+          ToPort: 5050
+          SourceSecurityGroupId: !Ref ApiLoadBalancerSecurityGroup
+      Tags:
+        - Key: Name
+          Value: !Sub ${EnvironmentName}-vsms-api
+
+  DatabaseSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: PostgreSQL access from VSMS API tasks only
+      VpcId: !Ref VpcId
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 5432
+          ToPort: 5432
+          SourceSecurityGroupId: !Ref ApiSecurityGroup
+
+  RedisSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Redis access from VSMS API tasks only
+      VpcId: !Ref VpcId
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 6379
+          ToPort: 6379
+          SourceSecurityGroupId: !Ref ApiSecurityGroup
+
+  BackupFileSystemSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Encrypted EFS backup access from VSMS API tasks only
+      VpcId: !Ref VpcId
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 2049
+          ToPort: 2049
+          SourceSecurityGroupId: !Ref ApiSecurityGroup
+
+  DatabaseSubnetGroup:
+    Type: AWS::RDS::DBSubnetGroup
+    Properties:
+      DBSubnetGroupDescription: Private multi-AZ subnets for VSMS PostgreSQL
+      SubnetIds: !Ref PrivateSubnetIds
+
+  BackupFileSystem:
+    Type: AWS::EFS::FileSystem
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      Encrypted: true
+      BackupPolicy:
+        Status: ENABLED
+      LifecyclePolicies:
+        - TransitionToIA: AFTER_30_DAYS
+      FileSystemTags:
+        - Key: Name
+          Value: !Sub ${EnvironmentName}-vsms-backups
+
+  BackupAccessPoint:
+    Type: AWS::EFS::AccessPoint
+    Properties:
+      FileSystemId: !Ref BackupFileSystem
+      PosixUser:
+        Uid: "1000"
+        Gid: "1000"
+      RootDirectory:
+        Path: /backups
+        CreationInfo:
+          OwnerUid: "1000"
+          OwnerGid: "1000"
+          Permissions: "0750"
+
+  BackupMountTargetA:
+    Type: AWS::EFS::MountTarget
+    Properties:
+      FileSystemId: !Ref BackupFileSystem
+      SubnetId: !Select [0, !Ref PrivateSubnetIds]
+      SecurityGroups:
+        - !Ref BackupFileSystemSecurityGroup
+
+  BackupMountTargetB:
+    Type: AWS::EFS::MountTarget
+    Properties:
+      FileSystemId: !Ref BackupFileSystem
+      SubnetId: !Select [1, !Ref PrivateSubnetIds]
+      SecurityGroups:
+        - !Ref BackupFileSystemSecurityGroup
+
+  DatabaseCredentialsSecret:
+    Type: AWS::SecretsManager::Secret
+    Properties:
+      Name: !Sub /vsms/${EnvironmentName}/database-master-credentials
+      KmsKeyId: alias/aws/secretsmanager
+      GenerateSecretString:
+        SecretStringTemplate: !Sub '{"username":"${DbMasterUsername}"}'
+        GenerateStringKey: password
+        PasswordLength: 32
+        ExcludePunctuation: true
+
+  Database:
+    Type: AWS::RDS::DBInstance
+    DeletionPolicy: Snapshot
+    UpdateReplacePolicy: Snapshot
+    Properties:
+      DBInstanceIdentifier: !Sub ${EnvironmentName}-vsms
+      Engine: postgres
+      DBName: vsms
+      DBInstanceClass: db.t4g.small
+      AllocatedStorage: 20
+      MaxAllocatedStorage: 100
+      StorageType: gp3
+      StorageEncrypted: true
+      MultiAZ: true
+      PubliclyAccessible: false
+      AutoMinorVersionUpgrade: true
+      BackupRetentionPeriod: 30
+      PreferredBackupWindow: 18:00-19:00
+      PreferredMaintenanceWindow: sun:19:30-sun:20:30
+      CopyTagsToSnapshot: true
+      DeletionProtection: true
+      EnablePerformanceInsights: true
+      PerformanceInsightsRetentionPeriod: 7
+      MasterUsername: !Ref DbMasterUsername
+      MasterUserPassword: !Sub "{{resolve:secretsmanager:${DatabaseCredentialsSecret}:SecretString:password}}"
+      DBSubnetGroupName: !Ref DatabaseSubnetGroup
+      VPCSecurityGroups:
+        - !Ref DatabaseSecurityGroup
+      Tags:
+        - Key: System
+          Value: VSMS
+        - Key: Environment
+          Value: !Ref EnvironmentName
+
+  DatabaseRuntimeCredentialsSecret:
+    Type: AWS::SecretsManager::Secret
+    Properties:
+      Name: !Sub /vsms/${EnvironmentName}/database-runtime-credentials
+      KmsKeyId: alias/aws/secretsmanager
+      GenerateSecretString:
+        SecretStringTemplate: '{"username":"vsms_runtime"}'
+        GenerateStringKey: password
+        PasswordLength: 32
+        ExcludePunctuation: true
+
+  RedisSubnetGroup:
+    Type: AWS::ElastiCache::SubnetGroup
+    Properties:
+      Description: Private multi-AZ subnets for VSMS Redis
+      SubnetIds: !Ref PrivateSubnetIds
+
+  RedisAuthTokenSecret:
+    Type: AWS::SecretsManager::Secret
+    Properties:
+      Name: !Sub /vsms/${EnvironmentName}/redis-auth-token
+      KmsKeyId: alias/aws/secretsmanager
+      GenerateSecretString:
+        PasswordLength: 32
+        ExcludePunctuation: true
+
+  RedisReplicationGroup:
+    Type: AWS::ElastiCache::ReplicationGroup
+    Properties:
+      ReplicationGroupDescription: !Sub ${EnvironmentName} VSMS shared coordination store
+      Engine: redis
+      CacheNodeType: cache.t4g.micro
+      NumCacheClusters: 2
+      AutomaticFailoverEnabled: true
+      MultiAZEnabled: true
+      AtRestEncryptionEnabled: true
+      TransitEncryptionEnabled: true
+      AuthToken: !Sub "{{resolve:secretsmanager:${RedisAuthTokenSecret}:SecretString}}"
+      CacheSubnetGroupName: !Ref RedisSubnetGroup
+      SecurityGroupIds:
+        - !Ref RedisSecurityGroup
+      SnapshotRetentionLimit: 7
+      SnapshotWindow: 17:00-18:00
+
+  DatabaseMigrationUrlSecret:
+    Type: AWS::SecretsManager::Secret
+    Properties:
+      Name: !Sub /vsms/${EnvironmentName}/database-migration-url
+      KmsKeyId: alias/aws/secretsmanager
+      SecretString: !Sub
+        - postgresql://${DbMasterUsername}:{{resolve:secretsmanager:${DatabaseCredentialsSecret}:SecretString:password}}@${DatabaseHost}:5432/vsms?sslmode=require&connection_limit=20&pool_timeout=10
+        - DatabaseHost: !GetAtt Database.Endpoint.Address
+
+  DatabaseRuntimeUrlSecret:
+    Type: AWS::SecretsManager::Secret
+    Properties:
+      Name: !Sub /vsms/${EnvironmentName}/database-runtime-url
+      KmsKeyId: alias/aws/secretsmanager
+      SecretString: !Sub
+        - postgresql://vsms_runtime:{{resolve:secretsmanager:${DatabaseRuntimeCredentialsSecret}:SecretString:password}}@${DatabaseHost}:5432/vsms?sslmode=require&connection_limit=20&pool_timeout=10
+        - DatabaseHost: !GetAtt Database.Endpoint.Address
+
+  RedisUrlSecret:
+    Type: AWS::SecretsManager::Secret
+    Properties:
+      Name: !Sub /vsms/${EnvironmentName}/redis-url
+      KmsKeyId: alias/aws/secretsmanager
+      SecretString: !Sub
+        - rediss://:{{resolve:secretsmanager:${RedisAuthTokenSecret}:SecretString}}@${RedisHost}:6379
+        - RedisHost: !GetAtt RedisReplicationGroup.PrimaryEndPoint.Address
+
+  JwtSecret:
+    Type: AWS::SecretsManager::Secret
+    Properties:
+      Name: !Sub /vsms/${EnvironmentName}/jwt-access-secret
+      KmsKeyId: alias/aws/secretsmanager
+      GenerateSecretString:
+        PasswordLength: 64
+        ExcludePunctuation: true
+
+  ApiCluster:
+    Type: AWS::ECS::Cluster
+    Properties:
+      ClusterName: !Sub ${EnvironmentName}-vsms
+      ClusterSettings:
+        - Name: containerInsights
+          Value: enabled
+
+  ApiExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: ecs-tasks.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy
+      Policies:
+        - PolicyName: ReadVsmsRuntimeSecrets
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action: secretsmanager:GetSecretValue
+                Resource:
+                  - !Ref DatabaseRuntimeUrlSecret
+                  - !Ref RedisUrlSecret
+                  - !Ref JwtSecret
+                  - !Ref EncryptionKeyringSecretArn
+
+  ApiTaskRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: ecs-tasks.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: ManageVsmsCognitoStaff
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - cognito-idp:AdminAddUserToGroup
+                  - cognito-idp:AdminCreateUser
+                  - cognito-idp:AdminDeleteUser
+                  - cognito-idp:AdminDisableUser
+                  - cognito-idp:AdminGetUser
+                  - cognito-idp:AdminListGroupsForUser
+                  - cognito-idp:AdminRemoveUserFromGroup
+                  - cognito-idp:AdminUserGlobalSignOut
+                Resource: !Sub arn:${AWS::Partition}:cognito-idp:${CognitoRegion}:${AWS::AccountId}:userpool/${CognitoUserPoolId}
+        - PolicyName: WriteVsmsBackups
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - elasticfilesystem:ClientMount
+                  - elasticfilesystem:ClientWrite
+                Resource: !Sub arn:${AWS::Partition}:elasticfilesystem:${AWS::Region}:${AWS::AccountId}:file-system/${BackupFileSystem}
+                Condition:
+                  ArnEquals:
+                    elasticfilesystem:AccessPointArn: !Sub arn:${AWS::Partition}:elasticfilesystem:${AWS::Region}:${AWS::AccountId}:access-point/${BackupAccessPoint}
+
+  WorkerTaskRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: ecs-tasks.amazonaws.com
+            Action: sts:AssumeRole
+
+  ApiTaskDefinition:
+    Type: AWS::ECS::TaskDefinition
+    Properties:
+      Family: !Sub ${EnvironmentName}-vsms-api
+      Cpu: "512"
+      Memory: "1024"
+      NetworkMode: awsvpc
+      RequiresCompatibilities: [FARGATE]
+      ExecutionRoleArn: !GetAtt ApiExecutionRole.Arn
+      TaskRoleArn: !GetAtt ApiTaskRole.Arn
+      ContainerDefinitions:
+        - Name: api
+          Image: !Ref ApiImageUri
+          Essential: true
+          PortMappings:
+            - ContainerPort: 5050
+              Protocol: tcp
+          Environment:
+            - Name: NODE_ENV
+              Value: production
+            - Name: LOCAL_HTTPS
+              Value: "false"
+            - Name: HOST
+              Value: 0.0.0.0
+            - Name: PORT
+              Value: "5050"
+            - Name: TRUST_PROXY
+              Value: "true"
+            - Name: RATE_LIMIT_STORE
+              Value: redis
+            - Name: PUBLIC_APP_ORIGIN
+              Value: !Sub https://${FrontendDomainName}
+            - Name: CORS_ORIGINS
+              Value: !Sub https://${FrontendDomainName}
+            - Name: COGNITO_DOMAIN
+              Value: !Ref CognitoDomain
+            - Name: COGNITO_REGION
+              Value: !Ref CognitoRegion
+            - Name: COGNITO_USER_POOL_ID
+              Value: !Ref CognitoUserPoolId
+            - Name: COGNITO_APP_CLIENT_ID
+              Value: !Ref CognitoAppClientId
+            - Name: COGNITO_REDIRECT_URI
+              Value: !Sub https://${FrontendDomainName}/auth/callback
+            - Name: COGNITO_LOGOUT_URI
+              Value: !Sub https://${FrontendDomainName}/
+            - Name: ENCRYPTION_ACTIVE_KEY_ID
+              Value: !Ref EncryptionActiveKeyId
+            - Name: VSMS_BACKUP_DIR
+              Value: /var/lib/vsms/backups
+          Secrets:
+            - Name: DATABASE_URL
+              ValueFrom: !Ref DatabaseRuntimeUrlSecret
+            - Name: REDIS_URL
+              ValueFrom: !Ref RedisUrlSecret
+            - Name: JWT_ACCESS_SECRET
+              ValueFrom: !Ref JwtSecret
+            - Name: ENCRYPTION_KEYRING_JSON
+              ValueFrom: !Ref EncryptionKeyringSecretArn
+          LogConfiguration:
+            LogDriver: awslogs
+            Options:
+              awslogs-group: !Ref ApiLogGroup
+              awslogs-region: !Ref AWS::Region
+              awslogs-stream-prefix: api
+          StopTimeout: 30
+          MountPoints:
+            - SourceVolume: backups
+              ContainerPath: /var/lib/vsms/backups
+              ReadOnly: false
+      Volumes:
+        - Name: backups
+          EFSVolumeConfiguration:
+            FilesystemId: !Ref BackupFileSystem
+            TransitEncryption: ENABLED
+            AuthorizationConfig:
+              AccessPointId: !Ref BackupAccessPoint
+              IAM: ENABLED
+
+  ReportWorkerTaskDefinition:
+    Type: AWS::ECS::TaskDefinition
+    Properties:
+      Family: !Sub ${EnvironmentName}-vsms-report-worker
+      Cpu: "256"
+      Memory: "512"
+      NetworkMode: awsvpc
+      RequiresCompatibilities: [FARGATE]
+      ExecutionRoleArn: !GetAtt ApiExecutionRole.Arn
+      TaskRoleArn: !GetAtt WorkerTaskRole.Arn
+      ContainerDefinitions:
+        - Name: report-worker
+          Image: !Ref ApiImageUri
+          Essential: true
+          Command: ["node", "scripts/report-worker.js"]
+          Environment:
+            - Name: NODE_ENV
+              Value: production
+            - Name: ENCRYPTION_ACTIVE_KEY_ID
+              Value: !Ref EncryptionActiveKeyId
+          Secrets:
+            - Name: DATABASE_URL
+              ValueFrom: !Ref DatabaseRuntimeUrlSecret
+            - Name: JWT_ACCESS_SECRET
+              ValueFrom: !Ref JwtSecret
+            - Name: ENCRYPTION_KEYRING_JSON
+              ValueFrom: !Ref EncryptionKeyringSecretArn
+          LogConfiguration:
+            LogDriver: awslogs
+            Options:
+              awslogs-group: !Ref ApiLogGroup
+              awslogs-region: !Ref AWS::Region
+              awslogs-stream-prefix: report-worker
+          StopTimeout: 30
+
+  DomainEventWorkerTaskDefinition:
+    Type: AWS::ECS::TaskDefinition
+    Properties:
+      Family: !Sub ${EnvironmentName}-vsms-domain-event-worker
+      Cpu: "256"
+      Memory: "512"
+      NetworkMode: awsvpc
+      RequiresCompatibilities: [FARGATE]
+      ExecutionRoleArn: !GetAtt ApiExecutionRole.Arn
+      TaskRoleArn: !GetAtt WorkerTaskRole.Arn
+      ContainerDefinitions:
+        - Name: domain-event-worker
+          Image: !Ref ApiImageUri
+          Essential: true
+          Command: ["node", "scripts/domain-event-worker.js"]
+          Environment:
+            - Name: NODE_ENV
+              Value: production
+            - Name: ENCRYPTION_ACTIVE_KEY_ID
+              Value: !Ref EncryptionActiveKeyId
+          Secrets:
+            - Name: DATABASE_URL
+              ValueFrom: !Ref DatabaseRuntimeUrlSecret
+            - Name: JWT_ACCESS_SECRET
+              ValueFrom: !Ref JwtSecret
+            - Name: ENCRYPTION_KEYRING_JSON
+              ValueFrom: !Ref EncryptionKeyringSecretArn
+          LogConfiguration:
+            LogDriver: awslogs
+            Options:
+              awslogs-group: !Ref ApiLogGroup
+              awslogs-region: !Ref AWS::Region
+              awslogs-stream-prefix: domain-event-worker
+          StopTimeout: 30
+
+  ApiLoadBalancer:
+    Type: AWS::ElasticLoadBalancingV2::LoadBalancer
+    Properties:
+      Scheme: internet-facing
+      Type: application
+      SecurityGroups:
+        - !Ref ApiLoadBalancerSecurityGroup
+      Subnets: !Ref PublicSubnetIds
+
+  ApiTargetGroup:
+    Type: AWS::ElasticLoadBalancingV2::TargetGroup
+    Properties:
+      VpcId: !Ref VpcId
+      TargetType: ip
+      Protocol: HTTP
+      Port: 5050
+      HealthCheckEnabled: true
+      HealthCheckPath: /health
+      HealthCheckIntervalSeconds: 30
+      HealthCheckTimeoutSeconds: 5
+      HealthyThresholdCount: 2
+      UnhealthyThresholdCount: 3
+      Matcher:
+        HttpCode: "200"
+      TargetGroupAttributes:
+        - Key: deregistration_delay.timeout_seconds
+          Value: "30"
+
+  ApiHttpsListener:
+    Type: AWS::ElasticLoadBalancingV2::Listener
+    Properties:
+      LoadBalancerArn: !Ref ApiLoadBalancer
+      Port: 443
+      Protocol: HTTPS
+      Certificates:
+        - CertificateArn: !Ref ApiCertificateArn
+      SslPolicy: ELBSecurityPolicy-TLS13-1-2-2021-06
+      DefaultActions:
+        - Type: forward
+          TargetGroupArn: !Ref ApiTargetGroup
+
+  ApiService:
+    Type: AWS::ECS::Service
+    DependsOn:
+      - ApiHttpsListener
+      - BackupMountTargetA
+      - BackupMountTargetB
+    Properties:
+      Cluster: !Ref ApiCluster
+      ServiceName: api
+      LaunchType: FARGATE
+      PlatformVersion: LATEST
+      DesiredCount: !If [ApplicationServicesAreEnabled, 2, 0]
+      EnableECSManagedTags: true
+      PropagateTags: SERVICE
+      HealthCheckGracePeriodSeconds: 60
+      DeploymentConfiguration:
+        MinimumHealthyPercent: 100
+        MaximumPercent: 200
+        DeploymentCircuitBreaker:
+          Enable: true
+          Rollback: true
+      NetworkConfiguration:
+        AwsvpcConfiguration:
+          AssignPublicIp: DISABLED
+          SecurityGroups:
+            - !Ref ApiSecurityGroup
+          Subnets: !Ref PrivateSubnetIds
+      LoadBalancers:
+        - ContainerName: api
+          ContainerPort: 5050
+          TargetGroupArn: !Ref ApiTargetGroup
+      TaskDefinition: !Ref ApiTaskDefinition
+
+  ReportWorkerService:
+    Type: AWS::ECS::Service
+    Properties:
+      Cluster: !Ref ApiCluster
+      ServiceName: report-worker
+      LaunchType: FARGATE
+      PlatformVersion: LATEST
+      DesiredCount: !If [ApplicationServicesAreEnabled, 1, 0]
+      EnableECSManagedTags: true
+      PropagateTags: SERVICE
+      DeploymentConfiguration:
+        MinimumHealthyPercent: 100
+        MaximumPercent: 200
+        DeploymentCircuitBreaker:
+          Enable: true
+          Rollback: true
+      NetworkConfiguration:
+        AwsvpcConfiguration:
+          AssignPublicIp: DISABLED
+          SecurityGroups:
+            - !Ref ApiSecurityGroup
+          Subnets: !Ref PrivateSubnetIds
+      TaskDefinition: !Ref ReportWorkerTaskDefinition
+
+  DomainEventWorkerService:
+    Type: AWS::ECS::Service
+    Properties:
+      Cluster: !Ref ApiCluster
+      ServiceName: domain-event-worker
+      LaunchType: FARGATE
+      PlatformVersion: LATEST
+      DesiredCount: !If [ApplicationServicesAreEnabled, 1, 0]
+      EnableECSManagedTags: true
+      PropagateTags: SERVICE
+      DeploymentConfiguration:
+        MinimumHealthyPercent: 100
+        MaximumPercent: 200
+        DeploymentCircuitBreaker:
+          Enable: true
+          Rollback: true
+      NetworkConfiguration:
+        AwsvpcConfiguration:
+          AssignPublicIp: DISABLED
+          SecurityGroups:
+            - !Ref ApiSecurityGroup
+          Subnets: !Ref PrivateSubnetIds
+      TaskDefinition: !Ref DomainEventWorkerTaskDefinition
+
+  ApiScalingTarget:
+    Type: AWS::ApplicationAutoScaling::ScalableTarget
+    Properties:
+      ServiceNamespace: ecs
+      ScalableDimension: ecs:service:DesiredCount
+      ResourceId: !Sub service/${ApiCluster}/${ApiService.Name}
+      MinCapacity: !If [ApplicationServicesAreEnabled, 2, 0]
+      MaxCapacity: 4
+      RoleARN: !Sub arn:${AWS::Partition}:iam::${AWS::AccountId}:role/aws-service-role/ecs.application-autoscaling.amazonaws.com/AWSServiceRoleForApplicationAutoScaling_ECSService
+
+  ApiCpuScalingPolicy:
+    Type: AWS::ApplicationAutoScaling::ScalingPolicy
+    Properties:
+      PolicyName: !Sub ${EnvironmentName}-vsms-api-cpu
+      PolicyType: TargetTrackingScaling
+      ScalingTargetId: !Ref ApiScalingTarget
+      TargetTrackingScalingPolicyConfiguration:
+        TargetValue: 60
+        ScaleInCooldown: 120
+        ScaleOutCooldown: 60
+        PredefinedMetricSpecification:
+          PredefinedMetricType: ECSServiceAverageCPUUtilization
+
+  ApiDnsRecord:
+    Type: AWS::Route53::RecordSet
+    Properties:
+      HostedZoneId: !Ref HostedZoneId
+      Name: !Ref ApiDomainName
+      Type: A
+      AliasTarget:
+        DNSName: !GetAtt ApiLoadBalancer.DNSName
+        HostedZoneId: !GetAtt ApiLoadBalancer.CanonicalHostedZoneID
+        EvaluateTargetHealth: true
+
+  FrontendBucket:
+    Type: AWS::S3::Bucket
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      VersioningConfiguration:
+        Status: Enabled
+      LifecycleConfiguration:
+        Rules:
+          - Id: ExpireOldFrontendVersions
+            Status: Enabled
+            NoncurrentVersionExpiration:
+              NoncurrentDays: 30
+
+  FrontendOriginAccessControl:
+    Type: AWS::CloudFront::OriginAccessControl
+    Properties:
+      OriginAccessControlConfig:
+        Name: !Sub ${EnvironmentName}-vsms-frontend
+        OriginAccessControlOriginType: s3
+        SigningBehavior: always
+        SigningProtocol: sigv4
+
+  FrontendDistribution:
+    Type: AWS::CloudFront::Distribution
+    Properties:
+      DistributionConfig:
+        Enabled: true
+        Aliases:
+          - !Ref FrontendDomainName
+        DefaultRootObject: index.html
+        HttpVersion: http2and3
+        PriceClass: PriceClass_100
+        Origins:
+          - Id: frontend-s3
+            DomainName: !GetAtt FrontendBucket.RegionalDomainName
+            OriginAccessControlId: !GetAtt FrontendOriginAccessControl.Id
+            S3OriginConfig:
+              OriginAccessIdentity: ""
+        DefaultCacheBehavior:
+          TargetOriginId: frontend-s3
+          ViewerProtocolPolicy: redirect-to-https
+          Compress: true
+          AllowedMethods: [GET, HEAD, OPTIONS]
+          CachedMethods: [GET, HEAD, OPTIONS]
+          CachePolicyId: 658327ea-f89d-4fab-a63d-7e88639e58f6
+        CustomErrorResponses:
+          - ErrorCode: 403
+            ResponseCode: 200
+            ResponsePagePath: /index.html
+            ErrorCachingMinTTL: 0
+          - ErrorCode: 404
+            ResponseCode: 200
+            ResponsePagePath: /index.html
+            ErrorCachingMinTTL: 0
+        ViewerCertificate:
+          AcmCertificateArn: !Ref FrontendCertificateArn
+          MinimumProtocolVersion: TLSv1.2_2021
+          SslSupportMethod: sni-only
+
+  FrontendBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref FrontendBucket
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Sid: AllowCloudFrontReadOnly
+            Effect: Allow
+            Principal:
+              Service: cloudfront.amazonaws.com
+            Action: s3:GetObject
+            Resource: !Sub ${FrontendBucket.Arn}/*
+            Condition:
+              StringEquals:
+                AWS:SourceArn: !Sub arn:${AWS::Partition}:cloudfront::${AWS::AccountId}:distribution/${FrontendDistribution}
+
+  FrontendDnsRecord:
+    Type: AWS::Route53::RecordSet
+    Properties:
+      HostedZoneId: !Ref HostedZoneId
+      Name: !Ref FrontendDomainName
+      Type: A
+      AliasTarget:
+        DNSName: !GetAtt FrontendDistribution.DomainName
+        HostedZoneId: Z2FDTNDATAQYW2
+        EvaluateTargetHealth: false
+
+Outputs:
+  ApiUrl:
+    Value: !Sub https://${ApiDomainName}
+  FrontendUrl:
+    Value: !Sub https://${FrontendDomainName}
+  FrontendBucketName:
+    Value: !Ref FrontendBucket
+  FrontendDistributionId:
+    Value: !Ref FrontendDistribution
+  ApiClusterName:
+    Value: !Ref ApiCluster
+  ApiServiceName:
+    Value: !GetAtt ApiService.Name
+  DatabaseEndpoint:
+    Value: !GetAtt Database.Endpoint.Address
+  DatabaseMigrationUrlSecretArn:
+    Value: !Ref DatabaseMigrationUrlSecret
+  DatabaseRuntimeCredentialsSecretArn:
+    Value: !Ref DatabaseRuntimeCredentialsSecret
+  BackupFileSystemId:
+    Value: !Ref BackupFileSystem

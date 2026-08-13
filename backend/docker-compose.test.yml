@@ -2,14 +2,14 @@ services:
   postgres:
     image: postgres:16-alpine
     environment:
-      POSTGRES_DB: vsms_test
-      POSTGRES_USER: vsms_test
+      POSTGRES_DB: postgres
+      POSTGRES_USER: postgres
       POSTGRES_PASSWORD: ${VSMS_TEST_DB_PASSWORD:?Set VSMS_TEST_DB_PASSWORD in backend/.env.test}
     ports:
       - "127.0.0.1:5433:5432"
     volumes:
       - vsms-test-postgres:/var/lib/postgresql/data
-      - ./db/test-role.sql:/docker-entrypoint-initdb.d/10-test-role.sql:ro
+      - ./db/init-test-database.sh:/docker-entrypoint-initdb.d/10-init-test-database.sh:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U vsms_test -d vsms_test"]
       interval: 5s

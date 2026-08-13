@@ -13,7 +13,7 @@ const helmet = require("helmet");
 const cookieParser = require("cookie-parser");
 const swaggerUi = require("swagger-ui-express");
 const YAML = require("yaml");
-
+const db = require("./config/db");
 const { rateLimit } = require("./middlewares/rateLimiter");
 
 // Environment Configuration & Error Handling
@@ -45,6 +45,7 @@ const emergencyContactRoutes = require("./routes/emergencyContactRoutes");
 const signatureRoutes = require("./routes/signatureRoutes");
 const providerEventRoutes = require("./routes/providerEventRoutes");
 const queueRoutes = require("./routes/queueRoutes");
+const operationsRoutes = require("./routes/operationsRoutes");
 
 // Dashboard
 const dashboardRoutes = require("./routes/dashboardRoutes");
@@ -250,12 +251,42 @@ app.get("/favicon.ico", (_req, res) => {
 });
 
 app.get("/health", (_req, res) => {
-    res.json({
-        status: "ok",
-        environment: env.isProduction
-            ? "production"
-            : "development",
+  return res.status(200).json({
+    status: "ok",
+    environment: env.isProduction
+      ? "production"
+      : "development",
+    timestamp: new Date().toISOString(),
+  });
+});
+
+app.get("/ready", async (_req, res) => {
+  try {
+    await db.query("SELECT 1");
+
+    return res.status(200).json({
+      status: "ready",
+      database: "connected",
+      environment: env.isProduction
+        ? "production"
+        : "development",
+      timestamp: new Date().toISOString(),
     });
+  } catch (error) {
+    logger.error("readiness_check_failed", {
+      event: "readiness_check_failed",
+      message: error.message,
+    });
+
+    return res.status(503).json({
+      status: "not_ready",
+      database: "disconnected",
+      environment: env.isProduction
+        ? "production"
+        : "development",
+      timestamp: new Date().toISOString(),
+    });
+  }
 });
 
 /**
@@ -328,6 +359,7 @@ app.use("/api/v1/admin", adminRoutes);
 
 // Dashboard
 app.use("/api/v1/dashboard", dashboardRoutes);
+app.use("/api/v1/operations", operationsRoutes);
 
 // QR Routes
 app.use("/api/v1/qr", qrLimiter, qrRoutes);

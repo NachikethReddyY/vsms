@@ -108,11 +108,11 @@ exports.listBackups = asyncHandler(async (req, res) => {
 });
 
 exports.createBackup = asyncHandler(async (req, res) => {
-    const result = await backupService.createBackup({
-        userId: req.auth.userId,
-        ipAddress: req.ip,
-        description: req.body.description,
-    });
+    const result = await backupService.createBackup(
+        { description: req.body.description },
+        req.auth.userId,
+        req.context,
+    );
     res.status(201).json({ success: true, ...result });
 });
 
@@ -124,8 +124,9 @@ exports.downloadBackup = asyncHandler(async (req, res) => {
 exports.restoreBackup = asyncHandler(async (req, res) => {
     const result = await backupService.restoreBackup(
         req.params.backupId,
-        { userId: req.auth.userId, roles: req.auth.roles },
-        req.ip
+        req.body,
+        req.auth.userId,
+        req.context,
     );
     res.json({ success: true, ...result });
 });
@@ -133,8 +134,8 @@ exports.restoreBackup = asyncHandler(async (req, res) => {
 exports.deleteBackup = asyncHandler(async (req, res) => {
     const result = await backupService.deleteBackup(
         req.params.backupId,
-        { userId: req.auth.userId, roles: req.auth.roles },
-        req.ip
+        req.auth.userId,
+        req.context,
     );
     res.json({ success: true, ...result });
 });

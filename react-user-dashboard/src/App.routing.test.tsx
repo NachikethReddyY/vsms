@@ -22,6 +22,7 @@ vi.mock('./features/events/EventFormPage', () => ({ default: ({ mode }: { mode: 
 vi.mock('./features/events/PublicEventPage', () => ({ default: () => <p>Public event</p> }));
 vi.mock('./features/reviews/ReviewWorkspacePage', () => ({ default: () => <p>Reviews page</p> }));
 vi.mock('./features/reports/ReportsPage', () => ({ default: () => <p>Global reports page</p> }));
+vi.mock('./features/operations/OperationsCenterPage', () => ({ default: () => <p>Operations center page</p> }));
 vi.mock('./features/screening/DynamicStationPage', () => ({
   default: ({ stationType }: { stationType?: string }) => (
     <p>{stationType === 'VISUAL_ACUITY' ? 'Visual acuity station' : stationType === 'REFRACTION' ? 'Refraction station' : stationType === 'COLOUR_VISION' ? 'Colour vision station' : 'Custom station'}</p>
@@ -67,7 +68,10 @@ beforeEach(() => {
 afterEach(() => cleanup());
 
 describe('App route and navigation topology', () => {
-  it('renders global reports and create-event routes without an eventId', async () => {
+  it('renders global operations, reports, and create-event routes without an eventId', async () => {
+    renderPath('/operations');
+    expect(await screen.findByText('Operations center page')).toBeTruthy();
+    cleanup();
     renderPath('/reports');
     expect(await screen.findByText('Global reports page')).toBeTruthy();
     cleanup();

@@ -12,6 +12,7 @@ path_exists() {
 
 command -v pg_dump >/dev/null 2>&1 || fail "pg_dump is required"
 command -v psql >/dev/null 2>&1 || fail "psql is required"
+command -v sha256sum >/dev/null 2>&1 || fail "sha256sum is required"
 [ -n "${DATABASE_URL:-}" ] || fail "DATABASE_URL is required"
 [ -n "${VSMS_BACKUP_DIR:-}" ] || fail "VSMS_BACKUP_DIR must be an absolute directory outside this repository"
 
@@ -26,8 +27,10 @@ database_name=$(psql "$DATABASE_URL" -Atq -v ON_ERROR_STOP=1 -c 'SELECT current_
 timestamp=$(date -u +%Y%m%dT%H%M%SZ)
 backup_file="$VSMS_BACKUP_DIR/vsms-${database_name}-${timestamp}.dump"
 manifest_file="$backup_file.counts.tsv"
+checksum_file="$backup_file.sha256"
 path_exists "$backup_file" && fail "Refusing to overwrite existing backup: $backup_file"
 path_exists "$manifest_file" && fail "Refusing to overwrite existing manifest: $manifest_file"
+path_exists "$checksum_file" && fail "Refusing to overwrite existing checksum: $checksum_file"
 started_epoch=$(date +%s)
 
 if ! pg_dump --dbname="$DATABASE_URL" --format=custom --no-owner --no-privileges --file="$backup_file"; then
@@ -43,5 +46,8 @@ for table_name in events participants event_registrations queue_entries screenin
   printf '%s\t%s\n' "$table_name" "$row_count" >> "$manifest_file"
 done
 
+backup_hash=$(sha256sum "$backup_file" | awk '{print $1}')
+printf '%s  %s\n' "$backup_hash" "$(basename "$backup_file")" > "$checksum_file"
+
 elapsed=$(( $(date +%s) - started_epoch ))
-printf 'Backup created: %s\nRows manifest: %s\nElapsed seconds: %s\n' "$backup_file" "$manifest_file" "$elapsed"
+printf 'Backup created: %s\nRows manifest: %s\nChecksum: %s\nElapsed seconds: %s\n' "$backup_file" "$manifest_file" "$checksum_file" "$elapsed"

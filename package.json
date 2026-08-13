@@ -9,6 +9,7 @@
   },
   "scripts": {
     "test": "pnpm --dir backend test",
+    "test:availability": "node --test \".vsms/tests/*.test.js\"",
     "check": "pnpm --dir backend prisma:validate && pnpm --dir backend openapi:lint && pnpm --dir backend contracts:check && pnpm check:api-collection && pnpm --dir react-user-dashboard lint && pnpm --dir react-user-dashboard build",
     "check:api-collection": "node scripts/check-api-collection.cjs",
     "check:https": "node scripts/check-local-https.mjs",

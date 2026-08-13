@@ -12,6 +12,7 @@ import EventFormPage from "./features/events/EventFormPage";
 import PublicEventPage from "./features/events/PublicEventPage";
 import ReviewWorkspacePage from "./features/reviews/ReviewWorkspacePage";
 import ReportsPage from "./features/reports/ReportsPage";
+import OperationsCenterPage from "./features/operations/OperationsCenterPage";
 import DynamicStationPage from "./features/screening/DynamicStationPage";
 import QRScannerPage from "./features/screening/QRScannerPage";
 import { AuditLogsPage as RegistrationAuditLogsPage } from "./pages/AdminPages";
@@ -50,6 +51,7 @@ import {
 const adminRoles = ["ADMINISTRATOR"];
 const eventManagerRoles = ["ADMINISTRATOR", "EVENT_MANAGER"];
 const registrationRoles = ["REGISTRATION_OFFICER"];
+const queueRoles = ["ADMINISTRATOR", "EVENT_MANAGER", "REGISTRATION_OFFICER"];
 const screenerRoles = ["SCREENER"];
 const reviewerRoles = ["REVIEWER"];
 
@@ -146,6 +148,7 @@ export default function App() {
           </Route>
 
           <Route element={<RoleGuard allowedRoles={eventManagerRoles} />}>
+            <Route path="/operations" element={<OperationsCenterPage />} />
             <Route path="/reports" element={<ReportsPage />} />
           </Route>
 
@@ -153,8 +156,11 @@ export default function App() {
             <Route path="/events/:eventId/edit" element={<EventFormPage mode="edit" />} />
           </Route>
 
-          <Route element={<EventCapabilityGuard allowedRoles={registrationRoles} />}>
+          <Route element={<EventCapabilityGuard allowedRoles={queueRoles} />}>
             <Route path="/events/:eventId/queue" element={<QueuePage />} />
+          </Route>
+
+          <Route element={<EventCapabilityGuard allowedRoles={registrationRoles} />}>
             <Route path="/events/qr-pass/:registrationId" element={<QRCodePage />} />
             <Route path="/qr-generator" element={<QRCodePage />} />
             <Route path="/participants" element={<Navigate to="/events" replace />} />

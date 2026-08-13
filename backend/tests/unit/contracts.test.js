@@ -85,7 +85,7 @@ test("API routes expose the required versioned contracts", () => {
 
 test("school API map records the actual Cognito, PATCH, and event-scoped contract", () => {
     const document = YAML.parse(read("docs/openapi.yaml"));
-    const map = fs.readFileSync(path.resolve(backendRoot, "../docs/api-contract-mapping.md"), "utf8");
+    const map = fs.readFileSync(path.resolve(backendRoot, "../docs/03-Architecture/api-contract-mapping.md"), "utf8");
     assert.ok(document.paths["/api/v1/auth/authorize"].get);
     assert.ok(document.paths["/api/v1/events/{eventId}"].patch);
     assert.ok(document.paths["/api/v1/participants/{participantId}"].patch);

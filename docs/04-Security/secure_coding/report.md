@@ -1,7 +1,8 @@
 ---
 title: VSMS secure coding project report
 authors:
-  - "[Human input required: verify team names and student identifiers]"
+  - "Mike, Sitt, Nachiketh, Keefe"
+team: "Team Cryptix"
 module: ST2515 Secure Coding
 date: "11/8/2026"
 submission: "16/8/2026"
@@ -35,6 +36,81 @@ is not currently an installable service-worker PWA. The offline implementation
 uses encrypted IndexedDB records and the authenticated
 `/events/{eventId}/sync/screening` endpoint; a hard refresh while offline
 requires the app shell to have already been loaded.
+
+## 1.1 Problem Statement
+
+Community organizations, healthcare providers, and volunteer groups regularly conduct visual screening programmes for senior citizens and residents. These programmes involve participant registration, multiple screening stations, queue management, screening-result recording, referrals, and report generation.
+
+However, many screening events continue to rely on paper forms, manual participant tracking, spreadsheets, and manually compiled reports. These processes create operational inefficiencies, increase the possibility of human error, and make it difficult to securely manage participant information across multiple screening stations.
+
+### Problem Breakdown
+
+| Problem Area | Current Problem | Impact on Organisation | VSMS Requirement |
+|---|---|---|---|
+| **Data Collection** | Paper forms and manual data entry are used to record participant information and screening results. | Forms can be lost or damaged, while duplicate data entry and human errors can reduce data accuracy. | Digital participant registration and structured screening-result capture. |
+| **Participant Tracking** | Staff have limited visibility of where participants are in the screening journey. | Staff may need to manually check participant status, causing delays and confusion. | Participant journey tracking and QR-based participant identification. |
+| **Queue Management** | Queues are managed manually at individual screening stations. | Participants may experience unnecessary waiting while staff have limited visibility of station workload. | Centralised queue management, participant transfers, queue status, and station workload monitoring. |
+| **Operational Visibility** | There is no centralised real-time view of event progress. | Event administrators cannot easily determine completion rates, waiting participants, or overloaded stations. | Real-time operational dashboard and event monitoring. |
+| **Connectivity** | Some screening locations have unstable or unavailable Internet connectivity. | Staff may be unable to continue recording screening information when connectivity is interrupted. | Offline-first data capture with secure synchronisation when connectivity returns. |
+| **Security & Accountability** | Participant information and system activities may not be adequately protected or tracked. | Unauthorised access, inappropriate data modification, and lack of accountability may occur. | RBAC, authentication, input validation, audit logging, and secure data handling. |
+| **Reporting** | Screening statistics and reports require manual consolidation. | Report generation is time-consuming and information may become outdated. | Automated dashboards, statistics, and report generation. |
+| **Scalability & Performance** | Manual processes become increasingly difficult as participant numbers and screening stations increase. | Large events may experience longer queues and slower administrative processing. | Scalable architecture and performance requirements for concurrent users and participants. |
+
+## 1.2 Business Need
+
+The organisation therefore requires a secure, scalable, and offline-capable Visual Screening Management System (VSMS) that digitises participant registration and screening operations, improves participant tracking and queue management, provides real-time visibility of station workload and event progress, supports continued operation during network interruptions, protects participant information through appropriate security controls, and automates reporting and operational analysis.
+
+## 1.3 Our Proposed Solution
+
+To address these challenges, we propose the **Visual Screening Management System (VSMS)**, a secure, scalable, and offline-capable web application designed to support the end-to-end workflow of community visual screening programmes.
+
+VSMS digitises the screening process by providing a centralised platform for **participant registration, QR-based identification, queue management, screening-result recording, referrals, event monitoring, and reporting**. This reduces reliance on paper forms, spreadsheets, and manual administrative processes while improving the accuracy and accessibility of screening information.
+
+The system addresses the identified problems through the following key capabilities:
+
+| Solution Area | VSMS Implementation | Problem Addressed |
+|---|---|---|
+| **Digital Data Collection** | Provides structured digital forms for participant registration and screening-result capture. | Reduces paper-based records, duplicate data entry, and human error. |
+| **Participant Tracking** | Uses QR-based participant identification and tracks participants throughout the screening journey. | Improves visibility of participant status and reduces manual tracking. |
+| **Queue & Station Management** | Provides centralised queue management, participant transfers, and station status monitoring. | Reduces unnecessary waiting and improves distribution of workload across stations. |
+| **Operational Dashboard** | Provides event administrators with real-time information on participant progress, queues, station workload, and screening completion. | Improves operational visibility and decision-making. |
+| **Offline-First Operation** | Allows screening activities to continue during temporary network interruptions and synchronises data when connectivity is restored. | Prevents network interruptions from stopping screening operations. |
+| **Security & Accountability** | Implements authentication, role-based access control (RBAC), input validation, audit logging, and secure data handling. | Protects participant information and improves accountability for system activities. |
+| **Automated Reporting** | Generates screening statistics and operational reports from centralised system data. | Reduces manual report consolidation and improves reporting efficiency. |
+| **Scalable Architecture** | Supports multiple users, screening stations, and participants operating concurrently. | Enables the system to support larger screening events without relying on manual processes. |
+
+### End-to-End Screening Workflow
+
+VSMS supports the screening process from participant registration through to reporting:
+
+**Participant Registration → QR Identification → Queue Management → Screening Stations → Result Recording → Review & Referral → Event Dashboard → Reporting**
+
+By integrating these activities into a single system, VSMS provides a more consistent and traceable workflow across screening stations. Staff can access the information required for their roles, while event administrators can monitor the overall progress of the screening programme.
+
+The system is also designed around the operational conditions of community screening programmes. In particular, its **offline-first capability** allows screening activities to continue when Internet connectivity is temporarily unavailable, while secure synchronisation allows locally captured information to be transferred when connectivity is restored.
+
+Overall, VSMS aims to transform the existing manual screening workflow into a **centralised, secure, and efficient digital process**. This enables organisations to reduce administrative workload, improve participant flow, maintain more accurate records, strengthen information security, and obtain timely operational insights from screening events.
+
+## 1.4 Key Benefits
+
+The implementation of VSMS provides several key benefits to organisations conducting community visual screening programmes:
+
+| Benefit | Description |
+|---|---|
+| **Improved Operational Efficiency** | Digitises manual registration, queue management, screening capture, and reporting processes, reducing administrative workload and unnecessary duplication. |
+| **Improved Data Accuracy** | Structured digital forms and input validation help reduce data-entry errors and maintain more consistent participant and screening records. |
+| **Better Participant Flow** | QR-based identification, centralised queues, and station transfers provide staff with better visibility of participant progress and help reduce unnecessary waiting. |
+| **Real-Time Operational Visibility** | Dashboards provide event administrators with up-to-date information about screening progress, queues, station workload, and completion rates. |
+| **Continued Operation During Connectivity Issues** | Offline-first functionality allows screening activities to continue during temporary network disruptions, with data synchronised when connectivity is restored. |
+| **Enhanced Security & Accountability** | Authentication, RBAC, input validation, audit logging, and secure data handling help protect participant information and provide traceability of system activities. |
+| **Faster Reporting & Decision-Making** | Centralised data enables automated statistics and reporting, allowing organisations to obtain operational insights without manually consolidating information from multiple sources. |
+| **Scalability** | The system is designed to support multiple screening stations, staff members, and participants, allowing it to accommodate larger screening events. |
+
+### Overall Value
+
+By combining these capabilities into a single platform, VSMS provides organisations with a more **efficient, secure, reliable, and scalable approach to managing visual screening programmes**. The system not only replaces manual processes with digital workflows but also provides the operational visibility and resilience required for real-world community screening environments.
+
+The proposed solution therefore directly addresses the key problems identified in Section 1.1 while fulfilling the organisational requirements described in Section 1.2.
 
 ## 2. Scope and evidence rules
 
