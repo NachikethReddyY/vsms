@@ -1,6 +1,5 @@
 import { XMarkIcon } from '@heroicons/react/24/outline';
 import { useEffect, useId, useRef, type ReactNode, type RefObject } from 'react';
-import './AppDialog.css';
 
 type AppDialogProps = {
   open: boolean;
@@ -71,7 +70,7 @@ export function AppDialog({
         </div>
         {dismissible && <button className="app-dialog-close -mt-2.5 -mr-2.5 grid size-11 shrink-0 cursor-pointer place-items-center rounded-lg border-0 bg-transparent p-0 text-[var(--ink-2)] transition-[background,color,transform] duration-150 hover:bg-[var(--surface-2)] hover:text-[var(--ink)] active:scale-[.97]" type="button" onClick={() => onOpenChange(false)} aria-label={`Close ${title}`}><XMarkIcon className="size-4.5" /></button>}
       </header>
-      <div className="app-dialog-content min-w-0 text-[0.8125rem] leading-5 text-[var(--ink-2)]">{children}</div>
+      <div className="app-dialog-content min-w-0 text-[0.8125rem] leading-5 text-[var(--ink-2)] [&>p]:m-0">{children}</div>
     </div>
   </dialog>;
 }

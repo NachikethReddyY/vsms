@@ -1,6 +1,7 @@
 import { ArrowPathIcon, EyeIcon, PencilSquareIcon, PlusIcon, UserGroupIcon } from '@heroicons/react/24/outline';
 import { useCallback, useEffect, useState, type FormEvent } from 'react';
 import { AppDialog } from '../components/AppDialog';
+import { appDialog } from '../components/appDialogStyles';
 import { AppToast } from '../components/AppToast';
 import type { AppUser } from '../types';
 import apiClient, { getApiError } from '../utils/apiClient';
@@ -193,14 +194,14 @@ export default function StaffAccountsPage() {
       dismissible={!saving}
       className="staff-account-dialog"
     >
-      <form className="app-dialog-form staff-account-form" onSubmit={submit}>
+      <form className={`${appDialog.form} staff-account-form`} onSubmit={submit}>
         <div className="staff-account-fields">
-        {formError && <p className="app-dialog-error" role="alert">{formError}</p>}
-        <label className="app-dialog-field"><span>Full name</span><input required autoComplete="name" value={draft.fullName} onChange={(event) => setDraft((current) => ({ ...current, fullName: event.target.value }))} /></label>
-        <label className="app-dialog-field"><span>Work email</span><input required type="email" autoComplete="email" disabled={Boolean(editing)} value={draft.email} onChange={(event) => setDraft((current) => ({ ...current, email: event.target.value }))} />{editing && <small className="app-dialog-help">Email is managed by the sign-in provider and cannot be changed here.</small>}</label>
+        {formError && <p className={appDialog.error} role="alert">{formError}</p>}
+        <label className={appDialog.field}><span>Full name</span><input required autoComplete="name" value={draft.fullName} onChange={(event) => setDraft((current) => ({ ...current, fullName: event.target.value }))} /></label>
+        <label className={appDialog.field}><span>Work email</span><input required type="email" autoComplete="email" disabled={Boolean(editing)} value={draft.email} onChange={(event) => setDraft((current) => ({ ...current, email: event.target.value }))} />{editing && <small className={appDialog.help}>Email is managed by the sign-in provider and cannot be changed here.</small>}</label>
         <div className="staff-account-form-grid">
-          <label className="app-dialog-field"><span>Department <small>Optional</small></span><input maxLength={100} value={draft.department} onChange={(event) => setDraft((current) => ({ ...current, department: event.target.value }))} /></label>
-          <label className="app-dialog-field"><span>Designation <small>Optional</small></span><input maxLength={100} value={draft.designation} onChange={(event) => setDraft((current) => ({ ...current, designation: event.target.value }))} /></label>
+          <label className={appDialog.field}><span>Department <small>Optional</small></span><input maxLength={100} value={draft.department} onChange={(event) => setDraft((current) => ({ ...current, department: event.target.value }))} /></label>
+          <label className={appDialog.field}><span>Designation <small>Optional</small></span><input maxLength={100} value={draft.designation} onChange={(event) => setDraft((current) => ({ ...current, designation: event.target.value }))} /></label>
         </div>
         {!editing && <fieldset className="staff-access-selector"><legend>Initial access</legend><div>
           <label><input type="radio" name="accessStatus" checked={draft.status === 'ACTIVE'} onChange={() => setDraft((current) => ({ ...current, status: 'ACTIVE' }))} /><span><strong>Active now</strong><small>Send the invitation and allow VSMS access immediately.</small></span></label>
@@ -208,7 +209,7 @@ export default function StaffAccountsPage() {
         </div></fieldset>}
         <fieldset className="staff-role-selector"><legend>Account type</legend><p>Choose the person’s organization-wide account type. Event duties are assigned inside each event.</p><div>{ROLE_OPTIONS.map((role) => <label key={role.value}><input type="radio" name="accountType" checked={draft.role === role.value} onChange={() => setDraft((current) => ({ ...current, role: role.value }))} /><span><strong>{role.label}</strong><small>{role.description}</small></span></label>)}</div></fieldset>
         </div>
-        <div className="app-dialog-actions"><button className="secondary" type="button" disabled={saving} onClick={() => closeDialog(false)}>Cancel</button><button className="primary" type="submit" disabled={saving}>{saving ? 'Saving…' : editing ? 'Save changes' : 'Create account'}</button></div>
+        <div className={appDialog.actions}><button className="secondary" type="button" disabled={saving} onClick={() => closeDialog(false)}>Cancel</button><button className="primary" type="submit" disabled={saving}>{saving ? 'Saving…' : editing ? 'Save changes' : 'Create account'}</button></div>
       </form>
     </AppDialog>
     <AppToast message={notice} onDismiss={() => setNotice('')} />
