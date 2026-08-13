@@ -17,7 +17,6 @@ const createParticipant = (label, creator, onboardingEventId = null) => prisma.p
     dateOfBirth: new Date("1980-01-01T00:00:00.000Z"),
     gender: "U",
     contactNumber: `+65${crypto.randomInt(1_000_0000, 9_999_9999)}`,
-    emergencyContact: "+6560002000",
     createdById: creator.id,
     updatedById: creator.id,
     onboardingEventId,

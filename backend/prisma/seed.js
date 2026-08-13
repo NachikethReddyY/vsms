@@ -538,7 +538,6 @@ async function upsertDemoParticipant(staff, {
       preferredLanguage: "English",
       accessibilityNotes,
       status: "ACTIVE",
-      emergencyContact: contactNumber,
       createdById: staff.id,
       updatedById: staff.id,
     },
@@ -600,7 +599,6 @@ async function ensureDemoRegistration(staff, participant, event) {
     update: {
       registrationStatus: "SIGNED_UP",
       participantDisplayName: `${participant.firstName} ${participant.lastName}`,
-      passToken: null,
     },
     create: {
       participantId: participant.id,
@@ -610,7 +608,6 @@ async function ensureDemoRegistration(staff, participant, event) {
       participantDisplayName: `${participant.firstName} ${participant.lastName}`,
       queueNumber: 1,
       idempotencyKey,
-      passToken: null,
     },
   });
   const history = await prisma.registrationStatusHistory.findFirst({

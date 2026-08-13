@@ -373,7 +373,6 @@ exports.createParticipantService = async (req) => {
                         ...participantData,
                         ...protectParticipantNric(participantId, nric),
                         participantReference: participantReference(),
-                        emergencyContact: data.contactNumber,
                         createdById: req.auth.userId,
                         updatedById: req.auth.userId,
                         onboardingEventId: req.registrationEventId,

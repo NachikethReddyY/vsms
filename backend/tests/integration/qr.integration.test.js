@@ -71,7 +71,6 @@ const fixture = async (label) => {
       dateOfBirth: new Date("1980-01-01T00:00:00.000Z"),
       gender: "U",
       contactNumber: "+6590000000",
-      emergencyContact: "+6590000001",
       createdById: user.id,
       updatedById: user.id,
       onboardingEventId: event.eventId,

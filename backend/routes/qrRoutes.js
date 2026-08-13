@@ -18,8 +18,14 @@ const {
 =======
 const { rateLimit } = require("../middlewares/rateLimiter");
 const { hashToken } = require("../utils/crypto/qrToken");
-const { tokenBody, tokenParams } = require("../schemas/qrSchemas");
->>>>>>> 40e42f8bd667cfae3262d148de139e8e755a00d5
+const {
+  tokenBody,
+  tokenParams,
+  registrationParams,
+  qrPassParams,
+  revokeBody,
+  manualCheckInBody,
+} = require("../schemas/qrSchemas");
 
 // Import your production-grade idempotency middleware
 const checkIdempotency = require("../middlewares/idempotency");
@@ -75,9 +81,9 @@ router.post(
 
 // Registration desk / QR management: Generation, Reissuing, and Manual Check-ins
 // are fully protected against accidental double submission or network retries.
-router.post("/registrations/:registrationId", checkIdempotency.requireKey, checkIdempotency, validate({ params: registrationParams }), asyncHandler(qrController.generateRegistrationQR));
-router.post("/generate/:registrationId", checkIdempotency.requireKey, checkIdempotency, validate({ params: registrationParams }), asyncHandler(qrController.generateQR));
-router.post("/reissue/:registrationId", checkIdempotency.requireKey, checkIdempotency, validate({ params: registrationParams }), asyncHandler(qrController.reissueQR));
+router.post("/registrations/:registrationId", checkIdempotency, asyncHandler(qrController.generateRegistrationQR));
+router.post("/generate/:registrationId", checkIdempotency, asyncHandler(qrController.generateQR));
+router.post("/reissue/:registrationId", checkIdempotency, asyncHandler(qrController.reissueQR));
 
 // Attendance (desk)
 router.post("/manual-checkin", checkIdempotency.requireKey, checkIdempotency, validate({ body: manualCheckInBody }), asyncHandler(qrController.manualCheckIn));

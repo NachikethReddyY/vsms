@@ -8889,7 +8889,6 @@ item:
                 "participantDisplayName": "",
                 "queueNumber": 0,
                 "status": "SIGNED_UP",
-                "passToken": "",
                 "existingResult": {}
               }
             ]
@@ -8988,8 +8987,7 @@ item:
             "registrationId": "00000000-0000-4000-8000-000000000000",
             "participantDisplayName": "",
             "queueNumber": 0,
-            "status": "SIGNED_UP",
-            "passToken": ""
+            "status": "SIGNED_UP"
           }
       - name: 401 Response
         originalRequest:
@@ -15866,7 +15864,11 @@ item:
     event: []
     request:
       method: POST
-      header: []
+      header:
+        - key: Idempotency-Key
+          value: ''
+          description: ''
+          type: text
       auth:
         type: bearer
         bearer:
@@ -15886,7 +15888,11 @@ item:
       - name: 201 Response
         originalRequest:
           method: POST
-          header: []
+          header:
+            - key: Idempotency-Key
+              value: ''
+              description: ''
+              type: text
           url: '{{baseUrl}}/qr/registrations/{registrationId}'
         status: Created
         code: 201
@@ -15904,7 +15910,11 @@ item:
       - name: 401 Response
         originalRequest:
           method: POST
-          header: []
+          header:
+            - key: Idempotency-Key
+              value: ''
+              description: ''
+              type: text
           url: '{{baseUrl}}/qr/registrations/{registrationId}'
         status: Unauthorized
         code: 401
@@ -15928,7 +15938,11 @@ item:
       - name: 404 Response
         originalRequest:
           method: POST
-          header: []
+          header:
+            - key: Idempotency-Key
+              value: ''
+              description: ''
+              type: text
           url: '{{baseUrl}}/qr/registrations/{registrationId}'
         status: Not Found
         code: 404
@@ -15954,7 +15968,11 @@ item:
     event: []
     request:
       method: POST
-      header: []
+      header:
+        - key: Idempotency-Key
+          value: ''
+          description: ''
+          type: text
       auth:
         type: bearer
         bearer:
@@ -15974,7 +15992,11 @@ item:
       - name: 201 Response
         originalRequest:
           method: POST
-          header: []
+          header:
+            - key: Idempotency-Key
+              value: ''
+              description: ''
+              type: text
           url: '{{baseUrl}}/qr/generate/{registrationId}'
         status: Created
         code: 201
@@ -15996,7 +16018,11 @@ item:
       - name: 401 Response
         originalRequest:
           method: POST
-          header: []
+          header:
+            - key: Idempotency-Key
+              value: ''
+              description: ''
+              type: text
           url: '{{baseUrl}}/qr/generate/{registrationId}'
         status: Unauthorized
         code: 401
@@ -16020,7 +16046,11 @@ item:
       - name: 404 Response
         originalRequest:
           method: POST
-          header: []
+          header:
+            - key: Idempotency-Key
+              value: ''
+              description: ''
+              type: text
           url: '{{baseUrl}}/qr/generate/{registrationId}'
         status: Not Found
         code: 404
@@ -16046,7 +16076,11 @@ item:
     event: []
     request:
       method: POST
-      header: []
+      header:
+        - key: Idempotency-Key
+          value: ''
+          description: ''
+          type: text
       auth:
         type: bearer
         bearer:
@@ -16066,7 +16100,11 @@ item:
       - name: 201 Response
         originalRequest:
           method: POST
-          header: []
+          header:
+            - key: Idempotency-Key
+              value: ''
+              description: ''
+              type: text
           url: '{{baseUrl}}/qr/reissue/{registrationId}'
         status: Created
         code: 201
@@ -16088,7 +16126,11 @@ item:
       - name: 401 Response
         originalRequest:
           method: POST
-          header: []
+          header:
+            - key: Idempotency-Key
+              value: ''
+              description: ''
+              type: text
           url: '{{baseUrl}}/qr/reissue/{registrationId}'
         status: Unauthorized
         code: 401
@@ -16112,7 +16154,11 @@ item:
       - name: 404 Response
         originalRequest:
           method: POST
-          header: []
+          header:
+            - key: Idempotency-Key
+              value: ''
+              description: ''
+              type: text
           url: '{{baseUrl}}/qr/reissue/{registrationId}'
         status: Not Found
         code: 404
@@ -16341,6 +16387,10 @@ item:
           value: application/json
           description: JSON request body
           type: text
+        - key: Idempotency-Key
+          value: ''
+          description: ''
+          type: text
       auth:
         type: bearer
         bearer:
@@ -16373,6 +16423,10 @@ item:
             - key: Content-Type
               value: application/json
               description: JSON request body
+              type: text
+            - key: Idempotency-Key
+              value: ''
+              description: ''
               type: text
           url: '{{baseUrl}}/qr/manual-checkin'
         status: OK
@@ -16421,6 +16475,10 @@ item:
               value: application/json
               description: JSON request body
               type: text
+            - key: Idempotency-Key
+              value: ''
+              description: ''
+              type: text
           url: '{{baseUrl}}/qr/manual-checkin'
         status: Bad Request
         code: 400
@@ -16448,6 +16506,10 @@ item:
             - key: Content-Type
               value: application/json
               description: JSON request body
+              type: text
+            - key: Idempotency-Key
+              value: ''
+              description: ''
               type: text
           url: '{{baseUrl}}/qr/manual-checkin'
         status: Unauthorized
@@ -16873,6 +16935,10 @@ item:
           value: application/json
           description: JSON request body
           type: text
+        - key: Idempotency-Key
+          value: ''
+          description: ''
+          type: text
       auth:
         type: bearer
         bearer:
@@ -16906,6 +16972,10 @@ item:
               value: application/json
               description: JSON request body
               type: text
+            - key: Idempotency-Key
+              value: ''
+              description: ''
+              type: text
           url: '{{baseUrl}}/qr/revoke/{qrId}'
         status: OK
         code: 200
@@ -16935,6 +17005,10 @@ item:
               value: application/json
               description: JSON request body
               type: text
+            - key: Idempotency-Key
+              value: ''
+              description: ''
+              type: text
           url: '{{baseUrl}}/qr/revoke/{qrId}'
         status: Bad Request
         code: 400
@@ -16962,6 +17036,10 @@ item:
             - key: Content-Type
               value: application/json
               description: JSON request body
+              type: text
+            - key: Idempotency-Key
+              value: ''
+              description: ''
               type: text
           url: '{{baseUrl}}/qr/revoke/{qrId}'
         status: Unauthorized

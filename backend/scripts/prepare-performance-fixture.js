@@ -177,7 +177,6 @@ async function main() {
         dateOfBirth: new Date("1980-01-01T00:00:00.000Z"),
         gender: "U",
         contactNumber: `+658${String(index).padStart(7, "0")}`,
-        emergencyContact: `+659${String(index).padStart(7, "0")}`,
         createdById: actor.id,
         updatedById: actor.id,
         onboardingEventId: event.eventId,
