@@ -13,11 +13,11 @@ This is an evidence-based readiness estimate, not a guaranteed client grade. It 
 | Database design (NoSQL) | 5 | 4.0 | The DynamoDB alternative now specifies access patterns, keys, consistency, capacity and security, with a reasoned decision to retain PostgreSQL for clinical transactions. It is a design exercise rather than a deployed secondary datastore. |
 | API design | 10 | 9.0 | Versioned OpenAPI, generated TypeScript parity, strict validation, RBAC, idempotency and documented error contracts are checked in CI. |
 | Security design | 20 | 18.0 | The OWASP Top 10:2025 matrix links every category to controls and repeatable checks. This demonstrates control coverage, not formal OWASP certification or a completed independent penetration test. |
-| Implementation | 20 | 19.0 | The complete journey now includes four configurable screening stations, queue progression, clinical review, referrals, reporting and offline synchronization. |
-| Testing | 10 | 9.5 | Docker validation passed 427 backend tests, 77 database integration/security tests, 92 frontend tests, 26 availability tests, schema migration, OpenAPI/client parity, builds and audits. Live Cognito/browser evidence must be recaptured for the final deployed revision. |
+| Implementation | 20 | 19.5 | The complete journey includes four configurable screening stations, queue progression, clinical review, referrals, reporting and offline synchronization. Four documented registration routines now enforce capacity, waitlist, QR revocation, check-in and aggregate invariants at the database boundary. |
+| Testing | 10 | 9.5 | Docker validation passed 427 backend tests, 79 database integration/security tests, 92 frontend tests, 27 availability tests, schema migration, OpenAPI/client parity, builds and audits. Live Cognito/browser evidence must be recaptured for the final deployed revision. |
 | Bonus features | 10 | 8.5 | Encrypted offline PWA capture, safe synchronization, immutable audit history, QR lifecycle controls, performance fixtures and availability infrastructure provide meaningful extension beyond CRUD. |
 | Presentation and Q&A | 10 | 9.0 | The demonstration deck now matches the four-station product and includes an evidence scorecard. Q&A should be rehearsed around residual risk, offline conflict handling and why PostgreSQL was selected over DynamoDB. |
-| **Projected total** | **100** | **90.5** | **High-distinction readiness if the live evidence and operational measurements are presented honestly.** |
+| **Projected total** | **100** | **91.0** | **High-distinction readiness if the live evidence and operational measurements are presented honestly.** |
 
 ## Implemented in this improvement
 
@@ -30,6 +30,7 @@ This is an evidence-based readiness estimate, not a guaranteed client grade. It 
 7. Expanded the NoSQL design into a defensible DynamoDB model and documented why the transactional clinical system remains on PostgreSQL.
 8. Updated acceptance evidence, report content and the demonstration deck so claims match implemented behavior.
 9. Made the availability infrastructure tests portable across LF and CRLF checkouts.
+10. Hardened the four registration stored routines, moved QR revocation into database-owned cancellation, and added fresh-database concurrency plus PostgreSQL catalog evidence.
 
 ## Evidence that must still be collected
 

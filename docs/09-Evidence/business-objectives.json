@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "requirements": [
     { "id": "BR-01", "status": "IMPLEMENTED", "evidence": ["docs/04-Security/secure_coding/api-requirement-map.md", "backend/services/event/eventService.js"] },
-    { "id": "BR-02", "status": "IMPLEMENTED", "evidence": ["backend/services/participant/registrationService.js", "backend/services/participant/qrService.js"] },
+    { "id": "BR-02", "status": "AUTOMATED_PROOF", "evidence": ["backend/docs/registration-stored-routines.md", "backend/tests/integration/registration-routines.integration.test.js"] },
     { "id": "BR-03", "status": "IMPLEMENTED", "evidence": ["backend/services/screening/queueService.js", "react-user-dashboard/src/features/operations/OperationsCenterPage.tsx"] },
     { "id": "BR-04", "status": "IMPLEMENTED", "evidence": ["backend/services/screening/screeningService.js", "react-user-dashboard/src/features/screening/EyeHealthStationPage.tsx"] },
     { "id": "BR-05", "status": "AUTOMATED_PROOF", "evidence": ["backend/services/screening/syncService.js", "react-user-dashboard/src/features/screening/offlineSync.test.ts"] },
