@@ -8889,7 +8889,6 @@ item:
                 "participantDisplayName": "",
                 "queueNumber": 0,
                 "status": "SIGNED_UP",
-                "passToken": "",
                 "existingResult": {}
               }
             ]
@@ -8988,8 +8987,7 @@ item:
             "registrationId": "00000000-0000-4000-8000-000000000000",
             "participantDisplayName": "",
             "queueNumber": 0,
-            "status": "SIGNED_UP",
-            "passToken": ""
+            "status": "SIGNED_UP"
           }
       - name: 401 Response
         originalRequest:

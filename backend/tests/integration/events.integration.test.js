@@ -432,7 +432,6 @@ describe("event lifecycle", () => {
           dateOfBirth: new Date("1980-01-01T00:00:00.000Z"),
           gender: "U",
           contactNumber: `+65 6000 10${String(index).padStart(2, "0")}`,
-          emergencyContact: "+65 6000 2000",
           createdById: staff.id,
           updatedById: staff.id,
         },

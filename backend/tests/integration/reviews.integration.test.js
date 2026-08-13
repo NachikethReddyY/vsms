@@ -42,7 +42,6 @@ const createRegistration = async (label, queueNumber, resultFlags) => {
       dateOfBirth: new Date("1970-01-01T00:00:00.000Z"),
       gender: "F",
       contactNumber: "+65 6000 1000",
-      emergencyContact: "+65 6000 1001",
       createdById: testUsers.manager.id,
       updatedById: testUsers.manager.id,
       onboardingEventId: eventId,

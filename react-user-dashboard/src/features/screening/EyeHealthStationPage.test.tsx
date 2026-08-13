@@ -104,7 +104,6 @@ const registration = {
   participantDisplayName: 'Ada Lovelace',
   queueNumber: 7,
   status: 'CHECKED_IN',
-  passToken: null,
   existingResult: null,
 };
 const secondRegistration = {
