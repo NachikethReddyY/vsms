@@ -65,8 +65,8 @@ router.post(
   asyncHandler(qrController.verifyQR)
 );
 
-// Registration desk / QR management: Generation, Reissuing, and Manual Check-ins
-// are fully protected against accidental double submission or network retries.
+// Registration desk mutations require retry keys. Redis replays completed
+// requests when available; database transactions preserve lifecycle invariants.
 router.post("/registrations/:registrationId", checkIdempotency.requireKey, checkIdempotency, validate({ params: registrationParams }), asyncHandler(qrController.generateRegistrationQR));
 router.post("/generate/:registrationId", checkIdempotency.requireKey, checkIdempotency, validate({ params: registrationParams }), asyncHandler(qrController.generateQR));
 router.post("/reissue/:registrationId", checkIdempotency.requireKey, checkIdempotency, validate({ params: registrationParams }), asyncHandler(qrController.reissueQR));

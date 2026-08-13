@@ -1796,7 +1796,7 @@ paths:
       tags: [QR Codes]
       operationId: generateRegistrationQrCode
       summary: Generate a safe QR pass for a registration
-      parameters: [{ $ref: "#/components/parameters/RegistrationId" }]
+      parameters: [{ $ref: "#/components/parameters/RegistrationId" }, { $ref: "#/components/parameters/IdempotencyKey" }]
       responses:
         "201": { description: QR pass generated, content: { application/json: { schema: { $ref: "#/components/schemas/QrPass" } } } }
         "401": { $ref: "#/components/responses/Unauthorized" }
@@ -1808,7 +1808,7 @@ paths:
       tags: [QR Codes]
       operationId: generateQrCode
       summary: Generate a QR pass using the legacy response envelope
-      parameters: [{ $ref: "#/components/parameters/RegistrationId" }]
+      parameters: [{ $ref: "#/components/parameters/RegistrationId" }, { $ref: "#/components/parameters/IdempotencyKey" }]
       responses:
         "201": { description: QR pass generated, content: { application/json: { schema: { $ref: "#/components/schemas/QrMutationResponse" } } } }
         "401": { $ref: "#/components/responses/Unauthorized" }
@@ -1820,7 +1820,7 @@ paths:
       tags: [QR Codes]
       operationId: reissueQrCode
       summary: Revoke the active pass and issue a replacement
-      parameters: [{ $ref: "#/components/parameters/RegistrationId" }]
+      parameters: [{ $ref: "#/components/parameters/RegistrationId" }, { $ref: "#/components/parameters/IdempotencyKey" }]
       responses:
         "201": { description: QR pass reissued, content: { application/json: { schema: { $ref: "#/components/schemas/QrMutationResponse" } } } }
         "401": { $ref: "#/components/responses/Unauthorized" }
@@ -1871,6 +1871,7 @@ paths:
       tags: [QR Codes]
       operationId: manualQrCheckIn
       summary: Check in a participant using a registration reference or QR token
+      parameters: [{ $ref: "#/components/parameters/IdempotencyKey" }]
       requestBody: { required: true, content: { application/json: { schema: { $ref: "#/components/schemas/ManualCheckInRequest" } } } }
       responses:
         "200": { description: Participant checked in, content: { application/json: { schema: { $ref: "#/components/schemas/ManualCheckInResponse" } } } }
@@ -1951,17 +1952,15 @@ paths:
       tags: [QR Codes]
       operationId: revokeQrCode
       summary: Revoke a QR pass
-      parameters: [{ $ref: "#/components/parameters/QrId" }]
+      parameters: [{ $ref: "#/components/parameters/QrId" }, { $ref: "#/components/parameters/IdempotencyKey" }]
       requestBody:
-        required: true
         content:
           application/json:
             schema:
               type: object
               additionalProperties: false
-              required: [revokedReason]
               properties:
-                revokedReason: { type: string, minLength: 1, maxLength: 255 }
+                revokedReason: { type: string, minLength: 3, maxLength: 255 }
       responses:
         "200": { description: QR pass revoked, content: { application/json: { schema: { $ref: "#/components/schemas/QrRevokeResponse" } } } }
         "400": { $ref: "#/components/responses/ValidationFailed" }
