@@ -19,6 +19,7 @@ const userSelect = {
   status: true,
   approvalState: true,
   accessState: true,
+  deprovisionedAt: true,
   sysRole: true,
   createdAt: true,
   userRoles: { select: { role: { select: { id: true, roleName: true } } } },
@@ -84,6 +85,7 @@ async function writeAudit(tx, { actorId, action, accountId, before = null, after
 
 exports.getAllUsers = async () => {
   const users = await prisma.user.findMany({
+    where: { deprovisionedAt: null },
     select: userSelect,
     orderBy: [{ fullName: "asc" }, { id: "asc" }],
   });

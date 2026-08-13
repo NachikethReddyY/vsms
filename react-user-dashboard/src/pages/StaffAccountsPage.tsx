@@ -1,4 +1,4 @@
-import { ArrowPathIcon, EyeIcon, PencilSquareIcon, PlusIcon, UserGroupIcon } from '@heroicons/react/24/outline';
+import { ArrowPathIcon, EyeIcon, PencilSquareIcon, PlusIcon, TrashIcon, UserGroupIcon } from '@heroicons/react/24/outline';
 import { useCallback, useEffect, useState, type FormEvent } from 'react';
 import { AppDialog } from '../components/AppDialog';
 import { appDialog } from '../components/appDialogStyles';
@@ -137,6 +137,21 @@ export default function StaffAccountsPage() {
       setReactivatingId(null);
     }
   };
+  const deleteAccount = async () => {
+    if (!editing || !window.confirm(`Delete ${editing.fullName}'s staff account? They will immediately lose access and disappear from the staff directory.`)) return;
+    setSaving(true);
+    setFormError('');
+    try {
+      await apiClient.post(`/admin/accounts/${editing.id}/deprovision`, { reason: 'Deleted from the staff directory by an administrator' });
+      setStaff((current) => current.filter((member) => member.id !== editing.id));
+      setDialogOpen(false);
+      setNotice('Staff account deleted and access revoked.');
+    } catch (cause) {
+      setFormError(getApiError(cause, 'Staff account could not be deleted.'));
+    } finally {
+      setSaving(false);
+    }
+  };
   const activeCount = staff.filter((member) => member.status === 'ACTIVE').length;
 
   return <div className="page-frame staff-accounts-page">
@@ -209,7 +224,7 @@ export default function StaffAccountsPage() {
         </div></fieldset>}
         <fieldset className="staff-role-selector"><legend>Account type</legend><p>Choose the person’s organization-wide account type. Event duties are assigned inside each event.</p><div>{ROLE_OPTIONS.map((role) => <label key={role.value}><input type="radio" name="accountType" checked={draft.role === role.value} onChange={() => setDraft((current) => ({ ...current, role: role.value }))} /><span><strong>{role.label}</strong><small>{role.description}</small></span></label>)}</div></fieldset>
         </div>
-        <div className={appDialog.actions}><button className="secondary" type="button" disabled={saving} onClick={() => closeDialog(false)}>Cancel</button><button className="primary" type="submit" disabled={saving}>{saving ? 'Saving…' : editing ? 'Save changes' : 'Create account'}</button></div>
+        <div className={appDialog.actions}>{editing && <button className="danger staff-delete-account" type="button" disabled={saving} onClick={() => void deleteAccount()}><TrashIcon aria-hidden="true" />Delete account</button>}<button className="secondary" type="button" disabled={saving} onClick={() => closeDialog(false)}>Cancel</button><button className="primary" type="submit" disabled={saving}>{saving ? 'Saving…' : editing ? 'Save changes' : 'Create account'}</button></div>
       </form>
     </AppDialog>
     <AppToast message={notice} onDismiss={() => setNotice('')} />

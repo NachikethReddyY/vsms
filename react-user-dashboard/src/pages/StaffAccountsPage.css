@@ -31,3 +31,5 @@
 @media (max-width:760px) { .staff-accounts-header { align-items:flex-start; flex-direction:column; gap:16px; }.staff-accounts-actions { width:100%; justify-content:flex-start; }.staff-count { width:100%; }.staff-directory { margin-top:24px; }.staff-account-form-grid,.staff-access-selector>div,.staff-role-selector>div { grid-template-columns:1fr; }.staff-loading { grid-template-columns:1fr; gap:10px; }.staff-account-dialog,.staff-role-guide-dialog { width:calc(100vw - 24px); } }
 @media (max-width:520px) { .staff-accounts-actions .primary { width:100%; }.staff-role-guide-list { grid-template-columns:1fr; } }
 @media (prefers-reduced-motion:reduce) { .staff-table tbody tr { transition:none; }.staff-loading span,.staff-icon-button:disabled svg { animation:none; } }
+.staff-account-dialog .staff-delete-account { margin-right:auto; }
+.staff-account-dialog .staff-delete-account svg { width:18px; }
