@@ -361,9 +361,6 @@ svg.signature-pad:focus-visible { outline:3px solid var(--accent-tint); border-c
 [data-theme="dark"] .registration-page .bg-white { background-color:var(--surface)!important; color:var(--ink); }
 [data-theme="dark"] .registration-page .bg-slate-50 { background-color:var(--canvas-soft)!important; }
 [data-theme="dark"] .registration-page .border,[data-theme="dark"] .registration-page .border-slate-200,[data-theme="dark"] .registration-page .border-slate-300 { border-color:var(--hairline-strong)!important; }
-[data-theme="dark"] .registration-page .text-slate-400 { color:var(--muted-soft)!important; }
-[data-theme="dark"] .registration-page .text-slate-500,[data-theme="dark"] .registration-page .text-slate-600 { color:var(--muted)!important; }
-[data-theme="dark"] .registration-page .text-slate-700,[data-theme="dark"] .registration-page .text-slate-800 { color:var(--ink-2)!important; }
 [data-theme="dark"] .registration-page .bg-blue-50 { background-color:var(--accent-tint)!important; }
 [data-theme="dark"] .registration-page .text-blue-900 { color:var(--accent)!important; }
 [data-theme="dark"] .registration-page .bg-amber-50 { background-color:color-mix(in srgb,var(--amber) 12%,var(--surface))!important; }
