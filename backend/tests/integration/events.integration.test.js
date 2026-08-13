@@ -224,7 +224,16 @@ describe("event lifecycle", () => {
     expect(created.status).toBe(201);
     expect(created.body.status).toBe("DRAFT");
     expect(created.body.bannerKey).toBe("COMMUNITY_SCREENING");
-    expect(created.body.artworkDataUrl).toBe(artworkDataUrl);
+    expect(created.body.artworkDataUrl).toBe(
+      `/api/v1/events/${created.body.eventId}/artwork?v=${created.body.version}`,
+    );
+    const artwork = await request(app)
+      .get(created.body.artworkDataUrl)
+      .set("Authorization", `Bearer ${adminToken}`);
+    expect(artwork.status).toBe(200);
+    expect(artwork.headers["content-type"]).toMatch(/^image\/jpeg/);
+    expect(artwork.headers["cache-control"]).toContain("private");
+    expect(Buffer.from(artwork.body)).toEqual(Buffer.from("custom event artwork"));
     expect(created.body.shifts).toHaveLength(1);
     expect(await helpers.prisma.eventMembership.findFirst({
       where: { eventId: created.body.eventId, userId: administrator.id, status: "ACTIVE", roles: { some: { role: "EVENT_MANAGER" } } },
