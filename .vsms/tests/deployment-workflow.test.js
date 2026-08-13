@@ -21,6 +21,10 @@ test("release workflow builds once, attests, stages, and then seeks production a
   assert.match(release, /actions\/attest@[0-9a-f]{40}/);
   assert.match(release, /image_uri: \$\{\{ needs\.build\.outputs\.image_uri \}\}/g);
   assert.match(release, /production:[\s\S]*?needs: \[build, staging\]/);
+  assert.match(release, /docker compose --file backend\/docker-compose\.test\.yml up --detach --wait/);
+  assert.match(release, /pnpm --dir backend db:test:prepare/);
+  assert.match(release, /pnpm --dir backend test:integration/);
+  assert.match(release, /docker compose --file backend\/docker-compose\.test\.yml down --volumes/);
   assert.doesNotMatch(release, /aws-access-key-id|aws-secret-access-key/i);
 });
 
