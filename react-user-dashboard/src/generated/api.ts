@@ -3522,6 +3522,7 @@ export interface components {
             /** @enum {string} */
             stationType: "VISUAL_ACUITY" | "REFRACTION" | "COLOUR_VISION" | "EYE_HEALTH" | "CUSTOM";
             stationOrder: number;
+            fieldSchemaSnapshot: components["schemas"]["StationFieldDefinition"][] | null;
             result: components["schemas"]["ScreeningResultSummary"] | null;
         };
         ReviewReadiness: {

@@ -33,6 +33,20 @@ test("older clinical templates keep extra fields while upgrading medical keys", 
   assert.equal(schema.some((field) => field.key === "distanceMetres"), false);
 });
 
+test("current clinical templates keep the administrator field order", () => {
+  const schema = resolveCompatibleFieldSchema("VISUAL_ACUITY", [
+    { key: "notes", label: "Accommodation needed?", type: "text", required: false },
+    ...SYSTEM_FIELD_SCHEMAS.VISUAL_ACUITY,
+  ]);
+  assert.deepEqual(schema.map((field) => field.key), [
+    "notes",
+    "chartDistanceMetres",
+    "od",
+    "os",
+    "withUsualDistanceGlasses",
+  ]);
+});
+
 test("clinical validation keeps extra customized fields that Zod would strip", () => {
   const schema = [
     ...SYSTEM_FIELD_SCHEMAS.VISUAL_ACUITY,

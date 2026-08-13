@@ -1,23 +1,22 @@
 import { describe, expect, it } from 'vitest';
-import {
-  extraResultData,
-  resolveCompatibleFieldSchema,
-  SYSTEM_FIELD_SCHEMAS,
-} from './fieldSchema';
+import { orderedResultFields, resolveCompatibleFieldSchema, SYSTEM_FIELD_SCHEMAS } from './fieldSchema';
 
 describe('compatible station schemas', () => {
   it('opens a built-in station that has no snapshot yet', () => {
     expect(resolveCompatibleFieldSchema('VISUAL_ACUITY', null)).toEqual(SYSTEM_FIELD_SCHEMAS.VISUAL_ACUITY);
   });
 
-  it('keeps extra customized clinical fields for the reviewer', () => {
-    const extras = extraResultData('VISUAL_ACUITY', {
+  it('uses frozen administrator labels and order for reviewer fields', () => {
+    const fields = orderedResultFields([
+      { key: 'screenerComment', label: 'Accommodation needed?', type: 'text' },
+      { key: 'chartDistanceMetres', label: 'Testing distance', type: 'number' },
+    ], {
       chartDistanceMetres: 6,
-      od: { kind: 'FRACTION', denominator: 6 },
-      os: { kind: 'FRACTION', denominator: 6 },
-      withUsualDistanceGlasses: false,
       screenerComment: 'Participant needed extra time.',
     });
-    expect(extras).toEqual({ screenerComment: 'Participant needed extra time.' });
+    expect(fields.map(({ key, label }) => ({ key, label }))).toEqual([
+      { key: 'screenerComment', label: 'Accommodation needed?' },
+      { key: 'chartDistanceMetres', label: 'Testing distance' },
+    ]);
   });
 });

@@ -338,30 +338,29 @@ const upgradeClinicalSchema = (stationType, fields) => {
   if (!system) return fields;
   const aliases = LEGACY_CLINICAL_KEY_ALIASES[stationType] || {};
   const drop = LEGACY_CLINICAL_KEYS_TO_DROP[stationType] || new Set();
-  const extras = [];
-  const seenExtra = new Set();
+  const upgraded = [];
+  const seen = new Set();
   for (const field of fields) {
     const mappedKey = aliases[field.key] || field.key;
-    if (system.some((item) => item.key === mappedKey) || drop.has(field.key)) continue;
-    if (seenExtra.has(field.key)) continue;
-    seenExtra.add(field.key);
-    extras.push(field);
-  }
-  return [
-    ...system.map((required) => {
-      const existing = fields.find((field) => (aliases[field.key] || field.key) === required.key);
-      if (!existing) return required;
-      const options = required.options && existing.options?.length
-        ? [...new Set([...required.options, ...existing.options])]
+    const required = system.find((item) => item.key === mappedKey);
+    if (required) {
+      if (seen.has(required.key)) continue;
+      const options = required.options && field.options?.length
+        ? [...new Set([...required.options, ...field.options])]
         : required.options;
-      return {
+      upgraded.push({
         ...required,
-        label: existing.label || required.label,
+        label: field.label || required.label,
         ...(options ? { options } : {}),
-      };
-    }),
-    ...extras,
-  ];
+      });
+      seen.add(required.key);
+      continue;
+    }
+    if (drop.has(field.key) || seen.has(field.key)) continue;
+    upgraded.push(field);
+    seen.add(field.key);
+  }
+  return [...upgraded, ...system.filter((required) => !seen.has(required.key))];
 };
 
 const keepParseableFields = (fields) => {

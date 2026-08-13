@@ -36,7 +36,7 @@ import {
   removeStoredReferralIssue,
   writeStoredReferralIssue,
 } from './referralRecovery';
-import { extraResultData } from '../screening/fieldSchema';
+import { orderedResultFields } from '../screening/fieldSchema';
 import './ReviewWorkspacePage.css';
 
 type EyeHealthRisk = 'NONE' | 'SUSPECTED' | 'PRESENT' | 'NOT_ASSESSED';
@@ -102,11 +102,6 @@ const apiProblem = (error: unknown) => axios.isAxiosError(error)
   ? error.response?.data as { code?: string; title?: string; errors?: { field: string; message: string }[] } | undefined
   : undefined;
 
-const prettyKey = (key: string) => key
-  .replace(/([a-z])([A-Z])/g, '$1 $2')
-  .replace(/_/g, ' ')
-  .replace(/^\w/, (letter: string) => letter.toUpperCase());
-
 const displayValue = (value: unknown) => {
   if (value == null) return 'Not recorded';
   if (typeof value === 'boolean') return value ? 'Yes' : 'No';
@@ -132,71 +127,38 @@ function FlagBadge({ flag }: { flag: OverallFlag }) {
   return <span className={`review-flag flag-${flag.toLowerCase()}`}>{meta.icon}{meta.label}</span>;
 }
 
-function GenericResultData({ data }: { data: Record<string, unknown> }) {
+function GenericResultData({ station, data }: {
+  station: ReviewDetailResponse['stations'][number];
+  data: Record<string, unknown>;
+}) {
   return <dl className="result-data-fallback">
-    {Object.entries(data).map(([key, value]) => {
+    {orderedResultFields(station.fieldSchemaSnapshot, data).map(({ key, label, value }) => {
       const eyePair = value && typeof value === 'object' && !Array.isArray(value)
         ? value as Record<string, unknown>
         : null;
-      const displayed = eyePair && ('od' in eyePair || 'os' in eyePair)
+      let displayed = eyePair && ('od' in eyePair || 'os' in eyePair)
         ? `OD: ${displayValue(eyePair.od)} · OS: ${displayValue(eyePair.os)}`
         : displayValue(value);
-      return <div key={key}><dt>{prettyKey(key)}</dt><dd>{displayed}</dd></div>;
+      if (station.stationType === 'VISUAL_ACUITY' && (key === 'od' || key === 'os')) {
+        displayed = eyeReading(value, data.chartDistanceMetres);
+      } else if (station.stationType === 'VISUAL_ACUITY' && key === 'chartDistanceMetres') {
+        displayed = `${displayValue(value)} m`;
+      } else if (station.stationType === 'REFRACTION' && (key === 'od' || key === 'os')) {
+        const eye = value as { sphere?: number; cylinder?: number; axis?: number | null } | null;
+        displayed = eye?.sphere == null || eye.cylinder == null
+          ? '—'
+          : `${eye.sphere}/${eye.cylinder} x ${eye.axis ?? '—'}`;
+      } else if (station.stationType === 'COLOUR_VISION' && (key === 'odCorrect' || key === 'osCorrect')) {
+        displayed = `${displayValue(value)} / ${displayValue(data.platesPresented)}`;
+      }
+      return <div key={key}><dt>{label}</dt><dd>{displayed}</dd></div>;
     })}
   </dl>;
-}
-
-function ExtraResultData({ stationType, data }: { stationType: string; data: Record<string, unknown> }) {
-  const extras = extraResultData(stationType, data);
-  if (!Object.keys(extras).length) return null;
-  return <GenericResultData data={extras} />;
 }
 
 function ResultData({ station }: { station: ReviewDetailResponse['stations'][number] }) {
   const data = station.result?.resultData;
   if (!data) return <p className="review-missing-result">Awaiting result</p>;
-  if (station.stationType === 'VISUAL_ACUITY') {
-    return <>
-      <dl className="visual-acuity-result">
-        <div><dt>Right eye (OD)</dt><dd>{eyeReading(data.od, data.chartDistanceMetres)}</dd></div>
-        <div><dt>Left eye (OS)</dt><dd>{eyeReading(data.os, data.chartDistanceMetres)}</dd></div>
-        <div><dt>Chart distance</dt><dd>{displayValue(data.chartDistanceMetres)} m</dd></div>
-        <div><dt>Usual distance glasses</dt><dd>{displayValue(data.withUsualDistanceGlasses)}</dd></div>
-      </dl>
-      <ExtraResultData stationType={station.stationType} data={data} />
-    </>;
-  }
-  if (station.stationType === 'REFRACTION') {
-    const refraction = data as typeof data & {
-      od?: { sphere?: number; cylinder?: number; axis?: number | null };
-      os?: { sphere?: number; cylinder?: number; axis?: number | null };
-    };
-    const formatEye = (eye?: { sphere?: number; cylinder?: number; axis?: number | null }) => {
-      if (!eye || eye.sphere == null || eye.cylinder == null) return '—';
-      return `${eye.sphere}/${eye.cylinder} x ${eye.axis ?? '—'}`;
-    };
-    return <>
-      <dl className="visual-acuity-result">
-        <div><dt>Status</dt><dd>{displayValue(data.measurementStatus)}</dd></div>
-        <div><dt>Usual distance glasses</dt><dd>{displayValue(data.wearsDistanceGlasses)}</dd></div>
-        <div><dt>Right eye (OD)</dt><dd>{formatEye(refraction.od)}</dd></div>
-        <div><dt>Left eye (OS)</dt><dd>{formatEye(refraction.os)}</dd></div>
-        {data.notes ? <div><dt>Notes</dt><dd>{displayValue(data.notes)}</dd></div> : null}
-      </dl>
-      <ExtraResultData stationType={station.stationType} data={data} />
-    </>;
-  }
-  if (station.stationType === 'COLOUR_VISION') {
-    return <>
-      <dl className="visual-acuity-result">
-        <div><dt>Test kit</dt><dd>{displayValue(data.testKit)}</dd></div>
-        <div><dt>Plates presented</dt><dd>{displayValue(data.platesPresented)}</dd></div>
-        <div><dt>Right eye (OD)</dt><dd>{displayValue(data.odCorrect)} / {displayValue(data.platesPresented)}</dd></div>
-        <div><dt>Left eye (OS)</dt><dd>{displayValue(data.osCorrect)} / {displayValue(data.platesPresented)}</dd></div>
-      </dl>
-      <ExtraResultData stationType={station.stationType} data={data} />
-    </>;
-  }
   if (station.stationType === 'EYE_HEALTH') {
     const eyeHealth = data as typeof data & {
       cataractRisk?: EyeHealthRisk;
@@ -215,7 +177,7 @@ function ResultData({ station }: { station: ReviewDetailResponse['stations'][num
       {eyeHealth.deviceFindings && <div className="wide"><dt>Device findings</dt><dd>{eyeHealth.deviceFindings}</dd></div>}
     </dl>;
   }
-  return <GenericResultData data={data} />;
+  return <GenericResultData station={station} data={data} />;
 }
 
 function ParticipantReport({ detail }: { detail: ReviewDetailResponse }) {
