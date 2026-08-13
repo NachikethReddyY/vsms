@@ -2,7 +2,6 @@ const SUPPORTED_SCREENING_STATION_TYPES = Object.freeze([
   "VISUAL_ACUITY",
   "REFRACTION",
   "COLOUR_VISION",
-  "EYE_HEALTH",
   "CUSTOM",
 ]);
 
@@ -10,7 +9,6 @@ const CLINICAL_ONE_PER_EVENT_TYPES = Object.freeze([
   "VISUAL_ACUITY",
   "REFRACTION",
   "COLOUR_VISION",
-  "EYE_HEALTH",
 ]);
 
 const stationTypeForTemplate = (template) => (

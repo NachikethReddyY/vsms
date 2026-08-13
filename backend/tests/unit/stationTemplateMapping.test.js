@@ -10,7 +10,6 @@ test("supported screening station types match StationType enum", () => {
   assert.deepEqual([...SUPPORTED_SCREENING_STATION_TYPES].sort(), [
     "COLOUR_VISION",
     "CUSTOM",
-    "EYE_HEALTH",
     "REFRACTION",
     "VISUAL_ACUITY",
   ]);
@@ -19,10 +18,10 @@ test("supported screening station types match StationType enum", () => {
   }
 });
 
-test("templates without stationType stay catalog-only", () => {
+test("legacy templates without stationType stay catalog-only", () => {
   assert.equal(stationTypeForTemplate({ templateKey: "REGISTRATION", stationType: null }), null);
   assert.equal(stationTypeForTemplate({ templateKey: "CLINICAL_REVIEW" }), null);
-  assert.equal(stationTypeForTemplate({ templateKey: "EYE_HEALTH", stationType: "EYE_HEALTH" }), "EYE_HEALTH");
+  assert.equal(stationTypeForTemplate({ templateKey: "EYE_HEALTH", stationType: "EYE_HEALTH" }), null);
 });
 
 test("classifyTemplates separates importable and skipped templates", () => {
@@ -104,6 +103,6 @@ test("isTemplateAvailableForEvent allows a second distinct CUSTOM template", () 
   );
   assert.equal(
     isTemplateAvailableForEvent({ stationType: "EYE_HEALTH", stationTemplateId: "eh" }, stations),
-    true,
+    false,
   );
 });

@@ -66,12 +66,11 @@ const stationTemplates = [
   {
     stationTemplateId: "60000000-0000-4000-8000-000000000003",
     templateKey: "EYE_HEALTH",
-    stationType: "EYE_HEALTH",
     version: 1,
     name: "Eye health",
-    description: "Record eye-health observations and screening flags.",
+    description: "Catalog reference for clinician review observations. Not a screener station — doctors record eye-health notes during clinical review from other station results.",
     defaultCapacity: 2,
-    fieldSchema: SYSTEM_FIELD_SCHEMAS.EYE_HEALTH,
+    fieldSchema: null,
   },
   {
     stationTemplateId: "60000000-0000-4000-8000-000000000004",
@@ -455,7 +454,6 @@ async function seedEventStructure(event, staff, registrationOfficer) {
     ["VISUAL_ACUITY", "Visual acuity", 1],
     ["REFRACTION", "Refraction", 2],
     ["COLOUR_VISION", "Colour vision", 3],
-    ["EYE_HEALTH", "Eye health", 4],
   ];
   const stations = [];
   for (const [stationType, stationName, stationOrder] of stationDefinitions) {
@@ -486,6 +484,13 @@ async function seedEventStructure(event, staff, registrationOfficer) {
         },
       }));
   }
+  // Eye health is clinician-review only — deactivate any leftover screener stations.
+  await prisma.station.updateMany({
+    where: { eventId: event.eventId, stationType: "EYE_HEALTH", isActive: true },
+    data: { isActive: false },
+  });
+
+
   await prisma.staffAssignment.deleteMany({
     where: { eventId: event.eventId, userId: staff.id, assignmentRole: "REGISTRATION" },
   });
