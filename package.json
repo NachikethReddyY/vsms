@@ -13,7 +13,8 @@
     "check:api-collection": "node scripts/check-api-collection.cjs",
     "check:https": "node scripts/check-local-https.mjs",
     "check:submission-package": "node scripts/check-submission-package.cjs",
-    "package:submission": "node scripts/package-submission.cjs"
+    "package:submission": "node scripts/package-submission.cjs",
+    "package:final-submission": "node scripts/package-final-submission.cjs"
   },
   "repository": {
     "type": "git",

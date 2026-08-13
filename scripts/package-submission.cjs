@@ -43,9 +43,11 @@ const REQUIRED_FILES = [
   "docs/secure_coding/report.md",
   "docs/secure_coding/api-requirement-map.md",
   "docs/secure_coding/demo-outline.md",
+  "docs/secure_coding/final-submission.md",
   "docs/secure_coding/diagrams/ComponentDiagram.md",
   "docs/secure_coding/diagrams/ContextDiagram.md",
   "docs/secure_coding/diagrams/OfflineSynchronization.md",
+  "docs/secure_coding/diagrams/NoSQLDesign.md",
   "docs/secure_coding/diagrams/PostgreSQL_ERD_Design.md",
   "docs/secure_coding/diagrams/RelationalAccessComparison.md",
   "docs/secure_coding/diagrams/SecureApiDesign.md",
@@ -56,6 +58,7 @@ const REQUIRED_FILES = [
   "docs/ai-transcripts/DECLARATION_TEMPLATE.md",
   "docs/ai-transcripts/EXTERNAL_AI_CHAT_LINKS.md",
   "scripts/check-submission-package.cjs",
+  "scripts/package-final-submission.cjs",
   "scripts/package-submission.cjs",
 ];
 
@@ -70,6 +73,7 @@ function shouldInclude(file) {
   if (EXCLUDED_DRAFT_DOCUMENTS.has(name)) return false;
   if (name.startsWith("docs/ai-transcripts/")) return false;
   if (name.startsWith("docs/images/")) return SOURCE_BRIEF_FILES.has(name);
+  if (name.startsWith("docs/secure_coding/final/")) return false;
   if (name === "amplify.yml" || base === "bun.lock") return false;
   if (/(^|\/)\.(?:git|agents|codex|claude|impeccable)(?:\/|$)/.test(name)) return false;
   if (/(^|\/)node_modules(?:\/|$)/.test(name)) return false;
