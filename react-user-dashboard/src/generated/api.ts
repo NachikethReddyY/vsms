@@ -2551,6 +2551,7 @@ export interface components {
             version: number;
             stationOrder?: number;
             capacity?: number;
+            availabilities?: components["schemas"]["StationAvailabilityInput"][];
             isAvailable?: boolean;
             operationalStatus?: components["schemas"]["StationOperationalStatus"];
         };
@@ -2558,7 +2559,8 @@ export interface components {
         ScreenerStaffAssignmentRequest: {
             version: number;
             /** Format: uuid */
-            userId: string;
+            userId?: string;
+            userIds?: string[];
             /**
              * @description discriminator enum property added by openapi-typescript
              * @enum {string}
@@ -2570,7 +2572,8 @@ export interface components {
         GeneralStaffAssignmentRequest: {
             version: number;
             /** Format: uuid */
-            userId: string;
+            userId?: string;
+            userIds?: string[];
             /**
              * @description discriminator enum property added by openapi-typescript
              * @enum {string}
