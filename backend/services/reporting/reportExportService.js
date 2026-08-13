@@ -43,6 +43,35 @@ async function createReportJob(eventId, input, user, context, db = prisma, now =
   return serializeJob(job);
 }
 
+async function queueCompletedEventOverview(tx, event, requestedById, context, now = new Date()) {
+  const expiresAt = new Date(now.getTime() + expiryHours() * 60 * 60 * 1000);
+  const created = await tx.reportExportJob.create({
+    data: {
+      eventId: event.eventId,
+      requestedById,
+      dataset: "OVERVIEW",
+      format: "PDF",
+      filterSnapshot: {
+        from: event.startsAt.toISOString(),
+        to: event.endsAt.toISOString(),
+      },
+      requestedAt: now,
+      nextAttemptAt: now,
+      expiresAt,
+    },
+  });
+  await createAuditLog({
+    userId: requestedById,
+    action: "REPORT_EXPORT_QUEUED",
+    entityName: "ReportExportJob",
+    entityId: created.id,
+    newValue: { eventId: event.eventId, dataset: "OVERVIEW", format: "PDF", trigger: "EVENT_COMPLETED" },
+    context,
+    client: tx,
+  });
+  return created;
+}
+
 async function listReportJobs(eventId, query, user, db = prisma) {
   await requireCompletedReportAccess(eventId, user, db);
   const jobs = await db.reportExportJob.findMany({ where: { eventId, ...(query.status ? { status: query.status } : {}) }, include: { artifact: true }, orderBy: [{ requestedAt: "desc" }, { id: "desc" }], take: query.limit });
@@ -231,4 +260,4 @@ async function expireReportArtifacts({ db = prisma, now = new Date(), limit = 10
   return { inspected: artifacts.length, expired, failed, recovery, staleBlobs };
 }
 
-module.exports = { DEFAULT_LEASE_MS, claimNextReportJob, createReportJob, downloadReportArtifact, expireReportArtifacts, failureCode, getReportJob, listReportJobs, processClaimedJob, processNextReportJob, recoverExpiredReportJobs, renewReportLease, requireCompletedReportAccess, serializeJob };
+module.exports = { DEFAULT_LEASE_MS, claimNextReportJob, createReportJob, downloadReportArtifact, expireReportArtifacts, failureCode, getReportJob, listReportJobs, processClaimedJob, processNextReportJob, queueCompletedEventOverview, recoverExpiredReportJobs, renewReportLease, requireCompletedReportAccess, serializeJob };

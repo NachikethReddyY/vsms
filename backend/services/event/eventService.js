@@ -23,6 +23,7 @@ const { attendancePredicate, attendanceWhere } = require("./attendanceDefinition
 const { enqueueAccountLifecycle } = require("../account/accountLifecycleNotificationService");
 const domainEventBus = require("../domain/domainEventBus");
 const { assertRoleEligibility, eventVisibilityWhere, isAdministrator } = require("./eventAuthorizationService");
+const { queueCompletedEventOverview } = require("../reporting/reportExportService");
 
 const EVENT_FIELDS = [
   "name", "description", "bannerKey", "artworkDataUrl", "venue", "address", "postalCode",
@@ -1136,6 +1137,10 @@ const transitionEvent = async (eventId, command, body, user, correlationId, db =
       where: { eventId },
       include: eventInclude,
     });
+
+    if (command === "complete") {
+      await queueCompletedEventOverview(tx, updated, user.userId, correlationId);
+    }
 
     await createAuditLog({
       client: tx,
