@@ -864,7 +864,8 @@ export interface paths {
         get?: never;
         put?: never;
         post?: never;
-        delete?: never;
+        /** Remove an unused station from a draft or published event */
+        delete: operations["removeEventStation"];
         options?: never;
         head?: never;
         /** Configure an imported station's order, capacity, or availability */
@@ -6850,6 +6851,35 @@ export interface operations {
         responses: {
             /** @description Stations imported and audited */
             201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Event"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            422: components["responses"]["ValidationFailed"];
+        };
+    };
+    removeEventStation: {
+        parameters: {
+            query: {
+                version: number;
+            };
+            header?: never;
+            path: {
+                eventId: components["parameters"]["EventId"];
+                eventStationId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Station removed and remaining stations reordered */
+            200: {
                 headers: {
                     [name: string]: unknown;
                 };
