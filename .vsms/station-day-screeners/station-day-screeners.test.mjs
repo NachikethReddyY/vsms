@@ -12,4 +12,6 @@ test('station days assign only event members with the screener role', () => {
   assert.match(page, /station-person-tag/);
   assert.match(page, /addDayShift/);
   assert.match(page, /Add shift/);
+  assert.match(page, /deleteShift/);
+  assert.match(page, /Delete \$\{shift\.name\}/);
 });
