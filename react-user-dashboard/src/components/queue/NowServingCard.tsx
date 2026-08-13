@@ -25,9 +25,7 @@ export function NowServingCard({ nowServing, actionLoading, onNoShow }: NowServi
             )}
           </div>
           <div className="flex gap-2">
-            <span className="max-w-52 text-right text-xs text-[#6B6970]">
-              Save the screening result at the station tablet to complete this visit.
-            </span>
+            <span className="self-center text-xs text-[#6B6970]">Saving the station result advances the route.</span>
             <button
               type="button"
               disabled={actionLoading === nowServing.id}

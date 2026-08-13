@@ -6,7 +6,6 @@ import {
   EyeHealthRisk,
   FlagEvaluation,
   newIdempotencyKey,
-  QueueJourney,
   QueueRegistration,
   screeningApi,
   Station,
@@ -46,9 +45,6 @@ export default function EyeHealthStationPage() {
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
-  const [savedRegistrationId, setSavedRegistrationId] = useState<string | null>(null);
-  const [savedJourney, setSavedJourney] = useState<QueueJourney | null>(null);
-  const [savedOffline, setSavedOffline] = useState(false);
   const participantRequestGeneration = useRef(0);
 
   const selected = useMemo(
@@ -176,9 +172,6 @@ export default function EyeHealthStationPage() {
         : saved.isFlagged
           ? `Saved with ${saved.overallFlag} flag (${saved.ruleVersion ?? preview.ruleVersion}): ${saved.flagSummary}`
           : `Saved Eye Health result (${saved.overallFlag}, ${saved.ruleVersion ?? preview.ruleVersion}).`);
-      setSavedRegistrationId(registrationId);
-      setSavedJourney(saved.journey || null);
-      setSavedOffline(Boolean(saved.queued));
       setEvaluation(null);
       setAcknowledged(false);
       await load();
@@ -216,13 +209,7 @@ export default function EyeHealthStationPage() {
       error={error}
       success={success}
       handoff={(
-        <StationHandoffLinks
-          eventId={eventId}
-          currentStationType="EYE_HEALTH"
-          registrationId={savedRegistrationId || selectedId}
-          journey={savedJourney}
-          queuedOffline={savedOffline}
-        />
+        <RouteProgressionNotice eventId={eventId} />
       )}
     >
       <ParticipantLookup

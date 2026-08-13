@@ -6,7 +6,6 @@ import { getApiError as getApiMessage } from '../../utils/apiClient';
 import {
   EyeReading,
   FlagEvaluation,
-  QueueJourney,
   QueueRegistration,
   screeningApi,
   Station,
@@ -86,9 +85,6 @@ export default function VisualAcuityStationPage() {
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
-  const [savedRegistrationId, setSavedRegistrationId] = useState<string | null>(null);
-  const [savedJourney, setSavedJourney] = useState<QueueJourney | null>(null);
-  const [savedOffline, setSavedOffline] = useState(false);
 
   const selected = useMemo(
     () => queue.find((row) => row.registrationId === selectedId) || null,
@@ -170,9 +166,6 @@ export default function VisualAcuityStationPage() {
         : saved.isFlagged
           ? `Saved with ${saved.overallFlag} flag (${saved.ruleVersion ?? preview.ruleVersion}): ${saved.flagSummary}`
           : `Saved Visual Acuity result (${saved.overallFlag}, ${saved.ruleVersion ?? preview.ruleVersion}).`);
-      setSavedRegistrationId(selected.registrationId);
-      setSavedJourney(saved.journey || null);
-      setSavedOffline(Boolean(saved.queued));
       setEvaluation(null);
       setAcknowledged(false);
       await load();
@@ -215,13 +208,7 @@ export default function VisualAcuityStationPage() {
       {error && <p className="form-error" role="alert">{error}</p>}
       <AppToast message={success ?? ''} />
       {success && (
-        <StationHandoffLinks
-          eventId={eventId}
-          currentStationType="VISUAL_ACUITY"
-          registrationId={savedRegistrationId || selectedId}
-          journey={savedJourney}
-          queuedOffline={savedOffline}
-        />
+        <RouteProgressionNotice eventId={eventId} queued={success.startsWith('Pending sync')} />
       )}
 
       <ParticipantLookup

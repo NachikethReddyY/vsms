@@ -5,7 +5,6 @@ import {
   ColourVisionResultData,
   FlagEvaluation,
   newIdempotencyKey,
-  QueueJourney,
   QueueRegistration,
   screeningApi,
   Station,
@@ -37,9 +36,6 @@ export default function ColourVisionStationPage() {
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
-  const [savedRegistrationId, setSavedRegistrationId] = useState<string | null>(null);
-  const [savedJourney, setSavedJourney] = useState<QueueJourney | null>(null);
-  const [savedOffline, setSavedOffline] = useState(false);
 
   const selected = useMemo(
     () => queue.find((row) => row.registrationId === selectedId) || null,
@@ -124,9 +120,6 @@ export default function ColourVisionStationPage() {
         : saved.isFlagged
           ? `Saved with ${saved.overallFlag} flag (${saved.ruleVersion ?? preview.ruleVersion}): ${saved.flagSummary}`
           : `Saved Colour Vision result (${saved.overallFlag}, ${saved.ruleVersion ?? preview.ruleVersion}).`);
-      setSavedRegistrationId(selected.registrationId);
-      setSavedJourney(saved.journey || null);
-      setSavedOffline(Boolean(saved.queued));
       setEvaluation(null);
       setAcknowledged(false);
       await load();
@@ -161,13 +154,7 @@ export default function ColourVisionStationPage() {
       error={error}
       success={success}
       handoff={(
-        <StationHandoffLinks
-          eventId={eventId}
-          currentStationType="COLOUR_VISION"
-          registrationId={savedRegistrationId || selectedId}
-          journey={savedJourney}
-          queuedOffline={savedOffline}
-        />
+        <RouteProgressionNotice eventId={eventId} queued={Boolean(success?.startsWith('Pending sync'))} />
       )}
     >
       <ParticipantLookup

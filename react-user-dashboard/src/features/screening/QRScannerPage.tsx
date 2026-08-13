@@ -1,7 +1,8 @@
 import { FormEvent, useCallback, useEffect, useId, useRef, useState } from 'react';
-import { Link, useSearchParams } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import {
   ArrowPathIcon,
+  ArrowRightIcon,
   CameraIcon,
   CheckBadgeIcon,
   ExclamationTriangleIcon,
@@ -10,10 +11,14 @@ import {
   ShieldCheckIcon,
   VideoCameraIcon,
 } from '@heroicons/react/24/outline';
-import { getApiError as getApiMessage } from '../../utils/apiClient';
-import { startQrScanner } from './startQrScanner';
-import { extractQrToken, stationHandoffUrl, verifyQrToken } from './qrHandoff';
+import apiClient, { getApiError as getApiMessage } from '../../utils/apiClient';
+import { startQrScanner, type QrCamera } from './startQrScanner';
+import {
+  extractQrToken,
+  verifyQrToken,
+} from './qrHandoff';
 import type { QrVerifyResult } from './qrHandoff';
+import { customStationPath, stationPath } from './stationConfig';
 import './QRScannerPage.css';
 
 type ScanStatus = 'scanning' | 'verifying' | 'verified';
@@ -24,6 +29,7 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-
 type TrackCapabilitiesWithTorch = MediaTrackCapabilities & { advanced?: Array<Record<string, unknown>> };
 
 export default function QRScannerPage() {
+  const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const [rawInput, setRawInput] = useState(() => searchParams.get('token') || '');
   const [status, setStatus] = useState<ScanStatus>('scanning');
@@ -86,6 +92,14 @@ export default function QRScannerPage() {
   const onSubmit = (event: FormEvent) => {
     event.preventDefault();
     void runVerify(rawInput);
+  };
+
+  const goToStation = () => {
+    if (!verified || !activeAssignment) return;
+    const href = activeAssignment.stationType === 'CUSTOM'
+      ? customStationPath(verified.event.id, activeAssignment.stationId, verified.registrationId)
+      : stationPath(verified.event.id, activeAssignment.stationType as Parameters<typeof stationPath>[1], verified.registrationId);
+    if (href) navigate(href);
   };
 
   const resetScan = () => {
@@ -173,45 +187,12 @@ export default function QRScannerPage() {
               </dl>
 
               <div className="qr-station-picker">
-                {verified.journey.state === 'QUEUED' && verified.journey.assignedStation ? (
-                  <>
-                    <h3>Computer-assigned station</h3>
-                    <p>
-                      Send the participant to <strong>{verified.journey.assignedStation.stationName}</strong>.
-                      Their queue status is <strong>{verified.journey.activeEntry?.status.toLowerCase().replace(/_/g, ' ')}</strong>.
-                    </p>
-                    {stationHandoffUrl(
-                      verified.event.id,
-                      verified.registrationId,
-                      verified.journey.assignedStation.stationType,
-                    ) && (
-                      <Link
-                        className="primary"
-                        to={stationHandoffUrl(
-                          verified.event.id,
-                          verified.registrationId,
-                          verified.journey.assignedStation.stationType,
-                        )!}
-                      >
-                        Open {verified.journey.assignedStation.stationName} tablet
-                      </Link>
-                    )}
-                  </>
-                ) : verified.journey.state === 'COMPLETED' ? (
-                  <>
-                    <h3>Screening journey complete</h3>
-                    <p>All required screening stations have a saved result. No further station is assigned.</p>
-                  </>
-                ) : (
-                  <>
-                    <h3>Waiting for an available station</h3>
-                    <p>No remaining station is both available and staffed. Keep the participant in the holding area; the backend will assign a station on the next scan.</p>
-                  </>
-                )}
+                <h3>Current route destination</h3>
+                {activeAssignment ? <button type="button" className="primary" onClick={goToStation}><span>{activeAssignment.stationName}</span><ArrowRightIcon aria-hidden="true" /></button> : <p role="status">No active station is assigned. Open the event queue to resolve the route; do not send the participant to an arbitrary station.</p>}
               </div>
 
               <p className="qr-verified-note">
-                This remains the participant's only QR for the event. A station completes when its screener saves a valid result.
+                The assigned station opens pre-loaded with this registration — no re-scan needed.
               </p>
             </div>
           ) : (
@@ -319,7 +300,7 @@ function CameraScanPanel({
         scannerRef.current = scanner;
         const started = await startQrScanner(
           scanner,
-          { fps: 16, qrboxWidth: 320, qrboxHeight: 320 },
+          { fps: 10, qrboxWidth: 240, qrboxHeight: 240, deviceId: requestedCameraId },
           async (value) => {
             if (stopped || generation !== scannerGenerationRef.current || decoding) return;
             decoding = true;

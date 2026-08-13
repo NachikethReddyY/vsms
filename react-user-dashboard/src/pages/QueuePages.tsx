@@ -88,7 +88,7 @@ export function QueuePage() {
     }
   };
 
-const handleAction = (id: string, action: "CALLED" | "STARTED" | "COMPLETED" | "SKIPPED") => {
+  const handleAction = (id: string, action: "CALLED" | "STARTED" | "SKIPPED") => {
     if (!eventId) return;
     const runners: Record<string, () => Promise<unknown>> = {
       CALLED: () => queueApi.callQueueEntry(eventId, id),

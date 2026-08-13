@@ -4,7 +4,6 @@ import { getApiError as getApiMessage } from '../../utils/apiClient';
 import {
   FlagEvaluation,
   newIdempotencyKey,
-  QueueJourney,
   QueueRegistration,
   RefractionEye,
   RefractionResultData,
@@ -102,9 +101,6 @@ export default function RefractionStationPage() {
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
-  const [savedRegistrationId, setSavedRegistrationId] = useState<string | null>(null);
-  const [savedJourney, setSavedJourney] = useState<QueueJourney | null>(null);
-  const [savedOffline, setSavedOffline] = useState(false);
 
   const selected = useMemo(
     () => queue.find((row) => row.registrationId === selectedId) || null,
@@ -200,9 +196,6 @@ export default function RefractionStationPage() {
         : saved.isFlagged
           ? `Saved with ${saved.overallFlag} flag (${saved.ruleVersion ?? preview.ruleVersion}): ${saved.flagSummary}`
           : `Saved Refraction result (${saved.overallFlag}, ${saved.ruleVersion ?? preview.ruleVersion}).`);
-      setSavedRegistrationId(selected.registrationId);
-      setSavedJourney(saved.journey || null);
-      setSavedOffline(Boolean(saved.queued));
       setEvaluation(null);
       setAcknowledged(false);
       await load();
@@ -236,13 +229,7 @@ export default function RefractionStationPage() {
       error={error}
       success={success}
       handoff={(
-        <StationHandoffLinks
-          eventId={eventId}
-          currentStationType="REFRACTION"
-          registrationId={savedRegistrationId || selectedId}
-          journey={savedJourney}
-          queuedOffline={savedOffline}
-        />
+        <RouteProgressionNotice eventId={eventId} queued={Boolean(success?.startsWith('Pending sync'))} />
       )}
     >
       <ParticipantLookup

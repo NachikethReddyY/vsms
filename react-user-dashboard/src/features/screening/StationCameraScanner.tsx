@@ -63,7 +63,7 @@ export function StationCameraScanner({
         scannerRef.current = scanner;
         const started = await startQrScanner(
           scanner,
-          { fps: 16, qrboxWidth: 340, qrboxHeight: 340 },
+          { fps: 10, qrboxWidth: 260, qrboxHeight: 260, deviceId: requestedCameraId },
           async (value) => {
             if (stopped || generation !== scannerGenerationRef.current || resolvingRef.current) return;
             stopped = true;
