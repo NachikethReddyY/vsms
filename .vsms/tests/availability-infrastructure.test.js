@@ -4,8 +4,12 @@ const path = require("node:path");
 const test = require("node:test");
 
 const root = path.resolve(__dirname, "../..");
-const template = fs.readFileSync(path.join(root, "infrastructure/availability.yaml"), "utf8");
-const runbook = fs.readFileSync(path.join(root, "docs/07-Operations/availability-runbook.md"), "utf8");
+const readPortableText = (relativePath) => fs
+  .readFileSync(path.join(root, relativePath), "utf8")
+  .replace(/\r\n/g, "\n");
+
+const template = readPortableText("infrastructure/availability.yaml");
+const runbook = readPortableText("docs/07-Operations/availability-runbook.md");
 
 test("production infrastructure retains redundant replaceable services", () => {
   assert.match(template, /HealthCheckPath: \/health/);
