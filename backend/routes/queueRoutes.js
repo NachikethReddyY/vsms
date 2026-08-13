@@ -20,11 +20,6 @@ const {
   eventQueueEntryParams,
   participantParams,
   eventParticipantParams,
-  joinQueueBody,
-  queueHandoffBody,
-  transferQueueBody,
-  advanceQueueBody,
-  redirectQueueBody,
   priorityQueueBody,
   routeOverrideBody,
 } = require("../schemas/queueSchemas");
@@ -54,19 +49,6 @@ router.get(
   "/events/:eventId/participants/:registrationId/route",
   validate({ params: eventParticipantParams }),
   asyncHandler(queueController.getParticipantRoute),
-);
-
-/**
- * @route   POST /events/:eventId/stations/:stationId/redirect
- * @desc    Staff override: redirect a participant to a chosen station
- * @access  Screener, Event Manager, Administrator
- */
-router.post(
-  "/events/:eventId/stations/:stationId/redirect",
-  requireAnyRole("SCREENER", "EVENT_MANAGER", "ADMINISTRATOR"),
-  checkIdempotency,
-  validate({ params: stationParams, body: redirectQueueBody }),
-  asyncHandler(queueController.redirectQueueEntry),
 );
 
 router.get(

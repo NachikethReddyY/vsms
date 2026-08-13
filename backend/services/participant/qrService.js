@@ -7,10 +7,7 @@ const { assertUuid } = require("../../utils/validation/validation");
 const { hashToken, QR_TOKEN_PATTERN } = require("../../utils/crypto/qrToken");
 const { assertRegistrationAssignment, assertQrVerifyAccess } = require("../../utils/auth/staff");
 const AppError = require("../../errors/AppError");
-const {
-    ensureActiveQueue,
-    getCurrentJourney,
-} = require("../screening/queueAssignmentService");
+const { assignRouteOnce } = require("../screening/routeAssignmentService");
 
 function buildQRTargetUrl(token) {
     return `${env.publicAppOrigin}/participant-status/${encodeURIComponent(token)}`;
@@ -258,18 +255,21 @@ exports.generateQR = async (registrationId, userId = null, externalTx = null, au
             where: activeQrWhere({ registrationId }, now),
             orderBy: { issuedAt: "desc" },
         });
-        // A participant keeps one active pass for the entire event journey.
-        // Rotation is an explicit revoke/reissue operation for a lost or compromised pass.
-        if (existing) return renderQr(existing, decryptQrToken(existing));
+        if (existing) {
+            const eventEndsAt = registration.event.endsAt?.getTime() || 0;
+            const currentExpiry = existing.expiresAt?.getTime() || 0;
+            const stablePass = eventEndsAt > currentExpiry
+                ? await tx.qRCodePass.update({ where: { id: existing.id }, data: { expiresAt: registration.event.endsAt } })
+                : existing;
+            return renderQr(stablePass, decryptQrToken(stablePass));
+        }
 
         const qrId = crypto.randomUUID();
         const token = crypto.randomBytes(32).toString("hex");
-        // The event journey, not a station visit, defines the pass lifetime.
-        // Keep the configured TTL as a fallback for legacy events without endsAt.
-        const configuredExpiry = new Date(Date.now() + env.qrTtlHours * 60 * 60 * 1000);
-        const expiresAt = registration.event.endsAt && registration.event.endsAt > configuredExpiry
-            ? registration.event.endsAt
-            : configuredExpiry;
+        const expiresAt = new Date(Math.max(
+            now.getTime() + env.qrTtlHours * 60 * 60 * 1000,
+            registration.event.endsAt?.getTime() || 0,
+        ));
 
         await tx.qRCodePass.updateMany({
             // Expired rows can still have is_active=true and therefore occupy
@@ -318,9 +318,6 @@ exports.verifyQR = async (token, eventId = null, userId = null, db = prisma, aud
         throw new AppError(400, "TOKEN_REQUIRED", "QR Token is required.");
     }
 
-    const scanId = auditContext.scanId || crypto.randomUUID();
-    assertUuid(scanId, "scanId");
-
     return await db.$transaction(async (tx) => {
         const qr = await tx.qRCodePass.findFirst({
             where: activeQrWhere(tokenSelector(token)),
@@ -336,83 +333,29 @@ exports.verifyQR = async (token, eventId = null, userId = null, db = prisma, aud
             throw new AppError(400, "QR_EVENT_MISMATCH", "QR Code is not valid for this specific event.");
         }
 
-        const registration = qr.registration;
-        await lockRegistration(tx, registration.registrationId, registration.eventId);
-
-        const previousScan = await tx.scanLog.findUnique({ where: { id: scanId } });
-        if (previousScan) {
-            if (previousScan.qrId !== qr.id || previousScan.registrationId !== registration.registrationId) {
-                throw new AppError(409, "SCAN_ID_REUSED", "This scan identifier was already used for another QR pass.");
-            }
-            const journey = await getCurrentJourney(tx, registration);
-            return {
-                valid: true,
-                replayed: true,
-                scanId,
-                qrId: qr.id,
-                registrationId: registration.registrationId,
-                participant: {
-                    id: registration.participant.id,
-                    firstName: registration.participant.firstName,
-                    lastName: registration.participant.lastName,
-                },
-                event: { id: registration.event.eventId, name: registration.event.name },
-                queueNumber: journey.queueNumber,
-                journey,
-            };
-        }
-
-        const journey = await ensureActiveQueue(tx, {
-            registration,
-            userId,
-            context: auditContext,
-        });
-
-        await tx.scanLog.create({
-            data: {
-                id: scanId,
-                qrId: qr.id,
-                userId,
-                stationId: journey.activeEntry?.stationId || null,
-                scanResult: "SUCCESS",
-                deviceName: String(auditContext.deviceName || "QR scanner").slice(0, 100),
-                ipAddress: String(auditContext.ipAddress || "127.0.0.1").slice(0, 45),
-                registrationId: registration.registrationId,
-            },
-        });
-
         await writeAudit(tx, {
             userId,
             action: "QR_VERIFIED",
             entityName: "QRCodePass",
             entityId: qr.id,
-            newValue: {
-                registrationId: registration.registrationId,
-                eventId: registration.eventId,
-                scanId,
-                queueState: journey.state,
-                assignedStationId: journey.activeEntry?.stationId || null,
-            },
+            newValue: { registrationId: qr.registration.registrationId, eventId },
             ...auditContext,
         });
 
         return {
             valid: true,
-            replayed: false,
-            scanId,
             qrId: qr.id,
-            registrationId: registration.registrationId,
+            registrationId: qr.registration.registrationId,
             participant: {
-                id: registration.participant.id,
-                firstName: registration.participant.firstName,
-                lastName: registration.participant.lastName,
+                id: qr.registration.participant.id,
+                firstName: qr.registration.participant.firstName,
+                lastName: qr.registration.participant.lastName,
             },
             event: {
-                id: registration.event.eventId,
-                name: registration.event.name,
+                id: qr.registration.event.eventId,
+                name: qr.registration.event.name,
             },
-            queueNumber: journey.queueNumber,
-            journey,
+            queueNumber: qr.registration.queueNumber,
         };
     });
 };

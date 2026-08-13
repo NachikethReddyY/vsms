@@ -607,7 +607,6 @@ model Event {
   endsAt               DateTime    @map("ends_at") @db.Timestamptz(3)
   capacity             Int
   expectedAttendance   Int?        @map("expected_attendance")
-  screeningRoute       Json?       @map("screening_route") @db.JsonB
   createIdempotencyKey String?     @map("create_idempotency_key") @db.VarChar(100)
   createPayloadHash    String?     @map("create_payload_hash") @db.Char(64)
   status               EventStatus @default(DRAFT)
@@ -926,16 +925,16 @@ model Station {
 
 model StationTemplate {
   stationTemplateId String       @id @default(uuid()) @map("station_template_id") @db.Uuid
-  fieldSchema       Json?        @map("field_schema")
   templateKey       String       @unique @map("template_key") @db.VarChar(50)
   stationType       StationType? @map("station_type")
   version           Int          @default(1)
   name              String       @db.VarChar(100)
   description       String?
-  defaultCapacity   Int      @default(3) @map("default_capacity")
-  active            Boolean  @default(true)
-  createdAt         DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
-  updatedAt         DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+  defaultCapacity   Int          @default(3) @map("default_capacity")
+  active            Boolean      @default(true)
+  fieldSchema       Json?        @map("field_schema")
+  createdAt         DateTime     @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt         DateTime     @updatedAt @map("updated_at") @db.Timestamptz(3)
   stations          Station[]
 
   @@index([stationType, active])
@@ -1013,7 +1012,7 @@ model ScanLog {
   id             String     @id @default(uuid()) @map("scan_id") @db.Uuid
   qrId           String?    @map("qr_id") @db.Uuid
   userId         String?    @map("user_id") @db.Uuid
-  stationId      String?    @map("station_id") @db.Uuid
+  stationId      String     @map("station_id") @db.Uuid
   scanResult     ScanResult @map("scan_result")
   deviceName     String     @map("device_name") @db.VarChar(100)
   ipAddress      String     @map("ip_address") @db.VarChar(45)
@@ -1022,7 +1021,7 @@ model ScanLog {
 
   qrCode       QRCodePass?        @relation(fields: [qrId], references: [id], onDelete: SetNull, onUpdate: Cascade)
   user         User?              @relation(fields: [userId], references: [id], onDelete: SetNull, onUpdate: Cascade)
-  station      Station?           @relation(fields: [stationId], references: [stationId], onDelete: SetNull, onUpdate: Cascade)
+  station      Station            @relation(fields: [stationId], references: [stationId], onDelete: Cascade, onUpdate: Cascade)
   registration EventRegistration? @relation(fields: [registrationId], references: [registrationId], onDelete: Cascade, onUpdate: Cascade)
 
   @@index([stationId, scannedAt])

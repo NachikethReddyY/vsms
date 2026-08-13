@@ -4,7 +4,6 @@ const { createAuditLog } = require("../../utils/logging/audit");
 const {
   requireQueueAccess,
 } = require("../event/eventAuthorizationService");
-const { completeStationAndAssignNext } = require("./queueAssignmentService");
 
 const ACTIVE_QUEUE_STATUSES = [
   "WAITING",
@@ -1595,14 +1594,6 @@ const completeQueueEntry = async (
         where: {
           id: queueId,
         },
-        include: {
-          registration: {
-            select: { eventId: true },
-          },
-          station: {
-            select: { stationType: true },
-          },
-        },
       });
 
     if (!current) {
@@ -1624,29 +1615,6 @@ const completeQueueEntry = async (
       );
     }
 
-    const storedResult =
-      await tx.screeningResult.findUnique({
-        where: {
-          registrationId_stationId: {
-            registrationId:
-              current.registrationId,
-            stationId:
-              current.stationId,
-          },
-        },
-        select: {
-          resultId: true,
-        },
-      });
-
-    if (!storedResult) {
-      throw new AppError(
-        409,
-        "SCREENING_RESULT_REQUIRED",
-        "Save a valid screening result to complete this station"
-      );
-    }
-
     const updated =
       await tx.queueEntry.update({
         where: {
@@ -1659,6 +1627,50 @@ const completeQueueEntry = async (
           leftQueueAt: new Date(),
         },
       });
+
+    const registration =
+      await tx.eventRegistration.findUnique({
+        where: {
+          registrationId:
+            current.registrationId,
+        },
+      });
+
+    if (
+      registration &&
+      registration.registrationStatus !==
+        "COMPLETED"
+    ) {
+      await tx.eventRegistration.update({
+        where: {
+          registrationId:
+            current.registrationId,
+        },
+
+        data: {
+          registrationStatus:
+            "COMPLETED",
+        },
+      });
+
+      await tx.registrationStatusHistory.create({
+        data: {
+          registrationId:
+            current.registrationId,
+
+          fromStatus:
+            registration.registrationStatus,
+
+          toStatus: "COMPLETED",
+
+          changedById:
+            user.userId,
+
+          reason:
+            "Completed the final queue station",
+        },
+      });
+    }
 
     await createAuditLog({
       userId: user.userId,
@@ -1685,32 +1697,7 @@ const completeQueueEntry = async (
       client: tx,
     });
 
-    // Computer-driven routing: either enqueue the participant at the next
-    // most-available required station, or mark the registration COMPLETED
-    // only when no required stations remain. The registration is no longer
-    // completed merely because a single queue entry finished.
-    const registration =
-      await tx.eventRegistration.findUnique({
-        where: {
-          registrationId:
-            current.registrationId,
-        },
-      });
-
-    const journey =
-      await completeStationAndAssignNext(tx, {
-        registration,
-        stationId: current.stationId,
-        resultId: storedResult.resultId,
-        userId: user.userId,
-        context,
-        excludeStationTypes:
-          current.station?.stationType
-            ? [current.station.stationType]
-            : [],
-      });
-
-    return { ...updated, journey };
+    return updated;
   });
 };
 
@@ -2274,235 +2261,6 @@ const getStationWorkload = async (
   };
 };
 
-/**
- * Staff override: redirect a participant to a specific station.
- *
- * Atomically cancels the current active queue entry (unless the participant
- * is already at the destination), creates a single WAITING entry at the
- * chosen station and records a STAFF_REDIRECT movement.
- *
- * The redirected station is NOT marked completed and remains in the
- * remaining-required set for future automatic routing.
- */
-const redirectQueueEntry = async (
-  {
-    eventId,
-    stationId,
-    registrationId,
-    toStationId,
-  },
-  user,
-  context = null,
-  db = prisma
-) => {
-  await requireQueueManagement(
-    db,
-    eventId,
-    user,
-    stationId
-  );
-
-  for (let attempt = 0; attempt < 4; attempt += 1) {
-    try {
-      return await db.$transaction(
-        async (tx) => {
-          if (toStationId === stationId) {
-            throw new AppError(
-              409,
-              "REDIRECT_TARGET_INVALID",
-              "Redirect target must differ from the current station"
-            );
-          }
-
-          const registration =
-            await tx.eventRegistration.findFirst({
-              where: {
-                registrationId,
-                eventId,
-              },
-            });
-
-          if (!registration) {
-            throw new AppError(
-              404,
-              "REGISTRATION_NOT_FOUND",
-              "Registration not found for this event"
-            );
-          }
-
-          if (
-            ["COMPLETED", "CANCELLED"].includes(
-              registration.registrationStatus
-            )
-          ) {
-            throw new AppError(
-              409,
-              "REGISTRATION_NOT_QUEUEABLE",
-              "Completed or cancelled registrations cannot be redirected"
-            );
-          }
-
-          const origin = await tx.station.findFirst({
-            where: { stationId, eventId },
-          });
-          if (!origin) {
-            throw new AppError(
-              404,
-              "STATION_NOT_FOUND",
-              "Origin station not found for this event"
-            );
-          }
-
-          const target = await tx.station.findFirst({
-            where: {
-              stationId: toStationId,
-              eventId,
-              isActive: true,
-            },
-          });
-          if (!target) {
-            throw new AppError(
-              404,
-              "STATION_NOT_FOUND",
-              "Target station not found for this event"
-            );
-          }
-          assertStationSelectable(target);
-
-          const active =
-            await tx.queueEntry.findFirst({
-              where: {
-                registrationId,
-                status: {
-                  in: ACTIVE_QUEUE_STATUSES,
-                },
-              },
-              orderBy: { enteredAt: "desc" },
-            });
-
-          if (active && active.stationId === toStationId) {
-            return {
-              queueEntry: { ...active, station: target },
-              created: false,
-              cancelled: null,
-              registrationId,
-            };
-          }
-
-          let cancelled = null;
-          if (active) {
-            cancelled = await tx.queueEntry.update({
-              where: { id: active.id },
-              data: {
-                status: "CANCELLED",
-                leftQueueAt: new Date(),
-              },
-            });
-          }
-
-          let queueNumber =
-            registration.queueNumber;
-          if (queueNumber == null) {
-            const aggregate =
-              await tx.eventRegistration.aggregate({
-                where: { eventId },
-                _max: { queueNumber: true },
-              });
-            queueNumber = (aggregate._max.queueNumber || 0) + 1;
-            await tx.eventRegistration.update({
-              where: { registrationId },
-              data: { queueNumber },
-            });
-          }
-
-          const queueEntry =
-            await tx.queueEntry.create({
-              data: {
-                registrationId,
-                stationId: toStationId,
-                queueNumber,
-                status: "WAITING",
-                isPriority: active?.isPriority ?? false,
-                priorityNotes: active?.priorityNotes ?? null,
-              },
-            });
-
-          const fromStationId =
-            active?.stationId ?? stationId;
-
-          await tx.queueMovement.create({
-            data: {
-              registrationId,
-              fromStationId,
-              toStationId,
-              movedBy: user.userId,
-              movementReason: "STAFF_REDIRECT",
-            },
-          });
-
-          await createAuditLog({
-            userId: user.userId,
-            action: "QUEUE_REDIRECTED",
-            entityName: "QueueEntry",
-            entityId: queueEntry.id,
-            oldValue: active
-              ? {
-                  queueEntryId: active.id,
-                  status: active.status,
-                  stationId: fromStationId,
-                }
-              : null,
-            newValue: {
-              eventId,
-              stationId: toStationId,
-              registrationId,
-              queueNumber,
-              reason: "STAFF_REDIRECT",
-            },
-            context,
-            client: tx,
-          });
-
-          return {
-            queueEntry: { ...queueEntry, station: target },
-            created: true,
-            cancelled,
-            registrationId,
-          };
-        },
-        {
-          isolationLevel: "Serializable",
-        }
-      );
-    } catch (error) {
-      const target = JSON.stringify(
-        error.meta?.target || ""
-      );
-
-      if (
-        (
-          error.code === "P2034" ||
-          (
-            error.code === "P2002" &&
-            target.includes("queue")
-          )
-        ) &&
-        attempt < 3
-      ) {
-        continue;
-      }
-
-      throw error;
-    }
-  }
-
-  throw new AppError(
-    409,
-    "QUEUE_REDIRECT_CONFLICT",
-    "Unable to redirect the participant. Please try again."
-  );
-};
-
 module.exports = {
   listRegistrationStations,
   getEventQueueStatus,
@@ -2512,6 +2270,5 @@ module.exports = {
   skipQueueEntry,
   leaveQueue,
   updatePriority,
-  redirectQueueEntry,
   getStationWorkload,
 };
