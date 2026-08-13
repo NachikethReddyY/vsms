@@ -12,6 +12,7 @@
   "staffPollClientCount": 10,
   "thresholds": {
     "readP95Ms": 250,
+    "reportingReadP95Ms": 350,
     "writeP95Ms": 500,
     "screeningBatchP95Ms": 7500,
     "errorRatePercent": 1
