@@ -1,9 +1,7 @@
 # VSMS context diagram
 
-This source retains the browser roles, offline storage, configured providers
-and EC2 target while exposing the current request boundary inside the Express
-process: versioned route and middleware → Controller → Service → Prisma. It
-does not show proposed alternatives or a live deployment.
+This source shows the implemented application boundary and the AWS topology
+recorded on 11 August 2026. Current availability is verified separately.
 
 ```mermaid
 flowchart LR
@@ -13,8 +11,8 @@ flowchart LR
     screener[Screener]
     reviewer[Reviewer]
 
-    client[React/Vite dashboard<br/>browser + encrypted IndexedDB]
-    subgraph api[Node.js Express API process<br/>EC2 deployment target]
+    client[Amplify-hosted React/Vite PWA<br/>service worker + encrypted IndexedDB]
+    subgraph api[Node.js Express API process<br/>Nginx on EC2]
         middleware[Request context, security,<br/>auth, authorization and validation]
         routes[Versioned routes]
         controllers[Controllers]
@@ -23,7 +21,7 @@ flowchart LR
         middleware --> routes --> controllers --> services --> prisma
     end
     workers[Separate Node worker processes<br/>backend/scripts/*.js]
-    db[(PostgreSQL<br/>Prisma schema and migrations)]
+    db[(Private encrypted RDS PostgreSQL<br/>Prisma schema and migrations)]
     cognito[Cognito<br/>authorization-code + PKCE]
     onemap[OneMap<br/>optional configured provider]
     providers[SES/SNS<br/>optional configured providers]
@@ -48,8 +46,6 @@ flowchart LR
 - API: `backend/app.js`, `backend/server.js`, `backend/routes/`.
 - Database: `backend/prisma/schema.prisma` and `backend/prisma/migrations/`.
 - Cognito: `backend/utils/cognitoClient.js` and `infrastructure/cognito.yaml`.
-- Optional providers are shown as dotted edges because repository source does
-  not prove external availability or delivery.
-- The repository has no infrastructure definition proving API Gateway,
-  ECS/Lambda, WAF, S3/CloudFront, DynamoDB, Secrets Manager or CloudWatch as
-  deployed components.
+- Optional providers are shown as dotted edges because the final acceptance
+  replay must prove delivery.
+- Deployment evidence: `docs/2026-08-11_aws-cloud-deployment-runbook.md`.

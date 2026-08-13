@@ -35,7 +35,6 @@ import StationTemplateFormPage from "./pages/StationTemplateFormPage";
 import { QueuePage } from "./pages/QueuePages"; // Imported the QueuePage component
 import EventRegistrationPage from "./pages/participant/EventRegistrationPage";
 import ParticipantCheckInPage from "./pages/participant/ParticipantCheckInPage";
-import ParticipantConsentPage from "./pages/participant/ParticipantConsentPage";
 import ParticipantCreatePage from "./pages/participant/ParticipantCreatePage";
 import ParticipantEmergencyContactsPage from "./pages/participant/ParticipantEmergencyContactsPage";
 import ParticipantProfilePage from "./pages/participant/ParticipantProfilePage";
@@ -43,7 +42,6 @@ import ParticipantQrPage from "./pages/participant/ParticipantQrPage";
 import ParticipantRegistrationPage from "./pages/participant/ParticipantRegistrationPage";
 import ParticipantStatusPage from "./pages/participant/ParticipantStatusPage";
 import {
-  ParticipantConsentsPage,
   ParticipantEditPage,
   RegistrationHistoryPage,
 } from './pages/participant/ParticipantPages';
@@ -70,9 +68,9 @@ function LegacyEventRegistrationRedirect() {
   return <Navigate to={`/events/${eventId}`} replace />;
 }
 
-function LegacyParticipantStepRedirect({ step }: { step: "consent" | "register" }) {
+function LegacyParticipantStepRedirect() {
   const { eventId = "", participantId = "" } = useParams();
-  return <Navigate to={`/participants/${participantId}/${step}?eventId=${encodeURIComponent(eventId)}`} replace />;
+  return <Navigate to={`/participants/${participantId}/register?eventId=${encodeURIComponent(eventId)}`} replace />;
 }
 
 function LegacyParticipantHistoryRedirect() {
@@ -166,10 +164,8 @@ export default function App() {
             <Route path="/participants" element={<Navigate to="/events" replace />} />
             <Route path="/participants/new" element={<ParticipantCreatePage />} />
             <Route path="/participants/:participantId/edit" element={<ParticipantEditPage />} />
-            <Route path="/participants/:participantId/consents" element={<ParticipantConsentsPage />} />
             <Route path="/participants/:participantId/emergency-contacts" element={<ParticipantEmergencyContactsPage />} />
             <Route path="/participants/:participantId/register" element={<ParticipantRegistrationPage />} />
-            <Route path="/participants/:participantId/consent" element={<ParticipantConsentPage />} />
             <Route path="/participants/:participantId/check-in" element={<ParticipantCheckInPage />} />
             <Route path="/participants/registrations/:registrationId/history" element={<RegistrationHistoryPage />} />
             <Route path="/participants/registrations/:registrationId/qr" element={<ParticipantQrPage />} />
@@ -179,10 +175,8 @@ export default function App() {
             <Route path="/participants/search" element={<LegacySearchRedirect />} />
             <Route path="/events/:eventId/register" element={<EventRegistrationPage />} />
             <Route path="/events/:eventId/registrations" element={<LegacyEventRegistrationRedirect />} />
-            <Route path="/events/:eventId/participants/:participantId/consent" element={<LegacyParticipantStepRedirect step="consent" />} />
-            <Route path="/events/:eventId/participants/:participantId/review" element={<LegacyParticipantStepRedirect step="register" />} />
+            <Route path="/events/:eventId/participants/:participantId/review" element={<LegacyParticipantStepRedirect />} />
             <Route path="/registrations/:registrationId/review" element={<LegacyRegistrationRedirect destination="search" />} />
-            <Route path="/registrations/:registrationId/consent" element={<LegacyRegistrationRedirect destination="search" />} />
             <Route path="/registrations/:registrationId/confirmation" element={<LegacyRegistrationRedirect destination="search" />} />
             <Route path="/registrations/:registrationId/history" element={<LegacyRegistrationRedirect destination="history" />} />
             <Route path="/registrations/:registrationId/qr" element={<LegacyRegistrationRedirect destination="qr" />} />

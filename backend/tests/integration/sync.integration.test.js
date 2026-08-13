@@ -81,7 +81,6 @@ before(async () => {
       gender: "X",
       contactNumber: "+65 8000 0001",
       emergencyContact: "+65 8000 0002",
-      consentGiven: true,
       createdById: screener.id,
       updatedById: screener.id,
       onboardingEventId: event.eventId,

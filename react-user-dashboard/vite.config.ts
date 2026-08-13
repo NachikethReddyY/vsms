@@ -90,6 +90,7 @@ export default defineConfig(({ command, mode }: ConfigEnv): UserConfig => {
       tailwindcss() as unknown as PluginOption,
       VitePWA({
         registerType: 'autoUpdate',
+        manifestFilename: 'manifest.json',
         includeAssets: ['favicon.svg'],
         manifest: {
           name: 'VSMS',

@@ -40,7 +40,6 @@ const screeningRoutes = require("./routes/screeningRoutes");
 const participantRoutes = require("./routes/participantRoutes");
 const registrationRoutes = require("./routes/registrationRoutes");
 const adminRoutes = require("./routes/adminRoutes");
-const consentRoutes = require("./routes/consentRoutes");
 const emergencyContactRoutes = require("./routes/emergencyContactRoutes");
 const signatureRoutes = require("./routes/signatureRoutes");
 const providerEventRoutes = require("./routes/providerEventRoutes");
@@ -192,6 +191,15 @@ const qrLimiter = rateLimit({
     name: "qr",
     windowMs: 60000,
     limit: 30,
+    skip: (req) => req.method === "GET" && req.path.startsWith("/public-status/"),
+    standardHeaders: "draft-8",
+    legacyHeaders: false,
+});
+
+const publicQrStatusIpLimiter = rateLimit({
+    name: "qr-public-status-ip",
+    windowMs: 60000,
+    limit: 10000,
     standardHeaders: "draft-8",
     legacyHeaders: false,
 });
@@ -352,7 +360,6 @@ app.use("/api/v1/users", userRoutes);
 app.use("/api/v1/locations", locationRoutes);
 app.use("/api/v1/participants", participantRoutes);
 app.use("/api/v1/registrations", registrationRoutes);
-app.use("/api/v1/consent-forms", consentRoutes);
 app.use("/api/v1/emergency-contacts", emergencyContactRoutes);
 app.use("/api/v1/signatures", signatureRoutes);
 app.use("/api/v1/admin", adminRoutes);
@@ -362,6 +369,7 @@ app.use("/api/v1/dashboard", dashboardRoutes);
 app.use("/api/v1/operations", operationsRoutes);
 
 // QR Routes
+app.use("/api/v1/qr/public-status", publicQrStatusIpLimiter);
 app.use("/api/v1/qr", qrLimiter, qrRoutes);
 
 // Event & Screening Routes

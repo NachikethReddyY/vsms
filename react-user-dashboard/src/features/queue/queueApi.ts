@@ -41,6 +41,7 @@ export interface QueueStationWorkload {
 export interface EventQueueStatus {
   event: { eventId: string; name: string; status: string; venue: string | null };
   stations: QueueStationWorkload[];
+  totals: Record<QueueStatus, number>;
   entries: QueueEntry[];
 }
 

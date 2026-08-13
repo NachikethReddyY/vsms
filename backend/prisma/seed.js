@@ -25,7 +25,7 @@ const DEMO_QR_TOKEN = "ab".repeat(32);
 const roleDefinitions = [
   ["ADMINISTRATOR", "Full administrative access", 1],
   ["EVENT_MANAGER", "Creates and manages events", 2],
-  ["REGISTRATION_OFFICER", "Registers participants and records consent", 3],
+  ["REGISTRATION_OFFICER", "Registers participants and manages event intake", 3],
   ["SCREENER", "Performs participant screening", 4],
   ["REVIEWER", "Reviews screening outcomes", 5],
   ["SUPPORT", "Supports event operations", 6],
@@ -35,7 +35,6 @@ const permissionNames = [
   "participants:read",
   "participants:write",
   "participants:cross-event-reuse",
-  "consents:record",
   "registrations:create",
   "registrations:read",
   "audit:read",
@@ -49,7 +48,7 @@ const stationTemplates = [
     templateKey: "REGISTRATION",
     version: 1,
     name: "Registration",
-    description: "Confirm the participant record, consent, and QR pass.",
+    description: "Confirm the participant record and QR pass.",
     defaultCapacity: 3,
     fieldSchema: null,
   },
@@ -304,34 +303,6 @@ async function seedStationTemplates() {
   }
 }
 
-async function seedConsentForm(staff) {
-  const contentText = [
-    "I confirm that the screening process, use of my information, potential risks,",
-    "privacy safeguards, and my right to decline or withdraw have been explained to me.",
-    "I voluntarily consent to participate in this event screening.",
-  ].join(" ");
-  return prisma.consentFormVersion.upsert({
-    where: {
-      formCode_versionNumber: {
-        formCode: "VSMS-CONSENT",
-        versionNumber: "1.0",
-      },
-    },
-    update: { isActive: true, contentText },
-    create: {
-      formCode: "VSMS-CONSENT",
-      versionNumber: "1.0",
-      title: "Participant Screening Consent",
-      contentText,
-      contentHash: crypto.createHash("sha256").update(contentText).digest("hex"),
-      documentObjectKey: "consent-forms/VSMS-CONSENT/1.0",
-      effectiveFrom: new Date("2026-01-01T00:00:00.000Z"),
-      isActive: true,
-      createdById: staff.id,
-    },
-  });
-}
-
 function demoDate(dayOffset, hour, minute = 0) {
   // Demo events are configured for Asia/Singapore. Derive the calendar date
   // there, then return the equivalent UTC instant for storage in PostgreSQL.
@@ -389,7 +360,7 @@ async function upsertDemoEvent(staff, {
     },
     create: {
       name,
-      description: "Demonstration event for testing participant registration, consent, check-in, and QR workflows.",
+      description: "Demonstration event for testing participant registration, check-in, and QR workflows.",
       bannerKey: "COMMUNITY_SCREENING",
       venue,
       address: venue,
@@ -565,7 +536,6 @@ async function upsertDemoParticipant(staff, {
       accessibilityNotes,
       status: "ACTIVE",
       emergencyContact: contactNumber,
-      consentGiven: false,
       createdById: staff.id,
       updatedById: staff.id,
     },
@@ -615,47 +585,7 @@ async function ensureDemoContact(staff, participant, {
   });
 }
 
-async function ensureAcceptedConsent(staff, participant, event, consentForm, signerName) {
-  const existing = await prisma.participantConsent.findFirst({
-    where: {
-      participantId: participant.id,
-      eventId: event.eventId,
-      consentStatus: "ACCEPTED",
-      withdrawalOfId: null,
-    },
-  });
-  const signatureSha256 = crypto.createHash("sha256")
-    .update(`${participant.participantReference}:${event.eventId}`)
-    .digest("hex");
-  const data = {
-    consentFormVersionId: consentForm.id,
-    consentStatus: "ACCEPTED",
-    signerType: "PARTICIPANT",
-    signerName,
-    signatureObjectKey: `signatures/demo/${event.eventId}/${participant.participantReference}.png`,
-    signatureSha256,
-    signatureMimeType: "image/png",
-    recordedById: staff.id,
-    signedAt: demoTimestamp(),
-    decisionAt: demoTimestamp(),
-  };
-  const consent = existing
-    ? await prisma.participantConsent.update({ where: { id: existing.id }, data })
-    : await prisma.participantConsent.create({
-        data: {
-          ...data,
-          participantId: participant.id,
-          eventId: event.eventId,
-        },
-      });
-  await prisma.participant.update({
-    where: { id: participant.id },
-    data: { consentGiven: true, updatedById: staff.id },
-  });
-  return consent;
-}
-
-async function ensureDemoRegistration(staff, participant, event, consent) {
+async function ensureDemoRegistration(staff, participant, event) {
   const idempotencyKey = `seed-registration-${participant.participantReference}`;
   const registration = await prisma.eventRegistration.upsert({
     where: {
@@ -694,11 +624,6 @@ async function ensureDemoRegistration(staff, participant, event, consent) {
       },
     });
   }
-  await prisma.participantConsent.update({
-    where: { id: consent.id },
-    data: { registrationId: registration.registrationId },
-  });
-
   const token = DEMO_QR_TOKEN;
   const existingQr = await prisma.qRCodePass.findFirst({
     where: { registrationId: registration.registrationId },
@@ -731,7 +656,7 @@ async function ensureDemoRegistration(staff, participant, event, consent) {
   return { registration, qr };
 }
 
-async function ensureScreenerQueueRegistration(staff, participant, event, station, consent, queueNumber) {
+async function ensureScreenerQueueRegistration(staff, participant, event, station, queueNumber) {
   const registration = await prisma.eventRegistration.upsert({
     where: { participantId_eventId: { participantId: participant.id, eventId: event.eventId } },
     update: {
@@ -751,7 +676,6 @@ async function ensureScreenerQueueRegistration(staff, participant, event, statio
       idempotencyKey: `seed-screener-queue-${participant.participantReference}`,
     },
   });
-  await prisma.participantConsent.update({ where: { id: consent.id }, data: { registrationId: registration.registrationId } });
   const qr = await qrService.generateRegistrationQR(registration.registrationId, staff.id, { source: "seed-screener-queue" });
 
   const existingEntry = await prisma.queueEntry.findFirst({
@@ -1134,7 +1058,7 @@ async function seedDomainAuditEvidence({ staff, reviewer, liveEvent, completedEv
   return records.length;
 }
 
-async function seedDemoData(staff, registrationOfficer, reviewer, screener, consentForm) {
+async function seedDemoData(staff, registrationOfficer, reviewer, screener) {
   const upcomingEvent = await upsertDemoEvent(staff, {
     key: "seed-demo-tampines",
     name: "VSMS Synthetic Upcoming Event",
@@ -1171,6 +1095,33 @@ async function seedDemoData(staff, registrationOfficer, reviewer, screener, cons
     startsAt: demoDate(-14, 1),
     endsAt: demoDate(-14, 9),
     capacity: 100,
+  });
+  const outreachEvent = await upsertDemoEvent(staff, {
+    key: "seed-demo-pasir-ris-outreach",
+    name: "VSMS Synthetic Outreach Event",
+    venue: "Synthetic Venue Four",
+    status: "PUBLISHED",
+    startsAt: demoDate(4, 2),
+    endsAt: demoDate(4, 10),
+    capacity: 90,
+  });
+  const schoolEvent = await upsertDemoEvent(staff, {
+    key: "seed-demo-school-morning",
+    name: "VSMS Synthetic School Screening Morning",
+    venue: "Synthetic Venue Five",
+    status: "PUBLISHED",
+    startsAt: demoDate(6, 1),
+    endsAt: demoDate(6, 8),
+    capacity: 140,
+  });
+  const followUpEvent = await upsertDemoEvent(staff, {
+    key: "seed-demo-follow-up-clinic",
+    name: "VSMS Synthetic Follow-up Clinic",
+    venue: "Synthetic Venue Six",
+    status: "COMPLETED",
+    startsAt: demoDate(-7, 1),
+    endsAt: demoDate(-7, 9),
+    capacity: 75,
   });
   const [, liveStructure, screenerStructure] = await Promise.all([
     seedEventStructure(upcomingEvent, staff, registrationOfficer),
@@ -1302,36 +1253,16 @@ async function seedDemoData(staff, registrationOfficer, reviewer, screener, cons
     email: "synthetic.contact.charlie@example.test",
   });
 
-  const aishaConsent = await ensureAcceptedConsent(
-    staff,
-    aisha,
-    upcomingEvent,
-    consentForm,
-    "Synthetic Alpha"
-  );
-  const danielConsent = await ensureAcceptedConsent(
-    staff,
-    daniel,
-    liveEvent,
-    consentForm,
-    "Synthetic Bravo"
-  );
   const { registration, qr } = await ensureDemoRegistration(
     staff,
     daniel,
-    liveEvent,
-    danielConsent
+    liveEvent
   );
 
-  const screenerConsents = await Promise.all([
-    ensureAcceptedConsent(staff, aisha, screenerEvent, consentForm, "Synthetic Alpha"),
-    ensureAcceptedConsent(staff, daniel, screenerEvent, consentForm, "Synthetic Bravo"),
-    ensureAcceptedConsent(staff, priya, screenerEvent, consentForm, "Synthetic Charlie"),
-  ]);
   const screenerQueue = await Promise.all([
-    ensureScreenerQueueRegistration(staff, aisha, screenerEvent, visualAcuityStation, screenerConsents[0], 1),
-    ensureScreenerQueueRegistration(staff, daniel, screenerEvent, visualAcuityStation, screenerConsents[1], 2),
-    ensureScreenerQueueRegistration(staff, priya, screenerEvent, visualAcuityStation, screenerConsents[2], 3),
+    ensureScreenerQueueRegistration(staff, aisha, screenerEvent, visualAcuityStation, 1),
+    ensureScreenerQueueRegistration(staff, daniel, screenerEvent, visualAcuityStation, 2),
+    ensureScreenerQueueRegistration(staff, priya, screenerEvent, visualAcuityStation, 3),
   ]);
 
   for (const station of liveStructure.stations) {
@@ -1403,9 +1334,8 @@ async function seedDemoData(staff, registrationOfficer, reviewer, screener, cons
   });
 
   return {
-    events: { upcomingEvent, liveEvent, screenerEvent, completedEvent },
+    events: { upcomingEvent, liveEvent, screenerEvent, completedEvent, outreachEvent, schoolEvent, followUpEvent },
     participants: { aisha, daniel, priya, marcus },
-    aishaConsent,
     registration,
     qr,
     queueEntry,
@@ -1425,15 +1355,16 @@ async function main() {
   const screener = await seedScreener(roles, staff, passwordHash);
   await seedPermissions(roles, staff);
   await seedStationTemplates();
-  const consentForm = await seedConsentForm(staff);
-  const demo = await seedDemoData(staff, registrationOfficer, reviewer, screener, consentForm);
-  console.log(`Seeded roles, permissions, station templates, consent form, staff profile, and demonstration data for ${staff.email}.`);
+  const demo = await seedDemoData(staff, registrationOfficer, reviewer, screener);
+  console.log(`Seeded roles, permissions, station templates, staff profile, and demonstration data for ${staff.email}.`);
   console.log(`Upcoming event: ${demo.events.upcomingEvent.name} (${demo.events.upcomingEvent.eventId})`);
   console.log(`Live event: ${demo.events.liveEvent.name} (${demo.events.liveEvent.eventId})`);
   console.log(`Screener event: ${demo.events.screenerEvent.name} (${demo.events.screenerEvent.eventId})`);
+  console.log(`Outreach event: ${demo.events.outreachEvent.name} (${demo.events.outreachEvent.eventId})`);
+  console.log(`School event: ${demo.events.schoolEvent.name} (${demo.events.schoolEvent.eventId})`);
+  console.log(`Follow-up event: ${demo.events.followUpEvent.name} (${demo.events.followUpEvent.eventId})`);
   console.log(`Screener queue: ${demo.screenerQueue.map(({ registration }) => `#${registration.queueNumber} ${registration.participantDisplayName}`).join(", ")}`);
   console.log(`Ready participant: ${demo.participants.aisha.participantReference} - Synthetic Alpha`);
-  console.log(`Needs consent: ${demo.participants.priya.participantReference} - Synthetic Charlie`);
   console.log(`Needs emergency contact: ${demo.participants.marcus.participantReference} - Synthetic Delta`);
   console.log(`Registered participant: ${demo.participants.daniel.participantReference} - Synthetic Bravo`);
   console.log(`Reviewer profile: ${reviewer.email} (local role: REVIEWER)`);

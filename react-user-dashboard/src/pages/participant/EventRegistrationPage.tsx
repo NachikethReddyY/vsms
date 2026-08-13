@@ -28,6 +28,7 @@ type RegistrationMatch = {
 };
 type MatchResponse = { result: "NO_MATCH" | "POSSIBLE_MATCH" | "ALREADY_REGISTERED"; matches: RegistrationMatch[] };
 type DialogView = "match" | "details" | "registered" | null;
+const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 function initials(match: RegistrationMatch) {
   return `${match.participant.firstName[0] ?? ""}${match.participant.lastName[0] ?? ""}`.toUpperCase() || "P";
@@ -82,6 +83,13 @@ export default function EventRegistrationPage() {
     if (form.dateOfBirth > latestDateOfBirth) return "Date of birth cannot be in the future.";
     if (!isValidParticipantPhoneNumber(form.contactNumber)) return "Enter a valid contact number to check for a match.";
     if (!isValidParticipantNric(form.nric)) return "Enter a valid NRIC or FIN to check for a match.";
+    if (!emailPattern.test(form.email.trim())) return "Enter a valid email address.";
+    if (!form.race.trim()) return "Race is required.";
+    if (!form.nationality.trim()) return "Nationality is required.";
+    if (!form.addressStreet.trim()) return "Street address is required.";
+    if (!form.addressUnit.trim()) return "Unit number is required.";
+    if (!form.addressPostalCode.trim()) return "Postal code is required.";
+    if (!form.preferredLanguage.trim()) return "Preferred language is required.";
     return null;
   }
 
@@ -177,24 +185,24 @@ export default function EventRegistrationPage() {
         {error ? <p className="participant-v2-alert participant-v2-create-alert" role="alert">{error}</p> : null}
         <form onSubmit={checkForExistingParticipant} noValidate>
           <section className="participant-v2-create-section"><header><h2>Participant details</h2><p>Full name, date of birth, and contact number are used together for the match check.</p></header><div className="participant-v2-create-grid">
-            <label><span>First name <b>*</b></span><input value={form.firstName} onChange={(input) => update("firstName", input.target.value)} maxLength={100} autoComplete="given-name" /></label>
-            <label><span>Last name <b>*</b></span><input value={form.lastName} onChange={(input) => update("lastName", input.target.value)} maxLength={100} autoComplete="family-name" /></label>
-            <label><span>Date of birth <b>*</b></span><span className="participant-v2-create-input-icon"><CalendarDaysIcon /><input type="date" value={form.dateOfBirth} max={latestDateOfBirth} onChange={(input) => update("dateOfBirth", input.target.value)} /></span></label>
-            <label><span>Gender <b>*</b></span><select value={form.gender} onChange={(input) => update("gender", input.target.value)}><option value="U">Prefer not to say</option><option value="M">Male</option><option value="F">Female</option><option value="O">Other</option></select></label>
-            <label><span>NRIC / FIN <b>*</b></span><input value={form.nric} onChange={(input) => update("nric", input.target.value)} maxLength={16} autoComplete="off" spellCheck={false} placeholder="S1234567A" /></label>
+            <label><span>First name <b>*</b></span><input required value={form.firstName} onChange={(input) => update("firstName", input.target.value)} maxLength={100} autoComplete="given-name" /></label>
+            <label><span>Last name <b>*</b></span><input required value={form.lastName} onChange={(input) => update("lastName", input.target.value)} maxLength={100} autoComplete="family-name" /></label>
+            <label><span>Date of birth <b>*</b></span><span className="participant-v2-create-input-icon"><CalendarDaysIcon /><input required type="date" value={form.dateOfBirth} max={latestDateOfBirth} onChange={(input) => update("dateOfBirth", input.target.value)} /></span></label>
+            <label><span>Gender <b>*</b></span><select required value={form.gender} onChange={(input) => update("gender", input.target.value)}><option value="U">Prefer not to say</option><option value="M">Male</option><option value="F">Female</option><option value="O">Other</option></select></label>
+            <label><span>NRIC / FIN <b>*</b></span><input required value={form.nric} onChange={(input) => update("nric", input.target.value)} maxLength={16} autoComplete="off" spellCheck={false} placeholder="S1234567A" /></label>
           </div></section>
           <section className="participant-v2-create-section"><header><h2>Contact and support</h2><p>These details are retained if you continue as a new participant.</p></header><div className="participant-v2-create-grid">
             <label><span>Contact number <b>*</b></span><PhoneInput value={form.contactNumber} onChange={(value) => update("contactNumber", value)} /></label>
-            <label><span>Email <small>optional</small></span><span className="participant-v2-create-input-icon"><EnvelopeIcon /><input type="email" value={form.email} onChange={(input) => update("email", input.target.value)} maxLength={255} autoComplete="email" placeholder="name@example.com" /></span></label>
-            <label><span>Preferred language</span><input value={form.preferredLanguage} onChange={(input) => update("preferredLanguage", input.target.value)} maxLength={50} /></label>
+            <label><span>Email <b>*</b></span><span className="participant-v2-create-input-icon"><EnvelopeIcon /><input required type="email" value={form.email} onChange={(input) => update("email", input.target.value)} maxLength={255} autoComplete="email" placeholder="name@example.com" /></span></label>
+            <label><span>Preferred language <b>*</b></span><input required value={form.preferredLanguage} onChange={(input) => update("preferredLanguage", input.target.value)} maxLength={50} /></label>
             <label className="participant-v2-create-notes"><span>Operational notes <small>optional</small></span><textarea value={form.accessibilityNotes} onChange={(input) => update("accessibilityNotes", input.target.value)} maxLength={1000} placeholder="Communication or access needs" /></label>
           </div></section>
-          <section className="participant-v2-create-section"><header><h2>Additional details</h2><p>Optional identity and address information for the participant profile.</p></header><div className="participant-v2-create-grid">
-            <label><span>Race <small>optional</small></span><input value={form.race} onChange={(input) => update("race", input.target.value)} maxLength={50} /></label>
-            <label><span>Nationality <small>optional</small></span><input value={form.nationality} onChange={(input) => update("nationality", input.target.value)} maxLength={50} autoComplete="country-name" /></label>
-            <label className="participant-v2-create-address"><span>Street address <small>optional</small></span><input value={form.addressStreet} onChange={(input) => update("addressStreet", input.target.value)} maxLength={255} autoComplete="street-address" /></label>
-            <label><span>Unit number <small>optional</small></span><input value={form.addressUnit} onChange={(input) => update("addressUnit", input.target.value)} maxLength={20} autoComplete="address-line2" placeholder="#01-01" /></label>
-            <label><span>Postal code <small>optional</small></span><input value={form.addressPostalCode} onChange={(input) => update("addressPostalCode", input.target.value)} maxLength={10} autoComplete="postal-code" /></label>
+          <section className="participant-v2-create-section"><header><h2>Additional details</h2><p>Identity and address information required for the participant profile.</p></header><div className="participant-v2-create-grid">
+            <label><span>Race <b>*</b></span><input required value={form.race} onChange={(input) => update("race", input.target.value)} maxLength={50} /></label>
+            <label><span>Nationality <b>*</b></span><input required value={form.nationality} onChange={(input) => update("nationality", input.target.value)} maxLength={50} autoComplete="country-name" /></label>
+            <label className="participant-v2-create-address"><span>Street address <b>*</b></span><input required value={form.addressStreet} onChange={(input) => update("addressStreet", input.target.value)} maxLength={255} autoComplete="street-address" /></label>
+            <label><span>Unit number <b>*</b></span><input required value={form.addressUnit} onChange={(input) => update("addressUnit", input.target.value)} maxLength={20} autoComplete="address-line2" placeholder="#01-01" /></label>
+            <label><span>Postal code <b>*</b></span><input required value={form.addressPostalCode} onChange={(input) => update("addressPostalCode", input.target.value)} maxLength={10} autoComplete="postal-code" /></label>
           </div></section>
           <footer className="participant-v2-create-actions"><p><ExclamationTriangleIcon /> The system checks for possible duplicates before opening the participant profile. A name by itself is never treated as a duplicate.</p><div><Link className="secondary" to={`/events/${eventId}`}>Cancel</Link><button className="primary" type="submit" disabled={checking || creating}>{checking ? "Checking participants..." : creating ? "Creating participant..." : "Register participant"}</button></div></footer>
         </form>

@@ -18,7 +18,7 @@ stateDiagram-v2
     Cleared --> NotDownloaded
 ```
 
-Current support is limited to assigned visual-acuity, refraction and
-colour-vision station flows. The pack is encrypted in IndexedDB; it is not a
-service-worker cache and does not make a hard-refreshed app shell available
-offline.
+Current support covers assigned visual-acuity, refraction, colour-vision and
+eye-health station flows. The service worker caches the app shell; clinical
+packs and pending mutations remain separately encrypted in IndexedDB and are
+bound to the signed-in owner and event.

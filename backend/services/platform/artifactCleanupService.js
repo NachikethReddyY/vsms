@@ -7,7 +7,6 @@ const { deleteEventSignature, signatureMetadata } = require("../../utils/storage
 const { artifactPath, deleteArtifact } = require("../reporting/reportArtifactStorage");
 
 const TYPES = Object.freeze({
-  CONSENT_SIGNATURE: "CONSENT_SIGNATURE",
   REFERRAL_SIGNATURE: "REFERRAL_SIGNATURE",
   REVIEW_DECISION_SIGNATURE: "REVIEW_DECISION_SIGNATURE",
   REFERRAL_DOCUMENT: "REFERRAL_DOCUMENT",
@@ -52,11 +51,7 @@ const uniqueTasks = (eventId, entries) => [...new Map(entries.map((entry) => [
 ])).values()];
 
 const collectEventArtifactTasks = async (tx, eventId) => {
-  const [consents, referrals, signatures, documents, reports] = await Promise.all([
-    tx.participantConsent.findMany({
-      where: { eventId, signatureObjectKey: { not: null } },
-      select: { signatureObjectKey: true },
-    }),
+  const [referrals, signatures, documents, reports] = await Promise.all([
     tx.referral.findMany({
       where: { review: { registration: { eventId } }, signatureObjectKey: { not: null } },
       select: { signatureObjectKey: true },
@@ -75,14 +70,13 @@ const collectEventArtifactTasks = async (tx, eventId) => {
   ]);
 
   const entries = [
-    ...consents.map(({ signatureObjectKey }) => ({ artifactType: TYPES.CONSENT_SIGNATURE, storageKey: signatureObjectKey })),
     ...referrals.map(({ signatureObjectKey }) => ({ artifactType: TYPES.REFERRAL_SIGNATURE, storageKey: signatureObjectKey })),
     ...signatures.map(({ purpose, signatureObjectKey }) => ({
       artifactType: purpose === "REFERRAL"
         ? TYPES.REFERRAL_SIGNATURE
         : purpose === "REVIEW_DECISION"
           ? TYPES.REVIEW_DECISION_SIGNATURE
-          : TYPES.CONSENT_SIGNATURE,
+          : TYPES.REVIEW_DECISION_SIGNATURE,
       storageKey: signatureObjectKey,
     })),
     ...documents.map(({ storageKey }) => ({ artifactType: TYPES.REFERRAL_DOCUMENT, storageKey })),
@@ -90,7 +84,7 @@ const collectEventArtifactTasks = async (tx, eventId) => {
   ];
 
   for (const entry of entries) {
-    if ([TYPES.CONSENT_SIGNATURE, TYPES.REFERRAL_SIGNATURE, TYPES.REVIEW_DECISION_SIGNATURE].includes(entry.artifactType)) {
+    if ([TYPES.REFERRAL_SIGNATURE, TYPES.REVIEW_DECISION_SIGNATURE].includes(entry.artifactType)) {
       signatureMetadata(entry.storageKey, eventId);
     } else if (entry.artifactType === TYPES.REFERRAL_DOCUMENT) {
       documentPathForKey(entry.storageKey);
@@ -124,7 +118,7 @@ const enqueueEventArtifactCleanup = async (tx, eventId) => {
 };
 
 const removeTaskArtifact = async (task) => {
-  if ([TYPES.CONSENT_SIGNATURE, TYPES.REFERRAL_SIGNATURE, TYPES.REVIEW_DECISION_SIGNATURE].includes(task.artifactType)) {
+  if ([TYPES.REFERRAL_SIGNATURE, TYPES.REVIEW_DECISION_SIGNATURE].includes(task.artifactType)) {
     return deleteEventSignature(task.storageKey, task.eventId);
   }
   if (task.artifactType === TYPES.REFERRAL_DOCUMENT) {

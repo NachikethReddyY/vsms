@@ -600,7 +600,6 @@ function installDeletionTransaction(t, { transactionVersion = 1, crossEventRevie
       updateMany: async () => ({ count: 0 }),
       ...remove("reviews"),
     },
-    participantConsent: { findMany: async () => [], updateMany: async () => ({ count: 0 }), ...remove("consents") },
     notificationDelivery: { count: async () => 0, ...remove("deliveries") },
     documentArtifact: { findMany: async () => [], findFirst: async () => null, ...remove("documents") },
     referral: { findMany: async () => [], ...remove("referrals") },
@@ -669,14 +668,12 @@ test("event deletion removes event-owned participant profiles and preserves shar
     onboardingEventId: eventId,
     eventRegistrations: { none: { eventId: { not: eventId } } },
     eventIntakes: { none: { eventId: { not: eventId } } },
-    consents: { none: { eventId: { not: eventId } } },
   });
   assert.deepEqual(calls.find(([name]) => name === "participants.delete")[1].where, {
     id: { in: [participantId] },
     onboardingEventId: eventId,
     eventRegistrations: { none: {} },
     eventIntakes: { none: {} },
-    consents: { none: {} },
   });
   assert.ok(calls.findIndex(([name]) => name === "participantEmergencyContacts") < calls.findIndex(([name]) => name === "participants.delete"));
   assert.deepEqual(calls.find(([name]) => name === "event.update")[1].where, {

@@ -144,7 +144,7 @@ export default function DynamicStationPage({ stationType }: { stationType?: Stat
     setError(null);
     const generation = participantRequestGeneration.current;
     try {
-      const next = await screeningApi.previewDynamic(eventId, station.stationId, values, resolvedType);
+      const next = await screeningApi.previewDynamic(eventId, station.stationId, values, resolvedType, fieldSchema);
       if (generation !== participantRequestGeneration.current) return null;
       setEvaluation(next);
       if (!next.isFlagged) setAcknowledged(false);

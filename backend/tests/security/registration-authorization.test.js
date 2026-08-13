@@ -149,7 +149,7 @@ test("QR service keeps registration and verification authorization event-scoped"
   await assert.doesNotReject(assertVerificationAccess({ token: "a".repeat(64) }, account(userId), db));
 });
 
-test("signature target authorization keeps registration duty and participant event scope", async () => {
+test("retired consent signatures cannot be created through the generic signature endpoint", async () => {
   const eventId = crypto.randomUUID();
   const participantId = crypto.randomUUID();
   const userId = crypto.randomUUID();
@@ -160,10 +160,13 @@ test("signature target authorization keeps registration duty and participant eve
     participant: { findFirst: async () => ({ id: participantId }) },
   };
 
-  await assert.doesNotReject(authorizeSignatureTarget({
-    eventId,
-    targetId: participantId,
-    purpose: "CONSENT",
-    auth: account(userId),
-  }, db));
+  await assert.rejects(
+    authorizeSignatureTarget({
+      eventId,
+      targetId: participantId,
+      purpose: "CONSENT",
+      auth: account(userId),
+    }, db),
+    /purpose must be REFERRAL or REVIEW_DECISION/,
+  );
 });

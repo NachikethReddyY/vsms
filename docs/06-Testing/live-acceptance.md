@@ -15,7 +15,7 @@ pnpm --dir backend acceptance:check
 
 `VSMS_DEMO_ANCHOR_DATE` makes the fixture's business dates reproducible. For a browser run requiring a current duty, choose and record that run's local calendar date instead. Database-generated UUIDs and `updatedAt` values are not stable evidence; the stable fixture references and values are.
 
-The seed creates only synthetic identities (`Synthetic …`, `TEST-NRIC-…`, `example.test`) and marks screening payloads `SYNTHETIC_ACCEPTANCE_ONLY`. It gives the synthetic administrator event-manager memberships, the synthetic registration officer a live-event registration membership/duty, and the synthetic reviewer a live-event reviewer membership/duty. It also includes consent, registration, QR, check-in-ready queue, transfer, review/referral, and sync-state data.
+The seed creates only synthetic identities (`Synthetic …`, `TEST-NRIC-…`, `example.test`) and marks screening payloads `SYNTHETIC_ACCEPTANCE_ONLY`. It gives the synthetic administrator event-manager memberships, the synthetic registration officer a live-event registration membership/duty, and the synthetic reviewer a live-event reviewer membership/duty. It also includes registration, QR, check-in-ready queue, transfer, review/referral, and sync-state data.
 
 Do not use `acceptance:reset` against an approved live environment. It is intentionally local-only and requires the exact command-scoped acknowledgement above; deployment migrations use the normal deployment procedure.
 
@@ -55,7 +55,7 @@ The executable scenario catalogue is [`backend/acceptance/live-workflow.json`](.
 2. In an approved live deployment only, invite a synthetic account; complete managed password and MFA setup; verify provider-group/local-role intersection and session restoration.
 3. Give synthetic staff an active event membership and duty. Show one allowed duty action, then repeat it on another event and retain the denied status/request ID.
 4. Suspend, revoke session, and deprovision separate synthetic accounts. Show the existing session denied after each action. Do not reuse a real staff account.
-5. Register Synthetic Charlie, record consent, issue/verify a QR pass, check in, and capture aggregate registration/queue count changes.
+5. Register Synthetic Charlie, issue/verify a QR pass, check in, and capture aggregate registration/queue count changes.
 6. Transfer through visual acuity, refraction, and colour vision queues. Capture only the synthetic fixture marker, request IDs, statuses, and counts.
 7. Record a review/referral with the synthetic recipient; retain a masked view only.
 8. Download an assigned station while online, disconnect, save one synthetic result, reconnect, and show one applied sync action without a duplicate.
