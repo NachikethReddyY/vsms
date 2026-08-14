@@ -1,11 +1,13 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const { post, queueOfflineStationSave } = vi.hoisted(() => ({
+const { get, post, queueOfflineStationSave, resolveOfflineRegistration } = vi.hoisted(() => ({
+  get: vi.fn(),
   post: vi.fn(),
   queueOfflineStationSave: vi.fn(),
+  resolveOfflineRegistration: vi.fn(),
 }));
 
-vi.mock('../../utils/apiClient', () => ({ default: { post } }));
+vi.mock('../../utils/apiClient', () => ({ default: { get, post } }));
 vi.mock('../../utils/session', () => ({
   getStoredSession: () => ({ user: { id: '11111111-1111-4111-8111-111111111111' } }),
 }));
@@ -13,6 +15,7 @@ vi.mock('./offlineSync', () => ({
   evaluateOfflineStation: vi.fn(),
   isNetworkError: (error: unknown) => (error as { code?: string })?.code === 'ERR_NETWORK',
   queueOfflineStationSave,
+  resolveOfflineRegistration,
 }));
 
 import { screeningApi } from './screeningApi';
@@ -32,8 +35,21 @@ const body = {
 };
 
 beforeEach(() => {
+  get.mockReset();
   post.mockReset();
   queueOfflineStationSave.mockReset();
+  resolveOfflineRegistration.mockReset();
+});
+
+it('unwraps the queue response when resolving a participant pass', async () => {
+  get
+    .mockResolvedValueOnce({ data: { registrationId: body.registrationId, participantDisplayName: 'Keefe Chen', queueNumber: 1, status: 'SIGNED_UP' } })
+    .mockResolvedValueOnce({ data: { data: { activeEntry: { station: { stationId, stationName: 'Visual main', stationType: 'VISUAL_ACUITY' } } } } });
+
+  await expect(screeningApi.resolve(eventId, { registrationId: body.registrationId })).resolves.toMatchObject({
+    participantDisplayName: 'Keefe Chen',
+    activeStation: { stationId, stationName: 'Visual main' },
+  });
 });
 
 describe('screening save synchronization state', () => {

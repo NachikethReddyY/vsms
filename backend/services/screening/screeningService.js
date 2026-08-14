@@ -300,6 +300,7 @@ const listQueue = async (eventId, stationId, user) => {
     include: {
       registration: {
         include: {
+          participant: { select: { firstName: true, lastName: true } },
           screeningResults: {
             where: { stationId },
             select: {
@@ -321,7 +322,9 @@ const listQueue = async (eventId, stationId, user) => {
       return {
       queueEntryId: entry.id,
       registrationId: row.registrationId,
-      participantDisplayName: row.participantDisplayName || "Unnamed participant",
+      participantDisplayName: row.participantDisplayName
+        || [row.participant?.firstName, row.participant?.lastName].filter(Boolean).join(" ")
+        || "Unnamed participant",
       queueNumber: row.queueNumber,
       status: entry.status,
       existingResult: row.screeningResults[0] || null,
@@ -336,6 +339,7 @@ const resolveParticipant = async (eventId, query, user) => {
   let registration = query.registrationId
     ? await prisma.eventRegistration.findFirst({
       where: { eventId, registrationId: query.registrationId },
+      include: { participant: { select: { firstName: true, lastName: true } } },
     })
     : null;
 
@@ -345,6 +349,7 @@ const resolveParticipant = async (eventId, query, user) => {
     registration = resolved?.registrationId
       ? await prisma.eventRegistration.findFirst({
         where: { eventId, registrationId: resolved.registrationId },
+        include: { participant: { select: { firstName: true, lastName: true } } },
       })
       : null;
   }
@@ -355,7 +360,9 @@ const resolveParticipant = async (eventId, query, user) => {
 
   return {
     registrationId: registration.registrationId,
-    participantDisplayName: registration.participantDisplayName || "Unnamed participant",
+    participantDisplayName: registration.participantDisplayName
+      || [registration.participant?.firstName, registration.participant?.lastName].filter(Boolean).join(" ")
+      || "Unnamed participant",
     queueNumber: registration.queueNumber,
     status: registration.registrationStatus,
   };

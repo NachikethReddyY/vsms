@@ -256,7 +256,8 @@ export const screeningApi = {
         queueNumber: number | null;
         status: string;
       }>(`/events/${eventId}/registrations/resolve`, { params });
-      const { data: queue } = await apiClient.get<{ activeEntry: { station: { stationId: string; stationName: string; stationType: string } } | null }>(`/queues/events/${eventId}/participants/${data.registrationId}`);
+      const { data: queueResponse } = await apiClient.get<{ data: { activeEntry: { station: { stationId: string; stationName: string; stationType: string } } | null } }>(`/queues/events/${eventId}/participants/${data.registrationId}`);
+      const queue = queueResponse.data;
       return { ...data, activeStation: queue.activeEntry?.station ?? null };
     } catch (error) {
       const ownerId = getStoredSession()?.user.id;
