@@ -1,6 +1,6 @@
 import { test } from 'vitest';
 import assert from 'node:assert/strict';
-import { formatEventTimeRange, getEventDisplayStatus, getEventScheduleDays } from './eventDisplayStatus.ts';
+import { formatEventTimeRange, getEventDisplayStatus, getEventScheduleDays, groupEventItemsByDate } from './eventDisplayStatus.ts';
 
 test('an in-progress event is ended after its scheduled end', () => {
   assert.equal(getEventDisplayStatus('IN_PROGRESS', '2026-08-03T23:00:00.000Z', new Date('2026-08-04T01:00:00.000Z')), 'ENDED');
@@ -20,4 +20,11 @@ test('multi-day schedules use each event day in date order', () => {
     { startsAt: '2026-08-14T01:00:00.000Z', endsAt: '2026-08-14T09:00:00.000Z' },
   ];
   assert.deepEqual(getEventScheduleDays(days, '', ''), [days[1], days[0]]);
+});
+
+test('timeline cards are grouped under their calendar date', () => {
+  const first = { groupKey: '2026-08-13', name: 'First' };
+  const second = { groupKey: '2026-08-13', name: 'Second' };
+  const third = { groupKey: '2026-08-14', name: 'Third' };
+  assert.deepEqual(groupEventItemsByDate([first, second, third]), [[first, second], [third]]);
 });

@@ -19,3 +19,9 @@ export function formatEventTimeRange(startsAt: string, endsAt: string, timeZone:
 export function getEventScheduleDays<T extends { startsAt: string; endsAt: string }>(eventDays: T[], startsAt: string, endsAt: string): T[] | Array<{ startsAt: string; endsAt: string }> {
   return eventDays.length ? [...eventDays].sort((a, b) => a.startsAt.localeCompare(b.startsAt)) : [{ startsAt, endsAt }];
 }
+
+export function groupEventItemsByDate<T extends { groupKey: string }>(events: T[]): T[][] {
+  const groups = new Map<string, T[]>();
+  events.forEach((event) => groups.set(event.groupKey, [...(groups.get(event.groupKey) ?? []), event]));
+  return [...groups.values()];
+}

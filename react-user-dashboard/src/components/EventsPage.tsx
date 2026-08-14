@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { getEventArtwork } from '../features/events/eventBanners';
 import { eventApi, type EventRecord, type EventStatus } from '../features/events/eventApi';
-import { getEventScheduleDays } from '../features/events/eventDisplayStatus';
+import { getEventScheduleDays, groupEventItemsByDate } from '../features/events/eventDisplayStatus';
 import { useAuth } from '../auth/AuthProvider';
 import { getApiError as getApiMessage } from '../utils/apiClient';
 import { Button } from './ui/button';
@@ -12,6 +12,7 @@ import './EventsPage.css';
 
 type EventItem = {
   eventId: string;
+  groupKey: string;
   date: string;
   day: string;
   month: string;
@@ -52,6 +53,7 @@ function toEventItem(event: EventRecord, scheduleDay: { startsAt: string; endsAt
 
   return {
     eventId: event.eventId,
+    groupKey: eventDate,
     date: eventDate === dateKey(now, event.timezone) ? 'Today' : eventDate === dateKey(tomorrow, event.timezone) ? 'Tomorrow' : shortDate,
     day: new Intl.DateTimeFormat('en-SG', { weekday: 'long', timeZone: event.timezone }).format(startsAt),
     month: new Intl.DateTimeFormat('en-SG', { day: 'numeric', month: 'long', timeZone: event.timezone }).format(startsAt),
@@ -103,6 +105,9 @@ export default function EventsPage() {
       .filter((event) => `${event.title} ${event.venue}`.toLowerCase().includes(query.toLowerCase())),
     [events, now, period, query],
   );
+  const groupedEvents = useMemo(() => {
+    return groupEventItemsByDate(visibleEvents).map((events) => ({ ...events[0], events }));
+  }, [visibleEvents]);
 
   return (
     <div className="events-page vsms-landing-system">
@@ -134,15 +139,16 @@ export default function EventsPage() {
           </section>
         ) : visibleEvents.length ? (
           <section className="events-register" id="events-register" aria-label={`${period === 'upcoming' ? 'Upcoming' : 'Past'} events`}>
-            {visibleEvents.map((event) => (
-              <article className={`events-register-row status-${event.statusKey.toLowerCase()} ${event.date === 'Today' ? 'today' : ''}`} key={`${event.eventId}-${event.month}`} aria-label={`${event.title}, ${event.month}, status ${event.status}`}>
+            {groupedEvents.map((group) => (
+              <section className={`events-register-row ${group.date === 'Today' ? 'today' : ''}`} key={group.groupKey} aria-label={`${group.month} events`}>
                 <div className="events-register-row-date">
-                  <strong>{event.date}</strong>
-                  <span>{event.day}</span>
-                  <small>{event.month}</small>
+                  <strong>{group.date}</strong>
+                  <span>{group.day}</span>
+                  <small>{group.month}</small>
                 </div>
                 <span className="events-timeline" aria-hidden="true"><i /></span>
-                <div className="events-event-card">
+                <div className="events-date-cards">
+                {group.events.map((event) => <article className="events-event-card" key={event.eventId} aria-label={`${event.title}, status ${event.status}`}>
                   <div className="events-event-media">
                     <img src={event.artwork} alt="" loading="lazy" />
                   </div>
@@ -165,8 +171,9 @@ export default function EventsPage() {
                   <div className="events-register-state">
                     <Link className="events-row-action" to={`/events/${event.eventId}`} aria-label={`Open ${event.title}`}>Open</Link>
                   </div>
+                </article>)}
                 </div>
-              </article>
+              </section>
             ))}
           </section>
         ) : (
