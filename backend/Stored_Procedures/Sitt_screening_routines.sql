@@ -1,0 +1,20 @@
+-- VSMS screening-routine catalog (Sitt)
+--
+-- Executable definitions are deployed by:
+-- prisma/migrations/20260814220000_add_screening_stored_routines/migration.sql
+--
+-- This file is a catalog, not a second copy of the bodies.
+--
+-- FUNCTION  vsms_screening_results_complete(uuid, uuid)
+--   True only when every route station has a screening_results row.
+--
+-- TRIGGER FUNCTION vsms_prevent_reviewed_screening_mutation()
+--   Blocks screening_results writes after a clinical review exists.
+--
+-- PROCEDURE sp_vsms_audit_screening_flag(uuid, uuid)
+--   PII-free flag audit (station, flag, registration). No result_data.
+--
+-- Clinical auto-flagging stays in screeningService.js.
+--
+-- Runtime adapter: utils/database/databaseRoutines.js
+-- Verification: backend/.vsms/tests/database-routines.integration.test.js
