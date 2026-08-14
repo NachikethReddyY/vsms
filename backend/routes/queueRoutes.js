@@ -11,6 +11,7 @@ const asyncHandler = require("../utils/http/asyncHandler");
 const queueController = require("../controllers/queueController");
 const authenticate = require("../middlewares/authenticate");
 const checkIdempotency = require("../middlewares/idempotency");
+const requireAnyRole = require("../middlewares/requireAnyRole");
 
 const {
   eventParams,
