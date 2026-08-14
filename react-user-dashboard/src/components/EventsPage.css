@@ -622,19 +622,55 @@ html[data-theme="light"] .events-workspace {
 .events-workspace .quiet-empty,
 .events-workspace .shift-empty { color:var(--ink-2); }
 .events-workspace .station-table,
-.events-workspace .shift-table { margin-top:18px; border-top-color:var(--line); }
+.events-workspace .shift-table { display:grid; gap:14px; margin-top:18px; border:0; }
+.events-workspace .shift-section-title { align-items:flex-end; }
+.events-workspace .shift-section-title>div { display:grid; gap:5px; }
+.events-workspace .shift-section-title h2,
+.events-workspace .shift-section-title p { margin:0; }
+.events-workspace .shift-section-title p { color:var(--muted); font-size:13px; line-height:19px; }
+.events-workspace .shift-count { padding:6px 10px; border:1px solid var(--line); border-radius:999px; background:var(--surface); color:var(--muted); font-size:11px; font-weight:700; white-space:nowrap; }
+.events-workspace .shift-heading-actions { display:flex; align-items:center; gap:10px; }
+.events-workspace .shift-heading-actions button svg { width:16px; }
+.events-workspace .shift-empty-state { min-height:260px; display:grid; place-items:center; align-content:center; gap:8px; margin-top:18px; padding:32px; border:1px dashed var(--line); border-radius:12px; background:var(--surface); text-align:center; }
+.events-workspace .shift-empty-state>svg { width:30px; color:var(--muted); }
+.events-workspace .shift-empty-state h3,
+.events-workspace .shift-empty-state p { margin:0; }
+.events-workspace .shift-empty-state p { max-width:48ch; color:var(--muted); font-size:13px; line-height:19px; }
+.events-workspace .shift-empty-state a { margin-top:8px; }
 .events-workspace .station-record,
 .events-workspace .shift-record { border-bottom-color:var(--line-soft); }
+.events-workspace .shift-record { padding:18px; border:1px solid var(--line); border-radius:12px; background:var(--surface); }
+.events-workspace .shift-record-summary { min-height:44px; grid-template-columns:minmax(180px,1.35fr) minmax(150px,.8fr) minmax(130px,.65fr) auto; }
+.events-workspace .shift-record-summary strong { font-size:15px; line-height:21px; }
+.events-workspace .shift-record-summary>span:not(:first-child) { padding-left:18px; border-left:1px solid var(--line-soft); }
+.events-workspace .shift-record-summary>.secondary { min-height:44px; }
+.events-workspace .shift-record .assignment-list { grid-template-columns:repeat(2,minmax(0,1fr)); gap:8px; margin:16px 0 0; padding-top:16px; border-top:1px solid var(--line-soft); background:transparent; }
+.events-workspace .shift-record .assignment-list li { min-height:58px; padding:9px 10px 9px 12px; border:1px solid var(--line-soft); border-radius:8px; background:var(--canvas); }
+.events-workspace .shift-record .assignment-list li button { flex:0 0 44px; min-height:44px; }
+.events-workspace .shift-record .shift-empty { margin:16px 0 0; padding-top:16px; border-top:1px solid var(--line-soft); }
+.events-workspace .shift-dialog-form { grid-template-columns:repeat(2,minmax(0,1fr)); }
+.events-workspace .shift-dialog-form .wide { grid-column:1/-1; }
+.events-workspace .shift-assignment-dialog { gap:18px; }
+.events-workspace .shift-assignment-fields { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:12px; }
+.events-workspace .shift-staff-picker { max-height:260px; overflow:auto; display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:0; padding:6px 14px 12px; border:1px solid var(--line); border-radius:8px; }
+.events-workspace .shift-staff-picker legend { padding:0 5px; color:var(--ink-2); font-size:12px; font-weight:700; }
+.events-workspace .shift-staff-picker label { min-height:44px; display:flex; align-items:center; gap:9px; padding:0 6px; border-bottom:1px solid var(--line-soft); font-size:13px; }
+.events-workspace .shift-staff-picker .staff-select-all { grid-column:1/-1; color:var(--ink-2); font-weight:700; }
+.events-workspace .shift-staff-picker input { width:17px; height:17px; accent-color:var(--focus); }
 .events-workspace .station-record-copy span,
 .events-workspace .station-record-copy small,
 .events-workspace .station-order span,
 .events-workspace .shift-record-summary small,
 .events-workspace .assignment-list small { color:var(--ink-2); }
 .events-workspace .station-day-list { display:flex; flex-wrap:wrap; gap:6px; margin-top:10px; }
+.events-workspace .station-record-actions { min-width:0; display:flex; align-items:center; justify-content:flex-end; gap:12px; }
+.events-workspace .station-record-actions .station-day-list { justify-content:flex-end; margin:0; }
+.events-workspace .station-record-actions>button { flex:0 0 auto; min-height:44px; }
 .events-workspace .station-day-list span { max-width:none; margin:0; padding:4px 7px; border:1px solid var(--line); border-radius:6px; background:var(--surface); color:var(--ink-2); font-size:10px; line-height:14px; }
 .events-workspace .station-day-list span.is-available { border-color:color-mix(in srgb,var(--today) 35%,var(--line)); color:var(--today); }
 .events-workspace .station-day-list span.is-unavailable { color:var(--ink-2); }
 .events-workspace .station-stacked-controls { grid-column:1/-1; display:grid; gap:18px; margin-top:12px; }
+.events-workspace .station-actions>span { display:flex; gap:8px; }
 .events-workspace .station-schedule { display:grid; gap:12px; }
 .events-workspace .station-schedule fieldset { display:grid; grid-template-columns:minmax(170px,.65fr) minmax(320px,1.35fr); align-items:center; gap:18px 24px; margin:0; padding:18px; border:1px solid var(--line); border-radius:12px; background:var(--surface); }
 .events-workspace .station-schedule legend { padding:0 7px; color:var(--ink); font-size:13px; font-weight:750; letter-spacing:-.01em; }
@@ -716,6 +752,7 @@ html[data-theme="light"] .events-workspace {
 }
 
 @media (max-width:760px) {
+  .events-workspace .shift-section-title { align-items:flex-start; }
   .events-workspace .station-capacity { grid-template-columns:1fr 112px auto; }
   .events-workspace .station-schedule fieldset { grid-template-columns:1fr; gap:14px; }
   .events-workspace .station-shift-screeners { grid-template-columns:1fr; }
@@ -750,11 +787,19 @@ html[data-theme="light"] .events-workspace {
   .events-workspace .lifecycle-heading { display:flex; justify-content:space-between; align-items:baseline; gap:16px; }
   .events-workspace .event-danger-zone { align-items:start; flex-direction:column; }
   .events-workspace .station-record { grid-template-columns:48px minmax(0,1fr); gap:12px; }
+  .events-workspace .station-record-actions { grid-column:1/-1; align-items:stretch; flex-direction:column; }
+  .events-workspace .station-record-actions .station-day-list { justify-content:flex-start; }
   .events-workspace .station-controls { grid-column:1/-1; justify-content:flex-start; }
   .events-workspace .station-capacity-readonly { grid-column:2; }
   .events-workspace .shift-record-summary { grid-template-columns:minmax(0,1fr) auto; gap:10px 16px; }
   .events-workspace .shift-record-summary>span:nth-child(2),
   .events-workspace .shift-record-summary>span:nth-child(3) { grid-column:1; }
+  .events-workspace .shift-record-summary>span:not(:first-child) { padding-left:0; border-left:0; }
+  .events-workspace .shift-record .assignment-list,
+  .events-workspace .shift-dialog-form,
+  .events-workspace .shift-assignment-fields,
+  .events-workspace .shift-staff-picker { grid-template-columns:1fr; }
+  .events-workspace .shift-heading-actions { width:100%; justify-content:space-between; }
   .events-workspace .shift-record-summary>.secondary { grid-column:2; grid-row:1; }
   .events-workspace .staffing-editor { grid-template-columns:1fr; }
   .events-workspace .station-capacity { grid-template-columns:1fr auto; gap:12px; padding:14px; }

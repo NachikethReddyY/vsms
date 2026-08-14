@@ -111,6 +111,7 @@ export default function App() {
           <Route path="/account/security" element={<AccountSecurityPage />} />
           <Route path="/forbidden" element={<ForbiddenPage />} />
           <Route path="/events/:eventId" element={<EventDetailPage />} />
+          <Route path="/qr-scanner" element={<QRScannerPage />} />
           <Route path="/settings" element={<SettingsPage />} />
 
           <Route element={<EventCapabilityGuard allowedRoles={eventMemberRoles} />}>
@@ -120,6 +121,7 @@ export default function App() {
           <Route element={<EventCapabilityGuard allowedRoles={eventManagerRoles} />}>
             <Route path="/events/:eventId/overview" element={<EventDetailPage />} />
             <Route path="/events/:eventId/stations" element={<EventDetailPage />} />
+            <Route path="/events/:eventId/shifts" element={<EventDetailPage />} />
             <Route path="/events/:eventId/staff/:membershipId/duties" element={<DutyEditorPage />} />
             <Route path="/events/:eventId/analytics" element={<EventAnalyticsPage />} />
             <Route path="/events/:eventId/reports" element={<EventReportsPage />} />
@@ -146,7 +148,7 @@ export default function App() {
             <Route element={<StationDutyGuard stationType="CUSTOM" />}>
               <Route path="/events/:eventId/stations/custom/:stationId" element={<DynamicStationPage />} />
             </Route>
-            <Route path="/qr-scanner" element={<QRScannerPage />} />
+            <Route path="/events/:eventId/qr-scanner" element={<QRScannerPage />} />
           </Route>
 
           <Route element={<RoleGuard allowedRoles={eventManagerRoles} />}>

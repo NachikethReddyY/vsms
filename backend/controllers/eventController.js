@@ -35,6 +35,7 @@ exports.updateStationTemplate = async (req, res) => res.json(await eventService.
 exports.importStations = async (req, res) => res.status(201).json(await eventService.importStations(req.params.eventId, req.body, req.user, req.context));
 exports.updateStation = async (req, res) => res.json(await eventService.updateStation(req.params.eventId, req.params.eventStationId, req.body, req.user, req.context));
 exports.removeStation = async (req, res) => res.json(await eventService.removeStation(req.params.eventId, req.params.eventStationId, req.query.version, req.user, req.context));
+exports.addShift = async (req, res) => res.status(201).json(await eventService.addShift(req.params.eventId, req.body, req.user, req.context));
 exports.addAssignment = async (req, res) => res.status(201).json(await eventService.addStaffAssignment(req.params.eventId, req.params.shiftId, req.body, req.user, req.context));
 exports.removeAssignment = async (req, res) => res.json(await eventService.removeStaffAssignment(req.params.eventId, req.params.shiftId, req.params.assignmentId, req.query.version, req.user, req.context));
 exports.audit = async (req, res) => res.json(await eventService.getAuditLog(req.params.eventId, req.query, req.user));

@@ -942,6 +942,24 @@ paths:
         "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
         "409": { $ref: "#/components/responses/Conflict" }
+  /api/v1/events/{eventId}/shifts:
+    post:
+      tags: [Events]
+      operationId: addEventShift
+      summary: Add a working period to a draft, published, or live event
+      parameters: [{ $ref: "#/components/parameters/EventId" }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/AddShiftRequest" }
+      responses:
+        "201": { description: Shift added and audited, content: { application/json: { schema: { $ref: "#/components/schemas/Event" } } } }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "422": { $ref: "#/components/responses/ValidationFailed" }
   /api/v1/events/{eventId}/shifts/{shiftId}/assignments:
     post:
       tags: [Events]
@@ -3364,6 +3382,16 @@ components:
           type: array
           maxItems: 100
           items: { $ref: "#/components/schemas/ShiftAssignmentInput" }
+    AddShiftRequest:
+      type: object
+      additionalProperties: false
+      required: [version, name, startsAt, endsAt, requiredStaff]
+      properties:
+        version: { type: integer, minimum: 1 }
+        name: { type: string, minLength: 1, maxLength: 100 }
+        startsAt: { type: string, format: date-time }
+        endsAt: { type: string, format: date-time }
+        requiredStaff: { type: integer, minimum: 1, maximum: 1000, default: 1 }
     Shift:
       allOf:
         - $ref: "#/components/schemas/ShiftInput"
@@ -5077,10 +5105,11 @@ components:
               type: object
               nullable: true
               additionalProperties: false
-              required: [status, queueNumber, station]
+              required: [status, queueNumber, nowCalling, station]
               properties:
                 status: { $ref: "#/components/schemas/QueueStatus", description: "Participant's own live queue state (waiting/called/in-progress)" }
                 queueNumber: { type: integer }
+                nowCalling: { type: integer, nullable: true, description: "Queue number currently called at this station" }
                 station:
                   type: object
                   additionalProperties: false
@@ -5256,8 +5285,9 @@ components:
     ScreeningQueueItem:
       type: object
       additionalProperties: false
-      required: [registrationId, participantDisplayName, queueNumber, status, existingResult]
+      required: [queueEntryId, registrationId, participantDisplayName, queueNumber, status, existingResult]
       properties:
+        queueEntryId: { type: string, format: uuid }
         registrationId: { type: string, format: uuid }
         participantDisplayName: { type: string }
         queueNumber: { type: integer, nullable: true }

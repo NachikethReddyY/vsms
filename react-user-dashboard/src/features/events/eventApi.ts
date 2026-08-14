@@ -103,6 +103,10 @@ export const eventApi = {
     const { data } = await apiClient.post<EventRecord>(`/events/${id}/shifts/${shiftId}/assignments`, input);
     return data;
   },
+  async addShift(id: string, input: { version: number; name: string; startsAt: string; endsAt: string; requiredStaff: number }) {
+    const { data } = await apiClient.post<EventRecord>(`/events/${id}/shifts`, input);
+    return data;
+  },
   async removeStaff(id: string, shiftId: string, assignmentId: string, version: number) {
     const { data } = await apiClient.delete<EventRecord>(`/events/${id}/shifts/${shiftId}/assignments/${assignmentId}`, { params: { version } });
     return data;

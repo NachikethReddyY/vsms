@@ -23,6 +23,7 @@ const {
     assignmentParams,
     assignmentDeleteParams,
     assignmentBody,
+    shiftCreateBody,
     versionQuery,
     stationParams,
     stationImportBody,
@@ -121,6 +122,7 @@ router.post("/:eventId/complete", validate({ params: eventParams, body: transiti
 router.post("/:eventId/cancel", validate({ params: eventParams, body: cancelBody }), requireEventManager, asyncHandler(eventController.cancel));
 router.delete("/:eventId", requireSystemRole("ADMIN"), requireRecentAuthentication(), validate({ params: eventParams, body: deleteEventBody }), asyncHandler(eventController.remove));
 router.post("/:eventId/shifts/:shiftId/assignments", validate({ params: assignmentParams, body: assignmentBody }), requireEventManager, asyncHandler(eventController.addAssignment));
+router.post("/:eventId/shifts", validate({ params: eventParams, body: shiftCreateBody }), requireEventManager, asyncHandler(eventController.addShift));
 router.delete("/:eventId/shifts/:shiftId/assignments/:assignmentId", validate({ params: assignmentDeleteParams, query: versionQuery }), requireEventManager, asyncHandler(eventController.removeAssignment));
 router.get("/:eventId/audit-log", validate({ params: eventParams, query: auditQuery }), requireEventManager, asyncHandler(eventController.audit));
 

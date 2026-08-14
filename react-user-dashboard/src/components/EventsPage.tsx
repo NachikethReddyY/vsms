@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { getEventArtwork } from '../features/events/eventBanners';
 import { eventApi, type EventRecord, type EventStatus } from '../features/events/eventApi';
-import { getEventDisplayStatus, getEventScheduleDays, groupEventItemsByDate } from '../features/events/eventDisplayStatus';
+import { getEventDisplayStatus, getEventScheduleDays, groupEventItemsByDate, sortEventItems } from '../features/events/eventDisplayStatus';
 import { useAuth } from '../auth/AuthProvider';
 import { getApiError as getApiMessage } from '../utils/apiClient';
 import { Button } from './ui/button';
@@ -13,6 +13,7 @@ import './EventsPage.css';
 type EventItem = {
   eventId: string;
   groupKey: string;
+  sortKey: string;
   date: string;
   day: string;
   month: string;
@@ -55,6 +56,7 @@ function toEventItem(event: EventRecord, scheduleDay: { startsAt: string; endsAt
   return {
     eventId: event.eventId,
     groupKey: eventDate,
+    sortKey: scheduleDay.endsAt,
     date: eventDate === dateKey(now, event.timezone) ? 'Today' : eventDate === dateKey(tomorrow, event.timezone) ? 'Tomorrow' : shortDate,
     day: new Intl.DateTimeFormat('en-SG', { weekday: 'long', timeZone: event.timezone }).format(startsAt),
     month: new Intl.DateTimeFormat('en-SG', { day: 'numeric', month: 'long', timeZone: event.timezone }).format(startsAt),
@@ -101,9 +103,9 @@ export default function EventsPage() {
     return () => window.clearInterval(clock);
   }, []);
   const visibleEvents = useMemo(
-    () => events.flatMap((event) => getEventScheduleDays(event.eventDays, event.startsAt, event.endsAt).map((day) => toEventItem(event, day, now)))
+    () => sortEventItems(events.flatMap((event) => getEventScheduleDays(event.eventDays, event.startsAt, event.endsAt).map((day) => toEventItem(event, day, now)))
       .filter((event) => period === 'past' ? ['COMPLETED', 'CANCELLED'].includes(event.statusKey) : !['COMPLETED', 'CANCELLED'].includes(event.statusKey))
-      .filter((event) => `${event.title} ${event.venue}`.toLowerCase().includes(query.toLowerCase())),
+      .filter((event) => `${event.title} ${event.venue}`.toLowerCase().includes(query.toLowerCase())), period === 'past'),
     [events, now, period, query],
   );
   const groupedEvents = useMemo(() => {

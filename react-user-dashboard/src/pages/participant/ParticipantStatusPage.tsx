@@ -27,6 +27,7 @@ const formatExpiry = (value: string) =>
 
 export default function ParticipantStatusPage() {
   const { token = '' } = useParams();
+  const qrDialogRef = useRef<HTMLDialogElement>(null);
   const [status, setStatus] = useState<PublicPassStatus | null>(null);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(true);
@@ -114,6 +115,13 @@ export default function ParticipantStatusPage() {
       <span className="ps-badge">Valid pass</span>
       <h1>{status.eventName ?? 'Event pass'}</h1>
 
+      <div className="ps-pass-code">
+        <button type="button" className="ps-pass-expand" onClick={() => qrDialogRef.current?.showModal()} aria-label="Expand participant pass QR code">
+          <img src={`/api/v1/qr/public-pass/${encodeURIComponent(token)}`} alt="Participant pass QR code for station staff to scan" />
+        </button>
+        <div><strong>Scan at each station</strong><span>Tap the code to enlarge it for authorised staff.</span></div>
+      </div>
+
       {error && (
         <div className="ps-delayed" role="status">
           <strong>Update delayed</strong>
@@ -123,11 +131,15 @@ export default function ParticipantStatusPage() {
       )}
 
       {queueState ? (
-        <div className="ps-state-card ps-state-tone-waiting">
+        <div className={`ps-state-card ps-state-tone-${queueState.status.toLowerCase().replace('_', '')}`}>
           <strong>{QUEUE_STATE_LABEL[queueState.status] ?? 'Screening in progress'}</strong>
           <p className="ps-state-card-sub">
-            Go to <b>{queueState.station.name}</b>{queueState.queueNumber != null ? ` · queue #${queueState.queueNumber}` : ''}
+            Go to <b>{queueState.station.name}</b>
           </p>
+          <div className="ps-queue-grid">
+            <div className="ps-queue-cell ps-queue-yours"><span className="ps-queue-label">Your number</span><strong className="ps-queue-value">{queueState.queueNumber}</strong></div>
+            <div className="ps-queue-cell ps-queue-now"><span className="ps-queue-label">Now calling</span>{queueState.nowCalling == null ? <strong className="ps-queue-pending">Waiting to be called</strong> : <strong className="ps-queue-value">{queueState.nowCalling}</strong>}</div>
+          </div>
         </div>
       ) : (
         <p className="ps-route-guidance">Follow the route below. Staff will help if a step is blocked.</p>
@@ -158,8 +170,16 @@ export default function ParticipantStatusPage() {
 
   return <main className="participant-status-page">
     <div className="participant-status-shell">
-      <Link className="participant-status-brand" to="/"><span aria-hidden="true">V</span>VSMS</Link>
+      <Link className="participant-status-brand" to="/"><img src="/favicon.svg" alt="" />VSMS</Link>
       {content}
+      <dialog ref={qrDialogRef} className="ps-qr-dialog" aria-labelledby="expanded-qr-title" onClick={(event) => { if (event.target === event.currentTarget) event.currentTarget.close(); }}>
+        <div className="ps-qr-dialog-card">
+          <button type="button" className="ps-qr-close" onClick={() => qrDialogRef.current?.close()}>Close</button>
+          <img src={`/api/v1/qr/public-pass/${encodeURIComponent(token)}`} alt="Expanded participant pass QR code for station staff to scan" />
+          <strong id="expanded-qr-title">Ready to scan</strong>
+          <span>Hold the screen steady in front of the station camera.</span>
+        </div>
+      </dialog>
       <footer className="participant-status-footer"><span>No personal information is shown on this page.</span><Link to="/">Staff sign in</Link></footer>
     </div>
   </main>;

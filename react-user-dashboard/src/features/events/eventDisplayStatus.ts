@@ -26,3 +26,7 @@ export function groupEventItemsByDate<T extends { groupKey: string }>(events: T[
   events.forEach((event) => groups.set(event.groupKey, [...(groups.get(event.groupKey) ?? []), event]));
   return [...groups.values()];
 }
+
+export function sortEventItems<T extends { sortKey: string }>(events: T[], newestFirst: boolean): T[] {
+  return [...events].sort((a, b) => newestFirst ? b.sortKey.localeCompare(a.sortKey) : a.sortKey.localeCompare(b.sortKey));
+}

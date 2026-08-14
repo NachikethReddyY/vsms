@@ -341,6 +341,54 @@ test("live events reject station and shift plan updates", async (t) => {
   assert.equal(transactionCalls, 0);
 });
 
+test("a live event accepts a new active shift without unlocking the event plan", async (t) => {
+  const current = eventRecord("IN_PROGRESS", 3);
+  const addedShift = {
+    shiftId: crypto.randomUUID(),
+    eventId,
+    name: "Late registration",
+    startsAt: new Date("2040-01-01T02:00:00.000Z"),
+    endsAt: new Date("2040-01-01T04:00:00.000Z"),
+    requiredStaff: 2,
+    status: "ACTIVE",
+    staffAssignments: [],
+  };
+  const updated = { ...eventRecord("IN_PROGRESS", 4), shifts: [...current.shifts, addedShift] };
+  let saved;
+  installTransaction(t, current, updated, {
+    shift: { create: async ({ data }) => { saved = data; return { ...addedShift, ...data }; } },
+  });
+
+  const result = await eventService.addShift(eventId, {
+    version: 3,
+    name: addedShift.name,
+    startsAt: addedShift.startsAt.toISOString(),
+    endsAt: addedShift.endsAt.toISOString(),
+    requiredStaff: 2,
+  }, manager, crypto.randomUUID());
+
+  assert.equal(saved.status, "ACTIVE");
+  assert.equal(result.shifts.at(-1).name, "Late registration");
+});
+
+test("a live event manager can change station availability", async (t) => {
+  const current = eventRecord("IN_PROGRESS", 1);
+  const stationId = current.stations[0].stationId;
+  const updated = { ...eventRecord("IN_PROGRESS", 2), stations: [{ ...current.stations[0], isActive: false }] };
+  let stationUpdate;
+  installTransaction(t, current, updated, {
+    station: { update: async (input) => { stationUpdate = input; return {}; } },
+  });
+
+  const result = await eventService.updateStation(eventId, stationId, {
+    version: 1,
+    isAvailable: false,
+  }, manager, crypto.randomUUID());
+
+  assert.equal(stationUpdate.data.isActive, false);
+  assert.equal(result.eventStations[0].isAvailable, false);
+});
+
 test("staff assignment saves an active user and preserves manager permissions", async (t) => {
   const current = eventRecord();
   const assignment = {
