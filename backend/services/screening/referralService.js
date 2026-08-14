@@ -27,9 +27,9 @@ const maskEmail = (email) => {
 const generateHandoffSecret = () => crypto.randomBytes(18).toString("base64url");
 const HANDOFF_SECRET_TTL_MS = 15 * 60 * 1000;
 
-const referralEmailTemplate = (referralId) => ({
-  subject: "Confidential document from VSMS (encrypted PDF)",
-  body: "A confidential health report and referral is attached as an encrypted PDF. Obtain the one-time password from the issuing reviewer through a separate channel. This email body does not contain the password, participant identity, or clinical details. Do not reply with personal or clinical information.",
+const referralEmailTemplate = (referralId, participantName = "Participant") => ({
+  subject: "Your VSMS vision screening referral and next steps (encrypted PDF)",
+  body: `Dear ${participantName},\n\nFollowing your VSMS vision screening, a clinician recommended follow-up care. The attached encrypted PDF explains the screening findings, reason for referral, urgency, referral destination, and next steps. For your privacy, those details are not repeated in this email. Obtain the one-time PDF password from the issuing reviewer through a separate channel. If you were not expecting this email, do not forward it or reply with personal or clinical information; contact the screening team.`,
   filename: `health-report-referral-${referralId.slice(0, 8)}.pdf`,
 });
 
@@ -423,7 +423,7 @@ const auditDelivery = (tx, { userId, action, outcome, delivery, eventId, referra
   client: tx,
 });
 
-// A delivery is claimed before calling SES. An ambiguous provider response is
+// A delivery is claimed before calling SMTP. An ambiguous provider response is
 // moved to manual reconciliation and is never retried automatically.
 const resumeQueuedDelivery = async (eventId, referralId, deliveryId, user, ipAddress) => {
   const current = await deliveryWithDocument(deliveryId);
@@ -523,7 +523,8 @@ const issueReferral = async (eventId, referralId, input, user, ipAddress, contex
   const signedPayloadHash = payloadHash(signedPayload(referral, destinationEmail, input.signatureSha256));
   const generatedAt = new Date();
   const version = referral.revisionNumber || 1;
-  const email = referralEmailTemplate(referralId);
+  const participant = referral.review.registration.participant;
+  const email = referralEmailTemplate(referralId, `${participant.firstName} ${participant.lastName}`.trim());
   const document = await generateReferralPdf({ referral, signature, password: handoffSecret, version, generatedAt });
   const documentId = crypto.randomUUID();
   const deliveryId = crypto.randomUUID();

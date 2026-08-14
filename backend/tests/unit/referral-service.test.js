@@ -167,17 +167,18 @@ test("does not mark a Google SMTP rejection as sent", async () => {
   assert.deepEqual(result, { status: "FAILED", reason: "SMTP_RECIPIENT_NOT_ACCEPTED", attempted: true });
 });
 
-test("uses one PII-free template for stored delivery metadata and the referral attachment", () => {
+test("personalizes the referral email without exposing clinical or contact details", () => {
   const referral = referralFixture();
-  const email = referralEmailTemplate(referral.referralId);
-  assert.equal(email.subject, "Confidential document from VSMS (encrypted PDF)");
-  assert.match(email.body, /confidential health report and referral/i);
-  assert.match(email.body, /one-time password.*separate channel/i);
+  const email = referralEmailTemplate(referral.referralId, "Alicia Lim");
+  assert.equal(email.subject, "Your VSMS vision screening referral and next steps (encrypted PDF)");
+  assert.match(email.body, /^Dear Alicia Lim,/);
+  assert.match(email.body, /reason for referral, urgency, referral destination, and next steps/i);
+  assert.match(email.body, /one-time PDF password.*separate channel/i);
   assert.equal(email.filename, "health-report-referral-11111111.pdf");
   for (const sensitiveValue of [
     referral.review.registration.participant.nric,
     referral.review.registration.participant.contactNumber,
-    `${referral.review.registration.participant.firstName} ${referral.review.registration.participant.lastName}`,
+    referral.reason,
     "45679876",
   ]) {
     assert.equal(JSON.stringify(email).includes(sensitiveValue), false);
