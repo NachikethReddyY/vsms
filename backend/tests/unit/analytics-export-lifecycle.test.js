@@ -119,7 +119,7 @@ test("queue analytics delegates percentiles to the migration-managed PostgreSQL 
   assert.match(statements[1], /vsms_event_queue_statistics/);
   assert.match(statements[2], /q\.completed_at >=/);
   assert.match(statements[2], /WHERE s\.event_id/);
-  const routines = fs.readFileSync(path.join(__dirname, "../../prisma/migrations/20260813040000_add_database_routines/migration.sql"), "utf8");
+  const routines = fs.readFileSync(path.join(__dirname, "../../prisma/migrations/20260814200000_add_database_routines/migration.sql"), "utf8");
   assert.match(routines, /percentile_cont\(0\.90\)/);
   assert.match(routines, /registration\."event_id" = p_event_id/);
   const migration = fs.readFileSync(path.join(__dirname, "../../prisma/migrations/20260806172000_stage3_hardening/migration.sql"), "utf8");

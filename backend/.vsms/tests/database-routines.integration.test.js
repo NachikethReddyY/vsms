@@ -2,7 +2,11 @@ const assert = require("node:assert/strict");
 const crypto = require("node:crypto");
 const { after, before, test } = require("node:test");
 
-const { cancelActiveRegistrationQueue, getEventQueueStatistics } = require("../../utils/database/databaseRoutines");
+const {
+  cancelActiveRegistrationQueue,
+  getEventQueueStatistics,
+  isRegistrationRouteComplete,
+} = require("../../utils/database/databaseRoutines");
 const { ensureTestUser, prisma } = require("../../tests/helpers");
 
 let actor;
@@ -16,14 +20,11 @@ let secondRegistration;
 const participantData = (label) => ({
   nric: `TEST-${crypto.randomUUID()}`,
   participantReference: `DBR-${crypto.randomUUID().replaceAll("-", "").slice(0, 20)}`,
-  nricMasked: "••••123A",
   firstName: label,
   lastName: "Routine",
   dateOfBirth: new Date("1970-01-01T00:00:00.000Z"),
   gender: "F",
   contactNumber: "+65 6000 2000",
-  emergencyContact: "+65 6000 2001",
-  consentGiven: true,
   createdById: actor.id,
   updatedById: actor.id,
   onboardingEventId: event.eventId,
@@ -122,9 +123,13 @@ test("queue statistics execute inside PostgreSQL with deterministic interval sem
   assert.equal(statistics.wait_p50, 10);
   assert.equal(statistics.wait_p90, 10);
   assert.equal(statistics.service_p50, 10);
+  await assert.rejects(
+    getEventQueueStatistics(event.eventId, new Date("2026-08-14T00:00:00.000Z"), new Date("2026-08-13T00:00:00.000Z")),
+    /analytics range must have a start before its end/,
+  );
 });
 
-test("queue cancellation validates event scope and rolls back a rejected call", async () => {
+test("queue cancellation validates event scope, reports affected rows, and is idempotent", async () => {
   await assert.rejects(
     prisma.$transaction((tx) => cancelActiveRegistrationQueue(
       otherEvent.eventId,
@@ -136,10 +141,48 @@ test("queue cancellation validates event scope and rolls back a rejected call", 
   );
   assert.equal((await prisma.queueEntry.findFirstOrThrow({ where: { registrationId: secondRegistration.registrationId } })).status, "WAITING");
 
-  await cancelActiveRegistrationQueue(event.eventId, secondRegistration.registrationId, new Date());
+  const result = await cancelActiveRegistrationQueue(event.eventId, secondRegistration.registrationId, new Date());
+  assert.equal(result.count, 1);
   const cancelled = await prisma.queueEntry.findFirstOrThrow({ where: { registrationId: secondRegistration.registrationId } });
   assert.equal(cancelled.status, "CANCELLED");
   assert.ok(cancelled.leftQueueAt instanceof Date);
+
+  const replay = await cancelActiveRegistrationQueue(event.eventId, secondRegistration.registrationId, new Date());
+  assert.equal(replay.count, 0);
+});
+
+test("route completion is event-scoped, non-vacuous, and reflects unfinished steps", async () => {
+  assert.equal(await isRegistrationRouteComplete(event.eventId, registration.registrationId), false);
+
+  const step = await prisma.registrationRouteStep.create({
+    data: {
+      registrationId: registration.registrationId,
+      stationId: station.stationId,
+      position: 1,
+    },
+  });
+  assert.equal(await isRegistrationRouteComplete(event.eventId, registration.registrationId), false);
+
+  await prisma.registrationRouteStep.update({
+    where: { routeStepId: step.routeStepId },
+    data: { completedAt: new Date() },
+  });
+  assert.equal(await isRegistrationRouteComplete(event.eventId, registration.registrationId), true);
+  await assert.rejects(
+    isRegistrationRouteComplete(otherEvent.eventId, registration.registrationId),
+    /registration does not belong to the supplied event/,
+  );
+});
+
+test("participant timestamp trigger covers direct SQL updates", async () => {
+  const forcedTimestamp = new Date("2020-01-01T00:00:00.000Z");
+  await prisma.$executeRaw`
+    UPDATE participants
+    SET updated_at = ${forcedTimestamp}
+    WHERE participant_id = ${registration.participantId}::uuid
+  `;
+  const updated = await prisma.participant.findUniqueOrThrow({ where: { id: registration.participantId } });
+  assert.ok(updated.updatedAt > forcedTimestamp);
 });
 
 test("database triggers reject cross-event station relationships", async () => {
@@ -159,7 +202,7 @@ test("database triggers reject cross-event station relationships", async () => {
       data: {
         registrationId: registration.registrationId,
         stationId: otherStation.stationId,
-        position: 1,
+        position: 2,
       },
     }),
     /must belong to the same event/,

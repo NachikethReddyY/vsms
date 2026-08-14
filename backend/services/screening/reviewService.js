@@ -12,6 +12,7 @@ const {
 
 const { requireEventRoleAndDuty } = require("../event/eventAuthorizationService");
 const { maskNric } = require("../../utils/validation/validation");
+const { cancelActiveRegistrationQueue } = require("../../utils/database/databaseRoutines");
 
 const FLAG_RANK = {
   NORMAL: 0,
@@ -114,10 +115,8 @@ const assertReviewOutcomeAllowed = (readiness, outcome) => {
   return incompleteUrgentRoute;
 };
 
-const stopRouteForUrgentReview = (tx, registrationId, now = new Date()) => tx.queueEntry.updateMany({
-  where: { registrationId, status: { in: ["WAITING", "CALLED", "IN_PROGRESS"] } },
-  data: { status: "CANCELLED", leftQueueAt: now },
-});
+const stopRouteForUrgentReview = (tx, eventId, registrationId, now = new Date()) =>
+  cancelActiveRegistrationQueue(eventId, registrationId, now, tx);
 
 const unfinishedRouteStationIds = (routeSteps) => routeSteps
   .filter(({ completedAt }) => !completedAt)
@@ -469,7 +468,7 @@ const recordDecision = async (eventId, registrationId, decision, user, ipAddress
       }
 
       const cancelledQueue = incompleteUrgentRoute
-        ? await stopRouteForUrgentReview(tx, registrationId)
+        ? await stopRouteForUrgentReview(tx, eventId, registrationId)
         : { count: 0 };
 
       const auditBase = {

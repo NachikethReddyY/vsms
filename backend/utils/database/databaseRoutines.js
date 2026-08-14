@@ -15,15 +15,31 @@ const cancelActiveRegistrationQueue = (
   registrationId,
   cancelledAt,
   client = prisma,
-) => client.$executeRaw(Prisma.sql`
+) => client.$queryRaw(Prisma.sql`
   CALL "sp_vsms_cancel_active_registration_queue"(
     ${eventId}::uuid,
     ${registrationId}::uuid,
-    ${cancelledAt}::timestamptz
+    ${cancelledAt}::timestamptz,
+    NULL
   )
-`);
+`).then(([result]) => ({ count: Number(result?.p_cancelled_count || 0) }));
+
+const isRegistrationRouteComplete = async (
+  eventId,
+  registrationId,
+  client = prisma,
+) => {
+  const [result] = await client.$queryRaw(Prisma.sql`
+    SELECT "vsms_registration_route_complete"(
+      ${eventId}::uuid,
+      ${registrationId}::uuid
+    ) AS complete
+  `);
+  return result?.complete === true;
+};
 
 module.exports = {
   cancelActiveRegistrationQueue,
   getEventQueueStatistics,
+  isRegistrationRouteComplete,
 };

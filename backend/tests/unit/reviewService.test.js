@@ -62,16 +62,15 @@ describe("clinical review eligibility and ordering", () => {
       .toThrow(expect.objectContaining({ code: "URGENT_ESCALATION_REQUIRED" }));
     expect(assertReviewOutcomeAllowed(readiness, "URGENT_ESCALATION")).toBe(true);
 
-    let mutation;
+    let statement;
     const stopped = await stopRouteForUrgentReview({
-      queueEntry: { updateMany: async (query) => { mutation = query; return { count: 1 }; } },
-    }, "registration-1", new Date("2026-08-12T12:00:00.000Z"));
+      $queryRaw: async (query) => {
+        statement = query.strings.join(" ");
+        return [{ p_cancelled_count: 1 }];
+      },
+    }, "10000000-0000-4000-8000-000000000010", "10000000-0000-4000-8000-000000000011", new Date("2026-08-12T12:00:00.000Z"));
     expect(stopped.count).toBe(1);
-    expect(mutation.where).toEqual({
-      registrationId: "registration-1",
-      status: { in: ["WAITING", "CALLED", "IN_PROGRESS"] },
-    });
-    expect(mutation.data).toMatchObject({ status: "CANCELLED" });
+    expect(statement).toMatch(/sp_vsms_cancel_active_registration_queue/);
     expect(unfinishedRouteStationIds([
       { stationId: stations[1].stationId, position: 2, completedAt: null },
       { stationId: stations[0].stationId, position: 1, completedAt: new Date() },

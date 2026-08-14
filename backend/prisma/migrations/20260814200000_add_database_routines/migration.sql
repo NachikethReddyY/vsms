@@ -88,13 +88,16 @@ COMMENT ON FUNCTION "vsms_event_queue_statistics"(UUID, TIMESTAMPTZ, TIMESTAMPTZ
 CREATE OR REPLACE PROCEDURE "sp_vsms_cancel_active_registration_queue"(
   p_event_id UUID,
   p_registration_id UUID,
-  p_cancelled_at TIMESTAMPTZ
+  p_cancelled_at TIMESTAMPTZ,
+  OUT p_cancelled_count INTEGER
 )
 LANGUAGE plpgsql
 SECURITY INVOKER
 SET search_path = pg_catalog, public
 AS $$
 BEGIN
+  p_cancelled_count := 0;
+
   IF p_event_id IS NULL OR p_registration_id IS NULL OR p_cancelled_at IS NULL THEN
     RAISE EXCEPTION USING
       ERRCODE = '22004',
@@ -118,11 +121,57 @@ BEGIN
     "left_queue_at" = COALESCE(queue."left_queue_at", p_cancelled_at)
   WHERE queue."registration_id" = p_registration_id
     AND queue."status" IN ('WAITING', 'CALLED', 'IN_PROGRESS');
+
+  GET DIAGNOSTICS p_cancelled_count = ROW_COUNT;
 END;
 $$;
 
 COMMENT ON PROCEDURE "sp_vsms_cancel_active_registration_queue"(UUID, UUID, TIMESTAMPTZ) IS
   'Closes any active queue row when an authorized service terminates a participant journey.';
+
+CREATE OR REPLACE FUNCTION "vsms_registration_route_complete"(
+  p_event_id UUID,
+  p_registration_id UUID
+)
+RETURNS BOOLEAN
+LANGUAGE plpgsql
+STABLE
+SECURITY INVOKER
+SET search_path = pg_catalog, public
+AS $$
+BEGIN
+  IF p_event_id IS NULL OR p_registration_id IS NULL THEN
+    RAISE EXCEPTION USING
+      ERRCODE = '22004',
+      MESSAGE = 'event id and registration id are required';
+  END IF;
+
+  IF NOT EXISTS (
+    SELECT 1
+    FROM public."event_registrations" registration
+    WHERE registration."registration_id" = p_registration_id
+      AND registration."event_id" = p_event_id
+  ) THEN
+    RAISE EXCEPTION USING
+      ERRCODE = '23503',
+      MESSAGE = 'registration does not belong to the supplied event';
+  END IF;
+
+  RETURN EXISTS (
+    SELECT 1
+    FROM public."registration_route_steps" route_step
+    WHERE route_step."registration_id" = p_registration_id
+  ) AND NOT EXISTS (
+    SELECT 1
+    FROM public."registration_route_steps" route_step
+    WHERE route_step."registration_id" = p_registration_id
+      AND route_step."completed_at" IS NULL
+  );
+END;
+$$;
+
+COMMENT ON FUNCTION "vsms_registration_route_complete"(UUID, UUID) IS
+  'Returns true only when an event-scoped registration has a non-empty route and every route step is complete.';
 
 CREATE OR REPLACE FUNCTION "vsms_assert_registration_station_scope"()
 RETURNS TRIGGER
@@ -264,3 +313,11 @@ COMMENT ON FUNCTION "vsms_assert_registration_station_scope"() IS
 
 COMMENT ON FUNCTION "vsms_assert_queue_movement_scope"() IS
   'Rejects queue movements whose source or destination station is outside the registration event.';
+
+-- PostgreSQL grants EXECUTE to PUBLIC by default. Only the migration owner and
+-- explicitly provisioned application roles may call these routines directly.
+REVOKE ALL ON FUNCTION "vsms_event_queue_statistics"(UUID, TIMESTAMPTZ, TIMESTAMPTZ) FROM PUBLIC;
+REVOKE ALL ON PROCEDURE "sp_vsms_cancel_active_registration_queue"(UUID, UUID, TIMESTAMPTZ) FROM PUBLIC;
+REVOKE ALL ON FUNCTION "vsms_registration_route_complete"(UUID, UUID) FROM PUBLIC;
+REVOKE ALL ON FUNCTION "vsms_assert_registration_station_scope"() FROM PUBLIC;
+REVOKE ALL ON FUNCTION "vsms_assert_queue_movement_scope"() FROM PUBLIC;

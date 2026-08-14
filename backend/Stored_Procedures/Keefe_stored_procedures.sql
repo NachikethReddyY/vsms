@@ -1,7 +1,7 @@
 -- VSMS database-routine catalog
 --
 -- The executable definitions are versioned and deployed by Prisma migration:
--- prisma/migrations/20260813040000_add_database_routines/migration.sql
+-- prisma/migrations/20260814200000_add_database_routines/migration.sql
 --
 -- This catalog intentionally contains no second copy of the routine bodies. A
 -- standalone SQL copy previously targeted obsolete tables such as queue_entry,
@@ -16,13 +16,45 @@
 --
 -- PROCEDURE sp_vsms_cancel_active_registration_queue(uuid, uuid, timestamptz)
 --   Cancels active queue rows when the authorized review service terminates a
---   participant journey. It validates event/registration scope in PostgreSQL.
+--   participant journey, reports the affected row count, and validates event
+--   and registration scope in PostgreSQL.
+--
+-- FUNCTION  vsms_registration_route_complete(uuid, uuid)
+--   Returns true only for a non-empty event-scoped route whose steps all have a
+--   completion timestamp. This replaces the obsolete global mandatory-station
+--   completion function.
 --
 -- TRIGGER FUNCTION vsms_assert_registration_station_scope()
 --   Rejects cross-event route, queue-entry, and screening-result relationships.
 --
 -- TRIGGER FUNCTION vsms_assert_queue_movement_scope()
 --   Rejects cross-event source or destination stations in queue movements.
+--
+-- Existing routine retained
+-- -------------------------
+-- FUNCTION fn_update_timestamp() / TRIGGER trg_participants_updated_at
+--   Deployed by migration 20260806020000_add_updated_at_trigger and verified by
+--   the database-routine integration suite.
+--
+-- Intentionally application-owned controls
+-- ----------------------------------------
+-- Clinical auto-flagging stays in screeningService.js because the current
+-- ScreeningResult stores versioned JSON for several station types rather than
+-- the obsolete visual_acuity_results columns. Keeping one rule engine prevents
+-- conflicting medical decisions.
+--
+-- Queue transition audits stay in queueService.js and reviewService.js so each
+-- immutable audit record includes the authenticated actor, request ID, before
+-- and after values, and event context. A database trigger cannot safely infer
+-- those request attributes.
+--
+-- Manual station transfers stay in queueService.js because authorization,
+-- route policy, queue movement creation, and the audit write must remain one
+-- service-owned transaction. PostgreSQL trigger functions enforce event scope
+-- underneath that transaction.
+--
+-- The reporting API uses the live aggregate function instead of a materialized
+-- view, avoiding stale clinical dashboards and an operational refresh job.
 --
 -- Runtime adapters
 -- ----------------
