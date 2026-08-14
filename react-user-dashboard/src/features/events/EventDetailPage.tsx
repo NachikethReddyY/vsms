@@ -140,6 +140,7 @@ export default function EventDetailPage() {
   const [stationTemplatesLoaded, setStationTemplatesLoaded] = useState(false);
   const [stationTemplatesError, setStationTemplatesError] = useState('');
   const [stationPending, setStationPending] = useState('');
+  const [stationEditing, setStationEditing] = useState<string | null>(null);
   const [shiftPending, setShiftPending] = useState('');
   const [shiftCreateOpen, setShiftCreateOpen] = useState(false);
   const [shiftCreateDraft, setShiftCreateDraft] = useState<NewShiftDraft>({ date: '', name: '', startsAt: '09:00', endsAt: '17:00', requiredStaff: 1 });
@@ -516,7 +517,7 @@ export default function EventDetailPage() {
   const terminal = event.status === 'COMPLETED' || event.status === 'CANCELLED';
   const canManage = event.canManage;
   const canCreateEvent = user?.roles.includes('ADMINISTRATOR') ?? false;
-  const canConfigureStations = canManage && ['DRAFT', 'PUBLISHED'].includes(event.status);
+  const canConfigureStations = canManage && ['DRAFT', 'PUBLISHED', 'IN_PROGRESS'].includes(event.status);
   const canEditStaffing = canManage && ['DRAFT', 'PUBLISHED', 'IN_PROGRESS'].includes(event.status);
   const availableTemplates = stationTemplates.filter((template) => {
     if (template.stationType === 'CUSTOM') {
@@ -696,7 +697,7 @@ export default function EventDetailPage() {
             const availabilities = station.availabilities.length ? station.availabilities : event.eventDays.map((day) => ({ eventStationAvailabilityId: `${station.eventStationId}-${day.eventDayId}`, eventDay: day, isAvailable: station.isAvailable, startsAt: day.startsAt, endsAt: day.endsAt, capacity: station.capacity }));
             return <article className={`station-record ${station.isAvailable ? '' : 'is-unavailable'}`} key={station.eventStationId}>
               <div className="station-record-copy"><strong>{station.name}</strong><span>{station.description || 'No station instructions.'}</span><small>Template v{station.templateVersion}</small></div>
-              {canConfigureStations ? <div className="station-stacked-controls">
+              {canConfigureStations && stationEditing === station.eventStationId ? <div className="station-stacked-controls">
                 <form className="station-capacity" noValidate onSubmit={(submitEvent) => saveStationCapacity(submitEvent, station.eventStationId)}>
                   <div><strong>Default capacity</strong><small>Apply one participant limit to every available day.</small></div>
                   <label><span>People per day</span><input key={`${station.eventStationId}-${station.capacity}`} name="capacity" type="number" min="1" max="1000" step="1" required defaultValue={station.capacity} aria-label={`${station.name} capacity for every day`} aria-invalid={!!capacityErrors[station.eventStationId]} aria-describedby={capacityErrors[station.eventStationId] ? `capacity-error-${station.eventStationId}` : undefined} onInput={() => setCapacityErrors((current) => ({ ...current, [station.eventStationId]: '' }))} />{capacityErrors[station.eventStationId] && <span className="field-error" id={`capacity-error-${station.eventStationId}`} role="alert">{capacityErrors[station.eventStationId]}</span>}</label>
@@ -731,9 +732,9 @@ export default function EventDetailPage() {
                       })}
                     </div>}
                   </fieldset>})}
-                  <div className="station-actions"><button className="secondary compact station-remove" type="button" disabled={!!stationPending} onClick={() => void removeStation(station.eventStationId, station.name)}><TrashIcon />Remove station</button><button className="primary compact" type="submit" disabled={!!stationPending}>{stationPending === station.eventStationId ? 'Saving…' : 'Save station schedule'}</button></div>
+                  <div className="station-actions"><button className="secondary compact station-remove" type="button" disabled={!!stationPending} onClick={() => void removeStation(station.eventStationId, station.name)}><TrashIcon />Remove station</button><span><button className="secondary compact" type="button" disabled={!!stationPending} onClick={() => setStationEditing(null)}>Cancel</button><button className="primary compact" type="submit" disabled={!!stationPending}>{stationPending === station.eventStationId ? 'Saving…' : 'Save availability'}</button></span></div>
                 </form>
-              </div> : <div className="station-day-list">{availabilities.map((availability) => <span className={availability.isAvailable ? 'is-available' : 'is-unavailable'} key={availability.eventStationAvailabilityId}>{formatEventDate(availability.eventDay.date, event.timezone, false)} · {availability.isAvailable ? `${availability.capacity} places` : 'Unavailable'}</span>)}</div>}
+              </div> : <div className="station-record-actions"><div className="station-day-list">{availabilities.map((availability) => <span className={availability.isAvailable ? 'is-available' : 'is-unavailable'} key={availability.eventStationAvailabilityId}>{formatEventDate(availability.eventDay.date, event.timezone, false)} · {availability.isAvailable ? `${availability.startsAt ? `${formatTime(availability.startsAt, event.timezone)}–${formatTime(availability.endsAt || availability.startsAt, event.timezone)} · ` : ''}${availability.capacity} places` : 'Unavailable'}</span>)}</div>{canConfigureStations && <button className="secondary compact" type="button" onClick={() => setStationEditing(station.eventStationId)}>Configure</button>}</div>}
             </article>;
           })}</div>}
     </section>}

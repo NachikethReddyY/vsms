@@ -371,6 +371,24 @@ test("a live event accepts a new active shift without unlocking the event plan",
   assert.equal(result.shifts.at(-1).name, "Late registration");
 });
 
+test("a live event manager can change station availability", async (t) => {
+  const current = eventRecord("IN_PROGRESS", 1);
+  const stationId = current.stations[0].stationId;
+  const updated = { ...eventRecord("IN_PROGRESS", 2), stations: [{ ...current.stations[0], isActive: false }] };
+  let stationUpdate;
+  installTransaction(t, current, updated, {
+    station: { update: async (input) => { stationUpdate = input; return {}; } },
+  });
+
+  const result = await eventService.updateStation(eventId, stationId, {
+    version: 1,
+    isAvailable: false,
+  }, manager, crypto.randomUUID());
+
+  assert.equal(stationUpdate.data.isActive, false);
+  assert.equal(result.eventStations[0].isAvailable, false);
+});
+
 test("staff assignment saves an active user and preserves manager permissions", async (t) => {
   const current = eventRecord();
   const assignment = {

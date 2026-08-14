@@ -551,8 +551,8 @@ const auditUpdate = (tx, current, updated, user, correlationId) => tx.eventAudit
 });
 
 const assertStationPlanningState = (event) => {
-  if (!["DRAFT", "PUBLISHED"].includes(event.status)) {
-    throw new AppError(409, "STATIONS_NOT_EDITABLE", "Stations cannot be changed after an event goes live");
+  if (!["DRAFT", "PUBLISHED", "IN_PROGRESS"].includes(event.status)) {
+    throw new AppError(409, "STATIONS_NOT_EDITABLE", "Stations cannot be changed for a completed or cancelled event");
   }
 };
 

@@ -663,10 +663,14 @@ html[data-theme="light"] .events-workspace {
 .events-workspace .shift-record-summary small,
 .events-workspace .assignment-list small { color:var(--ink-2); }
 .events-workspace .station-day-list { display:flex; flex-wrap:wrap; gap:6px; margin-top:10px; }
+.events-workspace .station-record-actions { min-width:0; display:flex; align-items:center; justify-content:flex-end; gap:12px; }
+.events-workspace .station-record-actions .station-day-list { justify-content:flex-end; margin:0; }
+.events-workspace .station-record-actions>button { flex:0 0 auto; min-height:44px; }
 .events-workspace .station-day-list span { max-width:none; margin:0; padding:4px 7px; border:1px solid var(--line); border-radius:6px; background:var(--surface); color:var(--ink-2); font-size:10px; line-height:14px; }
 .events-workspace .station-day-list span.is-available { border-color:color-mix(in srgb,var(--today) 35%,var(--line)); color:var(--today); }
 .events-workspace .station-day-list span.is-unavailable { color:var(--ink-2); }
 .events-workspace .station-stacked-controls { grid-column:1/-1; display:grid; gap:18px; margin-top:12px; }
+.events-workspace .station-actions>span { display:flex; gap:8px; }
 .events-workspace .station-schedule { display:grid; gap:12px; }
 .events-workspace .station-schedule fieldset { display:grid; grid-template-columns:minmax(170px,.65fr) minmax(320px,1.35fr); align-items:center; gap:18px 24px; margin:0; padding:18px; border:1px solid var(--line); border-radius:12px; background:var(--surface); }
 .events-workspace .station-schedule legend { padding:0 7px; color:var(--ink); font-size:13px; font-weight:750; letter-spacing:-.01em; }
@@ -783,6 +787,8 @@ html[data-theme="light"] .events-workspace {
   .events-workspace .lifecycle-heading { display:flex; justify-content:space-between; align-items:baseline; gap:16px; }
   .events-workspace .event-danger-zone { align-items:start; flex-direction:column; }
   .events-workspace .station-record { grid-template-columns:48px minmax(0,1fr); gap:12px; }
+  .events-workspace .station-record-actions { grid-column:1/-1; align-items:stretch; flex-direction:column; }
+  .events-workspace .station-record-actions .station-day-list { justify-content:flex-start; }
   .events-workspace .station-controls { grid-column:1/-1; justify-content:flex-start; }
   .events-workspace .station-capacity-readonly { grid-column:2; }
   .events-workspace .shift-record-summary { grid-template-columns:minmax(0,1fr) auto; gap:10px 16px; }
