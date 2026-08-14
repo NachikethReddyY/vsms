@@ -1,5 +1,5 @@
 import { FormEvent, useCallback, useEffect, useId, useRef, useState } from 'react';
-import { Link, useNavigate, useSearchParams } from 'react-router-dom';
+import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import {
   ArrowPathIcon,
   ArrowRightIcon,
@@ -31,6 +31,7 @@ type TrackCapabilitiesWithTorch = MediaTrackCapabilities & { advanced?: Array<Re
 
 export default function QRScannerPage() {
   const navigate = useNavigate();
+  const { eventId = '' } = useParams();
   const [searchParams] = useSearchParams();
   const [rawInput, setRawInput] = useState(() => searchParams.get('token') || '');
   const [status, setStatus] = useState<ScanStatus>('scanning');
@@ -38,7 +39,7 @@ export default function QRScannerPage() {
   const [verified, setVerified] = useState<QrVerifyResult | null>(null);
   const [lookupOnly, setLookupOnly] = useState(false);
   const [activeAssignment, setActiveAssignment] = useState<ActiveAssignment | null>(null);
-  const [lookupEventId, setLookupEventId] = useState('');
+  const [lookupEventId, setLookupEventId] = useState(eventId);
   const [lookupRegistrationId, setLookupRegistrationId] = useState('');
   const inputRef = useRef<HTMLInputElement>(null);
   const verificationRef = useRef(false);
@@ -157,7 +158,7 @@ export default function QRScannerPage() {
           </p>
         </div>
         <div className="action-cluster">
-          <Link className="secondary" to="/events">Back to events</Link>
+          <Link className="secondary" to={eventId ? `/events/${eventId}` : '/events'}>Back to event</Link>
         </div>
       </header>
 

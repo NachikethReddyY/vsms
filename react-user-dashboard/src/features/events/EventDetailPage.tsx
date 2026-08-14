@@ -604,7 +604,7 @@ export default function EventDetailPage() {
           {assignedStationTypes.has('COLOUR_VISION') && <Link className="primary" to={`${eventPath}/stations/colour-vision`}>Open Colour Vision station</Link>}
           {assignedStationTypes.has('EYE_HEALTH') && <p className="quiet-empty">Eye health is captured during clinical review, not as a screener station.</p>}
           {assignedStations.filter((station) => station.stationType === 'CUSTOM').map((station) => <Link className="primary" key={station.eventStationId} to={customStationPath(event.eventId, station.eventStationId)}>Open {station.name}</Link>)}
-          {assignedStationTypes.size > 0 && <Link className="secondary" to="/qr-scanner">Scan QR → station</Link>}
+          {assignedStationTypes.size > 0 && <Link className="secondary" to={`${eventPath}/qr-scanner`}>Scan QR → station</Link>}
           {canReview && <Link className="secondary" to={`${eventPath}/reviews`}><ClipboardDocumentCheckIcon />Open clinical review</Link>}
         </div>
       </div>

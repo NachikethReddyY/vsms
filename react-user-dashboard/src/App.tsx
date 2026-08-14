@@ -147,7 +147,7 @@ export default function App() {
             <Route element={<StationDutyGuard stationType="CUSTOM" />}>
               <Route path="/events/:eventId/stations/custom/:stationId" element={<DynamicStationPage />} />
             </Route>
-            <Route path="/qr-scanner" element={<QRScannerPage />} />
+            <Route path="/events/:eventId/qr-scanner" element={<QRScannerPage />} />
           </Route>
 
           <Route element={<RoleGuard allowedRoles={eventManagerRoles} />}>
