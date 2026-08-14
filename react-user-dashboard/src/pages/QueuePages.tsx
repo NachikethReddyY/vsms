@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useParams } from "react-router-dom";
 import { useAuth } from "../auth/AuthProvider";
+import { activeEventRoles } from "../auth/RoleGuard";
 import { NowServingCard } from "../components/queue/NowServingCard";
 import { RouteOverrideDialog } from "../components/queue/RouteOverrideDialog";
 import { QueueHeader } from "../components/queue/QueueHeader";
@@ -8,6 +9,7 @@ import { QueueTable, toQueueItems, type QueueStatus } from "../components/queue/
 import { StationWorkload } from "../components/queue/StationWorkload";
 import { AppShell, LoadingState } from "../components/ui";
 import { queueApi, sortWaitingByPriority, type EventQueueStatus } from "../features/queue/queueApi";
+import { getCurrentAccount, type AccountProfile } from "../features/stage4Api";
 import { getApiError, getApiErrorCode } from "../utils/apiClient";
 
 const PAGE_SIZE = 12;
@@ -18,9 +20,10 @@ export function QueuePage() {
   const { eventId } = useParams<{ eventId: string }>();
   const { session } = useAuth();
   const roles = session?.user.roles ?? [];
-  const canManagePriority = roles.includes("EVENT_MANAGER") || roles.includes("ADMINISTRATOR");
-  const canOverrideRoute = roles.some((role) => ["REGISTRATION_OFFICER", "SCREENER", "EVENT_MANAGER", "ADMINISTRATOR"].includes(role));
-  const hasFullRouteAccess = roles.includes("EVENT_MANAGER") || roles.includes("ADMINISTRATOR");
+  const [eventRoles, setEventRoles] = useState<string[]>([]);
+  const canManagePriority = roles.includes("ADMINISTRATOR") || eventRoles.includes("EVENT_MANAGER");
+  const canOverrideRoute = roles.includes("ADMINISTRATOR") || eventRoles.some((role) => ["REGISTRATION_OFFICER", "SCREENER", "EVENT_MANAGER"].includes(role));
+  const hasFullRouteAccess = roles.includes("ADMINISTRATOR") || eventRoles.includes("EVENT_MANAGER");
 
   const [status, setStatus] = useState<EventQueueStatus | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -34,6 +37,17 @@ export function QueuePage() {
   const requestSequence = useRef(0);
 
   const isPermissionError = Boolean(errorCode && PERMISSION_ERROR_CODES.has(errorCode));
+
+  useEffect(() => {
+    let active = true;
+    if (!eventId) return;
+    void getCurrentAccount().then((result) => {
+      if (!active) return;
+      const account = (result && typeof result === "object" && "account" in result ? result.account : result) as AccountProfile | undefined;
+      setEventRoles(activeEventRoles(account?.eventMemberships || account?.memberships, eventId));
+    }).catch(() => { if (active) setEventRoles([]); });
+    return () => { active = false; };
+  }, [eventId]);
 
   const fetchQueue = useCallback(async () => {
     if (!eventId) return;

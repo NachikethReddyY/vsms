@@ -2,6 +2,7 @@
 const AppError = require("../../errors/AppError");
 const { createAuditLog } = require("../../utils/logging/audit");
 const {
+  requireEventManager,
   requireQueueAccess,
 } = require("../event/eventAuthorizationService");
 
@@ -111,9 +112,10 @@ const requireQueueManagement = async (
   db,
   eventId,
   user,
-  stationId = null
+  stationId = null,
+  managerOnly = false
 ) => {
-  await requireQueueAccess(eventId, user, {
+  await (managerOnly ? requireEventManager : requireQueueAccess)(eventId, user, {
     db,
     stationId,
   });
@@ -1970,12 +1972,7 @@ const updatePriority = async (
     );
   }
 
-  await requireQueueStationOperation(
-    db,
-    entry.registration.eventId,
-    entry.stationId,
-    user
-  );
+  await requireEventManager(entry.registration.eventId, user, { db });
 
   return db.$transaction(async (tx) => {
     const current =
@@ -2071,7 +2068,9 @@ const getStationWorkload = async (
   const event = await requireQueueManagement(
     db,
     eventId,
-    user
+    user,
+    null,
+    true
   );
 
   const [stations, entries] =

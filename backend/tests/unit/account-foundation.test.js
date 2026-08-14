@@ -251,7 +251,8 @@ test("self-service profile rejects employment fields and account filters are str
   assert.equal(accountListQuery.safeParse({ approvalState: "UNKNOWN" }).success, false);
   assert.equal(accountListQuery.safeParse({ unexpected: "value" }).success, false);
   assert.equal(approvalBody.safeParse({}).success, false);
-  assert.equal(approvalBody.safeParse({ roles: ["REVIEWER"] }).success, true);
+  assert.equal(approvalBody.safeParse({ roles: [] }).success, true);
+  assert.equal(approvalBody.safeParse({ roles: ["REVIEWER"] }).success, false);
 });
 
 test("new lifecycle API locks the account before protecting the final administrator", async (t) => {

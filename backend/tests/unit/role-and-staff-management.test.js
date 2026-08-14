@@ -38,7 +38,7 @@ function useTransaction(t, tx) {
 test("legacy ADMIN Cognito group grants the canonical administrator application role", () => {
   assert.deepEqual(
     rolesFromCognitoGroups({ "cognito:groups": ["ADMIN", "Event Manager", "registration_officer", "unknown"] }),
-    ["ADMINISTRATOR", "EVENT_MANAGER", "REGISTRATION_OFFICER"],
+    ["ADMINISTRATOR", "EVENT_MANAGER"],
   );
 });
 
@@ -56,11 +56,11 @@ test("staff management blocks self-demotion and rejects lifecycle fields", async
   assert.equal(updateUserBody.safeParse({ status: "INACTIVE" }).success, false);
 });
 
-test("staff creation accepts a missing employee number", () => {
+test("generic staff creation accepts a missing employee number and global role", () => {
   assert.equal(createUserBody.safeParse({
-    fullName: "Support Person",
-    email: "support@example.com",
-    roles: ["SUPPORT"],
+    fullName: "Staff Person",
+    email: "staff@example.com",
+    roles: [],
   }).success, true);
 });
 

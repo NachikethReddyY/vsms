@@ -10,8 +10,8 @@ import './StaffAccountsPage.css';
 export const ROLE_OPTIONS = [
   { value: 'ADMINISTRATOR', label: 'Administrator', description: 'Manage organisation accounts and all administrative controls.' },
   { value: 'EVENT_MANAGER', label: 'Event manager', description: 'Manage events they create or are assigned to.' },
-  { value: 'REVIEWER', label: 'Doctor', description: 'Clinical professional who can be assigned reviewer duties for specific events.' },
-  { value: 'SUPPORT', label: 'Staff', description: 'Receives registration, screening, or support duties separately for each event.' },
+  { value: 'DOCTOR', label: 'Doctor', description: 'Clinical professional who can be assigned reviewer duties for specific events.' },
+  { value: 'STAFF', label: 'Staff', description: 'Receives registration, screening, or support duties separately for each event.' },
 ] as const;
 
 type ApplicationRole = typeof ROLE_OPTIONS[number]['value'];
@@ -25,14 +25,17 @@ type StaffDraft = {
 };
 
 const emptyDraft = (): StaffDraft => ({
-  fullName: '', email: '', department: '', designation: '', status: 'INACTIVE', role: 'SUPPORT',
+  fullName: '', email: '', department: '', designation: '', status: 'INACTIVE', role: 'STAFF',
 });
 
 const labelRole = (role: string) => ROLE_OPTIONS.find((item) => item.value === role)?.label ?? role.replace(/_/g, ' ');
 const initial = (name: string) => name.trim().split(/\s+/).map((part) => part[0]).join('').slice(0, 2).toUpperCase() || '?';
-const accountTypeFor = (member: AppUser): ApplicationRole => member.professionalCategory === 'DOCTOR'
-  ? 'REVIEWER'
-  : ROLE_OPTIONS.find((option) => member.roles.includes(option.value))?.value ?? 'SUPPORT';
+const accountTypeFor = (member: AppUser): ApplicationRole => member.systemRole === 'ADMIN' || member.roles.includes('ADMINISTRATOR')
+  ? 'ADMINISTRATOR'
+  : member.systemRole === 'EVENT_MANAGER' || member.roles.includes('EVENT_MANAGER')
+    ? 'EVENT_MANAGER'
+    : member.professionalCategory === 'DOCTOR' ? 'DOCTOR' : 'STAFF';
+const globalRolesFor = (type: ApplicationRole) => ['ADMINISTRATOR', 'EVENT_MANAGER'].includes(type) ? [type] : [];
 
 function toDraft(member: AppUser): StaffDraft {
   return {
@@ -110,14 +113,13 @@ export default function StaffAccountsPage() {
       designation: draft.designation.trim() || null,
       ...(!editing ? { status: draft.status } : {}),
       ...(accountTypeChanged ? {
-        roles: [draft.role],
-        professionalCategory: draft.role === 'REVIEWER' ? 'DOCTOR' : 'STAFF',
+        roles: globalRolesFor(draft.role),
+        professionalCategory: draft.role === 'DOCTOR' ? 'DOCTOR' : 'STAFF',
       } : {}),
     };
     try {
-      editing
-        ? await apiClient.patch<{ success: true; data: AppUser }>(`/users/${editing.id}`, payload)
-        : await apiClient.post<{ success: true; data: AppUser }>('/users', payload);
+      if (editing) await apiClient.patch<{ success: true; data: AppUser }>(`/users/${editing.id}`, payload);
+      else await apiClient.post<{ success: true; data: AppUser }>('/users', payload);
       await load();
       setDialogOpen(false);
       setNotice(editing ? 'Staff account updated.' : 'Staff account created.');
@@ -211,7 +213,7 @@ export default function StaffAccountsPage() {
               return <tr key={member.id}>
               <th scope="row"><div className="staff-person"><span className="staff-account-avatar" aria-hidden="true">{initial(member.fullName)}</span><span><strong>{member.fullName}</strong><small>{member.email}</small></span></div></th>
               <td><span className="staff-team">{member.designation || 'No designation'}<small>{member.department || 'No department'}</small></span></td>
-              <td><div className="staff-role-list"><span className="staff-role-chip">{member.professionalCategory === 'DOCTOR' ? 'Doctor' : labelRole(ROLE_OPTIONS.find((option) => member.roles.includes(option.value))?.value ?? 'SUPPORT')}</span></div></td>
+              <td><div className="staff-role-list"><span className="staff-role-chip">{labelRole(accountTypeFor(member))}</span></div></td>
               <td><span className={`staff-state ${member.approvalState?.toLowerCase()}`}>{member.approvalState ?? 'Unknown'}</span></td>
               <td><span className={`staff-access ${member.accessState === 'ENABLED' ? 'active' : 'inactive'}`}><i aria-hidden="true" />{member.accessState === 'DISABLED' ? 'Disabled' : member.accessState === 'SUSPENDED' ? 'Suspended' : 'Enabled'}</span></td>
               <td><span className="staff-last-login">{member.lastLoginAt ? new Date(member.lastLoginAt).toLocaleString() : 'Not recorded'}</span></td>
