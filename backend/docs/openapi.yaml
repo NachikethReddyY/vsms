@@ -3856,14 +3856,16 @@ components:
             skipped: { type: integer, minimum: 0 }
             priority: { type: integer, minimum: 0 }
             longestWaitMinutes: { type: integer, minimum: 0 }
-
-            waitP50Minutes: { type: number, minimum: 0, nullable: true }
-            waitP90Minutes: { type: number, minimum: 0, nullable: true }
-            serviceP50Minutes: { type: number, minimum: 0, nullable: true }
+        stations:
+          type: object
+          additionalProperties: false
+          required: [total, available, paused, offline, items]
           properties:
             total: { type: integer, minimum: 0 }
             available: { type: integer, minimum: 0 }
+            paused: { type: integer, minimum: 0 }
             offline: { type: integer, minimum: 0 }
+            items:
               type: array
               maxItems: 50
               items: { $ref: "#/components/schemas/OperationsStation" }
@@ -3874,6 +3876,10 @@ components:
           properties:
             shiftId: { type: string, format: uuid, nullable: true }
             shiftName: { type: string, maxLength: 100, nullable: true }
+            startsAt: { type: string, format: date-time, nullable: true }
+            endsAt: { type: string, format: date-time, nullable: true }
+            required: { type: integer, minimum: 0 }
+            assigned: { type: integer, minimum: 0 }
             unfilled: { type: integer, minimum: 0 }
             unstaffedStations: { type: integer, minimum: 0 }
         referrals:

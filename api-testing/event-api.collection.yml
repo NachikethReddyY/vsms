@@ -1817,7 +1817,8 @@ item:
                         },
                         "user": {
                           "userId": "00000000-0000-4000-8000-000000000000",
-                          "username": ""
+                          "username": "",
+                          "fullName": ""
                         }
                       }
                     ]
@@ -2131,7 +2132,8 @@ item:
                     },
                     "user": {
                       "userId": "00000000-0000-4000-8000-000000000000",
-                      "username": ""
+                      "username": "",
+                      "fullName": ""
                     }
                   }
                 ]
@@ -2375,7 +2377,8 @@ item:
                       },
                       "user": {
                         "userId": "00000000-0000-4000-8000-000000000000",
-                        "username": ""
+                        "username": "",
+                        "fullName": ""
                       }
                     }
                   ]
@@ -3713,6 +3716,88 @@ item:
               }
             ]
           }
+  - name: Read artwork for a public event without exposing private object storage
+    description: ''
+    event: []
+    request:
+      method: GET
+      header: []
+      auth:
+        type: bearer
+        bearer:
+          - key: token
+            value: '{{token}}'
+            type: string
+      url:
+        raw: '{{baseUrl}}/public/events/{eventId}/artwork'
+        host:
+          - '{{baseUrl}}'
+        path:
+          - public
+          - events
+          - '{eventId}'
+          - artwork
+        query: []
+    response:
+      - name: 200 Response
+        originalRequest:
+          method: GET
+          header: []
+          url: '{{baseUrl}}/public/events/{eventId}/artwork'
+        status: OK
+        code: 200
+        header:
+          - key: Content-Type
+            value: application/json
+        body: ''
+      - name: 404 Response
+        originalRequest:
+          method: GET
+          header: []
+          url: '{{baseUrl}}/public/events/{eventId}/artwork'
+        status: Not Found
+        code: 404
+        header:
+          - key: Content-Type
+            value: application/json
+        body: |-
+          {
+            "type": "",
+            "title": "",
+            "status": 0,
+            "code": "",
+            "requestId": "00000000-0000-4000-8000-000000000000",
+            "errors": [
+              {
+                "field": "",
+                "message": ""
+              }
+            ]
+          }
+      - name: 422 Response
+        originalRequest:
+          method: GET
+          header: []
+          url: '{{baseUrl}}/public/events/{eventId}/artwork'
+        status: Unprocessable Entity
+        code: 422
+        header:
+          - key: Content-Type
+            value: application/json
+        body: |-
+          {
+            "type": "",
+            "title": "",
+            "status": 0,
+            "code": "",
+            "requestId": "00000000-0000-4000-8000-000000000000",
+            "errors": [
+              {
+                "field": "",
+                "message": ""
+              }
+            ]
+          }
   - name: Get event operations metrics
     description: >-
       Requires an active EVENT_MANAGER membership for this event. Platform administrator status and event creation do
@@ -4431,6 +4516,15 @@ item:
                 "checkedIn": true,
                 "checkedInAt": "2026-08-07T00:00:00.000Z",
                 "queueNumber": 0,
+                "routeVersion": 1,
+                "routeSteps": [
+                  {
+                    "stationId": "00000000-0000-4000-8000-000000000000",
+                    "stationName": "",
+                    "position": 1,
+                    "state": "COMPLETED"
+                  }
+                ],
                 "createdAt": "2026-08-07T00:00:00.000Z"
               }
             ],
@@ -4660,7 +4754,8 @@ item:
                     },
                     "user": {
                       "userId": "00000000-0000-4000-8000-000000000000",
-                      "username": ""
+                      "username": "",
+                      "fullName": ""
                     }
                   }
                 ]
@@ -4964,7 +5059,8 @@ item:
                     },
                     "user": {
                       "userId": "00000000-0000-4000-8000-000000000000",
-                      "username": ""
+                      "username": "",
+                      "fullName": ""
                     }
                   }
                 ]
@@ -5206,6 +5302,87 @@ item:
               description: JSON request body
               type: text
           url: '{{baseUrl}}/events/{eventId}'
+        status: Forbidden
+        code: 403
+        header:
+          - key: Content-Type
+            value: application/json
+        body: |-
+          {
+            "type": "",
+            "title": "",
+            "status": 0,
+            "code": "",
+            "requestId": "00000000-0000-4000-8000-000000000000",
+            "errors": [
+              {
+                "field": "",
+                "message": ""
+              }
+            ]
+          }
+  - name: Read private draft or staff-visible event artwork
+    description: ''
+    event: []
+    request:
+      method: GET
+      header: []
+      auth:
+        type: bearer
+        bearer:
+          - key: token
+            value: '{{token}}'
+            type: string
+      url:
+        raw: '{{baseUrl}}/events/{eventId}/artwork'
+        host:
+          - '{{baseUrl}}'
+        path:
+          - events
+          - '{eventId}'
+          - artwork
+        query: []
+    response:
+      - name: 200 Response
+        originalRequest:
+          method: GET
+          header: []
+          url: '{{baseUrl}}/events/{eventId}/artwork'
+        status: OK
+        code: 200
+        header:
+          - key: Content-Type
+            value: application/json
+        body: ''
+      - name: 401 Response
+        originalRequest:
+          method: GET
+          header: []
+          url: '{{baseUrl}}/events/{eventId}/artwork'
+        status: Unauthorized
+        code: 401
+        header:
+          - key: Content-Type
+            value: application/json
+        body: |-
+          {
+            "type": "",
+            "title": "",
+            "status": 0,
+            "code": "",
+            "requestId": "00000000-0000-4000-8000-000000000000",
+            "errors": [
+              {
+                "field": "",
+                "message": ""
+              }
+            ]
+          }
+      - name: 403 Response
+        originalRequest:
+          method: GET
+          header: []
+          url: '{{baseUrl}}/events/{eventId}/artwork'
         status: Forbidden
         code: 403
         header:
@@ -5578,7 +5755,10 @@ item:
         mode: raw
         raw: |-
           {
-            "participantId": "00000000-0000-4000-8000-000000000000"
+            "participantId": "00000000-0000-4000-8000-000000000000",
+            "workflowStartedAt": "2026-08-07T00:00:00.000Z",
+            "paperFormUsed": false,
+            "paperExceptionReason": ""
           }
         options:
           raw:
@@ -6571,6 +6751,264 @@ item:
               }
             ]
           }
+  - name: Add a working period to a draft, published, or live event
+    description: ''
+    event: []
+    request:
+      method: POST
+      header:
+        - key: Content-Type
+          value: application/json
+          description: JSON request body
+          type: text
+      auth:
+        type: bearer
+        bearer:
+          - key: token
+            value: '{{token}}'
+            type: string
+      url:
+        raw: '{{baseUrl}}/events/{eventId}/shifts'
+        host:
+          - '{{baseUrl}}'
+        path:
+          - events
+          - '{eventId}'
+          - shifts
+        query: []
+      body:
+        mode: raw
+        raw: |-
+          {
+            "version": 1,
+            "name": "",
+            "startsAt": "2026-08-07T00:00:00.000Z",
+            "endsAt": "2026-08-07T00:00:00.000Z",
+            "requiredStaff": 1
+          }
+        options:
+          raw:
+            language: json
+    response:
+      - name: 201 Response
+        originalRequest:
+          method: POST
+          header:
+            - key: Content-Type
+              value: application/json
+              description: JSON request body
+              type: text
+          url: '{{baseUrl}}/events/{eventId}/shifts'
+        status: Created
+        code: 201
+        header:
+          - key: Content-Type
+            value: application/json
+        body: |-
+          {
+            "firstManagerUserId": "00000000-0000-4000-8000-000000000000",
+            "name": "",
+            "description": "",
+            "bannerKey": "COMMUNITY_SCREENING",
+            "artworkDataUrl": "",
+            "venue": "",
+            "address": "",
+            "postalCode": "",
+            "latitude": 1.13,
+            "longitude": 103.59,
+            "locationProvider": "ONEMAP",
+            "locationReference": "",
+            "timezone": "Asia/Singapore",
+            "startsAt": "2026-08-07T00:00:00.000Z",
+            "endsAt": "2026-08-07T00:00:00.000Z",
+            "capacity": 1,
+            "expectedAttendance": 1,
+            "eventDays": [
+              {
+                "eventDayId": "00000000-0000-4000-8000-000000000000"
+              }
+            ],
+            "stations": [
+              {
+                "eventStationId": "00000000-0000-4000-8000-000000000000",
+                "stationTemplateId": "00000000-0000-4000-8000-000000000000",
+                "stationOrder": 1,
+                "capacity": 1,
+                "isAvailable": true,
+                "availabilities": [
+                  {
+                    "date": "2026-08-07",
+                    "isAvailable": true,
+                    "startsAt": "2026-08-07T00:00:00.000Z",
+                    "endsAt": "2026-08-07T00:00:00.000Z",
+                    "capacity": 1
+                  }
+                ]
+              }
+            ],
+            "shifts": [
+              {
+                "shiftId": "00000000-0000-4000-8000-000000000000",
+                "status": "PLANNED",
+                "staffAssignments": [
+                  {
+                    "staffAssignmentId": "00000000-0000-4000-8000-000000000000",
+                    "assignmentRole": {},
+                    "status": "ASSIGNED",
+                    "notes": "",
+                    "eventStation": {
+                      "eventStationId": "00000000-0000-4000-8000-000000000000",
+                      "stationTemplateId": "00000000-0000-4000-8000-000000000000",
+                      "name": "",
+                      "stationOrder": 1
+                    },
+                    "user": {
+                      "userId": "00000000-0000-4000-8000-000000000000",
+                      "username": "",
+                      "fullName": ""
+                    }
+                  }
+                ]
+              }
+            ],
+            "eventId": "00000000-0000-4000-8000-000000000000",
+            "status": "DRAFT",
+            "version": 1,
+            "cancelledAt": "2026-08-07T00:00:00.000Z",
+            "cancellationReason": "",
+            "createdAt": "2026-08-07T00:00:00.000Z",
+            "updatedAt": "2026-08-07T00:00:00.000Z",
+            "eventStations": [
+              {
+                "eventStationId": "00000000-0000-4000-8000-000000000000",
+                "stationTemplateId": "00000000-0000-4000-8000-000000000000",
+                "templateVersion": 1,
+                "name": "",
+                "stationType": "VISUAL_ACUITY",
+                "description": "",
+                "stationOrder": 1,
+                "capacity": 1,
+                "isAvailable": true,
+                "fieldSchemaSnapshot": [
+                  {
+                    "key": "",
+                    "label": "",
+                    "type": "text",
+                    "required": true,
+                    "options": [
+                      ""
+                    ],
+                    "min": 0,
+                    "max": 0,
+                    "unit": "",
+                    "eyes": "OD",
+                    "flagRules": [
+                      {
+                        "op": "eq",
+                        "value": "",
+                        "flag": "REVIEW",
+                        "reason": ""
+                      }
+                    ]
+                  }
+                ],
+                "schemaVersion": 1,
+                "availabilities": [
+                  {
+                    "eventStationAvailabilityId": "00000000-0000-4000-8000-000000000000",
+                    "isAvailable": true,
+                    "startsAt": "2026-08-07T00:00:00.000Z",
+                    "endsAt": "2026-08-07T00:00:00.000Z",
+                    "capacity": 1,
+                    "eventDay": {
+                      "eventDayId": "00000000-0000-4000-8000-000000000000",
+                      "date": "2026-08-07"
+                    }
+                  }
+                ]
+              }
+            ],
+            "signupCount": 0,
+            "activeCapacityCount": 0,
+            "canManage": true,
+            "createdBy": {
+              "id": "00000000-0000-4000-8000-000000000000",
+              "userId": "00000000-0000-4000-8000-000000000000",
+              "username": "",
+              "email": "",
+              "fullName": "",
+              "employeeNumber": "",
+              "contactNumber": "",
+              "department": "",
+              "designation": "",
+              "systemRole": "ADMIN",
+              "status": "ACTIVE",
+              "approvalState": "PENDING",
+              "accessState": "ENABLED",
+              "professionalCategory": "STAFF",
+              "roles": [
+                "ADMINISTRATOR"
+              ],
+              "createdAt": "2026-08-07T00:00:00.000Z"
+            },
+            "cancelledBy": {}
+          }
+      - name: 401 Response
+        originalRequest:
+          method: POST
+          header:
+            - key: Content-Type
+              value: application/json
+              description: JSON request body
+              type: text
+          url: '{{baseUrl}}/events/{eventId}/shifts'
+        status: Unauthorized
+        code: 401
+        header:
+          - key: Content-Type
+            value: application/json
+        body: |-
+          {
+            "type": "",
+            "title": "",
+            "status": 0,
+            "code": "",
+            "requestId": "00000000-0000-4000-8000-000000000000",
+            "errors": [
+              {
+                "field": "",
+                "message": ""
+              }
+            ]
+          }
+      - name: 403 Response
+        originalRequest:
+          method: POST
+          header:
+            - key: Content-Type
+              value: application/json
+              description: JSON request body
+              type: text
+          url: '{{baseUrl}}/events/{eventId}/shifts'
+        status: Forbidden
+        code: 403
+        header:
+          - key: Content-Type
+            value: application/json
+        body: |-
+          {
+            "type": "",
+            "title": "",
+            "status": 0,
+            "code": "",
+            "requestId": "00000000-0000-4000-8000-000000000000",
+            "errors": [
+              {
+                "field": "",
+                "message": ""
+              }
+            ]
+          }
   - name: Schedule a duty for an active event member who already has the matching granular role
     description: ''
     event: []
@@ -6604,6 +7042,9 @@ item:
           {
             "version": 1,
             "userId": "00000000-0000-4000-8000-000000000000",
+            "userIds": [
+              "00000000-0000-4000-8000-000000000000"
+            ],
             "assignmentRole": "SCREENER",
             "eventStationId": "00000000-0000-4000-8000-000000000000"
           }
@@ -6685,7 +7126,8 @@ item:
                     },
                     "user": {
                       "userId": "00000000-0000-4000-8000-000000000000",
-                      "username": ""
+                      "username": "",
+                      "fullName": ""
                     }
                   }
                 ]
@@ -6928,7 +7370,8 @@ item:
                     },
                     "user": {
                       "userId": "00000000-0000-4000-8000-000000000000",
-                      "username": ""
+                      "username": "",
+                      "fullName": ""
                     }
                   }
                 ]
@@ -7179,7 +7622,8 @@ item:
                     },
                     "user": {
                       "userId": "00000000-0000-4000-8000-000000000000",
-                      "username": ""
+                      "username": "",
+                      "fullName": ""
                     }
                   }
                 ]
@@ -7356,6 +7800,15 @@ item:
             "version": 1,
             "stationOrder": 1,
             "capacity": 1,
+            "availabilities": [
+              {
+                "date": "2026-08-07",
+                "isAvailable": true,
+                "startsAt": "2026-08-07T00:00:00.000Z",
+                "endsAt": "2026-08-07T00:00:00.000Z",
+                "capacity": 1
+              }
+            ],
             "isAvailable": true,
             "operationalStatus": "AVAILABLE"
           }
@@ -7437,7 +7890,8 @@ item:
                     },
                     "user": {
                       "userId": "00000000-0000-4000-8000-000000000000",
-                      "username": ""
+                      "username": "",
+                      "fullName": ""
                     }
                   }
                 ]
@@ -7581,6 +8035,240 @@ item:
               }
             ]
           }
+  - name: Remove an unused station from a draft or published event
+    description: ''
+    event: []
+    request:
+      method: DELETE
+      header: []
+      auth:
+        type: bearer
+        bearer:
+          - key: token
+            value: '{{token}}'
+            type: string
+      url:
+        raw: '{{baseUrl}}/events/{eventId}/stations/{eventStationId}'
+        host:
+          - '{{baseUrl}}'
+        path:
+          - events
+          - '{eventId}'
+          - stations
+          - '{eventStationId}'
+        query:
+          - key: version
+            value: '1'
+            description: ''
+            disabled: false
+    response:
+      - name: 200 Response
+        originalRequest:
+          method: DELETE
+          header: []
+          url: '{{baseUrl}}/events/{eventId}/stations/{eventStationId}'
+        status: OK
+        code: 200
+        header:
+          - key: Content-Type
+            value: application/json
+        body: |-
+          {
+            "firstManagerUserId": "00000000-0000-4000-8000-000000000000",
+            "name": "",
+            "description": "",
+            "bannerKey": "COMMUNITY_SCREENING",
+            "artworkDataUrl": "",
+            "venue": "",
+            "address": "",
+            "postalCode": "",
+            "latitude": 1.13,
+            "longitude": 103.59,
+            "locationProvider": "ONEMAP",
+            "locationReference": "",
+            "timezone": "Asia/Singapore",
+            "startsAt": "2026-08-07T00:00:00.000Z",
+            "endsAt": "2026-08-07T00:00:00.000Z",
+            "capacity": 1,
+            "expectedAttendance": 1,
+            "eventDays": [
+              {
+                "eventDayId": "00000000-0000-4000-8000-000000000000"
+              }
+            ],
+            "stations": [
+              {
+                "eventStationId": "00000000-0000-4000-8000-000000000000",
+                "stationTemplateId": "00000000-0000-4000-8000-000000000000",
+                "stationOrder": 1,
+                "capacity": 1,
+                "isAvailable": true,
+                "availabilities": [
+                  {
+                    "date": "2026-08-07",
+                    "isAvailable": true,
+                    "startsAt": "2026-08-07T00:00:00.000Z",
+                    "endsAt": "2026-08-07T00:00:00.000Z",
+                    "capacity": 1
+                  }
+                ]
+              }
+            ],
+            "shifts": [
+              {
+                "shiftId": "00000000-0000-4000-8000-000000000000",
+                "status": "PLANNED",
+                "staffAssignments": [
+                  {
+                    "staffAssignmentId": "00000000-0000-4000-8000-000000000000",
+                    "assignmentRole": {},
+                    "status": "ASSIGNED",
+                    "notes": "",
+                    "eventStation": {
+                      "eventStationId": "00000000-0000-4000-8000-000000000000",
+                      "stationTemplateId": "00000000-0000-4000-8000-000000000000",
+                      "name": "",
+                      "stationOrder": 1
+                    },
+                    "user": {
+                      "userId": "00000000-0000-4000-8000-000000000000",
+                      "username": "",
+                      "fullName": ""
+                    }
+                  }
+                ]
+              }
+            ],
+            "eventId": "00000000-0000-4000-8000-000000000000",
+            "status": "DRAFT",
+            "version": 1,
+            "cancelledAt": "2026-08-07T00:00:00.000Z",
+            "cancellationReason": "",
+            "createdAt": "2026-08-07T00:00:00.000Z",
+            "updatedAt": "2026-08-07T00:00:00.000Z",
+            "eventStations": [
+              {
+                "eventStationId": "00000000-0000-4000-8000-000000000000",
+                "stationTemplateId": "00000000-0000-4000-8000-000000000000",
+                "templateVersion": 1,
+                "name": "",
+                "stationType": "VISUAL_ACUITY",
+                "description": "",
+                "stationOrder": 1,
+                "capacity": 1,
+                "isAvailable": true,
+                "fieldSchemaSnapshot": [
+                  {
+                    "key": "",
+                    "label": "",
+                    "type": "text",
+                    "required": true,
+                    "options": [
+                      ""
+                    ],
+                    "min": 0,
+                    "max": 0,
+                    "unit": "",
+                    "eyes": "OD",
+                    "flagRules": [
+                      {
+                        "op": "eq",
+                        "value": "",
+                        "flag": "REVIEW",
+                        "reason": ""
+                      }
+                    ]
+                  }
+                ],
+                "schemaVersion": 1,
+                "availabilities": [
+                  {
+                    "eventStationAvailabilityId": "00000000-0000-4000-8000-000000000000",
+                    "isAvailable": true,
+                    "startsAt": "2026-08-07T00:00:00.000Z",
+                    "endsAt": "2026-08-07T00:00:00.000Z",
+                    "capacity": 1,
+                    "eventDay": {
+                      "eventDayId": "00000000-0000-4000-8000-000000000000",
+                      "date": "2026-08-07"
+                    }
+                  }
+                ]
+              }
+            ],
+            "signupCount": 0,
+            "activeCapacityCount": 0,
+            "canManage": true,
+            "createdBy": {
+              "id": "00000000-0000-4000-8000-000000000000",
+              "userId": "00000000-0000-4000-8000-000000000000",
+              "username": "",
+              "email": "",
+              "fullName": "",
+              "employeeNumber": "",
+              "contactNumber": "",
+              "department": "",
+              "designation": "",
+              "systemRole": "ADMIN",
+              "status": "ACTIVE",
+              "approvalState": "PENDING",
+              "accessState": "ENABLED",
+              "professionalCategory": "STAFF",
+              "roles": [
+                "ADMINISTRATOR"
+              ],
+              "createdAt": "2026-08-07T00:00:00.000Z"
+            },
+            "cancelledBy": {}
+          }
+      - name: 401 Response
+        originalRequest:
+          method: DELETE
+          header: []
+          url: '{{baseUrl}}/events/{eventId}/stations/{eventStationId}'
+        status: Unauthorized
+        code: 401
+        header:
+          - key: Content-Type
+            value: application/json
+        body: |-
+          {
+            "type": "",
+            "title": "",
+            "status": 0,
+            "code": "",
+            "requestId": "00000000-0000-4000-8000-000000000000",
+            "errors": [
+              {
+                "field": "",
+                "message": ""
+              }
+            ]
+          }
+      - name: 404 Response
+        originalRequest:
+          method: DELETE
+          header: []
+          url: '{{baseUrl}}/events/{eventId}/stations/{eventStationId}'
+        status: Not Found
+        code: 404
+        header:
+          - key: Content-Type
+            value: application/json
+        body: |-
+          {
+            "type": "",
+            "title": "",
+            "status": 0,
+            "code": "",
+            "requestId": "00000000-0000-4000-8000-000000000000",
+            "errors": [
+              {
+                "field": "",
+                "message": ""
+              }
+            ]
+          }
   - name: Move a draft event to published
     description: ''
     event: []
@@ -7673,7 +8361,8 @@ item:
                     },
                     "user": {
                       "userId": "00000000-0000-4000-8000-000000000000",
-                      "username": ""
+                      "username": "",
+                      "fullName": ""
                     }
                   }
                 ]
@@ -7901,7 +8590,8 @@ item:
                     },
                     "user": {
                       "userId": "00000000-0000-4000-8000-000000000000",
-                      "username": ""
+                      "username": "",
+                      "fullName": ""
                     }
                   }
                 ]
@@ -8129,7 +8819,8 @@ item:
                     },
                     "user": {
                       "userId": "00000000-0000-4000-8000-000000000000",
-                      "username": ""
+                      "username": "",
+                      "fullName": ""
                     }
                   }
                 ]
@@ -8375,7 +9066,8 @@ item:
                     },
                     "user": {
                       "userId": "00000000-0000-4000-8000-000000000000",
-                      "username": ""
+                      "username": "",
+                      "fullName": ""
                     }
                   }
                 ]
@@ -8885,6 +9577,7 @@ item:
             },
             "registrations": [
               {
+                "queueEntryId": "00000000-0000-4000-8000-000000000000",
                 "registrationId": "00000000-0000-4000-8000-000000000000",
                 "participantDisplayName": "",
                 "queueNumber": 0,
@@ -10691,6 +11384,7 @@ item:
                 "highestFlag": "NORMAL",
                 "flaggedResultCount": 0,
                 "completedStationCount": 0,
+                "skippedStationCount": 0,
                 "totalStationCount": 1,
                 "readyReason": "SCREENING_COMPLETE",
                 "lastResultAt": "2026-08-07T00:00:00.000Z"
@@ -10825,6 +11519,7 @@ item:
                     ]
                   }
                 ],
+                "status": "COMPLETED",
                 "result": {
                   "resultId": "00000000-0000-4000-8000-000000000000",
                   "stationId": "00000000-0000-4000-8000-000000000000",
@@ -10844,6 +11539,7 @@ item:
               "ready": true,
               "readyReason": "SCREENING_COMPLETE",
               "completedStationCount": 0,
+              "skippedStationCount": 0,
               "totalStationCount": 0,
               "highestFlag": {}
             },
@@ -13026,7 +13722,8 @@ item:
                       },
                       "user": {
                         "userId": "00000000-0000-4000-8000-000000000000",
-                        "username": ""
+                        "username": "",
+                        "fullName": ""
                       }
                     }
                   ]
@@ -15749,19 +16446,19 @@ item:
             disabled: true
           - key: entityName
             value: ''
-            description: Filter application logs by target entity name
+            description: Filter records by target entity name
             disabled: true
           - key: action
             value: ''
-            description: Filter application logs by action verb
+            description: Filter records by action or authentication event
             disabled: true
           - key: eventType
             value: ''
-            description: Filter authentication logs by event type
+            description: Restrict the feed to a specific authentication event type
             disabled: true
           - key: outcome
             value: SUCCESS
-            description: Filter both tables by outcome
+            description: Filter the timeline by outcome
             disabled: true
           - key: from
             value: '2026-08-07T00:00:00.000Z'
@@ -16576,6 +17273,7 @@ item:
               "queueState": {
                 "status": "WAITING",
                 "queueNumber": 0,
+                "nowCalling": 0,
                 "station": {
                   "name": "",
                   "type": ""
@@ -18570,7 +19268,8 @@ item:
               "00000000-0000-4000-8000-000000000000"
             ],
             "reasonCode": "STATION_UNAVAILABLE",
-            "expectedVersion": 1
+            "expectedVersion": 1,
+            "skipActive": true
           }
         options:
           raw:

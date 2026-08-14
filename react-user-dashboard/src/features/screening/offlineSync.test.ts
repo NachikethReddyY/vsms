@@ -255,7 +255,7 @@ describe('encrypted screening outbox', () => {
     expect(await syncOfflineEvent(ownerId, eventId)).toMatchObject({ pending: 0, conflicts: 1, synced: 0, committedProgressions: [] });
   });
 
-  it('ignores eye-health stations in offline downloads because eye health is review-only', async () => {
+  it('includes assigned eye-health stations in encrypted offline downloads', async () => {
     const eyeStationId = '55555555-5555-4555-8555-555555555555';
     const vaStationId = '11111111-1111-4111-8111-111111111111';
     post.mockResolvedValueOnce({
@@ -302,7 +302,10 @@ describe('encrypted screening outbox', () => {
     });
     await downloadOfflineEvent(ownerId, eventId);
     expect(await getOfflineStationContext(ownerId, eventId, 'VISUAL_ACUITY')).toBeTruthy();
-    expect(await getOfflineStationContext(ownerId, eventId, 'EYE_HEALTH')).toBeNull();
+    expect(await getOfflineStationContext(ownerId, eventId, 'EYE_HEALTH')).toMatchObject({
+      station: { stationId: eyeStationId, stationType: 'EYE_HEALTH' },
+      queue: [expect.objectContaining({ registrationId })],
+    });
   });
 
   it('purges expired and logout-cleared encrypted data', async () => {

@@ -87,6 +87,7 @@ async function upsertStations(event) {
     ["VISUAL_ACUITY", "Visual acuity", 1],
     ["REFRACTION", "Refraction", 2],
     ["COLOUR_VISION", "Colour vision", 3],
+    ["EYE_HEALTH", "Eye health", 4],
   ];
   const stations = [];
   for (const [stationType, stationName, stationOrder] of definitions) {
@@ -117,10 +118,6 @@ async function upsertStations(event) {
         },
       }));
   }
-  await prisma.station.updateMany({
-    where: { eventId: event.eventId, stationType: "EYE_HEALTH", isActive: true },
-    data: { isActive: false },
-  });
   return stations;
 }
 

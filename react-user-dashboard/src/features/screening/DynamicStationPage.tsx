@@ -10,7 +10,7 @@ import { StationFieldRenderer } from './StationFieldRenderer';
 import { FlagBanner, ParticipantLookup, RouteProgressionNotice, StationPageFrame } from './StationShared';
 import { STATION_LABEL } from './stationConfig';
 
-const SCHEMA_DRIVEN_TYPES = new Set<StationType>(['CUSTOM', 'VISUAL_ACUITY', 'REFRACTION', 'COLOUR_VISION']);
+const SCHEMA_DRIVEN_TYPES = new Set<StationType>(['CUSTOM', 'VISUAL_ACUITY', 'REFRACTION', 'COLOUR_VISION', 'EYE_HEALTH']);
 
 export default function DynamicStationPage({ stationType }: { stationType?: StationType } = {}) {
   const { eventId = '', stationId: routeStationId = '' } = useParams();

@@ -71,6 +71,8 @@ const schema = z.object({
   ENCRYPTION_KEY: optionalEnv(z.string().regex(/^[a-fA-F0-9]{64}$/)),
   ENCRYPTION_ACTIVE_KEY_ID: optionalEnv(z.string().regex(/^[A-Za-z0-9_-]{1,32}$/)),
   ENCRYPTION_KEYRING_JSON: optionalEnv(z.string().min(1)),
+  PARTICIPANT_LOOKUP_HMAC_KEY: optionalEnv(z.string().regex(/^[a-fA-F0-9]{64}$/)),
+  SES_FROM_EMAIL: optionalEnv(z.string().email()),
   SMTP_HOST: optionalEnv(z.literal("smtp.gmail.com")),
   SMTP_PORT: optionalEnv(z.coerce.number().int().refine((value) => value === 465 || value === 587)),
   SMTP_USERNAME: optionalEnv(z.string().email()),

@@ -82,9 +82,7 @@ describe("Cognito authentication boundary", () => {
     const status = await request(app).get("/api/v1/auth/config-status");
     expect(status.status).toBe(200);
     expect(status.body.configured).toBe(true);
-    expect(status.body.supportedRoles).toEqual(expect.arrayContaining([
-      "ADMINISTRATOR", "EVENT_MANAGER", "REGISTRATION_OFFICER", "SCREENER", "REVIEWER", "SUPPORT",
-    ]));
+    expect(status.body.supportedRoles).toEqual(["ADMINISTRATOR", "EVENT_MANAGER"]);
 
     const authorize = await request(app).get("/api/v1/auth/authorize?returnTo=%2Fevents");
     expect(authorize.status).toBe(302);

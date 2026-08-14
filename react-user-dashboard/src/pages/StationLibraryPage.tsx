@@ -62,7 +62,7 @@ export default function StationLibraryPage() {
     <section className="station-library-body" aria-label="Station template library">
       {loading ? <div className="station-library-loading" aria-live="polite" aria-label="Loading station templates"><span /><span /><span /><span /></div> : templates.length ? <div className="station-library-grid">{templates.map((template) => <article className="station-library-card" key={template.stationTemplateId}>
         <header><span className="station-library-card-icon"><Squares2X2Icon aria-hidden="true" /></span><span className={`station-library-access ${template.active ? 'active' : 'inactive'}`}><i aria-hidden="true" />{template.active ? 'Active' : 'Inactive'}</span></header>
-        <div><p className="station-library-key">{labelStationType(template.stationType, template.templateKey)} · v{template.version}</p><h2>{template.name}</h2><p>{template.description || 'No description.'}</p></div>
+        <div><p className="station-library-key">{labelStationType(template.stationType)} · v{template.version}</p><h2>{template.name}</h2><p>{template.description || 'No description.'}</p></div>
         <footer>
           <span>
             <strong>{template.defaultCapacity}</strong> capacity · v{template.version}
