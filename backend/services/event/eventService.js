@@ -24,6 +24,7 @@ const { enqueueAccountLifecycle } = require("../account/accountLifecycleNotifica
 const domainEventBus = require("../domain/domainEventBus");
 const { assertRoleEligibility, eventVisibilityWhere, isAdministrator } = require("./eventAuthorizationService");
 const artworkStorage = require("./eventArtworkStorage");
+const { effectiveEventStatus } = require("./eventLifecycle");
 
 /** Station types whose library fieldSchema drives DynamicStationPage + API validation. */
 const SCHEMA_DRIVEN_STATION_TYPES = new Set(["CUSTOM", "VISUAL_ACUITY", "REFRACTION", "COLOUR_VISION"]);
@@ -339,7 +340,7 @@ const toEventResponse = async (event, user, db = prisma, options = {}) => {
     endTime: event.endsAt,
     capacity: event.capacity,
     expectedAttendance: event.expectedAttendance,
-    status: event.status,
+    status: effectiveEventStatus(event.status, event.endsAt),
     version: event.version,
     cancellationReason: event.cancellationReason,
     cancelledAt: event.cancelledAt,
@@ -2425,7 +2426,7 @@ const publicEventProjection = (event) => ({
   startsAt: dateTime(event.startsAt),
   endsAt: dateTime(event.endsAt),
   capacity: event.capacity,
-  status: event.status,
+  status: effectiveEventStatus(event.status, event.endsAt),
   eventDays: (event.eventDays || []).map((day) => ({
     eventDayId: day.eventDayId,
     date: day.date.toISOString().slice(0, 10),

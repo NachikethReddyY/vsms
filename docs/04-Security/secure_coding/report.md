@@ -384,7 +384,60 @@ database dumps. The final DBSP ZIP must additionally contain the official
 individual report PDF, source ZIP, SQL database ZIP and signed academic
 integrity declaration under the filenames required by the brief.
 
-## 9. 15-minute demo outline
+## 9. Advanced Features and Enhancements
+
+To further enhance the security, scalability, usability, and overall reliability of the Visual Screening Management System (VSMS), we implemented the required bonus features and added several additional enhancements of our own. These enhancements were introduced across different stages of the system, including deployment, authentication, data protection, and day-to-day application usage, to provide a more secure and reliable experience.
+
+### Bonus Features
+
+The following bonus features were implemented as part of the VSMS. These features extend the core functionality of the system and improve the efficiency, usability, scalability, and management of screening operations.
+
+#### QR Code Scanning
+
+The QR Code Scanning feature allows participants to be identified and accessed quickly using a generated QR code. Instead of relying entirely on manual searching or entering participant information, staff can scan the participant's QR code to retrieve the relevant registration and screening information.
+
+<img width="678" height="381" alt="image" src="https://github.com/user-attachments/assets/c72176d3-3771-4490-b478-00e05c151d81" />
+
+**For the scanner to scan the participant QR Code**
+
+<img width="614" height="402" alt="image" src="https://github.com/user-attachments/assets/6861fa75-ee25-4404-bb86-72af2da3d1d1" />
+
+**QR Code Validation Result**
+
+This improves the system by reducing manual data entry, speeding up participant identification, and reducing the likelihood of input errors. It also supports a smoother participant flow during busy screening events.
+
+#### Mobile Responsive Design
+
+The Mobile Responsive Design allows the VSMS interface to adapt to different screen sizes, including desktops, tablets, and mobile devices. This is particularly useful for screening staff who may need to access the system while moving between different screening stations.
+
+<img width="360" height="943" alt="image" src="https://github.com/user-attachments/assets/5409043c-8292-4ccd-9692-fb39c516127d" />
+
+**Mobile Responsive Design on Participant's Phone**
+
+This enhances the system's usability and accessibility, allowing staff to perform tasks without being restricted to a desktop computer. It also makes the system more practical for real-world screening environments where different devices may be used.
+
+#### Event-Driven Architecture
+
+The Event-Driven Architecture allows different parts of the VSMS to respond to system events without requiring every component to be directly dependent on one another. For example, when an action occurs within the system, such as a participant being registered, screened, referred, or moved through a queue, the relevant components can respond to that event.
+
+This improves the system's scalability, maintainability, and responsiveness. Components can be developed and updated more independently, while event-based processing can also reduce unnecessary coupling between different parts of the application.
+
+#### Multi-Event Operations Center
+
+The Multi-Event Operations Center allows authorised staff to manage and monitor multiple screening events from a centralised interface. Instead of treating each event as an isolated operation, administrators can oversee event information, participants, screening activities, and operational status across multiple events.
+
+<img width="1600" height="1035" alt="image" src="https://github.com/user-attachments/assets/ce1b7de3-5f9b-4a44-ac89-eec95d1931a8" />
+
+**Multi-Event Dashboard UI**
+
+This enhances the system by providing centralised management, better visibility, and improved operational efficiency. It also makes the VSMS more suitable for organisations that conduct multiple screening events across different locations or at different times.
+
+Overall, these bonus features enhance the VSMS beyond its core requirements by improving speed, usability, scalability, and operational management, while making the system more suitable for real-world deployment.
+
+### Other Add ons
+
+
+## 10. 15-minute demo outline
 
 The evidence-driven run sheet is in
 [`demo-outline.md`](demo-outline.md). It follows a path supported by the
@@ -401,7 +454,7 @@ app-shell access, encrypted local save, reconnect, idempotent synchronization
 and conflict handling. The final run must retain sanitized screenshots and
 timestamps for each acceptance-matrix row.
 
-## 10. Reflection and limitations
+## 11. Reflection and limitations
 
 The most important design lesson was that security and simple orchestration
 reinforce each other. Keeping HTTP mapping in controllers, domain decisions in
@@ -427,7 +480,7 @@ idempotency infrastructure, automated secret retrieval, monitoring and a
 tested regional recovery plan. Those changes should be made only when the
 availability requirement justifies their cost.
 
-## 11. Human-owned final inputs
+## 12. Human-owned final inputs
 
 These items intentionally remain open:
 
@@ -442,7 +495,7 @@ These items intentionally remain open:
 | Lucidchart ERD iterations and final editable link | Mermaid sources are supplied; the required Lucidchart ownership/link must come from the team |
 | Current AWS/Cognito acceptance screenshots | Renew AWS Academy access and replay the matrix with representative test accounts |
 
-## 12. References
+## 13. References
 
 - [`backend/docs/openapi.yaml`](../../backend/docs/openapi.yaml)
 - [`backend/prisma/schema.prisma`](../../backend/prisma/schema.prisma)
@@ -454,7 +507,7 @@ These items intentionally remain open:
 - [`docs/featureList.md`](../featureList.md)
 - [`diagrams/`](diagrams/)
 
-## 13. Diagram index
+## 14. Diagram index
 
 | Required view | Canonical editable source | Status |
 | --- | --- | --- |
