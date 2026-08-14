@@ -10,6 +10,7 @@ const AppError = require("../../errors/AppError");
 const { assignRouteOnce } = require("../screening/routeAssignmentService");
 const { createAuditLog, createAuditLogBestEffort } = require("../../utils/logging/audit");
 const { AUDIT_ACTIONS } = require("../../utils/logging/auditEvents");
+const registrationRoutines = require("./registrationRoutineRepository");
 
 function buildQRTargetUrl(token) {
     return `${env.publicAppOrigin}/participant-status/${encodeURIComponent(token)}`;
@@ -437,9 +438,8 @@ exports.getPublicStatus = async (token, db = prisma) => {
                         },
                     },
                     queueEntries: {
-                        where: { status: { in: ["WAITING", "CALLED", "IN_PROGRESS"] } },
+                        where: { status: { in: ["WAITING", "CALLED", "IN_PROGRESS", "SKIPPED"] } },
                         orderBy: [{ enteredAt: "desc" }, { id: "desc" }],
-                        take: 1,
                         select: {
                             status: true,
                             queueNumber: true,
@@ -463,7 +463,14 @@ exports.getPublicStatus = async (token, db = prisma) => {
         };
     }
 
-    const activeEntry = qr.registration.queueEntries[0] || null;
+    const activeEntry = qr.registration.queueEntries.find(({ status }) => (
+        ["WAITING", "CALLED", "IN_PROGRESS"].includes(status)
+    )) || null;
+    const skippedStationIds = new Set(
+        qr.registration.queueEntries
+            .filter(({ status }) => status === "SKIPPED")
+            .map(({ station }) => station.stationId),
+    );
     const nowCalling = activeEntry
         ? await db.queueEntry.findFirst({
             where: {
@@ -491,7 +498,7 @@ exports.getPublicStatus = async (token, db = prisma) => {
         stationName: step.station.stationName,
         stationType: step.station.stationType,
         state: step.completedAt
-            ? "COMPLETED"
+            ? skippedStationIds.has(step.station.stationId) ? "SKIPPED" : "COMPLETED"
             : activeEntry?.station.stationId === step.station.stationId
                 ? "CURRENT"
                 : !activeEntry && step.position === firstUnfinishedPosition
@@ -817,14 +824,11 @@ exports.manualCheckIn = async (params, db = prisma, auditContext = {}) => {
             throw new AppError(404, "INVALID_QR", "QR Code is invalid, expired, or unavailable.");
         }
 
-        const rows = await tx.$queryRaw`
-            SELECT * FROM "check_in_event_registration"(
-                CAST(${regIdToUpdate} AS uuid),
-                CAST(${eventId} AS uuid),
-                CAST(${userId} AS uuid)
-            )
-        `;
-        const checkedIn = rows[0];
+        const checkedIn = await registrationRoutines.checkInRegistration(tx, {
+            registrationId: regIdToUpdate,
+            eventId,
+            changedBy: userId,
+        });
         const result = manualCheckInRegistration({
             registrationId: checkedIn.registration_id,
             eventId: checkedIn.event_id,

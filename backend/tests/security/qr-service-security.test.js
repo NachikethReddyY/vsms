@@ -676,6 +676,7 @@ test("each issuance mints a unique opaque token and supersedes the prior active 
 test("public pass status reveals no PII and reports expired or revoked passes as invalid", async () => {
   const token = "d".repeat(64);
   let where;
+  let queueEntriesWhere;
   const db = {
     queueEntry: {
       findFirst: async () => ({ queueNumber: 39 }),
@@ -683,6 +684,7 @@ test("public pass status reveals no PII and reports expired or revoked passes as
     qRCodePass: {
       findFirst: async (query) => {
         where = query.where;
+        queueEntriesWhere = query.select.registration.select.queueEntries.where;
         return {
           expiresAt: new Date(Date.now() + 60_000),
           registration: {
@@ -701,11 +703,18 @@ test("public pass status reveals no PII and reports expired or revoked passes as
                 station: { stationId: "station-2", stationName: "Refraction", stationType: "REFRACTION" },
               },
             ],
-            queueEntries: [{
-              status: "WAITING",
-              queueNumber: 42,
-              station: { stationId: "station-2", stationName: "Refraction", stationType: "REFRACTION" },
-            }],
+            queueEntries: [
+              {
+                status: "SKIPPED",
+                queueNumber: 42,
+                station: { stationId: "station-1", stationName: "Visual Acuity", stationType: "VISUAL_ACUITY" },
+              },
+              {
+                status: "WAITING",
+                queueNumber: 42,
+                station: { stationId: "station-2", stationName: "Refraction", stationType: "REFRACTION" },
+              },
+            ],
           },
         };
       },
@@ -718,7 +727,7 @@ test("public pass status reveals no PII and reports expired or revoked passes as
   assert.equal(valid.queueNumber, 42);
   assert.equal(valid.queueState.nowCalling, 39);
   assert.deepEqual(valid.route.map(({ stationName, state }) => [stationName, state]), [
-    ["Visual Acuity", "COMPLETED"],
+    ["Visual Acuity", "SKIPPED"],
     ["Refraction", "CURRENT"],
     ["Clinical review", "UPCOMING"],
   ]);
@@ -727,6 +736,7 @@ test("public pass status reveals no PII and reports expired or revoked passes as
   assert.equal(where.isActive, true);
   assert.equal(where.revokedAt, null);
   assert.ok(where.expiresAt.gt instanceof Date);
+  assert.deepEqual(queueEntriesWhere.status.in, ["WAITING", "CALLED", "IN_PROGRESS", "SKIPPED"]);
   const publicJson = JSON.stringify(valid);
   for (const forbidden of ["stationId", "registrationId", "routeStepId", "actor", "audit", "capacity", "workload", "result", "nric"]) {
     assert.equal(publicJson.includes(forbidden), false);

@@ -3,6 +3,7 @@ const { createAuditLog } = require("../../utils/logging/audit");
 const { assertRegistrationAssignment } = require("../../utils/auth/staff");
 const { assertParticipantEventScope } = require("../../utils/validation/participantEventScope");
 const qrService = require("./qrService");
+const registrationRoutines = require("./registrationRoutineRepository");
 const {
     assignRouteOnce,
     getRouteState,
@@ -145,15 +146,12 @@ exports.createRegistration = async ({
         try {
             registration = await db.$transaction(async (tx) => {
                 await assertParticipantEventScope(tx, participantId, eventId, userId);
-                const rows = await tx.$queryRaw`
-                    SELECT * FROM "register_participant_for_event"(
-                        CAST(${participantId} AS uuid),
-                        CAST(${eventId} AS uuid),
-                        CAST(${userId} AS uuid),
-                        ${idempotencyKey}
-                    )
-                `;
-                const operation = rows[0];
+                const operation = await registrationRoutines.registerParticipant(tx, {
+                    participantId,
+                    eventId,
+                    registeredBy: userId,
+                    idempotencyKey,
+                });
                 const created = await tx.eventRegistration.findUnique({
                     where: { registrationId: operation.registration_id },
                     include: registrationInclude(),
@@ -245,11 +243,9 @@ exports.listEventRegistrations = async ({ eventId, page, pageSize, auth }, db = 
 
 exports.getEventRegistrationSummary = async ({ eventId, auth }, db = prisma) => {
     await assertRegistrationAssignment(db, eventId, auth);
-    const rows = await db.$queryRaw`
-        SELECT * FROM "get_event_registration_summary"(CAST(${eventId} AS uuid))
-    `;
-    if (!rows[0]) throw notFound("Event not found");
-    return rows[0];
+    const summary = await registrationRoutines.getEventSummary(db, eventId);
+    if (!summary) throw notFound("Event not found");
+    return summary;
 };
 
 exports.getRegistrationHistory = async ({ registrationId, auth }, db = prisma) => {
@@ -277,23 +273,13 @@ exports.changeRegistrationStatus = async ({ registrationId, toStatus, reason, au
 
         let promotedRegistrationId = null;
         const cancelled = await db.$transaction(async (tx) => {
-            const rows = await tx.$queryRaw`
-                SELECT * FROM "cancel_event_registration"(
-                    CAST(${registrationId} AS uuid),
-                    CAST(${auth.userId} AS uuid),
-                    ${reason || null}
-                )
-            `;
-            promotedRegistrationId = rows[0]?.promoted_registration_id || null;
-            const revokedQrPasses = await tx.qRCodePass.updateMany({
-                where: { registrationId, isActive: true },
-                data: {
-                    isActive: false,
-                    revokedAt: new Date(),
-                    revokedBy: auth.userId,
-                    revokedReason: "Registration cancelled",
-                },
+            const operation = await registrationRoutines.cancelRegistration(tx, {
+                registrationId,
+                changedBy: auth.userId,
+                reason,
             });
+            promotedRegistrationId = operation.promoted_registration_id || null;
+            const revokedQrPassCount = Number(operation.revoked_qr_count || 0);
             const registration = await tx.eventRegistration.findUnique({ where: { registrationId }, include: registrationInclude() });
             await createAuditLog({
                 userId: auth.userId,
@@ -301,7 +287,7 @@ exports.changeRegistrationStatus = async ({ registrationId, toStatus, reason, au
                 entityName: "EventRegistration",
                 entityId: registrationId,
                 oldValue: { status: existing.registrationStatus },
-                newValue: { status: "CANCELLED", reason, revokedQrPassCount: revokedQrPasses.count },
+                newValue: { status: "CANCELLED", reason, revokedQrPassCount },
                 context,
                 client: tx,
             });

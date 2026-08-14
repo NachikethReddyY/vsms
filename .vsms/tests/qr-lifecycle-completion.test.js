@@ -42,7 +42,6 @@ test("QR issuance is closed when the registration or event is cancelled", async 
 });
 
 test("cancelling a registration revokes its active passes in the same transaction", async () => {
-  let revoked;
   let audit;
   const existing = { registrationId, eventId, registrationStatus: "SIGNED_UP" };
   const updated = { ...existing, registrationStatus: "CANCELLED", event: {}, participant: {}, statusHistory: [] };
@@ -62,12 +61,9 @@ test("cancelling a registration revokes its active passes in the same transactio
     eventRegistration: {
       findUnique: async () => updated,
     },
-    qRCodePass: {
-      updateMany: async (query) => { revoked = query; return { count: 1 }; },
-    },
     registrationStatusHistory: { create: async () => ({}) },
     auditLog: { create: async ({ data }) => { audit = data; return data; } },
-    $queryRaw: async () => [{ promoted_registration_id: null }],
+    $queryRaw: async () => [{ promoted_registration_id: null, revoked_qr_count: 1n }],
   };
   const db = {
     event: tx.event,
@@ -86,10 +82,19 @@ test("cancelling a registration revokes its active passes in the same transactio
   }, db);
 
   assert.equal(result.registrationStatus, "CANCELLED");
-  assert.deepEqual(revoked.where, { registrationId, isActive: true });
-  assert.equal(revoked.data.isActive, false);
-  assert.equal(revoked.data.revokedBy, userId);
-  assert.equal(revoked.data.revokedReason, "Registration cancelled");
-  assert.ok(revoked.data.revokedAt instanceof Date);
   assert.equal(audit.newValue.revokedQrPassCount, 1);
+});
+
+test("the cancellation routine owns QR revocation and reports its row count", () => {
+  const migration = require("node:fs").readFileSync(
+    require("node:path").join(
+      __dirname,
+      "../../backend/prisma/migrations/20260814210000_harden_registration_stored_routines/migration.sql",
+    ),
+    "utf8",
+  );
+
+  assert.match(migration, /UPDATE public\.qr_code_passes AS pass/);
+  assert.match(migration, /GET DIAGNOSTICS v_revoked_qr_count = ROW_COUNT/);
+  assert.match(migration, /RETURN QUERY SELECT[\s\S]*v_revoked_qr_count/);
 });

@@ -3700,9 +3700,10 @@ export interface components {
             highestFlag: components["schemas"]["OverallFlag"];
             flaggedResultCount: number;
             completedStationCount: number;
+            skippedStationCount: number;
             totalStationCount: number;
             /** @enum {string} */
-            readyReason: "SCREENING_COMPLETE" | "URGENT_FLAG";
+            readyReason: "SCREENING_COMPLETE" | "ROUTE_COMPLETE" | "URGENT_FLAG";
             /** Format: date-time */
             lastResultAt: string | null;
         };
@@ -3750,13 +3751,16 @@ export interface components {
             stationType: "VISUAL_ACUITY" | "REFRACTION" | "COLOUR_VISION" | "EYE_HEALTH" | "CUSTOM";
             stationOrder: number;
             fieldSchemaSnapshot: components["schemas"]["StationFieldDefinition"][] | null;
+            /** @enum {string} */
+            status: "COMPLETED" | "SKIPPED" | "PENDING";
             result: components["schemas"]["ScreeningResultSummary"] | null;
         };
         ReviewReadiness: {
             ready: boolean;
             /** @enum {string|null} */
-            readyReason: "SCREENING_COMPLETE" | "URGENT_FLAG" | null;
+            readyReason: "SCREENING_COMPLETE" | "ROUTE_COMPLETE" | "URGENT_FLAG" | null;
             completedStationCount: number;
+            skippedStationCount: number;
             totalStationCount: number;
             highestFlag: components["schemas"]["OverallFlag"];
         };
@@ -4649,7 +4653,7 @@ export interface components {
                     stationName: string;
                     stationType: string;
                     /** @enum {string} */
-                    state: "COMPLETED" | "CURRENT" | "UPCOMING" | "BLOCKED";
+                    state: "COMPLETED" | "SKIPPED" | "CURRENT" | "UPCOMING" | "BLOCKED";
                 }[];
                 /** Format: date-time */
                 expiresAt: string | null;

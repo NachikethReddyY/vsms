@@ -203,6 +203,8 @@
 .ps-route li[data-state='current'] > span { border-color: var(--event-blue, #2563eb); background: var(--event-blue, #2563eb); color: #fff; }
 .ps-route li[data-state='completed'] { opacity: .7; }
 .ps-route li[data-state='completed'] > span { border-color: var(--green, #15803d); color: var(--green, #15803d); }
+.ps-route li[data-state='skipped'] { opacity: .7; }
+.ps-route li[data-state='skipped'] > span { border-color: var(--amber, #b45309); color: var(--amber, #b45309); }
 .ps-route li[data-state='blocked'] > span { border-color: var(--amber, #b45309); color: var(--amber, #b45309); }
 
 .ps-facts {
