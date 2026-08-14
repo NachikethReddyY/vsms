@@ -1297,7 +1297,7 @@ model NotificationDelivery {
 }
 
 // Non-clinical account and assignment mail remains separate from encrypted
-// SES referral deliveries. Metadata is template input, never an arbitrary body.
+// referral deliveries. Metadata is template input, never an arbitrary body.
 model LifecycleEmailOutbox {
   id                String                @id @default(uuid()) @map("lifecycle_email_id") @db.Uuid
   userId            String                @map("user_id") @db.Uuid

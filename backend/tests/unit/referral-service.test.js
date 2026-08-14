@@ -10,7 +10,7 @@ const {
   signedPayload,
   payloadHash,
   generateReferralPdf,
-  buildRawEmail,
+  sendWithSmtp,
   referralEmailTemplate,
   issueReferral,
   acknowledgeReferralHandoff,
@@ -139,18 +139,32 @@ test("generates an encrypted PDF whose plaintext clinical values are not exposed
   assert.equal(pdf.includes(Buffer.from("45679876")), false);
 
   const email = referralEmailTemplate(referralFixture().referralId);
-  const raw = buildRawEmail({
-    from: "referrals@example.com",
+  let message;
+  const result = await sendWithSmtp({
     to: "clinic@example.com",
+    document: pdf,
+    referralId: referralFixture().referralId,
     subject: email.subject,
     body: email.body,
-    attachment: pdf,
-    filename: email.filename,
-  });
-  assert.match(raw, /Content-Type: application\/pdf/);
-  assert.match(raw, new RegExp(`Subject: ${email.subject.replace(/[()]/g, "\\$&")}`));
-  assert.equal(raw.match(new RegExp(email.filename, "g")).length, 2);
-  assert.equal(raw.includes("45679876"), false);
+  }, { sendMail: async (input) => { message = input; return { accepted: [input.to], messageId: "google-message-id" }; } });
+  assert.deepEqual(result, { status: "SENT", messageId: "google-message-id", attempted: true });
+  assert.equal(message.attachments[0].contentType, "application/pdf");
+  assert.equal(message.attachments[0].content, pdf);
+  assert.equal(message.attachments[0].filename, email.filename);
+  assert.equal(message.disableFileAccess, true);
+  assert.equal(message.disableUrlAccess, true);
+  assert.equal(JSON.stringify({ subject: message.subject, text: message.text }).includes("45679876"), false);
+});
+
+test("does not mark a Google SMTP rejection as sent", async () => {
+  const result = await sendWithSmtp({
+    to: "clinic@example.com",
+    document: Buffer.from("encrypted-pdf"),
+    referralId: referralFixture().referralId,
+    subject: "Confidential referral",
+    body: "Encrypted attachment",
+  }, { sendMail: async () => ({ accepted: [], rejected: ["clinic@example.com"] }) });
+  assert.deepEqual(result, { status: "FAILED", reason: "SMTP_RECIPIENT_NOT_ACCEPTED", attempted: true });
 });
 
 test("uses one PII-free template for stored delivery metadata and the referral attachment", () => {

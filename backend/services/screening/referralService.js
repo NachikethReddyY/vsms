@@ -2,7 +2,7 @@
 const fs = require("fs/promises");
 const path = require("path");
 const PDFDocument = require("pdfkit");
-const { SESv2Client, SendEmailCommand } = require("@aws-sdk/client-sesv2");
+const nodemailer = require("nodemailer");
 const prisma = require("../../prisma/prismaClient");
 const env = require("../../config/env");
 const AppError = require("../../errors/AppError");
@@ -212,43 +212,45 @@ const generateReferralPdf = async ({ referral, signature, password, version, gen
   doc.end();
 });
 
-const base64Lines = (value) => Buffer.from(value).toString("base64").match(/.{1,76}/g).join("\r\n");
-const buildRawEmail = ({ from, to, subject, body, attachment, filename }) => {
-  const boundary = `vsms-${crypto.randomUUID()}`;
-  return [
-    `From: ${from}`,
-    `To: ${to}`,
-    `Subject: ${subject}`,
-    "MIME-Version: 1.0",
-    `Content-Type: multipart/mixed; boundary="${boundary}"`,
-    "",
-    `--${boundary}`,
-    "Content-Type: text/plain; charset=utf-8",
-    "Content-Transfer-Encoding: base64",
-    "",
-    base64Lines(body),
-    `--${boundary}`,
-    `Content-Type: application/pdf; name="${filename}"`,
-    "Content-Transfer-Encoding: base64",
-    `Content-Disposition: attachment; filename="${filename}"`,
-    "",
-    base64Lines(attachment),
-    `--${boundary}--`,
-    "",
-  ].join("\r\n");
-};
+const createReferralTransport = () => env.referralEmailEnabled ? nodemailer.createTransport({
+  host: env.SMTP_HOST,
+  port: env.SMTP_PORT,
+  secure: env.SMTP_PORT === 465,
+  requireTLS: env.SMTP_PORT === 587,
+  auth: { user: env.SMTP_USERNAME, pass: env.SMTP_PASSWORD },
+  tls: { rejectUnauthorized: true, minVersion: "TLSv1.2", servername: "smtp.gmail.com" },
+  connectionTimeout: env.LIFECYCLE_EMAIL_CONNECTION_TIMEOUT_MS,
+  greetingTimeout: env.LIFECYCLE_EMAIL_CONNECTION_TIMEOUT_MS,
+  socketTimeout: env.LIFECYCLE_EMAIL_SOCKET_TIMEOUT_MS,
+  disableFileAccess: true,
+  disableUrlAccess: true,
+}) : null;
 
-const sendWithSes = async ({ to, document, referralId, subject, body }) => {
-  if (!env.SES_FROM_EMAIL) return { status: "FAILED", reason: "DELIVERY_PROVIDER_NOT_CONFIGURED", attempted: false };
+const sendWithSmtp = async ({ to, document, referralId, subject, body }, transport = createReferralTransport()) => {
+  if (!transport) return { status: "FAILED", reason: "DELIVERY_PROVIDER_NOT_CONFIGURED", attempted: false };
   const { filename } = referralEmailTemplate(referralId);
-  const raw = buildRawEmail({ from: env.SES_FROM_EMAIL, to, subject, body, attachment: document, filename });
-  const client = new SESv2Client({ region: env.AWS_REGION });
-  const response = await client.send(new SendEmailCommand({
-    FromEmailAddress: env.SES_FROM_EMAIL,
-    Destination: { ToAddresses: [to] },
-    Content: { Raw: { Data: Buffer.from(raw) } },
-  }));
-  return { status: "SENT", messageId: response.MessageId, attempted: true };
+  let response;
+  try {
+    response = await transport.sendMail({
+      from: env.SMTP_USERNAME,
+      to,
+      subject,
+      text: body,
+      attachments: [{ filename, content: document, contentType: "application/pdf", contentDisposition: "attachment" }],
+      disableFileAccess: true,
+      disableUrlAccess: true,
+    });
+  } catch (error) {
+    if (["EAUTH", "EENVELOPE", "EMESSAGE"].includes(error?.code)) {
+      return { status: "FAILED", reason: String(error.code).slice(0, 80), attempted: false };
+    }
+    throw error;
+  }
+  const accepted = (response.accepted || []).map((recipient) => String(recipient).toLowerCase());
+  if (!accepted.includes(to.toLowerCase())) {
+    return { status: "FAILED", reason: "SMTP_RECIPIENT_NOT_ACCEPTED", attempted: true };
+  }
+  return { status: "SENT", messageId: String(response.messageId || "").slice(0, 255) || null, attempted: true };
 };
 
 const loadReferral = (eventId, referralId) => prisma.referral.findFirst({
@@ -450,7 +452,7 @@ const resumeQueuedDelivery = async (eventId, referralId, deliveryId, user, ipAdd
 
   let result;
   try {
-    result = await sendWithSes({
+    result = await sendWithSmtp({
       to: decrypt(delivery.recipientCiphertext, deliveryEncryptionContext(delivery.id, "recipient")),
       document,
       referralId,
@@ -797,7 +799,8 @@ module.exports = {
   payloadHash,
   maskEmail,
   generateReferralPdf,
-  buildRawEmail,
+  createReferralTransport,
+  sendWithSmtp,
   referralEmailTemplate,
   PDF_COLORS,
   resultSummary,
