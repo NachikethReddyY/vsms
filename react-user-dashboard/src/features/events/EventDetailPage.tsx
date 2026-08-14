@@ -25,11 +25,11 @@ import { AppDialog } from '../../components/AppDialog';
 import { appDialog } from '../../components/appDialogStyles';
 import { AppToast } from '../../components/AppToast';
 import { getApiError as getApiMessage } from '../../utils/apiClient';
-import { getDisplayName } from '../../utils/identity';
-import { eventApi, formatEventDate, STATUS_LABEL, type AuditRecord, type EventAttendee, type EventMembership, type EventMetrics, type EventRecord, type EventStatus, type StaffAssignmentRole, type StaffDirectoryEntry, type StationTemplate } from './eventApi';
+import { eventApi, formatEventDate, STATUS_LABEL, type AuditRecord, type EventAttendee, type EventMembership, type EventMetrics, type EventRecord, type EventStatus, type StaffAssignmentRole, type StationTemplate } from './eventApi';
 import { getEventScheduleDays } from './eventDisplayStatus';
 import { EVENT_BANNERS, getEventArtwork, type EventBannerKey } from './eventBanners';
 import { managementPercent } from './eventReport';
+import { findShiftConflicts } from './shiftAvailability';
 import { customStationPath } from '../screening/stationConfig';
 
 type AssignmentDraft = { userId: string; assignmentRole: StaffAssignmentRole; eventStationId: string };
@@ -37,9 +37,6 @@ type ShiftDraft = { name: string; startsAt: string; endsAt: string };
 type NewShiftDraft = ShiftDraft & { date: string; requiredStaff: number };
 const emptyAssignment: AssignmentDraft = { userId: '', assignmentRole: 'REGISTRATION', eventStationId: '' };
 const assignmentRoles: StaffAssignmentRole[] = ['EVENT_MANAGER', 'REGISTRATION', 'SCREENER', 'REVIEWER', 'SUPPORT'];
-const applicationRoleByAssignment: Record<StaffAssignmentRole, StaffDirectoryEntry['roles'][number]> = {
-  EVENT_MANAGER: 'EVENT_MANAGER', REGISTRATION: 'REGISTRATION_OFFICER', SCREENER: 'SCREENER', REVIEWER: 'REVIEWER', SUPPORT: 'SUPPORT',
-};
 const roleLabel = (role: string) => role.toLowerCase().replace(/_/g, ' ').replace(/^\w/, (letter: string) => letter.toUpperCase());
 const toInstant = (date: string, time: string) => new Date(`${date}T${time}:00+08:00`).toISOString();
 const scheduleOffset = (milliseconds: number) => {
@@ -122,16 +119,12 @@ export default function EventDetailPage() {
   const [bannerOpen, setBannerOpen] = useState(false);
   const [artworkFile, setArtworkFile] = useState('');
   const [selectedBannerKey, setSelectedBannerKey] = useState<EventBannerKey>('COMMUNITY_SCREENING');
-  const [staffDirectory, setStaffDirectory] = useState<StaffDirectoryEntry[]>([]);
-  const [eventScreeners, setEventScreeners] = useState<EventMembership[]>([]);
-  const [screenersLoading, setScreenersLoading] = useState(false);
-  const [screenersLoaded, setScreenersLoaded] = useState(false);
-  const [screenersError, setScreenersError] = useState('');
+  const [eventMembers, setEventMembers] = useState<EventMembership[]>([]);
+  const [membersLoading, setMembersLoading] = useState(false);
+  const [membersLoaded, setMembersLoaded] = useState(false);
+  const [membersError, setMembersError] = useState('');
   const [staffingOpen, setStaffingOpen] = useState<string | null>(null);
   const [staffingPending, setStaffingPending] = useState(false);
-  const [directoryLoading, setDirectoryLoading] = useState(false);
-  const [directoryLoaded, setDirectoryLoaded] = useState(false);
-  const [directoryError, setDirectoryError] = useState('');
   const [assignmentDrafts, setAssignmentDrafts] = useState<Record<string, AssignmentDraft>>({});
   const [selectedStaffIds, setSelectedStaffIds] = useState<Record<string, string[]>>({});
   const [stationTemplates, setStationTemplates] = useState<StationTemplate[]>([]);
@@ -143,6 +136,7 @@ export default function EventDetailPage() {
   const [stationEditing, setStationEditing] = useState<string | null>(null);
   const [shiftPending, setShiftPending] = useState('');
   const [shiftCreateOpen, setShiftCreateOpen] = useState(false);
+  const [shiftEditing, setShiftEditing] = useState<string | null>(null);
   const [shiftCreateDraft, setShiftCreateDraft] = useState<NewShiftDraft>({ date: '', name: '', startsAt: '09:00', endsAt: '17:00', requiredStaff: 1 });
   const [shiftDrafts, setShiftDrafts] = useState<Record<string, ShiftDraft>>({});
   const [newShiftDay, setNewShiftDay] = useState('');
@@ -249,21 +243,14 @@ export default function EventDetailPage() {
     reader.readAsDataURL(file);
   };
 
-  const loadStaffDirectory = async () => {
-    setDirectoryLoading(true); setDirectoryError('');
-    try { setStaffDirectory(await eventApi.staffDirectory()); setDirectoryLoaded(true); }
-    catch (cause) { setDirectoryError(getApiMessage(cause, 'Staff could not be loaded.')); setDirectoryLoaded(false); }
-    finally { setDirectoryLoading(false); }
-  };
-
-  const loadEventScreeners = async () => {
-    setScreenersLoading(true); setScreenersError('');
+  const loadEventMembers = async () => {
+    setMembersLoading(true); setMembersError('');
     try {
       const memberships = await eventApi.memberships(eventId);
-      setEventScreeners(memberships.filter((membership) => membership.status === 'ACTIVE' && membership.roles.some(({ role }) => role === 'SCREENER')));
-      setScreenersLoaded(true);
-    } catch (cause) { setScreenersError(getApiMessage(cause, 'Event screeners could not be loaded.')); setScreenersLoaded(false); }
-    finally { setScreenersLoading(false); }
+      setEventMembers(memberships.filter((membership) => membership.status === 'ACTIVE'));
+      setMembersLoaded(true);
+    } catch (cause) { setMembersError(getApiMessage(cause, 'Event staff could not be loaded.')); setMembersLoaded(false); }
+    finally { setMembersLoading(false); }
   };
 
   const assignStationScreener = async (shiftId: string, eventStationId: string, userId: string) => {
@@ -281,7 +268,7 @@ export default function EventDetailPage() {
     const opening = staffingOpen !== shiftId;
     setStaffingOpen(opening ? shiftId : null);
     setAssignmentDrafts((current) => current[shiftId] ? current : { ...current, [shiftId]: emptyAssignment });
-    if (opening && !directoryLoaded && !directoryLoading) await loadStaffDirectory();
+    if (opening && !membersLoaded && !membersLoading) await loadEventMembers();
   };
 
   const updateAssignmentDraft = (shiftId: string, changes: Partial<AssignmentDraft>) => {
@@ -439,6 +426,7 @@ export default function EventDetailPage() {
       } : { shiftId: shift.shiftId, name: shift.name, startsAt: shift.startsAt, endsAt: shift.endsAt, requiredStaff: shift.requiredStaff });
       setEvent(await eventApi.update(event.eventId, { version: event.version, shifts }));
       setShiftDrafts((currentDrafts) => { const next = { ...currentDrafts }; delete next[shiftId]; return next; });
+      setShiftEditing(null);
       setNotice('Shift updated.');
       void refreshAudit(event.eventId);
     } catch (cause) { setError(getApiMessage(cause, 'The shift could not be updated.')); }
@@ -564,7 +552,9 @@ export default function EventDetailPage() {
   const staffingShift = event.shifts.find((shift) => shift.shiftId === staffingOpen);
   const staffingDraft = staffingShift ? assignmentDrafts[staffingShift.shiftId] ?? emptyAssignment : emptyAssignment;
   const staffingSelectedIds = staffingShift ? selectedStaffIds[staffingShift.shiftId] ?? [] : [];
-  const eligibleStaff = staffDirectory.filter((person) => person.roles.includes(applicationRoleByAssignment[staffingDraft.assignmentRole]));
+  const eligibleStaff = eventMembers.filter((membership) => membership.roles.some(({ role }) => role === staffingDraft.assignmentRole));
+  const conflictingShiftByUser = staffingShift ? findShiftConflicts(event.shifts, staffingShift, staffingDraft.eventStationId) : new Map();
+  const availableStaff = eligibleStaff.filter(({ userId }) => !conflictingShiftByUser.has(userId));
   const managementMeasures = metrics ? [
     { label: 'Attendance', value: metrics.attendanceRatePercent, detail: `${metrics.checkedInCount.toLocaleString()} of ${metrics.signupCount.toLocaleString()} registrations checked in` },
     { label: 'Visit completion', value: managementPercent(metrics.completedCount, metrics.signupCount), detail: `${metrics.completedCount.toLocaleString()} completed visits` },
@@ -716,18 +706,18 @@ export default function EventDetailPage() {
                     <div className="station-day-hours"><label><span>Opens</span><input name={`starts-${index}`} type="time" defaultValue={availability.startsAt ? formatTimeInput(availability.startsAt, event.timezone) : ''} /></label><span aria-hidden="true">–</span><label><span>Closes</span><input name={`ends-${index}`} type="time" defaultValue={availability.endsAt ? formatTimeInput(availability.endsAt, event.timezone) : ''} /></label></div>
                     {availability.isAvailable && (startsLateBy > 0 || endsEarlyBy > 0) && <div className="station-hours-warning" role="status"><ClockIcon />{startsLateBy > 0 && <span>Starts {scheduleOffset(startsLateBy)} after the event opens.</span>}{endsEarlyBy > 0 && <span>Closes {scheduleOffset(endsEarlyBy)} before the event ends.</span>}</div>}
                     {availability.isAvailable && <div className="station-day-screeners">
-                      <div className="station-day-screeners-heading"><span><UserGroupIcon />Shifts &amp; screeners <small>{dayShifts.length ? `${dayShifts.length} ${dayShifts.length === 1 ? 'shift' : 'shifts'}` : 'No shift yet'}</small></span><span className="station-staffing-actions"><button className="secondary compact" type="button" onClick={() => openShiftComposer(shiftComposerKey, availability.startsAt || toInstant(availability.eventDay.date, formatTimeInput(event.startsAt, event.timezone)), availability.endsAt || toInstant(availability.eventDay.date, formatTimeInput(event.endsAt, event.timezone)))}><PlusIcon />Add shift</button>{dayShifts.length > 0 && !screenersLoaded && !screenersLoading && <button className="secondary compact" type="button" onClick={() => void loadEventScreeners()}><UserPlusIcon />Assign screener</button>}</span></div>
+                      <div className="station-day-screeners-heading"><span><UserGroupIcon />Shifts &amp; screeners <small>{dayShifts.length ? `${dayShifts.length} ${dayShifts.length === 1 ? 'shift' : 'shifts'}` : 'No shift yet'}</small></span><span className="station-staffing-actions"><button className="secondary compact" type="button" onClick={() => openShiftComposer(shiftComposerKey, availability.startsAt || toInstant(availability.eventDay.date, formatTimeInput(event.startsAt, event.timezone)), availability.endsAt || toInstant(availability.eventDay.date, formatTimeInput(event.endsAt, event.timezone)))}><PlusIcon />Add shift</button>{dayShifts.length > 0 && !membersLoaded && !membersLoading && <button className="secondary compact" type="button" onClick={() => void loadEventMembers()}><UserPlusIcon />Assign screener</button>}</span></div>
                       {newShiftDay === shiftComposerKey && (() => { const draft = newShiftDrafts[shiftComposerKey]; return draft && <div className="station-new-shift"><div><strong>New staffing shift</strong><small>Name the block and set its working hours before assigning screeners.</small></div><label><span>Shift name</span><input autoFocus value={draft.name} maxLength={100} placeholder="Morning screening" onChange={(change) => setNewShiftDrafts((current) => ({ ...current, [shiftComposerKey]: { ...draft, name: change.target.value } }))} /></label><label><span>Starts</span><input type="time" value={draft.startsAt} onChange={(change) => setNewShiftDrafts((current) => ({ ...current, [shiftComposerKey]: { ...draft, startsAt: change.target.value } }))} /></label><label><span>Ends</span><input type="time" value={draft.endsAt} onChange={(change) => setNewShiftDrafts((current) => ({ ...current, [shiftComposerKey]: { ...draft, endsAt: change.target.value } }))} /></label><span><button className="secondary compact" type="button" onClick={() => setNewShiftDay('')}>Cancel</button><button className="primary compact" type="button" disabled={shiftPending === availability.eventDay.date || !draft.name.trim() || draft.endsAt <= draft.startsAt} onClick={() => void addDayShift(shiftComposerKey, availability.eventDay.date)}>{shiftPending === availability.eventDay.date ? 'Adding…' : 'Create shift'}</button></span></div>; })()}
-                      {screenersLoading ? <small>Loading event screeners…</small> : screenersError ? <div className="station-screeners-error" role="alert"><small>{screenersError}</small><button className="secondary compact" type="button" onClick={() => void loadEventScreeners()}>Retry</button></div> : dayShifts.length === 0 ? <div className="station-shift-empty"><span><strong>No staffing shifts yet</strong><small>Station hours show availability. Add one or more shifts to schedule people within that window.</small></span></div> : dayShifts.map((shift) => {
+                      {membersLoading ? <small>Loading event screeners…</small> : membersError ? <div className="station-screeners-error" role="alert"><small>{membersError}</small><button className="secondary compact" type="button" onClick={() => void loadEventMembers()}>Retry</button></div> : dayShifts.length === 0 ? <div className="station-shift-empty"><span><strong>No staffing shifts yet</strong><small>Station hours show availability. Add one or more shifts to schedule people within that window.</small></span></div> : dayShifts.map((shift) => {
                         const assigned = shift.staffAssignments.filter((assignment) => assignment.assignmentRole === 'SCREENER' && assignment.eventStation?.eventStationId === station.eventStationId);
                         const assignedIds = new Set(assigned.map((assignment) => assignment.user.userId));
-                        const candidates = eventScreeners.filter((membership) => !assignedIds.has(membership.userId));
+                        const candidates = eventMembers.filter((membership) => membership.roles.some(({ role }) => role === 'SCREENER') && !assignedIds.has(membership.userId));
                         const draft = shiftDrafts[shift.shiftId] ?? { name: shift.name, startsAt: formatTimeInput(shift.startsAt, event.timezone), endsAt: formatTimeInput(shift.endsAt, event.timezone) };
                         const updateDraft = (patch: Partial<ShiftDraft>) => setShiftDrafts((current) => ({ ...current, [shift.shiftId]: { ...draft, ...patch } }));
                         return <div className="station-shift-screeners" key={shift.shiftId}>
                           <div className="station-shift-editor"><label><span>Shift name</span><input value={draft.name} maxLength={100} onChange={(change) => updateDraft({ name: change.target.value })} /></label><div><label><span>Starts</span><input type="time" value={draft.startsAt} onChange={(change) => updateDraft({ startsAt: change.target.value })} /></label><label><span>Ends</span><input type="time" value={draft.endsAt} onChange={(change) => updateDraft({ endsAt: change.target.value })} /></label></div><span className="station-shift-actions"><button className="icon-button danger" type="button" disabled={shiftPending === shift.shiftId} aria-label={`Delete ${shift.name}`} title={`Delete ${shift.name}`} onClick={() => void deleteShift(shift.shiftId, shift.name)}><TrashIcon /></button><button className="secondary compact" type="button" disabled={shiftPending === shift.shiftId || !draft.name.trim() || draft.endsAt <= draft.startsAt} onClick={() => void saveShift(shift.shiftId)}>{shiftPending === shift.shiftId ? 'Saving…' : 'Save shift'}</button></span></div>
                           <div className="station-person-tags">{assigned.map((assignment) => <span className="station-person-tag" key={assignment.staffAssignmentId}>{assignment.user.fullName}<button type="button" aria-label={`Remove ${assignment.user.fullName} from ${station.name} on ${formatEventDate(availability.eventDay.date, event.timezone, false)}`} disabled={staffingPending} onClick={() => void removeStaff(shift.shiftId, assignment.staffAssignmentId)}><XMarkIcon /></button></span>)}{assigned.length === 0 && <small>No screener assigned.</small>}</div>
-                          {screenersLoaded && <label className="station-add-person"><UserPlusIcon /><span className="visually-hidden">Add screener to {station.name} for {shift.name}</span><select value="" disabled={staffingPending || candidates.length === 0} onChange={(change) => { const userId = change.target.value; change.currentTarget.value = ''; if (userId) void assignStationScreener(shift.shiftId, station.eventStationId, userId); }}><option value="">{candidates.length ? 'Add person…' : 'No screeners available'}</option>{candidates.map((membership) => <option value={membership.userId} key={membership.membershipId}>{membership.user.fullName}</option>)}</select></label>}
+                          {membersLoaded && <label className="station-add-person"><UserPlusIcon /><span className="visually-hidden">Add screener to {station.name} for {shift.name}</span><select value="" disabled={staffingPending || candidates.length === 0} onChange={(change) => { const userId = change.target.value; change.currentTarget.value = ''; if (userId) void assignStationScreener(shift.shiftId, station.eventStationId, userId); }}><option value="">{candidates.length ? 'Add person…' : 'No screeners available'}</option>{candidates.map((membership) => <option value={membership.userId} key={membership.membershipId}>{membership.user.fullName}</option>)}</select></label>}
                         </div>;
                       })}
                     </div>}
@@ -742,8 +732,11 @@ export default function EventDetailPage() {
     {view === 'shifts' && <section className="event-view shift-section" aria-labelledby="shift-title">
         <div className="section-title shift-section-title"><div><h2 id="shift-title">Shifts</h2><p>Schedule working periods, then assign registration and station duties.</p></div><div className="shift-heading-actions"><span className="shift-count">{event.shifts.length} scheduled</span>{canEditStaffing && <button className="primary compact" type="button" onClick={openShiftCreator}><PlusIcon />Add shift</button>}</div></div>
         {event.shifts.length === 0 ? <div className="shift-empty-state"><ClockIcon /><h3>No shifts scheduled</h3><p>Add the first working period, then assign registration officers and station teams.</p>{canEditStaffing && <button className="primary compact" type="button" onClick={openShiftCreator}><PlusIcon />Add first shift</button>}</div> : <div className="shift-table">{event.shifts.map((shift) => {
+          const draft = shiftDrafts[shift.shiftId] ?? { name: shift.name, startsAt: formatTimeInput(shift.startsAt, event.timezone), endsAt: formatTimeInput(shift.endsAt, event.timezone) };
+          const updateDraft = (patch: Partial<ShiftDraft>) => setShiftDrafts((current) => ({ ...current, [shift.shiftId]: { ...draft, ...patch } }));
           return <article className="shift-record" key={shift.shiftId}>
-            <div className="shift-record-summary"><span><strong>{shift.name}</strong><small>{formatEventDate(shift.startsAt, event.timezone, false)} · {STATUS_LABEL[shift.status as keyof typeof STATUS_LABEL] ?? shift.status.toLowerCase()}</small></span><span><small>Working hours</small>{formatTime(shift.startsAt, event.timezone)}–{formatTime(shift.endsAt, event.timezone)}</span><span><small>Coverage</small>{shift.staffAssignments.length} of {shift.requiredStaff} assigned</span>{canEditStaffing && <button className="secondary compact" type="button" aria-expanded={staffingOpen === shift.shiftId} onClick={() => void openStaffing(shift.shiftId)}><PlusIcon />Assign staff</button>}</div>
+            <div className="shift-record-summary"><span><strong>{shift.name}</strong><small>{formatEventDate(shift.startsAt, event.timezone, false)} · {STATUS_LABEL[shift.status as keyof typeof STATUS_LABEL] ?? shift.status.toLowerCase()}</small></span><span><small>Working hours</small>{formatTime(shift.startsAt, event.timezone)}–{formatTime(shift.endsAt, event.timezone)}</span><span><small>Coverage</small>{shift.staffAssignments.length} of {shift.requiredStaff} assigned</span>{canEditStaffing && <span className="shift-record-actions"><button className="secondary compact" type="button" aria-expanded={shiftEditing === shift.shiftId} onClick={() => setShiftEditing((current) => current === shift.shiftId ? null : shift.shiftId)}><PencilSquareIcon />Edit shift</button><button className="secondary compact" type="button" aria-expanded={staffingOpen === shift.shiftId} onClick={() => void openStaffing(shift.shiftId)}><PlusIcon />Assign staff</button></span>}</div>
+            {shiftEditing === shift.shiftId && <div className="station-shift-editor"><label><span>Shift name</span><input value={draft.name} maxLength={100} onChange={(change) => updateDraft({ name: change.target.value })} /></label><div><label><span>Starts</span><input type="time" value={draft.startsAt} onChange={(change) => updateDraft({ startsAt: change.target.value })} /></label><label><span>Ends</span><input type="time" value={draft.endsAt} onChange={(change) => updateDraft({ endsAt: change.target.value })} /></label></div><span className="station-shift-actions"><button className="secondary compact" type="button" disabled={shiftPending === shift.shiftId} onClick={() => setShiftEditing(null)}>Cancel</button><button className="secondary compact" type="button" disabled={shiftPending === shift.shiftId || !draft.name.trim() || draft.endsAt <= draft.startsAt} onClick={() => void saveShift(shift.shiftId)}>{shiftPending === shift.shiftId ? 'Saving…' : 'Save shift'}</button></span></div>}
             {shift.staffAssignments.length > 0 ? <ul className="assignment-list">{shift.staffAssignments.map((assignment) => <li key={assignment.staffAssignmentId}><span><strong>{assignment.user.fullName}</strong><small>{roleLabel(assignment.assignmentRole)}{assignment.eventStation ? ` · ${assignment.eventStation.name}` : ''}</small></span>{canEditStaffing && <button className="assignment-remove" type="button" aria-label={`Remove ${assignment.user.fullName} from ${shift.name}`} title={`Remove ${assignment.user.fullName}`} onClick={() => void removeStaff(shift.shiftId, assignment.staffAssignmentId)} disabled={staffingPending}><TrashIcon /></button>}</li>)}</ul> : <p className="shift-empty">No staff assigned to this shift.</p>}
           </article>;
         })}</div>}
@@ -793,10 +786,10 @@ export default function EventDetailPage() {
       dismissible={!staffingPending}
     >
       {staffingShift && <form className={`${appDialog.form} shift-assignment-dialog`} onSubmit={(submitEvent) => { submitEvent.preventDefault(); void assignStaff(staffingShift.shiftId); }}>
-        {directoryLoading ? <p>Loading available staff…</p> : directoryError ? <div className="inline-retry" role="alert"><p>{directoryError}</p><button className="secondary compact" type="button" onClick={() => void loadStaffDirectory()}>Retry</button></div> : directoryLoaded && staffDirectory.length === 0 ? <p>No active staff members are available.</p> : <>
+        {membersLoading ? <p>Loading available staff…</p> : membersError ? <div className="inline-retry" role="alert"><p>{membersError}</p><button className="secondary compact" type="button" onClick={() => void loadEventMembers()}>Retry</button></div> : membersLoaded && eventMembers.length === 0 ? <p>No staff members belong to this event.</p> : <>
           <div className="shift-assignment-fields"><label className={appDialog.field}><span>Duty</span><select value={staffingDraft.assignmentRole} disabled={staffingPending} onChange={(change) => { updateAssignmentDraft(staffingShift.shiftId, { assignmentRole: change.target.value as StaffAssignmentRole, eventStationId: '' }); setSelectedStaffIds((current) => ({ ...current, [staffingShift.shiftId]: [] })); }}>{assignmentRoles.map((role) => <option value={role} key={role}>{roleLabel(role)}</option>)}</select></label><label className={appDialog.field}><span>Station {staffingDraft.assignmentRole === 'SCREENER' ? '(required)' : '(optional)'}</span><select required={staffingDraft.assignmentRole === 'SCREENER'} value={staffingDraft.eventStationId} disabled={staffingPending} onChange={(change) => updateAssignmentDraft(staffingShift.shiftId, { eventStationId: change.target.value })}><option value="">No station</option>{event.eventStations.filter((station) => station.isAvailable).map((station) => <option value={station.eventStationId} key={station.eventStationId}>{station.stationOrder}. {station.name}</option>)}</select></label></div>
-          <fieldset className="staff-picker shift-staff-picker"><legend>Staff members</legend><label className="staff-select-all"><input type="checkbox" checked={eligibleStaff.length > 0 && staffingSelectedIds.length === eligibleStaff.length} onChange={(change) => setSelectedStaffIds((current) => ({ ...current, [staffingShift.shiftId]: change.target.checked ? eligibleStaff.map(({ userId }) => userId) : [] }))} /> Select all {eligibleStaff.length}</label>{eligibleStaff.map((person) => <label key={person.userId}><input type="checkbox" checked={staffingSelectedIds.includes(person.userId)} onChange={(change) => setSelectedStaffIds((current) => ({ ...current, [staffingShift.shiftId]: change.target.checked ? [...staffingSelectedIds, person.userId] : staffingSelectedIds.filter((id) => id !== person.userId) }))} /><span>{getDisplayName(person.username)}</span></label>)}</fieldset>
-          {eligibleStaff.length === 0 && <p className={appDialog.help}>No active staff have the selected event role. Add the role under Staff first.</p>}
+          <fieldset className="staff-picker shift-staff-picker"><legend>Staff members</legend><label className="staff-select-all"><input type="checkbox" checked={availableStaff.length > 0 && staffingSelectedIds.length === availableStaff.length} onChange={(change) => setSelectedStaffIds((current) => ({ ...current, [staffingShift.shiftId]: change.target.checked ? availableStaff.map(({ userId }) => userId) : [] }))} /> Select all {availableStaff.length}</label>{eligibleStaff.map((membership) => { const conflict = conflictingShiftByUser.get(membership.userId); return <label key={membership.userId}><input type="checkbox" disabled={!!conflict} checked={staffingSelectedIds.includes(membership.userId)} onChange={(change) => setSelectedStaffIds((current) => ({ ...current, [staffingShift.shiftId]: change.target.checked ? [...staffingSelectedIds, membership.userId] : staffingSelectedIds.filter((id) => id !== membership.userId) }))} /><span>{membership.user.fullName}{conflict && <small>Unavailable · {conflict.name} {formatTime(conflict.startsAt, event.timezone)}–{formatTime(conflict.endsAt, event.timezone)}</small>}</span></label>; })}</fieldset>
+          {eligibleStaff.length === 0 && <p className={appDialog.help}>No event staff have the selected role. Add the role under Event staff first.</p>}
           <div className={appDialog.actions}><button className="secondary" type="button" disabled={staffingPending} onClick={() => setStaffingOpen(null)}>Cancel</button><button className="primary" type="submit" disabled={staffingPending || staffingSelectedIds.length === 0 || (staffingDraft.assignmentRole === 'SCREENER' && !staffingDraft.eventStationId)}>{staffingPending ? 'Assigning…' : `Assign ${staffingSelectedIds.length || ''} staff`}</button></div>
         </>}
       </form>}

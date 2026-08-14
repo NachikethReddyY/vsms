@@ -643,7 +643,9 @@ html[data-theme="light"] .events-workspace {
 .events-workspace .shift-record-summary { min-height:44px; grid-template-columns:minmax(180px,1.35fr) minmax(150px,.8fr) minmax(130px,.65fr) auto; }
 .events-workspace .shift-record-summary strong { font-size:15px; line-height:21px; }
 .events-workspace .shift-record-summary>span:not(:first-child) { padding-left:18px; border-left:1px solid var(--line-soft); }
-.events-workspace .shift-record-summary>.secondary { min-height:44px; }
+.events-workspace .shift-record-actions { display:flex; align-items:center; gap:7px; padding-left:0!important; border-left:0!important; }
+.events-workspace .shift-record-actions button { min-height:44px; white-space:nowrap; }
+.events-workspace .shift-record-actions svg { width:16px; }
 .events-workspace .shift-record .assignment-list { grid-template-columns:repeat(2,minmax(0,1fr)); gap:8px; margin:16px 0 0; padding-top:16px; border-top:1px solid var(--line-soft); background:transparent; }
 .events-workspace .shift-record .assignment-list li { min-height:58px; padding:9px 10px 9px 12px; border:1px solid var(--line-soft); border-radius:8px; background:var(--canvas); }
 .events-workspace .shift-record .assignment-list li button { flex:0 0 44px; min-height:44px; }
@@ -657,6 +659,8 @@ html[data-theme="light"] .events-workspace {
 .events-workspace .shift-staff-picker label { min-height:44px; display:flex; align-items:center; gap:9px; padding:0 6px; border-bottom:1px solid var(--line-soft); font-size:13px; }
 .events-workspace .shift-staff-picker .staff-select-all { grid-column:1/-1; color:var(--ink-2); font-weight:700; }
 .events-workspace .shift-staff-picker input { width:17px; height:17px; accent-color:var(--focus); }
+.events-workspace .shift-staff-picker label>span { display:grid; gap:1px; }
+.events-workspace .shift-staff-picker label small { color:var(--muted); font-size:10px; }
 .events-workspace .station-record-copy span,
 .events-workspace .station-record-copy small,
 .events-workspace .station-order span,
@@ -800,7 +804,7 @@ html[data-theme="light"] .events-workspace {
   .events-workspace .shift-assignment-fields,
   .events-workspace .shift-staff-picker { grid-template-columns:1fr; }
   .events-workspace .shift-heading-actions { width:100%; justify-content:space-between; }
-  .events-workspace .shift-record-summary>.secondary { grid-column:2; grid-row:1; }
+  .events-workspace .shift-record-actions { grid-column:2; grid-row:1; }
   .events-workspace .staffing-editor { grid-template-columns:1fr; }
   .events-workspace .station-capacity { grid-template-columns:1fr auto; gap:12px; padding:14px; }
   .events-workspace .station-capacity>div { grid-column:1/-1; }
