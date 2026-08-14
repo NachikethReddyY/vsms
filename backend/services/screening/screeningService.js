@@ -319,6 +319,7 @@ const listQueue = async (eventId, stationId, user) => {
     registrations: entries.map((entry) => {
       const row = entry.registration;
       return {
+      queueEntryId: entry.id,
       registrationId: row.registrationId,
       participantDisplayName: row.participantDisplayName || "Unnamed participant",
       queueNumber: row.queueNumber,

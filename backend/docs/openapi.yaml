@@ -5230,8 +5230,9 @@ components:
     ScreeningQueueItem:
       type: object
       additionalProperties: false
-      required: [registrationId, participantDisplayName, queueNumber, status, existingResult]
+      required: [queueEntryId, registrationId, participantDisplayName, queueNumber, status, existingResult]
       properties:
+        queueEntryId: { type: string, format: uuid }
         registrationId: { type: string, format: uuid }
         participantDisplayName: { type: string }
         queueNumber: { type: integer, nullable: true }

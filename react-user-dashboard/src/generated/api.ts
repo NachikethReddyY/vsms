@@ -4654,6 +4654,8 @@ export interface components {
         };
         ScreeningQueueItem: {
             /** Format: uuid */
+            queueEntryId: string;
+            /** Format: uuid */
             registrationId: string;
             participantDisplayName: string;
             queueNumber: number | null;

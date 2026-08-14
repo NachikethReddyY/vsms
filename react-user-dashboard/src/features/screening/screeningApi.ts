@@ -51,6 +51,7 @@ export type Station = {
 };
 
 export type QueueRegistration = {
+  queueEntryId?: string;
   registrationId: string;
   participantDisplayName: string;
   queueNumber: number | null;
@@ -239,6 +240,11 @@ export const screeningApi = {
       station: Station;
       registrations: QueueRegistration[];
     }>(`/events/${eventId}/stations/${stationId}/queue`);
+    return data;
+  },
+
+  async callQueueEntry(eventId: string, queueEntryId: string) {
+    const { data } = await apiClient.patch(`/queues/events/${eventId}/entries/${queueEntryId}/call`);
     return data;
   },
 
