@@ -76,6 +76,17 @@ test("skipping the active station keeps it in route history and selects the requ
   }).after, [a, b, d, c]);
 });
 
+test("the final active station may be skipped to clinical review", () => {
+  const finalSteps = [station(a, 1, true), station(b, 2, true), station(c, 3, true), station(d, 4)];
+  assert.deepEqual(validateRouteOverride({
+    steps: finalSteps,
+    stationIds: [d],
+    activeStationId: d,
+    scope: "NEXT_ONLY",
+    skipActive: true,
+  }).after, [a, b, c, d]);
+});
+
 test("route override request is strict, duplicate-free, versioned, and reason-allowlisted", () => {
   const valid = { stationIds: [a, b], reasonCode: "QUEUE_BALANCING", expectedVersion: 2 };
   assert.equal(routeOverrideBody.safeParse(valid).success, true);
@@ -250,4 +261,23 @@ test("an in-progress screening cannot be skipped into another queue", async () =
     reconcileAfterRouteOverride({ tx, registrationId, eventId, nextStep: steps[2], skipActive: true }),
     (error) => error.code === "QUEUE_ALREADY_IN_PROGRESS",
   );
+});
+
+test("skipping the final queue completes its route step without creating another queue", async () => {
+  const activeQueue = { id: crypto.randomUUID(), registrationId, stationId: d, status: "WAITING" };
+  let queueStatus = activeQueue.status;
+  let completed = false;
+  const tx = {
+    queueEntry: {
+      findFirst: async () => ({ ...activeQueue, status: queueStatus }),
+      updateMany: async ({ data }) => { queueStatus = data.status; return { count: 1 }; },
+    },
+    registrationRouteStep: {
+      updateMany: async () => { completed = true; return { count: 1 }; },
+    },
+  };
+  const result = await reconcileAfterRouteOverride({ tx, registrationId, eventId, nextStep: null, skipActive: true });
+  assert.equal(result, null);
+  assert.equal(queueStatus, "SKIPPED");
+  assert.equal(completed, true);
 });

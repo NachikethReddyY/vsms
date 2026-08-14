@@ -31,7 +31,10 @@ const validateRouteOverride = ({ steps, stationIds, activeStationId, scope, skip
   assertExactPermutation(beforeUnfinished, stationIds);
 
   const activeIndex = beforeUnfinished.indexOf(activeStationId);
-  if (skipActive && (activeIndex < 0 || stationIds[0] === activeStationId)) {
+  const skippingToReview = skipActive
+    && beforeUnfinished.length === 1
+    && stationIds[0] === activeStationId;
+  if (skipActive && (activeIndex < 0 || (stationIds[0] === activeStationId && !skippingToReview))) {
     throw new AppError(422, "INVALID_ROUTE_SKIP", "Choose a different unfinished station before skipping the current station.");
   }
   if (!skipActive && activeIndex >= 0 && stationIds[activeIndex] !== activeStationId) {

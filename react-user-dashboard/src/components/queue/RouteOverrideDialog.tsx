@@ -65,6 +65,7 @@ export function RouteOverrideDialog({
   const stationById = useMemo(() => new Map(route?.steps.map((step) => [step.stationId, step]) ?? []), [route]);
   const activeStationId = route?.steps.find((step) => step.state === 'CURRENT')?.stationId ?? null;
   const mutableIds = stationIds.filter((stationId) => stationId !== activeStationId);
+  const canSkipCurrent = Boolean(activeStationId && route?.queue && route.queue.status !== 'IN_PROGRESS');
 
   const move = (stationId: string, direction: -1 | 1) => {
     const mutableIndex = mutableIds.indexOf(stationId);
@@ -127,11 +128,10 @@ export function RouteOverrideDialog({
           if (!step) return null;
           const locked = stationId === activeStationId;
           const mutableIndex = mutableIds.indexOf(stationId);
-          const canMoveQueue = Boolean(activeStationId && route.queue && route.queue.status !== 'IN_PROGRESS');
           return <li key={stationId} className="flex min-h-11 items-center justify-between gap-3 rounded-lg border px-3">
             <span><strong>{step.stationName}</strong>{locked ? ' · current' : ''}</span>
             {locked ? <span>{route.queue?.status === 'IN_PROGRESS' ? 'Screening started' : 'Current queue'}</span> : <span className="flex flex-wrap justify-end gap-2">
-              {canMoveQueue && <button type="button" className="min-h-11 rounded-lg border px-3" onClick={() => skipToStation(stationId)}>{skipActive && stationIds[0] === stationId ? 'Selected after skip' : 'Skip current → go here'}</button>}
+              {canSkipCurrent && <button type="button" className="min-h-11 rounded-lg border px-3" onClick={() => skipToStation(stationId)}>{skipActive && stationIds[0] === stationId ? 'Selected after skip' : 'Skip current → go here'}</button>}
               {fullAccess ? <>
                 <button type="button" className="min-h-11 min-w-11 rounded-lg border" disabled={skipActive || mutableIndex <= 0} onClick={() => move(stationId, -1)} aria-label={`Move ${step.stationName} earlier`}><ArrowUpIcon className="mx-auto size-4" /></button>
                 <button type="button" className="min-h-11 min-w-11 rounded-lg border" disabled={skipActive || mutableIndex >= mutableIds.length - 1} onClick={() => move(stationId, 1)} aria-label={`Move ${step.stationName} later`}><ArrowDownIcon className="mx-auto size-4" /></button>
@@ -139,7 +139,7 @@ export function RouteOverrideDialog({
             </span>}
           </li>;
         })}
-        <li className="flex min-h-11 items-center justify-between rounded-lg border bg-stone-50 px-3"><strong>Clinical review</strong><span>Final · locked</span></li>
+        <li className="flex min-h-11 items-center justify-between gap-3 rounded-lg border bg-stone-50 px-3"><strong>Clinical review</strong>{canSkipCurrent && mutableIds.length === 0 ? <button type="button" className="min-h-11 rounded-lg border px-3" onClick={() => skipToStation(activeStationId as string)}>{skipActive ? 'Selected after skip' : 'Skip current → clinical review'}</button> : <span>Final · locked</span>}</li>
       </ol>
       <label className="grid gap-1 text-sm font-semibold">Reason
         <select className="min-h-11 rounded-lg border px-3" value={reasonCode} onChange={(event) => setReasonCode(event.target.value as RouteOverrideReason)}>

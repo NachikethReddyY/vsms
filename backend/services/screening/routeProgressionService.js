@@ -111,20 +111,22 @@ const reconcileAfterRouteOverride = async ({
       throw new AppError(409, "QUEUE_ALREADY_IN_PROGRESS", "A screening already in progress cannot be skipped.");
     }
   }
-  if (!nextStep) return null;
+  if (!activeQueue && !nextStep) return null;
 
-  const availability = await tx.eventStationAvailability.findFirst({
-    where: {
-      eventStationId: nextStep.stationId,
-      eventDay: { eventId, startsAt: { lte: now }, endsAt: { gt: now } },
-    },
-    select: { isAvailable: true, startsAt: true, endsAt: true },
-  });
-  if (!stationAvailable(nextStep.station, availability, now)) {
-    if (skipActive) {
-      throw new AppError(409, "ROUTE_STATION_UNAVAILABLE", "The selected station is not currently available.");
+  if (nextStep) {
+    const availability = await tx.eventStationAvailability.findFirst({
+      where: {
+        eventStationId: nextStep.stationId,
+        eventDay: { eventId, startsAt: { lte: now }, endsAt: { gt: now } },
+      },
+      select: { isAvailable: true, startsAt: true, endsAt: true },
+    });
+    if (!stationAvailable(nextStep.station, availability, now)) {
+      if (skipActive) {
+        throw new AppError(409, "ROUTE_STATION_UNAVAILABLE", "The selected station is not currently available.");
+      }
+      return null;
     }
-    return null;
   }
 
   if (activeQueue) {
@@ -143,6 +145,8 @@ const reconcileAfterRouteOverride = async ({
       throw new AppError(409, "ROUTE_QUEUE_CONFLICT", "The participant's route changed while the station was being skipped.");
     }
   }
+
+  if (!nextStep) return null;
 
   const queueEntry = await createInitialQueueEntry({ tx, registrationId, stationId: nextStep.stationId });
   if (activeQueue) {
