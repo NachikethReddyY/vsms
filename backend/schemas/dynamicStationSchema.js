@@ -394,6 +394,7 @@ const SYSTEM_FIELD_SCHEMAS = {
     { key: "symptomsNoted", label: "Symptoms noted", type: "boolean", required: true },
     { key: "symptomSummary", label: "Symptom summary", type: "text", required: false },
     { key: "observations", label: "Observations", type: "text", required: true },
+    { key: "deviceFindings", label: "Device findings", type: "text", required: false },
   ],
 };
 

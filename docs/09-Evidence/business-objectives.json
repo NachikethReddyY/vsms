@@ -1,0 +1,85 @@
+{
+  "schemaVersion": 1,
+  "requirements": [
+    { "id": "BR-01", "status": "IMPLEMENTED", "evidence": ["docs/04-Security/secure_coding/api-requirement-map.md", "backend/services/event/eventService.js"] },
+    { "id": "BR-02", "status": "AUTOMATED_PROOF", "evidence": ["backend/docs/registration-stored-routines.md", "backend/tests/integration/registration-routines.integration.test.js"] },
+    { "id": "BR-03", "status": "IMPLEMENTED", "evidence": ["backend/services/screening/queueService.js", "react-user-dashboard/src/features/operations/OperationsCenterPage.tsx"] },
+    { "id": "BR-04", "status": "IMPLEMENTED", "evidence": ["backend/services/screening/screeningService.js", "react-user-dashboard/src/features/screening/EyeHealthStationPage.tsx"] },
+    { "id": "BR-05", "status": "AUTOMATED_PROOF", "evidence": ["backend/services/screening/syncService.js", "react-user-dashboard/src/features/screening/offlineSync.test.ts"] },
+    { "id": "BR-06", "status": "AUTOMATED_PROOF", "evidence": ["docs/04-Security/owasp-verification-matrix.md", "backend/tests/security"] },
+    { "id": "BR-07", "status": "IMPLEMENTED", "evidence": ["backend/services/reporting/reportingService.js", "docs/2026-08-13-performance-recovery.md"] },
+    { "id": "BR-08", "status": "IMPLEMENTED", "evidence": ["backend/services/operations/operationsService.js", "react-user-dashboard/src/features/operations/OperationsCenterPage.tsx"] }
+  ],
+  "objectives": [
+    {
+      "id": "BO-01",
+      "objective": "Reduce registration time",
+      "target": { "operator": "REDUCTION_AT_LEAST", "value": 50, "unit": "percent" },
+      "status": "FIELD_BASELINE_REQUIRED",
+      "method": "Time the same synthetic registration script with the approved paper process and VSMS for at least 20 participants; compare medians.",
+      "baseline": null,
+      "actual": null,
+      "evidence": []
+    },
+    {
+      "id": "BO-02",
+      "objective": "Reduce paperwork",
+      "target": { "operator": "REDUCTION_AT_LEAST", "value": 90, "unit": "percent" },
+      "status": "FIELD_BASELINE_REQUIRED",
+      "method": "Count paper sheets generated for one 100-participant event before and after VSMS, excluding legally required referral handouts.",
+      "baseline": null,
+      "actual": null,
+      "evidence": []
+    },
+    {
+      "id": "BO-03",
+      "objective": "Improve screening throughput",
+      "target": { "operator": "INCREASE_AT_LEAST", "value": 30, "unit": "percent" },
+      "status": "FIELD_BASELINE_REQUIRED",
+      "method": "Compare completed participant journeys per staffed hour using the same station mix and synthetic cases.",
+      "baseline": null,
+      "actual": null,
+      "evidence": ["docs/2026-08-13-performance-recovery.md"]
+    },
+    {
+      "id": "BO-04",
+      "objective": "Support offline operation",
+      "target": { "operator": "COVERAGE_AT_LEAST", "value": 100, "unit": "percent_of_core_screening_stations" },
+      "status": "AUTOMATED_PROOF",
+      "method": "Exercise encrypted offline download, save, reconnect, idempotent replay, conflict handling, expiry, and owner-change purge for all four screening station types.",
+      "baseline": 0,
+      "actual": 100,
+      "evidence": ["react-user-dashboard/src/features/screening/offlineSync.test.ts", "backend/tests/unit/sync-service.test.js"]
+    },
+    {
+      "id": "BO-05",
+      "objective": "Improve reporting speed",
+      "target": { "operator": "DURATION_AT_MOST", "value": 1, "unit": "day" },
+      "status": "AUTOMATED_PROOF",
+      "method": "Generate aggregate reporting immediately after the synthetic event workflow and retain duration and error-rate evidence.",
+      "baseline": null,
+      "actual": 0.00000039,
+      "evidence": ["docs/2026-08-13-performance-recovery.md"]
+    },
+    {
+      "id": "BO-06",
+      "objective": "Improve security posture",
+      "target": { "operator": "CONTROL_COVERAGE", "value": 10, "unit": "owasp_top_10_categories" },
+      "status": "CONTROL_EVIDENCE",
+      "method": "Map every OWASP Top 10 category to implemented controls, automated checks, residual risks, and live verification evidence.",
+      "baseline": null,
+      "actual": 10,
+      "evidence": ["docs/04-Security/owasp-verification-matrix.md", "backend/docs/threat-model.md"]
+    },
+    {
+      "id": "BO-07",
+      "objective": "Improve participant tracking",
+      "target": { "operator": "VISIBILITY", "value": 1, "unit": "real_time_operational_view" },
+      "status": "AUTOMATED_PROOF",
+      "method": "Verify queue, route completion, operational dashboard, and participant-status projections update from committed workflow state.",
+      "baseline": 0,
+      "actual": 1,
+      "evidence": ["backend/services/operations/operationsService.js", "backend/services/participant/qrService.js"]
+    }
+  ]
+}

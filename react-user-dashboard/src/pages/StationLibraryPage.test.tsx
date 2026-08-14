@@ -186,11 +186,11 @@ describe('Station library pages', () => {
     ));
   });
 
-  it('hides registration, clinical review, and eye health from the library list', async () => {
+  it('hides operational templates but shows the eye-health screening template', async () => {
     const registration = {
       stationTemplateId: '60000000-0000-4000-8000-000000000001',
       templateKey: 'REGISTRATION',
-      stationType: null,
+      stationType: 'EYE_HEALTH' as const,
       version: 1,
       name: 'Registration',
       description: 'Check-in',
@@ -215,17 +215,17 @@ describe('Station library pages', () => {
       stationType: null,
       version: 1,
       name: 'Eye health',
-      description: 'Review only',
+      description: 'Eye-health screening',
       defaultCapacity: 2,
       active: true,
-      fieldSchema: null,
+      fieldSchema: [{ key: 'observations', label: 'Observations', type: 'text' as const, required: true }],
     };
     get.mockResolvedValueOnce({ data: [registration, clinicalReview, eyeHealth, template] });
     renderLibrary();
     expect(await within(library()).findByText('Visual acuity booth')).toBeTruthy();
     expect(screen.queryByText('Registration')).toBeNull();
     expect(screen.queryByText('Clinical review')).toBeNull();
-    expect(screen.queryByText('Eye health')).toBeNull();
+    expect(within(library()).getByText('Eye health')).toBeTruthy();
   });
 
   it('blocks edit routes for templates hidden from the station library', async () => {

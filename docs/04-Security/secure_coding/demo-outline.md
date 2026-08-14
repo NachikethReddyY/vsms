@@ -14,7 +14,7 @@ step as completed until it has been observed in the authorized environment.
 | 10:00–11:30 | Reconnect and sync | Restore connectivity, show the sync request/result, and show applied or conflict status | `POST /api/v1/events/{eventId}/sync/screening`, `syncService.js`; use safe test data only |
 | 11:30–13:00 | Review and referral | Open the clinical review, record the reviewer decision, issue or revise a referral, and show the protected document path if available | `reviewService.js`, `referralService.js`; requires reviewer access and configured document storage path |
 | 13:00–14:15 | Dashboard/report | Show event metrics and aggregate report/export status; summarize the 500-participant performance and verified backup restore | `analyticsService.js`, `reportingService.js`, `docs/2026-08-13-performance-recovery.md` |
-| 14:15–15:00 | Security recap | Point to event-scoped authorization, validation, CSRF/session controls, idempotency, audit records and encrypted local storage; state the Single-AZ/one-host deployment limit | `docs/secure_coding/diagrams/SecureApiDesign.md`, `backend/docs/offline-screening-28.md` |
+| 14:15–15:00 | Security recap | Point to event-scoped authorization, validation, CSRF/session controls, idempotency, audit records, encrypted local storage and the OWASP verification matrix; distinguish current lab deployment evidence from the optional HA foundation | `docs/secure_coding/diagrams/SecureApiDesign.md`, `backend/docs/offline-screening-28.md`, `docs/04-Security/owasp-verification-matrix.md` |
 
 ## Reset and safety checklist
 
