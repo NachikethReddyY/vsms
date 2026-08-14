@@ -34,7 +34,7 @@ VISUAL_ACUITY | REFRACTION | COLOUR_VISION | EYE_HEALTH | CUSTOM
 
 | Field | Notes |
 |---|---|
-| `stationType` | Required. Clinical types (VA/REF/CV) are one-per-event (enforced in service). `CUSTOM` may appear multiple times (unique by `stationTemplateId`). Eye health is review-only and not importable. |
+| `stationType` | Required. Clinical types (VA/REF/CV/EYE_HEALTH) are one-per-event (enforced in service). `CUSTOM` may appear multiple times (unique by `stationTemplateId`). |
 | `stationTemplateId` | Links runtime station to catalog template (required for idempotent CUSTOM re-import). |
 | `stationName` | Display name (from template `name` unless overridden later). |
 | `stationOrder` | Unique per `(eventId, stationOrder)`. |
@@ -89,7 +89,7 @@ Keep this as a **backend constant** (or seed-maintained map) used by import — 
 | `VISUAL_ACUITY` | `VISUAL_ACUITY` | **Yes** |
 | `REFRACTION` | `REFRACTION` | **Yes** |
 | `COLOUR_VISION` | `COLOUR_VISION` | **Yes** |
-| `EYE_HEALTH` | — | **No** — clinician review observations only (not a screener station) |
+| `EYE_HEALTH` | `EYE_HEALTH` | Yes — duty-scoped screening station with automatic flags and offline synchronization |
 | `CUSTOM_*` (e.g. `CUSTOM_OD_NOTES`) | `CUSTOM` | **Yes** — multiple CUSTOM stations allowed per event; matched by `stationTemplateId` |
 | `REGISTRATION` | — | **No** |
 | `CLINICAL_REVIEW` | — | **No** |
@@ -143,7 +143,7 @@ Idempotency: clinical types upsert by `(eventId, stationType)`; CUSTOM upserts b
 
 **Screening owners**
 
-4. ~~Is `EYE_HEALTH` in scope for import now?~~ **Decided:** review-only; clinicians may add optional eye-health notes on review decisions.
+4. ~~Is `EYE_HEALTH` in scope for import now?~~ **Decided:** yes; event managers may import one eye-health template per event, while reviewers retain final clinical decision ownership.
 5. Should `stationName` stay editable after import without changing `stationType`?
 
 **Auth / staffing owners**
@@ -162,7 +162,7 @@ Idempotency: clinical types upsert by `(eventId, stationType)`; CUSTOM upserts b
 - [ ] Canonical runtime table is `Station` (no new `EventStation` table).
 - [ ] VA / REFRACTION / COLOUR_VISION import as clinical stations (one per type per event).
 - [ ] CUSTOM templates import as dynamic stations (multi allowed; schema snapshot frozen).
-- [ ] EYE_HEALTH stays catalog/review-only (not a screener station).
+- [x] EYE_HEALTH is importable as a fourth screening station with duty checks, automatic flags and offline sync.
 - [ ] REGISTRATION + CLINICAL_REVIEW stay catalog-only (not screening stations).
 - [ ] Import sets `stationType`, `stationTemplateId`, `stationName`, `stationOrder`, `isActive`, `fieldSchemaSnapshot`, `schemaVersion`; capacity via availability or deferred.
 - [ ] Availability: `event_station_id` means `station_id`; day rows optional for #24 MVP.
