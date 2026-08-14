@@ -3,7 +3,8 @@ import type { EventStatus } from './eventApi';
 export type EventDisplayStatus = EventStatus | 'ENDED';
 
 export function getEventDisplayStatus(status: EventStatus, endsAt: string, now: Date): EventDisplayStatus {
-  return status === 'IN_PROGRESS' && new Date(endsAt).getTime() <= now.getTime() ? 'ENDED' : status;
+  if (new Date(endsAt).getTime() > now.getTime() || ['COMPLETED', 'CANCELLED'].includes(status)) return status;
+  return status === 'IN_PROGRESS' ? 'ENDED' : 'CANCELLED';
 }
 
 export function formatEventTimeRange(startsAt: string, endsAt: string, timeZone: string): string {

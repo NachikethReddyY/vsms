@@ -10,6 +10,10 @@ test('an in-progress event remains live before its scheduled end', () => {
   assert.equal(getEventDisplayStatus('IN_PROGRESS', '2026-08-04T03:00:00.000Z', new Date('2026-08-04T01:00:00.000Z')), 'IN_PROGRESS');
 });
 
+test('an unstarted day is cancelled after its scheduled end', () => {
+  assert.equal(getEventDisplayStatus('DRAFT', '2026-08-13T09:00:00.000Z', new Date('2026-08-14T00:00:00.000Z')), 'CANCELLED');
+});
+
 test('a schedule crossing midnight includes the end date', () => {
   assert.equal(formatEventTimeRange('2026-08-03T00:00:00.000Z', '2026-08-03T23:00:00.000Z', 'Asia/Singapore'), '8:00 AM – 4 AUG, 7:00 AM');
 });
