@@ -2,6 +2,7 @@
 --
 -- The executable definitions are versioned and deployed by Prisma migration:
 -- prisma/migrations/20260814200000_add_database_routines/migration.sql
+-- prisma/migrations/20260814210000_harden_registration_stored_routines/migration.sql
 --
 -- This catalog intentionally contains no second copy of the routine bodies. A
 -- standalone SQL copy previously targeted obsolete tables such as queue_entry,
@@ -10,6 +11,21 @@
 --
 -- Deployed routines
 -- -----------------
+-- FUNCTION  register_participant_for_event(uuid, uuid, uuid, varchar)
+--   Serializes event capacity allocation, supports idempotent replay, prevents
+--   duplicate registration, and writes the initial status history.
+--
+-- FUNCTION  cancel_event_registration(uuid, uuid, varchar)
+--   Atomically cancels an eligible registration, revokes active QR passes,
+--   promotes the oldest waitlisted participant, writes both status histories,
+--   and reports the affected QR count with one shared timestamp.
+--
+-- FUNCTION  check_in_event_registration(uuid, uuid, uuid)
+--   Serializes signed-up-only check-in and records its status transition.
+--
+-- FUNCTION  get_event_registration_summary(uuid)
+--   Returns a stable, PII-free registration and capacity aggregate.
+--
 -- FUNCTION  vsms_event_queue_statistics(uuid, timestamptz, timestamptz)
 --   Returns PII-free queue counts plus p50/p90 wait and service durations for
 --   FR-07 completed-event analytics.
@@ -59,7 +75,9 @@
 -- Runtime adapters
 -- ----------------
 -- utils/database/databaseRoutines.js
+-- services/participant/registrationRoutineRepository.js
 --
 -- Verification
 -- ------------
 -- backend/.vsms/tests/database-routines.integration.test.js
+-- backend/tests/integration/registration-routines.integration.test.js

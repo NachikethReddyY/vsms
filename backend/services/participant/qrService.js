@@ -10,6 +10,7 @@ const AppError = require("../../errors/AppError");
 const { assignRouteOnce } = require("../screening/routeAssignmentService");
 const { createAuditLog, createAuditLogBestEffort } = require("../../utils/logging/audit");
 const { AUDIT_ACTIONS } = require("../../utils/logging/auditEvents");
+const registrationRoutines = require("./registrationRoutineRepository");
 
 function buildQRTargetUrl(token) {
     return `${env.publicAppOrigin}/participant-status/${encodeURIComponent(token)}`;
@@ -795,14 +796,11 @@ exports.manualCheckIn = async (params, db = prisma, auditContext = {}) => {
             throw new AppError(404, "INVALID_QR", "QR Code is invalid, expired, or unavailable.");
         }
 
-        const rows = await tx.$queryRaw`
-            SELECT * FROM "check_in_event_registration"(
-                CAST(${regIdToUpdate} AS uuid),
-                CAST(${eventId} AS uuid),
-                CAST(${userId} AS uuid)
-            )
-        `;
-        const checkedIn = rows[0];
+        const checkedIn = await registrationRoutines.checkInRegistration(tx, {
+            registrationId: regIdToUpdate,
+            eventId,
+            changedBy: userId,
+        });
         const result = manualCheckInRegistration({
             registrationId: checkedIn.registration_id,
             eventId: checkedIn.event_id,
