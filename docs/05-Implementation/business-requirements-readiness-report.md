@@ -1,7 +1,10 @@
 # VSMS business requirements readiness report
 
-**Assessment date:** 13 August 2026
-**Scope:** Current React, Express and PostgreSQL implementation, including the business-readiness increment on `feat/business-readiness-evidence`.
+**Assessment date:** 14 August 2026
+**Scope:** Current React, Express and PostgreSQL implementation after reconciling the QR-lifecycle branch with `main`. This is an evidence assessment, not an awarded grade.
+
+The weighted marking estimate is maintained in
+[`../09-Evidence/rubric-readiness-report.md`](../09-Evidence/rubric-readiness-report.md).
 
 ## Executive summary
 
@@ -18,7 +21,7 @@ Security controls are strongly aligned with the OWASP Top 10, but the report sho
 | Reduce registration time | 50% reduction | Median time from opening the registration workflow to successful event registration is recorded and displayed. A pre-VSMS paper baseline is still required for comparison. | Measurable; target not yet proven |
 | Reduce paperwork | 90% reduction | Each registration records whether a paper exception was used. The Operations Center displays the paperless percentage. | Measurable; validate against live-event data |
 | Improve screening throughput | 30% increase | Completed station visits per operational event hour, queue wait p50/p90 and service-time p50/p90 are calculated. A historical baseline is still required. | Measurable; target not yet proven |
-| Support offline operation | 100% coverage | Encrypted offline capture and automatic synchronization support visual acuity, refraction, colour vision and custom screening stations. Coverage is displayed per event. Other workflows remain online-only. | Partially fulfilled |
+| Support offline operation | 100% coverage | Encrypted offline capture and automatic synchronization support all four core stations—visual acuity, refraction, colour vision and eye health—plus custom screening stations. Other workflows remain online-only. | Core screening target fulfilled; whole-application coverage remains partial |
 | Improve reporting speed | Same-day reporting | Completing an event now queues an overview PDF automatically. The dashboard records generation time and whether it was generated on the event's local calendar day. | Implemented; depends on worker availability |
 | Improve security posture | OWASP compliance | Backend RBAC, validation, audit logging, rate limiting, secure headers, MFA integration, encrypted offline storage and application-level NRIC encryption are present. | Strong alignment; formal assurance outstanding |
 | Improve participant tracking | Real-time visibility | Queue, station completion, referrals and synchronization state are refreshed every 15 seconds in the Operations Center. | Fulfilled as near-real-time visibility |
@@ -27,16 +30,16 @@ The percentage-improvement objectives cannot be honestly proven from a single po
 
 ## Business requirement traceability
 
-| Requirement | Implemented capability and evidence | Assessment |
-| --- | --- | --- |
-| BR-01 Event Management | Administrators and authorized event managers can create events, configure versioned stations, manage event days and shifts, and assign eligible staff. Publishing is blocked until an active station and staff assignment exist. | Fulfilled |
-| BR-02 Participant Registration | Electronic participant creation and event registration, participant search, secure QR generation and check-in are implemented. New NRIC values are encrypted with AES-256-GCM and searched through an HMAC blind index; API responses exclude plaintext and cryptographic storage fields. | Fulfilled |
-| BR-03 Participant Tracking | Route steps, queue entries, station hand-offs, public QR status and the Operations Center expose progress, queue state and station completion. | Fulfilled |
-| BR-04 Screening Operations | Screeners record and update supported station results through validated, event-scoped services. Rules create preliminary flags, acknowledgements are enforced and reviewers make the final clinical decision. | Fulfilled |
-| BR-05 Offline Operation | The PWA stores supported screening snapshots and outbox mutations in encrypted IndexedDB, synchronizes automatically after reconnection and uses idempotency keys to prevent duplicates. Whole-application offline operation is not yet available. | Partially fulfilled |
-| BR-06 Security and Compliance | Cognito/MFA integration, event-scoped RBAC, server validation, audit logs, secure QR tokens, encrypted offline records, encrypted NRIC storage, key rotation guidance and security tests are present. | Substantially fulfilled; independent assurance remains |
-| BR-07 Reporting and Analytics | Overview, operations, clinical and referral aggregate datasets can be generated as PDF or CSV for completed events. Small clinical cells are suppressed. An overview PDF is now queued automatically on completion. | Fulfilled |
-| BR-08 Operational Dashboard | Event status, completion, queues, staffing, referrals, sync health and business-objective evidence are shown in one 15-second-refresh operational view. | Fulfilled |
+| Requirement | Implemented capability | Primary source and automated evidence | Assessment / limit |
+| --- | --- | --- | --- |
+| BR-01 Event Management | Administrators and authorized event managers can create events, configure versioned stations, manage event days and shifts, and assign eligible staff. Publishing is blocked until an active station and staff assignment exist. | `backend/services/event/eventService.js`; `backend/tests/integration/events.integration.test.js`; `backend/tests/integration/event-membership-concurrency.integration.test.js` | Fulfilled in source/tests; retain a live publish and staffing screenshot. |
+| BR-02 Participant Registration | Electronic registration, participant search, secure QR generation and check-in are implemented. Database routines enforce capacity/waitlist and lifecycle invariants; NRIC equality search uses encrypted storage plus an HMAC blind index. | `backend/docs/registration-stored-routines.md`; `backend/services/participant/qrService.js`; `backend/tests/integration/registration-routines.integration.test.js`; `backend/tests/integration/qr.integration.test.js` | Fulfilled; use only synthetic participant data in the demo. |
+| BR-03 Participant Tracking | Route steps, queue entries, station hand-offs, public QR status and the Operations Center expose progress, queue state and station completion. | `backend/services/screening/queueService.js`; `backend/services/screening/queueAssignmentService.js`; `backend/tests/unit/queueFeature.test.js`; `backend/tests/integration/automatic-routing.integration.test.js` | Fulfilled; demonstrate a committed state transition rather than only static cards. |
+| BR-04 Screening Operations | Screeners record and update all four core station results plus custom stations. Server rules create preliminary flags, acknowledgements are enforced and reviewers make the final clinical decision. | `backend/services/screening/screeningService.js`; `backend/tests/unit/screeningService.test.js`; `backend/tests/unit/eye-health-screening.test.js`; `react-user-dashboard/src/features/screening/EyeHealthStationPage.test.tsx` | Fulfilled; screening flags support human review and are not diagnoses. |
+| BR-05 Offline Operation | The PWA stores assigned packs and outbox mutations in encrypted IndexedDB, supports all four core stations plus custom stations, synchronizes automatically and prevents duplicate replay. | `react-user-dashboard/src/features/screening/offlineSync.ts`; `backend/services/screening/syncService.js`; `react-user-dashboard/src/features/screening/offlineSync.test.ts`; `backend/tests/unit/sync-service.test.js` | Core screening coverage is fulfilled; registration, review, referral, administration and reporting remain online-only. |
+| BR-06 Security and Compliance | Cognito/MFA integration, event-scoped RBAC, validation, immutable audit logs, secure QR tokens, encrypted local records, encrypted NRIC storage and security tests are present. | `docs/04-Security/owasp-verification-matrix.md`; `backend/docs/security/threat-model.md`; `backend/tests/security/`; `backend/tests/integration/audit-immutability.test.js` | Substantially fulfilled; describe this as OWASP-aligned control coverage, not certification. |
+| BR-07 Reporting and Analytics | Overview, operations, clinical and referral aggregates can be generated as PDF or CSV for completed events. Small clinical cells are suppressed and an overview PDF is queued on completion. | `backend/services/reporting/reportingService.js`; `backend/services/reporting/reportExportService.js`; `backend/tests/integration/analytics.integration.test.js`; `backend/tests/security/event-reporting-security.test.js` | Fulfilled in source/tests; same-day delivery depends on a healthy report worker. |
+| BR-08 Operational Dashboard | Event status, completion, queues, staffing, referrals, sync health and business-objective evidence are shown in one 15-second-refresh operational view. | `backend/services/operations/operationsService.js`; `react-user-dashboard/src/features/operations/OperationsCenterPage.tsx`; `backend/tests/unit/operations-service.test.js`; `react-user-dashboard/src/features/Stage4Pages.behavior.test.tsx` | Fulfilled as near-real-time polling, not push streaming. |
 
 ## Changes implemented in this increment
 
@@ -70,7 +73,7 @@ A staged migration retains the legacy column only for controlled deployment comp
 
 ### 4. Offline scope made testable and honest
 
-Offline support is explicitly defined as visual acuity, refraction, colour vision and custom schema-driven screening capture. Unsupported eye-health screener writes are rejected because that information belongs to clinician review. The dashboard calculates coverage from the active station mix, so an event can demonstrate whether all configured screener stations are offline-capable.
+Offline support is explicitly defined as visual acuity, refraction, colour vision, eye health and custom schema-driven screening capture. The dashboard calculates coverage from the active station mix, so an event can demonstrate whether every configured screener station is offline-capable.
 
 Documentation now separates “100% of supported screening capture” from “100% of the whole application.” This prevents an inaccurate business claim and identifies the work needed for complete disconnected operation.
 
@@ -88,14 +91,14 @@ Documentation now separates “100% of supported screening capture” from “10
 The increment was checked with:
 
 - Prisma schema validation and client generation
-- Backend unit and security suites: 416 passed, 5 skipped and 0 failed
+- Backend, frontend, availability and database suites summarized in `docs/09-Evidence/rubric-readiness-report.md`
 - Focused completion-report test verifying event bounds, PDF format, expiry and audit metadata
 - Frontend TypeScript/Vite production build
 - Frontend lint
 - Participant and operations focused tests
 - OpenAPI lint and generated-contract consistency check
 
-The frontend production build transformed 1,225 modules successfully and generated the PWA service worker. The final branch verification should also be quoted from CI after the latest push. Integration tests requiring PostgreSQL should be run against the same migration sequence used for deployment.
+The frontend production build generates the PWA service worker. Final numerical results should be quoted from CI on the exact release commit; integration tests requiring PostgreSQL must use the deployment migration sequence.
 
 ## Recommended next-level roadmap
 

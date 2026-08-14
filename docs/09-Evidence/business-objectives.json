@@ -69,7 +69,7 @@
       "method": "Map every OWASP Top 10 category to implemented controls, automated checks, residual risks, and live verification evidence.",
       "baseline": null,
       "actual": 10,
-      "evidence": ["docs/04-Security/owasp-verification-matrix.md", "backend/docs/threat-model.md"]
+      "evidence": ["docs/04-Security/owasp-verification-matrix.md", "backend/docs/security/threat-model.md"]
     },
     {
       "id": "BO-07",
