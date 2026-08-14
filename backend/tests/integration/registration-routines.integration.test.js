@@ -54,14 +54,8 @@ test("registration routines serialize capacity and close the full QR lifecycle",
     createParticipant({ eventId: event.eventId, userId: actor.id, label: "Second" }),
   ]);
   const requests = [
-    {
-      participantId: firstParticipant.id,
-      idempotencyKey: `procedure-${crypto.randomUUID()}`,
-    },
-    {
-      participantId: secondParticipant.id,
-      idempotencyKey: `procedure-${crypto.randomUUID()}`,
-    },
+    { participantId: firstParticipant.id, idempotencyKey: `procedure-${crypto.randomUUID()}` },
+    { participantId: secondParticipant.id, idempotencyKey: `procedure-${crypto.randomUUID()}` },
   ];
 
   const operations = await Promise.all([
@@ -113,7 +107,9 @@ test("registration routines serialize capacity and close the full QR lifecycle",
   expect(cancellation.cancelled_registration_id).toBe(signedUp.registrationId);
   expect(cancellation.promoted_registration_id).toBe(waitlisted.registrationId);
   expect(cancellation.revoked_qr_count).toBe(1n);
-  const revokedPass = await helpers.prisma.qRCodePass.findUniqueOrThrow({ where: { id: activePass.id } });
+  const revokedPass = await helpers.prisma.qRCodePass.findUniqueOrThrow({
+    where: { id: activePass.id },
+  });
   expect(revokedPass).toEqual(expect.objectContaining({
     isActive: false,
     revokedBy: actor.id,

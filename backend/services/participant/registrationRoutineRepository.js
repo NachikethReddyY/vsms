@@ -3,15 +3,12 @@ const firstRow = (rows, routineName) => {
     throw new Error(`${routineName} returned no result`);
 };
 
-const registerParticipant = async (
-    db,
-    {
-        participantId,
-        eventId,
-        registeredBy,
-        idempotencyKey,
-    }
-) => firstRow(
+const registerParticipant = async (db, {
+    participantId,
+    eventId,
+    registeredBy,
+    idempotencyKey,
+}) => firstRow(
     await db.$queryRaw`
         SELECT * FROM public.register_participant_for_event(
             CAST(${participantId} AS uuid),
@@ -23,14 +20,11 @@ const registerParticipant = async (
     "register_participant_for_event"
 );
 
-const cancelRegistration = async (
-    db,
-    {
-        registrationId,
-        changedBy,
-        reason,
-    }
-) => firstRow(
+const cancelRegistration = async (db, {
+    registrationId,
+    changedBy,
+    reason,
+}) => firstRow(
     await db.$queryRaw`
         SELECT * FROM public.cancel_event_registration(
             CAST(${registrationId} AS uuid),
@@ -41,14 +35,11 @@ const cancelRegistration = async (
     "cancel_event_registration"
 );
 
-const checkInRegistration = async (
-    db,
-    {
-        registrationId,
-        eventId,
-        changedBy,
-    }
-) => firstRow(
+const checkInRegistration = async (db, {
+    registrationId,
+    eventId,
+    changedBy,
+}) => firstRow(
     await db.$queryRaw`
         SELECT * FROM public.check_in_event_registration(
             CAST(${registrationId} AS uuid),

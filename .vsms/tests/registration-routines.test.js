@@ -12,7 +12,7 @@ test("registration routines remove consent signatures and restrict database exec
   const routines = read("backend/prisma/migrations/20260813150100_add_registration_stored_functions/migration.sql");
   const consentRemoval = read("backend/prisma/migrations/20260813170000_remove_registration_consent_acknowledgement/migration.sql");
   const runtimeRole = read("backend/prisma/runtime-role.example.sql");
-  const hardening = read("backend/prisma/migrations/20260814090000_harden_registration_stored_routines/migration.sql");
+  const hardening = read("backend/prisma/migrations/20260814210000_harden_registration_stored_routines/migration.sql");
   const repository = read("backend/services/participant/registrationRoutineRepository.js");
 
   assert.doesNotMatch(schema, /model ParticipantConsent \{|model ConsentFormVersion \{|\bCONSENT\b/);
@@ -25,7 +25,8 @@ test("registration routines remove consent signatures and restrict database exec
   assert.match(consentRemoval, /CREATE OR REPLACE FUNCTION public\.check_in_event_registration/);
   assert.equal((routines.match(/SET search_path = pg_catalog, public/g) || []).length, 4);
   assert.equal((routines.match(/REVOKE ALL ON FUNCTION/g) || []).length, 4);
-  assert.equal((runtimeRole.match(/GRANT EXECUTE ON FUNCTION/g) || []).length, 4);
+  assert.equal((runtimeRole.match(/GRANT EXECUTE ON FUNCTION/g) || []).length, 6);
+  assert.equal((runtimeRole.match(/GRANT EXECUTE ON PROCEDURE/g) || []).length, 1);
   assert.match(hardening, /UPDATE public\.qr_code_passes AS pass/);
   assert.equal((hardening.match(/COMMENT ON FUNCTION/g) || []).length, 4);
   assert.match(hardening, /REVOKE ALL ON FUNCTION public\.cancel_event_registration/);

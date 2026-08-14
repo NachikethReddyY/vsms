@@ -89,7 +89,7 @@ test("the cancellation routine owns QR revocation and reports its row count", ()
   const migration = require("node:fs").readFileSync(
     require("node:path").join(
       __dirname,
-      "../../backend/prisma/migrations/20260814090000_harden_registration_stored_routines/migration.sql",
+      "../../backend/prisma/migrations/20260814210000_harden_registration_stored_routines/migration.sql",
     ),
     "utf8",
   );
