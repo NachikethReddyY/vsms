@@ -1,6 +1,7 @@
 import { FormEvent, useEffect, useMemo, useRef, useState } from 'react';
 import { useParams, useSearchParams } from 'react-router-dom';
 import { getApiError as getApiMessage } from '../../utils/apiClient';
+import { getStoredSession } from '../../utils/session';
 import {
   EyeHealthResultData,
   EyeHealthRisk,
@@ -17,6 +18,7 @@ import {
   RouteProgressionNotice,
   StationPageFrame,
 } from './StationShared';
+import { getOfflineStationContext, isNetworkError } from './offlineSync';
 
 const EYE_HEALTH_RISKS: { value: EyeHealthRisk; label: string }[] = [
   { value: 'NOT_ASSESSED', label: 'Not assessed' },
@@ -97,6 +99,19 @@ export default function EyeHealthStationPage() {
       setQueue(context.queue);
       if (!selectedId && context.nextSelectedId) selectParticipant(context.nextSelectedId);
     } catch (cause) {
+      if (isNetworkError(cause)) {
+        const ownerId = getStoredSession()?.user.id;
+        const offline = ownerId
+          ? await getOfflineStationContext(ownerId, eventId, 'EYE_HEALTH')
+          : null;
+        if (offline) {
+          setEventName(offline.eventName);
+          setStation(offline.station);
+          setQueue(offline.queue);
+          if (!selectedId && offline.queue[0]) selectParticipant(offline.queue[0].registrationId);
+          return;
+        }
+      }
       setError(getApiMessage(cause, 'Could not load the Eye Health station.'));
     }
   };

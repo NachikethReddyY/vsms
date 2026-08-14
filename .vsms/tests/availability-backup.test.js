@@ -5,9 +5,6 @@ const os = require("node:os");
 const path = require("node:path");
 const test = require("node:test");
 
-process.env.DATABASE_URL ||= "postgresql://vsms_test:vsms_test@127.0.0.1:1/vsms_test";
-process.env.NODE_ENV ||= "test";
-
 const backupService = require("../../backend/services/platform/backupService");
 const adminSchemas = require("../../backend/schemas/adminSchemas");
 

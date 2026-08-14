@@ -229,7 +229,7 @@ const saveDynamicBody = z.object({
 const screeningSyncAction = z.object({
   clientActionId: z.string().uuid(),
   stationId: z.string().uuid(),
-  stationType: z.enum(["VISUAL_ACUITY", "REFRACTION", "COLOUR_VISION", "CUSTOM"]),
+  stationType: z.enum(["VISUAL_ACUITY", "REFRACTION", "COLOUR_VISION", "EYE_HEALTH", "CUSTOM"]),
   payload: saveDynamicBody.strict(),
 }).strict();
 

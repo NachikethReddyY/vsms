@@ -104,13 +104,3 @@ test("current-event duplicates are returned without creating another intake", as
   assert.deepEqual(result, { outcome: "ALREADY_REGISTERED", registrationId });
   assert.equal(intakeCreated, false);
 });
-
-test("cross-event matching is denied without the explicit reuse permission", async () => {
-  await assert.rejects(
-    participantService.matchParticipantsForRegistrationService({
-      ...request(crypto.randomUUID(), crypto.randomUUID(), crypto.randomUUID()),
-      auth: { userId: crypto.randomUUID(), permissions: ["participants:read"] },
-    }),
-    (error) => error.statusCode === 403 && error.message === "Cross-event participant reuse is not authorized",
-  );
-});

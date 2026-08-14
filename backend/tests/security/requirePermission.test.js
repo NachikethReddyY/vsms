@@ -73,11 +73,11 @@ test("registration officer is denied audit logs (role guard + missing audit:read
   expect(res.statusCode).toBe(403);
 });
 
-test("requireAuthentication attaches effective permissions to req.auth", async () => {
+test("requireAuthentication does not promote event duties to global roles", async () => {
   const res = await request(app)
     .get("/api/v1/auth/me")
     .set("Authorization", `Bearer ${officerToken}`);
 
   expect(res.statusCode).toBe(200);
-  expect(res.body.user.roles).toContain("REGISTRATION_OFFICER");
+  expect(res.body.user.roles).not.toContain("REGISTRATION_OFFICER");
 });

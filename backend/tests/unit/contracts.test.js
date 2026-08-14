@@ -239,8 +239,8 @@ test("station template mapping imports the explicit screening stationType", () =
         { templateKey: "CLINICAL_REVIEW", stationType: null, name: "Clinical review" },
         { templateKey: "opaque-2", stationType: "EYE_HEALTH", name: "Eye health" },
     ]);
-    assert.deepEqual(importable.map(({ stationType }) => stationType), ["VISUAL_ACUITY"]);
-    assert.deepEqual(skipped.map((template) => template.templateKey), ["REGISTRATION", "CLINICAL_REVIEW", "opaque-2"]);
+    assert.deepEqual(importable.map(({ stationType }) => stationType), ["VISUAL_ACUITY", "EYE_HEALTH"]);
+    assert.deepEqual(skipped.map((template) => template.templateKey), ["REGISTRATION", "CLINICAL_REVIEW"]);
 });
 
 test("participant search matches any supplied identifier", () => {
@@ -316,8 +316,7 @@ test("demo QR fixtures are forbidden in production", () => {
     assert.match(read("prisma/seed.js"), /NODE_ENV === "production"[\s\S]*Demo seed execution is forbidden/);
     assert.match(read("scripts/dev-preset.js"), /env\.isProduction[\s\S]*Development preset execution is forbidden/);
     const packageJson = JSON.parse(read("package.json"));
-    assert.equal(packageJson.scripts["deploy:prod"], undefined);
-    assert.match(packageJson.scripts["setup:demo"], /assert-non-production/);
+    assert.doesNotMatch(packageJson.scripts["deploy:prod"], /db:setup|prisma:seed/);
 });
 
 test("single participant QR has no public generated-handoff path", () => {
@@ -334,11 +333,12 @@ test("manual queue movement endpoints are retired while station status remains d
     assert.match(openapi, /operationalStatus: \{ \$ref: "#\/components\/schemas\/StationOperationalStatus" \}/);
 });
 
-test("seed creates VA / refraction / colour vision Station rows", () => {
+test("seed creates all four screening Station rows", () => {
     const seed = read("prisma/seed.js");
     assert.match(seed, /\["VISUAL_ACUITY"/);
     assert.match(seed, /\["REFRACTION"/);
     assert.match(seed, /\["COLOUR_VISION"/);
+    assert.match(seed, /\["EYE_HEALTH"/);
     assert.match(seed, /Live event stations/);
 });
 

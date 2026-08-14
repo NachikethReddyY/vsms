@@ -4,12 +4,16 @@ const path = require("node:path");
 const test = require("node:test");
 
 const root = path.resolve(__dirname, "../..");
-const template = fs.readFileSync(path.join(root, "infrastructure/availability.yaml"), "utf8").replace(/\r\n/g, "\n");
-const runbook = fs.readFileSync(path.join(root, "docs/07-Operations/availability-runbook.md"), "utf8");
+const readPortableText = (relativePath) => fs
+  .readFileSync(path.join(root, relativePath), "utf8")
+  .replace(/\r\n/g, "\n");
+
+const template = readPortableText("infrastructure/availability.yaml");
+const runbook = readPortableText("docs/07-Operations/availability-runbook.md");
 
 test("production infrastructure retains redundant replaceable services", () => {
-  assert.match(template, /HealthCheckPath: \/ready/);
-  assert.match(template, /HealthCheck:[\s\S]*?127\.0\.0\.1:5050\/health/);
+  assert.match(template, /HealthCheckPath: \/health/);
+  assert.doesNotMatch(template, /HealthCheckPath: \/ready/);
   assert.match(template, /DesiredCount: !If \[ApplicationServicesAreEnabled, 2, 0\]/);
   assert.match(template, /MinimumHealthyPercent: 100/);
   assert.match(template, /DeploymentCircuitBreaker:[\s\S]*?Rollback: true/);
@@ -18,7 +22,6 @@ test("production infrastructure retains redundant replaceable services", () => {
   assert.match(template, /MultiAZEnabled: true/);
   assert.match(template, /ReportWorkerService:[\s\S]*?DesiredCount: !If \[ApplicationServicesAreEnabled, 1, 0\]/);
   assert.match(template, /DomainEventWorkerService:[\s\S]*?DesiredCount: !If \[ApplicationServicesAreEnabled, 1, 0\]/);
-  assert.match(template, /LifecycleEmailWorkerService:[\s\S]*?Condition: LifecycleEmailIsEnabled/);
 });
 
 test("database and frontend recovery data are retained", () => {
@@ -39,8 +42,7 @@ test("secrets are injected rather than placed in normal task environment values"
   assert.match(template, /DatabaseCredentialsSecret:[\s\S]*?GenerateSecretString:/);
   assert.match(template, /DatabaseRuntimeCredentialsSecret:[\s\S]*?"username":"vsms_runtime"/);
   assert.match(template, /DatabaseRuntimeUrlSecret:[\s\S]*?postgresql:\/\/vsms_runtime:/);
-  const applicationTasks = template.slice(template.indexOf("  ApiTaskDefinition:"), template.indexOf("  ApiLoadBalancer:"));
-  assert.doesNotMatch(applicationTasks, /ValueFrom: !Ref DatabaseMigrationUrlSecret/);
+  assert.doesNotMatch(template, /ValueFrom: !Ref DatabaseMigrationUrlSecret/);
   assert.match(template, /RedisAuthTokenSecret:[\s\S]*?GenerateSecretString:/);
   assert.match(template, /JwtSecret:[\s\S]*?GenerateSecretString:/);
   assert.doesNotMatch(template, /DbMasterPassword:/);

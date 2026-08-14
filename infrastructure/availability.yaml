@@ -1,5 +1,5 @@
 AWSTemplateFormatVersion: "2010-09-09"
-Description: Highly available, observable AWS release foundation for VSMS
+Description: Highly available AWS production foundation for VSMS (monitoring alarms are managed separately)
 
 Parameters:
   EnvironmentName:
@@ -31,20 +31,7 @@ Parameters:
     Description: ACM certificate ARN in us-east-1 for FrontendDomainName
   ApiImageUri:
     Type: String
-    AllowedPattern: ".+@sha256:[0-9a-f]{64}"
-    Description: Previously approved or current immutable ECR image URI including its sha256 digest
-  CandidateApiImageUri:
-    Type: String
-    AllowedPattern: ".+@sha256:[0-9a-f]{64}"
-    Description: Immutable ECR image URI used by the one-off migration task before service promotion
-  CandidateReleaseSha:
-    Type: String
-    AllowedPattern: "[0-9a-f]{40}"
-    Description: Full Git commit SHA used only by the candidate migration task
-  ReleaseSha:
-    Type: String
-    AllowedPattern: "[0-9a-f]{40}"
-    Description: Full Git commit SHA represented by this stack release
+    Description: Immutable ECR image URI including a digest or release tag
   DbMasterUsername:
     Type: String
     Default: vsmsapp
@@ -74,41 +61,10 @@ Parameters:
     Type: String
     Default: ""
     Description: Existing private S3 bucket for event artwork; leave empty to retain database-backed artwork
-  SesFromEmail:
-    Type: String
-    Default: ""
-    Description: Verified sender address for participant referral messages; leave empty to disable SES sending
-  SesIdentityArn:
-    Type: String
-    Default: ""
-    Description: Exact verified SES identity ARN used by the API task
-  SesSnsTopicArns:
-    Type: CommaDelimitedList
-    Default: ""
-    Description: SNS topic ARNs from which SES event subscriptions may be confirmed
-  LifecycleEmailEnabled:
-    Type: String
-    Default: "false"
-    AllowedValues: ["true", "false"]
-  LifecycleEmailConfigurationSecretArn:
-    Type: String
-    Default: arn:aws:secretsmanager:us-east-1:111111111111:secret:vsms-disabled-placeholder
-    AllowedPattern: "arn:(aws|aws-us-gov|aws-cn):secretsmanager:[a-z0-9-]+:[0-9]{12}:secret:.+"
-    Description: JSON secret containing the lifecycle sender and Google Workspace OAuth fields
-  AlarmNotificationEmail:
-    Type: String
-    Default: ""
-    Description: Optional operations address that confirms the deployment alarm SNS subscription
 
 Conditions:
   ApplicationServicesAreEnabled: !Equals [!Ref ApplicationServicesEnabled, "true"]
   EventArtworkStorageIsConfigured: !Not [!Equals [!Ref EventArtworkBucketName, ""]]
-  SesSendingIsEnabled: !Not [!Equals [!Ref SesIdentityArn, ""]]
-  SesSnsIsEnabled: !Not [!Equals [!Join [",", !Ref SesSnsTopicArns], ""]]
-  LifecycleEmailIsEnabled: !And
-    - !Condition ApplicationServicesAreEnabled
-    - !Equals [!Ref LifecycleEmailEnabled, "true"]
-  AlarmEmailIsConfigured: !Not [!Equals [!Ref AlarmNotificationEmail, ""]]
 
 Resources:
   ApiLogGroup:
@@ -116,78 +72,6 @@ Resources:
     Properties:
       LogGroupName: !Sub /vsms/${EnvironmentName}/api
       RetentionInDays: 30
-
-  DeploymentAlarmTopic:
-    Type: AWS::SNS::Topic
-    Properties:
-      TopicName: !Sub ${EnvironmentName}-vsms-deployment-alarms
-      KmsMasterKeyId: !GetAtt DeploymentAlarmKey.Arn
-
-  DeploymentAlarmKey:
-    Type: AWS::KMS::Key
-    DeletionPolicy: Retain
-    UpdateReplacePolicy: Retain
-    Properties:
-      Description: Encrypts VSMS deployment and availability notifications
-      EnableKeyRotation: true
-      KeyPolicy:
-        Version: "2012-10-17"
-        Statement:
-          - Sid: AllowAccountAdministration
-            Effect: Allow
-            Principal:
-              AWS: !Sub arn:${AWS::Partition}:iam::${AWS::AccountId}:root
-            Action: kms:*
-            Resource: "*"
-          - Sid: AllowMonitoringServices
-            Effect: Allow
-            Principal:
-              Service:
-                - cloudwatch.amazonaws.com
-                - events.amazonaws.com
-                - events.rds.amazonaws.com
-            Action:
-              - kms:Decrypt
-              - kms:GenerateDataKey
-            Resource: "*"
-            Condition:
-              StringEquals:
-                AWS:SourceAccount: !Ref AWS::AccountId
-
-  DeploymentAlarmKeyAlias:
-    Type: AWS::KMS::Alias
-    Properties:
-      AliasName: !Sub alias/${EnvironmentName}-vsms-deployment-alarms
-      TargetKeyId: !Ref DeploymentAlarmKey
-
-  DeploymentAlarmTopicPolicy:
-    Type: AWS::SNS::TopicPolicy
-    Properties:
-      Topics:
-        - !Ref DeploymentAlarmTopic
-      PolicyDocument:
-        Version: "2012-10-17"
-        Statement:
-          - Sid: AllowAwsMonitoringPublish
-            Effect: Allow
-            Principal:
-              Service:
-                - cloudwatch.amazonaws.com
-                - events.amazonaws.com
-                - events.rds.amazonaws.com
-            Action: sns:Publish
-            Resource: !Ref DeploymentAlarmTopic
-            Condition:
-              StringEquals:
-                AWS:SourceAccount: !Ref AWS::AccountId
-
-  DeploymentAlarmEmailSubscription:
-    Type: AWS::SNS::Subscription
-    Condition: AlarmEmailIsConfigured
-    Properties:
-      Protocol: email
-      Endpoint: !Ref AlarmNotificationEmail
-      TopicArn: !Ref DeploymentAlarmTopic
 
   ApiLoadBalancerSecurityGroup:
     Type: AWS::EC2::SecurityGroup
@@ -457,39 +341,6 @@ Resources:
                   - !Ref RedisUrlSecret
                   - !Ref JwtSecret
                   - !Ref EncryptionKeyringSecretArn
-                  - !If [LifecycleEmailIsEnabled, !Ref LifecycleEmailConfigurationSecretArn, !Ref AWS::NoValue]
-
-  MigrationExecutionRole:
-    Type: AWS::IAM::Role
-    Properties:
-      AssumeRolePolicyDocument:
-        Version: "2012-10-17"
-        Statement:
-          - Effect: Allow
-            Principal:
-              Service: ecs-tasks.amazonaws.com
-            Action: sts:AssumeRole
-      ManagedPolicyArns:
-        - arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy
-      Policies:
-        - PolicyName: ReadVsmsMigrationUrl
-          PolicyDocument:
-            Version: "2012-10-17"
-            Statement:
-              - Effect: Allow
-                Action: secretsmanager:GetSecretValue
-                Resource: !Ref DatabaseMigrationUrlSecret
-
-  MigrationTaskRole:
-    Type: AWS::IAM::Role
-    Properties:
-      AssumeRolePolicyDocument:
-        Version: "2012-10-17"
-        Statement:
-          - Effect: Allow
-            Principal:
-              Service: ecs-tasks.amazonaws.com
-            Action: sts:AssumeRole
 
   ApiTaskRole:
     Type: AWS::IAM::Role
@@ -542,28 +393,6 @@ Resources:
                     - s3:DeleteObject
                   Resource: !Sub arn:${AWS::Partition}:s3:::${EventArtworkBucketName}/event-artwork/*
           - !Ref AWS::NoValue
-        - !If
-          - SesSendingIsEnabled
-          - PolicyName: SendVsmsReferralEmail
-            PolicyDocument:
-              Version: "2012-10-17"
-              Statement:
-                - Effect: Allow
-                  Action:
-                    - ses:SendEmail
-                    - ses:SendRawEmail
-                  Resource: !Ref SesIdentityArn
-          - !Ref AWS::NoValue
-        - !If
-          - SesSnsIsEnabled
-          - PolicyName: ConfirmVsmsSesSubscriptions
-            PolicyDocument:
-              Version: "2012-10-17"
-              Statement:
-                - Effect: Allow
-                  Action: sns:ConfirmSubscription
-                  Resource: !Ref SesSnsTopicArns
-          - !Ref AWS::NoValue
 
   WorkerTaskRole:
     Type: AWS::IAM::Role
@@ -575,41 +404,6 @@ Resources:
             Principal:
               Service: ecs-tasks.amazonaws.com
             Action: sts:AssumeRole
-
-  MigrationTaskDefinition:
-    Type: AWS::ECS::TaskDefinition
-    Properties:
-      Family: !Sub ${EnvironmentName}-vsms-migration
-      Cpu: "256"
-      Memory: "512"
-      NetworkMode: awsvpc
-      RequiresCompatibilities: [FARGATE]
-      ExecutionRoleArn: !GetAtt MigrationExecutionRole.Arn
-      TaskRoleArn: !GetAtt MigrationTaskRole.Arn
-      ContainerDefinitions:
-        - Name: migration
-          Image: !Ref CandidateApiImageUri
-          Essential: true
-          Command: ["pnpm", "deploy:migrate"]
-          Environment:
-            - Name: NODE_ENV
-              Value: production
-            - Name: DEPLOY_ENVIRONMENT
-              Value: !Ref EnvironmentName
-            - Name: RELEASE_SHA
-              Value: !Ref CandidateReleaseSha
-            - Name: RELEASE_IMAGE_URI
-              Value: !Ref CandidateApiImageUri
-          Secrets:
-            - Name: DATABASE_URL
-              ValueFrom: !Ref DatabaseMigrationUrlSecret
-          LogConfiguration:
-            LogDriver: awslogs
-            Options:
-              awslogs-group: !Ref ApiLogGroup
-              awslogs-region: !Ref AWS::Region
-              awslogs-stream-prefix: migration
-          StopTimeout: 30
 
   ApiTaskDefinition:
     Type: AWS::ECS::TaskDefinition
@@ -631,12 +425,6 @@ Resources:
           Environment:
             - Name: NODE_ENV
               Value: production
-            - Name: DEPLOY_ENVIRONMENT
-              Value: !Ref EnvironmentName
-            - Name: RELEASE_SHA
-              Value: !Ref ReleaseSha
-            - Name: RELEASE_IMAGE_URI
-              Value: !Ref ApiImageUri
             - Name: LOCAL_HTTPS
               Value: "false"
             - Name: HOST
@@ -672,10 +460,6 @@ Resources:
               - !Ref AWS::NoValue
             - Name: VSMS_BACKUP_DIR
               Value: /var/lib/vsms/backups
-            - Name: SES_FROM_EMAIL
-              Value: !Ref SesFromEmail
-            - Name: SES_SNS_TOPIC_ARNS
-              Value: !Join [",", !Ref SesSnsTopicArns]
           Secrets:
             - Name: DATABASE_URL
               ValueFrom: !Ref DatabaseRuntimeUrlSecret
@@ -691,14 +475,6 @@ Resources:
               awslogs-group: !Ref ApiLogGroup
               awslogs-region: !Ref AWS::Region
               awslogs-stream-prefix: api
-          HealthCheck:
-            Command:
-              - CMD-SHELL
-              - node -e "fetch('http://127.0.0.1:5050/health').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"
-            Interval: 30
-            Timeout: 5
-            Retries: 3
-            StartPeriod: 30
           StopTimeout: 30
           MountPoints:
             - SourceVolume: backups
@@ -731,14 +507,6 @@ Resources:
           Environment:
             - Name: NODE_ENV
               Value: production
-            - Name: DEPLOY_ENVIRONMENT
-              Value: !Ref EnvironmentName
-            - Name: RELEASE_SHA
-              Value: !Ref ReleaseSha
-            - Name: RELEASE_IMAGE_URI
-              Value: !Ref ApiImageUri
-            - Name: PUBLIC_APP_ORIGIN
-              Value: !Sub https://${FrontendDomainName}
             - Name: ENCRYPTION_ACTIVE_KEY_ID
               Value: !Ref EncryptionActiveKeyId
           Secrets:
@@ -774,14 +542,6 @@ Resources:
           Environment:
             - Name: NODE_ENV
               Value: production
-            - Name: DEPLOY_ENVIRONMENT
-              Value: !Ref EnvironmentName
-            - Name: RELEASE_SHA
-              Value: !Ref ReleaseSha
-            - Name: RELEASE_IMAGE_URI
-              Value: !Ref ApiImageUri
-            - Name: PUBLIC_APP_ORIGIN
-              Value: !Sub https://${FrontendDomainName}
             - Name: ENCRYPTION_ACTIVE_KEY_ID
               Value: !Ref EncryptionActiveKeyId
           Secrets:
@@ -797,64 +557,6 @@ Resources:
               awslogs-group: !Ref ApiLogGroup
               awslogs-region: !Ref AWS::Region
               awslogs-stream-prefix: domain-event-worker
-          StopTimeout: 30
-
-  LifecycleEmailWorkerTaskDefinition:
-    Type: AWS::ECS::TaskDefinition
-    Condition: LifecycleEmailIsEnabled
-    Properties:
-      Family: !Sub ${EnvironmentName}-vsms-lifecycle-email-worker
-      Cpu: "256"
-      Memory: "512"
-      NetworkMode: awsvpc
-      RequiresCompatibilities: [FARGATE]
-      ExecutionRoleArn: !GetAtt ApiExecutionRole.Arn
-      TaskRoleArn: !GetAtt WorkerTaskRole.Arn
-      ContainerDefinitions:
-        - Name: lifecycle-email-worker
-          Image: !Ref ApiImageUri
-          Essential: true
-          Command: ["node", "scripts/lifecycle-email-worker.js"]
-          Environment:
-            - Name: NODE_ENV
-              Value: production
-            - Name: DEPLOY_ENVIRONMENT
-              Value: !Ref EnvironmentName
-            - Name: RELEASE_SHA
-              Value: !Ref ReleaseSha
-            - Name: RELEASE_IMAGE_URI
-              Value: !Ref ApiImageUri
-            - Name: PUBLIC_APP_ORIGIN
-              Value: !Sub https://${FrontendDomainName}
-            - Name: ENCRYPTION_ACTIVE_KEY_ID
-              Value: !Ref EncryptionActiveKeyId
-            - Name: LIFECYCLE_EMAIL_ENABLED
-              Value: "true"
-          Secrets:
-            - Name: DATABASE_URL
-              ValueFrom: !Ref DatabaseRuntimeUrlSecret
-            - Name: JWT_ACCESS_SECRET
-              ValueFrom: !Ref JwtSecret
-            - Name: ENCRYPTION_KEYRING_JSON
-              ValueFrom: !Ref EncryptionKeyringSecretArn
-            - Name: LIFECYCLE_EMAIL_FROM
-              ValueFrom: !Sub "${LifecycleEmailConfigurationSecretArn}:LIFECYCLE_EMAIL_FROM::"
-            - Name: LIFECYCLE_EMAIL_ALLOWED_SENDERS
-              ValueFrom: !Sub "${LifecycleEmailConfigurationSecretArn}:LIFECYCLE_EMAIL_ALLOWED_SENDERS::"
-            - Name: GOOGLE_WORKSPACE_USER
-              ValueFrom: !Sub "${LifecycleEmailConfigurationSecretArn}:GOOGLE_WORKSPACE_USER::"
-            - Name: GOOGLE_WORKSPACE_CLIENT_ID
-              ValueFrom: !Sub "${LifecycleEmailConfigurationSecretArn}:GOOGLE_WORKSPACE_CLIENT_ID::"
-            - Name: GOOGLE_WORKSPACE_CLIENT_SECRET
-              ValueFrom: !Sub "${LifecycleEmailConfigurationSecretArn}:GOOGLE_WORKSPACE_CLIENT_SECRET::"
-            - Name: GOOGLE_WORKSPACE_REFRESH_TOKEN
-              ValueFrom: !Sub "${LifecycleEmailConfigurationSecretArn}:GOOGLE_WORKSPACE_REFRESH_TOKEN::"
-          LogConfiguration:
-            LogDriver: awslogs
-            Options:
-              awslogs-group: !Ref ApiLogGroup
-              awslogs-region: !Ref AWS::Region
-              awslogs-stream-prefix: lifecycle-email-worker
           StopTimeout: 30
 
   ApiLoadBalancer:
@@ -874,7 +576,7 @@ Resources:
       Protocol: HTTP
       Port: 5050
       HealthCheckEnabled: true
-      HealthCheckPath: /ready
+      HealthCheckPath: /health
       HealthCheckIntervalSeconds: 30
       HealthCheckTimeoutSeconds: 5
       HealthyThresholdCount: 2
@@ -919,13 +621,6 @@ Resources:
         DeploymentCircuitBreaker:
           Enable: true
           Rollback: true
-        Alarms:
-          Enable: true
-          Rollback: true
-          AlarmNames:
-            - !Ref Api5xxAlarm
-            - !Ref ApiP95LatencyAlarm
-            - !Ref ApiUnhealthyTargetAlarm
       NetworkConfiguration:
         AwsvpcConfiguration:
           AssignPublicIp: DISABLED
@@ -954,11 +649,6 @@ Resources:
         DeploymentCircuitBreaker:
           Enable: true
           Rollback: true
-        Alarms:
-          Enable: true
-          Rollback: true
-          AlarmNames:
-            - !Ref ReportWorkerFailureAlarm
       NetworkConfiguration:
         AwsvpcConfiguration:
           AssignPublicIp: DISABLED
@@ -983,12 +673,6 @@ Resources:
         DeploymentCircuitBreaker:
           Enable: true
           Rollback: true
-        Alarms:
-          Enable: true
-          Rollback: true
-          AlarmNames:
-            - !Ref DomainEventWorkerFailureAlarm
-            - !Ref DomainEventDeadLetterAlarm
       NetworkConfiguration:
         AwsvpcConfiguration:
           AssignPublicIp: DISABLED
@@ -996,36 +680,6 @@ Resources:
             - !Ref ApiSecurityGroup
           Subnets: !Ref PrivateSubnetIds
       TaskDefinition: !Ref DomainEventWorkerTaskDefinition
-
-  LifecycleEmailWorkerService:
-    Type: AWS::ECS::Service
-    Condition: LifecycleEmailIsEnabled
-    Properties:
-      Cluster: !Ref ApiCluster
-      ServiceName: lifecycle-email-worker
-      LaunchType: FARGATE
-      PlatformVersion: LATEST
-      DesiredCount: 1
-      EnableECSManagedTags: true
-      PropagateTags: SERVICE
-      DeploymentConfiguration:
-        MinimumHealthyPercent: 100
-        MaximumPercent: 200
-        DeploymentCircuitBreaker:
-          Enable: true
-          Rollback: true
-        Alarms:
-          Enable: true
-          Rollback: true
-          AlarmNames:
-            - !Ref LifecycleEmailWorkerFailureAlarm
-      NetworkConfiguration:
-        AwsvpcConfiguration:
-          AssignPublicIp: DISABLED
-          SecurityGroups:
-            - !Ref ApiSecurityGroup
-          Subnets: !Ref PrivateSubnetIds
-      TaskDefinition: !Ref LifecycleEmailWorkerTaskDefinition
 
   ApiScalingTarget:
     Type: AWS::ApplicationAutoScaling::ScalableTarget
@@ -1049,314 +703,6 @@ Resources:
         ScaleOutCooldown: 60
         PredefinedMetricSpecification:
           PredefinedMetricType: ECSServiceAverageCPUUtilization
-
-  ApiReadyHealthCheck:
-    Type: AWS::Route53::HealthCheck
-    Properties:
-      HealthCheckConfig:
-        Type: HTTPS
-        FullyQualifiedDomainName: !Ref ApiDomainName
-        Port: 443
-        ResourcePath: /ready
-        RequestInterval: 30
-        FailureThreshold: 3
-        EnableSNI: true
-      HealthCheckTags:
-        - Key: Name
-          Value: !Sub ${EnvironmentName}-vsms-ready
-
-  ApiReadyAlarm:
-    Type: AWS::CloudWatch::Alarm
-    Properties:
-      AlarmName: !Sub ${EnvironmentName}-vsms-ready-unavailable
-      AlarmDescription: Synthetic readiness check is failing
-      Namespace: AWS/Route53
-      MetricName: HealthCheckStatus
-      Dimensions:
-        - Name: HealthCheckId
-          Value: !Ref ApiReadyHealthCheck
-      Statistic: Minimum
-      Period: 60
-      EvaluationPeriods: 2
-      DatapointsToAlarm: 2
-      Threshold: 1
-      ComparisonOperator: LessThanThreshold
-      TreatMissingData: breaching
-      AlarmActions: [!Ref DeploymentAlarmTopic]
-      OKActions: [!Ref DeploymentAlarmTopic]
-
-  Api5xxAlarm:
-    Type: AWS::CloudWatch::Alarm
-    Properties:
-      AlarmName: !Sub ${EnvironmentName}-vsms-api-5xx-rate
-      AlarmDescription: API target 5xx responses exceed one percent of requests
-      EvaluationPeriods: 2
-      DatapointsToAlarm: 2
-      Threshold: 1
-      ComparisonOperator: GreaterThanThreshold
-      TreatMissingData: notBreaching
-      Metrics:
-        - Id: errors
-          ReturnData: false
-          MetricStat:
-            Metric:
-              Namespace: AWS/ApplicationELB
-              MetricName: HTTPCode_Target_5XX_Count
-              Dimensions:
-                - Name: LoadBalancer
-                  Value: !GetAtt ApiLoadBalancer.LoadBalancerFullName
-                - Name: TargetGroup
-                  Value: !GetAtt ApiTargetGroup.TargetGroupFullName
-            Period: 60
-            Stat: Sum
-        - Id: requests
-          ReturnData: false
-          MetricStat:
-            Metric:
-              Namespace: AWS/ApplicationELB
-              MetricName: RequestCount
-              Dimensions:
-                - Name: LoadBalancer
-                  Value: !GetAtt ApiLoadBalancer.LoadBalancerFullName
-            Period: 60
-            Stat: Sum
-        - Id: error_rate
-          Expression: IF(requests>0,100*errors/requests,0)
-          Label: API 5xx percentage
-          ReturnData: true
-      AlarmActions: [!Ref DeploymentAlarmTopic]
-      OKActions: [!Ref DeploymentAlarmTopic]
-
-  ApiP95LatencyAlarm:
-    Type: AWS::CloudWatch::Alarm
-    Properties:
-      AlarmName: !Sub ${EnvironmentName}-vsms-api-p95-over-one-second
-      AlarmDescription: API target p95 latency breaches the one-second NFR
-      Namespace: AWS/ApplicationELB
-      MetricName: TargetResponseTime
-      Dimensions:
-        - Name: LoadBalancer
-          Value: !GetAtt ApiLoadBalancer.LoadBalancerFullName
-        - Name: TargetGroup
-          Value: !GetAtt ApiTargetGroup.TargetGroupFullName
-      ExtendedStatistic: p95
-      Period: 60
-      EvaluationPeriods: 3
-      DatapointsToAlarm: 2
-      Threshold: 1
-      ComparisonOperator: GreaterThanThreshold
-      TreatMissingData: notBreaching
-      AlarmActions: [!Ref DeploymentAlarmTopic]
-      OKActions: [!Ref DeploymentAlarmTopic]
-
-  ApiUnhealthyTargetAlarm:
-    Type: AWS::CloudWatch::Alarm
-    Properties:
-      AlarmName: !Sub ${EnvironmentName}-vsms-api-unhealthy-target
-      AlarmDescription: At least one API target is not ready
-      Namespace: AWS/ApplicationELB
-      MetricName: UnHealthyHostCount
-      Dimensions:
-        - Name: LoadBalancer
-          Value: !GetAtt ApiLoadBalancer.LoadBalancerFullName
-        - Name: TargetGroup
-          Value: !GetAtt ApiTargetGroup.TargetGroupFullName
-      Statistic: Maximum
-      Period: 60
-      EvaluationPeriods: 2
-      DatapointsToAlarm: 2
-      Threshold: 1
-      ComparisonOperator: GreaterThanOrEqualToThreshold
-      TreatMissingData: breaching
-      AlarmActions: [!Ref DeploymentAlarmTopic]
-      OKActions: [!Ref DeploymentAlarmTopic]
-
-  DatabaseCpuAlarm:
-    Type: AWS::CloudWatch::Alarm
-    Properties:
-      AlarmName: !Sub ${EnvironmentName}-vsms-rds-high-cpu
-      Namespace: AWS/RDS
-      MetricName: CPUUtilization
-      Dimensions:
-        - Name: DBInstanceIdentifier
-          Value: !Ref Database
-      Statistic: Average
-      Period: 300
-      EvaluationPeriods: 3
-      DatapointsToAlarm: 2
-      Threshold: 80
-      ComparisonOperator: GreaterThanThreshold
-      TreatMissingData: breaching
-      AlarmActions: [!Ref DeploymentAlarmTopic]
-      OKActions: [!Ref DeploymentAlarmTopic]
-
-  DatabaseStorageAlarm:
-    Type: AWS::CloudWatch::Alarm
-    Properties:
-      AlarmName: !Sub ${EnvironmentName}-vsms-rds-low-storage
-      Namespace: AWS/RDS
-      MetricName: FreeStorageSpace
-      Dimensions:
-        - Name: DBInstanceIdentifier
-          Value: !Ref Database
-      Statistic: Minimum
-      Period: 300
-      EvaluationPeriods: 2
-      Threshold: 2147483648
-      ComparisonOperator: LessThanThreshold
-      TreatMissingData: breaching
-      AlarmActions: [!Ref DeploymentAlarmTopic]
-      OKActions: [!Ref DeploymentAlarmTopic]
-
-  DatabaseConnectionsAlarm:
-    Type: AWS::CloudWatch::Alarm
-    Properties:
-      AlarmName: !Sub ${EnvironmentName}-vsms-rds-high-connections
-      Namespace: AWS/RDS
-      MetricName: DatabaseConnections
-      Dimensions:
-        - Name: DBInstanceIdentifier
-          Value: !Ref Database
-      Statistic: Maximum
-      Period: 300
-      EvaluationPeriods: 3
-      DatapointsToAlarm: 2
-      Threshold: 80
-      ComparisonOperator: GreaterThanThreshold
-      TreatMissingData: breaching
-      AlarmActions: [!Ref DeploymentAlarmTopic]
-      OKActions: [!Ref DeploymentAlarmTopic]
-
-  ReportWorkerFailureMetric:
-    Type: AWS::Logs::MetricFilter
-    Properties:
-      LogGroupName: !Ref ApiLogGroup
-      FilterPattern: '{ $.msg = "report-worker.failed" }'
-      MetricTransformations:
-        - MetricNamespace: !Sub VSMS/${EnvironmentName}
-          MetricName: ReportWorkerFailures
-          MetricValue: "1"
-
-  DomainEventWorkerFailureMetric:
-    Type: AWS::Logs::MetricFilter
-    Properties:
-      LogGroupName: !Ref ApiLogGroup
-      FilterPattern: '{ $.msg = "domain-event-worker.failed" }'
-      MetricTransformations:
-        - MetricNamespace: !Sub VSMS/${EnvironmentName}
-          MetricName: DomainEventWorkerFailures
-          MetricValue: "1"
-
-  DomainEventDeadLetterMetric:
-    Type: AWS::Logs::MetricFilter
-    Properties:
-      LogGroupName: !Ref ApiLogGroup
-      FilterPattern: '{ $.msg = "domain-event-worker.summary" && $.deadLettered > 0 }'
-      MetricTransformations:
-        - MetricNamespace: !Sub VSMS/${EnvironmentName}
-          MetricName: DomainEventDeadLetters
-          MetricValue: $.deadLettered
-
-  LifecycleEmailWorkerFailureMetric:
-    Type: AWS::Logs::MetricFilter
-    Condition: LifecycleEmailIsEnabled
-    Properties:
-      LogGroupName: !Ref ApiLogGroup
-      FilterPattern: '{ $.msg = "lifecycle-email-worker.failed" }'
-      MetricTransformations:
-        - MetricNamespace: !Sub VSMS/${EnvironmentName}
-          MetricName: LifecycleEmailWorkerFailures
-          MetricValue: "1"
-
-  ReportWorkerFailureAlarm:
-    Type: AWS::CloudWatch::Alarm
-    Properties:
-      AlarmName: !Sub ${EnvironmentName}-vsms-report-worker-failed
-      Namespace: !Sub VSMS/${EnvironmentName}
-      MetricName: ReportWorkerFailures
-      Statistic: Sum
-      Period: 60
-      EvaluationPeriods: 1
-      Threshold: 1
-      ComparisonOperator: GreaterThanOrEqualToThreshold
-      TreatMissingData: notBreaching
-      AlarmActions: [!Ref DeploymentAlarmTopic]
-      OKActions: [!Ref DeploymentAlarmTopic]
-
-  DomainEventWorkerFailureAlarm:
-    Type: AWS::CloudWatch::Alarm
-    Properties:
-      AlarmName: !Sub ${EnvironmentName}-vsms-domain-event-worker-failed
-      Namespace: !Sub VSMS/${EnvironmentName}
-      MetricName: DomainEventWorkerFailures
-      Statistic: Sum
-      Period: 60
-      EvaluationPeriods: 1
-      Threshold: 1
-      ComparisonOperator: GreaterThanOrEqualToThreshold
-      TreatMissingData: notBreaching
-      AlarmActions: [!Ref DeploymentAlarmTopic]
-      OKActions: [!Ref DeploymentAlarmTopic]
-
-  DomainEventDeadLetterAlarm:
-    Type: AWS::CloudWatch::Alarm
-    Properties:
-      AlarmName: !Sub ${EnvironmentName}-vsms-domain-event-dead-letter
-      Namespace: !Sub VSMS/${EnvironmentName}
-      MetricName: DomainEventDeadLetters
-      Statistic: Sum
-      Period: 60
-      EvaluationPeriods: 1
-      Threshold: 1
-      ComparisonOperator: GreaterThanOrEqualToThreshold
-      TreatMissingData: notBreaching
-      AlarmActions: [!Ref DeploymentAlarmTopic]
-      OKActions: [!Ref DeploymentAlarmTopic]
-
-  LifecycleEmailWorkerFailureAlarm:
-    Type: AWS::CloudWatch::Alarm
-    Condition: LifecycleEmailIsEnabled
-    Properties:
-      AlarmName: !Sub ${EnvironmentName}-vsms-lifecycle-email-worker-failed
-      Namespace: !Sub VSMS/${EnvironmentName}
-      MetricName: LifecycleEmailWorkerFailures
-      Statistic: Sum
-      Period: 60
-      EvaluationPeriods: 1
-      Threshold: 1
-      ComparisonOperator: GreaterThanOrEqualToThreshold
-      TreatMissingData: notBreaching
-      AlarmActions: [!Ref DeploymentAlarmTopic]
-      OKActions: [!Ref DeploymentAlarmTopic]
-
-  StoppedTaskEventRule:
-    Type: AWS::Events::Rule
-    Properties:
-      Description: Notify operations when a VSMS ECS task stops
-      EventPattern:
-        source: [aws.ecs]
-        detail-type: [ECS Task State Change]
-        detail:
-          clusterArn: [!GetAtt ApiCluster.Arn]
-          lastStatus: [STOPPED]
-      State: ENABLED
-      Targets:
-        - Arn: !Ref DeploymentAlarmTopic
-          Id: DeploymentAlarmTopic
-
-  DatabaseAvailabilityEvents:
-    Type: AWS::RDS::EventSubscription
-    DependsOn: DeploymentAlarmTopicPolicy
-    Properties:
-      SnsTopicArn: !Ref DeploymentAlarmTopic
-      SourceType: db-instance
-      SourceIds:
-        - !Ref Database
-      EventCategories:
-        - availability
-        - failover
-        - failure
-      Enabled: true
 
   ApiDnsRecord:
     Type: AWS::Route53::RecordSet
@@ -1479,31 +825,6 @@ Outputs:
     Value: !Ref ApiCluster
   ApiServiceName:
     Value: !GetAtt ApiService.Name
-  ReportWorkerServiceName:
-    Value: !GetAtt ReportWorkerService.Name
-  DomainEventWorkerServiceName:
-    Value: !GetAtt DomainEventWorkerService.Name
-  LifecycleEmailWorkerServiceName:
-    Condition: LifecycleEmailIsEnabled
-    Value: !GetAtt LifecycleEmailWorkerService.Name
-  MigrationTaskDefinitionArn:
-    Value: !Ref MigrationTaskDefinition
-  MigrationExecutionRoleArn:
-    Value: !GetAtt MigrationExecutionRole.Arn
-  MigrationTaskRoleArn:
-    Value: !GetAtt MigrationTaskRole.Arn
-  ApiTaskExecutionRoleArn:
-    Value: !GetAtt ApiExecutionRole.Arn
-  ApiTaskRoleArn:
-    Value: !GetAtt ApiTaskRole.Arn
-  WorkerTaskRoleArn:
-    Value: !GetAtt WorkerTaskRole.Arn
-  PrivateSubnetIds:
-    Value: !Join [",", !Ref PrivateSubnetIds]
-  ApiSecurityGroupId:
-    Value: !Ref ApiSecurityGroup
-  DeploymentAlarmTopicArn:
-    Value: !Ref DeploymentAlarmTopic
   DatabaseEndpoint:
     Value: !GetAtt Database.Endpoint.Address
   DatabaseMigrationUrlSecretArn:
