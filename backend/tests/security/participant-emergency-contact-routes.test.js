@@ -46,6 +46,8 @@ test("participant-scoped emergency-contact updates use the nested participant ro
 
 test("participant routes use event registration assignments instead of global roles", () => {
     const source = fs.readFileSync(path.join(__dirname, "../../routes/participantRoutes.js"), "utf8");
+    const service = fs.readFileSync(path.join(__dirname, "../../services/participant/participantService.js"), "utf8");
     assert.match(source, /requireRegistrationAssignment/);
     assert.doesNotMatch(source, /requireAnyRole|requirePermission|REGISTRATION_OFFICER/);
+    assert.doesNotMatch(service, /assertCrossEventReusePermission|participants:cross-event-reuse/);
 });

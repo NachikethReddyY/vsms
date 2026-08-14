@@ -118,15 +118,7 @@ function participantPublicDetails(participant) {
     return { ...safeParticipant, nricMasked: maskNric(nric) || nricMasked };
 }
 
-function assertCrossEventReusePermission(req) {
-    if (req.auth?.permissions?.includes("participants:cross-event-reuse")) return;
-    const error = new Error("Cross-event participant reuse is not authorized");
-    error.statusCode = 403;
-    throw error;
-}
-
 exports.matchParticipantsForRegistrationService = async (req) => {
-    assertCrossEventReusePermission(req);
     const criteria = parseParticipantMatch(req.body || {});
     const fullName = {
         AND: [
@@ -208,7 +200,6 @@ exports.matchParticipantsForRegistrationService = async (req) => {
 };
 
 exports.reuseMatchedParticipantService = async (req) => {
-    assertCrossEventReusePermission(req);
     const participantId = assertUuid(req.params.participantId, "participantId");
     const criteria = parseParticipantMatch(req.body || {});
     const eventId = req.registrationEventId;
