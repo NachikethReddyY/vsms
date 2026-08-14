@@ -27,6 +27,7 @@ const formatExpiry = (value: string) =>
 
 export default function ParticipantStatusPage() {
   const { token = '' } = useParams();
+  const qrDialogRef = useRef<HTMLDialogElement>(null);
   const [status, setStatus] = useState<PublicPassStatus | null>(null);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(true);
@@ -115,8 +116,10 @@ export default function ParticipantStatusPage() {
       <h1>{status.eventName ?? 'Event pass'}</h1>
 
       <div className="ps-pass-code">
-        <img src={`/api/v1/qr/public-pass/${encodeURIComponent(token)}`} alt="Participant pass QR code for station staff to scan" />
-        <div><strong>Scan at each station</strong><span>This secure code opens your event record for authorised staff.</span></div>
+        <button type="button" className="ps-pass-expand" onClick={() => qrDialogRef.current?.showModal()} aria-label="Expand participant pass QR code">
+          <img src={`/api/v1/qr/public-pass/${encodeURIComponent(token)}`} alt="Participant pass QR code for station staff to scan" />
+        </button>
+        <div><strong>Scan at each station</strong><span>Tap the code to enlarge it for authorised staff.</span></div>
       </div>
 
       {error && (
@@ -169,6 +172,14 @@ export default function ParticipantStatusPage() {
     <div className="participant-status-shell">
       <Link className="participant-status-brand" to="/"><img src="/favicon.svg" alt="" />VSMS</Link>
       {content}
+      <dialog ref={qrDialogRef} className="ps-qr-dialog" aria-labelledby="expanded-qr-title" onClick={(event) => { if (event.target === event.currentTarget) event.currentTarget.close(); }}>
+        <div className="ps-qr-dialog-card">
+          <button type="button" className="ps-qr-close" onClick={() => qrDialogRef.current?.close()}>Close</button>
+          <img src={`/api/v1/qr/public-pass/${encodeURIComponent(token)}`} alt="Expanded participant pass QR code for station staff to scan" />
+          <strong id="expanded-qr-title">Ready to scan</strong>
+          <span>Hold the screen steady in front of the station camera.</span>
+        </div>
+      </dialog>
       <footer className="participant-status-footer"><span>No personal information is shown on this page.</span><Link to="/">Staff sign in</Link></footer>
     </div>
   </main>;

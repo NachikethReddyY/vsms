@@ -78,10 +78,52 @@
   background: var(--event-canvas, #f6f7f5);
   text-align: left;
 }
-.ps-pass-code img { width: 136px; height: 136px; padding: 8px; border-radius: 12px; background: #fff; }
+.ps-pass-expand { display: block; width: 136px; height: 136px; padding: 0; border: 0; border-radius: 12px; background: #fff; cursor: zoom-in; }
+.ps-pass-expand:active { transform: scale(.97); transition: transform 100ms ease-out; }
+.ps-pass-expand img { width: 136px; height: 136px; padding: 8px; border-radius: 12px; background: #fff; }
 .ps-pass-code div { display: grid; gap: 5px; }
 .ps-pass-code strong { font-size: 15px; }
 .ps-pass-code span { color: var(--event-muted, #6b6f66); font-size: 12px; line-height: 18px; }
+
+.ps-qr-dialog {
+  width: min(94vw, 560px);
+  max-width: none;
+  padding: 0;
+  border: 0;
+  border-radius: 12px;
+  background: transparent;
+}
+.ps-qr-dialog::backdrop { background: rgba(0, 0, 0, .72); backdrop-filter: blur(12px); }
+.ps-qr-dialog-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 58px 24px 28px;
+  border-radius: 12px;
+  background: var(--event-card, #ffffff);
+  color: var(--event-ink, #0d0d0f);
+  text-align: center;
+}
+.ps-qr-dialog-card img { width: min(78vw, 440px); aspect-ratio: 1; padding: 12px; background: #fff; }
+.ps-qr-dialog-card strong { margin-top: 8px; font-size: 18px; letter-spacing: -.015em; }
+.ps-qr-dialog-card span { color: var(--event-muted, #6b6f66); font-size: 13px; }
+.ps-qr-close {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  min-width: 64px;
+  min-height: 40px;
+  border: 1px solid var(--event-line, #e3e4df);
+  border-radius: 8px;
+  background: var(--event-canvas, #f6f7f5);
+  color: inherit;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 700;
+}
+.ps-qr-close:active { transform: scale(.96); }
 
 .ps-delayed {
   display: flex;
@@ -262,8 +304,12 @@
 @media (max-width: 480px) {
   .ps-state { padding: 26px 20px; }
   .ps-pass-code { grid-template-columns: 112px 1fr; gap: 14px; }
-  .ps-pass-code img { width: 112px; height: 112px; }
+  .ps-pass-expand, .ps-pass-expand img { width: 112px; height: 112px; }
   .ps-queue-value { font-size: 36px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ps-pass-expand:active, .ps-qr-close:active { transform: none; }
 }
 .ps-state-card-head {
   display: flex;
