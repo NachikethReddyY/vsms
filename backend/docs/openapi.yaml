@@ -4066,7 +4066,7 @@ components:
     ReviewQueueItem:
       type: object
       additionalProperties: false
-      required: [registrationId, participantDisplayName, queueNumber, highestFlag, flaggedResultCount, completedStationCount, totalStationCount, readyReason, lastResultAt]
+      required: [registrationId, participantDisplayName, queueNumber, highestFlag, flaggedResultCount, completedStationCount, skippedStationCount, totalStationCount, readyReason, lastResultAt]
       properties:
         registrationId: { type: string, format: uuid }
         participantDisplayName: { type: string }
@@ -4074,8 +4074,9 @@ components:
         highestFlag: { $ref: "#/components/schemas/OverallFlag" }
         flaggedResultCount: { type: integer, minimum: 0 }
         completedStationCount: { type: integer, minimum: 0 }
+        skippedStationCount: { type: integer, minimum: 0 }
         totalStationCount: { type: integer, minimum: 1 }
-        readyReason: { type: string, enum: [SCREENING_COMPLETE, URGENT_FLAG] }
+        readyReason: { type: string, enum: [SCREENING_COMPLETE, ROUTE_COMPLETE, URGENT_FLAG] }
         lastResultAt: { type: string, format: date-time, nullable: true }
     ReviewQueueResponse:
       type: object
@@ -4118,7 +4119,7 @@ components:
     ReviewStationResult:
       type: object
       additionalProperties: false
-      required: [stationId, stationName, stationType, stationOrder, fieldSchemaSnapshot, result]
+      required: [stationId, stationName, stationType, stationOrder, fieldSchemaSnapshot, status, result]
       properties:
         stationId: { type: string, format: uuid }
         stationName: { type: string }
@@ -4128,6 +4129,7 @@ components:
           type: array
           nullable: true
           items: { $ref: "#/components/schemas/StationFieldDefinition" }
+        status: { type: string, enum: [COMPLETED, SKIPPED, PENDING] }
         result:
           type: object
           nullable: true
@@ -4135,11 +4137,12 @@ components:
     ReviewReadiness:
       type: object
       additionalProperties: false
-      required: [ready, readyReason, completedStationCount, totalStationCount, highestFlag]
+      required: [ready, readyReason, completedStationCount, skippedStationCount, totalStationCount, highestFlag]
       properties:
         ready: { type: boolean }
-        readyReason: { type: string, enum: [SCREENING_COMPLETE, URGENT_FLAG], nullable: true }
+        readyReason: { type: string, enum: [SCREENING_COMPLETE, ROUTE_COMPLETE, URGENT_FLAG], nullable: true }
         completedStationCount: { type: integer, minimum: 0 }
+        skippedStationCount: { type: integer, minimum: 0 }
         totalStationCount: { type: integer, minimum: 0 }
         highestFlag: { $ref: "#/components/schemas/OverallFlag" }
     ReferralSummary:
@@ -5086,7 +5089,7 @@ components:
                 properties:
                   stationName: { type: string }
                   stationType: { type: string }
-                  state: { type: string, enum: [COMPLETED, CURRENT, UPCOMING, BLOCKED] }
+                  state: { type: string, enum: [COMPLETED, SKIPPED, CURRENT, UPCOMING, BLOCKED] }
             expiresAt: { type: string, format: date-time, nullable: true }
     QrMutationResponse:
       type: object
