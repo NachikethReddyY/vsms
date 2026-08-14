@@ -41,8 +41,8 @@ test("QR issuance is closed when the registration or event is cancelled", async 
   }
 });
 
-test("cancelling a registration revokes its active passes in the same transaction", async () => {
-  let revoked;
+test("cancelling a registration delegates QR revocation to the atomic database routine", async () => {
+  let routineStatement;
   let audit;
   const existing = { registrationId, eventId, registrationStatus: "SIGNED_UP" };
   const updated = { ...existing, registrationStatus: "CANCELLED", event: {}, participant: {}, statusHistory: [] };
@@ -60,16 +60,15 @@ test("cancelling a registration revokes its active passes in the same transactio
       findFirst: async () => ({ id: "44444444-4444-4444-8444-444444444444", assignmentRole: "REGISTRATION" }),
     },
     eventRegistration: {
-      findUnique: async () => existing,
-      update: async () => updated,
+      findUnique: async ({ include }) => include ? updated : existing,
     },
-    qRCodePass: {
-      updateMany: async (query) => { revoked = query; return { count: 1 }; },
+    $queryRaw: async (query) => {
+      routineStatement = (Array.isArray(query) ? query : query.strings).join(" ");
+      return [{ promoted_registration_id: null, revoked_qr_count: 1n }];
     },
-    registrationStatusHistory: { create: async () => ({}) },
     auditLog: { create: async ({ data }) => { audit = data; return data; } },
   };
-  const db = { $transaction: async (work) => work(tx) };
+  const db = { ...tx, $transaction: async (work) => work(tx) };
 
   const result = await registrationService.changeRegistrationStatus({
     registrationId,
@@ -80,10 +79,6 @@ test("cancelling a registration revokes its active passes in the same transactio
   }, db);
 
   assert.equal(result.registrationStatus, "CANCELLED");
-  assert.deepEqual(revoked.where, { registrationId, isActive: true });
-  assert.equal(revoked.data.isActive, false);
-  assert.equal(revoked.data.revokedBy, userId);
-  assert.equal(revoked.data.revokedReason, "Registration cancelled");
-  assert.ok(revoked.data.revokedAt instanceof Date);
+  assert.match(routineStatement, /cancel_event_registration/);
   assert.equal(audit.newValue.revokedQrPassCount, 1);
 });

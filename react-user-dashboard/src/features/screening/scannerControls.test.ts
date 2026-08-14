@@ -14,7 +14,7 @@ describe('participant scanner controls', () => {
     expect(scanner).toContain('aria-live="polite"');
     expect(scanner).toContain('scannerGenerationRef.current += 1');
     expect(scanner).toContain('await scanner.stop()');
-    expect(station).toContain('<form className="va-resolve-row"');
+    expect(station).toMatch(/<form\s+className="va-resolve-row"/);
     expect(station).toContain('throw new Error(message)');
   });
 
