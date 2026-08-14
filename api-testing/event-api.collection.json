@@ -4339,7 +4339,7 @@
         },
         "body": {
           "mode": "raw",
-          "raw": "{\n  \"participantId\": \"00000000-0000-4000-8000-000000000000\"\n}",
+          "raw": "{\n  \"participantId\": \"00000000-0000-4000-8000-000000000000\",\n  \"workflowStartedAt\": \"2026-08-07T00:00:00.000Z\",\n  \"paperFormUsed\": false,\n  \"paperExceptionReason\": \"\"\n}",
           "options": {
             "raw": {
               "language": "json"
@@ -11681,25 +11681,25 @@
             {
               "key": "entityName",
               "value": "",
-              "description": "Filter application logs by target entity name",
+              "description": "Filter records by target entity name",
               "disabled": true
             },
             {
               "key": "action",
               "value": "",
-              "description": "Filter application logs by action verb",
+              "description": "Filter records by action or authentication event",
               "disabled": true
             },
             {
               "key": "eventType",
               "value": "",
-              "description": "Filter authentication logs by event type",
+              "description": "Restrict the feed to a specific authentication event type",
               "disabled": true
             },
             {
               "key": "outcome",
               "value": "SUCCESS",
-              "description": "Filter both tables by outcome",
+              "description": "Filter the timeline by outcome",
               "disabled": true
             },
             {
