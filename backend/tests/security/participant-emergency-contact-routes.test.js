@@ -1,6 +1,8 @@
 const assert = require("node:assert/strict");
 const test = require("node:test");
 const express = require("express");
+const fs = require("node:fs");
+const path = require("node:path");
 const request = require("supertest");
 
 const allow = (_req, _res, next) => next();
@@ -40,4 +42,10 @@ test("participant-scoped emergency-contact updates use the nested participant ro
     assert.equal(nestedResponse.status, 204);
     assert.equal(receivedParams.participantId, participantId);
     assert.equal(receivedParams.contactId, contactId);
+});
+
+test("participant routes use event registration assignments instead of global roles", () => {
+    const source = fs.readFileSync(path.join(__dirname, "../../routes/participantRoutes.js"), "utf8");
+    assert.match(source, /requireRegistrationAssignment/);
+    assert.doesNotMatch(source, /requireAnyRole|requirePermission|REGISTRATION_OFFICER/);
 });
