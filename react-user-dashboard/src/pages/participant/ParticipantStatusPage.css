@@ -250,6 +250,7 @@
 }
 .ps-queue-now .ps-queue-value { color: var(--event-blue, #2563eb); }
 .ps-queue-yours .ps-queue-value { color: var(--event-ink, #0d0d0f); }
+.ps-queue-pending { max-width: 12ch; color: var(--event-muted, #6b6f66); font-size: 14px; line-height: 19px; }
 .ps-queue-hint { color: var(--event-muted, #6b6f66); font-size: 12px; }
 
 .ps-queue-stack {

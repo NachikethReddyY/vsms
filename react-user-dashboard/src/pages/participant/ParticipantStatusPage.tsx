@@ -138,7 +138,7 @@ export default function ParticipantStatusPage() {
           </p>
           <div className="ps-queue-grid">
             <div className="ps-queue-cell ps-queue-yours"><span className="ps-queue-label">Your number</span><strong className="ps-queue-value">{queueState.queueNumber}</strong></div>
-            <div className="ps-queue-cell ps-queue-now"><span className="ps-queue-label">Now calling</span><strong className="ps-queue-value">{queueState.nowCalling ?? '—'}</strong></div>
+            <div className="ps-queue-cell ps-queue-now"><span className="ps-queue-label">Now calling</span>{queueState.nowCalling == null ? <strong className="ps-queue-pending">Waiting to be called</strong> : <strong className="ps-queue-value">{queueState.nowCalling}</strong>}</div>
           </div>
         </div>
       ) : (
