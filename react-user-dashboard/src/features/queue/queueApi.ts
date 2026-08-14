@@ -62,6 +62,12 @@ export type RegistrationRouteState = {
     position: number;
     state: 'COMPLETED' | 'CURRENT' | 'BLOCKED' | 'UPCOMING';
   }>;
+  queue: {
+    queueEntryId: string;
+    stationId: string;
+    queueNumber: number;
+    status: 'WAITING' | 'CALLED' | 'IN_PROGRESS';
+  } | null;
 };
 
 export const queueApi = {
@@ -75,7 +81,7 @@ export const queueApi = {
     return data.data;
   },
 
-  async replaceParticipantRoute(eventId: string, registrationId: string, request: { stationIds: string[]; reasonCode: RouteOverrideReason; expectedVersion: number }) {
+  async replaceParticipantRoute(eventId: string, registrationId: string, request: { stationIds: string[]; reasonCode: RouteOverrideReason; expectedVersion: number; skipActive?: boolean }) {
     const { data } = await apiClient.patch<{ status: 'success'; data: RegistrationRouteState }>(`/queues/events/${eventId}/participants/${registrationId}/route`, request);
     return data.data;
   },

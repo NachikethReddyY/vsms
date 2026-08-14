@@ -3312,6 +3312,15 @@ export interface components {
             /** Format: date-time */
             checkedInAt?: string | null;
             queueNumber: number | null;
+            routeVersion: number;
+            routeSteps: {
+                /** Format: uuid */
+                stationId: string;
+                stationName: string;
+                position: number;
+                /** @enum {string} */
+                state: "COMPLETED" | "SKIPPED" | "CURRENT" | "BLOCKED" | "UPCOMING";
+            }[];
             /** Format: date-time */
             createdAt: string;
         };
@@ -4461,10 +4470,12 @@ export interface components {
         /** @enum {string} */
         RouteOverrideReasonCode: "STATION_UNAVAILABLE" | "QUEUE_BALANCING" | "PARTICIPANT_NEED" | "EQUIPMENT_ISSUE" | "OPERATIONAL_EXCEPTION";
         RouteOverrideRequest: {
-            /** @description Complete proposed order of every unfinished required station. The active station, when present, must remain in place; completed stations are retained by the server. */
+            /** @description Complete proposed order of every unfinished required station. Completed stations are retained by the server. */
             stationIds: string[];
             reasonCode: components["schemas"]["RouteOverrideReasonCode"];
             expectedVersion: number;
+            /** @description Skip a waiting or called active station and join the first proposed unfinished station. In-progress screening cannot be skipped. */
+            skipActive?: boolean;
         };
         RouteOverrideResponse: {
             /** @enum {string} */

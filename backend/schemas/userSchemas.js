@@ -3,12 +3,8 @@ const { z } = require("zod");
 const applicationRole = z.enum([
   "ADMINISTRATOR",
   "EVENT_MANAGER",
-  "REGISTRATION_OFFICER",
-  "SCREENER",
-  "REVIEWER",
-  "SUPPORT",
 ]);
-const roleList = z.array(applicationRole).min(1).max(6).refine(
+const roleList = z.array(applicationRole).max(2).refine(
   (roles) => new Set(roles).size === roles.length,
   "Roles must not contain duplicates",
 );

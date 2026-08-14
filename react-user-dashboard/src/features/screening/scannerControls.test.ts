@@ -26,6 +26,8 @@ describe('participant scanner controls', () => {
     expect(general).not.toContain('DEMO_QR_TOKEN');
     expect(general).not.toContain('HANDOFF_STATION_OPTIONS.map');
     expect(general).toContain('Current route destination');
+    expect(general).toContain('Change route or queue');
+    expect(general).toContain('<RouteOverrideDialog');
     expect(general).toContain('Participant lookup fallback');
     expect(general).toContain('await scanner.stop()');
   });

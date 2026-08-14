@@ -10,7 +10,6 @@ const asyncHandler = require("../utils/http/asyncHandler");
 
 const queueController = require("../controllers/queueController");
 const authenticate = require("../middlewares/authenticate");
-const requireAnyRole = require("../middlewares/requireAnyRole");
 const checkIdempotency = require("../middlewares/idempotency");
 
 const {
@@ -57,7 +56,6 @@ router.get(
 
 router.get(
   "/events/:eventId",
-  requireAnyRole("REGISTRATION_OFFICER", "SCREENER", "EVENT_MANAGER", "ADMINISTRATOR"),
   validate({
     params: eventParams
   }),
@@ -84,16 +82,14 @@ router.get(
   asyncHandler(queueController.getParticipantQueueStatus),
 );
 
-router.patch("/events/:eventId/entries/:queueId/call", requireAnyRole("SCREENER", "EVENT_MANAGER", "ADMINISTRATOR"), checkIdempotency, validate({ params: eventQueueEntryParams }), asyncHandler(queueController.callQueueEntry));
-router.patch("/events/:eventId/entries/:queueId/start", requireAnyRole("SCREENER"), checkIdempotency, validate({ params: eventQueueEntryParams }), asyncHandler(queueController.startQueueEntry));
-router.patch("/events/:eventId/entries/:queueId/skip", requireAnyRole("SCREENER", "EVENT_MANAGER", "ADMINISTRATOR"), checkIdempotency, validate({ params: eventQueueEntryParams }), asyncHandler(queueController.skipQueueEntry));
-router.patch("/events/:eventId/entries/:queueId/priority", requireAnyRole("EVENT_MANAGER", "ADMINISTRATOR"), checkIdempotency, validate({ params: eventQueueEntryParams, body: priorityQueueBody }), asyncHandler(queueController.updatePriority));
-router.delete("/events/:eventId/entries/:queueId", requireAnyRole("REGISTRATION_OFFICER", "EVENT_MANAGER", "ADMINISTRATOR"), checkIdempotency, validate({ params: eventQueueEntryParams }), asyncHandler(queueController.leaveQueue));
+router.patch("/events/:eventId/entries/:queueId/call", validate({ params: eventQueueEntryParams }), asyncHandler(queueController.callQueueEntry));
+router.patch("/events/:eventId/entries/:queueId/start", validate({ params: eventQueueEntryParams }), asyncHandler(queueController.startQueueEntry));
+router.patch("/events/:eventId/entries/:queueId/skip", validate({ params: eventQueueEntryParams }), asyncHandler(queueController.skipQueueEntry));
+router.patch("/events/:eventId/entries/:queueId/priority", checkIdempotency, validate({ params: eventQueueEntryParams, body: priorityQueueBody }), asyncHandler(queueController.updatePriority));
+router.delete("/events/:eventId/entries/:queueId", validate({ params: eventQueueEntryParams }), asyncHandler(queueController.leaveQueue));
 
 router.patch(
   "/entries/:queueId/call",
-  requireAnyRole("SCREENER", "EVENT_MANAGER", "ADMINISTRATOR"),
-  checkIdempotency,
   validate({
     params: queueEntryParams
   }),
@@ -107,8 +103,6 @@ router.patch(
  */
 router.patch(
   "/entries/:queueId/start",
-  requireAnyRole("SCREENER"),
-  checkIdempotency,
   validate({
     params: queueEntryParams
   }),
@@ -122,8 +116,6 @@ router.patch(
  */
 router.patch(
   "/entries/:queueId/skip",
-  requireAnyRole("SCREENER", "EVENT_MANAGER", "ADMINISTRATOR"),
-  checkIdempotency,
   validate({
     params: queueEntryParams
   }),
@@ -137,8 +129,6 @@ router.patch(
  */
 router.patch(
   "/entries/:queueId/priority",
-  requireAnyRole("EVENT_MANAGER", "ADMINISTRATOR"),
-  checkIdempotency,
   validate({
     params: queueEntryParams,
     body: priorityQueueBody
@@ -153,7 +143,6 @@ router.patch(
  */
 router.get(
   "/events/:eventId/workload",
-  requireAnyRole("EVENT_MANAGER", "ADMINISTRATOR"),
   validate({
     params: eventParams
   }),
@@ -167,8 +156,6 @@ router.get(
  */
 router.delete(
   "/entries/:queueId",
-  requireAnyRole("REGISTRATION_OFFICER", "EVENT_MANAGER", "ADMINISTRATOR"),
-  checkIdempotency,
   validate({
     params: queueEntryParams
   }),

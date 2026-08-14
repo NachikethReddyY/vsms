@@ -358,9 +358,7 @@ exports.decideApproval = async (userId, decision, reason, actorId, context, enqu
     let assignedRoles = before.userRoles.map(({ role }) => role.roleName);
     if (decision === "APPROVED") {
       assignedRoles = options.roles;
-      if (!Array.isArray(assignedRoles) || assignedRoles.length === 0) {
-        throw new AppError(422, "ACCOUNT_ROLES_REQUIRED", "At least one account role is required for approval");
-      }
+      if (!Array.isArray(assignedRoles)) assignedRoles = [];
       const roles = await tx.role.findMany({
         where: { roleName: { in: assignedRoles } },
         select: { id: true, roleName: true },
