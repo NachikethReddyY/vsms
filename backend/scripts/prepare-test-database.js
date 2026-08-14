@@ -5,7 +5,7 @@ const dotenv = require("dotenv");
 const backendRoot = path.resolve(__dirname, "..");
 // Integration files share one disposable database. Run files serially while
 // preserving the explicit Promise.all concurrency checks inside each suite.
-const integrationTestArgs = ["--test", "--test-concurrency=1", "tests/integration/*.test.js", "tests/security/rateLimit.test.js", "tests/security/rbac.test.js"];
+const integrationTestArgs = ["--test", "--test-concurrency=1", ".vsms/tests/*.test.js", "tests/integration/*.test.js", "tests/security/rateLimit.test.js", "tests/security/rbac.test.js"];
 const resetAcknowledgement = "I_UNDERSTAND_THIS_RESETS_A_TEST_DATABASE";
 
 const testDatabaseName = (databaseUrl) => {

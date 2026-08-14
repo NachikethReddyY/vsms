@@ -7,7 +7,6 @@ allowBuilds:
 overrides:
   js-yaml: 4.3.1
 minimumReleaseAgeExclude:
-  - '@aws-sdk/client-sesv2@3.1102.0'
   - '@aws-sdk/core@3.977.5'
   - '@aws-sdk/credential-provider-env@3.972.66'
   - '@aws-sdk/credential-provider-http@3.972.68'

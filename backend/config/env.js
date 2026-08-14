@@ -71,8 +71,10 @@ const schema = z.object({
   ENCRYPTION_KEY: optionalEnv(z.string().regex(/^[a-fA-F0-9]{64}$/)),
   ENCRYPTION_ACTIVE_KEY_ID: optionalEnv(z.string().regex(/^[A-Za-z0-9_-]{1,32}$/)),
   ENCRYPTION_KEYRING_JSON: optionalEnv(z.string().min(1)),
-  PARTICIPANT_LOOKUP_HMAC_KEY: optionalEnv(z.string().regex(/^[a-fA-F0-9]{64}$/)),
-  SES_FROM_EMAIL: optionalEnv(z.string().email()),
+  SMTP_HOST: optionalEnv(z.literal("smtp.gmail.com")),
+  SMTP_PORT: optionalEnv(z.coerce.number().int().refine((value) => value === 465 || value === 587)),
+  SMTP_USERNAME: optionalEnv(z.string().email()),
+  SMTP_PASSWORD: optionalEnv(z.string().min(1)),
   SES_SNS_TOPIC_ARNS: optionalEnv(z.string().refine(
     (value) => value.split(",").every((topic) => snsTopicArn.test(topic.trim())),
     "must contain only Amazon SNS topic ARNs",
@@ -124,6 +126,12 @@ if (values.ENCRYPTION_ACTIVE_KEY_ID && !encryptionKeyring[values.ENCRYPTION_ACTI
 if (values.NODE_ENV === "production" && (!values.ENCRYPTION_ACTIVE_KEY_ID || !encryptionKeyring)) throw new Error("Versioned encryption keyring configuration is required in production");
 if (values.NODE_ENV === "production" && !values.PARTICIPANT_LOOKUP_HMAC_KEY) throw new Error("PARTICIPANT_LOOKUP_HMAC_KEY is required in production");
 const lifecycleEmailEnabled = values.LIFECYCLE_EMAIL_ENABLED === "true";
+const referralSmtpKeys = ["SMTP_HOST", "SMTP_PORT", "SMTP_USERNAME", "SMTP_PASSWORD"];
+const referralSmtpConfiguredCount = referralSmtpKeys.filter((key) => values[key] !== undefined).length;
+if (referralSmtpConfiguredCount > 0 && referralSmtpConfiguredCount !== referralSmtpKeys.length) {
+  throw new Error("Google SMTP referral email configuration is incomplete");
+}
+const referralEmailEnabled = referralSmtpConfiguredCount === referralSmtpKeys.length;
 const lifecycleRequired = ["LIFECYCLE_EMAIL_FROM", "LIFECYCLE_EMAIL_ALLOWED_SENDERS", "GOOGLE_WORKSPACE_USER", "GOOGLE_WORKSPACE_CLIENT_ID", "GOOGLE_WORKSPACE_CLIENT_SECRET", "GOOGLE_WORKSPACE_REFRESH_TOKEN"];
 if (lifecycleEmailEnabled && lifecycleRequired.some((key) => !values[key])) throw new Error("Google Workspace lifecycle email configuration is incomplete");
 const lifecycleAllowedSenders = (values.LIFECYCLE_EMAIL_ALLOWED_SENDERS || "").split(",").map((value) => value.trim().toLowerCase()).filter(Boolean);
@@ -152,6 +160,7 @@ module.exports = Object.freeze({
   encryptionKeyring,
   participantLookupHmacKey: values.PARTICIPANT_LOOKUP_HMAC_KEY?.toLowerCase() || null,
   sesSnsTopicArns: (values.SES_SNS_TOPIC_ARNS || "").split(",").map((topic) => topic.trim()).filter(Boolean),
+  referralEmailEnabled,
   lifecycleEmailEnabled,
   lifecycleAllowedSenders,
 });

@@ -12,6 +12,7 @@ const {
 
 const { requireEventRoleAndDuty } = require("../event/eventAuthorizationService");
 const { maskNric } = require("../../utils/validation/validation");
+const { cancelActiveRegistrationQueue } = require("../../utils/database/databaseRoutines");
 
 const FLAG_RANK = {
   NORMAL: 0,
@@ -25,17 +26,27 @@ const highestFlag = (results) => results.reduce(
   "NORMAL",
 );
 
-const reviewReadiness = (stations, results) => {
+const reviewReadiness = (stations, results, skippedStationIds = new Set()) => {
   const stationIds = new Set(stations.map((station) => station.stationId));
   const activeResults = results.filter((result) => stationIds.has(result.stationId));
-  const completedStationCount = new Set(activeResults.map((result) => result.stationId)).size;
-  const screeningComplete = stations.length > 0 && completedStationCount === stations.length;
+  const resultStationIds = new Set(activeResults.map((result) => result.stationId));
+  const skippedIds = new Set([...skippedStationIds].filter((stationId) => (
+    stationIds.has(stationId) && !resultStationIds.has(stationId)
+  )));
+  const completedStationCount = resultStationIds.size;
+  const skippedStationCount = skippedIds.size;
+  const routeComplete = stations.length > 0
+    && completedStationCount + skippedStationCount === stations.length;
+  const screeningComplete = routeComplete && skippedStationCount === 0;
   const urgent = activeResults.some((result) => result.overallFlag === "URGENT");
 
   return {
-    ready: screeningComplete || urgent,
-    readyReason: screeningComplete ? "SCREENING_COMPLETE" : urgent ? "URGENT_FLAG" : null,
+    ready: routeComplete || urgent,
+    readyReason: screeningComplete
+      ? "SCREENING_COMPLETE"
+      : routeComplete ? "ROUTE_COMPLETE" : urgent ? "URGENT_FLAG" : null,
     completedStationCount,
+    skippedStationCount,
     totalStationCount: stations.length,
     highestFlag: highestFlag(activeResults),
     flaggedResultCount: activeResults.filter((result) => result.overallFlag !== "NORMAL").length,
@@ -46,13 +57,13 @@ const reviewReadiness = (stations, results) => {
   };
 };
 
-const contextVersion = (stations, results) => {
+const contextVersion = (stations, results, skippedStationIds = new Set()) => {
   const byStation = new Map(results.map((result) => [result.stationId, result]));
   const context = [...stations]
     .sort((a, b) => a.stationId.localeCompare(b.stationId))
     .map(({ stationId }) => {
       const result = byStation.get(stationId);
-      return `${stationId}|${result?.resultId || ""}|${result?.updatedAt ? new Date(result.updatedAt).toISOString() : ""}`;
+      return `${stationId}|${result?.resultId || ""}|${result?.updatedAt ? new Date(result.updatedAt).toISOString() : ""}|${skippedStationIds.has(stationId) ? "SKIPPED" : ""}`;
     })
     .join("\n");
   return crypto.createHash("sha256").update(context).digest("hex");
@@ -103,6 +114,17 @@ const routeStations = (registration) => registration.routeSteps
   .sort((left, right) => left.position - right.position)
   .map(({ station }) => station);
 
+const skippedRouteStationIds = (registration) => {
+  const skippedQueueStationIds = new Set(
+    (registration.queueEntries || [])
+      .filter(({ status }) => status === "SKIPPED")
+      .map(({ stationId }) => stationId),
+  );
+  return new Set(registration.routeSteps
+    .filter(({ stationId, completedAt }) => completedAt && skippedQueueStationIds.has(stationId))
+    .map(({ stationId }) => stationId));
+};
+
 const assertReviewOutcomeAllowed = (readiness, outcome) => {
   const incompleteUrgentRoute = readiness.readyReason === "URGENT_FLAG";
   if (incompleteUrgentRoute && outcome !== "URGENT_ESCALATION") {
@@ -114,10 +136,8 @@ const assertReviewOutcomeAllowed = (readiness, outcome) => {
   return incompleteUrgentRoute;
 };
 
-const stopRouteForUrgentReview = (tx, registrationId, now = new Date()) => tx.queueEntry.updateMany({
-  where: { registrationId, status: { in: ["WAITING", "CALLED", "IN_PROGRESS"] } },
-  data: { status: "CANCELLED", leftQueueAt: now },
-});
+const stopRouteForUrgentReview = (tx, eventId, registrationId, now = new Date()) =>
+  cancelActiveRegistrationQueue(eventId, registrationId, now, tx);
 
 const unfinishedRouteStationIds = (routeSteps) => routeSteps
   .filter(({ completedAt }) => !completedAt)
@@ -156,13 +176,21 @@ const listQueue = async (eventId, user) => {
       queueNumber: true,
       participant: { select: { firstName: true, lastName: true } },
       routeSteps: { select: routeStepSelect, orderBy: { position: "asc" } },
+      queueEntries: {
+        where: { status: "SKIPPED" },
+        select: { stationId: true, status: true },
+      },
       screeningResults: { select: resultSelect },
     },
   });
 
   const queue = registrations.flatMap((registration) => {
     const stations = routeStations(registration);
-    const readiness = reviewReadiness(stations, registration.screeningResults);
+    const readiness = reviewReadiness(
+      stations,
+      registration.screeningResults,
+      skippedRouteStationIds(registration),
+    );
     if (!readiness.ready) return [];
     return [{
       registrationId: registration.registrationId,
@@ -171,6 +199,7 @@ const listQueue = async (eventId, user) => {
       highestFlag: readiness.highestFlag,
       flaggedResultCount: readiness.flaggedResultCount,
       completedStationCount: readiness.completedStationCount,
+      skippedStationCount: readiness.skippedStationCount,
       totalStationCount: readiness.totalStationCount,
       readyReason: readiness.readyReason,
       lastResultAt: readiness.lastResultAt,
@@ -205,6 +234,10 @@ const loadRegistration = async (db, eventId, registrationId) => db.eventRegistra
         },
       },
       routeSteps: { select: routeStepSelect, orderBy: { position: "asc" } },
+      queueEntries: {
+        where: { status: "SKIPPED" },
+        select: { stationId: true, status: true },
+      },
       screeningResults: { select: resultSelect },
       reviews: {
         where: { version: 1 },
@@ -307,7 +340,8 @@ const serializeReferral = (referral) => referral ? {
 
 const buildDetail = (event, stations, registration) => {
   const resultByStation = new Map(registration.screeningResults.map((result) => [result.stationId, result]));
-  const readiness = reviewReadiness(stations, registration.screeningResults);
+  const skippedStationIds = skippedRouteStationIds(registration);
+  const readiness = reviewReadiness(stations, registration.screeningResults, skippedStationIds);
   return {
     event,
     participant: {
@@ -328,17 +362,21 @@ const buildDetail = (event, stations, registration) => {
         station.stationType,
         station.fieldSchemaSnapshot,
       ),
+      status: resultByStation.has(station.stationId)
+        ? "COMPLETED"
+        : skippedStationIds.has(station.stationId) ? "SKIPPED" : "PENDING",
       result: resultByStation.get(station.stationId) || null,
     })),
     readiness: {
       ready: readiness.ready,
       readyReason: readiness.readyReason,
       completedStationCount: readiness.completedStationCount,
+      skippedStationCount: readiness.skippedStationCount,
       totalStationCount: readiness.totalStationCount,
       highestFlag: readiness.highestFlag,
     },
     existingReview: serializeReview(registration.reviews[0]),
-    contextVersion: contextVersion(stations, registration.screeningResults),
+    contextVersion: contextVersion(stations, registration.screeningResults, skippedStationIds),
   };
 };
 
@@ -408,11 +446,12 @@ const recordDecision = async (eventId, registrationId, decision, user, ipAddress
       }
 
       const stations = routeStations(registration);
-      const readiness = reviewReadiness(stations, registration.screeningResults);
+      const skippedStationIds = skippedRouteStationIds(registration);
+      const readiness = reviewReadiness(stations, registration.screeningResults, skippedStationIds);
       if (!readiness.ready || ["COMPLETED", "CANCELLED"].includes(registration.registrationStatus)) {
         throw new AppError(409, "REVIEW_NOT_READY", "This registration is not ready for clinical review");
       }
-      if (contextVersion(stations, registration.screeningResults) !== decision.contextVersion) {
+      if (contextVersion(stations, registration.screeningResults, skippedStationIds) !== decision.contextVersion) {
         throw new AppError(409, "SCREENING_RESULTS_CHANGED", "Screening results changed; reassess before deciding");
       }
       const incompleteUrgentRoute = assertReviewOutcomeAllowed(readiness, decision.outcome);
@@ -469,7 +508,7 @@ const recordDecision = async (eventId, registrationId, decision, user, ipAddress
       }
 
       const cancelledQueue = incompleteUrgentRoute
-        ? await stopRouteForUrgentReview(tx, registrationId)
+        ? await stopRouteForUrgentReview(tx, eventId, registrationId)
         : { count: 0 };
 
       const auditBase = {
@@ -488,6 +527,7 @@ const recordDecision = async (eventId, registrationId, decision, user, ipAddress
         stoppedUnfinishedStationIds: incompleteUrgentRoute
           ? unfinishedRouteStationIds(registration.routeSteps)
           : [],
+        skippedStationIds: [...skippedStationIds],
       };
       await createAuditLog({
         userId,
@@ -555,4 +595,5 @@ module.exports = {
   routeStations,
   stopRouteForUrgentReview,
   unfinishedRouteStationIds,
+  skippedRouteStationIds,
 };
