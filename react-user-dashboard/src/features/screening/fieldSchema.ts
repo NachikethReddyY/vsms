@@ -156,6 +156,10 @@ export function defaultValueForField(field: FieldDefinition): unknown {
   return '';
 }
 
+export function defaultValuesForSchema(schema: FieldSchema): DynamicFieldValues {
+  return Object.fromEntries(schema.map((field) => [field.key, defaultValueForField(field)]));
+}
+
 function triStateToNullableBoolean(value: unknown) {
   if (value === 'yes' || value === true) return true;
   if (value === 'no' || value === false) return false;
@@ -209,19 +213,21 @@ export const SYSTEM_FIELD_SCHEMAS: Partial<Record<string, FieldSchema>> = {
   ],
 };
 
-const CLINICAL_RESULT_KEYS: Record<string, string[]> = {
-  VISUAL_ACUITY: ['chartDistanceMetres', 'od', 'os', 'withUsualDistanceGlasses'],
-  REFRACTION: ['measurementStatus', 'wearsDistanceGlasses', 'od', 'os', 'notes'],
-  COLOUR_VISION: ['testKit', 'platesPresented', 'odCorrect', 'osCorrect'],
-  EYE_HEALTH: ['cataractRisk', 'glaucomaRisk', 'symptomsNoted', 'symptomSummary', 'observations', 'deviceFindings'],
-};
-
-/** Fields a reviewer should still see after clinical display of known medical keys. */
-export function extraResultData(stationType: string | null | undefined, data: Record<string, unknown> | null | undefined): Record<string, unknown> {
-  if (!data) return {};
-  const known = new Set(stationType ? CLINICAL_RESULT_KEYS[stationType] || [] : []);
-  if (!known.size) return data;
-  return Object.fromEntries(Object.entries(data).filter(([key]) => !known.has(key)));
+/** Keep configured labels and order when displaying a frozen station result. */
+export function orderedResultFields(schema: FieldSchema | null | undefined, data: Record<string, unknown>) {
+  const configured = new Map((schema ?? []).map((field) => [field.key, field]));
+  const orderedKeys = [
+    ...(schema ?? []).map((field) => field.key).filter((key) => key in data),
+    ...Object.keys(data).filter((key) => !configured.has(key)),
+  ];
+  return orderedKeys.map((key) => ({
+    key,
+    label: configured.get(key)?.label ?? key
+      .replace(/([a-z])([A-Z])/g, '$1 $2')
+      .replace(/_/g, ' ')
+      .replace(/^\w/, (letter: string) => letter.toUpperCase()),
+    value: data[key],
+  }));
 }
 
 /** Open pre-upgrade stations that have no snapshot yet. */

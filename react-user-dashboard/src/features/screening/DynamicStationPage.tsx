@@ -3,7 +3,7 @@ import { useParams, useSearchParams } from 'react-router-dom';
 import { getApiError as getApiMessage } from '../../utils/apiClient';
 import { getStoredSession } from '../../utils/session';
 import type { DynamicFieldValues } from './fieldSchema';
-import { defaultValueForField, resolveCompatibleFieldSchema, validateFieldValues, withCompatibleFieldSchema } from './fieldSchema';
+import { defaultValuesForSchema, resolveCompatibleFieldSchema, validateFieldValues, withCompatibleFieldSchema } from './fieldSchema';
 import { getOfflineStationContext, isNetworkError } from './offlineSync';
 import { screeningApi, newIdempotencyKey, type FlagEvaluation, type QueueRegistration, type Station, type StationType } from './screeningApi';
 import { StationFieldRenderer } from './StationFieldRenderer';
@@ -105,11 +105,7 @@ export default function DynamicStationPage({ stationType }: { stationType?: Stat
 
   useEffect(() => { void load(); }, [eventId, routeStationId, stationType]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
-    const defaults: DynamicFieldValues = {};
-    for (const field of fieldSchema) {
-      defaults[field.key] = defaultValueForField(field);
-    }
-    setValues(defaults);
+    setValues(defaultValuesForSchema(fieldSchema));
     setFieldErrors({});
     setEvaluation(null);
     setAcknowledged(false);

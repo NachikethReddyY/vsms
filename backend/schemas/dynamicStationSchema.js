@@ -93,26 +93,21 @@ const assertClinicalFieldSchema = (stationType, schema) => {
     }
     if (required.options) {
       const options = field.options || [];
-      const locked = required.options;
-      const same = locked.length === options.length && locked.every((option) => options.includes(option));
-      if (!same) {
-        const error = new Error(`Clinical field "${required.key}" options must remain ${locked.join(", ")}`);
+      if (options.length !== required.options.length
+        || required.options.some((option) => !options.includes(option))) {
+        const error = new Error(`Clinical field "${required.key}" options cannot be changed`);
         error.code = "INVALID_FIELD_SCHEMA";
         error.status = 422;
         throw error;
       }
     }
-    if (required.min !== undefined && field.min !== required.min) {
-      const error = new Error(`Clinical field "${required.key}" minimum must remain ${required.min}`);
-      error.code = "INVALID_FIELD_SCHEMA";
-      error.status = 422;
-      throw error;
-    }
-    if (required.max !== undefined && field.max !== required.max) {
-      const error = new Error(`Clinical field "${required.key}" maximum must remain ${required.max}`);
-      error.code = "INVALID_FIELD_SCHEMA";
-      error.status = 422;
-      throw error;
+    for (const boundary of ["min", "max"]) {
+      if (required[boundary] !== undefined && field[boundary] !== required[boundary]) {
+        const error = new Error(`Clinical field "${required.key}" ${boundary} cannot be changed`);
+        error.code = "INVALID_FIELD_SCHEMA";
+        error.status = 422;
+        throw error;
+      }
     }
   }
   return fields;
@@ -350,26 +345,25 @@ const upgradeClinicalSchema = (stationType, fields) => {
   if (!system) return fields;
   const aliases = LEGACY_CLINICAL_KEY_ALIASES[stationType] || {};
   const drop = LEGACY_CLINICAL_KEYS_TO_DROP[stationType] || new Set();
-  const extras = [];
-  const seenExtra = new Set();
+  const upgraded = [];
+  const seen = new Set();
   for (const field of fields) {
     const mappedKey = aliases[field.key] || field.key;
-    if (system.some((item) => item.key === mappedKey) || drop.has(field.key)) continue;
-    if (seenExtra.has(field.key)) continue;
-    seenExtra.add(field.key);
-    extras.push(field);
-  }
-  return [
-    ...system.map((required) => {
-      const existing = fields.find((field) => (aliases[field.key] || field.key) === required.key);
-      if (!existing) return required;
-      return {
+    const required = system.find((item) => item.key === mappedKey);
+    if (required) {
+      if (seen.has(required.key)) continue;
+      upgraded.push({
         ...required,
-        label: existing.label || required.label,
-      };
-    }),
-    ...extras,
-  ];
+        label: field.label || required.label,
+      });
+      seen.add(required.key);
+      continue;
+    }
+    if (drop.has(field.key) || seen.has(field.key)) continue;
+    upgraded.push(field);
+    seen.add(field.key);
+  }
+  return [...upgraded, ...system.filter((required) => !seen.has(required.key))];
 };
 
 const keepParseableFields = (fields) => {

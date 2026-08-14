@@ -71,7 +71,7 @@ const createRegistration = async (label, queueNumber, resultFlags) => {
         recordedByUserId: testUsers.screener.id,
         screeningType: stationType,
         resultData: stationType === "VISUAL_ACUITY"
-          ? { chartDistanceMetres: 6, od: { kind: "FRACTION", denominator: 6 }, os: { kind: "FRACTION", denominator: 6 }, withUsualDistanceGlasses: false }
+          ? { chartDistanceMetres: 6, od: { kind: "FRACTION", denominator: 6 }, os: { kind: "FRACTION", denominator: 6 }, withUsualDistanceGlasses: false, screenerComment: "Participant needed extra time." }
           : { finding: `${stationType} test result` },
         overallFlag,
         isFlagged: overallFlag !== "NORMAL",
@@ -157,7 +157,16 @@ before(async () => {
   const inactiveShift = await prisma.shift.create({ data: { eventId, name: "Inactive review", startsAt, endsAt, status: "PLANNED" } });
   const stations = [];
   for (const [index, stationType] of ["VISUAL_ACUITY", "REFRACTION", "COLOUR_VISION", "EYE_HEALTH"].entries()) {
-    stations.push(await prisma.station.create({ data: { eventId, stationName: stationType, stationType, stationOrder: index + 1, isActive: true } }));
+    const fieldSchemaSnapshot = stationType === "VISUAL_ACUITY" ? [
+      { key: "screenerComment", label: "Accommodation needed?", type: "text", required: false },
+      { key: "chartDistanceMetres", label: "Testing distance", type: "select", required: true, options: ["3", "6"] },
+      { key: "od", label: "Dominant eye reading", type: "va-eye", required: true },
+      { key: "os", label: "Other eye reading", type: "va-eye", required: true },
+      { key: "withUsualDistanceGlasses", label: "Glasses worn", type: "select", required: true, options: ["yes", "no", "unknown"] },
+    ] : null;
+    stations.push(await prisma.station.create({
+      data: { eventId, stationName: stationType, stationType, stationOrder: index + 1, isActive: true, fieldSchemaSnapshot },
+    }));
   }
   stationByType = new Map(stations.map((station) => [station.stationType, station]));
 
@@ -205,6 +214,15 @@ describe("clinical review API", () => {
     expect(detail.body.participant.maskedNric).toMatch(/^••••/);
     expect(JSON.stringify(detail.body)).not.toContain("TEST-");
     expect(JSON.stringify(detail.body)).not.toContain(testUsers.reviewer.email);
+    const visualAcuity = detail.body.stations.find((station) => station.stationType === "VISUAL_ACUITY");
+    expect(visualAcuity.fieldSchemaSnapshot.map(({ key, label }) => ({ key, label }))).toEqual([
+      { key: "screenerComment", label: "Accommodation needed?" },
+      { key: "chartDistanceMetres", label: "Testing distance" },
+      { key: "od", label: "Dominant eye reading" },
+      { key: "os", label: "Other eye reading" },
+      { key: "withUsualDistanceGlasses", label: "Glasses worn" },
+    ]);
+    expect(visualAcuity.result.resultData.screenerComment).toBe("Participant needed extra time.");
   });
 
   test("admin, manager, screener, inactive assignment, and inactive shift receive no bypass", async () => {

@@ -2,6 +2,7 @@ const assert = require("node:assert/strict");
 const test = require("node:test");
 const {
   SYSTEM_FIELD_SCHEMAS,
+  assertClinicalFieldSchema,
   resolveCompatibleFieldSchema,
   mergeClinicalAndTemplateResult,
   validateResultAgainstSchema,
@@ -34,6 +35,38 @@ test("older clinical templates keep extra fields while upgrading medical keys", 
   assert.equal(schema.some((field) => field.key === "distanceMetres"), false);
 });
 
+test("current clinical templates keep the administrator field order", () => {
+  const schema = resolveCompatibleFieldSchema("VISUAL_ACUITY", [
+    { key: "notes", label: "Accommodation needed?", type: "text", required: false },
+    ...SYSTEM_FIELD_SCHEMAS.VISUAL_ACUITY,
+  ]);
+  assert.deepEqual(schema.map((field) => field.key), [
+    "notes",
+    "chartDistanceMetres",
+    "od",
+    "os",
+    "withUsualDistanceGlasses",
+  ]);
+});
+
+test("clinical templates cannot loosen evaluator options or numeric limits", () => {
+  const extraOption = SYSTEM_FIELD_SCHEMAS.VISUAL_ACUITY.map((field) => (
+    field.key === "chartDistanceMetres" ? { ...field, options: [...field.options, "4"] } : field
+  ));
+  assert.throws(
+    () => assertClinicalFieldSchema("VISUAL_ACUITY", extraOption),
+    (error) => error.code === "INVALID_FIELD_SCHEMA" && /options cannot be changed/.test(error.message),
+  );
+
+  const widerRange = SYSTEM_FIELD_SCHEMAS.COLOUR_VISION.map((field) => (
+    field.key === "platesPresented" ? { ...field, min: 1 } : field
+  ));
+  assert.throws(
+    () => assertClinicalFieldSchema("COLOUR_VISION", widerRange),
+    (error) => error.code === "INVALID_FIELD_SCHEMA" && /min cannot be changed/.test(error.message),
+  );
+});
+
 test("clinical validation keeps extra customized fields that Zod would strip", () => {
   const schema = [
     ...SYSTEM_FIELD_SCHEMAS.VISUAL_ACUITY,
@@ -54,22 +87,4 @@ test("clinical validation keeps extra customized fields that Zod would strip", (
   assert.equal(persisted.screenerComment, "Needs extra time");
   assert.equal(persisted.chartDistanceMetres, 6);
   assert.equal(persisted.withUsualDistanceGlasses, false);
-});
-
-test("locked clinical options and numeric limits cannot be widened", () => {
-  const extraOption = SYSTEM_FIELD_SCHEMAS.VISUAL_ACUITY.map((field) => (
-    field.key === "chartDistanceMetres" ? { ...field, options: ["3", "6", "9"] } : field
-  ));
-  assert.throws(
-    () => assertClinicalFieldSchema("VISUAL_ACUITY", extraOption),
-    (error) => error.code === "INVALID_FIELD_SCHEMA" && /options must remain/.test(error.message),
-  );
-
-  const widened = SYSTEM_FIELD_SCHEMAS.COLOUR_VISION.map((field) => (
-    field.key === "platesPresented" ? { ...field, min: 1, max: 48 } : field
-  ));
-  assert.throws(
-    () => assertClinicalFieldSchema("COLOUR_VISION", widened),
-    (error) => error.code === "INVALID_FIELD_SCHEMA" && /must remain/.test(error.message),
-  );
 });
