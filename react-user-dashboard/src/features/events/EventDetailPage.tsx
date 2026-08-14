@@ -24,6 +24,7 @@ import { useAuth } from '../../auth/AuthProvider';
 import { AppDialog } from '../../components/AppDialog';
 import { appDialog } from '../../components/appDialogStyles';
 import { AppToast } from '../../components/AppToast';
+import { RouteOverrideDialog } from '../../components/queue/RouteOverrideDialog';
 import { getApiError as getApiMessage } from '../../utils/apiClient';
 import { eventApi, formatEventDate, STATUS_LABEL, type AuditRecord, type EventAttendee, type EventMembership, type EventMetrics, type EventRecord, type EventStatus, type StaffAssignmentRole, type StationTemplate } from './eventApi';
 import { getEventScheduleDays } from './eventDisplayStatus';
@@ -113,6 +114,7 @@ export default function EventDetailPage() {
   const [attendeeError, setAttendeeError] = useState('');
   const [attendeeSearch, setAttendeeSearch] = useState('');
   const [attendeeStatus, setAttendeeStatus] = useState<EventAttendee['registrationStatus'] | ''>('');
+  const [attendeeRouteRegistrationId, setAttendeeRouteRegistrationId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [pending, setPending] = useState(false);
   const [bannerPending, setBannerPending] = useState(false);
@@ -750,9 +752,17 @@ export default function EventDetailPage() {
         <button className="primary compact" type="submit" disabled={attendeeLoading}>{attendeeLoading ? 'Loading…' : 'Apply filters'}</button>
       </form>
       {attendeeError && <div className="inline-retry" role="alert"><p>{attendeeError}</p><button className="secondary compact" type="button" onClick={() => void loadAttendees()}>Retry</button></div>}
-      {!attendeeError && !attendeeLoading && attendees.length === 0 ? <p className="quiet-empty">No attendees match these filters.</p> : <div className="station-table">{attendees.map((attendee) => <article className="station-record" key={attendee.registrationId}><div className="station-record-copy"><strong>{attendee.participantDisplayName || attendee.participantReference}</strong><span>{attendee.participantReference} · {attendee.registrationStatus.toLowerCase().replace('_', ' ')}</span><small>{attendee.checkedInAt ? `Checked in ${formatEventDate(attendee.checkedInAt, event.timezone)}` : `Registered ${formatEventDate(attendee.createdAt, event.timezone)}`}</small></div><strong className="station-capacity-readonly">{attendee.queueNumber ? `#${attendee.queueNumber}` : '—'}</strong></article>)}</div>}
+      {!attendeeError && !attendeeLoading && attendees.length === 0 ? <p className="quiet-empty">No attendees match these filters.</p> : <div className="station-table">{attendees.map((attendee) => <article className="station-record" key={attendee.registrationId}><div className="station-record-copy"><strong>{attendee.participantDisplayName || attendee.participantReference}</strong><span>{attendee.participantReference} · {attendee.registrationStatus.toLowerCase().replace('_', ' ')}</span><small>{attendee.checkedInAt ? `Checked in ${formatEventDate(attendee.checkedInAt, event.timezone)}` : `Registered ${formatEventDate(attendee.createdAt, event.timezone)}`}</small>{attendee.routeSteps.length > 0 && <small>Route: {attendee.routeSteps.map((step) => `${step.stationName} (${step.state.toLowerCase()})`).join(' → ')}</small>}</div><span className="station-record-actions"><strong className="station-capacity-readonly">{attendee.queueNumber ? `#${attendee.queueNumber}` : '—'}</strong>{attendee.routeSteps.some((step) => ['CURRENT', 'BLOCKED', 'UPCOMING'].includes(step.state)) && <button className="secondary compact" type="button" onClick={() => setAttendeeRouteRegistrationId(attendee.registrationId)}>Change route</button>}</span></article>)}</div>}
       {attendeeNextCursor && <button className="secondary compact" type="button" disabled={attendeeLoading} onClick={() => void loadAttendees(attendeeNextCursor, true)}>{attendeeLoading ? 'Loading…' : 'Load more'}</button>}
     </section>}
+    <RouteOverrideDialog
+      open={attendeeRouteRegistrationId !== null}
+      eventId={event.eventId}
+      registrationId={attendeeRouteRegistrationId}
+      fullAccess
+      onOpenChange={(open) => { if (!open) setAttendeeRouteRegistrationId(null); }}
+      onCommitted={async () => { await loadAttendees(); }}
+    />
 
     {view === 'activity' && <section className="event-view history event-activity" aria-labelledby="activity-title">
       <h2 id="activity-title">Activity</h2>

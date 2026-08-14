@@ -2430,15 +2430,44 @@ const attendeeSelect = {
   checkedIn: true,
   checkedInAt: true,
   queueNumber: true,
+  routeVersion: true,
   createdAt: true,
   participant: { select: { participantReference: true } },
+  routeSteps: {
+    orderBy: { position: "asc" },
+    select: {
+      stationId: true,
+      position: true,
+      completedAt: true,
+      station: { select: { stationName: true } },
+    },
+  },
+  queueEntries: {
+    where: { status: { in: ["WAITING", "CALLED", "IN_PROGRESS", "SKIPPED"] } },
+    orderBy: { enteredAt: "desc" },
+    select: { stationId: true, status: true },
+  },
 };
-const attendeeProjection = ({ participant, ...registration }) => ({
-  ...registration,
-  participantReference: participant.participantReference,
-  checkedInAt: dateTime(registration.checkedInAt),
-  createdAt: dateTime(registration.createdAt),
-});
+const attendeeProjection = ({ participant, routeSteps = [], queueEntries = [], ...registration }) => {
+  const activeStationId = queueEntries.find(({ status }) => ["WAITING", "CALLED", "IN_PROGRESS"].includes(status))?.stationId;
+  const skippedStationIds = new Set(queueEntries.filter(({ status }) => status === "SKIPPED").map(({ stationId }) => stationId));
+  const firstUnfinishedId = routeSteps.find(({ completedAt }) => !completedAt)?.stationId;
+  return {
+    ...registration,
+    participantReference: participant.participantReference,
+    checkedInAt: dateTime(registration.checkedInAt),
+    createdAt: dateTime(registration.createdAt),
+    routeSteps: routeSteps.map((step) => ({
+      stationId: step.stationId,
+      stationName: step.station.stationName,
+      position: step.position,
+      state: step.completedAt
+        ? skippedStationIds.has(step.stationId) ? "SKIPPED" : "COMPLETED"
+        : step.stationId === activeStationId ? "CURRENT"
+          : !activeStationId && step.stationId === firstUnfinishedId ? "BLOCKED" : "UPCOMING",
+    })),
+  };
+};
 
 const publicEventProjection = (event) => ({
   eventId: event.eventId,

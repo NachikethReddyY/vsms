@@ -20,6 +20,7 @@ import {
 } from './qrHandoff';
 import type { QrVerifyResult } from './qrHandoff';
 import { customStationPath, stationPath } from './stationConfig';
+import { RouteOverrideDialog } from '../../components/queue/RouteOverrideDialog';
 import './QRScannerPage.css';
 
 type ScanStatus = 'scanning' | 'verifying' | 'verified';
@@ -41,6 +42,7 @@ export default function QRScannerPage() {
   const [activeAssignment, setActiveAssignment] = useState<ActiveAssignment | null>(null);
   const [lookupEventId, setLookupEventId] = useState(eventId);
   const [lookupRegistrationId, setLookupRegistrationId] = useState('');
+  const [routeDialogOpen, setRouteDialogOpen] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const verificationRef = useRef(false);
 
@@ -58,6 +60,7 @@ export default function QRScannerPage() {
     setVerified(null);
     setLookupOnly(false);
     setActiveAssignment(null);
+    setRouteDialogOpen(false);
     try {
       const result = await verifyQrToken(token);
       await loadAssignment(result.event.id, result.registrationId);
@@ -199,6 +202,7 @@ export default function QRScannerPage() {
               <div className="qr-station-picker">
                 <h3>Current route destination</h3>
                 {activeAssignment ? <button type="button" className="primary" onClick={goToStation}><span>{activeAssignment.stationName}</span><ArrowRightIcon aria-hidden="true" /></button> : <p role="status">No active station is assigned. Open the event queue to resolve the route; do not send the participant to an arbitrary station.</p>}
+                <button type="button" className="secondary" onClick={() => setRouteDialogOpen(true)}>Change route or queue</button>
               </div>
 
               <p className="qr-verified-note">
@@ -265,6 +269,14 @@ export default function QRScannerPage() {
           </section>
         </aside>
       </div>
+      {verified && <RouteOverrideDialog
+        open={routeDialogOpen}
+        eventId={verified.event.id}
+        registrationId={verified.registrationId}
+        fullAccess={false}
+        onOpenChange={setRouteDialogOpen}
+        onCommitted={async () => { await loadAssignment(verified.event.id, verified.registrationId); }}
+      />}
     </div>
   );
 }

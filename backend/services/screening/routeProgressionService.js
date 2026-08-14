@@ -93,6 +93,9 @@ const reconcileAfterRouteOverride = async ({
   registrationId,
   eventId,
   nextStep,
+  skipActive = false,
+  actorUserId = null,
+  reasonCode = null,
   now = new Date(),
 }) => {
   const activeQueue = await tx.queueEntry.findFirst({
@@ -100,10 +103,13 @@ const reconcileAfterRouteOverride = async ({
     orderBy: { enteredAt: "desc" },
   });
   if (activeQueue) {
-    if (activeQueue.stationId !== nextStep?.stationId) {
+    if (activeQueue.stationId === nextStep?.stationId) return activeQueue;
+    if (!skipActive) {
       throw new AppError(409, "ROUTE_QUEUE_CONFLICT", "The active queue does not match the current route step.");
     }
-    return activeQueue;
+    if (activeQueue.status === "IN_PROGRESS") {
+      throw new AppError(409, "QUEUE_ALREADY_IN_PROGRESS", "A screening already in progress cannot be skipped.");
+    }
   }
   if (!nextStep) return null;
 
@@ -114,9 +120,43 @@ const reconcileAfterRouteOverride = async ({
     },
     select: { isAvailable: true, startsAt: true, endsAt: true },
   });
-  if (!stationAvailable(nextStep.station, availability, now)) return null;
+  if (!stationAvailable(nextStep.station, availability, now)) {
+    if (skipActive) {
+      throw new AppError(409, "ROUTE_STATION_UNAVAILABLE", "The selected station is not currently available.");
+    }
+    return null;
+  }
 
-  return createInitialQueueEntry({ tx, registrationId, stationId: nextStep.stationId });
+  if (activeQueue) {
+    const closed = await tx.queueEntry.updateMany({
+      where: { id: activeQueue.id, registrationId, status: { in: ["WAITING", "CALLED"] } },
+      data: { status: "SKIPPED", leftQueueAt: now },
+    });
+    if (closed.count !== 1) {
+      throw new AppError(409, "ROUTE_QUEUE_CONFLICT", "The participant's queue changed while the route was being updated.");
+    }
+    const skipped = await tx.registrationRouteStep.updateMany({
+      where: { registrationId, stationId: activeQueue.stationId, completedAt: null },
+      data: { completedAt: now },
+    });
+    if (skipped.count !== 1) {
+      throw new AppError(409, "ROUTE_QUEUE_CONFLICT", "The participant's route changed while the station was being skipped.");
+    }
+  }
+
+  const queueEntry = await createInitialQueueEntry({ tx, registrationId, stationId: nextStep.stationId });
+  if (activeQueue) {
+    await tx.queueMovement.create({
+      data: {
+        registrationId,
+        fromStationId: activeQueue.stationId,
+        toStationId: nextStep.stationId,
+        movedBy: actorUserId,
+        movementReason: reasonCode,
+      },
+    });
+  }
+  return queueEntry;
 };
 
 /** Complete the current route step and queue, then create at most one next queue entry. */

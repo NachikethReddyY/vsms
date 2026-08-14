@@ -37,4 +37,6 @@ test("route editor preserves server locks and submits a versioned allowlisted ov
   assert.match(routeDialogSource, /Locked/);
   assert.match(routeDialogSource, /route\.routeVersion/);
   assert.match(routeDialogSource, /STATION_UNAVAILABLE/);
+  assert.match(routeDialogSource, /Skip current → go here/);
+  assert.match(apiSource, /skipActive\?: boolean/);
 });

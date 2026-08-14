@@ -207,6 +207,15 @@ test("assigned event managers can page through no-store attendee rows", async ()
     checkedIn: false,
     checkedInAt: null,
     queueNumber: index + 1,
+    routeVersion: 2,
+    routeSteps: [
+      { stationId: assignmentId, position: 1, completedAt: startsAt, station: { stationName: "Station 4" } },
+      { stationId: assignedBy, position: 2, completedAt: null, station: { stationName: "Station 5" } },
+    ],
+    queueEntries: [
+      { stationId: assignedBy, status: "WAITING" },
+      { stationId: assignmentId, status: "SKIPPED" },
+    ],
     createdAt: startsAt,
     participant: { participantReference: `P-${index}` },
   }));
@@ -229,6 +238,7 @@ test("assigned event managers can page through no-store attendee rows", async ()
 
   const result = await eventService.listEventAttendees(eventId, {}, approved(managerId, "EVENT_MANAGER"), db);
   assert.equal(result.attendees.length, 50);
+  assert.deepEqual(result.attendees[0].routeSteps.map(({ state }) => state), ["SKIPPED", "CURRENT"]);
   assert.equal(attendeeQuery.take, 51);
   assert.equal(typeof result.nextCursor, "string");
 

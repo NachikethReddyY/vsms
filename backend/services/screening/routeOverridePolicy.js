@@ -23,7 +23,7 @@ const assertExactPermutation = (before, after) => {
 };
 
 /** Pure validation for full-tail and next-only route replacements. */
-const validateRouteOverride = ({ steps, stationIds, activeStationId, scope }) => {
+const validateRouteOverride = ({ steps, stationIds, activeStationId, scope, skipActive = false }) => {
   const ordered = steps.slice().sort((left, right) => left.position - right.position);
   const before = ordered.map(({ stationId }) => stationId);
   const unfinished = ordered.filter(({ completedAt }) => !completedAt);
@@ -31,13 +31,16 @@ const validateRouteOverride = ({ steps, stationIds, activeStationId, scope }) =>
   assertExactPermutation(beforeUnfinished, stationIds);
 
   const activeIndex = beforeUnfinished.indexOf(activeStationId);
-  if (activeIndex >= 0 && stationIds[activeIndex] !== activeStationId) {
+  if (skipActive && (activeIndex < 0 || stationIds[0] === activeStationId)) {
+    throw new AppError(422, "INVALID_ROUTE_SKIP", "Choose a different unfinished station before skipping the current station.");
+  }
+  if (!skipActive && activeIndex >= 0 && stationIds[activeIndex] !== activeStationId) {
     throw new AppError(422, "LOCKED_ROUTE_STEP", "The currently active route step cannot be reordered.");
   }
 
   const mutableIndexes = beforeUnfinished
     .map((stationId, index) => ({ stationId, index }))
-    .filter(({ stationId }) => stationId !== activeStationId)
+    .filter(({ stationId }) => skipActive || stationId !== activeStationId)
     .map(({ index }) => index);
   if (!mutableIndexes.length) {
     throw new AppError(409, "ROUTE_ALREADY_COMPLETE", "There are no unfinished route steps available to replace.");
@@ -53,11 +56,17 @@ const validateRouteOverride = ({ steps, stationIds, activeStationId, scope }) =>
     }
   }
 
+  const proposedUnfinished = skipActive ? (() => {
+    const reordered = stationIds.filter((id) => id !== activeStationId);
+    return beforeUnfinished.map((stationId, index) => (
+      index === activeIndex ? activeStationId : reordered.shift()
+    ));
+  })() : stationIds;
   let unfinishedIndex = 0;
   const after = ordered.map((step) => (
-    step.completedAt ? step.stationId : stationIds[unfinishedIndex++]
+    step.completedAt ? step.stationId : proposedUnfinished[unfinishedIndex++]
   ));
-  if (sameOrder(before, after)) {
+  if (!skipActive && sameOrder(before, after)) {
     throw new AppError(409, "ROUTE_UNCHANGED", "The proposed route has the same station order.");
   }
 

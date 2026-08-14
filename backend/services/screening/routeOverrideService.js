@@ -74,6 +74,7 @@ const replaceRoute = async ({
   stationIds,
   reasonCode,
   expectedVersion,
+  skipActive = false,
   user,
   context = null,
   db = prisma,
@@ -112,6 +113,7 @@ const replaceRoute = async ({
         stationIds,
         activeStationId: activeQueue?.stationId || null,
         scope,
+        skipActive,
       });
       const version = await tx.eventRegistration.updateMany({
         where: { registrationId, eventId, routeVersion: expectedVersion },
@@ -135,6 +137,7 @@ const replaceRoute = async ({
       const orderedSteps = validated.after.map((stationId, index) => ({
         ...stepByStation.get(stationId),
         position: index + 1,
+        ...(skipActive && stationId === activeQueue?.stationId ? { completedAt: now } : {}),
       }));
       const firstUnfinished = orderedSteps.find(({ completedAt }) => !completedAt) || null;
       const queueEntry = await reconcileAfterRouteOverride({
@@ -142,6 +145,9 @@ const replaceRoute = async ({
         registrationId,
         eventId,
         nextStep: firstUnfinished,
+        skipActive,
+        actorUserId: actorId(user),
+        reasonCode,
         now,
       });
 
@@ -152,7 +158,7 @@ const replaceRoute = async ({
         entityName: "EventRegistration",
         entityId: registrationId,
         oldValue: { eventId, stationIds: validated.before, routeVersion: expectedVersion },
-        newValue: { eventId, stationIds: validated.after, routeVersion, reasonCode, scope },
+        newValue: { eventId, stationIds: validated.after, routeVersion, reasonCode, scope, skipActive },
         context,
         client: tx,
       });

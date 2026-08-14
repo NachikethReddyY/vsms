@@ -3590,7 +3590,7 @@ components:
     EventAttendee:
       type: object
       additionalProperties: false
-      required: [registrationId, registrationStatus, checkedIn, queueNumber, participantReference, createdAt]
+      required: [registrationId, registrationStatus, checkedIn, queueNumber, participantReference, routeVersion, routeSteps, createdAt]
       properties:
         registrationId: { type: string, format: uuid }
         participantDisplayName: { type: string, nullable: true }
@@ -3599,6 +3599,18 @@ components:
         checkedIn: { type: boolean }
         checkedInAt: { type: string, format: date-time, nullable: true }
         queueNumber: { type: integer, nullable: true }
+        routeVersion: { type: integer, minimum: 1 }
+        routeSteps:
+          type: array
+          items:
+            type: object
+            additionalProperties: false
+            required: [stationId, stationName, position, state]
+            properties:
+              stationId: { type: string, format: uuid }
+              stationName: { type: string }
+              position: { type: integer, minimum: 1 }
+              state: { type: string, enum: [COMPLETED, SKIPPED, CURRENT, BLOCKED, UPCOMING] }
         createdAt: { type: string, format: date-time }
     EventAttendeeList:
       type: object
@@ -4872,10 +4884,13 @@ components:
           minItems: 1
           maxItems: 100
           uniqueItems: true
-          description: Complete proposed order of every unfinished required station. The active station, when present, must remain in place; completed stations are retained by the server.
+          description: Complete proposed order of every unfinished required station. Completed stations are retained by the server.
           items: { type: string, format: uuid }
         reasonCode: { $ref: "#/components/schemas/RouteOverrideReasonCode" }
         expectedVersion: { type: integer, minimum: 1 }
+        skipActive:
+          type: boolean
+          description: Skip a waiting or called active station and join the first proposed unfinished station. In-progress screening cannot be skipped.
     RouteOverrideResponse:
       type: object
       additionalProperties: false
