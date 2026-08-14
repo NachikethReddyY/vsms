@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { getEventArtwork } from '../features/events/eventBanners';
 import { eventApi, type EventRecord, type EventStatus } from '../features/events/eventApi';
+import { getEventScheduleDays } from '../features/events/eventDisplayStatus';
 import { useAuth } from '../auth/AuthProvider';
 import { getApiError as getApiMessage } from '../utils/apiClient';
 import { Button } from './ui/button';
@@ -38,11 +39,11 @@ const dateKey = (value: Date, timeZone: string) => new Intl.DateTimeFormat('en-C
   year: 'numeric', month: '2-digit', day: '2-digit', timeZone,
 }).format(value);
 
-function toEventItem(event: EventRecord, now: Date): EventItem {
-  const startsAt = new Date(event.startsAt);
-  const endsAt = new Date(event.endsAt);
+function toEventItem(event: EventRecord, scheduleDay: { startsAt: string; endsAt: string }, now: Date): EventItem {
+  const startsAt = new Date(scheduleDay.startsAt);
+  const endsAt = new Date(scheduleDay.endsAt);
   const tomorrow = new Date(now.getTime() + 86400000);
-  const statusKey = event.status === 'IN_PROGRESS' && endsAt <= now ? 'COMPLETED' : event.status;
+  const statusKey = event.status === 'IN_PROGRESS' && new Date(event.endsAt) <= now ? 'COMPLETED' : event.status;
   const eventDate = dateKey(startsAt, event.timezone);
   const shortDate = new Intl.DateTimeFormat('en-SG', { day: 'numeric', month: 'short', timeZone: event.timezone }).format(startsAt);
   const names = [...new Set(event.eventTeam?.length ? event.eventTeam : event.shifts.flatMap((shift) => shift.staffAssignments.map((assignment) => assignment.user.username)))];
@@ -97,7 +98,7 @@ export default function EventsPage() {
     return () => window.clearInterval(clock);
   }, []);
   const visibleEvents = useMemo(
-    () => events.map((event) => toEventItem(event, now))
+    () => events.flatMap((event) => getEventScheduleDays(event.eventDays, event.startsAt, event.endsAt).map((day) => toEventItem(event, day, now)))
       .filter((event) => period === 'past' ? ['COMPLETED', 'CANCELLED'].includes(event.statusKey) : !['COMPLETED', 'CANCELLED'].includes(event.statusKey))
       .filter((event) => `${event.title} ${event.venue}`.toLowerCase().includes(query.toLowerCase())),
     [events, now, period, query],
@@ -134,7 +135,7 @@ export default function EventsPage() {
         ) : visibleEvents.length ? (
           <section className="events-register" id="events-register" aria-label={`${period === 'upcoming' ? 'Upcoming' : 'Past'} events`}>
             {visibleEvents.map((event) => (
-              <article className={`events-register-row status-${event.statusKey.toLowerCase()} ${event.date === 'Today' ? 'today' : ''}`} key={event.eventId} aria-label={`${event.title}, status ${event.status}`}>
+              <article className={`events-register-row status-${event.statusKey.toLowerCase()} ${event.date === 'Today' ? 'today' : ''}`} key={`${event.eventId}-${event.month}`} aria-label={`${event.title}, ${event.month}, status ${event.status}`}>
                 <div className="events-register-row-date">
                   <strong>{event.date}</strong>
                   <span>{event.day}</span>

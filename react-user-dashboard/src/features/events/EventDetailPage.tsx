@@ -27,6 +27,7 @@ import { AppToast } from '../../components/AppToast';
 import { getApiError as getApiMessage } from '../../utils/apiClient';
 import { getDisplayName } from '../../utils/identity';
 import { eventApi, formatEventDate, STATUS_LABEL, type AuditRecord, type EventAttendee, type EventMembership, type EventMetrics, type EventRecord, type EventStatus, type StaffAssignmentRole, type StaffDirectoryEntry, type StationTemplate } from './eventApi';
+import { getEventScheduleDays } from './eventDisplayStatus';
 import { EVENT_BANNERS, getEventArtwork, type EventBannerKey } from './eventBanners';
 import { managementPercent } from './eventReport';
 import { customStationPath } from '../screening/stationConfig';
@@ -472,6 +473,7 @@ export default function EventDetailPage() {
   };
 
   const dateParts = useMemo(() => event ? getDateParts(event.startsAt, event.timezone) : null, [event]);
+  const scheduleDays = useMemo(() => event ? getEventScheduleDays(event.eventDays, event.startsAt, event.endsAt) : [], [event]);
 
   if (loading) return <div className="detail-loading" aria-live="polite" aria-label="Loading event"><span /><span /><span /></div>;
   if (!event || !dateParts) return <div className="center-state error-state"><h1>Event unavailable</h1><p>{error}</p><div className="error-state-actions"><button className="primary" type="button" onClick={() => void load()}>Try again</button><Link className="secondary" to="/events">Return to events</Link></div></div>;
@@ -597,7 +599,7 @@ export default function EventDetailPage() {
     {view === 'overview' && <div className="event-view">
       <div className="event-view-heading"><div><h2>Overview</h2><p>Key details and operational performance for this event.</p></div><div className="event-view-actions">{canManage && metrics && <button className="secondary compact event-print-button" type="button" onClick={() => window.print()}><PrinterIcon />Print / save PDF</button>}{canManage && !terminal && <Link className="secondary compact" to={`${eventPath}/edit`}><PencilSquareIcon />Edit overview</Link>}</div></div>
       <section className="event-metric-grid" aria-label="Event overview">
-        <div className="event-info-row"><CalendarDaysIcon /><div><small>Date and time</small><strong>{dateParts.weekday}, {dateParts.month} {dateParts.day}, {dateParts.year}</strong><span>{formatTime(event.startsAt, event.timezone)} to {formatTime(event.endsAt, event.timezone)}, {eventDuration(event.startsAt, event.endsAt)}</span></div></div>
+        <div className="event-info-row event-schedule-summary"><CalendarDaysIcon /><div><small>{scheduleDays.length === 1 ? 'Date and time' : `${scheduleDays.length} event days`}</small>{scheduleDays.map((day) => <span className="event-schedule-day" key={day.startsAt}><strong>{formatEventDate(day.startsAt, event.timezone, false)}</strong><span>{formatTime(day.startsAt, event.timezone)} to {formatTime(day.endsAt, event.timezone)} · {eventDuration(day.startsAt, day.endsAt)}</span></span>)}</div></div>
         <div className="event-info-row"><MapPinIcon /><div><small>Venue</small><strong>{event.venue}</strong><span>{event.address || 'Address entered manually'}{event.postalCode ? ` · Singapore ${event.postalCode}` : ''} · {event.timezone}</span></div></div>
         {canManage && <div className="event-info-row"><UserGroupIcon /><div><small>At venue now</small><strong>{event.activeCapacityCount.toLocaleString()} of {event.capacity.toLocaleString()} people</strong><span>Signed up or checked in</span></div></div>}
         {canManage && <div className="event-info-row"><ClipboardDocumentListIcon /><div><small>Expected</small><strong>{event.expectedAttendance?.toLocaleString() || 'Not set'} visitors</strong><span>{event.signupCount.toLocaleString()} signups collected</span></div></div>}

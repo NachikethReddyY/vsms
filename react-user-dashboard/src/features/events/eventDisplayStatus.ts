@@ -15,3 +15,7 @@ export function formatEventTimeRange(startsAt: string, endsAt: string, timeZone:
   const endLabel = day.format(start) === day.format(end) ? time.format(end) : `${shortDate.format(end)}, ${time.format(end)}`;
   return `${time.format(start)} – ${endLabel}`.toUpperCase();
 }
+
+export function getEventScheduleDays<T extends { startsAt: string; endsAt: string }>(eventDays: T[], startsAt: string, endsAt: string): T[] | Array<{ startsAt: string; endsAt: string }> {
+  return eventDays.length ? [...eventDays].sort((a, b) => a.startsAt.localeCompare(b.startsAt)) : [{ startsAt, endsAt }];
+}
