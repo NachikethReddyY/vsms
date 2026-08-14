@@ -48,6 +48,7 @@ test("only a screener assigned to the requested station can read its queue", asy
   replace(t, prisma.queueEntry, "findMany", async ({ where }) => {
     assert.equal(where.stationId, stationA);
     assert.deepEqual(where.status.in, ["WAITING", "CALLED", "IN_PROGRESS"]);
+    assert.deepEqual(where.registration, { eventId });
     return [];
   });
 

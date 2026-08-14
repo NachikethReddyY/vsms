@@ -294,7 +294,7 @@ const listQueue = async (eventId, stationId, user) => {
     where: {
       stationId,
       status: { in: ["WAITING", "CALLED", "IN_PROGRESS"] },
-      registration: { eventId, registrationStatus: "CHECKED_IN" },
+      registration: { eventId },
     },
     orderBy: [{ isPriority: "desc" }, { queueNumber: "asc" }, { enteredAt: "asc" }],
     include: {
