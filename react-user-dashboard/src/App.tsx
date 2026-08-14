@@ -120,6 +120,7 @@ export default function App() {
           <Route element={<EventCapabilityGuard allowedRoles={eventManagerRoles} />}>
             <Route path="/events/:eventId/overview" element={<EventDetailPage />} />
             <Route path="/events/:eventId/stations" element={<EventDetailPage />} />
+            <Route path="/events/:eventId/shifts" element={<EventDetailPage />} />
             <Route path="/events/:eventId/staff/:membershipId/duties" element={<DutyEditorPage />} />
             <Route path="/events/:eventId/analytics" element={<EventAnalyticsPage />} />
             <Route path="/events/:eventId/reports" element={<EventReportsPage />} />

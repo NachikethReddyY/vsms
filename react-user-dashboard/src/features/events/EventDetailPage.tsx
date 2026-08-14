@@ -34,7 +34,7 @@ import { customStationPath } from '../screening/stationConfig';
 
 type AssignmentDraft = { userId: string; assignmentRole: StaffAssignmentRole; eventStationId: string };
 type ShiftDraft = { name: string; startsAt: string; endsAt: string };
-const emptyAssignment: AssignmentDraft = { userId: '', assignmentRole: 'SUPPORT', eventStationId: '' };
+const emptyAssignment: AssignmentDraft = { userId: '', assignmentRole: 'REGISTRATION', eventStationId: '' };
 const assignmentRoles: StaffAssignmentRole[] = ['EVENT_MANAGER', 'REGISTRATION', 'SCREENER', 'REVIEWER', 'SUPPORT'];
 const applicationRoleByAssignment: Record<StaffAssignmentRole, StaffDirectoryEntry['roles'][number]> = {
   EVENT_MANAGER: 'EVENT_MANAGER', REGISTRATION: 'REGISTRATION_OFFICER', SCREENER: 'SCREENER', REVIEWER: 'REVIEWER', SUPPORT: 'SUPPORT',
@@ -482,7 +482,7 @@ export default function EventDetailPage() {
   const canManage = event.canManage;
   const canCreateEvent = user?.roles.includes('ADMINISTRATOR') ?? false;
   const canConfigureStations = canManage && ['DRAFT', 'PUBLISHED'].includes(event.status);
-  const canEditStaffing = canManage && ['DRAFT', 'PUBLISHED'].includes(event.status);
+  const canEditStaffing = canManage && ['DRAFT', 'PUBLISHED', 'IN_PROGRESS'].includes(event.status);
   const availableTemplates = stationTemplates.filter((template) => {
     if (template.stationType === 'CUSTOM') {
       return !event.eventStations.some((station) => station.stationTemplateId === template.stationTemplateId);
@@ -522,7 +522,7 @@ export default function EventDetailPage() {
   const totalAssignedStaff = event.shifts.reduce((total, shift) => total + shift.staffAssignments.length, 0);
   const next = nextAction[event.status];
   const routeSection = location.pathname.split('/').filter(Boolean).pop();
-  const requestedView = routeSection && ['stations', 'staff', 'analytics', 'reports', 'attendees', 'activity'].includes(routeSection) ? routeSection : 'overview';
+  const requestedView = routeSection && ['stations', 'shifts', 'staff', 'analytics', 'reports', 'attendees', 'activity'].includes(routeSection) ? routeSection : 'overview';
   const view = canManage ? requestedView : 'overview';
   const eventPath = `/events/${event.eventId}`;
   const managementMeasures = metrics ? [
@@ -575,6 +575,7 @@ export default function EventDetailPage() {
       <Link className={view === 'staff' ? 'active' : undefined} to={`${eventPath}/staff`}>Staff</Link>
       {canManage && <>
       <Link className={view === 'stations' ? 'active' : undefined} to={`${eventPath}/stations`}>Stations</Link>
+      <Link className={view === 'shifts' ? 'active' : undefined} to={`${eventPath}/shifts`}>Shifts</Link>
       <Link className={view === 'analytics' ? 'active' : undefined} to={`${eventPath}/analytics`}>Analytics</Link>
       <Link className={view === 'reports' ? 'active' : undefined} to={`${eventPath}/reports`}>Reports</Link>
       <Link className={view === 'attendees' ? 'active' : undefined} to={`${eventPath}/attendees`}>Attendees</Link>
@@ -698,18 +699,18 @@ export default function EventDetailPage() {
           })}</div>}
     </section>}
 
-    {view === 'staff' && <section className="event-view shift-section" aria-labelledby="shift-title">
-        <div className="section-title"><h2 id="shift-title">Shifts</h2><span>{event.shifts.length} scheduled</span></div>
-        {event.shifts.length === 0 ? <p className="quiet-empty">No shifts have been added. The event can still be saved as a draft.</p> : <div className="shift-table">{event.shifts.map((shift) => {
+    {view === 'shifts' && <section className="event-view shift-section" aria-labelledby="shift-title">
+        <div className="section-title shift-section-title"><div><h2 id="shift-title">Shifts</h2><p>Assign registration officers and station teams to a specific working period.</p></div><span className="shift-count">{event.shifts.length} scheduled</span></div>
+        {event.shifts.length === 0 ? <div className="shift-empty-state"><ClockIcon /><h3>No shifts scheduled</h3><p>Add shifts while the event is in draft or published, then return here to assign each role.</p>{['DRAFT', 'PUBLISHED'].includes(event.status) && <Link className="primary compact" to={`${eventPath}/edit`}>Add shifts</Link>}</div> : <div className="shift-table">{event.shifts.map((shift) => {
           const draft = assignmentDrafts[shift.shiftId] ?? emptyAssignment;
           const selectedIds = selectedStaffIds[shift.shiftId] ?? [];
           const eligibleStaff = staffDirectory.filter((person) => person.roles.includes(applicationRoleByAssignment[draft.assignmentRole]));
           return <article className="shift-record" key={shift.shiftId}>
-            <div className="shift-record-summary"><span><strong>{shift.name}</strong><small>{STATUS_LABEL[shift.status as keyof typeof STATUS_LABEL] ?? shift.status.toLowerCase()}</small></span><span><small>Schedule</small>{formatTime(shift.startsAt, event.timezone)}–{formatTime(shift.endsAt, event.timezone)}</span><span><small>Coverage</small>{shift.staffAssignments.length} of {shift.requiredStaff} assigned</span>{canEditStaffing && <button className="secondary compact" type="button" aria-expanded={staffingOpen === shift.shiftId} onClick={() => void openStaffing(shift.shiftId)}><PlusIcon />Assign</button>}</div>
+            <div className="shift-record-summary"><span><strong>{shift.name}</strong><small>{formatEventDate(shift.startsAt, event.timezone, false)} · {STATUS_LABEL[shift.status as keyof typeof STATUS_LABEL] ?? shift.status.toLowerCase()}</small></span><span><small>Working hours</small>{formatTime(shift.startsAt, event.timezone)}–{formatTime(shift.endsAt, event.timezone)}</span><span><small>Coverage</small>{shift.staffAssignments.length} of {shift.requiredStaff} assigned</span>{canEditStaffing && <button className="secondary compact" type="button" aria-expanded={staffingOpen === shift.shiftId} onClick={() => void openStaffing(shift.shiftId)}><PlusIcon />Assign staff</button>}</div>
             {shift.staffAssignments.length > 0 ? <ul className="assignment-list">{shift.staffAssignments.map((assignment) => <li key={assignment.staffAssignmentId}><span><strong>{assignment.user.fullName}</strong><small>{roleLabel(assignment.assignmentRole)}{assignment.eventStation ? ` · ${assignment.eventStation.name}` : ''}</small></span>{canEditStaffing && <button className="assignment-remove" type="button" aria-label={`Remove ${assignment.user.fullName} from ${shift.name}`} title={`Remove ${assignment.user.fullName}`} onClick={() => void removeStaff(shift.shiftId, assignment.staffAssignmentId)} disabled={staffingPending}><TrashIcon /></button>}</li>)}</ul> : <p className="shift-empty">No staff assigned to this shift.</p>}
             {canEditStaffing && staffingOpen === shift.shiftId && <form className="staffing-editor" onSubmit={(submitEvent) => { submitEvent.preventDefault(); void assignStaff(shift.shiftId); }}>
               {directoryLoading ? <p>Loading available staff…</p> : directoryError ? <div className="inline-retry" role="alert"><p>{directoryError}</p><button className="secondary compact" type="button" onClick={() => void loadStaffDirectory()}>Retry</button></div> : directoryLoaded && staffDirectory.length === 0 ? <p>No active staff members are available.</p> : <>
-                <label><span>Shift role</span><select value={draft.assignmentRole} disabled={staffingPending} onChange={(change) => { updateAssignmentDraft(shift.shiftId, { assignmentRole: change.target.value as StaffAssignmentRole, eventStationId: '' }); setSelectedStaffIds((current) => ({ ...current, [shift.shiftId]: [] })); }}>{assignmentRoles.map((role) => <option value={role} key={role}>{roleLabel(role)}</option>)}</select></label>
+                <label><span>Duty</span><select value={draft.assignmentRole} disabled={staffingPending} onChange={(change) => { updateAssignmentDraft(shift.shiftId, { assignmentRole: change.target.value as StaffAssignmentRole, eventStationId: '' }); setSelectedStaffIds((current) => ({ ...current, [shift.shiftId]: [] })); }}>{assignmentRoles.map((role) => <option value={role} key={role}>{roleLabel(role)}</option>)}</select></label>
                 <label><span>Station {draft.assignmentRole === 'SCREENER' ? '(required)' : '(optional)'}</span><select required={draft.assignmentRole === 'SCREENER'} value={draft.eventStationId} disabled={staffingPending} onChange={(change) => updateAssignmentDraft(shift.shiftId, { eventStationId: change.target.value })}><option value="">No station</option>{event.eventStations.filter((station) => station.isAvailable).map((station) => <option value={station.eventStationId} key={station.eventStationId}>{station.stationOrder}. {station.name}</option>)}</select></label>
                 <fieldset className="staff-picker"><legend>Staff members</legend><label><input type="checkbox" checked={eligibleStaff.length > 0 && selectedIds.length === eligibleStaff.length} onChange={(change) => setSelectedStaffIds((current) => ({ ...current, [shift.shiftId]: change.target.checked ? eligibleStaff.map(({ userId }) => userId) : [] }))} /> Select all {eligibleStaff.length}</label>{eligibleStaff.map((person) => <label key={person.userId}><input type="checkbox" checked={selectedIds.includes(person.userId)} onChange={(change) => setSelectedStaffIds((current) => ({ ...current, [shift.shiftId]: change.target.checked ? [...selectedIds, person.userId] : selectedIds.filter((id) => id !== person.userId) }))} /> {getDisplayName(person.username)}</label>)}</fieldset>
                 <button className="primary compact" type="submit" disabled={staffingPending || selectedIds.length === 0 || (draft.assignmentRole === 'SCREENER' && !draft.eventStationId)}>{staffingPending ? 'Saving…' : `Assign ${selectedIds.length || ''} staff`}</button>
