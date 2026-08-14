@@ -437,9 +437,8 @@ exports.getPublicStatus = async (token, db = prisma) => {
                         },
                     },
                     queueEntries: {
-                        where: { status: { in: ["WAITING", "CALLED", "IN_PROGRESS"] } },
+                        where: { status: { in: ["WAITING", "CALLED", "IN_PROGRESS", "SKIPPED"] } },
                         orderBy: [{ enteredAt: "desc" }, { id: "desc" }],
-                        take: 1,
                         select: {
                             status: true,
                             queueNumber: true,
@@ -463,7 +462,14 @@ exports.getPublicStatus = async (token, db = prisma) => {
         };
     }
 
-    const activeEntry = qr.registration.queueEntries[0] || null;
+    const activeEntry = qr.registration.queueEntries.find(({ status }) => (
+        ["WAITING", "CALLED", "IN_PROGRESS"].includes(status)
+    )) || null;
+    const skippedStationIds = new Set(
+        qr.registration.queueEntries
+            .filter(({ status }) => status === "SKIPPED")
+            .map(({ station }) => station.stationId),
+    );
     const nowCalling = activeEntry
         ? await db.queueEntry.findFirst({
             where: {
@@ -491,7 +497,7 @@ exports.getPublicStatus = async (token, db = prisma) => {
         stationName: step.station.stationName,
         stationType: step.station.stationType,
         state: step.completedAt
-            ? "COMPLETED"
+            ? skippedStationIds.has(step.station.stationId) ? "SKIPPED" : "COMPLETED"
             : activeEntry?.station.stationId === step.station.stationId
                 ? "CURRENT"
                 : !activeEntry && step.position === firstUnfinishedPosition

@@ -17,6 +17,7 @@ const QUEUE_STATE_LABEL: Record<string, string> = {
 
 const ROUTE_STATE_LABEL: Record<string, string> = {
   COMPLETED: 'Completed',
+  SKIPPED: 'Skipped',
   CURRENT: 'Current',
   UPCOMING: 'Upcoming',
   BLOCKED: 'Waiting for staff action',
