@@ -72,6 +72,38 @@
 .stage4-table-wrap + .stage4-actions { margin-top: 14px; }
 
 .stage4-alert { margin-top: 18px; padding: 16px; border: 1px solid color-mix(in srgb,var(--orange) 35%,var(--hairline)); border-radius: 12px; background: color-mix(in srgb,var(--orange) 7%,var(--surface)); }
+.event-deletion-page { max-width: 1120px; }
+.event-deletion-hero { align-items: center; padding-bottom: 28px; }
+.event-deletion-eyebrow { display: block; margin-bottom: 8px; color: var(--red); font-size: 11px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; }
+.event-deletion-status { display: flex; gap: 12px; margin-top: 22px; padding: 15px 16px; border: 1px solid; border-radius: 12px; }
+.event-deletion-status.clear { border-color: color-mix(in srgb,var(--green) 32%,var(--hairline)); background: color-mix(in srgb,var(--green) 7%,var(--surface)); }
+.event-deletion-status.blocked { border-color: color-mix(in srgb,var(--red) 35%,var(--hairline)); background: color-mix(in srgb,var(--red) 7%,var(--surface)); }
+.event-deletion-status-mark { width: 9px; height: 9px; flex: 0 0 auto; margin-top: 5px; border-radius: 50%; background: var(--green); box-shadow: 0 0 0 4px color-mix(in srgb,var(--green) 14%,transparent); }
+.event-deletion-status.blocked .event-deletion-status-mark { background: var(--red); box-shadow: 0 0 0 4px color-mix(in srgb,var(--red) 14%,transparent); }
+.event-deletion-status strong { font-size: 13px; }
+.event-deletion-status ul { margin: 3px 0 0; padding: 0; color: var(--ink-2); font-size: 13px; line-height: 19px; list-style: none; }
+.event-deletion-status p { margin: 5px 0 0; color: var(--muted); font-size: 11px; }
+.event-deletion-grid { grid-template-columns: minmax(0,1fr) minmax(0,1fr); gap: 20px; margin-top: 20px; }
+.event-deletion-grid .stage4-card { padding: 22px; border-radius: 12px; }
+.event-deletion-grid header { display: flex; gap: 12px; align-items: flex-start; margin-bottom: 16px; }
+.event-deletion-grid header>span { width: 26px; height: 26px; display: grid; flex: 0 0 auto; place-items: center; border-radius: 50%; background: var(--canvas-soft); color: var(--ink-2); font-size: 11px; font-weight: 800; }
+.event-deletion-grid header h2,.event-deletion-grid header p { margin: 0; }
+.event-deletion-grid header h2 { font-size: 17px; line-height: 24px; }
+.event-deletion-grid header p { margin-top: 2px; color: var(--muted); font-size: 12px; line-height: 18px; }
+.event-deletion-impact .stage4-table { min-width: 0; }
+.event-deletion-impact .stage4-table th { padding-left: 0; background: transparent; }
+.event-deletion-impact .stage4-table td { padding-right: 0; color: var(--ink); font-size: 15px; font-variant-numeric: tabular-nums; font-weight: 750; text-align: right; }
+.event-deletion-confirm form { display: grid; gap: 16px; }
+.event-deletion-confirm form>label:first-child { display: grid; gap: 7px; color: var(--ink-2); font-size: 12px; font-weight: 700; }
+.event-deletion-name { width: fit-content; padding: 5px 8px; border-radius: 6px; background: var(--canvas-soft); color: var(--ink); font-size: 13px; font-weight: 750; }
+.event-deletion-confirm input[type="text"] { min-height: 44px; padding: 9px 11px; border: 1px solid var(--hairline-strong); border-radius: 8px; outline: 0; background: var(--surface); color: var(--ink); font-size: 14px; }
+.event-deletion-confirm input[type="text"]:focus { border-color: var(--red); box-shadow: 0 0 0 3px color-mix(in srgb,var(--red) 14%,transparent); }
+.event-deletion-ack { display: flex; align-items: flex-start; gap: 9px; color: var(--ink-2); font-size: 12px; line-height: 18px; cursor: pointer; }
+.event-deletion-ack input { width: 16px; height: 16px; flex: 0 0 auto; margin: 1px 0 0; accent-color: var(--red); }
+.event-deletion-confirm button.danger { width: 100%; min-height: 44px; margin-top: 2px; transition: background 140ms ease-out,transform 100ms ease-out; }
+.event-deletion-confirm button.danger:not(:disabled):hover { background: color-mix(in srgb,var(--red) 84%,black); }
+.event-deletion-confirm button.danger:not(:disabled):active { transform: scale(.985); }
+.event-deletion-cleanup { margin-top: 20px; }
 .stage4-chart { height: 180px; display: flex; align-items: end; gap: 12px; padding: 12px; border-left: 1px solid var(--hairline-strong); border-bottom: 1px solid var(--hairline-strong); }
 .stage4-bar { min-width: 36px; display: flex; flex: 1; align-items: flex-start; justify-content: center; padding-top: 8px; border-radius: 7px 7px 0 0; background: var(--accent); color: #fff; font-size: 12px; }
 
@@ -165,4 +197,6 @@
   .event-staffing-search label>div { grid-template-columns:20px minmax(0,1fr); padding:7px 10px; }
   .event-staffing-search button { grid-column:1/-1; margin:0; }
   .event-staffing-refresh,.event-team-remove,.event-team-roles button { width:40px; }
+  .event-deletion-grid { grid-template-columns:1fr; }
+  .event-deletion-hero .stage4-actions { display:grid; grid-template-columns:1fr 1fr; }
 }

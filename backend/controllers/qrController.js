@@ -125,6 +125,16 @@ exports.getPublicStatus = async (req, res, next) => {
     }
 };
 
+exports.getPublicPass = async (req, res, next) => {
+    try {
+        const qrImage = await qrService.renderPublicPass(req.params.token);
+        const svg = Buffer.from(qrImage.split(",")[1], "base64");
+        return res.set({ "Cache-Control": "private, max-age=300", "Content-Type": "image/svg+xml" }).send(svg);
+    } catch (err) {
+        next(err);
+    }
+};
+
 // ==========================================
 // Get Participant By QR
 // GET /qr/participant/:token

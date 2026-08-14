@@ -269,8 +269,8 @@ export default function LandingPage() {
                 <img
                   src="/landing/vsms-events-workspace.jpg"
                   alt="VSMS Events workspace showing upcoming screening events, schedules, capacity and staff assignment"
-                  width="1224"
-                  height="768"
+                  width="1600"
+                  height="1040"
                   loading="lazy"
                   decoding="async"
                 />

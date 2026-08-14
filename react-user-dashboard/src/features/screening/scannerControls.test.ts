@@ -23,9 +23,13 @@ describe('participant scanner controls', () => {
     const general = await source('./QRScannerPage.tsx');
     expect(review).toContain('<StationCameraScanner');
     expect(review).toContain('Find participant');
+    expect(review).toContain("station.status === 'SKIPPED'");
+    expect(review).toContain('Route complete with skipped stations');
     expect(general).not.toContain('DEMO_QR_TOKEN');
     expect(general).not.toContain('HANDOFF_STATION_OPTIONS.map');
     expect(general).toContain('Current route destination');
+    expect(general).toContain('Change route or queue');
+    expect(general).toContain('<RouteOverrideDialog');
     expect(general).toContain('Participant lookup fallback');
     expect(general).toContain('await scanner.stop()');
   });

@@ -27,7 +27,7 @@ vi.mock('./stage4Api', async () => {
     getCurrentAccount: vi.fn(async () => { if (accountMode === 'fail') throw new Error('profile failed'); if (accountMode === 'empty') return { account: { id: 'user-1', fullName: 'Asha Rao', approvalState: 'APPROVED', accessState: 'ENABLED', eventMemberships: [] } }; return { account: { id: 'user-1', fullName: 'Asha Rao', contactNumber: '+1', professionalCategory: 'DOCTOR', approvalState: 'APPROVED', accessState: 'ENABLED', eventMemberships: [{ id: 'm1', eventId: 'event-1', status: 'ACTIVE', roles: [{ role: 'EVENT_MANAGER' }], event: { name: 'Clinic Day' } }], securityControls: { mfa: true } } }; }),
     updateCurrentAccount: vi.fn(async (...args: unknown[]) => { calls.push({ name: 'updateCurrentAccount', args }); return {}; }),
     listAdminAccounts: vi.fn(async (params: unknown) => { calls.push({ name: 'listAdminAccounts', args: [params] }); return { items: [{ id: 'user-1', fullName: 'Asha Rao', email: 'asha@example.test', approvalState: 'PENDING', accessState: 'ENABLED' }], page: 1, limit: 25, total: 1, pendingCount: 1 }; }),
-    getAdminAccount: vi.fn(async () => ({ account: { id: 'user-1', fullName: 'Asha Rao', email: 'asha@example.test', approvalState: 'PENDING', roles: ['REVIEWER'], decisions: [], providerOperations: [], memberships: [] } })),
+    getAdminAccount: vi.fn(async () => ({ account: { id: 'user-1', fullName: 'Asha Rao', email: 'asha@example.test', approvalState: 'PENDING', professionalCategory: 'STAFF', roles: [], decisions: [], providerOperations: [], memberships: [] } })),
     decideAccount: vi.fn(async (...args: unknown[]) => { calls.push({ name: 'decideAccount', args }); return {}; }),
     listMemberships: vi.fn(async () => ({ memberships: [{ id: 'member-1', userId: 'user-1', status: 'ACTIVE', roles: membershipRoles, account: { id: 'user-1', userId: 'user-1', fullName: 'Asha Rao' } }] })),
     listEligibleUsers: vi.fn(async () => ({ users: [{ id: 'user-2', fullName: 'Ben Tan', email: 'ben@example.test', eventMemberships: [] }, { id: 'user-3', fullName: 'Devi Rao', email: 'devi@example.test', professionalCategory: 'DOCTOR', roles: ['EVENT_MANAGER'], eventMemberships: [] }] })),
@@ -141,8 +141,8 @@ describe('Stage 4 rendered route behavior', () => {
     accountButton.focus();
     expect(document.activeElement).toBe(accountButton);
     await user.keyboard('{Enter}');
-    await user.click(await screen.findByRole('button', { name: 'Approve and synchronize roles' }));
-    expect(calls.some(c => c.name === 'decideAccount' && c.args[1] === 'approve' && c.args[2] === undefined && JSON.stringify(c.args[3]) === JSON.stringify(['REVIEWER']))).toBe(true);
+    await user.click(await screen.findByRole('button', { name: 'Approve and synchronize access' }));
+    expect(calls.some(c => c.name === 'decideAccount' && c.args[1] === 'approve' && c.args[2] === undefined && JSON.stringify(c.args[3]) === JSON.stringify([]))).toBe(true);
     await user.click(await screen.findByRole('button', { name: 'Reject' }));
     expect(calls.find(c => c.name === 'decideAccount' && c.args[1] === 'reject')?.args).toEqual(['user-1', 'reject', 'Not eligible', undefined]);
   });

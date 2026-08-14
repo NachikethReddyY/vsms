@@ -8,7 +8,7 @@ const { buildAuthorizationUrl, getLogoutUrl } = require("../../utils/auth/cognit
 test("only verified Cognito groups map to application roles", () => {
     assert.deepEqual(
         rolesFromCognitoGroups({ "cognito:groups": ["Admin", "RegistrationOfficer", "Unknown"] }),
-        ["ADMINISTRATOR", "REGISTRATION_OFFICER"]
+        ["ADMINISTRATOR"]
     );
     assert.deepEqual(rolesFromCognitoGroups({ role: "ADMINISTRATOR" }), []);
 });

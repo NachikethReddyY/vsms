@@ -17,7 +17,8 @@ function normalizeRole(role: stage4Api.MembershipRole | string | undefined) {
   return value === "REGISTRATION" ? "REGISTRATION_OFFICER" : value || "";
 }
 
-function activeEventRoles(memberships: stage4Api.Membership[] | undefined, eventId: string) {
+// eslint-disable-next-line react-refresh/only-export-components
+export function activeEventRoles(memberships: stage4Api.Membership[] | undefined, eventId: string) {
   return (memberships || [])
     .filter((m) => (m.eventId === eventId || m.event?.eventId === eventId || m.event?.id === eventId) && m.status !== "REMOVED" && !m.removedAt)
     .flatMap((m) => (m.roles || []).map(normalizeRole));

@@ -632,6 +632,12 @@ html[data-vsms-theme-vt="active"]::view-transition-new(root) { clip-path:var(--v
 
 .permission-state p,.error-state p { max-width:520px; margin:0 0 8px; font-size:14px; line-height:22px; }
 .va-resolve-row { display:flex; gap:12px; align-items:flex-end; flex-wrap:wrap; margin-bottom:16px; }
+.va-queue-heading { display:flex; align-items:center; justify-content:space-between; gap:16px; margin-bottom:24px; padding:16px; border:1px solid var(--hairline); border-radius:12px; background:var(--surface-subtle); }
+.va-queue-heading h2 { margin:0; }
+.va-queue-heading p { margin:4px 0 0; color:var(--ink-2); font-size:13px; }
+.va-call-next { display:inline-flex; align-items:center; gap:8px; min-height:44px; white-space:nowrap; }
+.va-call-next svg { width:17px; height:17px; }
+.va-call-next:active { transform:scale(.97); transition:transform 100ms ease-out; }
 .va-resolve-row label { flex:1; min-width:220px; display:grid; gap:6px; font-size:13px; color:var(--ink-2); }
 .va-resolve-hint { margin:-6px 0 14px; color:var(--muted); font-size:12px; }
 .va-resolve-row input, .va-form select, .detail-panel select, .detail-panel input { min-height:42px; border:1px solid var(--hairline); border-radius:10px; padding:0 12px; background:var(--surface); color:var(--ink); }

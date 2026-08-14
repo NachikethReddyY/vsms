@@ -14,6 +14,7 @@ export type EventStatus = components['schemas']['EventStatus'];
 export type StaffAssignment = components['schemas']['StaffAssignment'];
 export type StaffAssignmentRole = components['schemas']['StaffAssignmentRole'];
 export type StaffDirectoryEntry = components['schemas']['StaffDirectoryEntry'];
+export type EventMembership = components['schemas']['EventMembershipDetail'];
 export type StationTemplate = Omit<components['schemas']['StationTemplate'], 'stationType'> & {
   stationType: StationType;
 };
@@ -71,6 +72,10 @@ export const eventApi = {
     const { data } = await apiClient.get<StaffDirectoryEntry[]>('/events/staff-directory');
     return data;
   },
+  async memberships(id: string) {
+    const { data } = await apiClient.get<components['schemas']['EventMembershipListResponse']>(`/events/${id}/memberships`);
+    return data.memberships;
+  },
   async stationTemplates() {
     const { data } = await apiClient.get<StationTemplate[]>('/events/station-templates');
     return data;
@@ -96,6 +101,10 @@ export const eventApi = {
   },
   async assignStaff(id: string, shiftId: string, input: { version: number; userId?: string; userIds?: string[]; assignmentRole: StaffAssignmentRole; eventStationId?: string | null; notes?: string | null }) {
     const { data } = await apiClient.post<EventRecord>(`/events/${id}/shifts/${shiftId}/assignments`, input);
+    return data;
+  },
+  async addShift(id: string, input: { version: number; name: string; startsAt: string; endsAt: string; requiredStaff: number }) {
+    const { data } = await apiClient.post<EventRecord>(`/events/${id}/shifts`, input);
     return data;
   },
   async removeStaff(id: string, shiftId: string, assignmentId: string, version: number) {

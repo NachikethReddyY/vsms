@@ -18,6 +18,10 @@ test('event managers receive a global Operations Center navigation entry', () =>
   assert.match(shell, /to="\/operations" aria-label="Operations"/);
 });
 
+test('event management routes include the dedicated shifts workspace', () => {
+  assert.match(shell, /overview\|stations\|shifts\|staff/);
+});
+
 test('unassigned staff see the events workspace empty state', () => {
   assert.match(eventsPage, /No events assigned/);
 });

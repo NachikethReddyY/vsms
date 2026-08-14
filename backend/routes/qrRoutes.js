@@ -35,6 +35,12 @@ router.get(
   publicStatusTokenLimiter,
   asyncHandler(qrController.getPublicStatus),
 );
+router.get(
+  "/public-pass/:token",
+  validate({ params: tokenParams }),
+  publicStatusTokenLimiter,
+  asyncHandler(qrController.getPublicPass),
+);
 
 // ==========================================
 // Dev-only QR preview (no auth). Blocked in production by controller.

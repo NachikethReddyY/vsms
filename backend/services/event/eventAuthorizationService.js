@@ -7,10 +7,6 @@ const ACTIVE_ASSIGNMENT_STATUSES = ["ASSIGNED", "CONFIRMED"];
 const actorId = (user) => user?.userId || user?.id;
 const isAdministrator = (user) => user?.systemRole === "ADMIN" || user?.roles?.includes("ADMINISTRATOR");
 const assertRoleEligibility = (user, roles = []) => {
-  const applicationRoles = user?.roles ?? user?.userRoles?.map(({ role }) => role.roleName) ?? [];
-  if (roles.includes("EVENT_MANAGER") && !applicationRoles.includes("EVENT_MANAGER")) {
-    throw new AppError(422, "EVENT_MANAGER_ACCOUNT_REQUIRED", "Event management can only be assigned to an event manager account");
-  }
   if (roles.includes("REVIEWER") && user?.professionalCategory !== "DOCTOR") {
     throw new AppError(422, "DOCTOR_REQUIRED", "Clinical review can only be assigned to a doctor account");
   }

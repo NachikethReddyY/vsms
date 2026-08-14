@@ -24,6 +24,7 @@ const { enqueueAccountLifecycle } = require("../account/accountLifecycleNotifica
 const domainEventBus = require("../domain/domainEventBus");
 const { assertRoleEligibility, eventVisibilityWhere, isAdministrator } = require("./eventAuthorizationService");
 const artworkStorage = require("./eventArtworkStorage");
+const { effectiveEventStatus } = require("./eventLifecycle");
 
 /** Station types whose library fieldSchema drives DynamicStationPage + API validation. */
 const SCHEMA_DRIVEN_STATION_TYPES = new Set(["CUSTOM", "VISUAL_ACUITY", "REFRACTION", "COLOUR_VISION", "EYE_HEALTH"]);
@@ -197,6 +198,7 @@ const rosterOwner = (value) => value ? {
 const assignmentUser = (value) => value ? {
   userId: value.id,
   username: value.username || value.fullName || "Staff member",
+  fullName: value.fullName || "Staff member",
 } : null;
 
 const loadStationTemplates = async (db = prisma) => {
@@ -338,7 +340,7 @@ const toEventResponse = async (event, user, db = prisma, options = {}) => {
     endTime: event.endsAt,
     capacity: event.capacity,
     expectedAttendance: event.expectedAttendance,
-    status: event.status,
+    status: effectiveEventStatus(event.status, event.endsAt),
     version: event.version,
     cancellationReason: event.cancellationReason,
     cancelledAt: event.cancelledAt,
@@ -549,8 +551,8 @@ const auditUpdate = (tx, current, updated, user, correlationId) => tx.eventAudit
 });
 
 const assertStationPlanningState = (event) => {
-  if (!["DRAFT", "PUBLISHED"].includes(event.status)) {
-    throw new AppError(409, "STATIONS_NOT_EDITABLE", "Stations cannot be changed after an event goes live");
+  if (!["DRAFT", "PUBLISHED", "IN_PROGRESS"].includes(event.status)) {
+    throw new AppError(409, "STATIONS_NOT_EDITABLE", "Stations cannot be changed for a completed or cancelled event");
   }
 };
 
@@ -2280,6 +2282,37 @@ const addStaffAssignment = async (eventId, shiftId, body, user, correlationId, d
   });
 };
 
+const addShift = async (eventId, body, user, correlationId, db = prisma) => {
+  const current = await requireEvent(eventId, user, true, db);
+  if (!["DRAFT", "PUBLISHED", "IN_PROGRESS"].includes(current.status)) {
+    throw new AppError(409, "SHIFTS_NOT_EDITABLE", "Shifts cannot be added to a completed or cancelled event");
+  }
+  assertRange(current, [body]);
+
+  return db.$transaction(async (tx) => {
+    await bumpEventVersion(tx, eventId, body.version);
+    const shift = await tx.shift.create({
+      data: {
+        ...normalizeShift(body, eventId),
+        status: current.status === "IN_PROGRESS" ? "ACTIVE" : "PLANNED",
+      },
+    });
+    const updated = await tx.event.findUniqueOrThrow({ where: { eventId }, include: eventInclude });
+    await auditUpdate(tx, current, updated, user, correlationId);
+    await createAuditLog({
+      client: tx,
+      userId: user.userId,
+      context: correlationId,
+      action: "SHIFT_ADDED",
+      resource: "Event",
+      entityName: "Event",
+      entityId: eventId,
+      details: { shiftId: shift.shiftId, name: shift.name },
+    });
+    return toEventResponse(updated, user, tx);
+  });
+};
+
 const removeStaffAssignment = async (eventId, shiftId, assignmentId, version, user, correlationId, db = prisma) => {
   const current = await requireEvent(eventId, user, true, db);
   if (!["DRAFT", "PUBLISHED", "IN_PROGRESS"].includes(current.status)) {
@@ -2388,15 +2421,44 @@ const attendeeSelect = {
   checkedIn: true,
   checkedInAt: true,
   queueNumber: true,
+  routeVersion: true,
   createdAt: true,
   participant: { select: { participantReference: true } },
+  routeSteps: {
+    orderBy: { position: "asc" },
+    select: {
+      stationId: true,
+      position: true,
+      completedAt: true,
+      station: { select: { stationName: true } },
+    },
+  },
+  queueEntries: {
+    where: { status: { in: ["WAITING", "CALLED", "IN_PROGRESS", "SKIPPED"] } },
+    orderBy: { enteredAt: "desc" },
+    select: { stationId: true, status: true },
+  },
 };
-const attendeeProjection = ({ participant, ...registration }) => ({
-  ...registration,
-  participantReference: participant.participantReference,
-  checkedInAt: dateTime(registration.checkedInAt),
-  createdAt: dateTime(registration.createdAt),
-});
+const attendeeProjection = ({ participant, routeSteps = [], queueEntries = [], ...registration }) => {
+  const activeStationId = queueEntries.find(({ status }) => ["WAITING", "CALLED", "IN_PROGRESS"].includes(status))?.stationId;
+  const skippedStationIds = new Set(queueEntries.filter(({ status }) => status === "SKIPPED").map(({ stationId }) => stationId));
+  const firstUnfinishedId = routeSteps.find(({ completedAt }) => !completedAt)?.stationId;
+  return {
+    ...registration,
+    participantReference: participant.participantReference,
+    checkedInAt: dateTime(registration.checkedInAt),
+    createdAt: dateTime(registration.createdAt),
+    routeSteps: routeSteps.map((step) => ({
+      stationId: step.stationId,
+      stationName: step.station.stationName,
+      position: step.position,
+      state: step.completedAt
+        ? skippedStationIds.has(step.stationId) ? "SKIPPED" : "COMPLETED"
+        : step.stationId === activeStationId ? "CURRENT"
+          : !activeStationId && step.stationId === firstUnfinishedId ? "BLOCKED" : "UPCOMING",
+    })),
+  };
+};
 
 const publicEventProjection = (event) => ({
   eventId: event.eventId,
@@ -2411,7 +2473,7 @@ const publicEventProjection = (event) => ({
   startsAt: dateTime(event.startsAt),
   endsAt: dateTime(event.endsAt),
   capacity: event.capacity,
-  status: event.status,
+  status: effectiveEventStatus(event.status, event.endsAt),
   eventDays: (event.eventDays || []).map((day) => ({
     eventDayId: day.eventDayId,
     date: day.date.toISOString().slice(0, 10),
@@ -2628,6 +2690,7 @@ module.exports = {
   importStations,
   updateStation,
   removeStation,
+  addShift,
   addStaffAssignment,
   removeStaffAssignment,
   getAuditLog,

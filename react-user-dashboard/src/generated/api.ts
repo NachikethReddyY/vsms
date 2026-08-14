@@ -803,6 +803,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/events/{eventId}/shifts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Add a working period to a draft, published, or live event */
+        post: operations["addEventShift"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/events/{eventId}/shifts/{shiftId}/assignments": {
         parameters: {
             query?: never;
@@ -2635,6 +2652,7 @@ export interface components {
                 /** Format: uuid */
                 userId: string;
                 username: string;
+                fullName: string;
             };
         };
         ShiftAssignmentInput: {
@@ -3017,6 +3035,16 @@ export interface components {
             requiredStaff: number;
             assignments?: components["schemas"]["ShiftAssignmentInput"][];
         };
+        AddShiftRequest: {
+            version: number;
+            name: string;
+            /** Format: date-time */
+            startsAt: string;
+            /** Format: date-time */
+            endsAt: string;
+            /** @default 1 */
+            requiredStaff: number;
+        };
         Shift: components["schemas"]["ShiftInput"] & {
             /** Format: uuid */
             shiftId: string;
@@ -3223,6 +3251,15 @@ export interface components {
             /** Format: date-time */
             checkedInAt?: string | null;
             queueNumber: number | null;
+            routeVersion: number;
+            routeSteps: {
+                /** Format: uuid */
+                stationId: string;
+                stationName: string;
+                position: number;
+                /** @enum {string} */
+                state: "COMPLETED" | "SKIPPED" | "CURRENT" | "BLOCKED" | "UPCOMING";
+            }[];
             /** Format: date-time */
             createdAt: string;
         };
@@ -3602,9 +3639,10 @@ export interface components {
             highestFlag: components["schemas"]["OverallFlag"];
             flaggedResultCount: number;
             completedStationCount: number;
+            skippedStationCount: number;
             totalStationCount: number;
             /** @enum {string} */
-            readyReason: "SCREENING_COMPLETE" | "URGENT_FLAG";
+            readyReason: "SCREENING_COMPLETE" | "ROUTE_COMPLETE" | "URGENT_FLAG";
             /** Format: date-time */
             lastResultAt: string | null;
         };
@@ -3652,13 +3690,16 @@ export interface components {
             stationType: "VISUAL_ACUITY" | "REFRACTION" | "COLOUR_VISION" | "EYE_HEALTH" | "CUSTOM";
             stationOrder: number;
             fieldSchemaSnapshot: components["schemas"]["StationFieldDefinition"][] | null;
+            /** @enum {string} */
+            status: "COMPLETED" | "SKIPPED" | "PENDING";
             result: components["schemas"]["ScreeningResultSummary"] | null;
         };
         ReviewReadiness: {
             ready: boolean;
             /** @enum {string|null} */
-            readyReason: "SCREENING_COMPLETE" | "URGENT_FLAG" | null;
+            readyReason: "SCREENING_COMPLETE" | "ROUTE_COMPLETE" | "URGENT_FLAG" | null;
             completedStationCount: number;
+            skippedStationCount: number;
             totalStationCount: number;
             highestFlag: components["schemas"]["OverallFlag"];
         };
@@ -4306,10 +4347,12 @@ export interface components {
         /** @enum {string} */
         RouteOverrideReasonCode: "STATION_UNAVAILABLE" | "QUEUE_BALANCING" | "PARTICIPANT_NEED" | "EQUIPMENT_ISSUE" | "OPERATIONAL_EXCEPTION";
         RouteOverrideRequest: {
-            /** @description Complete proposed order of every unfinished required station. The active station, when present, must remain in place; completed stations are retained by the server. */
+            /** @description Complete proposed order of every unfinished required station. Completed stations are retained by the server. */
             stationIds: string[];
             reasonCode: components["schemas"]["RouteOverrideReasonCode"];
             expectedVersion: number;
+            /** @description Skip a waiting or called active station and join the first proposed unfinished station. In-progress screening cannot be skipped. */
+            skipActive?: boolean;
         };
         RouteOverrideResponse: {
             /** @enum {string} */
@@ -4471,6 +4514,8 @@ export interface components {
                     /** @description Participant's own live queue state (waiting/called/in-progress) */
                     status: components["schemas"]["QueueStatus"];
                     queueNumber: number;
+                    /** @description Queue number currently called at this station */
+                    nowCalling: number | null;
                     station: {
                         name: string;
                         type: string;
@@ -4480,7 +4525,7 @@ export interface components {
                     stationName: string;
                     stationType: string;
                     /** @enum {string} */
-                    state: "COMPLETED" | "CURRENT" | "UPCOMING" | "BLOCKED";
+                    state: "COMPLETED" | "SKIPPED" | "CURRENT" | "UPCOMING" | "BLOCKED";
                 }[];
                 /** Format: date-time */
                 expiresAt: string | null;
@@ -4623,6 +4668,8 @@ export interface components {
             stations: components["schemas"]["ScreeningStation"][];
         };
         ScreeningQueueItem: {
+            /** Format: uuid */
+            queueEntryId: string;
             /** Format: uuid */
             registrationId: string;
             participantDisplayName: string;
@@ -6771,6 +6818,37 @@ export interface operations {
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
             409: components["responses"]["Conflict"];
+        };
+    };
+    addEventShift: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                eventId: components["parameters"]["EventId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AddShiftRequest"];
+            };
+        };
+        responses: {
+            /** @description Shift added and audited */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Event"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            422: components["responses"]["ValidationFailed"];
         };
     };
     assignEventStaff: {

@@ -37,5 +37,6 @@ test("participant status polling is non-overlapping and retains delayed state", 
 test("participant status renders only the server route and never creates handoff QR codes", () => {
   assert.match(statusSource, /status\.route\.map/);
   assert.match(statusSource, /Your event route/);
+  assert.match(statusSource, /SKIPPED: 'Skipped'/);
   assert.doesNotMatch(statusSource, /\/qr\/handoff|LiveStationHandoffPicker|Station workload|currentQueueNumber|aheadAtStation|transfers/);
 });

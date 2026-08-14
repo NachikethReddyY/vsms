@@ -57,7 +57,7 @@ it('creates staff without asking for or submitting an employee number', async ()
     status: 'ACTIVE',
     approvalState: 'APPROVED',
     accessState: 'ENABLED',
-    roles: ['SUPPORT'],
+    roles: [],
   } } });
   render(<StaffAccountsPage />);
   expect(await screen.findByText('VSMS Admin')).toBeTruthy();
@@ -79,7 +79,7 @@ it('creates staff without asking for or submitting an employee number', async ()
     fullName: 'Aryaa Tan',
     email: 'aryaa@vsms.cloud',
     status: 'ACTIVE',
-    roles: ['SUPPORT'],
+    roles: [],
   });
   expect(post.mock.calls[0][1]).not.toHaveProperty('employeeNumber');
 });

@@ -6,6 +6,7 @@ const {
   contextVersion,
   reviewReadiness,
   routeStations,
+  skippedRouteStationIds,
   stopRouteForUrgentReview,
   unfinishedRouteStationIds,
 } = require("../../services/screening/reviewService");
@@ -56,6 +57,34 @@ describe("clinical review eligibility and ordering", () => {
       .toMatchObject({ ready: false, completedStationCount: 1, totalStationCount: 2 });
   });
 
+  test("a completed skipped route step enters clinical review without inventing a result", () => {
+    const registration = {
+      routeSteps: [
+        { stationId: stations[0].stationId, position: 1, completedAt: new Date(), station: stations[0] },
+        { stationId: stations[1].stationId, position: 2, completedAt: new Date(), station: stations[1] },
+      ],
+      queueEntries: [{ stationId: stations[1].stationId, status: "SKIPPED" }],
+    };
+    const skipped = skippedRouteStationIds(registration);
+    expect([...skipped]).toEqual([stations[1].stationId]);
+    expect(reviewReadiness(routeStations(registration), [result(stations[0].stationId)], skipped)).toMatchObject({
+      ready: true,
+      readyReason: "ROUTE_COMPLETE",
+      completedStationCount: 1,
+      skippedStationCount: 1,
+      totalStationCount: 2,
+    });
+  });
+
+  test("a skipped queue entry does not satisfy an unfinished route step", () => {
+    const registration = {
+      routeSteps: [{ stationId: stations[0].stationId, position: 1, completedAt: null, station: stations[0] }],
+      queueEntries: [{ stationId: stations[0].stationId, status: "SKIPPED" }],
+    };
+    expect([...skippedRouteStationIds(registration)]).toEqual([]);
+    expect(reviewReadiness(routeStations(registration), [])).toMatchObject({ ready: false });
+  });
+
   test("incomplete urgent review requires urgent escalation and cancels the active queue", async () => {
     const readiness = reviewReadiness(stations, [result(stations[0].stationId, "URGENT")]);
     expect(() => assertReviewOutcomeAllowed(readiness, "REFER"))
@@ -98,6 +127,7 @@ describe("clinical review context and request contract", () => {
     const original = contextVersion(stations, results);
     expect(contextVersion([...stations, { stationId: "10000000-0000-4000-8000-000000000003" }], results)).not.toBe(original);
     expect(contextVersion(stations, [result(stations[0].stationId, "NORMAL", 1)])).not.toBe(original);
+    expect(contextVersion(stations, results, new Set([stations[1].stationId]))).not.toBe(original);
   });
 
   test("referral fields are accepted only for referral outcomes", () => {
