@@ -149,7 +149,7 @@ test("new and legacy administrator routes both protect the final administrator",
   const legacy = await request(app)
     .patch(`/users/${target.id}`)
     .set("Authorization", authorization)
-    .send({ roles: ["REVIEWER"] });
+    .send({ roles: ["EVENT_MANAGER"] });
   assert.equal(legacy.status, 422);
   assert.equal(legacy.body.code, "LAST_ADMIN_CHANGE_BLOCKED");
 });
@@ -186,7 +186,7 @@ test("account and legacy user controllers return accepted without changing entit
     fullName: "Queued Account",
     email: "queued@example.com",
     status: "ACTIVE",
-    roles: ["SUPPORT"],
+    roles: ["EVENT_MANAGER"],
     providerOperation,
   });
   t.after(() => {
@@ -213,7 +213,7 @@ test("account and legacy user controllers return accepted without changing entit
       fullName: "Queued Account",
       email: "queued@example.com",
       employeeNumber: "QUEUED-1",
-      roles: ["SUPPORT"],
+      roles: ["EVENT_MANAGER"],
     });
   assert.equal(userResponse.status, 202);
   assert.equal(userResponse.body.data.id, targetId);
@@ -235,7 +235,7 @@ test("account and legacy user controllers return accepted without changing entit
       fullName: "Queued Account",
       email: "queued@example.com",
       employeeNumber: "QUEUED-1",
-      roles: ["SUPPORT"],
+      roles: ["EVENT_MANAGER"],
     });
   assert.equal(completedUserResponse.status, 201);
 });

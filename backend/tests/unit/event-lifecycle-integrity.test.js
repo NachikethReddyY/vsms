@@ -15,8 +15,8 @@ function eventRecord(status, version, shifts = []) {
     description: null,
     venue: "Library hall",
     timezone: "Asia/Singapore",
-    startsAt: new Date("2026-08-10T01:00:00.000Z"),
-    endsAt: new Date("2026-08-10T09:00:00.000Z"),
+    startsAt: new Date("2099-08-10T01:00:00.000Z"),
+    endsAt: new Date("2099-08-10T09:00:00.000Z"),
     capacity: 100,
     expectedAttendance: 80,
     status,
@@ -156,9 +156,9 @@ test("event creation persists the selected event days", async () => {
     ...eventRecord("DRAFT", 1),
     eventDays: [{
       eventDayId: "66666666-6666-4666-8666-666666666666",
-      date: new Date("2026-08-10T00:00:00.000Z"),
-      startsAt: new Date("2026-08-10T01:00:00.000Z"),
-      endsAt: new Date("2026-08-10T09:00:00.000Z"),
+      date: new Date("2099-08-10T00:00:00.000Z"),
+      startsAt: new Date("2099-08-10T01:00:00.000Z"),
+      endsAt: new Date("2099-08-10T09:00:00.000Z"),
     }],
   };
   const createdDays = [];
@@ -190,14 +190,14 @@ test("event creation persists the selected event days", async () => {
     endsAt: saved.endsAt.toISOString(),
     capacity: saved.capacity,
     expectedAttendance: saved.expectedAttendance,
-    eventDays: [{ date: "2026-08-10", startsAt: saved.startsAt.toISOString(), endsAt: saved.endsAt.toISOString() }],
+    eventDays: [{ date: "2099-08-10", startsAt: saved.startsAt.toISOString(), endsAt: saved.endsAt.toISOString() }],
     stations: [],
     shifts: [],
   }, user, requestId, null, db);
 
   assert.equal(createdDays.length, 1);
   assert.equal(createdDays[0].eventId, eventId);
-  assert.equal(result.eventDays[0].date, "2026-08-10");
+  assert.equal(result.eventDays[0].date, "2099-08-10");
 });
 
 test("event creation rejects day slots outside the overall schedule", async () => {
@@ -214,14 +214,14 @@ test("event creation rejects day slots outside the overall schedule", async () =
     locationProvider: "MANUAL",
     locationReference: null,
     timezone: "Asia/Singapore",
-    startsAt: "2026-08-10T01:00:00.000Z",
-    endsAt: "2026-08-10T09:00:00.000Z",
+    startsAt: "2099-08-10T01:00:00.000Z",
+    endsAt: "2099-08-10T09:00:00.000Z",
     capacity: 100,
     expectedAttendance: 80,
     eventDays: [{
-      date: "2026-08-10",
-      startsAt: "2026-08-10T00:00:00.000Z",
-      endsAt: "2026-08-10T09:00:00.000Z",
+      date: "2099-08-10",
+      startsAt: "2099-08-10T00:00:00.000Z",
+      endsAt: "2099-08-10T09:00:00.000Z",
     }],
     stations: [],
     shifts: [],
@@ -246,8 +246,8 @@ test("event plans reject duplicate station orders", () => {
     name: "Community screening",
     venue: "Library hall",
     timezone: "Asia/Singapore",
-    startsAt: "2026-08-10T01:00:00.000Z",
-    endsAt: "2026-08-10T09:00:00.000Z",
+    startsAt: "2099-08-10T01:00:00.000Z",
+    endsAt: "2099-08-10T09:00:00.000Z",
     capacity: 100,
     stations: [
       station("55555555-5555-4555-8555-555555555555"),
@@ -314,8 +314,8 @@ test("staff assignment commits with schedule locking and the event version", asy
   const shift = {
     shiftId,
     name: "Morning",
-    startsAt: new Date("2026-08-10T01:00:00.000Z"),
-    endsAt: new Date("2026-08-10T05:00:00.000Z"),
+    startsAt: new Date("2099-08-10T01:00:00.000Z"),
+    endsAt: new Date("2099-08-10T05:00:00.000Z"),
     requiredStaff: 1,
     status: "PLANNED",
     staffAssignments: [],

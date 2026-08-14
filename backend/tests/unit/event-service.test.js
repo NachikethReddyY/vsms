@@ -209,17 +209,17 @@ test("clinical station templates reject invalid create schemas but allow fieldSc
   assert.equal(savedSchema.find((field) => field.key === "od").label, "OD acuity reading");
 });
 
-test("registration, clinical review, and eye health catalog templates cannot be updated", async () => {
+test("registration and clinical review catalog templates cannot be updated", async () => {
   const context = { requestId: crypto.randomUUID(), ipAddress: "127.0.0.1", deviceName: "Test" };
-  for (const templateKey of ["CLINICAL_REVIEW", "REGISTRATION", "EYE_HEALTH"]) {
+  for (const templateKey of ["CLINICAL_REVIEW", "REGISTRATION"]) {
     const transactionClient = {
       stationTemplate: {
         findUnique: async () => ({
           stationTemplateId: "60000000-0000-4000-8000-000000000004",
           templateKey,
-          stationType: templateKey === "EYE_HEALTH" ? "EYE_HEALTH" : null,
+          stationType: null,
           version: 1,
-          name: templateKey === "REGISTRATION" ? "Registration" : templateKey === "EYE_HEALTH" ? "Eye health" : "Clinical review",
+          name: templateKey === "REGISTRATION" ? "Registration" : "Clinical review",
           description: null,
           defaultCapacity: 2,
           active: true,

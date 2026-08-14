@@ -51,9 +51,9 @@
     },
     {
       "id": "eye-health-fourth-station",
-      "proofLevel": "DEPENDENCY_BLOCKED",
+      "proofLevel": "LIVE_BROWSER",
       "title": "Eye health as the fourth station",
-      "expected": "Do not mark passed: the Station Library deliberately keeps EYE_HEALTH catalog-only and there is no eye-health capture route/page."
+      "expected": "An assigned eye-health screener records observations, acknowledges any automatic flag, advances the route, and can repeat the save offline with exactly one synchronized result."
     },
     {
       "id": "review-referral",
@@ -76,7 +76,6 @@
   ],
   "blockers": [
     "Managed invitation, password, MFA, provider-group intersection, and lifecycle revocation require an approved live deployment and Cognito test accounts.",
-    "Station Library maps EYE_HEALTH as non-importable and the dashboard has no eye-health capture page, so the required fourth-station browser path is not implemented.",
     "Offline browser proof depends on an active assigned station, persistent browser storage, and a deliberate connection interruption; unit coverage is not a live reconnect result."
   ]
 }

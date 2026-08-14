@@ -27,7 +27,7 @@ const artworkStorage = require("./eventArtworkStorage");
 const { effectiveEventStatus } = require("./eventLifecycle");
 
 /** Station types whose library fieldSchema drives DynamicStationPage + API validation. */
-const SCHEMA_DRIVEN_STATION_TYPES = new Set(["CUSTOM", "VISUAL_ACUITY", "REFRACTION", "COLOUR_VISION"]);
+const SCHEMA_DRIVEN_STATION_TYPES = new Set(["CUSTOM", "VISUAL_ACUITY", "REFRACTION", "COLOUR_VISION", "EYE_HEALTH"]);
 
 const EVENT_FIELDS = [
   "name", "description", "bannerKey", "artworkDataUrl", "venue", "address", "postalCode",
@@ -1801,8 +1801,8 @@ const withSystemFieldSchemaFallback = (template) => {
   return { ...template, fieldSchema };
 };
 
-/** Admin catalog: screening templates only — registration/clinical review/eye health are not managed here. */
-const HIDDEN_LIBRARY_TEMPLATE_KEYS = new Set(["REGISTRATION", "CLINICAL_REVIEW", "EYE_HEALTH"]);
+/** Operational workflow templates are not managed in the screening-station library. */
+const HIDDEN_LIBRARY_TEMPLATE_KEYS = new Set(["REGISTRATION", "CLINICAL_REVIEW"]);
 const listStationTemplateLibrary = async () => {
   const templates = await prisma.stationTemplate.findMany({
     select: {
@@ -1821,19 +1821,11 @@ const listStationTemplateLibrary = async () => {
   return templates
     .filter((template) => (
       !HIDDEN_LIBRARY_TEMPLATE_KEYS.has(template.templateKey)
-      && template.stationType !== "EYE_HEALTH"
     ))
     .map((template) => serializeStationTemplate(withSystemFieldSchemaFallback(template)));
 };
 
 const createStationTemplate = async (body, user, context, db = prisma) => {
-  if (body.stationType === "EYE_HEALTH") {
-    throw new AppError(
-      422,
-      "STATION_TYPE_NOT_IMPORTABLE",
-      "Eye health is recorded during clinical review, not as a screening station template",
-    );
-  }
   const { SYSTEM_FIELD_SCHEMAS } = require("../../schemas/dynamicStationSchema");
   let fieldSchema;
   try {
@@ -1893,12 +1885,11 @@ const updateStationTemplate = async (stationTemplateId, body, user, context, db 
   if (!existing) throw new AppError(404, "STATION_TEMPLATE_NOT_FOUND", "Station template not found");
   if (
     HIDDEN_LIBRARY_TEMPLATE_KEYS.has(existing.templateKey)
-    || existing.stationType === "EYE_HEALTH"
   ) {
     throw new AppError(
       422,
       "STATION_TEMPLATE_NOT_EDITABLE",
-      "Registration, clinical review, and eye health are not managed in the station library",
+      "Registration and clinical review are not managed in the station library",
     );
   }
   let fieldSchema;
