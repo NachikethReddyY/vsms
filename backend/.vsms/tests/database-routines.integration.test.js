@@ -6,6 +6,8 @@ const {
   cancelActiveRegistrationQueue,
   getEventQueueStatistics,
   isRegistrationRouteComplete,
+  isScreeningResultsComplete,
+  recordScreeningFlagAudit,
 } = require("../../utils/database/databaseRoutines");
 const { ensureTestUser, prisma } = require("../../tests/helpers");
 
@@ -235,5 +237,79 @@ test("database triggers reject cross-event station relationships", async () => {
       },
     }),
     /must belong to the same event/,
+  );
+});
+
+test("screening completeness requires a result for every route station", async () => {
+  const resultRegistration = await createRegistration("Results", 3);
+  await prisma.registrationRouteStep.create({
+    data: {
+      registrationId: resultRegistration.registrationId,
+      stationId: station.stationId,
+      position: 1,
+    },
+  });
+  assert.equal(await isScreeningResultsComplete(event.eventId, resultRegistration.registrationId), false);
+
+  const saved = await prisma.screeningResult.create({
+    data: {
+      registrationId: resultRegistration.registrationId,
+      stationId: station.stationId,
+      recordedByUserId: actor.id,
+      screeningType: "VISUAL_ACUITY",
+      resultData: { chartDistanceMetres: 6 },
+      overallFlag: "REVIEW",
+      isFlagged: true,
+      idempotencyKey: crypto.randomUUID(),
+    },
+  });
+  assert.equal(await isScreeningResultsComplete(event.eventId, resultRegistration.registrationId), true);
+  await assert.rejects(
+    isScreeningResultsComplete(otherEvent.eventId, resultRegistration.registrationId),
+    /registration does not belong to the supplied event/,
+  );
+
+  const audit = await recordScreeningFlagAudit(saved.resultId, actor.id);
+  assert.ok(audit.auditId);
+  const auditRow = await prisma.auditLog.findUniqueOrThrow({ where: { id: audit.auditId } });
+  assert.equal(auditRow.action, "SCREENING_FLAG_DB_RECORDED");
+  assert.equal(auditRow.details.isFlagged, true);
+  assert.equal(auditRow.details.resultData, undefined);
+});
+
+test("reviewed screening results cannot be inserted, updated, or deleted", async () => {
+  const lockedRegistration = await createRegistration("Locked", 4);
+  const saved = await prisma.screeningResult.create({
+    data: {
+      registrationId: lockedRegistration.registrationId,
+      stationId: station.stationId,
+      recordedByUserId: actor.id,
+      screeningType: "VISUAL_ACUITY",
+      resultData: { chartDistanceMetres: 6 },
+      overallFlag: "NORMAL",
+      isFlagged: false,
+      idempotencyKey: crypto.randomUUID(),
+    },
+  });
+  await prisma.review.create({
+    data: {
+      registrationId: lockedRegistration.registrationId,
+      reviewedByUserId: actor.id,
+      outcome: "COMPLETE",
+      urgency: "ROUTINE",
+      clinicalSummary: "Signed off for database routine lock.",
+    },
+  });
+
+  await assert.rejects(
+    prisma.screeningResult.update({
+      where: { resultId: saved.resultId },
+      data: { overallFlag: "URGENT" },
+    }),
+    /cannot be changed after clinical review/,
+  );
+  await assert.rejects(
+    prisma.screeningResult.delete({ where: { resultId: saved.resultId } }),
+    /cannot be changed after clinical review/,
   );
 });

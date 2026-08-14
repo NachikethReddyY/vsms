@@ -72,6 +72,11 @@
 -- The reporting API uses the live aggregate function instead of a materialized
 -- view, avoiding stale clinical dashboards and an operational refresh job.
 --
+-- Screening result lock, completeness, and PII-free flag audit
+-- ------------------------------------------------------------
+-- prisma/migrations/20260814220000_add_screening_stored_routines/migration.sql
+-- Stored_Procedures/Sitt_screening_routines.sql
+--
 -- Runtime adapters
 -- ----------------
 -- utils/database/databaseRoutines.js

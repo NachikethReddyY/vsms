@@ -38,8 +38,36 @@ const isRegistrationRouteComplete = async (
   return result?.complete === true;
 };
 
+const isScreeningResultsComplete = async (
+  eventId,
+  registrationId,
+  client = prisma,
+) => {
+  const [result] = await client.$queryRaw(Prisma.sql`
+    SELECT "vsms_screening_results_complete"(
+      ${eventId}::uuid,
+      ${registrationId}::uuid
+    ) AS complete
+  `);
+  return result?.complete === true;
+};
+
+const recordScreeningFlagAudit = (
+  resultId,
+  actorUserId,
+  client = prisma,
+) => client.$queryRaw(Prisma.sql`
+  CALL "sp_vsms_audit_screening_flag"(
+    ${resultId}::uuid,
+    ${actorUserId}::uuid,
+    NULL
+  )
+`).then(([row]) => ({ auditId: row?.p_audit_id || null }));
+
 module.exports = {
   cancelActiveRegistrationQueue,
   getEventQueueStatistics,
   isRegistrationRouteComplete,
+  isScreeningResultsComplete,
+  recordScreeningFlagAudit,
 };
