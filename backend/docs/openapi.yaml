@@ -5050,10 +5050,11 @@ components:
               type: object
               nullable: true
               additionalProperties: false
-              required: [status, queueNumber, station]
+              required: [status, queueNumber, nowCalling, station]
               properties:
                 status: { $ref: "#/components/schemas/QueueStatus", description: "Participant's own live queue state (waiting/called/in-progress)" }
                 queueNumber: { type: integer }
+                nowCalling: { type: integer, nullable: true, description: "Queue number currently called at this station" }
                 station:
                   type: object
                   additionalProperties: false

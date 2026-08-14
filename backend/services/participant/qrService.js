@@ -427,7 +427,7 @@ exports.getPublicStatus = async (token, db = prisma) => {
                 select: {
                     queueNumber: true,
                     registrationStatus: true,
-                    event: { select: { name: true } },
+                    event: { select: { eventId: true, name: true } },
                     routeSteps: {
                         orderBy: { position: "asc" },
                         select: {
@@ -464,11 +464,23 @@ exports.getPublicStatus = async (token, db = prisma) => {
     }
 
     const activeEntry = qr.registration.queueEntries[0] || null;
+    const nowCalling = activeEntry
+        ? await db.queueEntry.findFirst({
+            where: {
+                stationId: activeEntry.station.stationId,
+                status: { in: ["CALLED", "IN_PROGRESS"] },
+                registration: { eventId: qr.registration.event.eventId },
+            },
+            orderBy: [{ calledAt: "desc" }, { queueNumber: "asc" }],
+            select: { queueNumber: true },
+        })
+        : null;
     const firstUnfinishedPosition = qr.registration.routeSteps.find(({ completedAt }) => !completedAt)?.position;
     const queueState = activeEntry
         ? {
             status: activeEntry.status,
             queueNumber: activeEntry.queueNumber,
+            nowCalling: nowCalling?.queueNumber ?? null,
             station: {
                 name: activeEntry.station.stationName,
                 type: activeEntry.station.stationType,
@@ -505,6 +517,16 @@ exports.getPublicStatus = async (token, db = prisma) => {
         route,
         expiresAt: qr.expiresAt,
     };
+};
+
+exports.renderPublicPass = async (token, db = prisma) => {
+    const normalizedToken = String(token || "").toLowerCase().trim();
+    const qr = await db.qRCodePass.findFirst({
+        where: activeQrWhere(tokenSelector(normalizedToken)),
+        select: { id: true },
+    });
+    if (!qr) throw new AppError(404, "QR_NOT_FOUND", "This pass is no longer active.");
+    return renderBrandedQrSvg(buildQRTargetUrl(normalizedToken), { width: 420 });
 };
 
 // ==========================================

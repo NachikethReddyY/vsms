@@ -114,6 +114,11 @@ export default function ParticipantStatusPage() {
       <span className="ps-badge">Valid pass</span>
       <h1>{status.eventName ?? 'Event pass'}</h1>
 
+      <div className="ps-pass-code">
+        <img src={`/api/v1/qr/public-pass/${encodeURIComponent(token)}`} alt="Participant pass QR code for station staff to scan" />
+        <div><strong>Scan at each station</strong><span>This secure code opens your event record for authorised staff.</span></div>
+      </div>
+
       {error && (
         <div className="ps-delayed" role="status">
           <strong>Update delayed</strong>
@@ -123,11 +128,15 @@ export default function ParticipantStatusPage() {
       )}
 
       {queueState ? (
-        <div className="ps-state-card ps-state-tone-waiting">
+        <div className={`ps-state-card ps-state-tone-${queueState.status.toLowerCase().replace('_', '')}`}>
           <strong>{QUEUE_STATE_LABEL[queueState.status] ?? 'Screening in progress'}</strong>
           <p className="ps-state-card-sub">
-            Go to <b>{queueState.station.name}</b>{queueState.queueNumber != null ? ` · queue #${queueState.queueNumber}` : ''}
+            Go to <b>{queueState.station.name}</b>
           </p>
+          <div className="ps-queue-grid">
+            <div className="ps-queue-cell ps-queue-yours"><span className="ps-queue-label">Your number</span><strong className="ps-queue-value">{queueState.queueNumber}</strong></div>
+            <div className="ps-queue-cell ps-queue-now"><span className="ps-queue-label">Now calling</span><strong className="ps-queue-value">{queueState.nowCalling ?? '—'}</strong></div>
+          </div>
         </div>
       ) : (
         <p className="ps-route-guidance">Follow the route below. Staff will help if a step is blocked.</p>
@@ -158,7 +167,7 @@ export default function ParticipantStatusPage() {
 
   return <main className="participant-status-page">
     <div className="participant-status-shell">
-      <Link className="participant-status-brand" to="/"><span aria-hidden="true">V</span>VSMS</Link>
+      <Link className="participant-status-brand" to="/"><img src="/favicon.svg" alt="" />VSMS</Link>
       {content}
       <footer className="participant-status-footer"><span>No personal information is shown on this page.</span><Link to="/">Staff sign in</Link></footer>
     </div>

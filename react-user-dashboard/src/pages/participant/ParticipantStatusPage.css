@@ -21,14 +21,10 @@
   font-size: 13px;
   font-weight: 800;
 }
-.participant-status-brand span {
+.participant-status-brand img {
   width: 28px;
   height: 28px;
-  display: grid;
-  place-items: center;
-  background: var(--event-ink, #0d0d0f);
-  color: var(--event-canvas, #f6f7f5);
-  font-size: 11px;
+  border-radius: 7px;
 }
 
 .ps-state {
@@ -67,6 +63,25 @@
   font-size: 12px;
   font-weight: 700;
 }
+
+.ps-pass-code {
+  display: grid;
+  grid-template-columns: 136px 1fr;
+  align-items: center;
+  gap: 18px;
+  width: 100%;
+  max-width: 420px;
+  padding: 14px;
+  margin-top: 6px;
+  border: 1px solid var(--event-line, #e3e4df);
+  border-radius: 12px;
+  background: var(--event-canvas, #f6f7f5);
+  text-align: left;
+}
+.ps-pass-code img { width: 136px; height: 136px; padding: 8px; border-radius: 12px; background: #fff; }
+.ps-pass-code div { display: grid; gap: 5px; }
+.ps-pass-code strong { font-size: 15px; }
+.ps-pass-code span { color: var(--event-muted, #6b6f66); font-size: 12px; line-height: 18px; }
 
 .ps-delayed {
   display: flex;
@@ -107,33 +122,46 @@
 .ps-route-guidance { margin-top: 6px; }
 .ps-route { width: 100%; margin-top: 12px; text-align: left; }
 .ps-route h2 { margin: 0 0 10px; font-size: 15px; }
-.ps-route ol { display: grid; gap: 8px; margin: 0; padding: 0; list-style: none; }
+.ps-route ol { position: relative; display: grid; gap: 0; margin: 0; padding: 0; list-style: none; }
+.ps-route ol::before {
+  content: '';
+  position: absolute;
+  top: 26px;
+  bottom: 26px;
+  left: 25px;
+  width: 2px;
+  background: var(--event-line, #e3e4df);
+}
 .ps-route li {
+  position: relative;
   display: grid;
-  grid-template-columns: 32px 1fr;
+  grid-template-columns: 42px 1fr;
   align-items: center;
-  gap: 10px;
-  min-height: 52px;
-  padding: 8px 12px;
-  border: 1px solid var(--event-line);
-  border-radius: 8px;
+  gap: 14px;
+  min-height: 68px;
+  padding: 8px 10px 8px 4px;
 }
 .ps-route li > span {
+  position: relative;
+  z-index: 1;
   display: grid;
-  width: 28px;
-  height: 28px;
+  width: 32px;
+  height: 32px;
   place-items: center;
   border: 1px solid var(--event-line);
   border-radius: 999px;
+  background: var(--event-card, #ffffff);
   font-size: 12px;
   font-weight: 800;
 }
 .ps-route li > div { display: grid; gap: 2px; }
 .ps-route li strong { font-size: 14px; }
 .ps-route li small { color: var(--event-muted); font-size: 12px; }
-.ps-route li[data-state='current'] { border-color: var(--event-action); }
-.ps-route li[data-state='completed'] { opacity: .72; }
-.ps-route li[data-state='blocked'] { border-color: var(--cancelled-light); }
+.ps-route li[data-state='current'] > div { padding: 10px 12px; border-radius: 8px; background: color-mix(in srgb, var(--event-blue, #2563eb) 8%, transparent); }
+.ps-route li[data-state='current'] > span { border-color: var(--event-blue, #2563eb); background: var(--event-blue, #2563eb); color: #fff; }
+.ps-route li[data-state='completed'] { opacity: .7; }
+.ps-route li[data-state='completed'] > span { border-color: var(--green, #15803d); color: var(--green, #15803d); }
+.ps-route li[data-state='blocked'] > span { border-color: var(--amber, #b45309); color: var(--amber, #b45309); }
 
 .ps-facts {
   display: grid;
@@ -153,10 +181,11 @@
 
 .ps-queue-grid {
   display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 12px;
   width: 100%;
   max-width: 360px;
-  margin-top: 18px;
+  margin-top: 14px;
 }
 .ps-queue-cell {
   display: flex;
@@ -228,6 +257,13 @@
   border-radius: 12px;
   border: 1px solid var(--event-line, #e3e4df);
   text-align: left;
+}
+
+@media (max-width: 480px) {
+  .ps-state { padding: 26px 20px; }
+  .ps-pass-code { grid-template-columns: 112px 1fr; gap: 14px; }
+  .ps-pass-code img { width: 112px; height: 112px; }
+  .ps-queue-value { font-size: 36px; }
 }
 .ps-state-card-head {
   display: flex;

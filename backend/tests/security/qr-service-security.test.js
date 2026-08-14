@@ -677,6 +677,9 @@ test("public pass status reveals no PII and reports expired or revoked passes as
   const token = "d".repeat(64);
   let where;
   const db = {
+    queueEntry: {
+      findFirst: async () => ({ queueNumber: 39 }),
+    },
     qRCodePass: {
       findFirst: async (query) => {
         where = query.where;
@@ -685,7 +688,7 @@ test("public pass status reveals no PII and reports expired or revoked passes as
           registration: {
             queueNumber: 42,
             registrationStatus: "CHECKED_IN",
-            event: { name: "Community Vision Screening" },
+            event: { eventId: crypto.randomUUID(), name: "Community Vision Screening" },
             routeSteps: [
               {
                 position: 1,
@@ -713,6 +716,7 @@ test("public pass status reveals no PII and reports expired or revoked passes as
   assert.equal(valid.valid, true);
   assert.equal(valid.eventName, "Community Vision Screening");
   assert.equal(valid.queueNumber, 42);
+  assert.equal(valid.queueState.nowCalling, 39);
   assert.deepEqual(valid.route.map(({ stationName, state }) => [stationName, state]), [
     ["Visual Acuity", "COMPLETED"],
     ["Refraction", "CURRENT"],

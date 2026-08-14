@@ -4499,6 +4499,8 @@ export interface components {
                     /** @description Participant's own live queue state (waiting/called/in-progress) */
                     status: components["schemas"]["QueueStatus"];
                     queueNumber: number;
+                    /** @description Queue number currently called at this station */
+                    nowCalling: number | null;
                     station: {
                         name: string;
                         type: string;
