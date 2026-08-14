@@ -111,6 +111,7 @@ export default function App() {
           <Route path="/account/security" element={<AccountSecurityPage />} />
           <Route path="/forbidden" element={<ForbiddenPage />} />
           <Route path="/events/:eventId" element={<EventDetailPage />} />
+          <Route path="/qr-scanner" element={<QRScannerPage />} />
           <Route path="/settings" element={<SettingsPage />} />
 
           <Route element={<EventCapabilityGuard allowedRoles={eventMemberRoles} />}>
