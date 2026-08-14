@@ -42,8 +42,6 @@ const createRegistration = async (label, queueNumber, resultFlags) => {
       dateOfBirth: new Date("1970-01-01T00:00:00.000Z"),
       gender: "F",
       contactNumber: "+65 6000 1000",
-      emergencyContact: "+65 6000 1001",
-      consentGiven: true,
       createdById: testUsers.manager.id,
       updatedById: testUsers.manager.id,
       onboardingEventId: eventId,
@@ -258,7 +256,7 @@ describe("clinical review API", () => {
     expect(JSON.stringify(audits)).not.toContain("Screening is within expected limits");
     expect(audits[0].details.signaturePurpose).toBe("REVIEW_DECISION");
     expect(audits[0].details.eyeHealthRecorded).toBe(true);
-    expect(audits[0].details.signatureSha256).toBe(signature.signatureSha256);
+    expect(audits[0].details.signatureSha256).toBe("[REDACTED]");
     const review = await prisma.review.findFirstOrThrow({ where: { registrationId: registrations.Normal } });
     expect(review.signatureSignerUserId).toBe(testUsers.reviewer.id);
     expect(review.signatureObjectKey).toBe(signature.signatureObjectKey);

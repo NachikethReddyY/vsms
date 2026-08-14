@@ -108,13 +108,33 @@ describe('Station library pages', () => {
     expect(await screen.findByRole('heading', { name: /Add station template/i })).toBeTruthy();
     expect(screen.queryByLabelText(/Station type/i)).toBeNull();
     expect(screen.getByRole('heading', { level: 2, name: /^Form fields$/i })).toBeTruthy();
-    expect(screen.getByRole('heading', { level: 2, name: /^Preview$/i })).toBeTruthy();
+    expect(screen.getByRole('heading', { level: 2, name: /^Live preview$/i })).toBeTruthy();
     await userEvent.type(screen.getByLabelText(/^Name$/i), 'Custom notes booth');
     await userEvent.click(screen.getByRole('button', { name: /Create template/i }));
     await waitFor(() => expect(post).toHaveBeenCalledWith('/events/station-templates', expect.objectContaining({
       stationType: 'CUSTOM',
       name: 'Custom notes booth',
       fieldSchema: expect.arrayContaining([expect.objectContaining({ type: 'text' })]),
+    })));
+  });
+
+  it('loads valid example data with multiple flag rules', async () => {
+    post.mockResolvedValueOnce({ data: customTemplate });
+    renderLibrary('/admin/station-templates/new');
+    await userEvent.click(await screen.findByRole('button', { name: /Use example/i }));
+    expect(screen.getAllByText(/Flag rules ·/i).length).toBeGreaterThan(0);
+    expect(screen.getByRole('heading', { name: /Live preview/i })).toBeTruthy();
+    expect((screen.getByLabelText('Plates presented *') as HTMLInputElement).value).toBe('1');
+    await userEvent.click(screen.getByRole('button', { name: /Create template/i }));
+    await waitFor(() => expect(post).toHaveBeenCalledWith('/events/station-templates', expect.objectContaining({
+      name: 'Colour vision screening',
+      fieldSchema: expect.arrayContaining([expect.objectContaining({
+        key: 'platesCorrect',
+        flagRules: expect.arrayContaining([
+          expect.objectContaining({ flag: 'REFER', value: 12 }),
+          expect.objectContaining({ flag: 'REVIEW', value: 16 }),
+        ]),
+      })]),
     })));
   });
 
@@ -166,11 +186,11 @@ describe('Station library pages', () => {
     ));
   });
 
-  it('hides registration, clinical review, and eye health from the library list', async () => {
+  it('hides operational templates but shows the eye-health screening template', async () => {
     const registration = {
       stationTemplateId: '60000000-0000-4000-8000-000000000001',
       templateKey: 'REGISTRATION',
-      stationType: null,
+      stationType: 'EYE_HEALTH' as const,
       version: 1,
       name: 'Registration',
       description: 'Check-in',
@@ -195,17 +215,17 @@ describe('Station library pages', () => {
       stationType: null,
       version: 1,
       name: 'Eye health',
-      description: 'Review only',
+      description: 'Eye-health screening',
       defaultCapacity: 2,
       active: true,
-      fieldSchema: null,
+      fieldSchema: [{ key: 'observations', label: 'Observations', type: 'text' as const, required: true }],
     };
     get.mockResolvedValueOnce({ data: [registration, clinicalReview, eyeHealth, template] });
     renderLibrary();
     expect(await within(library()).findByText('Visual acuity booth')).toBeTruthy();
     expect(screen.queryByText('Registration')).toBeNull();
     expect(screen.queryByText('Clinical review')).toBeNull();
-    expect(screen.queryByText('Eye health')).toBeNull();
+    expect(within(library()).getByText('Eye health')).toBeTruthy();
   });
 
   it('blocks edit routes for templates hidden from the station library', async () => {

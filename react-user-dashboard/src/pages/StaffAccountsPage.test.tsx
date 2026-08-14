@@ -57,7 +57,7 @@ it('creates staff without asking for or submitting an employee number', async ()
     status: 'ACTIVE',
     approvalState: 'APPROVED',
     accessState: 'ENABLED',
-    roles: ['SUPPORT'],
+    roles: [],
   } } });
   render(<StaffAccountsPage />);
   expect(await screen.findByText('VSMS Admin')).toBeTruthy();
@@ -79,9 +79,21 @@ it('creates staff without asking for or submitting an employee number', async ()
     fullName: 'Aryaa Tan',
     email: 'aryaa@vsms.cloud',
     status: 'ACTIVE',
-    roles: ['SUPPORT'],
+    roles: [],
   });
   expect(post.mock.calls[0][1]).not.toHaveProperty('employeeNumber');
+});
+
+it('deletes a staff account from the directory and revokes access', async () => {
+  vi.spyOn(window, 'confirm').mockReturnValue(true);
+  post.mockResolvedValue({ data: {} });
+  render(<StaffAccountsPage />);
+  expect(await screen.findByText('VSMS Admin')).toBeTruthy();
+  await userEvent.click(screen.getByRole('button', { name: 'Edit' }));
+  await userEvent.click(within(await screen.findByRole('dialog', { name: 'Edit VSMS Admin' })).getByRole('button', { name: 'Delete account' }));
+  await waitFor(() => expect(post).toHaveBeenCalledWith('/admin/accounts/user-1/deprovision', { reason: 'Deleted from the staff directory by an administrator' }));
+  expect(get).toHaveBeenCalledTimes(2);
+  expect(await screen.findByText('Staff account deleted and access revoked.')).toBeTruthy();
 });
 
 afterEach(cleanup);

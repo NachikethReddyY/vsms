@@ -46,7 +46,6 @@ const artifactCleanupListQuery = z.object({
 
 const auditLogListQuery = z.object({
   cursor: z.string().trim().min(1).max(512).optional(),
-  authCursor: z.string().trim().min(1).max(512).optional(),
   limit: z.coerce.number().int().min(1).max(100).default(50),
   entityName: z.string().trim().min(1).max(50).optional(),
   action: z.string().trim().min(1).max(100).optional(),
@@ -77,6 +76,17 @@ const accountProviderOperationActionBody = z.object({
   reason: z.string().trim().min(10).max(500),
 }).strict();
 
+const backupListQuery = z.object({}).strict();
+const createBackupBody = z.object({
+  description: z.string().trim().min(3).max(300).optional(),
+}).strict();
+const backupParams = z.object({
+  backupId: z.string().regex(/^vsms-\d{8}T\d{6}Z-[a-f0-9]{8}\.dump$/),
+}).strict();
+const restoreBackupBody = z.object({
+  confirmation: z.literal("RESTORE_ISOLATED_TEST_DATABASE"),
+}).strict();
+
 module.exports = {
   referralDeliveryMaintenanceBody,
   auditLogListQuery,
@@ -86,4 +96,8 @@ module.exports = {
   accountProviderDrainBody,
   accountProviderOperationParams,
   accountProviderOperationActionBody,
+  backupListQuery,
+  createBackupBody,
+  backupParams,
+  restoreBackupBody,
 };

@@ -80,8 +80,6 @@ before(async () => {
       dateOfBirth: new Date("1980-01-01T00:00:00.000Z"),
       gender: "X",
       contactNumber: "+65 8000 0001",
-      emergencyContact: "+65 8000 0002",
-      consentGiven: true,
       createdById: screener.id,
       updatedById: screener.id,
       onboardingEventId: event.eventId,
@@ -96,7 +94,6 @@ before(async () => {
       participantDisplayName: "Sync Participant",
       queueNumber: 1,
       idempotencyKey: crypto.randomUUID(),
-      passToken: `secret-${crypto.randomUUID()}`,
       checkedIn: true,
     },
   });

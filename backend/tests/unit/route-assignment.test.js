@@ -32,6 +32,7 @@ const routeDb = ({ stations, activeEntries = [], availabilities = [], results = 
     stationReads: 0,
   };
   const tx = {
+    $queryRaw: async () => [{ event_id: eventId }],
     eventRegistration: {
       findUnique: async () => ({
         registrationId,

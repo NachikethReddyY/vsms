@@ -15,8 +15,8 @@ function eventRecord(status, version, shifts = []) {
     description: null,
     venue: "Library hall",
     timezone: "Asia/Singapore",
-    startsAt: new Date("2026-08-10T01:00:00.000Z"),
-    endsAt: new Date("2026-08-10T09:00:00.000Z"),
+    startsAt: new Date("2099-08-10T01:00:00.000Z"),
+    endsAt: new Date("2099-08-10T09:00:00.000Z"),
     capacity: 100,
     expectedAttendance: 80,
     status,
@@ -40,6 +40,7 @@ function transactionDb(current, updated, handlers = {}) {
       findUniqueOrThrow: async () => updated,
     },
     shift: { updateMany: async () => ({ count: 0 }) },
+    qRCodePass: { updateMany: handlers.revokeQrPasses || (async () => ({ count: 0 })) },
     staffAssignment: { updateMany: async () => ({ count: 0 }) },
     station: { findMany: async () => [], deleteMany: async () => ({ count: 0 }) },
     eventDay: { findMany: async () => [] },
@@ -96,11 +97,23 @@ test("event lifecycle commands use the real primary key and retain management ac
   const cancelling = eventRecord("PUBLISHED", 2);
   const cancelled = { ...eventRecord("CANCELLED", 3), cancellationReason: "Venue is no longer available" };
   let cancelWhere;
+  let revokedQrWhere;
+  let revokedQrData;
   const cancelDb = transactionDb(cancelling, cancelled, {
     updateEvent: async ({ where }) => { cancelWhere = where; return { count: 1 }; },
+    revokeQrPasses: async ({ where, data }) => {
+      revokedQrWhere = where;
+      revokedQrData = data;
+      return { count: 2 };
+    },
   });
   const cancelResult = await eventService.cancelEvent(eventId, { version: 2, reason: "Venue is no longer available" }, user, requestId, cancelDb);
   assert.deepEqual(cancelWhere, { eventId, version: 2, status: "PUBLISHED" });
+  assert.deepEqual(revokedQrWhere, { isActive: true, registration: { eventId } });
+  assert.equal(revokedQrData.isActive, false);
+  assert.equal(revokedQrData.revokedBy, userId);
+  assert.equal(revokedQrData.revokedReason, "Event cancelled");
+  assert.ok(revokedQrData.revokedAt instanceof Date);
   assert.equal(cancelResult.status, "CANCELLED");
   assert.equal(cancelResult.canManage, true);
 });
@@ -143,9 +156,9 @@ test("event creation persists the selected event days", async () => {
     ...eventRecord("DRAFT", 1),
     eventDays: [{
       eventDayId: "66666666-6666-4666-8666-666666666666",
-      date: new Date("2026-08-10T00:00:00.000Z"),
-      startsAt: new Date("2026-08-10T01:00:00.000Z"),
-      endsAt: new Date("2026-08-10T09:00:00.000Z"),
+      date: new Date("2099-08-10T00:00:00.000Z"),
+      startsAt: new Date("2099-08-10T01:00:00.000Z"),
+      endsAt: new Date("2099-08-10T09:00:00.000Z"),
     }],
   };
   const createdDays = [];
@@ -177,14 +190,14 @@ test("event creation persists the selected event days", async () => {
     endsAt: saved.endsAt.toISOString(),
     capacity: saved.capacity,
     expectedAttendance: saved.expectedAttendance,
-    eventDays: [{ date: "2026-08-10", startsAt: saved.startsAt.toISOString(), endsAt: saved.endsAt.toISOString() }],
+    eventDays: [{ date: "2099-08-10", startsAt: saved.startsAt.toISOString(), endsAt: saved.endsAt.toISOString() }],
     stations: [],
     shifts: [],
   }, user, requestId, null, db);
 
   assert.equal(createdDays.length, 1);
   assert.equal(createdDays[0].eventId, eventId);
-  assert.equal(result.eventDays[0].date, "2026-08-10");
+  assert.equal(result.eventDays[0].date, "2099-08-10");
 });
 
 test("event creation rejects day slots outside the overall schedule", async () => {
@@ -201,14 +214,14 @@ test("event creation rejects day slots outside the overall schedule", async () =
     locationProvider: "MANUAL",
     locationReference: null,
     timezone: "Asia/Singapore",
-    startsAt: "2026-08-10T01:00:00.000Z",
-    endsAt: "2026-08-10T09:00:00.000Z",
+    startsAt: "2099-08-10T01:00:00.000Z",
+    endsAt: "2099-08-10T09:00:00.000Z",
     capacity: 100,
     expectedAttendance: 80,
     eventDays: [{
-      date: "2026-08-10",
-      startsAt: "2026-08-10T00:00:00.000Z",
-      endsAt: "2026-08-10T09:00:00.000Z",
+      date: "2099-08-10",
+      startsAt: "2099-08-10T00:00:00.000Z",
+      endsAt: "2099-08-10T09:00:00.000Z",
     }],
     stations: [],
     shifts: [],
@@ -233,8 +246,8 @@ test("event plans reject duplicate station orders", () => {
     name: "Community screening",
     venue: "Library hall",
     timezone: "Asia/Singapore",
-    startsAt: "2026-08-10T01:00:00.000Z",
-    endsAt: "2026-08-10T09:00:00.000Z",
+    startsAt: "2099-08-10T01:00:00.000Z",
+    endsAt: "2099-08-10T09:00:00.000Z",
     capacity: 100,
     stations: [
       station("55555555-5555-4555-8555-555555555555"),
@@ -301,8 +314,8 @@ test("staff assignment commits with schedule locking and the event version", asy
   const shift = {
     shiftId,
     name: "Morning",
-    startsAt: new Date("2026-08-10T01:00:00.000Z"),
-    endsAt: new Date("2026-08-10T05:00:00.000Z"),
+    startsAt: new Date("2099-08-10T01:00:00.000Z"),
+    endsAt: new Date("2099-08-10T05:00:00.000Z"),
     requiredStaff: 1,
     status: "PLANNED",
     staffAssignments: [],
@@ -327,7 +340,7 @@ test("staff assignment commits with schedule locking and the event version", asy
     audit: async ({ data }) => { audit = data; return {}; },
     tx: {
       $executeRawUnsafe: async () => 1,
-      user: { findFirst: async () => ({ id: assigneeId, userRoles: [{ role: { roleName: "SCREENER" } }] }) },
+      user: { findMany: async () => [{ id: assigneeId, userRoles: [{ role: { roleName: "SCREENER" } }] }] },
       staffAssignment: {
         findFirst: async () => null,
         create: async ({ data }) => { createdAssignment = data; return assignment; },

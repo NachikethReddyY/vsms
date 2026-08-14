@@ -11,7 +11,7 @@ servers:
     description: Same-origin API server; local development proxies to https://127.0.0.1:5050
 tags:
   - name: System
-    description: Service readiness
+    description: Service liveness and dependency readiness
   - name: Authentication
     description: Amazon Cognito managed login with a secure cookie session
   - name: Events
@@ -19,7 +19,7 @@ tags:
   - name: Users
     description: Restricted administrative user projection
   - name: Participants
-    description: Participant onboarding, lookup, consent, and emergency contacts
+    description: Participant onboarding, lookup, and emergency contacts
   - name: Registrations
     description: Event registration and status history
   - name: Screening
@@ -44,10 +44,10 @@ paths:
       tags: [System]
       security: []
       operationId: getHealth
-      summary: Check API readiness
+      summary: Check API process liveness
       responses:
         "200":
-          description: API is ready
+          description: API process is alive
           content:
             application/json:
               schema:
@@ -55,12 +55,33 @@ paths:
                 required: [status]
                 properties:
                   status: { type: string, enum: [ok] }
-        "500":
-          description: Service is not ready
-          content: { application/json: { schema: { $ref: "#/components/schemas/Problem" } } }
-        "404":
-          description: Health endpoint is unavailable
-          content: { application/json: { schema: { $ref: "#/components/schemas/Problem" } } }
+  /ready:
+    get:
+      tags: [System]
+      security: []
+      operationId: getReady
+      summary: Check API readiness (database reachability)
+      responses:
+        "200":
+          description: API is ready to serve traffic
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [status, database]
+                properties:
+                  status: { type: string, enum: [ready] }
+                  database: { type: string, enum: [connected] }
+        "503":
+          description: API process is alive but a required dependency (database) is unreachable
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [status, database]
+                properties:
+                  status: { type: string, enum: [not_ready] }
+                  database: { type: string, enum: [disconnected] }
   /api/v1/webhooks/ses:
     post:
       tags: [Provider Events]
@@ -483,6 +504,35 @@ paths:
         "403": { $ref: "#/components/responses/Forbidden" }
         "422": { $ref: "#/components/responses/ValidationFailed" }
         "429": { $ref: "#/components/responses/RateLimited" }
+  /api/v1/operations:
+    get:
+      tags: [Events]
+      operationId: getMultiEventOperationsOverview
+      summary: Monitor authorized events from the Operations Center
+      description: Returns aggregate-only operational health for every event the administrator or active event manager may manage. Participant identity, queue notes, screening values, clinical narratives, referral recipients, and synchronization payloads are excluded. Intended for bounded polling; responses are never cached.
+      parameters:
+        - name: status
+          in: query
+          schema: { type: string, enum: [ALL, ACTIVE, UPCOMING, COMPLETED], default: ALL }
+        - name: search
+          in: query
+          schema: { type: string, maxLength: 100 }
+        - name: limit
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 100, default: 50 }
+      responses:
+        "200":
+          description: Authorized multi-event operational snapshot
+          headers:
+            Cache-Control:
+              schema: { type: string, enum: [no-store] }
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/OperationsOverview" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "422": { $ref: "#/components/responses/ValidationFailed" }
+        "429": { $ref: "#/components/responses/RateLimited" }
   /api/v1/locations/search:
     get:
       tags: [Events]
@@ -518,6 +568,21 @@ paths:
           headers:
             Cache-Control: { schema: { type: string, enum: ["public, max-age=60"] } }
           content: { application/json: { schema: { $ref: "#/components/schemas/PublicEvent" } } }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "422": { $ref: "#/components/responses/ValidationFailed" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+  /api/v1/public/events/{eventId}/artwork:
+    get:
+      tags: [Events]
+      operationId: getPublicEventArtwork
+      summary: Read artwork for a public event without exposing private object storage
+      parameters: [{ $ref: "#/components/parameters/EventId" }]
+      responses:
+        "200":
+          description: Event artwork
+          content:
+            image/jpeg: { schema: { type: string, format: binary } }
+            image/webp: { schema: { type: string, format: binary } }
         "404": { $ref: "#/components/responses/NotFound" }
         "422": { $ref: "#/components/responses/ValidationFailed" }
         "429": { $ref: "#/components/responses/RateLimited" }
@@ -632,7 +697,7 @@ paths:
           schema: { type: integer, minimum: 1, maximum: 100, default: 50 }
         - name: status
           in: query
-          schema: { type: string, enum: [SIGNED_UP, CHECKED_IN, COMPLETED, CANCELLED] }
+          schema: { type: string, enum: [SIGNED_UP, WAITLISTED, CHECKED_IN, COMPLETED, CANCELLED] }
         - name: search
           in: query
           schema: { type: string, maxLength: 150 }
@@ -711,6 +776,22 @@ paths:
         "404": { $ref: "#/components/responses/NotFound" }
         "409": { $ref: "#/components/responses/Conflict" }
         "422": { $ref: "#/components/responses/ValidationFailed" }
+  /api/v1/events/{eventId}/artwork:
+    get:
+      tags: [Events]
+      operationId: getEventArtwork
+      summary: Read private draft or staff-visible event artwork
+      parameters: [{ $ref: "#/components/parameters/EventId" }]
+      responses:
+        "200":
+          description: Event artwork
+          content:
+            image/jpeg: { schema: { type: string, format: binary } }
+            image/webp: { schema: { type: string, format: binary } }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "422": { $ref: "#/components/responses/ValidationFailed" }
   /api/v1/events/{eventId}/deletion-preview:
     get:
       tags: [Events]
@@ -751,7 +832,6 @@ paths:
           content: { application/json: { schema: { $ref: "#/components/schemas/RegistrationListResponse" } } }
         "401": { $ref: "#/components/responses/Unauthorized" }
         "403": { $ref: "#/components/responses/Forbidden" }
-        "404": { $ref: "#/components/responses/NotFound" }
     post:
       tags: [Registrations]
       operationId: createEventRegistration
@@ -774,6 +854,17 @@ paths:
         "401": { $ref: "#/components/responses/Unauthorized" }
         "403": { $ref: "#/components/responses/Forbidden" }
         "409": { $ref: "#/components/responses/Conflict" }
+  /api/v1/events/{eventId}/registrations/summary:
+    parameters: [{ $ref: "#/components/parameters/EventId" }]
+    get:
+      tags: [Registrations]
+      operationId: getEventRegistrationSummary
+      summary: Get registration capacity and status totals for an event
+      responses:
+        "200": { description: Registration summary, content: { application/json: { schema: { $ref: "#/components/schemas/EventRegistrationSummaryResponse" } } } }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
   /api/v1/events/{eventId}/memberships:
     parameters: [{ $ref: "#/components/parameters/EventId" }]
     get:
@@ -848,6 +939,24 @@ paths:
         "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
         "409": { $ref: "#/components/responses/Conflict" }
+  /api/v1/events/{eventId}/shifts:
+    post:
+      tags: [Events]
+      operationId: addEventShift
+      summary: Add a working period to a draft, published, or live event
+      parameters: [{ $ref: "#/components/parameters/EventId" }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/AddShiftRequest" }
+      responses:
+        "201": { description: Shift added and audited, content: { application/json: { schema: { $ref: "#/components/schemas/Event" } } } }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "422": { $ref: "#/components/responses/ValidationFailed" }
   /api/v1/events/{eventId}/shifts/{shiftId}/assignments:
     post:
       tags: [Events]
@@ -931,6 +1040,28 @@ paths:
       responses:
         "200":
           description: Event station updated and audited
+          content: { application/json: { schema: { $ref: "#/components/schemas/Event" } } }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "422": { $ref: "#/components/responses/ValidationFailed" }
+    delete:
+      tags: [Events]
+      operationId: removeEventStation
+      summary: Remove an unused station from a draft or published event
+      parameters:
+        - $ref: "#/components/parameters/EventId"
+        - name: eventStationId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+        - name: version
+          in: query
+          required: true
+          schema: { type: integer, minimum: 1 }
+      responses:
+        "200":
+          description: Station removed and remaining stations reordered
           content: { application/json: { schema: { $ref: "#/components/schemas/Event" } } }
         "401": { $ref: "#/components/responses/Unauthorized" }
         "404": { $ref: "#/components/responses/NotFound" }
@@ -1314,16 +1445,6 @@ paths:
         "400": { $ref: "#/components/responses/ValidationFailed" }
         "401": { $ref: "#/components/responses/Unauthorized" }
         "403": { $ref: "#/components/responses/Forbidden" }
-  /api/v1/participants/active-consent-form:
-    get:
-      tags: [Participants]
-      operationId: getParticipantActiveConsentForm
-      summary: Get the currently effective consent form
-      responses:
-        "200": { description: Active consent form, content: { application/json: { schema: { $ref: "#/components/schemas/ConsentFormEnvelope" } } } }
-        "401": { $ref: "#/components/responses/Unauthorized" }
-        "403": { $ref: "#/components/responses/Forbidden" }
-        "404": { $ref: "#/components/responses/NotFound" }
   /api/v1/participants/match:
     post:
       tags: [Participants]
@@ -1403,43 +1524,6 @@ paths:
         "200": { description: Registrations, content: { application/json: { schema: { $ref: "#/components/schemas/RegistrationsEnvelope" } } } }
         "401": { $ref: "#/components/responses/Unauthorized" }
         "403": { $ref: "#/components/responses/Forbidden" }
-  /api/v1/participants/{participantId}/consents:
-    parameters: [{ $ref: "#/components/parameters/ParticipantId" }]
-    get:
-      tags: [Participants]
-      operationId: listParticipantConsents
-      summary: List a participant's consent records
-      responses:
-        "200": { description: Consent records, content: { application/json: { schema: { $ref: "#/components/schemas/ConsentsEnvelope" } } } }
-        "401": { $ref: "#/components/responses/Unauthorized" }
-        "403": { $ref: "#/components/responses/Forbidden" }
-    post:
-      tags: [Participants]
-      operationId: createParticipantConsent
-      summary: Record consent using an event ID in the request body
-      requestBody: { required: true, content: { application/json: { schema: { $ref: "#/components/schemas/ConsentWithEventRequest" } } } }
-      responses:
-        "201": { description: Consent recorded, content: { application/json: { schema: { $ref: "#/components/schemas/ConsentEnvelope" } } } }
-        "400": { $ref: "#/components/responses/ValidationFailed" }
-        "401": { $ref: "#/components/responses/Unauthorized" }
-        "403": { $ref: "#/components/responses/Forbidden" }
-        "404": { $ref: "#/components/responses/NotFound" }
-  /api/v1/participants/{participantId}/consents/{consentId}/withdraw:
-    post:
-      tags: [Participants]
-      operationId: withdrawParticipantConsent
-      summary: Create an immutable withdrawal for accepted consent
-      parameters:
-        - $ref: "#/components/parameters/ParticipantId"
-        - $ref: "#/components/parameters/ConsentId"
-      requestBody: { required: true, content: { application/json: { schema: { $ref: "#/components/schemas/ConsentWithdrawalRequest" } } } }
-      responses:
-        "201": { description: Consent withdrawn, content: { application/json: { schema: { $ref: "#/components/schemas/ConsentEnvelope" } } } }
-        "400": { $ref: "#/components/responses/ValidationFailed" }
-        "401": { $ref: "#/components/responses/Unauthorized" }
-        "403": { $ref: "#/components/responses/Forbidden" }
-        "404": { $ref: "#/components/responses/NotFound" }
-        "409": { $ref: "#/components/responses/Conflict" }
   /api/v1/participants/{participantId}/emergency-contacts:
     parameters: [{ $ref: "#/components/parameters/ParticipantId" }]
     get:
@@ -1476,26 +1560,11 @@ paths:
         "401": { $ref: "#/components/responses/Unauthorized" }
         "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
-  /api/v1/participants/{participantId}/events/{eventId}/consent:
-    post:
-      tags: [Participants]
-      operationId: createEventConsent
-      summary: Record consent for a participant and event
-      parameters:
-        - $ref: "#/components/parameters/ParticipantId"
-        - $ref: "#/components/parameters/EventId"
-      requestBody: { required: true, content: { application/json: { schema: { $ref: "#/components/schemas/ConsentRequest" } } } }
-      responses:
-        "201": { description: Consent recorded, content: { application/json: { schema: { $ref: "#/components/schemas/ConsentEnvelope" } } } }
-        "400": { $ref: "#/components/responses/ValidationFailed" }
-        "401": { $ref: "#/components/responses/Unauthorized" }
-        "403": { $ref: "#/components/responses/Forbidden" }
-        "404": { $ref: "#/components/responses/NotFound" }
   /api/v1/participants/{participantId}/events/{eventId}/review:
     get:
       tags: [Participants]
       operationId: getParticipantRegistrationReview
-      summary: Get participant, event, emergency contact, and latest consent for registration review
+      summary: Get participant, event, and emergency contact for registration review
       parameters:
         - $ref: "#/components/parameters/ParticipantId"
         - $ref: "#/components/parameters/EventId"
@@ -1563,16 +1632,6 @@ paths:
         "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
         "409": { $ref: "#/components/responses/Conflict" }
-  /api/v1/consent-forms/active:
-    get:
-      tags: [Participants]
-      operationId: getActiveConsentForm
-      summary: Get the currently effective consent form
-      responses:
-        "200": { description: Active consent form, content: { application/json: { schema: { $ref: "#/components/schemas/ConsentFormEnvelope" } } } }
-        "401": { $ref: "#/components/responses/Unauthorized" }
-        "403": { $ref: "#/components/responses/Forbidden" }
-        "404": { $ref: "#/components/responses/NotFound" }
   /api/v1/emergency-contacts/{contactId}:
     patch:
       tags: [Participants]
@@ -1759,25 +1818,19 @@ paths:
     get:
       tags: [Administration]
       operationId: listAdministrativeAuditLogs
-      summary: List the latest application and authentication audit records
+      summary: List the unified immutable audit timeline
       description: >
-        Administrator-only paged read surface for the append-only audit trail.
-        Application audit records (`logs`) and authentication audit records
-        (`authLogs`) are returned together with independent signed keyset cursors
-        (`nextCursor` / `nextAuthCursor`) for load-more pagination. Rows are
-        immutable; this endpoint never mutates history.
+        Administrator-only paged read surface combining application,
+        authentication, and event audit ledgers behind one signed keyset cursor.
+        Rows are immutable; this endpoint never mutates history.
       parameters:
         - name: cursor
           in: query
-          description: Signed keyset cursor for the application audit page
-          schema: { type: string }
-        - name: authCursor
-          in: query
-          description: Signed keyset cursor for the authentication audit page
+          description: Signed keyset cursor for the unified audit timeline
           schema: { type: string }
         - name: limit
           in: query
-          description: Maximum rows per table in this page
+          description: Maximum timeline rows in this page
           schema: { type: integer, minimum: 1, maximum: 100, default: 50 }
         - name: entityName
           in: query
@@ -1814,7 +1867,7 @@ paths:
       tags: [QR Codes]
       operationId: generateRegistrationQrCode
       summary: Generate a safe QR pass for a registration
-      parameters: [{ $ref: "#/components/parameters/RegistrationId" }]
+      parameters: [{ $ref: "#/components/parameters/RegistrationId" }, { $ref: "#/components/parameters/IdempotencyKey" }]
       responses:
         "201": { description: QR pass generated, content: { application/json: { schema: { $ref: "#/components/schemas/QrPass" } } } }
         "401": { $ref: "#/components/responses/Unauthorized" }
@@ -1826,7 +1879,7 @@ paths:
       tags: [QR Codes]
       operationId: generateQrCode
       summary: Generate a QR pass using the legacy response envelope
-      parameters: [{ $ref: "#/components/parameters/RegistrationId" }]
+      parameters: [{ $ref: "#/components/parameters/RegistrationId" }, { $ref: "#/components/parameters/IdempotencyKey" }]
       responses:
         "201": { description: QR pass generated, content: { application/json: { schema: { $ref: "#/components/schemas/QrMutationResponse" } } } }
         "401": { $ref: "#/components/responses/Unauthorized" }
@@ -1838,7 +1891,7 @@ paths:
       tags: [QR Codes]
       operationId: reissueQrCode
       summary: Revoke the active pass and issue a replacement
-      parameters: [{ $ref: "#/components/parameters/RegistrationId" }]
+      parameters: [{ $ref: "#/components/parameters/RegistrationId" }, { $ref: "#/components/parameters/IdempotencyKey" }]
       responses:
         "201": { description: QR pass reissued, content: { application/json: { schema: { $ref: "#/components/schemas/QrMutationResponse" } } } }
         "401": { $ref: "#/components/responses/Unauthorized" }
@@ -1863,7 +1916,8 @@ paths:
     post:
       tags: [QR Codes]
       operationId: verifyQrCode
-      summary: Verify a QR token for an event
+      summary: Verify a journey QR and assign its current queue station
+      description: Validates the participant's single event-journey QR. A repeated scanId is replayed without creating another queue entry. If no active queue exists, the backend assigns the least-loaded eligible staffed station.
       requestBody:
         required: true
         content:
@@ -1871,21 +1925,24 @@ paths:
             schema:
               type: object
               additionalProperties: false
-              required: [token, eventId]
+              required: [token, scanId]
               properties:
                 token: { type: string, minLength: 1 }
                 eventId: { type: string, format: uuid }
+                scanId: { type: string, format: uuid }
       responses:
         "200": { description: Verification result, content: { application/json: { schema: { $ref: "#/components/schemas/ApiDataResponse" } } } }
         "400": { $ref: "#/components/responses/ValidationFailed" }
         "401": { $ref: "#/components/responses/Unauthorized" }
         "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
         "429": { $ref: "#/components/responses/RateLimited" }
   /api/v1/qr/manual-checkin:
     post:
       tags: [QR Codes]
       operationId: manualQrCheckIn
       summary: Check in a participant using a registration reference or QR token
+      parameters: [{ $ref: "#/components/parameters/IdempotencyKey" }]
       requestBody: { required: true, content: { application/json: { schema: { $ref: "#/components/schemas/ManualCheckInRequest" } } } }
       responses:
         "200": { description: Participant checked in, content: { application/json: { schema: { $ref: "#/components/schemas/ManualCheckInResponse" } } } }
@@ -1966,17 +2023,15 @@ paths:
       tags: [QR Codes]
       operationId: revokeQrCode
       summary: Revoke a QR pass
-      parameters: [{ $ref: "#/components/parameters/QrId" }]
+      parameters: [{ $ref: "#/components/parameters/QrId" }, { $ref: "#/components/parameters/IdempotencyKey" }]
       requestBody:
-        required: true
         content:
           application/json:
             schema:
               type: object
               additionalProperties: false
-              required: [revokedReason]
               properties:
-                revokedReason: { type: string, minLength: 1, maxLength: 255 }
+                revokedReason: { type: string, minLength: 3, maxLength: 255 }
       responses:
         "200": { description: QR pass revoked, content: { application/json: { schema: { $ref: "#/components/schemas/QrRevokeResponse" } } } }
         "400": { $ref: "#/components/responses/ValidationFailed" }
@@ -2485,11 +2540,6 @@ components:
       in: path
       required: true
       schema: { type: string, format: uuid }
-    ConsentId:
-      name: consentId
-      in: path
-      required: true
-      schema: { type: string, format: uuid }
     QrId:
       name: qrId
       in: path
@@ -2653,11 +2703,28 @@ components:
         label: { type: string, minLength: 1, maxLength: 100 }
         type: { type: string, enum: [text, number, select, boolean, eye-pair, va-eye, refraction-eye] }
         required: { type: boolean }
-        options: { type: array, items: { type: string } }
+        options:
+          type: array
+          items: { type: string }
         min: { type: number }
         max: { type: number }
         unit: { type: string }
         eyes: { type: string, enum: [OD, OS, BOTH] }
+        flagRules:
+          type: array
+          maxItems: 10
+          items:
+            type: object
+            required: [op, flag, reason]
+            properties:
+              op: { type: string, enum: [eq, neq, lt, lte, gt, gte, includes, isTrue, isFalse, isEmpty, notEmpty] }
+              value:
+                oneOf:
+                  - { type: string }
+                  - { type: number }
+                  - { type: boolean }
+              flag: { type: string, enum: [REVIEW, REFER, URGENT] }
+              reason: { type: string, maxLength: 200 }
     CreateStationTemplateRequest:
       type: object
       additionalProperties: false
@@ -2787,6 +2854,10 @@ components:
         version: { type: integer, minimum: 1 }
         stationOrder: { type: integer, minimum: 1, maximum: 50 }
         capacity: { type: integer, minimum: 1, maximum: 1000 }
+        availabilities:
+          type: array
+          maxItems: 31
+          items: { $ref: "#/components/schemas/StationAvailabilityInput" }
         isAvailable: { type: boolean }
         operationalStatus: { $ref: "#/components/schemas/StationOperationalStatus" }
     StaffAssignmentRequest:
@@ -2804,19 +2875,31 @@ components:
     ScreenerStaffAssignmentRequest:
       type: object
       additionalProperties: false
-      required: [version, userId, assignmentRole, eventStationId]
+      required: [version, assignmentRole, eventStationId]
       properties:
         version: { type: integer, minimum: 1 }
         userId: { type: string, format: uuid }
+        userIds:
+          type: array
+          minItems: 1
+          maxItems: 100
+          uniqueItems: true
+          items: { type: string, format: uuid }
         assignmentRole: { type: string, enum: [SCREENER] }
         eventStationId: { type: string, format: uuid }
     GeneralStaffAssignmentRequest:
       type: object
       additionalProperties: false
-      required: [version, userId, assignmentRole]
+      required: [version, assignmentRole]
       properties:
         version: { type: integer, minimum: 1 }
         userId: { type: string, format: uuid }
+        userIds:
+          type: array
+          minItems: 1
+          maxItems: 100
+          uniqueItems: true
+          items: { type: string, format: uuid }
         assignmentRole: { type: string, enum: [EVENT_MANAGER, REGISTRATION, REVIEWER, SUPPORT] }
         eventStationId: { type: string, format: uuid, nullable: true }
     StaffAssignment:
@@ -2841,10 +2924,11 @@ components:
         user:
           type: object
           additionalProperties: false
-          required: [userId, username]
+          required: [userId, username, fullName]
           properties:
             userId: { type: string, format: uuid }
             username: { type: string }
+            fullName: { type: string }
     ShiftAssignmentInput:
       type: object
       additionalProperties: false
@@ -3277,6 +3361,16 @@ components:
           type: array
           maxItems: 100
           items: { $ref: "#/components/schemas/ShiftAssignmentInput" }
+    AddShiftRequest:
+      type: object
+      additionalProperties: false
+      required: [version, name, startsAt, endsAt, requiredStaff]
+      properties:
+        version: { type: integer, minimum: 1 }
+        name: { type: string, minLength: 1, maxLength: 100 }
+        startsAt: { type: string, format: date-time }
+        endsAt: { type: string, format: date-time }
+        requiredStaff: { type: integer, minimum: 1, maximum: 1000, default: 1 }
     Shift:
       allOf:
         - $ref: "#/components/schemas/ShiftInput"
@@ -3298,9 +3392,10 @@ components:
         artworkDataUrl:
           type: string
           nullable: true
-          maxLength: 180000
-          pattern: '^data:image/(jpeg|webp);base64,[A-Za-z0-9+/]+={0,2}$'
-          description: Cropped square event artwork encoded as a bounded JPEG or WebP data URL
+          description: Cropped square artwork as a bounded data URL on upload or a VSMS artwork route returned by the API
+          oneOf:
+            - { type: string, maxLength: 180000, pattern: '^data:image/(jpeg|webp);base64,[A-Za-z0-9+/]+={0,2}$' }
+            - { type: string, pattern: '^/api/v1/(public/)?events/[a-f0-9-]{36}/artwork(?:\?v=\d+)?$' }
         venue: { type: string, minLength: 1, maxLength: 255 }
         address: { type: string, nullable: true, maxLength: 500 }
         postalCode: { type: string, nullable: true, pattern: '^\d{6}$' }
@@ -3328,8 +3423,9 @@ components:
         artworkDataUrl:
           type: string
           nullable: true
-          maxLength: 180000
-          pattern: '^data:image/(jpeg|webp);base64,[A-Za-z0-9+/]+={0,2}$'
+          oneOf:
+            - { type: string, maxLength: 180000, pattern: '^data:image/(jpeg|webp);base64,[A-Za-z0-9+/]+={0,2}$' }
+            - { type: string, pattern: '^/api/v1/(public/)?events/[a-f0-9-]{36}/artwork(?:\?v=\d+)?$' }
         venue: { type: string, minLength: 1, maxLength: 255 }
         address: { type: string, nullable: true, maxLength: 500 }
         postalCode: { type: string, nullable: true, pattern: '^\d{6}$' }
@@ -3494,15 +3590,27 @@ components:
     EventAttendee:
       type: object
       additionalProperties: false
-      required: [registrationId, registrationStatus, checkedIn, queueNumber, participantReference, createdAt]
+      required: [registrationId, registrationStatus, checkedIn, queueNumber, participantReference, routeVersion, routeSteps, createdAt]
       properties:
         registrationId: { type: string, format: uuid }
         participantDisplayName: { type: string, nullable: true }
         participantReference: { type: string }
-        registrationStatus: { type: string, enum: [SIGNED_UP, CHECKED_IN, COMPLETED, CANCELLED] }
+        registrationStatus: { type: string, enum: [SIGNED_UP, WAITLISTED, CHECKED_IN, COMPLETED, CANCELLED] }
         checkedIn: { type: boolean }
         checkedInAt: { type: string, format: date-time, nullable: true }
         queueNumber: { type: integer, nullable: true }
+        routeVersion: { type: integer, minimum: 1 }
+        routeSteps:
+          type: array
+          items:
+            type: object
+            additionalProperties: false
+            required: [stationId, stationName, position, state]
+            properties:
+              stationId: { type: string, format: uuid }
+              stationName: { type: string }
+              position: { type: integer, minimum: 1 }
+              state: { type: string, enum: [COMPLETED, SKIPPED, CURRENT, BLOCKED, UPCOMING] }
         createdAt: { type: string, format: date-time }
     EventAttendeeList:
       type: object
@@ -3678,6 +3786,169 @@ components:
           items: { $ref: "#/components/schemas/OperationalReportEventOption" }
         truncated: { type: boolean }
         eventOptionsTruncated: { type: boolean }
+    OperationsAttentionReason:
+      type: object
+      additionalProperties: false
+      required: [code, label, count, severity]
+      properties:
+        code:
+          type: string
+          enum: [STATIONS_OFFLINE, SYNC_ISSUES, STATIONS_PAUSED, STATIONS_UNSTAFFED, QUEUE_WITHOUT_STAFF, PRIORITY_WAITING, REFERRALS_ACTION_REQUIRED]
+        label: { type: string, maxLength: 100 }
+        count: { type: integer, minimum: 1 }
+        severity: { type: string, enum: [critical, warning] }
+    OperationsStation:
+      type: object
+      additionalProperties: false
+      required: [stationId, name, type, order, operationalStatus, staffed, queue]
+      properties:
+        stationId: { type: string, format: uuid }
+        name: { type: string, maxLength: 100 }
+        type:
+          type: string
+          enum: [VISUAL_ACUITY, REFRACTION, COLOUR_VISION, EYE_HEALTH]
+        order: { type: integer, minimum: 1 }
+        operationalStatus: { $ref: "#/components/schemas/StationOperationalStatus" }
+        staffed: { type: boolean }
+        queue:
+          type: object
+          additionalProperties: false
+          required: [waiting, active]
+          properties:
+            waiting: { type: integer, minimum: 0 }
+            active: { type: integer, minimum: 0 }
+    OperationsEvent:
+      type: object
+      additionalProperties: false
+      required: [eventId, name, status, venue, timezone, startsAt, endsAt, capacity, progress, queue, stations, staffing, referrals, sync, attention]
+      properties:
+        eventId: { type: string, format: uuid }
+        name: { type: string, maxLength: 150 }
+        status: { $ref: "#/components/schemas/EventStatus" }
+        venue: { type: string, maxLength: 255 }
+        timezone: { type: string, maxLength: 100 }
+        startsAt: { type: string, format: date-time }
+        endsAt: { type: string, format: date-time }
+        capacity: { type: integer, minimum: 1 }
+        progress:
+          type: object
+          additionalProperties: false
+          required: [total, signedUp, checkedIn, completed, screened, reviewed]
+          properties:
+            total: { type: integer, minimum: 0 }
+            signedUp: { type: integer, minimum: 0 }
+            checkedIn: { type: integer, minimum: 0 }
+            completed: { type: integer, minimum: 0 }
+            screened: { type: integer, minimum: 0 }
+            reviewed: { type: integer, minimum: 0 }
+        queue:
+          type: object
+          additionalProperties: false
+          required: [waiting, called, inProgress, completed, skipped, priority, longestWaitMinutes]
+          properties:
+            waiting: { type: integer, minimum: 0 }
+            called: { type: integer, minimum: 0 }
+            inProgress: { type: integer, minimum: 0 }
+            completed: { type: integer, minimum: 0 }
+            skipped: { type: integer, minimum: 0 }
+            priority: { type: integer, minimum: 0 }
+            longestWaitMinutes: { type: integer, minimum: 0 }
+        stations:
+          type: object
+          additionalProperties: false
+          required: [total, available, paused, offline, items]
+          properties:
+            total: { type: integer, minimum: 0 }
+            available: { type: integer, minimum: 0 }
+            paused: { type: integer, minimum: 0 }
+            offline: { type: integer, minimum: 0 }
+            items:
+              type: array
+              maxItems: 50
+              items: { $ref: "#/components/schemas/OperationsStation" }
+        staffing:
+          type: object
+          additionalProperties: false
+          required: [shiftId, shiftName, startsAt, endsAt, required, assigned, unfilled, unstaffedStations]
+          properties:
+            shiftId: { type: string, format: uuid, nullable: true }
+            shiftName: { type: string, maxLength: 100, nullable: true }
+            startsAt: { type: string, format: date-time, nullable: true }
+            endsAt: { type: string, format: date-time, nullable: true }
+            required: { type: integer, minimum: 0 }
+            assigned: { type: integer, minimum: 0 }
+            unfilled: { type: integer, minimum: 0 }
+            unstaffedStations: { type: integer, minimum: 0 }
+        referrals:
+          type: object
+          additionalProperties: false
+          required: [actionRequired]
+          properties:
+            actionRequired: { type: integer, minimum: 0 }
+        sync:
+          type: object
+          additionalProperties: false
+          required: [pending, issues]
+          properties:
+            pending: { type: integer, minimum: 0 }
+            issues: { type: integer, minimum: 0 }
+        attention:
+          type: object
+          additionalProperties: false
+          required: [severity, reasons]
+          properties:
+            severity: { type: string, enum: [critical, warning, normal] }
+            reasons:
+              type: array
+              maxItems: 7
+              items: { $ref: "#/components/schemas/OperationsAttentionReason" }
+    OperationsOverview:
+      type: object
+      additionalProperties: false
+      required: [generatedAt, filters, summary, events, truncated]
+      properties:
+        generatedAt: { type: string, format: date-time }
+        filters:
+          type: object
+          additionalProperties: false
+          required: [status, search]
+          properties:
+            status: { type: string, enum: [ALL, ACTIVE, UPCOMING, COMPLETED] }
+            search: { type: string, maxLength: 100, nullable: true }
+        summary:
+          type: object
+          additionalProperties: false
+          required: [events, participants, queue]
+          properties:
+            events:
+              type: object
+              additionalProperties: false
+              required: [total, active, upcoming, completed, needsAttention]
+              properties:
+                total: { type: integer, minimum: 0 }
+                active: { type: integer, minimum: 0 }
+                upcoming: { type: integer, minimum: 0 }
+                completed: { type: integer, minimum: 0 }
+                needsAttention: { type: integer, minimum: 0 }
+            participants:
+              type: object
+              additionalProperties: false
+              required: [checkedIn, completed]
+              properties:
+                checkedIn: { type: integer, minimum: 0 }
+                completed: { type: integer, minimum: 0 }
+            queue:
+              type: object
+              additionalProperties: false
+              required: [waiting, active]
+              properties:
+                waiting: { type: integer, minimum: 0 }
+                active: { type: integer, minimum: 0 }
+        events:
+          type: array
+          maxItems: 100
+          items: { $ref: "#/components/schemas/OperationsEvent" }
+        truncated: { type: boolean }
     AnalyticsColumn:
       type: object
       additionalProperties: false
@@ -3795,7 +4066,7 @@ components:
     ReviewQueueItem:
       type: object
       additionalProperties: false
-      required: [registrationId, participantDisplayName, queueNumber, highestFlag, flaggedResultCount, completedStationCount, totalStationCount, readyReason, lastResultAt]
+      required: [registrationId, participantDisplayName, queueNumber, highestFlag, flaggedResultCount, completedStationCount, skippedStationCount, totalStationCount, readyReason, lastResultAt]
       properties:
         registrationId: { type: string, format: uuid }
         participantDisplayName: { type: string }
@@ -3803,8 +4074,9 @@ components:
         highestFlag: { $ref: "#/components/schemas/OverallFlag" }
         flaggedResultCount: { type: integer, minimum: 0 }
         completedStationCount: { type: integer, minimum: 0 }
+        skippedStationCount: { type: integer, minimum: 0 }
         totalStationCount: { type: integer, minimum: 1 }
-        readyReason: { type: string, enum: [SCREENING_COMPLETE, URGENT_FLAG] }
+        readyReason: { type: string, enum: [SCREENING_COMPLETE, ROUTE_COMPLETE, URGENT_FLAG] }
         lastResultAt: { type: string, format: date-time, nullable: true }
     ReviewQueueResponse:
       type: object
@@ -3824,7 +4096,7 @@ components:
         registrationId: { type: string, format: uuid }
         participantDisplayName: { type: string }
         queueNumber: { type: integer, nullable: true }
-        registrationStatus: { type: string, enum: [SIGNED_UP, CHECKED_IN, COMPLETED, CANCELLED] }
+        registrationStatus: { type: string, enum: [SIGNED_UP, WAITLISTED, CHECKED_IN, COMPLETED, CANCELLED] }
         maskedNric: { type: string, pattern: '^(?:•••••[0-9]{3}[A-Z]|Not recorded)$' }
         dateOfBirth: { type: string, format: date }
         gender: { type: string, maxLength: 1 }
@@ -3847,7 +4119,7 @@ components:
     ReviewStationResult:
       type: object
       additionalProperties: false
-      required: [stationId, stationName, stationType, stationOrder, fieldSchemaSnapshot, result]
+      required: [stationId, stationName, stationType, stationOrder, fieldSchemaSnapshot, status, result]
       properties:
         stationId: { type: string, format: uuid }
         stationName: { type: string }
@@ -3857,6 +4129,7 @@ components:
           type: array
           nullable: true
           items: { $ref: "#/components/schemas/StationFieldDefinition" }
+        status: { type: string, enum: [COMPLETED, SKIPPED, PENDING] }
         result:
           type: object
           nullable: true
@@ -3864,11 +4137,12 @@ components:
     ReviewReadiness:
       type: object
       additionalProperties: false
-      required: [ready, readyReason, completedStationCount, totalStationCount, highestFlag]
+      required: [ready, readyReason, completedStationCount, skippedStationCount, totalStationCount, highestFlag]
       properties:
         ready: { type: boolean }
-        readyReason: { type: string, enum: [SCREENING_COMPLETE, URGENT_FLAG], nullable: true }
+        readyReason: { type: string, enum: [SCREENING_COMPLETE, ROUTE_COMPLETE, URGENT_FLAG], nullable: true }
         completedStationCount: { type: integer, minimum: 0 }
+        skippedStationCount: { type: integer, minimum: 0 }
         totalStationCount: { type: integer, minimum: 0 }
         highestFlag: { $ref: "#/components/schemas/OverallFlag" }
     ReferralSummary:
@@ -4044,7 +4318,7 @@ components:
       properties:
         taskId: { type: string, format: uuid }
         eventId: { type: string, format: uuid }
-        artifactType: { type: string, enum: [CONSENT_SIGNATURE, REFERRAL_SIGNATURE, REVIEW_DECISION_SIGNATURE, REFERRAL_DOCUMENT] }
+        artifactType: { type: string, enum: [REFERRAL_SIGNATURE, REVIEW_DECISION_SIGNATURE, REFERRAL_DOCUMENT] }
         status: { type: string, enum: [PENDING, PROCESSING, FAILED, ESCALATED, COMPLETED, RESOLVED] }
         attemptCount: { type: integer, minimum: 0 }
         lastError: { type: string, nullable: true }
@@ -4308,7 +4582,7 @@ components:
     ParticipantRequest:
       type: object
       additionalProperties: false
-      required: [firstName, lastName, dateOfBirth, gender, contactNumber, nric]
+      required: [firstName, lastName, dateOfBirth, gender, contactNumber, nric, email, race, nationality, addressStreet, addressUnit, addressPostalCode, preferredLanguage]
       properties:
         firstName: { type: string, minLength: 1, maxLength: 100 }
         lastName: { type: string, minLength: 1, maxLength: 100 }
@@ -4446,7 +4720,7 @@ components:
           properties:
             id: { type: string, format: uuid }
             queueNumber: { type: integer, nullable: true }
-            status: { type: string, enum: [SIGNED_UP, CHECKED_IN, COMPLETED, CANCELLED] }
+            status: { type: string, enum: [SIGNED_UP, WAITLISTED, CHECKED_IN, COMPLETED, CANCELLED] }
             assignedBooth: { type: string, nullable: true }
     ParticipantReuseResponse:
       type: object
@@ -4503,86 +4777,29 @@ components:
       additionalProperties: false
       required: [contacts]
       properties: { contacts: { type: array, items: { $ref: "#/components/schemas/EmergencyContact" } } }
-    ConsentForm:
-      type: object
-      additionalProperties: true
-      required: [id, formCode, versionNumber, title, contentHash, documentObjectKey, effectiveFrom, isActive]
-      properties:
-        id: { type: string, format: uuid }
-        formCode: { type: string }
-        versionNumber: { type: string }
-        title: { type: string }
-        contentText: { type: string, nullable: true }
-        contentHash: { type: string, pattern: '^[a-f0-9]{64}$' }
-        documentObjectKey: { type: string }
-        effectiveFrom: { type: string, format: date-time }
-        effectiveTo: { type: string, format: date-time, nullable: true }
-        isActive: { type: boolean }
-    ConsentFormEnvelope:
-      type: object
-      additionalProperties: false
-      required: [consentForm]
-      properties: { consentForm: { $ref: "#/components/schemas/ConsentForm" } }
-    ConsentRequest:
-      type: object
-      additionalProperties: false
-      required: [consentFormVersionId, consentStatus, signerType, signerName]
-      properties:
-        consentFormVersionId: { type: string, format: uuid }
-        consentStatus: { type: string, enum: [ACCEPTED, DECLINED] }
-        signerType: { type: string, enum: [PARTICIPANT, PARENT, GUARDIAN, AUTHORISED_REPRESENTATIVE] }
-        signerName: { type: string, minLength: 1, maxLength: 150 }
-        signerRelationship: { type: string, maxLength: 60, nullable: true }
-        guardianContactName: { type: string, maxLength: 150, nullable: true }
-        guardianContactPhone: { type: string, maxLength: 30, nullable: true }
-        guardianContactEmail: { type: string, format: email, nullable: true }
-        signatureObjectKey: { type: string, maxLength: 500, nullable: true }
-        signatureSha256: { type: string, pattern: '^[a-fA-F0-9]{64}$', nullable: true }
-        signatureMimeType: { type: string, enum: [image/png, image/jpeg], nullable: true }
-      description: Accepted consent requires signature metadata; non-participant signers require their relationship to the participant. Optional contact fields are retained only for legacy records.
-    ConsentWithEventRequest:
-      allOf:
-        - $ref: "#/components/schemas/ConsentRequest"
-        - type: object
-          required: [eventId]
-          properties: { eventId: { type: string, format: uuid } }
-    ConsentWithdrawalRequest:
-      type: object
-      additionalProperties: false
-      required: [withdrawalReason]
-      properties: { withdrawalReason: { type: string, minLength: 1, maxLength: 1000 } }
-    Consent:
-      type: object
-      additionalProperties: true
-      required: [id, participantId, eventId, consentFormVersionId, consentStatus, recordedById, createdAt]
-      properties:
-        id: { type: string, format: uuid }
-        participantId: { type: string, format: uuid }
-        eventId: { type: string, format: uuid }
-        registrationId: { type: string, format: uuid, nullable: true }
-        withdrawalOfId: { type: string, format: uuid, nullable: true }
-        consentFormVersionId: { type: string, format: uuid }
-        consentStatus: { type: string, enum: [PENDING, ACCEPTED, DECLINED, WITHDRAWN] }
-        signerType: { type: string, nullable: true }
-        signerName: { type: string, nullable: true }
-        recordedById: { type: string, format: uuid }
-        signedAt: { type: string, format: date-time, nullable: true }
-        withdrawnAt: { type: string, format: date-time, nullable: true }
-        withdrawalReason: { type: string, nullable: true }
-        createdAt: { type: string, format: date-time }
-    ConsentEnvelope:
-      type: object
-      additionalProperties: false
-      required: [consent]
-      properties: { consent: { $ref: "#/components/schemas/Consent" } }
-    ConsentsEnvelope:
-      type: object
-      additionalProperties: false
-      required: [consents]
-      properties: { consents: { type: array, items: { $ref: "#/components/schemas/Consent" } } }
     RegistrationStatus:
       type: string
-      enum: [SIGNED_UP, CHECKED_IN, COMPLETED, CANCELLED]
+      enum: [SIGNED_UP, WAITLISTED, CHECKED_IN, COMPLETED, CANCELLED]
+    EventRegistrationSummary:
+      type: object
+      additionalProperties: false
+      required: [eventId, capacity, signedUpCount, waitlistedCount, checkedInCount, completedCount, cancelledCount, filledCount, remainingCapacity]
+      properties:
+        eventId: { type: string, format: uuid }
+        capacity: { type: integer, minimum: 0 }
+        signedUpCount: { type: integer, minimum: 0 }
+        waitlistedCount: { type: integer, minimum: 0 }
+        checkedInCount: { type: integer, minimum: 0 }
+        completedCount: { type: integer, minimum: 0 }
+        cancelledCount: { type: integer, minimum: 0 }
+        filledCount: { type: integer, minimum: 0 }
+        remainingCapacity: { type: integer, minimum: 0 }
+    EventRegistrationSummaryResponse:
+      type: object
+      additionalProperties: false
+      required: [summary]
+      properties:
+        summary: { $ref: "#/components/schemas/EventRegistrationSummary" }
     Registration:
       type: object
       additionalProperties: true
@@ -4603,13 +4820,12 @@ components:
     RegistrationLookup:
       type: object
       additionalProperties: false
-      required: [registrationId, participantDisplayName, queueNumber, status, passToken]
+      required: [registrationId, participantDisplayName, queueNumber, status]
       properties:
         registrationId: { type: string, format: uuid }
         participantDisplayName: { type: string }
         queueNumber: { type: integer, nullable: true }
         status: { $ref: "#/components/schemas/RegistrationStatus" }
-        passToken: { type: string, nullable: true }
     RegistrationResponse:
       type: object
       additionalProperties: true
@@ -4671,10 +4887,13 @@ components:
           minItems: 1
           maxItems: 100
           uniqueItems: true
-          description: Complete proposed order of every unfinished required station. The active station, when present, must remain in place; completed stations are retained by the server.
+          description: Complete proposed order of every unfinished required station. Completed stations are retained by the server.
           items: { type: string, format: uuid }
         reasonCode: { $ref: "#/components/schemas/RouteOverrideReasonCode" }
         expectedVersion: { type: integer, minimum: 1 }
+        skipActive:
+          type: boolean
+          description: Skip a waiting or called active station and join the first proposed unfinished station. In-progress screening cannot be skipped.
     RouteOverrideResponse:
       type: object
       additionalProperties: false
@@ -4732,12 +4951,12 @@ components:
       additionalProperties: false
       required: [toStatus]
       properties:
-        toStatus: { $ref: "#/components/schemas/RegistrationStatus" }
+        toStatus: { type: string, enum: [SIGNED_UP, CHECKED_IN, COMPLETED, CANCELLED] }
         reason: { type: string, maxLength: 200, nullable: true }
     ParticipantRegistrationReview:
       type: object
       additionalProperties: false
-      required: [participant, event, emergencyContact, latestConsent]
+      required: [participant, event, emergencyContact]
       properties:
         participant: { $ref: "#/components/schemas/Participant" }
         event: { $ref: "#/components/schemas/Event" }
@@ -4745,10 +4964,6 @@ components:
           type: object
           nullable: true
           allOf: [{ $ref: "#/components/schemas/EmergencyContact" }]
-        latestConsent:
-          type: object
-          nullable: true
-          allOf: [{ $ref: "#/components/schemas/Consent" }]
     SignatureRequest:
       type: object
       additionalProperties: false
@@ -4759,75 +4974,58 @@ components:
           maxLength: 140000
           pattern: '^data:image/(png|jpeg);base64,'
         eventId: { type: string, format: uuid }
-        purpose: { type: string, enum: [CONSENT, REFERRAL, REVIEW_DECISION] }
-        targetId: { type: string, format: uuid, description: "Participant ID for consent, referral ID for referral issuance, or registration ID for a review decision." }
+        purpose: { type: string, enum: [REFERRAL, REVIEW_DECISION] }
+        targetId: { type: string, format: uuid, description: "Referral ID for referral issuance or registration ID for a review decision." }
     SignatureResponse:
       type: object
       additionalProperties: false
       required: [signatureObjectKey, signatureSha256, signatureMimeType]
       properties:
-        signatureObjectKey: { type: string, pattern: '^signatures/[a-f0-9-]{36}/(consent|referral|review-decision)-[a-f0-9-]{36}-[a-f0-9-]{36}\\.(png|jpg)$' }
+        signatureObjectKey: { type: string, pattern: '^signatures/[a-f0-9-]{36}/(referral|review-decision)-[a-f0-9-]{36}-[a-f0-9-]{36}\\.(png|jpg)$' }
         signatureSha256: { type: string, pattern: '^[a-f0-9]{64}$' }
         signatureMimeType: { type: string, enum: [image/png, image/jpeg] }
     AdminAuditLogsResponse:
       type: object
       additionalProperties: false
-      required: [logs, authLogs, nextCursor, nextAuthCursor]
+      required: [items, nextCursor]
       properties:
-        logs:
+        items:
           type: array
-          description: Reverse-chronological application audit records (max 100)
+          description: Reverse-chronological records from every immutable audit ledger
           items:
             type: object
-            additionalProperties: true
-            required: [id, action, outcome, createdAt]
+            additionalProperties: false
+            required: [id, source, occurredAt, action, outcome, actor, eventId, entityName, entityId, requestId, ipAddress, deviceName, details, oldValue, newValue]
             properties:
               id: { type: string, format: uuid }
-              userId: { type: string, format: uuid, nullable: true }
-              deviceId: { type: string, format: uuid, nullable: true }
-              action:
-                type: string
-                enum: [CREATED, UPDATED, PUBLISHED, STARTED, COMPLETED, CANCELLED, EVENT_DELETED, EVENT_REGISTRATION_CREATED, REGISTRATION_STATUS_CHANGED, DUPLICATE_REGISTRATION_BLOCKED, PARTICIPANT_CREATED, PARTICIPANT_UPDATED, EMERGENCY_CONTACT_CREATED, EMERGENCY_CONTACT_UPDATED, CONSENT_WITHDRAWN, SCREENING_RESULT_RECORDED, CLINICAL_REVIEW_RECORDED, REFERRAL_ISSUED, REFERRAL_REVISION_CREATED, REFERRAL_HANDOFF_ACKNOWLEDGED, REFERRAL_EMAIL_FAILED, REFERRAL_EMAIL_CONFIRMATION_PENDING, REFERRAL_EMAIL_RECONCILIATION_REQUIRED, REFERRAL_EMAIL_RETRY_AUTHORIZED, REFERRAL_DRAFT_CREATED, QR_GENERATED, QR_VERIFIED, QR_REVOKED, QR_REISSUED_REVOCATION, MANUAL_CHECKIN_PERFORMED, STAFF_ACCOUNT_CREATED, STAFF_ACCOUNT_UPDATED, STAFF_ASSIGNMENT_ADDED, STAFF_ASSIGNMENT_REMOVED, REPORT_VIEWED, SCREENING_SYNC_BATCH, ARTIFACT_CLEANUP_ESCALATED, ENCRYPTION_BACKFILL_APPLIED]
-              resource: { type: string, nullable: true }
+              source: { type: string, enum: [APPLICATION, AUTHENTICATION, EVENT] }
+              occurredAt: { type: string, format: date-time }
+              action: { type: string, maxLength: 100 }
+              outcome: { type: string, enum: [SUCCESS, FAILED, DENIED, BLOCKED] }
+              actor:
+                type: object
+                nullable: true
+                additionalProperties: false
+                required: [id, fullName, email, status]
+                properties:
+                  id: { type: string, format: uuid }
+                  fullName: { type: string }
+                  email: { type: string, format: email }
+                  status: { type: string }
+              eventId: { type: string, format: uuid, nullable: true }
               entityName: { type: string, nullable: true }
               entityId: { type: string, format: uuid, nullable: true }
-              outcome: { type: string, enum: [SUCCESS, FAILED, DENIED, BLOCKED] }
               requestId: { type: string, format: uuid, nullable: true }
+              ipAddress: { type: string, nullable: true }
+              deviceName: { type: string, nullable: true }
+              userAgent: { type: string, nullable: true }
               details: { type: object, nullable: true, additionalProperties: true }
               oldValue: { type: object, nullable: true, additionalProperties: true }
               newValue: { type: object, nullable: true, additionalProperties: true }
-              ipAddress: { type: string, nullable: true }
-              deviceName: { type: string, nullable: true }
-              createdAt: { type: string, format: date-time }
-              user: { $ref: "#/components/schemas/User" }
-        authLogs:
-          type: array
-          description: Reverse-chronological authentication audit records (max 100)
-          items:
-            type: object
-            additionalProperties: true
-            required: [id, eventType, outcome, occurredAt]
-            properties:
-              id: { type: string, format: uuid }
-              userId: { type: string, format: uuid, nullable: true }
-              deviceId: { type: string, format: uuid, nullable: true }
-              eventType: { type: string }
-              outcome: { type: string, enum: [SUCCESS, FAILED, DENIED, BLOCKED] }
-              failureCategory: { type: string, nullable: true }
-              identifierHash: { type: string, nullable: true }
-              ipAddress: { type: string, nullable: true }
-              userAgent: { type: string, nullable: true }
-              requestId: { type: string, format: uuid, nullable: true }
-              occurredAt: { type: string, format: date-time }
-              user: { $ref: "#/components/schemas/User" }
         nextCursor:
           type: string
           nullable: true
-          description: Signed keyset cursor for the next page of application logs
-        nextAuthCursor:
-          type: string
-          nullable: true
-          description: Signed keyset cursor for the next page of authentication logs
+          description: Signed keyset cursor for the next timeline page
     QrCode:
       type: object
       additionalProperties: true
@@ -4865,15 +5063,16 @@ components:
             valid: { type: boolean, description: Whether the pass is active and unexpired }
             eventName: { type: string, nullable: true, description: "Only the event name; never participant data. Unset when the pass is invalid" }
             queueNumber: { type: integer, nullable: true }
-            registrationStatus: { type: string, enum: [SIGNED_UP, CHECKED_IN, COMPLETED, CANCELLED], nullable: true }
+            registrationStatus: { type: string, enum: [SIGNED_UP, WAITLISTED, CHECKED_IN, COMPLETED, CANCELLED], nullable: true }
             queueState:
               type: object
               nullable: true
               additionalProperties: false
-              required: [status, queueNumber, station]
+              required: [status, queueNumber, nowCalling, station]
               properties:
                 status: { $ref: "#/components/schemas/QueueStatus", description: "Participant's own live queue state (waiting/called/in-progress)" }
                 queueNumber: { type: integer }
+                nowCalling: { type: integer, nullable: true, description: "Queue number currently called at this station" }
                 station:
                   type: object
                   additionalProperties: false
@@ -4890,7 +5089,7 @@ components:
                 properties:
                   stationName: { type: string }
                   stationType: { type: string }
-                  state: { type: string, enum: [COMPLETED, CURRENT, UPCOMING, BLOCKED] }
+                  state: { type: string, enum: [COMPLETED, SKIPPED, CURRENT, UPCOMING, BLOCKED] }
             expiresAt: { type: string, format: date-time, nullable: true }
     QrMutationResponse:
       type: object
@@ -5049,13 +5248,13 @@ components:
     ScreeningQueueItem:
       type: object
       additionalProperties: false
-      required: [registrationId, participantDisplayName, queueNumber, status, passToken, existingResult]
+      required: [queueEntryId, registrationId, participantDisplayName, queueNumber, status, existingResult]
       properties:
+        queueEntryId: { type: string, format: uuid }
         registrationId: { type: string, format: uuid }
         participantDisplayName: { type: string }
         queueNumber: { type: integer, nullable: true }
         status: { $ref: "#/components/schemas/RegistrationStatus" }
-        passToken: { type: string, nullable: true }
         existingResult:
           type: object
           nullable: true
@@ -5201,7 +5400,7 @@ components:
     EventQueueStatusResponse:
       type: object
       additionalProperties: false
-      required: [event, stations, entries]
+      required: [event, stations, totals, entries]
       properties:
         event:
           type: object
@@ -5213,9 +5412,20 @@ components:
             status: { type: string }
             venue: { type: string, nullable: true }
         stations: { type: array, items: { $ref: "#/components/schemas/QueueStationWorkload" } }
+        totals:
+          type: object
+          additionalProperties: false
+          required: [WAITING, CALLED, IN_PROGRESS, COMPLETED, SKIPPED, CANCELLED]
+          properties:
+            WAITING: { type: integer, minimum: 0 }
+            CALLED: { type: integer, minimum: 0 }
+            IN_PROGRESS: { type: integer, minimum: 0 }
+            COMPLETED: { type: integer, minimum: 0 }
+            SKIPPED: { type: integer, minimum: 0 }
+            CANCELLED: { type: integer, minimum: 0 }
         entries:
           type: array
-          description: "Every queue entry for the event, ordered by queue number, with priority ordering surfaced through each station's next-up"
+          description: "Active queue entries for the event, ordered by queue number, with complete status counts in totals"
           items: { $ref: "#/components/schemas/EventQueueEntry" }
     RegistrationStation:
       type: object

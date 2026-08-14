@@ -9,13 +9,10 @@ const {
     parsePositiveInt,
     validateParticipantPayload,
     validateEmergencyContactPayload,
-    validateConsentPayload,
     validationError,
 } = require("../../utils/validation/validation");
-const { loadVerifiedSignature, consumeSignatureArtifact } = require("../../utils/storage/signatureStorage");
 const { assertParticipantEventScope, participantEventScopeWhere } = require("../../utils/validation/participantEventScope");
 
-const OPEN_EVENT_STATUSES = ["PUBLISHED", "UPCOMING", "ONGOING", "IN_PROGRESS"];
 
 function participantReference() {
     return `VSMS-${new Date().getUTCFullYear()}-${String(crypto.randomInt(0, 1_000_000)).padStart(6, "0")}`;
@@ -121,15 +118,7 @@ function participantPublicDetails(participant) {
     return { ...safeParticipant, nricMasked: maskNric(nric) || nricMasked };
 }
 
-function assertCrossEventReusePermission(req) {
-    if (req.auth?.permissions?.includes("participants:cross-event-reuse")) return;
-    const error = new Error("Cross-event participant reuse is not authorized");
-    error.statusCode = 403;
-    throw error;
-}
-
 exports.matchParticipantsForRegistrationService = async (req) => {
-    assertCrossEventReusePermission(req);
     const criteria = parseParticipantMatch(req.body || {});
     const fullName = {
         AND: [
@@ -211,7 +200,6 @@ exports.matchParticipantsForRegistrationService = async (req) => {
 };
 
 exports.reuseMatchedParticipantService = async (req) => {
-    assertCrossEventReusePermission(req);
     const participantId = assertUuid(req.params.participantId, "participantId");
     const criteria = parseParticipantMatch(req.body || {});
     const eventId = req.registrationEventId;
@@ -359,8 +347,6 @@ exports.createParticipantService = async (req) => {
                     data: {
                         ...data,
                         participantReference: participantReference(),
-                        emergencyContact: data.contactNumber,
-                        consentGiven: false,
                         createdById: req.auth.userId,
                         updatedById: req.auth.userId,
                         onboardingEventId: req.registrationEventId,
@@ -456,24 +442,6 @@ exports.getParticipantRegistrationsService = async (participantIdParam, eventId,
     return registrations.map(registrationPublicSummary);
 };
 
-exports.getParticipantConsentsService = async (participantIdParam, eventId, userId) => {
-    const participantId = assertUuid(participantIdParam, "participantId");
-    await assertParticipantEventScope(prisma, participantId, eventId, userId);
-    const consents = await prisma.participantConsent.findMany({
-        where: { participantId, eventId },
-        include: {
-            consentFormVersion: true,
-            event: true,
-            withdrawals: true,
-        },
-        orderBy: { createdAt: "desc" },
-    });
-    return consents.map((consent) => ({
-        ...consent,
-        event: eventPublicSummary(consent.event),
-    }));
-};
-
 exports.getEmergencyContactsService = async (participantIdParam, eventId, userId) => {
     const participantId = await assertParticipantEventScope(prisma, participantIdParam, eventId, userId);
     return await prisma.participantEmergencyContact.findMany({
@@ -567,167 +535,17 @@ exports.updateEmergencyContactService = async (req) => {
     });
 };
 
-exports.getActiveConsentFormService = async () => {
-    const now = new Date();
-    const consentForm = await prisma.consentFormVersion.findFirst({
-        where: {
-            isActive: true,
-            effectiveFrom: { lte: now },
-            OR: [{ effectiveTo: null }, { effectiveTo: { gte: now } }],
-        },
-        orderBy: [{ effectiveFrom: "desc" }, { createdAt: "desc" }],
-    });
-    if (!consentForm) {
-        const error = new Error("No active consent form version found");
-        error.statusCode = 404;
-        throw error;
-    }
-    return consentForm;
-};
-
-exports.saveConsentService = async (req) => {
-    const participantId = assertUuid(req.params.participantId, "participantId");
-    const eventId = assertUuid(req.params.eventId || req.body.eventId, "eventId");
-    if (eventId !== req.registrationEventId) throw validationError("Event context does not match the consent event");
-    const data = validateConsentPayload(req.body);
-    const now = new Date();
-    if (data.consentStatus === "ACCEPTED") {
-        await loadVerifiedSignature(data, req.auth.userId, eventId, "CONSENT");
-    }
-
-    return await prisma.$transaction(async (tx) => {
-        await assertParticipantEventScope(tx, participantId, eventId, req.auth.userId);
-        const [participant, event, consentForm] = await Promise.all([
-            tx.participant.findUnique({ where: { id: participantId }, select: { id: true } }),
-            tx.event.findUnique({ where: { eventId }, select: { eventId: true, status: true } }),
-            tx.consentFormVersion.findFirst({
-                where: {
-                    id: data.consentFormVersionId,
-                    isActive: true,
-                    effectiveFrom: { lte: now },
-                    OR: [{ effectiveTo: null }, { effectiveTo: { gte: now } }],
-                },
-            }),
-        ]);
-        if (!participant || !event) {
-            const error = new Error("Participant or event not found");
-            error.statusCode = 404;
-            throw error;
-        }
-        if (!OPEN_EVENT_STATUSES.includes(event.status)) throw validationError("Event is not open for consent");
-        if (!consentForm) throw validationError("The selected consent form is not the current active version");
-
-        const created = await tx.participantConsent.create({
-            data: {
-                ...data,
-                participantId,
-                eventId,
-                recordedById: req.auth.userId,
-                deviceId: req.context.deviceId,
-                decisionAt: now,
-                signedAt: data.consentStatus === "ACCEPTED" ? now : null,
-            },
-        });
-        if (data.consentStatus === "ACCEPTED") {
-            await consumeSignatureArtifact(tx, data, req.auth.userId, eventId, "CONSENT", participantId, now);
-            await tx.participant.update({
-                where: { id: participantId },
-                data: { consentGiven: true, updatedById: req.auth.userId },
-            });
-        }
-        await createAuditLog({
-            userId: req.auth.userId,
-            action: `CONSENT_${data.consentStatus}`,
-            entityName: "ParticipantConsent",
-            entityId: created.id,
-            newValue: {
-                participantId,
-                eventId,
-                consentFormVersionId: data.consentFormVersionId,
-                consentStatus: data.consentStatus,
-                signerType: data.signerType,
-            },
-            context: req.context,
-            client: tx,
-        });
-        return created;
-    });
-};
-
-exports.withdrawConsentService = async (req) => {
-    const participantId = assertUuid(req.params.participantId, "participantId");
-    const consentId = assertUuid(req.params.consentId, "consentId");
-    const withdrawalReason = cleanString(req.body.withdrawalReason, "withdrawalReason", { required: true, max: 1000 });
-    const now = new Date();
-
-    return await prisma.$transaction(async (tx) => {
-        const original = await tx.participantConsent.findFirst({
-            where: { id: consentId, participantId, consentStatus: "ACCEPTED" },
-            include: { withdrawals: true },
-        });
-        if (!original) {
-            const error = new Error("Accepted consent record not found");
-            error.statusCode = 404;
-            throw error;
-        }
-        if (original.eventId !== req.registrationEventId) {
-            const error = new Error("Consent is outside the assigned event");
-            error.statusCode = 403;
-            throw error;
-        }
-        await assertParticipantEventScope(tx, participantId, original.eventId, req.auth.userId);
-        if (original.withdrawals.some((item) => item.consentStatus === "WITHDRAWN")) {
-            const error = new Error("Consent has already been withdrawn");
-            error.statusCode = 409;
-            throw error;
-        }
-
-        const created = await tx.participantConsent.create({
-            data: {
-                participantId,
-                eventId: original.eventId,
-                registrationId: original.registrationId,
-                withdrawalOfId: original.id,
-                consentFormVersionId: original.consentFormVersionId,
-                consentStatus: "WITHDRAWN",
-                signerType: original.signerType,
-                signerName: original.signerName,
-                signerRelationship: original.signerRelationship,
-                recordedById: req.auth.userId,
-                deviceId: req.context.deviceId,
-                withdrawnAt: now,
-                withdrawalReason,
-            },
-        });
-        await createAuditLog({
-            userId: req.auth.userId,
-            action: "CONSENT_WITHDRAWN",
-            entityName: "ParticipantConsent",
-            entityId: created.id,
-            newValue: { originalConsentId: original.id, participantId, eventId: original.eventId },
-            context: req.context,
-            client: tx,
-        });
-        return created;
-    });
-};
-
 exports.getRegistrationReviewService = async (req) => {
     const participantId = assertUuid(req.params.participantId, "participantId");
     const eventId = assertUuid(req.params.eventId, "eventId");
     if (eventId !== req.registrationEventId) throw validationError("Event context does not match the registration event");
     await assertParticipantEventScope(prisma, participantId, eventId, req.auth.userId);
-    const [participant, event, emergencyContact, consent] = await Promise.all([
+    const [participant, event, emergencyContact] = await Promise.all([
         prisma.participant.findUnique({ where: { id: participantId } }),
         prisma.event.findUnique({ where: { eventId } }),
         prisma.participantEmergencyContact.findFirst({
             where: { participantId, status: "ACTIVE" },
             orderBy: [{ isPrimary: "desc" }, { createdAt: "asc" }],
-        }),
-        prisma.participantConsent.findFirst({
-            where: { participantId, eventId },
-            include: { consentFormVersion: true, withdrawals: true },
-            orderBy: { createdAt: "desc" },
         }),
     ]);
     if (!participant || !event) {
@@ -739,6 +557,5 @@ exports.getRegistrationReviewService = async (req) => {
         participant,
         event: eventPublicSummary(event),
         emergencyContact,
-        latestConsent: consent,
     };
 };

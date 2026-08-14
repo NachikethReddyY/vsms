@@ -2,6 +2,7 @@ import apiClient from '../../utils/apiClient';
 import type {
   ColourVisionResultData,
   DynamicResultData,
+  EyeHealthResultData,
   EyeReading,
   FlagEvaluation,
   OverallFlag,
@@ -13,20 +14,21 @@ import type {
   StationType,
   VisualAcuityResultData,
 } from './screeningApi';
-import { normalizeClinicalResultData, withCompatibleFieldSchema } from './fieldSchema';
+import { evaluateTemplateFlagRules, mergeFlagEvaluations, normalizeClinicalResultData } from './fieldSchema';
+import type { FieldSchema } from './fieldSchema';
 
 const DATABASE_NAME = 'vsms-screening-offline';
 const DATABASE_VERSION = 1;
 const KEY_ID = 'screening-cache-key';
-const SUPPORTED_STATIONS = new Set<StationType>(['VISUAL_ACUITY', 'REFRACTION', 'COLOUR_VISION', 'CUSTOM']);
+const SUPPORTED_STATIONS = new Set<StationType>(['VISUAL_ACUITY', 'REFRACTION', 'COLOUR_VISION', 'EYE_HEALTH', 'CUSTOM']);
 const OFFLINE_SYNC_EVENT = 'vsms-offline-sync';
 let cryptoKeyPromise: Promise<CryptoKey> | null = null;
 
-type ScreeningPath = 'visual-acuity' | 'refraction' | 'colour-vision' | 'dynamic';
+type ScreeningPath = 'visual-acuity' | 'refraction' | 'colour-vision' | 'eye-health' | 'dynamic';
 type OfflineMutationStatus = 'pending' | 'conflict';
 
 type OfflineStation = Station & { offlineAccessExpiresAt: string };
-type OfflineQueueRegistration = Omit<QueueRegistration, 'passToken'>;
+type OfflineQueueRegistration = QueueRegistration;
 
 type OfflineSnapshot = {
   event: { eventId: string; name: string };
@@ -39,7 +41,7 @@ type OfflineMutation = {
   stationId: string;
   path: ScreeningPath;
   stationType?: StationType;
-  body: ScreeningSavePayload<VisualAcuityResultData | RefractionResultData | ColourVisionResultData | DynamicResultData>;
+  body: ScreeningSavePayload<VisualAcuityResultData | RefractionResultData | ColourVisionResultData | EyeHealthResultData | DynamicResultData>;
 };
 
 type ScreeningSyncActionResult = {
@@ -251,7 +253,7 @@ function toOfflineStation(station: Station): OfflineStation | null {
   };
 }
 
-function toOfflineQueue(rows: QueueRegistration[]): OfflineQueueRegistration[] {
+function toOfflineQueue(rows: OfflineQueueRegistration[]): OfflineQueueRegistration[] {
   return rows.map((row) => ({
     registrationId: row.registrationId,
     participantDisplayName: row.participantDisplayName,
@@ -348,9 +350,9 @@ export async function getOfflineStationContext(
   }
   return {
     eventName: snapshot.event.name,
-    station: withCompatibleFieldSchema(station),
-    stations: snapshot.stations.map((item) => withCompatibleFieldSchema(item)),
-    queue: (snapshot.queues[station.stationId] ?? []).map((row) => ({ ...row, passToken: null })),
+    station,
+    stations: snapshot.stations,
+    queue: snapshot.queues[station.stationId] ?? [],
   };
 }
 
@@ -460,26 +462,73 @@ function evaluateColourVision(resultData: ColourVisionResultData): FlagEvaluatio
   };
 }
 
+function evaluateEyeHealth(resultData: EyeHealthResultData): FlagEvaluation {
+  const reasons: Array<{ flag: OverallFlag; reason: string }> = [];
+  if (resultData.cataractRisk === 'PRESENT' || resultData.glaucomaRisk === 'PRESENT') {
+    reasons.push({
+      flag: 'REFER',
+      reason: `Eye-health risk present (cataract ${resultData.cataractRisk}, glaucoma ${resultData.glaucomaRisk})`,
+    });
+  }
+  if (resultData.cataractRisk === 'SUSPECTED' || resultData.glaucomaRisk === 'SUSPECTED') {
+    reasons.push({
+      flag: 'REVIEW',
+      reason: `Suspected eye-health risk (cataract ${resultData.cataractRisk}, glaucoma ${resultData.glaucomaRisk})`,
+    });
+  }
+  if (resultData.symptomsNoted) {
+    reasons.push({
+      flag: 'REVIEW',
+      reason: resultData.symptomSummary
+        ? `Symptoms noted: ${resultData.symptomSummary}`
+        : 'Participant-reported symptoms noted',
+    });
+  }
+  const overallFlag = worstFlag(reasons);
+  return {
+    ruleVersion: 'VSMS-EH-1.0',
+    overallFlag,
+    isFlagged: overallFlag !== 'NORMAL',
+    flagSummary: reasons.length
+      ? reasons.map((item) => item.reason).join('; ')
+      : `Cataract ${resultData.cataractRisk} / Glaucoma ${resultData.glaucomaRisk} / ${resultData.symptomsNoted ? 'Symptoms noted' : 'No symptoms'}`,
+    reasons,
+  };
+}
+
 export function evaluateOfflineStation(
   path: ScreeningPath,
-  resultData: VisualAcuityResultData | RefractionResultData | ColourVisionResultData | DynamicResultData,
+  resultData: VisualAcuityResultData | RefractionResultData | ColourVisionResultData | EyeHealthResultData | DynamicResultData,
   stationType?: StationType,
+  fieldSchema: FieldSchema = [],
 ): FlagEvaluation {
   if (path === 'dynamic') {
-    const normalized = normalizeClinicalResultData(stationType, resultData as DynamicResultData);
-    if (stationType === 'VISUAL_ACUITY') return evaluateVisualAcuity(normalized as VisualAcuityResultData);
-    if (stationType === 'REFRACTION') return evaluateRefraction(normalized as RefractionResultData);
-    if (stationType === 'COLOUR_VISION') return evaluateColourVision(normalized as ColourVisionResultData);
-    return {
-      ruleVersion: 'TEMPLATE-SCHEMA-1.0',
-      overallFlag: 'NORMAL',
-      isFlagged: false,
-      flagSummary: 'Custom station result recorded.',
-      reasons: [],
-    };
+    const raw = resultData as DynamicResultData;
+    const schemaEvaluation = evaluateTemplateFlagRules(raw, fieldSchema);
+    if (stationType === 'VISUAL_ACUITY') {
+      const normalized = normalizeClinicalResultData(stationType, raw);
+      return mergeFlagEvaluations(evaluateVisualAcuity(normalized as VisualAcuityResultData), schemaEvaluation);
+    }
+    if (stationType === 'REFRACTION') {
+      const normalized = normalizeClinicalResultData(stationType, raw);
+      return mergeFlagEvaluations(evaluateRefraction(normalized as RefractionResultData), schemaEvaluation);
+    }
+    if (stationType === 'COLOUR_VISION') {
+      return mergeFlagEvaluations(evaluateColourVision(raw as ColourVisionResultData), schemaEvaluation);
+    }
+    return schemaEvaluation.reasons.length
+      ? schemaEvaluation
+      : {
+        ruleVersion: 'TEMPLATE-FLAG-1.0',
+        overallFlag: 'NORMAL',
+        isFlagged: false,
+        flagSummary: 'Custom station result recorded.',
+        reasons: [],
+      };
   }
   if (path === 'visual-acuity') return evaluateVisualAcuity(resultData as VisualAcuityResultData);
   if (path === 'refraction') return evaluateRefraction(resultData as RefractionResultData);
+  if (path === 'eye-health') return evaluateEyeHealth(resultData as EyeHealthResultData);
   return evaluateColourVision(resultData as ColourVisionResultData);
 }
 
@@ -488,7 +537,7 @@ export async function queueOfflineStationSave(
   eventId: string,
   stationId: string,
   path: ScreeningPath,
-  body: ScreeningSavePayload<VisualAcuityResultData | RefractionResultData | ColourVisionResultData | DynamicResultData>,
+  body: ScreeningSavePayload<VisualAcuityResultData | RefractionResultData | ColourVisionResultData | EyeHealthResultData | DynamicResultData>,
 ): Promise<FlagEvaluation> {
   const snapshot = await loadSnapshot(ownerId, eventId);
   const station = snapshot?.stations.find((item) => item.stationId === stationId);
@@ -500,7 +549,12 @@ export async function queueOfflineStationSave(
     await purgeEvent(ownerId, eventId);
     throw new Error('Offline access for this station has expired. Reconnect before saving.');
   }
-  const evaluation = evaluateOfflineStation(path, body.resultData, station.stationType);
+  const evaluation = evaluateOfflineStation(
+    path,
+    body.resultData,
+    station.stationType,
+    station.fieldSchemaSnapshot ?? [],
+  );
   if (evaluation.isFlagged && body.acknowledged !== true) {
     throw new Error(`Flagged result (${evaluation.overallFlag}) must be acknowledged before saving.`);
   }
@@ -576,12 +630,14 @@ export async function syncOfflineEvent(ownerId: string, eventId: string): Promis
         clientActionId: mutation.clientActionId,
         stationId: mutation.stationId,
         stationType: mutation.path === 'dynamic'
-          ? (mutation.stationType && mutation.stationType !== 'EYE_HEALTH' ? mutation.stationType : 'CUSTOM')
+          ? (mutation.stationType || 'CUSTOM')
           : mutation.path === 'visual-acuity'
           ? 'VISUAL_ACUITY'
           : mutation.path === 'refraction'
             ? 'REFRACTION'
-            : 'COLOUR_VISION',
+            : mutation.path === 'eye-health'
+              ? 'EYE_HEALTH'
+              : 'COLOUR_VISION',
         payload: mutation.body,
       })));
       const recordByAction = new Map(batch.map((item) => [item.mutation.clientActionId, item.record]));

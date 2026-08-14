@@ -37,7 +37,7 @@ function replace(t, target, key, value) {
   t.after(() => { target[key] = original; });
 }
 
-function installSuccessMocks(t, audits) {
+function installSuccessMocks(t, audits, existingResult = null) {
   replace(t, prisma.eventMembership, "findFirst", async () => ({ id: crypto.randomUUID(), eventId, userId: user.userId, status: "ACTIVE", roles: [{ role: "SCREENER" }], user }));
   replace(t, prisma.event, "findUnique", async () => ({ eventId, name: "Live", status: "IN_PROGRESS", venue: "Hall" }));
   replace(t, prisma.staffAssignment, "findFirst", async () => ({ id: crypto.randomUUID() }));
@@ -48,8 +48,10 @@ function installSuccessMocks(t, audits) {
       create: async ({ data }) => data,
     },
     screeningResult: {
-      findUnique: async () => null,
-      upsert: async ({ create }) => ({ resultId: crypto.randomUUID(), ...create, version: 1 }),
+      findUnique: async () => existingResult,
+      upsert: async ({ create, update }) => existingResult
+        ? { ...existingResult, ...update, version: existingResult.version + 1 }
+        : { resultId: crypto.randomUUID(), ...create, version: 1 },
     },
     eventRegistration: {
       findFirst: async () => ({ registrationId, eventId, registrationStatus: "CHECKED_IN" }),
@@ -95,6 +97,57 @@ test("screening save emits a SCREENING_RESULT_RECORDED audit inside the transact
   assert.equal(audit.newValue.isFlagged, false);
   assert.equal(audit.newValue.registrationId, registrationId);
   assert.ok(/^[0-9a-f-]{36}$/i.test(audit.entityId));
+});
+
+test("flagged screening saves emit an explicit acknowledgement audit", async (t) => {
+  const audits = [];
+  installSuccessMocks(t, audits);
+  const flaggedBody = {
+    ...body,
+    idempotencyKey: "screening-flag-audit-key",
+    acknowledged: true,
+    resultData: {
+      ...body.resultData,
+      od: { kind: "FRACTION", denominator: 60 },
+    },
+  };
+
+  const result = await screeningService.saveVisualAcuity(eventId, stationId, flaggedBody, user, context);
+
+  assert.equal(result.result.isFlagged, true);
+  const acknowledgement = audits.find(({ action }) => action === "SCREENING_FLAG_ACKNOWLEDGED");
+  assert.ok(acknowledgement);
+  assert.equal(acknowledgement.entityId, result.result.resultId);
+  assert.equal(acknowledgement.newValue.overallFlag, result.result.overallFlag);
+  assert.match(acknowledgement.newValue.acknowledgedAt, /^\d{4}-\d{2}-\d{2}T/);
+});
+
+test("screening corrections are distinguishable and retain a safe before snapshot", async (t) => {
+  const audits = [];
+  const existingResult = {
+    resultId: crypto.randomUUID(),
+    version: 1,
+    overallFlag: "REVIEW",
+    isFlagged: true,
+    ruleVersion: "VSMS-VA-1.0",
+    acknowledgedAt: new Date("2026-08-01T00:00:00.000Z"),
+  };
+  installSuccessMocks(t, audits, existingResult);
+
+  const result = await screeningService.saveVisualAcuity(
+    eventId,
+    stationId,
+    { ...body, idempotencyKey: "screening-correction-audit-key" },
+    user,
+    context,
+  );
+
+  assert.equal(result.created, false);
+  const correction = audits.find(({ action }) => action === "SCREENING_RESULT_CORRECTED");
+  assert.ok(correction);
+  assert.equal(correction.oldValue.version, 1);
+  assert.equal(correction.oldValue.overallFlag, "REVIEW");
+  assert.equal(correction.newValue.version, 2);
 });
 
 test("screening audit is not emitted on an idempotent replay", async (t) => {

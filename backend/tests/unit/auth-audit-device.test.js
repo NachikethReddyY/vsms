@@ -99,3 +99,18 @@ test("failed logins and malformed identifiers cannot enroll devices", async () =
         assert.equal(client.record.deviceId, null);
     }
 });
+
+test("authorization denials remain valid authentication audit events", async () => {
+    const client = auditClient();
+    await createAuthAuditLog({
+        userId,
+        eventType: "ACCESS_DENIED",
+        outcome: "DENIED",
+        context,
+        client,
+    });
+
+    assert.equal(client.record.eventType, "ACCESS_DENIED");
+    assert.equal(client.record.outcome, "DENIED");
+    assert.equal(client.calls.create.length, 0);
+});

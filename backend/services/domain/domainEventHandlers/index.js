@@ -9,6 +9,7 @@
  */
 
 const ESCALATED_FLAGS = new Set(["REFER", "URGENT"]);
+const { createAuditLog } = require("../../../utils/logging/audit");
 
 const FLAG_PUBLISHED_EVENT = "SCREENING_FLAGGED";
 
@@ -42,21 +43,20 @@ async function escalateScreeningFlag({ event, context }) {
  * request-path audit already written by the screening service.
  */
 async function auditScreeningFlag({ event, context }) {
-  await context.db.auditLog.create({
-    data: {
-      userId: event.actorUserId,
-      requestId: event.correlationId,
-      action: "SCREENING_FLAG_EVENT_DISPATCHED",
-      resource: "DomainEvent",
-      entityName: "ScreeningResult",
-      entityId: event.aggregateId,
-      details: {
-        eventId: event.payload.eventId,
-        registrationId: event.payload.registrationId,
-        overallFlag: event.payload.overallFlag,
-      },
-      newValue: { domainEventId: event.id },
+  await createAuditLog({
+    client: context.db,
+    userId: event.actorUserId,
+    context: { requestId: event.correlationId },
+    action: "SCREENING_FLAG_EVENT_DISPATCHED",
+    resource: "DomainEvent",
+    entityName: "ScreeningResult",
+    entityId: event.aggregateId,
+    details: {
+      eventId: event.payload.eventId,
+      registrationId: event.payload.registrationId,
+      overallFlag: event.payload.overallFlag,
     },
+    newValue: { domainEventId: event.id },
   });
 }
 
@@ -66,21 +66,20 @@ async function auditScreeningFlag({ event, context }) {
  * the bus (publish / start / complete / cancel).
  */
 async function auditEventTransition({ event, context }) {
-  await context.db.auditLog.create({
-    data: {
-      userId: event.actorUserId,
-      requestId: event.correlationId,
-      action: "EVENT_TRANSITION_EVENT_DISPATCHED",
-      resource: "DomainEvent",
-      entityName: "Event",
-      entityId: event.aggregateId,
-      details: {
-        fromStatus: event.payload.fromStatus,
-        toStatus: event.payload.toStatus,
-        command: event.payload.command,
-      },
-      newValue: { domainEventId: event.id },
+  await createAuditLog({
+    client: context.db,
+    userId: event.actorUserId,
+    context: { requestId: event.correlationId },
+    action: "EVENT_TRANSITION_EVENT_DISPATCHED",
+    resource: "DomainEvent",
+    entityName: "Event",
+    entityId: event.aggregateId,
+    details: {
+      fromStatus: event.payload.fromStatus,
+      toStatus: event.payload.toStatus,
+      command: event.payload.command,
     },
+    newValue: { domainEventId: event.id },
   });
 }
 
@@ -89,21 +88,20 @@ async function auditEventTransition({ event, context }) {
  * Observable audit trail for referral issuance published through the bus.
  */
 async function auditReferralIssued({ event, context }) {
-  await context.db.auditLog.create({
-    data: {
-      userId: event.actorUserId,
-      requestId: event.correlationId,
-      action: "REFERRAL_ISSUE_EVENT_DISPATCHED",
-      resource: "DomainEvent",
-      entityName: "Referral",
-      entityId: event.aggregateId,
-      details: {
-        eventId: event.payload.eventId,
-        documentId: event.payload.documentId,
-        version: event.payload.version,
-      },
-      newValue: { domainEventId: event.id },
+  await createAuditLog({
+    client: context.db,
+    userId: event.actorUserId,
+    context: { requestId: event.correlationId },
+    action: "REFERRAL_ISSUE_EVENT_DISPATCHED",
+    resource: "DomainEvent",
+    entityName: "Referral",
+    entityId: event.aggregateId,
+    details: {
+      eventId: event.payload.eventId,
+      documentId: event.payload.documentId,
+      version: event.payload.version,
     },
+    newValue: { domainEventId: event.id },
   });
 }
 

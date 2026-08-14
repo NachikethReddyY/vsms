@@ -43,7 +43,9 @@ test("shared scanner resolver accepts only active event-scoped secure passes", a
     assert.equal(where.isActive, true);
     assert.equal(where.revokedAt, null);
     assert.ok(where.expiresAt.gt instanceof Date);
-    assert.deepEqual(where.registration, { eventId });
+    assert.equal(where.registration.eventId, eventId);
+    assert.deepEqual(where.registration.registrationStatus, { not: "CANCELLED" });
+    assert.deepEqual(where.registration.event.status, { not: "CANCELLED" });
   }
 });
 
@@ -134,7 +136,6 @@ test("QR lookups return only the operational registration projection", async () 
               lastName: "Lovelace",
               nric: "encrypted-nric",
               contactNumber: "+6512345678",
-              consentGiven: true,
               createdById: "66666666-6666-4666-8666-666666666666",
             },
             event: {
@@ -305,6 +306,7 @@ test("the same secure pass remains valid through the event end", async () => {
 test("download renders an active pass from encrypted storage without returning its target URL", async () => {
   const token = "b".repeat(64);
   let where;
+  let audit;
   const db = {
     qRCodePass: {
       findFirst: async (query) => {
@@ -318,9 +320,10 @@ test("download renders an active pass from encrypted storage without returning i
         };
       },
     },
+    auditLog: { create: async ({ data }) => { audit = data; return data; } },
   };
 
-  const result = await qrService.downloadQR(qrId, db);
+  const result = await qrService.downloadQR(qrId, db, { userId: registrationId, requestId: eventId });
   assert.equal(where.id, qrId);
   assert.equal(where.isActive, true);
   assert.ok(where.expiresAt.gt instanceof Date);
@@ -329,30 +332,93 @@ test("download renders an active pass from encrypted storage without returning i
   const branded = Buffer.from(result.qrImage.split(",")[1], "base64").toString("utf8");
   assert.match(branded, /^<svg/);
   assert.doesNotMatch(branded, /VSMS|SECURE EVENT PASS/);
+  assert.equal(audit.action, "QR_DOWNLOADED");
+  assert.equal(audit.userId, registrationId);
+  assert.equal(audit.requestId, eventId);
+  assert.deepEqual(audit.newValue, { registrationId });
+});
+
+test("print has its own audit event and does not double-log as a download", async () => {
+  const token = "f".repeat(64);
+  const actions = [];
+  const db = {
+    qRCodePass: {
+      findFirst: async () => ({
+        id: qrId,
+        registrationId,
+        expiresAt: new Date(Date.now() + 60_000),
+        tokenCiphertext: encrypt(token, encryptionContext("QRCodePass", qrId, "token")),
+        tokenEncryptionVersion: 2,
+      }),
+    },
+    auditLog: { create: async ({ data }) => { actions.push(data.action); return data; } },
+  };
+
+  await qrService.printQR(qrId, db, { userId: registrationId });
+  assert.deepEqual(actions, ["QR_PRINTED"]);
+});
+
+test("authorization denials are audited without recording the bearer token", async () => {
+  const token = "7".repeat(64);
+  let audit;
+  const db = { auditLog: { create: async ({ data }) => { audit = data; return data; } } };
+
+  await qrService.auditAccessDenied({
+    selectors: { token, eventId },
+    operation: "VERIFY",
+    userId: registrationId,
+    error: { code: "EVENT_ROLE_REQUIRED" },
+    context: { requestId: qrId },
+  }, db);
+
+  assert.equal(audit.action, "QR_VERIFICATION_DENIED");
+  assert.equal(audit.outcome, "DENIED");
+  assert.equal(audit.newValue.errorCode, "EVENT_ROLE_REQUIRED");
+  assert.match(audit.newValue.tokenFingerprint, /^[a-f0-9]{64}$/);
+  assert.equal(JSON.stringify(audit).includes(token), false);
 });
 
 test("verification rejects any pass that does not satisfy the shared active-expiry predicate", async () => {
+  let deniedAudit;
   const db = {
     $transaction: async (work) => work({
       qRCodePass: { findFirst: async () => null },
       auditLog: { create: async () => ({}) },
     }),
+    auditLog: { create: async ({ data }) => { deniedAudit = data; return data; } },
   };
 
   await assert.rejects(
     qrService.verifyQR("c".repeat(64), eventId, null, db),
     (error) => error.code === "INVALID_QR" && error.status === 404,
   );
+  assert.equal(deniedAudit.action, "QR_VERIFICATION_DENIED");
+  assert.equal(deniedAudit.outcome, "DENIED");
+  assert.equal(deniedAudit.newValue.errorCode, "INVALID_QR");
+  assert.match(deniedAudit.newValue.tokenFingerprint, /^[a-f0-9]{64}$/);
 });
 
 test("manual QR check-in writes no bearer or participant data and returns a minimal projection", async () => {
   const token = "e".repeat(64);
   const qrQueries = [];
-  let registrationQuery;
-  let updateQuery;
+  const rawQueries = [];
   let audit;
   const db = {
     $transaction: async (work) => work({
+      $queryRaw: async (strings) => {
+        const sql = strings.join("");
+        rawQueries.push(sql);
+        if (sql.includes("FROM event_registrations")) return [{ registration_id: registrationId }];
+        if (sql.includes("FROM qr_code_passes")) return [{ id: qrId, registrationId }];
+        return [{
+          registration_id: registrationId,
+          event_id: eventId,
+          registration_status: "CHECKED_IN",
+          checked_in: true,
+          checked_in_at: new Date(),
+          queue_number: 7,
+        }];
+      },
       qRCodePass: {
         findFirst: async (query) => {
           qrQueries.push(query);
@@ -362,23 +428,6 @@ test("manual QR check-in writes no bearer or participant data and returns a mini
         },
       },
       eventRegistration: {
-        findFirst: async (query) => {
-          registrationQuery = query;
-          return {
-            registrationId,
-            eventId,
-            registrationStatus: "SIGNED_UP",
-            checkedIn: false,
-            checkedInAt: null,
-            queueNumber: 7,
-            participant: { nric: "encrypted-nric", firstName: "Ada" },
-            event: { name: "Internal event" },
-          };
-        },
-        updateMany: async (query) => {
-          updateQuery = query;
-          return { count: 1 };
-        },
         findUnique: async () => ({
           registrationId,
           eventId,
@@ -401,30 +450,11 @@ test("manual QR check-in writes no bearer or participant data and returns a mini
     registrationId: true,
   });
   assert.equal(qrQueries[0].where.tokenHash, tokenHash(token));
-  assert.deepEqual(qrQueries[0].where.registration, { eventId });
+  assert.equal(qrQueries[0].where.registration.eventId, eventId);
+  assert.deepEqual(qrQueries[0].where.registration.registrationStatus, { not: "CANCELLED" });
+  assert.deepEqual(qrQueries[0].where.registration.event.status, { not: "CANCELLED" });
   assert.equal(JSON.stringify(qrQueries[0]).includes(token), false);
-  assert.deepEqual(qrQueries[1].select, { id: true, registrationId: true });
-  assert.equal(qrQueries[1].where.id, qrId);
-  assert.equal(qrQueries[1].where.registrationId, registrationId);
-  assert.equal(qrQueries[1].where.isActive, true);
-  assert.ok(qrQueries[1].where.expiresAt.gt instanceof Date);
-  assert.deepEqual(registrationQuery.select, {
-    registrationId: true,
-    eventId: true,
-    registrationStatus: true,
-    checkedIn: true,
-    checkedInAt: true,
-    queueNumber: true,
-  });
-  assert.deepEqual(updateQuery.where, {
-    registrationId,
-    eventId,
-    registrationStatus: "SIGNED_UP",
-    checkedIn: false,
-  });
-  assert.equal(updateQuery.data.registrationStatus, "CHECKED_IN");
-  assert.equal(updateQuery.data.checkedIn, true);
-  assert.ok(updateQuery.data.checkedInAt instanceof Date);
+  assert.equal(rawQueries.some((sql) => sql.includes("check_in_event_registration")), true);
   assert.deepEqual(audit.newValue, { eventId, checkInMethod: "QR_TOKEN" });
   assert.equal(JSON.stringify(audit).includes(token), false);
   assert.equal(JSON.stringify(audit).includes("encrypted-nric"), false);
@@ -441,17 +471,18 @@ test("manual registration-reference check-in does not resolve participant identi
   let audit;
   const db = {
     $transaction: async (work) => work({
+      $queryRaw: async (strings) => strings.join("").includes("FROM event_registrations")
+        ? [{ registration_id: registrationId }]
+        : [{
+            registration_id: registrationId,
+            event_id: eventId,
+            registration_status: "CHECKED_IN",
+            checked_in: true,
+            checked_in_at: new Date(),
+            queue_number: null,
+          }],
       qRCodePass: { findFirst: async () => { qrLookup = true; return null; } },
       eventRegistration: {
-        findFirst: async () => ({
-          registrationId,
-          eventId,
-          registrationStatus: "SIGNED_UP",
-          checkedIn: false,
-          checkedInAt: null,
-          queueNumber: null,
-        }),
-        updateMany: async () => ({ count: 1 }),
         findUnique: async () => ({
           registrationId,
           eventId,
@@ -527,7 +558,9 @@ test("unknown and cross-event QR tokens have the same concealed error and event-
   assert.deepEqual(foreignError, unknownError);
   assert.equal(queries.length, 2);
   for (const query of queries) {
-    assert.deepEqual(query.where.registration, { eventId });
+    assert.equal(query.where.registration.eventId, eventId);
+    assert.deepEqual(query.where.registration.registrationStatus, { not: "CANCELLED" });
+    assert.deepEqual(query.where.registration.event.status, { not: "CANCELLED" });
   }
   assert.equal(queries[1].where.tokenHash, tokenHash(foreignToken));
   assert.equal(updated, false);
@@ -590,37 +623,21 @@ test("missing and cross-event registration references have the same concealed er
   }
 });
 
-test("manual check-in cannot reopen terminal registrations or win a stale update race", async () => {
-  for (const [registrationStatus, checkedIn] of [["CANCELLED", false], ["COMPLETED", false], ["CHECKED_IN", true]]) {
-    let updated = false;
-    const db = {
-      $transaction: async (work) => work({
-        eventRegistration: {
-          findFirst: async () => ({ registrationId, eventId, registrationStatus, checkedIn, checkedInAt: null, queueNumber: 1 }),
-          updateMany: async () => { updated = true; return { count: 1 }; },
-        },
-        auditLog: { create: async () => ({}) },
-      }),
-    };
-    await assert.rejects(
-      qrService.manualCheckIn({ registrationId, eventId, userId: qrId }, db),
-      (error) => error.code === "CHECKIN_STATE_CONFLICT" && error.status === 409,
-    );
-    assert.equal(updated, false);
-  }
-
+test("manual check-in maps stored-routine state conflicts and writes no audit", async () => {
   let auditWrites = 0;
-  const staleDb = {
+  let rawCalls = 0;
+  const db = {
     $transaction: async (work) => work({
-      eventRegistration: {
-        findFirst: async () => ({ registrationId, eventId, registrationStatus: "SIGNED_UP", checkedIn: false, checkedInAt: null, queueNumber: 1 }),
-        updateMany: async () => ({ count: 0 }),
+      $queryRaw: async () => {
+        rawCalls += 1;
+        if (rawCalls === 1) return [{ registration_id: registrationId }];
+        throw new Error("REGISTRATION_CHECKIN_CONFLICT");
       },
       auditLog: { create: async () => { auditWrites += 1; return {}; } },
     }),
   };
   await assert.rejects(
-    qrService.manualCheckIn({ registrationId, eventId, userId: qrId }, staleDb),
+    qrService.manualCheckIn({ registrationId, eventId, userId: qrId }, db),
     (error) => error.code === "CHECKIN_STATE_CONFLICT" && error.status === 409,
   );
   assert.equal(auditWrites, 0);
@@ -659,16 +676,21 @@ test("each issuance mints a unique opaque token and supersedes the prior active 
 test("public pass status reveals no PII and reports expired or revoked passes as invalid", async () => {
   const token = "d".repeat(64);
   let where;
+  let queueEntriesWhere;
   const db = {
+    queueEntry: {
+      findFirst: async () => ({ queueNumber: 39 }),
+    },
     qRCodePass: {
       findFirst: async (query) => {
         where = query.where;
+        queueEntriesWhere = query.select.registration.select.queueEntries.where;
         return {
           expiresAt: new Date(Date.now() + 60_000),
           registration: {
             queueNumber: 42,
             registrationStatus: "CHECKED_IN",
-            event: { name: "Community Vision Screening" },
+            event: { eventId: crypto.randomUUID(), name: "Community Vision Screening" },
             routeSteps: [
               {
                 position: 1,
@@ -681,11 +703,18 @@ test("public pass status reveals no PII and reports expired or revoked passes as
                 station: { stationId: "station-2", stationName: "Refraction", stationType: "REFRACTION" },
               },
             ],
-            queueEntries: [{
-              status: "WAITING",
-              queueNumber: 42,
-              station: { stationId: "station-2", stationName: "Refraction", stationType: "REFRACTION" },
-            }],
+            queueEntries: [
+              {
+                status: "SKIPPED",
+                queueNumber: 42,
+                station: { stationId: "station-1", stationName: "Visual Acuity", stationType: "VISUAL_ACUITY" },
+              },
+              {
+                status: "WAITING",
+                queueNumber: 42,
+                station: { stationId: "station-2", stationName: "Refraction", stationType: "REFRACTION" },
+              },
+            ],
           },
         };
       },
@@ -696,8 +725,9 @@ test("public pass status reveals no PII and reports expired or revoked passes as
   assert.equal(valid.valid, true);
   assert.equal(valid.eventName, "Community Vision Screening");
   assert.equal(valid.queueNumber, 42);
+  assert.equal(valid.queueState.nowCalling, 39);
   assert.deepEqual(valid.route.map(({ stationName, state }) => [stationName, state]), [
-    ["Visual Acuity", "COMPLETED"],
+    ["Visual Acuity", "SKIPPED"],
     ["Refraction", "CURRENT"],
     ["Clinical review", "UPCOMING"],
   ]);
@@ -706,6 +736,7 @@ test("public pass status reveals no PII and reports expired or revoked passes as
   assert.equal(where.isActive, true);
   assert.equal(where.revokedAt, null);
   assert.ok(where.expiresAt.gt instanceof Date);
+  assert.deepEqual(queueEntriesWhere.status.in, ["WAITING", "CALLED", "IN_PROGRESS", "SKIPPED"]);
   const publicJson = JSON.stringify(valid);
   for (const forbidden of ["stationId", "registrationId", "routeStepId", "actor", "audit", "capacity", "workload", "result", "nric"]) {
     assert.equal(publicJson.includes(forbidden), false);

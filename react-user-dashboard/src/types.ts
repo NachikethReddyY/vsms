@@ -11,6 +11,8 @@ export interface AppUser {
   status?: string;
   approvalState?: 'PENDING' | 'APPROVED' | 'REJECTED';
   accessState?: 'ENABLED' | 'SUSPENDED' | 'DISABLED';
+  lastLoginAt?: string | null;
+  deprovisionedAt?: string | null;
   roles: string[];
   systemRole?: "ADMIN" | "EVENT_MANAGER" | "STAFF";
 }
@@ -71,15 +73,6 @@ export interface EmergencyContact {
   email: string | null;
   isPrimary: boolean;
   status: string;
-}
-
-export interface ConsentFormVersion {
-  id: string;
-  formCode: string;
-  versionNumber: string;
-  title: string;
-  contentText: string | null;
-  documentObjectKey: string;
 }
 
 export interface Registration {

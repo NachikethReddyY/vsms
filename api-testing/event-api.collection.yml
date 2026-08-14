@@ -6,7 +6,7 @@ info:
     the HttpOnly Cognito refresh cookie and CSRF header for replacement auth/CSRF cookies, while its JSON response
     contains user, expiresIn, and sessionExpiresIn only.
 item:
-  - name: Check API readiness
+  - name: Check API process liveness
     description: ''
     event: []
     request:
@@ -36,53 +36,51 @@ item:
           {
             "status": "ok"
           }
-      - name: 404 Response
+  - name: Check API readiness (database reachability)
+    description: ''
+    event: []
+    request:
+      method: GET
+      header: []
+      auth:
+        type: noauth
+      url:
+        raw: '{{baseUrl}}/ready'
+        host:
+          - '{{baseUrl}}'
+        path:
+          - ready
+        query: []
+    response:
+      - name: 200 Response
         originalRequest:
           method: GET
           header: []
-          url: '{{baseUrl}}/health'
-        status: Not Found
-        code: 404
+          url: '{{baseUrl}}/ready'
+        status: OK
+        code: 200
         header:
           - key: Content-Type
             value: application/json
         body: |-
           {
-            "type": "",
-            "title": "",
-            "status": 0,
-            "code": "",
-            "requestId": "00000000-0000-4000-8000-000000000000",
-            "errors": [
-              {
-                "field": "",
-                "message": ""
-              }
-            ]
+            "status": "ready",
+            "database": "connected"
           }
-      - name: 500 Response
+      - name: 503 Response
         originalRequest:
           method: GET
           header: []
-          url: '{{baseUrl}}/health'
-        status: Internal Server Error
-        code: 500
+          url: '{{baseUrl}}/ready'
+        status: Service Unavailable
+        code: 503
         header:
           - key: Content-Type
             value: application/json
         body: |-
           {
-            "type": "",
-            "title": "",
-            "status": 0,
-            "code": "",
-            "requestId": "00000000-0000-4000-8000-000000000000",
-            "errors": [
-              {
-                "field": "",
-                "message": ""
-              }
-            ]
+            "status": "not_ready",
+            "database": "disconnected"
           }
   - name: Accept a signature-verified Amazon SNS envelope for SES delivery lifecycle events
     description: >-
@@ -1819,7 +1817,8 @@ item:
                         },
                         "user": {
                           "userId": "00000000-0000-4000-8000-000000000000",
-                          "username": ""
+                          "username": "",
+                          "fullName": ""
                         }
                       }
                     ]
@@ -1855,7 +1854,15 @@ item:
                         "min": 0,
                         "max": 0,
                         "unit": "",
-                        "eyes": "OD"
+                        "eyes": "OD",
+                        "flagRules": [
+                          {
+                            "op": "eq",
+                            "value": "",
+                            "flag": "REVIEW",
+                            "reason": ""
+                          }
+                        ]
                       }
                     ],
                     "schemaVersion": 1,
@@ -2125,7 +2132,8 @@ item:
                     },
                     "user": {
                       "userId": "00000000-0000-4000-8000-000000000000",
-                      "username": ""
+                      "username": "",
+                      "fullName": ""
                     }
                   }
                 ]
@@ -2161,7 +2169,15 @@ item:
                     "min": 0,
                     "max": 0,
                     "unit": "",
-                    "eyes": "OD"
+                    "eyes": "OD",
+                    "flagRules": [
+                      {
+                        "op": "eq",
+                        "value": "",
+                        "flag": "REVIEW",
+                        "reason": ""
+                      }
+                    ]
                   }
                 ],
                 "schemaVersion": 1,
@@ -2361,7 +2377,8 @@ item:
                       },
                       "user": {
                         "userId": "00000000-0000-4000-8000-000000000000",
-                        "username": ""
+                        "username": "",
+                        "fullName": ""
                       }
                     }
                   ]
@@ -2397,7 +2414,15 @@ item:
                       "min": 0,
                       "max": 0,
                       "unit": "",
-                      "eyes": "OD"
+                      "eyes": "OD",
+                      "flagRules": [
+                        {
+                          "op": "eq",
+                          "value": "",
+                          "flag": "REVIEW",
+                          "reason": ""
+                        }
+                      ]
                     }
                   ],
                   "schemaVersion": 1,
@@ -2610,7 +2635,15 @@ item:
                   "min": 0,
                   "max": 0,
                   "unit": "",
-                  "eyes": "OD"
+                  "eyes": "OD",
+                  "flagRules": [
+                    {
+                      "op": "eq",
+                      "value": "",
+                      "flag": "REVIEW",
+                      "reason": ""
+                    }
+                  ]
                 }
               ]
             }
@@ -2708,7 +2741,15 @@ item:
                 "min": 0,
                 "max": 0,
                 "unit": "",
-                "eyes": "OD"
+                "eyes": "OD",
+                "flagRules": [
+                  {
+                    "op": "eq",
+                    "value": "",
+                    "flag": "REVIEW",
+                    "reason": ""
+                  }
+                ]
               }
             ]
           }
@@ -2752,7 +2793,15 @@ item:
                 "min": 0,
                 "max": 0,
                 "unit": "",
-                "eyes": "OD"
+                "eyes": "OD",
+                "flagRules": [
+                  {
+                    "op": "eq",
+                    "value": "",
+                    "flag": "REVIEW",
+                    "reason": ""
+                  }
+                ]
               }
             ]
           }
@@ -2867,7 +2916,15 @@ item:
                   "min": 0,
                   "max": 0,
                   "unit": "",
-                  "eyes": "OD"
+                  "eyes": "OD",
+                  "flagRules": [
+                    {
+                      "op": "eq",
+                      "value": "",
+                      "flag": "REVIEW",
+                      "reason": ""
+                    }
+                  ]
                 }
               ]
             }
@@ -2966,7 +3023,15 @@ item:
                 "min": 0,
                 "max": 0,
                 "unit": "",
-                "eyes": "OD"
+                "eyes": "OD",
+                "flagRules": [
+                  {
+                    "op": "eq",
+                    "value": "",
+                    "flag": "REVIEW",
+                    "reason": ""
+                  }
+                ]
               }
             ]
           }
@@ -3010,7 +3075,15 @@ item:
                 "min": 0,
                 "max": 0,
                 "unit": "",
-                "eyes": "OD"
+                "eyes": "OD",
+                "flagRules": [
+                  {
+                    "op": "eq",
+                    "value": "",
+                    "flag": "REVIEW",
+                    "reason": ""
+                  }
+                ]
               }
             ]
           }
@@ -3247,6 +3320,202 @@ item:
               }
             ]
           }
+  - name: Monitor authorized events from the Operations Center
+    description: >-
+      Returns aggregate-only operational health for every event the administrator or active event manager may manage.
+      Participant identity, queue notes, screening values, clinical narratives, referral recipients, and synchronization
+      payloads are excluded. Intended for bounded polling; responses are never cached.
+    event: []
+    request:
+      method: GET
+      header: []
+      auth:
+        type: bearer
+        bearer:
+          - key: token
+            value: '{{token}}'
+            type: string
+      url:
+        raw: '{{baseUrl}}/operations'
+        host:
+          - '{{baseUrl}}'
+        path:
+          - operations
+        query:
+          - key: status
+            value: ALL
+            description: ''
+            disabled: true
+          - key: search
+            value: ''
+            description: ''
+            disabled: true
+          - key: limit
+            value: '50'
+            description: ''
+            disabled: true
+    response:
+      - name: 200 Response
+        originalRequest:
+          method: GET
+          header: []
+          url: '{{baseUrl}}/operations'
+        status: OK
+        code: 200
+        header:
+          - key: Content-Type
+            value: application/json
+        body: |-
+          {
+            "generatedAt": "2026-08-07T00:00:00.000Z",
+            "filters": {
+              "status": "ALL",
+              "search": ""
+            },
+            "summary": {
+              "events": {
+                "total": 0,
+                "active": 0,
+                "upcoming": 0,
+                "completed": 0,
+                "needsAttention": 0
+              },
+              "participants": {
+                "checkedIn": 0,
+                "completed": 0
+              },
+              "queue": {
+                "waiting": 0,
+                "active": 0
+              }
+            },
+            "events": [
+              {
+                "eventId": "00000000-0000-4000-8000-000000000000",
+                "name": "",
+                "status": "DRAFT",
+                "venue": "",
+                "timezone": "",
+                "startsAt": "2026-08-07T00:00:00.000Z",
+                "endsAt": "2026-08-07T00:00:00.000Z",
+                "capacity": 1,
+                "progress": {
+                  "total": 0,
+                  "signedUp": 0,
+                  "checkedIn": 0,
+                  "completed": 0,
+                  "screened": 0,
+                  "reviewed": 0
+                },
+                "queue": {
+                  "waiting": 0,
+                  "called": 0,
+                  "inProgress": 0,
+                  "completed": 0,
+                  "skipped": 0,
+                  "priority": 0,
+                  "longestWaitMinutes": 0
+                },
+                "stations": {
+                  "total": 0,
+                  "available": 0,
+                  "paused": 0,
+                  "offline": 0,
+                  "items": [
+                    {
+                      "stationId": "00000000-0000-4000-8000-000000000000",
+                      "name": "",
+                      "type": "VISUAL_ACUITY",
+                      "order": 1,
+                      "operationalStatus": "AVAILABLE",
+                      "staffed": true,
+                      "queue": {
+                        "waiting": 0,
+                        "active": 0
+                      }
+                    }
+                  ]
+                },
+                "staffing": {
+                  "shiftId": "00000000-0000-4000-8000-000000000000",
+                  "shiftName": "",
+                  "startsAt": "2026-08-07T00:00:00.000Z",
+                  "endsAt": "2026-08-07T00:00:00.000Z",
+                  "required": 0,
+                  "assigned": 0,
+                  "unfilled": 0,
+                  "unstaffedStations": 0
+                },
+                "referrals": {
+                  "actionRequired": 0
+                },
+                "sync": {
+                  "pending": 0,
+                  "issues": 0
+                },
+                "attention": {
+                  "severity": "critical",
+                  "reasons": [
+                    {
+                      "code": "STATIONS_OFFLINE",
+                      "label": "",
+                      "count": 1,
+                      "severity": "critical"
+                    }
+                  ]
+                }
+              }
+            ],
+            "truncated": true
+          }
+      - name: 401 Response
+        originalRequest:
+          method: GET
+          header: []
+          url: '{{baseUrl}}/operations'
+        status: Unauthorized
+        code: 401
+        header:
+          - key: Content-Type
+            value: application/json
+        body: |-
+          {
+            "type": "",
+            "title": "",
+            "status": 0,
+            "code": "",
+            "requestId": "00000000-0000-4000-8000-000000000000",
+            "errors": [
+              {
+                "field": "",
+                "message": ""
+              }
+            ]
+          }
+      - name: 403 Response
+        originalRequest:
+          method: GET
+          header: []
+          url: '{{baseUrl}}/operations'
+        status: Forbidden
+        code: 403
+        header:
+          - key: Content-Type
+            value: application/json
+        body: |-
+          {
+            "type": "",
+            "title": "",
+            "status": 0,
+            "code": "",
+            "requestId": "00000000-0000-4000-8000-000000000000",
+            "errors": [
+              {
+                "field": "",
+                "message": ""
+              }
+            ]
+          }
   - name: Search Singapore addresses with OneMap
     description: >-
       Uses a server-cached OneMap token that is renewed automatically; requests are rate limited below OneMap's 300
@@ -3428,6 +3697,88 @@ item:
           method: GET
           header: []
           url: '{{baseUrl}}/public/events/{eventId}'
+        status: Unprocessable Entity
+        code: 422
+        header:
+          - key: Content-Type
+            value: application/json
+        body: |-
+          {
+            "type": "",
+            "title": "",
+            "status": 0,
+            "code": "",
+            "requestId": "00000000-0000-4000-8000-000000000000",
+            "errors": [
+              {
+                "field": "",
+                "message": ""
+              }
+            ]
+          }
+  - name: Read artwork for a public event without exposing private object storage
+    description: ''
+    event: []
+    request:
+      method: GET
+      header: []
+      auth:
+        type: bearer
+        bearer:
+          - key: token
+            value: '{{token}}'
+            type: string
+      url:
+        raw: '{{baseUrl}}/public/events/{eventId}/artwork'
+        host:
+          - '{{baseUrl}}'
+        path:
+          - public
+          - events
+          - '{eventId}'
+          - artwork
+        query: []
+    response:
+      - name: 200 Response
+        originalRequest:
+          method: GET
+          header: []
+          url: '{{baseUrl}}/public/events/{eventId}/artwork'
+        status: OK
+        code: 200
+        header:
+          - key: Content-Type
+            value: application/json
+        body: ''
+      - name: 404 Response
+        originalRequest:
+          method: GET
+          header: []
+          url: '{{baseUrl}}/public/events/{eventId}/artwork'
+        status: Not Found
+        code: 404
+        header:
+          - key: Content-Type
+            value: application/json
+        body: |-
+          {
+            "type": "",
+            "title": "",
+            "status": 0,
+            "code": "",
+            "requestId": "00000000-0000-4000-8000-000000000000",
+            "errors": [
+              {
+                "field": "",
+                "message": ""
+              }
+            ]
+          }
+      - name: 422 Response
+        originalRequest:
+          method: GET
+          header: []
+          url: '{{baseUrl}}/public/events/{eventId}/artwork'
         status: Unprocessable Entity
         code: 422
         header:
@@ -4165,6 +4516,15 @@ item:
                 "checkedIn": true,
                 "checkedInAt": "2026-08-07T00:00:00.000Z",
                 "queueNumber": 0,
+                "routeVersion": 1,
+                "routeSteps": [
+                  {
+                    "stationId": "00000000-0000-4000-8000-000000000000",
+                    "stationName": "",
+                    "position": 1,
+                    "state": "COMPLETED"
+                  }
+                ],
                 "createdAt": "2026-08-07T00:00:00.000Z"
               }
             ],
@@ -4394,7 +4754,8 @@ item:
                     },
                     "user": {
                       "userId": "00000000-0000-4000-8000-000000000000",
-                      "username": ""
+                      "username": "",
+                      "fullName": ""
                     }
                   }
                 ]
@@ -4430,7 +4791,15 @@ item:
                     "min": 0,
                     "max": 0,
                     "unit": "",
-                    "eyes": "OD"
+                    "eyes": "OD",
+                    "flagRules": [
+                      {
+                        "op": "eq",
+                        "value": "",
+                        "flag": "REVIEW",
+                        "reason": ""
+                      }
+                    ]
                   }
                 ],
                 "schemaVersion": 1,
@@ -4690,7 +5059,8 @@ item:
                     },
                     "user": {
                       "userId": "00000000-0000-4000-8000-000000000000",
-                      "username": ""
+                      "username": "",
+                      "fullName": ""
                     }
                   }
                 ]
@@ -4726,7 +5096,15 @@ item:
                     "min": 0,
                     "max": 0,
                     "unit": "",
-                    "eyes": "OD"
+                    "eyes": "OD",
+                    "flagRules": [
+                      {
+                        "op": "eq",
+                        "value": "",
+                        "flag": "REVIEW",
+                        "reason": ""
+                      }
+                    ]
                   }
                 ],
                 "schemaVersion": 1,
@@ -4924,6 +5302,87 @@ item:
               description: JSON request body
               type: text
           url: '{{baseUrl}}/events/{eventId}'
+        status: Forbidden
+        code: 403
+        header:
+          - key: Content-Type
+            value: application/json
+        body: |-
+          {
+            "type": "",
+            "title": "",
+            "status": 0,
+            "code": "",
+            "requestId": "00000000-0000-4000-8000-000000000000",
+            "errors": [
+              {
+                "field": "",
+                "message": ""
+              }
+            ]
+          }
+  - name: Read private draft or staff-visible event artwork
+    description: ''
+    event: []
+    request:
+      method: GET
+      header: []
+      auth:
+        type: bearer
+        bearer:
+          - key: token
+            value: '{{token}}'
+            type: string
+      url:
+        raw: '{{baseUrl}}/events/{eventId}/artwork'
+        host:
+          - '{{baseUrl}}'
+        path:
+          - events
+          - '{eventId}'
+          - artwork
+        query: []
+    response:
+      - name: 200 Response
+        originalRequest:
+          method: GET
+          header: []
+          url: '{{baseUrl}}/events/{eventId}/artwork'
+        status: OK
+        code: 200
+        header:
+          - key: Content-Type
+            value: application/json
+        body: ''
+      - name: 401 Response
+        originalRequest:
+          method: GET
+          header: []
+          url: '{{baseUrl}}/events/{eventId}/artwork'
+        status: Unauthorized
+        code: 401
+        header:
+          - key: Content-Type
+            value: application/json
+        body: |-
+          {
+            "type": "",
+            "title": "",
+            "status": 0,
+            "code": "",
+            "requestId": "00000000-0000-4000-8000-000000000000",
+            "errors": [
+              {
+                "field": "",
+                "message": ""
+              }
+            ]
+          }
+      - name: 403 Response
+        originalRequest:
+          method: GET
+          header: []
+          url: '{{baseUrl}}/events/{eventId}/artwork'
         status: Forbidden
         code: 403
         header:
@@ -5451,6 +5910,101 @@ item:
           url: '{{baseUrl}}/events/{eventId}/registrations'
         status: Bad Request
         code: 400
+        header:
+          - key: Content-Type
+            value: application/json
+        body: |-
+          {
+            "type": "",
+            "title": "",
+            "status": 0,
+            "code": "",
+            "requestId": "00000000-0000-4000-8000-000000000000",
+            "errors": [
+              {
+                "field": "",
+                "message": ""
+              }
+            ]
+          }
+  - name: Get registration capacity and status totals for an event
+    description: ''
+    event: []
+    request:
+      method: GET
+      header: []
+      auth:
+        type: bearer
+        bearer:
+          - key: token
+            value: '{{token}}'
+            type: string
+      url:
+        raw: '{{baseUrl}}/events/{eventId}/registrations/summary'
+        host:
+          - '{{baseUrl}}'
+        path:
+          - events
+          - '{eventId}'
+          - registrations
+          - summary
+        query: []
+    response:
+      - name: 200 Response
+        originalRequest:
+          method: GET
+          header: []
+          url: '{{baseUrl}}/events/{eventId}/registrations/summary'
+        status: OK
+        code: 200
+        header:
+          - key: Content-Type
+            value: application/json
+        body: |-
+          {
+            "summary": {
+              "eventId": "00000000-0000-4000-8000-000000000000",
+              "capacity": 0,
+              "signedUpCount": 0,
+              "waitlistedCount": 0,
+              "checkedInCount": 0,
+              "completedCount": 0,
+              "cancelledCount": 0,
+              "filledCount": 0,
+              "remainingCapacity": 0
+            }
+          }
+      - name: 401 Response
+        originalRequest:
+          method: GET
+          header: []
+          url: '{{baseUrl}}/events/{eventId}/registrations/summary'
+        status: Unauthorized
+        code: 401
+        header:
+          - key: Content-Type
+            value: application/json
+        body: |-
+          {
+            "type": "",
+            "title": "",
+            "status": 0,
+            "code": "",
+            "requestId": "00000000-0000-4000-8000-000000000000",
+            "errors": [
+              {
+                "field": "",
+                "message": ""
+              }
+            ]
+          }
+      - name: 403 Response
+        originalRequest:
+          method: GET
+          header: []
+          url: '{{baseUrl}}/events/{eventId}/registrations/summary'
+        status: Forbidden
+        code: 403
         header:
           - key: Content-Type
             value: application/json
@@ -6194,6 +6748,264 @@ item:
               }
             ]
           }
+  - name: Add a working period to a draft, published, or live event
+    description: ''
+    event: []
+    request:
+      method: POST
+      header:
+        - key: Content-Type
+          value: application/json
+          description: JSON request body
+          type: text
+      auth:
+        type: bearer
+        bearer:
+          - key: token
+            value: '{{token}}'
+            type: string
+      url:
+        raw: '{{baseUrl}}/events/{eventId}/shifts'
+        host:
+          - '{{baseUrl}}'
+        path:
+          - events
+          - '{eventId}'
+          - shifts
+        query: []
+      body:
+        mode: raw
+        raw: |-
+          {
+            "version": 1,
+            "name": "",
+            "startsAt": "2026-08-07T00:00:00.000Z",
+            "endsAt": "2026-08-07T00:00:00.000Z",
+            "requiredStaff": 1
+          }
+        options:
+          raw:
+            language: json
+    response:
+      - name: 201 Response
+        originalRequest:
+          method: POST
+          header:
+            - key: Content-Type
+              value: application/json
+              description: JSON request body
+              type: text
+          url: '{{baseUrl}}/events/{eventId}/shifts'
+        status: Created
+        code: 201
+        header:
+          - key: Content-Type
+            value: application/json
+        body: |-
+          {
+            "firstManagerUserId": "00000000-0000-4000-8000-000000000000",
+            "name": "",
+            "description": "",
+            "bannerKey": "COMMUNITY_SCREENING",
+            "artworkDataUrl": "",
+            "venue": "",
+            "address": "",
+            "postalCode": "",
+            "latitude": 1.13,
+            "longitude": 103.59,
+            "locationProvider": "ONEMAP",
+            "locationReference": "",
+            "timezone": "Asia/Singapore",
+            "startsAt": "2026-08-07T00:00:00.000Z",
+            "endsAt": "2026-08-07T00:00:00.000Z",
+            "capacity": 1,
+            "expectedAttendance": 1,
+            "eventDays": [
+              {
+                "eventDayId": "00000000-0000-4000-8000-000000000000"
+              }
+            ],
+            "stations": [
+              {
+                "eventStationId": "00000000-0000-4000-8000-000000000000",
+                "stationTemplateId": "00000000-0000-4000-8000-000000000000",
+                "stationOrder": 1,
+                "capacity": 1,
+                "isAvailable": true,
+                "availabilities": [
+                  {
+                    "date": "2026-08-07",
+                    "isAvailable": true,
+                    "startsAt": "2026-08-07T00:00:00.000Z",
+                    "endsAt": "2026-08-07T00:00:00.000Z",
+                    "capacity": 1
+                  }
+                ]
+              }
+            ],
+            "shifts": [
+              {
+                "shiftId": "00000000-0000-4000-8000-000000000000",
+                "status": "PLANNED",
+                "staffAssignments": [
+                  {
+                    "staffAssignmentId": "00000000-0000-4000-8000-000000000000",
+                    "assignmentRole": {},
+                    "status": "ASSIGNED",
+                    "notes": "",
+                    "eventStation": {
+                      "eventStationId": "00000000-0000-4000-8000-000000000000",
+                      "stationTemplateId": "00000000-0000-4000-8000-000000000000",
+                      "name": "",
+                      "stationOrder": 1
+                    },
+                    "user": {
+                      "userId": "00000000-0000-4000-8000-000000000000",
+                      "username": "",
+                      "fullName": ""
+                    }
+                  }
+                ]
+              }
+            ],
+            "eventId": "00000000-0000-4000-8000-000000000000",
+            "status": "DRAFT",
+            "version": 1,
+            "cancelledAt": "2026-08-07T00:00:00.000Z",
+            "cancellationReason": "",
+            "createdAt": "2026-08-07T00:00:00.000Z",
+            "updatedAt": "2026-08-07T00:00:00.000Z",
+            "eventStations": [
+              {
+                "eventStationId": "00000000-0000-4000-8000-000000000000",
+                "stationTemplateId": "00000000-0000-4000-8000-000000000000",
+                "templateVersion": 1,
+                "name": "",
+                "stationType": "VISUAL_ACUITY",
+                "description": "",
+                "stationOrder": 1,
+                "capacity": 1,
+                "isAvailable": true,
+                "fieldSchemaSnapshot": [
+                  {
+                    "key": "",
+                    "label": "",
+                    "type": "text",
+                    "required": true,
+                    "options": [
+                      ""
+                    ],
+                    "min": 0,
+                    "max": 0,
+                    "unit": "",
+                    "eyes": "OD",
+                    "flagRules": [
+                      {
+                        "op": "eq",
+                        "value": "",
+                        "flag": "REVIEW",
+                        "reason": ""
+                      }
+                    ]
+                  }
+                ],
+                "schemaVersion": 1,
+                "availabilities": [
+                  {
+                    "eventStationAvailabilityId": "00000000-0000-4000-8000-000000000000",
+                    "isAvailable": true,
+                    "startsAt": "2026-08-07T00:00:00.000Z",
+                    "endsAt": "2026-08-07T00:00:00.000Z",
+                    "capacity": 1,
+                    "eventDay": {
+                      "eventDayId": "00000000-0000-4000-8000-000000000000",
+                      "date": "2026-08-07"
+                    }
+                  }
+                ]
+              }
+            ],
+            "signupCount": 0,
+            "activeCapacityCount": 0,
+            "canManage": true,
+            "createdBy": {
+              "id": "00000000-0000-4000-8000-000000000000",
+              "userId": "00000000-0000-4000-8000-000000000000",
+              "username": "",
+              "email": "",
+              "fullName": "",
+              "employeeNumber": "",
+              "contactNumber": "",
+              "department": "",
+              "designation": "",
+              "systemRole": "ADMIN",
+              "status": "ACTIVE",
+              "approvalState": "PENDING",
+              "accessState": "ENABLED",
+              "professionalCategory": "STAFF",
+              "roles": [
+                "ADMINISTRATOR"
+              ],
+              "createdAt": "2026-08-07T00:00:00.000Z"
+            },
+            "cancelledBy": {}
+          }
+      - name: 401 Response
+        originalRequest:
+          method: POST
+          header:
+            - key: Content-Type
+              value: application/json
+              description: JSON request body
+              type: text
+          url: '{{baseUrl}}/events/{eventId}/shifts'
+        status: Unauthorized
+        code: 401
+        header:
+          - key: Content-Type
+            value: application/json
+        body: |-
+          {
+            "type": "",
+            "title": "",
+            "status": 0,
+            "code": "",
+            "requestId": "00000000-0000-4000-8000-000000000000",
+            "errors": [
+              {
+                "field": "",
+                "message": ""
+              }
+            ]
+          }
+      - name: 403 Response
+        originalRequest:
+          method: POST
+          header:
+            - key: Content-Type
+              value: application/json
+              description: JSON request body
+              type: text
+          url: '{{baseUrl}}/events/{eventId}/shifts'
+        status: Forbidden
+        code: 403
+        header:
+          - key: Content-Type
+            value: application/json
+        body: |-
+          {
+            "type": "",
+            "title": "",
+            "status": 0,
+            "code": "",
+            "requestId": "00000000-0000-4000-8000-000000000000",
+            "errors": [
+              {
+                "field": "",
+                "message": ""
+              }
+            ]
+          }
   - name: Schedule a duty for an active event member who already has the matching granular role
     description: ''
     event: []
@@ -6227,6 +7039,9 @@ item:
           {
             "version": 1,
             "userId": "00000000-0000-4000-8000-000000000000",
+            "userIds": [
+              "00000000-0000-4000-8000-000000000000"
+            ],
             "assignmentRole": "SCREENER",
             "eventStationId": "00000000-0000-4000-8000-000000000000"
           }
@@ -6308,7 +7123,8 @@ item:
                     },
                     "user": {
                       "userId": "00000000-0000-4000-8000-000000000000",
-                      "username": ""
+                      "username": "",
+                      "fullName": ""
                     }
                   }
                 ]
@@ -6344,7 +7160,15 @@ item:
                     "min": 0,
                     "max": 0,
                     "unit": "",
-                    "eyes": "OD"
+                    "eyes": "OD",
+                    "flagRules": [
+                      {
+                        "op": "eq",
+                        "value": "",
+                        "flag": "REVIEW",
+                        "reason": ""
+                      }
+                    ]
                   }
                 ],
                 "schemaVersion": 1,
@@ -6543,7 +7367,8 @@ item:
                     },
                     "user": {
                       "userId": "00000000-0000-4000-8000-000000000000",
-                      "username": ""
+                      "username": "",
+                      "fullName": ""
                     }
                   }
                 ]
@@ -6579,7 +7404,15 @@ item:
                     "min": 0,
                     "max": 0,
                     "unit": "",
-                    "eyes": "OD"
+                    "eyes": "OD",
+                    "flagRules": [
+                      {
+                        "op": "eq",
+                        "value": "",
+                        "flag": "REVIEW",
+                        "reason": ""
+                      }
+                    ]
                   }
                 ],
                 "schemaVersion": 1,
@@ -6786,7 +7619,8 @@ item:
                     },
                     "user": {
                       "userId": "00000000-0000-4000-8000-000000000000",
-                      "username": ""
+                      "username": "",
+                      "fullName": ""
                     }
                   }
                 ]
@@ -6822,7 +7656,15 @@ item:
                     "min": 0,
                     "max": 0,
                     "unit": "",
-                    "eyes": "OD"
+                    "eyes": "OD",
+                    "flagRules": [
+                      {
+                        "op": "eq",
+                        "value": "",
+                        "flag": "REVIEW",
+                        "reason": ""
+                      }
+                    ]
                   }
                 ],
                 "schemaVersion": 1,
@@ -6955,6 +7797,15 @@ item:
             "version": 1,
             "stationOrder": 1,
             "capacity": 1,
+            "availabilities": [
+              {
+                "date": "2026-08-07",
+                "isAvailable": true,
+                "startsAt": "2026-08-07T00:00:00.000Z",
+                "endsAt": "2026-08-07T00:00:00.000Z",
+                "capacity": 1
+              }
+            ],
             "isAvailable": true,
             "operationalStatus": "AVAILABLE"
           }
@@ -7036,7 +7887,8 @@ item:
                     },
                     "user": {
                       "userId": "00000000-0000-4000-8000-000000000000",
-                      "username": ""
+                      "username": "",
+                      "fullName": ""
                     }
                   }
                 ]
@@ -7072,7 +7924,15 @@ item:
                     "min": 0,
                     "max": 0,
                     "unit": "",
-                    "eyes": "OD"
+                    "eyes": "OD",
+                    "flagRules": [
+                      {
+                        "op": "eq",
+                        "value": "",
+                        "flag": "REVIEW",
+                        "reason": ""
+                      }
+                    ]
                   }
                 ],
                 "schemaVersion": 1,
@@ -7152,6 +8012,240 @@ item:
               value: application/json
               description: JSON request body
               type: text
+          url: '{{baseUrl}}/events/{eventId}/stations/{eventStationId}'
+        status: Not Found
+        code: 404
+        header:
+          - key: Content-Type
+            value: application/json
+        body: |-
+          {
+            "type": "",
+            "title": "",
+            "status": 0,
+            "code": "",
+            "requestId": "00000000-0000-4000-8000-000000000000",
+            "errors": [
+              {
+                "field": "",
+                "message": ""
+              }
+            ]
+          }
+  - name: Remove an unused station from a draft or published event
+    description: ''
+    event: []
+    request:
+      method: DELETE
+      header: []
+      auth:
+        type: bearer
+        bearer:
+          - key: token
+            value: '{{token}}'
+            type: string
+      url:
+        raw: '{{baseUrl}}/events/{eventId}/stations/{eventStationId}'
+        host:
+          - '{{baseUrl}}'
+        path:
+          - events
+          - '{eventId}'
+          - stations
+          - '{eventStationId}'
+        query:
+          - key: version
+            value: '1'
+            description: ''
+            disabled: false
+    response:
+      - name: 200 Response
+        originalRequest:
+          method: DELETE
+          header: []
+          url: '{{baseUrl}}/events/{eventId}/stations/{eventStationId}'
+        status: OK
+        code: 200
+        header:
+          - key: Content-Type
+            value: application/json
+        body: |-
+          {
+            "firstManagerUserId": "00000000-0000-4000-8000-000000000000",
+            "name": "",
+            "description": "",
+            "bannerKey": "COMMUNITY_SCREENING",
+            "artworkDataUrl": "",
+            "venue": "",
+            "address": "",
+            "postalCode": "",
+            "latitude": 1.13,
+            "longitude": 103.59,
+            "locationProvider": "ONEMAP",
+            "locationReference": "",
+            "timezone": "Asia/Singapore",
+            "startsAt": "2026-08-07T00:00:00.000Z",
+            "endsAt": "2026-08-07T00:00:00.000Z",
+            "capacity": 1,
+            "expectedAttendance": 1,
+            "eventDays": [
+              {
+                "eventDayId": "00000000-0000-4000-8000-000000000000"
+              }
+            ],
+            "stations": [
+              {
+                "eventStationId": "00000000-0000-4000-8000-000000000000",
+                "stationTemplateId": "00000000-0000-4000-8000-000000000000",
+                "stationOrder": 1,
+                "capacity": 1,
+                "isAvailable": true,
+                "availabilities": [
+                  {
+                    "date": "2026-08-07",
+                    "isAvailable": true,
+                    "startsAt": "2026-08-07T00:00:00.000Z",
+                    "endsAt": "2026-08-07T00:00:00.000Z",
+                    "capacity": 1
+                  }
+                ]
+              }
+            ],
+            "shifts": [
+              {
+                "shiftId": "00000000-0000-4000-8000-000000000000",
+                "status": "PLANNED",
+                "staffAssignments": [
+                  {
+                    "staffAssignmentId": "00000000-0000-4000-8000-000000000000",
+                    "assignmentRole": {},
+                    "status": "ASSIGNED",
+                    "notes": "",
+                    "eventStation": {
+                      "eventStationId": "00000000-0000-4000-8000-000000000000",
+                      "stationTemplateId": "00000000-0000-4000-8000-000000000000",
+                      "name": "",
+                      "stationOrder": 1
+                    },
+                    "user": {
+                      "userId": "00000000-0000-4000-8000-000000000000",
+                      "username": "",
+                      "fullName": ""
+                    }
+                  }
+                ]
+              }
+            ],
+            "eventId": "00000000-0000-4000-8000-000000000000",
+            "status": "DRAFT",
+            "version": 1,
+            "cancelledAt": "2026-08-07T00:00:00.000Z",
+            "cancellationReason": "",
+            "createdAt": "2026-08-07T00:00:00.000Z",
+            "updatedAt": "2026-08-07T00:00:00.000Z",
+            "eventStations": [
+              {
+                "eventStationId": "00000000-0000-4000-8000-000000000000",
+                "stationTemplateId": "00000000-0000-4000-8000-000000000000",
+                "templateVersion": 1,
+                "name": "",
+                "stationType": "VISUAL_ACUITY",
+                "description": "",
+                "stationOrder": 1,
+                "capacity": 1,
+                "isAvailable": true,
+                "fieldSchemaSnapshot": [
+                  {
+                    "key": "",
+                    "label": "",
+                    "type": "text",
+                    "required": true,
+                    "options": [
+                      ""
+                    ],
+                    "min": 0,
+                    "max": 0,
+                    "unit": "",
+                    "eyes": "OD",
+                    "flagRules": [
+                      {
+                        "op": "eq",
+                        "value": "",
+                        "flag": "REVIEW",
+                        "reason": ""
+                      }
+                    ]
+                  }
+                ],
+                "schemaVersion": 1,
+                "availabilities": [
+                  {
+                    "eventStationAvailabilityId": "00000000-0000-4000-8000-000000000000",
+                    "isAvailable": true,
+                    "startsAt": "2026-08-07T00:00:00.000Z",
+                    "endsAt": "2026-08-07T00:00:00.000Z",
+                    "capacity": 1,
+                    "eventDay": {
+                      "eventDayId": "00000000-0000-4000-8000-000000000000",
+                      "date": "2026-08-07"
+                    }
+                  }
+                ]
+              }
+            ],
+            "signupCount": 0,
+            "activeCapacityCount": 0,
+            "canManage": true,
+            "createdBy": {
+              "id": "00000000-0000-4000-8000-000000000000",
+              "userId": "00000000-0000-4000-8000-000000000000",
+              "username": "",
+              "email": "",
+              "fullName": "",
+              "employeeNumber": "",
+              "contactNumber": "",
+              "department": "",
+              "designation": "",
+              "systemRole": "ADMIN",
+              "status": "ACTIVE",
+              "approvalState": "PENDING",
+              "accessState": "ENABLED",
+              "professionalCategory": "STAFF",
+              "roles": [
+                "ADMINISTRATOR"
+              ],
+              "createdAt": "2026-08-07T00:00:00.000Z"
+            },
+            "cancelledBy": {}
+          }
+      - name: 401 Response
+        originalRequest:
+          method: DELETE
+          header: []
+          url: '{{baseUrl}}/events/{eventId}/stations/{eventStationId}'
+        status: Unauthorized
+        code: 401
+        header:
+          - key: Content-Type
+            value: application/json
+        body: |-
+          {
+            "type": "",
+            "title": "",
+            "status": 0,
+            "code": "",
+            "requestId": "00000000-0000-4000-8000-000000000000",
+            "errors": [
+              {
+                "field": "",
+                "message": ""
+              }
+            ]
+          }
+      - name: 404 Response
+        originalRequest:
+          method: DELETE
+          header: []
           url: '{{baseUrl}}/events/{eventId}/stations/{eventStationId}'
         status: Not Found
         code: 404
@@ -7264,7 +8358,8 @@ item:
                     },
                     "user": {
                       "userId": "00000000-0000-4000-8000-000000000000",
-                      "username": ""
+                      "username": "",
+                      "fullName": ""
                     }
                   }
                 ]
@@ -7300,7 +8395,15 @@ item:
                     "min": 0,
                     "max": 0,
                     "unit": "",
-                    "eyes": "OD"
+                    "eyes": "OD",
+                    "flagRules": [
+                      {
+                        "op": "eq",
+                        "value": "",
+                        "flag": "REVIEW",
+                        "reason": ""
+                      }
+                    ]
                   }
                 ],
                 "schemaVersion": 1,
@@ -7484,7 +8587,8 @@ item:
                     },
                     "user": {
                       "userId": "00000000-0000-4000-8000-000000000000",
-                      "username": ""
+                      "username": "",
+                      "fullName": ""
                     }
                   }
                 ]
@@ -7520,7 +8624,15 @@ item:
                     "min": 0,
                     "max": 0,
                     "unit": "",
-                    "eyes": "OD"
+                    "eyes": "OD",
+                    "flagRules": [
+                      {
+                        "op": "eq",
+                        "value": "",
+                        "flag": "REVIEW",
+                        "reason": ""
+                      }
+                    ]
                   }
                 ],
                 "schemaVersion": 1,
@@ -7704,7 +8816,8 @@ item:
                     },
                     "user": {
                       "userId": "00000000-0000-4000-8000-000000000000",
-                      "username": ""
+                      "username": "",
+                      "fullName": ""
                     }
                   }
                 ]
@@ -7740,7 +8853,15 @@ item:
                     "min": 0,
                     "max": 0,
                     "unit": "",
-                    "eyes": "OD"
+                    "eyes": "OD",
+                    "flagRules": [
+                      {
+                        "op": "eq",
+                        "value": "",
+                        "flag": "REVIEW",
+                        "reason": ""
+                      }
+                    ]
                   }
                 ],
                 "schemaVersion": 1,
@@ -7942,7 +9063,8 @@ item:
                     },
                     "user": {
                       "userId": "00000000-0000-4000-8000-000000000000",
-                      "username": ""
+                      "username": "",
+                      "fullName": ""
                     }
                   }
                 ]
@@ -7978,7 +9100,15 @@ item:
                     "min": 0,
                     "max": 0,
                     "unit": "",
-                    "eyes": "OD"
+                    "eyes": "OD",
+                    "flagRules": [
+                      {
+                        "op": "eq",
+                        "value": "",
+                        "flag": "REVIEW",
+                        "reason": ""
+                      }
+                    ]
                   }
                 ],
                 "schemaVersion": 1,
@@ -8312,7 +9442,15 @@ item:
                       "min": 0,
                       "max": 0,
                       "unit": "",
-                      "eyes": "OD"
+                      "eyes": "OD",
+                      "flagRules": [
+                        {
+                          "op": "eq",
+                          "value": "",
+                          "flag": "REVIEW",
+                          "reason": ""
+                        }
+                      ]
                     }
                   ],
                   "schemaVersion": 1,
@@ -8436,11 +9574,11 @@ item:
             },
             "registrations": [
               {
+                "queueEntryId": "00000000-0000-4000-8000-000000000000",
                 "registrationId": "00000000-0000-4000-8000-000000000000",
                 "participantDisplayName": "",
                 "queueNumber": 0,
                 "status": "SIGNED_UP",
-                "passToken": "",
                 "existingResult": {}
               }
             ]
@@ -8539,8 +9677,7 @@ item:
             "registrationId": "00000000-0000-4000-8000-000000000000",
             "participantDisplayName": "",
             "queueNumber": 0,
-            "status": "SIGNED_UP",
-            "passToken": ""
+            "status": "SIGNED_UP"
           }
       - name: 401 Response
         originalRequest:
@@ -10244,6 +11381,7 @@ item:
                 "highestFlag": "NORMAL",
                 "flaggedResultCount": 0,
                 "completedStationCount": 0,
+                "skippedStationCount": 0,
                 "totalStationCount": 1,
                 "readyReason": "SCREENING_COMPLETE",
                 "lastResultAt": "2026-08-07T00:00:00.000Z"
@@ -10367,9 +11505,18 @@ item:
                     "min": 0,
                     "max": 0,
                     "unit": "",
-                    "eyes": "OD"
+                    "eyes": "OD",
+                    "flagRules": [
+                      {
+                        "op": "eq",
+                        "value": "",
+                        "flag": "REVIEW",
+                        "reason": ""
+                      }
+                    ]
                   }
                 ],
+                "status": "COMPLETED",
                 "result": {
                   "resultId": "00000000-0000-4000-8000-000000000000",
                   "stationId": "00000000-0000-4000-8000-000000000000",
@@ -10389,6 +11536,7 @@ item:
               "ready": true,
               "readyReason": "SCREENING_COMPLETE",
               "completedStationCount": 0,
+              "skippedStationCount": 0,
               "totalStationCount": 0,
               "highestFlag": {}
             },
@@ -11504,100 +12652,6 @@ item:
               }
             ]
           }
-  - name: Get the currently effective consent form
-    description: ''
-    event: []
-    request:
-      method: GET
-      header: []
-      auth:
-        type: bearer
-        bearer:
-          - key: token
-            value: '{{token}}'
-            type: string
-      url:
-        raw: '{{baseUrl}}/participants/active-consent-form'
-        host:
-          - '{{baseUrl}}'
-        path:
-          - participants
-          - active-consent-form
-        query: []
-    response:
-      - name: 200 Response
-        originalRequest:
-          method: GET
-          header: []
-          url: '{{baseUrl}}/participants/active-consent-form'
-        status: OK
-        code: 200
-        header:
-          - key: Content-Type
-            value: application/json
-        body: |-
-          {
-            "consentForm": {
-              "id": "00000000-0000-4000-8000-000000000000",
-              "formCode": "",
-              "versionNumber": "",
-              "title": "",
-              "contentText": "",
-              "contentHash": "",
-              "documentObjectKey": "",
-              "effectiveFrom": "2026-08-07T00:00:00.000Z",
-              "effectiveTo": "2026-08-07T00:00:00.000Z",
-              "isActive": true
-            }
-          }
-      - name: 401 Response
-        originalRequest:
-          method: GET
-          header: []
-          url: '{{baseUrl}}/participants/active-consent-form'
-        status: Unauthorized
-        code: 401
-        header:
-          - key: Content-Type
-            value: application/json
-        body: |-
-          {
-            "type": "",
-            "title": "",
-            "status": 0,
-            "code": "",
-            "requestId": "00000000-0000-4000-8000-000000000000",
-            "errors": [
-              {
-                "field": "",
-                "message": ""
-              }
-            ]
-          }
-      - name: 403 Response
-        originalRequest:
-          method: GET
-          header: []
-          url: '{{baseUrl}}/participants/active-consent-form'
-        status: Forbidden
-        code: 403
-        header:
-          - key: Content-Type
-            value: application/json
-        body: |-
-          {
-            "type": "",
-            "title": "",
-            "status": 0,
-            "code": "",
-            "requestId": "00000000-0000-4000-8000-000000000000",
-            "errors": [
-              {
-                "field": "",
-                "message": ""
-              }
-            ]
-          }
   - name: Find possible participant matches for the assigned registration event
     description: >-
       A name alone never produces a possible match. An exact NRIC or FIN match is a strong match; otherwise at least two
@@ -12200,368 +13254,6 @@ item:
               }
             ]
           }
-  - name: List a participant's consent records
-    description: ''
-    event: []
-    request:
-      method: GET
-      header: []
-      auth:
-        type: bearer
-        bearer:
-          - key: token
-            value: '{{token}}'
-            type: string
-      url:
-        raw: '{{baseUrl}}/participants/{participantId}/consents'
-        host:
-          - '{{baseUrl}}'
-        path:
-          - participants
-          - '{participantId}'
-          - consents
-        query: []
-    response:
-      - name: 200 Response
-        originalRequest:
-          method: GET
-          header: []
-          url: '{{baseUrl}}/participants/{participantId}/consents'
-        status: OK
-        code: 200
-        header:
-          - key: Content-Type
-            value: application/json
-        body: |-
-          {
-            "consents": [
-              {
-                "id": "00000000-0000-4000-8000-000000000000",
-                "participantId": "00000000-0000-4000-8000-000000000000",
-                "eventId": "00000000-0000-4000-8000-000000000000",
-                "registrationId": "00000000-0000-4000-8000-000000000000",
-                "withdrawalOfId": "00000000-0000-4000-8000-000000000000",
-                "consentFormVersionId": "00000000-0000-4000-8000-000000000000",
-                "consentStatus": "PENDING",
-                "signerType": "",
-                "signerName": "",
-                "recordedById": "00000000-0000-4000-8000-000000000000",
-                "signedAt": "2026-08-07T00:00:00.000Z",
-                "withdrawnAt": "2026-08-07T00:00:00.000Z",
-                "withdrawalReason": "",
-                "createdAt": "2026-08-07T00:00:00.000Z"
-              }
-            ]
-          }
-      - name: 401 Response
-        originalRequest:
-          method: GET
-          header: []
-          url: '{{baseUrl}}/participants/{participantId}/consents'
-        status: Unauthorized
-        code: 401
-        header:
-          - key: Content-Type
-            value: application/json
-        body: |-
-          {
-            "type": "",
-            "title": "",
-            "status": 0,
-            "code": "",
-            "requestId": "00000000-0000-4000-8000-000000000000",
-            "errors": [
-              {
-                "field": "",
-                "message": ""
-              }
-            ]
-          }
-      - name: 403 Response
-        originalRequest:
-          method: GET
-          header: []
-          url: '{{baseUrl}}/participants/{participantId}/consents'
-        status: Forbidden
-        code: 403
-        header:
-          - key: Content-Type
-            value: application/json
-        body: |-
-          {
-            "type": "",
-            "title": "",
-            "status": 0,
-            "code": "",
-            "requestId": "00000000-0000-4000-8000-000000000000",
-            "errors": [
-              {
-                "field": "",
-                "message": ""
-              }
-            ]
-          }
-  - name: Record consent using an event ID in the request body
-    description: ''
-    event: []
-    request:
-      method: POST
-      header:
-        - key: Content-Type
-          value: application/json
-          description: JSON request body
-          type: text
-      auth:
-        type: bearer
-        bearer:
-          - key: token
-            value: '{{token}}'
-            type: string
-      url:
-        raw: '{{baseUrl}}/participants/{participantId}/consents'
-        host:
-          - '{{baseUrl}}'
-        path:
-          - participants
-          - '{participantId}'
-          - consents
-        query: []
-      body:
-        mode: raw
-        raw: |-
-          {
-            "consentFormVersionId": "00000000-0000-4000-8000-000000000000",
-            "consentStatus": "ACCEPTED",
-            "signerType": "PARTICIPANT",
-            "signerName": "",
-            "signerRelationship": "",
-            "guardianContactName": "",
-            "guardianContactPhone": "",
-            "guardianContactEmail": "",
-            "signatureObjectKey": "",
-            "signatureSha256": "",
-            "signatureMimeType": "image/png",
-            "eventId": "00000000-0000-4000-8000-000000000000"
-          }
-        options:
-          raw:
-            language: json
-    response:
-      - name: 201 Response
-        originalRequest:
-          method: POST
-          header:
-            - key: Content-Type
-              value: application/json
-              description: JSON request body
-              type: text
-          url: '{{baseUrl}}/participants/{participantId}/consents'
-        status: Created
-        code: 201
-        header:
-          - key: Content-Type
-            value: application/json
-        body: |-
-          {
-            "consent": {
-              "id": "00000000-0000-4000-8000-000000000000",
-              "participantId": "00000000-0000-4000-8000-000000000000",
-              "eventId": "00000000-0000-4000-8000-000000000000",
-              "registrationId": "00000000-0000-4000-8000-000000000000",
-              "withdrawalOfId": "00000000-0000-4000-8000-000000000000",
-              "consentFormVersionId": "00000000-0000-4000-8000-000000000000",
-              "consentStatus": "PENDING",
-              "signerType": "",
-              "signerName": "",
-              "recordedById": "00000000-0000-4000-8000-000000000000",
-              "signedAt": "2026-08-07T00:00:00.000Z",
-              "withdrawnAt": "2026-08-07T00:00:00.000Z",
-              "withdrawalReason": "",
-              "createdAt": "2026-08-07T00:00:00.000Z"
-            }
-          }
-      - name: 400 Response
-        originalRequest:
-          method: POST
-          header:
-            - key: Content-Type
-              value: application/json
-              description: JSON request body
-              type: text
-          url: '{{baseUrl}}/participants/{participantId}/consents'
-        status: Bad Request
-        code: 400
-        header:
-          - key: Content-Type
-            value: application/json
-        body: |-
-          {
-            "type": "",
-            "title": "",
-            "status": 0,
-            "code": "",
-            "requestId": "00000000-0000-4000-8000-000000000000",
-            "errors": [
-              {
-                "field": "",
-                "message": ""
-              }
-            ]
-          }
-      - name: 401 Response
-        originalRequest:
-          method: POST
-          header:
-            - key: Content-Type
-              value: application/json
-              description: JSON request body
-              type: text
-          url: '{{baseUrl}}/participants/{participantId}/consents'
-        status: Unauthorized
-        code: 401
-        header:
-          - key: Content-Type
-            value: application/json
-        body: |-
-          {
-            "type": "",
-            "title": "",
-            "status": 0,
-            "code": "",
-            "requestId": "00000000-0000-4000-8000-000000000000",
-            "errors": [
-              {
-                "field": "",
-                "message": ""
-              }
-            ]
-          }
-  - name: Create an immutable withdrawal for accepted consent
-    description: ''
-    event: []
-    request:
-      method: POST
-      header:
-        - key: Content-Type
-          value: application/json
-          description: JSON request body
-          type: text
-      auth:
-        type: bearer
-        bearer:
-          - key: token
-            value: '{{token}}'
-            type: string
-      url:
-        raw: '{{baseUrl}}/participants/{participantId}/consents/{consentId}/withdraw'
-        host:
-          - '{{baseUrl}}'
-        path:
-          - participants
-          - '{participantId}'
-          - consents
-          - '{consentId}'
-          - withdraw
-        query: []
-      body:
-        mode: raw
-        raw: |-
-          {
-            "withdrawalReason": ""
-          }
-        options:
-          raw:
-            language: json
-    response:
-      - name: 201 Response
-        originalRequest:
-          method: POST
-          header:
-            - key: Content-Type
-              value: application/json
-              description: JSON request body
-              type: text
-          url: '{{baseUrl}}/participants/{participantId}/consents/{consentId}/withdraw'
-        status: Created
-        code: 201
-        header:
-          - key: Content-Type
-            value: application/json
-        body: |-
-          {
-            "consent": {
-              "id": "00000000-0000-4000-8000-000000000000",
-              "participantId": "00000000-0000-4000-8000-000000000000",
-              "eventId": "00000000-0000-4000-8000-000000000000",
-              "registrationId": "00000000-0000-4000-8000-000000000000",
-              "withdrawalOfId": "00000000-0000-4000-8000-000000000000",
-              "consentFormVersionId": "00000000-0000-4000-8000-000000000000",
-              "consentStatus": "PENDING",
-              "signerType": "",
-              "signerName": "",
-              "recordedById": "00000000-0000-4000-8000-000000000000",
-              "signedAt": "2026-08-07T00:00:00.000Z",
-              "withdrawnAt": "2026-08-07T00:00:00.000Z",
-              "withdrawalReason": "",
-              "createdAt": "2026-08-07T00:00:00.000Z"
-            }
-          }
-      - name: 400 Response
-        originalRequest:
-          method: POST
-          header:
-            - key: Content-Type
-              value: application/json
-              description: JSON request body
-              type: text
-          url: '{{baseUrl}}/participants/{participantId}/consents/{consentId}/withdraw'
-        status: Bad Request
-        code: 400
-        header:
-          - key: Content-Type
-            value: application/json
-        body: |-
-          {
-            "type": "",
-            "title": "",
-            "status": 0,
-            "code": "",
-            "requestId": "00000000-0000-4000-8000-000000000000",
-            "errors": [
-              {
-                "field": "",
-                "message": ""
-              }
-            ]
-          }
-      - name: 401 Response
-        originalRequest:
-          method: POST
-          header:
-            - key: Content-Type
-              value: application/json
-              description: JSON request body
-              type: text
-          url: '{{baseUrl}}/participants/{participantId}/consents/{consentId}/withdraw'
-        status: Unauthorized
-        code: 401
-        header:
-          - key: Content-Type
-            value: application/json
-        body: |-
-          {
-            "type": "",
-            "title": "",
-            "status": 0,
-            "code": "",
-            "requestId": "00000000-0000-4000-8000-000000000000",
-            "errors": [
-              {
-                "field": "",
-                "message": ""
-              }
-            ]
-          }
   - name: List a participant's emergency contacts
     description: ''
     event: []
@@ -12910,143 +13602,7 @@ item:
               }
             ]
           }
-  - name: Record consent for a participant and event
-    description: ''
-    event: []
-    request:
-      method: POST
-      header:
-        - key: Content-Type
-          value: application/json
-          description: JSON request body
-          type: text
-      auth:
-        type: bearer
-        bearer:
-          - key: token
-            value: '{{token}}'
-            type: string
-      url:
-        raw: '{{baseUrl}}/participants/{participantId}/events/{eventId}/consent'
-        host:
-          - '{{baseUrl}}'
-        path:
-          - participants
-          - '{participantId}'
-          - events
-          - '{eventId}'
-          - consent
-        query: []
-      body:
-        mode: raw
-        raw: |-
-          {
-            "consentFormVersionId": "00000000-0000-4000-8000-000000000000",
-            "consentStatus": "ACCEPTED",
-            "signerType": "PARTICIPANT",
-            "signerName": "",
-            "signerRelationship": "",
-            "guardianContactName": "",
-            "guardianContactPhone": "",
-            "guardianContactEmail": "",
-            "signatureObjectKey": "",
-            "signatureSha256": "",
-            "signatureMimeType": "image/png"
-          }
-        options:
-          raw:
-            language: json
-    response:
-      - name: 201 Response
-        originalRequest:
-          method: POST
-          header:
-            - key: Content-Type
-              value: application/json
-              description: JSON request body
-              type: text
-          url: '{{baseUrl}}/participants/{participantId}/events/{eventId}/consent'
-        status: Created
-        code: 201
-        header:
-          - key: Content-Type
-            value: application/json
-        body: |-
-          {
-            "consent": {
-              "id": "00000000-0000-4000-8000-000000000000",
-              "participantId": "00000000-0000-4000-8000-000000000000",
-              "eventId": "00000000-0000-4000-8000-000000000000",
-              "registrationId": "00000000-0000-4000-8000-000000000000",
-              "withdrawalOfId": "00000000-0000-4000-8000-000000000000",
-              "consentFormVersionId": "00000000-0000-4000-8000-000000000000",
-              "consentStatus": "PENDING",
-              "signerType": "",
-              "signerName": "",
-              "recordedById": "00000000-0000-4000-8000-000000000000",
-              "signedAt": "2026-08-07T00:00:00.000Z",
-              "withdrawnAt": "2026-08-07T00:00:00.000Z",
-              "withdrawalReason": "",
-              "createdAt": "2026-08-07T00:00:00.000Z"
-            }
-          }
-      - name: 400 Response
-        originalRequest:
-          method: POST
-          header:
-            - key: Content-Type
-              value: application/json
-              description: JSON request body
-              type: text
-          url: '{{baseUrl}}/participants/{participantId}/events/{eventId}/consent'
-        status: Bad Request
-        code: 400
-        header:
-          - key: Content-Type
-            value: application/json
-        body: |-
-          {
-            "type": "",
-            "title": "",
-            "status": 0,
-            "code": "",
-            "requestId": "00000000-0000-4000-8000-000000000000",
-            "errors": [
-              {
-                "field": "",
-                "message": ""
-              }
-            ]
-          }
-      - name: 401 Response
-        originalRequest:
-          method: POST
-          header:
-            - key: Content-Type
-              value: application/json
-              description: JSON request body
-              type: text
-          url: '{{baseUrl}}/participants/{participantId}/events/{eventId}/consent'
-        status: Unauthorized
-        code: 401
-        header:
-          - key: Content-Type
-            value: application/json
-        body: |-
-          {
-            "type": "",
-            "title": "",
-            "status": 0,
-            "code": "",
-            "requestId": "00000000-0000-4000-8000-000000000000",
-            "errors": [
-              {
-                "field": "",
-                "message": ""
-              }
-            ]
-          }
-  - name: Get participant, event, emergency contact, and latest consent for registration review
+  - name: Get participant, event, and emergency contact for registration review
     description: ''
     event: []
     request:
@@ -13163,7 +13719,8 @@ item:
                       },
                       "user": {
                         "userId": "00000000-0000-4000-8000-000000000000",
-                        "username": ""
+                        "username": "",
+                        "fullName": ""
                       }
                     }
                   ]
@@ -13199,7 +13756,15 @@ item:
                       "min": 0,
                       "max": 0,
                       "unit": "",
-                      "eyes": "OD"
+                      "eyes": "OD",
+                      "flagRules": [
+                        {
+                          "op": "eq",
+                          "value": "",
+                          "flag": "REVIEW",
+                          "reason": ""
+                        }
+                      ]
                     }
                   ],
                   "schemaVersion": 1,
@@ -13254,22 +13819,6 @@ item:
               "status": "ACTIVE",
               "createdAt": "2026-08-07T00:00:00.000Z",
               "updatedAt": "2026-08-07T00:00:00.000Z"
-            },
-            "latestConsent": {
-              "id": "00000000-0000-4000-8000-000000000000",
-              "participantId": "00000000-0000-4000-8000-000000000000",
-              "eventId": "00000000-0000-4000-8000-000000000000",
-              "registrationId": "00000000-0000-4000-8000-000000000000",
-              "withdrawalOfId": "00000000-0000-4000-8000-000000000000",
-              "consentFormVersionId": "00000000-0000-4000-8000-000000000000",
-              "consentStatus": "PENDING",
-              "signerType": "",
-              "signerName": "",
-              "recordedById": "00000000-0000-4000-8000-000000000000",
-              "signedAt": "2026-08-07T00:00:00.000Z",
-              "withdrawnAt": "2026-08-07T00:00:00.000Z",
-              "withdrawalReason": "",
-              "createdAt": "2026-08-07T00:00:00.000Z"
             }
           }
       - name: 401 Response
@@ -13901,100 +14450,6 @@ item:
               }
             ]
           }
-  - name: Get the currently effective consent form
-    description: ''
-    event: []
-    request:
-      method: GET
-      header: []
-      auth:
-        type: bearer
-        bearer:
-          - key: token
-            value: '{{token}}'
-            type: string
-      url:
-        raw: '{{baseUrl}}/consent-forms/active'
-        host:
-          - '{{baseUrl}}'
-        path:
-          - consent-forms
-          - active
-        query: []
-    response:
-      - name: 200 Response
-        originalRequest:
-          method: GET
-          header: []
-          url: '{{baseUrl}}/consent-forms/active'
-        status: OK
-        code: 200
-        header:
-          - key: Content-Type
-            value: application/json
-        body: |-
-          {
-            "consentForm": {
-              "id": "00000000-0000-4000-8000-000000000000",
-              "formCode": "",
-              "versionNumber": "",
-              "title": "",
-              "contentText": "",
-              "contentHash": "",
-              "documentObjectKey": "",
-              "effectiveFrom": "2026-08-07T00:00:00.000Z",
-              "effectiveTo": "2026-08-07T00:00:00.000Z",
-              "isActive": true
-            }
-          }
-      - name: 401 Response
-        originalRequest:
-          method: GET
-          header: []
-          url: '{{baseUrl}}/consent-forms/active'
-        status: Unauthorized
-        code: 401
-        header:
-          - key: Content-Type
-            value: application/json
-        body: |-
-          {
-            "type": "",
-            "title": "",
-            "status": 0,
-            "code": "",
-            "requestId": "00000000-0000-4000-8000-000000000000",
-            "errors": [
-              {
-                "field": "",
-                "message": ""
-              }
-            ]
-          }
-      - name: 403 Response
-        originalRequest:
-          method: GET
-          header: []
-          url: '{{baseUrl}}/consent-forms/active'
-        status: Forbidden
-        code: 403
-        header:
-          - key: Content-Type
-            value: application/json
-        body: |-
-          {
-            "type": "",
-            "title": "",
-            "status": 0,
-            "code": "",
-            "requestId": "00000000-0000-4000-8000-000000000000",
-            "errors": [
-              {
-                "field": "",
-                "message": ""
-              }
-            ]
-          }
   - name: Update an emergency contact by ID
     description: ''
     event: []
@@ -14148,7 +14603,7 @@ item:
           {
             "dataUrl": "",
             "eventId": "00000000-0000-4000-8000-000000000000",
-            "purpose": "CONSENT",
+            "purpose": "REFERRAL",
             "targetId": "00000000-0000-4000-8000-000000000000"
           }
         options:
@@ -15956,12 +16411,10 @@ item:
               }
             ]
           }
-  - name: List the latest application and authentication audit records
+  - name: List the unified immutable audit timeline
     description: >
-      Administrator-only paged read surface for the append-only audit trail. Application audit records (`logs`) and
-      authentication audit records (`authLogs`) are returned together with independent signed keyset cursors
-      (`nextCursor` / `nextAuthCursor`) for load-more pagination. Rows are immutable; this endpoint never mutates
-      history.
+      Administrator-only paged read surface combining application, authentication, and event audit ledgers behind one
+      signed keyset cursor. Rows are immutable; this endpoint never mutates history.
     event: []
     request:
       method: GET
@@ -15982,15 +16435,11 @@ item:
         query:
           - key: cursor
             value: ''
-            description: Signed keyset cursor for the application audit page
-            disabled: true
-          - key: authCursor
-            value: ''
-            description: Signed keyset cursor for the authentication audit page
+            description: Signed keyset cursor for the unified audit timeline
             disabled: true
           - key: limit
             value: '50'
-            description: Maximum rows per table in this page
+            description: Maximum timeline rows in this page
             disabled: true
           - key: entityName
             value: ''
@@ -16029,63 +16478,32 @@ item:
             value: application/json
         body: |-
           {
-            "logs": [
+            "items": [
               {
                 "id": "00000000-0000-4000-8000-000000000000",
-                "userId": "00000000-0000-4000-8000-000000000000",
-                "deviceId": "00000000-0000-4000-8000-000000000000",
-                "action": "CREATED",
-                "resource": "",
+                "source": "APPLICATION",
+                "occurredAt": "2026-08-07T00:00:00.000Z",
+                "action": "",
+                "outcome": "SUCCESS",
+                "actor": {
+                  "id": "00000000-0000-4000-8000-000000000000",
+                  "fullName": "",
+                  "email": "",
+                  "status": ""
+                },
+                "eventId": "00000000-0000-4000-8000-000000000000",
                 "entityName": "",
                 "entityId": "00000000-0000-4000-8000-000000000000",
-                "outcome": "SUCCESS",
                 "requestId": "00000000-0000-4000-8000-000000000000",
-                "details": {},
-                "oldValue": {},
-                "newValue": {},
                 "ipAddress": "",
                 "deviceName": "",
-                "createdAt": "2026-08-07T00:00:00.000Z",
-                "user": {
-                  "id": "00000000-0000-4000-8000-000000000000",
-                  "userId": "00000000-0000-4000-8000-000000000000",
-                  "username": "",
-                  "email": "",
-                  "fullName": "",
-                  "employeeNumber": "",
-                  "contactNumber": "",
-                  "department": "",
-                  "designation": "",
-                  "systemRole": "ADMIN",
-                  "status": "ACTIVE",
-                  "approvalState": "PENDING",
-                  "accessState": "ENABLED",
-                  "professionalCategory": "STAFF",
-                  "roles": [
-                    "ADMINISTRATOR"
-                  ],
-                  "createdAt": "2026-08-07T00:00:00.000Z"
-                }
-              }
-            ],
-            "authLogs": [
-              {
-                "id": "00000000-0000-4000-8000-000000000000",
-                "userId": "00000000-0000-4000-8000-000000000000",
-                "deviceId": "00000000-0000-4000-8000-000000000000",
-                "eventType": "",
-                "outcome": "SUCCESS",
-                "failureCategory": "",
-                "identifierHash": "",
-                "ipAddress": "",
                 "userAgent": "",
-                "requestId": "00000000-0000-4000-8000-000000000000",
-                "occurredAt": "2026-08-07T00:00:00.000Z",
-                "user": {}
+                "details": {},
+                "oldValue": {},
+                "newValue": {}
               }
             ],
-            "nextCursor": "",
-            "nextAuthCursor": ""
+            "nextCursor": ""
           }
       - name: 400 Response
         originalRequest:
@@ -16140,7 +16558,11 @@ item:
     event: []
     request:
       method: POST
-      header: []
+      header:
+        - key: Idempotency-Key
+          value: ''
+          description: ''
+          type: text
       auth:
         type: bearer
         bearer:
@@ -16160,7 +16582,11 @@ item:
       - name: 201 Response
         originalRequest:
           method: POST
-          header: []
+          header:
+            - key: Idempotency-Key
+              value: ''
+              description: ''
+              type: text
           url: '{{baseUrl}}/qr/registrations/{registrationId}'
         status: Created
         code: 201
@@ -16178,7 +16604,11 @@ item:
       - name: 401 Response
         originalRequest:
           method: POST
-          header: []
+          header:
+            - key: Idempotency-Key
+              value: ''
+              description: ''
+              type: text
           url: '{{baseUrl}}/qr/registrations/{registrationId}'
         status: Unauthorized
         code: 401
@@ -16202,7 +16632,11 @@ item:
       - name: 404 Response
         originalRequest:
           method: POST
-          header: []
+          header:
+            - key: Idempotency-Key
+              value: ''
+              description: ''
+              type: text
           url: '{{baseUrl}}/qr/registrations/{registrationId}'
         status: Not Found
         code: 404
@@ -16228,7 +16662,11 @@ item:
     event: []
     request:
       method: POST
-      header: []
+      header:
+        - key: Idempotency-Key
+          value: ''
+          description: ''
+          type: text
       auth:
         type: bearer
         bearer:
@@ -16248,7 +16686,11 @@ item:
       - name: 201 Response
         originalRequest:
           method: POST
-          header: []
+          header:
+            - key: Idempotency-Key
+              value: ''
+              description: ''
+              type: text
           url: '{{baseUrl}}/qr/generate/{registrationId}'
         status: Created
         code: 201
@@ -16270,7 +16712,11 @@ item:
       - name: 401 Response
         originalRequest:
           method: POST
-          header: []
+          header:
+            - key: Idempotency-Key
+              value: ''
+              description: ''
+              type: text
           url: '{{baseUrl}}/qr/generate/{registrationId}'
         status: Unauthorized
         code: 401
@@ -16294,7 +16740,11 @@ item:
       - name: 404 Response
         originalRequest:
           method: POST
-          header: []
+          header:
+            - key: Idempotency-Key
+              value: ''
+              description: ''
+              type: text
           url: '{{baseUrl}}/qr/generate/{registrationId}'
         status: Not Found
         code: 404
@@ -16320,7 +16770,11 @@ item:
     event: []
     request:
       method: POST
-      header: []
+      header:
+        - key: Idempotency-Key
+          value: ''
+          description: ''
+          type: text
       auth:
         type: bearer
         bearer:
@@ -16340,7 +16794,11 @@ item:
       - name: 201 Response
         originalRequest:
           method: POST
-          header: []
+          header:
+            - key: Idempotency-Key
+              value: ''
+              description: ''
+              type: text
           url: '{{baseUrl}}/qr/reissue/{registrationId}'
         status: Created
         code: 201
@@ -16362,7 +16820,11 @@ item:
       - name: 401 Response
         originalRequest:
           method: POST
-          header: []
+          header:
+            - key: Idempotency-Key
+              value: ''
+              description: ''
+              type: text
           url: '{{baseUrl}}/qr/reissue/{registrationId}'
         status: Unauthorized
         code: 401
@@ -16386,7 +16848,11 @@ item:
       - name: 404 Response
         originalRequest:
           method: POST
-          header: []
+          header:
+            - key: Idempotency-Key
+              value: ''
+              description: ''
+              type: text
           url: '{{baseUrl}}/qr/reissue/{registrationId}'
         status: Not Found
         code: 404
@@ -16491,8 +16957,10 @@ item:
               }
             ]
           }
-  - name: Verify a QR token for an event
-    description: ''
+  - name: Verify a journey QR and assign its current queue station
+    description: >-
+      Validates the participant's single event-journey QR. A repeated scanId is replayed without creating another queue
+      entry. If no active queue exists, the backend assigns the least-loaded eligible staffed station.
     event: []
     request:
       method: POST
@@ -16520,7 +16988,8 @@ item:
         raw: |-
           {
             "token": "",
-            "eventId": "00000000-0000-4000-8000-000000000000"
+            "eventId": "00000000-0000-4000-8000-000000000000",
+            "scanId": "00000000-0000-4000-8000-000000000000"
           }
         options:
           raw:
@@ -16612,6 +17081,10 @@ item:
           value: application/json
           description: JSON request body
           type: text
+        - key: Idempotency-Key
+          value: ''
+          description: ''
+          type: text
       auth:
         type: bearer
         bearer:
@@ -16644,6 +17117,10 @@ item:
             - key: Content-Type
               value: application/json
               description: JSON request body
+              type: text
+            - key: Idempotency-Key
+              value: ''
+              description: ''
               type: text
           url: '{{baseUrl}}/qr/manual-checkin'
         status: OK
@@ -16692,6 +17169,10 @@ item:
               value: application/json
               description: JSON request body
               type: text
+            - key: Idempotency-Key
+              value: ''
+              description: ''
+              type: text
           url: '{{baseUrl}}/qr/manual-checkin'
         status: Bad Request
         code: 400
@@ -16719,6 +17200,10 @@ item:
             - key: Content-Type
               value: application/json
               description: JSON request body
+              type: text
+            - key: Idempotency-Key
+              value: ''
+              description: ''
               type: text
           url: '{{baseUrl}}/qr/manual-checkin'
         status: Unauthorized
@@ -16785,6 +17270,7 @@ item:
               "queueState": {
                 "status": "WAITING",
                 "queueNumber": 0,
+                "nowCalling": 0,
                 "station": {
                   "name": "",
                   "type": ""
@@ -17144,6 +17630,10 @@ item:
           value: application/json
           description: JSON request body
           type: text
+        - key: Idempotency-Key
+          value: ''
+          description: ''
+          type: text
       auth:
         type: bearer
         bearer:
@@ -17177,6 +17667,10 @@ item:
               value: application/json
               description: JSON request body
               type: text
+            - key: Idempotency-Key
+              value: ''
+              description: ''
+              type: text
           url: '{{baseUrl}}/qr/revoke/{qrId}'
         status: OK
         code: 200
@@ -17206,6 +17700,10 @@ item:
               value: application/json
               description: JSON request body
               type: text
+            - key: Idempotency-Key
+              value: ''
+              description: ''
+              type: text
           url: '{{baseUrl}}/qr/revoke/{qrId}'
         status: Bad Request
         code: 400
@@ -17233,6 +17731,10 @@ item:
             - key: Content-Type
               value: application/json
               description: JSON request body
+              type: text
+            - key: Idempotency-Key
+              value: ''
+              description: ''
               type: text
           url: '{{baseUrl}}/qr/revoke/{qrId}'
         status: Unauthorized
@@ -18101,7 +18603,7 @@ item:
               {
                 "taskId": "00000000-0000-4000-8000-000000000000",
                 "eventId": "00000000-0000-4000-8000-000000000000",
-                "artifactType": "CONSENT_SIGNATURE",
+                "artifactType": "REFERRAL_SIGNATURE",
                 "status": "PENDING",
                 "attemptCount": 0,
                 "lastError": "",
@@ -18216,7 +18718,7 @@ item:
           {
             "taskId": "00000000-0000-4000-8000-000000000000",
             "eventId": "00000000-0000-4000-8000-000000000000",
-            "artifactType": "CONSENT_SIGNATURE",
+            "artifactType": "REFERRAL_SIGNATURE",
             "status": "PENDING",
             "attemptCount": 0,
             "lastError": "",
@@ -18345,6 +18847,14 @@ item:
                 }
               }
             ],
+            "totals": {
+              "WAITING": 0,
+              "CALLED": 0,
+              "IN_PROGRESS": 0,
+              "COMPLETED": 0,
+              "SKIPPED": 0,
+              "CANCELLED": 0
+            },
             "entries": [
               {
                 "id": "00000000-0000-4000-8000-000000000000",
@@ -18755,7 +19265,8 @@ item:
               "00000000-0000-4000-8000-000000000000"
             ],
             "reasonCode": "STATION_UNAVAILABLE",
-            "expectedVersion": 1
+            "expectedVersion": 1,
+            "skipActive": true
           }
         options:
           raw:

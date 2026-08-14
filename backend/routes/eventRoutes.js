@@ -21,6 +21,7 @@ const {
     assignmentParams,
     assignmentDeleteParams,
     assignmentBody,
+    shiftCreateBody,
     versionQuery,
     stationParams,
     stationImportBody,
@@ -73,7 +74,7 @@ router.get(
 router.get("/", validate({ query: listQuery }), asyncHandler(eventController.list));
 router.post("/", requireSystemRole("ADMIN"), validate({ body: createEventBody }), asyncHandler(eventController.create));
 router.get("/:eventId/memberships/eligible-users", validate({ params: eventParams, query: eligibleUsersQuery }), requireEventManager, asyncHandler(membershipController.eligible));
-router.get("/:eventId/memberships", validate({ params: eventParams }), requireEventManager, asyncHandler(membershipController.list));
+router.get("/:eventId/memberships", validate({ params: eventParams }), requireEventRoles("EVENT_MANAGER", "REGISTRATION", "SCREENER", "REVIEWER", "SUPPORT"), asyncHandler(membershipController.list));
 router.post("/:eventId/memberships", validate({ params: eventParams, body: membershipBody }), requireEventManager, asyncHandler(membershipController.add));
 router.delete("/:eventId/memberships/:membershipId", validate({ params: membershipParams, body: membershipRemovalBody }), requireEventManager, asyncHandler(membershipController.remove));
 router.post("/:eventId/memberships/:membershipId/roles", validate({ params: membershipParams, body: membershipRoleBody }), requireEventManager, asyncHandler(membershipController.addRole));
@@ -88,6 +89,11 @@ router.get(
   requireEventRoleAndDuty("REGISTRATION"),
   registrationController.listEventRegistrations
 );
+router.get(
+  "/:eventId/registrations/summary",
+  requireEventRoleAndDuty("REGISTRATION"),
+  registrationController.getEventRegistrationSummary
+);
 
 // 3. Dynamic parameter routes come last
 router.get("/:eventId/metrics", reportingLimiter, validate({ params: eventParams }), requireEventManager, asyncHandler(eventController.metrics));
@@ -100,16 +106,19 @@ router.get("/:eventId/attendees", reportingLimiter, validate({ params: eventPara
 router.get("/:eventId/export", reportingLimiter, validate({ params: eventParams }), requireEventManager, asyncHandler(eventController.export));
 router.get("/:eventId/deletion-preview", requireSystemRole("ADMIN"), validate({ params: eventParams }), asyncHandler(eventController.deletionPreview));
 router.get("/:eventId/deletion-cleanup", requireSystemRole("ADMIN"), validate({ params: eventParams }), asyncHandler(eventController.deletionCleanupStatus));
+router.get("/:eventId/artwork", validate({ params: eventParams }), requireEventRoles("EVENT_MANAGER", "REGISTRATION", "SCREENER", "REVIEWER", "SUPPORT"), asyncHandler(eventController.artwork));
 router.get("/:eventId", validate({ params: eventParams }), requireEventRoles("EVENT_MANAGER", "REGISTRATION", "SCREENER", "REVIEWER", "SUPPORT"), asyncHandler(eventController.get));
 router.patch("/:eventId", validate({ params: eventParams, body: updateEventBody }), requireEventManager, asyncHandler(eventController.update));
 router.post("/:eventId/stations/import", validate({ params: eventParams, body: stationImportBody }), requireEventManager, asyncHandler(eventController.importStations));
 router.patch("/:eventId/stations/:eventStationId", validate({ params: stationParams, body: stationUpdateBody }), requireEventManager, asyncHandler(eventController.updateStation));
+router.delete("/:eventId/stations/:eventStationId", validate({ params: stationParams, query: versionQuery }), requireEventManager, asyncHandler(eventController.removeStation));
 router.post("/:eventId/publish", validate({ params: eventParams, body: transitionBody }), requireEventManager, asyncHandler(eventController.publish));
 router.post("/:eventId/start", validate({ params: eventParams, body: transitionBody }), requireEventManager, asyncHandler(eventController.start));
 router.post("/:eventId/complete", validate({ params: eventParams, body: transitionBody }), requireEventManager, asyncHandler(eventController.complete));
 router.post("/:eventId/cancel", validate({ params: eventParams, body: cancelBody }), requireEventManager, asyncHandler(eventController.cancel));
 router.delete("/:eventId", requireSystemRole("ADMIN"), validate({ params: eventParams, body: deleteEventBody }), asyncHandler(eventController.remove));
 router.post("/:eventId/shifts/:shiftId/assignments", validate({ params: assignmentParams, body: assignmentBody }), requireEventManager, asyncHandler(eventController.addAssignment));
+router.post("/:eventId/shifts", validate({ params: eventParams, body: shiftCreateBody }), requireEventManager, asyncHandler(eventController.addShift));
 router.delete("/:eventId/shifts/:shiftId/assignments/:assignmentId", validate({ params: assignmentDeleteParams, query: versionQuery }), requireEventManager, asyncHandler(eventController.removeAssignment));
 router.get("/:eventId/audit-log", validate({ params: eventParams, query: auditQuery }), requireEventManager, asyncHandler(eventController.audit));
 

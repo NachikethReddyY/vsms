@@ -2,7 +2,6 @@ import { LightBulbIcon, VideoCameraIcon } from '@heroicons/react/24/outline';
 import { type FormEvent, useEffect, useId, useRef, useState } from 'react';
 import { AppDialog } from '../../components/AppDialog';
 import { startQrScanner, type QrCamera } from './startQrScanner';
-import './StationCameraScanner.css';
 
 /** Non-standard `torch` constraint used by html5-qrcode for the flashlight. */
 type TrackCapabilitiesWithTorch = MediaTrackCapabilities & { advanced?: Array<Record<string, unknown>> };
@@ -193,21 +192,21 @@ export function StationCameraScanner({
       onOpenChange={onOpenChange}
       title={title}
       description={description}
-      className="station-scanner-dialog"
+      className="w-[min(42.5rem,calc(100vw-2rem))]"
     >
-      <div className="station-scanner">
-        <div className="station-scanner-viewport">
+      <div className="grid gap-3">
+        <div className="relative aspect-4/3 overflow-hidden rounded-lg border border-[var(--hairline-strong)] bg-[var(--canvas)] dark:bg-[var(--events-canvas-dark,#0b0b0d)] [&_video]:size-full [&_video]:object-cover">
           <div id={scannerId} aria-label="Live camera preview" />
-          <div className="station-scanner-frame" aria-hidden="true" />
-          {resolving && <div className="station-scanner-status">Loading participant…</div>}
+          <div className="pointer-events-none absolute inset-[18%] rounded-lg border-2 border-white/85 shadow-[0_0_0_999px_color-mix(in_srgb,var(--canvas)_35%,transparent)]" aria-hidden="true" />
+          {resolving && <div className="absolute bottom-4 left-1/2 -translate-x-1/2 rounded-full bg-[color-mix(in_srgb,var(--canvas)_82%,var(--events-canvas-dark,#0b0b0d))] px-3.5 py-2 text-xs whitespace-nowrap text-[var(--ink)]">Loading participant…</div>}
         </div>
-        {error && <p className="station-scanner-error" role="alert">{error}</p>}
-        <div className="station-scanner-controls">
-          {cameras.length > 1 && <label className="station-scanner-camera"><VideoCameraIcon aria-hidden="true" /><span>Camera</span><select value={activeCameraId} disabled={resolving || switchingCamera} onChange={(event) => void switchCamera(event.target.value)}>{cameras.map((camera, index) => <option key={camera.id} value={camera.id}>{camera.label || `Camera ${index + 1}`}</option>)}</select></label>}
+        {error && <p className="m-0 text-xs leading-4.5 text-[var(--red)]" role="alert">{error}</p>}
+        <div className="flex flex-wrap items-center justify-center gap-2">
+          {cameras.length > 1 && <label className="flex min-h-11 items-center gap-2 text-xs font-semibold text-[var(--ink-2)] [&>svg]:size-4.25"><VideoCameraIcon aria-hidden="true" /><span>Camera</span><select className="min-h-11 max-w-[min(20rem,70vw)] rounded-lg border border-[var(--hairline-strong)] bg-[var(--surface)] py-0 pr-8.5 pl-2.75 text-[var(--ink)]" value={activeCameraId} disabled={resolving || switchingCamera} onChange={(event) => void switchCamera(event.target.value)}>{cameras.map((camera, index) => <option key={camera.id} value={camera.id}>{camera.label || `Camera ${index + 1}`}</option>)}</select></label>}
           {!error && torchSupported && (
             <button
               type="button"
-              className={`station-scanner-torch ${torchOn ? 'is-on' : ''}`}
+              className={`inline-flex min-h-11 cursor-pointer items-center gap-1.75 rounded-lg border px-3.5 text-xs transition-[background,border-color,color,transform] duration-150 active:scale-[.97] [&>svg]:size-3.75 ${torchOn ? 'border-[var(--accent)] bg-[var(--accent-tint)] text-[var(--accent)]' : 'border-[var(--hairline-strong)] bg-[var(--surface)] text-[var(--ink-2)] hover:border-[var(--accent)] hover:text-[var(--accent)]'}`}
               onClick={() => void toggleTorch()}
               aria-pressed={torchOn}
             >
@@ -216,11 +215,11 @@ export function StationCameraScanner({
             </button>
           )}
         </div>
-        <form className="station-scanner-manual" onSubmit={(event) => void submitManual(event)}>
+        <form className="grid gap-1.5 border-t border-[var(--hairline)] pt-1 [&>label]:text-xs [&>label]:font-semibold [&>label]:text-[var(--ink-2)]" onSubmit={(event) => void submitManual(event)}>
           <label htmlFor={`${scannerId}-manual`}>QR value or registration UUID</label>
-          <div><input id={`${scannerId}-manual`} data-dialog-autofocus value={manualValue} onChange={(event) => setManualValue(event.target.value)} autoComplete="off" spellCheck="false" placeholder="Paste, type, or scan with a physical reader" /><button className="secondary" type="submit" disabled={resolving || !manualValue.trim()}>Load</button></div>
+          <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-2 max-[520px]:grid-cols-1"><input className="min-h-11 min-w-0 rounded-lg border border-[var(--hairline-strong)] bg-[var(--surface)] px-2.75 text-base text-[var(--ink)] outline-0 focus:border-[var(--accent)] focus:shadow-[0_0_0_3px_var(--accent-tint)]" id={`${scannerId}-manual`} data-dialog-autofocus value={manualValue} onChange={(event) => setManualValue(event.target.value)} autoComplete="off" spellCheck="false" placeholder="Paste, type, or scan with a physical reader" /><button className="secondary min-h-11" type="submit" disabled={resolving || !manualValue.trim()}>Load</button></div>
         </form>
-        <p className="station-scanner-hint">
+        <p className="m-0 text-[0.71875rem] leading-[1.55] text-[var(--muted)]">
           Camera scanning is automatic. A physical reader can type into the field and submit with Enter.
         </p>
         <span className="sr-only" role="status" aria-live="polite">{announcement}</span>

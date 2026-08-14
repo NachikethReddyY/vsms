@@ -1,5 +1,5 @@
 /* eslint-disable react-refresh/only-export-components */
-import { ExclamationTriangleIcon } from '@heroicons/react/24/outline';
+import { ExclamationTriangleIcon, PlayIcon } from '@heroicons/react/24/outline';
 import { FormEvent, ReactNode, useCallback, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { AppToast } from '../../components/AppToast';
@@ -15,7 +15,6 @@ import {
 import { extractQrToken } from './qrHandoff';
 import { getOfflineStationContext, isNetworkError } from './offlineSync';
 import { StationCameraScanner } from './StationCameraScanner';
-import './StationCameraScanner.css';
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
@@ -114,6 +113,10 @@ export function ParticipantLookup({
   const [scannerOpen, setScannerOpen] = useState(false);
   const [queueSearch, setQueueSearch] = useState('');
   const [lookupPending, setLookupPending] = useState(false);
+  const [callPending, setCallPending] = useState(false);
+  const [calledQueueEntryId, setCalledQueueEntryId] = useState('');
+  const activeCall = queue.find((row) => ['CALLED', 'IN_PROGRESS'].includes(row.status)) || queue.find((row) => row.queueEntryId === calledQueueEntryId);
+  const nextWaiting = queue.find((row) => row.status === 'WAITING' && Boolean(row.queueEntryId) && row.queueEntryId !== calledQueueEntryId);
   const filteredQueue = useMemo(() => {
     const search = queueSearch.trim().toLowerCase();
     if (!search) return queue;
@@ -173,8 +176,30 @@ export function ParticipantLookup({
     }
   }, [eventId, applyResolved]);
 
+  const callNext = async () => {
+    if (!nextWaiting?.queueEntryId || activeCall || callPending) return;
+    setCallPending(true);
+    setError(null);
+    try {
+      await screeningApi.callQueueEntry(eventId, nextWaiting.queueEntryId);
+      setCalledQueueEntryId(nextWaiting.queueEntryId);
+      onSelect(nextWaiting.registrationId);
+      setSuccess(`Queue #${nextWaiting.queueNumber ?? '—'} has been called.`);
+    } catch (cause) {
+      setError(getApiMessage(cause, 'Could not call the next participant.'));
+    } finally {
+      setCallPending(false);
+    }
+  };
+
   return (
     <section className="detail-panel" style={{ marginBottom: 24 }}>
+      <div className="va-queue-heading">
+        <div><h2>Station queue</h2><p>{activeCall ? `Serving queue #${activeCall.queueNumber ?? '—'}` : nextWaiting ? `Queue #${nextWaiting.queueNumber ?? '—'} is next` : 'No participants are waiting'}</p></div>
+        <button type="button" className="primary va-call-next" onClick={() => void callNext()} disabled={!nextWaiting || Boolean(activeCall) || callPending}>
+          <PlayIcon aria-hidden="true" />{callPending ? 'Calling…' : activeCall ? 'Participant called' : 'Call next'}
+        </button>
+      </div>
       <h2>Find participant</h2>
       {error && <p className="form-error" role="alert">{error}</p>}
       <AppToast message={success ?? ''} />

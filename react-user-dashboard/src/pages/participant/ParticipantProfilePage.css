@@ -36,10 +36,6 @@
   padding-left:20px;
 }
 
-.participant-v2-profile-summary .participant-v2-consent-status { color:var(--muted); }
-.participant-v2-profile-summary .participant-v2-consent-status.accepted { color:var(--green); }
-.participant-v2-profile-summary .participant-v2-consent-status.declined,
-.participant-v2-profile-summary .participant-v2-consent-status.withdrawn { color:var(--orange); }
 
 .participant-v2-profile-details {
   display:grid;

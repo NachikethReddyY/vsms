@@ -12,3 +12,21 @@ test('the workspace owns the only responsive navigation shell', () => {
   assert.match(shell, /className="workspace-mobile-header"/);
   assert.match(styles, /@media \(max-width:680px\)[\s\S]*?\.workspace-site-nav \{ display:none; \}/);
 });
+
+test('event managers receive a global Operations Center navigation entry', () => {
+  assert.match(shell, /to="\/operations"[\s\S]*?>Operations<\/NavLink>/);
+  assert.match(shell, /to="\/operations" aria-label="Operations"/);
+});
+
+test('event management routes include the dedicated shifts workspace', () => {
+  assert.match(shell, /overview\|stations\|shifts\|staff/);
+});
+
+test('unassigned staff see the events workspace empty state', () => {
+  assert.match(eventsPage, /No events assigned/);
+});
+
+test('assigned staff avatars are visible to non-manager event members', () => {
+  assert.doesNotMatch(eventsPage, /event\.canManage\s*\?\s*\[\.\.\.new Set\(event\.eventTeam/);
+  assert.match(eventsPage, /className=\{`events-team/);
+});

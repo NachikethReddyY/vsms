@@ -3,13 +3,18 @@ import { ArrowDownIcon, ArrowUpIcon, PlusIcon, TrashIcon } from '@heroicons/reac
 import type {
   DynamicFieldValues,
   FieldDefinition,
+  FieldFlagRule,
   FieldSchema,
   FieldType,
   RefractionEyeValue,
   VaEyeValue,
 } from './fieldSchema';
-import { emptyField } from './fieldSchema';
-import './StationFieldRenderer.css';
+import {
+  emptyField,
+  emptyFlagRule,
+  FLAG_OP_OPTIONS,
+  supportsFieldFlagRules,
+} from './fieldSchema';
 
 type RendererProps = {
   fieldSchema: FieldSchema;
@@ -157,7 +162,7 @@ function RefractionEyeFields({
 }
 
 export function StationFieldRenderer({ fieldSchema, values, onChange, errors = {}, disabled = false }: RendererProps) {
-  return <div className="station-field-renderer">
+  return <div className="station-field-renderer grid gap-3.5 [&>label]:grid [&>label]:gap-1.5">
     {fieldSchema.map((field) => {
       const id = fieldId(field.key);
       const error = errors[field.key];
@@ -246,6 +251,11 @@ export function StationFieldBuilder({ fieldSchema, onChange, disabled = false, l
   const changeOptions = (index: number, event: ChangeEvent<HTMLInputElement>) => update(index, {
     options: event.target.value.split(',').map((option) => option.trim()).filter(Boolean),
   });
+  const changeLabel = (index: number, label: string) => {
+    const field = fieldSchema[index];
+    const generatedKey = label.trim().replace(/[^a-zA-Z0-9]+(.)/g, (_, letter: string) => letter.toUpperCase()).replace(/^[^a-zA-Z]+/, '');
+    update(index, { label, ...(!field.key || /^field\d+$/.test(field.key) ? { key: generatedKey } : {}) });
+  };
 
   return <section className="station-field-builder" aria-label="Template fields">
     <header>
@@ -270,8 +280,8 @@ export function StationFieldBuilder({ fieldSchema, onChange, disabled = false, l
             </div>
           </div>
           <div className="station-field-builder-grid">
-            <label><span>Label</span><input required maxLength={100} disabled={disabled} value={field.label} onChange={(event) => update(index, { label: event.target.value })} /></label>
-            <label><span>Key</span><input required pattern="[a-zA-Z][a-zA-Z0-9_]*" maxLength={64} disabled={disabled || locked} value={field.key} onChange={(event) => update(index, { key: event.target.value })} /></label>
+            <label><span>Label</span><input required maxLength={100} disabled={disabled} value={field.label} onChange={(event) => changeLabel(index, event.target.value)} /></label>
+            <label><span>Key <small>Generated automatically</small></span><input required pattern="[a-zA-Z][a-zA-Z0-9_]*" maxLength={64} disabled={disabled || locked} value={field.key} onChange={(event) => update(index, { key: event.target.value })} /></label>
             <label><span>Type</span><select disabled={disabled || locked} value={field.type} onChange={(event) => changeType(index, event.target.value as FieldType)}>{FIELD_TYPES.map((type) => <option key={type.value} value={type.value}>{type.label}</option>)}</select></label>
             <label className="station-field-required"><input type="checkbox" disabled={disabled || locked} checked={field.required ?? false} onChange={(event) => update(index, { required: event.target.checked })} /><span>Required</span></label>
             {field.type === 'select' && <label className="wide"><span>Options <small>Comma-separated</small></span><input required disabled={disabled || locked} value={(field.options ?? []).join(', ')} onChange={(event) => changeOptions(index, event)} /></label>}
@@ -279,6 +289,74 @@ export function StationFieldBuilder({ fieldSchema, onChange, disabled = false, l
             {field.type === 'number' && <><label><span>Minimum</span><input type="number" disabled={disabled || locked} value={field.min ?? ''} onChange={(event) => update(index, { min: event.target.value === '' ? undefined : event.target.valueAsNumber })} /></label><label><span>Maximum</span><input type="number" disabled={disabled || locked} value={field.max ?? ''} onChange={(event) => update(index, { max: event.target.value === '' ? undefined : event.target.valueAsNumber })} /></label></>}
             {(field.type === 'number' || field.type === 'eye-pair') && <label><span>Unit <small>Optional</small></span><input maxLength={20} disabled={disabled} value={field.unit ?? ''} onChange={(event) => update(index, { unit: event.target.value || undefined })} /></label>}
           </div>
+          {!locked && supportsFieldFlagRules(field) && (
+            <div className="station-field-flag-rules">
+              <div className="station-field-builder-heading">
+                <strong>Flag rules · {field.flagRules?.length ?? 0} of 10</strong>
+                <button
+                  type="button"
+                  className="secondary compact"
+                  disabled={disabled || (field.flagRules?.length ?? 0) >= 10}
+                  onClick={() => update(index, { flagRules: [...(field.flagRules ?? []), emptyFlagRule()] })}
+                >
+                  <PlusIcon />Add rule
+                </button>
+              </div>
+              <p className="station-library-schema-note">When this field matches a rule, the station result is flagged.</p>
+              {(field.flagRules ?? []).map((rule, ruleIndex) => {
+                const needsValue = FLAG_OP_OPTIONS.find((item) => item.value === rule.op)?.needsValue ?? true;
+                const updateRule = (changes: Partial<FieldFlagRule>) => {
+                  const nextRules = [...(field.flagRules ?? [])];
+                  nextRules[ruleIndex] = { ...nextRules[ruleIndex], ...changes };
+                  update(index, { flagRules: nextRules });
+                };
+                return <div className="station-field-builder-grid station-flag-rule-row" key={`${field.key}-rule-${ruleIndex}`}>
+                  <label>
+                    <span>When</span>
+                    <select disabled={disabled} value={rule.op} onChange={(event) => updateRule({ op: event.target.value as FieldFlagRule['op'], value: FLAG_OP_OPTIONS.find((item) => item.value === event.target.value)?.needsValue ? rule.value ?? '' : undefined })}>
+                      {FLAG_OP_OPTIONS.map((op) => <option key={op.value} value={op.value}>{op.label}</option>)}
+                    </select>
+                  </label>
+                  {needsValue && (
+                    <label>
+                      <span>Value</span>
+                      <input
+                        disabled={disabled}
+                        type={field.type === 'number' ? 'number' : 'text'}
+                        value={rule.value === undefined || rule.value === null ? '' : String(rule.value)}
+                        onChange={(event) => updateRule({
+                          value: field.type === 'number'
+                            ? (event.target.value === '' ? '' : event.target.valueAsNumber)
+                            : event.target.value,
+                        })}
+                      />
+                    </label>
+                  )}
+                  <label>
+                    <span>Flag</span>
+                    <select disabled={disabled} value={rule.flag} onChange={(event) => updateRule({ flag: event.target.value as FieldFlagRule['flag'] })}>
+                      <option value="REVIEW">REVIEW</option>
+                      <option value="REFER">REFER</option>
+                      <option value="URGENT">URGENT</option>
+                    </select>
+                  </label>
+                  <label className="wide">
+                    <span>Reason</span>
+                    <input required maxLength={200} disabled={disabled} value={rule.reason} onChange={(event) => updateRule({ reason: event.target.value })} />
+                  </label>
+                  <button
+                    type="button"
+                    className="icon-button"
+                    disabled={disabled}
+                    aria-label={`Remove flag rule ${ruleIndex + 1}`}
+                    onClick={() => update(index, { flagRules: (field.flagRules ?? []).filter((_, itemIndex) => itemIndex !== ruleIndex) })}
+                  >
+                    <TrashIcon />
+                  </button>
+                </div>;
+              })}
+            </div>
+          )}
         </article>;
       })}
     </div>

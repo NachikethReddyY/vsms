@@ -30,6 +30,7 @@ export function RouteOverrideDialog({
   const [route, setRoute] = useState<RegistrationRouteState | null>(null);
   const [stationIds, setStationIds] = useState<string[]>([]);
   const [reasonCode, setReasonCode] = useState<RouteOverrideReason>('STATION_UNAVAILABLE');
+  const [skipActive, setSkipActive] = useState(false);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -41,6 +42,7 @@ export function RouteOverrideDialog({
       const next = await queueApi.getParticipantRoute(eventId, registrationId);
       setRoute(next);
       setStationIds(next.steps.filter((step) => step.state !== 'COMPLETED').map((step) => step.stationId));
+      setSkipActive(false);
     } catch (cause) {
       setError(getApiError(cause, 'Unable to load this route.'));
     } finally {
@@ -53,6 +55,7 @@ export function RouteOverrideDialog({
     else {
       setRoute(null);
       setStationIds([]);
+      setSkipActive(false);
       setError(null);
     }
     // The dialog reloads only when its identity/open state changes.
@@ -62,6 +65,7 @@ export function RouteOverrideDialog({
   const stationById = useMemo(() => new Map(route?.steps.map((step) => [step.stationId, step]) ?? []), [route]);
   const activeStationId = route?.steps.find((step) => step.state === 'CURRENT')?.stationId ?? null;
   const mutableIds = stationIds.filter((stationId) => stationId !== activeStationId);
+  const canSkipCurrent = Boolean(activeStationId && route?.queue && route.queue.status !== 'IN_PROGRESS');
 
   const move = (stationId: string, direction: -1 | 1) => {
     const mutableIndex = mutableIds.indexOf(stationId);
@@ -70,11 +74,18 @@ export function RouteOverrideDialog({
     const nextMutable = [...mutableIds];
     [nextMutable[mutableIndex], nextMutable[swapWith]] = [nextMutable[swapWith], nextMutable[mutableIndex]];
     setStationIds(stationIds.map((id) => id === activeStationId ? id : nextMutable.shift() as string));
+    setSkipActive(false);
   };
 
   const makeNext = (stationId: string) => {
     const nextMutable = [stationId, ...mutableIds.filter((id) => id !== stationId)];
     setStationIds(stationIds.map((id) => id === activeStationId ? id : nextMutable.shift() as string));
+    setSkipActive(false);
+  };
+
+  const skipToStation = (stationId: string) => {
+    setStationIds([stationId, ...stationIds.filter((id) => id !== stationId)]);
+    setSkipActive(true);
   };
 
   const save = async () => {
@@ -86,6 +97,7 @@ export function RouteOverrideDialog({
         stationIds,
         reasonCode,
         expectedVersion: route.routeVersion,
+        ...(skipActive && { skipActive: true }),
       });
       await onCommitted();
       onOpenChange(false);
@@ -101,7 +113,7 @@ export function RouteOverrideDialog({
     open={open}
     onOpenChange={onOpenChange}
     title="Change participant route"
-    description="Completed and current steps are locked. Clinical review always remains last."
+    description="Completed steps are locked. A waiting or called station can be skipped before screening starts."
   >
     {error && <p className="mb-3 text-sm text-red-700" role="alert">{error}</p>}
     {!route ? <p role="status">Loading route…</p> : <div className="grid gap-4">
@@ -118,13 +130,16 @@ export function RouteOverrideDialog({
           const mutableIndex = mutableIds.indexOf(stationId);
           return <li key={stationId} className="flex min-h-11 items-center justify-between gap-3 rounded-lg border px-3">
             <span><strong>{step.stationName}</strong>{locked ? ' · current' : ''}</span>
-            {locked ? <span>Locked</span> : fullAccess ? <span className="flex gap-2">
-              <button type="button" className="min-h-11 min-w-11 rounded-lg border" disabled={mutableIndex <= 0} onClick={() => move(stationId, -1)} aria-label={`Move ${step.stationName} earlier`}><ArrowUpIcon className="mx-auto size-4" /></button>
-              <button type="button" className="min-h-11 min-w-11 rounded-lg border" disabled={mutableIndex >= mutableIds.length - 1} onClick={() => move(stationId, 1)} aria-label={`Move ${step.stationName} later`}><ArrowDownIcon className="mx-auto size-4" /></button>
-            </span> : <button type="button" className="min-h-11 rounded-lg border px-3" disabled={mutableIndex === 0} onClick={() => makeNext(stationId)}>Make next</button>}
+            {locked ? <span>{route.queue?.status === 'IN_PROGRESS' ? 'Screening started' : 'Current queue'}</span> : <span className="flex flex-wrap justify-end gap-2">
+              {canSkipCurrent && <button type="button" className="min-h-11 rounded-lg border px-3" onClick={() => skipToStation(stationId)}>{skipActive && stationIds[0] === stationId ? 'Selected after skip' : 'Skip current → go here'}</button>}
+              {fullAccess ? <>
+                <button type="button" className="min-h-11 min-w-11 rounded-lg border" disabled={skipActive || mutableIndex <= 0} onClick={() => move(stationId, -1)} aria-label={`Move ${step.stationName} earlier`}><ArrowUpIcon className="mx-auto size-4" /></button>
+                <button type="button" className="min-h-11 min-w-11 rounded-lg border" disabled={skipActive || mutableIndex >= mutableIds.length - 1} onClick={() => move(stationId, 1)} aria-label={`Move ${step.stationName} later`}><ArrowDownIcon className="mx-auto size-4" /></button>
+              </> : <button type="button" className="min-h-11 rounded-lg border px-3" disabled={skipActive || mutableIndex === 0} onClick={() => makeNext(stationId)}>Make next</button>}
+            </span>}
           </li>;
         })}
-        <li className="flex min-h-11 items-center justify-between rounded-lg border bg-stone-50 px-3"><strong>Clinical review</strong><span>Final · locked</span></li>
+        <li className="flex min-h-11 items-center justify-between gap-3 rounded-lg border bg-stone-50 px-3"><strong>Clinical review</strong>{canSkipCurrent && mutableIds.length === 0 ? <button type="button" className="min-h-11 rounded-lg border px-3" onClick={() => skipToStation(activeStationId as string)}>{skipActive ? 'Selected after skip' : 'Skip current → clinical review'}</button> : <span>Final · locked</span>}</li>
       </ol>
       <label className="grid gap-1 text-sm font-semibold">Reason
         <select className="min-h-11 rounded-lg border px-3" value={reasonCode} onChange={(event) => setReasonCode(event.target.value as RouteOverrideReason)}>
@@ -133,7 +148,7 @@ export function RouteOverrideDialog({
       </label>
       <div className="flex justify-end gap-2">
         <button type="button" className="secondary min-h-11" disabled={pending} onClick={() => onOpenChange(false)}>Cancel</button>
-        <button type="button" className="primary min-h-11" disabled={pending || !route} onClick={() => void save()}>{pending ? 'Saving…' : 'Save route'}</button>
+        <button type="button" className="primary min-h-11" disabled={pending || !route} onClick={() => void save()}>{pending ? 'Saving…' : skipActive ? 'Skip and update route' : 'Save route'}</button>
       </div>
     </div>}
   </AppDialog>;

@@ -209,17 +209,17 @@ test("clinical station templates reject invalid create schemas but allow fieldSc
   assert.equal(savedSchema.find((field) => field.key === "od").label, "OD acuity reading");
 });
 
-test("registration, clinical review, and eye health catalog templates cannot be updated", async () => {
+test("registration and clinical review catalog templates cannot be updated", async () => {
   const context = { requestId: crypto.randomUUID(), ipAddress: "127.0.0.1", deviceName: "Test" };
-  for (const templateKey of ["CLINICAL_REVIEW", "REGISTRATION", "EYE_HEALTH"]) {
+  for (const templateKey of ["CLINICAL_REVIEW", "REGISTRATION"]) {
     const transactionClient = {
       stationTemplate: {
         findUnique: async () => ({
           stationTemplateId: "60000000-0000-4000-8000-000000000004",
           templateKey,
-          stationType: templateKey === "EYE_HEALTH" ? "EYE_HEALTH" : null,
+          stationType: null,
           version: 1,
-          name: templateKey === "REGISTRATION" ? "Registration" : templateKey === "EYE_HEALTH" ? "Eye health" : "Clinical review",
+          name: templateKey === "REGISTRATION" ? "Registration" : "Clinical review",
           description: null,
           defaultCapacity: 2,
           active: true,
@@ -279,7 +279,10 @@ function installTransaction(t, current, updated, overrides = {}) {
       create: async () => ({}),
       updateMany: async () => ({ count: 0 }),
     },
-    user: { findFirst: async () => ({ id: staffId, userRoles: [{ role: { roleName: "SUPPORT" } }] }) },
+    user: {
+      findFirst: async () => ({ id: staffId, userRoles: [{ role: { roleName: "SUPPORT" } }] }),
+      findMany: async () => [{ id: staffId, userRoles: [{ role: { roleName: "SUPPORT" } }] }],
+    },
     stationTemplate: { findMany: async () => [] },
     eventAuditLog: { create: async () => ({}) },
     auditLog: { create: async () => ({}) },
@@ -336,6 +339,54 @@ test("live events reject station and shift plan updates", async (t) => {
     (error) => error.code === "EVENT_NOT_EDITABLE" && error.status === 409,
   );
   assert.equal(transactionCalls, 0);
+});
+
+test("a live event accepts a new active shift without unlocking the event plan", async (t) => {
+  const current = eventRecord("IN_PROGRESS", 3);
+  const addedShift = {
+    shiftId: crypto.randomUUID(),
+    eventId,
+    name: "Late registration",
+    startsAt: new Date("2040-01-01T02:00:00.000Z"),
+    endsAt: new Date("2040-01-01T04:00:00.000Z"),
+    requiredStaff: 2,
+    status: "ACTIVE",
+    staffAssignments: [],
+  };
+  const updated = { ...eventRecord("IN_PROGRESS", 4), shifts: [...current.shifts, addedShift] };
+  let saved;
+  installTransaction(t, current, updated, {
+    shift: { create: async ({ data }) => { saved = data; return { ...addedShift, ...data }; } },
+  });
+
+  const result = await eventService.addShift(eventId, {
+    version: 3,
+    name: addedShift.name,
+    startsAt: addedShift.startsAt.toISOString(),
+    endsAt: addedShift.endsAt.toISOString(),
+    requiredStaff: 2,
+  }, manager, crypto.randomUUID());
+
+  assert.equal(saved.status, "ACTIVE");
+  assert.equal(result.shifts.at(-1).name, "Late registration");
+});
+
+test("a live event manager can change station availability", async (t) => {
+  const current = eventRecord("IN_PROGRESS", 1);
+  const stationId = current.stations[0].stationId;
+  const updated = { ...eventRecord("IN_PROGRESS", 2), stations: [{ ...current.stations[0], isActive: false }] };
+  let stationUpdate;
+  installTransaction(t, current, updated, {
+    station: { update: async (input) => { stationUpdate = input; return {}; } },
+  });
+
+  const result = await eventService.updateStation(eventId, stationId, {
+    version: 1,
+    isAvailable: false,
+  }, manager, crypto.randomUUID());
+
+  assert.equal(stationUpdate.data.isActive, false);
+  assert.equal(result.eventStations[0].isAvailable, false);
 });
 
 test("staff assignment saves an active user and preserves manager permissions", async (t) => {
@@ -508,9 +559,9 @@ test("event responses project operational staff to only their own planned or act
     ],
     stations: [ownAssignment.station, otherAssignment.station],
     memberships: [
-      { userId: manager.userId, roles: [{ role: "EVENT_MANAGER" }] },
-      { userId: staffId, roles: [{ role: "SUPPORT" }] },
-      { userId: otherStaffId, roles: [{ role: "EVENT_MANAGER" }] },
+      { userId: manager.userId, user: { fullName: "Admin" }, roles: [{ role: "EVENT_MANAGER" }] },
+      { userId: staffId, user: { fullName: "Support Person" }, roles: [{ role: "SUPPORT" }] },
+      { userId: otherStaffId, user: { fullName: "Other Person" }, roles: [{ role: "EVENT_MANAGER" }] },
     ],
   };
   current.shifts[0].staffAssignments = [otherAssignment];
@@ -541,6 +592,7 @@ test("event responses project operational staff to only their own planned or act
     accessState: "ENABLED",
   });
   assert.equal(supportResult.canManage, false);
+  assert.deepEqual(supportResult.eventTeam, ["Admin", "Support Person", "Other Person"]);
   assert.equal(supportResult.shifts.length, 1);
   assert.deepEqual(supportResult.shifts[0].staffAssignments.map(({ user }) => user.userId), [staffId]);
   assert.equal(supportResult.shifts[0].staffAssignments[0].notes, "Report to the north entrance");
@@ -600,7 +652,6 @@ function installDeletionTransaction(t, { transactionVersion = 1, crossEventRevie
       updateMany: async () => ({ count: 0 }),
       ...remove("reviews"),
     },
-    participantConsent: { findMany: async () => [], updateMany: async () => ({ count: 0 }), ...remove("consents") },
     notificationDelivery: { count: async () => 0, ...remove("deliveries") },
     documentArtifact: { findMany: async () => [], findFirst: async () => null, ...remove("documents") },
     referral: { findMany: async () => [], ...remove("referrals") },
@@ -669,14 +720,12 @@ test("event deletion removes event-owned participant profiles and preserves shar
     onboardingEventId: eventId,
     eventRegistrations: { none: { eventId: { not: eventId } } },
     eventIntakes: { none: { eventId: { not: eventId } } },
-    consents: { none: { eventId: { not: eventId } } },
   });
   assert.deepEqual(calls.find(([name]) => name === "participants.delete")[1].where, {
     id: { in: [participantId] },
     onboardingEventId: eventId,
     eventRegistrations: { none: {} },
     eventIntakes: { none: {} },
-    consents: { none: {} },
   });
   assert.ok(calls.findIndex(([name]) => name === "participantEmergencyContacts") < calls.findIndex(([name]) => name === "participants.delete"));
   assert.deepEqual(calls.find(([name]) => name === "event.update")[1].where, {

@@ -71,12 +71,16 @@ const schema = z.object({
   ENCRYPTION_KEY: optionalEnv(z.string().regex(/^[a-fA-F0-9]{64}$/)),
   ENCRYPTION_ACTIVE_KEY_ID: optionalEnv(z.string().regex(/^[A-Za-z0-9_-]{1,32}$/)),
   ENCRYPTION_KEYRING_JSON: optionalEnv(z.string().min(1)),
-  SES_FROM_EMAIL: optionalEnv(z.string().email()),
+  SMTP_HOST: optionalEnv(z.literal("smtp.gmail.com")),
+  SMTP_PORT: optionalEnv(z.coerce.number().int().refine((value) => value === 465 || value === 587)),
+  SMTP_USERNAME: optionalEnv(z.string().email()),
+  SMTP_PASSWORD: optionalEnv(z.string().min(1)),
   SES_SNS_TOPIC_ARNS: optionalEnv(z.string().refine(
     (value) => value.split(",").every((topic) => snsTopicArn.test(topic.trim())),
     "must contain only Amazon SNS topic ARNs",
   )),
   AWS_REGION: z.string().min(1).default("us-east-1"),
+  EVENT_ARTWORK_BUCKET: optionalEnv(z.string().regex(/^[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]$/)),
   LIFECYCLE_EMAIL_ENABLED: z.enum(["true", "false"]).default("false"),
   LIFECYCLE_EMAIL_FROM: optionalEnv(z.string().email()),
   LIFECYCLE_EMAIL_ALLOWED_SENDERS: optionalEnv(z.string().min(1)),
@@ -121,6 +125,12 @@ if (Boolean(values.ENCRYPTION_ACTIVE_KEY_ID) !== Boolean(encryptionKeyring)) thr
 if (values.ENCRYPTION_ACTIVE_KEY_ID && !encryptionKeyring[values.ENCRYPTION_ACTIVE_KEY_ID]) throw new Error("ENCRYPTION_ACTIVE_KEY_ID must identify a key in ENCRYPTION_KEYRING_JSON");
 if (values.NODE_ENV === "production" && (!values.ENCRYPTION_ACTIVE_KEY_ID || !encryptionKeyring)) throw new Error("Versioned encryption keyring configuration is required in production");
 const lifecycleEmailEnabled = values.LIFECYCLE_EMAIL_ENABLED === "true";
+const referralSmtpKeys = ["SMTP_HOST", "SMTP_PORT", "SMTP_USERNAME", "SMTP_PASSWORD"];
+const referralSmtpConfiguredCount = referralSmtpKeys.filter((key) => values[key] !== undefined).length;
+if (referralSmtpConfiguredCount > 0 && referralSmtpConfiguredCount !== referralSmtpKeys.length) {
+  throw new Error("Google SMTP referral email configuration is incomplete");
+}
+const referralEmailEnabled = referralSmtpConfiguredCount === referralSmtpKeys.length;
 const lifecycleRequired = ["LIFECYCLE_EMAIL_FROM", "LIFECYCLE_EMAIL_ALLOWED_SENDERS", "GOOGLE_WORKSPACE_USER", "GOOGLE_WORKSPACE_CLIENT_ID", "GOOGLE_WORKSPACE_CLIENT_SECRET", "GOOGLE_WORKSPACE_REFRESH_TOKEN"];
 if (lifecycleEmailEnabled && lifecycleRequired.some((key) => !values[key])) throw new Error("Google Workspace lifecycle email configuration is incomplete");
 const lifecycleAllowedSenders = (values.LIFECYCLE_EMAIL_ALLOWED_SENDERS || "").split(",").map((value) => value.trim().toLowerCase()).filter(Boolean);
@@ -143,10 +153,12 @@ module.exports = Object.freeze({
   authRateLimit: values.AUTH_RATE_LIMIT,
   redisUrl: values.REDIS_URL || null,
   rateLimitStore: values.RATE_LIMIT_STORE,
+  eventArtworkBucket: values.EVENT_ARTWORK_BUCKET || null,
   publicAppOrigin,
   encryptionActiveKeyId: values.ENCRYPTION_ACTIVE_KEY_ID || null,
   encryptionKeyring,
   sesSnsTopicArns: (values.SES_SNS_TOPIC_ARNS || "").split(",").map((topic) => topic.trim()).filter(Boolean),
+  referralEmailEnabled,
   lifecycleEmailEnabled,
   lifecycleAllowedSenders,
 });

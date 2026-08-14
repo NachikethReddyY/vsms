@@ -4,20 +4,22 @@ const AppError = require("../../errors/AppError");
 const { requireEventRoleAndDuty } = require("../event/eventAuthorizationService");
 const qrService = require("../participant/qrService");
 const domainEventBus = require("../domain/domainEventBus");
+const { AUDIT_ACTIONS } = require("../../utils/logging/auditEvents");
 const { createAuditLog } = require("../../utils/logging/audit");
 const { resolveRegistrationByQrValue } = require("../../utils/crypto/qrToken");
-const { recordVisualAcuity } = require("../../utils/database/visualAcuityProcedure");
 const {
   validateResultAgainstSchema,
   normalizeClinicalResultData,
   mergeClinicalAndTemplateResult,
   resolveCompatibleFieldSchema,
   evaluateDynamicResult,
+  mergeFlagEvaluations,
 } = require("../../schemas/dynamicStationSchema");
 const {
   visualAcuityResultData,
   refractionResultData,
   colourVisionResultData,
+  eyeHealthResultData,
 } = require("../../schemas/screeningSchemas");
 const { advanceAfterFirstResult } = require("./routeProgressionService");
 
@@ -292,12 +294,13 @@ const listQueue = async (eventId, stationId, user) => {
     where: {
       stationId,
       status: { in: ["WAITING", "CALLED", "IN_PROGRESS"] },
-      registration: { eventId, registrationStatus: "CHECKED_IN" },
+      registration: { eventId },
     },
     orderBy: [{ isPriority: "desc" }, { queueNumber: "asc" }, { enteredAt: "asc" }],
     include: {
       registration: {
         include: {
+          participant: { select: { firstName: true, lastName: true } },
           screeningResults: {
             where: { stationId },
             select: {
@@ -317,8 +320,11 @@ const listQueue = async (eventId, stationId, user) => {
     registrations: entries.map((entry) => {
       const row = entry.registration;
       return {
+      queueEntryId: entry.id,
       registrationId: row.registrationId,
-      participantDisplayName: row.participantDisplayName || "Unnamed participant",
+      participantDisplayName: row.participantDisplayName
+        || [row.participant?.firstName, row.participant?.lastName].filter(Boolean).join(" ")
+        || "Unnamed participant",
       queueNumber: row.queueNumber,
       status: entry.status,
       existingResult: row.screeningResults[0] || null,
@@ -333,6 +339,7 @@ const resolveParticipant = async (eventId, query, user) => {
   let registration = query.registrationId
     ? await prisma.eventRegistration.findFirst({
       where: { eventId, registrationId: query.registrationId },
+      include: { participant: { select: { firstName: true, lastName: true } } },
     })
     : null;
 
@@ -342,6 +349,7 @@ const resolveParticipant = async (eventId, query, user) => {
     registration = resolved?.registrationId
       ? await prisma.eventRegistration.findFirst({
         where: { eventId, registrationId: resolved.registrationId },
+        include: { participant: { select: { firstName: true, lastName: true } } },
       })
       : null;
   }
@@ -352,7 +360,9 @@ const resolveParticipant = async (eventId, query, user) => {
 
   return {
     registrationId: registration.registrationId,
-    participantDisplayName: registration.participantDisplayName || "Unnamed participant",
+    participantDisplayName: registration.participantDisplayName
+      || [registration.participant?.firstName, registration.participant?.lastName].filter(Boolean).join(" ")
+      || "Unnamed participant",
     queueNumber: registration.queueNumber,
     status: registration.registrationStatus,
   };
@@ -399,6 +409,14 @@ const saveStationResult = async ({
 
   try {
     return await prisma.$transaction(async (tx) => {
+      if (typeof tx.$queryRaw === "function") {
+        await tx.$queryRaw`
+          SELECT registration_id
+          FROM event_registrations
+          WHERE registration_id = CAST(${body.registrationId} AS uuid)
+          FOR UPDATE
+        `;
+      }
       const existingByKey = await tx.screeningRequestLedger.findUnique({
         where: { idempotencyKey: body.idempotencyKey },
       });
@@ -419,7 +437,14 @@ const saveStationResult = async ({
             stationId,
           },
         },
-        select: { resultId: true },
+        select: {
+          resultId: true,
+          version: true,
+          overallFlag: true,
+          isFlagged: true,
+          ruleVersion: true,
+          acknowledgedAt: true,
+        },
       });
 
       const evaluation = evaluate(body.resultData);
@@ -494,9 +519,16 @@ const saveStationResult = async ({
       });
       await createAuditLog({
         userId: user.userId,
-        action: "SCREENING_RESULT_RECORDED",
+        action: existingResult ? AUDIT_ACTIONS.SCREENING_RESULT_CORRECTED : AUDIT_ACTIONS.SCREENING_RESULT_RECORDED,
         entityName: "ScreeningResult",
         entityId: result.resultId,
+        oldValue: existingResult ? {
+          overallFlag: existingResult.overallFlag,
+          isFlagged: existingResult.isFlagged,
+          ruleVersion: existingResult.ruleVersion,
+          acknowledgedAt: existingResult.acknowledgedAt,
+          version: existingResult.version,
+        } : null,
         newValue: {
           eventId,
           stationId,
@@ -504,11 +536,32 @@ const saveStationResult = async ({
           registrationId: body.registrationId,
           overallFlag: evaluation.overallFlag,
           isFlagged: evaluation.isFlagged,
+          acknowledgedAt: result.acknowledgedAt,
           version: result.version,
         },
         context,
         client: tx,
       });
+      if (evaluation.isFlagged) {
+        await createAuditLog({
+          userId: user.userId,
+          action: AUDIT_ACTIONS.SCREENING_FLAG_ACKNOWLEDGED,
+          entityName: "ScreeningResult",
+          entityId: result.resultId,
+          newValue: {
+            eventId,
+            stationId,
+            stationType,
+            registrationId: body.registrationId,
+            overallFlag: evaluation.overallFlag,
+            ruleVersion: persistedRuleVersion,
+            acknowledgedAt: result.acknowledgedAt,
+            version: result.version,
+          },
+          context,
+          client: tx,
+        });
+      }
       await domainEventBus.emit({
         client: tx,
         type: "SCREENING_RESULT_RECORDED",
@@ -528,7 +581,7 @@ const saveStationResult = async ({
         },
       });
       return { result: responseResult, routeProgression, created: !existingResult };
-    }, { isolationLevel: "Serializable" });
+    }, { isolationLevel: "ReadCommitted" });
   } catch (error) {
     if (error.code === "P2002") {
       const raced = await prisma.screeningRequestLedger.findUnique({ where: { idempotencyKey: body.idempotencyKey } });
@@ -595,34 +648,36 @@ const saveColourVision = (eventId, stationId, body, user, context) => saveStatio
   context,
 });
 
-const previewEyeHealth = () => {
-  throw new AppError(
-    410,
-    "EYE_HEALTH_REVIEW_ONLY",
-    "Eye health is recorded during clinical review, not as a screening station",
-  );
-};
+const previewEyeHealth = (eventId, stationId, body, user) => previewStationResult(
+  eventId, stationId, "EYE_HEALTH", "Eye health", evaluateEyeHealth, body, user,
+);
 
-const saveEyeHealth = () => {
-  throw new AppError(
-    410,
-    "EYE_HEALTH_REVIEW_ONLY",
-    "Eye health is recorded during clinical review, not as a screening station",
-  );
-};
+const saveEyeHealth = (eventId, stationId, body, user, context) => saveStationResult({
+  eventId,
+  stationId,
+  stationType: "EYE_HEALTH",
+  label: "Eye health",
+  ruleVersion: EH_RULE_VERSION,
+  evaluate: evaluateEyeHealth,
+  body,
+  user,
+  context,
+});
 
-const SCHEMA_DRIVEN_STATION_TYPES = new Set(["CUSTOM", "VISUAL_ACUITY", "REFRACTION", "COLOUR_VISION"]);
+const SCHEMA_DRIVEN_STATION_TYPES = new Set(["CUSTOM", "VISUAL_ACUITY", "REFRACTION", "COLOUR_VISION", "EYE_HEALTH"]);
 
 const CLINICAL_RESULT_SCHEMAS = {
   VISUAL_ACUITY: visualAcuityResultData,
   REFRACTION: refractionResultData,
   COLOUR_VISION: colourVisionResultData,
+  EYE_HEALTH: eyeHealthResultData,
 };
 
 const CLINICAL_EVALUATORS = {
   VISUAL_ACUITY: evaluateVisualAcuity,
   REFRACTION: evaluateRefraction,
   COLOUR_VISION: evaluateColourVision,
+  EYE_HEALTH: evaluateEyeHealth,
 };
 
 const loadDynamicStation = async (eventId, stationId, user) => {
@@ -665,15 +720,17 @@ const validateDynamicBody = (station, body) => {
   return { ...body, resultData: mergeClinicalAndTemplateResult(cleaned, parsed.data) };
 };
 
-const evaluateForStationType = (stationType, resultData) => {
-  const evaluate = CLINICAL_EVALUATORS[stationType] || evaluateDynamicResult;
-  return evaluate(resultData);
+const evaluateForStationType = (stationType, resultData, fieldSchema = []) => {
+  const schemaEvaluation = evaluateDynamicResult(resultData, fieldSchema);
+  const clinicalEvaluate = CLINICAL_EVALUATORS[stationType];
+  if (!clinicalEvaluate) return schemaEvaluation;
+  return mergeFlagEvaluations(clinicalEvaluate(resultData), schemaEvaluation);
 };
 
 const previewDynamic = async (eventId, stationId, body, user) => {
   const station = await loadDynamicStation(eventId, stationId, user);
   const validatedBody = validateDynamicBody(station, body);
-  return evaluateForStationType(station.stationType, validatedBody.resultData);
+  return evaluateForStationType(station.stationType, validatedBody.resultData, station.fieldSchemaSnapshot);
 };
 
 const saveDynamic = async (eventId, stationId, body, user, context) => {
@@ -684,7 +741,7 @@ const saveDynamic = async (eventId, stationId, body, user, context) => {
     stationId,
     stationType: station.stationType,
     label: station.stationName,
-    evaluate: (resultData) => evaluateForStationType(station.stationType, resultData),
+    evaluate: (resultData) => evaluateForStationType(station.stationType, resultData, station.fieldSchemaSnapshot),
     body: validatedBody,
     user,
     context,

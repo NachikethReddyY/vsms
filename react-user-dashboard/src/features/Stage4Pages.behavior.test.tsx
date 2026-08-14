@@ -10,8 +10,9 @@ let eventMode: 'ok' | '403' | '404' = 'ok';
 let accountMode: 'ok' | 'fail' | 'empty' = 'ok';
 let membershipRoles = [{ role: 'REGISTRATION' }];
 let stationMode: 'allow' | 'deny' = 'allow';
+let eventCanManage = true;
 const eventData = {
-  eventId: 'event-1', name: 'Clinic Day', version: 3, canManage: false,
+  eventId: 'event-1', name: 'Clinic Day', version: 3,
   shifts: [{ shiftId: 'shift-1', name: 'Morning', startsAt: '2026-08-07T08:00:00.000Z', endsAt: '2026-08-07T12:00:00.000Z', status: 'PLANNED', staffAssignments: [{ staffAssignmentId: 'duty-1', assignmentRole: 'SCREENER', user: { userId: 'user-1', fullName: 'Asha Rao' }, eventStation: { eventStationId: 'station-1', name: 'VA' } }] }],
   eventStations: [{ eventStationId: 'station-1', name: 'VA', stationOrder: 1, isAvailable: true }],
 };
@@ -26,15 +27,15 @@ vi.mock('./stage4Api', async () => {
     getCurrentAccount: vi.fn(async () => { if (accountMode === 'fail') throw new Error('profile failed'); if (accountMode === 'empty') return { account: { id: 'user-1', fullName: 'Asha Rao', approvalState: 'APPROVED', accessState: 'ENABLED', eventMemberships: [] } }; return { account: { id: 'user-1', fullName: 'Asha Rao', contactNumber: '+1', professionalCategory: 'DOCTOR', approvalState: 'APPROVED', accessState: 'ENABLED', eventMemberships: [{ id: 'm1', eventId: 'event-1', status: 'ACTIVE', roles: [{ role: 'EVENT_MANAGER' }], event: { name: 'Clinic Day' } }], securityControls: { mfa: true } } }; }),
     updateCurrentAccount: vi.fn(async (...args: unknown[]) => { calls.push({ name: 'updateCurrentAccount', args }); return {}; }),
     listAdminAccounts: vi.fn(async (params: unknown) => { calls.push({ name: 'listAdminAccounts', args: [params] }); return { items: [{ id: 'user-1', fullName: 'Asha Rao', email: 'asha@example.test', approvalState: 'PENDING', accessState: 'ENABLED' }], page: 1, limit: 25, total: 1, pendingCount: 1 }; }),
-    getAdminAccount: vi.fn(async () => ({ account: { id: 'user-1', fullName: 'Asha Rao', email: 'asha@example.test', approvalState: 'PENDING', roles: ['REVIEWER'], decisions: [], providerOperations: [], memberships: [] } })),
+    getAdminAccount: vi.fn(async () => ({ account: { id: 'user-1', fullName: 'Asha Rao', email: 'asha@example.test', approvalState: 'PENDING', professionalCategory: 'STAFF', roles: [], decisions: [], providerOperations: [], memberships: [] } })),
     decideAccount: vi.fn(async (...args: unknown[]) => { calls.push({ name: 'decideAccount', args }); return {}; }),
     listMemberships: vi.fn(async () => ({ memberships: [{ id: 'member-1', userId: 'user-1', status: 'ACTIVE', roles: membershipRoles, account: { id: 'user-1', userId: 'user-1', fullName: 'Asha Rao' } }] })),
-    listEligibleUsers: vi.fn(async () => ({ users: [{ id: 'user-2', fullName: 'Ben Tan', email: 'ben@example.test', eventMemberships: [] }] })),
+    listEligibleUsers: vi.fn(async () => ({ users: [{ id: 'user-2', fullName: 'Ben Tan', email: 'ben@example.test', eventMemberships: [] }, { id: 'user-3', fullName: 'Devi Rao', email: 'devi@example.test', professionalCategory: 'DOCTOR', roles: ['EVENT_MANAGER'], eventMemberships: [] }] })),
     addMembership: vi.fn(async (...args: unknown[]) => { calls.push({ name: 'addMembership', args }); return {}; }),
     addMembershipRole: vi.fn(async (...args: unknown[]) => { calls.push({ name: 'addMembershipRole', args }); return {}; }),
     removeMembershipRole: vi.fn(async (...args: unknown[]) => { calls.push({ name: 'removeMembershipRole', args }); return {}; }),
     removeMembership: vi.fn(async (...args: unknown[]) => { calls.push({ name: 'removeMembership', args }); return {}; }),
-    getEvent: vi.fn(async () => { if (eventMode === '403') throw new Error('403 forbidden'); if (eventMode === '404') throw new Error('404 not found'); return eventData; }),
+    getEvent: vi.fn(async () => { if (eventMode === '403') throw new Error('403 forbidden'); if (eventMode === '404') throw new Error('404 not found'); return { ...eventData, canManage: eventCanManage }; }),
     assignShiftStaff: vi.fn(async (...args: unknown[]) => { calls.push({ name: 'assignShiftStaff', args }); return eventData; }),
     removeShiftAssignment: vi.fn(async (...args: unknown[]) => { calls.push({ name: 'removeShiftAssignment', args }); return eventData; }),
     getAnalytics: vi.fn(async () => ({ schemaVersion: 1, aggregateOnly: true, generatedAt: '2026-08-07T00:00:00.000Z', timeBasis: { interval: 'event' }, appliedFilters: {}, smallCellSuppression: { rule: 'n<5' }, dataCompleteness: { registrations: 'complete' }, metricDefinitions: [{ id: 'checkedIn', definition: 'Checked-in attendees' }], tables: [{ id: 'ops', title: 'Operations', columns: [{ key: 'checkedIn', label: 'Checked in' }], rows: [{ checkedIn: 12 }] }], observations: ['Aggregate only'] })),
@@ -53,7 +54,7 @@ const { EventCapabilityGuard } = await import('../auth/RoleGuard');
 const { ProtectedRoute } = await import('../auth/ProtectedRoute');
 
 beforeEach(() => {
-  calls.length = 0; eventMode = 'ok'; accountMode = 'ok'; membershipRoles = [{ role: 'REGISTRATION' }]; stationMode = 'allow'; authUser = { approvalState: 'APPROVED', accessState: 'ENABLED', roles: [], eventMemberships: [{ id: 'm1', eventId: 'event-1', status: 'ACTIVE', roles: [{ role: 'EVENT_MANAGER' }] }] }; vi.useRealTimers();
+  calls.length = 0; eventMode = 'ok'; eventCanManage = true; accountMode = 'ok'; membershipRoles = [{ role: 'REGISTRATION' }]; stationMode = 'allow'; authUser = { approvalState: 'APPROVED', accessState: 'ENABLED', roles: [], eventMemberships: [{ id: 'm1', eventId: 'event-1', status: 'ACTIVE', roles: [{ role: 'EVENT_MANAGER' }] }] }; vi.useRealTimers();
   HTMLDialogElement.prototype.showModal = function showModal() { this.setAttribute('open', ''); };
   HTMLDialogElement.prototype.close = function close() { this.removeAttribute('open'); };
 });
@@ -63,6 +64,7 @@ function renderRoute(path: string, element: React.ReactNode) { render(<MemoryRou
 
 describe('Stage 4 rendered route behavior', () => {
   it('uses event membership guard outcomes for allow, 403, and 404 without operational global-role bypass', async () => {
+    eventCanManage = false;
     authUser = { approvalState: 'APPROVED', accessState: 'ENABLED', roles: ['ADMINISTRATOR'], eventMemberships: [] }; accountMode = 'fail';
     render(<MemoryRouter initialEntries={["/events/event-1/staff"]}><Routes><Route element={<EventCapabilityGuard allowedRoles={['ADMINISTRATOR','EVENT_MANAGER']} />}><Route path="/events/:eventId/staff" element={<p>Allowed staff</p>} /></Route><Route path="/forbidden" element={<p>Forbidden page</p>} /><Route path="/not-found" element={<p>Missing page</p>} /></Routes></MemoryRouter>);
     expect(await screen.findByText('Forbidden page')).toBeTruthy();
@@ -76,10 +78,10 @@ describe('Stage 4 rendered route behavior', () => {
     expect(await screen.findByText('Missing page')).toBeTruthy();
   });
 
-  it('routes approved enabled accounts without active membership to unassigned state while profile remains reachable', async () => {
+  it('allows approved enabled accounts without active membership to view events and their profile', async () => {
     authUser = { approvalState: 'APPROVED', accessState: 'ENABLED', roles: [], eventMemberships: [] };
     render(<MemoryRouter initialEntries={["/events"]}><Routes><Route element={<ProtectedRoute />}><Route path="/events" element={<p>Events</p>} /><Route path="/account/state" element={<pages.AccountStatePage />} /></Route></Routes></MemoryRouter>);
-    expect(await screen.findByText(/No event assignment yet/i)).toBeTruthy();
+    expect(await screen.findByText('Events')).toBeTruthy();
     render(<MemoryRouter initialEntries={["/account/profile"]}><Routes><Route element={<ProtectedRoute />}><Route path="/account/profile" element={<pages.ProfilePage />} /></Route></Routes></MemoryRouter>);
     expect(await screen.findByRole('heading', { name: 'Profile and access' })).toBeTruthy();
   });
@@ -93,7 +95,7 @@ describe('Stage 4 rendered route behavior', () => {
     cleanup();
     delete authUser.eventMemberships; delete authUser.memberships; accountMode = 'empty';
     render(<MemoryRouter initialEntries={["/events"]}><Routes><Route element={<ProtectedRoute />}><Route path="/events" element={<p>Events</p>} /><Route path="/account/state" element={<pages.AccountStatePage />} /></Route></Routes></MemoryRouter>);
-    expect(await screen.findByText(/No event assignment yet/i)).toBeTruthy();
+    expect(await screen.findByText('Events')).toBeTruthy();
   });
 
   it('requires current station duty instead of membership-only station access', async () => {
@@ -106,22 +108,19 @@ describe('Stage 4 rendered route behavior', () => {
     expect(await screen.findByText('VA station')).toBeTruthy();
   });
 
-  it('treats eye-health screener URLs as review-only redirects to the event', async () => {
-    const { Navigate, Route, Routes, useParams } = await import('react-router-dom');
-    function EyeHealthStationRedirect() {
-      const { eventId = '' } = useParams();
-      return <Navigate to={`/events/${eventId}`} replace />;
-    }
+  it('allows eye-health screener URLs only with an active eye-health duty', async () => {
+    const { StationDutyGuard } = await import('../auth/RoleGuard');
     render(
       <MemoryRouter initialEntries={['/events/event-1/stations/eye-health']}>
         <Routes>
-          <Route path="/events/:eventId/stations/eye-health" element={<EyeHealthStationRedirect />} />
-          <Route path="/events/:eventId" element={<p>Event overview</p>} />
+          <Route element={<StationDutyGuard stationType="EYE_HEALTH" />}>
+            <Route path="/events/:eventId/stations/eye-health" element={<p>Eye health station</p>} />
+          </Route>
+          <Route path="/forbidden" element={<p>Forbidden page</p>} />
         </Routes>
       </MemoryRouter>,
     );
-    expect(await screen.findByText('Event overview')).toBeTruthy();
-    expect(screen.queryByText('Eye health station')).toBeNull();
+    expect(await screen.findByText('Eye health station')).toBeTruthy();
   });
 
   it('renders profile eventMemberships exact field and profile failure', async () => {
@@ -142,8 +141,8 @@ describe('Stage 4 rendered route behavior', () => {
     accountButton.focus();
     expect(document.activeElement).toBe(accountButton);
     await user.keyboard('{Enter}');
-    await user.click(await screen.findByRole('button', { name: 'Approve and synchronize roles' }));
-    expect(calls.some(c => c.name === 'decideAccount' && c.args[1] === 'approve' && c.args[2] === undefined && JSON.stringify(c.args[3]) === JSON.stringify(['REVIEWER']))).toBe(true);
+    await user.click(await screen.findByRole('button', { name: 'Approve and synchronize access' }));
+    expect(calls.some(c => c.name === 'decideAccount' && c.args[1] === 'approve' && c.args[2] === undefined && JSON.stringify(c.args[3]) === JSON.stringify([]))).toBe(true);
     await user.click(await screen.findByRole('button', { name: 'Reject' }));
     expect(calls.find(c => c.name === 'decideAccount' && c.args[1] === 'reject')?.args).toEqual(['user-1', 'reject', 'Not eligible', undefined]);
   });
@@ -168,15 +167,20 @@ describe('Stage 4 rendered route behavior', () => {
     expect(calls.find(c => c.name === 'deleteEventPermanently')?.args[1]).toEqual({ previewToken: 'preview-token', version: 7, confirmationName: 'Clinic Day', acknowledgePermanentDeletion: true });
   });
 
-  it('assigns approved people and event-specific roles without changing account types', async () => {
+  it('assigns multiple approved people the same event roles and identifies privileged accounts', async () => {
     const user = userEvent.setup();
     renderRoute('/events/event-1/staff', <pages.EventStaffingPage />);
     await user.click(await screen.findByRole('button', { name: /add staff/i }));
-    await user.click(screen.getByLabelText(/ben tan/i));
+    expect(screen.getAllByText('Event manager').length).toBeGreaterThan(0);
+    expect(screen.getByText('Doctor')).toBeTruthy();
+    await user.click(screen.getByLabelText(/select all 2/i));
     await user.click(screen.getByLabelText(/screener/i));
-    await user.click(screen.getByRole('button', { name: /add to event/i }));
-    await waitFor(() => expect(calls.some(c => c.name === 'addMembership')).toBe(true));
-    expect(calls.find(c => c.name === 'addMembership')?.args).toEqual(['event-1', 'user-2', ['REGISTRATION', 'SCREENER']]);
+    await user.click(screen.getByRole('button', { name: /add 2 to event/i }));
+    await waitFor(() => expect(calls.filter(c => c.name === 'addMembership')).toHaveLength(2));
+    expect(calls.filter(c => c.name === 'addMembership').map(c => c.args)).toEqual([
+      ['event-1', 'user-2', ['REGISTRATION', 'SCREENER']],
+      ['event-1', 'user-3', ['REGISTRATION', 'SCREENER']],
+    ]);
   });
 
   it('edits roles on an existing event assignment', async () => {

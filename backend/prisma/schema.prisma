@@ -171,6 +171,7 @@ enum StaffAssignmentStatus {
 
 enum EventRegistrationStatus {
   SIGNED_UP
+  WAITLISTED
   CHECKED_IN
   COMPLETED
   CANCELLED
@@ -289,15 +290,7 @@ enum EmergencyContactStatus {
   REMOVED
 }
 
-enum ConsentStatus {
-  PENDING
-  ACCEPTED
-  DECLINED
-  WITHDRAWN
-}
-
 enum SignaturePurpose {
-  CONSENT
   REFERRAL
   REVIEW_DECISION
 }
@@ -371,9 +364,7 @@ model User {
   authAuditLogs            AuthAuditLog[]
   emergencyContactsCreated ParticipantEmergencyContact[] @relation("EmergencyContactCreatedBy")
   emergencyContactsUpdated ParticipantEmergencyContact[] @relation("EmergencyContactUpdatedBy")
-  consentsRecorded         ParticipantConsent[]          @relation("ConsentRecordedBy")
   signatureArtifacts       SignatureArtifact[]           @relation("SignatureArtifactOwner")
-  consentVersionsCreated   ConsentFormVersion[]          @relation("ConsentFormVersionCreatedBy")
   registrationChanges      RegistrationStatusHistory[]   @relation("RegistrationStatusChangedBy")
   participantsCreated      Participant[]                 @relation("ParticipantCreatedBy")
   participantsUpdated      Participant[]                 @relation("ParticipantUpdatedBy")
@@ -561,9 +552,6 @@ model Participant {
   preferredLanguage    String?           @map("preferred_language") @db.VarChar(50)
   accessibilityNotes   String?           @map("accessibility_notes") @db.VarChar(1000)
   status               ParticipantStatus @default(ACTIVE)
-  emergencyContact     String            @map("emergency_contact") @db.VarChar(20)
-  emergencyContactName String?           @map("emergency_contact_name") @db.VarChar(100)
-  consentGiven         Boolean           @map("consent_given")
   createdById          String            @map("created_by") @db.Uuid
   updatedById          String            @map("updated_by") @db.Uuid
   onboardingEventId    String?           @map("onboarding_event_id") @db.Uuid
@@ -574,7 +562,6 @@ model Participant {
   eventRegistrations EventRegistration[]
   eventIntakes       ParticipantEventIntake[]
   emergencyContacts  ParticipantEmergencyContact[]
-  consents           ParticipantConsent[]
   createdBy          User                          @relation("ParticipantCreatedBy", fields: [createdById], references: [id], onDelete: Restrict, onUpdate: Cascade)
   updatedBy          User                          @relation("ParticipantUpdatedBy", fields: [updatedById], references: [id], onDelete: Restrict, onUpdate: Cascade)
   onboardingEvent    Event?                        @relation("ParticipantOnboardingEvent", fields: [onboardingEventId], references: [eventId], onDelete: SetNull, onUpdate: Cascade)
@@ -626,7 +613,6 @@ model Event {
   registrations           EventRegistration[]
   participantIntakes      ParticipantEventIntake[]
   staffAssignments        StaffAssignment[]
-  participantConsents     ParticipantConsent[]
   onboardingParticipants  Participant[]            @relation("ParticipantOnboardingEvent")
   signatureArtifacts      SignatureArtifact[]
   screeningRequestLedgers ScreeningRequestLedger[]
@@ -803,7 +789,6 @@ model EventRegistration {
   participantDisplayName String?                 @map("participant_display_name") @db.VarChar(150)
   queueNumber            Int?                    @map("queue_number")
   idempotencyKey         String                  @map("idempotency_key") @db.VarChar(100)
-  passToken              String?                 @unique @map("pass_token") @db.VarChar(255)
   checkedIn              Boolean                 @default(false) @map("checked_in")
   checkedInAt            DateTime?               @map("checked_in_at") @db.Timestamptz(3)
   routeVersion           Int                     @default(1) @map("route_version")
@@ -821,7 +806,6 @@ model EventRegistration {
   screeningRequestLedgers ScreeningRequestLedger[]
   reviews                 Review[]
   statusHistory           RegistrationStatusHistory[]
-  consents                ParticipantConsent[]
   routeSteps              RegistrationRouteStep[]
 
   @@unique([participantId, eventId])
@@ -1313,7 +1297,7 @@ model NotificationDelivery {
 }
 
 // Non-clinical account and assignment mail remains separate from encrypted
-// SES referral deliveries. Metadata is template input, never an arbitrary body.
+// referral deliveries. Metadata is template input, never an arbitrary body.
 model LifecycleEmailOutbox {
   id                String                @id @default(uuid()) @map("lifecycle_email_id") @db.Uuid
   userId            String                @map("user_id") @db.Uuid
@@ -1498,8 +1482,6 @@ model Device {
   user      User?                @relation(fields: [userId], references: [id], onDelete: SetNull)
   authLogs  AuthAuditLog[]
   auditLogs AuditLog[]
-  consents  ParticipantConsent[]
-
   @@index([userId, status])
   @@map("devices")
 }
@@ -1527,73 +1509,6 @@ model ParticipantEmergencyContact {
   @@index([updatedById])
   @@index([participantId, isPrimary, status])
   @@map("participant_emergency_contacts")
-}
-
-model ConsentFormVersion {
-  id                String    @id @default(uuid()) @map("consent_form_version_id") @db.Uuid
-  formCode          String    @map("form_code") @db.VarChar(50)
-  versionNumber     String    @map("version_number") @db.VarChar(30)
-  title             String    @db.VarChar(200)
-  contentText       String?   @map("content_text") @db.Text
-  contentHash       String    @map("content_hash") @db.Char(64)
-  documentObjectKey String    @map("document_object_key") @db.VarChar(500)
-  effectiveFrom     DateTime  @map("effective_from") @db.Timestamptz(3)
-  effectiveTo       DateTime? @map("effective_to") @db.Timestamptz(3)
-  isActive          Boolean   @default(true) @map("is_active")
-  createdById       String    @map("created_by") @db.Uuid
-  createdAt         DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
-
-  createdBy User                 @relation("ConsentFormVersionCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
-  consents  ParticipantConsent[]
-
-  @@unique([formCode, versionNumber])
-  @@index([isActive, effectiveFrom])
-  @@index([createdById])
-  @@map("consent_form_versions")
-}
-
-model ParticipantConsent {
-  id                   String        @id @default(uuid()) @map("consent_id") @db.Uuid
-  participantId        String        @map("participant_id") @db.Uuid
-  eventId              String        @map("event_id") @db.Uuid
-  registrationId       String?       @map("registration_id") @db.Uuid
-  withdrawalOfId       String?       @map("withdrawal_of_id") @db.Uuid
-  consentFormVersionId String        @map("consent_form_version_id") @db.Uuid
-  consentStatus        ConsentStatus @default(PENDING) @map("consent_status")
-  signerType           String?       @map("signer_type") @db.VarChar(40)
-  signerName           String?       @map("signer_name") @db.VarChar(150)
-  signerRelationship   String?       @map("signer_relationship") @db.VarChar(60)
-  guardianContactName  String?       @map("guardian_contact_name") @db.VarChar(150)
-  guardianContactPhone String?       @map("guardian_contact_phone") @db.VarChar(30)
-  guardianContactEmail String?       @map("guardian_contact_email") @db.VarChar(255)
-  signatureObjectKey   String?       @unique @map("signature_object_key") @db.VarChar(500)
-  signatureSha256      String?       @map("signature_sha256") @db.Char(64)
-  signatureMimeType    String?       @map("signature_mime_type") @db.VarChar(100)
-  deviceId             String?       @map("device_id") @db.Uuid
-  recordedById         String        @map("recorded_by") @db.Uuid
-  signedAt             DateTime?     @map("signed_at") @db.Timestamptz(3)
-  withdrawnAt          DateTime?     @map("withdrawn_at") @db.Timestamptz(3)
-  decisionAt           DateTime?     @map("decision_at") @db.Timestamptz(3)
-  withdrawalReason     String?       @map("withdrawal_reason") @db.Text
-  createdAt            DateTime      @default(now()) @map("created_at") @db.Timestamptz(3)
-
-  participant        Participant          @relation(fields: [participantId], references: [id], onDelete: Restrict)
-  event              Event                @relation(fields: [eventId], references: [eventId], onDelete: Restrict)
-  registration       EventRegistration?   @relation(fields: [registrationId], references: [registrationId], onDelete: SetNull)
-  withdrawalOf       ParticipantConsent?  @relation("ConsentWithdrawal", fields: [withdrawalOfId], references: [id], onDelete: Restrict)
-  withdrawals        ParticipantConsent[] @relation("ConsentWithdrawal")
-  consentFormVersion ConsentFormVersion   @relation(fields: [consentFormVersionId], references: [id], onDelete: Restrict)
-  recordedBy         User                 @relation("ConsentRecordedBy", fields: [recordedById], references: [id], onDelete: Restrict)
-  device             Device?              @relation(fields: [deviceId], references: [id], onDelete: SetNull)
-
-  @@index([participantId])
-  @@index([eventId])
-  @@index([registrationId])
-  @@index([withdrawalOfId])
-  @@index([consentFormVersionId])
-  @@index([recordedById])
-  @@index([deviceId])
-  @@map("participant_consents")
 }
 
 model SignatureArtifact {

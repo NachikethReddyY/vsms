@@ -15,6 +15,7 @@ const { verifyCognitoToken } = require("../utils/auth/cognitoJwt");
 const { timingSafeEqual } = require("../utils/crypto/security");
 const { ALLOWED_ROLES } = require("../utils/auth/staff");
 const accountService = require("../services/account/accountService");
+const { AUTH_AUDIT_EVENTS } = require("../utils/logging/auditEvents");
 const {
     ACCESS_COOKIE,
     REFRESH_COOKIE,
@@ -142,6 +143,12 @@ exports.callback = asyncHandler(async (req, res) => {
     const cookies = parseCookies(req.headers.cookie);
     if (!timingSafeEqual(req.query.state, cookies[OAUTH_STATE_COOKIE]) || !cookies[OAUTH_VERIFIER_COOKIE]) {
         clearOAuthCookies(res);
+        await accountService.recordAuthAuditBestEffort({
+            eventType: AUTH_AUDIT_EVENTS.LOGIN_FAILED,
+            outcome: "DENIED",
+            failureCategory: "OAUTH_STATE_INVALID",
+            context: req.context,
+        });
         const error = new Error("Cognito authorization state is invalid or expired");
         error.statusCode = 400;
         throw error;
@@ -156,7 +163,7 @@ exports.callback = asyncHandler(async (req, res) => {
     } catch (error) {
         clearOAuthCookies(res);
         await accountService.recordAuthAudit({
-            eventType: "LOGIN_FAILED",
+            eventType: AUTH_AUDIT_EVENTS.LOGIN_FAILED,
             outcome: "FAILED",
             failureCategory: error.name || "OAUTH_CALLBACK_FAILED",
             context: req.context,
@@ -171,6 +178,13 @@ exports.refresh = asyncHandler(async (req, res) => {
     const refreshToken = cookies[REFRESH_COOKIE];
     const username = cookies[USERNAME_COOKIE];
     if (!refreshToken || !username) {
+        await accountService.recordAuthAuditBestEffort({
+            eventType: AUTH_AUDIT_EVENTS.TOKEN_REFRESH_FAILED,
+            outcome: "DENIED",
+            failureCategory: "REFRESH_SESSION_UNAVAILABLE",
+            identifier: username,
+            context: req.context,
+        });
         const error = new Error("Refresh session is unavailable");
         error.statusCode = 401;
         throw error;
@@ -184,6 +198,13 @@ exports.refresh = asyncHandler(async (req, res) => {
             accessTokenPayload: accessPayload,
             username,
         });
+        await accountService.recordAuthAuditBestEffort({
+            userId: localUser.id,
+            eventType: AUTH_AUDIT_EVENTS.TOKEN_REFRESH_SUCCESS,
+            outcome: "SUCCESS",
+            identifier: username,
+            context: req.context,
+        });
         setAuthCookies(res, { ...authResult, RefreshToken: refreshToken }, username);
         res.json({
             expiresIn: authResult.ExpiresIn,
@@ -193,7 +214,7 @@ exports.refresh = asyncHandler(async (req, res) => {
     } catch (error) {
         clearAuthCookies(res);
         await accountService.recordAuthAudit({
-            eventType: "TOKEN_REFRESH_FAILED",
+            eventType: AUTH_AUDIT_EVENTS.TOKEN_REFRESH_FAILED,
             outcome: "FAILED",
             failureCategory: error.name || "TOKEN_REFRESH_FAILED",
             identifier: username,
@@ -210,12 +231,21 @@ exports.me = asyncHandler(async (req, res) => {
 
 exports.logout = asyncHandler(async (req, res) => {
     ensureCognitoConfigured();
+    const username = parseCookies(req.headers.cookie)[USERNAME_COOKIE];
     clearAuthCookies(res);
+    await accountService.recordAuthAuditBestEffort({
+        eventType: AUTH_AUDIT_EVENTS.LOGOUT_SUCCESS,
+        outcome: "SUCCESS",
+        identifier: username,
+        context: req.context,
+    });
     res.json({ message: "Logged out successfully", logoutUrl: getLogoutUrl() });
 });
 
 exports.globalLogout = asyncHandler(async (req, res) => {
-    const accessToken = parseCookies(req.headers.cookie)[ACCESS_COOKIE];
+    const cookies = parseCookies(req.headers.cookie);
+    const accessToken = cookies[ACCESS_COOKIE];
+    const username = cookies[USERNAME_COOKIE];
     try {
         ensureCognitoConfigured();
         if (!accessToken) {
@@ -224,7 +254,20 @@ exports.globalLogout = asyncHandler(async (req, res) => {
             throw error;
         }
         await globalSignOut(accessToken);
+        await accountService.recordAuthAuditBestEffort({
+            eventType: AUTH_AUDIT_EVENTS.GLOBAL_LOGOUT_SUCCESS,
+            outcome: "SUCCESS",
+            identifier: username,
+            context: req.context,
+        });
     } catch (error) {
+        await accountService.recordAuthAuditBestEffort({
+            eventType: AUTH_AUDIT_EVENTS.GLOBAL_LOGOUT_FAILED,
+            outcome: error.statusCode === 401 ? "DENIED" : "FAILED",
+            failureCategory: error.name || "GLOBAL_LOGOUT_FAILED",
+            identifier: username,
+            context: req.context,
+        });
         if (error.statusCode !== 401 && error.statusCode !== 503) error.statusCode = 502;
         throw error;
     } finally {
@@ -236,15 +279,27 @@ exports.globalLogout = asyncHandler(async (req, res) => {
 exports.changePassword = asyncHandler(async (req, res) => {
     ensureCognitoConfigured();
     requireFields(req.body, ["oldPassword", "newPassword"]);
-    await changePassword({
-        accessToken: req.auth.token,
-        oldPassword: req.body.oldPassword,
-        newPassword: req.body.newPassword,
-    });
-    await accountService.recordPasswordChange({
-        userId: req.auth.userId,
-        email: req.auth.email,
-        context: req.context,
-    });
+    try {
+        await changePassword({
+            accessToken: req.auth.token,
+            oldPassword: req.body.oldPassword,
+            newPassword: req.body.newPassword,
+        });
+        await accountService.recordPasswordChange({
+            userId: req.auth.userId,
+            email: req.auth.email,
+            context: req.context,
+        });
+    } catch (error) {
+        await accountService.recordAuthAuditBestEffort({
+            userId: req.auth.userId,
+            eventType: AUTH_AUDIT_EVENTS.PASSWORD_CHANGE_FAILED,
+            outcome: error.statusCode === 403 ? "DENIED" : "FAILED",
+            failureCategory: error.name || "PASSWORD_CHANGE_FAILED",
+            identifier: req.auth.email,
+            context: req.context,
+        });
+        throw error;
+    }
     res.json({ message: "Password changed successfully." });
 });

@@ -9,7 +9,7 @@ import styles from './LandingPage.module.css';
 const workflowSteps = [
   {
     title: 'Registration',
-    description: 'Confirm identity and consent, then create the event registration.',
+    description: 'Confirm identity and the emergency contact, then create the event registration.',
     icon: <path d="M7 9h18v16H7zM11 6h10v6H11zM11 17h10M11 21h7" />,
   },
   {
@@ -63,10 +63,12 @@ const workflowSteps = [
 const featureZooms = [
   {
     label: 'Queue and station load',
+    image: '/landing/feature-queue.webp',
     icon: <path d="M5 25h22M8 21v-6M16 21V8M24 21v-9" />,
   },
   {
     label: 'Offline save and sync',
+    image: '/landing/feature-sync.webp',
     icon: (
       <>
         <path d="M9 23a7 7 0 0 1 1.2-13.9A9 9 0 0 1 27 13.5 5.5 5.5 0 0 1 25 24H9" />
@@ -76,6 +78,7 @@ const featureZooms = [
   },
   {
     label: 'Clinical review',
+    image: '/landing/feature-review.webp',
     icon: (
       <>
         <path d="M8 6h16v20H8zM12 11h8M12 15h8" />
@@ -266,8 +269,8 @@ export default function LandingPage() {
                 <img
                   src="/landing/vsms-events-workspace.jpg"
                   alt="VSMS Events workspace showing upcoming screening events, schedules, capacity and staff assignment"
-                  width="1224"
-                  height="768"
+                  width="1600"
+                  height="1040"
                   loading="lazy"
                   decoding="async"
                 />
@@ -279,12 +282,10 @@ export default function LandingPage() {
               {featureZooms.map((feature) => (
                 <figure className={styles['feature-zoom']} key={feature.label}>
                   <div className={styles['zoom-window']} aria-hidden="true">
-                    <img src="/landing/vsms-events-workspace.jpg" alt="" width="1224" height="768" loading="lazy" decoding="async" />
+                    <img src={feature.image} alt="" width="960" height="720" loading="lazy" decoding="async" />
+                    <span className={styles['zoom-icon']}><OutlineIcon>{feature.icon}</OutlineIcon></span>
                   </div>
-                  <figcaption>
-                    <span aria-hidden="true"><OutlineIcon>{feature.icon}</OutlineIcon></span>
-                    {feature.label}
-                  </figcaption>
+                  <figcaption>{feature.label}</figcaption>
                 </figure>
               ))}
             </div>

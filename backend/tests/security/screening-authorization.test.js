@@ -48,6 +48,7 @@ test("only a screener assigned to the requested station can read its queue", asy
   replace(t, prisma.queueEntry, "findMany", async ({ where }) => {
     assert.equal(where.stationId, stationA);
     assert.deepEqual(where.status.in, ["WAITING", "CALLED", "IN_PROGRESS"]);
+    assert.deepEqual(where.registration, { eventId });
     return [];
   });
 
@@ -62,7 +63,7 @@ test("only a screener assigned to the requested station can read its queue", asy
   const queue = await screeningService.listQueue(eventId, stationA, user);
   assert.deepEqual(queue.registrations, []);
   assert.equal(stationTypeForTemplate({ templateKey: "opaque", stationType: "VISUAL_ACUITY" }), "VISUAL_ACUITY");
-  assert.equal(stationTypeForTemplate({ templateKey: "opaque", stationType: "EYE_HEALTH" }), null);
+  assert.equal(stationTypeForTemplate({ templateKey: "opaque", stationType: "EYE_HEALTH" }), "EYE_HEALTH");
 });
 
 test("an administrator remains denied without a screener event membership", async (t) => {
@@ -148,7 +149,7 @@ test("dynamic routes accept schema-driven clinical and CUSTOM stations", async (
     user,
   );
   assert.equal(clinicalPreview.overallFlag, "URGENT");
-  assert.equal(clinicalPreview.ruleVersion, "VSMS-VA-1.0");
+  assert.match(clinicalPreview.ruleVersion, /VSMS-VA-1\.0/);
 
   const preview = await screeningService.previewDynamic(
     eventId,

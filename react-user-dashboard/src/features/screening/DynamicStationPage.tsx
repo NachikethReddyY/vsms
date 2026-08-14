@@ -3,14 +3,14 @@ import { useParams, useSearchParams } from 'react-router-dom';
 import { getApiError as getApiMessage } from '../../utils/apiClient';
 import { getStoredSession } from '../../utils/session';
 import type { DynamicFieldValues } from './fieldSchema';
-import { defaultValuesForSchema, resolveCompatibleFieldSchema, validateFieldValues, withCompatibleFieldSchema } from './fieldSchema';
+import { defaultValuesForSchema, resolveCompatibleFieldSchema, validateFieldValues } from './fieldSchema';
 import { getOfflineStationContext, isNetworkError } from './offlineSync';
 import { screeningApi, newIdempotencyKey, type FlagEvaluation, type QueueRegistration, type Station, type StationType } from './screeningApi';
 import { StationFieldRenderer } from './StationFieldRenderer';
 import { FlagBanner, ParticipantLookup, RouteProgressionNotice, StationPageFrame } from './StationShared';
 import { STATION_LABEL } from './stationConfig';
 
-const SCHEMA_DRIVEN_TYPES = new Set<StationType>(['CUSTOM', 'VISUAL_ACUITY', 'REFRACTION', 'COLOUR_VISION']);
+const SCHEMA_DRIVEN_TYPES = new Set<StationType>(['CUSTOM', 'VISUAL_ACUITY', 'REFRACTION', 'COLOUR_VISION', 'EYE_HEALTH']);
 
 export default function DynamicStationPage({ stationType }: { stationType?: StationType } = {}) {
   const { eventId = '', stationId: routeStationId = '' } = useParams();
@@ -88,12 +88,8 @@ export default function DynamicStationPage({ stationType }: { stationType?: Stat
           ? await getOfflineStationContext(ownerId, eventId, offlineType, routeStationId || undefined)
           : null;
         if (offline) {
-          const compatibleStation = withCompatibleFieldSchema(offline.station);
-          if (!compatibleStation.fieldSchemaSnapshot?.length) {
-            throw new Error('This station does not have a field schema snapshot.');
-          }
           setEventName(offline.eventName);
-          setStation(compatibleStation);
+          setStation(offline.station);
           setQueue(offline.queue);
           if (!selectedId && offline.queue[0]) selectParticipant(offline.queue[0].registrationId);
           return;
@@ -148,7 +144,7 @@ export default function DynamicStationPage({ stationType }: { stationType?: Stat
     setError(null);
     const generation = participantRequestGeneration.current;
     try {
-      const next = await screeningApi.previewDynamic(eventId, station.stationId, values, resolvedType);
+      const next = await screeningApi.previewDynamic(eventId, station.stationId, values, resolvedType, fieldSchema);
       if (generation !== participantRequestGeneration.current) return null;
       setEvaluation(next);
       if (!next.isFlagged) setAcknowledged(false);

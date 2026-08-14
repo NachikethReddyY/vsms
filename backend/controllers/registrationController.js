@@ -62,6 +62,20 @@ function publicRegistration(registration) {
     };
 }
 
+function publicRegistrationSummary(summary) {
+    return {
+        eventId: summary.event_id,
+        capacity: Number(summary.capacity),
+        signedUpCount: Number(summary.signed_up_count),
+        waitlistedCount: Number(summary.waitlisted_count),
+        checkedInCount: Number(summary.checked_in_count),
+        completedCount: Number(summary.completed_count),
+        cancelledCount: Number(summary.cancelled_count),
+        filledCount: Number(summary.filled_count),
+        remainingCapacity: Number(summary.remaining_capacity),
+    };
+}
+
 exports.createRegistration = asyncHandler(async (req, res) => {
     const result = await registrationService.createRegistration({
         participantId: assertUuid(req.body.participantId, "participantId"),
@@ -95,6 +109,14 @@ exports.listEventRegistrations = asyncHandler(async (req, res) => {
         auth: req.auth,
     });
     res.json({ registrations: result.registrations.map(publicRegistration), pagination: result.pagination });
+});
+
+exports.getEventRegistrationSummary = asyncHandler(async (req, res) => {
+    const summary = await registrationService.getEventRegistrationSummary({
+        eventId: assertUuid(req.params.eventId, "eventId"),
+        auth: req.auth,
+    });
+    res.json({ summary: publicRegistrationSummary(summary) });
 });
 
 exports.getRegistrationHistory = asyncHandler(async (req, res) => {

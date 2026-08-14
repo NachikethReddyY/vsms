@@ -2,6 +2,7 @@ const crypto = require("node:crypto");
 const prisma = require("../../prisma/prismaClient");
 const AppError = require("../../errors/AppError");
 const { verifySnsMessage, confirmSnsSubscription } = require("./snsMessageService");
+const { createAuditLog } = require("../../utils/logging/audit");
 
 const providerMessageHash = (messageId) => crypto.createHash("sha256").update(messageId).digest("hex");
 
@@ -78,7 +79,8 @@ const recordProviderEvent = async (message, event, db = prisma) => {
         });
         if (changed.count === 1) {
           appliedStatus = event.targetStatus;
-          await tx.auditLog.create({ data: {
+          await createAuditLog({
+            client: tx,
             userId: null,
             action: `REFERRAL_EMAIL_${event.targetStatus}`,
             resource: "NotificationDelivery",
@@ -92,7 +94,7 @@ const recordProviderEvent = async (message, event, db = prisma) => {
               previousStatus: delivery.status,
               status: event.targetStatus,
             },
-          } });
+          });
         }
       }
       await tx.providerEventReceipt.update({

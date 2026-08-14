@@ -2,6 +2,7 @@ const prisma = require("../../prisma/prismaClient");
 const AppError = require("../../errors/AppError");
 const { assertOperationalAccount, eventVisibilityWhere, isAdministrator, requireEventManager } = require("../event/eventAuthorizationService");
 const { attended } = require("../event/attendanceDefinition");
+const { effectiveEventStatus } = require("../event/eventLifecycle");
 
 const EVENT_LIMIT = 100;
 
@@ -22,10 +23,10 @@ const reportRange = (query, now = new Date()) => {
 
 const reportVisibility = (user) => eventVisibilityWhere(user, ["EVENT_MANAGER"]);
 
-const emptyEventMetrics = (event) => ({
+const emptyEventMetrics = (event, now) => ({
   eventId: event.eventId,
   name: event.name,
-  status: event.status,
+  status: effectiveEventStatus(event.status, event.endsAt, now),
   startsAt: event.startsAt,
   endsAt: event.endsAt,
   timezone: event.timezone,
@@ -100,19 +101,23 @@ const getOperationalReport = async (query, user, db = prisma, now = new Date()) 
     db.event.count({ where: optionWhere }),
     db.event.findMany({
       where: optionWhere,
-      select: { eventId: true, name: true, status: true, startsAt: true },
+      select: { eventId: true, name: true, status: true, startsAt: true, endsAt: true },
       orderBy: [{ startsAt: "desc" }, { eventId: "desc" }],
       take: EVENT_LIMIT,
     }),
   ]);
 
   const eventIds = events.map(({ eventId }) => eventId);
+  const effectiveEventOptions = eventOptions.map(({ endsAt, ...event }) => ({
+    ...event,
+    status: effectiveEventStatus(event.status, endsAt, now),
+  }));
   if (eventIds.length === 0) {
     return {
       filters: { eventId: query.eventId || null, from: range.from, to: range.to },
       summary: totalMetrics([]),
       events: [],
-      eventOptions,
+      eventOptions: effectiveEventOptions,
       truncated: eventCount > EVENT_LIMIT,
       eventOptionsTruncated: eventOptionCount > EVENT_LIMIT,
     };
@@ -145,7 +150,7 @@ const getOperationalReport = async (query, user, db = prisma, now = new Date()) 
     }),
   ]);
 
-  const byEvent = new Map(events.map((event) => [event.eventId, emptyEventMetrics(event)]));
+  const byEvent = new Map(events.map((event) => [event.eventId, emptyEventMetrics(event, now)]));
   const entityEvent = new Map(eventIds.map((eventId) => [eventId, eventId]));
 
   for (const row of registrations) {
@@ -223,7 +228,7 @@ const getOperationalReport = async (query, user, db = prisma, now = new Date()) 
     filters: { eventId: query.eventId || null, from: range.from, to: range.to },
     summary: totalMetrics(reportEvents),
     events: reportEvents,
-    eventOptions,
+    eventOptions: effectiveEventOptions,
     truncated: eventCount > EVENT_LIMIT,
     eventOptionsTruncated: eventOptionCount > EVENT_LIMIT,
   };

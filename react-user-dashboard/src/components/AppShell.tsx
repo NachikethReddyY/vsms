@@ -1,4 +1,4 @@
-import { CalendarDaysIcon, ChartBarSquareIcon, PencilSquareIcon, PlusIcon, Squares2X2Icon, UserGroupIcon } from '@heroicons/react/24/outline';
+import { CalendarDaysIcon, ChartBarSquareIcon, PencilSquareIcon, PlusIcon, SignalIcon, Squares2X2Icon, UserGroupIcon } from '@heroicons/react/24/outline';
 import { useEffect, useRef, type ReactNode } from 'react';
 import { Link, NavLink, useLocation } from 'react-router-dom';
 import { useAuth } from '../auth/AuthProvider';
@@ -20,8 +20,8 @@ export default function AppShell({ children }: { children: ReactNode }) {
   const canManageEvents = roles.some((role) => eventManagerRoles.has(role));
   const canCreateEvent = roles.some((role) => adminRoles.has(role));
   const canManageStaff = canCreateEvent;
-  const canUseOfflineScreening = roles.includes('SCREENER') && !roles.includes('ADMINISTRATOR');
-  const eventManagementMatch = location.pathname.match(/^\/events\/([^/]+)(?:\/(overview|stations|staff|analytics|reports|attendees|activity))?$/);
+  const canUseOfflineScreening = !roles.includes('ADMINISTRATOR');
+  const eventManagementMatch = location.pathname.match(/^\/events\/([^/]+)(?:\/(overview|stations|shifts|staff|analytics|reports|attendees|activity))?$/);
   const stationWorkflowMatch = location.pathname.match(/^\/events\/([^/]+)\/stations\/(visual-acuity|refraction|colour-vision|custom\/[^/]+)$/);
   const eventDetailMatch = location.pathname.match(/^\/events\/([^/]+)$/);
   const offlineEventId = stationWorkflowMatch?.[1]
@@ -52,6 +52,7 @@ export default function AppShell({ children }: { children: ReactNode }) {
 
         <nav className="workspace-primary-nav" aria-label="Primary navigation">
           <NavLink to="/events" className={({ isActive }) => isActive ? 'active' : undefined}><CalendarDaysIcon aria-hidden="true" />Events</NavLink>
+          {canManageEvents && <NavLink to="/operations" className={({ isActive }) => isActive ? 'active' : undefined}><SignalIcon aria-hidden="true" />Operations</NavLink>}
           {canManageEvents && <NavLink to="/reports" className={({ isActive }) => isActive ? 'active' : undefined}><ChartBarSquareIcon aria-hidden="true" />Reports</NavLink>}
           {canManageStaff && <NavLink to="/staff" className={({ isActive }) => isActive ? 'active' : undefined}><UserGroupIcon aria-hidden="true" />Staff</NavLink>}
           {canManageStaff && <NavLink to="/admin/station-templates" className={({ isActive }) => isActive ? 'active' : undefined}><Squares2X2Icon aria-hidden="true" />Stations</NavLink>}
@@ -84,6 +85,7 @@ export default function AppShell({ children }: { children: ReactNode }) {
 
       <nav className="workspace-mobile-dock" aria-label="Mobile navigation">
         <NavLink to="/events" aria-label="Events"><CalendarDaysIcon aria-hidden="true" /></NavLink>
+        {canManageEvents && <NavLink to="/operations" aria-label="Operations"><SignalIcon aria-hidden="true" /></NavLink>}
         {canManageEvents && <NavLink to="/reports" aria-label="Reports"><ChartBarSquareIcon aria-hidden="true" /></NavLink>}
         {canManageStaff && <NavLink to="/staff" aria-label="Staff"><UserGroupIcon aria-hidden="true" /></NavLink>}
         {canManageStaff && <NavLink to="/admin/station-templates" aria-label="Stations"><Squares2X2Icon aria-hidden="true" /></NavLink>}

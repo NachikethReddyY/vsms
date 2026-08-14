@@ -51,6 +51,7 @@ const routeOverrideBody = z.object({
   stationIds: z.array(z.string().uuid()).min(1).max(100),
   reasonCode: routeOverrideReasonCode,
   expectedVersion: z.number().int().positive(),
+  skipActive: z.boolean().optional(),
 }).strict().superRefine(({ stationIds }, ctx) => {
   if (new Set(stationIds).size !== stationIds.length) {
     ctx.addIssue({

@@ -1,9 +1,9 @@
-import { ArrowLeftIcon, ClipboardDocumentCheckIcon } from "@heroicons/react/24/outline";
-import { useCallback, useEffect, useState, type Dispatch, type FormEvent, type SetStateAction } from "react";
+import { ArrowLeftIcon } from "@heroicons/react/24/outline";
+import { useEffect, useState, type Dispatch, type FormEvent, type SetStateAction } from "react";
 import { Link, useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { PhoneInput } from "../../components/PhoneInput";
 import { Field, FormErrorSummary, LoadingState, TextInput } from "../../components/ui";
-import type { ConsentFormVersion, Participant, RegistrationHistory } from "../../types";
+import type { Participant, RegistrationHistory } from "../../types";
 import apiClient, { getApiError } from "../../utils/apiClient";
 import { isValidParticipantPhoneNumber } from "../../utils/phone";
 import "./ParticipantPage.css";
@@ -24,15 +24,6 @@ type ParticipantFormState = {
   preferredLanguage: string;
   accessibilityNotes: string;
   status: string;
-};
-
-type ConsentRecord = {
-  id: string;
-  consentStatus: string;
-  createdAt: string;
-  event: { eventName: string };
-  consentFormVersion: ConsentFormVersion;
-  withdrawals: Array<{ id: string; consentStatus: string }>;
 };
 
 const emptyParticipantForm: ParticipantFormState = {
@@ -58,7 +49,6 @@ const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 function displayStatus(value: string) {
   return value.toLowerCase().split("_").map((word) => word.charAt(0).toUpperCase() + word.slice(1)).join(" ");
 }
-
 function participantFormError(form: ParticipantFormState) {
   if (!form.firstName.trim() || !form.lastName.trim()) return "First name and last name are required.";
   if (!form.dateOfBirth) return "Date of birth is required.";
@@ -66,7 +56,6 @@ function participantFormError(form: ParticipantFormState) {
   if (form.email.trim() && !emailPattern.test(form.email.trim())) return "Enter a valid email address.";
   return null;
 }
-
 function BackLink({ to, label }: { to: string; label: string }) {
   return <Link className="participant-v2-back" to={to}><ArrowLeftIcon /> {label}</Link>;
 }
@@ -199,38 +188,5 @@ export function RegistrationHistoryPage() {
       .then((response) => setHistory(response.data.history ?? []))
       .catch((requestError: unknown) => setError(getApiError(requestError, "Unable to load registration history.")));
   }, [registrationId]);
-  return <section className="participant-v2-page"><BackLink to={backLink} label={eventId ? "Back to event registration" : "Back to events"} /><h1>Registration history</h1><FormErrorSummary error={error} /><div className="space-y-3">{history.map((item) => <article key={item.id} className="rounded-xl border bg-white p-4"><p className="font-semibold">{item.fromStatus ? displayStatus(item.fromStatus) : "New"} to {displayStatus(item.toStatus)}</p><p className="text-sm text-slate-600">{new Date(item.occurredAt).toLocaleString()} - {item.changedBy?.fullName ?? "Staff"} - {item.reason ?? "No reason recorded"}</p></article>)}</div></section>;
-}
-
-export function ParticipantConsentsPage() {
-  const { participantId = "" } = useParams();
-  const [searchParams] = useSearchParams();
-  const eventId = searchParams.get("eventId") ?? "";
-  const participantLink = `/participants/${participantId}${eventId ? `?eventId=${encodeURIComponent(eventId)}` : ""}`;
-  const [consents, setConsents] = useState<ConsentRecord[]>([]);
-  const [reason, setReason] = useState<Record<string, string>>({});
-  const [error, setError] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
-  const load = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const response = await apiClient.get(`/participants/${participantId}/consents`);
-      setConsents(response.data.consents ?? []);
-    } catch (requestError: unknown) {
-      setError(getApiError(requestError, "Unable to load consent history."));
-    } finally {
-      setLoading(false);
-    }
-  }, [participantId]);
-  useEffect(() => { void load(); }, [load]);
-  async function withdraw(consentId: string) {
-    try {
-      await apiClient.post(`/participants/${participantId}/consents/${consentId}/withdraw`, { withdrawalReason: reason[consentId] });
-      await load();
-    } catch (requestError: unknown) {
-      setError(getApiError(requestError, "Unable to withdraw consent."));
-    }
-  }
-  return <section className="participant-v2-page"><BackLink to={participantLink} label="Back to participant profile" /><h1>Consent history</h1><FormErrorSummary error={error} />{loading ? <LoadingState label="Loading consent history..." /> : <div className="space-y-3">{consents.map((consent) => { const withdrawn = consent.withdrawals.some((item) => item.consentStatus === "WITHDRAWN"); return <article key={consent.id} className="rounded-xl border bg-white p-4"><p className="font-semibold">{consent.event.eventName} - {displayStatus(consent.consentStatus)}</p><p className="text-sm">Version {consent.consentFormVersion.versionNumber} - {new Date(consent.createdAt).toLocaleString()}</p>{consent.consentStatus === "ACCEPTED" && !withdrawn ? <div className="mt-3 flex gap-2"><TextInput placeholder="Withdrawal reason" value={reason[consent.id] ?? ""} onChange={(event) => setReason((current) => ({ ...current, [consent.id]: event.target.value }))} /><button className="secondary" disabled={!reason[consent.id]?.trim()} onClick={() => void withdraw(consent.id)}>Withdraw</button></div> : withdrawn ? <p className="mt-2 text-sm text-amber-700">Withdrawn; original evidence preserved.</p> : null}</article>; })}{!consents.length ? <section className="registration-panel no-match-panel"><ClipboardDocumentCheckIcon /><p>No consent recorded yet.</p></section> : null}</div>}</section>;
+  return <section className="participant-v2-page"><BackLink to={backLink} label={eventId ? "Back to event registration" : "Back to events"} /><h1>Registration history</h1><FormErrorSummary error={error} /><div className="space-y-3">{history.map((item) => <article key={item.id} className="rounded-xl border border-[var(--hairline)] bg-[var(--surface)] p-4"><p className="font-semibold">{item.fromStatus ? displayStatus(item.fromStatus) : "New"} to {displayStatus(item.toStatus)}</p><p className="text-sm text-[var(--ink-2)]">{new Date(item.occurredAt).toLocaleString()} - {item.changedBy?.fullName ?? "Staff"} - {item.reason ?? "No reason recorded"}</p></article>)}</div></section>;
 }

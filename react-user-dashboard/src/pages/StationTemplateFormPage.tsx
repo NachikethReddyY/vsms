@@ -2,7 +2,7 @@ import { ArrowLeftIcon } from '@heroicons/react/24/outline';
 import { useCallback, useEffect, useState, type FormEvent } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { AppToast } from '../components/AppToast';
-import { validateFieldSchema, clinicalLockedKeys, type DynamicFieldValues, type FieldSchema } from '../features/screening/fieldSchema';
+import { defaultValuesForSchema, validateFieldSchema, clinicalLockedKeys, type DynamicFieldValues, type FieldSchema } from '../features/screening/fieldSchema';
 import { StationFieldBuilder, StationFieldRenderer } from '../features/screening/StationFieldRenderer';
 import apiClient, { getApiError } from '../utils/apiClient';
 import {
@@ -39,6 +39,23 @@ const blankCreateForm = (): FormState => ({
   fieldSchema: blankCustomFieldSchema(),
 });
 
+const colourVisionExample = (): FormState => ({
+  name: 'Colour vision screening',
+  description: 'Record Ishihara plate results and flag reduced colour discrimination.',
+  defaultCapacity: 10,
+  active: true,
+  fieldSchema: [
+    { key: 'platesPresented', label: 'Plates presented', type: 'number', required: true, min: 1, max: 24 },
+    { key: 'platesCorrect', label: 'Plates correct', type: 'number', required: true, min: 0, max: 24, flagRules: [
+      { op: 'lte', value: 12, flag: 'REFER', reason: 'Low Ishihara plate score' },
+      { op: 'lte', value: 16, flag: 'REVIEW', reason: 'Borderline Ishihara plate score' },
+    ] },
+    { key: 'notes', label: 'Notes', type: 'text', required: false, flagRules: [
+      { op: 'includes', value: 'unable', flag: 'REVIEW', reason: 'Participant was unable to complete the test' },
+    ] },
+  ],
+});
+
 function formFromTemplate(template: StationTemplateRecord): FormState {
   return {
     name: template.name,
@@ -58,7 +75,7 @@ export default function StationTemplateFormPage({ mode }: { mode: Mode }) {
   const [error, setError] = useState('');
   const [loadError, setLoadError] = useState('');
   const [notice, setNotice] = useState('');
-  const [previewValues, setPreviewValues] = useState<DynamicFieldValues>({});
+  const [previewValues, setPreviewValues] = useState<DynamicFieldValues>(() => defaultValuesForSchema(blankCreateForm().fieldSchema));
   const [editingMeta, setEditingMeta] = useState<EditingMeta | null>(null);
 
   const fieldsEditable = mode === 'create' || usesEditableFieldSchema(editingMeta?.stationType);
@@ -82,7 +99,7 @@ export default function StationTemplateFormPage({ mode }: { mode: Mode }) {
           templateKey: template.templateKey,
           version: template.version,
         });
-        setLoadError('Registration, clinical review, and eye health are not managed in the station library.');
+        setLoadError('Registration and clinical review are not managed in the station library.');
         return;
       }
       setEditingMeta({
@@ -91,7 +108,7 @@ export default function StationTemplateFormPage({ mode }: { mode: Mode }) {
         version: template.version,
       });
       setForm(formFromTemplate(template));
-      setPreviewValues({});
+      setPreviewValues(defaultValuesForSchema(template.fieldSchema?.length ? template.fieldSchema : blankCustomFieldSchema()));
     } catch (cause) {
       setLoadError(getApiError(cause, 'Station template could not be loaded.'));
     } finally {
@@ -191,7 +208,7 @@ export default function StationTemplateFormPage({ mode }: { mode: Mode }) {
           {mode === 'edit' && editingMeta && (
             <label className="station-template-field">
               <span>Station type</span>
-              <input disabled value={labelStationType(editingMeta.stationType, editingMeta.templateKey)} />
+              <input disabled value={labelStationType(editingMeta.stationType)} />
             </label>
           )}
           <label className="station-template-field">
@@ -244,15 +261,16 @@ export default function StationTemplateFormPage({ mode }: { mode: Mode }) {
         <section className="station-template-section" aria-labelledby="station-fields-title">
           <div className="station-template-section-copy">
             <h2 id="station-fields-title">Form fields</h2>
-            <p>Define the inputs screeners fill at this station. The schema is frozen onto an event when imported.</p>
+            <p>Define the inputs screeners fill at this station. Add flag rules on custom fields so matching values raise REVIEW / REFER / URGENT.</p>
           </div>
           <div className="station-template-section-body">
+            {mode === 'create' && <div className="station-template-example"><div><strong>Need test data?</strong><span>Load a complete Colour Vision example with three fields and three flag rules.</span></div><button className="secondary compact" type="button" onClick={() => { const example = colourVisionExample(); setForm(example); setPreviewValues(defaultValuesForSchema(example.fieldSchema)); setError(''); }}>Use example</button></div>}
             <StationFieldBuilder
               fieldSchema={form.fieldSchema}
               lockedKeys={lockedFieldKeys}
               onChange={(fieldSchema) => {
                 setForm((current) => ({ ...current, fieldSchema }));
-                setPreviewValues({});
+                setPreviewValues(defaultValuesForSchema(fieldSchema));
               }}
               disabled={saving}
             />
@@ -261,8 +279,8 @@ export default function StationTemplateFormPage({ mode }: { mode: Mode }) {
 
         <section className="station-template-section" aria-labelledby="station-preview-title">
           <div className="station-template-section-copy">
-            <h2 id="station-preview-title">Preview</h2>
-            <p>Check how the screener form will look before saving.</p>
+            <h2 id="station-preview-title">Live preview</h2>
+            <p>Try the exact controls screeners will use. Values here are only examples and are not saved.</p>
           </div>
           <div className="station-template-section-body">
             <div className="station-field-preview">

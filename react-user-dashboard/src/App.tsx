@@ -12,7 +12,9 @@ import EventFormPage from "./features/events/EventFormPage";
 import PublicEventPage from "./features/events/PublicEventPage";
 import ReviewWorkspacePage from "./features/reviews/ReviewWorkspacePage";
 import ReportsPage from "./features/reports/ReportsPage";
+import OperationsCenterPage from "./features/operations/OperationsCenterPage";
 import DynamicStationPage from "./features/screening/DynamicStationPage";
+import EyeHealthStationPage from "./features/screening/EyeHealthStationPage";
 import QRScannerPage from "./features/screening/QRScannerPage";
 import { AuditLogsPage as RegistrationAuditLogsPage } from "./pages/AdminPages";
 import {
@@ -34,7 +36,6 @@ import StationTemplateFormPage from "./pages/StationTemplateFormPage";
 import { QueuePage } from "./pages/QueuePages"; // Imported the QueuePage component
 import EventRegistrationPage from "./pages/participant/EventRegistrationPage";
 import ParticipantCheckInPage from "./pages/participant/ParticipantCheckInPage";
-import ParticipantConsentPage from "./pages/participant/ParticipantConsentPage";
 import ParticipantCreatePage from "./pages/participant/ParticipantCreatePage";
 import ParticipantEmergencyContactsPage from "./pages/participant/ParticipantEmergencyContactsPage";
 import ParticipantProfilePage from "./pages/participant/ParticipantProfilePage";
@@ -42,7 +43,6 @@ import ParticipantQrPage from "./pages/participant/ParticipantQrPage";
 import ParticipantRegistrationPage from "./pages/participant/ParticipantRegistrationPage";
 import ParticipantStatusPage from "./pages/participant/ParticipantStatusPage";
 import {
-  ParticipantConsentsPage,
   ParticipantEditPage,
   RegistrationHistoryPage,
 } from './pages/participant/ParticipantPages';
@@ -50,8 +50,10 @@ import {
 const adminRoles = ["ADMINISTRATOR"];
 const eventManagerRoles = ["ADMINISTRATOR", "EVENT_MANAGER"];
 const registrationRoles = ["REGISTRATION_OFFICER"];
+const queueRoles = ["ADMINISTRATOR", "EVENT_MANAGER", "REGISTRATION_OFFICER"];
 const screenerRoles = ["SCREENER"];
 const reviewerRoles = ["REVIEWER"];
+const eventMemberRoles = ["ADMINISTRATOR", "EVENT_MANAGER", "REGISTRATION_OFFICER", "SCREENER", "REVIEWER", "SUPPORT"];
 
 function EventWorkspace() {
   return <AppShell><Outlet /></AppShell>;
@@ -68,9 +70,9 @@ function LegacyEventRegistrationRedirect() {
   return <Navigate to={`/events/${eventId}`} replace />;
 }
 
-function LegacyParticipantStepRedirect({ step }: { step: "consent" | "register" }) {
+function LegacyParticipantStepRedirect() {
   const { eventId = "", participantId = "" } = useParams();
-  return <Navigate to={`/participants/${participantId}/${step}?eventId=${encodeURIComponent(eventId)}`} replace />;
+  return <Navigate to={`/participants/${participantId}/register?eventId=${encodeURIComponent(eventId)}`} replace />;
 }
 
 function LegacyParticipantHistoryRedirect() {
@@ -83,12 +85,6 @@ function LegacyRegistrationRedirect({ destination }: { destination: "history" | 
   const { registrationId = "" } = useParams();
   if (destination === "search") return <Navigate to="/events" replace />;
   return <Navigate to={`/participants/registrations/${registrationId}/${destination}`} replace />;
-}
-
-/** Eye health is clinician-review only — legacy screener URLs return to the event. */
-function EyeHealthStationRedirect() {
-  const { eventId = "" } = useParams();
-  return <Navigate to={`/events/${eventId}`} replace />;
 }
 
 export default function App() {
@@ -110,12 +106,17 @@ export default function App() {
           <Route path="/account/security" element={<AccountSecurityPage />} />
           <Route path="/forbidden" element={<ForbiddenPage />} />
           <Route path="/events/:eventId" element={<EventDetailPage />} />
+          <Route path="/qr-scanner" element={<QRScannerPage />} />
           <Route path="/settings" element={<SettingsPage />} />
+
+          <Route element={<EventCapabilityGuard allowedRoles={eventMemberRoles} />}>
+            <Route path="/events/:eventId/staff" element={<EventStaffingPage />} />
+          </Route>
 
           <Route element={<EventCapabilityGuard allowedRoles={eventManagerRoles} />}>
             <Route path="/events/:eventId/overview" element={<EventDetailPage />} />
             <Route path="/events/:eventId/stations" element={<EventDetailPage />} />
-            <Route path="/events/:eventId/staff" element={<EventStaffingPage />} />
+            <Route path="/events/:eventId/shifts" element={<EventDetailPage />} />
             <Route path="/events/:eventId/staff/:membershipId/duties" element={<DutyEditorPage />} />
             <Route path="/events/:eventId/analytics" element={<EventAnalyticsPage />} />
             <Route path="/events/:eventId/reports" element={<EventReportsPage />} />
@@ -138,14 +139,17 @@ export default function App() {
             <Route element={<StationDutyGuard stationType="COLOUR_VISION" />}>
               <Route path="/events/:eventId/stations/colour-vision" element={<DynamicStationPage stationType="COLOUR_VISION" />} />
             </Route>
-            <Route path="/events/:eventId/stations/eye-health" element={<EyeHealthStationRedirect />} />
+            <Route element={<StationDutyGuard stationType="EYE_HEALTH" />}>
+              <Route path="/events/:eventId/stations/eye-health" element={<EyeHealthStationPage />} />
+            </Route>
             <Route element={<StationDutyGuard stationType="CUSTOM" />}>
               <Route path="/events/:eventId/stations/custom/:stationId" element={<DynamicStationPage />} />
             </Route>
-            <Route path="/qr-scanner" element={<QRScannerPage />} />
+            <Route path="/events/:eventId/qr-scanner" element={<QRScannerPage />} />
           </Route>
 
           <Route element={<RoleGuard allowedRoles={eventManagerRoles} />}>
+            <Route path="/operations" element={<OperationsCenterPage />} />
             <Route path="/reports" element={<ReportsPage />} />
           </Route>
 
@@ -153,17 +157,18 @@ export default function App() {
             <Route path="/events/:eventId/edit" element={<EventFormPage mode="edit" />} />
           </Route>
 
-          <Route element={<EventCapabilityGuard allowedRoles={registrationRoles} />}>
+          <Route element={<EventCapabilityGuard allowedRoles={queueRoles} />}>
             <Route path="/events/:eventId/queue" element={<QueuePage />} />
+          </Route>
+
+          <Route element={<EventCapabilityGuard allowedRoles={registrationRoles} />}>
             <Route path="/events/qr-pass/:registrationId" element={<QRCodePage />} />
             <Route path="/qr-generator" element={<QRCodePage />} />
             <Route path="/participants" element={<Navigate to="/events" replace />} />
             <Route path="/participants/new" element={<ParticipantCreatePage />} />
             <Route path="/participants/:participantId/edit" element={<ParticipantEditPage />} />
-            <Route path="/participants/:participantId/consents" element={<ParticipantConsentsPage />} />
             <Route path="/participants/:participantId/emergency-contacts" element={<ParticipantEmergencyContactsPage />} />
             <Route path="/participants/:participantId/register" element={<ParticipantRegistrationPage />} />
-            <Route path="/participants/:participantId/consent" element={<ParticipantConsentPage />} />
             <Route path="/participants/:participantId/check-in" element={<ParticipantCheckInPage />} />
             <Route path="/participants/registrations/:registrationId/history" element={<RegistrationHistoryPage />} />
             <Route path="/participants/registrations/:registrationId/qr" element={<ParticipantQrPage />} />
@@ -173,10 +178,8 @@ export default function App() {
             <Route path="/participants/search" element={<LegacySearchRedirect />} />
             <Route path="/events/:eventId/register" element={<EventRegistrationPage />} />
             <Route path="/events/:eventId/registrations" element={<LegacyEventRegistrationRedirect />} />
-            <Route path="/events/:eventId/participants/:participantId/consent" element={<LegacyParticipantStepRedirect step="consent" />} />
-            <Route path="/events/:eventId/participants/:participantId/review" element={<LegacyParticipantStepRedirect step="register" />} />
+            <Route path="/events/:eventId/participants/:participantId/review" element={<LegacyParticipantStepRedirect />} />
             <Route path="/registrations/:registrationId/review" element={<LegacyRegistrationRedirect destination="search" />} />
-            <Route path="/registrations/:registrationId/consent" element={<LegacyRegistrationRedirect destination="search" />} />
             <Route path="/registrations/:registrationId/confirmation" element={<LegacyRegistrationRedirect destination="search" />} />
             <Route path="/registrations/:registrationId/history" element={<LegacyRegistrationRedirect destination="history" />} />
             <Route path="/registrations/:registrationId/qr" element={<LegacyRegistrationRedirect destination="qr" />} />

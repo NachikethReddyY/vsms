@@ -66,8 +66,7 @@ test("schema contains all required registration module tables", () => {
     const schema = read("prisma/schema.prisma");
     for (const model of [
         "User", "Role", "Permission", "UserRole", "RolePermission", "AuthAuditLog",
-        "Participant", "ParticipantEmergencyContact", "ConsentFormVersion",
-        "ParticipantConsent", "Event", "EventRegistration", "RegistrationStatusHistory",
+        "Participant", "ParticipantEmergencyContact", "Event", "EventRegistration", "RegistrationStatusHistory",
         "AuditLog", "Device",
     ]) {
         assert.match(schema, new RegExp(`model ${model}\\s*\\{`), `missing ${model}`);
@@ -80,14 +79,15 @@ test("API routes expose the required versioned contracts", () => {
     const events = read("routes/eventRoutes.js");
     const registrations = read("routes/registrationRoutes.js");
     const auth = read("routes/authRoutes.js");
-    assert.match(app, /"\/api\/v1\/consent-forms"/);
+    assert.doesNotMatch(app, /"\/api\/v1\/consent-forms"/);
     assert.match(app, /"\/api\/v1\/emergency-contacts"/);
     assert.match(participants, /"\/:participantId\/registrations"/);
-    assert.match(participants, /"\/:participantId\/consents"/);
+    assert.doesNotMatch(participants, /"\/:participantId\/consents"/);
     assert.match(events, /"\/:eventId\/registrations"/);
     assert.match(events, /"\/active"/);
     assert.ok(events.indexOf('"/active"') < events.indexOf('"/:eventId"'), "active events route must precede the dynamic event route");
     assert.match(registrations, /"\/:registrationId\/history"/);
+    assert.doesNotMatch(read("controllers/registrationController.js"), /consentAcknowledged/);
     for (const route of ["/authorize", "/callback", "/logout", "/refresh", "/me"]) {
         assert.ok(auth.includes(`"${route}"`), `missing auth route ${route}`);
     }
@@ -96,7 +96,7 @@ test("API routes expose the required versioned contracts", () => {
 
 test("school API map records the actual Cognito, PATCH, and event-scoped contract", () => {
     const document = YAML.parse(read("docs/openapi.yaml"));
-    const map = fs.readFileSync(path.resolve(backendRoot, "../docs/api-contract-mapping.md"), "utf8");
+    const map = fs.readFileSync(path.resolve(backendRoot, "../docs/03-Architecture/api-contract-mapping.md"), "utf8");
     assert.ok(document.paths["/api/v1/auth/authorize"].get);
     assert.ok(document.paths["/api/v1/events/{eventId}"].patch);
     assert.ok(document.paths["/api/v1/participants/{participantId}"].patch);
@@ -143,17 +143,35 @@ test("account contracts allow composed runtime fields and document provider main
     assert.ok(document.paths["/api/v1/users"].post.responses["202"]);
 });
 
-test("registration service creates registration, history and audit together", () => {
+test("registration service delegates atomic registration work to stored functions", () => {
     const controller = read("controllers/registrationController.js");
     const service = read("services/participant/registrationService.js");
+    const qrService = read("services/participant/qrService.js");
+    const repository = read("services/participant/registrationRoutineRepository.js");
+    const migration = read("prisma/migrations/20260813150100_add_registration_stored_functions/migration.sql");
+    const consentRemoval = read("prisma/migrations/20260813170000_remove_registration_consent_acknowledgement/migration.sql");
     const transactionBody = service.slice(service.indexOf("db.$transaction"));
-    assert.match(transactionBody, /eventRegistration\.create/);
-    assert.match(transactionBody, /registrationStatusHistory\.create/);
+    assert.match(transactionBody, /registrationRoutines\.registerParticipant/);
+    assert.match(service, /registrationRoutines\.cancelRegistration/);
+    assert.match(qrService, /registrationRoutines\.checkInRegistration/);
+    assert.match(service, /registrationRoutines\.getEventSummary/);
+    assert.match(repository, /register_participant_for_event/);
+    assert.match(repository, /cancel_event_registration/);
+    assert.match(repository, /check_in_event_registration/);
+    assert.match(repository, /get_event_registration_summary/);
     assert.match(transactionBody, /createAuditLog/);
-    assert.match(transactionBody, /isolationLevel:\s*"Serializable"/);
+    assert.match(transactionBody, /isolationLevel:\s*"ReadCommitted"/);
     assert.match(service, /DUPLICATE_REGISTRATION_BLOCKED/);
     assert.match(controller, /registrationService\.createRegistration/);
+    assert.match(controller, /registrationService\.getEventRegistrationSummary/);
     assert.doesNotMatch(controller, /prisma/);
+    assert.match(migration, /CREATE OR REPLACE FUNCTION "register_participant_for_event"/);
+    assert.match(migration, /CREATE OR REPLACE FUNCTION "cancel_event_registration"/);
+    assert.match(migration, /CREATE OR REPLACE FUNCTION "check_in_event_registration"/);
+    assert.match(migration, /CREATE OR REPLACE FUNCTION "get_event_registration_summary"/);
+    assert.match(migration, /registration_status_history/);
+    assert.match(consentRemoval, /DROP COLUMN IF EXISTS consent_acknowledged/);
+    assert.doesNotMatch(consentRemoval, /p_consent_acknowledged/);
 });
 
 test("migration preserves history and enforces one active primary contact", () => {
@@ -198,10 +216,11 @@ test("listStationTemplates reads active StationTemplate rows", () => {
     assert.doesNotMatch(body, /return\s+\[\];/);
 });
 
-test("importStations and updateStation use Prisma Station not EventStation", () => {
+test("event station mutations use Prisma Station not EventStation", () => {
     const source = read("services/event/eventService.js");
     assert.match(source, /const importStations = async/);
     assert.match(source, /const updateStation = async/);
+    assert.match(source, /const removeStation = async/);
     assert.doesNotMatch(source, /STATION_TEMPLATES_NOT_AVAILABLE/);
     assert.doesNotMatch(source, /tx\.eventStation\./);
     const importFn = source.slice(source.indexOf("const importStations = async"));
@@ -213,6 +232,11 @@ test("importStations and updateStation use Prisma Station not EventStation", () 
     const updateBody = updateFn.slice(0, updateFn.indexOf("\nconst addStaffAssignment"));
     assert.match(updateBody, /tx\.station\.update/);
     assert.match(updateBody, /isActive:\s*body\.isAvailable/);
+    const removeFn = source.slice(source.indexOf("const removeStation = async"));
+    const removeBody = removeFn.slice(0, removeFn.indexOf("\nconst addStaffAssignment"));
+    assert.match(removeBody, /STATION_IN_USE/);
+    assert.match(removeBody, /eventStationAvailability\.deleteMany/);
+    assert.match(removeBody, /station\.delete/);
 });
 
 test("station template mapping imports the explicit screening stationType", () => {
@@ -226,8 +250,8 @@ test("station template mapping imports the explicit screening stationType", () =
         { templateKey: "CLINICAL_REVIEW", stationType: null, name: "Clinical review" },
         { templateKey: "opaque-2", stationType: "EYE_HEALTH", name: "Eye health" },
     ]);
-    assert.deepEqual(importable.map(({ stationType }) => stationType), ["VISUAL_ACUITY"]);
-    assert.deepEqual(skipped.map((template) => template.templateKey), ["REGISTRATION", "CLINICAL_REVIEW", "opaque-2"]);
+    assert.deepEqual(importable.map(({ stationType }) => stationType), ["VISUAL_ACUITY", "EYE_HEALTH"]);
+    assert.deepEqual(skipped.map((template) => template.templateKey), ["REGISTRATION", "CLINICAL_REVIEW"]);
 });
 
 test("participant search matches any supplied identifier", () => {
@@ -320,11 +344,12 @@ test("manual queue movement endpoints are retired while station status remains d
     assert.match(openapi, /operationalStatus: \{ \$ref: "#\/components\/schemas\/StationOperationalStatus" \}/);
 });
 
-test("seed creates VA / refraction / colour vision Station rows", () => {
+test("seed creates all four screening Station rows", () => {
     const seed = read("prisma/seed.js");
     assert.match(seed, /\["VISUAL_ACUITY"/);
     assert.match(seed, /\["REFRACTION"/);
     assert.match(seed, /\["COLOUR_VISION"/);
+    assert.match(seed, /\["EYE_HEALTH"/);
     assert.match(seed, /Live event stations/);
 });
 

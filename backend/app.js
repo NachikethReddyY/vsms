@@ -13,7 +13,7 @@ const helmet = require("helmet");
 const cookieParser = require("cookie-parser");
 const swaggerUi = require("swagger-ui-express");
 const YAML = require("yaml");
-
+const db = require("./config/db");
 const { rateLimit } = require("./middlewares/rateLimiter");
 
 // Environment Configuration & Error Handling
@@ -40,11 +40,11 @@ const screeningRoutes = require("./routes/screeningRoutes");
 const participantRoutes = require("./routes/participantRoutes");
 const registrationRoutes = require("./routes/registrationRoutes");
 const adminRoutes = require("./routes/adminRoutes");
-const consentRoutes = require("./routes/consentRoutes");
 const emergencyContactRoutes = require("./routes/emergencyContactRoutes");
 const signatureRoutes = require("./routes/signatureRoutes");
 const providerEventRoutes = require("./routes/providerEventRoutes");
 const queueRoutes = require("./routes/queueRoutes");
+const operationsRoutes = require("./routes/operationsRoutes");
 
 // Dashboard
 const dashboardRoutes = require("./routes/dashboardRoutes");
@@ -191,6 +191,15 @@ const qrLimiter = rateLimit({
     name: "qr",
     windowMs: 60000,
     limit: 30,
+    skip: (req) => req.method === "GET" && req.path.startsWith("/public-status/"),
+    standardHeaders: "draft-8",
+    legacyHeaders: false,
+});
+
+const publicQrStatusIpLimiter = rateLimit({
+    name: "qr-public-status-ip",
+    windowMs: 60000,
+    limit: 10000,
     standardHeaders: "draft-8",
     legacyHeaders: false,
 });
@@ -250,12 +259,42 @@ app.get("/favicon.ico", (_req, res) => {
 });
 
 app.get("/health", (_req, res) => {
-    res.json({
-        status: "ok",
-        environment: env.isProduction
-            ? "production"
-            : "development",
+  return res.status(200).json({
+    status: "ok",
+    environment: env.isProduction
+      ? "production"
+      : "development",
+    timestamp: new Date().toISOString(),
+  });
+});
+
+app.get("/ready", async (_req, res) => {
+  try {
+    await db.query("SELECT 1");
+
+    return res.status(200).json({
+      status: "ready",
+      database: "connected",
+      environment: env.isProduction
+        ? "production"
+        : "development",
+      timestamp: new Date().toISOString(),
     });
+  } catch (error) {
+    logger.error("readiness_check_failed", {
+      event: "readiness_check_failed",
+      message: error.message,
+    });
+
+    return res.status(503).json({
+      status: "not_ready",
+      database: "disconnected",
+      environment: env.isProduction
+        ? "production"
+        : "development",
+      timestamp: new Date().toISOString(),
+    });
+  }
 });
 
 /**
@@ -321,15 +360,16 @@ app.use("/api/v1/users", userRoutes);
 app.use("/api/v1/locations", locationRoutes);
 app.use("/api/v1/participants", participantRoutes);
 app.use("/api/v1/registrations", registrationRoutes);
-app.use("/api/v1/consent-forms", consentRoutes);
 app.use("/api/v1/emergency-contacts", emergencyContactRoutes);
 app.use("/api/v1/signatures", signatureRoutes);
 app.use("/api/v1/admin", adminRoutes);
 
 // Dashboard
 app.use("/api/v1/dashboard", dashboardRoutes);
+app.use("/api/v1/operations", operationsRoutes);
 
 // QR Routes
+app.use("/api/v1/qr/public-status", publicQrStatusIpLimiter);
 app.use("/api/v1/qr", qrLimiter, qrRoutes);
 
 // Event & Screening Routes

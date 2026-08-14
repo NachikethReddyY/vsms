@@ -1,0 +1,7 @@
+export const appDialog = {
+  form: 'app-dialog-form grid gap-3.5',
+  field: 'app-dialog-field grid gap-1.5 [&>span]:text-xs [&>span]:font-bold [&>span]:text-[var(--ink-2)] [&_input]:min-h-11 [&_input]:w-full [&_input]:rounded-lg [&_input]:border [&_input]:border-[var(--line-strong,var(--hairline-strong))] [&_input]:bg-[var(--surface)] [&_input]:px-3 [&_input]:py-2.5 [&_input]:text-base [&_input]:leading-5 [&_input]:text-[var(--ink)] [&_input]:outline-0 [&_input:focus]:border-[var(--accent)] [&_input:focus]:shadow-[0_0_0_3px_var(--accent-tint)] [&_textarea]:min-h-27 [&_textarea]:w-full [&_textarea]:resize-y [&_textarea]:rounded-lg [&_textarea]:border [&_textarea]:border-[var(--line-strong,var(--hairline-strong))] [&_textarea]:bg-[var(--surface)] [&_textarea]:px-3 [&_textarea]:py-2.5 [&_textarea]:text-base [&_textarea]:leading-5 [&_textarea]:text-[var(--ink)] [&_textarea]:outline-0 [&_textarea:focus]:border-[var(--accent)] [&_textarea:focus]:shadow-[0_0_0_3px_var(--accent-tint)]',
+  help: 'app-dialog-help -mt-1.5 mb-0 text-xs leading-4.5 text-[var(--muted)]',
+  error: 'app-dialog-error m-0 rounded-lg border border-[color-mix(in_srgb,var(--red)_40%,var(--hairline))] bg-[color-mix(in_srgb,var(--red)_9%,var(--surface))] px-3 py-2.5 text-xs leading-4.5 text-[var(--red)]',
+  actions: 'app-dialog-actions flex flex-wrap-reverse justify-end gap-2 pt-0.5 max-[520px]:[&>button]:flex-[1_1_8.75rem]',
+} as const;

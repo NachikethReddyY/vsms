@@ -9,6 +9,7 @@ import apiClient from '../../utils/apiClient';
 import {
   clearOfflineData,
   downloadOfflineEvent,
+  evaluateOfflineStation,
   getOfflineStationContext,
   getOfflineSyncStatus,
   purgeExpiredOfflineData,
@@ -22,6 +23,13 @@ const stationId = '33333333-3333-4333-8333-333333333333';
 const registrationId = '44444444-4444-4444-8444-444444444444';
 const expiry = '2099-08-05T09:00:00.000Z';
 const post = vi.mocked(apiClient.post);
+
+const vaFieldSchema = [
+  { key: 'chartDistanceMetres', label: 'Chart distance (m)', type: 'select', required: true, options: ['3', '6'] },
+  { key: 'od', label: 'Right eye (OD)', type: 'va-eye', required: true },
+  { key: 'os', label: 'Left eye (OS)', type: 'va-eye', required: true },
+  { key: 'withUsualDistanceGlasses', label: 'With usual distance glasses', type: 'select', required: true, options: ['yes', 'no', 'unknown'] },
+];
 
 type ActionResult = {
   clientActionId: string;
@@ -66,7 +74,8 @@ function response(actions: ActionResult[] = [], expiresAt = expiry) {
           stationType: 'VISUAL_ACUITY',
           stationOrder: 1,
           isActive: true,
-          fieldSchemaSnapshot: null,
+          fieldSchemaSnapshot: vaFieldSchema,
+          schemaVersion: 1,
           offlineAccessExpiresAt: expiresAt,
           registrations: [{
             registrationId,
@@ -82,7 +91,7 @@ function response(actions: ActionResult[] = [], expiresAt = expiry) {
   };
 }
 
-function saveBody() {
+function saveBody(overrides: Record<string, unknown> = {}) {
   return {
     registrationId,
     idempotencyKey: crypto.randomUUID(),
@@ -93,6 +102,22 @@ function saveBody() {
       os: { kind: 'FRACTION' as const, denominator: 6 },
       withUsualDistanceGlasses: true,
     },
+    ...overrides,
+  };
+}
+
+function dynamicSaveBody(overrides: Record<string, unknown> = {}) {
+  return {
+    registrationId,
+    idempotencyKey: crypto.randomUUID(),
+    acknowledged: false,
+    resultData: {
+      chartDistanceMetres: '6',
+      od: { kind: 'FRACTION' as const, denominator: 6 },
+      os: { kind: 'FRACTION' as const, denominator: 6 },
+      withUsualDistanceGlasses: 'unknown',
+    },
+    ...overrides,
   };
 }
 
@@ -133,10 +158,8 @@ describe('encrypted screening outbox', () => {
     expect(post.mock.calls[0][0]).toBe(`/events/${eventId}/sync/screening`);
     expect(post.mock.calls[0][1]).toMatchObject({ actions: [] });
     const context = await getOfflineStationContext(ownerId, eventId, 'VISUAL_ACUITY');
-    expect(context?.queue[0]).toMatchObject({
-      participantDisplayName: 'Encrypted Queue Person',
-      passToken: null,
-    });
+    expect(context?.queue[0]).toMatchObject({ participantDisplayName: 'Encrypted Queue Person' });
+    expect(context?.queue[0]).not.toHaveProperty('passToken');
 
     const records = await rawRecords();
     expect(records).toHaveLength(1);
@@ -144,16 +167,6 @@ describe('encrypted screening outbox', () => {
     expect(bytes).not.toContain('Encrypted Queue Person');
     expect(bytes).not.toContain('defensively-removed-pass-token');
     expect(bytes).not.toContain(registrationId);
-  });
-
-  it('normalizes a pre-upgrade offline pack before it enters page state', async () => {
-    const payload = response();
-    payload.data.pull.stations[0].fieldSchemaSnapshot = null;
-    post.mockResolvedValueOnce(payload);
-    await downloadOfflineEvent(ownerId, eventId);
-    const context = await getOfflineStationContext(ownerId, eventId, 'VISUAL_ACUITY');
-    expect(context?.station.fieldSchemaSnapshot?.some((field) => field.key === 'chartDistanceMetres')).toBe(true);
-    expect(context?.station.fieldSchemaSnapshot?.every((field) => typeof field.label === 'string' && field.label.length > 0)).toBe(true);
   });
 
   it('pushes a stable encrypted action through the batch API and clears it only when applied', async () => {
@@ -242,7 +255,7 @@ describe('encrypted screening outbox', () => {
     expect(await syncOfflineEvent(ownerId, eventId)).toMatchObject({ pending: 0, conflicts: 1, synced: 0, committedProgressions: [] });
   });
 
-  it('ignores eye-health stations in offline downloads because eye health is review-only', async () => {
+  it('includes assigned eye-health stations in encrypted offline downloads', async () => {
     const eyeStationId = '55555555-5555-4555-8555-555555555555';
     const vaStationId = '11111111-1111-4111-8111-111111111111';
     post.mockResolvedValueOnce({
@@ -264,7 +277,6 @@ describe('encrypted screening outbox', () => {
                 participantDisplayName: 'Encrypted Queue Person',
                 queueNumber: 1,
                 status: 'CHECKED_IN',
-                passToken: null,
                 existingResult: null,
               }],
             },
@@ -281,7 +293,6 @@ describe('encrypted screening outbox', () => {
                 participantDisplayName: 'Encrypted Queue Person',
                 queueNumber: 1,
                 status: 'CHECKED_IN',
-                passToken: null,
                 existingResult: null,
               }],
             },
@@ -291,7 +302,10 @@ describe('encrypted screening outbox', () => {
     });
     await downloadOfflineEvent(ownerId, eventId);
     expect(await getOfflineStationContext(ownerId, eventId, 'VISUAL_ACUITY')).toBeTruthy();
-    expect(await getOfflineStationContext(ownerId, eventId, 'EYE_HEALTH')).toBeNull();
+    expect(await getOfflineStationContext(ownerId, eventId, 'EYE_HEALTH')).toMatchObject({
+      station: { stationId: eyeStationId, stationType: 'EYE_HEALTH' },
+      queue: [expect.objectContaining({ registrationId })],
+    });
   });
 
   it('purges expired and logout-cleared encrypted data', async () => {
@@ -314,5 +328,85 @@ describe('encrypted screening outbox', () => {
     await downloadOfflineEvent(ownerId, eventId);
     await clearOfflineData();
     expect(await rawRecords()).toEqual([]);
+  });
+
+  it('keeps clinical VA flagging for dynamic-schema offline saves and syncs as VISUAL_ACUITY', async () => {
+    const urgent = evaluateOfflineStation('dynamic', {
+      chartDistanceMetres: '6',
+      od: { kind: 'EXCEPTION', code: 'NLP' },
+      os: { kind: 'FRACTION', denominator: 6 },
+      withUsualDistanceGlasses: 'unknown',
+    }, 'VISUAL_ACUITY');
+    expect(urgent).toMatchObject({ overallFlag: 'URGENT', isFlagged: true, ruleVersion: 'VSMS-VA-1.0' });
+
+    const normal = evaluateOfflineStation('dynamic', {
+      chartDistanceMetres: '6',
+      od: { kind: 'FRACTION', denominator: 6 },
+      os: { kind: 'FRACTION', denominator: 6 },
+      withUsualDistanceGlasses: 'no',
+    }, 'VISUAL_ACUITY');
+    expect(normal).toMatchObject({ overallFlag: 'NORMAL', isFlagged: false });
+
+    post.mockResolvedValueOnce(response());
+    await downloadOfflineEvent(ownerId, eventId);
+    const context = await getOfflineStationContext(ownerId, eventId, 'VISUAL_ACUITY');
+    expect(context?.station.fieldSchemaSnapshot).toEqual(vaFieldSchema);
+
+    await expect(queueOfflineStationSave(
+      ownerId,
+      eventId,
+      stationId,
+      'dynamic',
+      dynamicSaveBody({
+        acknowledged: false,
+        resultData: {
+          chartDistanceMetres: '6',
+          od: { kind: 'EXCEPTION', code: 'NLP' },
+          os: { kind: 'FRACTION', denominator: 6 },
+          withUsualDistanceGlasses: 'unknown',
+        },
+      }),
+    )).rejects.toThrow(/must be acknowledged/i);
+
+    await queueOfflineStationSave(
+      ownerId,
+      eventId,
+      stationId,
+      'dynamic',
+      dynamicSaveBody({
+        acknowledged: true,
+        resultData: {
+          chartDistanceMetres: '6',
+          od: { kind: 'EXCEPTION', code: 'NLP' },
+          os: { kind: 'FRACTION', denominator: 6 },
+          withUsualDistanceGlasses: 'unknown',
+        },
+      }),
+    );
+
+    post.mockImplementationOnce(async (_url, body) => response([{
+      clientActionId: syncRequest(body).actions[0].clientActionId,
+      status: 'APPLIED',
+      retryCount: 0,
+      result: {
+        routeProgression: {
+          status: 'REVIEW_READY',
+          routeVersion: 2,
+          completedStation: { stationId, stationName: 'Visual Acuity', stationType: 'VISUAL_ACUITY' },
+          nextStation: null,
+          nextQueue: null,
+        },
+      },
+    }]));
+    const result = await syncOfflineEvent(ownerId, eventId);
+    expect(result).toMatchObject({ synced: 1, pending: 0 });
+    expect(syncRequest(post.mock.calls[1][1]).actions[0]).toMatchObject({
+      stationId,
+      stationType: 'VISUAL_ACUITY',
+      payload: expect.objectContaining({
+        acknowledged: true,
+        resultData: expect.objectContaining({ chartDistanceMetres: '6' }),
+      }),
+    });
   });
 });

@@ -16,6 +16,7 @@ import axios from 'axios';
 import { useCallback, useEffect, useRef, useState, type FormEvent, type ReactNode } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { AppDialog } from '../../components/AppDialog';
+import { appDialog } from '../../components/appDialogStyles';
 import { SignaturePad } from '../../components/SignaturePad';
 import { StationCameraScanner } from '../screening/StationCameraScanner';
 import {
@@ -158,7 +159,7 @@ function GenericResultData({ station, data }: {
 
 function ResultData({ station }: { station: ReviewDetailResponse['stations'][number] }) {
   const data = station.result?.resultData;
-  if (!data) return <p className="review-missing-result">Awaiting result</p>;
+  if (!data) return <p className="review-missing-result">{station.status === 'SKIPPED' ? 'Station skipped — no screening result recorded' : 'Awaiting result'}</p>;
   if (station.stationType === 'EYE_HEALTH') {
     const eyeHealth = data as typeof data & {
       cataractRisk?: EyeHealthRisk;
@@ -200,9 +201,9 @@ function ParticipantReport({ detail }: { detail: ReviewDetailResponse }) {
     </dl>
 
     <section className="participant-report-section">
-      <header><h2>Screening results</h2><span>{detail.readiness.completedStationCount} of {detail.readiness.totalStationCount} stations completed · Highest flag: {detail.readiness.highestFlag}</span></header>
+      <header><h2>Screening results</h2><span>{detail.readiness.completedStationCount} recorded · {detail.readiness.skippedStationCount} skipped · {detail.readiness.totalStationCount} required · Highest flag: {detail.readiness.highestFlag}</span></header>
       {detail.stations.map((station) => <article key={station.stationId}>
-        <div className="participant-report-station-heading"><strong>{station.stationOrder}. {station.stationName}</strong><span>{station.result?.overallFlag || 'PENDING'}</span></div>
+        <div className="participant-report-station-heading"><strong>{station.stationOrder}. {station.stationName}</strong><span>{station.result?.overallFlag || station.status}</span></div>
         <ResultData station={station} />
         {station.result?.flagSummary && <p className="participant-report-summary">{station.result.flagSummary}</p>}
       </article>)}
@@ -826,10 +827,10 @@ export default function ReviewWorkspacePage() {
           </dl>
 
           <section className="screening-summary" aria-labelledby="screening-summary-title">
-            <div className="review-section-heading"><div><h3 id="screening-summary-title">Screening summary</h3><p>{detail.readiness.completedStationCount} of {detail.readiness.totalStationCount} active stations recorded</p></div><span>{detail.readiness.readyReason === 'URGENT_FLAG' ? 'Early review: urgent flag' : 'Screening complete'}</span></div>
+            <div className="review-section-heading"><div><h3 id="screening-summary-title">Screening summary</h3><p>{detail.readiness.completedStationCount} recorded · {detail.readiness.skippedStationCount} skipped · {detail.readiness.totalStationCount} required</p></div><span>{detail.readiness.readyReason === 'URGENT_FLAG' ? 'Early review: urgent flag' : detail.readiness.readyReason === 'ROUTE_COMPLETE' ? 'Route complete with skipped stations' : 'Screening complete'}</span></div>
             <div className="screening-results">
               {detail.stations.map((station) => <article key={station.stationId} className={!station.result ? 'missing' : ''}>
-                <header><div><span>Station {station.stationOrder}</span><h4>{station.stationName}</h4></div>{station.result ? <FlagBadge flag={station.result.overallFlag} /> : <span className="pending-label">Pending</span>}</header>
+                <header><div><span>Station {station.stationOrder}</span><h4>{station.stationName}</h4></div>{station.result ? <FlagBadge flag={station.result.overallFlag} /> : <span className="pending-label">{station.status === 'SKIPPED' ? 'Skipped' : 'Pending'}</span>}</header>
                 <ResultData station={station} />
                 {station.result?.flagSummary && <div className={`rule-recommendation flag-${station.result.overallFlag.toLowerCase()}`}><ExclamationTriangleIcon /><p><strong>Rule recommendation</strong>{station.result.flagSummary}. The reviewer makes the final decision.</p></div>}
               </article>)}
@@ -882,7 +883,7 @@ export default function ReviewWorkspacePage() {
       title="Discard clinical review draft?"
       description="Your notes and unrecorded decision will be removed."
     >
-      <div className="app-dialog-actions">
+      <div className={appDialog.actions}>
         <button className="secondary" type="button" data-dialog-autofocus onClick={closeDiscardDialog}>Keep editing</button>
         <button className="danger-button" type="button" onClick={discardDraft}>Discard draft</button>
       </div>

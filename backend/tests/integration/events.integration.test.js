@@ -196,8 +196,10 @@ describe("event lifecycle", () => {
     expect(created.body.eventStations[0]).toEqual(expect.objectContaining({
       stationTemplateId: template.stationTemplateId,
       name: template.name,
-      // Day-level capacity rows may exist in DB; OpenAPI DTO still returns [] until availability wiring lands.
-      availabilities: [],
+      availabilities: expect.arrayContaining([
+        expect.objectContaining({ isAvailable: true, capacity: 10 }),
+        expect.objectContaining({ isAvailable: false, capacity: 12 }),
+      ]),
     }));
     expect(created.body.shifts[0].staffAssignments[0]).toEqual(expect.objectContaining({
       assignmentRole: "SCREENER",
@@ -222,7 +224,16 @@ describe("event lifecycle", () => {
     expect(created.status).toBe(201);
     expect(created.body.status).toBe("DRAFT");
     expect(created.body.bannerKey).toBe("COMMUNITY_SCREENING");
-    expect(created.body.artworkDataUrl).toBe(artworkDataUrl);
+    expect(created.body.artworkDataUrl).toBe(
+      `/api/v1/events/${created.body.eventId}/artwork?v=${created.body.version}`,
+    );
+    const artwork = await request(app)
+      .get(created.body.artworkDataUrl)
+      .set("Authorization", `Bearer ${adminToken}`);
+    expect(artwork.status).toBe(200);
+    expect(artwork.headers["content-type"]).toMatch(/^image\/jpeg/);
+    expect(artwork.headers["cache-control"]).toContain("private");
+    expect(Buffer.from(artwork.body)).toEqual(Buffer.from("custom event artwork"));
     expect(created.body.shifts).toHaveLength(1);
     expect(await helpers.prisma.eventMembership.findFirst({
       where: { eventId: created.body.eventId, userId: administrator.id, status: "ACTIVE", roles: { some: { role: "EVENT_MANAGER" } } },
@@ -419,7 +430,7 @@ describe("event lifecycle", () => {
     expect(assigned.body.shifts[0].staffAssignments).toEqual(expect.arrayContaining([
       expect.objectContaining({
         assignmentRole: "REGISTRATION",
-        user: { userId: staff.id, username: staff.username },
+        user: expect.objectContaining({ userId: staff.id, username: staff.username }),
       }),
     ]));
 
@@ -432,8 +443,6 @@ describe("event lifecycle", () => {
           dateOfBirth: new Date("1980-01-01T00:00:00.000Z"),
           gender: "U",
           contactNumber: `+65 6000 10${String(index).padStart(2, "0")}`,
-          emergencyContact: "+65 6000 2000",
-          consentGiven: true,
           createdById: staff.id,
           updatedById: staff.id,
         },
@@ -473,7 +482,7 @@ describe("event lifecycle", () => {
     expect(removed.body.shifts[0].staffAssignments).toEqual([
       expect.objectContaining({
         assignmentRole: "EVENT_MANAGER",
-        user: { userId: manager.id, username: manager.username },
+        user: expect.objectContaining({ userId: manager.id, username: manager.username }),
       }),
     ]);
   });
@@ -749,7 +758,7 @@ describe("event lifecycle", () => {
     const task = await helpers.prisma.artifactCleanupTask.create({
       data: {
         eventId: created.body.eventId,
-        artifactType: "CONSENT_SIGNATURE",
+        artifactType: "REVIEW_DECISION_SIGNATURE",
         storageKey: `signatures/${created.body.eventId}/${crypto.randomUUID()}.png`,
       },
     });

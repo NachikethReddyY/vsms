@@ -1,17 +1,10 @@
 const prisma = require("../../prisma/prismaClient");
 const { validationError } = require("../../utils/validation/validation");
-const { assertRegistrationAssignment } = require("../../utils/auth/staff");
-const { assertParticipantEventScope } = require("../../utils/validation/participantEventScope");
 const { requireReviewerAccess } = require("../screening/reviewService");
 const { storeSignature, deleteSignature } = require("../../utils/storage/signatureStorage");
 
 exports.authorizeSignatureTarget = async ({ eventId, targetId, purpose, auth }, db = prisma) => {
     const eventUser = { ...auth.user, userId: auth.userId };
-    if (purpose === "CONSENT") {
-        await assertRegistrationAssignment(db, eventId, auth);
-        await assertParticipantEventScope(db, targetId, eventId, auth.userId);
-        return;
-    }
     if (purpose === "REFERRAL") {
         await requireReviewerAccess(db, eventId, eventUser);
         const referral = await db.referral.findFirst({
@@ -35,7 +28,7 @@ exports.authorizeSignatureTarget = async ({ eventId, targetId, purpose, auth }, 
         if (!registration) throw validationError("Review decision signature target is not available");
         return;
     }
-    throw validationError("purpose must be CONSENT, REFERRAL, or REVIEW_DECISION");
+    throw validationError("purpose must be REFERRAL or REVIEW_DECISION");
 };
 
 exports.storeSignature = async ({ eventId, targetId, purpose, buffer, mimeType, auth }, db = prisma) => {

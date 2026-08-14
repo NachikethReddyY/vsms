@@ -18,6 +18,9 @@ const path = require("path");
 
 const app = require("./app");
 const env = require("./config/env");
+const db = require("./config/db");
+const prisma = require("./prisma/prismaClient");
+const { closeRateLimiterClient } = require("./middlewares/rateLimiter");
 const logger = require("./utils/logging/logger/logger");
 const runSecurityChecks = require("./utils/security/securityCheck");
 
@@ -30,8 +33,7 @@ process.on("uncaughtException", (error) => {
         message: error.message,
         stack: error.stack,
     });
-
-    process.exit(1);
+    void shutdown("uncaughtException", 1).finally(() => process.exit(1));
 });
 
 process.on("unhandledRejection", (reason) => {
@@ -40,7 +42,7 @@ process.on("unhandledRejection", (reason) => {
         stack: reason instanceof Error ? reason.stack : undefined,
     });
 
-    process.exit(1);
+    void shutdown("unhandledRejection", 1).finally(() => process.exit(1));
 });
 
 // ============================================================================
@@ -126,49 +128,61 @@ server.on("error", (error) => {
 // 6. GRACEFUL SHUTDOWN
 // ============================================================================
 
-let shuttingDown = false;
+const SHUTDOWN_GRACE_MS = 25_000;
+let shutdownPromise = null;
 
-async function shutdown(signal) {
-    if (shuttingDown) {
-        return;
-    }
+function closeHttpServer() {
+    return new Promise((resolve, reject) => {
+        server.close((error) => {
+            if (error && error.code !== "ERR_SERVER_NOT_RUNNING") reject(error);
+            else resolve();
+        });
+        server.closeIdleConnections?.();
+    });
+}
 
-    shuttingDown = true;
+async function shutdown(signal, exitCode = 0) {
+    if (shutdownPromise) return shutdownPromise;
 
-    logger.info(`${signal} received. Initiating graceful server shutdown...`);
+    shutdownPromise = (async () => {
+        logger.info(`${signal} received. Initiating graceful server shutdown...`);
+        const forceTimer = setTimeout(() => {
+            logger.error("Forced server shutdown due to connection drain timeout.");
+            process.exit(1);
+        }, SHUTDOWN_GRACE_MS);
 
-    server.close((error) => {
-        if (error) {
-            logger.error("server_close_error", {
+        try {
+            await closeHttpServer();
+            const resources = await Promise.allSettled([
+                prisma.$disconnect(),
+                db.end(),
+                closeRateLimiterClient(),
+            ]);
+            const failures = resources.filter(({ status }) => status === "rejected");
+            if (failures.length) {
+                throw new AggregateError(failures.map(({ reason }) => reason), "One or more resources could not close");
+            }
+            logger.info("HTTP server drained and database and Redis connections closed.");
+            process.exitCode = exitCode;
+        } catch (error) {
+            logger.error("server_shutdown_failed", {
                 message: error.message,
                 stack: error.stack,
             });
-
-            process.exit(1);
+            process.exitCode = 1;
+        } finally {
+            clearTimeout(forceTimer);
         }
+    })();
 
-        logger.info(
-            "HTTP server closed successfully. Releasing system resources."
-        );
-
-        process.exit(0);
-    });
-
-    // Force shutdown after 10 seconds
-    setTimeout(() => {
-        logger.error(
-            "Forced server shutdown due to connection drain timeout."
-        );
-
-        process.exit(1);
-    }, 10_000);
+    return shutdownPromise;
 }
 
-process.on("SIGTERM", () => {
+process.once("SIGTERM", () => {
     void shutdown("SIGTERM");
 });
 
-process.on("SIGINT", () => {
+process.once("SIGINT", () => {
     void shutdown("SIGINT");
 });
 
@@ -194,4 +208,5 @@ if (require.main === module) {
 
 module.exports = {
     server,
+    shutdown,
 };

@@ -4,21 +4,19 @@ const env = require("../../config/env");
 const { decrypt, encrypt, encryptionContext } = require("../../utils/crypto/cryptoUtils");
 const { renderBrandedQrSvg } = require("../../utils/qr/qrBranding");
 const { assertUuid } = require("../../utils/validation/validation");
-const { hashToken, QR_TOKEN_PATTERN } = require("../../utils/crypto/qrToken");
+const { activeQrPassWhere, hashToken, QR_TOKEN_PATTERN } = require("../../utils/crypto/qrToken");
 const { assertRegistrationAssignment, assertQrVerifyAccess } = require("../../utils/auth/staff");
 const AppError = require("../../errors/AppError");
 const { assignRouteOnce } = require("../screening/routeAssignmentService");
+const { createAuditLog, createAuditLogBestEffort } = require("../../utils/logging/audit");
+const { AUDIT_ACTIONS } = require("../../utils/logging/auditEvents");
+const registrationRoutines = require("./registrationRoutineRepository");
 
 function buildQRTargetUrl(token) {
     return `${env.publicAppOrigin}/participant-status/${encodeURIComponent(token)}`;
 }
 
-const activeQrWhere = (selector = {}, now = new Date()) => ({
-    ...selector,
-    isActive: true,
-    revokedAt: null,
-    expiresAt: { gt: now },
-});
+const activeQrWhere = activeQrPassWhere;
 
 const tokenSelector = (token) => ({ tokenHash: hashToken(token) });
 
@@ -58,15 +56,6 @@ const qrLookupRegistration = (registration) => ({
     checkedIn: registration.checkedIn,
 });
 
-const manualCheckInRegistrationSelect = {
-    registrationId: true,
-    eventId: true,
-    registrationStatus: true,
-    checkedIn: true,
-    checkedInAt: true,
-    queueNumber: true,
-};
-
 const manualCheckInRegistration = (registration) => ({
     registrationId: registration.registrationId,
     eventId: registration.eventId,
@@ -75,6 +64,16 @@ const manualCheckInRegistration = (registration) => ({
     checkedInAt: registration.checkedInAt,
     queueNumber: registration.queueNumber,
 });
+
+const mapCheckInRoutineError = (error) => {
+    if (String(error?.message || "").includes("REGISTRATION_NOT_FOUND")) {
+        return new AppError(404, "REGISTRATION_NOT_FOUND", "Registration record was not found for this event.");
+    }
+    if (String(error?.message || "").includes("REGISTRATION_CHECKIN_CONFLICT")) {
+        return new AppError(409, "CHECKIN_STATE_CONFLICT", "Only a signed-up participant can be checked in.");
+    }
+    return error;
+};
 
 const decryptQrToken = (qr) => {
     if (qr.tokenEncryptionVersion !== 2 || !qr.tokenCiphertext) {
@@ -182,20 +181,50 @@ exports.assertVerificationAccess = async (selectors, auth, db = prisma) => {
     return eventId;
 };
 
+exports.auditAccessDenied = async ({ selectors = {}, operation, userId, error, context = {} }, db = prisma) => {
+    const tokenFingerprint = selectors.token ? hashToken(String(selectors.token).toLowerCase().trim()) : null;
+    return createAuditLogBestEffort({
+        userId,
+        action: operation === "VERIFY" ? AUDIT_ACTIONS.QR_VERIFICATION_DENIED : AUDIT_ACTIONS.QR_ACCESS_DENIED,
+        resource: "QRCodePass",
+        entityName: "QRCodeAuthorizationAttempt",
+        entityId: selectors.qrId || null,
+        outcome: "DENIED",
+        newValue: {
+            operation,
+            eventId: selectors.eventId || null,
+            registrationId: selectors.registrationId || null,
+            tokenFingerprint,
+            errorCode: error?.code || "QR_ACCESS_DENIED",
+        },
+        context,
+        client: db,
+    });
+};
+
 /**
  * Audit Logger Helper conforming to unified schema
  */
-async function writeAudit(tx, { userId, action, entityName, entityId, newValue, ipAddress, deviceName }) {
-    await tx.auditLog.create({
-        data: {
-            userId: userId || null,
-            action,
-            entityName,
-            entityId: entityId || null,
-            newValue: newValue ? JSON.parse(JSON.stringify(newValue)) : null,
-            ipAddress: ipAddress || "127.0.0.1",
-            deviceName: deviceName || "Internal System / QR Service",
-        },
+async function writeAudit(tx, {
+    userId,
+    action,
+    entityName,
+    entityId,
+    newValue,
+    requestId,
+    deviceId,
+    ipAddress,
+    deviceName,
+}) {
+    await createAuditLog({
+        userId,
+        action,
+        resource: entityName,
+        entityName,
+        entityId,
+        newValue,
+        context: { requestId, deviceId, ipAddress, deviceName },
+        client: tx,
     });
 }
 
@@ -249,6 +278,9 @@ exports.generateQR = async (registrationId, userId = null, externalTx = null, au
         if (!registration) {
             throw new AppError(404, "REGISTRATION_NOT_FOUND", "Event registration not found.");
         }
+        if (registration.registrationStatus === "CANCELLED" || registration.event.status === "CANCELLED") {
+            throw new AppError(409, "QR_LIFECYCLE_CLOSED", "A QR pass cannot be issued for a cancelled registration or event.");
+        }
 
         const now = new Date();
         const existing = await tx.qRCodePass.findFirst({
@@ -297,7 +329,7 @@ exports.generateQR = async (registrationId, userId = null, externalTx = null, au
 
         await writeAudit(tx, {
             userId,
-            action: "QR_GENERATED",
+            action: AUDIT_ACTIONS.QR_GENERATED,
             entityName: "QRCodePass",
             entityId: qrRecord.id,
             newValue: { registrationId, expiresAt },
@@ -318,46 +350,66 @@ exports.verifyQR = async (token, eventId = null, userId = null, db = prisma, aud
         throw new AppError(400, "TOKEN_REQUIRED", "QR Token is required.");
     }
 
-    return await db.$transaction(async (tx) => {
-        const qr = await tx.qRCodePass.findFirst({
-            where: activeQrWhere(tokenSelector(token)),
-            include: {
-                registration: {
-                    include: { participant: true, event: true },
+    try {
+        return await db.$transaction(async (tx) => {
+            const qr = await tx.qRCodePass.findFirst({
+                where: activeQrWhere(tokenSelector(token)),
+                include: {
+                    registration: {
+                        include: { participant: true, event: true },
+                    },
                 },
-            },
+            });
+
+            if (!qr) throw new AppError(404, "INVALID_QR", "QR Code is invalid, expired, or unavailable.");
+            if (eventId && qr.registration.eventId !== eventId) {
+                throw new AppError(400, "QR_EVENT_MISMATCH", "QR Code is not valid for this specific event.");
+            }
+
+            await writeAudit(tx, {
+                userId,
+                action: AUDIT_ACTIONS.QR_VERIFIED,
+                entityName: "QRCodePass",
+                entityId: qr.id,
+                newValue: { registrationId: qr.registration.registrationId, eventId: qr.registration.eventId },
+                ...auditContext,
+            });
+
+            return {
+                valid: true,
+                qrId: qr.id,
+                registrationId: qr.registration.registrationId,
+                participant: {
+                    id: qr.registration.participant.id,
+                    firstName: qr.registration.participant.firstName,
+                    lastName: qr.registration.participant.lastName,
+                },
+                event: {
+                    id: qr.registration.event.eventId,
+                    name: qr.registration.event.name,
+                },
+                queueNumber: qr.registration.queueNumber,
+            };
         });
-
-        if (!qr) throw new AppError(404, "INVALID_QR", "QR Code is invalid, expired, or unavailable.");
-        if (eventId && qr.registration.eventId !== eventId) {
-            throw new AppError(400, "QR_EVENT_MISMATCH", "QR Code is not valid for this specific event.");
-        }
-
-        await writeAudit(tx, {
+    } catch (error) {
+        await createAuditLogBestEffort({
             userId,
-            action: "QR_VERIFIED",
-            entityName: "QRCodePass",
-            entityId: qr.id,
-            newValue: { registrationId: qr.registration.registrationId, eventId },
-            ...auditContext,
+            action: Number(error?.status || error?.statusCode) >= 500
+                ? AUDIT_ACTIONS.QR_VERIFICATION_FAILED
+                : AUDIT_ACTIONS.QR_VERIFICATION_DENIED,
+            resource: "QRCodePass",
+            entityName: "QRCodeVerificationAttempt",
+            outcome: Number(error?.status || error?.statusCode) >= 500 ? "FAILED" : "DENIED",
+            newValue: {
+                eventId,
+                errorCode: error?.code || "QR_VERIFICATION_FAILED",
+                tokenFingerprint: hashToken(token),
+            },
+            context: auditContext,
+            client: db,
         });
-
-        return {
-            valid: true,
-            qrId: qr.id,
-            registrationId: qr.registration.registrationId,
-            participant: {
-                id: qr.registration.participant.id,
-                firstName: qr.registration.participant.firstName,
-                lastName: qr.registration.participant.lastName,
-            },
-            event: {
-                id: qr.registration.event.eventId,
-                name: qr.registration.event.name,
-            },
-            queueNumber: qr.registration.queueNumber,
-        };
-    });
+        throw error;
+    }
 };
 
 // ==========================================
@@ -376,7 +428,7 @@ exports.getPublicStatus = async (token, db = prisma) => {
                 select: {
                     queueNumber: true,
                     registrationStatus: true,
-                    event: { select: { name: true } },
+                    event: { select: { eventId: true, name: true } },
                     routeSteps: {
                         orderBy: { position: "asc" },
                         select: {
@@ -386,9 +438,8 @@ exports.getPublicStatus = async (token, db = prisma) => {
                         },
                     },
                     queueEntries: {
-                        where: { status: { in: ["WAITING", "CALLED", "IN_PROGRESS"] } },
+                        where: { status: { in: ["WAITING", "CALLED", "IN_PROGRESS", "SKIPPED"] } },
                         orderBy: [{ enteredAt: "desc" }, { id: "desc" }],
-                        take: 1,
                         select: {
                             status: true,
                             queueNumber: true,
@@ -412,12 +463,31 @@ exports.getPublicStatus = async (token, db = prisma) => {
         };
     }
 
-    const activeEntry = qr.registration.queueEntries[0] || null;
+    const activeEntry = qr.registration.queueEntries.find(({ status }) => (
+        ["WAITING", "CALLED", "IN_PROGRESS"].includes(status)
+    )) || null;
+    const skippedStationIds = new Set(
+        qr.registration.queueEntries
+            .filter(({ status }) => status === "SKIPPED")
+            .map(({ station }) => station.stationId),
+    );
+    const nowCalling = activeEntry
+        ? await db.queueEntry.findFirst({
+            where: {
+                stationId: activeEntry.station.stationId,
+                status: { in: ["CALLED", "IN_PROGRESS"] },
+                registration: { eventId: qr.registration.event.eventId },
+            },
+            orderBy: [{ calledAt: "desc" }, { queueNumber: "asc" }],
+            select: { queueNumber: true },
+        })
+        : null;
     const firstUnfinishedPosition = qr.registration.routeSteps.find(({ completedAt }) => !completedAt)?.position;
     const queueState = activeEntry
         ? {
             status: activeEntry.status,
             queueNumber: activeEntry.queueNumber,
+            nowCalling: nowCalling?.queueNumber ?? null,
             station: {
                 name: activeEntry.station.stationName,
                 type: activeEntry.station.stationType,
@@ -428,7 +498,7 @@ exports.getPublicStatus = async (token, db = prisma) => {
         stationName: step.station.stationName,
         stationType: step.station.stationType,
         state: step.completedAt
-            ? "COMPLETED"
+            ? skippedStationIds.has(step.station.stationId) ? "SKIPPED" : "COMPLETED"
             : activeEntry?.station.stationId === step.station.stationId
                 ? "CURRENT"
                 : !activeEntry && step.position === firstUnfinishedPosition
@@ -454,6 +524,16 @@ exports.getPublicStatus = async (token, db = prisma) => {
         route,
         expiresAt: qr.expiresAt,
     };
+};
+
+exports.renderPublicPass = async (token, db = prisma) => {
+    const normalizedToken = String(token || "").toLowerCase().trim();
+    const qr = await db.qRCodePass.findFirst({
+        where: activeQrWhere(tokenSelector(normalizedToken)),
+        select: { id: true },
+    });
+    if (!qr) throw new AppError(404, "QR_NOT_FOUND", "This pass is no longer active.");
+    return renderBrandedQrSvg(buildQRTargetUrl(normalizedToken), { width: 420 });
 };
 
 // ==========================================
@@ -526,7 +606,7 @@ exports.revokeQR = async (qrId, revokedReason = "Revoked by staff", revokedBy = 
 
         await writeAudit(tx, {
             userId: revokedBy,
-            action: "QR_REVOKED",
+            action: AUDIT_ACTIONS.QR_REVOKED,
             entityName: "QRCodePass",
             entityId: qrId,
             newValue: { reason: revokedReason },
@@ -561,7 +641,7 @@ exports.reissueQR = async (registrationId, userId = null, db = prisma, auditCont
 
         await writeAudit(tx, {
             userId,
-            action: "QR_REISSUED_REVOCATION",
+            action: AUDIT_ACTIONS.QR_REISSUED_REVOCATION,
             entityName: "EventRegistration",
             entityId: registrationId,
             newValue: { action: "Revoked prior active QRs" },
@@ -576,7 +656,7 @@ exports.reissueQR = async (registrationId, userId = null, db = prisma, auditCont
 // ==========================================
 // Download QR Image
 // ==========================================
-exports.downloadQR = async (qrId, db = prisma) => {
+const renderQrArtifact = async (qrId, action, db, auditContext) => {
     if (!qrId) {
         throw new AppError(400, "QR_ID_REQUIRED", "QR ID is required.");
     }
@@ -586,8 +666,22 @@ exports.downloadQR = async (qrId, db = prisma) => {
 
     const qrImage = await renderBrandedQrSvg(buildQRTargetUrl(decryptQrToken(qr)), { width: 600 });
 
+    const { userId = null, ...context } = auditContext;
+    await writeAudit(db, {
+        userId,
+        action,
+        entityName: "QRCodePass",
+        entityId: qr.id,
+        newValue: { registrationId: qr.registrationId },
+        ...context,
+    });
+
     return { qrId: qr.id, expiresAt: qr.expiresAt, qrImage };
 };
+
+exports.downloadQR = async (qrId, db = prisma, auditContext = {}) => (
+    renderQrArtifact(qrId, AUDIT_ACTIONS.QR_DOWNLOADED, db, auditContext)
+);
 
 /** Re-render the active participant pass for authenticated station tablets. */
 exports.renderActivePassForRegistration = async (registrationId, db = prisma) => {
@@ -668,12 +762,9 @@ exports.getDevPageData = async (registrationId, auditContext = {}, db = prisma) 
 // ==========================================
 // Print QR Helper
 // ==========================================
-exports.printQR = async (qrId, db = prisma) => {
-    if (!qrId) {
-        throw new AppError(400, "QR_ID_REQUIRED", "QR ID is required.");
-    }
-    return exports.downloadQR(qrId, db);
-};
+exports.printQR = async (qrId, db = prisma, auditContext = {}) => (
+    renderQrArtifact(qrId, AUDIT_ACTIONS.QR_PRINTED, db, auditContext)
+);
 
 // ==========================================
 // Manual Check-In Procedure
@@ -733,48 +824,23 @@ exports.manualCheckIn = async (params, db = prisma, auditContext = {}) => {
             throw new AppError(404, "INVALID_QR", "QR Code is invalid, expired, or unavailable.");
         }
 
-        const registration = await tx.eventRegistration.findFirst({
-            where: {
-                registrationId: regIdToUpdate,
-                eventId,
-            },
-            select: manualCheckInRegistrationSelect,
+        const checkedIn = await registrationRoutines.checkInRegistration(tx, {
+            registrationId: regIdToUpdate,
+            eventId,
+            changedBy: userId,
         });
-        if (!registration) {
-            throw new AppError(404, "REGISTRATION_NOT_FOUND", "Registration record was not found for this event.");
-        }
-        if (registration.registrationStatus !== "SIGNED_UP" || registration.checkedIn) {
-            throw new AppError(409, "CHECKIN_STATE_CONFLICT", "Only a signed-up participant can be checked in.");
-        }
-
-        const checkedInAt = new Date();
-        const updated = await tx.eventRegistration.updateMany({
-            where: {
-                registrationId: registration.registrationId,
-                eventId,
-                registrationStatus: "SIGNED_UP",
-                checkedIn: false,
-            },
-            data: {
-                checkedIn: true,
-                checkedInAt,
-                registrationStatus: "CHECKED_IN",
-            },
-        });
-        if (updated.count !== 1) {
-            throw new AppError(409, "CHECKIN_STATE_CONFLICT", "Registration was changed before check-in completed.");
-        }
-
         const result = manualCheckInRegistration({
-            ...registration,
-            registrationStatus: "CHECKED_IN",
-            checkedIn: true,
-            checkedInAt,
+            registrationId: checkedIn.registration_id,
+            eventId: checkedIn.event_id,
+            registrationStatus: checkedIn.registration_status,
+            checkedIn: checkedIn.checked_in,
+            checkedInAt: checkedIn.checked_in_at,
+            queueNumber: checkedIn.queue_number,
         });
 
         const route = await assignRouteOnce({
             tx,
-            registrationId: registration.registrationId,
+            registrationId: result.registrationId,
             eventId,
             actorUserId: userId,
             context: auditContext,
@@ -782,7 +848,7 @@ exports.manualCheckIn = async (params, db = prisma, auditContext = {}) => {
 
         await writeAudit(tx, {
             userId,
-            action: "MANUAL_CHECKIN_PERFORMED",
+            action: AUDIT_ACTIONS.MANUAL_CHECKIN_PERFORMED,
             entityName: "EventRegistration",
             entityId: regIdToUpdate,
             newValue: {
@@ -793,10 +859,10 @@ exports.manualCheckIn = async (params, db = prisma, auditContext = {}) => {
         });
 
                 return { ...result, route };
-            }, { isolationLevel: "Serializable" });
+            }, { isolationLevel: "ReadCommitted" });
         } catch (error) {
             if (error.code === "P2034" && attempt < 3) continue;
-            throw error;
+            throw mapCheckInRoutineError(error);
         }
     }
     throw new AppError(409, "CHECKIN_CONFLICT", "Unable to check in this participant. Please retry.");

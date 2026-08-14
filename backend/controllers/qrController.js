@@ -5,22 +5,46 @@ const { assertRegistrationAssignment, assertQrVerifyAccess } = require("../utils
 
 const escapeHtml = (value) => String(value ?? "").replace(/[&<>"']/g, (character) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[character]));
 
-async function assertQrAccess(req, selectors) {
-    return qrService.assertRegistrationAccess(selectors, req.auth);
+const auditContext = (req) => ({ ...req.context, ipAddress: req.ip });
+
+async function assertQrAccess(req, selectors, operation = "ACCESS") {
+    try {
+        return await qrService.assertRegistrationAccess(selectors, req.auth);
+    } catch (error) {
+        await qrService.auditAccessDenied({
+            selectors,
+            operation,
+            userId: req.auth?.userId,
+            error,
+            context: auditContext(req),
+        });
+        throw error;
+    }
 }
 
 async function assertVerifyAccess(req, selectors) {
-    return qrService.assertVerificationAccess(selectors, req.auth);
+    try {
+        return await qrService.assertVerificationAccess(selectors, req.auth);
+    } catch (error) {
+        await qrService.auditAccessDenied({
+            selectors,
+            operation: "VERIFY",
+            userId: req.auth?.userId,
+            error,
+            context: auditContext(req),
+        });
+        throw error;
+    }
 }
 
 // Registration-module compatibility endpoint
 exports.generateRegistrationQR = async (req, res, next) => {
     try {
-        await assertQrAccess(req, { registrationId: req.params.registrationId });
+        await assertQrAccess(req, { registrationId: req.params.registrationId }, "GENERATE");
         const qr = await qrService.generateRegistrationQR(
             req.params.registrationId,
             req.auth.userId,
-            { ipAddress: req.ip }
+            auditContext(req)
         );
         const { token: _token, ...safeQr } = qr;
         return res.status(201).json(safeQr);
@@ -31,7 +55,7 @@ exports.generateRegistrationQR = async (req, res, next) => {
 
 exports.getRegistrationByQR = async (req, res, next) => {
     try {
-        await assertQrAccess(req, { token: req.params.token });
+        await assertQrAccess(req, { token: req.params.token }, "LOOKUP");
         const result = await qrService.getRegistrationByQR(req.params.token);
         return res.json({ registration: result });
     } catch (err) {
@@ -47,9 +71,9 @@ exports.generateQR = async (req, res, next) => {
     try {
         const { registrationId } = req.params;
         const userId = req.auth.userId;
-        await assertQrAccess(req, { registrationId });
+        await assertQrAccess(req, { registrationId }, "GENERATE");
 
-        const qr = await qrService.generateQR(registrationId, userId, null, { ipAddress: req.ip });
+        const qr = await qrService.generateQR(registrationId, userId, null, auditContext(req));
 
         const { token: _token, ...safeQr } = qr;
 
@@ -73,7 +97,10 @@ exports.verifyQR = async (req, res, next) => {
         const userId = req.auth.userId;
         await assertVerifyAccess(req, { token, eventId });
 
-        const result = await qrService.verifyQR(token, eventId, userId, undefined, { ipAddress: req.ip });
+        const result = await qrService.verifyQR(token, eventId, userId, undefined, {
+            ...req.context,
+            ipAddress: req.ip,
+        });
 
         return res.status(200).json({
             success: true,
@@ -98,6 +125,16 @@ exports.getPublicStatus = async (req, res, next) => {
     }
 };
 
+exports.getPublicPass = async (req, res, next) => {
+    try {
+        const qrImage = await qrService.renderPublicPass(req.params.token);
+        const svg = Buffer.from(qrImage.split(",")[1], "base64");
+        return res.set({ "Cache-Control": "private, max-age=300", "Content-Type": "image/svg+xml" }).send(svg);
+    } catch (err) {
+        next(err);
+    }
+};
+
 // ==========================================
 // Get Participant By QR
 // GET /qr/participant/:token
@@ -105,7 +142,7 @@ exports.getPublicStatus = async (req, res, next) => {
 exports.getParticipantByQR = async (req, res, next) => {
     try {
         const { token } = req.params;
-        await assertQrAccess(req, { token });
+        await assertQrAccess(req, { token }, "PARTICIPANT_LOOKUP");
         const participant = await qrService.getParticipant(token);
 
         return res.status(200).json({
@@ -126,9 +163,9 @@ exports.revokeQR = async (req, res, next) => {
         const { qrId } = req.params;
         const { revokedReason } = req.body;
         const revokedBy = req.auth.userId;
-        await assertQrAccess(req, { qrId });
+        await assertQrAccess(req, { qrId }, "REVOKE");
 
-        const qr = await qrService.revokeQR(qrId, revokedReason, revokedBy, undefined, { ipAddress: req.ip });
+        const qr = await qrService.revokeQR(qrId, revokedReason, revokedBy, undefined, auditContext(req));
 
         return res.status(200).json({
             success: true,
@@ -148,9 +185,9 @@ exports.reissueQR = async (req, res, next) => {
     try {
         const { registrationId } = req.params;
         const userId = req.auth.userId;
-        await assertQrAccess(req, { registrationId });
+        await assertQrAccess(req, { registrationId }, "REISSUE");
 
-        const qr = await qrService.reissueQR(registrationId, userId, undefined, { ipAddress: req.ip });
+        const qr = await qrService.reissueQR(registrationId, userId, undefined, auditContext(req));
         const { token: _token, ...safeQr } = qr;
 
         return res.status(201).json({
@@ -170,8 +207,8 @@ exports.reissueQR = async (req, res, next) => {
 exports.downloadQR = async (req, res, next) => {
     try {
         const { qrId } = req.params;
-        await assertQrAccess(req, { qrId });
-        const qr = await qrService.downloadQR(qrId);
+        await assertQrAccess(req, { qrId }, "DOWNLOAD");
+        const qr = await qrService.downloadQR(qrId, undefined, { ...auditContext(req), userId: req.auth.userId });
 
         return res.status(200).json({
             success: true,
@@ -189,8 +226,8 @@ exports.downloadQR = async (req, res, next) => {
 exports.printQR = async (req, res, next) => {
     try {
         const { qrId } = req.params;
-        await assertQrAccess(req, { qrId });
-        const qr = await qrService.printQR(qrId);
+        await assertQrAccess(req, { qrId }, "PRINT");
+        const qr = await qrService.printQR(qrId, undefined, { ...auditContext(req), userId: req.auth.userId });
 
         return res.status(200).json({
             success: true,
@@ -207,11 +244,11 @@ exports.printQR = async (req, res, next) => {
 // ==========================================
 exports.viewQR = async (req, res, next) => {
     try {
-        await assertQrAccess(req, { registrationId: req.params.registrationId });
+        await assertQrAccess(req, { registrationId: req.params.registrationId }, "VIEW");
         const qr = await qrService.generateRegistrationQR(
             req.params.registrationId,
             req.auth.userId,
-            { ipAddress: req.ip }
+            auditContext(req)
         );
         const svgBase64 = qr.qrImage.split(",")[1]; // strip data:image/svg+xml;base64,
         const svg = Buffer.from(svgBase64, "base64").toString("utf8");
@@ -483,15 +520,14 @@ exports.manualCheckIn = async (req, res, next) => {
         const userId = req.auth.userId;
         // Manual check-in accepts a registration reference or an active QR token. NRIC is
         // deliberately not searchable. Authorize the claimed event before resolving either.
-        await assertQrAccess(req, { eventId });
+        await assertQrAccess(req, { eventId }, "MANUAL_CHECKIN");
 
         const result = await qrService.manualCheckIn({
             registrationId,
             identifier,
             eventId,
             userId,
-            ipAddress: req.ip
-        });
+        }, undefined, auditContext(req));
 
         return res.status(200).json({
             success: true,

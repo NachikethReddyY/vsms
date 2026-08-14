@@ -3,10 +3,16 @@ const { z } = require("zod");
 const uuid = z.string().uuid();
 const timestamp = z.string().datetime({ offset: true });
 const bannerKey = z.enum(["COMMUNITY_SCREENING", "LIBRARY_SCREENING", "EVENT_OPERATIONS"]);
-const artworkDataUrl = z.string().max(180000).regex(
-  /^data:image\/(jpeg|webp);base64,[A-Za-z0-9+/]+={0,2}$/,
-  "Artwork must be a JPEG or WebP data URL",
-).nullable();
+const artworkDataUrl = z.union([
+  z.string().max(180000).regex(
+    /^data:image\/(jpeg|webp);base64,[A-Za-z0-9+/]+={0,2}$/,
+    "Artwork must be a JPEG or WebP data URL",
+  ),
+  z.string().regex(
+    /^\/api\/v1\/(?:public\/)?events\/[a-f0-9-]{36}\/artwork(?:\?v=\d+)?$/i,
+    "Artwork must reference a VSMS event image",
+  ),
+]).nullable();
 const timezone = z.string().trim().min(1).max(100).refine((value) => {
   try {
     new Intl.DateTimeFormat("en", { timeZone: value });
@@ -271,13 +277,28 @@ const reportJobListQuery = z.object({
 const assignmentParams = z.object({ eventId: uuid, shiftId: uuid }).strict();
 const assignmentDeleteParams = z.object({ eventId: uuid, shiftId: uuid, assignmentId: uuid }).strict();
 const versionQuery = z.object({ version: z.coerce.number().int().positive() }).strict();
+const shiftCreateBody = z.object({
+  version: z.number().int().positive(),
+  name: z.string().trim().min(1).max(100),
+  startsAt: timestamp,
+  endsAt: timestamp,
+  requiredStaff: z.number().int().min(1).max(1000).default(1),
+}).strict().superRefine((value, ctx) => {
+  if (new Date(value.endsAt) <= new Date(value.startsAt)) {
+    ctx.addIssue({ code: "custom", path: ["endsAt"], message: "Shift end must be after its start" });
+  }
+});
 const assignmentBody = z.object({
   version: z.number().int().positive(),
-  userId: uuid,
+  userId: uuid.optional(),
+  userIds: z.array(uuid).min(1).max(100).refine((ids) => new Set(ids).size === ids.length, "Staff members must be unique").optional(),
   assignmentRole: z.enum(["EVENT_MANAGER", "REGISTRATION", "SCREENER", "REVIEWER", "SUPPORT"]),
   eventStationId: uuid.nullable().optional(),
   notes: z.string().trim().max(500).nullable().optional(),
 }).strict().superRefine((value, ctx) => {
+  if ((value.userId ? 1 : 0) + (value.userIds ? 1 : 0) !== 1) {
+    ctx.addIssue({ code: "custom", path: ["userIds"], message: "Choose one or more staff members" });
+  }
   if (value.assignmentRole === "SCREENER" && !value.eventStationId) {
     ctx.addIssue({ code: "custom", path: ["eventStationId"], message: "Screeners must be assigned to an event station" });
   }
@@ -292,6 +313,7 @@ const stationUpdateBody = z.object({
   stationOrder: z.number().int().min(1).max(50).optional(),
   capacity: z.number().int().min(1).max(1000).optional(),
   isAvailable: z.boolean().optional(),
+  availabilities: z.array(stationAvailabilityInput).max(31).optional(),
   operationalStatus: z.enum(["AVAILABLE", "PAUSED", "OFFLINE"]).optional(),
 }).strict().refine((value) => Object.keys(value).some((key) => key !== "version"), {
   message: "At least one station field is required",
@@ -315,6 +337,12 @@ const fieldSchemaValue = z.array(z.object({
   max: z.number().optional(),
   unit: z.string().optional(),
   eyes: z.enum(["OD", "OS", "BOTH"]).optional(),
+  flagRules: z.array(z.object({
+    op: z.enum(["eq", "neq", "lt", "lte", "gt", "gte", "includes", "isTrue", "isFalse", "isEmpty", "notEmpty"]),
+    value: z.union([z.string(), z.number(), z.boolean()]).optional(),
+    flag: z.enum(["REVIEW", "REFER", "URGENT"]),
+    reason: z.string().trim().min(1).max(200),
+  }).passthrough()).max(10).optional(),
 }).passthrough()).min(1).max(40).optional();
 const createStationTemplateBody = z.object({
   stationType: z.enum(SCREENING_STATION_TYPES),
@@ -351,6 +379,7 @@ module.exports = {
   reportJobListQuery,
   assignmentParams,
   assignmentDeleteParams,
+  shiftCreateBody,
   versionQuery,
   assignmentBody,
   stationParams,

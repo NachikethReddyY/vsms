@@ -1,4 +1,5 @@
 const assert = require("node:assert/strict");
+const crypto = require("node:crypto");
 const fs = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
@@ -6,6 +7,9 @@ const { spawnSync } = require("node:child_process");
 const test = require("node:test");
 
 const backend = path.resolve(__dirname, "../..");
+const shellTest = spawnSync("sh", ["--version"], { encoding: "utf8" }).status === null
+  ? test.skip
+  : test;
 
 function run(command, args, env = {}) {
   return spawnSync(command, args, {
@@ -21,6 +25,11 @@ function completeManifest() {
     .join("\n");
 }
 
+function writeChecksum(backup) {
+  const digest = crypto.createHash("sha256").update(fs.readFileSync(backup)).digest("hex");
+  fs.writeFileSync(`${backup}.sha256`, `${digest}  ${path.basename(backup)}\n`);
+}
+
 function writeTool(directory, name, source) {
   const file = path.join(directory, name);
   fs.writeFileSync(file, source, { mode: 0o755 });
@@ -29,14 +38,25 @@ function writeTool(directory, name, source) {
 test("the 500-participant load configuration is accepted without running load", () => {
   const result = run(process.execPath, ["scripts/performance-runner.js", "--check", "--config", "performance/isolated-500.json"]);
   assert.equal(result.status, 0, result.stderr);
-  assert.match(result.stdout, /vsms_test/);
+  assert.match(result.stdout, /vsms_perf_test/);
   const config = JSON.parse(fs.readFileSync(path.join(backend, "performance/isolated-500.json"), "utf8"));
   const runner = fs.readFileSync(path.join(backend, "scripts/performance-runner.js"), "utf8");
   assert.equal(config.participantCount, 500);
+  assert.equal(config.concurrency, 5);
+  assert.equal(config.pollDurationSeconds, 30);
+  assert.equal(config.checkInSampleSize, 20);
+  assert.equal(config.thresholds.reportingReadP95Ms, 350);
+  assert.equal(config.thresholds.screeningBatchP95Ms, 7500);
   assert.equal(config.participantPollIntervalMs, 5000);
   assert.equal(config.staffPollIntervalMs, 10000);
   assert.match(runner, /participant-status\.poll/);
   assert.match(runner, /staff-queue\.poll/);
+  assert.match(runner, /registration\.check-in\.write/);
+  assert.match(runner, /reportingReadP95Ms/);
+  assert.match(runner, /screeningBatchP95Ms/);
+  assert.match(runner, /pollRegistrationIds/);
+  assert.match(runner, /chartDistanceMetres: "6"/);
+  assert.match(runner, /withUsualDistanceGlasses: "yes"/);
   assert.doesNotMatch(runner, /stations\/\$\{fixture\.stationId\}\/handoff/);
 });
 
@@ -77,11 +97,13 @@ test("fixture preparation requires its exact acknowledgement before loading Pris
   assert.match(result.stderr, /PERF_FIXTURE_CONFIRM=CREATE_SYNTHETIC_TEST_DATA/);
 });
 
-test("restore rejects a non-test database URL before invoking PostgreSQL", () => {
+shellTest("restore rejects a non-test database URL before invoking PostgreSQL", () => {
   const directory = fs.mkdtempSync(path.join(os.tmpdir(), "vsms-restore-guard-"));
   const backup = path.join(directory, "fixture.dump");
   fs.writeFileSync(backup, "not a dump");
   fs.writeFileSync(`${backup}.counts.tsv`, "events\t0\n");
+  fs.writeFileSync(`${backup}.schema.tsv`, "");
+  writeChecksum(backup);
   const result = run("sh", ["scripts/restore-postgres-test.sh", backup], {
     RESTORE_DATABASE_URL: "postgresql://user:secret@127.0.0.1:1/vsms",
     RESTORE_CONFIRM: "RESTORE_ISOLATED_TEST_DATABASE",
@@ -90,11 +112,13 @@ test("restore rejects a non-test database URL before invoking PostgreSQL", () =>
   assert.match(result.stderr, /URL must end in _test/);
 });
 
-test("restore rejects an incomplete row-count manifest before it can clear a test database", () => {
+shellTest("restore rejects an incomplete row-count manifest before it can clear a test database", () => {
   const directory = fs.mkdtempSync(path.join(os.tmpdir(), "vsms-restore-manifest-"));
   const backup = path.join(directory, "fixture.dump");
   fs.writeFileSync(backup, "not a dump");
   fs.writeFileSync(`${backup}.counts.tsv`, "events\t0\n");
+  fs.writeFileSync(`${backup}.schema.tsv`, "");
+  writeChecksum(backup);
   const result = run("sh", ["scripts/restore-postgres-test.sh", backup], {
     RESTORE_DATABASE_URL: "postgresql://user:secret@127.0.0.1:1/vsms_test",
     RESTORE_CONFIRM: "RESTORE_ISOLATED_TEST_DATABASE",
@@ -103,7 +127,7 @@ test("restore rejects an incomplete row-count manifest before it can clear a tes
   assert.match(result.stderr, /Manifest must contain every critical table/);
 });
 
-test("restore requires its exact acknowledgement before checking a backup", () => {
+shellTest("restore requires its exact acknowledgement before checking a backup", () => {
   const result = run("sh", ["scripts/restore-postgres-test.sh", "/not/a/real.dump"], {
     RESTORE_DATABASE_URL: "postgresql://user:secret@127.0.0.1:1/vsms_test",
   });
@@ -111,7 +135,7 @@ test("restore requires its exact acknowledgement before checking a backup", () =
   assert.match(result.stderr, /RESTORE_CONFIRM=RESTORE_ISOLATED_TEST_DATABASE/);
 });
 
-test("backup refuses an existing same-name output before pg_dump", () => {
+shellTest("backup refuses an existing same-name output before pg_dump", () => {
   const directory = fs.mkdtempSync(path.join(os.tmpdir(), "vsms-backup-collision-"));
   const tools = fs.mkdtempSync(path.join(os.tmpdir(), "vsms-backup-tools-"));
   const backup = path.join(directory, "vsms-vsms_test-20260101T000000Z.dump");
@@ -129,13 +153,15 @@ test("backup refuses an existing same-name output before pg_dump", () => {
   assert.doesNotMatch(result.stderr, /pg_dump should not run/);
 });
 
-test("restore passes pg_restore the single-transaction flag", () => {
+shellTest("restore passes pg_restore the single-transaction flag", () => {
   const directory = fs.mkdtempSync(path.join(os.tmpdir(), "vsms-restore-transaction-"));
   const tools = fs.mkdtempSync(path.join(os.tmpdir(), "vsms-restore-tools-"));
   const backup = path.join(directory, "fixture.dump");
   const argumentsFile = path.join(directory, "pg-restore-arguments.txt");
   fs.writeFileSync(backup, "not a real dump");
   fs.writeFileSync(`${backup}.counts.tsv`, `${completeManifest()}\n`);
+  fs.writeFileSync(`${backup}.schema.tsv`, "0\n");
+  writeChecksum(backup);
   writeTool(tools, "psql", "#!/bin/sh\ncase \"$*\" in *current_database*) printf '%s\\n' vsms_test ;; *) printf '%s\\n' 0 ;; esac\n");
   writeTool(tools, "pg_restore", "#!/bin/sh\nprintf '%s\\n' \"$@\" > \"$PG_RESTORE_ARGUMENTS_FILE\"\n");
   const result = run("sh", ["scripts/restore-postgres-test.sh", backup], {

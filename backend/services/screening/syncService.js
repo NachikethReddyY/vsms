@@ -2,11 +2,13 @@
 const prisma = require("../../prisma/prismaClient");
 const screeningService = require("./screeningService");
 const { createAuditLog } = require("../../utils/logging/audit");
+const { AUDIT_ACTIONS } = require("../../utils/logging/auditEvents");
 
 const HANDLERS = {
   VISUAL_ACUITY: "saveDynamic",
   REFRACTION: "saveDynamic",
   COLOUR_VISION: "saveDynamic",
+  EYE_HEALTH: "saveEyeHealth",
   CUSTOM: "saveDynamic",
 };
 
@@ -29,7 +31,6 @@ const SAFE_CONFLICT_CODES = new Set([
   "SHIFT_NOT_ACTIVE",
   "STATION_NOT_FOUND",
   "STATION_SCHEMA_MISSING",
-  "EYE_HEALTH_REVIEW_ONLY",
 ]);
 
 const canonicalJson = (value) => {
@@ -261,14 +262,9 @@ const processAction = async ({ eventId, action, user, db, screening, options }) 
   try {
     const handlerName = HANDLERS[action.stationType];
     if (!handlerName || typeof screening[handlerName] !== "function") {
-      const reviewOnly = action.stationType === "EYE_HEALTH";
-      throw Object.assign(new Error(
-        reviewOnly
-          ? "Eye health is recorded during clinical review, not as a screening station"
-          : `Unsupported screening station type: ${action.stationType}`,
-      ), {
-        status: reviewOnly ? 410 : 422,
-        code: reviewOnly ? "EYE_HEALTH_REVIEW_ONLY" : "UNSUPPORTED_STATION_TYPE",
+      throw Object.assign(new Error(`Unsupported screening station type: ${action.stationType}`), {
+        status: 422,
+        code: "UNSUPPORTED_STATION_TYPE",
       });
     }
     const receipt = await screening[handlerName](
@@ -373,9 +369,29 @@ const processScreeningSync = async (
     return acc;
   }, {});
 
+  for (const action of actions) {
+    await audit({
+      userId: user.userId,
+      action: AUDIT_ACTIONS[`SCREENING_SYNC_ACTION_${action.status}`],
+      entityName: "SyncAction",
+      entityId: action.clientActionId,
+      outcome: action.status === "APPLIED" ? "SUCCESS" : action.status === "CONFLICT" ? "DENIED" : "FAILED",
+      newValue: {
+        eventId,
+        clientBatchId: body.clientBatchId,
+        clientActionId: action.clientActionId,
+        status: action.status,
+        retryCount: action.retryCount,
+        errorCode: action.errorCode || null,
+      },
+      context,
+      client: db,
+    });
+  }
+
   await audit({
     userId: user.userId,
-    action: "SCREENING_SYNC_BATCH",
+    action: AUDIT_ACTIONS.SCREENING_SYNC_BATCH,
     entityName: "Event",
     entityId: eventId,
     newValue: {

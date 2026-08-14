@@ -8,7 +8,7 @@ const { buildAuthorizationUrl, getLogoutUrl } = require("../../utils/auth/cognit
 test("only verified Cognito groups map to application roles", () => {
     assert.deepEqual(
         rolesFromCognitoGroups({ "cognito:groups": ["Admin", "RegistrationOfficer", "Unknown"] }),
-        ["ADMINISTRATOR", "REGISTRATION_OFFICER"]
+        ["ADMINISTRATOR"]
     );
     assert.deepEqual(rolesFromCognitoGroups({ role: "ADMINISTRATOR" }), []);
 });
@@ -70,10 +70,12 @@ test("audit metadata redacts credentials, tokens and signature evidence", () => 
         action: "test",
         password: "secret",
         accessToken: "token",
-        nested: { signatureObjectKey: "private/key", participantId: "abc" },
+        nested: { signatureObjectKey: "private/key", participantId: "abc", NRIC: "S1234567A", emailAddress: "person@example.test" },
     });
     assert.equal(safe.password, "[REDACTED]");
     assert.equal(safe.accessToken, "[REDACTED]");
     assert.equal(safe.nested.signatureObjectKey, "[REDACTED]");
     assert.equal(safe.nested.participantId, "abc");
+    assert.equal(safe.nested.NRIC, "[REDACTED]");
+    assert.equal(safe.nested.emailAddress, "[REDACTED]");
 });

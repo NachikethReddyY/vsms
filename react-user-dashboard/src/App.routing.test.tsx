@@ -22,6 +22,7 @@ vi.mock('./features/events/EventFormPage', () => ({ default: ({ mode }: { mode: 
 vi.mock('./features/events/PublicEventPage', () => ({ default: () => <p>Public event</p> }));
 vi.mock('./features/reviews/ReviewWorkspacePage', () => ({ default: () => <p>Reviews page</p> }));
 vi.mock('./features/reports/ReportsPage', () => ({ default: () => <p>Global reports page</p> }));
+vi.mock('./features/operations/OperationsCenterPage', () => ({ default: () => <p>Operations center page</p> }));
 vi.mock('./features/screening/DynamicStationPage', () => ({
   default: ({ stationType }: { stationType?: string }) => (
     <p>{stationType === 'VISUAL_ACUITY' ? 'Visual acuity station' : stationType === 'REFRACTION' ? 'Refraction station' : stationType === 'COLOUR_VISION' ? 'Colour vision station' : 'Custom station'}</p>
@@ -39,11 +40,10 @@ vi.mock('./pages/StationLibraryPage', () => ({ default: () => <p>Station library
 vi.mock('./pages/AccountSecurityPage', () => ({ default: () => <p>Security</p> }));
 vi.mock('./pages/QueuePages', () => ({ QueuePage: () => <p>Queue</p> }));
 vi.mock('./pages/ParticipantStatusPage', () => ({ default: () => <p>Participant status</p> }));
-vi.mock('./pages/ParticipantV2ConsentPage', () => ({ default: () => <p>V2 consent</p> }));
 vi.mock('./pages/ParticipantV2Page', () => ({ default: () => <p>V2</p> }));
 vi.mock('./pages/ParticipantV2ProfilePage', () => ({ default: () => <p>V2 profile</p> }));
 vi.mock('./pages/ParticipantPages', () => ({
-  ConsentPage: () => <p>Consent</p>, EmergencyContactsPage: () => <p>Emergency</p>, EventRegistrationStartPage: () => <p>Register</p>, EventRegistrationsPage: () => <p>Registrations</p>, ParticipantConsentsPage: () => <p>Consents</p>, ParticipantCreatePage: () => <p>Participant create</p>, ParticipantDetailPage: () => <p>Participant detail</p>, ParticipantEditPage: () => <p>Participant edit</p>, ParticipantHistoryPage: () => <p>History</p>, ParticipantSearchPage: () => <p>Participant search</p>, RegistrationConfirmationPage: () => <p>Confirmation</p>, RegistrationHistoryPage: () => <p>Reg history</p>, RegistrationQrPage: () => <p>Reg QR</p>, RegistrationReviewPage: () => <p>Reg review</p>,
+  EmergencyContactsPage: () => <p>Emergency</p>, EventRegistrationStartPage: () => <p>Register</p>, EventRegistrationsPage: () => <p>Registrations</p>, ParticipantCreatePage: () => <p>Participant create</p>, ParticipantDetailPage: () => <p>Participant detail</p>, ParticipantEditPage: () => <p>Participant edit</p>, ParticipantHistoryPage: () => <p>History</p>, ParticipantSearchPage: () => <p>Participant search</p>, RegistrationConfirmationPage: () => <p>Confirmation</p>, RegistrationHistoryPage: () => <p>Reg history</p>, RegistrationQrPage: () => <p>Reg QR</p>, RegistrationReviewPage: () => <p>Reg review</p>,
 }));
 vi.mock('./auth/CognitoRoutes', () => ({ CognitoCallback: () => <p>Callback</p> }));
 vi.mock('./features/stage4Api', async () => {
@@ -67,7 +67,10 @@ beforeEach(() => {
 afterEach(() => cleanup());
 
 describe('App route and navigation topology', () => {
-  it('renders global reports and create-event routes without an eventId', async () => {
+  it('renders global operations, reports, and create-event routes without an eventId', async () => {
+    renderPath('/operations');
+    expect(await screen.findByText('Operations center page')).toBeTruthy();
+    cleanup();
     renderPath('/reports');
     expect(await screen.findByText('Global reports page')).toBeTruthy();
     cleanup();
@@ -117,6 +120,5 @@ describe('App route and navigation topology', () => {
   it('consolidates staff invitations and lifecycle administration on /staff', async () => {
     renderPath('/staff');
     expect(await screen.findByText('Staff directory')).toBeTruthy();
-    expect(await screen.findByText('Account administration')).toBeTruthy();
   });
 });

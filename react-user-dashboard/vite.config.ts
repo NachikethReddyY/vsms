@@ -90,6 +90,7 @@ export default defineConfig(({ command, mode }: ConfigEnv): UserConfig => {
       tailwindcss() as unknown as PluginOption,
       VitePWA({
         registerType: 'autoUpdate',
+        manifestFilename: 'manifest.json',
         includeAssets: ['favicon.svg'],
         manifest: {
           name: 'VSMS',
@@ -131,6 +132,19 @@ export default defineConfig(({ command, mode }: ConfigEnv): UserConfig => {
           changeOrigin: true,
           secure: true,
           agent: proxyAgent,
+        },
+      },
+    },
+    build: {
+      rollupOptions: {
+        output: {
+          manualChunks(id) {
+            if (!id.includes('node_modules')) return undefined
+            if (id.includes('html5-qrcode')) return 'qr-scanner'
+            if (id.includes('@astryxdesign')) return 'design-system'
+            if (id.includes('react')) return 'react-vendor'
+            return 'vendor'
+          },
         },
       },
     },

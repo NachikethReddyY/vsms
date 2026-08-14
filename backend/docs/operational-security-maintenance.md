@@ -2,7 +2,13 @@
 
 Deploy `20260804230000_close_operational_security_gaps` before application code that emits `RECONCILIATION_REQUIRED` or creates artifact cleanup tasks. Deploy `20260805003000_referral_revisions_and_provider_events` before enabling referral revisions or SES provider callbacks.
 
-## SES lifecycle callbacks
+## Google SMTP referral delivery
+
+Set `SMTP_HOST=smtp.gmail.com`, `SMTP_PORT=465` (implicit TLS) or `587` (STARTTLS), `SMTP_USERNAME`, and `SMTP_PASSWORD`. Configuration is all-or-nothing and the authenticated Google account is always used as the sender. Referral PDFs remain encrypted and are attached from memory; Nodemailer file and URL access are disabled.
+
+SMTP acceptance records the referral as `SENT`; it does not claim inbox delivery. An ambiguous connection failure remains `RECONCILIATION_REQUIRED` and is never retried automatically. Check the Google sent-mail or Workspace audit log before resolving it.
+
+## Legacy SES lifecycle callbacks
 
 Set `SES_SNS_TOPIC_ARNS` to the exact comma-separated SNS TopicArn values authorized for this deployment, then subscribe `POST /api/v1/webhooks/ses` as the HTTPS endpoint. The endpoint is intentionally outside browser cookie/CSRF authentication: it accepts a callback only after verifying the SNS canonical signature, certificate validity, exact AWS SNS HTTPS host/path and region, and TopicArn allowlist. Subscription confirmation uses the AWS SDK with authenticated unsubscribe enabled.
 
@@ -16,7 +22,7 @@ An issued referral is immutable. The issuing reviewer can create the next sequen
 
 ## Event artifact cleanup
 
-Hard-delete first validates and records every event-owned consent signature, referral signature, and referral PDF in `artifact_cleanup_tasks` inside the same database transaction that deletes the event. It never deletes a file before commit. After commit, the service claims those durable tasks and unlinks only validated regular files under the configured signature or referral roots.
+Hard-delete first validates and records every event-owned reviewer/referral signature and referral PDF in `artifact_cleanup_tasks` inside the same database transaction that deletes the event. It never deletes a file before commit. After commit, the service claims those durable tasks and unlinks only validated regular files under the configured signature or referral roots.
 
 Failed and stale claims remain retryable with bounded exponential backoff. After the final automatic attempt, the task moves to `ESCALATED`; it is not silently abandoned. Administrators can list tasks without exposing storage paths and must explicitly choose one of the audited maintenance actions:
 
