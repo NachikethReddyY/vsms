@@ -48,8 +48,8 @@ BEGIN
     COUNT(*) FILTER (WHERE queue."status" IN ('CALLED', 'IN_PROGRESS'))::BIGINT,
     COUNT(*) FILTER (
       WHERE queue."status" = 'COMPLETED'
-        AND queue."completed_at" >= p_from
-        AND queue."completed_at" < p_to
+        AND queue."completed_at" >= (p_from AT TIME ZONE 'UTC')
+        AND queue."completed_at" < (p_to AT TIME ZONE 'UTC')
     )::BIGINT,
     COUNT(*) FILTER (WHERE queue."status" = 'SKIPPED')::BIGINT,
     percentile_cont(0.50) WITHIN GROUP (
@@ -77,8 +77,8 @@ BEGIN
     ON registration."registration_id" = queue."registration_id"
   WHERE registration."event_id" = p_event_id
     AND registration."registration_status" <> 'CANCELLED'
-    AND queue."entered_at" >= p_from
-    AND queue."entered_at" < p_to;
+    AND queue."entered_at" >= (p_from AT TIME ZONE 'UTC')
+    AND queue."entered_at" < (p_to AT TIME ZONE 'UTC');
 END;
 $$;
 
