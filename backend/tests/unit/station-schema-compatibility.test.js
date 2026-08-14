@@ -7,7 +7,6 @@ const {
   mergeClinicalAndTemplateResult,
   validateResultAgainstSchema,
   normalizeClinicalResultData,
-  assertClinicalFieldSchema,
 } = require("../../schemas/dynamicStationSchema");
 const { visualAcuityResultData } = require("../../schemas/screeningSchemas");
 

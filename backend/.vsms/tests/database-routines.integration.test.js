@@ -312,4 +312,22 @@ test("reviewed screening results cannot be inserted, updated, or deleted", async
     prisma.screeningResult.delete({ where: { resultId: saved.resultId } }),
     /cannot be changed after clinical review/,
   );
+  const extraStation = await prisma.station.create({
+    data: { eventId: event.eventId, stationName: "Routine REF", stationType: "REFRACTION", stationOrder: 2 },
+  });
+  await assert.rejects(
+    prisma.screeningResult.create({
+      data: {
+        registrationId: lockedRegistration.registrationId,
+        stationId: extraStation.stationId,
+        recordedByUserId: actor.id,
+        screeningType: "REFRACTION",
+        resultData: { measurementStatus: "COMPLETED" },
+        overallFlag: "NORMAL",
+        isFlagged: false,
+        idempotencyKey: crypto.randomUUID(),
+      },
+    }),
+    /cannot be changed after clinical review/,
+  );
 });

@@ -152,3 +152,13 @@ COMMENT ON PROCEDURE "sp_vsms_audit_screening_flag"(UUID, UUID) IS
 REVOKE ALL ON FUNCTION "vsms_screening_results_complete"(UUID, UUID) FROM PUBLIC;
 REVOKE ALL ON FUNCTION "vsms_prevent_reviewed_screening_mutation"() FROM PUBLIC;
 REVOKE ALL ON PROCEDURE "sp_vsms_audit_screening_flag"(UUID, UUID) FROM PUBLIC;
+
+DO $$
+BEGIN
+  IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'vsms_runtime') THEN
+    GRANT EXECUTE ON FUNCTION public."vsms_screening_results_complete"(UUID, UUID) TO vsms_runtime;
+    GRANT EXECUTE ON FUNCTION public."vsms_prevent_reviewed_screening_mutation"() TO vsms_runtime;
+    GRANT EXECUTE ON PROCEDURE public."sp_vsms_audit_screening_flag"(UUID, UUID) TO vsms_runtime;
+  END IF;
+END;
+$$;

@@ -12,6 +12,7 @@ GRANT EXECUTE ON FUNCTION public.vsms_event_queue_statistics(UUID, TIMESTAMPTZ, 
 GRANT EXECUTE ON PROCEDURE public.sp_vsms_cancel_active_registration_queue(UUID, UUID, TIMESTAMPTZ) TO vsms_runtime;
 GRANT EXECUTE ON FUNCTION public.vsms_registration_route_complete(UUID, UUID) TO vsms_runtime;
 GRANT EXECUTE ON FUNCTION public.vsms_screening_results_complete(UUID, UUID) TO vsms_runtime;
+GRANT EXECUTE ON FUNCTION public.vsms_prevent_reviewed_screening_mutation() TO vsms_runtime;
 GRANT EXECUTE ON PROCEDURE public.sp_vsms_audit_screening_flag(UUID, UUID) TO vsms_runtime;
 REVOKE UPDATE, DELETE, TRUNCATE ON TABLE event_audit_logs FROM vsms_runtime;
 REVOKE CREATE ON SCHEMA public FROM vsms_runtime;
