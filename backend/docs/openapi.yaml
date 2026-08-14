@@ -1821,23 +1821,6 @@ paths:
     get:
       tags: [Administration]
       operationId: listAdministrativeAuditLogs
-<<<<<<< HEAD
-      summary: List the centralized immutable audit history
-      description: >
-        Administrator-only paged read surface for the append-only audit trail.
-        Application, authentication, and event-history records are normalized
-        into one globally ordered timeline. A filter-bound signed keyset cursor
-        provides stable load-more pagination. Rows are immutable; this endpoint
-        never mutates history.
-      parameters:
-        - name: cursor
-          in: query
-          description: Signed keyset cursor for the unified timeline
-          schema: { type: string }
-        - name: limit
-          in: query
-          description: Maximum timeline records in this page
-=======
       summary: List the unified immutable audit timeline
       description: >
         Administrator-only paged read surface combining application,
@@ -1851,7 +1834,6 @@ paths:
         - name: limit
           in: query
           description: Maximum timeline rows in this page
->>>>>>> 40e42f8bd667cfae3262d148de139e8e755a00d5
           schema: { type: integer, minimum: 1, maximum: 100, default: 50 }
         - name: entityName
           in: query
@@ -5003,45 +4985,6 @@ components:
       properties:
         items:
           type: array
-<<<<<<< HEAD
-          description: Globally reverse-chronological records from every immutable audit ledger
-          items:
-            $ref: "#/components/schemas/AdminAuditEntry"
-        nextCursor:
-          type: string
-          nullable: true
-          description: Filter-bound signed keyset cursor for the next timeline page
-    AdminAuditEntry:
-      type: object
-      additionalProperties: false
-      required: [id, source, occurredAt, action, outcome, actor, eventId, entityName, entityId, requestId, ipAddress, deviceName, details, oldValue, newValue]
-      properties:
-        id: { type: string, format: uuid }
-        source: { type: string, enum: [APPLICATION, AUTHENTICATION, EVENT] }
-        occurredAt: { type: string, format: date-time }
-        action: { type: string, maxLength: 100 }
-        outcome: { type: string, enum: [SUCCESS, FAILED, DENIED] }
-        actor:
-          type: object
-          nullable: true
-          additionalProperties: false
-          required: [id, fullName, email, status]
-          properties:
-            id: { type: string, format: uuid }
-            fullName: { type: string, nullable: true }
-            email: { type: string, format: email }
-            status: { type: string }
-        eventId: { type: string, format: uuid, nullable: true }
-        entityName: { type: string, nullable: true }
-        entityId: { type: string, format: uuid, nullable: true }
-        requestId: { type: string, format: uuid, nullable: true }
-        ipAddress: { type: string, nullable: true }
-        deviceName: { type: string, nullable: true }
-        userAgent: { type: string, nullable: true }
-        details: { type: object, nullable: true, additionalProperties: true }
-        oldValue: { type: object, nullable: true, additionalProperties: true }
-        newValue: { type: object, nullable: true, additionalProperties: true }
-=======
           description: Reverse-chronological records from every immutable audit ledger
           items:
             type: object
@@ -5077,7 +5020,6 @@ components:
           type: string
           nullable: true
           description: Signed keyset cursor for the next timeline page
->>>>>>> 40e42f8bd667cfae3262d148de139e8e755a00d5
     QrCode:
       type: object
       additionalProperties: true
