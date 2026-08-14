@@ -1,6 +1,7 @@
 const { Prisma } = require("@prisma/client");
 const prisma = require("../../prisma/prismaClient");
 const AppError = require("../../errors/AppError");
+const { getEventQueueStatistics } = require("../../utils/database/databaseRoutines");
 const { requireEventManager } = require("../event/eventAuthorizationService");
 const { ATTENDANCE_DEFINITION } = require("../event/attendanceDefinition");
 
@@ -64,25 +65,7 @@ async function aggregateRows(db, eventId, from, to) {
         COUNT(*) FILTER (WHERE registration_status = 'COMPLETED') AS completed
       FROM event_registrations WHERE event_id = ${eventId}::uuid
     `),
-    db.$queryRaw(Prisma.sql`
-      SELECT
-        COUNT(*) FILTER (WHERE q.status = 'WAITING') AS waiting,
-        COUNT(*) FILTER (WHERE q.status IN ('CALLED', 'IN_PROGRESS')) AS active,
-        COUNT(*) FILTER (WHERE q.status = 'COMPLETED' AND q.completed_at >= ${from} AND q.completed_at < ${to}) AS completed,
-        COUNT(*) FILTER (WHERE q.status = 'SKIPPED') AS skipped,
-        percentile_cont(0.50) WITHIN GROUP (ORDER BY EXTRACT(EPOCH FROM (COALESCE(q.started_at, q.called_at) - q.entered_at)) / 60.0)
-          FILTER (WHERE COALESCE(q.started_at, q.called_at) >= q.entered_at) AS wait_p50,
-        percentile_cont(0.90) WITHIN GROUP (ORDER BY EXTRACT(EPOCH FROM (COALESCE(q.started_at, q.called_at) - q.entered_at)) / 60.0)
-          FILTER (WHERE COALESCE(q.started_at, q.called_at) >= q.entered_at) AS wait_p90,
-        percentile_cont(0.50) WITHIN GROUP (ORDER BY EXTRACT(EPOCH FROM (q.completed_at - COALESCE(q.started_at, q.called_at))) / 60.0)
-          FILTER (WHERE q.completed_at >= COALESCE(q.started_at, q.called_at)) AS service_p50,
-        percentile_cont(0.90) WITHIN GROUP (ORDER BY EXTRACT(EPOCH FROM (q.completed_at - COALESCE(q.started_at, q.called_at))) / 60.0)
-          FILTER (WHERE q.completed_at >= COALESCE(q.started_at, q.called_at)) AS service_p90
-      FROM queue_entries q
-      JOIN event_registrations r ON r.registration_id = q.registration_id
-      WHERE r.event_id = ${eventId}::uuid AND r.registration_status <> 'CANCELLED'
-        AND q.entered_at >= ${from} AND q.entered_at < ${to}
-    `),
+    getEventQueueStatistics(eventId, from, to, db),
     db.$queryRaw(Prisma.sql`
       SELECT s.station_name, s.station_type::text,
         COUNT(*) FILTER (WHERE q.status = 'COMPLETED') AS completed,

@@ -8,6 +8,9 @@ GRANT EXECUTE ON FUNCTION public.register_participant_for_event(UUID, UUID, UUID
 GRANT EXECUTE ON FUNCTION public.cancel_event_registration(UUID, UUID, VARCHAR) TO vsms_runtime;
 GRANT EXECUTE ON FUNCTION public.check_in_event_registration(UUID, UUID, UUID) TO vsms_runtime;
 GRANT EXECUTE ON FUNCTION public.get_event_registration_summary(UUID) TO vsms_runtime;
+GRANT EXECUTE ON FUNCTION public.vsms_event_queue_statistics(UUID, TIMESTAMPTZ, TIMESTAMPTZ) TO vsms_runtime;
+GRANT EXECUTE ON PROCEDURE public.sp_vsms_cancel_active_registration_queue(UUID, UUID, TIMESTAMPTZ) TO vsms_runtime;
+GRANT EXECUTE ON FUNCTION public.vsms_registration_route_complete(UUID, UUID) TO vsms_runtime;
 REVOKE UPDATE, DELETE, TRUNCATE ON TABLE event_audit_logs FROM vsms_runtime;
 REVOKE CREATE ON SCHEMA public FROM vsms_runtime;
 ALTER DEFAULT PRIVILEGES IN SCHEMA public
