@@ -803,6 +803,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/events/{eventId}/shifts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Add a working period to a draft, published, or live event */
+        post: operations["addEventShift"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/events/{eventId}/shifts/{shiftId}/assignments": {
         parameters: {
             query?: never;
@@ -864,7 +881,8 @@ export interface paths {
         get?: never;
         put?: never;
         post?: never;
-        delete?: never;
+        /** Remove an unused station from a draft or published event */
+        delete: operations["removeEventStation"];
         options?: never;
         head?: never;
         /** Configure an imported station's order, capacity, or availability */
@@ -3016,6 +3034,16 @@ export interface components {
             /** @default 1 */
             requiredStaff: number;
             assignments?: components["schemas"]["ShiftAssignmentInput"][];
+        };
+        AddShiftRequest: {
+            version: number;
+            name: string;
+            /** Format: date-time */
+            startsAt: string;
+            /** Format: date-time */
+            endsAt: string;
+            /** @default 1 */
+            requiredStaff: number;
         };
         Shift: components["schemas"]["ShiftInput"] & {
             /** Format: uuid */
@@ -6773,6 +6801,37 @@ export interface operations {
             409: components["responses"]["Conflict"];
         };
     };
+    addEventShift: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                eventId: components["parameters"]["EventId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AddShiftRequest"];
+            };
+        };
+        responses: {
+            /** @description Shift added and audited */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Event"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            422: components["responses"]["ValidationFailed"];
+        };
+    };
     assignEventStaff: {
         parameters: {
             query?: never;
@@ -6851,6 +6910,35 @@ export interface operations {
         responses: {
             /** @description Stations imported and audited */
             201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Event"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            422: components["responses"]["ValidationFailed"];
+        };
+    };
+    removeEventStation: {
+        parameters: {
+            query: {
+                version: number;
+            };
+            header?: never;
+            path: {
+                eventId: components["parameters"]["EventId"];
+                eventStationId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Station removed and remaining stations reordered */
+            200: {
                 headers: {
                     [name: string]: unknown;
                 };

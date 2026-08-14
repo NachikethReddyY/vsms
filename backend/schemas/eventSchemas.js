@@ -277,6 +277,17 @@ const reportJobListQuery = z.object({
 const assignmentParams = z.object({ eventId: uuid, shiftId: uuid }).strict();
 const assignmentDeleteParams = z.object({ eventId: uuid, shiftId: uuid, assignmentId: uuid }).strict();
 const versionQuery = z.object({ version: z.coerce.number().int().positive() }).strict();
+const shiftCreateBody = z.object({
+  version: z.number().int().positive(),
+  name: z.string().trim().min(1).max(100),
+  startsAt: timestamp,
+  endsAt: timestamp,
+  requiredStaff: z.number().int().min(1).max(1000).default(1),
+}).strict().superRefine((value, ctx) => {
+  if (new Date(value.endsAt) <= new Date(value.startsAt)) {
+    ctx.addIssue({ code: "custom", path: ["endsAt"], message: "Shift end must be after its start" });
+  }
+});
 const assignmentBody = z.object({
   version: z.number().int().positive(),
   userId: uuid.optional(),
@@ -368,6 +379,7 @@ module.exports = {
   reportJobListQuery,
   assignmentParams,
   assignmentDeleteParams,
+  shiftCreateBody,
   versionQuery,
   assignmentBody,
   stationParams,

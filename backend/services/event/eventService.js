@@ -2291,6 +2291,37 @@ const addStaffAssignment = async (eventId, shiftId, body, user, correlationId, d
   });
 };
 
+const addShift = async (eventId, body, user, correlationId, db = prisma) => {
+  const current = await requireEvent(eventId, user, true, db);
+  if (!["DRAFT", "PUBLISHED", "IN_PROGRESS"].includes(current.status)) {
+    throw new AppError(409, "SHIFTS_NOT_EDITABLE", "Shifts cannot be added to a completed or cancelled event");
+  }
+  assertRange(current, [body]);
+
+  return db.$transaction(async (tx) => {
+    await bumpEventVersion(tx, eventId, body.version);
+    const shift = await tx.shift.create({
+      data: {
+        ...normalizeShift(body, eventId),
+        status: current.status === "IN_PROGRESS" ? "ACTIVE" : "PLANNED",
+      },
+    });
+    const updated = await tx.event.findUniqueOrThrow({ where: { eventId }, include: eventInclude });
+    await auditUpdate(tx, current, updated, user, correlationId);
+    await createAuditLog({
+      client: tx,
+      userId: user.userId,
+      context: correlationId,
+      action: "SHIFT_ADDED",
+      resource: "Event",
+      entityName: "Event",
+      entityId: eventId,
+      details: { shiftId: shift.shiftId, name: shift.name },
+    });
+    return toEventResponse(updated, user, tx);
+  });
+};
+
 const removeStaffAssignment = async (eventId, shiftId, assignmentId, version, user, correlationId, db = prisma) => {
   const current = await requireEvent(eventId, user, true, db);
   if (!["DRAFT", "PUBLISHED", "IN_PROGRESS"].includes(current.status)) {
@@ -2639,6 +2670,7 @@ module.exports = {
   importStations,
   updateStation,
   removeStation,
+  addShift,
   addStaffAssignment,
   removeStaffAssignment,
   getAuditLog,

@@ -341,6 +341,36 @@ test("live events reject station and shift plan updates", async (t) => {
   assert.equal(transactionCalls, 0);
 });
 
+test("a live event accepts a new active shift without unlocking the event plan", async (t) => {
+  const current = eventRecord("IN_PROGRESS", 3);
+  const addedShift = {
+    shiftId: crypto.randomUUID(),
+    eventId,
+    name: "Late registration",
+    startsAt: new Date("2040-01-01T02:00:00.000Z"),
+    endsAt: new Date("2040-01-01T04:00:00.000Z"),
+    requiredStaff: 2,
+    status: "ACTIVE",
+    staffAssignments: [],
+  };
+  const updated = { ...eventRecord("IN_PROGRESS", 4), shifts: [...current.shifts, addedShift] };
+  let saved;
+  installTransaction(t, current, updated, {
+    shift: { create: async ({ data }) => { saved = data; return { ...addedShift, ...data }; } },
+  });
+
+  const result = await eventService.addShift(eventId, {
+    version: 3,
+    name: addedShift.name,
+    startsAt: addedShift.startsAt.toISOString(),
+    endsAt: addedShift.endsAt.toISOString(),
+    requiredStaff: 2,
+  }, manager, crypto.randomUUID());
+
+  assert.equal(saved.status, "ACTIVE");
+  assert.equal(result.shifts.at(-1).name, "Late registration");
+});
+
 test("staff assignment saves an active user and preserves manager permissions", async (t) => {
   const current = eventRecord();
   const assignment = {
