@@ -1,395 +1,462 @@
 -- =============================================================================
--- ST0528 Database Systems (Project 2) - VSMS Stored Procedures & Triggers
--- File: stored_procedures.sql
--- Description: Consolidated enterprise-grade database objects for the Visual
---              Screening Management System (VSMS).
+-- ST0528 Database Systems (Project 2) - VSMS Database Routines
+-- Contributor: Keefe Chen Lin Li
+-- =============================================================================
+--
+-- This submission catalogue mirrors the current PostgreSQL/Prisma model. The
+-- dated files under backend/prisma/migrations remain the deployment authority.
+-- This file is intentionally safe to execute again after those migrations: it
+-- uses CREATE OR REPLACE and recreates named triggers explicitly.
+--
+-- Application integration:
+--   * analyticsService.js -> databaseRoutines.getEventQueueStatistics()
+--   * reviewService.js    -> databaseRoutines.cancelActiveRegistrationQueue()
+--   * Prisma/raw SQL      -> fn_update_timestamp and event-scope triggers
+--
+-- Authorization, event assignment, request validation, clinical decisions and
+-- request-aware audit attribution stay in Express. PostgreSQL owns aggregate
+-- computation and invariants that must remain correct for every database caller.
 -- =============================================================================
 
+BEGIN;
+
 -- -----------------------------------------------------------------------------
--- 1. TRIGGER FUNCTIONS & TRIGGERS
+-- 1. Participant timestamp integrity
 -- -----------------------------------------------------------------------------
 
--- 1.1 Automatic Timestamp Update Trigger Function
--- Ensures 'updated_at' is always current whenever a row is modified.
-CREATE OR REPLACE FUNCTION fn_update_timestamp()
+CREATE OR REPLACE FUNCTION public.fn_update_timestamp()
 RETURNS TRIGGER
 LANGUAGE plpgsql
+SECURITY INVOKER
+SET search_path = pg_catalog, public
 AS $$
 BEGIN
-    NEW.updated_at = NOW();
-    RETURN NEW;
+  NEW."updated_at" := CURRENT_TIMESTAMP;
+  RETURN NEW;
 END;
 $$;
 
--- Attach trigger to participants table
-DROP TRIGGER IF EXISTS trg_participants_updated_at ON participants;
-CREATE TRIGGER trg_participants_updated_at
-BEFORE UPDATE ON participants
+DROP TRIGGER IF EXISTS "trg_participants_updated_at" ON public."participants";
+CREATE TRIGGER "trg_participants_updated_at"
+BEFORE UPDATE ON public."participants"
 FOR EACH ROW
-EXECUTE FUNCTION fn_update_timestamp();
+EXECUTE FUNCTION public.fn_update_timestamp();
 
-
--- 1.2 Clinical Auto-Flagging Trigger Function (FR-05)
--- Automatically evaluates visual acuity thresholds and sets flags upon insertion/update.
-CREATE OR REPLACE FUNCTION fn_auto_flag_visual_acuity()
-RETURNS TRIGGER
-LANGUAGE plpgsql
-AS $$
-BEGIN
-    -- Reset flag status before evaluation
-    NEW.is_flagged := FALSE;
-    NEW.flag_reason := '';
-
-    /*
-        Driving Standard Check:
-        Flags participants with visual acuity worse than 20/40
-    */
-    IF NEW.left_eye_va IN ('20/50', '20/60', '20/80', '20/100', '20/200')
-       OR NEW.right_eye_va IN ('20/50', '20/60', '20/80', '20/100', '20/200') THEN
-        
-        NEW.is_flagged := TRUE;
-        NEW.flag_reason := NEW.flag_reason ||
-        '[Driving Standard: Visual acuity worse than 20/40] ';
-    END IF;
-
-
-    /*
-        Pathology Check:
-        Flags participants where pinhole correction does not significantly improve vision
-    */
-    IF NEW.pinhole_left IN ('20/40', '20/50', '20/60', '20/80', '20/100', '20/200')
-       OR NEW.pinhole_right IN ('20/40', '20/50', '20/60', '20/80', '20/100', '20/200') THEN
-        
-        NEW.is_flagged := TRUE;
-        NEW.flag_reason := NEW.flag_reason ||
-        '[Pathology Risk: Pinhole improvement insufficient] ';
-    END IF;
-
-
-    RETURN NEW;
-END;
-$$;
-
-
--- Attach trigger to visual_acuity_results table
-DROP TRIGGER IF EXISTS trg_auto_flag_va 
-ON visual_acuity_results;
-
-CREATE TRIGGER trg_auto_flag_va
-BEFORE INSERT OR UPDATE ON visual_acuity_results
-FOR EACH ROW
-EXECUTE FUNCTION fn_auto_flag_visual_acuity();
-
-
--- 1.3 Audit Logger Trigger Function (BR-06 Compliance)
--- Automatically records audit entries when queue statuses change.
-CREATE OR REPLACE FUNCTION fn_audit_queue_transition()
-RETURNS TRIGGER
-LANGUAGE plpgsql
-AS $$
-BEGIN
-    IF NEW.status = 'COMPLETED' AND (OLD.status IS NULL OR OLD.status != 'COMPLETED') THEN
-        INSERT INTO audit_logs (participant_id, action, station_name, performed_by, created_at)
-        VALUES (NEW.participant_id, 'STATION_COMPLETED', NEW.station_name, NEW.updated_by, NOW());
-    END IF;
-    RETURN NEW;
-END;
-$$;
-
--- Attach audit trigger to station_queues table
-DROP TRIGGER IF EXISTS trg_audit_queue_change ON station_queues;
-CREATE TRIGGER trg_audit_queue_change
-AFTER UPDATE ON station_queues
-FOR EACH ROW
-EXECUTE FUNCTION fn_audit_queue_transition();
-
+COMMENT ON FUNCTION public.fn_update_timestamp() IS
+  'Refreshes participants.updated_at for writes made outside Prisma.';
 
 -- -----------------------------------------------------------------------------
--- 2. STORED PROCEDURES
+-- 2. PII-free operational queue analytics
 -- -----------------------------------------------------------------------------
 
--- 2.1 Participant Station Queue Transfer Procedure (FR-04)
--- Atomically completes the current station and adds participant to the next station queue.
-CREATE OR REPLACE PROCEDURE sp_transfer_participant(
-    p_queue_entry_id VARCHAR,
-    p_next_station_id VARCHAR,
-    p_performed_by VARCHAR
+CREATE OR REPLACE FUNCTION public."vsms_event_queue_statistics"(
+  p_event_id UUID,
+  p_from TIMESTAMPTZ,
+  p_to TIMESTAMPTZ
+)
+RETURNS TABLE (
+  waiting BIGINT,
+  active BIGINT,
+  completed BIGINT,
+  skipped BIGINT,
+  wait_p50 DOUBLE PRECISION,
+  wait_p90 DOUBLE PRECISION,
+  service_p50 DOUBLE PRECISION,
+  service_p90 DOUBLE PRECISION
 )
 LANGUAGE plpgsql
+STABLE
+SECURITY INVOKER
+SET search_path = pg_catalog, public
 AS $$
-DECLARE
-    v_registration_id VARCHAR;
-    v_current_station_id VARCHAR;
-    v_queue_number INTEGER;
-    v_is_priority BOOLEAN;
-    v_priority_notes VARCHAR;
 BEGIN
-    /*
-     * 1. Get the current queue entry.
-     * FOR UPDATE prevents another transaction from
-     * modifying the same queue entry simultaneously.
-     */
-    SELECT
-        registration_id,
-        station_id,
-        queue_number,
-        is_priority,
-        priority_notes
-    INTO
-        v_registration_id,
-        v_current_station_id,
-        v_queue_number,
-        v_is_priority,
-        v_priority_notes
-    FROM queue_entry
-    WHERE id = p_queue_entry_id
-      AND status = 'IN_PROGRESS'
-    FOR UPDATE;
+  IF p_event_id IS NULL THEN
+    RAISE EXCEPTION USING
+      ERRCODE = '22004',
+      MESSAGE = 'event id is required';
+  END IF;
 
-    IF NOT FOUND THEN
-        RAISE EXCEPTION
-            'Queue entry % does not exist or is not IN_PROGRESS',
-            p_queue_entry_id;
-    END IF;
+  IF p_from IS NULL OR p_to IS NULL OR p_from >= p_to THEN
+    RAISE EXCEPTION USING
+      ERRCODE = '22007',
+      MESSAGE = 'analytics range must have a start before its end';
+  END IF;
 
+  IF NOT EXISTS (
+    SELECT 1
+    FROM public."events" event
+    WHERE event."event_id" = p_event_id
+  ) THEN
+    RAISE EXCEPTION USING
+      ERRCODE = '23503',
+      MESSAGE = 'analytics event does not exist';
+  END IF;
 
-    /*
-     * 2. Validate the target station exists and is active.
-     */
-    IF NOT EXISTS (
-        SELECT 1
-        FROM station
-        WHERE station_id = p_next_station_id
-          AND is_active = TRUE
-    ) THEN
-        RAISE EXCEPTION
-            'Target station % does not exist or is inactive',
-            p_next_station_id;
-    END IF;
-
-
-    /*
-     * 3. Complete the current station queue entry.
-     */
-    UPDATE queue_entry
-    SET
-        status = 'COMPLETED',
-        completed_at = NOW(),
-        left_queue_at = NOW()
-    WHERE id = p_queue_entry_id;
-
-
-    /*
-     * 4. Create the participant's queue entry
-     *    at the next screening station.
-     */
-    INSERT INTO queue_entry (
-        registration_id,
-        station_id,
-        queue_number,
-        status,
-        is_priority,
-        priority_notes
+  RETURN QUERY
+  SELECT
+    COUNT(*) FILTER (WHERE queue."status" = 'WAITING')::BIGINT,
+    COUNT(*) FILTER (WHERE queue."status" IN ('CALLED', 'IN_PROGRESS'))::BIGINT,
+    COUNT(*) FILTER (
+      WHERE queue."status" = 'COMPLETED'
+        AND queue."completed_at" >= (p_from AT TIME ZONE 'UTC')
+        AND queue."completed_at" < (p_to AT TIME ZONE 'UTC')
+    )::BIGINT,
+    COUNT(*) FILTER (WHERE queue."status" = 'SKIPPED')::BIGINT,
+    percentile_cont(0.50) WITHIN GROUP (
+      ORDER BY (
+        EXTRACT(EPOCH FROM (
+          COALESCE(queue."started_at", queue."called_at") - queue."entered_at"
+        )) / 60.0
+      )::DOUBLE PRECISION
+    ) FILTER (
+      WHERE COALESCE(queue."started_at", queue."called_at") >= queue."entered_at"
+    ),
+    percentile_cont(0.90) WITHIN GROUP (
+      ORDER BY (
+        EXTRACT(EPOCH FROM (
+          COALESCE(queue."started_at", queue."called_at") - queue."entered_at"
+        )) / 60.0
+      )::DOUBLE PRECISION
+    ) FILTER (
+      WHERE COALESCE(queue."started_at", queue."called_at") >= queue."entered_at"
+    ),
+    percentile_cont(0.50) WITHIN GROUP (
+      ORDER BY (
+        EXTRACT(EPOCH FROM (
+          queue."completed_at" - COALESCE(queue."started_at", queue."called_at")
+        )) / 60.0
+      )::DOUBLE PRECISION
+    ) FILTER (
+      WHERE queue."completed_at" >= COALESCE(queue."started_at", queue."called_at")
+    ),
+    percentile_cont(0.90) WITHIN GROUP (
+      ORDER BY (
+        EXTRACT(EPOCH FROM (
+          queue."completed_at" - COALESCE(queue."started_at", queue."called_at")
+        )) / 60.0
+      )::DOUBLE PRECISION
+    ) FILTER (
+      WHERE queue."completed_at" >= COALESCE(queue."started_at", queue."called_at")
     )
-    VALUES (
-        v_registration_id,
-        p_next_station_id,
-        v_queue_number,
-        'WAITING',
-        COALESCE(v_is_priority, FALSE),
-        v_priority_notes
-    );
-
+  FROM public."queue_entries" queue
+  JOIN public."event_registrations" registration
+    ON registration."registration_id" = queue."registration_id"
+  WHERE registration."event_id" = p_event_id
+    AND registration."registration_status" <> 'CANCELLED'
+    AND queue."entered_at" >= (p_from AT TIME ZONE 'UTC')
+    AND queue."entered_at" < (p_to AT TIME ZONE 'UTC');
 END;
 $$;
 
-
--- 2.2 Record Visual Acuity Screening Results Procedure
--- Inserts or updates screening test results safely.
-CREATE OR REPLACE PROCEDURE sp_record_visual_acuity(
-    p_participant_id VARCHAR,
-    p_left_eye_va VARCHAR,
-    p_right_eye_va VARCHAR,
-    p_pinhole_left VARCHAR,
-    p_pinhole_right VARCHAR,
-    p_recorded_by VARCHAR
-)
-LANGUAGE plpgsql
-AS $$
-BEGIN
-    -- Validate required participant ID
-    IF p_participant_id IS NULL
-       OR TRIM(p_participant_id) = '' THEN
-        RAISE EXCEPTION
-            'Participant ID is required';
-    END IF;
-
-    -- Validate visual-acuity values
-    IF p_left_eye_va IS NULL
-       OR TRIM(p_left_eye_va) = '' THEN
-        RAISE EXCEPTION
-            'Left-eye visual acuity is required';
-    END IF;
-
-    IF p_right_eye_va IS NULL
-       OR TRIM(p_right_eye_va) = '' THEN
-        RAISE EXCEPTION
-            'Right-eye visual acuity is required';
-    END IF;
-
-    -- Validate staff member
-    IF p_recorded_by IS NULL
-       OR TRIM(p_recorded_by) = '' THEN
-        RAISE EXCEPTION
-            'Recorded-by user is required';
-    END IF;
-
-    INSERT INTO visual_acuity_results (
-        participant_id,
-        left_eye_va,
-        right_eye_va,
-        pinhole_left,
-        pinhole_right,
-        recorded_by,
-        created_at,
-        updated_at
-    )
-    VALUES (
-        p_participant_id,
-        p_left_eye_va,
-        p_right_eye_va,
-        p_pinhole_left,
-        p_pinhole_right,
-        p_recorded_by,
-        NOW(),
-        NOW()
-    )
-    ON CONFLICT (participant_id)
-    DO UPDATE SET
-        left_eye_va = EXCLUDED.left_eye_va,
-        right_eye_va = EXCLUDED.right_eye_va,
-        pinhole_left = EXCLUDED.pinhole_left,
-        pinhole_right = EXCLUDED.pinhole_right,
-        recorded_by = EXCLUDED.recorded_by,
-        updated_at = NOW();
-END;
-$$;
-
-
--- 2.3 Cancel/Remove Participant from Active Queue Procedure
-CREATE OR REPLACE PROCEDURE sp_cancel_participant_queue(
-    p_participant_id VARCHAR,
-    p_station_name VARCHAR,
-    p_reason TEXT,
-    p_performed_by VARCHAR
-)
-LANGUAGE plpgsql
-AS $$
-BEGIN
-    UPDATE station_queues
-    SET status = 'CANCELLED',
-        cancellation_reason = p_reason,
-        updated_by = p_performed_by,
-        updated_at = NOW()
-    WHERE participant_id = p_participant_id
-      AND station_name = p_station_name
-      AND status IN ('WAITING', 'IN_PROGRESS');
-
-    -- Insert cancellation into audit logs
-    INSERT INTO audit_logs (participant_id, action, station_name, performed_by, details, created_at)
-    VALUES (p_participant_id, 'QUEUE_CANCELLED', p_station_name, p_performed_by, p_reason, NOW());
-END;
-$$;
-
+COMMENT ON FUNCTION public."vsms_event_queue_statistics"(
+  UUID,
+  TIMESTAMPTZ,
+  TIMESTAMPTZ
+) IS
+  'Returns PII-free queue counts and p50/p90 timings for one authorized event and half-open interval.';
 
 -- -----------------------------------------------------------------------------
--- 3. USER-DEFINED FUNCTIONS (UDFs)
+-- 3. Atomic cancellation of active queue state
 -- -----------------------------------------------------------------------------
 
--- 3.1 Check Overall Participant Screening Completion Status
--- Returns TRUE if a participant has completed all mandatory stations.
-CREATE OR REPLACE FUNCTION fn_check_participant_completion(
-    p_participant_id VARCHAR
+CREATE OR REPLACE PROCEDURE public."sp_vsms_cancel_active_registration_queue"(
+  p_event_id UUID,
+  p_registration_id UUID,
+  p_cancelled_at TIMESTAMPTZ,
+  OUT p_cancelled_count INTEGER
+)
+LANGUAGE plpgsql
+SECURITY INVOKER
+SET search_path = pg_catalog, public
+AS $$
+BEGIN
+  p_cancelled_count := 0;
+
+  IF p_event_id IS NULL OR p_registration_id IS NULL OR p_cancelled_at IS NULL THEN
+    RAISE EXCEPTION USING
+      ERRCODE = '22004',
+      MESSAGE = 'event id, registration id, and cancellation time are required';
+  END IF;
+
+  IF NOT EXISTS (
+    SELECT 1
+    FROM public."event_registrations" registration
+    WHERE registration."registration_id" = p_registration_id
+      AND registration."event_id" = p_event_id
+  ) THEN
+    RAISE EXCEPTION USING
+      ERRCODE = '23503',
+      MESSAGE = 'registration does not belong to the supplied event';
+  END IF;
+
+  UPDATE public."queue_entries" queue
+  SET
+    "status" = 'CANCELLED',
+    "left_queue_at" = COALESCE(queue."left_queue_at", p_cancelled_at)
+  WHERE queue."registration_id" = p_registration_id
+    AND queue."status" IN ('WAITING', 'CALLED', 'IN_PROGRESS');
+
+  GET DIAGNOSTICS p_cancelled_count = ROW_COUNT;
+END;
+$$;
+
+COMMENT ON PROCEDURE public."sp_vsms_cancel_active_registration_queue"(
+  UUID,
+  UUID,
+  TIMESTAMPTZ
+) IS
+  'Idempotently closes active queue rows for one event-scoped registration and returns the affected count.';
+
+-- -----------------------------------------------------------------------------
+-- 4. Event-scoped route completion UDF
+-- -----------------------------------------------------------------------------
+
+CREATE OR REPLACE FUNCTION public."vsms_registration_route_complete"(
+  p_event_id UUID,
+  p_registration_id UUID
 )
 RETURNS BOOLEAN
 LANGUAGE plpgsql
+STABLE
+SECURITY INVOKER
+SET search_path = pg_catalog, public
+AS $$
+BEGIN
+  IF p_event_id IS NULL OR p_registration_id IS NULL THEN
+    RAISE EXCEPTION USING
+      ERRCODE = '22004',
+      MESSAGE = 'event id and registration id are required';
+  END IF;
+
+  IF NOT EXISTS (
+    SELECT 1
+    FROM public."event_registrations" registration
+    WHERE registration."registration_id" = p_registration_id
+      AND registration."event_id" = p_event_id
+  ) THEN
+    RAISE EXCEPTION USING
+      ERRCODE = '23503',
+      MESSAGE = 'registration does not belong to the supplied event';
+  END IF;
+
+  RETURN EXISTS (
+    SELECT 1
+    FROM public."registration_route_steps" route_step
+    WHERE route_step."registration_id" = p_registration_id
+  ) AND NOT EXISTS (
+    SELECT 1
+    FROM public."registration_route_steps" route_step
+    WHERE route_step."registration_id" = p_registration_id
+      AND route_step."completed_at" IS NULL
+  );
+END;
+$$;
+
+COMMENT ON FUNCTION public."vsms_registration_route_complete"(UUID, UUID) IS
+  'Returns true only when an event-scoped registration has a non-empty route and every route step is complete.';
+
+-- -----------------------------------------------------------------------------
+-- 5. Cross-event station integrity triggers
+-- -----------------------------------------------------------------------------
+
+CREATE OR REPLACE FUNCTION public."vsms_assert_registration_station_scope"()
+RETURNS TRIGGER
+LANGUAGE plpgsql
+SECURITY INVOKER
+SET search_path = pg_catalog, public
 AS $$
 DECLARE
-    v_total_mandatory_stations INT;
-    v_completed_mandatory_stations INT;
+  registration_event_id UUID;
+  station_event_id UUID;
 BEGIN
-    -- Count mandatory stations configured in the system
-    SELECT COUNT(DISTINCT station_name)
-    INTO v_total_mandatory_stations
-    FROM screening_stations
-    WHERE is_mandatory = TRUE;
+  SELECT registration."event_id"
+  INTO registration_event_id
+  FROM public."event_registrations" registration
+  WHERE registration."registration_id" = NEW."registration_id";
 
-    -- Count completed mandatory stations for the participant
-    SELECT COUNT(DISTINCT sq.station_name)
-    INTO v_completed_mandatory_stations
-    FROM station_queues sq
-    JOIN screening_stations ss ON sq.station_name = ss.station_name
-    WHERE sq.participant_id = p_participant_id
-      AND sq.status = 'COMPLETED'
-      AND ss.is_mandatory = TRUE;
+  SELECT station."event_id"
+  INTO station_event_id
+  FROM public."stations" station
+  WHERE station."station_id" = NEW."station_id";
 
-    RETURN (v_completed_mandatory_stations >= v_total_mandatory_stations);
+  IF registration_event_id IS DISTINCT FROM station_event_id THEN
+    RAISE EXCEPTION USING
+      ERRCODE = '23514',
+      MESSAGE = format(
+        'station %s and registration %s must belong to the same event',
+        NEW."station_id",
+        NEW."registration_id"
+      );
+  END IF;
+
+  RETURN NEW;
 END;
 $$;
 
-
--- 3.2 Visual Acuity Categorization Helper Function
--- Categorizes visual acuity readings into clinical impairment levels.
-CREATE OR REPLACE FUNCTION fn_get_visual_acuity_category(
-    p_va VARCHAR
-)
-RETURNS VARCHAR
+CREATE OR REPLACE FUNCTION public."vsms_assert_queue_movement_scope"()
+RETURNS TRIGGER
 LANGUAGE plpgsql
+SECURITY INVOKER
+SET search_path = pg_catalog, public
 AS $$
+DECLARE
+  registration_event_id UUID;
+  from_event_id UUID;
+  to_event_id UUID;
 BEGIN
-    RETURN CASE
-        WHEN p_va IN ('20/20', '20/25') THEN 'NORMAL'
-        WHEN p_va IN ('20/30', '20/40') THEN 'MILD_IMPAIRMENT'
-        WHEN p_va IN ('20/50', '20/100') THEN 'MODERATE_IMPAIRMENT'
-        WHEN p_va IN ('20/200') THEN 'SEVERE_IMPAIRMENT'
-        ELSE 'UNCLASSIFIED'
-    END;
+  SELECT registration."event_id"
+  INTO registration_event_id
+  FROM public."event_registrations" registration
+  WHERE registration."registration_id" = NEW."registration_id";
+
+  SELECT station."event_id"
+  INTO from_event_id
+  FROM public."stations" station
+  WHERE station."station_id" = NEW."from_station_id";
+
+  SELECT station."event_id"
+  INTO to_event_id
+  FROM public."stations" station
+  WHERE station."station_id" = NEW."to_station_id";
+
+  IF registration_event_id IS DISTINCT FROM from_event_id
+    OR registration_event_id IS DISTINCT FROM to_event_id THEN
+    RAISE EXCEPTION USING
+      ERRCODE = '23514',
+      MESSAGE = format(
+        'queue movement stations and registration %s must belong to the same event',
+        NEW."registration_id"
+      );
+  END IF;
+
+  RETURN NEW;
 END;
 $$;
 
+-- Reject existing invalid data instead of installing constraints over it.
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1
+    FROM public."registration_route_steps" route_step
+    JOIN public."event_registrations" registration USING ("registration_id")
+    JOIN public."stations" station USING ("station_id")
+    WHERE registration."event_id" <> station."event_id"
+  ) OR EXISTS (
+    SELECT 1
+    FROM public."queue_entries" queue
+    JOIN public."event_registrations" registration USING ("registration_id")
+    JOIN public."stations" station USING ("station_id")
+    WHERE registration."event_id" <> station."event_id"
+  ) OR EXISTS (
+    SELECT 1
+    FROM public."screening_results" result
+    JOIN public."event_registrations" registration USING ("registration_id")
+    JOIN public."stations" station USING ("station_id")
+    WHERE registration."event_id" <> station."event_id"
+  ) OR EXISTS (
+    SELECT 1
+    FROM public."queue_movements" movement
+    JOIN public."event_registrations" registration USING ("registration_id")
+    JOIN public."stations" from_station
+      ON from_station."station_id" = movement."from_station_id"
+    JOIN public."stations" to_station
+      ON to_station."station_id" = movement."to_station_id"
+    WHERE registration."event_id" <> from_station."event_id"
+      OR registration."event_id" <> to_station."event_id"
+  ) THEN
+    RAISE EXCEPTION USING
+      ERRCODE = '23514',
+      MESSAGE = 'cross-event station data must be corrected before installing VSMS scope constraints';
+  END IF;
+END;
+$$;
+
+DROP TRIGGER IF EXISTS "registration_route_steps_event_scope_check"
+  ON public."registration_route_steps";
+CREATE TRIGGER "registration_route_steps_event_scope_check"
+BEFORE INSERT OR UPDATE OF "registration_id", "station_id"
+ON public."registration_route_steps"
+FOR EACH ROW
+EXECUTE FUNCTION public."vsms_assert_registration_station_scope"();
+
+DROP TRIGGER IF EXISTS "queue_entries_event_scope_check"
+  ON public."queue_entries";
+CREATE TRIGGER "queue_entries_event_scope_check"
+BEFORE INSERT OR UPDATE OF "registration_id", "station_id"
+ON public."queue_entries"
+FOR EACH ROW
+EXECUTE FUNCTION public."vsms_assert_registration_station_scope"();
+
+DROP TRIGGER IF EXISTS "screening_results_event_scope_check"
+  ON public."screening_results";
+CREATE TRIGGER "screening_results_event_scope_check"
+BEFORE INSERT OR UPDATE OF "registration_id", "station_id"
+ON public."screening_results"
+FOR EACH ROW
+EXECUTE FUNCTION public."vsms_assert_registration_station_scope"();
+
+DROP TRIGGER IF EXISTS "queue_movements_event_scope_check"
+  ON public."queue_movements";
+CREATE TRIGGER "queue_movements_event_scope_check"
+BEFORE INSERT OR UPDATE OF "registration_id", "from_station_id", "to_station_id"
+ON public."queue_movements"
+FOR EACH ROW
+EXECUTE FUNCTION public."vsms_assert_queue_movement_scope"();
+
+COMMENT ON FUNCTION public."vsms_assert_registration_station_scope"() IS
+  'Rejects route, queue and screening-result rows whose station is outside the registration event.';
+
+COMMENT ON FUNCTION public."vsms_assert_queue_movement_scope"() IS
+  'Rejects queue movements whose source or destination station is outside the registration event.';
 
 -- -----------------------------------------------------------------------------
--- 4. MATERIALIZED VIEWS & REFRESH PROCEDURES
+-- 6. Least-privilege execution boundary
 -- -----------------------------------------------------------------------------
 
--- 4.1 Daily Screening Summary Materialized View (FR-07 Reporting Dashboard)
--- Aggregates station throughput, waiting counts, and clinical flag statistics.
-DROP MATERIALIZED VIEW IF EXISTS mv_daily_screening_summary;
+-- PostgreSQL grants routine execution to PUBLIC by default. Keep direct calls
+-- limited to the owner and explicitly provisioned application roles.
+REVOKE ALL ON FUNCTION public.fn_update_timestamp() FROM PUBLIC;
+REVOKE ALL ON FUNCTION public."vsms_event_queue_statistics"(
+  UUID,
+  TIMESTAMPTZ,
+  TIMESTAMPTZ
+) FROM PUBLIC;
+REVOKE ALL ON PROCEDURE public."sp_vsms_cancel_active_registration_queue"(
+  UUID,
+  UUID,
+  TIMESTAMPTZ
+) FROM PUBLIC;
+REVOKE ALL ON FUNCTION public."vsms_registration_route_complete"(UUID, UUID) FROM PUBLIC;
+REVOKE ALL ON FUNCTION public."vsms_assert_registration_station_scope"() FROM PUBLIC;
+REVOKE ALL ON FUNCTION public."vsms_assert_queue_movement_scope"() FROM PUBLIC;
 
-CREATE MATERIALIZED VIEW mv_daily_screening_summary AS
-SELECT
-    DATE(sq.joined_at) AS screening_date,
-    sq.station_name,
-    COUNT(DISTINCT sq.participant_id) AS total_participants,
-    COUNT(CASE WHEN sq.status = 'COMPLETED' THEN 1 END) AS completed_count,
-    COUNT(CASE WHEN sq.status = 'WAITING' THEN 1 END) AS waiting_count,
-    COUNT(CASE WHEN sq.status = 'IN_PROGRESS' THEN 1 END) AS in_progress_count,
-    COUNT(CASE WHEN va.is_flagged = TRUE THEN 1 END) AS total_flagged_cases
-FROM station_queues sq
-LEFT JOIN visual_acuity_results va ON sq.participant_id = va.participant_id
-GROUP BY DATE(sq.joined_at), sq.station_name
-WITH DATA;
-
--- Unique Index required for CONCURRENT REFRESH operations
-CREATE UNIQUE INDEX idx_mv_daily_summary ON mv_daily_screening_summary (screening_date, station_name);
-
-
--- 4.2 Concurrent Refresh Procedure for Materialized View
--- Can be scheduled via pg_cron or called on-demand by API background jobs.
-CREATE OR REPLACE PROCEDURE sp_refresh_screening_summary()
-LANGUAGE plpgsql
-AS $$
+-- Local and production deployments create vsms_runtime separately. Grant only
+-- the routine signatures this application role needs when it already exists.
+DO $$
 BEGIN
-    REFRESH MATERIALIZED VIEW CONCURRENTLY mv_daily_screening_summary;
+  IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'vsms_runtime') THEN
+    GRANT EXECUTE ON FUNCTION public.fn_update_timestamp() TO vsms_runtime;
+    GRANT EXECUTE ON FUNCTION public."vsms_event_queue_statistics"(
+      UUID,
+      TIMESTAMPTZ,
+      TIMESTAMPTZ
+    ) TO vsms_runtime;
+    GRANT EXECUTE ON PROCEDURE public."sp_vsms_cancel_active_registration_queue"(
+      UUID,
+      UUID,
+      TIMESTAMPTZ
+    ) TO vsms_runtime;
+    GRANT EXECUTE ON FUNCTION public."vsms_registration_route_complete"(
+      UUID,
+      UUID
+    ) TO vsms_runtime;
+    GRANT EXECUTE ON FUNCTION public."vsms_assert_registration_station_scope"()
+      TO vsms_runtime;
+    GRANT EXECUTE ON FUNCTION public."vsms_assert_queue_movement_scope"()
+      TO vsms_runtime;
+  END IF;
 END;
 $$;
+
+COMMIT;
