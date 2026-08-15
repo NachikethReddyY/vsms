@@ -11,7 +11,6 @@ const asyncHandler = require("../utils/http/asyncHandler");
 const queueController = require("../controllers/queueController");
 const authenticate = require("../middlewares/authenticate");
 const checkIdempotency = require("../middlewares/idempotency");
-const requireAnyRole = require("../middlewares/requireAnyRole");
 
 const {
   eventParams,
@@ -35,14 +34,12 @@ router.use(authenticate);
  */
 router.get(
   "/events/:eventId/stations",
-  requireAnyRole("REGISTRATION_OFFICER", "SCREENER", "EVENT_MANAGER", "SUPPORT"),
   validate({ params: eventParams }),
   asyncHandler(queueController.listRegistrationStations),
 );
 
 router.patch(
   "/events/:eventId/participants/:registrationId/route",
-  requireAnyRole("REGISTRATION_OFFICER", "SCREENER", "EVENT_MANAGER", "ADMINISTRATOR"),
   checkIdempotency,
   validate({ params: eventParticipantParams, body: routeOverrideBody }),
   asyncHandler(queueController.replaceParticipantRoute),
@@ -50,7 +47,6 @@ router.patch(
 
 router.get(
   "/events/:eventId/participants/:registrationId/route",
-  requireAnyRole("REGISTRATION_OFFICER", "SCREENER", "EVENT_MANAGER", "SUPPORT"),
   validate({ params: eventParticipantParams }),
   asyncHandler(queueController.getParticipantRoute),
 );
@@ -70,7 +66,6 @@ router.get(
  */
 router.get(
   "/events/:eventId/participants/:registrationId",
-  requireAnyRole("REGISTRATION_OFFICER", "SCREENER", "EVENT_MANAGER", "SUPPORT"),
   validate({ params: eventParticipantParams }),
   asyncHandler(queueController.getParticipantQueueStatus),
 );
@@ -78,7 +73,6 @@ router.get(
 // Compatibility alias: the service derives and authorizes the registration's event.
 router.get(
   "/participant/:registrationId",
-  requireAnyRole("REGISTRATION_OFFICER", "SCREENER", "EVENT_MANAGER", "SUPPORT"),
   validate({ params: participantParams }),
   asyncHandler(queueController.getParticipantQueueStatus),
 );
