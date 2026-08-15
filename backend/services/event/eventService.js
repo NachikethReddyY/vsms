@@ -21,6 +21,7 @@ const { createAuditLog } = require("../../utils/logging/audit");
 const env = require("../../config/env");
 const { attendancePredicate, attendanceWhere } = require("./attendanceDefinition");
 const { enqueueAccountLifecycle } = require("../account/accountLifecycleNotificationService");
+const { queueCompletedEventOverview } = require("../reporting/reportExportService");
 const domainEventBus = require("../domain/domainEventBus");
 const { assertRoleEligibility, eventVisibilityWhere, isAdministrator } = require("./eventAuthorizationService");
 const artworkStorage = require("./eventArtworkStorage");
