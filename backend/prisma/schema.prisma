@@ -536,8 +536,12 @@ model UserRole {
 model Participant {
   id                   String            @id @default(uuid()) @map("participant_id") @db.Uuid
   participantReference String            @unique @map("participant_reference") @db.VarChar(30)
-  nric                 String?           @unique @db.Text
-  nricMasked           String?           @map("nric_masked") @db.VarChar(9)
+  // Legacy plaintext column retained temporarily for the staged backfill. New writes keep it null.
+  nric                  String?           @unique @db.Text
+  nricMasked            String?           @map("nric_masked") @db.VarChar(9)
+  nricCiphertext        String?           @map("nric_ciphertext") @db.Text
+  nricLookupHash        String?           @unique @map("nric_lookup_hash") @db.Char(64)
+  nricEncryptionVersion Int?              @map("nric_encryption_version")
   firstName            String            @map("first_name") @db.VarChar(100)
   lastName             String            @map("last_name") @db.VarChar(100)
   dateOfBirth          DateTime          @map("date_of_birth") @db.Date
