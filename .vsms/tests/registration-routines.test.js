@@ -25,8 +25,24 @@ test("registration routines remove consent signatures and restrict database exec
   assert.match(consentRemoval, /CREATE OR REPLACE FUNCTION public\.check_in_event_registration/);
   assert.equal((routines.match(/SET search_path = pg_catalog, public/g) || []).length, 4);
   assert.equal((routines.match(/REVOKE ALL ON FUNCTION/g) || []).length, 4);
-  assert.equal((runtimeRole.match(/GRANT EXECUTE ON FUNCTION/g) || []).length, 6);
-  assert.equal((runtimeRole.match(/GRANT EXECUTE ON PROCEDURE/g) || []).length, 1);
+  const functionGrants = [...runtimeRole.matchAll(/GRANT EXECUTE ON FUNCTION ([^;]+) TO vsms_runtime;/g)]
+    .map((match) => match[1]);
+  const procedureGrants = [...runtimeRole.matchAll(/GRANT EXECUTE ON PROCEDURE ([^;]+) TO vsms_runtime;/g)]
+    .map((match) => match[1]);
+  assert.deepEqual(functionGrants, [
+    "public.register_participant_for_event(UUID, UUID, UUID, VARCHAR)",
+    "public.cancel_event_registration(UUID, UUID, VARCHAR)",
+    "public.check_in_event_registration(UUID, UUID, UUID)",
+    "public.get_event_registration_summary(UUID)",
+    "public.vsms_event_queue_statistics(UUID, TIMESTAMPTZ, TIMESTAMPTZ)",
+    "public.vsms_registration_route_complete(UUID, UUID)",
+    "public.vsms_screening_results_complete(UUID, UUID)",
+    "public.vsms_prevent_reviewed_screening_mutation()",
+  ]);
+  assert.deepEqual(procedureGrants, [
+    "public.sp_vsms_cancel_active_registration_queue(UUID, UUID, TIMESTAMPTZ)",
+    "public.sp_vsms_audit_screening_flag(UUID, UUID)",
+  ]);
   assert.match(hardening, /UPDATE public\.qr_code_passes AS pass/);
   assert.equal((hardening.match(/COMMENT ON FUNCTION/g) || []).length, 4);
   assert.match(hardening, /REVOKE ALL ON FUNCTION public\.cancel_event_registration/);
