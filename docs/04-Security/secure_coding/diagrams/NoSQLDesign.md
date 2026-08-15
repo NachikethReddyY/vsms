@@ -31,6 +31,21 @@ flowchart TB
     queues -. active station queue .-> queueIndex
 ```
 
+## Representative item shapes
+
+| Entity | `PK` | `SK` | Indexed projection / purpose |
+| --- | --- | --- | --- |
+| Event | `EVENT#e1` | `META` | Event lifecycle and configuration root |
+| Membership | `EVENT#e1` | `MEMBER#u9` | GSI1 projects only user/event role metadata for assigned-event navigation |
+| Registration | `EVENT#e1` | `REG#r7` | GSI2 projects participant/event references, never NRIC or clinical content |
+| Queue entry | `EVENT#e1` | `QUEUE#s2#000184` | GSI3 contains active status, priority and number; completed rows leave the active index |
+| Screening result | `EVENT#e1` | `RESULT#r7#EYE_HEALTH` | Encrypted/sensitive attributes remain on the base item and outside every GSI |
+| Audit event | `EVENT#e1` | `AUDIT#20260814T082204Z#a91` | Append-only, time-ordered evidence with bounded safe metadata |
+
+Idempotency receipts use a separate key such as `ACTION#actorId#clientActionId`
+and store a canonical request hash. An exact retry returns its recorded result;
+reuse with a different hash fails conditionally.
+
 ## Access-pattern design
 
 | Access pattern | Key condition | Consistency | Bound / protection |
@@ -57,6 +72,20 @@ flowchart TB
   deletion, never best-effort TTL alone.
 - Conditional writes prevent lost updates. Eventual GSI reads are display hints;
   every protected mutation revalidates authoritative base items.
+
+## Capacity and failure behaviour
+
+- Start with on-demand capacity because arrival traffic is bursty and events are
+  short-lived. Move to autoscaled provisioned capacity only after measured
+  usage makes it cheaper and predictable.
+- Use bounded `Query` operations and narrow projections; dashboard and queue
+  paths never scan the table. Retry throttled writes with capped exponential
+  backoff and jitter while preserving the original idempotency key.
+- Monitor consumed capacity, throttles, conditional-check failures, transaction
+  cancellations and GSI lag. Shard queue/audit writes by station or time bucket
+  only when a measured event exceeds the single-partition target.
+- Enable point-in-time recovery and test restoration. TTL expiry is asynchronous
+  and therefore cannot enforce authorization or a legal deletion deadline.
 
 ## Selection comparison
 

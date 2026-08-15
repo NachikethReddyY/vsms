@@ -6599,6 +6599,14 @@ export interface operations {
                 "application/json": {
                     /** Format: uuid */
                     participantId: string;
+                    /**
+                     * Format: date-time
+                     * @description Client-observed start of the current registration workflow, accepted only within a bounded 24-hour window.
+                     */
+                    workflowStartedAt?: string;
+                    /** @default false */
+                    paperFormUsed?: boolean;
+                    paperExceptionReason?: string;
                 };
             };
         };
@@ -8543,13 +8551,13 @@ export interface operations {
                 cursor?: string;
                 /** @description Maximum timeline rows in this page */
                 limit?: number;
-                /** @description Filter application logs by target entity name */
+                /** @description Filter records by target entity name */
                 entityName?: string;
-                /** @description Filter application logs by action verb */
+                /** @description Filter records by action or authentication event */
                 action?: string;
-                /** @description Filter authentication logs by event type */
+                /** @description Restrict the feed to a specific authentication event type */
                 eventType?: string;
-                /** @description Filter both tables by outcome */
+                /** @description Filter the timeline by outcome */
                 outcome?: "SUCCESS" | "FAILED" | "DENIED";
                 /** @description Inclusive lower bound (ISO-8601) for occurred/created time */
                 from?: string;

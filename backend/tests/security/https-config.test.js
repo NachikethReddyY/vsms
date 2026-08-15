@@ -40,6 +40,7 @@ test("production requires a valid versioned encryption keyring", () => {
     ENCRYPTION_KEY: "",
     ENCRYPTION_ACTIVE_KEY_ID: "",
     ENCRYPTION_KEYRING_JSON: "",
+    PARTICIPANT_LOOKUP_HMAC_KEY: "",
   };
   assert.notEqual(loadConfig(production).status, 0);
   assert.notEqual(loadConfig({
@@ -56,6 +57,7 @@ test("production requires a valid versioned encryption keyring", () => {
     ...production,
     ENCRYPTION_ACTIVE_KEY_ID: "current",
     ENCRYPTION_KEYRING_JSON: JSON.stringify({ previous: "1".repeat(64), current: "2".repeat(64) }),
+    PARTICIPANT_LOOKUP_HMAC_KEY: "3".repeat(64),
   }).status, 0);
 });
 
@@ -66,6 +68,7 @@ test("production QR origins require a non-local HTTPS public origin", () => {
     CORS_ORIGINS: "https://app.example.com",
     ENCRYPTION_ACTIVE_KEY_ID: "current",
     ENCRYPTION_KEYRING_JSON: JSON.stringify({ current: "2".repeat(64) }),
+    PARTICIPANT_LOOKUP_HMAC_KEY: "3".repeat(64),
   };
 
   assert.notEqual(loadConfig({ ...production, PUBLIC_APP_ORIGIN: "http://app.example.com" }).status, 0);

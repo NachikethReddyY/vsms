@@ -101,7 +101,16 @@ async function provisionExistingRegistration({ registration, userId, eventId, co
     throw conflict("Unable to provision registration. Please retry.");
 }
 
-exports.createRegistration = async ({ participantId, eventId, idempotencyKey, auth, context }, db = prisma) => {
+exports.createRegistration = async ({
+    participantId,
+    eventId,
+    idempotencyKey,
+    workflowStartedAt = null,
+    paperFormUsed = false,
+    paperExceptionReason = null,
+    auth,
+    context,
+}, db = prisma) => {
     const userId = auth.userId;
     await assertRegistrationAssignment(db, eventId, auth);
 
@@ -315,6 +324,17 @@ exports.changeRegistrationStatus = async ({ registrationId, toStatus, reason, au
             data: { registrationStatus: toStatus },
             include: registrationInclude(),
         });
+        const revokedQrPasses = toStatus === "CANCELLED"
+            ? await tx.qRCodePass.updateMany({
+                where: { registrationId, isActive: true },
+                data: {
+                    isActive: false,
+                    revokedAt: new Date(),
+                    revokedBy: auth.userId,
+                    revokedReason: "Registration cancelled",
+                },
+            })
+            : { count: 0 };
         await tx.registrationStatusHistory.create({
             data: {
                 registrationId,
@@ -330,7 +350,7 @@ exports.changeRegistrationStatus = async ({ registrationId, toStatus, reason, au
             entityName: "EventRegistration",
             entityId: registrationId,
             oldValue: { status: existing.registrationStatus },
-            newValue: { status: toStatus, reason },
+            newValue: { status: toStatus, reason, revokedQrPassCount: revokedQrPasses.count },
             context,
             client: tx,
         });

@@ -847,6 +847,9 @@ paths:
               required: [participantId]
               properties:
                 participantId: { type: string, format: uuid }
+                workflowStartedAt: { type: string, format: date-time, description: "Client-observed start of the current registration workflow, accepted only within a bounded 24-hour window." }
+                paperFormUsed: { type: boolean, default: false }
+                paperExceptionReason: { type: string, minLength: 3, maxLength: 200 }
       responses:
         "200": { description: Idempotent replay, content: { application/json: { schema: { $ref: "#/components/schemas/RegistrationResponse" } } } }
         "201": { description: Participant registered, content: { application/json: { schema: { $ref: "#/components/schemas/RegistrationResponse" } } } }
@@ -1834,19 +1837,19 @@ paths:
           schema: { type: integer, minimum: 1, maximum: 100, default: 50 }
         - name: entityName
           in: query
-          description: Filter application logs by target entity name
+          description: Filter records by target entity name
           schema: { type: string, maxLength: 50 }
         - name: action
           in: query
-          description: Filter application logs by action verb
+          description: Filter records by action or authentication event
           schema: { type: string, maxLength: 100 }
         - name: eventType
           in: query
-          description: Filter authentication logs by event type
+          description: Restrict the feed to a specific authentication event type
           schema: { type: string, maxLength: 50 }
         - name: outcome
           in: query
-          description: Filter both tables by outcome
+          description: Filter the timeline by outcome
           schema: { type: string, enum: [SUCCESS, FAILED, DENIED] }
         - name: from
           in: query

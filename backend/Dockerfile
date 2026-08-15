@@ -32,11 +32,9 @@ RUN apt-get update \
 
 COPY --from=postgres-client /usr/lib/postgresql/16/bin/pg_dump /usr/local/bin/pg_dump
 COPY --from=postgres-client /usr/lib/postgresql/16/bin/pg_restore /usr/local/bin/pg_restore
-
 WORKDIR /app
 COPY --from=dependencies /app/node_modules ./node_modules
 COPY --chown=node:node . .
-
 USER node
 EXPOSE 5050
 

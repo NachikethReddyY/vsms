@@ -84,7 +84,7 @@ VSMS enforces the **Principle of Least Privilege**. Backend authorization guaran
 
 ### 4.4 Cryptography & Data Protection
 * **In Transit:** Mandatory **TLS 1.3** for all client-server and inter-service communications.
-* **At Rest:** Sensitive fields and participant health details encrypted via **AES-256**.
+* **At Rest:** Infrastructure storage is encrypted, while bearer secrets, referral delivery data, and participant NRIC values use application-layer **AES-256-GCM** envelopes. NRIC equality matching uses a separate keyed HMAC blind index; plaintext NRIC is not written by the application.
 * **Secrets Management:** Environment-specific configuration; production secrets are never committed to version control.
 
 ---

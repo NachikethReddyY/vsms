@@ -463,6 +463,11 @@ app-shell access, encrypted local save, reconnect, idempotent synchronization
 and conflict handling. The final run must retain sanitized screenshots and
 timestamps for each acceptance-matrix row.
 
+The marking estimate and remaining evidence gaps are summarized in
+[`../../09-Evidence/rubric-readiness-report.md`](../../09-Evidence/rubric-readiness-report.md).
+Likely reviewer questions and concise evidence-backed answers are in
+[`presentation-q-and-a.md`](presentation-q-and-a.md).
+
 ## 11. Reflection and limitations
 
 The most important design lesson was that security and simple orchestration
@@ -506,14 +511,14 @@ These items intentionally remain open:
 
 ## 13. References
 
-- [`backend/docs/openapi.yaml`](../../backend/docs/openapi.yaml)
-- [`backend/prisma/schema.prisma`](../../backend/prisma/schema.prisma)
-- [`backend/docs/offline-screening-28.md`](../../backend/docs/offline-screening-28.md)
-- [`backend/services/SERVICES.md`](../../backend/services/SERVICES.md)
-- [`README.md`](../../README.md)
-- [`docs/2026-08-11_aws-cloud-deployment-runbook.md`](../2026-08-11_aws-cloud-deployment-runbook.md)
-- [`docs/2026-08-13-performance-recovery.md`](../2026-08-13-performance-recovery.md)
-- [`docs/featureList.md`](../featureList.md)
+- [`backend/docs/openapi.yaml`](../../../backend/docs/openapi.yaml)
+- [`backend/prisma/schema.prisma`](../../../backend/prisma/schema.prisma)
+- [`backend/docs/operations/offline-screening-28.md`](../../../backend/docs/operations/offline-screening-28.md)
+- [`backend/services/SERVICES.md`](../../../backend/services/SERVICES.md)
+- [`README.md`](../../../README.md)
+- [`docs/2026-08-11_aws-cloud-deployment-runbook.md`](../../2026-08-11_aws-cloud-deployment-runbook.md)
+- [`docs/2026-08-13-performance-recovery.md`](../../2026-08-13-performance-recovery.md)
+- [`docs/01-Project/featureList.md`](../../01-Project/featureList.md)
 - [`diagrams/`](diagrams/)
 
 ## 14. Diagram index

@@ -7,6 +7,7 @@ const accountController = require("../controllers/accountController");
 const requireAuthentication = require("../middlewares/requireAuthentication");
 const requireAnyRole = require("../middlewares/requireAnyRole");
 const requirePermission = require("../middlewares/requirePermission");
+const requireRecentAuthentication = require("../middlewares/requireRecentAuthentication");
 const validate = require("../middlewares/validate");
 const {
   referralDeliveryMaintenanceBody,
@@ -44,8 +45,8 @@ router.post("/accounts/:accountId/approve", validate({ params: accountParams, bo
 router.post("/accounts/:accountId/reject", validate({ params: accountParams, body: rejectionBody }), accountController.reject);
 router.post("/accounts/:accountId/suspend", validate({ params: accountParams, body: suspensionBody }), accountController.suspend);
 router.post("/accounts/:accountId/reactivate", validate({ params: accountParams, body: reactivationBody }), accountController.reactivate);
-router.post("/accounts/:accountId/revoke-sessions", validate({ params: accountParams }), accountController.revokeSessions);
-router.post("/accounts/:accountId/deprovision", validate({ params: accountParams, body: deprovisionBody }), accountController.deprovision);
+router.post("/accounts/:accountId/revoke-sessions", requireRecentAuthentication(), validate({ params: accountParams }), accountController.revokeSessions);
+router.post("/accounts/:accountId/deprovision", requireRecentAuthentication(), validate({ params: accountParams, body: deprovisionBody }), accountController.deprovision);
 router.post("/accounts/:accountId/resend-lifecycle", validate({ params: accountParams }), accountController.resendLifecycle);
 router.post("/maintenance/lifecycle-emails/:deliveryId", validate({ params: lifecycleEmailParams, body: lifecycleEmailMaintenanceBody }), accountController.maintainLifecycleEmail);
 router.post(
@@ -104,6 +105,7 @@ router.post(
 // 3. Download a specific backup dump file
 router.get(
   "/backups/:backupId/download",
+  requireRecentAuthentication(),
   requirePermission("system:backup:read"),
   validate({ params: backupParams }),
   adminController.downloadBackup,
@@ -112,6 +114,7 @@ router.get(
 // 4. Restore database state from a given backup
 router.post(
   "/backups/:backupId/restore",
+  requireRecentAuthentication(),
   requirePermission("system:backup:execute"),
   validate({ params: backupParams, body: restoreBackupBody }),
   adminController.restoreBackup,
@@ -120,6 +123,7 @@ router.post(
 // 5. Delete a backup file
 router.delete(
   "/backups/:backupId",
+  requireRecentAuthentication(),
   requirePermission("system:backup:delete"),
   validate({ params: backupParams }),
   adminController.deleteBackup,

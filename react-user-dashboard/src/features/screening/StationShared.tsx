@@ -2,27 +2,46 @@
 import { ExclamationTriangleIcon, PlayIcon } from '@heroicons/react/24/outline';
 import { FormEvent, ReactNode, useCallback, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
+
 import { AppToast } from '../../components/AppToast';
 import { getApiError as getApiMessage } from '../../utils/apiClient';
 import { getStoredSession } from '../../utils/session';
+
 import {
   FlagEvaluation,
+  QueueJourney,
   QueueRegistration,
   screeningApi,
   Station,
   StationType,
 } from './screeningApi';
+
 import { extractQrToken } from './qrHandoff';
-import { getOfflineStationContext, isNetworkError } from './offlineSync';
+import {
+  getOfflineStationContext,
+  isNetworkError,
+} from './offlineSync';
+
 import { StationCameraScanner } from './StationCameraScanner';
 
-const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+const UUID =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 function participantReference(value: string) {
   const reference = value.trim();
-  if (UUID.test(reference)) return { registrationId: reference };
+
+  if (UUID.test(reference)) {
+    return {
+      registrationId: reference,
+    };
+  }
+
   const token = extractQrToken(reference) || reference;
-  return { passToken: token, qrToken: token };
+
+  return {
+    passToken: token,
+    qrToken: token,
+  };
 }
 
 export function RouteProgressionNotice({
@@ -34,13 +53,50 @@ export function RouteProgressionNotice({
 }) {
   return (
     <section className="va-handoff" aria-live="polite">
-      <p className="va-handoff-label">{queued
-        ? 'Pending sync — the participant has not entered the next queue yet.'
-        : 'Result committed. The server has updated the participant route and queue.'}</p>
-      <div className="action-cluster" style={{ paddingTop: 0 }}>
-        <Link className="secondary" to={`/events/${eventId}`}>Back to event</Link>
+      <p className="va-handoff-label">
+        {queued
+          ? 'Pending sync — the participant has not entered the next queue yet.'
+          : 'Result committed. The server has updated the participant route and queue.'}
+      </p>
+
+      <div
+        className="action-cluster"
+        style={{ paddingTop: 0 }}
+      >
+        <Link
+          className="secondary"
+          to={`/events/${eventId}`}
+        >
+          Back to event
+        </Link>
       </div>
     </section>
+  );
+}
+
+export function StationHandoffLinks({
+  eventId,
+  currentStationType,
+  registrationId,
+  journey,
+  queuedOffline = false,
+}: {
+  eventId: string;
+  currentStationType: StationType;
+  registrationId: string;
+  journey: QueueJourney | null;
+  queuedOffline?: boolean;
+}) {
+  // Preserve the shared station contract while the server owns route progression.
+  void currentStationType;
+  void registrationId;
+  void journey;
+
+  return (
+    <RouteProgressionNotice
+      eventId={eventId}
+      queued={queuedOffline}
+    />
   );
 }
 
@@ -63,28 +119,47 @@ export function FlagBanner({
     >
       <div className="va-flag-banner-head">
         <ExclamationTriangleIcon />
+
         <div>
-          <strong>{evaluation.isFlagged ? `${evaluation.overallFlag} flag` : 'No clinical flag'}</strong>
-          <small>Rule {evaluation.ruleVersion}</small>
+          <strong>
+            {evaluation.isFlagged
+              ? `${evaluation.overallFlag} flag`
+              : 'No clinical flag'}
+          </strong>
+
+          <small>
+            Rule {evaluation.ruleVersion}
+          </small>
         </div>
       </div>
-      {evaluation.flagSummary && <p>{evaluation.flagSummary}</p>}
+
+      {evaluation.flagSummary && (
+        <p>{evaluation.flagSummary}</p>
+      )}
+
       {evaluation.reasons.length > 0 && (
         <ul>
           {evaluation.reasons.map((item) => (
-            <li key={`${item.flag}-${item.reason}`}>{item.flag}: {item.reason}</li>
+            <li key={`${item.flag}-${item.reason}`}>
+              {item.flag}: {item.reason}
+            </li>
           ))}
         </ul>
       )}
+
       {evaluation.isFlagged && (
         <label className="va-ack">
           <input
             type="checkbox"
             checked={acknowledged}
-            onChange={(event) => onAcknowledgedChange(event.target.checked)}
+            onChange={(event) =>
+              onAcknowledgedChange(event.target.checked)
+            }
           />
+
           <span>
-            I have reviewed this automatic flag and acknowledge saving a {evaluation.overallFlag} {stationLabel} result.
+            I have reviewed this automatic flag and acknowledge
+            saving a {evaluation.overallFlag} {stationLabel} result.
           </span>
         </label>
       )}
@@ -119,62 +194,134 @@ export function ParticipantLookup({
   const nextWaiting = queue.find((row) => row.status === 'WAITING' && Boolean(row.queueEntryId) && row.queueEntryId !== calledQueueEntryId);
   const filteredQueue = useMemo(() => {
     const search = queueSearch.trim().toLowerCase();
-    if (!search) return queue;
-    return queue.filter((row) => row.participantDisplayName.toLowerCase().includes(search) || String(row.queueNumber ?? '').includes(search));
+
+    if (!search) {
+      return queue;
+    }
+
+    return queue.filter(
+      (row) =>
+        row.participantDisplayName
+          .toLowerCase()
+          .includes(search) ||
+        String(row.queueNumber ?? '').includes(search),
+    );
   }, [queue, queueSearch]);
 
-  const applyResolved = useCallback((person: {
-    registrationId: string;
-    participantDisplayName: string;
-    activeStation: { stationId: string; stationName: string } | null;
-  }, source: string) => {
-    if (!person.activeStation) {
-      const message = 'This participant has no active station assignment. Ask an authorized officer to resolve the route.';
-      setError(message);
-      throw new Error(message);
-    }
-    if (person.activeStation.stationId !== currentStationId) {
-      const message = `This participant is assigned to ${person.activeStation.stationName}, not this station.`;
-      setError(message);
-      throw new Error(message);
-    }
-    setError(null);
-    onSelect(person.registrationId);
-    setSuccess(`Loaded ${person.participantDisplayName} from ${source}.`);
-  }, [currentStationId, onSelect]);
+  const applyResolved = useCallback(
+    (
+      person: {
+        registrationId: string;
+        participantDisplayName: string;
+        activeStation: {
+          stationId: string;
+          stationName: string;
+        } | null;
+      },
+      source: string,
+    ) => {
+      if (!person.activeStation) {
+        const message =
+          'This participant has no active station assignment. Ask an authorized officer to resolve the route.';
+
+        setError(message);
+        throw new Error(message);
+      }
+
+      if (
+        person.activeStation.stationId !==
+        currentStationId
+      ) {
+        const message =
+          `This participant is assigned to ${person.activeStation.stationName}, not this station.`;
+
+        setError(message);
+        throw new Error(message);
+      }
+
+      setError(null);
+
+      onSelect(person.registrationId);
+
+      setSuccess(
+        `Loaded ${person.participantDisplayName} from ${source}.`,
+      );
+    },
+    [currentStationId, onSelect],
+  );
 
   const resolvePass = async (event?: FormEvent) => {
     event?.preventDefault();
-    if (!eventId || !passToken.trim()) return;
+
+    if (!eventId || !passToken.trim()) {
+      return;
+    }
+
     setLookupPending(true);
     setError(null);
     setSuccess(null);
+
     try {
-      const reference = participantReference(passToken);
-      const person = await screeningApi.resolve(eventId, reference);
-      applyResolved(person, 'registration reference');
+      const reference =
+        participantReference(passToken);
+
+      const person =
+        await screeningApi.resolve(
+          eventId,
+          reference,
+        );
+
+      applyResolved(
+        person,
+        'registration reference',
+      );
     } catch (cause) {
-      setError(getApiMessage(cause, 'Could not resolve that participant pass.'));
+      setError(
+        getApiMessage(
+          cause,
+          'Could not resolve that participant pass.',
+        ),
+      );
     } finally {
       setLookupPending(false);
     }
   };
 
-  const onCameraScan = useCallback(async (raw: string) => {
-    if (!eventId) throw new Error('Event is not ready.');
-    const reference = participantReference(raw);
-    setError(null);
-    setSuccess(null);
-    setPassToken(raw.trim());
-    try {
-      const person = await screeningApi.resolve(eventId, reference);
-      applyResolved(person, 'scanner');
-    } catch (cause) {
-      const message = getApiMessage(cause, 'Could not resolve that participant pass.');
-      setError(message);
-      throw new Error(message);
-    }
-  }, [eventId, applyResolved]);
+  const onCameraScan = useCallback(
+    async (raw: string) => {
+      if (!eventId) {
+        throw new Error('Event is not ready.');
+      }
+
+      const reference =
+        participantReference(raw);
+
+      setError(null);
+      setSuccess(null);
+      setPassToken(raw.trim());
+
+      try {
+        const person =
+          await screeningApi.resolve(
+            eventId,
+            reference,
+          );
+
+        applyResolved(person, 'scanner');
+      } catch (cause) {
+        const message =
+          getApiMessage(
+            cause,
+            'Could not resolve that participant pass.',
+          );
+
+        setError(message);
+
+        throw new Error(message);
+      }
+    },
+    [eventId, applyResolved],
+  );
 
   const callNext = async () => {
     if (!nextWaiting?.queueEntryId || activeCall || callPending) return;
@@ -201,44 +348,118 @@ export function ParticipantLookup({
         </button>
       </div>
       <h2>Find participant</h2>
-      {error && <p className="form-error" role="alert">{error}</p>}
-      <AppToast message={success ?? ''} />
-      <form className="va-resolve-row" onSubmit={(event) => void resolvePass(event)}>
+
+      {error && (
+        <p
+          className="form-error"
+          role="alert"
+        >
+          {error}
+        </p>
+      )}
+
+      <AppToast
+        message={success ?? ''}
+      />
+
+      <form
+        className="va-resolve-row"
+        onSubmit={(event) =>
+          void resolvePass(event)
+        }
+      >
         <label>
           QR value / registration UUID
+
           <input
             value={passToken}
-            onChange={(event) => setPassToken(event.target.value)}
+            onChange={(event) =>
+              setPassToken(event.target.value)
+            }
             placeholder="QR URL, token, or registration UUID"
           />
         </label>
-        <button type="submit" className="primary" disabled={lookupPending}>{lookupPending ? 'Loading…' : 'Load pass'}</button>
-        <button type="button" className="secondary" onClick={() => setScannerOpen(true)}>
+
+        <button
+          type="submit"
+          className="primary"
+          disabled={lookupPending}
+        >
+          {lookupPending
+            ? 'Loading…'
+            : 'Load pass'}
+        </button>
+
+        <button
+          type="button"
+          className="secondary"
+          onClick={() =>
+            setScannerOpen(true)
+          }
+        >
           Scan QR with camera
         </button>
       </form>
-      <p className="va-resolve-hint">Registration UUID lookup continues to work from the encrypted station download when offline.</p>
+
+      <p className="va-resolve-hint">
+        Registration UUID lookup continues to work
+        from the encrypted station download when
+        offline.
+      </p>
+
       <label>
         Search this station queue
-        <input type="search" value={queueSearch} onChange={(event) => setQueueSearch(event.target.value)} placeholder="Queue number or participant name" />
+
+        <input
+          type="search"
+          value={queueSearch}
+          onChange={(event) =>
+            setQueueSearch(event.target.value)
+          }
+          placeholder="Queue number or participant name"
+        />
       </label>
+
       <label>
         Choose from this station queue
-        <select value={selectedId} onChange={(event) => onSelect(event.target.value)}>
-          <option value="" disabled>Select participant</option>
+
+        <select
+          value={selectedId}
+          onChange={(event) =>
+            onSelect(event.target.value)
+          }
+        >
+          <option
+            value=""
+            disabled
+          >
+            Select participant
+          </option>
+
           {filteredQueue.map((row) => (
-            <option key={row.registrationId} value={row.registrationId}>
-              #{row.queueNumber ?? '—'} {row.participantDisplayName}
-              {row.existingResult ? ` · ${row.existingResult.overallFlag}` : ''}
+            <option
+              key={row.registrationId}
+              value={row.registrationId}
+            >
+              #{row.queueNumber ?? '—'}{' '}
+              {row.participantDisplayName}
+              {row.existingResult
+                ? ` · ${row.existingResult.overallFlag}`
+                : ''}
             </option>
           ))}
         </select>
       </label>
+
       {selected && (
         <p>
-          Screening <strong>{selected.participantDisplayName}</strong>
+          Screening{' '}
+          <strong>
+            {selected.participantDisplayName}
+          </strong>
         </p>
       )}
+
       <StationCameraScanner
         open={scannerOpen}
         onOpenChange={setScannerOpen}
@@ -279,28 +500,62 @@ export function StationPageFrame({
     <div className="page-frame narrow">
       <div className="page-heading">
         <div>
-          <p className="eyebrow">{eyebrow}</p>
+          <p className="eyebrow">
+            {eyebrow}
+          </p>
+
           <h1>{title}</h1>
-          <p>{eventName || 'Loading event…'} — {description}</p>
+
+          <p>
+            {eventName || 'Loading event…'} —{' '}
+            {description}
+          </p>
         </div>
+
         <div className="action-cluster">
-          <button type="button" className="secondary" onClick={onToggleInstructions} aria-expanded={instructionsOpen}>
+          <button
+            type="button"
+            className="secondary"
+            onClick={onToggleInstructions}
+            aria-expanded={instructionsOpen}
+          >
             Instructions
           </button>
-          <Link className="secondary" to={`/events/${eventId}`}>Back to event</Link>
+
+          <Link
+            className="secondary"
+            to={`/events/${eventId}`}
+          >
+            Back to event
+          </Link>
         </div>
       </div>
 
       {instructionsOpen && (
-        <aside className="detail-panel" style={{ marginBottom: 24 }}>
+        <aside
+          className="detail-panel"
+          style={{ marginBottom: 24 }}
+        >
           <h2>Station instructions</h2>
           {instructions}
         </aside>
       )}
 
-      {error && <p className="form-error" role="alert">{error}</p>}
-      <AppToast message={success ?? ''} />
+      {error && (
+        <p
+          className="form-error"
+          role="alert"
+        >
+          {error}
+        </p>
+      )}
+
+      <AppToast
+        message={success ?? ''}
+      />
+
       {success && handoff}
+
       {children}
     </div>
   );
@@ -319,30 +574,77 @@ export async function loadStationContext(
   nextSelectedId: string;
 }> {
   try {
-    const stationsPayload = await screeningApi.listStations(eventId);
-    const station = stationsPayload.stations.find((item) => item.stationType === stationType);
-    if (!station) throw new Error(`${label} station is not configured for this event.`);
-    const queuePayload = await screeningApi.listQueue(eventId, station.stationId);
+    const stationsPayload =
+      await screeningApi.listStations(
+        eventId,
+      );
+
+    const station =
+      stationsPayload.stations.find(
+        (item) =>
+          item.stationType === stationType,
+      );
+
+    if (!station) {
+      throw new Error(
+        `${label} station is not configured for this event.`,
+      );
+    }
+
+    const queuePayload =
+      await screeningApi.listQueue(
+        eventId,
+        station.stationId,
+      );
+
     return {
-      eventName: stationsPayload.event.name,
+      eventName:
+        stationsPayload.event.name,
       station,
-      stations: stationsPayload.stations,
-      queue: queuePayload.registrations,
-      nextSelectedId: selectedId || queuePayload.registrations[0]?.registrationId || '',
+      stations:
+        stationsPayload.stations,
+      queue:
+        queuePayload.registrations,
+      nextSelectedId:
+        selectedId ||
+        queuePayload.registrations[0]
+          ?.registrationId ||
+        '',
     };
   } catch (error) {
-    if (!isNetworkError(error)) throw error;
-    const ownerId = getStoredSession()?.user.id;
-    const offline = ownerId ? await getOfflineStationContext(ownerId, eventId, stationType) : null;
-    if (!offline) throw error;
+    if (!isNetworkError(error)) {
+      throw error;
+    }
+
+    const ownerId =
+      getStoredSession()?.user.id;
+
+    const offline = ownerId
+      ? await getOfflineStationContext(
+          ownerId,
+          eventId,
+          stationType,
+        )
+      : null;
+
+    if (!offline) {
+      throw error;
+    }
+
     return {
       ...offline,
-      nextSelectedId: selectedId || offline.queue[0]?.registrationId || '',
+      nextSelectedId:
+        selectedId ||
+        offline.queue[0]
+          ?.registrationId ||
+        '',
     };
   }
 }
 
-export function preventDefaultSubmit(handler: () => Promise<void>) {
+export function preventDefaultSubmit(
+  handler: () => Promise<void>,
+) {
   return (event: FormEvent) => {
     event.preventDefault();
     void handler();

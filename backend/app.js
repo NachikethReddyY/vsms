@@ -175,6 +175,13 @@ app.use(
     })
 );
 
+// API responses can contain participant, clinical, or account data. Prevent
+// browsers and intermediary caches from retaining authenticated responses.
+app.use(["/api/v1", "/api"], (_req, res, next) => {
+    res.set("Cache-Control", "no-store");
+    next();
+});
+
 // General mutation limiter
 // Integration suites share one in-memory IP key; keep production tight but
 // give NODE_ENV=test enough headroom for the full suite in one window.

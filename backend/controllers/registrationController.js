@@ -77,10 +77,12 @@ function publicRegistrationSummary(summary) {
 }
 
 exports.createRegistration = asyncHandler(async (req, res) => {
+    const evidence = registrationEvidence(req.body);
     const result = await registrationService.createRegistration({
         participantId: assertUuid(req.body.participantId, "participantId"),
         eventId: assertUuid(req.params.eventId || req.body.eventId, "eventId"),
         idempotencyKey: validateIdempotencyKey(req.headers["idempotency-key"]),
+        ...evidence,
         auth: req.auth,
         context: req.context,
     });

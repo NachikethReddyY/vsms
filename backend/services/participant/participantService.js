@@ -12,6 +12,11 @@ const {
     validationError,
 } = require("../../utils/validation/validation");
 const { assertParticipantEventScope, participantEventScopeWhere } = require("../../utils/validation/participantEventScope");
+const {
+    nricLookupHash,
+    protectParticipantNric,
+    revealParticipantNric,
+} = require("../../utils/crypto/participantIdentity");
 
 
 function participantReference() {
@@ -109,12 +114,18 @@ function participantMatchReasons(participant, criteria) {
     }
     if (new Date(participant.dateOfBirth).toISOString().slice(0, 10) === criteria.dateOfBirth) reasons.push("Date of birth");
     if (participant.contactNumber === criteria.contactNumber) reasons.push("Contact number");
-    if (participant.nric === criteria.nric) reasons.push("NRIC / FIN");
+    if (revealParticipantNric(participant) === criteria.nric) reasons.push("NRIC / FIN");
     return reasons;
 }
 
 function participantPublicDetails(participant) {
-    const { nric, nricMasked, ...safeParticipant } = participant;
+    const safeParticipant = { ...participant };
+    const { nric, nricMasked } = safeParticipant;
+    delete safeParticipant.nric;
+    delete safeParticipant.nricMasked;
+    delete safeParticipant.nricCiphertext;
+    delete safeParticipant.nricLookupHash;
+    delete safeParticipant.nricEncryptionVersion;
     return { ...safeParticipant, nricMasked: maskNric(nric) || nricMasked };
 }
 
@@ -130,6 +141,7 @@ exports.matchParticipantsForRegistrationService = async (req) => {
     const participants = await prisma.participant.findMany({
         where: {
             OR: [
+                { nricLookupHash: nricLookupHash(criteria.nric) },
                 { nric: criteria.nric },
                 { AND: [fullName, { dateOfBirth: criteria.parsedDateOfBirth }] },
                 { AND: [fullName, { contactNumber: criteria.contactNumber }] },
@@ -338,6 +350,9 @@ exports.searchParticipantsService = async (req) => {
 // ==========================================
 exports.createParticipantService = async (req) => {
     const data = validateParticipantPayload(req.body);
+    const participantId = crypto.randomUUID();
+    const { nric, ...participantData } = data;
+    delete participantData.nricMasked;
     let participant;
 
     for (let attempt = 0; attempt < 5; attempt += 1) {
@@ -345,7 +360,9 @@ exports.createParticipantService = async (req) => {
             participant = await prisma.$transaction(async (tx) => {
                 const created = await tx.participant.create({
                     data: {
-                        ...data,
+                        id: participantId,
+                        ...participantData,
+                        ...protectParticipantNric(participantId, nric),
                         participantReference: participantReference(),
                         createdById: req.auth.userId,
                         updatedById: req.auth.userId,
@@ -408,9 +425,13 @@ exports.updateParticipantService = async (req) => {
             throw error;
         }
 
+        const { nric, ...safeUpdates } = updates;
+        delete safeUpdates.nricMasked;
+        const protectedNric = nric ? protectParticipantNric(participantId, nric) : {};
+
         const updated = await tx.participant.update({
             where: { id: participantId },
-            data: { ...updates, updatedById: req.auth.userId },
+            data: { ...safeUpdates, ...protectedNric, updatedById: req.auth.userId },
         });
 
         await createAuditLog({

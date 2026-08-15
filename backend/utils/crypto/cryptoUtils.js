@@ -107,6 +107,15 @@ const decrypt = (cipherPayload, context) => {
 
 const ciphertextKeyId = (cipherPayload) => cipherPayload?.startsWith(`${ENVELOPE_VERSION}:`) ? cipherPayload.split(":", 2)[1] : null;
 const activeEncryptionKeyId = () => configuredKeys().activeKeyId;
+const blindIndex = (text, domain) => {
+  if (typeof text !== "string" || !text || typeof domain !== "string" || !domain) {
+    throw new Error("Blind-index value and domain are required");
+  }
+  const config = configuredKeys();
+  const fallbackKey = config.keyring[config.activeKeyId];
+  const key = env.participantLookupHmacKey || fallbackKey;
+  return crypto.createHmac("sha256", keyBuffer(key)).update(`vsms|blind-index|v1|${domain}|${text}`, "utf8").digest("hex");
+};
 
 module.exports = {
   encrypt,
@@ -114,6 +123,7 @@ module.exports = {
   encryptionContext,
   ciphertextKeyId,
   activeEncryptionKeyId,
+  blindIndex,
   encryptWithKeyring,
   decryptWithKeyring,
 };

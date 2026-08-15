@@ -40,6 +40,7 @@ router.get(
 
 router.patch(
   "/events/:eventId/participants/:registrationId/route",
+  checkIdempotency,
   validate({ params: eventParticipantParams, body: routeOverrideBody }),
   asyncHandler(queueController.replaceParticipantRoute),
 );
@@ -70,7 +71,11 @@ router.get(
 );
 
 // Compatibility alias: the service derives and authorizes the registration's event.
-router.get("/participant/:registrationId", validate({ params: participantParams }), asyncHandler(queueController.getParticipantQueueStatus));
+router.get(
+  "/participant/:registrationId",
+  validate({ params: participantParams }),
+  asyncHandler(queueController.getParticipantQueueStatus),
+);
 
 router.patch("/events/:eventId/entries/:queueId/call", validate({ params: eventQueueEntryParams }), asyncHandler(queueController.callQueueEntry));
 router.patch("/events/:eventId/entries/:queueId/start", validate({ params: eventQueueEntryParams }), asyncHandler(queueController.startQueueEntry));

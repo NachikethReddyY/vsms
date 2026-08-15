@@ -347,3 +347,12 @@ test("seeded screener identity is synthetic by default", () => {
     assert.match(seed, /synthetic\.screener@example\.test/);
     assert.doesNotMatch(seed, /@gmail\.com/);
 });
+
+test("seed guarantees the assignment audit volume with PII-free deterministic evidence", () => {
+    const seed = read("prisma/seed.js");
+    const volumeSeed = seed.match(/async function seedAssessmentAuditVolume[\s\S]*?async function seedDemoData/)?.[0] || "";
+    assert.match(volumeSeed, /target = 5000/);
+    assert.match(volumeSeed, /synthetic: true/);
+    assert.match(volumeSeed, /skipDuplicates: true/);
+    assert.doesNotMatch(volumeSeed, /nric|dateOfBirth|participantDisplayName/i);
+});

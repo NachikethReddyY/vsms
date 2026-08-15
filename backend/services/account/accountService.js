@@ -419,13 +419,24 @@ exports.changeAccess = async (userId, action, reason, actorId, context, options 
   if (action === "suspend" && !String(reason || "").trim()) {
     throw new AppError(422, "SUSPENSION_REASON_REQUIRED", "A suspension reason is required");
   }
+  const requestedDeprovisionedAt = action === "reactivate"
+    ? (await prisma.user.findUnique({
+        where: { id: userId },
+        select: { deprovisionedAt: true },
+      }))?.deprovisionedAt || null
+    : null;
   const enqueue = options.enqueue || enqueueAccountLifecycle;
   const nextAccessState = action === "suspend" ? "SUSPENDED" : "ENABLED";
   const invalidBefore = action === "suspend" ? new Date() : undefined;
   const result = await prisma.$transaction(async (tx) => {
     await lockAccountTransition(tx, userId);
     const before = await findAccount(tx, userId);
-    const restoring = action === "reactivate" && Boolean(before.deprovisionedAt);
+    const restoring = action === "reactivate"
+      && Boolean(
+        before.deprovisionedAt
+        && requestedDeprovisionedAt
+        && before.deprovisionedAt.getTime() === requestedDeprovisionedAt.getTime()
+      );
     if ((before.deprovisionedAt || before.accessState === "DISABLED") && !restoring) {
       throw new AppError(409, "ACCOUNT_DISABLED", "A disabled account cannot change access state");
     }
