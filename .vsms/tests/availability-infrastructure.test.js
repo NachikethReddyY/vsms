@@ -12,8 +12,7 @@ const template = readPortableText("infrastructure/availability.yaml");
 const runbook = readPortableText("docs/07-Operations/availability-runbook.md");
 
 test("production infrastructure retains redundant replaceable services", () => {
-  assert.match(template, /HealthCheckPath: \/health/);
-  assert.doesNotMatch(template, /HealthCheckPath: \/ready/);
+  assert.match(template, /HealthCheckPath: \/ready/);
   assert.match(template, /DesiredCount: !If \[ApplicationServicesAreEnabled, 2, 0\]/);
   assert.match(template, /MinimumHealthyPercent: 100/);
   assert.match(template, /DeploymentCircuitBreaker:[\s\S]*?Rollback: true/);
@@ -48,7 +47,9 @@ test("secrets are injected rather than placed in normal task environment values"
   assert.match(template, /DatabaseCredentialsSecret:[\s\S]*?GenerateSecretString:/);
   assert.match(template, /DatabaseRuntimeCredentialsSecret:[\s\S]*?"username":"vsms_runtime"/);
   assert.match(template, /DatabaseRuntimeUrlSecret:[\s\S]*?postgresql:\/\/vsms_runtime:/);
-  assert.doesNotMatch(template, /ValueFrom: !Ref DatabaseMigrationUrlSecret/);
+  assert.match(template, /MigrationTaskDefinition:[\s\S]*?ValueFrom: !Ref DatabaseMigrationUrlSecret/);
+  const applicationTasks = template.slice(template.indexOf("  ApiTaskDefinition:"), template.indexOf("  ApiLoadBalancer:"));
+  assert.doesNotMatch(applicationTasks, /ValueFrom: !Ref DatabaseMigrationUrlSecret/);
   assert.match(template, /RedisAuthTokenSecret:[\s\S]*?GenerateSecretString:/);
   assert.match(template, /JwtSecret:[\s\S]*?GenerateSecretString:/);
   assert.doesNotMatch(template, /DbMasterPassword:/);

@@ -31,7 +31,20 @@ Parameters:
     Description: ACM certificate ARN in us-east-1 for FrontendDomainName
   ApiImageUri:
     Type: String
-    Description: Immutable ECR image URI including a digest or release tag
+    AllowedPattern: ".+@sha256:[0-9a-f]{64}"
+    Description: Previously approved or current immutable ECR image URI including its sha256 digest
+  CandidateApiImageUri:
+    Type: String
+    AllowedPattern: ".+@sha256:[0-9a-f]{64}"
+    Description: Immutable ECR image URI used only by the one-off migration task before service promotion
+  CandidateReleaseSha:
+    Type: String
+    AllowedPattern: "[0-9a-f]{40}"
+    Description: Full Git commit SHA used by the candidate migration task
+  ReleaseSha:
+    Type: String
+    AllowedPattern: "[0-9a-f]{40}"
+    Description: Full Git commit SHA represented by the running application release
   DbMasterUsername:
     Type: String
     Default: vsmsapp
@@ -346,6 +359,38 @@ Resources:
                   - !Ref EncryptionKeyringSecretArn
                   - !Ref ParticipantLookupHmacSecretArn
 
+  MigrationExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: ecs-tasks.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy
+      Policies:
+        - PolicyName: ReadVsmsMigrationUrl
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action: secretsmanager:GetSecretValue
+                Resource: !Ref DatabaseMigrationUrlSecret
+
+  MigrationTaskRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: ecs-tasks.amazonaws.com
+            Action: sts:AssumeRole
+
   ApiTaskRole:
     Type: AWS::IAM::Role
     Properties:
@@ -409,6 +454,41 @@ Resources:
               Service: ecs-tasks.amazonaws.com
             Action: sts:AssumeRole
 
+  MigrationTaskDefinition:
+    Type: AWS::ECS::TaskDefinition
+    Properties:
+      Family: !Sub ${EnvironmentName}-vsms-migration
+      Cpu: "256"
+      Memory: "512"
+      NetworkMode: awsvpc
+      RequiresCompatibilities: [FARGATE]
+      ExecutionRoleArn: !GetAtt MigrationExecutionRole.Arn
+      TaskRoleArn: !GetAtt MigrationTaskRole.Arn
+      ContainerDefinitions:
+        - Name: migration
+          Image: !Ref CandidateApiImageUri
+          Essential: true
+          Command: ["pnpm", "deploy:migrate"]
+          Environment:
+            - Name: NODE_ENV
+              Value: production
+            - Name: DEPLOY_ENVIRONMENT
+              Value: !Ref EnvironmentName
+            - Name: RELEASE_SHA
+              Value: !Ref CandidateReleaseSha
+            - Name: RELEASE_IMAGE_URI
+              Value: !Ref CandidateApiImageUri
+          Secrets:
+            - Name: DATABASE_URL
+              ValueFrom: !Ref DatabaseMigrationUrlSecret
+          LogConfiguration:
+            LogDriver: awslogs
+            Options:
+              awslogs-group: !Ref ApiLogGroup
+              awslogs-region: !Ref AWS::Region
+              awslogs-stream-prefix: migration
+          StopTimeout: 30
+
   ApiTaskDefinition:
     Type: AWS::ECS::TaskDefinition
     Properties:
@@ -429,6 +509,8 @@ Resources:
           Environment:
             - Name: NODE_ENV
               Value: production
+            - Name: RELEASE_SHA
+              Value: !Ref ReleaseSha
             - Name: LOCAL_HTTPS
               Value: "false"
             - Name: HOST
@@ -513,6 +595,8 @@ Resources:
           Environment:
             - Name: NODE_ENV
               Value: production
+            - Name: RELEASE_SHA
+              Value: !Ref ReleaseSha
             - Name: ENCRYPTION_ACTIVE_KEY_ID
               Value: !Ref EncryptionActiveKeyId
           Secrets:
@@ -550,6 +634,8 @@ Resources:
           Environment:
             - Name: NODE_ENV
               Value: production
+            - Name: RELEASE_SHA
+              Value: !Ref ReleaseSha
             - Name: ENCRYPTION_ACTIVE_KEY_ID
               Value: !Ref EncryptionActiveKeyId
           Secrets:
@@ -586,7 +672,7 @@ Resources:
       Protocol: HTTP
       Port: 5050
       HealthCheckEnabled: true
-      HealthCheckPath: /health
+      HealthCheckPath: /ready
       HealthCheckIntervalSeconds: 30
       HealthCheckTimeoutSeconds: 5
       HealthyThresholdCount: 2
@@ -835,8 +921,30 @@ Outputs:
     Value: !Ref ApiCluster
   ApiServiceName:
     Value: !GetAtt ApiService.Name
+  ReportWorkerServiceName:
+    Value: !GetAtt ReportWorkerService.Name
+  DomainEventWorkerServiceName:
+    Value: !GetAtt DomainEventWorkerService.Name
+  MigrationTaskDefinitionArn:
+    Value: !Ref MigrationTaskDefinition
+  MigrationExecutionRoleArn:
+    Value: !GetAtt MigrationExecutionRole.Arn
+  MigrationTaskRoleArn:
+    Value: !GetAtt MigrationTaskRole.Arn
+  ApiTaskExecutionRoleArn:
+    Value: !GetAtt ApiExecutionRole.Arn
+  ApiTaskRoleArn:
+    Value: !GetAtt ApiTaskRole.Arn
+  WorkerTaskRoleArn:
+    Value: !GetAtt WorkerTaskRole.Arn
+  PrivateSubnetIds:
+    Value: !Join [",", !Ref PrivateSubnetIds]
+  ApiSecurityGroupId:
+    Value: !Ref ApiSecurityGroup
   DatabaseEndpoint:
     Value: !GetAtt Database.Endpoint.Address
+  DatabaseIdentifier:
+    Value: !Ref Database
   DatabaseMigrationUrlSecretArn:
     Value: !Ref DatabaseMigrationUrlSecret
   DatabaseRuntimeCredentialsSecretArn:
