@@ -297,9 +297,10 @@ async function seedStationTemplates() {
       stationType: template.stationType ?? null,
       active: true,
     };
+    const { stationTemplateId, ...updates } = data;
     await prisma.stationTemplate.upsert({
-      where: { stationTemplateId: template.stationTemplateId },
-      update: data,
+      where: { templateKey: template.templateKey },
+      update: updates,
       create: data,
     });
   }
