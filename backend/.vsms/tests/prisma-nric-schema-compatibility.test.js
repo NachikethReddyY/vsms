@@ -33,8 +33,12 @@ test("every package seed entry point regenerates Prisma Client first", () => {
 
   assert.equal(
     scripts["prisma:seed"],
-    "pnpm prisma:generate && node prisma/seed.js",
+    "node scripts/deploy/assert-non-production.js && pnpm prisma:generate && node prisma/seed.js",
   );
-  assert.equal(scripts.seed, "pnpm prisma:seed");
-  assert.equal(scripts["db:setup"], "pnpm prisma:migrate && pnpm prisma:seed");
+  assert.equal(scripts.seed, "node scripts/deploy/assert-non-production.js && pnpm prisma:seed");
+  assert.equal(
+    scripts["setup:demo"],
+    "node scripts/deploy/assert-non-production.js && pnpm prisma:generate && pnpm prisma:migrate && node prisma/seed.js",
+  );
+  assert.equal(scripts["db:setup"], undefined);
 });

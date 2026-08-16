@@ -81,6 +81,24 @@ The unit tests also verify that analytics and urgent review use the database
 adapters. `pnpm test:integration` prepares a disposable test database, applies all
 Prisma migrations in order, and includes the `.vsms` database-routine suite.
 
+## Controlled migration deployment
+
+Prisma migration files are the production schema source of truth. The GitHub
+Actions quality job prepares a fresh PostgreSQL 16 database and requires
+`prisma migrate status` to be clean. A release then creates and verifies an
+encrypted RDS snapshot before launching one dedicated Fargate migration task.
+That task alone receives the privileged migration URL and runs
+`prisma migrate deploy` followed by `prisma migrate status`. A failure prevents
+the new API and worker image from being promoted.
+
+Runtime tasks use only the restricted `vsms_runtime` role and never execute
+migrations on startup. Existing applied migrations are not edited; corrections
+are delivered as reviewed forward-fix migrations. Application rollback retains
+the previous image digest, while database recovery is tested by restoring the
+snapshot or point-in-time state to an isolated instance. The implementation and
+operator configuration are documented in
+`docs/07-Operations/controlled-release-pipeline.md`.
+
 Verification performed on 14 August 2026 produced the following evidence:
 
 - Prisma schema validation: passed;
