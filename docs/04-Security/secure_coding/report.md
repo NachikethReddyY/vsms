@@ -132,7 +132,7 @@ The canonical implementation sources are:
 | SQL evidence | `backend/stored_procedures.sql` | A separate stored-procedure/function draft; not proof that those objects are installed or called by the current Prisma path |
 | Auth/config | `backend/config/env.js`, `backend/utils/cognitoClient.js`, `infrastructure/cognito.yaml` | Cognito integration/configuration boundary and fail-closed environment validation |
 | Logging | `backend/utils/logger/logger.js`, `backend/middlewares/httpLogger.js`, `backend/app.js`, and `backend/tests/unit/http-logging.test.js` | Pino redaction and correlated HTTP completion logging |
-| Tests | `backend/tests/`, `react-user-dashboard/src/**/*.test.*`, `.github/workflows/` | Runnable checks, 500-participant load workflow and backup/restore verification; not a substitute for live acceptance evidence |
+| Tests and release automation | `backend/tests/`, `react-user-dashboard/src/**/*.test.*`, `.vsms/tests/deployment-*.test.js`, `.github/workflows/` | Runnable checks plus controlled staging/production release gates; not a substitute for live AWS acceptance evidence |
 
 `docs/vsms-client-brief.md` describes project requirements and alternatives.
 Reference material is not treated as proof that an alternative architecture
@@ -181,6 +181,12 @@ configured; the API still owns local account state and event authorization.
   same-origin `/api/*` proxy to Nginx with Let's Encrypt on a `t3.small` EC2
   instance. The API and standalone workers run under systemd. This is a
   lab-grade Single-AZ topology, not a high-availability production claim.
+- **Production target:** `infrastructure/availability.yaml`,
+  `infrastructure/github-oidc-roles.yaml`, and the GitHub Actions workflows
+  implement a Multi-AZ/ECS release target with separated roles, one-off
+  migrations, recovery checkpoints and readiness gating. This repository
+  evidence does not claim that the target is currently deployed or meeting its
+  availability objective.
 - **PostgreSQL:** Prisma declares `provider = "postgresql"`; migrations are
   the runtime schema authority. `backend/db/init.sql` intentionally refuses
   to create the old incompatible schema.
@@ -207,6 +213,7 @@ configured; the API still owns local account state and event authorization.
 | Implemented | Installable PWA and scoped offline screening pack | `backend/docs/offline-screening-28.md`, `offlineSync.ts`, Vite PWA configuration and generated `manifest.json` |
 | Config-dependent | Cognito staff identity and provider synchronization | Cognito client/config and provider-operation services; environment/provider evidence required |
 | Config-dependent | OneMap, SES/SNS and Redis integrations | Provider adapters and environment settings exist; external delivery/availability is not claimed |
+| Implemented, deployment-dependent | Controlled AWS release automation | `.github/workflows/deploy.yml`, `deploy-environment.yml`, `infrastructure/availability.yaml`, and `github-oidc-roles.yaml`; an actual successful production run still requires configured AWS/GitHub environments |
 | Implemented | Pino/Pino HTTP structured and correlated logging | `backend/utils/logger/logger.js`, `backend/middlewares/httpLogger.js`, `backend/app.js`, and the HTTP logging tests |
 | Deferred | Participant self-service offline, full sync-centre UI and broader offline coverage | Explicitly out of scope in the offline implementation note |
 
@@ -363,10 +370,43 @@ The same run created a PostgreSQL custom-format dump and restored it into a
 fresh database. Verification compared exact row counts plus all 177
 constraints and 245 index definitions. The restored counts included 500
 participants, 1,000 event registrations, 520 queue entries, 500 screening
-results, 500 synchronization actions and 2,070 audit logs. The manual
-`performance-recovery.yml` workflow repeats the load and restore sequence in a
-GitHub-hosted PostgreSQL 16 service and retains only synthetic private
-artifacts for 30 days.
+results, 500 synchronization actions and 2,070 audit logs. The enterprise
+release workflow independently prepares PostgreSQL 16, applies the complete
+Prisma history, and requires `prisma migrate status` to be clean before a
+release image can be built. The performance/recovery record remains the
+evidence for the measured load and restore exercise.
+
+### 7.1 Controlled deployment and migration safety
+
+The production-target workflow implements the following order:
+
+```text
+Verified encrypted RDS snapshot
+  -> one dedicated privileged migration task
+  -> prisma migrate deploy and prisma migrate status
+  -> promote API and worker image digest
+  -> ECS stability and /ready traffic gate
+  -> health/authenticated smoke tests
+  -> frontend publication
+  -> alarm check and retained release evidence
+```
+
+Migrations are not run by each application replica. The migration task alone
+receives the database-owner URL; API and worker tasks receive the restricted
+`vsms_runtime` URL. A failed snapshot, migration, migration-status check,
+readiness check, smoke test or alarm gate stops progression. The workflow keeps
+the previous application digest and S3 `index.html` version for rollback.
+Database migrations are not automatically reversed: changes must follow
+expand-and-contract, an applied error is repaired with a forward-fix migration,
+and snapshot/PITR recovery is validated in an isolated database before cutover.
+
+GitHub uses short-lived OIDC credentials with distinct build, deploy, migration
+and read-only verification roles. Staging must pass before production, releases
+to the same environment cannot overlap, and production should require a GitHub
+Environment reviewer. The successful release or rollback manifest is retained
+for 90 days and includes the image digest, release SHA, endpoint evidence and
+verified recovery snapshot identifier. The exact configuration and operator
+checklist are in `docs/07-Operations/controlled-release-pipeline.md`.
 
 ## 8. Verification record
 
@@ -376,6 +416,7 @@ role journeys still require the final acceptance replay.
 
 ```bash
 pnpm --dir backend prisma:validate
+pnpm --dir backend exec prisma migrate status
 pnpm check:rubric-evidence
 pnpm --dir backend openapi:lint
 pnpm --dir backend contracts:check
@@ -385,6 +426,7 @@ pnpm --dir react-user-dashboard test
 pnpm --dir react-user-dashboard build
 pnpm check:api-collection
 pnpm check:submission-package
+pnpm test:availability
 ```
 
 `pnpm package:submission` creates the deterministic source-only archive. It
@@ -485,14 +527,13 @@ and returning the smaller operational set improved throughput without adding
 a cache or new infrastructure. Recovery testing also showed that row counts
 alone are inadequate; a usable restore must preserve constraints and indexes.
 
-Remaining risk is operational rather than hidden in the report. The AWS lab is
-Single-AZ, uses one EC2 application host, relies on refreshed static database
-credentials after rotation, and was not reachable end to end during the final
-repository audit. A production evolution would add Multi-AZ RDS, more than one
-API instance behind a load balancer, shared fail-closed rate-limit and
-idempotency infrastructure, automated secret retrieval, monitoring and a
-tested regional recovery plan. Those changes should be made only when the
-availability requirement justifies their cost.
+Remaining risk is operational rather than hidden in the report. The historical
+AWS lab is Single-AZ, uses one EC2 application host, and was not reachable end to
+end during the final repository audit. The repository now contains a Multi-AZ
+RDS, multi-task ECS, encrypted Redis and controlled OIDC release target, but an
+actual AWS deployment, configured alarms, a successful production workflow and
+measured availability still require operator evidence. Regional recovery also
+remains an exercise rather than a demonstrated production capability.
 
 ## 12. Human-owned final inputs
 
@@ -518,6 +559,8 @@ These items intentionally remain open:
 - [`README.md`](../../../README.md)
 - [`docs/2026-08-11_aws-cloud-deployment-runbook.md`](../../2026-08-11_aws-cloud-deployment-runbook.md)
 - [`docs/2026-08-13-performance-recovery.md`](../../2026-08-13-performance-recovery.md)
+- [`docs/07-Operations/controlled-release-pipeline.md`](../../07-Operations/controlled-release-pipeline.md)
+- [`docs/07-Operations/availability-runbook.md`](../../07-Operations/availability-runbook.md)
 - [`docs/01-Project/featureList.md`](../../01-Project/featureList.md)
 - [`diagrams/`](diagrams/)
 
