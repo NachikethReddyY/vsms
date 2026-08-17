@@ -15,7 +15,13 @@ const preferredTheme = savedTheme === 'light' || savedTheme === 'dark'
 document.documentElement.dataset.theme = preferredTheme
 document.documentElement.style.colorScheme = preferredTheme
 
-registerSW({ immediate: true })
+const updateServiceWorker = registerSW({
+  onNeedRefresh() {
+    if (window.confirm('A VSMS update is ready. Reload now? Encrypted offline work will remain on this device.')) {
+      void updateServiceWorker(true)
+    }
+  },
+})
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>

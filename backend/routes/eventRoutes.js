@@ -17,6 +17,7 @@ const {
     cancelBody,
     deleteEventBody,
     eventParams,
+    offlinePackHeaders,
     listQuery,
     auditQuery,
     attendeeQuery,
@@ -111,6 +112,12 @@ router.get("/:eventId/export", reportingLimiter, requireRecentAuthentication(), 
 router.get("/:eventId/deletion-preview", requireSystemRole("ADMIN"), validate({ params: eventParams }), asyncHandler(eventController.deletionPreview));
 router.get("/:eventId/deletion-cleanup", requireSystemRole("ADMIN"), validate({ params: eventParams }), asyncHandler(eventController.deletionCleanupStatus));
 router.get("/:eventId/artwork", validate({ params: eventParams }), requireEventRoles("EVENT_MANAGER", "REGISTRATION", "SCREENER", "REVIEWER", "SUPPORT"), asyncHandler(eventController.artwork));
+router.get(
+  "/:eventId/offline-pack",
+  validate({ params: eventParams, headers: offlinePackHeaders }),
+  requireEventRoles("EVENT_MANAGER", "REGISTRATION", "SCREENER", "REVIEWER", "SUPPORT"),
+  asyncHandler(eventController.offlinePack),
+);
 router.get("/:eventId", validate({ params: eventParams }), requireEventRoles("EVENT_MANAGER", "REGISTRATION", "SCREENER", "REVIEWER", "SUPPORT"), asyncHandler(eventController.get));
 router.patch("/:eventId", validate({ params: eventParams, body: updateEventBody }), requireEventManager, asyncHandler(eventController.update));
 router.post("/:eventId/stations/import", validate({ params: eventParams, body: stationImportBody }), requireEventManager, asyncHandler(eventController.importStations));

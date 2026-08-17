@@ -721,6 +721,31 @@ paths:
         "404": { $ref: "#/components/responses/NotFound" }
         "422": { $ref: "#/components/responses/ValidationFailed" }
         "429": { $ref: "#/components/responses/RateLimited" }
+  /api/v1/events/{eventId}/offline-pack:
+    get:
+      tags: [Events]
+      operationId: getEventOfflinePack
+      summary: Download a device-bound, role-scoped event offline pack
+      description: Reuses the caller-redacted event detail. Active screeners additionally receive only their assigned station queues; active registration officers receive selectable station metadata and a provisional queue-number seed without participant data. Event managers and active registration, screening, or support duties also receive the canonical safe event queue projection. Doctors with an active reviewer duty receive only currently actionable redacted review details. The opaque pack identifier and ES256 capability lease bind the actor, event, device, roles, capabilities, generation time, and expiry. Clients must verify the lease and their production-pinned key identifier before persisting the pack.
+      parameters:
+        - $ref: "#/components/parameters/EventId"
+        - name: x-device-id
+          in: header
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        "200":
+          description: Allowlisted offline pack capped by event end and any applicable active duty
+          headers:
+            Cache-Control: { schema: { type: string, enum: [no-store] } }
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EventOfflinePack" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "422": { $ref: "#/components/responses/ValidationFailed" }
   /api/v1/events/{eventId}:
     parameters:
       - $ref: "#/components/parameters/EventId"
@@ -1138,6 +1163,28 @@ paths:
         "401": { $ref: "#/components/responses/Unauthorized" }
         "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "422": { $ref: "#/components/responses/ValidationFailed" }
+  /api/v1/events/{eventId}/sync/operations:
+    post:
+      tags: [Registrations, Queues, Clinical Reviews]
+      operationId: syncOfflineOperations
+      summary: Apply local-first event operations
+      description: Registration actions require a current REGISTRATION duty. Queue call/start/skip actions require current queue access and station duty where applicable; priority changes require event-manager access. Route overrides reuse the canonical event-manager or current REGISTRATION/SCREENER duty policy and require an expected route version. Review decisions require a current REVIEWER duty and doctor account while the event is in progress. Each stable client action is fingerprinted and replayed from the existing SyncAction ledger. Participant, NRIC, emergency-contact, priority-note, clinical, signature, referral-body, and QR bearer data are never stored in that ledger; an APPLIED receipt is the durable acceptance signal. Referral issue and delivery remain online-only.
+      parameters: [{ $ref: "#/components/parameters/EventId" }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/OperationSyncRequest" }
+      responses:
+        "200":
+          description: Per-action durable outcomes with safe canonical registration, queue, route, or review receipts
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/OperationSyncResponse" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
         "409": { $ref: "#/components/responses/Conflict" }
         "422": { $ref: "#/components/responses/ValidationFailed" }
   /api/v1/events/{eventId}/stations/{stationId}/queue:
@@ -3555,6 +3602,132 @@ components:
               type: object
               allOf: [{ $ref: "#/components/schemas/User" }]
               nullable: true
+    EventOfflinePack:
+      type: object
+      additionalProperties: false
+      required: [schemaVersion, packId, generatedAt, expiresAt, event, roles, capabilities, lease, screening]
+      properties:
+        schemaVersion: { type: integer, enum: [1] }
+        packId: { type: string, pattern: '^[A-Za-z0-9_-]{43}$' }
+        generatedAt: { type: string, format: date-time }
+        expiresAt: { type: string, format: date-time }
+        event: { $ref: "#/components/schemas/Event" }
+        roles:
+          type: array
+          uniqueItems: true
+          items: { type: string, enum: [EVENT_MANAGER, REGISTRATION, SCREENER, REVIEWER, SUPPORT] }
+        capabilities:
+          type: object
+          additionalProperties: false
+          required: [screening, registration, queue, review, routeOverride]
+          properties:
+            screening: { type: boolean }
+            registration: { type: boolean }
+            queue: { type: boolean }
+            review: { type: boolean }
+            routeOverride: { type: boolean }
+        lease: { $ref: "#/components/schemas/OfflineCapabilityLease" }
+        screening:
+          type: object
+          additionalProperties: false
+          required: [event, stations]
+          properties:
+            event:
+              type: object
+              additionalProperties: false
+              required: [eventId, name, status]
+              properties:
+                eventId: { type: string, format: uuid }
+                name: { type: string }
+                status: { $ref: "#/components/schemas/EventStatus" }
+            stations: { type: array, items: { $ref: "#/components/schemas/ScreeningSyncPullStation" } }
+        registration:
+          type: object
+          additionalProperties: false
+          required: [stations, nextQueueNumber]
+          description: Present only for a caller with a current REGISTRATION duty. The queue number is provisional and may be remapped by the server during synchronization.
+          properties:
+            stations:
+              type: array
+              items:
+                type: object
+                additionalProperties: false
+                required: [stationId, stationName, stationType, stationOrder]
+                properties:
+                  stationId: { type: string, format: uuid }
+                  stationName: { type: string }
+                  stationType: { type: string }
+                  stationOrder: { type: integer }
+            nextQueueNumber: { type: integer, minimum: 1 }
+        queue: { $ref: "#/components/schemas/EventQueueStatusResponse" }
+        routes:
+          type: array
+          description: Present only for event managers or callers with a current REGISTRATION or SCREENER duty. Contains safe route state only for registrations already present in this role-scoped queue snapshot.
+          items:
+            type: object
+            additionalProperties: false
+            required: [registrationId, route]
+            properties:
+              registrationId: { type: string, format: uuid }
+              route: { $ref: "#/components/schemas/RegistrationRouteState" }
+        review:
+          type: object
+          additionalProperties: false
+          required: [event, queue, details]
+          description: Present only for a doctor with a current REVIEWER duty while the event is in progress. Contains actionable registrations only and never includes raw NRIC, contact/address data, pass tokens, signatures, or referral-delivery data.
+          properties:
+            event: { $ref: "#/components/schemas/ReviewEvent" }
+            queue:
+              type: array
+              maxItems: 500
+              items: { $ref: "#/components/schemas/ReviewQueueItem" }
+            details:
+              type: array
+              maxItems: 500
+              items: { $ref: "#/components/schemas/OfflineReviewDetail" }
+    OfflineCapabilityLease:
+      type: object
+      additionalProperties: false
+      required: [algorithm, keyId, publicKey, payload, signature]
+      properties:
+        algorithm: { type: string, enum: [ES256] }
+        keyId: { type: string, pattern: '^[A-Za-z0-9_-]{43}$' }
+        publicKey:
+          type: object
+          additionalProperties: false
+          required: [kty, crv, x, y]
+          properties:
+            kty: { type: string, enum: [EC] }
+            crv: { type: string, enum: [P-256] }
+            x: { type: string, pattern: '^[A-Za-z0-9_-]{43}$' }
+            y: { type: string, pattern: '^[A-Za-z0-9_-]{43}$' }
+        payload:
+          type: object
+          additionalProperties: false
+          required: [schemaVersion, packId, actorId, eventId, deviceId, issuedAt, expiresAt, roles, capabilities]
+          properties:
+            schemaVersion: { type: integer, enum: [1] }
+            packId: { type: string, pattern: '^[A-Za-z0-9_-]{43}$' }
+            actorId: { type: string, format: uuid }
+            eventId: { type: string, format: uuid }
+            deviceId: { type: string, format: uuid }
+            issuedAt: { type: string, format: date-time }
+            expiresAt: { type: string, format: date-time }
+            roles:
+              type: array
+              uniqueItems: true
+              items: { type: string, enum: [EVENT_MANAGER, REGISTRATION, SCREENER, REVIEWER, SUPPORT] }
+            capabilities:
+              type: object
+              additionalProperties: false
+              required: [screening, registration, queue, review, routeOverride]
+              properties:
+                screening: { type: boolean }
+                registration: { type: boolean }
+                queue: { type: boolean }
+                review: { type: boolean }
+                routeOverride: { type: boolean }
+        signature: { type: string, pattern: '^[A-Za-z0-9_-]{86}$' }
     PublicEvent:
       type: object
       additionalProperties: false
@@ -4395,6 +4568,21 @@ components:
           type: object
           nullable: true
           allOf: [{ $ref: "#/components/schemas/ExistingReview" }]
+        contextVersion: { type: string, pattern: '^[a-f0-9]{64}$' }
+    OfflineReviewDetail:
+      type: object
+      additionalProperties: false
+      required: [event, participant, stations, readiness, existingReview, contextVersion]
+      properties:
+        event: { $ref: "#/components/schemas/ReviewEvent" }
+        participant: { $ref: "#/components/schemas/ReviewParticipant" }
+        stations: { type: array, items: { $ref: "#/components/schemas/ReviewStationResult" } }
+        readiness: { $ref: "#/components/schemas/ReviewReadiness" }
+        existingReview:
+          type: object
+          nullable: true
+          maxProperties: 0
+          description: Always null because offline packs contain only registrations with no recorded review.
         contextVersion: { type: string, pattern: '^[a-f0-9]{64}$' }
     ReferralDecisionInput:
       type: object
@@ -5603,6 +5791,209 @@ components:
         idempotencyKey: { type: string, minLength: 8, maxLength: 64 }
         acknowledged: { type: boolean }
         resultData: { type: object, additionalProperties: true }
+    OfflineRegistrationEvidence:
+      type: object
+      additionalProperties: false
+      required: [workflowStartedAt, paperFormUsed]
+      properties:
+        workflowStartedAt: { type: string, format: date-time, nullable: true, description: Client-observed workflow start; when supplied it must be within the current 24-hour workflow window. }
+        paperFormUsed: { type: boolean }
+        paperExceptionReason: { type: string, minLength: 3, maxLength: 200 }
+    OfflineRegistrationProposal:
+      type: object
+      additionalProperties: false
+      required: [queueNumber, nextStationId, nextStationNumber]
+      description: Optimistic local placement used only for client reconciliation; the server allocates the canonical queue and route.
+      properties:
+        queueNumber: { type: integer, minimum: 1 }
+        nextStationId: { type: string, format: uuid }
+        nextStationNumber: { type: integer, minimum: 1 }
+    RegistrationCreateSyncAction:
+      type: object
+      additionalProperties: false
+      required: [type, clientActionId, clientParticipantId, clientRegistrationId, participant, emergencyContact, evidence, proposed]
+      properties:
+        type: { type: string, enum: [REGISTRATION_CREATE] }
+        clientActionId: { type: string, format: uuid }
+        clientParticipantId: { type: string, format: uuid }
+        clientRegistrationId: { type: string, format: uuid }
+        participant:
+          type: object
+          additionalProperties: false
+          required: [firstName, lastName, dateOfBirth, gender, contactNumber, nric, email, race, nationality, addressStreet, addressUnit, addressPostalCode, preferredLanguage]
+          properties:
+            firstName: { type: string, minLength: 1, maxLength: 100 }
+            lastName: { type: string, minLength: 1, maxLength: 100 }
+            dateOfBirth: { type: string, format: date }
+            gender: { type: string, enum: [M, F, O, U] }
+            contactNumber: { type: string, minLength: 7, maxLength: 30 }
+            nric: { type: string, pattern: '^[STFGM][0-9]{7}[A-Z]$', writeOnly: true }
+            email: { type: string, format: email, maxLength: 255 }
+            race: { type: string, minLength: 1, maxLength: 50 }
+            nationality: { type: string, minLength: 1, maxLength: 50 }
+            addressStreet: { type: string, minLength: 1, maxLength: 255 }
+            addressUnit: { type: string, minLength: 1, maxLength: 20 }
+            addressPostalCode: { type: string, minLength: 1, maxLength: 10 }
+            preferredLanguage: { type: string, minLength: 1, maxLength: 50 }
+            accessibilityNotes: { type: string, maxLength: 1000 }
+        emergencyContact:
+          type: object
+          additionalProperties: false
+          required: [contactName, relationship, phoneNumber]
+          properties:
+            contactName: { type: string, minLength: 1, maxLength: 120 }
+            relationship: { type: string, minLength: 1, maxLength: 60 }
+            phoneNumber: { type: string, minLength: 7, maxLength: 30 }
+            email: { type: string, format: email, maxLength: 255 }
+        evidence: { $ref: "#/components/schemas/OfflineRegistrationEvidence" }
+        proposed: { $ref: "#/components/schemas/OfflineRegistrationProposal" }
+    QueueSyncAction:
+      oneOf:
+        - type: object
+          additionalProperties: false
+          required: [type, clientActionId, queueId, expectedStatus]
+          properties:
+            type: { type: string, enum: [QUEUE_CALL] }
+            clientActionId: { type: string, format: uuid }
+            queueId: { type: string, format: uuid }
+            expectedStatus: { type: string, enum: [WAITING] }
+        - type: object
+          additionalProperties: false
+          required: [type, clientActionId, queueId, expectedStatus]
+          properties:
+            type: { type: string, enum: [QUEUE_START] }
+            clientActionId: { type: string, format: uuid }
+            queueId: { type: string, format: uuid }
+            expectedStatus: { type: string, enum: [CALLED] }
+        - type: object
+          additionalProperties: false
+          required: [type, clientActionId, queueId, expectedStatus]
+          properties:
+            type: { type: string, enum: [QUEUE_SKIP] }
+            clientActionId: { type: string, format: uuid }
+            queueId: { type: string, format: uuid }
+            expectedStatus: { type: string, enum: [WAITING, CALLED] }
+        - type: object
+          additionalProperties: false
+          required: [type, clientActionId, queueId, expectedStatus, payload]
+          properties:
+            type: { type: string, enum: [QUEUE_PRIORITY] }
+            clientActionId: { type: string, format: uuid }
+            queueId: { type: string, format: uuid }
+            expectedStatus: { type: string, enum: [WAITING, CALLED, IN_PROGRESS] }
+            payload:
+              type: object
+              additionalProperties: false
+              required: [isPriority, notes]
+              properties:
+                isPriority: { type: boolean }
+                notes: { type: string, minLength: 1, maxLength: 255, nullable: true, writeOnly: true, description: Required when isPriority is true; never retained in the sync ledger. }
+    ReviewDecisionSyncAction:
+      type: object
+      additionalProperties: false
+      required: [type, clientActionId, registrationId, decision]
+      properties:
+        type: { type: string, enum: [REVIEW_DECISION] }
+        clientActionId: { type: string, format: uuid, description: Also becomes the deterministic immutable review identifier when the action is applied. }
+        registrationId: { type: string, format: uuid }
+        decision:
+          allOf: [{ $ref: "#/components/schemas/ReviewDecisionRequest" }]
+          writeOnly: true
+          description: Validated by the canonical review decision contract and never stored in the SyncAction ledger.
+    RouteOverrideSyncAction:
+      type: object
+      additionalProperties: false
+      required: [type, clientActionId, registrationId, stationIds, reasonCode, expectedVersion, skipActive]
+      properties:
+        type: { type: string, enum: [ROUTE_OVERRIDE] }
+        clientActionId: { type: string, format: uuid }
+        registrationId: { type: string, format: uuid }
+        stationIds:
+          type: array
+          minItems: 1
+          maxItems: 100
+          uniqueItems: true
+          items: { type: string, format: uuid }
+        reasonCode: { $ref: "#/components/schemas/RouteOverrideReasonCode" }
+        expectedVersion: { type: integer, minimum: 1 }
+        skipActive: { type: boolean }
+    OperationSyncRequest:
+      type: object
+      additionalProperties: false
+      required: [clientBatchId, actions]
+      properties:
+        clientBatchId: { type: string, format: uuid }
+        actions:
+          type: array
+          minItems: 1
+          maxItems: 25
+          items:
+            oneOf:
+              - $ref: "#/components/schemas/RegistrationCreateSyncAction"
+              - $ref: "#/components/schemas/QueueSyncAction"
+              - $ref: "#/components/schemas/ReviewDecisionSyncAction"
+              - $ref: "#/components/schemas/RouteOverrideSyncAction"
+    OperationSyncReceipt:
+      type: object
+      additionalProperties: false
+      required: [participantId, registrationId, queueNumber, nextStation, canonicalQrAvailable]
+      properties:
+        participantId: { type: string, format: uuid }
+        registrationId: { type: string, format: uuid }
+        queueNumber: { type: integer, minimum: 1, nullable: true }
+        nextStation:
+          type: object
+          nullable: true
+          additionalProperties: false
+          required: [stationId, stationName, stationNumber]
+          properties:
+            stationId: { type: string, format: uuid }
+            stationName: { type: string, minLength: 1, maxLength: 100 }
+            stationNumber: { type: integer, minimum: 1 }
+        canonicalQrAvailable: { type: boolean }
+    QueueOperationSyncReceipt:
+      type: object
+      additionalProperties: false
+      required: [queueId, status, isPriority]
+      properties:
+        queueId: { type: string, format: uuid }
+        status: { $ref: "#/components/schemas/QueueStatus" }
+        isPriority: { type: boolean }
+    ReviewOperationSyncReceipt:
+      type: object
+      additionalProperties: false
+      required: [reviewId, registrationStatus, referralId, referralStatus, signedAt]
+      properties:
+        reviewId: { type: string, format: uuid }
+        registrationStatus: { type: string, enum: [COMPLETED] }
+        referralId: { type: string, format: uuid, nullable: true }
+        referralStatus: { type: string, enum: [DRAFT], nullable: true }
+        signedAt: { type: string, format: date-time }
+    RouteOperationSyncReceipt:
+      allOf: [{ $ref: "#/components/schemas/RegistrationRouteState" }]
+    OperationSyncActionResult:
+      type: object
+      additionalProperties: false
+      required: [clientActionId, status, retryCount]
+      properties:
+        clientActionId: { type: string, format: uuid }
+        status: { type: string, enum: [APPLIED, CONFLICT, FAILED] }
+        retryCount: { type: integer, minimum: 0 }
+        errorCode: { type: string, maxLength: 64 }
+        result:
+          oneOf:
+            - $ref: "#/components/schemas/OperationSyncReceipt"
+            - $ref: "#/components/schemas/QueueOperationSyncReceipt"
+            - $ref: "#/components/schemas/ReviewOperationSyncReceipt"
+            - $ref: "#/components/schemas/RouteOperationSyncReceipt"
+    OperationSyncResponse:
+      type: object
+      additionalProperties: false
+      required: [clientBatchId, serverTime, actions]
+      properties:
+        clientBatchId: { type: string, format: uuid }
+        serverTime: { type: string, format: date-time }
+        actions: { type: array, items: { $ref: "#/components/schemas/OperationSyncActionResult" } }
     ScreeningSyncAction:
       oneOf:
         - type: object

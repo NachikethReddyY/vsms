@@ -11,6 +11,10 @@ const { buildRouteState, getRouteState } = require("./routeAssignmentService");
 const { reconcileAfterRouteOverride } = require("./routeProgressionService");
 const { validateRouteOverride } = require("./routeOverridePolicy");
 
+const inTransaction = (db, callback) => (
+  typeof db.$transaction === "function" ? db.$transaction(callback, { isolationLevel: "Serializable" }) : callback(db)
+);
+
 const routeStepSelect = {
   routeStepId: true,
   stationId: true,
@@ -81,7 +85,7 @@ const replaceRoute = async ({
   now = new Date(),
 }) => {
   try {
-    return await db.$transaction(async (tx) => {
+    return await inTransaction(db, async (tx) => {
       const scope = await authorizeOverride(tx, eventId, user);
       const registration = await tx.eventRegistration.findFirst({
         where: { registrationId, eventId },
@@ -164,7 +168,7 @@ const replaceRoute = async ({
       });
 
       return buildRouteState({ routeVersion, steps: orderedSteps, queueEntry });
-    }, { isolationLevel: "Serializable" });
+    });
   } catch (error) {
     if (["P2002", "P2034"].includes(error?.code)) throw await staleRouteError(db, registrationId);
     throw error;

@@ -123,7 +123,7 @@ export default function ReportsPage() {
 
       <p className="reports-scope">
         <CalendarDaysIcon aria-hidden="true" />
-        {selectedLabel ? `${selectedLabel}, ` : isAdministrator ? 'All organization events, ' : 'Assigned events, '}{filters.from} to {filters.to}
+        {report?.scope === 'DEVICE_LOCAL' ? 'This device snapshot · ' : ''}{selectedLabel ? `${selectedLabel}, ` : isAdministrator ? 'All organization events, ' : 'Assigned events, '}{filters.from} to {filters.to}
       </p>
 
       {error ? (

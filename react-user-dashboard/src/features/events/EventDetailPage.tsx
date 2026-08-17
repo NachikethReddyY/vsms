@@ -189,13 +189,16 @@ export default function EventDetailPage() {
     setLoading(true); setError('');
     try {
       const detail = await eventApi.get(eventId); setEvent(detail);
-      if (detail.canManage) { void refreshAudit(detail.eventId); void loadMetrics(detail.eventId); }
+      if (detail.canManage && detail.scope !== 'DEVICE_LOCAL') { void refreshAudit(detail.eventId); void loadMetrics(detail.eventId); }
     } catch (cause) { setError(getApiMessage(cause, 'Event details could not be loaded.')); }
     finally { setLoading(false); }
   };
   useEffect(() => { void load(); }, [eventId]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
-    if (event?.canManage && location.pathname.endsWith('/attendees')) void loadAttendees();
+    if (event?.canManage && location.pathname.endsWith('/attendees')) {
+      if (event.scope === 'DEVICE_LOCAL') setAttendeeError('The full attendee roster is online-only. Queue and station participants remain available in their event-day workspaces.');
+      else void loadAttendees();
+    }
   // The attendee query is explicitly initiated by its form or pagination controls.
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [event?.eventId, location.pathname]);
@@ -505,17 +508,18 @@ export default function EventDetailPage() {
   if (!event || !dateParts) return <div className="center-state error-state"><h1>Event unavailable</h1><p>{error}</p><div className="error-state-actions"><button className="primary" type="button" onClick={() => void load()}>Try again</button><Link className="secondary" to="/events">Return to events</Link></div></div>;
 
   const terminal = event.status === 'COMPLETED' || event.status === 'CANCELLED';
+  const deviceLocal = event.scope === 'DEVICE_LOCAL';
   const canManage = event.canManage;
   const canCreateEvent = user?.roles.includes('ADMINISTRATOR') ?? false;
-  const canConfigureStations = canManage && ['DRAFT', 'PUBLISHED', 'IN_PROGRESS'].includes(event.status);
-  const canEditStaffing = canManage && ['DRAFT', 'PUBLISHED', 'IN_PROGRESS'].includes(event.status);
+  const canConfigureStations = canManage && !deviceLocal && ['DRAFT', 'PUBLISHED', 'IN_PROGRESS'].includes(event.status);
+  const canEditStaffing = canManage && !deviceLocal && ['DRAFT', 'PUBLISHED', 'IN_PROGRESS'].includes(event.status);
   const availableTemplates = stationTemplates.filter((template) => {
     if (template.stationType === 'CUSTOM') {
       return !event.eventStations.some((station) => station.stationTemplateId === template.stationTemplateId);
     }
     return !event.eventStations.some((station) => station.stationType === template.stationType);
   });
-  const canCancel = canManage && !terminal && (event.status !== 'IN_PROGRESS' || user?.systemRole === 'ADMIN');
+  const canCancel = canManage && !deviceLocal && !terminal && (event.status !== 'IN_PROGRESS' || user?.systemRole === 'ADMIN');
   const isAdministrator = user?.roles.includes('ADMINISTRATOR') ?? false;
   const canRegisterParticipants = !isAdministrator && event.status === 'IN_PROGRESS' && event.shifts.some((shift) => (
     shift.status === 'ACTIVE' && shift.staffAssignments.some((assignment) => (
@@ -524,7 +528,7 @@ export default function EventDetailPage() {
       && assignment.user.userId === user?.userId
     ))
   ));
-  const canPermanentlyDelete = ['DRAFT', 'COMPLETED', 'CANCELLED'].includes(event.status) && user?.systemRole === 'ADMIN' && isAdministrator;
+  const canPermanentlyDelete = !deviceLocal && ['DRAFT', 'COMPLETED', 'CANCELLED'].includes(event.status) && user?.systemRole === 'ADMIN' && isAdministrator;
   const canReview = !isAdministrator && event.status === 'IN_PROGRESS' && event.shifts.some((shift) => (
     shift.status === 'ACTIVE' && shift.staffAssignments.some((assignment) => (
       assignment.assignmentRole === 'REVIEWER'
@@ -578,7 +582,7 @@ export default function EventDetailPage() {
           <h1 id="event-title">{event.name}</h1>
           <p>{event.description || 'No event description has been added.'}</p>
           <div className="event-summary-actions">
-            {canManage ? <details className="event-status-control">
+            {canManage && !deviceLocal ? <details className="event-status-control">
               <summary><i className={`status-dot ${event.status.toLowerCase()}`} />{STATUS_LABEL[event.status]}<ChevronDownIcon /></summary>
               <div>
                 {next ? <><span>Next stage</span><button className="primary compact" type="button" disabled={pending} onClick={() => setStatusConfirmOpen(true)}>{pending ? 'Saving…' : next.label}</button></> : <span>This lifecycle is complete.</span>}
@@ -617,6 +621,7 @@ export default function EventDetailPage() {
     </nav>
 
     <AppToast message={notice} onDismiss={() => setNotice('')} />
+    {deviceLocal && <div className="alert" role="status">This is the encrypted snapshot on this device. Global totals and management changes require a connection.</div>}
     {error && <div className="alert error" role="alert">{error}</div>}
 
     {bannerOpen && !terminal && <section className="banner-picker event-hero-banner-picker" id="event-banner-picker" aria-labelledby="banner-picker-title">
@@ -751,7 +756,7 @@ export default function EventDetailPage() {
         <label><span>Registration status</span><select value={attendeeStatus} onChange={(change) => setAttendeeStatus(change.target.value as EventAttendee['registrationStatus'] | '')}><option value="">All statuses</option><option value="SIGNED_UP">Signed up</option><option value="CHECKED_IN">Checked in</option><option value="COMPLETED">Completed</option><option value="CANCELLED">Cancelled</option></select></label>
         <button className="primary compact" type="submit" disabled={attendeeLoading}>{attendeeLoading ? 'Loading…' : 'Apply filters'}</button>
       </form>
-      {attendeeError && <div className="inline-retry" role="alert"><p>{attendeeError}</p><button className="secondary compact" type="button" onClick={() => void loadAttendees()}>Retry</button></div>}
+      {attendeeError && <div className="inline-retry" role="alert"><p>{attendeeError}</p>{!deviceLocal && <button className="secondary compact" type="button" onClick={() => void loadAttendees()}>Retry</button>}</div>}
       {!attendeeError && !attendeeLoading && attendees.length === 0 ? <p className="quiet-empty">No attendees match these filters.</p> : <div className="station-table">{attendees.map((attendee) => <article className="station-record" key={attendee.registrationId}><div className="station-record-copy"><strong>{attendee.participantDisplayName || attendee.participantReference}</strong><span>{attendee.participantReference} · {attendee.registrationStatus.toLowerCase().replace('_', ' ')}</span><small>{attendee.checkedInAt ? `Checked in ${formatEventDate(attendee.checkedInAt, event.timezone)}` : `Registered ${formatEventDate(attendee.createdAt, event.timezone)}`}</small>{attendee.routeSteps.length > 0 && <small>Route: {attendee.routeSteps.map((step) => `${step.stationName} (${step.state.toLowerCase()})`).join(' → ')}</small>}</div><span className="station-record-actions"><strong className="station-capacity-readonly">{attendee.queueNumber ? `#${attendee.queueNumber}` : '—'}</strong>{attendee.routeSteps.some((step) => ['CURRENT', 'BLOCKED', 'UPCOMING'].includes(step.state)) && <button className="secondary compact" type="button" onClick={() => setAttendeeRouteRegistrationId(attendee.registrationId)}>Change route</button>}</span></article>)}</div>}
       {attendeeNextCursor && <button className="secondary compact" type="button" disabled={attendeeLoading} onClick={() => void loadAttendees(attendeeNextCursor, true)}>{attendeeLoading ? 'Loading…' : 'Load more'}</button>}
     </section>}
@@ -767,7 +772,7 @@ export default function EventDetailPage() {
     {view === 'activity' && <section className="event-view history event-activity" aria-labelledby="activity-title">
       <h2 id="activity-title">Activity</h2>
       <p>Consequential event actions retain the authenticated actor and timestamp.</p>
-      {!canManage ? <p>History is available to the event’s managers and administrators.</p> : <>
+      {deviceLocal ? <p>Activity history requires a connection and is not stored in this device snapshot.</p> : !canManage ? <p>History is available to the event’s managers and administrators.</p> : <>
         {auditError && <div className="inline-retry" role="alert"><p>{auditError}</p><button className="secondary compact" type="button" onClick={() => void refreshAudit(event.eventId)}>Retry</button></div>}
         {auditLoading && audit.length === 0 ? <p>Loading activity…</p> : !auditError && audit.length === 0 ? <p>No history is available.</p> : audit.length > 0 ? <ol>{audit.map((item) => <li key={item.eventAuditLogId}><i /><div><strong>{item.action.toLowerCase().replace(/_/g, ' ')}</strong><span>{item.actor?.email ?? 'System actor'}</span><time dateTime={item.createdAt}>{formatEventDate(item.createdAt, event.timezone)}</time></div></li>)}</ol> : null}
       </>}

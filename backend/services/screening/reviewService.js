@@ -414,16 +414,29 @@ const reviewSignedPayloadHash = ({ eventId, registrationId, reviewId, userId, de
   }))
   .digest("hex");
 
-const recordDecision = async (eventId, registrationId, decision, user, ipAddress) => {
+const verifyReviewDecisionSignature = (eventId, decision, user) => loadVerifiedSignature({
+  signatureObjectKey: decision.signatureObjectKey,
+  signatureSha256: decision.signatureSha256,
+  signatureMimeType: decision.signatureMimeType,
+}, user.userId, eventId, "REVIEW_DECISION");
+
+const authorizeReviewSyncAction = (eventId, _action, user, db = prisma) => (
+  requireReviewerAccess(db, eventId, user)
+);
+
+const recordDecision = async (eventId, registrationId, decision, user, ipAddress, dependencies = {}) => {
+  const db = dependencies.db || prisma;
+  const verifySignature = dependencies.verifySignature || verifyReviewDecisionSignature;
+  const consumeSignature = dependencies.consumeSignature || consumeSignatureArtifact;
   const userId = user.userId;
   const signature = {
     signatureObjectKey: decision.signatureObjectKey,
     signatureSha256: decision.signatureSha256,
     signatureMimeType: decision.signatureMimeType,
   };
-  await loadVerifiedSignature(signature, userId, eventId, "REVIEW_DECISION");
-  const reviewId = crypto.randomUUID();
-  const signedAt = new Date();
+  if (!dependencies.signatureVerified) await verifySignature(eventId, decision, user);
+  const reviewId = dependencies.reviewId || crypto.randomUUID();
+  const signedAt = dependencies.signedAt || new Date();
   const urgency = decisionUrgency(decision);
   const eyeHealthObservations = normalizeEyeHealthObservations(decision.eyeHealthObservations);
   const signedPayloadHash = reviewSignedPayloadHash({
@@ -437,7 +450,7 @@ const recordDecision = async (eventId, registrationId, decision, user, ipAddress
     signedAt,
   });
   try {
-    return await prisma.$transaction(async (tx) => {
+    const apply = async (tx) => {
       await requireReviewerAccess(tx, eventId, user);
       const registration = await loadRegistration(tx, eventId, registrationId);
       if (!registration) throw new AppError(404, "REGISTRATION_NOT_FOUND", "Registration not found");
@@ -456,7 +469,7 @@ const recordDecision = async (eventId, registrationId, decision, user, ipAddress
       }
       const incompleteUrgentRoute = assertReviewOutcomeAllowed(readiness, decision.outcome);
 
-      await consumeSignatureArtifact(
+      await consumeSignature(
         tx,
         signature,
         userId,
@@ -570,10 +583,13 @@ const recordDecision = async (eventId, registrationId, decision, user, ipAddress
         },
         referral: serializeReferral(referral),
       };
-    }, { isolationLevel: "Serializable" });
+    };
+    return typeof db.$transaction === "function"
+      ? await db.$transaction(apply, { isolationLevel: "Serializable" })
+      : await apply(db);
   } catch (error) {
     if (error?.code === "P2002" || error?.code === "P2034") {
-      const existing = await prisma.review.findFirst({ where: { registrationId, version: 1 }, select: { reviewId: true } });
+      const existing = await db.review.findFirst({ where: { registrationId, version: 1 }, select: { reviewId: true } });
       if (existing) throw new AppError(409, "REVIEW_ALREADY_RECORDED", "A clinical review has already been recorded");
       throw new AppError(409, "SCREENING_RESULTS_CHANGED", "Screening results changed; reassess before deciding");
     }
@@ -596,4 +612,6 @@ module.exports = {
   stopRouteForUrgentReview,
   unfinishedRouteStationIds,
   skippedRouteStationIds,
+  authorizeReviewSyncAction,
+  verifyReviewDecisionSignature,
 };

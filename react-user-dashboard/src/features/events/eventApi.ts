@@ -1,6 +1,8 @@
 import apiClient from '../../utils/apiClient';
 import type { components } from '../../generated/api';
 import type { StationType } from '../screening/screeningApi';
+import { getOfflineEvent, isNetworkError, listOfflineEvents } from '../screening/offlineSync';
+import { getStoredSession } from '../../utils/session';
 
 export type EventStation = Omit<components['schemas']['EventStation'], 'stationType'> & {
   stationType: StationType;
@@ -9,6 +11,7 @@ export type EventRecord = Omit<components['schemas']['Event'], 'shifts' | 'event
   shifts: components['schemas']['Shift'][];
   eventStations: EventStation[];
   eventTeam?: string[];
+  scope?: 'DEVICE_LOCAL' | 'SERVER';
 };
 export type EventStatus = components['schemas']['EventStatus'];
 export type StaffAssignment = components['schemas']['StaffAssignment'];
@@ -31,14 +34,51 @@ export type EventAttendee = components['schemas']['EventAttendee'];
 export type EventAttendeeList = components['schemas']['EventAttendeeList'];
 export type EventExportResponse = components['schemas']['EventExportResponse'];
 
+function offlineOwnerId() {
+  return getStoredSession()?.user.id ?? null;
+}
+
+function browserIsOnline() {
+  return typeof navigator === 'undefined' || navigator.onLine;
+}
+
+async function offlineEventList(params?: { status?: EventStatus; search?: string }) {
+  const ownerId = offlineOwnerId();
+  if (!ownerId) return [];
+  const search = params?.search?.trim().toLowerCase();
+  return (await listOfflineEvents(ownerId))
+    .filter((event) => !params?.status || event.status === params.status)
+    .filter((event) => !search || `${event.name} ${event.venue}`.toLowerCase().includes(search))
+    .sort((left, right) => Date.parse(left.startsAt) - Date.parse(right.startsAt))
+    .map((event) => ({ ...event, scope: 'DEVICE_LOCAL' as const }));
+}
+
 export const eventApi = {
   async list(params?: { status?: EventStatus; search?: string; cursor?: string }) {
-    const { data } = await apiClient.get<components['schemas']['EventListResponse']>('/events', { params: { ...params, limit: 25 } });
-    return data;
+    if (!browserIsOnline()) return { events: await offlineEventList(params), nextCursor: null };
+    try {
+      const { data } = await apiClient.get<components['schemas']['EventListResponse']>('/events', { params: { ...params, limit: 25 } });
+      return data;
+    } catch (error) {
+      const events = isNetworkError(error) ? await offlineEventList(params) : [];
+      if (events.length) return { events, nextCursor: null };
+      throw error;
+    }
   },
   async get(id: string, signal?: AbortSignal) {
-    const { data } = await apiClient.get<EventRecord>(`/events/${id}`, { signal });
-    return data;
+    const ownerId = offlineOwnerId();
+    if (!browserIsOnline() && ownerId) {
+      const event = await getOfflineEvent(ownerId, id);
+      if (event) return { ...event, scope: 'DEVICE_LOCAL' as const };
+    }
+    try {
+      const { data } = await apiClient.get<EventRecord>(`/events/${id}`, { signal });
+      return data;
+    } catch (error) {
+      const event = isNetworkError(error) && ownerId ? await getOfflineEvent(ownerId, id) : null;
+      if (event) return { ...event, scope: 'DEVICE_LOCAL' as const };
+      throw error;
+    }
   },
   async publicGet(id: string, signal?: AbortSignal) {
     const { data } = await apiClient.get<PublicEvent>(`/public/events/${id}`, { signal });

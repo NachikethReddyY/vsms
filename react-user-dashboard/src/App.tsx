@@ -50,7 +50,7 @@ import {
 const adminRoles = ["ADMINISTRATOR"];
 const eventManagerRoles = ["ADMINISTRATOR", "EVENT_MANAGER"];
 const registrationRoles = ["REGISTRATION_OFFICER"];
-const queueRoles = ["ADMINISTRATOR", "EVENT_MANAGER", "REGISTRATION_OFFICER"];
+const queueRoles = ["ADMINISTRATOR", "EVENT_MANAGER", "REGISTRATION_OFFICER", "SCREENER", "SUPPORT"];
 const screenerRoles = ["SCREENER"];
 const reviewerRoles = ["REVIEWER"];
 const eventMemberRoles = ["ADMINISTRATOR", "EVENT_MANAGER", "REGISTRATION_OFFICER", "SCREENER", "REVIEWER", "SUPPORT"];

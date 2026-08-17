@@ -1,5 +1,6 @@
 const { z } = require("zod");
 const { extractQrToken } = require("../utils/crypto/qrToken");
+const { ROUTE_OVERRIDE_REASON_CODES } = require("../services/screening/routeOverridePolicy");
 
 const secureQrValue = z.string().trim().min(64).max(2048).refine((value) => extractQrToken(value) !== null, {
   message: "A valid secure QR pass token or participant-status URL is required",
@@ -239,6 +240,137 @@ const screeningSyncBody = z.object({
   actions: z.array(screeningSyncAction).max(25),
 }).strict();
 
+const offlineParticipant = z.object({
+  firstName: z.string().trim().min(1).max(100),
+  lastName: z.string().trim().min(1).max(100),
+  dateOfBirth: z.string().date(),
+  gender: z.enum(["M", "F", "O", "U"]),
+  contactNumber: z.string().trim().regex(/^\+?[0-9][0-9\s-]{6,19}$/).max(30),
+  nric: z.string().trim().regex(/^[STFGM]\d{7}[A-Z]$/i),
+  email: z.string().trim().toLowerCase().email().max(255),
+  race: z.string().trim().min(1).max(50),
+  nationality: z.string().trim().min(1).max(50),
+  addressStreet: z.string().trim().min(1).max(255),
+  addressUnit: z.string().trim().min(1).max(20),
+  addressPostalCode: z.string().trim().min(1).max(10),
+  preferredLanguage: z.string().trim().min(1).max(50),
+  accessibilityNotes: z.string().trim().max(1000).optional(),
+}).strict();
+
+const offlineEmergencyContact = z.object({
+  contactName: z.string().trim().min(1).max(120),
+  relationship: z.string().trim().min(1).max(60),
+  phoneNumber: z.string().trim().regex(/^\+?[0-9][0-9\s-]{6,19}$/).max(30),
+  email: z.string().trim().toLowerCase().email().max(255).optional(),
+}).strict();
+
+const offlineRegistrationEvidence = z.object({
+  workflowStartedAt: z.string().datetime({ offset: true }).nullable(),
+  paperFormUsed: z.boolean(),
+  paperExceptionReason: z.string().trim().min(3).max(200).optional(),
+}).strict().superRefine((value, ctx) => {
+  if (value.paperFormUsed && !value.paperExceptionReason) {
+    ctx.addIssue({ code: "custom", path: ["paperExceptionReason"], message: "Paper exception reason is required" });
+  }
+  if (!value.paperFormUsed && value.paperExceptionReason) {
+    ctx.addIssue({ code: "custom", path: ["paperExceptionReason"], message: "Paper exception reason requires paperFormUsed" });
+  }
+});
+
+const registrationCreateSyncAction = z.object({
+  type: z.literal("REGISTRATION_CREATE"),
+  clientActionId: z.string().uuid(),
+  clientParticipantId: z.string().uuid(),
+  clientRegistrationId: z.string().uuid(),
+  participant: offlineParticipant,
+  emergencyContact: offlineEmergencyContact,
+  evidence: offlineRegistrationEvidence,
+  proposed: z.object({
+    queueNumber: z.number().int().positive(),
+    nextStationId: z.string().uuid(),
+    nextStationNumber: z.number().int().positive(),
+  }).strict(),
+}).strict();
+
+const queueSyncBase = {
+  clientActionId: z.string().uuid(),
+  queueId: z.string().uuid(),
+};
+const queueCallSyncAction = z.object({
+  ...queueSyncBase,
+  type: z.literal("QUEUE_CALL"),
+  expectedStatus: z.literal("WAITING"),
+}).strict();
+const queueStartSyncAction = z.object({
+  ...queueSyncBase,
+  type: z.literal("QUEUE_START"),
+  expectedStatus: z.literal("CALLED"),
+}).strict();
+const queueSkipSyncAction = z.object({
+  ...queueSyncBase,
+  type: z.literal("QUEUE_SKIP"),
+  expectedStatus: z.enum(["WAITING", "CALLED"]),
+}).strict();
+const queuePrioritySyncAction = z.object({
+  ...queueSyncBase,
+  type: z.literal("QUEUE_PRIORITY"),
+  expectedStatus: z.enum(["WAITING", "CALLED", "IN_PROGRESS"]),
+  payload: z.object({
+    isPriority: z.boolean(),
+    notes: z.string().trim().min(1).max(255).nullable(),
+  }).strict(),
+}).strict();
+
+const reviewDecisionSyncAction = z.object({
+  type: z.literal("REVIEW_DECISION"),
+  clientActionId: z.string().uuid(),
+  registrationId: z.string().uuid(),
+  decision: reviewDecisionBody,
+}).strict();
+
+const routeOverrideSyncAction = z.object({
+  type: z.literal("ROUTE_OVERRIDE"),
+  clientActionId: z.string().uuid(),
+  registrationId: z.string().uuid(),
+  stationIds: z.array(z.string().uuid()).min(1).max(100),
+  reasonCode: z.enum(ROUTE_OVERRIDE_REASON_CODES),
+  expectedVersion: z.number().int().positive(),
+  skipActive: z.boolean(),
+}).strict().superRefine(({ stationIds }, ctx) => {
+  if (new Set(stationIds).size !== stationIds.length) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["stationIds"],
+      message: "Station IDs must be unique",
+    });
+  }
+});
+
+const syncOperationAction = z.discriminatedUnion("type", [
+  registrationCreateSyncAction,
+  queueCallSyncAction,
+  queueStartSyncAction,
+  queueSkipSyncAction,
+  queuePrioritySyncAction,
+  reviewDecisionSyncAction,
+  routeOverrideSyncAction,
+]);
+
+const syncOperationsBody = z.object({
+  clientBatchId: z.string().uuid(),
+  actions: z.array(syncOperationAction).min(1).max(25),
+}).strict().superRefine(({ actions }, ctx) => {
+  actions.forEach((action, index) => {
+    if (action.type === "QUEUE_PRIORITY" && action.payload.isPriority && !action.payload.notes) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["actions", index, "payload", "notes"],
+        message: "A reason is required when marking a queue entry as priority",
+      });
+    }
+  });
+});
+
 module.exports = {
   eventParams,
   stationParams,
@@ -266,4 +398,5 @@ module.exports = {
   previewDynamicBody,
   saveDynamicBody,
   screeningSyncBody,
+  syncOperationsBody,
 };

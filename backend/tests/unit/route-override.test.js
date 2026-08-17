@@ -164,8 +164,9 @@ const serviceDb = ({ routeVersion = 3 } = {}) => {
   return { db: { ...tx, $transaction: async (work) => work(tx) }, state };
 };
 
-test("manager override uses routeVersion CAS, preserves active queue, and audits before/after order", async () => {
+test("manager override accepts an existing transaction, uses routeVersion CAS, and audits the order", async () => {
   const { db, state } = serviceDb();
+  const { $transaction: _transaction, ...transactionClient } = db;
   const route = await replaceRoute({
     eventId,
     registrationId,
@@ -173,7 +174,7 @@ test("manager override uses routeVersion CAS, preserves active queue, and audits
     reasonCode: "QUEUE_BALANCING",
     expectedVersion: 3,
     user: manager,
-    db,
+    db: transactionClient,
   });
   assert.equal(route.routeVersion, 4);
   assert.deepEqual(route.steps.map(({ stationId }) => stationId), [a, b, d, c]);

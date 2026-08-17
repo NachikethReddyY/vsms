@@ -589,6 +589,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/events/{eventId}/offline-pack": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Download a device-bound, role-scoped event offline pack
+         * @description Reuses the caller-redacted event detail. Active screeners additionally receive only their assigned station queues; active registration officers receive selectable station metadata and a provisional queue-number seed without participant data. Event managers and active registration, screening, or support duties also receive the canonical safe event queue projection. Doctors with an active reviewer duty receive only currently actionable redacted review details. The opaque pack identifier and ES256 capability lease bind the actor, event, device, roles, capabilities, generation time, and expiry. Clients must verify the lease and their production-pinned key identifier before persisting the pack.
+         */
+        get: operations["getEventOfflinePack"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/events/{eventId}": {
         parameters: {
             query?: never;
@@ -988,6 +1008,26 @@ export interface paths {
          * @description Each action is independently idempotent. The durable server sync ledger stores only operational metadata and safe error codes, never clinical bodies, participant profiles, NRIC values, or pass tokens.
          */
         post: operations["syncScreeningBatch"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/events/{eventId}/sync/operations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Apply local-first event operations
+         * @description Registration actions require a current REGISTRATION duty. Queue call/start/skip actions require current queue access and station duty where applicable; priority changes require event-manager access. Route overrides reuse the canonical event-manager or current REGISTRATION/SCREENER duty policy and require an expected route version. Review decisions require a current REVIEWER duty and doctor account while the event is in progress. Each stable client action is fingerprinted and replayed from the existing SyncAction ledger. Participant, NRIC, emergency-contact, priority-note, clinical, signature, referral-body, and QR bearer data are never stored in that ledger; an APPLIED receipt is the durable acceptance signal. Referral issue and delivery remain online-only.
+         */
+        post: operations["syncOfflineOperations"];
         delete?: never;
         options?: never;
         head?: never;
@@ -3208,6 +3248,95 @@ export interface components {
             /** @description Manager-only organisation identity projection. */
             cancelledBy?: components["schemas"]["User"] | null;
         };
+        EventOfflinePack: {
+            /** @enum {integer} */
+            schemaVersion: 1;
+            packId: string;
+            /** Format: date-time */
+            generatedAt: string;
+            /** Format: date-time */
+            expiresAt: string;
+            event: components["schemas"]["Event"];
+            roles: ("EVENT_MANAGER" | "REGISTRATION" | "SCREENER" | "REVIEWER" | "SUPPORT")[];
+            capabilities: {
+                screening: boolean;
+                registration: boolean;
+                queue: boolean;
+                review: boolean;
+                routeOverride: boolean;
+            };
+            lease: components["schemas"]["OfflineCapabilityLease"];
+            screening: {
+                event: {
+                    /** Format: uuid */
+                    eventId: string;
+                    name: string;
+                    status: components["schemas"]["EventStatus"];
+                };
+                stations: components["schemas"]["ScreeningSyncPullStation"][];
+            };
+            /** @description Present only for a caller with a current REGISTRATION duty. The queue number is provisional and may be remapped by the server during synchronization. */
+            registration?: {
+                stations: {
+                    /** Format: uuid */
+                    stationId: string;
+                    stationName: string;
+                    stationType: string;
+                    stationOrder: number;
+                }[];
+                nextQueueNumber: number;
+            };
+            queue?: components["schemas"]["EventQueueStatusResponse"];
+            /** @description Present only for event managers or callers with a current REGISTRATION or SCREENER duty. Contains safe route state only for registrations already present in this role-scoped queue snapshot. */
+            routes?: {
+                /** Format: uuid */
+                registrationId: string;
+                route: components["schemas"]["RegistrationRouteState"];
+            }[];
+            /** @description Present only for a doctor with a current REVIEWER duty while the event is in progress. Contains actionable registrations only and never includes raw NRIC, contact/address data, pass tokens, signatures, or referral-delivery data. */
+            review?: {
+                event: components["schemas"]["ReviewEvent"];
+                queue: components["schemas"]["ReviewQueueItem"][];
+                details: components["schemas"]["OfflineReviewDetail"][];
+            };
+        };
+        OfflineCapabilityLease: {
+            /** @enum {string} */
+            algorithm: "ES256";
+            keyId: string;
+            publicKey: {
+                /** @enum {string} */
+                kty: "EC";
+                /** @enum {string} */
+                crv: "P-256";
+                x: string;
+                y: string;
+            };
+            payload: {
+                /** @enum {integer} */
+                schemaVersion: 1;
+                packId: string;
+                /** Format: uuid */
+                actorId: string;
+                /** Format: uuid */
+                eventId: string;
+                /** Format: uuid */
+                deviceId: string;
+                /** Format: date-time */
+                issuedAt: string;
+                /** Format: date-time */
+                expiresAt: string;
+                roles: ("EVENT_MANAGER" | "REGISTRATION" | "SCREENER" | "REVIEWER" | "SUPPORT")[];
+                capabilities: {
+                    screening: boolean;
+                    registration: boolean;
+                    queue: boolean;
+                    review: boolean;
+                    routeOverride: boolean;
+                };
+            };
+            signature: string;
+        };
         PublicEvent: {
             /** Format: uuid */
             eventId: string;
@@ -3906,6 +4035,15 @@ export interface components {
             stations: components["schemas"]["ReviewStationResult"][];
             readiness: components["schemas"]["ReviewReadiness"];
             existingReview: components["schemas"]["ExistingReview"] | null;
+            contextVersion: string;
+        };
+        OfflineReviewDetail: {
+            event: components["schemas"]["ReviewEvent"];
+            participant: components["schemas"]["ReviewParticipant"];
+            stations: components["schemas"]["ReviewStationResult"][];
+            readiness: components["schemas"]["ReviewReadiness"];
+            /** @description Always null because offline packs contain only registrations with no recorded review. */
+            existingReview: Record<string, never> | null;
             contextVersion: string;
         };
         ReferralDecisionInput: {
@@ -4962,6 +5100,181 @@ export interface components {
             resultData: {
                 [key: string]: unknown;
             };
+        };
+        OfflineRegistrationEvidence: {
+            /**
+             * Format: date-time
+             * @description Client-observed workflow start; when supplied it must be within the current 24-hour workflow window.
+             */
+            workflowStartedAt: string | null;
+            paperFormUsed: boolean;
+            paperExceptionReason?: string;
+        };
+        /** @description Optimistic local placement used only for client reconciliation; the server allocates the canonical queue and route. */
+        OfflineRegistrationProposal: {
+            queueNumber: number;
+            /** Format: uuid */
+            nextStationId: string;
+            nextStationNumber: number;
+        };
+        RegistrationCreateSyncAction: {
+            /** @enum {string} */
+            type: "REGISTRATION_CREATE";
+            /** Format: uuid */
+            clientActionId: string;
+            /** Format: uuid */
+            clientParticipantId: string;
+            /** Format: uuid */
+            clientRegistrationId: string;
+            participant: {
+                firstName: string;
+                lastName: string;
+                /** Format: date */
+                dateOfBirth: string;
+                /** @enum {string} */
+                gender: "M" | "F" | "O" | "U";
+                contactNumber: string;
+                nric: string;
+                /** Format: email */
+                email: string;
+                race: string;
+                nationality: string;
+                addressStreet: string;
+                addressUnit: string;
+                addressPostalCode: string;
+                preferredLanguage: string;
+                accessibilityNotes?: string;
+            };
+            emergencyContact: {
+                contactName: string;
+                relationship: string;
+                phoneNumber: string;
+                /** Format: email */
+                email?: string;
+            };
+            evidence: components["schemas"]["OfflineRegistrationEvidence"];
+            proposed: components["schemas"]["OfflineRegistrationProposal"];
+        };
+        QueueSyncAction: {
+            /** @enum {string} */
+            type: "QUEUE_CALL";
+            /** Format: uuid */
+            clientActionId: string;
+            /** Format: uuid */
+            queueId: string;
+            /** @enum {string} */
+            expectedStatus: "WAITING";
+        } | {
+            /** @enum {string} */
+            type: "QUEUE_START";
+            /** Format: uuid */
+            clientActionId: string;
+            /** Format: uuid */
+            queueId: string;
+            /** @enum {string} */
+            expectedStatus: "CALLED";
+        } | {
+            /** @enum {string} */
+            type: "QUEUE_SKIP";
+            /** Format: uuid */
+            clientActionId: string;
+            /** Format: uuid */
+            queueId: string;
+            /** @enum {string} */
+            expectedStatus: "WAITING" | "CALLED";
+        } | {
+            /** @enum {string} */
+            type: "QUEUE_PRIORITY";
+            /** Format: uuid */
+            clientActionId: string;
+            /** Format: uuid */
+            queueId: string;
+            /** @enum {string} */
+            expectedStatus: "WAITING" | "CALLED" | "IN_PROGRESS";
+            payload: {
+                isPriority: boolean;
+                /** @description Required when isPriority is true; never retained in the sync ledger. */
+                notes: string | null;
+            };
+        };
+        ReviewDecisionSyncAction: {
+            /** @enum {string} */
+            type: "REVIEW_DECISION";
+            /**
+             * Format: uuid
+             * @description Also becomes the deterministic immutable review identifier when the action is applied.
+             */
+            clientActionId: string;
+            /** Format: uuid */
+            registrationId: string;
+            /** @description Validated by the canonical review decision contract and never stored in the SyncAction ledger. */
+            decision: Omit<components["schemas"]["ReviewDecisionRequest"], "outcome">;
+        };
+        RouteOverrideSyncAction: {
+            /** @enum {string} */
+            type: "ROUTE_OVERRIDE";
+            /** Format: uuid */
+            clientActionId: string;
+            /** Format: uuid */
+            registrationId: string;
+            stationIds: string[];
+            reasonCode: components["schemas"]["RouteOverrideReasonCode"];
+            expectedVersion: number;
+            skipActive: boolean;
+        };
+        OperationSyncRequest: {
+            /** Format: uuid */
+            clientBatchId: string;
+            actions: (components["schemas"]["RegistrationCreateSyncAction"] | components["schemas"]["QueueSyncAction"] | components["schemas"]["ReviewDecisionSyncAction"] | components["schemas"]["RouteOverrideSyncAction"])[];
+        };
+        OperationSyncReceipt: {
+            /** Format: uuid */
+            participantId: string;
+            /** Format: uuid */
+            registrationId: string;
+            queueNumber: number | null;
+            nextStation: {
+                /** Format: uuid */
+                stationId: string;
+                stationName: string;
+                stationNumber: number;
+            } | null;
+            canonicalQrAvailable: boolean;
+        };
+        QueueOperationSyncReceipt: {
+            /** Format: uuid */
+            queueId: string;
+            status: components["schemas"]["QueueStatus"];
+            isPriority: boolean;
+        };
+        ReviewOperationSyncReceipt: {
+            /** Format: uuid */
+            reviewId: string;
+            /** @enum {string} */
+            registrationStatus: "COMPLETED";
+            /** Format: uuid */
+            referralId: string | null;
+            /** @enum {string|null} */
+            referralStatus: "DRAFT" | null;
+            /** Format: date-time */
+            signedAt: string;
+        };
+        RouteOperationSyncReceipt: components["schemas"]["RegistrationRouteState"];
+        OperationSyncActionResult: {
+            /** Format: uuid */
+            clientActionId: string;
+            /** @enum {string} */
+            status: "APPLIED" | "CONFLICT" | "FAILED";
+            retryCount: number;
+            errorCode?: string;
+            result?: components["schemas"]["OperationSyncReceipt"] | components["schemas"]["QueueOperationSyncReceipt"] | components["schemas"]["ReviewOperationSyncReceipt"] | components["schemas"]["RouteOperationSyncReceipt"];
+        };
+        OperationSyncResponse: {
+            /** Format: uuid */
+            clientBatchId: string;
+            /** Format: date-time */
+            serverTime: string;
+            actions: components["schemas"]["OperationSyncActionResult"][];
         };
         ScreeningSyncAction: {
             /** Format: uuid */
@@ -6393,6 +6706,36 @@ export interface operations {
             429: components["responses"]["RateLimited"];
         };
     };
+    getEventOfflinePack: {
+        parameters: {
+            query?: never;
+            header: {
+                "x-device-id": string;
+            };
+            path: {
+                eventId: components["parameters"]["EventId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Allowlisted offline pack capped by event end and any applicable active duty */
+            200: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EventOfflinePack"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            422: components["responses"]["ValidationFailed"];
+        };
+    };
     getEvent: {
         parameters: {
             query?: never;
@@ -7143,6 +7486,36 @@ export interface operations {
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            422: components["responses"]["ValidationFailed"];
+        };
+    };
+    syncOfflineOperations: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                eventId: components["parameters"]["EventId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["OperationSyncRequest"];
+            };
+        };
+        responses: {
+            /** @description Per-action durable outcomes with safe canonical registration, queue, route, or review receipts */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OperationSyncResponse"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
             409: components["responses"]["Conflict"];
             422: components["responses"]["ValidationFailed"];
         };

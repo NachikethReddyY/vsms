@@ -1,6 +1,11 @@
 ﻿const crypto = require("crypto");
 const prisma = require("../../prisma/prismaClient");
 const screeningService = require("./screeningService");
+const queueService = require("./queueService");
+const reviewService = require("./reviewService");
+const routeOverrideService = require("./routeOverrideService");
+const registrationService = require("../participant/registrationService");
+const { assertRegistrationAssignment } = require("../../utils/auth/staff");
 const { createAuditLog } = require("../../utils/logging/audit");
 const { AUDIT_ACTIONS } = require("../../utils/logging/auditEvents");
 
@@ -20,17 +25,44 @@ const SAFE_CONFLICT_CODES = new Set([
   "IDEMPOTENCY_KEY_REUSED",
   "INVALID_FIELD_SCHEMA",
   "INVALID_RESULT_DATA",
+  "INVALID_QUEUE_STATE",
+  "QUEUE_ENTRY_NOT_FOUND",
+  "QUEUE_STATE_CONFLICT",
+  "PRIORITY_NOTES_REQUIRED",
   "REGISTRATION_NOT_FOUND",
   "REGISTRATION_NOT_SCREENABLE",
+  "REGISTRATION_DUPLICATE",
+  "REGISTRATION_EMERGENCY_CONTACT_REQUIRED",
+  "REGISTRATION_EVENT_NOT_FOUND",
+  "REGISTRATION_EVENT_NOT_OPEN",
+  "REGISTRATION_IDEMPOTENCY_CONFLICT",
+  "REGISTRATION_PARTICIPANT_NOT_ACTIVE",
+  "REGISTRATION_WRITE_CONFLICT",
+  "REVIEW_ALREADY_RECORDED",
+  "REVIEW_NOT_READY",
   "ROUTE_NOT_ASSIGNED",
+  "ROUTE_VERSION_CONFLICT",
+  "INVALID_ROUTE_OVERRIDE",
+  "INVALID_ROUTE_SKIP",
+  "LOCKED_ROUTE_STEP",
+  "NEXT_ROUTE_STEP_ONLY",
+  "REGISTRATION_ROUTE_TERMINAL",
+  "ROUTE_ALREADY_COMPLETE",
+  "ROUTE_UNCHANGED",
+  "QUEUE_ALREADY_IN_PROGRESS",
   "ROUTE_PROGRESSION_CONFLICT",
   "ROUTE_QUEUE_CONFLICT",
   "ROUTE_STATION_MISMATCH",
   "SCREENER_ROLE_REQUIRED",
+  "SCREENING_RESULTS_CHANGED",
   "SCREENING_WRITE_CONFLICT",
+  "SIGNATURE_ALREADY_USED",
   "SHIFT_NOT_ACTIVE",
   "STATION_NOT_FOUND",
   "STATION_SCHEMA_MISSING",
+  "URGENT_ESCALATION_REQUIRED",
+  "URGENT_FLAG_REQUIRED",
+  "INVALID_SIGNATURE",
 ]);
 
 const canonicalJson = (value) => {
@@ -46,7 +78,9 @@ const requestFingerprint = ({ eventId, userId, action }) => crypto
   .update(JSON.stringify(canonicalJson({ eventId, userId, action })))
   .digest("hex");
 
-const withTransaction = (db, callback) => db.$transaction(callback);
+const withTransaction = (db, callback) => (
+  typeof db.$transaction === "function" ? db.$transaction(callback) : callback(db)
+);
 const TERMINAL_STATUSES = new Set(["APPLIED", "CONFLICT", "FAILED"]);
 const PROCESSING_LEASE_MS = 30_000;
 const TERMINAL_WAIT_MS = 10_000;
@@ -83,6 +117,57 @@ const safeResultSnapshot = (receipt) => {
   };
 };
 
+const safeRegistrationSnapshot = (receipt) => ({
+  participantId: receipt.participantId,
+  registrationId: receipt.registrationId,
+  queueNumber: receipt.queueNumber ?? null,
+  nextStation: receipt.nextStation ? {
+    stationId: receipt.nextStation.stationId,
+    stationName: receipt.nextStation.stationName,
+    stationNumber: receipt.nextStation.stationNumber,
+  } : null,
+  canonicalQrAvailable: receipt.canonicalQrAvailable === true,
+});
+
+const safeQueueSnapshot = (receipt) => ({
+  queueId: receipt.id,
+  status: receipt.status,
+  isPriority: receipt.isPriority === true,
+});
+
+const safeReviewSnapshot = (receipt) => ({
+  reviewId: receipt.review.reviewId,
+  registrationStatus: receipt.registrationStatus,
+  referralId: receipt.referral?.referralId || null,
+  referralStatus: receipt.referral?.status || null,
+  signedAt: new Date(receipt.review.signedAt).toISOString(),
+});
+
+const safeRouteSnapshot = (route) => ({
+  status: route.status,
+  routeVersion: route.routeVersion,
+  steps: route.steps.map(({ stationId, stationName, stationType, position, state }) => ({
+    stationId,
+    stationName,
+    stationType,
+    position,
+    state,
+  })),
+  currentStation: route.currentStation ? {
+    stationId: route.currentStation.stationId,
+    stationName: route.currentStation.stationName,
+    stationType: route.currentStation.stationType,
+    position: route.currentStation.position,
+    state: route.currentStation.state,
+  } : null,
+  queue: route.queue ? {
+    queueEntryId: route.queue.queueEntryId,
+    stationId: route.queue.stationId,
+    queueNumber: route.queue.queueNumber,
+    status: route.queue.status,
+  } : null,
+});
+
 const responseFor = (row) => ({
   clientActionId: row.clientActionId,
   status: row.status,
@@ -91,19 +176,58 @@ const responseFor = (row) => ({
   ...(row.responseSnapshot ? { result: row.responseSnapshot } : {}),
 });
 
+const ledgerFields = (action) => {
+  if (action.type === "REGISTRATION_CREATE") return {
+    stationId: action.proposed.nextStationId,
+    operation: "CREATE",
+    entityType: "EventRegistration",
+    entityId: action.clientRegistrationId,
+    payload: { schemaVersion: 1, actionType: action.type },
+  };
+  if (action.type?.startsWith("QUEUE_")) return {
+    stationId: null,
+    operation: "UPDATE",
+    entityType: "QueueEntry",
+    entityId: action.queueId,
+    payload: { schemaVersion: 1, actionType: action.type, expectedStatus: action.expectedStatus },
+  };
+  if (action.type === "REVIEW_DECISION") return {
+    stationId: null,
+    operation: "CREATE",
+    entityType: "Review",
+    entityId: action.clientActionId,
+    payload: { schemaVersion: 1, actionType: action.type },
+  };
+  if (action.type === "ROUTE_OVERRIDE") return {
+    stationId: null,
+    operation: "UPDATE",
+    entityType: "EventRegistration",
+    entityId: action.registrationId,
+    payload: { schemaVersion: 1, actionType: action.type, expectedVersion: action.expectedVersion },
+  };
+  return {
+    stationId: action.stationId,
+    operation: "UPDATE",
+    entityType: "ScreeningResult",
+    entityId: action.payload.registrationId,
+    payload: { schemaVersion: 1, stationType: action.stationType },
+  };
+};
+
 const createPendingAction = async (db, eventId, userId, action, fingerprint) => withTransaction(db, async (tx) => {
+  const fields = ledgerFields(action);
   const row = await tx.syncAction.create({
     data: {
       userId,
       eventId,
-      stationId: action.stationId,
+      stationId: fields.stationId,
       clientActionId: action.clientActionId,
       requestFingerprint: fingerprint,
-      operation: "UPDATE",
-      entityType: "ScreeningResult",
-      entityId: action.payload.registrationId,
-      // Clinical content is deliberately excluded from the durable sync ledger.
-      payload: { schemaVersion: 1, stationType: action.stationType },
+      operation: fields.operation,
+      entityType: fields.entityType,
+      entityId: fields.entityId,
+      // Clinical and participant content is deliberately excluded from the durable sync ledger.
+      payload: fields.payload,
       status: "PENDING",
       retryCount: 0,
       version: 0,
@@ -295,6 +419,146 @@ const processAction = async ({ eventId, action, user, db, screening, options }) 
   }
 };
 
+const processRegistrationAction = async ({ eventId, action, user, context, db, registration, options }) => {
+  const fingerprint = requestFingerprint({ eventId, userId: user.userId, action });
+  const pending = await beginAction(db, eventId, user.userId, action, fingerprint, options);
+  if (!pending.shouldApply) return responseFor(pending.row);
+
+  try {
+    const receipt = await registration.createOfflineWalkInRegistration({ eventId, action, auth: user, context }, db);
+    const applied = await finishAction(db, pending.row, "APPLIED", {
+      responseSnapshot: safeRegistrationSnapshot(receipt),
+      waitTimeoutMs: options.waitTimeoutMs,
+    });
+    return responseFor(applied);
+  } catch (error) {
+    const status = error?.status || error?.statusCode;
+    if (status >= 400 && status < 500) {
+      const conflict = await finishAction(db, pending.row, "CONFLICT", {
+        errorCode: safeConflictCode(error),
+        waitTimeoutMs: options.waitTimeoutMs,
+      });
+      return responseFor(conflict);
+    }
+    const failed = await finishAction(db, pending.row, "FAILED", {
+      errorCode: "SYNC_APPLY_FAILED",
+      waitTimeoutMs: options.waitTimeoutMs,
+    });
+    return responseFor(failed);
+  }
+};
+
+const processQueueAction = async ({ eventId, action, user, context, db, queue, options }) => {
+  const fingerprint = requestFingerprint({ eventId, userId: user.userId, action });
+  const pending = await beginAction(db, eventId, user.userId, action, fingerprint, options);
+  if (!pending.shouldApply) return responseFor(pending.row);
+
+  try {
+    const applied = await withTransaction(db, async (tx) => {
+      const receipt = await queue.applySyncedQueueAction(eventId, action, user, context, tx);
+      return finishAction(tx, pending.row, "APPLIED", {
+        responseSnapshot: safeQueueSnapshot(receipt),
+        waitTimeoutMs: options.waitTimeoutMs,
+      });
+    });
+    return responseFor(applied);
+  } catch (error) {
+    const status = error?.status || error?.statusCode;
+    if (status >= 400 && status < 500) {
+      const conflict = await finishAction(db, pending.row, "CONFLICT", {
+        errorCode: safeConflictCode(error),
+        waitTimeoutMs: options.waitTimeoutMs,
+      });
+      return responseFor(conflict);
+    }
+    const failed = await finishAction(db, pending.row, "FAILED", {
+      errorCode: "SYNC_APPLY_FAILED",
+      waitTimeoutMs: options.waitTimeoutMs,
+    });
+    return responseFor(failed);
+  }
+};
+
+const processReviewAction = async ({ eventId, action, user, context, db, review, options }) => {
+  const fingerprint = requestFingerprint({ eventId, userId: user.userId, action });
+  const pending = await beginAction(db, eventId, user.userId, action, fingerprint, options);
+  if (!pending.shouldApply) return responseFor(pending.row);
+
+  try {
+    await review.verifyReviewDecisionSignature(eventId, action.decision, user);
+    const applied = await withTransaction(db, async (tx) => {
+      const receipt = await review.recordDecision(
+        eventId,
+        action.registrationId,
+        action.decision,
+        user,
+        context?.ipAddress,
+        { db: tx, reviewId: action.clientActionId, signatureVerified: true },
+      );
+      return finishAction(tx, pending.row, "APPLIED", {
+        responseSnapshot: safeReviewSnapshot(receipt),
+        waitTimeoutMs: options.waitTimeoutMs,
+      });
+    });
+    return responseFor(applied);
+  } catch (error) {
+    const status = error?.status || error?.statusCode;
+    if (status >= 400 && status < 500) {
+      const conflict = await finishAction(db, pending.row, "CONFLICT", {
+        errorCode: safeConflictCode(error),
+        waitTimeoutMs: options.waitTimeoutMs,
+      });
+      return responseFor(conflict);
+    }
+    const failed = await finishAction(db, pending.row, "FAILED", {
+      errorCode: "SYNC_APPLY_FAILED",
+      waitTimeoutMs: options.waitTimeoutMs,
+    });
+    return responseFor(failed);
+  }
+};
+
+const processRouteAction = async ({ eventId, action, user, context, db, routeOverride, options }) => {
+  const fingerprint = requestFingerprint({ eventId, userId: user.userId, action });
+  const pending = await beginAction(db, eventId, user.userId, action, fingerprint, options);
+  if (!pending.shouldApply) return responseFor(pending.row);
+
+  try {
+    const applied = await withTransaction(db, async (tx) => {
+      const receipt = await routeOverride.replaceRoute({
+        eventId,
+        registrationId: action.registrationId,
+        stationIds: action.stationIds,
+        reasonCode: action.reasonCode,
+        expectedVersion: action.expectedVersion,
+        skipActive: action.skipActive,
+        user,
+        context,
+        db: tx,
+      });
+      return finishAction(tx, pending.row, "APPLIED", {
+        responseSnapshot: safeRouteSnapshot(receipt),
+        waitTimeoutMs: options.waitTimeoutMs,
+      });
+    });
+    return responseFor(applied);
+  } catch (error) {
+    const status = error?.status || error?.statusCode;
+    if (status >= 400 && status < 500) {
+      const conflict = await finishAction(db, pending.row, "CONFLICT", {
+        errorCode: safeConflictCode(error),
+        waitTimeoutMs: options.waitTimeoutMs,
+      });
+      return responseFor(conflict);
+    }
+    const failed = await finishAction(db, pending.row, "FAILED", {
+      errorCode: "SYNC_APPLY_FAILED",
+      waitTimeoutMs: options.waitTimeoutMs,
+    });
+    return responseFor(failed);
+  }
+};
+
 const sanitizeStation = (station) => ({
   stationId: station.stationId,
   eventId: station.eventId,
@@ -413,7 +677,74 @@ const processScreeningSync = async (
   };
 };
 
+const processSyncOperations = async (eventId, body, user, context, dependencies = {}) => {
+  const db = dependencies.db || prisma;
+  const registration = dependencies.registration || registrationService;
+  const queue = dependencies.queue || queueService;
+  const review = dependencies.review || reviewService;
+  const routeOverride = dependencies.routeOverride || routeOverrideService;
+  const authorizeRegistration = dependencies.authorize || assertRegistrationAssignment;
+  const audit = dependencies.audit || createAuditLog;
+  const options = {
+    processingLeaseMs: dependencies.processingLeaseMs || PROCESSING_LEASE_MS,
+    waitTimeoutMs: dependencies.waitTimeoutMs || TERMINAL_WAIT_MS,
+  };
+
+  // Authorize the whole batch before any action can create a ledger row or mutate event data.
+  for (const action of body.actions) {
+    if (action.type === "REGISTRATION_CREATE") {
+      await authorizeRegistration(db, eventId, user);
+    } else if (action.type === "REVIEW_DECISION") {
+      await review.authorizeReviewSyncAction(eventId, action, user, db);
+    } else if (action.type === "ROUTE_OVERRIDE") {
+      await routeOverride.getRoute({ eventId, registrationId: action.registrationId, user, db });
+    } else {
+      await queue.authorizeQueueSyncAction(eventId, action, user, db);
+    }
+  }
+
+  const actions = [];
+  for (const action of body.actions) {
+    if (action.type === "REGISTRATION_CREATE") {
+      actions.push(await processRegistrationAction({ eventId, action, user, context, db, registration, options }));
+    } else if (action.type === "REVIEW_DECISION") {
+      actions.push(await processReviewAction({ eventId, action, user, context, db, review, options }));
+    } else if (action.type === "ROUTE_OVERRIDE") {
+      actions.push(await processRouteAction({ eventId, action, user, context, db, routeOverride, options }));
+    } else {
+      actions.push(await processQueueAction({ eventId, action, user, context, db, queue, options }));
+    }
+  }
+  const serverTime = new Date().toISOString();
+  for (const action of actions) {
+    const actionType = body.actions.find(({ clientActionId }) => clientActionId === action.clientActionId)?.type;
+    const family = actionType === "REVIEW_DECISION"
+      ? "REVIEW"
+      : actionType === "ROUTE_OVERRIDE" ? "ROUTE"
+      : actionType?.startsWith("QUEUE_") ? "QUEUE" : "REGISTRATION";
+    await audit({
+      userId: user.userId,
+      action: `${family}_SYNC_ACTION_${action.status}`,
+      entityName: "SyncAction",
+      entityId: action.clientActionId,
+      outcome: action.status === "APPLIED" ? "SUCCESS" : action.status === "CONFLICT" ? "DENIED" : "FAILED",
+      newValue: {
+        eventId,
+        clientBatchId: body.clientBatchId,
+        clientActionId: action.clientActionId,
+        status: action.status,
+        retryCount: action.retryCount,
+        errorCode: action.errorCode || null,
+      },
+      context,
+      client: db,
+    });
+  }
+  return { clientBatchId: body.clientBatchId, serverTime, actions };
+};
+
 module.exports = {
   processScreeningSync,
+  processSyncOperations,
   requestFingerprint,
 };

@@ -6,17 +6,19 @@ const source = await readFile(new URL("./EventRegistrationPage.tsx", import.meta
 const registrationSource = await readFile(new URL("./ParticipantRegistrationPage.tsx", import.meta.url), "utf8");
 const statusSource = await readFile(new URL("./ParticipantStatusPage.tsx", import.meta.url), "utf8");
 
-test("participant registration checks a full identity combination before creating a participant", () => {
-  assert.match(source, /apiClient\.post<MatchResponse>\("\/participants\/match"/);
-  assert.match(source, /firstName: form\.firstName\.trim\(\), lastName: form\.lastName\.trim\(\), dateOfBirth: form\.dateOfBirth, contactNumber: form\.contactNumber\.trim\(\), nric: form\.nric/);
-  assert.match(source, /if \(data\.result === "NO_MATCH"\) \{\s*await registerNewParticipant\(\);/);
+test("event registration always writes the complete walk-in record to encrypted device storage first", () => {
+  assert.match(source, /queueOfflineWalkInRegistration\(ownerId, eventId/);
+  assert.match(source, /participant: \{\s*\.\.\.participant/);
+  assert.match(source, /emergencyContact: \{/);
+  assert.match(source, /if \(online\) await ensureOfflineReady\(eventId\)/);
+  assert.doesNotMatch(source, /\/participants\/match|apiClient\.(?:post|patch)/);
 });
 
-test("participant registration keeps entered non-sensitive details when continuing to the participant profile", () => {
-  assert.match(source, /navigate\(`\/participants\/\$\{response\.data\.participant\.id\}\?eventId=\$\{encodeURIComponent\(eventId\)\}`\)/);
-  assert.match(source, /Object\.entries\(form\)\.filter\(\(\[field\]\) => field !== "nric"\)/);
-  assert.match(source, /state: \{ registrationDraft \}/);
-  assert.match(source, /match\.matchReasons\.includes\("NRIC \/ FIN"\)/);
+test("event registration shows only local queue and station numbers until canonical sync", () => {
+  assert.match(source, /saved\.queueNumber/);
+  assert.match(source, /saved\.stationNumber/);
+  assert.match(source, /No QR code exists until the server confirms/);
+  assert.doesNotMatch(source, /qrImage|passToken|qrToken/);
 });
 
 test("registration uses the assigned route and never asks staff to create a queue handoff", () => {

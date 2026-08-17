@@ -4,6 +4,8 @@ import { Link, useParams } from 'react-router-dom';
 import { AppDialog } from '../components/AppDialog';
 import { appDialog } from '../components/appDialogStyles';
 import { getApiError } from '../utils/apiClient';
+import { eventApi, type EventRecord } from './events/eventApi';
+import { isNetworkError } from './screening/offlineSync';
 import * as api from './stage4Api';
 
 const EVENT_ROLES = [
@@ -17,6 +19,29 @@ const EVENT_ROLES = [
 const list = <T,>(value: api.Page<T> | T[] | null) => Array.isArray(value) ? value : value?.memberships ?? value?.users ?? value?.items ?? [];
 const roleName = (role: api.MembershipRole) => typeof role === 'string' ? role : role.role;
 const roleLabel = (value: string) => EVENT_ROLES.find((role) => role.value === value)?.label ?? value;
+
+function downloadedDutyMembers(event: EventRecord): api.MembershipRow[] {
+  const byUser = new Map<string, api.MembershipRow>();
+  for (const assignment of event.shifts.flatMap((shift) => shift.staffAssignments)) {
+    const userId = assignment.user.userId;
+    const current = byUser.get(userId);
+    const roles = new Set((current?.roles ?? []).map(roleName));
+    roles.add(assignment.assignmentRole);
+    byUser.set(userId, {
+      id: `offline-${userId}`,
+      eventId: event.eventId,
+      userId,
+      status: 'ACTIVE',
+      roles: [...roles],
+      user: {
+        id: userId,
+        userId,
+        fullName: assignment.user.fullName || assignment.user.username || 'Assigned staff',
+      },
+    });
+  }
+  return [...byUser.values()];
+}
 
 export default function EventStaffingPage() {
   const { eventId = '' } = useParams();
@@ -38,12 +63,32 @@ export default function EventStaffingPage() {
     setLoading(true);
     setError('');
     try {
+      if (!navigator.onLine) {
+        const event = await eventApi.get(eventId);
+        setMembers(downloadedDutyMembers(event));
+        setCanManage(false);
+        setEligible([]);
+        setNotice('Showing downloaded duties on this device. Staff changes require a connection.');
+        return;
+      }
       const [membershipPage, event] = await Promise.all([api.listMemberships(eventId), api.getEvent(eventId)]);
       setMembers(list(membershipPage));
       setCanManage(Boolean(event.canManage));
       setEligible(event.canManage ? list(await api.listEligibleUsers(eventId)) : []);
     } catch (cause) {
-      setError(getApiError(cause, 'Event team could not be loaded.'));
+      if (!isNetworkError(cause)) {
+        setError(getApiError(cause, 'Event team could not be loaded.'));
+        return;
+      }
+      try {
+        const event = await eventApi.get(eventId);
+        setMembers(downloadedDutyMembers(event));
+        setCanManage(false);
+        setEligible([]);
+        setNotice('Showing downloaded duties on this device. Staff changes require a connection.');
+      } catch {
+        setError('Event team is not included in this device\'s offline download.');
+      }
     } finally {
       setLoading(false);
     }

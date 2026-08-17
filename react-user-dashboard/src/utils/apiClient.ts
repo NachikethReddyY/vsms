@@ -43,7 +43,7 @@ export function beginLogout() {
   markLogoutPending();
 }
 
-function getDeviceId() {
+export function getDeviceId() {
   const key = "vsms_device_id";
   try {
     let value = window.localStorage.getItem(key);

@@ -1,9 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-const { post, clearOfflineData } = vi.hoisted(() => ({ post: vi.fn(), clearOfflineData: vi.fn() }));
+const { post } = vi.hoisted(() => ({ post: vi.fn() }));
 
 vi.mock('./apiClient', () => ({ default: { post } }));
-vi.mock('../features/screening/offlineSync', () => ({ clearOfflineData }));
 
 import { logoutAndReturnHome } from './logout';
 
@@ -11,7 +10,6 @@ const replace = vi.fn();
 
 beforeEach(() => {
   post.mockReset();
-  clearOfflineData.mockReset();
   replace.mockReset();
   Object.defineProperty(globalThis, 'window', {
     configurable: true,
@@ -28,7 +26,6 @@ describe('logoutAndReturnHome', () => {
     const clearSession = vi.fn();
     let resolveLogout!: (value: unknown) => void;
     post.mockImplementation(() => new Promise((resolve) => { resolveLogout = resolve; }));
-    clearOfflineData.mockResolvedValue(undefined);
 
     const logout = logoutAndReturnHome(clearSession);
     await Promise.resolve();
@@ -38,19 +35,16 @@ describe('logoutAndReturnHome', () => {
     expect(replace).not.toHaveBeenCalled();
     resolveLogout({ data: { logoutUrl: 'https://vsms.auth.ap-southeast-1.amazoncognito.com/logout?client_id=test-client&logout_uri=https%3A%2F%2Flocalhost%3A5173%2F' } });
     await logout;
-    expect(clearOfflineData).toHaveBeenCalledOnce();
     expect(replace).toHaveBeenCalledWith('https://vsms.auth.ap-southeast-1.amazoncognito.com/logout?client_id=test-client&logout_uri=https%3A%2F%2Flocalhost%3A5173%2F');
   });
 
-  it('still clears local artifacts and returns home when server revocation fails', async () => {
+  it('locks the local session without deleting encrypted offline work when server revocation fails', async () => {
     const clearSession = vi.fn();
     post.mockRejectedValue(new Error('CSRF validation failed'));
-    clearOfflineData.mockRejectedValue(new Error('offline storage unavailable'));
 
     await logoutAndReturnHome(clearSession);
 
     expect(clearSession).toHaveBeenCalledOnce();
-    expect(clearOfflineData).toHaveBeenCalledOnce();
     expect(replace).toHaveBeenCalledWith('https://localhost:5173/');
   });
 });

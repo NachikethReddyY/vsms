@@ -1,4 +1,5 @@
 const eventService = require("../services/event/eventService");
+const offlinePackService = require("../services/event/offlinePackService");
 
 exports.list = async (req, res) => res.json(await eventService.listEvents(req.query, req.user));
 exports.listActive = async (req, res) => res.json(await eventService.listActiveEvents(req.user));
@@ -7,6 +8,12 @@ exports.create = async (req, res) => {
   res.status(201).json(await eventService.createEvent(req.body, req.user, req.context, idempotencyKey));
 };
 exports.get = async (req, res) => res.json(await eventService.getEvent(req.params.eventId, req.user));
+exports.offlinePack = async (req, res) => res.json(await offlinePackService.getOfflinePack(
+  req.params.eventId,
+  req.user,
+  req.context,
+  req.eventAuthorization,
+));
 exports.publicGet = async (req, res) => res.set("Cache-Control", "public, max-age=60").json(await eventService.getPublicEvent(req.params.eventId));
 const sendArtwork = (res, artwork, cacheControl) => res
   .set("Cache-Control", cacheControl)

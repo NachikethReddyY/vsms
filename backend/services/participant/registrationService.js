@@ -1,8 +1,11 @@
 const prisma = require("../../prisma/prismaClient");
+const AppError = require("../../errors/AppError");
 const { createAuditLog } = require("../../utils/logging/audit");
 const { assertRegistrationAssignment } = require("../../utils/auth/staff");
 const { assertParticipantEventScope } = require("../../utils/validation/participantEventScope");
+const { cleanString, validationError } = require("../../utils/validation/validation");
 const qrService = require("./qrService");
+const participantService = require("./participantService");
 const registrationRoutines = require("./registrationRoutineRepository");
 const {
     assignRouteOnce,
@@ -55,8 +58,35 @@ function mapRoutineError(error) {
     if (!entry) return error;
     const mapped = new Error(entry[1]);
     mapped.statusCode = entry[0];
+    mapped.status = entry[0];
+    mapped.code = routineCode;
     return mapped;
 }
+
+const validateRegistrationEvidence = ({
+    workflowStartedAt = null,
+    paperFormUsed = false,
+    paperExceptionReason = null,
+} = {}) => {
+    let startedAt = null;
+    if (workflowStartedAt) {
+        startedAt = new Date(workflowStartedAt);
+        const now = Date.now();
+        if (Number.isNaN(startedAt.getTime())) throw validationError("workflowStartedAt is invalid");
+        if (startedAt.getTime() < now - 24 * 60 * 60 * 1000 || startedAt.getTime() > now + 5 * 60 * 1000) {
+            throw validationError("workflowStartedAt must be within the current 24-hour workflow window");
+        }
+    }
+    const reason = cleanString(paperExceptionReason, "paperExceptionReason", {
+        required: Boolean(paperFormUsed),
+        max: 200,
+    });
+    if (paperFormUsed && reason.length < 3) throw validationError("paperExceptionReason must be at least 3 characters");
+    if (!paperFormUsed && reason) throw validationError("paperExceptionReason requires paperFormUsed");
+    return { workflowStartedAt: startedAt, paperFormUsed: Boolean(paperFormUsed), paperExceptionReason: reason };
+};
+
+exports.validateRegistrationEvidence = validateRegistrationEvidence;
 
 async function auditDuplicate({ userId, context, participantId, eventId, registrationId }) {
     await createAuditLog({
@@ -112,6 +142,7 @@ exports.createRegistration = async ({
     context,
 }, db = prisma) => {
     const userId = auth.userId;
+    const evidence = validateRegistrationEvidence({ workflowStartedAt, paperFormUsed, paperExceptionReason });
     await assertRegistrationAssignment(db, eventId, auth);
 
     const priorRequest = await db.eventRegistration.findUnique({
@@ -152,6 +183,12 @@ exports.createRegistration = async ({
                     registeredBy: userId,
                     idempotencyKey,
                 });
+                if (!operation.idempotent_replay) {
+                    await tx.eventRegistration.update({
+                        where: { registrationId: operation.registration_id },
+                        data: evidence,
+                    });
+                }
                 const created = await tx.eventRegistration.findUnique({
                     where: { registrationId: operation.registration_id },
                     include: registrationInclude(),
@@ -216,6 +253,120 @@ exports.createRegistration = async ({
     }
 
     return { ...registration, idempotentReplay: registration.idempotentReplay === true };
+};
+
+const offlineReceipt = async (tx, registration, route = null) => {
+    const current = await tx.eventRegistration.findUnique({
+        where: { registrationId: registration.registrationId },
+        select: { registrationId: true, participantId: true, queueNumber: true, registrationStatus: true },
+    });
+    const activeQr = current.registrationStatus === "WAITLISTED" ? null : await tx.qRCodePass.findFirst({
+        where: { registrationId: current.registrationId, isActive: true, expiresAt: { gt: new Date() } },
+        select: { id: true },
+    });
+    const station = route?.currentStation || null;
+    return {
+        participantId: current.participantId,
+        registrationId: current.registrationId,
+        queueNumber: current.queueNumber,
+        nextStation: station ? {
+            stationId: station.stationId,
+            stationName: station.stationName,
+            stationNumber: station.position,
+        } : null,
+        canonicalQrAvailable: Boolean(activeQr),
+    };
+};
+
+exports.createOfflineWalkInRegistration = async ({ eventId, action, auth, context }, db = prisma) => {
+    const userId = auth.userId;
+    const evidence = validateRegistrationEvidence(action.evidence);
+    await assertRegistrationAssignment(db, eventId, auth);
+
+    const prior = await db.eventRegistration.findUnique({
+        where: { registeredBy_idempotencyKey: { registeredBy: userId, idempotencyKey: action.clientActionId } },
+        select: { registrationId: true, participantId: true, eventId: true, registrationStatus: true },
+    });
+    if (prior) {
+        if (prior.participantId !== action.clientParticipantId || prior.eventId !== eventId) {
+            throw new AppError(409, "REGISTRATION_IDEMPOTENCY_CONFLICT", "Registration action was already used for another participant or event.");
+        }
+        return db.$transaction(async (tx) => {
+            const route = prior.registrationStatus === "WAITLISTED"
+                ? null
+                : await getRouteState(tx, prior.registrationId, true);
+            return offlineReceipt(tx, prior, route);
+        });
+    }
+
+    for (let attempt = 0; attempt < 5; attempt += 1) {
+        try {
+            return await db.$transaction(async (tx) => {
+                const participant = await participantService.createParticipantInTransaction({
+                    tx,
+                    participantId: action.clientParticipantId,
+                    payload: action.participant,
+                    eventId,
+                    userId,
+                    context,
+                });
+                await participantService.createPrimaryEmergencyContactInTransaction({
+                    tx,
+                    participantId: participant.id,
+                    payload: action.emergencyContact,
+                    userId,
+                    context,
+                });
+                const operation = await registrationRoutines.registerParticipant(tx, {
+                    participantId: participant.id,
+                    eventId,
+                    registeredBy: userId,
+                    idempotencyKey: action.clientActionId,
+                });
+                const registration = await tx.eventRegistration.update({
+                    where: { registrationId: operation.registration_id },
+                    data: {
+                        ...evidence,
+                        participantDisplayName: `${participant.firstName} ${participant.lastName}`,
+                    },
+                    select: { registrationId: true, participantId: true, eventId: true, registrationStatus: true },
+                });
+                await createAuditLog({
+                    userId,
+                    action: "EVENT_REGISTRATION_CREATED",
+                    entityName: "EventRegistration",
+                    entityId: registration.registrationId,
+                    newValue: { participantId: participant.id, eventId, status: registration.registrationStatus },
+                    context,
+                    client: tx,
+                });
+                if (registration.registrationStatus === "WAITLISTED") {
+                    return offlineReceipt(tx, registration, null);
+                }
+
+                await qrService.generateQR(registration.registrationId, userId, tx, context);
+                await registrationRoutines.checkInRegistration(tx, {
+                    registrationId: registration.registrationId,
+                    eventId,
+                    changedBy: userId,
+                });
+                const route = await assignRouteOnce({
+                    tx,
+                    registrationId: registration.registrationId,
+                    eventId,
+                    actorUserId: userId,
+                    context,
+                });
+                return offlineReceipt(tx, registration, route);
+            }, { isolationLevel: "Serializable" });
+        } catch (error) {
+            if ((error.code === "P2034" || (error.code === "P2002" && JSON.stringify(error.meta?.target || "").includes("participant_reference"))) && attempt < 4) {
+                continue;
+            }
+            throw mapRoutineError(error);
+        }
+    }
+    throw new AppError(409, "REGISTRATION_WRITE_CONFLICT", "Unable to register the participant. Please retry.");
 };
 
 exports.getRegistrationById = async ({ registrationId, auth }, db = prisma) => {

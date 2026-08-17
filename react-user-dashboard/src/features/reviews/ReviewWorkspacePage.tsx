@@ -21,8 +21,8 @@ import { SignaturePad } from '../../components/SignaturePad';
 import { StationCameraScanner } from '../screening/StationCameraScanner';
 import {
   reviewApi,
+  type OfflineReviewDecision,
   type OverallFlag,
-  type ReviewDecisionRequest,
   type ReviewDetailResponse,
   type ReviewOutcome,
   type ReviewQueueItem,
@@ -30,7 +30,6 @@ import {
   type IssueReferralRequest,
   type IssueReferralResponse,
   type ReviseReferralRequest,
-  type SignatureResponse,
 } from './reviewApi';
 import {
   readStoredReferralIssue,
@@ -467,9 +466,8 @@ export default function ReviewWorkspacePage() {
   const [submitting, setSubmitting] = useState(false);
   const [formErrors, setFormErrors] = useState<string[]>([]);
   const [decisionSignature, setDecisionSignature] = useState<string | null>(null);
-  const [decisionSignatureArtifact, setDecisionSignatureArtifact] = useState<SignatureResponse | null>(null);
   const [signaturePadKey, setSignaturePadKey] = useState(0);
-  const [submissionStage, setSubmissionStage] = useState<'idle' | 'uploading' | 'recording'>('idle');
+  const [submissionStage, setSubmissionStage] = useState<'idle' | 'saving'>('idle');
   const [announcement, setAnnouncement] = useState('');
   const [mobileDetail, setMobileDetail] = useState(Boolean(directRegistrationId));
   const errorSummaryRef = useRef<HTMLDivElement>(null);
@@ -508,7 +506,6 @@ export default function ReviewWorkspacePage() {
       if (!preserveForm) {
         setForm(EMPTY_FORM);
         setDecisionSignature(null);
-        setDecisionSignatureArtifact(null);
         setSignaturePadKey((current) => current + 1);
         setSubmissionStage('idle');
         setDirty(false);
@@ -544,7 +541,6 @@ export default function ReviewWorkspacePage() {
     setDirty(false);
     setForm(EMPTY_FORM);
     setDecisionSignature(null);
-    setDecisionSignatureArtifact(null);
     setSignaturePadKey((current) => current + 1);
     setSubmissionStage('idle');
     setFormErrors([]);
@@ -593,9 +589,8 @@ export default function ReviewWorkspacePage() {
 
   const updateForm = <K extends keyof FormState>(key: K, value: FormState[K]) => {
     setForm((current) => ({ ...current, [key]: value }));
-    if (decisionSignature || decisionSignatureArtifact) {
+    if (decisionSignature) {
       setDecisionSignature(null);
-      setDecisionSignatureArtifact(null);
       setSignaturePadKey((current) => current + 1);
       setSubmissionStage('idle');
     }
@@ -604,7 +599,6 @@ export default function ReviewWorkspacePage() {
 
   const captureDecisionSignature = (dataUrl: string | null) => {
     setDecisionSignature(dataUrl);
-    setDecisionSignatureArtifact(null);
     setSubmissionStage('idle');
     setDirty(true);
   };
@@ -626,13 +620,13 @@ export default function ReviewWorkspacePage() {
       if (form.instructions.trim().length > 2000) errors.push('Referral instructions cannot exceed 2,000 characters.');
     }
     if (!form.confirmed) errors.push('Confirm that the screening results and clinical decision were reviewed.');
-    if (!decisionSignature && !decisionSignatureArtifact) errors.push('Add a fresh electronic signature for this clinical decision.');
+    if (!decisionSignature) errors.push('Add a fresh electronic signature for this clinical decision.');
     setFormErrors(errors);
     if (errors.length) window.setTimeout(() => errorSummaryRef.current?.focus(), 0);
     return errors.length === 0;
   };
 
-  const decisionRequest = (signature: SignatureResponse): ReviewDecisionRequest => {
+  const decisionRequest = (): OfflineReviewDecision => {
     const hasReviewerEyeHealth = form.eyeHealthObservations.trim()
       || form.symptomsNoted
       || form.cataractRisk !== 'NOT_ASSESSED'
@@ -652,7 +646,6 @@ export default function ReviewWorkspacePage() {
       clinicalSummary: form.clinicalSummary.trim(),
       ...(eyeHealthObservations ? { eyeHealthObservations } : {}),
       ...(form.recommendations.trim() ? { recommendations: form.recommendations.trim() } : {}),
-      ...signature,
     };
     if (form.outcome === 'REFER') return {
       ...common,
@@ -673,7 +666,7 @@ export default function ReviewWorkspacePage() {
         ...(form.instructions.trim() ? { instructions: form.instructions.trim() } : {}),
       },
     };
-    return { ...common, outcome: form.outcome } as ReviewDecisionRequest;
+    return { ...common, outcome: form.outcome } as OfflineReviewDecision;
   };
 
   const submitDecision = async (event: FormEvent) => {
@@ -682,33 +675,18 @@ export default function ReviewWorkspacePage() {
     setSubmitting(true);
     setFormErrors([]);
     try {
-      let signature = decisionSignatureArtifact;
-      if (!signature) {
-        setSubmissionStage('uploading');
-        signature = await reviewApi.uploadDecisionSignature(eventId, detail.participant.registrationId, decisionSignature!);
-        setDecisionSignatureArtifact(signature);
-      }
-      setSubmissionStage('recording');
-      const result = await reviewApi.decide(eventId, detail.participant.registrationId, decisionRequest(signature));
-      const reviewedRegistrationId = detail.participant.registrationId;
+      setSubmissionStage('saving');
+      await reviewApi.decide(eventId, detail.participant.registrationId, decisionRequest(), decisionSignature!);
       const queue = queueData?.queue || [];
       const completedIndex = queue.findIndex((item) => item.registrationId === detail.participant.registrationId);
       const remaining = queue.filter((item) => item.registrationId !== detail.participant.registrationId);
       setQueueData((current) => current ? { ...current, queue: remaining } : current);
-      setAnnouncement(`${result.review.outcome.replace(/_/g, ' ')} decision recorded for ${detail.participant.participantDisplayName}.`);
+      setAnnouncement(`${form.outcome.replace(/_/g, ' ')} decision saved securely on this device for ${detail.participant.participantDisplayName}. It remains pending until sync.`);
       setDirty(false);
       setForm(EMPTY_FORM);
       setDecisionSignature(null);
-      setDecisionSignatureArtifact(null);
       setSignaturePadKey((current) => current + 1);
       setSubmissionStage('idle');
-      if (result.referral) {
-        setSelectedId(reviewedRegistrationId);
-        setMobileDetail(true);
-        await loadDetail(reviewedRegistrationId);
-        navigate(`/events/${eventId}/reviews/${reviewedRegistrationId}`, { replace: true });
-        return;
-      }
       const next = remaining[Math.min(Math.max(completedIndex, 0), Math.max(remaining.length - 1, 0))];
       setSelectedId(next?.registrationId || '');
       setDetail(next ? detail : null);
@@ -719,7 +697,6 @@ export default function ReviewWorkspacePage() {
       if (problem?.code === 'SCREENING_RESULTS_CHANGED') {
         await loadDetail(detail.participant.registrationId, true);
         setDecisionSignature(null);
-        setDecisionSignatureArtifact(null);
         setSignaturePadKey((current) => current + 1);
         setFormErrors(['Screening results changed. Reassess the refreshed results before submitting again.']);
       } else if (problem?.code === 'REVIEW_ALREADY_RECORDED') {
@@ -729,7 +706,6 @@ export default function ReviewWorkspacePage() {
         setFormErrors([]);
       } else if (problem?.code === 'SIGNATURE_ALREADY_USED' || problem?.code === 'INVALID_SIGNATURE') {
         setDecisionSignature(null);
-        setDecisionSignatureArtifact(null);
         setSignaturePadKey((current) => current + 1);
         setFormErrors(['This electronic signature is unavailable or no longer valid. Capture a fresh signature and retry.']);
       } else if (problem?.errors?.length) {
@@ -869,9 +845,8 @@ export default function ReviewWorkspacePage() {
             <section className="decision-signature" aria-labelledby="decision-signature-title">
               <div><ShieldCheckIcon aria-hidden="true" /><span><strong id="decision-signature-title">Sign this decision</strong><small>Your signature is bound only to this participant, event, and decision. Referral delivery requires a separate signature.</small></span></div>
               <SignaturePad key={signaturePadKey} onChange={captureDecisionSignature} disabled={submitting} />
-              {decisionSignatureArtifact && <p className="decision-signature-secured" role="status"><CheckCircleIcon aria-hidden="true" />Signature secured for retry. Editing the decision will require a fresh signature.</p>}
             </section>
-            <div className="decision-actions"><button className="primary" type="submit" disabled={submitting || (!decisionSignature && !decisionSignatureArtifact)}>{submissionStage === 'uploading' ? 'Securing signature…' : submissionStage === 'recording' ? 'Recording signed decision…' : `Sign and record ${OUTCOMES.find((item) => item.value === form.outcome)?.label} decision`}</button></div>
+            <div className="decision-actions"><button className="primary" type="submit" disabled={submitting || !decisionSignature}>{submissionStage === 'saving' ? 'Saving encrypted decision…' : `Sign and save ${OUTCOMES.find((item) => item.value === form.outcome)?.label} decision`}</button></div>
           </form>}
         </>}
       </section>

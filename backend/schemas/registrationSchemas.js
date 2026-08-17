@@ -6,14 +6,36 @@ const registrationParams = z.object({
   registrationId: uuid,
 }).strict();
 
+const registrationEvidence = {
+  workflowStartedAt: z.string().datetime({ offset: true }).optional(),
+  paperFormUsed: z.boolean().optional().default(false),
+  paperExceptionReason: z.string().trim().min(3).max(200).optional(),
+};
+
 const createRegistrationBody = z.object({
   participantId: uuid,
   eventId: uuid,
-}).strict();
+  ...registrationEvidence,
+}).strict().superRefine((value, ctx) => {
+  if (value.paperFormUsed && !value.paperExceptionReason) {
+    ctx.addIssue({ code: "custom", path: ["paperExceptionReason"], message: "Paper exception reason is required" });
+  }
+  if (!value.paperFormUsed && value.paperExceptionReason) {
+    ctx.addIssue({ code: "custom", path: ["paperExceptionReason"], message: "Paper exception reason requires paperFormUsed" });
+  }
+});
 
 const eventRegistrationBody = z.object({
   participantId: uuid,
-}).strict();
+  ...registrationEvidence,
+}).strict().superRefine((value, ctx) => {
+  if (value.paperFormUsed && !value.paperExceptionReason) {
+    ctx.addIssue({ code: "custom", path: ["paperExceptionReason"], message: "Paper exception reason is required" });
+  }
+  if (!value.paperFormUsed && value.paperExceptionReason) {
+    ctx.addIssue({ code: "custom", path: ["paperExceptionReason"], message: "Paper exception reason requires paperFormUsed" });
+  }
+});
 
 const registrationStatusBody = z.object({
   toStatus: z.enum(["SIGNED_UP", "CHECKED_IN", "COMPLETED", "CANCELLED"]),

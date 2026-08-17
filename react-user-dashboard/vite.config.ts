@@ -89,7 +89,7 @@ export default defineConfig(({ command, mode }: ConfigEnv): UserConfig => {
       react() as unknown as PluginOption,
       tailwindcss() as unknown as PluginOption,
       VitePWA({
-        registerType: 'autoUpdate',
+        registerType: 'prompt',
         manifestFilename: 'manifest.json',
         includeAssets: ['favicon.svg'],
         manifest: {
