@@ -16,7 +16,7 @@ export interface QueueItem {
   stationName: string;
 }
 
-type QueueAction = "CALLED" | "STARTED" | "SKIPPED";
+type QueueAction = "CALLED" | "STARTED" | "SKIPPED" | "LEFT";
 
 interface QueueTableProps {
   items: QueueItem[];
@@ -235,14 +235,25 @@ export function QueueTable({
                 </td>
                 <td className="px-4 py-3.5 text-right">
                   {item.status === "WAITING" && (
-                    <button
-                      type="button"
-                      disabled={actionLoading === item.id}
-                      onClick={() => onAction(item.id, "CALLED")}
-                      className="font-semibold text-blue-600 disabled:opacity-50"
-                    >
-                      Call
-                    </button>
+                    <span className="inline-flex gap-3">
+                      <button
+                        type="button"
+                        disabled={actionLoading === item.id}
+                        onClick={() => onAction(item.id, "CALLED")}
+                        className="font-semibold text-blue-600 disabled:opacity-50"
+                      >
+                        Call
+                      </button>
+                      <button
+                        type="button"
+                        aria-label={`Leave queue ${item.queueNumber}`}
+                        disabled={actionLoading === item.id}
+                        onClick={() => onAction(item.id, "LEFT")}
+                        className="font-semibold text-red-700 disabled:opacity-50"
+                      >
+                        Leave queue
+                      </button>
+                    </span>
                   )}
                   {item.status === "CALLED" && (
                     <span className="inline-flex gap-3">
@@ -261,6 +272,15 @@ export function QueueTable({
                         className="font-semibold text-amber-700 disabled:opacity-50"
                       >
                         No show
+                      </button>
+                      <button
+                        type="button"
+                        aria-label={`Leave queue ${item.queueNumber}`}
+                        disabled={actionLoading === item.id}
+                        onClick={() => onAction(item.id, "LEFT")}
+                        className="font-semibold text-red-700 disabled:opacity-50"
+                      >
+                        Leave queue
                       </button>
                     </span>
                   )}

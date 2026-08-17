@@ -3,7 +3,6 @@ import { useAuth } from '../../auth/AuthProvider';
 import { getStoredSession } from '../../utils/session';
 import {
   clearOfflineData,
-  discardOfflineConflicts,
   downloadOfflineEvent,
   getOfflineSyncStatus,
   listOfflineEventIds,
@@ -26,7 +25,6 @@ type OfflineSyncContextValue = {
   statusFor: (eventId: string) => EventSyncState;
   downloadEvent: (eventId: string) => Promise<void>;
   syncEvent: (eventId: string) => Promise<void>;
-  discardConflicts: (eventId: string) => Promise<void>;
   clearDeviceData: () => Promise<void>;
   /** Download if missing, or refresh the snapshot when already present. Safe to call repeatedly. */
   ensureOfflineReady: (eventId: string, options?: { refreshIfPresent?: boolean }) => Promise<void>;
@@ -38,6 +36,8 @@ const EMPTY_STATE: EventSyncState = {
   conflicts: 0,
   locked: 0,
   expiresAt: null,
+  snapshotBytes: null,
+  conflictCodes: [],
   downloading: false,
   syncing: false,
   error: null,
@@ -120,12 +120,6 @@ export function OfflineSyncProvider({ children }: PropsWithChildren) {
     }
   }, [ownerId, setEventState]);
 
-  const discardConflicts = useCallback(async (eventId: string) => {
-    if (!ownerId) return;
-    const status = await discardOfflineConflicts(ownerId, eventId);
-    setEventState(eventId, { ...status, error: null });
-  }, [ownerId, setEventState]);
-
   const clearDeviceData = useCallback(async () => {
     await clearOfflineData();
     setStates({});
@@ -176,7 +170,7 @@ export function OfflineSyncProvider({ children }: PropsWithChildren) {
     };
     const goOffline = () => setOnline(false);
     const onVisibilityChange = () => {
-      if (document.visibilityState === 'visible') void refreshAll();
+      if (document.visibilityState === 'visible') void syncAll();
     };
     const onOfflineChange = () => void (autoSync && navigator.onLine ? syncAll() : refreshAll());
     setStates({});
@@ -209,10 +203,9 @@ export function OfflineSyncProvider({ children }: PropsWithChildren) {
     },
     downloadEvent,
     syncEvent,
-    discardConflicts,
     clearDeviceData,
     ensureOfflineReady,
-  }), [autoSync, clearDeviceData, discardConflicts, downloadEvent, ensureOfflineReady, online, setAutoSync, states, syncEvent]);
+  }), [autoSync, clearDeviceData, downloadEvent, ensureOfflineReady, online, setAutoSync, states, syncEvent]);
 
   return <OfflineSyncContext.Provider value={value}>{children}</OfflineSyncContext.Provider>;
 }

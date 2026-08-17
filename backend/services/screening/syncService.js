@@ -4,6 +4,7 @@ const screeningService = require("./screeningService");
 const queueService = require("./queueService");
 const reviewService = require("./reviewService");
 const routeOverrideService = require("./routeOverrideService");
+const eventService = require("../event/eventService");
 const registrationService = require("../participant/registrationService");
 const { assertRegistrationAssignment } = require("../../utils/auth/staff");
 const { createAuditLog } = require("../../utils/logging/audit");
@@ -59,6 +60,8 @@ const SAFE_CONFLICT_CODES = new Set([
   "SIGNATURE_ALREADY_USED",
   "SHIFT_NOT_ACTIVE",
   "STATION_NOT_FOUND",
+  "STALE_EVENT_VERSION",
+  "STATIONS_NOT_EDITABLE",
   "STATION_SCHEMA_MISSING",
   "URGENT_ESCALATION_REQUIRED",
   "URGENT_FLAG_REQUIRED",
@@ -168,6 +171,12 @@ const safeRouteSnapshot = (route) => ({
   } : null,
 });
 
+const safeStationAvailabilitySnapshot = (event, eventStationId) => ({
+  eventStationId,
+  isAvailable: event.eventStations.find((station) => station.eventStationId === eventStationId).isAvailable,
+  eventVersion: event.version,
+});
+
 const responseFor = (row) => ({
   clientActionId: row.clientActionId,
   status: row.status,
@@ -203,6 +212,13 @@ const ledgerFields = (action) => {
     operation: "UPDATE",
     entityType: "EventRegistration",
     entityId: action.registrationId,
+    payload: { schemaVersion: 1, actionType: action.type, expectedVersion: action.expectedVersion },
+  };
+  if (action.type === "STATION_AVAILABILITY") return {
+    stationId: action.eventStationId,
+    operation: "UPDATE",
+    entityType: "EventStation",
+    entityId: action.eventStationId,
     payload: { schemaVersion: 1, actionType: action.type, expectedVersion: action.expectedVersion },
   };
   return {
@@ -559,6 +575,39 @@ const processRouteAction = async ({ eventId, action, user, context, db, routeOve
   }
 };
 
+const processStationAvailabilityAction = async ({ eventId, action, user, context, db, events, options }) => {
+  const fingerprint = requestFingerprint({ eventId, userId: user.userId, action });
+  const pending = await beginAction(db, eventId, user.userId, action, fingerprint, options);
+  if (!pending.shouldApply) return responseFor(pending.row);
+  try {
+    const applied = await withTransaction(db, async (tx) => {
+      const receipt = await events.updateStation(
+        eventId,
+        action.eventStationId,
+        { version: action.expectedVersion, isAvailable: action.isAvailable },
+        user,
+        context,
+        tx,
+      );
+      return finishAction(tx, pending.row, "APPLIED", {
+        responseSnapshot: safeStationAvailabilitySnapshot(receipt, action.eventStationId),
+        waitTimeoutMs: options.waitTimeoutMs,
+      });
+    });
+    return responseFor(applied);
+  } catch (error) {
+    const status = error?.status || error?.statusCode;
+    if (status >= 400 && status < 500) {
+      return responseFor(await finishAction(db, pending.row, "CONFLICT", {
+        errorCode: safeConflictCode(error), waitTimeoutMs: options.waitTimeoutMs,
+      }));
+    }
+    return responseFor(await finishAction(db, pending.row, "FAILED", {
+      errorCode: "SYNC_APPLY_FAILED", waitTimeoutMs: options.waitTimeoutMs,
+    }));
+  }
+};
+
 const sanitizeStation = (station) => ({
   stationId: station.stationId,
   eventId: station.eventId,
@@ -683,6 +732,7 @@ const processSyncOperations = async (eventId, body, user, context, dependencies 
   const queue = dependencies.queue || queueService;
   const review = dependencies.review || reviewService;
   const routeOverride = dependencies.routeOverride || routeOverrideService;
+  const events = dependencies.events || eventService;
   const authorizeRegistration = dependencies.authorize || assertRegistrationAssignment;
   const audit = dependencies.audit || createAuditLog;
   const options = {
@@ -698,6 +748,8 @@ const processSyncOperations = async (eventId, body, user, context, dependencies 
       await review.authorizeReviewSyncAction(eventId, action, user, db);
     } else if (action.type === "ROUTE_OVERRIDE") {
       await routeOverride.getRoute({ eventId, registrationId: action.registrationId, user, db });
+    } else if (action.type === "STATION_AVAILABILITY") {
+      await events.authorizeStationAvailability(eventId, action.eventStationId, user, db);
     } else {
       await queue.authorizeQueueSyncAction(eventId, action, user, db);
     }
@@ -711,6 +763,8 @@ const processSyncOperations = async (eventId, body, user, context, dependencies 
       actions.push(await processReviewAction({ eventId, action, user, context, db, review, options }));
     } else if (action.type === "ROUTE_OVERRIDE") {
       actions.push(await processRouteAction({ eventId, action, user, context, db, routeOverride, options }));
+    } else if (action.type === "STATION_AVAILABILITY") {
+      actions.push(await processStationAvailabilityAction({ eventId, action, user, context, db, events, options }));
     } else {
       actions.push(await processQueueAction({ eventId, action, user, context, db, queue, options }));
     }
@@ -721,6 +775,7 @@ const processSyncOperations = async (eventId, body, user, context, dependencies 
     const family = actionType === "REVIEW_DECISION"
       ? "REVIEW"
       : actionType === "ROUTE_OVERRIDE" ? "ROUTE"
+      : actionType === "STATION_AVAILABILITY" ? "STATION"
       : actionType?.startsWith("QUEUE_") ? "QUEUE" : "REGISTRATION";
     await audit({
       userId: user.userId,

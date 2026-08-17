@@ -3624,6 +3624,118 @@
       ]
     },
     {
+      "name": "Download a device-bound, role-scoped event offline pack",
+      "description": "Reuses the caller-redacted event detail. Active screeners additionally receive only their assigned station queues; active registration officers receive selectable station metadata and a provisional queue-number seed without participant data. Event managers and active registration, screening, or support duties also receive the canonical safe event queue projection. Doctors with an active reviewer duty receive only currently actionable redacted review details. The opaque pack identifier and ES256 capability lease bind the actor, event, device, roles, capabilities, generation time, and expiry. Clients must verify the lease and their production-pinned key identifier before persisting the pack.",
+      "event": [],
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "x-device-id",
+            "value": "",
+            "description": "",
+            "type": "text"
+          }
+        ],
+        "auth": {
+          "type": "bearer",
+          "bearer": [
+            {
+              "key": "token",
+              "value": "{{token}}",
+              "type": "string"
+            }
+          ]
+        },
+        "url": {
+          "raw": "{{baseUrl}}/events/{eventId}/offline-pack",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "events",
+            "{eventId}",
+            "offline-pack"
+          ],
+          "query": []
+        }
+      },
+      "response": [
+        {
+          "name": "200 Response",
+          "originalRequest": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "x-device-id",
+                "value": "",
+                "description": "",
+                "type": "text"
+              }
+            ],
+            "url": "{{baseUrl}}/events/{eventId}/offline-pack"
+          },
+          "status": "OK",
+          "code": 200,
+          "header": [
+            {
+              "key": "Content-Type",
+              "value": "application/json"
+            }
+          ],
+          "body": "{\n  \"schemaVersion\": 1,\n  \"packId\": \"\",\n  \"generatedAt\": \"2026-08-07T00:00:00.000Z\",\n  \"expiresAt\": \"2026-08-07T00:00:00.000Z\",\n  \"event\": {\n    \"firstManagerUserId\": \"00000000-0000-4000-8000-000000000000\",\n    \"name\": \"\",\n    \"description\": \"\",\n    \"bannerKey\": \"COMMUNITY_SCREENING\",\n    \"artworkDataUrl\": \"\",\n    \"venue\": \"\",\n    \"address\": \"\",\n    \"postalCode\": \"\",\n    \"latitude\": 1.13,\n    \"longitude\": 103.59,\n    \"locationProvider\": \"ONEMAP\",\n    \"locationReference\": \"\",\n    \"timezone\": \"Asia/Singapore\",\n    \"startsAt\": \"2026-08-07T00:00:00.000Z\",\n    \"endsAt\": \"2026-08-07T00:00:00.000Z\",\n    \"capacity\": 1,\n    \"expectedAttendance\": 1,\n    \"eventDays\": [\n      {\n        \"eventDayId\": \"00000000-0000-4000-8000-000000000000\"\n      }\n    ],\n    \"stations\": [\n      {\n        \"eventStationId\": \"00000000-0000-4000-8000-000000000000\",\n        \"stationTemplateId\": \"00000000-0000-4000-8000-000000000000\",\n        \"stationOrder\": 1,\n        \"capacity\": 1,\n        \"isAvailable\": true,\n        \"availabilities\": [\n          {\n            \"date\": \"2026-08-07\",\n            \"isAvailable\": true,\n            \"startsAt\": \"2026-08-07T00:00:00.000Z\",\n            \"endsAt\": \"2026-08-07T00:00:00.000Z\",\n            \"capacity\": 1\n          }\n        ]\n      }\n    ],\n    \"shifts\": [\n      {\n        \"shiftId\": \"00000000-0000-4000-8000-000000000000\",\n        \"status\": \"PLANNED\",\n        \"staffAssignments\": [\n          {\n            \"staffAssignmentId\": \"00000000-0000-4000-8000-000000000000\",\n            \"assignmentRole\": {},\n            \"status\": \"ASSIGNED\",\n            \"notes\": \"\",\n            \"eventStation\": {\n              \"eventStationId\": \"00000000-0000-4000-8000-000000000000\",\n              \"stationTemplateId\": \"00000000-0000-4000-8000-000000000000\",\n              \"name\": \"\",\n              \"stationOrder\": 1\n            },\n            \"user\": {\n              \"userId\": \"00000000-0000-4000-8000-000000000000\",\n              \"username\": \"\",\n              \"fullName\": \"\"\n            }\n          }\n        ]\n      }\n    ],\n    \"eventId\": \"00000000-0000-4000-8000-000000000000\",\n    \"status\": \"DRAFT\",\n    \"version\": 1,\n    \"cancelledAt\": \"2026-08-07T00:00:00.000Z\",\n    \"cancellationReason\": \"\",\n    \"createdAt\": \"2026-08-07T00:00:00.000Z\",\n    \"updatedAt\": \"2026-08-07T00:00:00.000Z\",\n    \"eventStations\": [\n      {\n        \"eventStationId\": \"00000000-0000-4000-8000-000000000000\",\n        \"stationTemplateId\": \"00000000-0000-4000-8000-000000000000\",\n        \"templateVersion\": 1,\n        \"name\": \"\",\n        \"stationType\": \"VISUAL_ACUITY\",\n        \"description\": \"\",\n        \"stationOrder\": 1,\n        \"capacity\": 1,\n        \"isAvailable\": true,\n        \"fieldSchemaSnapshot\": [\n          {\n            \"key\": \"\",\n            \"label\": \"\",\n            \"type\": \"text\",\n            \"required\": true,\n            \"options\": [\n              \"\"\n            ],\n            \"min\": 0,\n            \"max\": 0,\n            \"unit\": \"\",\n            \"eyes\": \"OD\",\n            \"flagRules\": [\n              {\n                \"op\": \"eq\",\n                \"value\": \"\",\n                \"flag\": \"REVIEW\",\n                \"reason\": \"\"\n              }\n            ]\n          }\n        ],\n        \"schemaVersion\": 1,\n        \"availabilities\": [\n          {\n            \"eventStationAvailabilityId\": \"00000000-0000-4000-8000-000000000000\",\n            \"isAvailable\": true,\n            \"startsAt\": \"2026-08-07T00:00:00.000Z\",\n            \"endsAt\": \"2026-08-07T00:00:00.000Z\",\n            \"capacity\": 1,\n            \"eventDay\": {\n              \"eventDayId\": \"00000000-0000-4000-8000-000000000000\",\n              \"date\": \"2026-08-07\"\n            }\n          }\n        ]\n      }\n    ],\n    \"signupCount\": 0,\n    \"activeCapacityCount\": 0,\n    \"canManage\": true,\n    \"createdBy\": {\n      \"id\": \"00000000-0000-4000-8000-000000000000\",\n      \"userId\": \"00000000-0000-4000-8000-000000000000\",\n      \"username\": \"\",\n      \"email\": \"\",\n      \"fullName\": \"\",\n      \"employeeNumber\": \"\",\n      \"contactNumber\": \"\",\n      \"department\": \"\",\n      \"designation\": \"\",\n      \"systemRole\": \"ADMIN\",\n      \"status\": \"ACTIVE\",\n      \"approvalState\": \"PENDING\",\n      \"accessState\": \"ENABLED\",\n      \"professionalCategory\": \"STAFF\",\n      \"roles\": [\n        \"ADMINISTRATOR\"\n      ],\n      \"createdAt\": \"2026-08-07T00:00:00.000Z\"\n    },\n    \"cancelledBy\": {}\n  },\n  \"roles\": [\n    \"EVENT_MANAGER\"\n  ],\n  \"capabilities\": {\n    \"screening\": true,\n    \"registration\": true,\n    \"queue\": true,\n    \"review\": true,\n    \"routeOverride\": true,\n    \"stationAvailability\": true\n  },\n  \"lease\": {\n    \"algorithm\": \"ES256\",\n    \"keyId\": \"\",\n    \"publicKey\": {\n      \"kty\": \"EC\",\n      \"crv\": \"P-256\",\n      \"x\": \"\",\n      \"y\": \"\"\n    },\n    \"payload\": {\n      \"schemaVersion\": 1,\n      \"packId\": \"\",\n      \"actorId\": \"00000000-0000-4000-8000-000000000000\",\n      \"eventId\": \"00000000-0000-4000-8000-000000000000\",\n      \"deviceId\": \"00000000-0000-4000-8000-000000000000\",\n      \"issuedAt\": \"2026-08-07T00:00:00.000Z\",\n      \"expiresAt\": \"2026-08-07T00:00:00.000Z\",\n      \"roles\": [\n        \"EVENT_MANAGER\"\n      ],\n      \"capabilities\": {\n        \"screening\": true,\n        \"registration\": true,\n        \"queue\": true,\n        \"review\": true,\n        \"routeOverride\": true,\n        \"stationAvailability\": true\n      },\n      \"contentDigest\": \"\"\n    },\n    \"signature\": \"\"\n  },\n  \"screening\": {\n    \"event\": {\n      \"eventId\": \"00000000-0000-4000-8000-000000000000\",\n      \"name\": \"\",\n      \"status\": {}\n    },\n    \"stations\": [\n      {\n        \"stationId\": \"00000000-0000-4000-8000-000000000000\",\n        \"eventId\": \"00000000-0000-4000-8000-000000000000\",\n        \"stationName\": \"\",\n        \"stationType\": \"VISUAL_ACUITY\",\n        \"stationOrder\": 0,\n        \"isActive\": true,\n        \"fieldSchemaSnapshot\": [\n          {}\n        ],\n        \"schemaVersion\": 1,\n        \"offlineAccessExpiresAt\": \"2026-08-07T00:00:00.000Z\",\n        \"registrations\": [\n          {\n            \"registrationId\": \"00000000-0000-4000-8000-000000000000\",\n            \"participantDisplayName\": \"\",\n            \"queueNumber\": 0,\n            \"status\": \"SIGNED_UP\",\n            \"existingResult\": {\n              \"resultId\": \"00000000-0000-4000-8000-000000000000\",\n              \"overallFlag\": \"NORMAL\",\n              \"isFlagged\": true,\n              \"createdAt\": \"2026-08-07T00:00:00.000Z\"\n            }\n          }\n        ]\n      }\n    ]\n  },\n  \"registration\": {\n    \"stations\": [\n      {\n        \"stationId\": \"00000000-0000-4000-8000-000000000000\",\n        \"stationName\": \"\",\n        \"stationType\": \"\",\n        \"stationOrder\": 0\n      }\n    ],\n    \"nextQueueNumber\": 1\n  },\n  \"queue\": {\n    \"event\": {\n      \"eventId\": \"00000000-0000-4000-8000-000000000000\",\n      \"name\": \"\",\n      \"status\": \"\",\n      \"venue\": \"\"\n    },\n    \"stations\": [\n      {\n        \"stationId\": \"00000000-0000-4000-8000-000000000000\",\n        \"stationName\": \"\",\n        \"stationType\": \"\",\n        \"stationOrder\": 0,\n        \"workload\": {\n          \"WAITING\": 0,\n          \"CALLED\": 0,\n          \"IN_PROGRESS\": 0,\n          \"COMPLETED\": 0,\n          \"SKIPPED\": 0,\n          \"CANCELLED\": 0\n        },\n        \"nextUp\": {\n          \"queueId\": \"00000000-0000-4000-8000-000000000000\",\n          \"queueNumber\": 0,\n          \"registrationId\": \"00000000-0000-4000-8000-000000000000\",\n          \"participantDisplayName\": \"\",\n          \"isPriority\": false\n        }\n      }\n    ],\n    \"totals\": {\n      \"WAITING\": 0,\n      \"CALLED\": 0,\n      \"IN_PROGRESS\": 0,\n      \"COMPLETED\": 0,\n      \"SKIPPED\": 0,\n      \"CANCELLED\": 0\n    },\n    \"entries\": [\n      {\n        \"id\": \"00000000-0000-4000-8000-000000000000\",\n        \"registrationId\": \"00000000-0000-4000-8000-000000000000\",\n        \"participantDisplayName\": \"\",\n        \"participantReference\": \"\",\n        \"stationId\": \"00000000-0000-4000-8000-000000000000\",\n        \"stationName\": \"\",\n        \"stationType\": \"\",\n        \"queueNumber\": 0,\n        \"status\": \"WAITING\",\n        \"isPriority\": false,\n        \"priorityNotes\": \"\",\n        \"enteredAt\": \"2026-08-07T00:00:00.000Z\",\n        \"calledAt\": \"2026-08-07T00:00:00.000Z\",\n        \"startedAt\": \"2026-08-07T00:00:00.000Z\",\n        \"leftQueueAt\": \"2026-08-07T00:00:00.000Z\",\n        \"completedAt\": \"2026-08-07T00:00:00.000Z\"\n      }\n    ]\n  },\n  \"routes\": [\n    {\n      \"registrationId\": \"00000000-0000-4000-8000-000000000000\",\n      \"route\": {\n        \"status\": \"PENDING_CHECK_IN\",\n        \"routeVersion\": 1,\n        \"steps\": [\n          {\n            \"stationId\": \"00000000-0000-4000-8000-000000000000\",\n            \"stationName\": \"\",\n            \"stationType\": \"\",\n            \"position\": 1,\n            \"state\": \"COMPLETED\"\n          }\n        ],\n        \"currentStation\": {},\n        \"queue\": {\n          \"queueEntryId\": \"00000000-0000-4000-8000-000000000000\",\n          \"stationId\": \"00000000-0000-4000-8000-000000000000\",\n          \"queueNumber\": 1,\n          \"status\": \"WAITING\"\n        }\n      }\n    }\n  ],\n  \"review\": {\n    \"event\": {\n      \"eventId\": \"00000000-0000-4000-8000-000000000000\",\n      \"name\": \"\",\n      \"venue\": \"\",\n      \"timezone\": \"\",\n      \"status\": \"IN_PROGRESS\"\n    },\n    \"queue\": [\n      {\n        \"registrationId\": \"00000000-0000-4000-8000-000000000000\",\n        \"participantDisplayName\": \"\",\n        \"queueNumber\": 0,\n        \"highestFlag\": {},\n        \"flaggedResultCount\": 0,\n        \"completedStationCount\": 0,\n        \"skippedStationCount\": 0,\n        \"totalStationCount\": 1,\n        \"readyReason\": \"SCREENING_COMPLETE\",\n        \"lastResultAt\": \"2026-08-07T00:00:00.000Z\"\n      }\n    ],\n    \"details\": [\n      {\n        \"event\": {},\n        \"participant\": {\n          \"registrationId\": \"00000000-0000-4000-8000-000000000000\",\n          \"participantDisplayName\": \"\",\n          \"queueNumber\": 0,\n          \"registrationStatus\": \"SIGNED_UP\",\n          \"maskedNric\": \"\",\n          \"dateOfBirth\": \"2026-08-07\",\n          \"gender\": \"\"\n        },\n        \"stations\": [\n          {\n            \"stationId\": \"00000000-0000-4000-8000-000000000000\",\n            \"stationName\": \"\",\n            \"stationType\": \"VISUAL_ACUITY\",\n            \"stationOrder\": 1,\n            \"fieldSchemaSnapshot\": [\n              {}\n            ],\n            \"status\": \"COMPLETED\",\n            \"result\": {\n              \"resultId\": \"00000000-0000-4000-8000-000000000000\",\n              \"stationId\": \"00000000-0000-4000-8000-000000000000\",\n              \"screeningType\": \"VISUAL_ACUITY\",\n              \"resultData\": {},\n              \"schemaVersion\": 1,\n              \"overallFlag\": {},\n              \"isFlagged\": true,\n              \"flagSummary\": \"\",\n              \"ruleVersion\": \"\",\n              \"createdAt\": \"2026-08-07T00:00:00.000Z\",\n              \"updatedAt\": \"2026-08-07T00:00:00.000Z\"\n            }\n          }\n        ],\n        \"readiness\": {\n          \"ready\": true,\n          \"readyReason\": \"SCREENING_COMPLETE\",\n          \"completedStationCount\": 0,\n          \"skippedStationCount\": 0,\n          \"totalStationCount\": 0,\n          \"highestFlag\": {}\n        },\n        \"existingReview\": {},\n        \"contextVersion\": \"\"\n      }\n    ]\n  }\n}"
+        },
+        {
+          "name": "401 Response",
+          "originalRequest": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "x-device-id",
+                "value": "",
+                "description": "",
+                "type": "text"
+              }
+            ],
+            "url": "{{baseUrl}}/events/{eventId}/offline-pack"
+          },
+          "status": "Unauthorized",
+          "code": 401,
+          "header": [
+            {
+              "key": "Content-Type",
+              "value": "application/json"
+            }
+          ],
+          "body": "{\n  \"type\": \"\",\n  \"title\": \"\",\n  \"status\": 0,\n  \"code\": \"\",\n  \"requestId\": \"00000000-0000-4000-8000-000000000000\",\n  \"errors\": [\n    {\n      \"field\": \"\",\n      \"message\": \"\"\n    }\n  ]\n}"
+        },
+        {
+          "name": "403 Response",
+          "originalRequest": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "x-device-id",
+                "value": "",
+                "description": "",
+                "type": "text"
+              }
+            ],
+            "url": "{{baseUrl}}/events/{eventId}/offline-pack"
+          },
+          "status": "Forbidden",
+          "code": 403,
+          "header": [
+            {
+              "key": "Content-Type",
+              "value": "application/json"
+            }
+          ],
+          "body": "{\n  \"type\": \"\",\n  \"title\": \"\",\n  \"status\": 0,\n  \"code\": \"\",\n  \"requestId\": \"00000000-0000-4000-8000-000000000000\",\n  \"errors\": [\n    {\n      \"field\": \"\",\n      \"message\": \"\"\n    }\n  ]\n}"
+        }
+      ]
+    },
+    {
       "name": "Get an authorized event detail",
       "description": "",
       "event": [],
@@ -6400,6 +6512,128 @@
               }
             ],
             "url": "{{baseUrl}}/events/{eventId}/sync/screening"
+          },
+          "status": "Forbidden",
+          "code": 403,
+          "header": [
+            {
+              "key": "Content-Type",
+              "value": "application/json"
+            }
+          ],
+          "body": "{\n  \"type\": \"\",\n  \"title\": \"\",\n  \"status\": 0,\n  \"code\": \"\",\n  \"requestId\": \"00000000-0000-4000-8000-000000000000\",\n  \"errors\": [\n    {\n      \"field\": \"\",\n      \"message\": \"\"\n    }\n  ]\n}"
+        }
+      ]
+    },
+    {
+      "name": "Apply local-first event operations",
+      "description": "Registration actions require a current REGISTRATION duty. Queue call/start/skip/leave actions require current queue access and station duty where applicable; priority changes require event-manager access. Route overrides reuse the canonical event-manager or current REGISTRATION/SCREENER duty policy and require an expected route version. Review decisions require a current REVIEWER duty and doctor account while the event is in progress. Each stable client action is fingerprinted and replayed from the existing SyncAction ledger. Participant, NRIC, emergency-contact, priority-note, clinical, signature, referral-body, and QR bearer data are never stored in that ledger; an APPLIED receipt is the durable acceptance signal. Referral issue and delivery remain online-only.",
+      "event": [],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json",
+            "description": "JSON request body",
+            "type": "text"
+          }
+        ],
+        "auth": {
+          "type": "bearer",
+          "bearer": [
+            {
+              "key": "token",
+              "value": "{{token}}",
+              "type": "string"
+            }
+          ]
+        },
+        "url": {
+          "raw": "{{baseUrl}}/events/{eventId}/sync/operations",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "events",
+            "{eventId}",
+            "sync",
+            "operations"
+          ],
+          "query": []
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"clientBatchId\": \"00000000-0000-4000-8000-000000000000\",\n  \"actions\": [\n    {\n      \"type\": \"REGISTRATION_CREATE\",\n      \"clientActionId\": \"00000000-0000-4000-8000-000000000000\",\n      \"clientParticipantId\": \"00000000-0000-4000-8000-000000000000\",\n      \"clientRegistrationId\": \"00000000-0000-4000-8000-000000000000\",\n      \"participant\": {\n        \"firstName\": \"\",\n        \"lastName\": \"\",\n        \"dateOfBirth\": \"2026-08-07\",\n        \"gender\": \"M\",\n        \"contactNumber\": \"\",\n        \"nric\": \"\",\n        \"email\": \"\",\n        \"race\": \"\",\n        \"nationality\": \"\",\n        \"addressStreet\": \"\",\n        \"addressUnit\": \"\",\n        \"addressPostalCode\": \"\",\n        \"preferredLanguage\": \"\",\n        \"accessibilityNotes\": \"\"\n      },\n      \"emergencyContact\": {\n        \"contactName\": \"\",\n        \"relationship\": \"\",\n        \"phoneNumber\": \"\",\n        \"email\": \"\"\n      },\n      \"evidence\": {\n        \"workflowStartedAt\": \"2026-08-07T00:00:00.000Z\",\n        \"paperFormUsed\": true,\n        \"paperExceptionReason\": \"\"\n      },\n      \"proposed\": {\n        \"queueNumber\": 1,\n        \"nextStationId\": \"00000000-0000-4000-8000-000000000000\",\n        \"nextStationNumber\": 1\n      }\n    }\n  ]\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "response": [
+        {
+          "name": "200 Response",
+          "originalRequest": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "description": "JSON request body",
+                "type": "text"
+              }
+            ],
+            "url": "{{baseUrl}}/events/{eventId}/sync/operations"
+          },
+          "status": "OK",
+          "code": 200,
+          "header": [
+            {
+              "key": "Content-Type",
+              "value": "application/json"
+            }
+          ],
+          "body": "{\n  \"clientBatchId\": \"00000000-0000-4000-8000-000000000000\",\n  \"serverTime\": \"2026-08-07T00:00:00.000Z\",\n  \"actions\": [\n    {\n      \"clientActionId\": \"00000000-0000-4000-8000-000000000000\",\n      \"status\": \"APPLIED\",\n      \"retryCount\": 0,\n      \"errorCode\": \"\",\n      \"result\": {\n        \"participantId\": \"00000000-0000-4000-8000-000000000000\",\n        \"registrationId\": \"00000000-0000-4000-8000-000000000000\",\n        \"queueNumber\": 1,\n        \"nextStation\": {\n          \"stationId\": \"00000000-0000-4000-8000-000000000000\",\n          \"stationName\": \"\",\n          \"stationNumber\": 1\n        },\n        \"canonicalQrAvailable\": true\n      }\n    }\n  ]\n}"
+        },
+        {
+          "name": "401 Response",
+          "originalRequest": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "description": "JSON request body",
+                "type": "text"
+              }
+            ],
+            "url": "{{baseUrl}}/events/{eventId}/sync/operations"
+          },
+          "status": "Unauthorized",
+          "code": 401,
+          "header": [
+            {
+              "key": "Content-Type",
+              "value": "application/json"
+            }
+          ],
+          "body": "{\n  \"type\": \"\",\n  \"title\": \"\",\n  \"status\": 0,\n  \"code\": \"\",\n  \"requestId\": \"00000000-0000-4000-8000-000000000000\",\n  \"errors\": [\n    {\n      \"field\": \"\",\n      \"message\": \"\"\n    }\n  ]\n}"
+        },
+        {
+          "name": "403 Response",
+          "originalRequest": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "description": "JSON request body",
+                "type": "text"
+              }
+            ],
+            "url": "{{baseUrl}}/events/{eventId}/sync/operations"
           },
           "status": "Forbidden",
           "code": 403,

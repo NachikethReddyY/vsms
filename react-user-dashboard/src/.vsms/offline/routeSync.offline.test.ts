@@ -13,11 +13,13 @@ import type { EventQueueStatus, RegistrationRouteState } from '../../features/qu
 import {
   clearOfflineData,
   downloadOfflineEvent,
+  getOfflineEvent,
   getOfflineParticipantRoute,
   getOfflineQueueStatus,
   getOfflineSyncStatus,
   queueOfflineQueueAction,
   queueOfflineRouteOverride,
+  queueOfflineStationAvailability,
   syncOfflineEvent,
 } from '../../features/screening/offlineSync';
 
@@ -35,6 +37,15 @@ const post = vi.mocked(apiClient.post);
 const leaseKeys = generateKeyPairSync('ec', { namedCurve: 'prime256v1' });
 const exportedPublicKey = leaseKeys.publicKey.export({ format: 'jwk' });
 const publicKey = { kty: 'EC', crv: 'P-256', x: exportedPublicKey.x, y: exportedPublicKey.y };
+
+function canonicalJson(value: unknown): unknown {
+  if (Array.isArray(value)) return value.map(canonicalJson);
+  if (value && typeof value === 'object') {
+    const object = value as Record<string, unknown>;
+    return Object.fromEntries(Object.keys(object).sort().map((key) => [key, canonicalJson(object[key])]));
+  }
+  return value;
+}
 
 const route: RegistrationRouteState = {
   status: 'READY',
@@ -99,28 +110,37 @@ const queue: EventQueueStatus = {
   }],
 };
 
-function packResponse(routeState: RegistrationRouteState = route) {
-  const capabilities = { screening: false, registration: false, queue: true, review: false, routeOverride: true };
-  const payload = {
+function packResponse(routeState: RegistrationRouteState = route, event: Record<string, unknown> = { eventId, name: 'Offline event' }) {
+  const capabilities = { screening: false, registration: false, queue: true, review: false, routeOverride: true, stationAvailability: true };
+  const data = {
     schemaVersion: 1 as const,
     packId: 'a'.repeat(43),
+    generatedAt: issuedAt,
+    expiresAt,
+    event,
+    roles: ['EVENT_MANAGER'],
+    capabilities,
+    screening: null,
+    registration: null,
+    queue,
+    routes: [{ registrationId, route: routeState }],
+    review: null,
+  };
+  const payload = {
+    schemaVersion: 1 as const,
+    packId: data.packId,
     actorId: ownerId,
     eventId,
     deviceId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
     issuedAt,
     expiresAt,
-    roles: ['EVENT_MANAGER'],
+    roles: data.roles,
     capabilities,
+    contentDigest: createHash('sha256').update(JSON.stringify(canonicalJson(data))).digest('base64url'),
   };
   return {
     data: {
-      schemaVersion: 1 as const,
-      packId: payload.packId,
-      generatedAt: issuedAt,
-      expiresAt,
-      event: { eventId, name: 'Offline event' },
-      roles: payload.roles,
-      capabilities,
+      ...data,
       lease: {
         algorithm: 'ES256' as const,
         keyId: createHash('sha256').update(JSON.stringify(publicKey)).digest('base64url'),
@@ -131,11 +151,6 @@ function packResponse(routeState: RegistrationRouteState = route) {
           dsaEncoding: 'ieee-p1363',
         }).toString('base64url'),
       },
-      screening: null,
-      registration: null,
-      queue,
-      routes: [{ registrationId, route: routeState }],
-      review: null,
     },
   };
 }
@@ -180,6 +195,51 @@ beforeEach(async () => {
 afterEach(() => vi.restoreAllMocks());
 
 describe('offline route override sync', () => {
+  it('optimistically toggles manager station availability, applies its receipt, and retains conflicts', async () => {
+    const station = { eventStationId: currentStationId, isAvailable: true };
+    const event = { eventId, name: 'Offline event', timezone: 'Asia/Singapore', eventDays: [], eventStations: [station], shifts: [], version: 7 };
+    get.mockResolvedValueOnce(packResponse(route, event));
+    await downloadOfflineEvent(ownerId, eventId);
+    await expect(queueOfflineStationAvailability(ownerId, eventId, currentStationId, false, 7)).resolves.toMatchObject({
+      version: 8, eventStations: [{ eventStationId: currentStationId, isAvailable: false }],
+    });
+    post.mockImplementationOnce(async (_url, body) => ({ data: {
+      clientBatchId: (body as { clientBatchId: string }).clientBatchId,
+      serverTime: issuedAt,
+      actions: [{
+        clientActionId: (body as { actions: Array<{ clientActionId: string }> }).actions[0].clientActionId,
+        status: 'APPLIED', retryCount: 0,
+        result: { eventStationId: currentStationId, isAvailable: false, eventVersion: 8 },
+      }],
+    } }));
+    await expect(syncOfflineEvent(ownerId, eventId)).resolves.toMatchObject({ synced: 1, pending: 0, conflicts: 0 });
+    await expect(getOfflineEvent(ownerId, eventId)).resolves.toMatchObject({ version: 8, eventStations: [{ isAvailable: false }] });
+
+    await queueOfflineStationAvailability(ownerId, eventId, currentStationId, true, 8);
+    post.mockImplementationOnce(async (_url, body) => ({ data: {
+      clientBatchId: (body as { clientBatchId: string }).clientBatchId,
+      serverTime: issuedAt,
+      actions: [{
+        clientActionId: (body as { actions: Array<{ clientActionId: string }> }).actions[0].clientActionId,
+        status: 'CONFLICT', retryCount: 0, errorCode: 'STALE_EVENT_VERSION',
+      }],
+    } }));
+    await expect(syncOfflineEvent(ownerId, eventId)).resolves.toMatchObject({ pending: 0, conflicts: 1 });
+  });
+
+  it('requires an earlier queue change to sync before editing the same participant route', async () => {
+    get.mockResolvedValueOnce(packResponse());
+    await downloadOfflineEvent(ownerId, eventId);
+    await queueOfflineQueueAction(ownerId, eventId, queueId, 'CALL');
+
+    await expect(queueOfflineRouteOverride(ownerId, eventId, registrationId, {
+      stationIds: [nextStationId, currentStationId],
+      reasonCode: 'QUEUE_BALANCING',
+      expectedVersion: 3,
+      skipActive: true,
+    })).rejects.toThrow(/queue change.*before editing the route/i);
+  });
+
   it('stores an encrypted optimistic route, blocks its provisional queue, and atomically applies the canonical receipt', async () => {
     get.mockResolvedValueOnce(packResponse());
     await downloadOfflineEvent(ownerId, eventId);

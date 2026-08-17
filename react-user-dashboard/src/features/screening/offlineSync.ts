@@ -36,6 +36,7 @@ const KEY_ID = 'screening-cache-key';
 const SUPPORTED_STATIONS = new Set<StationType>(['VISUAL_ACUITY', 'REFRACTION', 'COLOUR_VISION', 'EYE_HEALTH', 'CUSTOM']);
 const OFFLINE_SYNC_EVENT = 'vsms-offline-sync';
 const RECOVERY_RETENTION_MS = 7 * 24 * 60 * 60 * 1000;
+const MIN_OFFLINE_PACK_FREE_BYTES = 1024 * 1024;
 let cryptoKeyPromise: Promise<CryptoKey> | null = null;
 
 type ScreeningPath = 'visual-acuity' | 'refraction' | 'colour-vision' | 'eye-health' | 'dynamic';
@@ -95,6 +96,7 @@ type OfflineLeaseCapabilities = {
   queue: boolean;
   review: boolean;
   routeOverride: boolean;
+  stationAvailability: boolean;
 };
 
 type OfflineCapabilityLease = {
@@ -111,6 +113,7 @@ type OfflineCapabilityLease = {
     expiresAt: string;
     roles: string[];
     capabilities: OfflineLeaseCapabilities;
+    contentDigest: string;
   };
   signature: string;
 };
@@ -167,7 +170,7 @@ type OfflineRegistrationCommand = {
 };
 
 type OfflineQueueCommand = {
-  type: 'QUEUE_CALL' | 'QUEUE_START' | 'QUEUE_SKIP' | 'QUEUE_PRIORITY';
+  type: 'QUEUE_CALL' | 'QUEUE_START' | 'QUEUE_SKIP' | 'QUEUE_LEAVE' | 'QUEUE_PRIORITY';
   clientActionId: string;
   occurredAt: string;
   queueId: string;
@@ -197,7 +200,16 @@ type OfflineRouteCommand = {
   provisionalQueueId?: string;
 };
 
-type OfflineOperationCommand = OfflineRegistrationCommand | OfflineQueueCommand | OfflineReviewCommand | OfflineRouteCommand;
+type OfflineStationAvailabilityCommand = {
+  type: 'STATION_AVAILABILITY';
+  clientActionId: string;
+  occurredAt: string;
+  eventStationId: string;
+  isAvailable: boolean;
+  expectedVersion: number;
+};
+
+type OfflineOperationCommand = OfflineRegistrationCommand | OfflineQueueCommand | OfflineReviewCommand | OfflineRouteCommand | OfflineStationAvailabilityCommand;
 
 export type OfflineRegistrationSave = OfflineRegistrationCommand['local'] & {
   participantId: string;
@@ -262,6 +274,9 @@ type OperationSyncActionResult = {
     referralId?: string | null;
     referralStatus?: string | null;
     signedAt?: string;
+    eventStationId?: string;
+    isAvailable?: boolean;
+    eventVersion?: number;
   };
 };
 
@@ -275,9 +290,10 @@ type EncryptedRecord = {
   id: string;
   ownerId: string;
   eventId: string;
-  kind: 'snapshot' | 'mutation' | 'registration' | 'queue' | 'review' | 'route';
+  kind: 'snapshot' | 'mutation' | 'registration' | 'queue' | 'review' | 'route' | 'station';
   status: OfflineMutationStatus | 'ready';
   expiresAt: string;
+  errorCode?: string;
   iv: ArrayBuffer;
   ciphertext: ArrayBuffer;
 };
@@ -288,6 +304,8 @@ export type OfflineSyncStatus = {
   conflicts: number;
   locked: number;
   expiresAt: string | null;
+  snapshotBytes: number | null;
+  conflictCodes: string[];
 };
 
 export type OfflineStationContext = {
@@ -408,6 +426,22 @@ function recoveryExpired(expiresAt: string) {
   return !Number.isFinite(accessExpiry) || accessExpiry + RECOVERY_RETENTION_MS <= Date.now();
 }
 
+async function requireOfflinePackCapacity(plaintextBytes: number) {
+  if (typeof navigator === 'undefined' || typeof navigator.storage?.estimate !== 'function') return;
+  let estimate: StorageEstimate;
+  try {
+    estimate = await navigator.storage.estimate();
+  } catch {
+    return;
+  }
+  const { quota, usage } = estimate;
+  if (typeof quota !== 'number' || typeof usage !== 'number' || !Number.isFinite(quota) || !Number.isFinite(usage) || quota < 0 || usage < 0) return;
+  const required = Math.max(MIN_OFFLINE_PACK_FREE_BYTES, (plaintextBytes + 28) * 2);
+  if (quota - usage < required) {
+    throw new Error(`This device needs at least ${Math.ceil(required / 1024 / 1024)} MB free to prepare the encrypted offline pack. The existing offline copy was kept.`);
+  }
+}
+
 async function getRecord(id: string): Promise<EncryptedRecord | undefined> {
   return inStore<EncryptedRecord | undefined>('records', 'readonly', (store) => store.get(id));
 }
@@ -504,7 +538,7 @@ async function loadSnapshot(ownerId: string, eventId: string): Promise<OfflineSn
   const record = await getRecord(snapshotId(ownerId, eventId));
   if (!record) return null;
   if (record.kind !== 'snapshot') {
-    await purgeEvent(ownerId, eventId);
+    await deleteRecords([record]);
     return null;
   }
   if (isExpired(record.expiresAt)) return null;
@@ -512,7 +546,7 @@ async function loadSnapshot(ownerId: string, eventId: string): Promise<OfflineSn
     return await decryptRecord<OfflineSnapshot>(record);
   } catch {
     // A browser key reset or malformed ciphertext must never leave stale clinical data available.
-    await purgeEvent(ownerId, eventId);
+    await deleteRecords([record]);
     return null;
   }
 }
@@ -583,6 +617,12 @@ async function requestOperationsSync(eventId: string, commands: OfflineOperation
         reasonCode: command.reasonCode,
         expectedVersion: command.expectedVersion,
         skipActive: command.skipActive,
+      } : command.type === 'STATION_AVAILABILITY' ? {
+        type: command.type,
+        clientActionId: command.clientActionId,
+        eventStationId: command.eventStationId,
+        isAvailable: command.isAvailable,
+        expectedVersion: command.expectedVersion,
       } : {
         type: command.type,
         clientActionId: command.clientActionId,
@@ -595,7 +635,7 @@ async function requestOperationsSync(eventId: string, commands: OfflineOperation
 }
 
 const OFFLINE_ROLES = new Set(['EVENT_MANAGER', 'REGISTRATION', 'SCREENER', 'REVIEWER', 'SUPPORT']);
-const CAPABILITY_KEYS = ['queue', 'registration', 'review', 'routeOverride', 'screening'] as const;
+const CAPABILITY_KEYS = ['queue', 'registration', 'review', 'routeOverride', 'screening', 'stationAvailability'] as const;
 
 function exactKeys(value: unknown, keys: readonly string[]): value is Record<string, unknown> {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
@@ -628,8 +668,28 @@ function signingBytes(payload: OfflineCapabilityLease['payload']) {
       queue: payload.capabilities.queue,
       review: payload.capabilities.review,
       routeOverride: payload.capabilities.routeOverride,
+      stationAvailability: payload.capabilities.stationAvailability,
     },
+    contentDigest: payload.contentDigest,
   }));
+}
+
+function canonicalJson(value: unknown): unknown {
+  if (Array.isArray(value)) return value.map(canonicalJson);
+  if (value && typeof value === 'object') {
+    const object = value as Record<string, unknown>;
+    return Object.fromEntries(Object.keys(object).sort().map((key) => [key, canonicalJson(object[key])]));
+  }
+  return value;
+}
+
+async function contentDigest(pack: OfflineEventPack) {
+  const content = Object.fromEntries(Object.entries(pack).filter(([key]) => key !== 'lease'));
+  const wireContent = JSON.parse(JSON.stringify(content));
+  return base64Url(await crypto.subtle.digest(
+    'SHA-256',
+    new TextEncoder().encode(JSON.stringify(canonicalJson(wireContent))),
+  ));
 }
 
 function base64UrlBytes(value: string) {
@@ -670,7 +730,7 @@ export async function verifyOfflineEventPackLease(
     || lease.publicKey.crv !== 'P-256'
     || typeof lease.publicKey.x !== 'string'
     || typeof lease.publicKey.y !== 'string'
-    || !exactKeys(payload, ['actorId', 'capabilities', 'deviceId', 'eventId', 'expiresAt', 'issuedAt', 'packId', 'roles', 'schemaVersion'])
+    || !exactKeys(payload, ['actorId', 'capabilities', 'contentDigest', 'deviceId', 'eventId', 'expiresAt', 'issuedAt', 'packId', 'roles', 'schemaVersion'])
     || payload.schemaVersion !== 1
     || typeof payload.packId !== 'string'
     || typeof payload.actorId !== 'string'
@@ -678,6 +738,8 @@ export async function verifyOfflineEventPackLease(
     || typeof payload.deviceId !== 'string'
     || typeof payload.issuedAt !== 'string'
     || typeof payload.expiresAt !== 'string'
+    || typeof payload.contentDigest !== 'string'
+    || !/^[A-Za-z0-9_-]{43}$/.test(payload.contentDigest)
     || payload.packId !== pack.packId
     || payload.actorId !== ownerId
     || payload.eventId !== eventId
@@ -720,6 +782,9 @@ export async function verifyOfflineEventPackLease(
     signingBytes(payload),
   );
   if (!verified) throw new Error('The offline access lease signature is invalid.');
+  if (await contentDigest(pack) !== payload.contentDigest) {
+    throw new Error('The offline event pack content failed its signed integrity check.');
+  }
 }
 
 function snapshotExpiry(snapshot: OfflineSnapshot) {
@@ -748,7 +813,11 @@ async function localRouteRegistrationIds(ownerId: string, eventId: string) {
   const registrationIds = new Set<string>();
   for (const record of await recordsForEvent(ownerId, eventId)) {
     if (record.kind !== 'route' || !['pending', 'conflict'].includes(record.status)) continue;
-    registrationIds.add((await decryptRecord<OfflineRouteCommand>(record)).registrationId);
+    try {
+      registrationIds.add((await decryptRecord<OfflineRouteCommand>(record)).registrationId);
+    } catch {
+      // Keep unreadable recovery records untouched; a fresh valid pack may still be activated.
+    }
   }
   return registrationIds;
 }
@@ -794,6 +863,7 @@ export async function downloadOfflineEvent(ownerId: string, eventId: string): Pr
       registrationMappings: previousSnapshot?.registrationMappings,
       canonicalQrPasses: previousSnapshot?.canonicalQrPasses,
     };
+  await requireOfflinePackCapacity(new TextEncoder().encode(JSON.stringify(snapshot)).byteLength);
   const expiresAt = snapshotExpiry(snapshot) ?? pack.expiresAt;
   const record = await encryptRecord({
     id: snapshotId(ownerId, eventId),
@@ -803,7 +873,19 @@ export async function downloadOfflineEvent(ownerId: string, eventId: string): Pr
     status: 'ready',
     expiresAt,
   }, snapshot);
-  await putRecord(record);
+  const capabilityByKind: Partial<Record<EncryptedRecord['kind'], keyof OfflineLeaseCapabilities>> = {
+    mutation: 'screening',
+    registration: 'registration',
+    queue: 'queue',
+    review: 'review',
+    route: 'routeOverride',
+    station: 'stationAvailability',
+  };
+  const renewed = (await recordsForEvent(ownerId, eventId)).filter((existing) => {
+    const capability = capabilityByKind[existing.kind];
+    return existing.kind !== 'snapshot' && capability && pack.capabilities[capability] === true;
+  }).map((existing) => ({ ...existing, expiresAt }));
+  await putRecordsAtomically([record, ...renewed]);
   notifyOfflineChange();
   return getOfflineSyncStatus(ownerId, eventId);
 }
@@ -849,6 +931,58 @@ function isEventRecord(event: OfflineSnapshot['event']): event is EventRecord {
 export async function getOfflineEvent(ownerId: string, eventId: string): Promise<EventRecord | null> {
   const snapshot = await loadSnapshot(ownerId, eventId);
   return snapshot && isEventRecord(snapshot.event) ? snapshot.event : null;
+}
+
+export async function queueOfflineStationAvailability(
+  ownerId: string,
+  eventId: string,
+  eventStationId: string,
+  isAvailable: boolean,
+  expectedVersion: number,
+): Promise<EventRecord> {
+  const storedSnapshot = await getRecord(snapshotId(ownerId, eventId));
+  const snapshot = await loadSnapshot(ownerId, eventId);
+  if (!storedSnapshot || !snapshot || !isEventRecord(snapshot.event) || snapshot.capabilities?.stationAvailability !== true) {
+    throw new Error('This device does not have manager access to change station availability.');
+  }
+  if (snapshot.event.version !== expectedVersion) throw new Error('The event changed. Refresh before updating this station.');
+  const station = snapshot.event.eventStations.find((candidate) => candidate.eventStationId === eventStationId);
+  if (!station) throw new Error('The station is unavailable in this offline event pack.');
+  for (const record of await recordsForEvent(ownerId, eventId)) {
+    if (record.kind !== 'station') continue;
+    if ((await decryptRecord<OfflineStationAvailabilityCommand>(record)).eventStationId === eventStationId) {
+      throw new Error('This station already has an availability change waiting for sync or conflict resolution.');
+    }
+  }
+  const command: OfflineStationAvailabilityCommand = {
+    type: 'STATION_AVAILABILITY',
+    clientActionId: crypto.randomUUID(),
+    occurredAt: new Date().toISOString(),
+    eventStationId,
+    isAvailable,
+    expectedVersion,
+  };
+  const event: EventRecord = {
+    ...snapshot.event,
+    version: expectedVersion + 1,
+    eventStations: snapshot.event.eventStations.map((candidate) => (
+      candidate.eventStationId === eventStationId ? { ...candidate, isAvailable } : candidate
+    )),
+  };
+  const [encryptedSnapshot, encryptedCommand] = await Promise.all([
+    encryptRecord({ ...storedSnapshot, kind: 'snapshot', status: 'ready' }, { ...snapshot, event }),
+    encryptRecord({
+      id: `${ownerId}:${eventId}:station:${command.clientActionId}`,
+      ownerId,
+      eventId,
+      kind: 'station',
+      status: 'pending',
+      expiresAt: storedSnapshot.expiresAt,
+    }, command),
+  ]);
+  await putRecordsAtomically([encryptedSnapshot, encryptedCommand]);
+  notifyOfflineChange();
+  return event;
 }
 
 export async function listOfflineEvents(ownerId: string): Promise<EventRecord[]> {
@@ -1099,10 +1233,22 @@ export async function queueOfflineRouteOverride(
     throw new Error('The route changed after this dialog was opened. Reload it before saving.');
   }
   for (const record of await recordsForEvent(ownerId, eventId)) {
-    if (record.kind !== 'route') continue;
-    const existing = await decryptRecord<OfflineRouteCommand>(record);
-    if (existing.registrationId === registrationId) {
-      throw new Error('This participant already has a route change waiting for sync or conflict resolution.');
+    if (record.kind === 'route') {
+      const existing = await decryptRecord<OfflineRouteCommand>(record);
+      if (existing.registrationId === registrationId) {
+        throw new Error('This participant already has a route change waiting for sync or conflict resolution.');
+      }
+    }
+    if (record.kind === 'queue' && route.queue?.queueEntryId) {
+      try {
+        const existing = await decryptRecord<OfflineQueueCommand>(record);
+        if (existing.queueId === route.queue.queueEntryId) {
+          throw new Error('Sync or recover this participant’s queue change before editing the route.');
+        }
+      } catch (error) {
+        if (error instanceof Error && error.message.includes('before editing the route')) throw error;
+        throw new Error('An unreadable queue change must be recovered before editing participant routes.');
+      }
     }
   }
 
@@ -1184,7 +1330,7 @@ export async function queueOfflineQueueAction(
   ownerId: string,
   eventId: string,
   queueId: string,
-  action: 'CALL' | 'START' | 'SKIP' | 'PRIORITY',
+  action: 'CALL' | 'START' | 'SKIP' | 'LEAVE' | 'PRIORITY',
   priority?: { isPriority: boolean; notes: string | null },
 ): Promise<QueueEntry> {
   if (queueId.startsWith('local-route:')) {
@@ -1197,11 +1343,12 @@ export async function queueOfflineQueueAction(
   if (!storedSnapshot || !snapshot || !queue || !current) {
     throw new Error('This queue entry is not available in the current offline event pack.');
   }
-  const nextStatus = action === 'CALL' ? 'CALLED' : action === 'START' ? 'IN_PROGRESS' : action === 'SKIP' ? 'SKIPPED' : current.status;
+  const nextStatus = action === 'CALL' ? 'CALLED' : action === 'START' ? 'IN_PROGRESS' : action === 'SKIP' ? 'SKIPPED' : action === 'LEAVE' ? 'CANCELLED' : current.status;
   const allowed = action === 'PRIORITY'
     || (action === 'CALL' && current.status === 'WAITING')
     || (action === 'START' && current.status === 'CALLED')
-    || (action === 'SKIP' && ['WAITING', 'CALLED'].includes(current.status));
+    || (action === 'SKIP' && ['WAITING', 'CALLED'].includes(current.status))
+    || (action === 'LEAVE' && ['WAITING', 'CALLED', 'IN_PROGRESS', 'SKIPPED'].includes(current.status));
   if (!allowed) throw new Error(`Queue action ${action.toLowerCase()} is not valid while the entry is ${current.status.toLowerCase()}.`);
   const now = new Date().toISOString();
   const updated: QueueEntry = {
@@ -1209,7 +1356,7 @@ export async function queueOfflineQueueAction(
     status: nextStatus,
     ...(action === 'CALL' ? { calledAt: now } : {}),
     ...(action === 'START' ? { startedAt: now } : {}),
-    ...(action === 'SKIP' ? { leftQueueAt: now } : {}),
+    ...(['SKIP', 'LEAVE'].includes(action) ? { leftQueueAt: now } : {}),
     ...(action === 'PRIORITY' ? { isPriority: priority?.isPriority ?? false, priorityNotes: priority?.notes ?? null } : {}),
   };
   const command: OfflineQueueCommand = {
@@ -1526,28 +1673,23 @@ export async function queueOfflineStationSave(
 
 export async function getOfflineSyncStatus(ownerId: string, eventId: string): Promise<OfflineSyncStatus> {
   const records = await recordsForEvent(ownerId, eventId);
-  if (records.some((record) => recoveryExpired(record.expiresAt))) {
-    await purgeEvent(ownerId, eventId);
-    return { downloaded: false, pending: 0, conflicts: 0, locked: 0, expiresAt: null };
-  }
   const snapshot = records.find((record) => record.kind === 'snapshot');
   const unconfirmed = records.filter((record) => record.kind !== 'snapshot');
-  const locked = snapshot && isExpired(snapshot.expiresAt) ? unconfirmed.length : 0;
+  if (records.some((record) => recoveryExpired(record.expiresAt)) && unconfirmed.length === 0) {
+    await purgeEvent(ownerId, eventId);
+    return { downloaded: false, pending: 0, conflicts: 0, locked: 0, expiresAt: null, snapshotBytes: null, conflictCodes: [] };
+  }
+  const conflicts = unconfirmed.filter((record) => record.status === 'conflict');
+  const locked = unconfirmed.filter((record) => isExpired(record.expiresAt)).length;
   return {
     downloaded: Boolean(snapshot && !isExpired(snapshot.expiresAt)),
     pending: unconfirmed.filter((record) => record.status === 'pending').length,
-    conflicts: unconfirmed.filter((record) => record.status === 'conflict').length,
+    conflicts: conflicts.length,
     locked,
     expiresAt: snapshot?.expiresAt ?? null,
+    snapshotBytes: snapshot ? snapshot.iv.byteLength + snapshot.ciphertext.byteLength : null,
+    conflictCodes: [...new Set(conflicts.map((record) => record.errorCode).filter((code): code is string => Boolean(code)))],
   };
-}
-
-export async function discardOfflineConflicts(ownerId: string, eventId: string): Promise<OfflineSyncStatus> {
-  await deleteRecords((await recordsForEvent(ownerId, eventId)).filter(
-    (record) => record.kind !== 'snapshot' && record.status === 'conflict',
-  ));
-  notifyOfflineChange();
-  return getOfflineSyncStatus(ownerId, eventId);
 }
 
 function isScopeExpiredError(error: unknown) {
@@ -1555,8 +1697,8 @@ function isScopeExpiredError(error: unknown) {
   return status === 403 || status === 404 || status === 409;
 }
 
-async function markConflict(record: EncryptedRecord) {
-  await putRecord({ ...record, status: 'conflict' });
+async function markConflict(record: EncryptedRecord, errorCode = 'OFFLINE_SYNC_CONFLICT') {
+  await putRecord({ ...record, status: 'conflict', errorCode });
 }
 
 async function lockEventAccess(ownerId: string, eventId: string) {
@@ -1682,13 +1824,13 @@ async function syncOfflineRegistrations(ownerId: string, eventId: string) {
           await applyRegistrationReceipt(ownerId, eventId, item.record, item.command, receipt.result, qrPass);
           synced += 1;
         } else if (receipt.status === 'CONFLICT') {
-          await markConflict(item.record);
+          await markConflict(item.record, receipt.errorCode);
         }
       }
     } catch (error) {
       if (isNetworkError(error)) break;
       if (isScopeExpiredError(error)) {
-        await Promise.all(batch.map(({ record }) => markConflict(record)));
+        await Promise.all(batch.map(({ record }) => markConflict(record, 'OFFLINE_SCOPE_REJECTED')));
         await lockEventAccess(ownerId, eventId);
         break;
       }
@@ -1768,13 +1910,65 @@ async function syncOfflineRouteActions(ownerId: string, eventId: string) {
           await applyRouteReceipt(ownerId, eventId, item.record, item.command, receipt.result);
           synced += 1;
         } else if (receipt.status === 'CONFLICT') {
-          await markConflict(item.record);
+          await markConflict(item.record, receipt.errorCode);
         }
       }
     } catch (error) {
       if (isNetworkError(error)) break;
       if (isScopeExpiredError(error)) {
-        await Promise.all(batch.map(({ record }) => markConflict(record)));
+        await Promise.all(batch.map(({ record }) => markConflict(record, 'OFFLINE_SCOPE_REJECTED')));
+        await lockEventAccess(ownerId, eventId);
+        break;
+      }
+      throw error;
+    }
+  }
+  return synced;
+}
+
+function isStationAvailabilityReceipt(result: OperationSyncActionResult['result']): result is {
+  eventStationId: string; isAvailable: boolean; eventVersion: number;
+} {
+  return Boolean(result && 'eventStationId' in result && typeof result.eventStationId === 'string'
+    && typeof result.isAvailable === 'boolean' && Number.isInteger(result.eventVersion));
+}
+
+async function syncOfflineStationAvailability(ownerId: string, eventId: string) {
+  let synced = 0;
+  const pending: Array<{ record: EncryptedRecord; command: OfflineStationAvailabilityCommand }> = [];
+  for (const record of await recordsForEvent(ownerId, eventId)) {
+    if (record.kind === 'station' && record.status === 'pending') {
+      pending.push({ record, command: await decryptRecord<OfflineStationAvailabilityCommand>(record) });
+    }
+  }
+  pending.sort((left, right) => left.command.occurredAt.localeCompare(right.command.occurredAt));
+  for (const item of pending) {
+    try {
+      const response = await requestOperationsSync(eventId, [item.command]);
+      const receipt = response.actions[0];
+      if (receipt?.status === 'APPLIED') {
+        if (!isStationAvailabilityReceipt(receipt.result)) throw new Error('The server returned an invalid station receipt.');
+        const result = receipt.result;
+        const storedSnapshot = await getRecord(snapshotId(ownerId, eventId));
+        const snapshot = await loadSnapshot(ownerId, eventId);
+        if (!storedSnapshot || !snapshot || !isEventRecord(snapshot.event)) throw new Error('The offline event snapshot is unavailable.');
+        const event = {
+          ...snapshot.event,
+          version: result.eventVersion,
+          eventStations: snapshot.event.eventStations.map((station) => station.eventStationId === result.eventStationId
+            ? { ...station, isAvailable: result.isAvailable }
+            : station),
+        };
+        await replaceRecordAndDelete(
+          await encryptRecord({ ...storedSnapshot, kind: 'snapshot', status: 'ready' }, { ...snapshot, event }),
+          item.record.id,
+        );
+        synced += 1;
+      } else if (receipt?.status === 'CONFLICT') await markConflict(item.record, receipt.errorCode);
+    } catch (error) {
+      if (isNetworkError(error)) break;
+      if (isScopeExpiredError(error)) {
+        await markConflict(item.record, 'OFFLINE_SCOPE_REJECTED');
         await lockEventAccess(ownerId, eventId);
         break;
       }
@@ -1804,13 +1998,13 @@ async function syncOfflineQueueActions(ownerId: string, eventId: string) {
           await deleteRecords([record]);
           synced += 1;
         } else if (receipt.status === 'CONFLICT') {
-          await markConflict(record);
+          await markConflict(record, receipt.errorCode);
         }
       }
     } catch (error) {
       if (isNetworkError(error)) break;
       if (isScopeExpiredError(error)) {
-        await Promise.all(batch.map(({ record }) => markConflict(record)));
+        await Promise.all(batch.map(({ record }) => markConflict(record, 'OFFLINE_SCOPE_REJECTED')));
         await lockEventAccess(ownerId, eventId);
         break;
       }
@@ -1860,13 +2054,13 @@ async function syncOfflineReviews(ownerId: string, eventId: string) {
           await deleteRecords([record]);
           synced += 1;
         } else if (receipt.status === 'CONFLICT') {
-          await markConflict(record);
+          await markConflict(record, receipt.errorCode);
         }
       }
     } catch (error) {
       if (isNetworkError(error)) break;
       if (isScopeExpiredError(error)) {
-        await Promise.all(batch.map(({ record }) => markConflict(record)));
+        await Promise.all(batch.map(({ record }) => markConflict(record, 'OFFLINE_SCOPE_REJECTED')));
         await lockEventAccess(ownerId, eventId);
         break;
       }
@@ -1881,6 +2075,7 @@ export async function syncOfflineEvent(ownerId: string, eventId: string): Promis
   if (!initial.downloaded) return { ...initial, synced: 0, expired: initial.locked > 0, committedProgressions: [] };
 
   let synced = await syncOfflineRegistrations(ownerId, eventId);
+  synced += await syncOfflineStationAvailability(ownerId, eventId);
   synced += await syncOfflineRouteActions(ownerId, eventId);
   synced += await syncOfflineQueueActions(ownerId, eventId);
   const committedProgressions: OfflineSyncResult['committedProgressions'] = [];
@@ -1890,6 +2085,16 @@ export async function syncOfflineEvent(ownerId: string, eventId: string): Promis
     notifyOfflineChange();
     return { ...(await getOfflineSyncStatus(ownerId, eventId)), synced, expired: false, committedProgressions };
   }
+  const unresolvedLocalRegistrations = new Set<string>();
+  let unreadableRegistrationCommand = false;
+  for (const record of await recordsForEvent(ownerId, eventId)) {
+    if (record.kind !== 'registration' || !['pending', 'conflict'].includes(record.status)) continue;
+    try {
+      unresolvedLocalRegistrations.add((await decryptRecord<OfflineRegistrationCommand>(record)).registrationId);
+    } catch {
+      unreadableRegistrationCommand = true;
+    }
+  }
   const pending: Array<{ record: EncryptedRecord; mutation: OfflineMutation }> = [];
   for (const record of await recordsForEvent(ownerId, eventId)) {
     if (record.kind !== 'mutation' || record.status !== 'pending') continue;
@@ -1897,7 +2102,9 @@ export async function syncOfflineEvent(ownerId: string, eventId: string): Promis
       await lockEventAccess(ownerId, eventId);
       return { ...(await getOfflineSyncStatus(ownerId, eventId)), synced, expired: true, committedProgressions };
     }
-    pending.push({ record, mutation: await decryptRecord<OfflineMutation>(record) });
+    const mutation = await decryptRecord<OfflineMutation>(record);
+    if (unreadableRegistrationCommand || unresolvedLocalRegistrations.has(mutation.body.registrationId)) continue;
+    pending.push({ record, mutation });
   }
 
   const batches = pending.length
@@ -1917,7 +2124,10 @@ export async function syncOfflineEvent(ownerId: string, eventId: string): Promis
             : mutation.path === 'eye-health'
               ? 'EYE_HEALTH'
               : 'COLOUR_VISION',
-        payload: mutation.body,
+        payload: {
+          ...mutation.body,
+          registrationId: screeningSnapshot.registrationMappings?.[mutation.body.registrationId] ?? mutation.body.registrationId,
+        },
       })));
       const recordByAction = new Map(batch.map((item) => [item.mutation.clientActionId, item.record]));
       for (const result of response.actions) {
@@ -1933,7 +2143,7 @@ export async function syncOfflineEvent(ownerId: string, eventId: string): Promis
             });
           }
         } else if (result.status === 'CONFLICT') {
-          await markConflict(record);
+          await markConflict(record, result.errorCode);
         }
       }
 

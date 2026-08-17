@@ -44,7 +44,20 @@ const leasePublicKey = {
   y: exportedLeasePublicKey.y,
 };
 
-function signedTestLease(expiresAt: string, capabilities: Record<string, boolean>) {
+function canonicalJson(value: unknown): unknown {
+  if (Array.isArray(value)) return value.map(canonicalJson);
+  if (value && typeof value === 'object') {
+    const object = value as Record<string, unknown>;
+    return Object.fromEntries(Object.keys(object).sort().map((key) => [key, canonicalJson(object[key])]));
+  }
+  return value;
+}
+
+function testContentDigest(pack: object) {
+  return createHash('sha256').update(JSON.stringify(canonicalJson(JSON.parse(JSON.stringify(pack))))).digest('base64url');
+}
+
+function signedTestLease(expiresAt: string, capabilities: Record<string, boolean>, contentDigest: string) {
   const payload = {
     schemaVersion: 1 as const,
     packId: '55555555-5555-4555-8555-555555555555',
@@ -55,6 +68,7 @@ function signedTestLease(expiresAt: string, capabilities: Record<string, boolean
     expiresAt,
     roles: ['SCREENER'],
     capabilities,
+    contentDigest,
   };
   return {
     algorithm: 'ES256' as const,
@@ -142,9 +156,8 @@ function packResponse(
   queue?: import('../queue/queueApi').EventQueueStatus,
   review?: import('../reviews/reviewApi').ReviewQueueResponse & { details: import('../reviews/reviewApi').ReviewDetailResponse[] },
 ) {
-  const capabilities = { screening: true, registration: false, queue: false, review: false, routeOverride: false };
-  return {
-    data: {
+  const capabilities = { screening: true, registration: false, queue: false, review: false, routeOverride: false, stationAvailability: false };
+  const data = {
       schemaVersion: 1 as const,
       packId: '55555555-5555-4555-8555-555555555555',
       generatedAt: '2026-08-04T10:00:00.000Z',
@@ -190,13 +203,12 @@ function packResponse(
         canManage: false,
         eventTeam: [],
       },
-      lease: signedTestLease(expiresAt, capabilities),
       screening,
       registration,
       queue,
       review,
-    },
   };
+  return { data: { ...data, lease: signedTestLease(expiresAt, capabilities, testContentDigest(data)) } };
 }
 
 function saveBody(overrides: Record<string, unknown> = {}) {
@@ -240,6 +252,31 @@ async function rawRecords(): Promise<Array<{ kind: string; ciphertext: ArrayBuff
       const request = database.transaction('records', 'readonly').objectStore('records').getAll();
       request.onsuccess = () => resolve(request.result);
       request.onerror = () => reject(request.error);
+    });
+  } finally {
+    database.close();
+  }
+}
+
+async function corruptSnapshot() {
+  const database = await new Promise<IDBDatabase>((resolve, reject) => {
+    const request = indexedDB.open('vsms-screening-offline', 1);
+    request.onsuccess = () => resolve(request.result);
+    request.onerror = () => reject(request.error);
+  });
+  try {
+    const transaction = database.transaction('records', 'readwrite');
+    const store = transaction.objectStore('records');
+    const records = await new Promise<Array<{ kind: string; ciphertext: ArrayBuffer } & Record<string, unknown>>>((resolve, reject) => {
+      const request = store.getAll();
+      request.onsuccess = () => resolve(request.result);
+      request.onerror = () => reject(request.error);
+    });
+    const snapshot = records.find((record) => record.kind === 'snapshot');
+    if (snapshot) store.put({ ...snapshot, ciphertext: new Uint8Array([1, 2, 3]).buffer });
+    await new Promise<void>((resolve, reject) => {
+      transaction.oncomplete = () => resolve();
+      transaction.onerror = () => reject(transaction.error);
     });
   } finally {
     database.close();
@@ -479,6 +516,60 @@ describe('encrypted screening outbox', () => {
     expect(await rawRecords()).toHaveLength(1);
   });
 
+  it('maps dependent screening saves to the canonical registration before sync', async () => {
+    get.mockResolvedValueOnce(packResponse(expiry, undefined, {
+      stations: [{ stationId, stationName: 'Station 1', stationType: 'VISUAL_ACUITY', stationOrder: 1 }],
+      nextQueueNumber: 17,
+    }));
+    await downloadOfflineEvent(ownerId, eventId);
+    const saved = await queueOfflineWalkInRegistration(ownerId, eventId, {
+      participant: {
+        firstName: 'Ada', lastName: 'Lovelace', dateOfBirth: '1980-01-01', gender: 'F',
+        contactNumber: '+6591234567', nric: 'S1234567D', email: 'ada@example.test', race: 'Other',
+        nationality: 'Singaporean', addressStreet: '1 Test Street', addressUnit: '#01-01',
+        addressPostalCode: '123456', preferredLanguage: 'English', accessibilityNotes: '',
+      },
+      emergencyContact: { contactName: 'Grace Hopper', relationship: 'Friend', phoneNumber: '+6597654321' },
+      paperFormUsed: false,
+    });
+    await queueOfflineStationSave(ownerId, eventId, stationId, 'visual-acuity', saveBody({ registrationId: saved.registrationId }));
+
+    const canonicalRegistrationId = '88888888-8888-4888-8888-888888888888';
+    post.mockImplementationOnce(async (_url, body) => {
+      const request = body as { clientBatchId: string; actions: Array<{ clientActionId: string }> };
+      return { data: {
+        clientBatchId: request.clientBatchId,
+        serverTime: '2026-08-04T10:01:00.000Z',
+        actions: [{
+          clientActionId: request.actions[0].clientActionId,
+          status: 'APPLIED',
+          retryCount: 0,
+          result: {
+            participantId: saved.participantId,
+            registrationId: canonicalRegistrationId,
+            queueNumber: 17,
+            nextStation: { stationId, stationName: 'Station 1', stationNumber: 1 },
+            canonicalQrAvailable: true,
+          },
+        }],
+      } };
+    }).mockResolvedValueOnce({ data: {
+      qrId: '99999999-9999-4999-8999-999999999999',
+      registrationId: canonicalRegistrationId,
+      issuedAt: '2026-08-04T10:01:00.000Z',
+      expiresAt: expiry,
+      qrImage: 'data:image/svg+xml;base64,PHN2Zy8+',
+    } }).mockImplementationOnce(async (_url, body) => response([{
+      clientActionId: syncRequest(body).actions[0].clientActionId,
+      status: 'APPLIED',
+      retryCount: 0,
+    }]));
+
+    await expect(syncOfflineEvent(ownerId, eventId)).resolves.toMatchObject({ synced: 2, pending: 0 });
+    expect(post.mock.calls[2][0]).toBe(`/events/${eventId}/sync/screening`);
+    expect(syncRequest(post.mock.calls[2][1]).actions[0].payload.registrationId).toBe(canonicalRegistrationId);
+  });
+
   it('applies queue actions locally and removes their encrypted command after sync', async () => {
     const queueId = '66666666-6666-4666-8666-666666666666';
     get.mockResolvedValueOnce(packResponse(expiry, null, undefined, {
@@ -635,7 +726,13 @@ describe('encrypted screening outbox', () => {
         },
       },
     }]));
-    expect(await syncOfflineEvent(ownerId, eventId)).toMatchObject({ pending: 0, conflicts: 1, synced: 0, committedProgressions: [] });
+    expect(await syncOfflineEvent(ownerId, eventId)).toMatchObject({
+      pending: 0,
+      conflicts: 1,
+      conflictCodes: ['ROUTE_STATION_MISMATCH'],
+      synced: 0,
+      committedProgressions: [],
+    });
   });
 
   it('includes assigned eye-health stations in encrypted offline downloads', async () => {
@@ -707,11 +804,50 @@ describe('encrypted screening outbox', () => {
       conflicts: 0,
       locked: 1,
       expiresAt: '2026-08-04T11:00:00.000Z',
+      snapshotBytes: expect.any(Number),
+      conflictCodes: [],
     });
+    expect(await rawRecords()).toHaveLength(2);
+
+    now.mockReturnValue(Date.parse('2026-08-12T12:00:00.000Z'));
+    await purgeExpiredOfflineData(ownerId);
+    expect(await getOfflineSyncStatus(ownerId, eventId)).toMatchObject({ pending: 1, locked: 1 });
     expect(await rawRecords()).toHaveLength(2);
 
     await clearOfflineData();
     expect(await rawRecords()).toEqual([]);
+  });
+
+  it('renews authorized pending work after a fresh signed pack and syncs it', async () => {
+    const now = vi.spyOn(Date, 'now');
+    now.mockReturnValue(Date.parse('2026-08-04T10:00:00.000Z'));
+    get.mockResolvedValueOnce(packResponse('2026-08-04T11:00:00.000Z'));
+    await downloadOfflineEvent(ownerId, eventId);
+    await queueOfflineStationSave(ownerId, eventId, stationId, 'visual-acuity', saveBody());
+
+    now.mockReturnValue(Date.parse('2026-08-04T12:00:00.000Z'));
+    expect(await getOfflineSyncStatus(ownerId, eventId)).toMatchObject({ downloaded: false, pending: 1, locked: 1 });
+    get.mockResolvedValueOnce(packResponse('2026-08-04T13:00:00.000Z'));
+    await downloadOfflineEvent(ownerId, eventId);
+    expect(await getOfflineSyncStatus(ownerId, eventId)).toMatchObject({ downloaded: true, pending: 1, locked: 0 });
+
+    post.mockImplementationOnce(async (_url, body) => response([{
+      clientActionId: syncRequest(body).actions[0].clientActionId,
+      status: 'APPLIED',
+      retryCount: 0,
+    }], '2026-08-04T13:00:00.000Z'));
+    await expect(syncOfflineEvent(ownerId, eventId)).resolves.toMatchObject({ synced: 1, pending: 0, locked: 0 });
+  });
+
+  it('drops an unreadable snapshot without deleting encrypted unconfirmed work', async () => {
+    get.mockResolvedValueOnce(packResponse());
+    await downloadOfflineEvent(ownerId, eventId);
+    await queueOfflineStationSave(ownerId, eventId, stationId, 'visual-acuity', saveBody());
+    await corruptSnapshot();
+
+    await expect(getOfflineEvent(ownerId, eventId)).resolves.toBeNull();
+    await expect(getOfflineSyncStatus(ownerId, eventId)).resolves.toMatchObject({ downloaded: false, pending: 1 });
+    expect((await rawRecords()).map(({ kind }) => kind)).toEqual(['mutation']);
   });
 
   it('keeps clinical VA flagging for dynamic-schema offline saves and syncs as VISUAL_ACUITY', async () => {

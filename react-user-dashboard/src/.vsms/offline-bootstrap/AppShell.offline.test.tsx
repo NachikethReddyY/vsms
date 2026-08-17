@@ -29,4 +29,19 @@ describe('eye-health offline preparation', () => {
 
     expect(screen.getAllByText('Offline prep event-1')).toHaveLength(2);
   });
+
+  it.each([
+    '/events/event-1/overview',
+    '/events/event-1/staff',
+    '/events/event-1/reports',
+    '/events/event-1/qr-scanner',
+  ])('keeps the offline control visible on %s', (path) => {
+    render(
+      <MemoryRouter initialEntries={[path]}>
+        <AppShell><p>Event workspace</p></AppShell>
+      </MemoryRouter>,
+    );
+
+    expect(screen.getAllByText('Offline prep event-1')).toHaveLength(2);
+  });
 });

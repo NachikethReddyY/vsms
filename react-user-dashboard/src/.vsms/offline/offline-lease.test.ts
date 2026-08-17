@@ -10,27 +10,40 @@ const exportedPublicKey = leaseKeys.publicKey.export({ format: 'jwk' });
 const publicKey = { kty: 'EC', crv: 'P-256', x: exportedPublicKey.x, y: exportedPublicKey.y };
 const keyId = createHash('sha256').update(JSON.stringify(publicKey)).digest('base64url');
 
+function canonicalJson(value: unknown): unknown {
+  if (Array.isArray(value)) return value.map(canonicalJson);
+  if (value && typeof value === 'object') {
+    const object = value as Record<string, unknown>;
+    return Object.fromEntries(Object.keys(object).sort().map((key) => [key, canonicalJson(object[key])]));
+  }
+  return value;
+}
+
 function signedPack() {
-  const capabilities = { screening: true, registration: false, queue: true, review: false, routeOverride: true };
-  const payload = {
+  const capabilities = { screening: true, registration: false, queue: true, review: false, routeOverride: true, stationAvailability: false };
+  const content = {
     schemaVersion: 1 as const,
     packId: 'a'.repeat(43),
-    actorId: ownerId,
-    eventId,
-    deviceId,
-    issuedAt: '2026-08-17T08:00:00.000Z',
+    generatedAt: '2026-08-17T08:00:00.000Z',
     expiresAt: '2099-08-17T10:00:00.000Z',
+    event: { eventId },
     roles: ['EVENT_MANAGER'],
     capabilities,
   };
-  return {
+  const payload = {
     schemaVersion: 1 as const,
-    packId: payload.packId,
-    generatedAt: payload.issuedAt,
-    expiresAt: payload.expiresAt,
-    event: { eventId },
-    roles: payload.roles,
+    packId: content.packId,
+    actorId: ownerId,
+    eventId,
+    deviceId,
+    issuedAt: content.generatedAt,
+    expiresAt: content.expiresAt,
+    roles: content.roles,
     capabilities,
+    contentDigest: createHash('sha256').update(JSON.stringify(canonicalJson(content))).digest('base64url'),
+  };
+  return {
+    ...content,
     lease: {
       algorithm: 'ES256' as const,
       keyId,
@@ -58,6 +71,10 @@ describe('offline capability lease', () => {
     const changedCapabilities = structuredClone(pack);
     changedCapabilities.capabilities.routeOverride = false;
     await expect(verifyOfflineEventPackLease(changedCapabilities, ownerId, eventId, deviceId)).rejects.toThrow(/invalid|does not match/i);
+
+    const changedContent = structuredClone(pack);
+    (changedContent.event as { name?: string }).name = 'Tampered event';
+    await expect(verifyOfflineEventPackLease(changedContent, ownerId, eventId, deviceId)).rejects.toThrow(/integrity/i);
 
     const changedSignature = structuredClone(pack);
     changedSignature.lease.signature = `${changedSignature.lease.signature.slice(0, -1)}${changedSignature.lease.signature.endsWith('A') ? 'B' : 'A'}`;

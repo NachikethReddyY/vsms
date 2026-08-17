@@ -235,7 +235,7 @@ test("screener pack is event-scoped, duty-capped, and strips forbidden queue and
   assert.match(pack.packId, /^[A-Za-z0-9_-]{43}$/);
   assert.equal(pack.expiresAt, shiftEnd.toISOString());
   assert.deepEqual(pack.roles, ["SCREENER"]);
-  assert.deepEqual(pack.capabilities, { screening: true, registration: false, queue: true, review: false, routeOverride: true });
+  assert.deepEqual(pack.capabilities, { screening: true, registration: false, queue: true, review: false, routeOverride: true, stationAvailability: false });
   assert.deepEqual(pack.lease.payload, {
     schemaVersion: 1,
     packId: pack.packId,
@@ -246,7 +246,9 @@ test("screener pack is event-scoped, duty-capped, and strips forbidden queue and
     expiresAt: pack.expiresAt,
     roles: pack.roles,
     capabilities: pack.capabilities,
+    contentDigest: __test.packContentDigest(pack),
   });
+  assert.match(pack.lease.payload.contentDigest, /^[A-Za-z0-9_-]{43}$/);
   assert.equal(pack.lease.algorithm, "ES256");
   assert.match(pack.lease.keyId, /^[A-Za-z0-9_-]{43}$/);
   assert.equal(
@@ -258,6 +260,12 @@ test("screener pack is event-scoped, duty-capped, and strips forbidden queue and
   const tamperedLease = structuredClone(pack.lease);
   tamperedLease.payload.capabilities.review = true;
   assert.equal(__test.verifyLease(tamperedLease), false);
+  const tamperedPack = structuredClone(pack);
+  tamperedPack.queue.entries[0].queueNumber = 999;
+  const tamperedContentDigest = __test.packContentDigest(tamperedPack);
+  assert.notEqual(tamperedContentDigest, pack.lease.payload.contentDigest);
+  tamperedPack.lease.payload.contentDigest = tamperedContentDigest;
+  assert.equal(__test.verifyLease(tamperedPack.lease), false);
   assert.equal(pack.screening.stations.length, 1);
   assert.equal(pack.screening.stations[0].registrations[0].participantDisplayName, "Queue Participant");
   assert.equal(pack.event.shifts[0].staffAssignments.length, 1);
@@ -340,7 +348,7 @@ test("manager pack keeps event access, omits other staff, and canonical event vi
   const pack = await getOfflinePack(eventId, user, { deviceId: crypto.randomUUID() }, managerAuthorization, dependencies);
   assert.equal(pack.expiresAt, eventEnd.toISOString());
   assert.deepEqual(pack.roles, ["EVENT_MANAGER"]);
-  assert.deepEqual(pack.capabilities, { screening: false, registration: false, queue: true, review: false, routeOverride: true });
+  assert.deepEqual(pack.capabilities, { screening: false, registration: false, queue: true, review: false, routeOverride: true, stationAvailability: true });
   assert.deepEqual(pack.screening.stations, []);
   assert.equal(pack.queue, safeQueueStatus);
   assert.equal(pack.routes, safeRouteProjection);

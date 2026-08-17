@@ -4663,6 +4663,510 @@ item:
               }
             ]
           }
+  - name: Download a device-bound, role-scoped event offline pack
+    description: >-
+      Reuses the caller-redacted event detail. Active screeners additionally receive only their assigned station queues;
+      active registration officers receive selectable station metadata and a provisional queue-number seed without
+      participant data. Event managers and active registration, screening, or support duties also receive the canonical
+      safe event queue projection. Doctors with an active reviewer duty receive only currently actionable redacted
+      review details. The opaque pack identifier and ES256 capability lease bind the actor, event, device, roles,
+      capabilities, generation time, and expiry. Clients must verify the lease and their production-pinned key
+      identifier before persisting the pack.
+    event: []
+    request:
+      method: GET
+      header:
+        - key: x-device-id
+          value: ''
+          description: ''
+          type: text
+      auth:
+        type: bearer
+        bearer:
+          - key: token
+            value: '{{token}}'
+            type: string
+      url:
+        raw: '{{baseUrl}}/events/{eventId}/offline-pack'
+        host:
+          - '{{baseUrl}}'
+        path:
+          - events
+          - '{eventId}'
+          - offline-pack
+        query: []
+    response:
+      - name: 200 Response
+        originalRequest:
+          method: GET
+          header:
+            - key: x-device-id
+              value: ''
+              description: ''
+              type: text
+          url: '{{baseUrl}}/events/{eventId}/offline-pack'
+        status: OK
+        code: 200
+        header:
+          - key: Content-Type
+            value: application/json
+        body: |-
+          {
+            "schemaVersion": 1,
+            "packId": "",
+            "generatedAt": "2026-08-07T00:00:00.000Z",
+            "expiresAt": "2026-08-07T00:00:00.000Z",
+            "event": {
+              "firstManagerUserId": "00000000-0000-4000-8000-000000000000",
+              "name": "",
+              "description": "",
+              "bannerKey": "COMMUNITY_SCREENING",
+              "artworkDataUrl": "",
+              "venue": "",
+              "address": "",
+              "postalCode": "",
+              "latitude": 1.13,
+              "longitude": 103.59,
+              "locationProvider": "ONEMAP",
+              "locationReference": "",
+              "timezone": "Asia/Singapore",
+              "startsAt": "2026-08-07T00:00:00.000Z",
+              "endsAt": "2026-08-07T00:00:00.000Z",
+              "capacity": 1,
+              "expectedAttendance": 1,
+              "eventDays": [
+                {
+                  "eventDayId": "00000000-0000-4000-8000-000000000000"
+                }
+              ],
+              "stations": [
+                {
+                  "eventStationId": "00000000-0000-4000-8000-000000000000",
+                  "stationTemplateId": "00000000-0000-4000-8000-000000000000",
+                  "stationOrder": 1,
+                  "capacity": 1,
+                  "isAvailable": true,
+                  "availabilities": [
+                    {
+                      "date": "2026-08-07",
+                      "isAvailable": true,
+                      "startsAt": "2026-08-07T00:00:00.000Z",
+                      "endsAt": "2026-08-07T00:00:00.000Z",
+                      "capacity": 1
+                    }
+                  ]
+                }
+              ],
+              "shifts": [
+                {
+                  "shiftId": "00000000-0000-4000-8000-000000000000",
+                  "status": "PLANNED",
+                  "staffAssignments": [
+                    {
+                      "staffAssignmentId": "00000000-0000-4000-8000-000000000000",
+                      "assignmentRole": {},
+                      "status": "ASSIGNED",
+                      "notes": "",
+                      "eventStation": {
+                        "eventStationId": "00000000-0000-4000-8000-000000000000",
+                        "stationTemplateId": "00000000-0000-4000-8000-000000000000",
+                        "name": "",
+                        "stationOrder": 1
+                      },
+                      "user": {
+                        "userId": "00000000-0000-4000-8000-000000000000",
+                        "username": "",
+                        "fullName": ""
+                      }
+                    }
+                  ]
+                }
+              ],
+              "eventId": "00000000-0000-4000-8000-000000000000",
+              "status": "DRAFT",
+              "version": 1,
+              "cancelledAt": "2026-08-07T00:00:00.000Z",
+              "cancellationReason": "",
+              "createdAt": "2026-08-07T00:00:00.000Z",
+              "updatedAt": "2026-08-07T00:00:00.000Z",
+              "eventStations": [
+                {
+                  "eventStationId": "00000000-0000-4000-8000-000000000000",
+                  "stationTemplateId": "00000000-0000-4000-8000-000000000000",
+                  "templateVersion": 1,
+                  "name": "",
+                  "stationType": "VISUAL_ACUITY",
+                  "description": "",
+                  "stationOrder": 1,
+                  "capacity": 1,
+                  "isAvailable": true,
+                  "fieldSchemaSnapshot": [
+                    {
+                      "key": "",
+                      "label": "",
+                      "type": "text",
+                      "required": true,
+                      "options": [
+                        ""
+                      ],
+                      "min": 0,
+                      "max": 0,
+                      "unit": "",
+                      "eyes": "OD",
+                      "flagRules": [
+                        {
+                          "op": "eq",
+                          "value": "",
+                          "flag": "REVIEW",
+                          "reason": ""
+                        }
+                      ]
+                    }
+                  ],
+                  "schemaVersion": 1,
+                  "availabilities": [
+                    {
+                      "eventStationAvailabilityId": "00000000-0000-4000-8000-000000000000",
+                      "isAvailable": true,
+                      "startsAt": "2026-08-07T00:00:00.000Z",
+                      "endsAt": "2026-08-07T00:00:00.000Z",
+                      "capacity": 1,
+                      "eventDay": {
+                        "eventDayId": "00000000-0000-4000-8000-000000000000",
+                        "date": "2026-08-07"
+                      }
+                    }
+                  ]
+                }
+              ],
+              "signupCount": 0,
+              "activeCapacityCount": 0,
+              "canManage": true,
+              "createdBy": {
+                "id": "00000000-0000-4000-8000-000000000000",
+                "userId": "00000000-0000-4000-8000-000000000000",
+                "username": "",
+                "email": "",
+                "fullName": "",
+                "employeeNumber": "",
+                "contactNumber": "",
+                "department": "",
+                "designation": "",
+                "systemRole": "ADMIN",
+                "status": "ACTIVE",
+                "approvalState": "PENDING",
+                "accessState": "ENABLED",
+                "professionalCategory": "STAFF",
+                "roles": [
+                  "ADMINISTRATOR"
+                ],
+                "createdAt": "2026-08-07T00:00:00.000Z"
+              },
+              "cancelledBy": {}
+            },
+            "roles": [
+              "EVENT_MANAGER"
+            ],
+            "capabilities": {
+              "screening": true,
+              "registration": true,
+              "queue": true,
+              "review": true,
+              "routeOverride": true,
+              "stationAvailability": true
+            },
+            "lease": {
+              "algorithm": "ES256",
+              "keyId": "",
+              "publicKey": {
+                "kty": "EC",
+                "crv": "P-256",
+                "x": "",
+                "y": ""
+              },
+              "payload": {
+                "schemaVersion": 1,
+                "packId": "",
+                "actorId": "00000000-0000-4000-8000-000000000000",
+                "eventId": "00000000-0000-4000-8000-000000000000",
+                "deviceId": "00000000-0000-4000-8000-000000000000",
+                "issuedAt": "2026-08-07T00:00:00.000Z",
+                "expiresAt": "2026-08-07T00:00:00.000Z",
+                "roles": [
+                  "EVENT_MANAGER"
+                ],
+                "capabilities": {
+                  "screening": true,
+                  "registration": true,
+                  "queue": true,
+                  "review": true,
+                  "routeOverride": true,
+                  "stationAvailability": true
+                },
+                "contentDigest": ""
+              },
+              "signature": ""
+            },
+            "screening": {
+              "event": {
+                "eventId": "00000000-0000-4000-8000-000000000000",
+                "name": "",
+                "status": {}
+              },
+              "stations": [
+                {
+                  "stationId": "00000000-0000-4000-8000-000000000000",
+                  "eventId": "00000000-0000-4000-8000-000000000000",
+                  "stationName": "",
+                  "stationType": "VISUAL_ACUITY",
+                  "stationOrder": 0,
+                  "isActive": true,
+                  "fieldSchemaSnapshot": [
+                    {}
+                  ],
+                  "schemaVersion": 1,
+                  "offlineAccessExpiresAt": "2026-08-07T00:00:00.000Z",
+                  "registrations": [
+                    {
+                      "registrationId": "00000000-0000-4000-8000-000000000000",
+                      "participantDisplayName": "",
+                      "queueNumber": 0,
+                      "status": "SIGNED_UP",
+                      "existingResult": {
+                        "resultId": "00000000-0000-4000-8000-000000000000",
+                        "overallFlag": "NORMAL",
+                        "isFlagged": true,
+                        "createdAt": "2026-08-07T00:00:00.000Z"
+                      }
+                    }
+                  ]
+                }
+              ]
+            },
+            "registration": {
+              "stations": [
+                {
+                  "stationId": "00000000-0000-4000-8000-000000000000",
+                  "stationName": "",
+                  "stationType": "",
+                  "stationOrder": 0
+                }
+              ],
+              "nextQueueNumber": 1
+            },
+            "queue": {
+              "event": {
+                "eventId": "00000000-0000-4000-8000-000000000000",
+                "name": "",
+                "status": "",
+                "venue": ""
+              },
+              "stations": [
+                {
+                  "stationId": "00000000-0000-4000-8000-000000000000",
+                  "stationName": "",
+                  "stationType": "",
+                  "stationOrder": 0,
+                  "workload": {
+                    "WAITING": 0,
+                    "CALLED": 0,
+                    "IN_PROGRESS": 0,
+                    "COMPLETED": 0,
+                    "SKIPPED": 0,
+                    "CANCELLED": 0
+                  },
+                  "nextUp": {
+                    "queueId": "00000000-0000-4000-8000-000000000000",
+                    "queueNumber": 0,
+                    "registrationId": "00000000-0000-4000-8000-000000000000",
+                    "participantDisplayName": "",
+                    "isPriority": false
+                  }
+                }
+              ],
+              "totals": {
+                "WAITING": 0,
+                "CALLED": 0,
+                "IN_PROGRESS": 0,
+                "COMPLETED": 0,
+                "SKIPPED": 0,
+                "CANCELLED": 0
+              },
+              "entries": [
+                {
+                  "id": "00000000-0000-4000-8000-000000000000",
+                  "registrationId": "00000000-0000-4000-8000-000000000000",
+                  "participantDisplayName": "",
+                  "participantReference": "",
+                  "stationId": "00000000-0000-4000-8000-000000000000",
+                  "stationName": "",
+                  "stationType": "",
+                  "queueNumber": 0,
+                  "status": "WAITING",
+                  "isPriority": false,
+                  "priorityNotes": "",
+                  "enteredAt": "2026-08-07T00:00:00.000Z",
+                  "calledAt": "2026-08-07T00:00:00.000Z",
+                  "startedAt": "2026-08-07T00:00:00.000Z",
+                  "leftQueueAt": "2026-08-07T00:00:00.000Z",
+                  "completedAt": "2026-08-07T00:00:00.000Z"
+                }
+              ]
+            },
+            "routes": [
+              {
+                "registrationId": "00000000-0000-4000-8000-000000000000",
+                "route": {
+                  "status": "PENDING_CHECK_IN",
+                  "routeVersion": 1,
+                  "steps": [
+                    {
+                      "stationId": "00000000-0000-4000-8000-000000000000",
+                      "stationName": "",
+                      "stationType": "",
+                      "position": 1,
+                      "state": "COMPLETED"
+                    }
+                  ],
+                  "currentStation": {},
+                  "queue": {
+                    "queueEntryId": "00000000-0000-4000-8000-000000000000",
+                    "stationId": "00000000-0000-4000-8000-000000000000",
+                    "queueNumber": 1,
+                    "status": "WAITING"
+                  }
+                }
+              }
+            ],
+            "review": {
+              "event": {
+                "eventId": "00000000-0000-4000-8000-000000000000",
+                "name": "",
+                "venue": "",
+                "timezone": "",
+                "status": "IN_PROGRESS"
+              },
+              "queue": [
+                {
+                  "registrationId": "00000000-0000-4000-8000-000000000000",
+                  "participantDisplayName": "",
+                  "queueNumber": 0,
+                  "highestFlag": {},
+                  "flaggedResultCount": 0,
+                  "completedStationCount": 0,
+                  "skippedStationCount": 0,
+                  "totalStationCount": 1,
+                  "readyReason": "SCREENING_COMPLETE",
+                  "lastResultAt": "2026-08-07T00:00:00.000Z"
+                }
+              ],
+              "details": [
+                {
+                  "event": {},
+                  "participant": {
+                    "registrationId": "00000000-0000-4000-8000-000000000000",
+                    "participantDisplayName": "",
+                    "queueNumber": 0,
+                    "registrationStatus": "SIGNED_UP",
+                    "maskedNric": "",
+                    "dateOfBirth": "2026-08-07",
+                    "gender": ""
+                  },
+                  "stations": [
+                    {
+                      "stationId": "00000000-0000-4000-8000-000000000000",
+                      "stationName": "",
+                      "stationType": "VISUAL_ACUITY",
+                      "stationOrder": 1,
+                      "fieldSchemaSnapshot": [
+                        {}
+                      ],
+                      "status": "COMPLETED",
+                      "result": {
+                        "resultId": "00000000-0000-4000-8000-000000000000",
+                        "stationId": "00000000-0000-4000-8000-000000000000",
+                        "screeningType": "VISUAL_ACUITY",
+                        "resultData": {},
+                        "schemaVersion": 1,
+                        "overallFlag": {},
+                        "isFlagged": true,
+                        "flagSummary": "",
+                        "ruleVersion": "",
+                        "createdAt": "2026-08-07T00:00:00.000Z",
+                        "updatedAt": "2026-08-07T00:00:00.000Z"
+                      }
+                    }
+                  ],
+                  "readiness": {
+                    "ready": true,
+                    "readyReason": "SCREENING_COMPLETE",
+                    "completedStationCount": 0,
+                    "skippedStationCount": 0,
+                    "totalStationCount": 0,
+                    "highestFlag": {}
+                  },
+                  "existingReview": {},
+                  "contextVersion": ""
+                }
+              ]
+            }
+          }
+      - name: 401 Response
+        originalRequest:
+          method: GET
+          header:
+            - key: x-device-id
+              value: ''
+              description: ''
+              type: text
+          url: '{{baseUrl}}/events/{eventId}/offline-pack'
+        status: Unauthorized
+        code: 401
+        header:
+          - key: Content-Type
+            value: application/json
+        body: |-
+          {
+            "type": "",
+            "title": "",
+            "status": 0,
+            "code": "",
+            "requestId": "00000000-0000-4000-8000-000000000000",
+            "errors": [
+              {
+                "field": "",
+                "message": ""
+              }
+            ]
+          }
+      - name: 403 Response
+        originalRequest:
+          method: GET
+          header:
+            - key: x-device-id
+              value: ''
+              description: ''
+              type: text
+          url: '{{baseUrl}}/events/{eventId}/offline-pack'
+        status: Forbidden
+        code: 403
+        header:
+          - key: Content-Type
+            value: application/json
+        body: |-
+          {
+            "type": "",
+            "title": "",
+            "status": 0,
+            "code": "",
+            "requestId": "00000000-0000-4000-8000-000000000000",
+            "errors": [
+              {
+                "field": "",
+                "message": ""
+              }
+            ]
+          }
   - name: Get an authorized event detail
     description: ''
     event: []
@@ -9513,6 +10017,183 @@ item:
               description: JSON request body
               type: text
           url: '{{baseUrl}}/events/{eventId}/sync/screening'
+        status: Forbidden
+        code: 403
+        header:
+          - key: Content-Type
+            value: application/json
+        body: |-
+          {
+            "type": "",
+            "title": "",
+            "status": 0,
+            "code": "",
+            "requestId": "00000000-0000-4000-8000-000000000000",
+            "errors": [
+              {
+                "field": "",
+                "message": ""
+              }
+            ]
+          }
+  - name: Apply local-first event operations
+    description: >-
+      Registration actions require a current REGISTRATION duty. Queue call/start/skip/leave actions require current
+      queue access and station duty where applicable; priority changes require event-manager access. Route overrides
+      reuse the canonical event-manager or current REGISTRATION/SCREENER duty policy and require an expected route
+      version. Review decisions require a current REVIEWER duty and doctor account while the event is in progress. Each
+      stable client action is fingerprinted and replayed from the existing SyncAction ledger. Participant, NRIC,
+      emergency-contact, priority-note, clinical, signature, referral-body, and QR bearer data are never stored in that
+      ledger; an APPLIED receipt is the durable acceptance signal. Referral issue and delivery remain online-only.
+    event: []
+    request:
+      method: POST
+      header:
+        - key: Content-Type
+          value: application/json
+          description: JSON request body
+          type: text
+      auth:
+        type: bearer
+        bearer:
+          - key: token
+            value: '{{token}}'
+            type: string
+      url:
+        raw: '{{baseUrl}}/events/{eventId}/sync/operations'
+        host:
+          - '{{baseUrl}}'
+        path:
+          - events
+          - '{eventId}'
+          - sync
+          - operations
+        query: []
+      body:
+        mode: raw
+        raw: |-
+          {
+            "clientBatchId": "00000000-0000-4000-8000-000000000000",
+            "actions": [
+              {
+                "type": "REGISTRATION_CREATE",
+                "clientActionId": "00000000-0000-4000-8000-000000000000",
+                "clientParticipantId": "00000000-0000-4000-8000-000000000000",
+                "clientRegistrationId": "00000000-0000-4000-8000-000000000000",
+                "participant": {
+                  "firstName": "",
+                  "lastName": "",
+                  "dateOfBirth": "2026-08-07",
+                  "gender": "M",
+                  "contactNumber": "",
+                  "nric": "",
+                  "email": "",
+                  "race": "",
+                  "nationality": "",
+                  "addressStreet": "",
+                  "addressUnit": "",
+                  "addressPostalCode": "",
+                  "preferredLanguage": "",
+                  "accessibilityNotes": ""
+                },
+                "emergencyContact": {
+                  "contactName": "",
+                  "relationship": "",
+                  "phoneNumber": "",
+                  "email": ""
+                },
+                "evidence": {
+                  "workflowStartedAt": "2026-08-07T00:00:00.000Z",
+                  "paperFormUsed": true,
+                  "paperExceptionReason": ""
+                },
+                "proposed": {
+                  "queueNumber": 1,
+                  "nextStationId": "00000000-0000-4000-8000-000000000000",
+                  "nextStationNumber": 1
+                }
+              }
+            ]
+          }
+        options:
+          raw:
+            language: json
+    response:
+      - name: 200 Response
+        originalRequest:
+          method: POST
+          header:
+            - key: Content-Type
+              value: application/json
+              description: JSON request body
+              type: text
+          url: '{{baseUrl}}/events/{eventId}/sync/operations'
+        status: OK
+        code: 200
+        header:
+          - key: Content-Type
+            value: application/json
+        body: |-
+          {
+            "clientBatchId": "00000000-0000-4000-8000-000000000000",
+            "serverTime": "2026-08-07T00:00:00.000Z",
+            "actions": [
+              {
+                "clientActionId": "00000000-0000-4000-8000-000000000000",
+                "status": "APPLIED",
+                "retryCount": 0,
+                "errorCode": "",
+                "result": {
+                  "participantId": "00000000-0000-4000-8000-000000000000",
+                  "registrationId": "00000000-0000-4000-8000-000000000000",
+                  "queueNumber": 1,
+                  "nextStation": {
+                    "stationId": "00000000-0000-4000-8000-000000000000",
+                    "stationName": "",
+                    "stationNumber": 1
+                  },
+                  "canonicalQrAvailable": true
+                }
+              }
+            ]
+          }
+      - name: 401 Response
+        originalRequest:
+          method: POST
+          header:
+            - key: Content-Type
+              value: application/json
+              description: JSON request body
+              type: text
+          url: '{{baseUrl}}/events/{eventId}/sync/operations'
+        status: Unauthorized
+        code: 401
+        header:
+          - key: Content-Type
+            value: application/json
+        body: |-
+          {
+            "type": "",
+            "title": "",
+            "status": 0,
+            "code": "",
+            "requestId": "00000000-0000-4000-8000-000000000000",
+            "errors": [
+              {
+                "field": "",
+                "message": ""
+              }
+            ]
+          }
+      - name: 403 Response
+        originalRequest:
+          method: POST
+          header:
+            - key: Content-Type
+              value: application/json
+              description: JSON request body
+              type: text
+          url: '{{baseUrl}}/events/{eventId}/sync/operations'
         status: Forbidden
         code: 403
         header:

@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-vi.mock('../../utils/apiClient', () => ({ default: { get: vi.fn(), patch: vi.fn() } }));
+vi.mock('../../utils/apiClient', () => ({ default: { get: vi.fn(), patch: vi.fn(), delete: vi.fn() } }));
 vi.mock('../../utils/session', () => ({
   getStoredSession: () => ({ user: { id: '11111111-1111-4111-8111-111111111111' }, expiresAt: Date.now() + 60_000 }),
 }));
@@ -76,6 +76,25 @@ describe('queueApi local-first operations', () => {
       '11111111-1111-4111-8111-111111111111', eventId, queueId, 'CALL',
     );
     expect(apiClient.patch).not.toHaveBeenCalled();
+  });
+
+  it('records leaving a prepared queue locally without calling the delete endpoint', async () => {
+    vi.mocked(queueOfflineQueueAction).mockResolvedValue({ ...entry, status: 'CANCELLED' });
+
+    await expect(queueApi.leaveQueueEntry(eventId, queueId)).resolves.toMatchObject({ status: 'CANCELLED' });
+    expect(queueOfflineQueueAction).toHaveBeenCalledWith(
+      '11111111-1111-4111-8111-111111111111', eventId, queueId, 'LEAVE',
+    );
+    expect(apiClient.delete).not.toHaveBeenCalled();
+  });
+
+  it('uses the event-scoped delete endpoint when no local queue is prepared', async () => {
+    vi.mocked(getOfflineQueueStatus).mockResolvedValue(null);
+    vi.mocked(apiClient.delete).mockResolvedValue({ data: { ...entry, status: 'CANCELLED' } });
+
+    await expect(queueApi.leaveQueueEntry(eventId, queueId)).resolves.toMatchObject({ status: 'CANCELLED' });
+    expect(apiClient.delete).toHaveBeenCalledWith(`/events/${eventId}/entries/${queueId}`);
+    expect(queueOfflineQueueAction).not.toHaveBeenCalled();
   });
 
   it('reads and replaces prepared participant routes without a network request', async () => {

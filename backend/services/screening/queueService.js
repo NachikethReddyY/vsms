@@ -1851,7 +1851,8 @@ const leaveQueue = async (
   user,
   context = null,
   db = prisma,
-  expectedEventId = null
+  expectedEventId = null,
+  expectedStatus = null
 ) => {
   const entry = await loadQueueEntry(
     db,
@@ -1877,7 +1878,7 @@ const leaveQueue = async (
     user
   );
 
-  return db.$transaction(async (tx) => {
+  return inTransaction(db, async (tx) => {
     const current =
       await tx.queueEntry.findUnique({
         where: {
@@ -1891,6 +1892,10 @@ const leaveQueue = async (
         "QUEUE_ENTRY_NOT_FOUND",
         "Queue entry not found"
       );
+    }
+
+    if (expectedStatus && current.status !== expectedStatus) {
+      throw new AppError(409, "QUEUE_STATE_CONFLICT", "Queue entry changed after it was saved on this device");
     }
 
     if (
@@ -1909,15 +1914,9 @@ const leaveQueue = async (
     }
 
     const updated =
-      await tx.queueEntry.update({
-        where: {
-          id: queueId,
-        },
-
-        data: {
+      await updateQueueEntry(tx, queueId, expectedStatus, {
           status: "CANCELLED",
           leftQueueAt: new Date(),
-        },
       });
 
     await createAuditLog({
@@ -2099,6 +2098,7 @@ const applySyncedQueueAction = async (eventId, action, user, context = null, db 
     QUEUE_CALL: callQueueEntry,
     QUEUE_START: startQueueEntry,
     QUEUE_SKIP: skipQueueEntry,
+    QUEUE_LEAVE: leaveQueue,
   };
   return handlers[action.type](action.queueId, user, context, db, eventId, action.expectedStatus);
 };

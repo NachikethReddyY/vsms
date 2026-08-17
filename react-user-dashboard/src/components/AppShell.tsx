@@ -23,6 +23,7 @@ export default function AppShell({ children }: { children: ReactNode }) {
   const canUseOfflineScreening = !roles.includes('ADMINISTRATOR');
   const eventManagementMatch = location.pathname.match(/^\/events\/([^/]+)(?:\/(overview|stations|shifts|staff|analytics|reports|attendees|activity))?$/);
   const stationWorkflowMatch = location.pathname.match(/^\/events\/([^/]+)\/stations\/(visual-acuity|refraction|colour-vision|eye-health|custom\/[^/]+)$/);
+  const scannerWorkflowMatch = location.pathname.match(/^\/events\/([^/]+)\/qr-scanner$/);
   const registrationWorkflowMatch = location.pathname.match(/^\/events\/([^/]+)\/register$/);
   const queueWorkflowMatch = location.pathname.match(/^\/events\/([^/]+)\/queue$/);
   const reviewWorkflowMatch = location.pathname.match(/^\/events\/([^/]+)\/reviews(?:\/[^/]+)?$/);
@@ -31,6 +32,8 @@ export default function AppShell({ children }: { children: ReactNode }) {
     ?? queueWorkflowMatch?.[1]
     ?? reviewWorkflowMatch?.[1]
     ?? stationWorkflowMatch?.[1]
+    ?? scannerWorkflowMatch?.[1]
+    ?? (eventManagementMatch && eventManagementMatch[1] !== 'new' ? eventManagementMatch[1] : null)
     ?? (eventDetailMatch && eventDetailMatch[1] !== 'new' ? eventDetailMatch[1] : null);
   const eventEditPath = eventManagementMatch && eventManagementMatch[1] !== 'new'
     ? `/events/${eventManagementMatch[1]}/edit`

@@ -11,7 +11,7 @@ The service worker precaches only the application shell. API responses are never
 | Events and staffing | Downloaded assigned events, schedules, own duties, stations, and manager-scoped event views remain navigable. Staffing changes remain online-only. |
 | Registration | Walk-ins are always saved locally first, even while connected. The device shows a queue number and station number; it never invents a QR. Participant, NRIC, contact, emergency-contact, evidence, route seed, and check-in data remain encrypted until a durable receipt. |
 | Canonical QR | After registration sync, the device fetches the server-issued pass before atomically deleting the temporary registration command. A failed QR fetch leaves the command pending for exact replay. Cached canonical passes remain viewable offline. |
-| Queue and route | View, priority, call, start, skip, and versioned route overrides operate on the downloaded queue. Server receipts return canonical state; stale transitions remain visible as conflicts. |
+| Queue and route | View, priority, call, start, skip, leave, and versioned route overrides operate on the downloaded queue. Event managers can also change station availability. Server receipts return canonical state; stale transitions remain visible as conflicts. |
 | Screening | Visual acuity, refraction, colour vision, eye health, and custom schema stations validate and save locally using the downloaded schema and rules. |
 | Clinical review | The review queue, result detail, decision, referral draft, and signature are encrypted locally. The signature artifact uploads first on reconnect; the decision then reuses the canonical review service. |
 | Operations and reports | Pages render clearly labelled `This device` projections. Cloud analytics, final export jobs, PDF generation, and downloads require a connection and are never shown as complete while offline. |
@@ -27,14 +27,14 @@ Global account administration, Cognito changes, destructive event deletion, audi
 5. Reconnect. Registration commands synchronize before queue/route, screening, and review commands. Commands are deleted only after a durable `APPLIED` receipt and any required canonical artifact has been stored.
 6. Conflicts remain encrypted on the originating device. Authorization loss locks the pack; it never attributes work to a different staff member or silently deletes clinical evidence.
 
-An access-lease expiry stops new viewing and capture. It does not erase pending work. Unconfirmed ciphertext remains locked for the seven-day recovery window unless an authorized user completes sync or explicitly clears device data.
+An access-lease expiry stops new viewing and capture. It does not erase pending or conflicted work. Unconfirmed ciphertext remains locked until an authorized user completes sync or explicitly clears device data.
 
 ## Synchronization endpoints
 
 | Endpoint | Purpose |
 | --- | --- |
 | `GET /api/v1/events/{eventId}/offline-pack` | Signed, device-bound, role/duty-scoped event read model. |
-| `POST /api/v1/events/{eventId}/sync/operations` | Typed registration, queue, route, and review commands in batches of at most 25. |
+| `POST /api/v1/events/{eventId}/sync/operations` | Typed registration, queue, route, station-availability, and review commands in batches of at most 25. |
 | `POST /api/v1/events/{eventId}/sync/screening` | Existing station-result commands plus a fresh scoped screening pull. |
 
 Every command has a client-generated action ID and canonical request fingerprint. Replaying the same action returns the stored safe receipt; reusing its ID for different input is rejected. Each action is committed independently so losing the connection mid-batch leaves either a durable receipt or an encrypted pending command.
@@ -54,9 +54,9 @@ Every synchronized command rechecks current event membership, role, active duty,
 
 | Control | Implementation |
 | --- | --- |
-| Offline authorization | ES256 capability lease binds actor, event, device, pack, roles, capabilities, issue time, and absolute expiry. The browser verifies it with a pinned public-key fingerprint before storing the pack. |
+| Offline authorization | ES256 capability lease binds actor, event, device, pack-content digest, roles, capabilities, issue time, and absolute expiry. The browser verifies the signature, pinned public-key fingerprint, and exact pack digest before storing the pack. |
 | Data minimization | Packs omit QR bearer tokens, raw NRIC outside registration capture, unrelated participants, other staff notes, referral PDFs, and unneeded clinical data. |
-| Device storage | Non-exportable WebCrypto key, AES-GCM ciphertext, and owner/event/kind additional authenticated data. Cache Storage contains only the application shell. |
+| Device storage | Non-exportable WebCrypto key, AES-GCM ciphertext, and owner/event/kind additional authenticated data. Preparation checks available browser storage with a conservative margin and records the encrypted snapshot size. Cache Storage contains only the application shell. |
 | Session lifecycle | Transport failure does not sign out a still-valid offline user. Logout and account switching lock ciphertext; only an explicit confirmed device purge removes unconfirmed work. |
 | Idempotency | Database ledgers, domain request receipts, state predicates, and route versions prevent duplicate or stale application. Redis request middleware is not trusted for offline durability. |
 | External effects | Email, canonical PDFs, report jobs, Cognito mutations, and remote revocation remain server-authoritative and visibly pending or unavailable offline. |
@@ -89,5 +89,5 @@ Key rotation is a coordinated API/frontend release: generate the replacement, bu
 - Prepare only assigned events and confirm `Offline ready`, lease expiry, pending count, and storage availability before venue deployment.
 - Use one staff account per device session. Do not share an unlocked tablet between staff.
 - At handover, sync until pending is zero. If a conflict or locked-recovery count remains, keep the device encrypted and escalate it; do not clear browser data.
-- Use `Clear offline data` only after confirmed sync or an explicit supervised decision. The warning states how many pending records would be destroyed.
+- Use `Clear offline data` only after confirmed sync or an explicit supervised decision. The warning states how many pending and conflicted records would be destroyed.
 - If a device is lost, revoke the staff session and event assignment when connectivity returns. The short lease bounds offline exposure; remote revocation cannot reach a physically disconnected browser.

@@ -1170,7 +1170,7 @@ paths:
       tags: [Registrations, Queues, Clinical Reviews]
       operationId: syncOfflineOperations
       summary: Apply local-first event operations
-      description: Registration actions require a current REGISTRATION duty. Queue call/start/skip actions require current queue access and station duty where applicable; priority changes require event-manager access. Route overrides reuse the canonical event-manager or current REGISTRATION/SCREENER duty policy and require an expected route version. Review decisions require a current REVIEWER duty and doctor account while the event is in progress. Each stable client action is fingerprinted and replayed from the existing SyncAction ledger. Participant, NRIC, emergency-contact, priority-note, clinical, signature, referral-body, and QR bearer data are never stored in that ledger; an APPLIED receipt is the durable acceptance signal. Referral issue and delivery remain online-only.
+      description: Registration actions require a current REGISTRATION duty. Queue call/start/skip/leave actions require current queue access and station duty where applicable; priority changes require event-manager access. Route overrides reuse the canonical event-manager or current REGISTRATION/SCREENER duty policy and require an expected route version. Review decisions require a current REVIEWER duty and doctor account while the event is in progress. Each stable client action is fingerprinted and replayed from the existing SyncAction ledger. Participant, NRIC, emergency-contact, priority-note, clinical, signature, referral-body, and QR bearer data are never stored in that ledger; an APPLIED receipt is the durable acceptance signal. Referral issue and delivery remain online-only.
       parameters: [{ $ref: "#/components/parameters/EventId" }]
       requestBody:
         required: true
@@ -3619,13 +3619,14 @@ components:
         capabilities:
           type: object
           additionalProperties: false
-          required: [screening, registration, queue, review, routeOverride]
+          required: [screening, registration, queue, review, routeOverride, stationAvailability]
           properties:
             screening: { type: boolean }
             registration: { type: boolean }
             queue: { type: boolean }
             review: { type: boolean }
             routeOverride: { type: boolean }
+            stationAvailability: { type: boolean, description: Manager-only authority to toggle an existing event station globally available or unavailable. }
         lease: { $ref: "#/components/schemas/OfflineCapabilityLease" }
         screening:
           type: object
@@ -3704,7 +3705,7 @@ components:
         payload:
           type: object
           additionalProperties: false
-          required: [schemaVersion, packId, actorId, eventId, deviceId, issuedAt, expiresAt, roles, capabilities]
+          required: [schemaVersion, packId, actorId, eventId, deviceId, issuedAt, expiresAt, roles, capabilities, contentDigest]
           properties:
             schemaVersion: { type: integer, enum: [1] }
             packId: { type: string, pattern: '^[A-Za-z0-9_-]{43}$' }
@@ -3720,13 +3721,18 @@ components:
             capabilities:
               type: object
               additionalProperties: false
-              required: [screening, registration, queue, review, routeOverride]
+              required: [screening, registration, queue, review, routeOverride, stationAvailability]
               properties:
                 screening: { type: boolean }
                 registration: { type: boolean }
                 queue: { type: boolean }
                 review: { type: boolean }
                 routeOverride: { type: boolean }
+                stationAvailability: { type: boolean }
+            contentDigest:
+              type: string
+              pattern: '^[A-Za-z0-9_-]{43}$'
+              description: Base64url-encoded SHA-256 digest of the canonical JSON EventOfflinePack content with the lease property omitted. Clients must verify this digest after verifying the lease signature and before activating the downloaded content.
         signature: { type: string, pattern: '^[A-Za-z0-9_-]{86}$' }
     PublicEvent:
       type: object
@@ -5875,6 +5881,14 @@ components:
             expectedStatus: { type: string, enum: [WAITING, CALLED] }
         - type: object
           additionalProperties: false
+          required: [type, clientActionId, queueId, expectedStatus]
+          properties:
+            type: { type: string, enum: [QUEUE_LEAVE] }
+            clientActionId: { type: string, format: uuid }
+            queueId: { type: string, format: uuid }
+            expectedStatus: { type: string, enum: [WAITING, CALLED, IN_PROGRESS, SKIPPED] }
+        - type: object
+          additionalProperties: false
           required: [type, clientActionId, queueId, expectedStatus, payload]
           properties:
             type: { type: string, enum: [QUEUE_PRIORITY] }
@@ -5917,6 +5931,16 @@ components:
         reasonCode: { $ref: "#/components/schemas/RouteOverrideReasonCode" }
         expectedVersion: { type: integer, minimum: 1 }
         skipActive: { type: boolean }
+    StationAvailabilitySyncAction:
+      type: object
+      additionalProperties: false
+      required: [type, clientActionId, eventStationId, isAvailable, expectedVersion]
+      properties:
+        type: { type: string, enum: [STATION_AVAILABILITY] }
+        clientActionId: { type: string, format: uuid }
+        eventStationId: { type: string, format: uuid }
+        isAvailable: { type: boolean }
+        expectedVersion: { type: integer, minimum: 1 }
     OperationSyncRequest:
       type: object
       additionalProperties: false
@@ -5933,6 +5957,7 @@ components:
               - $ref: "#/components/schemas/QueueSyncAction"
               - $ref: "#/components/schemas/ReviewDecisionSyncAction"
               - $ref: "#/components/schemas/RouteOverrideSyncAction"
+              - $ref: "#/components/schemas/StationAvailabilitySyncAction"
     OperationSyncReceipt:
       type: object
       additionalProperties: false
@@ -5971,6 +5996,14 @@ components:
         signedAt: { type: string, format: date-time }
     RouteOperationSyncReceipt:
       allOf: [{ $ref: "#/components/schemas/RegistrationRouteState" }]
+    StationAvailabilityOperationSyncReceipt:
+      type: object
+      additionalProperties: false
+      required: [eventStationId, isAvailable, eventVersion]
+      properties:
+        eventStationId: { type: string, format: uuid }
+        isAvailable: { type: boolean }
+        eventVersion: { type: integer, minimum: 1 }
     OperationSyncActionResult:
       type: object
       additionalProperties: false
@@ -5986,6 +6019,7 @@ components:
             - $ref: "#/components/schemas/QueueOperationSyncReceipt"
             - $ref: "#/components/schemas/ReviewOperationSyncReceipt"
             - $ref: "#/components/schemas/RouteOperationSyncReceipt"
+            - $ref: "#/components/schemas/StationAvailabilityOperationSyncReceipt"
     OperationSyncResponse:
       type: object
       additionalProperties: false

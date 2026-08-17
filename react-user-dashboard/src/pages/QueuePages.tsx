@@ -107,12 +107,14 @@ export function QueuePage() {
     }
   };
 
-  const handleAction = (id: string, action: "CALLED" | "STARTED" | "SKIPPED") => {
+  const handleAction = (id: string, action: "CALLED" | "STARTED" | "SKIPPED" | "LEFT") => {
     if (!eventId) return;
+    if (action === "LEFT" && !window.confirm("Remove this participant from the queue? Their current queue place will be cancelled.")) return;
     const runners: Record<string, () => Promise<unknown>> = {
       CALLED: () => queueApi.callQueueEntry(eventId, id),
       STARTED: () => queueApi.startQueueEntry(eventId, id),
       SKIPPED: () => queueApi.skipQueueEntry(eventId, id),
+      LEFT: () => queueApi.leaveQueueEntry(eventId, id),
     };
     void runAction(id, runners[action]);
   };

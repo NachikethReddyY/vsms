@@ -311,6 +311,11 @@ const queueSkipSyncAction = z.object({
   type: z.literal("QUEUE_SKIP"),
   expectedStatus: z.enum(["WAITING", "CALLED"]),
 }).strict();
+const queueLeaveSyncAction = z.object({
+  ...queueSyncBase,
+  type: z.literal("QUEUE_LEAVE"),
+  expectedStatus: z.enum(["WAITING", "CALLED", "IN_PROGRESS", "SKIPPED"]),
+}).strict();
 const queuePrioritySyncAction = z.object({
   ...queueSyncBase,
   type: z.literal("QUEUE_PRIORITY"),
@@ -346,14 +351,24 @@ const routeOverrideSyncAction = z.object({
   }
 });
 
+const stationAvailabilitySyncAction = z.object({
+  type: z.literal("STATION_AVAILABILITY"),
+  clientActionId: z.string().uuid(),
+  eventStationId: z.string().uuid(),
+  isAvailable: z.boolean(),
+  expectedVersion: z.number().int().positive(),
+}).strict();
+
 const syncOperationAction = z.discriminatedUnion("type", [
   registrationCreateSyncAction,
   queueCallSyncAction,
   queueStartSyncAction,
   queueSkipSyncAction,
+  queueLeaveSyncAction,
   queuePrioritySyncAction,
   reviewDecisionSyncAction,
   routeOverrideSyncAction,
+  stationAvailabilitySyncAction,
 ]);
 
 const syncOperationsBody = z.object({

@@ -536,6 +536,13 @@ export default function EventDetailPage() {
       && assignment.user.userId === user?.userId
     ))
   ));
+  const canUseQueue = !isAdministrator && event.status === 'IN_PROGRESS' && (canManage || event.shifts.some((shift) => (
+    shift.status === 'ACTIVE' && shift.staffAssignments.some((assignment) => (
+      ['EVENT_MANAGER', 'REGISTRATION', 'SCREENER', 'SUPPORT'].includes(assignment.assignmentRole)
+      && ['ASSIGNED', 'CONFIRMED'].includes(assignment.status)
+      && assignment.user.userId === user?.userId
+    ))
+  )));
   const assignedStationCandidates = !isAdministrator ? event.shifts.flatMap((shift) => shift.staffAssignments.flatMap((assignment) => {
     if (shift.status !== 'ACTIVE'
       || assignment.assignmentRole !== 'SCREENER'
@@ -595,6 +602,7 @@ export default function EventDetailPage() {
 
         <div className="event-role-actions">
           {canRegisterParticipants && <Link className="secondary" to={`${eventPath}/register`}><UserPlusIcon />Start registration</Link>}
+          {canUseQueue && <Link className="secondary" to={`${eventPath}/queue`}><ClipboardDocumentListIcon />Open live queue</Link>}
           {assignedStationTypes.has('VISUAL_ACUITY') && <Link className="primary" to={`${eventPath}/stations/visual-acuity`}>Open Visual Acuity station</Link>}
           {assignedStationTypes.has('REFRACTION') && <Link className="primary" to={`${eventPath}/stations/refraction`}>Open Refraction station</Link>}
           {assignedStationTypes.has('COLOUR_VISION') && <Link className="primary" to={`${eventPath}/stations/colour-vision`}>Open Colour Vision station</Link>}
@@ -731,7 +739,7 @@ export default function EventDetailPage() {
                   </fieldset>})}
                   <div className="station-actions"><button className="secondary compact station-remove" type="button" disabled={!!stationPending} onClick={() => void removeStation(station.eventStationId, station.name)}><TrashIcon />Remove station</button><span><button className="secondary compact" type="button" disabled={!!stationPending} onClick={() => setStationEditing(null)}>Cancel</button><button className="primary compact" type="submit" disabled={!!stationPending}>{stationPending === station.eventStationId ? 'Saving…' : 'Save availability'}</button></span></div>
                 </form>
-              </div> : <div className="station-record-actions"><div className="station-day-list">{availabilities.map((availability) => <span className={availability.isAvailable ? 'is-available' : 'is-unavailable'} key={availability.eventStationAvailabilityId}>{formatEventDate(availability.eventDay.date, event.timezone, false)} · {availability.isAvailable ? `${availability.startsAt ? `${formatTime(availability.startsAt, event.timezone)}–${formatTime(availability.endsAt || availability.startsAt, event.timezone)} · ` : ''}${availability.capacity} places` : 'Unavailable'}</span>)}</div>{canConfigureStations && <button className="secondary compact" type="button" onClick={() => setStationEditing(station.eventStationId)}>Configure</button>}</div>}
+              </div> : <div className="station-record-actions"><div className="station-day-list">{availabilities.map((availability) => <span className={availability.isAvailable ? 'is-available' : 'is-unavailable'} key={availability.eventStationAvailabilityId}>{formatEventDate(availability.eventDay.date, event.timezone, false)} · {availability.isAvailable ? `${availability.startsAt ? `${formatTime(availability.startsAt, event.timezone)}–${formatTime(availability.endsAt || availability.startsAt, event.timezone)} · ` : ''}${availability.capacity} places` : 'Unavailable'}</span>)}</div>{deviceLocal && canManage && <label className="station-available"><input type="checkbox" checked={station.isAvailable} disabled={stationPending === station.eventStationId} onChange={(change) => void updateStation(station.eventStationId, { isAvailable: change.target.checked })} />Station available</label>}{canConfigureStations && <button className="secondary compact" type="button" onClick={() => setStationEditing(station.eventStationId)}>Configure</button>}</div>}
             </article>;
           })}</div>}
     </section>}

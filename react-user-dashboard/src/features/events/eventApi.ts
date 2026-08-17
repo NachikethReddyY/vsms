@@ -1,7 +1,7 @@
 import apiClient from '../../utils/apiClient';
 import type { components } from '../../generated/api';
 import type { StationType } from '../screening/screeningApi';
-import { getOfflineEvent, isNetworkError, listOfflineEvents } from '../screening/offlineSync';
+import { getOfflineEvent, isNetworkError, listOfflineEvents, queueOfflineStationAvailability } from '../screening/offlineSync';
 import { getStoredSession } from '../../utils/session';
 
 export type EventStation = Omit<components['schemas']['EventStation'], 'stationType'> & {
@@ -132,6 +132,12 @@ export const eventApi = {
     return data;
   },
   async updateStation(id: string, eventStationId: string, input: { version: number; stationOrder?: number; capacity?: number; isAvailable?: boolean; availabilities?: Array<{ date: string; isAvailable: boolean; startsAt: string | null; endsAt: string | null; capacity: number }> }) {
+    const ownerId = offlineOwnerId();
+    const availabilityOnly = typeof input.isAvailable === 'boolean'
+      && Object.keys(input).every((key) => ['version', 'isAvailable'].includes(key));
+    if (ownerId && availabilityOnly && await getOfflineEvent(ownerId, id)) {
+      return { ...await queueOfflineStationAvailability(ownerId, id, eventStationId, input.isAvailable!, input.version), scope: 'DEVICE_LOCAL' as const };
+    }
     const { data } = await apiClient.patch<EventRecord>(`/events/${id}/stations/${eventStationId}`, input);
     return data;
   },

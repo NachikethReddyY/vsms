@@ -166,6 +166,23 @@ const packIdFor = ({ actorId, eventId, deviceId, generatedAt, expiresAt, nonce, 
   .update(JSON.stringify({ schemaVersion: 1, actorId, eventId, deviceId, generatedAt, expiresAt, nonce }))
   .digest("base64url");
 
+const canonicalJson = (value) => {
+  if (Array.isArray(value)) return value.map(canonicalJson);
+  if (value && typeof value === "object") {
+    return Object.fromEntries(Object.keys(value).sort().map((key) => [key, canonicalJson(value[key])]));
+  }
+  return value;
+};
+
+const packContentDigest = (pack) => {
+  const { lease: _lease, ...content } = pack;
+  const wireContent = JSON.parse(JSON.stringify(content));
+  return crypto
+    .createHash("sha256")
+    .update(JSON.stringify(canonicalJson(wireContent)))
+    .digest("base64url");
+};
+
 const leaseSigningBytes = (payload) => Buffer.from(JSON.stringify({
   schemaVersion: payload.schemaVersion,
   packId: payload.packId,
@@ -181,7 +198,9 @@ const leaseSigningBytes = (payload) => Buffer.from(JSON.stringify({
     queue: payload.capabilities.queue,
     review: payload.capabilities.review,
     routeOverride: payload.capabilities.routeOverride,
+    stationAvailability: payload.capabilities.stationAvailability,
   },
+  contentDigest: payload.contentDigest,
 }));
 
 const signLease = (payload, keys = env) => ({
@@ -363,20 +382,9 @@ const getOfflinePack = async (eventId, user, context, existingAuthorization, dep
     queue: Boolean(queueSnapshot),
     review: Boolean(reviewSnapshot),
     routeOverride: canOverrideRoutes,
+    stationAvailability: managerAccess,
   };
-  const lease = signLease({
-    schemaVersion: 1,
-    packId,
-    actorId: user.userId,
-    eventId,
-    deviceId,
-    issuedAt: generatedAt,
-    expiresAt,
-    roles,
-    capabilities,
-  }, dependencies.leaseKeys || env);
-
-  return {
+  const pack = {
     schemaVersion: 1,
     packId,
     generatedAt,
@@ -384,7 +392,7 @@ const getOfflinePack = async (eventId, user, context, existingAuthorization, dep
     event,
     roles,
     capabilities,
-    lease,
+    lease: null,
     screening: {
       event: { eventId: event.eventId, name: event.name, status: event.status },
       stations: screeningStations,
@@ -394,6 +402,19 @@ const getOfflinePack = async (eventId, user, context, existingAuthorization, dep
     ...(routes ? { routes } : {}),
     ...(reviewSnapshot ? { review: reviewSnapshot } : {}),
   };
+  pack.lease = signLease({
+    schemaVersion: 1,
+    packId,
+    actorId: user.userId,
+    eventId,
+    deviceId,
+    issuedAt: generatedAt,
+    expiresAt,
+    roles,
+    capabilities,
+    contentDigest: packContentDigest(pack),
+  }, dependencies.leaseKeys || env);
+  return pack;
 };
 
-module.exports = { getOfflinePack, __test: { leaseSigningBytes, loadOfflineRoutes, packIdFor, safeEvent, signLease, verifyLease } };
+module.exports = { getOfflinePack, __test: { leaseSigningBytes, loadOfflineRoutes, packContentDigest, packIdFor, safeEvent, signLease, verifyLease } };

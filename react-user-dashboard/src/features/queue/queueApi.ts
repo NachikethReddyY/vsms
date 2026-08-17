@@ -143,6 +143,15 @@ export const queueApi = {
     const { data } = await apiClient.patch<QueueEntry>(`/events/${eventId}/entries/${queueId}/skip`);
     return data;
   },
+
+  async leaveQueueEntry(eventId: string, queueId: string) {
+    const ownerId = getStoredSession()?.user.id;
+    if (ownerId && await getOfflineQueueStatus(ownerId, eventId)) {
+      return queueOfflineQueueAction(ownerId, eventId, queueId, 'LEAVE');
+    }
+    const { data } = await apiClient.delete<QueueEntry>(`/events/${eventId}/entries/${queueId}`);
+    return data;
+  },
 };
 
 export function sortWaitingByPriority(entries: QueueEntry[]): QueueEntry[] {

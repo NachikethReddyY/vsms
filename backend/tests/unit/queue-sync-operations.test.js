@@ -125,6 +125,84 @@ test("queue operations apply once, replay a safe receipt, and keep priority note
   assert.deepEqual(db.transitions.map(({ status }) => status), ["PENDING", "PROCESSING", "APPLIED"]);
 });
 
+test("queue leave applies once and replays its safe receipt", async () => {
+  const db = createLedgerDb();
+  const action = queueAction({ type: "QUEUE_LEAVE", expectedStatus: "IN_PROGRESS" });
+  let applies = 0;
+  const queue = {
+    authorizeQueueSyncAction: async () => {},
+    applySyncedQueueAction: async () => {
+      applies += 1;
+      return { id: queueId, status: "CANCELLED", isPriority: false, participantName: "must-not-receipt" };
+    },
+  };
+
+  const first = await invoke(db, action, queue);
+  const replay = await invoke(db, action, queue);
+
+  assert.equal(applies, 1);
+  assert.deepEqual(first.actions[0], replay.actions[0]);
+  assert.deepEqual(first.actions[0].result, { queueId, status: "CANCELLED", isPriority: false });
+  assert.deepEqual(db.rows[0].payload, {
+    schemaVersion: 1,
+    actionType: "QUEUE_LEAVE",
+    expectedStatus: "IN_PROGRESS",
+  });
+});
+
+test("station availability applies once, replays a safe receipt, and records stale versions as conflicts", async () => {
+  const eventStationId = crypto.randomUUID();
+  const action = {
+    type: "STATION_AVAILABILITY",
+    clientActionId: crypto.randomUUID(),
+    eventStationId,
+    isAvailable: false,
+    expectedVersion: 7,
+  };
+  const db = createLedgerDb();
+  let applies = 0;
+  let authorizations = 0;
+  const events = {
+    authorizeStationAvailability: async () => { authorizations += 1; },
+    updateStation: async (_eventId, _stationId, _body, _user, _context, transactionDb) => {
+      applies += 1;
+      assert.equal(transactionDb, db);
+      return { version: 8, eventStations: [{ eventStationId, isAvailable: false, privateNote: "omit" }] };
+    },
+  };
+  const invokeStation = (stationAction = action, dependencies = events) => processSyncOperations(
+    eventId,
+    { clientBatchId: crypto.randomUUID(), actions: [stationAction] },
+    user,
+    null,
+    { db, events: dependencies, audit: async () => {} },
+  );
+
+  const first = await invokeStation();
+  const replay = await invokeStation();
+  assert.equal(applies, 1);
+  assert.equal(authorizations, 2);
+  assert.deepEqual(first.actions[0], replay.actions[0]);
+  assert.deepEqual(first.actions[0].result, { eventStationId, isAvailable: false, eventVersion: 8 });
+  assert.deepEqual(db.rows[0].payload, { schemaVersion: 1, actionType: "STATION_AVAILABILITY", expectedVersion: 7 });
+  assert.equal(JSON.stringify(db.rows).includes("privateNote"), false);
+  assert.equal(syncOperationsBody.safeParse({ clientBatchId: crypto.randomUUID(), actions: [action] }).success, true);
+
+  const staleDb = createLedgerDb();
+  const stale = await processSyncOperations(
+    eventId,
+    { clientBatchId: crypto.randomUUID(), actions: [{ ...action, clientActionId: crypto.randomUUID() }] },
+    user,
+    null,
+    { db: staleDb, events: {
+      authorizeStationAvailability: async () => {},
+      updateStation: async () => { throw new AppError(409, "STALE_EVENT_VERSION", "Changed on another device"); },
+    }, audit: async () => {} },
+  );
+  assert.equal(stale.actions[0].status, "CONFLICT");
+  assert.equal(stale.actions[0].errorCode, "STALE_EVENT_VERSION");
+});
+
 test("queue authorization is checked before a durable ledger row is created", async () => {
   const db = createLedgerDb();
   const queue = {
@@ -157,7 +235,7 @@ test("the full operation batch is authorized before its first action applies", a
   assert.equal(db.rows.length, 0);
 });
 
-test("a stale queue status is recorded as an allowlisted conflict", async () => {
+test("a stale queue leave status is recorded as an allowlisted conflict", async () => {
   const db = createLedgerDb();
   const queue = {
     authorizeQueueSyncAction: async () => {},
@@ -165,7 +243,7 @@ test("a stale queue status is recorded as an allowlisted conflict", async () => 
       throw new AppError(409, "QUEUE_STATE_CONFLICT", "Changed on another device");
     },
   };
-  const response = await invoke(db, queueAction(), queue);
+  const response = await invoke(db, queueAction({ type: "QUEUE_LEAVE", expectedStatus: "WAITING" }), queue);
   assert.equal(response.actions[0].status, "CONFLICT");
   assert.equal(response.actions[0].errorCode, "QUEUE_STATE_CONFLICT");
   assert.deepEqual(db.transitions.map(({ status }) => status), ["PENDING", "PROCESSING", "CONFLICT"]);
@@ -177,12 +255,15 @@ test("queue operation schema is a strict transition-specific union", () => {
     queueAction(),
     queueAction({ type: "QUEUE_START", expectedStatus: "CALLED" }),
     queueAction({ type: "QUEUE_SKIP", expectedStatus: "CALLED" }),
+    queueAction({ type: "QUEUE_LEAVE", expectedStatus: "IN_PROGRESS" }),
     queueAction({ type: "QUEUE_PRIORITY", expectedStatus: "IN_PROGRESS", payload: { isPriority: false, notes: null } }),
   ]) {
     assert.equal(syncOperationsBody.safeParse(batch(action)).success, true);
   }
   for (const action of [
     queueAction({ expectedStatus: "CALLED" }),
+    queueAction({ type: "QUEUE_LEAVE", expectedStatus: "COMPLETED" }),
+    queueAction({ type: "QUEUE_LEAVE", expectedStatus: "WAITING", payload: {} }),
     queueAction({ payload: { isPriority: true, notes: "not valid for call" } }),
     queueAction({ type: "QUEUE_PRIORITY", payload: { isPriority: true, notes: null } }),
     queueAction({ type: "QUEUE_PRIORITY", payload: { isPriority: true, notes: "Reason", extra: true } }),
@@ -226,10 +307,14 @@ test("offline queue writes use an atomic expected-status predicate", async () =>
   assert.deepEqual(casWhere, { id: queueId, status: "WAITING" });
   assert.equal(result.status, "CALLED");
 
+  const left = await queueService.leaveQueue(queueId, user, null, db, eventId, "CALLED");
+  assert.deepEqual(casWhere, { id: queueId, status: "CALLED" });
+  assert.equal(left.status, "CANCELLED");
+
   current = { ...current, status: "WAITING" };
   tx.queueEntry.updateMany = async () => ({ count: 0 });
   await assert.rejects(
-    queueService.callQueueEntry(queueId, user, null, db, eventId, "WAITING"),
+    queueService.leaveQueue(queueId, user, null, db, eventId, "WAITING"),
     (error) => error.code === "QUEUE_STATE_CONFLICT" && error.status === 409,
   );
 });

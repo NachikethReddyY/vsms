@@ -1025,7 +1025,7 @@ export interface paths {
         put?: never;
         /**
          * Apply local-first event operations
-         * @description Registration actions require a current REGISTRATION duty. Queue call/start/skip actions require current queue access and station duty where applicable; priority changes require event-manager access. Route overrides reuse the canonical event-manager or current REGISTRATION/SCREENER duty policy and require an expected route version. Review decisions require a current REVIEWER duty and doctor account while the event is in progress. Each stable client action is fingerprinted and replayed from the existing SyncAction ledger. Participant, NRIC, emergency-contact, priority-note, clinical, signature, referral-body, and QR bearer data are never stored in that ledger; an APPLIED receipt is the durable acceptance signal. Referral issue and delivery remain online-only.
+         * @description Registration actions require a current REGISTRATION duty. Queue call/start/skip/leave actions require current queue access and station duty where applicable; priority changes require event-manager access. Route overrides reuse the canonical event-manager or current REGISTRATION/SCREENER duty policy and require an expected route version. Review decisions require a current REVIEWER duty and doctor account while the event is in progress. Each stable client action is fingerprinted and replayed from the existing SyncAction ledger. Participant, NRIC, emergency-contact, priority-note, clinical, signature, referral-body, and QR bearer data are never stored in that ledger; an APPLIED receipt is the durable acceptance signal. Referral issue and delivery remain online-only.
          */
         post: operations["syncOfflineOperations"];
         delete?: never;
@@ -3264,6 +3264,8 @@ export interface components {
                 queue: boolean;
                 review: boolean;
                 routeOverride: boolean;
+                /** @description Manager-only authority to toggle an existing event station globally available or unavailable. */
+                stationAvailability: boolean;
             };
             lease: components["schemas"]["OfflineCapabilityLease"];
             screening: {
@@ -3333,7 +3335,10 @@ export interface components {
                     queue: boolean;
                     review: boolean;
                     routeOverride: boolean;
+                    stationAvailability: boolean;
                 };
+                /** @description Base64url-encoded SHA-256 digest of the canonical JSON EventOfflinePack content with the lease property omitted. Clients must verify this digest after verifying the lease signature and before activating the downloaded content. */
+                contentDigest: string;
             };
             signature: string;
         };
@@ -5184,6 +5189,15 @@ export interface components {
             expectedStatus: "WAITING" | "CALLED";
         } | {
             /** @enum {string} */
+            type: "QUEUE_LEAVE";
+            /** Format: uuid */
+            clientActionId: string;
+            /** Format: uuid */
+            queueId: string;
+            /** @enum {string} */
+            expectedStatus: "WAITING" | "CALLED" | "IN_PROGRESS" | "SKIPPED";
+        } | {
+            /** @enum {string} */
             type: "QUEUE_PRIORITY";
             /** Format: uuid */
             clientActionId: string;
@@ -5222,10 +5236,20 @@ export interface components {
             expectedVersion: number;
             skipActive: boolean;
         };
+        StationAvailabilitySyncAction: {
+            /** @enum {string} */
+            type: "STATION_AVAILABILITY";
+            /** Format: uuid */
+            clientActionId: string;
+            /** Format: uuid */
+            eventStationId: string;
+            isAvailable: boolean;
+            expectedVersion: number;
+        };
         OperationSyncRequest: {
             /** Format: uuid */
             clientBatchId: string;
-            actions: (components["schemas"]["RegistrationCreateSyncAction"] | components["schemas"]["QueueSyncAction"] | components["schemas"]["ReviewDecisionSyncAction"] | components["schemas"]["RouteOverrideSyncAction"])[];
+            actions: (components["schemas"]["RegistrationCreateSyncAction"] | components["schemas"]["QueueSyncAction"] | components["schemas"]["ReviewDecisionSyncAction"] | components["schemas"]["RouteOverrideSyncAction"] | components["schemas"]["StationAvailabilitySyncAction"])[];
         };
         OperationSyncReceipt: {
             /** Format: uuid */
@@ -5260,6 +5284,12 @@ export interface components {
             signedAt: string;
         };
         RouteOperationSyncReceipt: components["schemas"]["RegistrationRouteState"];
+        StationAvailabilityOperationSyncReceipt: {
+            /** Format: uuid */
+            eventStationId: string;
+            isAvailable: boolean;
+            eventVersion: number;
+        };
         OperationSyncActionResult: {
             /** Format: uuid */
             clientActionId: string;
@@ -5267,7 +5297,7 @@ export interface components {
             status: "APPLIED" | "CONFLICT" | "FAILED";
             retryCount: number;
             errorCode?: string;
-            result?: components["schemas"]["OperationSyncReceipt"] | components["schemas"]["QueueOperationSyncReceipt"] | components["schemas"]["ReviewOperationSyncReceipt"] | components["schemas"]["RouteOperationSyncReceipt"];
+            result?: components["schemas"]["OperationSyncReceipt"] | components["schemas"]["QueueOperationSyncReceipt"] | components["schemas"]["ReviewOperationSyncReceipt"] | components["schemas"]["RouteOperationSyncReceipt"] | components["schemas"]["StationAvailabilityOperationSyncReceipt"];
         };
         OperationSyncResponse: {
             /** Format: uuid */
