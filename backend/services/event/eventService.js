@@ -557,6 +557,19 @@ const assertStationPlanningState = (event) => {
   }
 };
 
+const inTransaction = (db, callback) => (
+  typeof db.$transaction === "function" ? db.$transaction(callback) : callback(db)
+);
+
+const authorizeStationAvailability = async (eventId, eventStationId, user, db = prisma) => {
+  const event = await requireEvent(eventId, user, true, db);
+  assertStationPlanningState(event);
+  if (!(event.stations || []).some(({ stationId }) => stationId === eventStationId)) {
+    throw new AppError(404, "STATION_NOT_FOUND", "Event station was not found");
+  }
+  return event;
+};
+
 const requireTemplates = async (tx, stations) => {
   const ids = [...new Set((stations || []).map((station) => station.stationTemplateId))];
   if (ids.length === 0) return new Map();
@@ -2042,8 +2055,7 @@ const importStations = async (eventId, body, user, correlationId, db = prisma) =
 };
 
 const updateStation = async (eventId, eventStationId, body, user, correlationId, db = prisma) => {
-  const current = await requireEvent(eventId, user, true, db);
-  assertStationPlanningState(current);
+  const current = await authorizeStationAvailability(eventId, eventStationId, user, db);
   const stations = current.stations || [];
   const station = stations.find((candidate) => candidate.stationId === eventStationId);
   if (!station) throw new AppError(404, "STATION_NOT_FOUND", "Event station was not found");
@@ -2051,7 +2063,7 @@ const updateStation = async (eventId, eventStationId, body, user, correlationId,
     throw new AppError(422, "INVALID_STATION_ORDER", "Station order must be within the event station list");
   }
 
-  return db.$transaction(async (tx) => {
+  return inTransaction(db, async (tx) => {
     await bumpEventVersion(tx, eventId, body.version);
 
     if (body.stationOrder !== undefined && body.stationOrder !== station.stationOrder) {
@@ -2694,6 +2706,7 @@ module.exports = {
   updateStationTemplate,
   importStations,
   updateStation,
+  authorizeStationAvailability,
   removeStation,
   addShift,
   addStaffAssignment,

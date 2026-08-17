@@ -2,6 +2,8 @@ import apiClient from '../../utils/apiClient';
 import { getStoredSession } from '../../utils/session';
 import {
   evaluateOfflineStation,
+  getOfflineStationContext,
+  getOfflineScreeningStations,
   isNetworkError,
   queueOfflineStationSave,
   resolveOfflineRegistration,
@@ -171,6 +173,15 @@ async function previewStation<T extends StationResultData>(
   stationType?: StationType,
   fieldSchema?: import('./fieldSchema').FieldSchema,
 ) {
+  const ownerId = getStoredSession()?.user.id;
+  if (ownerId && await getOfflineStationContext(ownerId, eventId, stationType, stationId)) {
+    return evaluateOfflineStation(
+      path,
+      resultData as VisualAcuityResultData | RefractionResultData | ColourVisionResultData | EyeHealthResultData | DynamicResultData,
+      stationType,
+      fieldSchema ?? [],
+    );
+  }
   try {
     const { data } = await apiClient.post<FlagEvaluation>(
       `/events/${eventId}/stations/${stationId}/${path}/preview`,
@@ -194,12 +205,38 @@ async function saveStation<T extends StationResultData>(
   path: ScreeningPath,
   body: ScreeningSavePayload<T>,
 ): Promise<ScreeningSaveResponse<T>> {
+  const ownerId = getStoredSession()?.user.id;
+  const stationType = path === 'visual-acuity' ? 'VISUAL_ACUITY'
+    : path === 'refraction' ? 'REFRACTION'
+      : path === 'colour-vision' ? 'COLOUR_VISION'
+        : path === 'eye-health' ? 'EYE_HEALTH'
+          : undefined;
+  if (ownerId && await getOfflineStationContext(ownerId, eventId, stationType, stationId)) {
+    const evaluation = await queueOfflineStationSave(
+      ownerId,
+      eventId,
+      stationId,
+      path,
+      body as ScreeningSavePayload<VisualAcuityResultData | RefractionResultData | ColourVisionResultData | EyeHealthResultData | DynamicResultData>,
+    );
+    return {
+      resultId: `offline:${body.idempotencyKey}`,
+      overallFlag: evaluation.overallFlag,
+      isFlagged: evaluation.isFlagged,
+      flagSummary: evaluation.flagSummary,
+      ruleVersion: evaluation.ruleVersion,
+      acknowledgedAt: body.acknowledged ? new Date().toISOString() : null,
+      resultData: body.resultData,
+      evaluation,
+      queued: true,
+      syncState: 'PENDING_SYNC' as const,
+    };
+  }
   try {
     const { data } = await apiClient.post(`/events/${eventId}/stations/${stationId}/${path}`, body);
     return { ...(data as Omit<ScreeningSaveResponse<T>, 'syncState'>), syncState: 'COMMITTED' as const };
   } catch (error) {
     if (!isNetworkError(error)) throw error;
-    const ownerId = getStoredSession()?.user.id;
     if (!ownerId) throw error;
     const evaluation = await queueOfflineStationSave(
       ownerId,
@@ -225,6 +262,9 @@ async function saveStation<T extends StationResultData>(
 
 export const screeningApi = {
   async listStations(eventId: string) {
+    const ownerId = getStoredSession()?.user.id;
+    const local = ownerId ? await getOfflineScreeningStations(ownerId, eventId) : null;
+    if (local) return local;
     const { data } = await apiClient.get<{
       event: { eventId: string; name: string; status: string; venue: string };
       stations: Station[];
@@ -233,6 +273,9 @@ export const screeningApi = {
   },
 
   async listQueue(eventId: string, stationId: string) {
+    const ownerId = getStoredSession()?.user.id;
+    const local = ownerId ? await getOfflineStationContext(ownerId, eventId, undefined, stationId) : null;
+    if (local) return { station: local.station, registrations: local.queue };
     const { data } = await apiClient.get<{
       station: Station;
       registrations: QueueRegistration[];

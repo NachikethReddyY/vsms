@@ -348,44 +348,81 @@ exports.searchParticipantsService = async (req) => {
 // ==========================================
 // Create Participant with Transaction (tx)
 // ==========================================
-exports.createParticipantService = async (req) => {
-    const data = validateParticipantPayload(req.body);
-    const participantId = crypto.randomUUID();
+const createParticipantInTransaction = async ({
+    tx,
+    participantId,
+    payload,
+    eventId,
+    userId,
+    context,
+}) => {
+    const data = validateParticipantPayload(payload);
     const { nric, ...participantData } = data;
     delete participantData.nricMasked;
+    const created = await tx.participant.create({
+        data: {
+            id: participantId,
+            ...participantData,
+            ...protectParticipantNric(participantId, nric),
+            participantReference: participantReference(),
+            createdById: userId,
+            updatedById: userId,
+            onboardingEventId: eventId,
+        },
+    });
+    await createAuditLog({
+        userId,
+        action: "PARTICIPANT_CREATED",
+        entityName: "Participant",
+        entityId: created.id,
+        newValue: { participantReference: created.participantReference, status: created.status },
+        context,
+        client: tx,
+    });
+    return created;
+};
+
+const createPrimaryEmergencyContactInTransaction = async ({ tx, participantId, payload, userId, context }) => {
+    const data = validateEmergencyContactPayload(payload);
+    const created = await tx.participantEmergencyContact.create({
+        data: {
+            ...data,
+            participantId,
+            isPrimary: true,
+            status: "ACTIVE",
+            createdById: userId,
+            updatedById: userId,
+        },
+    });
+    await createAuditLog({
+        userId,
+        action: "EMERGENCY_CONTACT_CREATED",
+        entityName: "ParticipantEmergencyContact",
+        entityId: created.id,
+        newValue: { participantId, isPrimary: true, status: "ACTIVE" },
+        context,
+        client: tx,
+    });
+    return created;
+};
+
+exports.createParticipantInTransaction = createParticipantInTransaction;
+exports.createPrimaryEmergencyContactInTransaction = createPrimaryEmergencyContactInTransaction;
+
+exports.createParticipantService = async (req) => {
+    const participantId = crypto.randomUUID();
     let participant;
 
     for (let attempt = 0; attempt < 5; attempt += 1) {
         try {
-            participant = await prisma.$transaction(async (tx) => {
-                const created = await tx.participant.create({
-                    data: {
-                        id: participantId,
-                        ...participantData,
-                        ...protectParticipantNric(participantId, nric),
-                        participantReference: participantReference(),
-                        createdById: req.auth.userId,
-                        updatedById: req.auth.userId,
-                        onboardingEventId: req.registrationEventId,
-                    },
-                });
-
-                // Passing 'tx' to the audit log ensures it rolls back if logging fails
-                await createAuditLog({
-                    userId: req.auth.userId,
-                    action: "PARTICIPANT_CREATED",
-                    entityName: "Participant",
-                    entityId: created.id,
-                    newValue: {
-                        participantReference: created.participantReference,
-                        status: created.status,
-                    },
-                    context: req.context,
-                    client: tx, 
-                });
-
-                return created;
-            });
+            participant = await prisma.$transaction((tx) => createParticipantInTransaction({
+                tx,
+                participantId,
+                payload: req.body,
+                eventId: req.registrationEventId,
+                userId: req.auth.userId,
+                context: req.context,
+            }));
             break;
         } catch (error) {
             // Retry if unique constraint violation occurs on participantReference

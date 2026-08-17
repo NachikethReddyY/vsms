@@ -27,10 +27,12 @@ export function AuthProvider({ children }: PropsWithChildren) {
       try {
         const restored = await refreshAuthSession();
         if (active) setSessionState(restored);
-      } catch {
-        setSessionTokens(null);
-        clearStoredSession();
-        if (active) setSessionState(null);
+      } catch (error) {
+        if ((error as { response?: unknown })?.response !== undefined) {
+          setSessionTokens(null);
+          clearStoredSession();
+          if (active) setSessionState(null);
+        }
       } finally {
         if (active) setIsBootstrapping(false);
       }
@@ -38,6 +40,16 @@ export function AuthProvider({ children }: PropsWithChildren) {
     void restore();
     return () => { active = false; };
   }, []);
+
+  useEffect(() => {
+    if (!session) return undefined;
+    const timer = window.setTimeout(() => {
+      setSessionTokens(null);
+      clearStoredSession();
+      setSessionState(null);
+    }, Math.max(0, session.expiresAt - Date.now()));
+    return () => window.clearTimeout(timer);
+  }, [session]);
 
   const value = useMemo<AuthContextValue>(
     () => ({

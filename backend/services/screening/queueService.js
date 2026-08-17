@@ -12,6 +12,27 @@ const ACTIVE_QUEUE_STATUSES = [
   "IN_PROGRESS",
 ];
 
+const inTransaction = (db, callback) => (
+  typeof db.$transaction === "function" ? db.$transaction(callback) : callback(db)
+);
+
+const updateQueueEntry = async (tx, queueId, expectedStatus, data) => {
+  if (!expectedStatus) return tx.queueEntry.update({ where: { id: queueId }, data });
+
+  const changed = await tx.queueEntry.updateMany({
+    where: { id: queueId, status: expectedStatus },
+    data,
+  });
+  if (changed.count !== 1) {
+    throw new AppError(
+      409,
+      "QUEUE_STATE_CONFLICT",
+      "Queue entry changed after it was saved on this device"
+    );
+  }
+  return tx.queueEntry.findUnique({ where: { id: queueId } });
+};
+
 const stationCapacity = (station, capacities) => Math.max(
   1,
   Number(capacities.get(station.stationId)) ||
@@ -1204,7 +1225,8 @@ const callQueueEntry = async (
   user,
   context = null,
   db = prisma,
-  expectedEventId = null
+  expectedEventId = null,
+  expectedStatus = null
 ) => {
   const entry = await loadQueueEntry(
     db,
@@ -1230,7 +1252,7 @@ const callQueueEntry = async (
     user
   );
 
-  return db.$transaction(async (tx) => {
+  return inTransaction(db, async (tx) => {
     const current =
       await tx.queueEntry.findUnique({
         where: {
@@ -1246,6 +1268,10 @@ const callQueueEntry = async (
       );
     }
 
+    if (expectedStatus && current.status !== expectedStatus) {
+      throw new AppError(409, "QUEUE_STATE_CONFLICT", "Queue entry changed after it was saved on this device");
+    }
+
     if (current.status !== "WAITING") {
       throw new AppError(
         409,
@@ -1257,17 +1283,10 @@ const callQueueEntry = async (
       );
     }
 
-    const updated =
-      await tx.queueEntry.update({
-        where: {
-          id: queueId,
-        },
-
-        data: {
+    const updated = await updateQueueEntry(tx, queueId, expectedStatus, {
           status: "CALLED",
           calledAt: new Date(),
-        },
-      });
+        });
 
     await createAuditLog({
       userId: user.userId,
@@ -1303,7 +1322,8 @@ const startQueueEntry = async (
   user,
   context = null,
   db = prisma,
-  expectedEventId = null
+  expectedEventId = null,
+  expectedStatus = null
 ) => {
   const entry = await loadQueueEntry(
     db,
@@ -1329,7 +1349,7 @@ const startQueueEntry = async (
     user
   );
 
-  return db.$transaction(async (tx) => {
+  return inTransaction(db, async (tx) => {
     const current =
       await tx.queueEntry.findUnique({
         where: {
@@ -1345,6 +1365,10 @@ const startQueueEntry = async (
       );
     }
 
+    if (expectedStatus && current.status !== expectedStatus) {
+      throw new AppError(409, "QUEUE_STATE_CONFLICT", "Queue entry changed after it was saved on this device");
+    }
+
     if (current.status !== "CALLED") {
       throw new AppError(
         409,
@@ -1356,17 +1380,10 @@ const startQueueEntry = async (
       );
     }
 
-    const updated =
-      await tx.queueEntry.update({
-        where: {
-          id: queueId,
-        },
-
-        data: {
+    const updated = await updateQueueEntry(tx, queueId, expectedStatus, {
           status: "IN_PROGRESS",
           startedAt: new Date(),
-        },
-      });
+        });
 
     await createAuditLog({
       userId: user.userId,
@@ -1733,7 +1750,8 @@ const skipQueueEntry = async (
   user,
   context = null,
   db = prisma,
-  expectedEventId = null
+  expectedEventId = null,
+  expectedStatus = null
 ) => {
   const entry = await loadQueueEntry(
     db,
@@ -1759,7 +1777,7 @@ const skipQueueEntry = async (
     user
   );
 
-  return db.$transaction(async (tx) => {
+  return inTransaction(db, async (tx) => {
     const current =
       await tx.queueEntry.findUnique({
         where: {
@@ -1773,6 +1791,10 @@ const skipQueueEntry = async (
         "QUEUE_ENTRY_NOT_FOUND",
         "Queue entry not found"
       );
+    }
+
+    if (expectedStatus && current.status !== expectedStatus) {
+      throw new AppError(409, "QUEUE_STATE_CONFLICT", "Queue entry changed after it was saved on this device");
     }
 
     if (
@@ -1790,17 +1812,10 @@ const skipQueueEntry = async (
       );
     }
 
-    const updated =
-      await tx.queueEntry.update({
-        where: {
-          id: queueId,
-        },
-
-        data: {
+    const updated = await updateQueueEntry(tx, queueId, expectedStatus, {
           status: "SKIPPED",
           leftQueueAt: new Date(),
-        },
-      });
+        });
 
     await createAuditLog({
       userId: user.userId,
@@ -1836,7 +1851,8 @@ const leaveQueue = async (
   user,
   context = null,
   db = prisma,
-  expectedEventId = null
+  expectedEventId = null,
+  expectedStatus = null
 ) => {
   const entry = await loadQueueEntry(
     db,
@@ -1862,7 +1878,7 @@ const leaveQueue = async (
     user
   );
 
-  return db.$transaction(async (tx) => {
+  return inTransaction(db, async (tx) => {
     const current =
       await tx.queueEntry.findUnique({
         where: {
@@ -1876,6 +1892,10 @@ const leaveQueue = async (
         "QUEUE_ENTRY_NOT_FOUND",
         "Queue entry not found"
       );
+    }
+
+    if (expectedStatus && current.status !== expectedStatus) {
+      throw new AppError(409, "QUEUE_STATE_CONFLICT", "Queue entry changed after it was saved on this device");
     }
 
     if (
@@ -1894,15 +1914,9 @@ const leaveQueue = async (
     }
 
     const updated =
-      await tx.queueEntry.update({
-        where: {
-          id: queueId,
-        },
-
-        data: {
+      await updateQueueEntry(tx, queueId, expectedStatus, {
           status: "CANCELLED",
           leftQueueAt: new Date(),
-        },
       });
 
     await createAuditLog({
@@ -1940,6 +1954,7 @@ const updatePriority = async (
     isPriority,
     notes = null,
     eventId = null,
+    expectedStatus = null,
   },
   user,
   context = null,
@@ -1974,7 +1989,7 @@ const updatePriority = async (
 
   await requireEventManager(entry.registration.eventId, user, { db });
 
-  return db.$transaction(async (tx) => {
+  return inTransaction(db, async (tx) => {
     const current =
       await tx.queueEntry.findUnique({
         where: {
@@ -1988,6 +2003,10 @@ const updatePriority = async (
         "QUEUE_ENTRY_NOT_FOUND",
         "Queue entry not found"
       );
+    }
+
+    if (expectedStatus && current.status !== expectedStatus) {
+      throw new AppError(409, "QUEUE_STATE_CONFLICT", "Queue entry changed after it was saved on this device");
     }
 
     if (
@@ -2007,19 +2026,12 @@ const updatePriority = async (
       );
     }
 
-    const updated =
-      await tx.queueEntry.update({
-        where: {
-          id: queueId,
-        },
-
-        data: {
+    const updated = await updateQueueEntry(tx, queueId, expectedStatus, {
           isPriority,
           priorityNotes: isPriority
             ? String(notes).trim()
             : null,
-        },
-      });
+        });
 
     await createAuditLog({
       userId: user.userId,
@@ -2055,6 +2067,40 @@ const updatePriority = async (
 
     return updated;
   });
+};
+
+const authorizeQueueSyncAction = async (eventId, action, user, db = prisma) => {
+  const entry = await loadQueueEntry(db, action.queueId);
+  if (entry.registration.eventId !== eventId) {
+    throw new AppError(404, "QUEUE_ENTRY_NOT_FOUND", "Queue entry not found for this event");
+  }
+
+  const authorization = action.type === "QUEUE_PRIORITY"
+    ? await requireEventManager(eventId, user, { db })
+    : await requireQueueStationOperation(db, eventId, entry.stationId, user);
+  if (authorization.event.status !== "IN_PROGRESS") {
+    throw new AppError(409, "EVENT_NOT_IN_PROGRESS", "Queue operations are available only while the event is in progress");
+  }
+  return entry;
+};
+
+const applySyncedQueueAction = async (eventId, action, user, context = null, db = prisma) => {
+  if (action.type === "QUEUE_PRIORITY") {
+    return updatePriority({
+      queueId: action.queueId,
+      eventId,
+      expectedStatus: action.expectedStatus,
+      ...action.payload,
+    }, user, context, db);
+  }
+
+  const handlers = {
+    QUEUE_CALL: callQueueEntry,
+    QUEUE_START: startQueueEntry,
+    QUEUE_SKIP: skipQueueEntry,
+    QUEUE_LEAVE: leaveQueue,
+  };
+  return handlers[action.type](action.queueId, user, context, db, eventId, action.expectedStatus);
 };
 
 /**
@@ -2291,5 +2337,7 @@ module.exports = {
   skipQueueEntry,
   leaveQueue,
   updatePriority,
+  authorizeQueueSyncAction,
+  applySyncedQueueAction,
   getStationWorkload,
 };

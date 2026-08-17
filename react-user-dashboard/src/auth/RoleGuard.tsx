@@ -3,6 +3,7 @@ import { Navigate, Outlet, useLocation, useParams } from "react-router-dom";
 import { getApiError } from "../utils/apiClient";
 import * as stage4Api from "../features/stage4Api";
 import { screeningApi, type StationType } from "../features/screening/screeningApi";
+import { getOfflineEventRoles, getOfflineStationContext, isNetworkError } from "../features/screening/offlineSync";
 import { useAuth } from "./AuthProvider";
 
 interface RoleGuardProps {
@@ -60,6 +61,14 @@ export function EventCapabilityGuard({ allowedRoles }: Pick<RoleGuardProps, "all
         setState("allowed");
         return;
       }
+      const checkOfflineAccess = async () => {
+        const ownerId = session?.user.id;
+        return Boolean(ownerId && (await getOfflineEventRoles(ownerId, eventId)).some((role) => allowedRoles.includes(role)));
+      };
+      if (!navigator.onLine) {
+        setState(await checkOfflineAccess() ? "allowed" : "forbidden");
+        return;
+      }
       const eventResult = await Promise.allSettled([stage4Api.getEvent(eventId), stage4Api.getCurrentAccount()]);
       if (!alive) return;
       const [eventAccess, accountAccess] = eventResult;
@@ -77,6 +86,10 @@ export function EventCapabilityGuard({ allowedRoles }: Pick<RoleGuardProps, "all
         }
       }
       if (eventAccess.status === "rejected") {
+        if (isNetworkError(eventAccess.reason) && await checkOfflineAccess()) {
+          setState("allowed");
+          return;
+        }
         setState(isNotFound(eventAccess.reason) ? "not-found" : "forbidden");
         return;
       }
@@ -98,17 +111,28 @@ export function EventCapabilityGuard({ allowedRoles }: Pick<RoleGuardProps, "all
 
 
 export function StationDutyGuard({ stationType }: { stationType: StationType }) {
+  const { session } = useAuth();
   const { eventId = "", stationId = "" } = useParams();
   const [state, setState] = useState<GuardState>("loading");
 
   useEffect(() => {
     let alive = true;
     async function check() {
+      const ownerId = session?.user.id;
       if (!eventId) {
         setState("forbidden");
         return;
       }
+      const checkOfflineDuty = async () => {
+        if (!ownerId) return false;
+        const context = await getOfflineStationContext(ownerId, eventId, stationType, stationType === "CUSTOM" ? stationId || undefined : undefined);
+        return Boolean(context?.station && context.station.isActive !== false);
+      };
       try {
+        if (!navigator.onLine) {
+          setState(await checkOfflineDuty() ? "allowed" : "forbidden");
+          return;
+        }
         const result = await screeningApi.listStations(eventId);
         if (!alive) return;
         setState(result.stations.some((station) => (
@@ -118,13 +142,21 @@ export function StationDutyGuard({ stationType }: { stationType: StationType }) 
         )) ? "allowed" : "forbidden");
       } catch (error) {
         if (!alive) return;
+        if (isNetworkError(error)) {
+          try {
+            setState(await checkOfflineDuty() ? "allowed" : "forbidden");
+          } catch {
+            setState("forbidden");
+          }
+          return;
+        }
         setState(isNotFound(error) ? "not-found" : "forbidden");
       }
     }
     setState("loading");
     void check();
     return () => { alive = false; };
-  }, [eventId, stationId, stationType]);
+  }, [eventId, session?.user.id, stationId, stationType]);
 
   if (state === "loading") return <div role="status" aria-live="polite">Checking station duty…</div>;
   if (state === "not-found") return <Navigate to="/not-found" replace />;

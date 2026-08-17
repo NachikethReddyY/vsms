@@ -1,4 +1,11 @@
 import apiClient from '../../utils/apiClient';
+import {
+  getOfflineParticipantRoute,
+  getOfflineQueueStatus,
+  queueOfflineQueueAction,
+  queueOfflineRouteOverride,
+} from '../screening/offlineSync';
+import { getStoredSession } from '../../utils/session';
 
 export type QueueStatus = 'WAITING' | 'CALLED' | 'IN_PROGRESS' | 'COMPLETED' | 'SKIPPED' | 'CANCELLED';
 
@@ -62,6 +69,7 @@ export type RegistrationRouteState = {
     position: number;
     state: 'COMPLETED' | 'CURRENT' | 'BLOCKED' | 'UPCOMING';
   }>;
+  currentStation: RegistrationRouteState['steps'][number] | null;
   queue: {
     queueEntryId: string;
     stationId: string;
@@ -72,21 +80,36 @@ export type RegistrationRouteState = {
 
 export const queueApi = {
   async getEventQueueStatus(eventId: string) {
+    const ownerId = getStoredSession()?.user.id;
+    const local = ownerId ? await getOfflineQueueStatus(ownerId, eventId) : null;
+    if (local) return local;
     const { data } = await apiClient.get<EventQueueStatus>(`/queues/events/${eventId}`);
     return data;
   },
 
   async getParticipantRoute(eventId: string, registrationId: string) {
+    const ownerId = getStoredSession()?.user.id;
+    const local = ownerId ? await getOfflineParticipantRoute(ownerId, eventId, registrationId) : null;
+    if (local) return local;
     const { data } = await apiClient.get<{ status: 'success'; data: RegistrationRouteState }>(`/queues/events/${eventId}/participants/${registrationId}/route`);
     return data.data;
   },
 
   async replaceParticipantRoute(eventId: string, registrationId: string, request: { stationIds: string[]; reasonCode: RouteOverrideReason; expectedVersion: number; skipActive?: boolean }) {
+    const ownerId = getStoredSession()?.user.id;
+    if (ownerId && await getOfflineParticipantRoute(ownerId, eventId, registrationId)) {
+      return queueOfflineRouteOverride(ownerId, eventId, registrationId, request);
+    }
     const { data } = await apiClient.patch<{ status: 'success'; data: RegistrationRouteState }>(`/queues/events/${eventId}/participants/${registrationId}/route`, request);
     return data.data;
   },
 
   async updatePriority(eventId: string, queueId: string, isPriority: boolean, notes: string | null) {
+    const ownerId = getStoredSession()?.user.id;
+    if (ownerId && await getOfflineQueueStatus(ownerId, eventId)) {
+      const entry = await queueOfflineQueueAction(ownerId, eventId, queueId, 'PRIORITY', { isPriority, notes });
+      return { id: entry.id, isPriority: entry.isPriority, priorityNotes: entry.priorityNotes ?? null };
+    }
     const { data } = await apiClient.patch<PriorityUpdateResult>(
       `/events/${eventId}/entries/${queueId}/priority`,
       { isPriority, ...(notes && notes.trim() ? { notes: notes.trim() } : {}) },
@@ -95,17 +118,38 @@ export const queueApi = {
   },
 
   async callQueueEntry(eventId: string, queueId: string) {
+    const ownerId = getStoredSession()?.user.id;
+    if (ownerId && await getOfflineQueueStatus(ownerId, eventId)) {
+      return queueOfflineQueueAction(ownerId, eventId, queueId, 'CALL');
+    }
     const { data } = await apiClient.patch<QueueEntry>(`/events/${eventId}/entries/${queueId}/call`);
     return data;
   },
 
   async startQueueEntry(eventId: string, queueId: string) {
+    const ownerId = getStoredSession()?.user.id;
+    if (ownerId && await getOfflineQueueStatus(ownerId, eventId)) {
+      return queueOfflineQueueAction(ownerId, eventId, queueId, 'START');
+    }
     const { data } = await apiClient.patch<QueueEntry>(`/events/${eventId}/entries/${queueId}/start`);
     return data;
   },
 
   async skipQueueEntry(eventId: string, queueId: string) {
+    const ownerId = getStoredSession()?.user.id;
+    if (ownerId && await getOfflineQueueStatus(ownerId, eventId)) {
+      return queueOfflineQueueAction(ownerId, eventId, queueId, 'SKIP');
+    }
     const { data } = await apiClient.patch<QueueEntry>(`/events/${eventId}/entries/${queueId}/skip`);
+    return data;
+  },
+
+  async leaveQueueEntry(eventId: string, queueId: string) {
+    const ownerId = getStoredSession()?.user.id;
+    if (ownerId && await getOfflineQueueStatus(ownerId, eventId)) {
+      return queueOfflineQueueAction(ownerId, eventId, queueId, 'LEAVE');
+    }
+    const { data } = await apiClient.delete<QueueEntry>(`/events/${eventId}/entries/${queueId}`);
     return data;
   },
 };

@@ -1,6 +1,8 @@
 import { ArrowLeftIcon, CheckCircleIcon, QrCodeIcon, ShieldCheckIcon } from "@heroicons/react/24/outline";
 import { useEffect, useState } from "react";
 import { Link, useParams, useSearchParams } from "react-router-dom";
+import { useAuth } from "../../auth/AuthProvider";
+import { getOfflineCanonicalRegistration, type OfflineCanonicalRegistration } from "../../features/screening/offlineSync";
 import type { Registration } from "../../types";
 import apiClient, { getApiError, newIdempotencyHeaders } from "../../utils/apiClient";
 import "./ParticipantPage.css";
@@ -11,26 +13,51 @@ export default function ParticipantQrPage() {
   const [searchParams] = useSearchParams();
   const eventId = searchParams.get("eventId") ?? "";
   const backLink = eventId ? `/events/${encodeURIComponent(eventId)}/register` : "/events";
+  const { session } = useAuth();
   const [registration, setRegistration] = useState<Registration | null>(null);
+  const [cachedRegistration, setCachedRegistration] = useState<OfflineCanonicalRegistration | null>(null);
   const [isLoadingRegistration, setIsLoadingRegistration] = useState(true);
   const [qrImage, setQrImage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     let active = true;
-    void Promise.all([
-      apiClient.get(`/registrations/${registrationId}`),
-      apiClient.post(`/qr/registrations/${registrationId}`, undefined, { headers: newIdempotencyHeaders() }),
-    ])
-      .then(([registrationResponse, qrResponse]) => {
+    setRegistration(null);
+    setCachedRegistration(null);
+    setQrImage(null);
+    setError(null);
+    setIsLoadingRegistration(true);
+    void (async () => {
+      const cached = session?.user.id && eventId
+        ? await getOfflineCanonicalRegistration(session.user.id, eventId, registrationId).catch(() => null)
+        : null;
+      if (!active) return;
+      if (cached) {
+        setCachedRegistration(cached);
+        setQrImage(cached.qrImage);
+      }
+      if (!navigator.onLine) {
+        if (!cached) setError("This canonical QR pass is not available on this device.");
+        return;
+      }
+
+      const canonicalRegistrationId = cached?.registrationId ?? registrationId;
+      try {
+        const [registrationResponse, qrResponse] = await Promise.all([
+          apiClient.get(`/registrations/${canonicalRegistrationId}`),
+          cached
+            ? Promise.resolve({ data: cached })
+            : apiClient.post(`/qr/registrations/${canonicalRegistrationId}`, undefined, { headers: newIdempotencyHeaders() }),
+        ]);
         if (!active) return;
         setRegistration(registrationResponse.data.registration);
         setQrImage(qrResponse.data.qrImage);
-      })
-      .catch((requestError: unknown) => { if (active) setError(getApiError(requestError, "Unable to create the QR pass.")); })
-      .finally(() => { if (active) setIsLoadingRegistration(false); });
+      } catch (requestError: unknown) {
+        if (active) setError(getApiError(requestError, cached ? "Participant details are unavailable while offline." : "Unable to create the QR pass."));
+      }
+    })().finally(() => { if (active) setIsLoadingRegistration(false); });
     return () => { active = false; };
-  }, [registrationId]);
+  }, [eventId, registrationId, session?.user.id]);
 
   return (
     <section className="participant-v2-page participant-qr-page" aria-labelledby="qr-pass-title">
@@ -45,8 +72,8 @@ export default function ParticipantQrPage() {
           <dl>
             <div><dt>Participant</dt><dd>{isLoadingRegistration ? "Loading..." : registration ? `${registration.participant.firstName} ${registration.participant.lastName}` : "Unavailable"}</dd></div>
             <div><dt>Participant reference</dt><dd>{registration?.participant.participantReference ?? "Unavailable"}</dd></div>
-            <div><dt>Event</dt><dd>{registration?.event.eventName ?? "Loading..."}</dd></div>
-            <div><dt>Queue number</dt><dd>{registration?.queueNumber == null ? "Not assigned" : `Q-${String(registration.queueNumber).padStart(3, "0")}`}</dd></div>
+            <div><dt>Event</dt><dd>{registration?.event.eventName ?? cachedRegistration?.eventName ?? "Loading..."}</dd></div>
+            <div><dt>Queue number</dt><dd>{(registration?.queueNumber ?? cachedRegistration?.queueNumber) == null ? "Not assigned" : `Q-${String(registration?.queueNumber ?? cachedRegistration?.queueNumber).padStart(3, "0")}`}</dd></div>
             <div><dt>Security</dt><dd><CheckCircleIcon /> Server-issued pass</dd></div>
           </dl>
         </div>

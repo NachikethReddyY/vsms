@@ -26,6 +26,7 @@ const {
   acknowledgeReferralHandoffBody,
   reviseReferralBody,
   screeningSyncBody,
+  syncOperationsBody,
 } = require("../schemas/screeningSchemas");
 
 const router = express.Router({ mergeParams: true });
@@ -36,6 +37,12 @@ router.post(
   "/:eventId/sync/screening",
   validate({ params: eventParams, body: screeningSyncBody }),
   asyncHandler(screeningController.syncScreening),
+);
+
+router.post(
+  "/:eventId/sync/operations",
+  validate({ params: eventParams, body: syncOperationsBody }),
+  asyncHandler(screeningController.syncOperations),
 );
 
 router.get(

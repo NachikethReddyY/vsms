@@ -1,10 +1,21 @@
 import apiClient from '../../utils/apiClient';
 import type { components } from '../../generated/api';
+import { getStoredSession } from '../../utils/session';
+import {
+  downloadOfflineEvent,
+  getOfflineReviewDetail,
+  getOfflineReviewQueue,
+  queueOfflineReviewDecision,
+} from '../screening/offlineSync';
 
 export type ReviewQueueResponse = components['schemas']['ReviewQueueResponse'];
 export type ReviewQueueItem = components['schemas']['ReviewQueueItem'];
 export type ReviewDetailResponse = components['schemas']['ReviewDetailResponse'];
 export type ReviewDecisionRequest = components['schemas']['ReviewDecisionRequest'];
+type ReviewSignatureFields = 'signatureObjectKey' | 'signatureSha256' | 'signatureMimeType';
+export type OfflineReviewDecision = ReviewDecisionRequest extends infer Decision
+  ? Decision extends ReviewDecisionRequest ? Omit<Decision, ReviewSignatureFields> : never
+  : never;
 export type ReviewDecisionResponse = components['schemas']['ReviewDecisionResponse'];
 export type ReviewOutcome = components['schemas']['ReviewOutcome'];
 export type OverallFlag = components['schemas']['OverallFlag'];
@@ -18,10 +29,16 @@ export type SignatureResponse = components['schemas']['SignatureResponse'];
 
 export const reviewApi = {
   async list(eventId: string) {
+    const ownerId = getStoredSession()?.user.id;
+    const local = ownerId ? await getOfflineReviewQueue(ownerId, eventId) : null;
+    if (local) return local;
     const { data } = await apiClient.get<ReviewQueueResponse>(`/events/${eventId}/reviews`);
     return data;
   },
   async get(eventId: string, registrationId: string) {
+    const ownerId = getStoredSession()?.user.id;
+    const local = ownerId ? await getOfflineReviewDetail(ownerId, eventId, registrationId) : null;
+    if (local) return local;
     const { data } = await apiClient.get<ReviewDetailResponse>(`/events/${eventId}/reviews/${registrationId}`);
     return data;
   },
@@ -29,9 +46,13 @@ export const reviewApi = {
     const { data } = await apiClient.post<{ registrationId: string }>(`/events/${eventId}/reviews/scan`, { passToken });
     return data;
   },
-  async decide(eventId: string, registrationId: string, decision: ReviewDecisionRequest) {
-    const { data } = await apiClient.post<ReviewDecisionResponse>(`/events/${eventId}/reviews/${registrationId}/decision`, decision);
-    return data;
+  async decide(eventId: string, registrationId: string, decision: OfflineReviewDecision, signatureDataUrl: string) {
+    const ownerId = getStoredSession()?.user.id;
+    if (!ownerId) throw new Error('Your session is unavailable. Sign in again before recording a review.');
+    if (!await getOfflineReviewDetail(ownerId, eventId, registrationId) && navigator.onLine) {
+      await downloadOfflineEvent(ownerId, eventId);
+    }
+    return queueOfflineReviewDecision(ownerId, eventId, registrationId, decision, signatureDataUrl);
   },
   async issueReferral(eventId: string, referralId: string, request: IssueReferralRequest) {
     const { data } = await apiClient.post<IssueReferralResponse>(`/events/${eventId}/referrals/${referralId}/issue`, request);

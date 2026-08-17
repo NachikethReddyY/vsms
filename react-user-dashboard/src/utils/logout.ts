@@ -1,5 +1,4 @@
 import apiClient from "./apiClient";
-import { clearOfflineData } from "../features/screening/offlineSync";
 
 export async function logoutAndReturnHome(clearSession: () => void) {
   clearSession();
@@ -9,10 +8,9 @@ export async function logoutAndReturnHome(clearSession: () => void) {
     const candidate = response.data.logoutUrl;
     if (candidate && new URL(candidate).protocol === "https:") logoutUrl = candidate;
   } catch {
-    // HttpOnly cookies can only be cleared by the server. Local and offline
-    // artifacts are still cleared before the secure fallback navigation.
+    // HttpOnly cookies can only be cleared by the server. The local auth state
+    // is already locked; encrypted offline work remains available after sign-in.
   } finally {
-    await clearOfflineData().catch(() => {});
     const landing = new URL("/", window.location.href);
     landing.protocol = "https:";
     window.location.replace(logoutUrl ?? landing.toString());

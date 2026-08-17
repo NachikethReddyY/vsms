@@ -176,7 +176,7 @@ export default function OperationsCenterPage() {
           {FILTERS.map((item) => <button key={item.value} type="button" role="radio" aria-checked={filter === item.value} onClick={() => setFilter(item.value)}>{item.label}</button>)}
         </div>
         <label className="operations-search"><MagnifyingGlassIcon aria-hidden="true" /><span className="sr-only">Search events or venues</span><input value={searchDraft} onChange={(event) => setSearchDraft(event.target.value)} placeholder="Search events or venues" /></label>
-        {overview && <span className="operations-updated" aria-live="polite"><SignalIcon aria-hidden="true" />{relativeUpdate(overview.generatedAt)}</span>}
+        {overview && <span className="operations-updated" aria-live="polite"><SignalIcon aria-hidden="true" />{overview.scope === 'DEVICE_LOCAL' ? 'This device · ' : ''}{relativeUpdate(overview.generatedAt)}</span>}
       </div>
 
       {summary && <section className="operations-summary" aria-label={`${scopeLabel} event summary`} aria-busy={refreshing}>

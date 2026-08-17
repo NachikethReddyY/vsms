@@ -218,6 +218,7 @@ const eligibleUsersQuery = z.object({
 }).strict();
 
 const eventParams = z.object({ eventId: uuid }).strict();
+const offlinePackHeaders = z.object({ "x-device-id": uuid }).passthrough();
 const listQuery = z.object({
   cursor: z.string().max(2048).optional(),
   limit: z.coerce.number().int().min(1).max(100).default(25),
@@ -369,6 +370,7 @@ module.exports = {
   cancelBody,
   deleteEventBody,
   eventParams,
+  offlinePackHeaders,
   listQuery,
   auditQuery,
   attendeeQuery,

@@ -12,6 +12,15 @@ exports.syncScreening = async (req, res) => {
   ));
 };
 
+exports.syncOperations = async (req, res) => {
+  res.json(await syncService.processSyncOperations(
+    req.params.eventId,
+    req.body,
+    req.user,
+    req.context,
+  ));
+};
+
 exports.listStations = async (req, res) => {
   res.json(await screeningService.listStations(req.params.eventId, req.user));
 };

@@ -3,7 +3,6 @@ import { useAuth } from '../../auth/AuthProvider';
 import { getStoredSession } from '../../utils/session';
 import {
   clearOfflineData,
-  discardOfflineConflicts,
   downloadOfflineEvent,
   getOfflineSyncStatus,
   listOfflineEventIds,
@@ -21,10 +20,12 @@ type EventSyncState = OfflineSyncStatus & {
 
 type OfflineSyncContextValue = {
   online: boolean;
+  autoSync: boolean;
+  setAutoSync: (enabled: boolean) => void;
   statusFor: (eventId: string) => EventSyncState;
   downloadEvent: (eventId: string) => Promise<void>;
   syncEvent: (eventId: string) => Promise<void>;
-  discardConflicts: (eventId: string) => Promise<void>;
+  clearDeviceData: () => Promise<void>;
   /** Download if missing, or refresh the snapshot when already present. Safe to call repeatedly. */
   ensureOfflineReady: (eventId: string, options?: { refreshIfPresent?: boolean }) => Promise<void>;
 };
@@ -33,13 +34,21 @@ const EMPTY_STATE: EventSyncState = {
   downloaded: false,
   pending: 0,
   conflicts: 0,
+  locked: 0,
   expiresAt: null,
+  snapshotBytes: null,
+  conflictCodes: [],
   downloading: false,
   syncing: false,
   error: null,
 };
 
 const OfflineSyncContext = createContext<OfflineSyncContextValue | undefined>(undefined);
+const AUTO_SYNC_KEY = 'vsms_offline_auto_sync';
+
+function storedAutoSync() {
+  try { return localStorage.getItem(AUTO_SYNC_KEY) !== 'false'; } catch { return true; }
+}
 
 function readableError(error: unknown, fallback: string) {
   return error instanceof Error && error.message ? error.message : fallback;
@@ -49,9 +58,15 @@ export function OfflineSyncProvider({ children }: PropsWithChildren) {
   const { session, isAuthenticated } = useAuth();
   const ownerId = isAuthenticated ? session?.user.id ?? null : null;
   const [online, setOnline] = useState(() => navigator.onLine);
+  const [autoSync, setAutoSyncState] = useState(storedAutoSync);
   const [states, setStates] = useState<Record<string, EventSyncState>>({});
-  const previousOwnerId = useRef<string | null>(null);
   const ensureInFlight = useRef(new Set<string>());
+  const syncInFlight = useRef(new Set<string>());
+
+  const setAutoSync = useCallback((enabled: boolean) => {
+    setAutoSyncState(enabled);
+    try { localStorage.setItem(AUTO_SYNC_KEY, String(enabled)); } catch { /* Manual sync remains available. */ }
+  }, []);
 
   const setEventState = useCallback((eventId: string, update: Partial<EventSyncState>) => {
     setStates((current) => ({
@@ -88,26 +103,27 @@ export function OfflineSyncProvider({ children }: PropsWithChildren) {
   }, [ownerId, setEventState]);
 
   const syncEvent = useCallback(async (eventId: string) => {
-    if (!ownerId || !navigator.onLine) return;
+    if (!ownerId || !navigator.onLine || syncInFlight.current.has(eventId)) return;
+    syncInFlight.current.add(eventId);
     setEventState(eventId, { syncing: true, error: null });
     try {
       const status = await syncOfflineEvent(ownerId, eventId);
       setEventState(eventId, {
         ...status,
-        error: status.expired ? 'Offline access expired and the local copy was removed.' : null,
+        error: status.expired ? 'Offline access expired. Encrypted unconfirmed work remains locked for supervised recovery.' : null,
       });
     } catch (error) {
       setEventState(eventId, { error: readableError(error, 'Could not sync offline results.') });
     } finally {
+      syncInFlight.current.delete(eventId);
       setEventState(eventId, { syncing: false });
     }
   }, [ownerId, setEventState]);
 
-  const discardConflicts = useCallback(async (eventId: string) => {
-    if (!ownerId) return;
-    const status = await discardOfflineConflicts(ownerId, eventId);
-    setEventState(eventId, { ...status, error: null });
-  }, [ownerId, setEventState]);
+  const clearDeviceData = useCallback(async () => {
+    await clearOfflineData();
+    setStates({});
+  }, []);
 
   const ensureOfflineReady = useCallback(async (
     eventId: string,
@@ -120,7 +136,7 @@ export function OfflineSyncProvider({ children }: PropsWithChildren) {
     try {
       const status = await getOfflineSyncStatus(ownerId, eventId);
       setEventState(eventId, { ...status, error: null });
-      if (status.downloaded && !options.refreshIfPresent) return;
+      if (status.downloaded && (!options.refreshIfPresent || status.pending > 0 || status.conflicts > 0)) return;
       await downloadEvent(eventId, { quiet: Boolean(status.downloaded && options.refreshIfPresent) });
     } catch (error) {
       setEventState(eventId, { error: readableError(error, 'Could not prepare the offline copy.') });
@@ -130,10 +146,7 @@ export function OfflineSyncProvider({ children }: PropsWithChildren) {
   }, [downloadEvent, ownerId, setEventState]);
 
   useEffect(() => {
-    const ownerChanged = previousOwnerId.current !== null && previousOwnerId.current !== ownerId;
-    previousOwnerId.current = ownerId;
     if (!ownerId) {
-      void clearOfflineData();
       setStates({});
       return undefined;
     }
@@ -147,7 +160,7 @@ export function OfflineSyncProvider({ children }: PropsWithChildren) {
     };
     const syncAll = async () => {
       await refreshAll();
-      if (!navigator.onLine || !active) return;
+      if (!navigator.onLine || !active || !autoSync) return;
       const eventIds = await listOfflineEventIds(ownerId);
       await Promise.all(eventIds.map((eventId) => syncEvent(eventId)));
     };
@@ -157,26 +170,15 @@ export function OfflineSyncProvider({ children }: PropsWithChildren) {
     };
     const goOffline = () => setOnline(false);
     const onVisibilityChange = () => {
-      if (document.visibilityState === 'visible') void refreshAll();
+      if (document.visibilityState === 'visible') void syncAll();
     };
-    const onOfflineChange = () => void refreshAll();
-    const initialise = async () => {
-      if (ownerChanged) {
-        await clearOfflineData();
-        if (!active) return;
-        setStates({});
-      }
-      await syncAll();
-    };
-    void initialise();
+    const onOfflineChange = () => void (autoSync && navigator.onLine ? syncAll() : refreshAll());
+    setStates({});
+    void syncAll();
     const expiryTimer = window.setInterval(() => {
       const storedSession = getStoredSession();
-      if (!storedSession || storedSession.user.id !== ownerId || (session?.expiresAt && session.expiresAt <= Date.now())) {
-        void clearOfflineData();
-        setStates({});
-        return;
-      }
-      void refreshAll();
+      if (!storedSession || storedSession.user.id !== ownerId || (session?.expiresAt && session.expiresAt <= Date.now())) return;
+      void (autoSync && navigator.onLine ? syncAll() : refreshAll());
     }, 60_000);
     window.addEventListener('online', goOnline);
     window.addEventListener('offline', goOffline);
@@ -190,18 +192,20 @@ export function OfflineSyncProvider({ children }: PropsWithChildren) {
       window.removeEventListener(offlineSyncChangeEvent, onOfflineChange);
       document.removeEventListener('visibilitychange', onVisibilityChange);
     };
-  }, [ownerId, refreshEvent, session?.expiresAt, syncEvent]);
+  }, [autoSync, ownerId, refreshEvent, session?.expiresAt, syncEvent]);
 
   const value = useMemo<OfflineSyncContextValue>(() => ({
     online,
+    autoSync,
+    setAutoSync,
     statusFor(eventId) {
       return states[eventId] ?? EMPTY_STATE;
     },
     downloadEvent,
     syncEvent,
-    discardConflicts,
+    clearDeviceData,
     ensureOfflineReady,
-  }), [discardConflicts, downloadEvent, ensureOfflineReady, online, states, syncEvent]);
+  }), [autoSync, clearDeviceData, downloadEvent, ensureOfflineReady, online, setAutoSync, states, syncEvent]);
 
   return <OfflineSyncContext.Provider value={value}>{children}</OfflineSyncContext.Provider>;
 }

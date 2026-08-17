@@ -1,8 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const { get, post, queueOfflineStationSave, resolveOfflineRegistration } = vi.hoisted(() => ({
+const { get, post, getOfflineScreeningStations, getOfflineStationContext, queueOfflineStationSave, resolveOfflineRegistration } = vi.hoisted(() => ({
   get: vi.fn(),
   post: vi.fn(),
+  getOfflineStationContext: vi.fn(),
+  getOfflineScreeningStations: vi.fn(),
   queueOfflineStationSave: vi.fn(),
   resolveOfflineRegistration: vi.fn(),
 }));
@@ -13,6 +15,8 @@ vi.mock('../../utils/session', () => ({
 }));
 vi.mock('./offlineSync', () => ({
   evaluateOfflineStation: vi.fn(),
+  getOfflineStationContext,
+  getOfflineScreeningStations,
   isNetworkError: (error: unknown) => (error as { code?: string })?.code === 'ERR_NETWORK',
   queueOfflineStationSave,
   resolveOfflineRegistration,
@@ -37,6 +41,10 @@ const body = {
 beforeEach(() => {
   get.mockReset();
   post.mockReset();
+  getOfflineStationContext.mockReset();
+  getOfflineStationContext.mockResolvedValue(null);
+  getOfflineScreeningStations.mockReset();
+  getOfflineScreeningStations.mockResolvedValue(null);
   queueOfflineStationSave.mockReset();
   resolveOfflineRegistration.mockReset();
 });
@@ -54,7 +62,7 @@ it('unwraps the queue response when resolving a participant pass', async () => {
 
 describe('screening save synchronization state', () => {
   it('marks an offline save pending without claiming route progression', async () => {
-    post.mockRejectedValueOnce(Object.assign(new Error('offline'), { code: 'ERR_NETWORK' }));
+    getOfflineStationContext.mockResolvedValueOnce({ station: { stationId } });
     queueOfflineStationSave.mockResolvedValueOnce({
       overallFlag: 'NORMAL',
       isFlagged: false,
@@ -68,6 +76,7 @@ describe('screening save synchronization state', () => {
     expect(saved).toMatchObject({ queued: true, syncState: 'PENDING_SYNC' });
     expect(saved.routeProgression).toBeUndefined();
     expect(queueOfflineStationSave).toHaveBeenCalledOnce();
+    expect(post).not.toHaveBeenCalled();
   });
 
   it('marks server progression committed only after the mutation succeeds', async () => {

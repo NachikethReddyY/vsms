@@ -9,6 +9,7 @@ import { QueueTable, toQueueItems, type QueueStatus } from "../components/queue/
 import { StationWorkload } from "../components/queue/StationWorkload";
 import { AppShell, LoadingState } from "../components/ui";
 import { queueApi, sortWaitingByPriority, type EventQueueStatus } from "../features/queue/queueApi";
+import { getOfflineEventRoles } from "../features/screening/offlineSync";
 import { getCurrentAccount, type AccountProfile } from "../features/stage4Api";
 import { getApiError, getApiErrorCode } from "../utils/apiClient";
 
@@ -45,9 +46,13 @@ export function QueuePage() {
       if (!active) return;
       const account = (result && typeof result === "object" && "account" in result ? result.account : result) as AccountProfile | undefined;
       setEventRoles(activeEventRoles(account?.eventMemberships || account?.memberships, eventId));
-    }).catch(() => { if (active) setEventRoles([]); });
+    }).catch(async () => {
+      if (!active) return;
+      const ownerId = session?.user.id;
+      setEventRoles(ownerId ? await getOfflineEventRoles(ownerId, eventId) : []);
+    });
     return () => { active = false; };
-  }, [eventId]);
+  }, [eventId, session?.user.id]);
 
   const fetchQueue = useCallback(async () => {
     if (!eventId) return;
@@ -102,12 +107,14 @@ export function QueuePage() {
     }
   };
 
-  const handleAction = (id: string, action: "CALLED" | "STARTED" | "SKIPPED") => {
+  const handleAction = (id: string, action: "CALLED" | "STARTED" | "SKIPPED" | "LEFT") => {
     if (!eventId) return;
+    if (action === "LEFT" && !window.confirm("Remove this participant from the queue? Their current queue place will be cancelled.")) return;
     const runners: Record<string, () => Promise<unknown>> = {
       CALLED: () => queueApi.callQueueEntry(eventId, id),
       STARTED: () => queueApi.startQueueEntry(eventId, id),
       SKIPPED: () => queueApi.skipQueueEntry(eventId, id),
+      LEFT: () => queueApi.leaveQueueEntry(eventId, id),
     };
     void runAction(id, runners[action]);
   };
