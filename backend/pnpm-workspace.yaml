@@ -5,6 +5,7 @@ allowBuilds:
   bcrypt: true
   prisma: true
 overrides:
+  deepmerge-ts: 8.0.0
   js-yaml: 4.3.1
 minimumReleaseAgeExclude:
   - '@aws-sdk/core@3.977.5'
