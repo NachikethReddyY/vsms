@@ -1272,6 +1272,35 @@ html[data-theme="light"] .events-workspace {
 
 @keyframes events-live-blink { 50% { opacity:.25; } }
 
+.events-page .events-offline-state {
+  min-height:22px;
+  display:inline-flex;
+  align-items:center;
+  flex:none;
+  gap:4px;
+  padding:0 8px;
+  border:1px solid var(--line);
+  border-radius:999px;
+  background:var(--surface-2);
+  color:var(--ink-2);
+  font-size:11px;
+  font-weight:700;
+  line-height:1;
+  pointer-events:auto;
+}
+.events-page .events-offline-state svg { width:14px; height:14px; }
+.events-page .events-offline-state.is-active { color:var(--status-assigned); }
+.events-page .events-offline-state.is-active svg { animation:workspace-sync-spin .9s linear infinite; }
+.events-page .events-offline-state.is-ready { color:var(--status-completed); }
+.events-page .events-offline-state.is-pending { color:var(--live); }
+.events-page .events-offline-state.is-error { color:var(--status-cancelled); }
+html[data-theme="light"] .events-page .events-offline-state.is-ready { color:color-mix(in srgb,var(--status-completed) 85%,var(--ink)); }
+html[data-theme="light"] .events-page .events-offline-state.is-pending { color:color-mix(in srgb,var(--live) 95%,var(--ink)); }
+.events-page button.events-offline-state { position:relative; }
+.events-page button.events-offline-state::after { content:""; position:absolute; inset:-11px; }
+.events-page button.events-offline-state:hover { border-color:currentColor; background:var(--card); }
+.events-page button.events-offline-state:focus-visible { outline:2px solid var(--muted-blue); outline-offset:2px; }
+
 .events-page .events-time-mobile { display:none; }
 
 .events-page .events-register-event h2 {
@@ -1461,6 +1490,9 @@ html[data-theme="light"] .events-workspace {
     text-overflow:ellipsis;
   }
 
+  .events-page .events-offline-state { width:22px; padding:0; justify-content:center; }
+  .events-page .events-offline-state-label { position:absolute; width:1px; height:1px; overflow:hidden; clip:rect(0,0,0,0); white-space:nowrap; }
+
   .events-page .events-register-event h2 {
     max-width:100%;
     display:-webkit-box;
@@ -1582,4 +1614,5 @@ html[data-theme="light"] .events-workspace {
   .events-page .events-period-tabs::before,
   .events-page .events-period-tabs button { transition:none; }
   .events-page .events-status-tag i { animation:none; }
+  .events-page .events-offline-state.is-active svg { animation:none; }
 }
