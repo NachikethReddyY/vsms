@@ -5,6 +5,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { getEventArtwork } from '../features/events/eventBanners';
 import { eventApi, type EventRecord, type EventStatus } from '../features/events/eventApi';
 import { getEventDisplayStatus, getEventScheduleDays, groupEventItemsByDate, sortEventItems } from '../features/events/eventDisplayStatus';
+import { useOfflineSync } from '../features/screening/OfflineSyncProvider';
 import { useAuth } from '../auth/AuthProvider';
 import { getApiError as getApiMessage } from '../utils/apiClient';
 import { Button } from './ui/button';
@@ -81,6 +82,7 @@ export default function EventsPage() {
   const [period, setPeriod] = useState<'upcoming' | 'past'>('upcoming');
   const [now, setNow] = useState(() => new Date());
   const { session } = useAuth();
+  const { online, ensureOfflineReady } = useOfflineSync();
   const user = session?.user;
   const navigate = useNavigate();
   const canCreate = user?.roles.includes('ADMINISTRATOR') ?? false;
@@ -98,6 +100,12 @@ export default function EventsPage() {
   }, []);
 
   useEffect(() => { void loadEvents(); }, [loadEvents]);
+  useEffect(() => {
+    if (!online || user?.roles.includes('ADMINISTRATOR')) return;
+    events
+      .filter((event) => event.status === 'IN_PROGRESS')
+      .forEach((event) => void ensureOfflineReady(event.eventId));
+  }, [ensureOfflineReady, events, online, user?.roles]);
   useEffect(() => {
     const clock = window.setInterval(() => setNow(new Date()), 60000);
     return () => window.clearInterval(clock);
