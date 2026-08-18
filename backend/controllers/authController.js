@@ -110,7 +110,7 @@ async function finalizeSuccessfulLogin(authResult, username, context, res) {
 
     return {
         expiresIn: authResult.ExpiresIn,
-        sessionExpiresIn: Number(process.env.REFRESH_COOKIE_MAX_AGE_SECONDS || 30 * 24 * 60 * 60),
+        sessionExpiresIn: env.REFRESH_COOKIE_MAX_AGE_SECONDS,
         user: publicUser(localUser, roles),
     };
 }
@@ -208,7 +208,7 @@ exports.refresh = asyncHandler(async (req, res) => {
         setAuthCookies(res, { ...authResult, RefreshToken: refreshToken }, username);
         res.json({
             expiresIn: authResult.ExpiresIn,
-            sessionExpiresIn: Number(process.env.REFRESH_COOKIE_MAX_AGE_SECONDS || 30 * 24 * 60 * 60),
+            sessionExpiresIn: env.REFRESH_COOKIE_MAX_AGE_SECONDS,
             user: publicUser(localUser, roles),
         });
     } catch (error) {
