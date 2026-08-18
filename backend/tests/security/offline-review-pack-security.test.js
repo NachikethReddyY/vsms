@@ -123,7 +123,7 @@ test("reviewer pack contains only actionable safe review projections", async () 
     isAdministrator: () => false,
     requireEventRoleAndDuty: async (_eventId, _user, role) => {
       assert.equal(role, "REVIEWER");
-      return { shiftId, assignmentRole: role };
+      return { duty: { shiftId, assignmentRole: role } };
     },
   };
 

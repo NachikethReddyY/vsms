@@ -260,7 +260,7 @@ const getOfflinePack = async (eventId, user, context, existingAuthorization, dep
   let reviewerEligibilityError = null;
   for (const role of DUTY_ROLES.filter((candidate) => authorization.roles.has(candidate))) {
     try {
-      const duty = await auth.requireEventRoleAndDuty(eventId, user, role);
+      const { duty } = await auth.requireEventRoleAndDuty(eventId, user, role);
       activeDuties.push({ role, duty });
     } catch (error) {
       if (error.code === "CURRENT_DUTY_REQUIRED") continue;

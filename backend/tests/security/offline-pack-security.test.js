@@ -163,7 +163,7 @@ test("screener pack is event-scoped, duty-capped, and strips forbidden queue and
     isAdministrator: () => false,
     requireEventRoleAndDuty: async (requestedEventId, _actor, role) => {
       calls.push(["duty", requestedEventId, role]);
-      return { shiftId, stationId, assignmentRole: role };
+      return { duty: { shiftId, stationId, assignmentRole: role } };
     },
   };
   const screening = {
@@ -369,7 +369,7 @@ test("registration duty gets only selectable station metadata and an event-scope
     requireEventRoleAndDuty: async (requestedEventId, _actor, role) => {
       assert.equal(requestedEventId, eventId);
       assert.equal(role, "REGISTRATION");
-      return { shiftId, assignmentRole: role };
+      return { duty: { shiftId, assignmentRole: role } };
     },
   };
   const queue = {
@@ -480,7 +480,7 @@ test("support duty can cache its queue but cannot receive route override state",
     isAdministrator: () => false,
     requireEventRoleAndDuty: async (_eventId, _actor, role) => {
       assert.equal(role, "SUPPORT");
-      return { shiftId, assignmentRole: role };
+      return { duty: { shiftId, assignmentRole: role } };
     },
   };
   const pack = await getOfflinePack(
