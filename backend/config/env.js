@@ -49,6 +49,7 @@ const schema = z.object({
   QR_ROTATION_INTERVAL_MINUTES: z.coerce.number().int().min(0).max(1440).default(0),
   REQUEST_BODY_LIMIT: z.string().regex(/^\d+(?:b|kb|mb)$/i, "must be a byte value such as 256kb").default("256kb"),
   AUTH_RATE_LIMIT: z.coerce.number().int().min(1).max(10000).default(5),
+  REFRESH_COOKIE_MAX_AGE_SECONDS: z.coerce.number().int().min(3600).max(7 * 24 * 60 * 60).default(24 * 60 * 60),
   REDIS_URL: optionalEnv(z.string().url()),
   RATE_LIMIT_STORE: z.enum(["auto", "memory", "redis"]).default("auto"),
   PUBLIC_SIGNUP_ENABLED: z.enum(["true", "false"]).default("false"),

@@ -38,7 +38,7 @@ export function CognitoCallback() {
         setSessionTokens(response.data);
         setSession({
           user: response.data.user,
-          expiresAt: Date.now() + Number(response.data.sessionExpiresIn || 2_592_000) * 1000,
+          expiresAt: Date.now() + Number(response.data.sessionExpiresIn || 86_400) * 1000,
         });
         navigate(response.data.returnTo || "/events", { replace: true });
       })

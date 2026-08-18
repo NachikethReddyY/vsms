@@ -106,7 +106,7 @@ async function rotateSession(): Promise<AuthSession> {
   setSessionTokens(response.data);
   const session = {
     user: response.data.user,
-    expiresAt: Date.now() + Number(response.data.sessionExpiresIn || 604_800) * 1000,
+    expiresAt: Date.now() + Number(response.data.sessionExpiresIn || 86_400) * 1000,
   };
   setStoredSession(session);
   return session;

@@ -3,6 +3,7 @@ const test = require("node:test");
 const request = require("supertest");
 
 process.env.DATABASE_URL ||= "postgresql://test:test@localhost:5432/vsms_test";
+delete process.env.REFRESH_COOKIE_MAX_AGE_SECONDS;
 
 Object.assign(process.env, {
     COGNITO_REGION: "us-east-1",
@@ -229,6 +230,16 @@ test(
         );
 
         assert.equal(response.status, 200);
+
+        assert.equal(response.body.sessionExpiresIn, 24 * 60 * 60);
+
+        assert.ok(
+            response.headers["set-cookie"].some(
+                (cookie) =>
+                    cookie.startsWith("vsms_refresh=") &&
+                    cookie.includes("Max-Age=86400")
+            )
+        );
 
         assert.equal(
             response.body.returnTo,

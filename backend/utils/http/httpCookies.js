@@ -1,4 +1,5 @@
 const crypto = require("crypto");
+const env = require("../../config/env");
 
 const ACCESS_COOKIE = "vsms_access";
 const REFRESH_COOKIE = "vsms_refresh";
@@ -44,7 +45,7 @@ function appendCookies(res, cookies) {
 
 function setAuthCookies(res, authenticationResult, username) {
     const accessMaxAge = Number(authenticationResult.ExpiresIn || 3600);
-    const refreshMaxAge = Number(process.env.REFRESH_COOKIE_MAX_AGE_SECONDS || 30 * 24 * 60 * 60);
+    const refreshMaxAge = env.REFRESH_COOKIE_MAX_AGE_SECONDS;
     const csrfToken = crypto.randomBytes(32).toString("base64url");
     const cookies = [
         cookie(ACCESS_COOKIE, authenticationResult.AccessToken, accessMaxAge),

@@ -20,7 +20,7 @@ export function AuthProvider({ children }: PropsWithChildren) {
   useEffect(() => {
     let active = true;
     const restore = async () => {
-      if (!getCsrfToken() || isLogoutPending()) {
+      if (window.location.pathname === "/auth/callback" || !getCsrfToken() || isLogoutPending()) {
         if (active) setIsBootstrapping(false);
         return;
       }
@@ -43,11 +43,18 @@ export function AuthProvider({ children }: PropsWithChildren) {
 
   useEffect(() => {
     if (!session) return undefined;
-    const timer = window.setTimeout(() => {
+    let timer: number;
+    const expire = () => {
+      const remaining = session.expiresAt - Date.now();
+      if (remaining > 0) {
+        timer = window.setTimeout(expire, Math.min(remaining, 2_147_483_647));
+        return;
+      }
       setSessionTokens(null);
       clearStoredSession();
       setSessionState(null);
-    }, Math.max(0, session.expiresAt - Date.now()));
+    };
+    timer = window.setTimeout(expire, Math.min(Math.max(0, session.expiresAt - Date.now()), 2_147_483_647));
     return () => window.clearTimeout(timer);
   }, [session]);
 
