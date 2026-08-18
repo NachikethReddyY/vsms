@@ -1,10 +1,11 @@
-import { MagnifyingGlassIcon, MapPinIcon, PlusIcon, UsersIcon } from '@heroicons/react/24/outline';
+import { ArrowDownTrayIcon, ArrowPathIcon, CheckCircleIcon, ExclamationTriangleIcon, MagnifyingGlassIcon, MapPinIcon, PlusIcon, UsersIcon } from '@heroicons/react/24/outline';
 import { SegmentedControl } from '@astryxdesign/core';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useId, useMemo, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { getEventArtwork } from '../features/events/eventBanners';
 import { eventApi, type EventRecord, type EventStatus } from '../features/events/eventApi';
 import { getEventDisplayStatus, getEventScheduleDays, groupEventItemsByDate, sortEventItems } from '../features/events/eventDisplayStatus';
+import { useOfflineSync } from '../features/screening/OfflineSyncProvider';
 import { useAuth } from '../auth/AuthProvider';
 import { getApiError as getApiMessage } from '../utils/apiClient';
 import { Button } from './ui/button';
@@ -73,6 +74,37 @@ function toEventItem(event: EventRecord, scheduleDay: { startsAt: string; endsAt
   };
 }
 
+function EventOfflineState({ eventId }: { eventId: string }) {
+  const { online, statusFor, downloadEvent, syncEvent } = useOfflineSync();
+  const status = statusFor(eventId);
+  const errorId = useId();
+  const state = status.downloading
+    ? { label: 'Preparing offline', kind: 'active', Icon: ArrowDownTrayIcon }
+    : status.syncing
+      ? { label: 'Syncing', kind: 'active', Icon: ArrowPathIcon }
+      : status.conflicts > 0
+        ? { label: `${status.conflicts} sync conflict${status.conflicts === 1 ? '' : 's'}`, kind: 'error', Icon: ExclamationTriangleIcon }
+        : status.locked > 0
+          ? { label: `${status.locked} locked for recovery`, kind: 'error', Icon: ExclamationTriangleIcon }
+        : status.error
+          ? { label: online ? status.downloaded ? 'Retry sync' : 'Retry offline download' : status.downloaded ? 'Sync paused offline' : 'Not saved offline', kind: online ? 'error' : 'unavailable', Icon: ExclamationTriangleIcon }
+          : status.pending > 0
+            ? { label: `${status.pending} waiting to sync`, kind: 'pending', Icon: ArrowPathIcon }
+            : status.downloaded
+              ? { label: 'Offline ready', kind: 'ready', Icon: CheckCircleIcon }
+              : !online
+                ? { label: 'Not saved offline', kind: 'unavailable', Icon: ExclamationTriangleIcon }
+                : { label: 'Preparing offline', kind: 'active', Icon: ArrowDownTrayIcon };
+  const content = <><state.Icon aria-hidden="true" /><span className="events-offline-state-label">{state.label}</span></>;
+  const error = status.error ? <span className="sr-only" id={errorId} role="status" aria-live="polite">{status.error}</span> : null;
+  const canRetry = Boolean(status.error && online && !status.downloading && !status.syncing && status.conflicts === 0 && status.locked === 0);
+
+  if (canRetry) {
+    return <><button type="button" className={`events-offline-state is-${state.kind}`} aria-describedby={errorId} onClick={() => void (status.downloaded ? syncEvent(eventId) : downloadEvent(eventId))}>{content}</button>{error}</>;
+  }
+  return <><span className={`events-offline-state is-${state.kind}`} role="status" aria-live="polite" aria-describedby={status.error ? errorId : undefined} title={state.label}>{content}</span>{error}</>;
+}
+
 export default function EventsPage() {
   const [events, setEvents] = useState<EventRecord[]>([]);
   const [loading, setLoading] = useState(true);
@@ -81,6 +113,7 @@ export default function EventsPage() {
   const [period, setPeriod] = useState<'upcoming' | 'past'>('upcoming');
   const [now, setNow] = useState(() => new Date());
   const { session } = useAuth();
+  const { online, ensureOfflineReady } = useOfflineSync();
   const user = session?.user;
   const navigate = useNavigate();
   const canCreate = user?.roles.includes('ADMINISTRATOR') ?? false;
@@ -98,6 +131,12 @@ export default function EventsPage() {
   }, []);
 
   useEffect(() => { void loadEvents(); }, [loadEvents]);
+  useEffect(() => {
+    if (!online || user?.roles.includes('ADMINISTRATOR')) return;
+    events
+      .filter((event) => event.status === 'IN_PROGRESS' && Date.parse(event.endsAt) > Date.now())
+      .forEach((event) => void ensureOfflineReady(event.eventId));
+  }, [ensureOfflineReady, events, online, user?.roles]);
   useEffect(() => {
     const clock = window.setInterval(() => setNow(new Date()), 60000);
     return () => window.clearInterval(clock);
@@ -158,6 +197,7 @@ export default function EventsPage() {
                   <div className="events-register-event">
                     <div className="events-event-time">
                       <span className={`events-status-tag status-${event.statusKey.toLowerCase()}`}><i aria-hidden="true" />{event.status}</span>
+                      {event.statusKey === 'IN_PROGRESS' && !canCreate ? <EventOfflineState eventId={event.eventId} /> : null}
                       <time className="events-time-desktop">{event.time}</time>
                       <time className="events-time-mobile">{event.date === 'Today' ? event.time : `${event.date}, ${event.time}`}</time>
                     </div>

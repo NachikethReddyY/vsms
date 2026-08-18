@@ -77,7 +77,7 @@ describe('offline capability lease', () => {
     await expect(verifyOfflineEventPackLease(changedContent, ownerId, eventId, deviceId)).rejects.toThrow(/integrity/i);
 
     const changedSignature = structuredClone(pack);
-    changedSignature.lease.signature = `${changedSignature.lease.signature.slice(0, -1)}${changedSignature.lease.signature.endsWith('A') ? 'B' : 'A'}`;
+    changedSignature.lease.signature = `${changedSignature.lease.signature.startsWith('A') ? 'B' : 'A'}${changedSignature.lease.signature.slice(1)}`;
     await expect(verifyOfflineEventPackLease(changedSignature, ownerId, eventId, deviceId)).rejects.toThrow(/signature is invalid/i);
 
     vi.stubEnv('VITE_OFFLINE_LEASE_KEY_ID', 'untrusted');

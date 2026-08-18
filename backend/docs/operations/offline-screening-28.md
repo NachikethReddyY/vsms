@@ -20,7 +20,7 @@ Global account administration, Cognito changes, destructive event deletion, audi
 
 ## Staff flow
 
-1. While connected, open an assigned event. VSMS downloads the role- and duty-scoped pack and shows `Offline ready` only after signature verification and one encrypted IndexedDB transaction complete.
+1. While connected, visit the event list or open an assigned event. VSMS prepares each running event's role- and duty-scoped pack and shows `Offline ready` only after signature verification and one encrypted IndexedDB transaction complete.
 2. Disconnect, reload, or reopen a protected event route. The valid stored session and signed lease unlock only that user's downloaded scope.
 3. Work normally. Each mutation updates the encrypted read model and appends its typed command atomically. The UI reports `Saved on this device` until the server confirms it.
 4. Choose automatic sync or manual end-of-event sync. Automatic mode runs on save, reconnect, foreground activity, and the bounded retry timer. Manual mode sends only when the user selects `Sync now`.
